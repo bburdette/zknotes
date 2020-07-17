@@ -1,6 +1,6 @@
 use rusqlite::{params, Connection};
 use serde_json;
-use std::collections::{BTreeMap};
+use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::error::Error;
 use std::path::Path;
@@ -11,6 +11,94 @@ pub struct PdfInfo {
   pub last_read: Option<i64>,
   pub filename: String,
   pub state: Option<serde_json::Value>,
+}
+
+pub fn addUser(dbfile: &Path, name: &str, hashwd: &str) -> Result<(), Box<dyn Error>> {
+  let conn = Connection::open(dbfile)?;
+
+  // create date
+  let nowsecs = SystemTime::now()
+    .duration_since(SystemTime::UNIX_EPOCH)
+    .map(|n| n.as_secs())?;
+  let s: i64 = nowsecs.try_into()?;
+  let nowi64secs = s * 1000;
+
+  println!("adding user: {}", name);
+  conn.execute(
+    "INSERT INTO user (name, hashwd, createdate)
+                VALUES (?1, ?2, ?3)",
+    params![name, hashwd, nowi64secs],
+  )?;
+
+  Ok(())
+}
+
+pub fn add_tag(dbfile: &Path, name: &str, user: i64) -> Result<(), Box<dyn Error>> {
+  let conn = Connection::open(dbfile)?;
+
+  println!("adding user: {}", name);
+  conn.execute(
+    "INSERT INTO tag (name, user)
+                VALUES (?1, ?2)",
+    params![name, user],
+  )?;
+
+  Ok(())
+}
+
+pub fn dbinit(dbfile: &Path) -> rusqlite::Result<()> {
+  let conn = Connection::open(dbfile)?;
+
+  println!("pre user");
+  // create the pdfinfo table.
+  conn.execute(
+    "CREATE TABLE user (
+                id          INTEGER NOT NULL PRIMARY KEY,
+                name        TEXT NOT NULL UNIQUE,
+                hashwd      TEXT NOT NULL,
+                createdate  INTEGER NOT NULL
+                )",
+    params![],
+  )?;
+
+  println!("pre tag");
+  conn.execute(
+    "CREATE TABLE tag (
+                id          INTEGER NOT NULL PRIMARY KEY,
+                name        TEXT NOT NULL UNIQUE,
+                user				INTEGER NOT NULL,
+                FOREIGN KEY(user) REFERENCES user(id)
+                )",
+    params![],
+  )?;
+
+  println!("pre be");
+  conn.execute(
+    "CREATE TABLE blogentry (
+                id          	INTEGER NOT NULL PRIMARY KEY,
+                title					TEXT NOT NULL,
+                content 			TEXT NOT NULL,
+                user 					INTEGER NOT NULL,
+                createdate 		INTEGER NOT NULL,
+                changeddate 	INTEGER NOT NULL,
+                FOREIGN KEY(user) REFERENCES user(id)
+                )",
+    params![],
+  )?;
+
+  println!("pre bt");
+  conn.execute(
+    "CREATE TABLE blogtag (
+                tagid     		   INTEGER NOT NULL,
+                blogentryid      INTEGER NOT NULL,
+                FOREIGN KEY(tagid) REFERENCES tag(id),
+                FOREIGN KEY(blogentryid) REFERENCES blogentry(id),
+                CONSTRAINT unq UNIQUE (tagid, blodentryid)
+                )",
+    params![],
+  )?;
+
+  Ok(())
 }
 
 pub fn pdflist(dbfile: &Path) -> rusqlite::Result<Vec<PdfInfo>> {
@@ -43,30 +131,35 @@ pub fn pdflist(dbfile: &Path) -> rusqlite::Result<Vec<PdfInfo>> {
   Ok(pv)
 }
 
-pub fn dbinit(dbfile: &Path) -> rusqlite::Result<()> {
+/*
+pub fn pdflist(dbfile: &Path) -> rusqlite::Result<Vec<PdfInfo>> {
   let conn = Connection::open(dbfile)?;
 
-  // create the pdfinfo table.
-  println!(
-    "pdfinfo create: {:?}",
-    conn.execute(
-      "CREATE TABLE pdfinfo (
-                  name            TEXT NOT NULL PRIMARY KEY,
-                  last_read       INTEGER,
-                  persistentState BLOB,
-                  notes           TEXT NOT NULL
-                  )",
-      params![],
-    )?
-  );
-  conn.execute(
-    "CREATE TABLE uistate (
-                id          INTEGER NOT NULL PRIMARY KEY,
-                state       TEXT NOT NULL
-                )",
-    params![],
-  )?;
-  Ok(())
+  let mut pstmt = conn.prepare("SELECT name, last_read, persistentState FROM pdfinfo")?;
+  let pdfinfo_iter = pstmt.query_map(params![], |row| {
+    let ss: Option<String> = row.get(2)?;
+    // we don't get the json parse error if there is one!
+    let state: Option<serde_json::Value> = ss.and_then(|s| serde_json::from_str(s.as_str()).ok());
+
+    Ok(PdfInfo {
+      filename: row.get(0)?,
+      last_read: row.get(1)?,
+      state: state,
+    })
+  })?;
+
+  let mut pv = Vec::new();
+
+  for rspdfinfo in pdfinfo_iter {
+    match rspdfinfo {
+      Ok(pdfinfo) => {
+        pv.push(pdfinfo);
+      }
+      Err(_) => (),
+    }
+  }
+
+  Ok(pv)
 }
 
 // create entries in the db for pdfs that aren't in there yet.
@@ -256,3 +349,5 @@ pub fn pdfscan(pdfdir: &str) -> Result<std::vec::Vec<PdfInfo>, Box<dyn Error>> {
 
   Ok(v)
 }
+
+*/

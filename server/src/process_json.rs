@@ -6,8 +6,8 @@ use sqldata;
 use sqldata::PdfInfo;
 use std::error::Error;
 use std::fs::File;
-use std::io::{ Write};
-use std::path::{Path};
+use std::io::Write;
+use std::path::Path;
 
 #[derive(Deserialize, Debug)]
 pub struct PublicMessage {
@@ -67,6 +67,7 @@ pub fn public_interface(
 ) -> Result<Option<ServerResponse>, Box<dyn Error>> {
   let pdbp = Path::new(&pdfdb);
   match msg.what.as_str() {
+    /*
     "getfilelist" => {
       // get db record info for all pdfs in the pdf dir.
 
@@ -214,7 +215,7 @@ pub fn public_interface(
         what: "laststatesaved".to_string(),
         content: serde_json::Value::Null,
       }))
-    }
+    } */
     // error for unsupported whats
     wat => bail!(format!("invalid 'what' code:'{}'", wat)),
   }

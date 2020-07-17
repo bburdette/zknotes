@@ -33,6 +33,7 @@ use actix_web::{
 };
 use futures::future::Future;
 use process_json::{PublicMessage, ServerResponse};
+use std::error::Error;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::SystemTime;
@@ -162,7 +163,8 @@ fn main() {
     Ok(_) => (),
   }
 }
-fn err_main() -> Result<(), std::io::Error> {
+
+fn err_main() -> Result<(), Box<dyn Error>> {
   env_logger::init();
 
   info!("server init!");
@@ -172,30 +174,27 @@ fn err_main() -> Result<(), std::io::Error> {
   let pdfdbp = Path::new(&config.pdfdb);
 
   if !pdfdbp.exists() {
-    sqldata::dbinit(pdfdbp);
+    sqldata::dbinit(pdfdbp)?;
   }
 
-  if config.createdirs {
-    std::fs::create_dir_all(config.pdfdir.clone())?;
-  } else {
-    if !Path::new(&config.pdfdir).exists() {
-      Err(std::io::Error::new(
-        std::io::ErrorKind::NotFound,
-        "pdfdir not found!",
-      ))?
-    }
-  }
+  // if config.createdirs {
+  //   std::fs::create_dir_all(config.pdfdir.clone())?;
+  // } else {
+  //   if !Path::new(&config.pdfdir).exists() {
+  //     Err(std::io::Error::new(
+  //       std::io::ErrorKind::NotFound,
+  //       "pdfdir not found!",
+  //     ))?
+  //   }
+  // }
 
   println!("config: {:?}", config);
 
+  Ok(())
+
   // let sys = actix_rt::System::new("pdf-server");
 
-  let nf = NamedFile::open("/home/bburdette/papers/7Sketches2.pdf");
-  match nf {
-    Ok(_) => println!("ef: "),
-    Err(e) => println!("err: {}", e),
-  }
-
+  /*
   let c = web::Data::new(config.clone());
   HttpServer::new(move || {
     App::new()
@@ -212,9 +211,10 @@ fn err_main() -> Result<(), std::io::Error> {
           )
           .route(web::post().to(public)),
       )
-      .service(actix_files::Files::new("/pdfs", c.pdfdir.as_str()))
+      // .service(actix_files::Files::new("/pdfs", c.pdfdir.as_str()))
       .service(actix_files::Files::new("/", "static/"))
   })
   .bind(format!("{}:{}", config.ip, config.port))?
   .run()
+  */
 }
