@@ -159,7 +159,7 @@ view size model =
 
 loginView : Model -> Element Msg
 loginView model =
-    column [ spacing 5, width fill, Background.color (Common.navbarColor 1) ]
+    column [ spacing 5, width fill, padding 10, Background.color (Common.navbarColor 1) ]
         [ text "welcome to Practica!  log in below:"
         , Input.text [ width fill ]
             { onChange = IdUpdate

@@ -1,0 +1,40 @@
+<!DOCTYPE HTML>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Main</title>
+    <meta name="viewport" content="width=device-width">
+    <style>html,head,body { padding:0; margin:0; } 
+      body { font-family: calibri, helvetica, arial, sans-serif; }</style>
+    <script type="text/javascript" src="/main.js"></script>
+  </head>
+  <body>
+    <div id="elm"></div> 
+    <script type="text/javascript">
+      function storeVal( [name, val] ) { 
+        localStorage.setItem(name, val); 
+        console.log("js storeVal storing " + name + ", " + val);
+      }
+
+      function getVal( [forstr, name] ) { 
+        console.log("js getVal getting " + name + "," + localStorage.getItem(name) + " for " + forstr);
+        app.ports.localVal.send([forstr, name,localStorage.getItem(name)]); 
+      }
+
+      function clearStorage () {
+        console.log("clearstorage");
+        localStorage.clear();
+      }
+      app = Elm.Main.init({
+        node: document.getElementById('elm'),
+        flags: { seed : Math.floor(Math.random()*0x0FFFFFFF), 
+                 location : document.location.origin || "", 
+                 useragent : navigator.userAgent, 
+                 debugstring : "initial-info", 
+                 width : window.innerWidth, 
+                 height : window.innerHeight }});
+      app.ports.storeLocalVal.subscribe(storeVal);
+      app.ports.getLocalVal.subscribe(getVal);
+    </script>
+  </body>
+</html>

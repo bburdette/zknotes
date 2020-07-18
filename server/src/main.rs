@@ -190,11 +190,8 @@ fn err_main() -> Result<(), Box<dyn Error>> {
 
   println!("config: {:?}", config);
 
-  Ok(())
-
   // let sys = actix_rt::System::new("pdf-server");
 
-  /*
   let c = web::Data::new(config.clone());
   HttpServer::new(move || {
     App::new()
@@ -215,6 +212,7 @@ fn err_main() -> Result<(), Box<dyn Error>> {
       .service(actix_files::Files::new("/", "static/"))
   })
   .bind(format!("{}:{}", config.ip, config.port))?
-  .run()
-  */
+  .run()?;
+
+  Ok(())
 }
