@@ -14,10 +14,19 @@ pub struct PdfInfo {
 }
 
 #[derive(Serialize, Debug, Clone)]
-pub struct ReadBlogEntry {
+pub struct FullBlogEntry {
   id: i64,
   title: String,
   content: String,
+  user: i64,
+  createdate: i64,
+  changeddate: i64,
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub struct BlogListEntry {
+  id: i64,
+  title: String,
   user: i64,
   createdate: i64,
   changeddate: i64,
@@ -160,7 +169,7 @@ pub fn update_blogentry(dbfile: &Path, entry: &UpdateBlogEntry) -> Result<(), Bo
   Ok(())
 }
 
-pub fn read_blogentry(dbfile: &Path, id: i64) -> Result<ReadBlogEntry, Box<dyn Error>> {
+pub fn read_blogentry(dbfile: &Path, id: i64) -> Result<FullBlogEntry, Box<dyn Error>> {
   let conn = Connection::open(dbfile)?;
 
   let rbe = conn.query_row(
@@ -168,7 +177,7 @@ pub fn read_blogentry(dbfile: &Path, id: i64) -> Result<ReadBlogEntry, Box<dyn E
       from blogentry WHERE id = ?1",
     params![id],
     |row| {
-      Ok(ReadBlogEntry {
+      Ok(FullBlogEntry {
         id: id,
         title: row.get(0)?,
         content: row.get(1)?,
@@ -182,19 +191,21 @@ pub fn read_blogentry(dbfile: &Path, id: i64) -> Result<ReadBlogEntry, Box<dyn E
   Ok(rbe)
 }
 
-pub fn pdflist(dbfile: &Path) -> rusqlite::Result<Vec<PdfInfo>> {
+pub fn bloglisting(dbfile: &Path, user: i64) -> rusqlite::Result<Vec<BlogListEntry>> {
   let conn = Connection::open(dbfile)?;
 
-  let mut pstmt = conn.prepare("SELECT name, last_read, persistentState FROM pdfinfo")?;
-  let pdfinfo_iter = pstmt.query_map(params![], |row| {
-    let ss: Option<String> = row.get(2)?;
-    // we don't get the json parse error if there is one!
-    let state: Option<serde_json::Value> = ss.and_then(|s| serde_json::from_str(s.as_str()).ok());
+  let mut pstmt = conn.prepare(
+    "SELECT id, title, createdate, changeddate
+      from blogentry where user = ?1",
+  )?;
 
-    Ok(PdfInfo {
-      filename: row.get(0)?,
-      last_read: row.get(1)?,
-      state: state,
+  let pdfinfo_iter = pstmt.query_map(params![user], |row| {
+    Ok(BlogListEntry {
+      id: row.get(0)?,
+      title: row.get(1)?,
+      user: row.get(2)?,
+      createdate: row.get(3)?,
+      changeddate: row.get(4)?,
     })
   })?;
 
