@@ -13,37 +13,28 @@ pub struct PdfInfo {
   pub state: Option<serde_json::Value>,
 }
 
-pub fn addUser(dbfile: &Path, name: &str, hashwd: &str) -> Result<(), Box<dyn Error>> {
-  let conn = Connection::open(dbfile)?;
-
-  // create date
-  let nowsecs = SystemTime::now()
-    .duration_since(SystemTime::UNIX_EPOCH)
-    .map(|n| n.as_secs())?;
-  let s: i64 = nowsecs.try_into()?;
-  let nowi64secs = s * 1000;
-
-  println!("adding user: {}", name);
-  conn.execute(
-    "INSERT INTO user (name, hashwd, createdate)
-                VALUES (?1, ?2, ?3)",
-    params![name, hashwd, nowi64secs],
-  )?;
-
-  Ok(())
+#[derive(Serialize, Debug, Clone)]
+pub struct ReadBlogEntry {
+  id: i64,
+  title: String,
+  content: String,
+  user: i64,
+  createdate: i64,
+  changeddate: i64,
 }
 
-pub fn add_tag(dbfile: &Path, name: &str, user: i64) -> Result<(), Box<dyn Error>> {
-  let conn = Connection::open(dbfile)?;
+#[derive(Serialize, Debug, Clone)]
+pub struct UpdateBlogEntry {
+  id: i64,
+  title: String,
+  content: String,
+}
 
-  println!("adding user: {}", name);
-  conn.execute(
-    "INSERT INTO tag (name, user)
-                VALUES (?1, ?2)",
-    params![name, user],
-  )?;
-
-  Ok(())
+#[derive(Serialize, Debug, Clone)]
+pub struct NewBlogEntry {
+  title: String,
+  content: String,
+  user: i64,
 }
 
 pub fn dbinit(dbfile: &Path) -> rusqlite::Result<()> {
@@ -93,12 +84,102 @@ pub fn dbinit(dbfile: &Path) -> rusqlite::Result<()> {
                 blogentryid      INTEGER NOT NULL,
                 FOREIGN KEY(tagid) REFERENCES tag(id),
                 FOREIGN KEY(blogentryid) REFERENCES blogentry(id),
-                CONSTRAINT unq UNIQUE (tagid, blodentryid)
+                CONSTRAINT unq UNIQUE (tagid, blogentryid)
                 )",
     params![],
   )?;
 
   Ok(())
+}
+
+pub fn naiow() -> Result<i64, Box<dyn Error>> {
+  let nowsecs = SystemTime::now()
+    .duration_since(SystemTime::UNIX_EPOCH)
+    .map(|n| n.as_secs())?;
+  let s: i64 = nowsecs.try_into()?;
+  Ok(s * 1000)
+}
+
+pub fn add_user(dbfile: &Path, name: &str, hashwd: &str) -> Result<i64, Box<dyn Error>> {
+  let conn = Connection::open(dbfile)?;
+
+  let nowi64secs = naiow()?;
+
+  println!("adding user: {}", name);
+  let wat = conn.execute(
+    "INSERT INTO user (name, hashwd, createdate)
+                VALUES (?1, ?2, ?3)",
+    params![name, hashwd, nowi64secs],
+  )?;
+
+  println!("wat: {}", wat);
+
+  Ok(conn.last_insert_rowid())
+}
+
+pub fn add_tag(dbfile: &Path, name: &str, user: i64) -> Result<i64, Box<dyn Error>> {
+  let conn = Connection::open(dbfile)?;
+
+  println!("adding tag: {}", name);
+  conn.execute(
+    "INSERT INTO tag (name, user)
+                VALUES (?1, ?2)",
+    params![name, user],
+  )?;
+
+  Ok(conn.last_insert_rowid())
+}
+
+pub fn new_blogentry(dbfile: &Path, entry: &NewBlogEntry) -> Result<i64, Box<dyn Error>> {
+  let conn = Connection::open(dbfile)?;
+
+  let now = naiow()?;
+
+  println!("adding blogentry: {}", entry.title);
+  conn.execute(
+    "INSERT INTO blogentry (title, content, user, createdate, changeddate)
+                VALUES (?1, ?2, ?3, ?4, ?5)",
+    params![entry.title, entry.content, entry.user, now, now],
+  )?;
+
+  Ok(conn.last_insert_rowid())
+}
+
+pub fn update_blogentry(dbfile: &Path, entry: &UpdateBlogEntry) -> Result<(), Box<dyn Error>> {
+  let conn = Connection::open(dbfile)?;
+
+  let now = naiow()?;
+
+  println!("adding blogentry: {}", entry.title);
+  conn.execute(
+    "UPDATE blogentry SET title = ?1, content = ?2, changeddate = ?3
+     WHERE id = ?4",
+    params![entry.title, entry.content, now, entry.id],
+  )?;
+
+  Ok(())
+}
+
+pub fn read_blogentry(dbfile: &Path, id: i64) -> Result<ReadBlogEntry, Box<dyn Error>> {
+  let conn = Connection::open(dbfile)?;
+
+  let rbe = conn.query_row(
+    "SELECT title, content, user, createdate, changeddate
+      from blogentry WHERE id = ?1",
+    params![id],
+    |row| {
+      Ok(ReadBlogEntry {
+        id: id,
+        title: row.get(0)?,
+        content: row.get(1)?,
+        user: row.get(2)?,
+        createdate: row.get(3)?,
+        changeddate: row.get(4)?,
+      })
+    },
+  )?;
+
+  Ok(rbe)
 }
 
 pub fn pdflist(dbfile: &Path) -> rusqlite::Result<Vec<PdfInfo>> {
