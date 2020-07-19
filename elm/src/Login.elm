@@ -30,6 +30,7 @@ type alias Model =
     , sent : Bool
     , responseMessage : String
     , postLoginUrl : Maybe ( List String, Dict String String )
+    , appname : String
     }
 
 
@@ -50,8 +51,8 @@ type Cmd
     | None
 
 
-initialModel : Maybe { uid : String, pwd : String } -> Seed -> Model
-initialModel mblogin seed =
+initialModel : Maybe { uid : String, pwd : String } -> String -> Seed -> Model
+initialModel mblogin appname seed =
     let
         ( newseed, cq, cans ) =
             Util.captchaQ seed
@@ -74,6 +75,7 @@ initialModel mblogin seed =
     , sent = False
     , responseMessage = ""
     , postLoginUrl = Nothing
+    , appname = appname
     }
 
 
@@ -122,7 +124,7 @@ unregisteredUser model =
 registrationSent : Model -> Model
 registrationSent model =
     { model
-        | responseMessage = "registration sent.  check your spam folder for email from practica!"
+        | responseMessage = "registration sent.  check your spam folder for email from " ++ model.appname ++ "!"
         , sent = False
     }
 
@@ -160,7 +162,7 @@ view size model =
 loginView : Model -> Element Msg
 loginView model =
     column [ spacing 5, width fill, padding 10, Background.color (Common.navbarColor 1) ]
-        [ text "welcome to Practica!  log in below:"
+        [ text <| "welcome to " ++ model.appname ++ "!  log in below:"
         , Input.text [ width fill ]
             { onChange = IdUpdate
             , text = model.userId
@@ -189,7 +191,7 @@ loginView model =
 registrationView : Model -> Element Msg
 registrationView model =
     column [ Background.color (Common.navbarColor 1), width fill ]
-        [ row [] [ text "welcome to Practica!  register your new account below:" ]
+        [ row [] [ text <| "welcome to " ++ model.appname ++ "!  register your new account below:" ]
         , text "email: "
         , Input.text []
             { onChange = EmailUpdate

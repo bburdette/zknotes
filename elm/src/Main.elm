@@ -13,21 +13,24 @@ import Element.Input as EI
 import Element.Region
 import Html exposing (Attribute, Html)
 import Html.Attributes
+import Http
 import Login
 import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..))
 import Markdown.Html
 import Markdown.Parser
 import Markdown.Renderer
-import PublicInterface
+import PublicInterface as PI
 import Random exposing (Seed, initialSeed)
 import Schelme.Show exposing (showTerm)
-import UserInterface
+import UserInterface as UI
 import Util
 
 
 type Msg
     = LoginMsg Login.Msg
     | EditMsg Edit.Msg
+    | ReplyData (Result Http.Error UI.ServerResponse)
+    | PublicReplyData (Result Http.Error PI.ServerResponse)
 
 
 type State
@@ -48,6 +51,7 @@ type alias Flags =
 type alias Model =
     { state : State
     , size : Util.Size
+    , location : String
     }
 
 
@@ -71,8 +75,9 @@ main =
     Browser.document
         { init =
             \flags ->
-                ( { state = Login <| Login.initialModel Nothing (initialSeed (flags.seed + 7))
+                ( { state = Login <| Login.initialModel Nothing "mahbloag" (initialSeed (flags.seed + 7))
                   , size = { width = flags.width, height = flags.height }
+                  , location = flags.location
                   }
                 , Cmd.none
                 )
@@ -90,7 +95,38 @@ update msg model =
                 ( lmod, lcmd ) =
                     Login.update lm ls
             in
-            ( { model | state = Login lmod }, Cmd.none )
+            case lcmd of
+                Login.None ->
+                    ( { model | state = Login lmod }, Cmd.none )
+
+                Login.Register ->
+                    ( { model | state = Login lmod }
+                    , Http.post
+                        { url = model.location ++ "/cmd"
+                        , body =
+                            Http.jsonBody
+                                (UI.encodeSendMsg (UI.Register ls.email)
+                                    lmod.userId
+                                    lmod.password
+                                )
+                        , expect = Http.expectJson ReplyData UI.serverResponseDecoder
+                        }
+                    )
+
+                Login.Login ->
+                    ( { model | state = Login lmod }
+                    , Http.post
+                        { url = model.location ++ "/cmd"
+                        , body =
+                            Http.jsonBody
+                                (UI.encodeSendMsg
+                                    UI.Login
+                                    lmod.userId
+                                    lmod.password
+                                )
+                        , expect = Http.expectJson ReplyData UI.serverResponseDecoder
+                        }
+                    )
 
         ( EditMsg em, Edit es ) ->
             let
