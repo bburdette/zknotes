@@ -36,7 +36,7 @@ use actix_web::{
   Responder, Result,
 };
 use futures::future::Future;
-use interfaces::{PublicMessage, ServerResponse};
+use interfaces::{PublicMessage, ServerResponse, UserMessage};
 use std::error::Error;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
@@ -132,6 +132,24 @@ fn public(
   }
 }
 
+fn user(state: web::Data<Config>, item: web::Json<UserMessage>, req: HttpRequest) -> HttpResponse {
+  println!("model: {:?}", &item);
+
+  let pdb = state.pdfdb.clone();
+
+  match interfaces::user_interface(pdb.as_str(), item.into_inner()) {
+    Ok(sr) => HttpResponse::Ok().json(sr),
+    Err(e) => {
+      error!("uh oh, 'user' err: {:?}", e);
+      let se = ServerResponse {
+        what: "server error".to_string(),
+        content: serde_json::Value::String(e.to_string()),
+      };
+      HttpResponse::Ok().json(se)
+    }
+  }
+}
+
 fn defcon() -> Config {
   Config {
     ip: "127.0.0.1".to_string(),
@@ -200,16 +218,8 @@ fn err_main() -> Result<(), Box<dyn Error>> {
       // enable logger
       .wrap(middleware::Logger::default())
       .route("/", web::get().to(mainpage))
-      .service(
-        web::resource("/public")
-          .data(
-            // change json extractor configuration
-            // TODO: break incoming pdfs into parts to use smaller buffer.
-            web::Json::<PublicMessage>::configure(|cfg| cfg.limit(4096000)),
-          )
-          .route(web::post().to(public)),
-      )
-      // .service(actix_files::Files::new("/pdfs", c.pdfdir.as_str()))
+      .service(web::resource("/public").route(web::post().to(public)))
+      .service(web::resource("/user").route(web::post().to(user)))
       .service(actix_files::Files::new("/", "static/"))
   })
   .bind(format!("{}:{}", config.ip, config.port))?

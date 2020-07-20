@@ -102,7 +102,7 @@ update msg model =
                 Login.Register ->
                     ( { model | state = Login lmod }
                     , Http.post
-                        { url = model.location ++ "/cmd"
+                        { url = model.location ++ "/user"
                         , body =
                             Http.jsonBody
                                 (UI.encodeSendMsg (UI.Register ls.email)
@@ -116,7 +116,7 @@ update msg model =
                 Login.Login ->
                     ( { model | state = Login lmod }
                     , Http.post
-                        { url = model.location ++ "/cmd"
+                        { url = model.location ++ "/user"
                         , body =
                             Http.jsonBody
                                 (UI.encodeSendMsg
