@@ -145,7 +145,7 @@ pub fn read_user(dbfile: &Path, name: &str) -> Result<User, Box<dyn Error>> {
 
   let user = conn.query_row(
     "SELECT id, name, hashwd, salt, email, registration_key, createdate
-      from user WHERE name = ?1",
+      FROM user WHERE name = ?1",
     params![name],
     |row| {
       Ok(User {
@@ -176,7 +176,7 @@ pub fn new_user(
 
   let user = conn.execute(
     "INSERT INTO user  (name, hashwd, salt, email, registration_key, createdate)
-      from user VALUES (?2, ?3, ?4, ?5, ?6)",
+      VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
     params![name, hashwd, salt, email, registration_key, now],
   )?;
 
@@ -231,7 +231,7 @@ pub fn read_blogentry(dbfile: &Path, id: i64) -> Result<FullBlogEntry, Box<dyn E
 
   let rbe = conn.query_row(
     "SELECT title, content, user, createdate, changeddate
-      from blogentry WHERE id = ?1",
+      FROM blogentry WHERE id = ?1",
     params![id],
     |row| {
       Ok(FullBlogEntry {
@@ -253,7 +253,7 @@ pub fn bloglisting(dbfile: &Path, user: i64) -> rusqlite::Result<Vec<BlogListEnt
 
   let mut pstmt = conn.prepare(
     "SELECT id, title, createdate, changeddate
-      from blogentry where user = ?1",
+      FROM blogentry where user = ?1",
   )?;
 
   let pdfinfo_iter = pstmt.query_map(params![user], |row| {
