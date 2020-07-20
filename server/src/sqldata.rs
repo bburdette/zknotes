@@ -46,6 +46,17 @@ pub struct NewBlogEntry {
   user: i64,
 }
 
+#[derive(Deserialize, Serialize, Debug)]
+pub struct User {
+  id: i64,
+  name: String,
+  hashwd: String,
+  salt: String,
+  email: String,
+  pub registration_key: Option<String>,
+  // current_tb: Option<i32>,
+}
+
 pub fn dbinit(dbfile: &Path) -> rusqlite::Result<()> {
   let conn = Connection::open(dbfile)?;
 
@@ -56,6 +67,9 @@ pub fn dbinit(dbfile: &Path) -> rusqlite::Result<()> {
                 id          INTEGER NOT NULL PRIMARY KEY,
                 name        TEXT NOT NULL UNIQUE,
                 hashwd      TEXT NOT NULL,
+                salt        TEXT NOT NULL,
+                email       TEXT NOT NULL,
+                registration_key  TEXT,
                 createdate  INTEGER NOT NULL
                 )",
     params![],
@@ -122,6 +136,49 @@ pub fn add_user(dbfile: &Path, name: &str, hashwd: &str) -> Result<i64, Box<dyn 
   )?;
 
   println!("wat: {}", wat);
+
+  Ok(conn.last_insert_rowid())
+}
+
+pub fn read_user(dbfile: &Path, id: i64) -> Result<User, Box<dyn Error>> {
+  let conn = Connection::open(dbfile)?;
+
+  let user = conn.query_row(
+    "SELECT id, name, hashwd, salt, email, registration_key, createdate
+      from user WHERE id = ?1",
+    params![id],
+    |row| {
+      Ok(User {
+        id: id,
+        name: row.get(0)?,
+        hashwd: row.get(1)?,
+        salt: row.get(2)?,
+        email: row.get(3)?,
+        registration_key: row.get(4)?,
+      })
+    },
+  )?;
+
+  Ok(user)
+}
+
+pub fn new_user(
+  dbfile: &Path,
+  name: String,
+  hashwd: String,
+  salt: String,
+  email: String,
+  registration_key: String,
+) -> Result<i64, Box<dyn Error>> {
+  let conn = Connection::open(dbfile)?;
+
+  let now = naiow()?;
+
+  let user = conn.execute(
+    "INSERT INTO user  (name, hashwd, salt, email, registration_key, createdate)
+      from user VALUES (?2, ?3, ?4, ?5, ?6)",
+    params![name, hashwd, salt, email, registration_key, now],
+  )?;
 
   Ok(conn.last_insert_rowid())
 }

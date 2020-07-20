@@ -4,9 +4,12 @@ extern crate actix_web;
 extern crate reqwest;
 #[macro_use]
 extern crate simple_error;
+extern crate crypto_hash;
 extern crate env_logger;
 extern crate futures;
 extern crate json;
+extern crate lettre;
+extern crate lettre_email;
 extern crate rand;
 extern crate serde_json;
 extern crate time;
@@ -19,7 +22,8 @@ extern crate rusqlite;
 extern crate serde_derive;
 extern crate base64;
 
-mod process_json;
+mod email;
+mod interfaces;
 mod sqldata;
 mod util;
 
@@ -32,7 +36,7 @@ use actix_web::{
   Responder, Result,
 };
 use futures::future::Future;
-use process_json::{PublicMessage, ServerResponse};
+use interfaces::{PublicMessage, ServerResponse};
 use std::error::Error;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
@@ -113,12 +117,9 @@ fn public(
 ) -> HttpResponse {
   println!("model: {:?}", &item);
 
-  let ci = req.connection_info().clone();
-  let pd = state.pdfdir.clone();
   let pdb = state.pdfdb.clone();
 
-  match process_json::public_interface(pd.as_str(), pdb.as_str(), &(ci.remote()), item.into_inner())
-  {
+  match interfaces::public_interface(pdb.as_str(), item.into_inner()) {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("uh oh, 'public' err: {:?}", e);
