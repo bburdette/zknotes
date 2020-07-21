@@ -162,6 +162,24 @@ pub fn read_user(dbfile: &Path, name: &str) -> Result<User, Box<dyn Error>> {
   Ok(user)
 }
 
+pub fn update_user(dbfile: &Path, user: &User) -> Result<(), Box<dyn Error>> {
+  let conn = Connection::open(dbfile)?;
+
+  let user = conn.execute(
+    "UPDATE user SET name = ?1, hashwd = ?2, salt = ?3, email = ?4, registration_key = ?5
+     WHERE id = ?6",
+    params![
+      user.name,
+      user.hashwd,
+      user.salt,
+      user.email,
+      user.registration_key
+    ],
+  )?;
+
+  Ok(())
+}
+
 pub fn new_user(
   dbfile: &Path,
   name: String,
@@ -175,7 +193,7 @@ pub fn new_user(
   let now = naiow()?;
 
   let user = conn.execute(
-    "INSERT INTO user  (name, hashwd, salt, email, registration_key, createdate)
+    "INSERT INTO user (name, hashwd, salt, email, registration_key, createdate)
       VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
     params![name, hashwd, salt, email, registration_key, now],
   )?;

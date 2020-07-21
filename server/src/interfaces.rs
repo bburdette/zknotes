@@ -53,8 +53,6 @@ pub struct RegistrationData {
 }
 
 pub fn user_interface(pdfdb: &str, msg: UserMessage) -> Result<ServerResponse, Box<Error>> {
-  // let conn = Connection::open(pdfdb)?;
-
   info!("got a user message: {}", msg.what);
   if msg.what.as_str() == "register" {
     // do the registration thing.
@@ -142,7 +140,10 @@ pub fn user_interface(pdfdb: &str, msg: UserMessage) -> Result<ServerResponse, B
                   what: "logged in".to_string(),
                   content: serde_json::Value::Null, // return api token that expires?
                 }),
-                wat => Err(bail!(format!("invalid 'what' code:'{}'", wat))),
+                wat => Err(Box::new(simple_error::SimpleError::new(format!(
+                  "invalid 'what' code:'{}'",
+                  wat
+                )))),
               }
             }
           }
@@ -156,6 +157,9 @@ pub fn user_interface(pdfdb: &str, msg: UserMessage) -> Result<ServerResponse, B
 pub fn public_interface(pdfdb: &str, msg: PublicMessage) -> Result<ServerResponse, Box<Error>> {
   info!("process_public_json, what={}", msg.what.as_str());
   match msg.what.as_str() {
-    wat => Err(bail!(format!("invalid 'what' code:'{}'", wat))),
+    wat => Err(Box::new(simple_error::SimpleError::new(format!(
+      "invalid 'what' code:'{}'",
+      wat
+    )))),
   }
 }

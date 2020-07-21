@@ -150,6 +150,36 @@ fn user(state: web::Data<Config>, item: web::Json<UserMessage>, req: HttpRequest
   }
 }
 
+fn register(state: web::Data<Config>, req: HttpRequest) -> HttpResponse {
+  info!("registration: uid: {:?}", req.match_info().get("uid"));
+  match (req.match_info().get("uid"), req.match_info().get("key")) {
+    (Some(uid), Some(key)) => {
+      let pdfdbp = Path::new(&state.pdfdb);
+      // read user record.  does the reg key match?
+      match sqldata::read_user(pdfdbp, uid) {
+        Ok(user) => {
+          if user.registration_key == Some(key.to_string()) {
+            let mut mu = user;
+            mu.registration_key = None;
+            match sqldata::update_user(pdfdbp, &mu) {
+              Ok(_) => HttpResponse::Ok().body(
+                "<h1>You are registered!<h1> <a href=\"https://www.practica.site\">\
+                 Proceed to the main site</a>"
+                  .to_string(),
+              ),
+              Err(_e) => HttpResponse::Ok().body("<h1>registration failed</h1>".to_string()),
+            }
+          } else {
+            HttpResponse::Ok().body("<h1>registration failed</h1>".to_string())
+          }
+        }
+        Err(_e) => HttpResponse::Ok().body("registration key or user doesn't match".to_string()),
+      }
+    }
+    _ => HttpResponse::Ok().body("Uid, key not found!".to_string()),
+  }
+}
+
 fn defcon() -> Config {
   Config {
     ip: "127.0.0.1".to_string(),
@@ -220,6 +250,7 @@ fn err_main() -> Result<(), Box<dyn Error>> {
       .route("/", web::get().to(mainpage))
       .service(web::resource("/public").route(web::post().to(public)))
       .service(web::resource("/user").route(web::post().to(user)))
+      .service(web::resource(r"/register/{uid}/{key}").route(web::get().to(register)))
       .service(actix_files::Files::new("/", "static/"))
   })
   .bind(format!("{}:{}", config.ip, config.port))?
