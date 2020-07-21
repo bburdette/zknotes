@@ -1,5 +1,6 @@
 module Main exposing (main)
 
+import BadError
 import BlogEdit as Edit
 import Browser
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
@@ -28,14 +29,16 @@ import Util
 
 type Msg
     = LoginMsg Login.Msg
+    | BadErrorMsg BadError.Msg
     | EditMsg Edit.Msg
-    | ReplyData (Result Http.Error UI.ServerResponse)
+    | UserReplyData (Result Http.Error UI.ServerResponse)
     | PublicReplyData (Result Http.Error PI.ServerResponse)
 
 
 type State
     = Login Login.Model
     | Edit Edit.Model
+    | BadError BadError.Model State
 
 
 type alias Flags =
@@ -66,6 +69,9 @@ view model =
 
                 Edit em ->
                     Element.map EditMsg <| Edit.view em
+
+                BadError em _ ->
+                    Element.map BadErrorMsg <| BadError.view em
         ]
     }
 
@@ -109,7 +115,7 @@ update msg model =
                                     lmod.userId
                                     lmod.password
                                 )
-                        , expect = Http.expectJson ReplyData UI.serverResponseDecoder
+                        , expect = Http.expectJson UserReplyData UI.serverResponseDecoder
                         }
                     )
 
@@ -124,9 +130,26 @@ update msg model =
                                     lmod.userId
                                     lmod.password
                                 )
-                        , expect = Http.expectJson ReplyData UI.serverResponseDecoder
+                        , expect = Http.expectJson UserReplyData UI.serverResponseDecoder
                         }
                     )
+
+        ( UserReplyData urd, state ) ->
+            let
+                _ =
+                    Debug.log "( UserReplyData urd," urd
+            in
+            case urd of
+                Err e ->
+                    ( { model | state = BadError (BadError.initialModel <| Util.httpErrorString e) model.state }, Cmd.none )
+
+                Ok uiresponse ->
+                    case uiresponse of
+                        UI.ServerError e ->
+                            ( { model | state = BadError (BadError.initialModel e) state }, Cmd.none )
+
+                        _ ->
+                            ( model, Cmd.none )
 
         ( EditMsg em, Edit es ) ->
             let
@@ -134,6 +157,15 @@ update msg model =
                     Edit.update em es
             in
             ( { model | state = Edit emod }, Cmd.none )
+
+        ( BadErrorMsg bm, BadError bs prevstate ) ->
+            let
+                ( bmod, bcmd ) =
+                    BadError.update bm bs
+            in
+            case bcmd of
+                BadError.Okay ->
+                    ( { model | state = prevstate }, Cmd.none )
 
         ( _, _ ) ->
             ( model, Cmd.none )
