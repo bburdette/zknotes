@@ -28,9 +28,8 @@ mod sqldata;
 mod util;
 
 use actix_files::NamedFile;
-use actix_web::http::{Method, StatusCode};
+// use actix_web::http::{Method, StatusCode};
 use actix_web::middleware::Logger;
-use actix_web::web::JsonConfig;
 use actix_web::{
   http, middleware, web, App, FromRequest, HttpMessage, HttpRequest, HttpResponse, HttpServer,
   Responder, Result,
@@ -38,7 +37,7 @@ use actix_web::{
 use futures::future::Future;
 use interfaces::{PublicMessage, ServerResponse, UserMessage};
 use std::error::Error;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::{Arc, RwLock};
 use std::time::SystemTime;
 
@@ -46,34 +45,8 @@ use std::time::SystemTime;
 pub struct Config {
   ip: String,
   port: u16,
-  pdfdir: String,
   createdirs: bool,
   pdfdb: String,
-}
-
-fn files(req: &HttpRequest) -> Result<NamedFile> {
-  println!("files!");
-  let path: PathBuf = req.match_info().query("tail").parse()?;
-  info!("files: {:?}", path);
-  let stpath = Path::new("static/").join(path);
-  Ok(NamedFile::open(stpath)?)
-}
-
-fn pdffiles(state: web::Data<Config>, req: &HttpRequest) -> Result<NamedFile> {
-  let uripath = Path::new(req.uri().path());
-  uripath
-    .strip_prefix("/pdfs")
-    .map_err(|e| actix_web::error::ErrorImATeapot(e))
-    .and_then(|path| {
-      let stpath = Path::new(&state.pdfdir.to_string()).join(path);
-      let nf = NamedFile::open(stpath.clone());
-      match nf {
-        Ok(_) => println!("ef: "),
-        Err(e) => println!("err: {}", e),
-      }
-      let nf = NamedFile::open(stpath);
-      nf.map_err(|e| actix_web::error::ErrorImATeapot(e))
-    })
 }
 
 fn favicon(_req: &HttpRequest) -> Result<NamedFile> {
@@ -184,7 +157,6 @@ fn defcon() -> Config {
   Config {
     ip: "127.0.0.1".to_string(),
     port: 8000,
-    pdfdir: "./pdfs".to_string(),
     createdirs: false,
     pdfdb: "./pdf.db".to_string(),
   }
@@ -225,17 +197,6 @@ fn err_main() -> Result<(), Box<dyn Error>> {
   if !pdfdbp.exists() {
     sqldata::dbinit(pdfdbp)?;
   }
-
-  // if config.createdirs {
-  //   std::fs::create_dir_all(config.pdfdir.clone())?;
-  // } else {
-  //   if !Path::new(&config.pdfdir).exists() {
-  //     Err(std::io::Error::new(
-  //       std::io::ErrorKind::NotFound,
-  //       "pdfdir not found!",
-  //     ))?
-  //   }
-  // }
 
   println!("config: {:?}", config);
 

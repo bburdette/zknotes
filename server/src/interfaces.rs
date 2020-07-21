@@ -14,10 +14,9 @@ use email;
 use serde_json::Value;
 use simple_error;
 use sqldata;
-use sqldata::User;
 use std::error::Error;
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, RwLock};
+use std::path::Path;
+// use std::sync::{Arc, RwLock};
 use util;
 use uuid::Uuid;
 
@@ -52,7 +51,7 @@ pub struct RegistrationData {
   email: String,
 }
 
-pub fn user_interface(pdfdb: &str, msg: UserMessage) -> Result<ServerResponse, Box<Error>> {
+pub fn user_interface(pdfdb: &str, msg: UserMessage) -> Result<ServerResponse, Box<dyn Error>> {
   info!("got a user message: {}", msg.what);
   if msg.what.as_str() == "register" {
     // do the registration thing.
@@ -154,7 +153,10 @@ pub fn user_interface(pdfdb: &str, msg: UserMessage) -> Result<ServerResponse, B
 }
 
 // public json msgs don't require login.
-pub fn public_interface(pdfdb: &str, msg: PublicMessage) -> Result<ServerResponse, Box<Error>> {
+pub fn public_interface(
+  _pdfdb: &str,
+  msg: PublicMessage,
+) -> Result<ServerResponse, Box<dyn Error>> {
   info!("process_public_json, what={}", msg.what.as_str());
   match msg.what.as_str() {
     wat => Err(Box::new(simple_error::SimpleError::new(format!(

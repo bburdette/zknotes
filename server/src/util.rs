@@ -9,7 +9,7 @@ use std::string::*;
 
 pub fn load_string(file_name: &str) -> Result<String, Box<dyn Error>> {
   let path = &Path::new(&file_name);
-  let mut inf = try!(File::open(path));
+  let mut inf = File::open(path)?;
   let mut result = String::new();
   inf.read_to_string(&mut result)?;
   Ok(result)

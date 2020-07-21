@@ -1,6 +1,5 @@
 use lettre::smtp::response::Response;
 use lettre::{EmailAddress, Envelope, SendableEmail, SmtpClient, SmtpTransport, Transport};
-use simple_error;
 use std::error::Error;
 
 pub fn send_registration(email: &str, uid: &str, reg_id: &str) -> Result<Response, Box<dyn Error>> {
@@ -30,7 +29,7 @@ pub fn send_registration_notification(
   email: &str,
   uid: &str,
   reg_id: &str,
-) -> Result<Response, Box<Error>> {
+) -> Result<Response, Box<dyn Error>> {
   info!("sending registration notification to admin!");
   let email = SendableEmail::new(
     Envelope::new(

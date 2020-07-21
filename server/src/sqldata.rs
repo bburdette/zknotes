@@ -1,10 +1,9 @@
 use rusqlite::{params, Connection};
 use serde_json;
-use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::error::Error;
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::SystemTime;
 
 #[derive(Serialize, Debug, Clone)]
 pub struct PdfInfo {
@@ -165,7 +164,7 @@ pub fn read_user(dbfile: &Path, name: &str) -> Result<User, Box<dyn Error>> {
 pub fn update_user(dbfile: &Path, user: &User) -> Result<(), Box<dyn Error>> {
   let conn = Connection::open(dbfile)?;
 
-  let user = conn.execute(
+  conn.execute(
     "UPDATE user SET name = ?1, hashwd = ?2, salt = ?3, email = ?4, registration_key = ?5
      WHERE id = ?6",
     params![
