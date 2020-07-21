@@ -46,7 +46,8 @@ pub struct Config {
   ip: String,
   port: u16,
   createdirs: bool,
-  pdfdb: String,
+  db: String,
+  mainsite: String,
 }
 
 fn favicon(_req: &HttpRequest) -> Result<NamedFile> {
@@ -86,11 +87,11 @@ fn mainpage(_state: web::Data<Config>, req: HttpRequest) -> HttpResponse {
 fn public(
   state: web::Data<Config>,
   item: web::Json<PublicMessage>,
-  req: HttpRequest,
+  _req: HttpRequest,
 ) -> HttpResponse {
   println!("model: {:?}", &item);
 
-  let pdb = state.pdfdb.clone();
+  let pdb = state.db.clone();
 
   match interfaces::public_interface(pdb.as_str(), item.into_inner()) {
     Ok(sr) => HttpResponse::Ok().json(sr),
@@ -105,10 +106,10 @@ fn public(
   }
 }
 
-fn user(state: web::Data<Config>, item: web::Json<UserMessage>, req: HttpRequest) -> HttpResponse {
+fn user(state: web::Data<Config>, item: web::Json<UserMessage>, _req: HttpRequest) -> HttpResponse {
   println!("model: {:?}", &item);
 
-  let pdb = state.pdfdb.clone();
+  let pdb = state.db.clone();
 
   match interfaces::user_interface(pdb.as_str(), item.into_inner()) {
     Ok(sr) => HttpResponse::Ok().json(sr),
@@ -127,18 +128,21 @@ fn register(state: web::Data<Config>, req: HttpRequest) -> HttpResponse {
   info!("registration: uid: {:?}", req.match_info().get("uid"));
   match (req.match_info().get("uid"), req.match_info().get("key")) {
     (Some(uid), Some(key)) => {
-      let pdfdbp = Path::new(&state.pdfdb);
+      let dbp = Path::new(&state.db);
       // read user record.  does the reg key match?
-      match sqldata::read_user(pdfdbp, uid) {
+      match sqldata::read_user(dbp, uid) {
         Ok(user) => {
           if user.registration_key == Some(key.to_string()) {
             let mut mu = user;
             mu.registration_key = None;
-            match sqldata::update_user(pdfdbp, &mu) {
+            match sqldata::update_user(dbp, &mu) {
               Ok(_) => HttpResponse::Ok().body(
-                "<h1>You are registered!<h1> <a href=\"https://www.practica.site\">\
-                 Proceed to the main site</a>"
-                  .to_string(),
+                format!(
+                  "<h1>You are registered!<h1> <a href=\"{}\">\
+                 Proceed to the main site</a>",
+                  state.mainsite
+                )
+                .to_string(),
               ),
               Err(_e) => HttpResponse::Ok().body("<h1>registration failed</h1>".to_string()),
             }
@@ -158,7 +162,8 @@ fn defcon() -> Config {
     ip: "127.0.0.1".to_string(),
     port: 8000,
     createdirs: false,
-    pdfdb: "./pdf.db".to_string(),
+    db: "./mahbloag.db".to_string(),
+    mainsite: "https:://mahbloag.practica.site/".to_string(),
   }
 }
 
@@ -192,10 +197,10 @@ fn err_main() -> Result<(), Box<dyn Error>> {
 
   let config = load_config();
 
-  let pdfdbp = Path::new(&config.pdfdb);
+  let dbp = Path::new(&config.db);
 
-  if !pdfdbp.exists() {
-    sqldata::dbinit(pdfdbp)?;
+  if !dbp.exists() {
+    sqldata::dbinit(dbp)?;
   }
 
   println!("config: {:?}", config);
