@@ -1,5 +1,6 @@
 module UserInterface exposing (SendMsg(..), ServerResponse(..), encodeEmail, encodeSendMsg, serverResponseDecoder)
 
+import Data
 import Json.Decode as JD
 import Json.Encode as JE
 
@@ -48,6 +49,8 @@ type ServerResponse
     | UserExists
     | UnregisteredUser
     | InvalidUserOrPwd
+    | LoggedIn
+    | EntryListing (List Data.BlogListEntry)
     | ServerError String
 
 
@@ -236,6 +239,9 @@ serverResponseDecoder =
 
                 "user exists" ->
                     JD.succeed UserExists
+
+                "logged in" ->
+                    JD.succeed LoggedIn
 
                 "invalid user or pwd" ->
                     JD.succeed InvalidUserOrPwd

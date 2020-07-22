@@ -5,7 +5,9 @@ import BlogEdit as Edit
 import Browser
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
+import Data
 import Dict exposing (Dict)
+import EditListing
 import Element exposing (Element)
 import Element.Background as EBk
 import Element.Border as EBd
@@ -15,6 +17,7 @@ import Element.Region
 import Html exposing (Attribute, Html)
 import Html.Attributes
 import Http
+import Loader
 import Login
 import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..))
 import Markdown.Html
@@ -31,6 +34,8 @@ type Msg
     = LoginMsg Login.Msg
     | BadErrorMsg BadError.Msg
     | EditMsg Edit.Msg
+    | EditListingMsg EditListing.Msg
+    | ListingLoaderMsg (Loader.Msg (List Data.BlogListEntry))
     | UserReplyData (Result Http.Error UI.ServerResponse)
     | PublicReplyData (Result Http.Error PI.ServerResponse)
 
@@ -38,7 +43,9 @@ type Msg
 type State
     = Login Login.Model
     | Edit Edit.Model
+    | EditListing EditListing.Model
     | BadError BadError.Model State
+    | ListingLoader (Loader.Model (List Data.BlogListEntry) State)
 
 
 type alias Flags =
@@ -58,6 +65,11 @@ type alias Model =
     }
 
 
+listingTransition : List Data.BlogListEntry -> State
+listingTransition e =
+    EditListing { entries = e }
+
+
 view : Model -> { title : String, body : List (Html Msg) }
 view model =
     { title = "mah bloag!"
@@ -66,6 +78,12 @@ view model =
             case model.state of
                 Login lem ->
                     Element.map LoginMsg <| Login.view model.size lem
+
+                EditListing em ->
+                    Element.map EditListingMsg <| EditListing.view em
+
+                ListingLoader em ->
+                    Element.map ListingLoaderMsg <| Loader.view em
 
                 Edit em ->
                     Element.map EditMsg <| Edit.view em
@@ -150,6 +168,21 @@ update msg model =
 
                         UI.RegistrationSent ->
                             ( model, Cmd.none )
+
+                        UI.LoggedIn ->
+                            -- we're logged in!  Get article listing.
+                            ( { model
+                                | state =
+                                    ListingLoader
+                                        { message = "loading articles"
+                                        , ondata = listingTransition
+                                        }
+                              }
+                            , Cmd.none
+                            )
+
+                        UI.EntryListing l ->
+                            ( { model | state = EditListing { entries = l } }, Cmd.none )
 
                         UI.UserExists ->
                             ( { model | state = BadError (BadError.initialModel "Can't register - User exists already!") state }, Cmd.none )
