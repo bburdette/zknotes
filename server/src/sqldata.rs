@@ -143,7 +143,7 @@ pub fn read_user(dbfile: &Path, name: &str) -> Result<User, Box<dyn Error>> {
   let conn = Connection::open(dbfile)?;
 
   let user = conn.query_row(
-    "SELECT id, name, hashwd, salt, email, registration_key, createdate
+    "SELECT id, hashwd, salt, email, registration_key
       FROM user WHERE name = ?1",
     params![name],
     |row| {
@@ -172,7 +172,8 @@ pub fn update_user(dbfile: &Path, user: &User) -> Result<(), Box<dyn Error>> {
       user.hashwd,
       user.salt,
       user.email,
-      user.registration_key
+      user.registration_key,
+      user.id
     ],
   )?;
 

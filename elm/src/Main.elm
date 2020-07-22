@@ -148,8 +148,17 @@ update msg model =
                         UI.ServerError e ->
                             ( { model | state = BadError (BadError.initialModel e) state }, Cmd.none )
 
-                        _ ->
+                        UI.RegistrationSent ->
                             ( model, Cmd.none )
+
+                        UI.UserExists ->
+                            ( { model | state = BadError (BadError.initialModel "Can't register - User exists already!") state }, Cmd.none )
+
+                        UI.UnregisteredUser ->
+                            ( { model | state = BadError (BadError.initialModel "Unregistered user.  Check your spam folder!") state }, Cmd.none )
+
+                        UI.InvalidUserOrPwd ->
+                            ( { model | state = BadError (BadError.initialModel "Invalid username or password.") state }, Cmd.none )
 
         ( EditMsg em, Edit es ) ->
             let

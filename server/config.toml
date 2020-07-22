@@ -4,3 +4,5 @@ pdfdir = "/home/bburdette/papers"
 createdirs = false
 db = "./mahbloag.db"
 mainsite = "https:://mahbloag.practica.site"
+appname = "mahbloag"
+domain = "practica.site"

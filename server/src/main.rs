@@ -22,6 +22,7 @@ extern crate rusqlite;
 extern crate serde_derive;
 extern crate base64;
 
+mod config;
 mod email;
 mod interfaces;
 mod sqldata;
@@ -34,21 +35,13 @@ use actix_web::{
   http, middleware, web, App, FromRequest, HttpMessage, HttpRequest, HttpResponse, HttpServer,
   Responder, Result,
 };
+use config::Config;
 use futures::future::Future;
 use interfaces::{PublicMessage, ServerResponse, UserMessage};
 use std::error::Error;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
 use std::time::SystemTime;
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct Config {
-  ip: String,
-  port: u16,
-  createdirs: bool,
-  db: String,
-  mainsite: String,
-}
 
 fn favicon(_req: &HttpRequest) -> Result<NamedFile> {
   let stpath = Path::new("static/favicon.ico");
@@ -91,9 +84,7 @@ fn public(
 ) -> HttpResponse {
   println!("model: {:?}", &item);
 
-  let pdb = state.db.clone();
-
-  match interfaces::public_interface(pdb.as_str(), item.into_inner()) {
+  match interfaces::public_interface(&state, item.into_inner()) {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("uh oh, 'public' err: {:?}", e);
@@ -109,9 +100,7 @@ fn public(
 fn user(state: web::Data<Config>, item: web::Json<UserMessage>, _req: HttpRequest) -> HttpResponse {
   println!("model: {:?}", &item);
 
-  let pdb = state.db.clone();
-
-  match interfaces::user_interface(pdb.as_str(), item.into_inner()) {
+  match interfaces::user_interface(&state, item.into_inner()) {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("uh oh, 'user' err: {:?}", e);
@@ -132,6 +121,9 @@ fn register(state: web::Data<Config>, req: HttpRequest) -> HttpResponse {
       // read user record.  does the reg key match?
       match sqldata::read_user(dbp, uid) {
         Ok(user) => {
+          println!("user {:?}", user);
+          println!("user.registration_key {:?}", user.registration_key);
+          println!("key {}", key);
           if user.registration_key == Some(key.to_string()) {
             let mut mu = user;
             mu.registration_key = None;
@@ -164,6 +156,8 @@ fn defcon() -> Config {
     createdirs: false,
     db: "./mahbloag.db".to_string(),
     mainsite: "https:://mahbloag.practica.site/".to_string(),
+    appname: "mahbloag".to_string(),
+    domain: "practica.site".to_string(),
   }
 }
 

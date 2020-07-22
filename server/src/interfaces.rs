@@ -17,6 +17,7 @@ use sqldata;
 use std::error::Error;
 use std::path::Path;
 // use std::sync::{Arc, RwLock};
+use config::Config;
 use util;
 use uuid::Uuid;
 
@@ -51,12 +52,12 @@ pub struct RegistrationData {
   email: String,
 }
 
-pub fn user_interface(pdfdb: &str, msg: UserMessage) -> Result<ServerResponse, Box<dyn Error>> {
+pub fn user_interface(config: &Config, msg: UserMessage) -> Result<ServerResponse, Box<dyn Error>> {
   info!("got a user message: {}", msg.what);
   if msg.what.as_str() == "register" {
     // do the registration thing.
     // user already exists?
-    match sqldata::read_user(Path::new(pdfdb), msg.uid.as_str()) {
+    match sqldata::read_user(Path::new(&config.db), msg.uid.as_str()) {
       Ok(_) => {
         // err - user exists.
         Ok(ServerResponse {
@@ -76,7 +77,7 @@ pub fn user_interface(pdfdb: &str, msg: UserMessage) -> Result<ServerResponse, B
 
         // write a user record.
         sqldata::new_user(
-          Path::new(pdfdb),
+          Path::new(&config.db),
           msg.uid.clone(),
           hex_digest(
             Algorithm::SHA256,
@@ -89,6 +90,9 @@ pub fn user_interface(pdfdb: &str, msg: UserMessage) -> Result<ServerResponse, B
 
         // send a registration email.
         email::send_registration(
+          config.appname.as_str(),
+          config.domain.as_str(),
+          config.mainsite.as_str(),
           rd.email.as_str(),
           msg.uid.as_str(),
           registration_key.as_str(),
@@ -96,6 +100,8 @@ pub fn user_interface(pdfdb: &str, msg: UserMessage) -> Result<ServerResponse, B
 
         // notify the admin.
         email::send_registration_notification(
+          config.appname.as_str(),
+          config.domain.as_str(),
           "bburdettte@protonmail.com",
           rd.email.as_str(),
           msg.uid.as_str(),
@@ -109,7 +115,7 @@ pub fn user_interface(pdfdb: &str, msg: UserMessage) -> Result<ServerResponse, B
       }
     }
   } else {
-    match sqldata::read_user(Path::new(pdfdb), msg.uid.as_str()) {
+    match sqldata::read_user(Path::new(&config.db), msg.uid.as_str()) {
       Err(_) => Ok(ServerResponse {
         what: "invalid user or pwd".to_string(),
         content: serde_json::Value::Null,
@@ -154,7 +160,7 @@ pub fn user_interface(pdfdb: &str, msg: UserMessage) -> Result<ServerResponse, B
 
 // public json msgs don't require login.
 pub fn public_interface(
-  _pdfdb: &str,
+  config: &Config,
   msg: PublicMessage,
 ) -> Result<ServerResponse, Box<dyn Error>> {
   info!("process_public_json, what={}", msg.what.as_str());
