@@ -17,7 +17,6 @@ import Element.Region
 import Html exposing (Attribute, Html)
 import Html.Attributes
 import Http
-import Loader
 import Login
 import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..))
 import Markdown.Html
@@ -26,6 +25,7 @@ import Markdown.Renderer
 import PublicInterface as PI
 import Random exposing (Seed, initialSeed)
 import Schelme.Show exposing (showTerm)
+import ShowMessage
 import UserInterface as UI
 import Util
 
@@ -35,7 +35,7 @@ type Msg
     | BadErrorMsg BadError.Msg
     | EditMsg Edit.Msg
     | EditListingMsg EditListing.Msg
-    | ListingLoaderMsg (Loader.Msg (List Data.BlogListEntry))
+    | ShowMessageMsg ShowMessage.Msg
     | UserReplyData (Result Http.Error UI.ServerResponse)
     | PublicReplyData (Result Http.Error PI.ServerResponse)
 
@@ -45,7 +45,7 @@ type State
     | Edit Edit.Model
     | EditListing EditListing.Model
     | BadError BadError.Model State
-    | ListingLoader (Loader.Model (List Data.BlogListEntry) State)
+    | ShowMessage ShowMessage.Model
 
 
 type alias Flags =
@@ -82,8 +82,8 @@ view model =
                 EditListing em ->
                     Element.map EditListingMsg <| EditListing.view em
 
-                ListingLoader em ->
-                    Element.map ListingLoaderMsg <| Loader.view em
+                ShowMessage em ->
+                    Element.map ShowMessageMsg <| ShowMessage.view em
 
                 Edit em ->
                     Element.map EditMsg <| Edit.view em
@@ -173,9 +173,8 @@ update msg model =
                             -- we're logged in!  Get article listing.
                             ( { model
                                 | state =
-                                    ListingLoader
+                                    ShowMessage
                                         { message = "loading articles"
-                                        , ondata = listingTransition
                                         }
                               }
                             , Cmd.none
