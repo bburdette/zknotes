@@ -28,6 +28,7 @@ import Json.Encode as JE
 type SendMsg
     = Register String
     | Login
+    | GetListing
 
 
 
@@ -86,6 +87,13 @@ encodeSendMsg sm uid pwd =
         Login ->
             JE.object
                 [ ( "what", JE.string "login" )
+                , ( "uid", JE.string uid )
+                , ( "pwd", JE.string pwd )
+                ]
+
+        GetListing ->
+            JE.object
+                [ ( "what", JE.string "getlisting" )
                 , ( "uid", JE.string uid )
                 , ( "pwd", JE.string pwd )
                 ]
@@ -248,6 +256,9 @@ serverResponseDecoder =
 
                 "server error" ->
                     JD.map ServerError (JD.at [ "content" ] JD.string)
+
+                "listing" ->
+                    JD.map EntryListing (JD.at [ "content" ] <| JD.list Data.decodeBlogListEntry)
 
                 -- "tagbase" ->
                 --     decodeTagBase

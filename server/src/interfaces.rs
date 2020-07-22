@@ -130,7 +130,9 @@ pub fn user_interface(config: &Config, msg: UserMessage) -> Result<ServerRespons
           None => {
             if hex_digest(
               Algorithm::SHA256,
-              (msg.pwd + userdata.salt.as_str()).into_bytes().as_slice(),
+              (msg.pwd.clone() + userdata.salt.as_str())
+                .into_bytes()
+                .as_slice(),
             ) != userdata.hashwd
             {
               // don't distinguish between bad user id and bad pwd!
@@ -139,22 +141,37 @@ pub fn user_interface(config: &Config, msg: UserMessage) -> Result<ServerRespons
                 content: serde_json::Value::Null,
               })
             } else {
-              info!("password match!");
-              match msg.what.as_str() {
-                "login" => Ok(ServerResponse {
-                  what: "logged in".to_string(),
-                  content: serde_json::Value::Null, // return api token that expires?
-                }),
-                wat => Err(Box::new(simple_error::SimpleError::new(format!(
-                  "invalid 'what' code:'{}'",
-                  wat
-                )))),
-              }
+              // finally!  processing messages as logged in user.
+              user_interface_loggedin(&config, userdata.id, &msg)
             }
           }
         }
       }
     }
+  }
+}
+
+fn user_interface_loggedin(
+  config: &Config,
+  uid: i64,
+  msg: &UserMessage,
+) -> Result<ServerResponse, Box<dyn Error>> {
+  match msg.what.as_str() {
+    "login" => Ok(ServerResponse {
+      what: "logged in".to_string(),
+      content: serde_json::Value::Null, // return api token that expires?
+    }),
+    "getlisting" => {
+      let entries = sqldata::bloglisting(Path::new(&config.db), uid)?;
+      Ok(ServerResponse {
+        what: "listing".to_string(),
+        content: serde_json::to_value(entries)?, // return api token that expires?
+      })
+    }
+    wat => Err(Box::new(simple_error::SimpleError::new(format!(
+      "invalid 'what' code:'{}'",
+      wat
+    )))),
   }
 }
 

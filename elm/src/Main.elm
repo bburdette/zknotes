@@ -45,7 +45,7 @@ type State
     | Edit Edit.Model
     | EditListing EditListing.Model
     | BadError BadError.Model State
-    | ShowMessage ShowMessage.Model
+    | ShowMessage ShowMessage.Model Data.Login
 
 
 type alias Flags =
@@ -65,11 +65,6 @@ type alias Model =
     }
 
 
-listingTransition : List Data.BlogListEntry -> State
-listingTransition e =
-    EditListing { entries = e }
-
-
 view : Model -> { title : String, body : List (Html Msg) }
 view model =
     { title = "mah bloag!"
@@ -82,7 +77,7 @@ view model =
                 EditListing em ->
                     Element.map EditListingMsg <| EditListing.view em
 
-                ShowMessage em ->
+                ShowMessage em _ ->
                     Element.map ShowMessageMsg <| ShowMessage.view em
 
                 Edit em ->
@@ -170,18 +165,42 @@ update msg model =
                             ( model, Cmd.none )
 
                         UI.LoggedIn ->
-                            -- we're logged in!  Get article listing.
-                            ( { model
-                                | state =
-                                    ShowMessage
-                                        { message = "loading articles"
+                            case state of
+                                Login lmod ->
+                                    -- we're logged in!  Get article listing.
+                                    ( { model
+                                        | state =
+                                            ShowMessage
+                                                { message = "loading articles"
+                                                }
+                                                { uid = lmod.userId, pwd = lmod.password }
+                                      }
+                                    , Http.post
+                                        { url = model.location ++ "/user"
+                                        , body =
+                                            Http.jsonBody
+                                                (UI.encodeSendMsg UI.GetListing
+                                                    lmod.userId
+                                                    lmod.password
+                                                )
+                                        , expect = Http.expectJson UserReplyData UI.serverResponseDecoder
                                         }
-                              }
-                            , Cmd.none
-                            )
+                                    )
+
+                                _ ->
+                                    ( { model | state = BadError (BadError.initialModel "unexpected login reply") state }
+                                    , Cmd.none
+                                    )
 
                         UI.EntryListing l ->
-                            ( { model | state = EditListing { entries = l } }, Cmd.none )
+                            case state of
+                                ShowMessage _ login ->
+                                    ( { model | state = EditListing { entries = l, login = login } }, Cmd.none )
+
+                                _ ->
+                                    ( { model | state = BadError (BadError.initialModel "unexpected login reply") state }
+                                    , Cmd.none
+                                    )
 
                         UI.UserExists ->
                             ( { model | state = BadError (BadError.initialModel "Can't register - User exists already!") state }, Cmd.none )
