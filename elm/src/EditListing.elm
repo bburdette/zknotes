@@ -11,6 +11,7 @@ import Element.Region
 
 type Msg
     = OnSelect Int
+    | NewPress
 
 
 type alias Model =
@@ -21,12 +22,16 @@ type alias Model =
 
 type Command
     = Selected Int
+    | New
 
 
 view : Model -> Element Msg
 view model =
     E.column [] <|
-        E.text "Select an article"
+        E.row []
+            [ E.text "Select an article"
+            , EI.button [] { onPress = Just NewPress, label = E.text "new" }
+            ]
             :: List.map (\e -> E.text e.title) model.entries
 
 
@@ -37,3 +42,6 @@ update msg model =
             ( model
             , Selected id
             )
+
+        NewPress ->
+            ( model, New )

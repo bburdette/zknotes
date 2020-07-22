@@ -218,6 +218,18 @@ update msg model =
             in
             ( { model | state = Edit emod }, Cmd.none )
 
+        ( EditListingMsg em, EditListing es ) ->
+            let
+                ( emod, ecmd ) =
+                    EditListing.update em es
+            in
+            case ecmd of
+                EditListing.New ->
+                    ( { model | state = Edit Edit.init }, Cmd.none )
+
+                EditListing.Selected id ->
+                    ( { model | state = Edit Edit.init }, Cmd.none )
+
         ( BadErrorMsg bm, BadError bs prevstate ) ->
             let
                 ( bmod, bcmd ) =
