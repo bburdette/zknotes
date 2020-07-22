@@ -1,12 +1,12 @@
 module Main exposing (main)
 
 import BadError
-import BlogEdit as Edit
 import Browser
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
 import Data
 import Dict exposing (Dict)
+import Edit
 import EditListing
 import Element exposing (Element)
 import Element.Background as EBk

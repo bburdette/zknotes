@@ -1,5 +1,6 @@
 module EditListing exposing (..)
 
+import Common
 import Data
 import Element as E exposing (Element)
 import Element.Background as EBk
@@ -28,9 +29,9 @@ type Command
 view : Model -> Element Msg
 view model =
     E.column [] <|
-        E.row []
+        E.row [ E.spacing 20 ]
             [ E.text "Select an article"
-            , EI.button [] { onPress = Just NewPress, label = E.text "new" }
+            , EI.button Common.buttonStyle { onPress = Just NewPress, label = E.text "new" }
             ]
             :: List.map (\e -> E.text e.title) model.entries
 

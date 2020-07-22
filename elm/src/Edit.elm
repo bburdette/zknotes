@@ -1,4 +1,4 @@
-module BlogEdit exposing (Model, Msg(..), blockCells, cellView, code, codeBlock, defCell, heading, init, markdownBody, markdownView, mdCells, mkRenderer, rawTextToId, showRunState, update, view)
+module Edit exposing (Model, Msg(..), blockCells, cellView, code, codeBlock, defCell, heading, init, markdownBody, markdownView, mdCells, mkRenderer, rawTextToId, showRunState, update, view)
 
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
