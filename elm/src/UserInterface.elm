@@ -10,6 +10,7 @@ type SendMsg
     | Login
     | GetListing
     | GetBlogEntry Int
+    | DeleteBlogEntry Int
     | SaveBlogEntry Data.SaveBlogEntry
 
 
@@ -21,6 +22,7 @@ type ServerResponse
     | LoggedIn
     | EntryListing (List Data.BlogListEntry)
     | SavedBlogEntry Int
+    | DeletedBlogEntry Int
     | BlogEntry Data.FullBlogEntry
     | ServerError String
 
@@ -53,6 +55,14 @@ encodeSendMsg sm uid pwd =
         GetBlogEntry id ->
             JE.object
                 [ ( "what", JE.string "getblogentry" )
+                , ( "uid", JE.string uid )
+                , ( "pwd", JE.string pwd )
+                , ( "data", JE.int id )
+                ]
+
+        DeleteBlogEntry id ->
+            JE.object
+                [ ( "what", JE.string "deleteblogentry" )
                 , ( "uid", JE.string uid )
                 , ( "pwd", JE.string pwd )
                 , ( "data", JE.int id )
@@ -102,6 +112,9 @@ serverResponseDecoder =
 
                 "savedblogentry" ->
                     JD.map SavedBlogEntry (JD.at [ "content" ] <| JD.int)
+
+                "deletedblogentry" ->
+                    JD.map DeletedBlogEntry (JD.at [ "content" ] <| JD.int)
 
                 "blogentry" ->
                     JD.map BlogEntry (JD.at [ "content" ] <| Data.decodeFullBlogEntry)

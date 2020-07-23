@@ -26,6 +26,7 @@ type Msg
     | OnTitleChanged String
     | SavePress
     | CancelPress
+    | DeletePress
 
 
 type alias Model =
@@ -40,6 +41,7 @@ type Command
     = None
     | Save Data.SaveBlogEntry
     | Cancel
+    | Delete Int
 
 
 view : Model -> Element Msg
@@ -48,7 +50,8 @@ view model =
         [ E.width E.fill ]
         [ E.row []
             [ EI.button Common.buttonStyle { onPress = Just SavePress, label = E.text "Save" }
-            , EI.button Common.buttonStyle { onPress = Just CancelPress, label = E.text "Cancel" }
+            , EI.button Common.buttonStyle { onPress = Just CancelPress, label = E.text "Done" }
+            , EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just DeletePress, label = E.text "Delete" }
             ]
         , EI.text []
             { onChange = OnTitleChanged
@@ -446,6 +449,14 @@ update msg model =
 
         CancelPress ->
             ( model, Cancel )
+
+        DeletePress ->
+            case model.id of
+                Just id ->
+                    ( model, Delete id )
+
+                Nothing ->
+                    ( model, None )
 
         OnTitleChanged t ->
             ( { model | title = t }, None )

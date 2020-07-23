@@ -32,7 +32,14 @@ view model =
             [ E.text "Select an article"
             , EI.button Common.buttonStyle { onPress = Just NewPress, label = E.text "new" }
             ]
-            :: List.map (\e -> E.text e.title) model.entries
+            :: List.map
+                (\e ->
+                    E.row []
+                        [ E.text e.title
+                        , EI.button Common.buttonStyle { onPress = Just (OnSelect e.id), label = E.text "edit" }
+                        ]
+                )
+                model.entries
 
 
 update : Msg -> Model -> ( Model, Command )

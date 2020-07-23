@@ -222,6 +222,16 @@ update msg model =
                                 _ ->
                                     ( { model | state = BadError (BadError.initialModel "unexpected blog message") state }, Cmd.none )
 
+                        UI.DeletedBlogEntry beid ->
+                            case state of
+                                ShowMessage _ login ->
+                                    ( model
+                                    , sendUIMsg model.location login UI.GetListing
+                                    )
+
+                                _ ->
+                                    ( { model | state = BadError (BadError.initialModel "unexpected message") state }, Cmd.none )
+
                         UI.UserExists ->
                             ( { model | state = BadError (BadError.initialModel "Can't register - User exists already!") state }, Cmd.none )
 
@@ -258,6 +268,20 @@ update msg model =
                     , sendUIMsg model.location
                         login
                         UI.GetListing
+                    )
+
+                Edit.Delete id ->
+                    -- issue delete and go back to listing.
+                    ( { model
+                        | state =
+                            ShowMessage
+                                { message = "loading articles"
+                                }
+                                login
+                      }
+                    , sendUIMsg model.location
+                        login
+                        (UI.DeleteBlogEntry id)
                     )
 
         ( EditListingMsg em, EditListing es login ) ->

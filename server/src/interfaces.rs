@@ -165,6 +165,16 @@ fn user_interface_loggedin(
         content: serde_json::to_value(entry)?,
       })
     }
+    "deleteblogentry" => {
+      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      let id: i64 = serde_json::from_value(msgdata.clone())?;
+
+      sqldata::delete_blogentry(Path::new(&config.db), uid, id)?;
+      Ok(ServerResponse {
+        what: "deletedblogentry".to_string(),
+        content: serde_json::to_value(id)?,
+      })
+    }
     "saveblogentry" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let sbe: sqldata::SaveBlogEntry = serde_json::from_value(msgdata.clone())?;

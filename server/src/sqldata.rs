@@ -260,6 +260,16 @@ pub fn read_blogentry(dbfile: &Path, id: i64) -> Result<FullBlogEntry, Box<dyn E
 
   Ok(rbe)
 }
+pub fn delete_blogentry(dbfile: &Path, uid: i64, beid: i64) -> Result<(), Box<dyn Error>> {
+  let conn = Connection::open(dbfile)?;
+
+  conn.execute(
+    "DELETE FROM blogentry WHERE id = ?1 and user = ?2",
+    params![beid, uid],
+  )?;
+
+  Ok(())
+}
 
 pub fn bloglisting(dbfile: &Path, user: i64) -> rusqlite::Result<Vec<BlogListEntry>> {
   let conn = Connection::open(dbfile)?;
