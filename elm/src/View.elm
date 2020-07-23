@@ -1,4 +1,4 @@
-module Edit exposing (Command(..), Model, Msg(..), blockCells, cellView, code, codeBlock, defCell, heading, initFull, initNew, markdownBody, markdownView, mdCells, mkRenderer, rawTextToId, setId, showRunState, update, view)
+module View exposing (Command(..), Model, Msg(..), blockCells, cellView, code, codeBlock, defCell, heading, initFull, initNew, markdownBody, markdownView, mdCells, mkRenderer, rawTextToId, setId, showRunState, update, view)
 
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
@@ -21,12 +21,8 @@ import Schelme.Show exposing (showTerm)
 
 
 type Msg
-    = OnMarkdownInput String
-    | OnSchelmeCodeChanged String String
-    | OnTitleChanged String
-    | SavePress
+    = OnSchelmeCodeChanged String String
     | DonePress
-    | DeletePress
 
 
 type alias Model =
@@ -39,9 +35,7 @@ type alias Model =
 
 type Command
     = None
-    | Save Data.SaveBlogEntry
     | Done
-    | Delete Int
 
 
 view : Model -> Element Msg
@@ -49,25 +43,11 @@ view model =
     E.column
         [ E.width E.fill ]
         [ E.row []
-            [ EI.button Common.buttonStyle { onPress = Just SavePress, label = E.text "Save" }
-            , EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "Done" }
-            , EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just DeletePress, label = E.text "Delete" }
+            [ EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "Done" }
             ]
-        , EI.text []
-            { onChange = OnTitleChanged
-            , text = model.title
-            , placeholder = Nothing
-            , label = EI.labelLeft [] (E.text "title")
-            }
+        , E.text "title"
         , E.row [ E.width E.fill ]
-            [ EI.multiline [ E.width (E.px 400) ]
-                { onChange = OnMarkdownInput
-                , text = model.md
-                , placeholder = Nothing
-                , label = EI.labelHidden "Markdown input"
-                , spellcheck = False
-                }
-            , case markdownView (mkRenderer model.cells) model.md of
+            [ case markdownView (mkRenderer model.cells) model.md of
                 Ok rendered ->
                     E.column
                         [ E.spacing 30
@@ -438,48 +418,8 @@ setId model beid =
 update : Msg -> Model -> ( Model, Command )
 update msg model =
     case msg of
-        SavePress ->
-            ( model
-            , Save
-                { id = model.id
-                , title = model.title
-                , content = model.md
-                }
-            )
-
         DonePress ->
             ( model, Done )
-
-        DeletePress ->
-            case model.id of
-                Just id ->
-                    ( model, Delete id )
-
-                Nothing ->
-                    ( model, None )
-
-        OnTitleChanged t ->
-            ( { model | title = t }, None )
-
-        OnMarkdownInput newMarkdown ->
-            let
-                cells =
-                    Debug.log "newcells"
-                        (newMarkdown
-                            |> mdCells
-                            |> Result.withDefault (CellDict Dict.empty)
-                        )
-
-                ( cc, result ) =
-                    evalCellsFully
-                        (mkCc cells)
-            in
-            ( { model
-                | md = newMarkdown
-                , cells = Debug.log "evaled cells: " <| getCd cc
-              }
-            , None
-            )
 
         OnSchelmeCodeChanged name string ->
             let
