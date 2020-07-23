@@ -221,7 +221,7 @@ pub fn save_blogentry(
       println!("updating blogentry: {}", entry.title);
       conn.execute(
         "UPDATE blogentry SET title = ?1, content = ?2, changeddate = ?3
-     WHERE id = ?4",
+         WHERE id = ?4",
         params![entry.title, entry.content, now, entry.id],
       )?;
       Ok(id)
@@ -230,7 +230,7 @@ pub fn save_blogentry(
       println!("adding blogentry: {}", entry.title);
       conn.execute(
         "INSERT INTO blogentry (title, content, user, createdate, changeddate)
-                VALUES (?1, ?2, ?3, ?4, ?5)",
+         VALUES (?1, ?2, ?3, ?4, ?5)",
         params![entry.title, entry.content, uid, now, now],
       )?;
 
@@ -273,9 +273,9 @@ pub fn bloglisting(dbfile: &Path, user: i64) -> rusqlite::Result<Vec<BlogListEnt
     Ok(BlogListEntry {
       id: row.get(0)?,
       title: row.get(1)?,
-      user: row.get(2)?,
-      createdate: row.get(3)?,
-      changeddate: row.get(4)?,
+      user: user,
+      createdate: row.get(2)?,
+      changeddate: row.get(3)?,
     })
   })?;
 
