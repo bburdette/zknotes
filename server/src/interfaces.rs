@@ -162,7 +162,17 @@ fn user_interface_loggedin(
       let entry = sqldata::read_blogentry(Path::new(&config.db), id)?;
       Ok(ServerResponse {
         what: "blogentry".to_string(),
-        content: serde_json::to_value(entry)?, // return api token that expires?
+        content: serde_json::to_value(entry)?,
+      })
+    }
+    "saveblogentry" => {
+      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      let sbe: sqldata::SaveBlogEntry = serde_json::from_value(msgdata.clone())?;
+
+      let beid = sqldata::save_blogentry(Path::new(&config.db), uid, &sbe)?;
+      Ok(ServerResponse {
+        what: "savedblogentry".to_string(),
+        content: serde_json::to_value(beid)?,
       })
     }
     wat => Err(Box::new(simple_error::SimpleError::new(format!(

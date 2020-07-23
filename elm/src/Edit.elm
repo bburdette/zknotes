@@ -1,4 +1,4 @@
-module Edit exposing (Command(..), Model, Msg(..), blockCells, cellView, code, codeBlock, defCell, heading, initFull, initNew, markdownBody, markdownView, mdCells, mkRenderer, rawTextToId, showRunState, update, view)
+module Edit exposing (Command(..), Model, Msg(..), blockCells, cellView, code, codeBlock, defCell, heading, initFull, initNew, markdownBody, markdownView, mdCells, mkRenderer, rawTextToId, setId, showRunState, update, view)
 
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
@@ -29,8 +29,7 @@ type Msg
 
 
 type alias Model =
-    { login : Data.Login
-    , id : Maybe Int
+    { id : Maybe Int
     , title : String
     , md : String
     , cells : CellDict
@@ -39,7 +38,7 @@ type alias Model =
 
 type Command
     = None
-    | Save
+    | Save Data.SaveBlogEntry
     | Cancel
 
 
@@ -386,8 +385,8 @@ markdownBody =
 """
 
 
-initFull : Data.Login -> Data.FullBlogEntry -> Model
-initFull login blogentry =
+initFull : Data.FullBlogEntry -> Model
+initFull blogentry =
     let
         cells =
             Debug.log "newcells"
@@ -400,16 +399,15 @@ initFull login blogentry =
             evalCellsFully
                 (mkCc cells)
     in
-    { login = login
-    , id = Just blogentry.id
+    { id = Just blogentry.id
     , title = blogentry.title
     , md = blogentry.content
     , cells = Debug.log "evaled cells: " <| getCd cc
     }
 
 
-initNew : Data.Login -> Model
-initNew login =
+initNew : Model
+initNew =
     let
         cells =
             Debug.log "newcells"
@@ -422,19 +420,29 @@ initNew login =
             evalCellsFully
                 (mkCc cells)
     in
-    { login = login
-    , id = Nothing
+    { id = Nothing
     , title = ""
     , md = ""
     , cells = Debug.log "evaled cells: " <| getCd cc
     }
 
 
+setId : Model -> Int -> Model
+setId model beid =
+    { model | id = Just beid }
+
+
 update : Msg -> Model -> ( Model, Command )
 update msg model =
     case msg of
         SavePress ->
-            ( model, Save )
+            ( model
+            , Save
+                { id = model.id
+                , title = model.title
+                , content = model.md
+                }
+            )
 
         CancelPress ->
             ( model, Cancel )

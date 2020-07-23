@@ -17,7 +17,6 @@ type Msg
 
 type alias Model =
     { entries : List Data.BlogListEntry
-    , login : Data.Login
     }
 
 

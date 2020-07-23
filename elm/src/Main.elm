@@ -42,8 +42,8 @@ type Msg
 
 type State
     = Login Login.Model
-    | Edit Edit.Model
-    | EditListing EditListing.Model
+    | Edit Edit.Model Data.Login
+    | EditListing EditListing.Model Data.Login
     | BadError BadError.Model State
     | ShowMessage ShowMessage.Model Data.Login
 
@@ -74,13 +74,13 @@ view model =
                 Login lem ->
                     Element.map LoginMsg <| Login.view model.size lem
 
-                EditListing em ->
+                EditListing em _ ->
                     Element.map EditListingMsg <| EditListing.view em
 
                 ShowMessage em _ ->
                     Element.map ShowMessageMsg <| ShowMessage.view em
 
-                Edit em ->
+                Edit em _ ->
                     Element.map EditMsg <| Edit.view em
 
                 BadError em _ ->
@@ -106,6 +106,20 @@ main =
         }
 
 
+sendUIMsg : String -> Data.Login -> UI.SendMsg -> Cmd Msg
+sendUIMsg location login msg =
+    Http.post
+        { url = location ++ "/user"
+        , body =
+            Http.jsonBody
+                (UI.encodeSendMsg msg
+                    login.uid
+                    login.pwd
+                )
+        , expect = Http.expectJson UserReplyData UI.serverResponseDecoder
+        }
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case ( msg, model.state ) of
@@ -120,31 +134,24 @@ update msg model =
 
                 Login.Register ->
                     ( { model | state = Login lmod }
-                    , Http.post
-                        { url = model.location ++ "/user"
-                        , body =
-                            Http.jsonBody
-                                (UI.encodeSendMsg (UI.Register ls.email)
-                                    lmod.userId
-                                    lmod.password
-                                )
-                        , expect = Http.expectJson UserReplyData UI.serverResponseDecoder
+                    , sendUIMsg model.location
+                        { uid =
+                            lmod.userId
+                        , pwd =
+                            lmod.password
                         }
+                        (UI.Register ls.email)
                     )
 
                 Login.Login ->
                     ( { model | state = Login lmod }
-                    , Http.post
-                        { url = model.location ++ "/user"
-                        , body =
-                            Http.jsonBody
-                                (UI.encodeSendMsg
-                                    UI.Login
-                                    lmod.userId
-                                    lmod.password
-                                )
-                        , expect = Http.expectJson UserReplyData UI.serverResponseDecoder
+                    , sendUIMsg model.location
+                        { uid =
+                            lmod.userId
+                        , pwd =
+                            lmod.password
                         }
+                        UI.Login
                     )
 
         ( UserReplyData urd, state ) ->
@@ -175,16 +182,13 @@ update msg model =
                                                 }
                                                 { uid = lmod.userId, pwd = lmod.password }
                                       }
-                                    , Http.post
-                                        { url = model.location ++ "/user"
-                                        , body =
-                                            Http.jsonBody
-                                                (UI.encodeSendMsg UI.GetListing
-                                                    lmod.userId
-                                                    lmod.password
-                                                )
-                                        , expect = Http.expectJson UserReplyData UI.serverResponseDecoder
+                                    , sendUIMsg model.location
+                                        { uid =
+                                            lmod.userId
+                                        , pwd =
+                                            lmod.password
                                         }
+                                        UI.GetListing
                                     )
 
                                 _ ->
@@ -195,12 +199,28 @@ update msg model =
                         UI.EntryListing l ->
                             case state of
                                 ShowMessage _ login ->
-                                    ( { model | state = EditListing { entries = l, login = login } }, Cmd.none )
+                                    ( { model | state = EditListing { entries = l } login }, Cmd.none )
 
                                 _ ->
                                     ( { model | state = BadError (BadError.initialModel "unexpected login reply") state }
                                     , Cmd.none
                                     )
+
+                        UI.BlogEntry fbe ->
+                            case state of
+                                EditListing _ login ->
+                                    ( { model | state = Edit (Edit.initFull fbe) login }, Cmd.none )
+
+                                _ ->
+                                    ( { model | state = BadError (BadError.initialModel "unexpected blog message") state }, Cmd.none )
+
+                        UI.SavedBlogEntry beid ->
+                            case state of
+                                Edit emod login ->
+                                    ( { model | state = Edit (Edit.setId emod beid) login }, Cmd.none )
+
+                                _ ->
+                                    ( { model | state = BadError (BadError.initialModel "unexpected blog message") state }, Cmd.none )
 
                         UI.UserExists ->
                             ( { model | state = BadError (BadError.initialModel "Can't register - User exists already!") state }, Cmd.none )
@@ -211,34 +231,49 @@ update msg model =
                         UI.InvalidUserOrPwd ->
                             ( { model | state = BadError (BadError.initialModel "Invalid username or password.") state }, Cmd.none )
 
-        ( EditMsg em, Edit es ) ->
+        ( EditMsg em, Edit es login ) ->
             let
                 ( emod, ecmd ) =
                     Edit.update em es
             in
-            ( { model | state = Edit emod }, Cmd.none )
+            case ecmd of
+                Edit.Save sbe ->
+                    ( { model | state = Edit emod login }
+                    , sendUIMsg model.location
+                        login
+                        (UI.SaveBlogEntry sbe)
+                    )
 
-        ( EditListingMsg em, EditListing es ) ->
+                Edit.None ->
+                    ( { model | state = Edit emod login }, Cmd.none )
+
+                Edit.Cancel ->
+                    ( { model
+                        | state =
+                            ShowMessage
+                                { message = "loading articles"
+                                }
+                                login
+                      }
+                    , sendUIMsg model.location
+                        login
+                        UI.GetListing
+                    )
+
+        ( EditListingMsg em, EditListing es login ) ->
             let
                 ( emod, ecmd ) =
                     EditListing.update em es
             in
             case ecmd of
                 EditListing.New ->
-                    ( { model | state = Edit <| Edit.initNew emod.login }, Cmd.none )
+                    ( { model | state = Edit Edit.initNew login }, Cmd.none )
 
                 EditListing.Selected id ->
                     ( model
-                    , Http.post
-                        { url = model.location ++ "/user"
-                        , body =
-                            Http.jsonBody
-                                (UI.encodeSendMsg UI.GetListing
-                                    emod.login.uid
-                                    emod.login.pwd
-                                )
-                        , expect = Http.expectJson UserReplyData UI.serverResponseDecoder
-                        }
+                    , sendUIMsg model.location
+                        login
+                        (UI.GetBlogEntry id)
                     )
 
         ( BadErrorMsg bm, BadError bs prevstate ) ->

@@ -31,18 +31,11 @@ pub struct BlogListEntry {
   changeddate: i64,
 }
 
-#[derive(Serialize, Debug, Clone)]
-pub struct UpdateBlogEntry {
-  id: i64,
+#[derive(Deserialize, Debug, Clone)]
+pub struct SaveBlogEntry {
+  id: Option<i64>,
   title: String,
   content: String,
-}
-
-#[derive(Serialize, Debug, Clone)]
-pub struct NewBlogEntry {
-  title: String,
-  content: String,
-  user: i64,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -214,34 +207,36 @@ pub fn add_tag(dbfile: &Path, name: &str, user: i64) -> Result<i64, Box<dyn Erro
   Ok(conn.last_insert_rowid())
 }
 
-pub fn new_blogentry(dbfile: &Path, entry: &NewBlogEntry) -> Result<i64, Box<dyn Error>> {
+pub fn save_blogentry(
+  dbfile: &Path,
+  uid: i64,
+  entry: &SaveBlogEntry,
+) -> Result<i64, Box<dyn Error>> {
   let conn = Connection::open(dbfile)?;
 
   let now = naiow()?;
 
-  println!("adding blogentry: {}", entry.title);
-  conn.execute(
-    "INSERT INTO blogentry (title, content, user, createdate, changeddate)
-                VALUES (?1, ?2, ?3, ?4, ?5)",
-    params![entry.title, entry.content, entry.user, now, now],
-  )?;
-
-  Ok(conn.last_insert_rowid())
-}
-
-pub fn update_blogentry(dbfile: &Path, entry: &UpdateBlogEntry) -> Result<(), Box<dyn Error>> {
-  let conn = Connection::open(dbfile)?;
-
-  let now = naiow()?;
-
-  println!("adding blogentry: {}", entry.title);
-  conn.execute(
-    "UPDATE blogentry SET title = ?1, content = ?2, changeddate = ?3
+  match entry.id {
+    Some(id) => {
+      println!("updating blogentry: {}", entry.title);
+      conn.execute(
+        "UPDATE blogentry SET title = ?1, content = ?2, changeddate = ?3
      WHERE id = ?4",
-    params![entry.title, entry.content, now, entry.id],
-  )?;
+        params![entry.title, entry.content, now, entry.id],
+      )?;
+      Ok(id)
+    }
+    None => {
+      println!("adding blogentry: {}", entry.title);
+      conn.execute(
+        "INSERT INTO blogentry (title, content, user, createdate, changeddate)
+                VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![entry.title, entry.content, uid, now, now],
+      )?;
 
-  Ok(())
+      Ok(conn.last_insert_rowid())
+    }
+  }
 }
 
 pub fn read_blogentry(dbfile: &Path, id: i64) -> Result<FullBlogEntry, Box<dyn Error>> {

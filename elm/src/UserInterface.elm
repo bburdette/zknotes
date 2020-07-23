@@ -10,6 +10,7 @@ type SendMsg
     | Login
     | GetListing
     | GetBlogEntry Int
+    | SaveBlogEntry Data.SaveBlogEntry
 
 
 type ServerResponse
@@ -19,6 +20,8 @@ type ServerResponse
     | InvalidUserOrPwd
     | LoggedIn
     | EntryListing (List Data.BlogListEntry)
+    | SavedBlogEntry Int
+    | BlogEntry Data.FullBlogEntry
     | ServerError String
 
 
@@ -55,6 +58,14 @@ encodeSendMsg sm uid pwd =
                 , ( "data", JE.int id )
                 ]
 
+        SaveBlogEntry sbe ->
+            JE.object
+                [ ( "what", JE.string "saveblogentry" )
+                , ( "uid", JE.string uid )
+                , ( "pwd", JE.string pwd )
+                , ( "data", Data.encodeSaveBlogEntry sbe )
+                ]
+
 
 encodeEmail : String -> JE.Value
 encodeEmail email =
@@ -88,6 +99,12 @@ serverResponseDecoder =
 
                 "listing" ->
                     JD.map EntryListing (JD.at [ "content" ] <| JD.list Data.decodeBlogListEntry)
+
+                "savedblogentry" ->
+                    JD.map SavedBlogEntry (JD.at [ "content" ] <| JD.int)
+
+                "blogentry" ->
+                    JD.map BlogEntry (JD.at [ "content" ] <| Data.decodeFullBlogEntry)
 
                 wat ->
                     JD.succeed

@@ -1,6 +1,7 @@
 module Data exposing (..)
 
 import Json.Decode as JD
+import Json.Encode as JE
 
 
 type alias BlogListEntry =
@@ -20,6 +21,24 @@ type alias FullBlogEntry =
     , createdate : Int
     , changeddate : Int
     }
+
+
+type alias SaveBlogEntry =
+    { id : Maybe Int
+    , title : String
+    , content : String
+    }
+
+
+encodeSaveBlogEntry : SaveBlogEntry -> JE.Value
+encodeSaveBlogEntry sbe =
+    JE.object <|
+        (Maybe.map (\id -> [ ( "id", JE.int id ) ]) sbe.id
+            |> Maybe.withDefault []
+        )
+            ++ [ ( "title", JE.string sbe.title )
+               , ( "content", JE.string sbe.content )
+               ]
 
 
 type alias Login =
