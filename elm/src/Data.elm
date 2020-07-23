@@ -12,6 +12,22 @@ type alias BlogListEntry =
     }
 
 
+type alias FullBlogEntry =
+    { id : Int
+    , title : String
+    , content : String
+    , user : Int
+    , createdate : Int
+    , changeddate : Int
+    }
+
+
+type alias Login =
+    { uid : String
+    , pwd : String
+    }
+
+
 decodeBlogListEntry : JD.Decoder BlogListEntry
 decodeBlogListEntry =
     JD.map5 BlogListEntry
@@ -22,7 +38,12 @@ decodeBlogListEntry =
         (JD.field "changeddate" JD.int)
 
 
-type alias Login =
-    { uid : String
-    , pwd : String
-    }
+decodeFullBlogEntry : JD.Decoder FullBlogEntry
+decodeFullBlogEntry =
+    JD.map6 FullBlogEntry
+        (JD.field "id" JD.int)
+        (JD.field "title" JD.string)
+        (JD.field "content" JD.string)
+        (JD.field "user" JD.int)
+        (JD.field "createdate" JD.int)
+        (JD.field "changeddate" JD.int)

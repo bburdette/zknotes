@@ -1,14 +1,16 @@
-module Edit exposing (Model, Msg(..), blockCells, cellView, code, codeBlock, defCell, heading, init, markdownBody, markdownView, mdCells, mkRenderer, rawTextToId, showRunState, update, view)
+module Edit exposing (Command(..), Model, Msg(..), blockCells, cellView, code, codeBlock, defCell, heading, initFull, initNew, markdownBody, markdownView, mdCells, mkRenderer, rawTextToId, showRunState, update, view)
 
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
+import Common
+import Data
 import Dict exposing (Dict)
-import Element exposing (Element)
+import Element as E exposing (Element)
 import Element.Background as EBk
 import Element.Border as EBd
 import Element.Font as Font
 import Element.Input as EI
-import Element.Region
+import Element.Region as ER
 import Html exposing (Attribute, Html)
 import Html.Attributes
 import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..))
@@ -21,36 +23,61 @@ import Schelme.Show exposing (showTerm)
 type Msg
     = OnMarkdownInput String
     | OnSchelmeCodeChanged String String
+    | OnTitleChanged String
+    | SavePress
+    | CancelPress
 
 
 type alias Model =
-    { md : String
+    { login : Data.Login
+    , id : Maybe Int
+    , title : String
+    , md : String
     , cells : CellDict
     }
 
 
+type Command
+    = None
+    | Save
+    | Cancel
+
+
 view : Model -> Element Msg
 view model =
-    Element.row [ Element.width Element.fill ]
-        [ EI.multiline [ Element.width (Element.px 400) ]
-            { onChange = OnMarkdownInput
-            , text = model.md
+    E.column
+        [ E.width E.fill ]
+        [ E.row []
+            [ EI.button Common.buttonStyle { onPress = Just SavePress, label = E.text "Save" }
+            , EI.button Common.buttonStyle { onPress = Just CancelPress, label = E.text "Cancel" }
+            ]
+        , EI.text []
+            { onChange = OnTitleChanged
+            , text = model.title
             , placeholder = Nothing
-            , label = EI.labelHidden "Markdown input"
-            , spellcheck = False
+            , label = EI.labelLeft [] (E.text "title")
             }
-        , case markdownView (mkRenderer model.cells) model.md of
-            Ok rendered ->
-                Element.column
-                    [ Element.spacing 30
-                    , Element.padding 80
-                    , Element.width (Element.fill |> Element.maximum 1000)
-                    , Element.centerX
-                    ]
-                    rendered
+        , E.row [ E.width E.fill ]
+            [ EI.multiline [ E.width (E.px 400) ]
+                { onChange = OnMarkdownInput
+                , text = model.md
+                , placeholder = Nothing
+                , label = EI.labelHidden "Markdown input"
+                , spellcheck = False
+                }
+            , case markdownView (mkRenderer model.cells) model.md of
+                Ok rendered ->
+                    E.column
+                        [ E.spacing 30
+                        , E.padding 80
+                        , E.width (E.fill |> E.maximum 1000)
+                        , E.centerX
+                        ]
+                        rendered
 
-            Err errors ->
-                Element.text errors
+                Err errors ->
+                    E.text errors
+            ]
         ]
 
 
@@ -114,51 +141,51 @@ mkRenderer : CellDict -> Markdown.Renderer.Renderer (Element Msg)
 mkRenderer cellDict =
     { heading = heading
     , paragraph =
-        Element.paragraph
-            [ Element.spacing 15 ]
-    , thematicBreak = Element.none
-    , text = Element.text
-    , strong = \content -> Element.row [ Font.bold ] content
-    , emphasis = \content -> Element.row [ Font.italic ] content
+        E.paragraph
+            [ E.spacing 15 ]
+    , thematicBreak = E.none
+    , text = E.text
+    , strong = \content -> E.row [ Font.bold ] content
+    , emphasis = \content -> E.row [ Font.italic ] content
     , codeSpan = code
     , link =
         \{ title, destination } body ->
-            Element.newTabLink
-                [ Element.htmlAttribute (Html.Attributes.style "display" "inline-flex") ]
+            E.newTabLink
+                [ E.htmlAttribute (Html.Attributes.style "display" "inline-flex") ]
                 { url = destination
                 , label =
-                    Element.paragraph
-                        [ Font.color (Element.rgb255 0 0 255)
+                    E.paragraph
+                        [ Font.color (E.rgb255 0 0 255)
                         ]
                         body
                 }
-    , hardLineBreak = Html.br [] [] |> Element.html
+    , hardLineBreak = Html.br [] [] |> E.html
     , image =
         \image ->
             case image.title of
                 Just title ->
-                    Element.image [ Element.width Element.fill ] { src = image.src, description = image.alt }
+                    E.image [ E.width E.fill ] { src = image.src, description = image.alt }
 
                 Nothing ->
-                    Element.image [ Element.width Element.fill ] { src = image.src, description = image.alt }
+                    E.image [ E.width E.fill ] { src = image.src, description = image.alt }
     , blockQuote =
         \children ->
-            Element.column
+            E.column
                 [ EBd.widthEach { top = 0, right = 0, bottom = 0, left = 10 }
-                , Element.padding 10
-                , EBd.color (Element.rgb255 145 145 145)
-                , EBk.color (Element.rgb255 245 245 245)
+                , E.padding 10
+                , EBd.color (E.rgb255 145 145 145)
+                , EBk.color (E.rgb255 245 245 245)
                 ]
                 children
     , unorderedList =
         \items ->
-            Element.column [ Element.spacing 15 ]
+            E.column [ E.spacing 15 ]
                 (items
                     |> List.map
                         (\(ListItem task children) ->
-                            Element.row [ Element.spacing 5 ]
-                                [ Element.row
-                                    [ Element.alignTop ]
+                            E.row [ E.spacing 5 ]
+                                [ E.row
+                                    [ E.alignTop ]
                                     ((case task of
                                         IncompleteTask ->
                                             EI.defaultCheckbox False
@@ -167,9 +194,9 @@ mkRenderer cellDict =
                                             EI.defaultCheckbox True
 
                                         NoTask ->
-                                            Element.text "•"
+                                            E.text "•"
                                      )
-                                        :: Element.text " "
+                                        :: E.text " "
                                         :: children
                                     )
                                 ]
@@ -177,13 +204,13 @@ mkRenderer cellDict =
                 )
     , orderedList =
         \startingIndex items ->
-            Element.column [ Element.spacing 15 ]
+            E.column [ E.spacing 15 ]
                 (items
                     |> List.indexedMap
                         (\index itemBlocks ->
-                            Element.row [ Element.spacing 5 ]
-                                [ Element.row [ Element.alignTop ]
-                                    (Element.text (String.fromInt (index + startingIndex) ++ " ") :: itemBlocks)
+                            E.row [ E.spacing 5 ]
+                                [ E.row [ E.alignTop ]
+                                    (E.text (String.fromInt (index + startingIndex) ++ " ") :: itemBlocks)
                                 ]
                         )
                 )
@@ -197,37 +224,37 @@ mkRenderer cellDict =
                 |> Markdown.Html.withAttribute "name"
                 |> Markdown.Html.withAttribute "schelmecode"
             ]
-    , table = Element.column []
-    , tableHeader = Element.column []
-    , tableBody = Element.column []
-    , tableRow = Element.row []
+    , table = E.column []
+    , tableHeader = E.column []
+    , tableBody = E.column []
+    , tableRow = E.row []
     , tableHeaderCell =
         \maybeAlignment children ->
-            Element.paragraph [] children
-    , tableCell = Element.paragraph []
+            E.paragraph [] children
+    , tableCell = E.paragraph []
     }
 
 
 cellView : CellDict -> List (Element Msg) -> String -> String -> Element Msg
 cellView (CellDict cellDict) renderedChildren name schelmeCode =
-    Element.column
+    E.column
         [ EBd.shadow
             { offset = ( 0.3, 0.3 )
             , size = 2
             , blur = 0.5
-            , color = Element.rgba255 0 0 0 0.22
+            , color = E.rgba255 0 0 0 0.22
             }
-        , Element.padding 20
-        , Element.spacing 30
-        , Element.centerX
+        , E.padding 20
+        , E.spacing 30
+        , E.centerX
         , Font.center
         ]
-        (Element.row [ Element.spacing 20 ]
-            [ Element.el
+        (E.row [ E.spacing 20 ]
+            [ E.el
                 [ Font.bold
                 , Font.size 30
                 ]
-                (Element.text name)
+                (E.text name)
             , EI.text []
                 { onChange = OnSchelmeCodeChanged name
                 , placeholder = Nothing
@@ -242,7 +269,7 @@ cellView (CellDict cellDict) renderedChildren name schelmeCode =
                 |> Dict.get name
                 |> Maybe.map showRunState
                 |> Maybe.withDefault
-                    (Element.text "<reserr>")
+                    (E.text "<reserr>")
             ]
             :: renderedChildren
         )
@@ -250,19 +277,19 @@ cellView (CellDict cellDict) renderedChildren name schelmeCode =
 
 showRunState : DictCell -> Element Msg
 showRunState cell =
-    Element.el [ Element.width Element.fill ] <|
+    E.el [ E.width E.fill ] <|
         case cell.runstate of
             RsOk term ->
-                Element.text <| showTerm term
+                E.text <| showTerm term
 
             RsErr s ->
-                Element.el [ Font.color <| Element.rgb 1 0.1 0.1 ] <| Element.text <| "err: " ++ s
+                E.el [ Font.color <| E.rgb 1 0.1 0.1 ] <| E.text <| "err: " ++ s
 
             RsUnevaled ->
-                Element.text <| "unevaled"
+                E.text <| "unevaled"
 
             RsBlocked _ id ->
-                Element.text <| "blocked on cell: " ++ dictCcr.showId id
+                E.text <| "blocked on cell: " ++ dictCcr.showId id
 
 
 rawTextToId : String -> String
@@ -274,7 +301,7 @@ rawTextToId rawText =
 
 heading : { level : Block.HeadingLevel, rawText : String, children : List (Element msg) } -> Element msg
 heading { level, rawText, children } =
-    Element.paragraph
+    E.paragraph
         [ Font.size
             (case level of
                 Block.H1 ->
@@ -288,10 +315,10 @@ heading { level, rawText, children } =
             )
         , Font.bold
         , Font.family [ Font.typeface "Montserrat" ]
-        , Element.Region.heading (Block.headingLevelToInt level)
-        , Element.htmlAttribute
+        , ER.heading (Block.headingLevelToInt level)
+        , E.htmlAttribute
             (Html.Attributes.attribute "name" (rawTextToId rawText))
-        , Element.htmlAttribute
+        , E.htmlAttribute
             (Html.Attributes.id (rawTextToId rawText))
         ]
         children
@@ -299,11 +326,11 @@ heading { level, rawText, children } =
 
 code : String -> Element msg
 code snippet =
-    Element.el
+    E.el
         [ EBk.color
-            (Element.rgba 0 0 0 0.04)
+            (E.rgba 0 0 0 0.04)
         , EBd.rounded 2
-        , Element.paddingXY 5 3
+        , E.paddingXY 5 3
         , Font.family
             [ Font.external
                 { url = "https://fonts.googleapis.com/css?family=Source+Code+Pro"
@@ -311,16 +338,16 @@ code snippet =
                 }
             ]
         ]
-        (Element.text snippet)
+        (E.text snippet)
 
 
 codeBlock : { body : String, language : Maybe String } -> Element msg
 codeBlock details =
-    Element.el
-        [ EBk.color (Element.rgba 0 0 0 0.03)
-        , Element.htmlAttribute (Html.Attributes.style "white-space" "pre")
-        , Element.padding 20
-        , Element.width Element.fill
+    E.el
+        [ EBk.color (E.rgba 0 0 0 0.03)
+        , E.htmlAttribute (Html.Attributes.style "white-space" "pre")
+        , E.padding 20
+        , E.width E.fill
         , Font.family
             [ Font.external
                 { url = "https://fonts.googleapis.com/css?family=Source+Code+Pro"
@@ -328,7 +355,7 @@ codeBlock details =
                 }
             ]
         ]
-        (Element.text details.body)
+        (E.text details.body)
 
 
 markdownBody : String
@@ -359,8 +386,8 @@ markdownBody =
 """
 
 
-init : Model
-init =
+initFull : Data.Login -> Data.FullBlogEntry -> Model
+initFull login blogentry =
     let
         cells =
             Debug.log "newcells"
@@ -373,14 +400,48 @@ init =
             evalCellsFully
                 (mkCc cells)
     in
-    { md = markdownBody
+    { login = login
+    , id = Just blogentry.id
+    , title = blogentry.title
+    , md = blogentry.content
     , cells = Debug.log "evaled cells: " <| getCd cc
     }
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
+initNew : Data.Login -> Model
+initNew login =
+    let
+        cells =
+            Debug.log "newcells"
+                (markdownBody
+                    |> mdCells
+                    |> Result.withDefault (CellDict Dict.empty)
+                )
+
+        ( cc, result ) =
+            evalCellsFully
+                (mkCc cells)
+    in
+    { login = login
+    , id = Nothing
+    , title = ""
+    , md = ""
+    , cells = Debug.log "evaled cells: " <| getCd cc
+    }
+
+
+update : Msg -> Model -> ( Model, Command )
 update msg model =
     case msg of
+        SavePress ->
+            ( model, Save )
+
+        CancelPress ->
+            ( model, Cancel )
+
+        OnTitleChanged t ->
+            ( { model | title = t }, None )
+
         OnMarkdownInput newMarkdown ->
             let
                 cells =
@@ -398,7 +459,7 @@ update msg model =
                 | md = newMarkdown
                 , cells = Debug.log "evaled cells: " <| getCd cc
               }
-            , Cmd.none
+            , None
             )
 
         OnSchelmeCodeChanged name string ->
@@ -417,5 +478,5 @@ update msg model =
             ( { model
                 | cells = getCd cc
               }
-            , Cmd.none
+            , None
             )

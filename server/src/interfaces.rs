@@ -1,23 +1,11 @@
-// extern crate crypto_hash;
-// // extern crate bail! extern crate lettre;
-// extern crate lettre_email;
-// extern crate rand;
-// extern crate serde_json;
-// extern crate time;
-// extern crate uuid;
-
+use config::Config;
 use crypto_hash::{hex_digest, Algorithm};
 use email;
-// use bail!;
-// use meta_tag_base;
-// use meta_tag_base::{CopyTagBase, MetaTagBase, PubTagBase};
 use serde_json::Value;
 use simple_error;
 use sqldata;
 use std::error::Error;
 use std::path::Path;
-// use std::sync::{Arc, RwLock};
-use config::Config;
 use util;
 use uuid::Uuid;
 
@@ -69,7 +57,6 @@ pub fn user_interface(config: &Config, msg: UserMessage) -> Result<ServerRespons
         // user does not exist, which is what we want for a new user.
         // get email from 'data'.
         let msgdata = Option::ok_or(msg.data, "malformed registration data")?;
-
         let rd: RegistrationData = serde_json::from_value(msgdata)?;
         // TODO: make a real registration key
         let registration_key = Uuid::new_v4().to_string();
@@ -166,6 +153,16 @@ fn user_interface_loggedin(
       Ok(ServerResponse {
         what: "listing".to_string(),
         content: serde_json::to_value(entries)?, // return api token that expires?
+      })
+    }
+    "getblogentry" => {
+      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      let id: i64 = serde_json::from_value(msgdata.clone())?;
+
+      let entry = sqldata::read_blogentry(Path::new(&config.db), id)?;
+      Ok(ServerResponse {
+        what: "blogentry".to_string(),
+        content: serde_json::to_value(entry)?, // return api token that expires?
       })
     }
     wat => Err(Box::new(simple_error::SimpleError::new(format!(

@@ -9,6 +9,7 @@ type SendMsg
     = Register String
     | Login
     | GetListing
+    | GetBlogEntry Int
 
 
 type ServerResponse
@@ -44,6 +45,14 @@ encodeSendMsg sm uid pwd =
                 [ ( "what", JE.string "getlisting" )
                 , ( "uid", JE.string uid )
                 , ( "pwd", JE.string pwd )
+                ]
+
+        GetBlogEntry id ->
+            JE.object
+                [ ( "what", JE.string "getblogentry" )
+                , ( "uid", JE.string uid )
+                , ( "pwd", JE.string pwd )
+                , ( "data", JE.int id )
                 ]
 
 

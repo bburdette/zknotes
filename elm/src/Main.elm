@@ -225,10 +225,21 @@ update msg model =
             in
             case ecmd of
                 EditListing.New ->
-                    ( { model | state = Edit Edit.init }, Cmd.none )
+                    ( { model | state = Edit <| Edit.initNew emod.login }, Cmd.none )
 
                 EditListing.Selected id ->
-                    ( { model | state = Edit Edit.init }, Cmd.none )
+                    ( model
+                    , Http.post
+                        { url = model.location ++ "/user"
+                        , body =
+                            Http.jsonBody
+                                (UI.encodeSendMsg UI.GetListing
+                                    emod.login.uid
+                                    emod.login.pwd
+                                )
+                        , expect = Http.expectJson UserReplyData UI.serverResponseDecoder
+                        }
+                    )
 
         ( BadErrorMsg bm, BadError bs prevstate ) ->
             let
