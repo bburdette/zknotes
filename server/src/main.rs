@@ -39,7 +39,7 @@ use config::Config;
 use futures::future::Future;
 use interfaces::{PublicMessage, ServerResponse, UserMessage};
 use std::error::Error;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::SystemTime;
 
@@ -117,9 +117,8 @@ fn register(state: web::Data<Config>, req: HttpRequest) -> HttpResponse {
   info!("registration: uid: {:?}", req.match_info().get("uid"));
   match (req.match_info().get("uid"), req.match_info().get("key")) {
     (Some(uid), Some(key)) => {
-      let dbp = Path::new(&state.db);
       // read user record.  does the reg key match?
-      match sqldata::read_user(dbp, uid) {
+      match sqldata::read_user(state.db.as_path(), uid) {
         Ok(user) => {
           println!("user {:?}", user);
           println!("user.registration_key {:?}", user.registration_key);
@@ -127,7 +126,7 @@ fn register(state: web::Data<Config>, req: HttpRequest) -> HttpResponse {
           if user.registration_key == Some(key.to_string()) {
             let mut mu = user;
             mu.registration_key = None;
-            match sqldata::update_user(dbp, &mu) {
+            match sqldata::update_user(state.db.as_path(), &mu) {
               Ok(_) => HttpResponse::Ok().body(
                 format!(
                   "<h1>You are registered!<h1> <a href=\"{}\">\
@@ -154,7 +153,7 @@ fn defcon() -> Config {
     ip: "127.0.0.1".to_string(),
     port: 8000,
     createdirs: false,
-    db: "./mahbloag.db".to_string(),
+    db: PathBuf::from("./mahbloag.db"),
     mainsite: "https:://mahbloag.practica.site/".to_string(),
     appname: "mahbloag".to_string(),
     domain: "practica.site".to_string(),
@@ -191,10 +190,8 @@ fn err_main() -> Result<(), Box<dyn Error>> {
 
   let config = load_config();
 
-  let dbp = Path::new(&config.db);
-
-  if !dbp.exists() {
-    sqldata::dbinit(dbp)?;
+  if !config.db.as_path().exists() {
+    sqldata::dbinit(config.db.as_path())?;
   }
 
   println!("config: {:?}", config);
