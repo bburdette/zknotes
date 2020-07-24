@@ -1,31 +1,27 @@
 module PublicInterface exposing (SendMsg(..), ServerResponse(..), encodeSendMsg, serverResponseDecoder)
 
+import Data
 import Json.Decode as JD
 import Json.Encode as JE
 import Util
 
 
 type SendMsg
-    = GetBloag String Int
+    = GetBlogEntry Int
 
 
 type ServerResponse
-    = ReceiveFail
-    | ServerError String
+    = ServerError String
+    | BlogEntry Data.FullBlogEntry
 
 
 encodeSendMsg : SendMsg -> JE.Value
 encodeSendMsg sm =
     case sm of
-        GetBloag uid beid ->
+        GetBlogEntry beid ->
             JE.object
-                [ ( "what", JE.string "getbloag" )
-                , ( "data"
-                  , JE.object
-                        [ ( "uid", JE.string uid )
-                        , ( "beid", JE.int beid )
-                        ]
-                  )
+                [ ( "what", JE.string "getblogentry" )
+                , ( "data", JE.int beid )
                 ]
 
 
@@ -34,6 +30,9 @@ serverResponseDecoder =
     JD.andThen
         (\what ->
             case what of
+                "blogentry" ->
+                    JD.map BlogEntry (JD.at [ "content" ] <| Data.decodeFullBlogEntry)
+
                 "server error" ->
                     JD.map ServerError (JD.at [ "content" ] JD.string)
 

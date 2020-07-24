@@ -1,4 +1,4 @@
-module View exposing (Command(..), Model, Msg(..), blockCells, cellView, code, codeBlock, defCell, heading, initFull, initNew, markdownBody, markdownView, mdCells, mkRenderer, rawTextToId, setId, showRunState, update, view)
+module View exposing (Command(..), Model, Msg(..), blockCells, cellView, code, codeBlock, defCell, heading, initFull, initNew, initSbe, markdownBody, markdownView, mdCells, mkRenderer, rawTextToId, setId, showRunState, update, view)
 
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
@@ -45,7 +45,7 @@ view model =
         [ E.row []
             [ EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "Done" }
             ]
-        , E.text "title"
+        , E.text model.title
         , E.row [ E.width E.fill ]
             [ case markdownView (mkRenderer model.cells) model.md of
                 Ok rendered ->
@@ -383,6 +383,27 @@ initFull blogentry =
                 (mkCc cells)
     in
     { id = Just blogentry.id
+    , title = blogentry.title
+    , md = blogentry.content
+    , cells = Debug.log "evaled cells: " <| getCd cc
+    }
+
+
+initSbe : Data.SaveBlogEntry -> Model
+initSbe blogentry =
+    let
+        cells =
+            Debug.log "newcells"
+                (markdownBody
+                    |> mdCells
+                    |> Result.withDefault (CellDict Dict.empty)
+                )
+
+        ( cc, result ) =
+            evalCellsFully
+                (mkCc cells)
+    in
+    { id = blogentry.id
     , title = blogentry.title
     , md = blogentry.content
     , cells = Debug.log "evaled cells: " <| getCd cc

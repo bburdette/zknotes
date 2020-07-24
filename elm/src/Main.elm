@@ -28,24 +28,35 @@ import Schelme.Show exposing (showTerm)
 import ShowMessage
 import UserInterface as UI
 import Util
+import View
 
 
 type Msg
     = LoginMsg Login.Msg
     | BadErrorMsg BadError.Msg
+    | ViewMsg View.Msg
     | EditMsg Edit.Msg
     | EditListingMsg EditListing.Msg
     | ShowMessageMsg ShowMessage.Msg
     | UserReplyData (Result Http.Error UI.ServerResponse)
     | PublicReplyData (Result Http.Error PI.ServerResponse)
+    | Noop
+
+
+type BlogMode
+    = BmView
+    | BmEdit
 
 
 type State
     = Login Login.Model
     | Edit Edit.Model Data.Login
     | EditListing EditListing.Model Data.Login
+    | View View.Model
+    | EView View.Model State
     | BadError BadError.Model State
     | ShowMessage ShowMessage.Model Data.Login
+    | BlogWait State BlogMode
 
 
 type alias Flags =
@@ -65,26 +76,68 @@ type alias Model =
     }
 
 
+stateLogin : State -> Maybe Data.Login
+stateLogin state =
+    case state of
+        Login lmod ->
+            Just { uid = lmod.userId, pwd = lmod.password }
+
+        Edit _ login ->
+            Just login
+
+        EditListing _ login ->
+            Just login
+
+        View _ ->
+            Nothing
+
+        EView _ evstate ->
+            stateLogin evstate
+
+        BadError _ bestate ->
+            stateLogin bestate
+
+        ShowMessage _ login ->
+            Just login
+
+        BlogWait bwstate _ ->
+            stateLogin bwstate
+
+
+viewState : Util.Size -> State -> Element Msg
+viewState size state =
+    case state of
+        Login lem ->
+            Element.map LoginMsg <| Login.view size lem
+
+        EditListing em _ ->
+            Element.map EditListingMsg <| EditListing.view em
+
+        ShowMessage em _ ->
+            Element.map ShowMessageMsg <| ShowMessage.view em
+
+        View em ->
+            Element.map ViewMsg <| View.view em
+
+        EView em _ ->
+            Element.map ViewMsg <| View.view em
+
+        Edit em _ ->
+            Element.map EditMsg <| Edit.view em
+
+        BadError em _ ->
+            Element.map BadErrorMsg <| BadError.view em
+
+        BlogWait innerState _ ->
+            Element.map (\_ -> Noop) (viewState size innerState)
+
+
 view : Model -> { title : String, body : List (Html Msg) }
 view model =
     { title = "mah bloag!"
     , body =
         [ Element.layout [] <|
-            case model.state of
-                Login lem ->
-                    Element.map LoginMsg <| Login.view model.size lem
-
-                EditListing em _ ->
-                    Element.map EditListingMsg <| EditListing.view em
-
-                ShowMessage em _ ->
-                    Element.map ShowMessageMsg <| ShowMessage.view em
-
-                Edit em _ ->
-                    Element.map EditMsg <| Edit.view em
-
-                BadError em _ ->
-                    Element.map BadErrorMsg <| BadError.view em
+            viewState model.size model.state
         ]
     }
 
@@ -154,11 +207,20 @@ update msg model =
                         UI.Login
                     )
 
+        ( PublicReplyData prd, state ) ->
+            case prd of
+                Err e ->
+                    ( { model | state = BadError (BadError.initialModel <| Util.httpErrorString e) model.state }, Cmd.none )
+
+                Ok piresponse ->
+                    case piresponse of
+                        PI.ServerError e ->
+                            ( { model | state = BadError (BadError.initialModel e) state }, Cmd.none )
+
+                        PI.BlogEntry fbe ->
+                            ( { model | state = View (View.initFull fbe) }, Cmd.none )
+
         ( UserReplyData urd, state ) ->
-            let
-                _ =
-                    Debug.log "( UserReplyData urd," urd
-            in
             case urd of
                 Err e ->
                     ( { model | state = BadError (BadError.initialModel <| Util.httpErrorString e) model.state }, Cmd.none )
@@ -211,6 +273,19 @@ update msg model =
                                 EditListing _ login ->
                                     ( { model | state = Edit (Edit.initFull fbe) login }, Cmd.none )
 
+                                BlogWait bwstate mode ->
+                                    case mode of
+                                        BmView ->
+                                            ( { model | state = EView (View.initFull fbe) bwstate }, Cmd.none )
+
+                                        BmEdit ->
+                                            case stateLogin state of
+                                                Just login ->
+                                                    ( { model | state = Edit (Edit.initFull fbe) login }, Cmd.none )
+
+                                                Nothing ->
+                                                    ( { model | state = BadError (BadError.initialModel "can't edit - not logged in!") state }, Cmd.none )
+
                                 _ ->
                                     ( { model | state = BadError (BadError.initialModel "unexpected blog message") state }, Cmd.none )
 
@@ -241,6 +316,30 @@ update msg model =
                         UI.InvalidUserOrPwd ->
                             ( { model | state = BadError (BadError.initialModel "Invalid username or password.") state }, Cmd.none )
 
+        ( ViewMsg em, View es ) ->
+            let
+                ( emod, ecmd ) =
+                    View.update em es
+            in
+            case ecmd of
+                View.None ->
+                    ( { model | state = View emod }, Cmd.none )
+
+                View.Done ->
+                    ( { model | state = View emod }, Cmd.none )
+
+        ( ViewMsg em, EView es state ) ->
+            let
+                ( emod, ecmd ) =
+                    View.update em es
+            in
+            case ecmd of
+                View.None ->
+                    ( { model | state = EView emod state }, Cmd.none )
+
+                View.Done ->
+                    ( { model | state = state }, Cmd.none )
+
         ( EditMsg em, Edit es login ) ->
             let
                 ( emod, ecmd ) =
@@ -257,7 +356,7 @@ update msg model =
                 Edit.None ->
                     ( { model | state = Edit emod login }, Cmd.none )
 
-                Edit.Cancel ->
+                Edit.Done ->
                     ( { model
                         | state =
                             ShowMessage
@@ -284,6 +383,14 @@ update msg model =
                         (UI.DeleteBlogEntry id)
                     )
 
+                Edit.View sbe ->
+                    -- issue delete and go back to listing.
+                    ( { model
+                        | state = EView (View.initSbe sbe) model.state
+                      }
+                    , Cmd.none
+                    )
+
         ( EditListingMsg em, EditListing es login ) ->
             let
                 ( emod, ecmd ) =
@@ -294,7 +401,14 @@ update msg model =
                     ( { model | state = Edit Edit.initNew login }, Cmd.none )
 
                 EditListing.Selected id ->
-                    ( model
+                    ( { model | state = BlogWait model.state BmEdit }
+                    , sendUIMsg model.location
+                        login
+                        (UI.GetBlogEntry id)
+                    )
+
+                EditListing.View id ->
+                    ( { model | state = BlogWait model.state BmView }
                     , sendUIMsg model.location
                         login
                         (UI.GetBlogEntry id)

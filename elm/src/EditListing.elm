@@ -11,7 +11,8 @@ import Element.Region
 
 
 type Msg
-    = OnSelect Int
+    = SelectPress Int
+    | ViewPress Int
     | NewPress
 
 
@@ -22,6 +23,7 @@ type alias Model =
 
 type Command
     = Selected Int
+    | View Int
     | New
 
 
@@ -36,7 +38,8 @@ view model =
                 (\e ->
                     E.row []
                         [ E.text e.title
-                        , EI.button Common.buttonStyle { onPress = Just (OnSelect e.id), label = E.text "edit" }
+                        , EI.button Common.buttonStyle { onPress = Just (SelectPress e.id), label = E.text "edit" }
+                        , EI.button Common.buttonStyle { onPress = Just (ViewPress e.id), label = E.text "view" }
                         ]
                 )
                 model.entries
@@ -45,9 +48,14 @@ view model =
 update : Msg -> Model -> ( Model, Command )
 update msg model =
     case msg of
-        OnSelect id ->
+        SelectPress id ->
             ( model
             , Selected id
+            )
+
+        ViewPress id ->
+            ( model
+            , View id
             )
 
         NewPress ->

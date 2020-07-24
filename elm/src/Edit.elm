@@ -27,6 +27,7 @@ type Msg
     | SavePress
     | DonePress
     | DeletePress
+    | ViewPress
 
 
 type alias Model =
@@ -41,6 +42,7 @@ type Command
     = None
     | Save Data.SaveBlogEntry
     | Done
+    | View Data.SaveBlogEntry
     | Delete Int
 
 
@@ -48,9 +50,10 @@ view : Model -> Element Msg
 view model =
     E.column
         [ E.width E.fill ]
-        [ E.row []
+        [ E.row [ E.width E.fill ]
             [ EI.button Common.buttonStyle { onPress = Just SavePress, label = E.text "Save" }
             , EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "Done" }
+            , EI.button Common.buttonStyle { onPress = Just ViewPress, label = E.text "View" }
             , EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just DeletePress, label = E.text "Delete" }
             ]
         , EI.text []
@@ -441,6 +444,15 @@ update msg model =
         SavePress ->
             ( model
             , Save
+                { id = model.id
+                , title = model.title
+                , content = model.md
+                }
+            )
+
+        ViewPress ->
+            ( model
+            , View
                 { id = model.id
                 , title = model.title
                 , content = model.md
