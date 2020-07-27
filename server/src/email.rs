@@ -21,7 +21,7 @@ pub fn send_registration(
     (format!(
       "Hey click on this crazy link, {} user '{}'!  \
        {}/register/{}/{}",
-      appname, uid, domain, uid, reg_id
+      appname, uid, mainsite, uid, reg_id
     ))
     .to_string()
     .into_bytes(),

@@ -194,7 +194,7 @@ fn user_interface_loggedin(
 
 // public json msgs don't require login.
 pub fn public_interface(
-  config: &Config,
+  _config: &Config,
   msg: PublicMessage,
 ) -> Result<ServerResponse, Box<dyn Error>> {
   info!("process_public_json, what={}", msg.what.as_str());
