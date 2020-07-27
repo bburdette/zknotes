@@ -2,6 +2,7 @@ module Main exposing (main)
 
 import BadError
 import Browser
+import Browser.Navigation
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
 import Data
@@ -26,6 +27,8 @@ import PublicInterface as PI
 import Random exposing (Seed, initialSeed)
 import Schelme.Show exposing (showTerm)
 import ShowMessage
+import Url exposing (Url)
+import Url.Parser as UP exposing ((</>))
 import UserInterface as UI
 import Util
 import View
@@ -73,6 +76,7 @@ type alias Model =
     { state : State
     , size : Util.Size
     , location : String
+    , navkey : Browser.Navigation.Key
     }
 
 
@@ -140,23 +144,6 @@ view model =
             viewState model.size model.state
         ]
     }
-
-
-main : Platform.Program Flags Model Msg
-main =
-    Browser.document
-        { init =
-            \flags ->
-                ( { state = Login <| Login.initialModel Nothing "mahbloag" (initialSeed (flags.seed + 7))
-                  , size = { width = flags.width, height = flags.height }
-                  , location = flags.location
-                  }
-                , Cmd.none
-                )
-        , view = view
-        , update = update
-        , subscriptions = \model -> Sub.none
-        }
 
 
 sendUIMsg : String -> Data.Login -> UI.SendMsg -> Cmd Msg
@@ -425,3 +412,46 @@ update msg model =
 
         ( _, _ ) ->
             ( model, Cmd.none )
+
+
+init : Flags -> Url -> Browser.Navigation.Key -> ( Model, Cmd Msg )
+init flags url key =
+    let
+        _ =
+            Debug.log "parsed: " (parseUrl url)
+    in
+    ( { state = Login <| Login.initialModel Nothing "mahbloag" (initialSeed (flags.seed + 7))
+      , size = { width = flags.width, height = flags.height }
+      , location = flags.location
+      , navkey = key
+      }
+    , Cmd.none
+    )
+
+
+type Route
+    = PublicBlog Int
+    | Fail
+
+
+parseUrl : Url -> Maybe Route
+parseUrl url =
+    UP.parse
+        (UP.map (\i -> PublicBlog i) <|
+            UP.s
+                "blog"
+                </> UP.int
+        )
+        url
+
+
+main : Platform.Program Flags Model Msg
+main =
+    Browser.application
+        { init = init
+        , view = view
+        , update = update
+        , subscriptions = \model -> Sub.none
+        , onUrlRequest = \_ -> Noop -- UrlRequest -> msg
+        , onUrlChange = \_ -> Noop -- Url -> msg
+        }

@@ -179,7 +179,7 @@ fn user_interface_loggedin(
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let sbe: sqldata::SaveBlogEntry = serde_json::from_value(msgdata.clone())?;
 
-      let beid = sqldata::save_blogentry(Path::new(&config.db), uid, &sbe)?;
+      let beid = sqldata::save_blogentry(&config.db.as_path(), uid, &sbe)?;
       Ok(ServerResponse {
         what: "savedblogentry".to_string(),
         content: serde_json::to_value(beid)?,
@@ -194,11 +194,21 @@ fn user_interface_loggedin(
 
 // public json msgs don't require login.
 pub fn public_interface(
-  _config: &Config,
+  config: &Config,
   msg: PublicMessage,
 ) -> Result<ServerResponse, Box<dyn Error>> {
   info!("process_public_json, what={}", msg.what.as_str());
   match msg.what.as_str() {
+    "getblogentry" => {
+      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      let id: i64 = serde_json::from_value(msgdata.clone())?;
+
+      let entry = sqldata::read_blogentry(&config.db.as_path(), id)?;
+      Ok(ServerResponse {
+        what: "blogentry".to_string(),
+        content: serde_json::to_value(entry)?,
+      })
+    }
     wat => Err(Box::new(simple_error::SimpleError::new(format!(
       "invalid 'what' code:'{}'",
       wat

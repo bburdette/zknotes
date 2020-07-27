@@ -204,11 +204,12 @@ fn err_main() -> Result<(), Box<dyn Error>> {
       .register_data(c.clone()) // <- create app with shared state
       // enable logger
       .wrap(middleware::Logger::default())
-      .route("/", web::get().to(mainpage))
+      //      .route("/", web::get().to(mainpage))
       .service(web::resource("/public").route(web::post().to(public)))
       .service(web::resource("/user").route(web::post().to(user)))
       .service(web::resource(r"/register/{uid}/{key}").route(web::get().to(register)))
-      .service(actix_files::Files::new("/", "static/"))
+      .service(actix_files::Files::new("/static/", "static/"))
+      .service(web::resource("/{tail:.*}").route(web::get().to(mainpage)))
   })
   .bind(format!("{}:{}", config.ip, config.port))?
   .run()?;

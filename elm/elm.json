@@ -18,13 +18,13 @@
             "elm/parser": "1.1.0",
             "elm/random": "1.0.0",
             "elm/time": "1.0.0",
+            "elm/url": "1.0.0",
             "mdgriffith/elm-ui": "1.1.7"
         },
         "indirect": {
             "elm/bytes": "1.0.8",
             "elm/file": "1.0.5",
             "elm/regex": "1.0.0",
-            "elm/url": "1.0.0",
             "elm/virtual-dom": "1.0.2",
             "rtfeldman/elm-hex": "1.0.0"
         }
