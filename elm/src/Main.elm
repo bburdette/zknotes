@@ -59,6 +59,7 @@ type State
     | EView View.Model State
     | BadError BadError.Model State
     | ShowMessage ShowMessage.Model Data.Login
+    | PubShowMessage ShowMessage.Model
     | BlogWait State BlogMode
 
 
@@ -104,6 +105,9 @@ stateLogin state =
         ShowMessage _ login ->
             Just login
 
+        PubShowMessage _ ->
+            Nothing
+
         BlogWait bwstate _ ->
             stateLogin bwstate
 
@@ -118,6 +122,9 @@ viewState size state =
             Element.map EditListingMsg <| EditListing.view em
 
         ShowMessage em _ ->
+            Element.map ShowMessageMsg <| ShowMessage.view em
+
+        PubShowMessage em ->
             Element.map ShowMessageMsg <| ShowMessage.view em
 
         View em ->
@@ -157,6 +164,17 @@ sendUIMsg location login msg =
                     login.pwd
                 )
         , expect = Http.expectJson UserReplyData UI.serverResponseDecoder
+        }
+
+
+sendPIMsg : String -> PI.SendMsg -> Cmd Msg
+sendPIMsg location msg =
+    Http.post
+        { url = location ++ "/public"
+        , body =
+            Http.jsonBody
+                (PI.encodeSendMsg msg)
+        , expect = Http.expectJson PublicReplyData PI.serverResponseDecoder
         }
 
 
@@ -419,13 +437,18 @@ init flags url key =
     let
         _ =
             Debug.log "parsed: " (parseUrl url)
+
+        ( state, cmd ) =
+            parseUrl url
+                |> Maybe.map (routeState flags.location flags.seed)
+                |> Maybe.withDefault ( initLogin flags.seed, Cmd.none )
     in
-    ( { state = Login <| Login.initialModel Nothing "mahbloag" (initialSeed (flags.seed + 7))
+    ( { state = state
       , size = { width = flags.width, height = flags.height }
       , location = flags.location
       , navkey = key
       }
-    , Cmd.none
+    , cmd
     )
 
 
@@ -443,6 +466,26 @@ parseUrl url =
                 </> UP.int
         )
         url
+
+
+initLogin : Int -> State
+initLogin seed =
+    Login <| Login.initialModel Nothing "mahbloag" (initialSeed (seed + 7))
+
+
+routeState : String -> Int -> Route -> ( State, Cmd Msg )
+routeState location seed route =
+    case route of
+        PublicBlog id ->
+            ( PubShowMessage
+                { message = "loading articles"
+                }
+            , sendPIMsg location
+                (PI.GetBlogEntry id)
+            )
+
+        Fail ->
+            ( initLogin seed, Cmd.none )
 
 
 main : Platform.Program Flags Model Msg

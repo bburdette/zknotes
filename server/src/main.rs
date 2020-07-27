@@ -55,7 +55,6 @@ fn sitemap(_req: &HttpRequest) -> Result<NamedFile> {
 
 // simple index handler
 fn mainpage(_state: web::Data<Config>, req: HttpRequest) -> HttpResponse {
-  println!("mainpage");
   info!(
     "remote ip: {:?}, request:{:?}",
     req.connection_info().remote(),
@@ -64,7 +63,6 @@ fn mainpage(_state: web::Data<Config>, req: HttpRequest) -> HttpResponse {
 
   match util::load_string("static/index.html") {
     Ok(s) => {
-      println!("okaey");
       // response
       HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
