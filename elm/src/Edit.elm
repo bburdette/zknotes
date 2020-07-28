@@ -1,4 +1,4 @@
-module Edit exposing (Command(..), Model, Msg(..), initFull, initNew, setId, update, view)
+module Edit exposing (Command(..), Model, Msg(..), initExample, initFull, initNew, setId, update, view)
 
 import CellCommon exposing (..)
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
@@ -108,6 +108,25 @@ initFull blogentry =
 
 initNew : Model
 initNew =
+    let
+        cells =
+            ""
+                |> mdCells
+                |> Result.withDefault (CellDict Dict.empty)
+
+        ( cc, result ) =
+            evalCellsFully
+                (mkCc cells)
+    in
+    { id = Nothing
+    , title = ""
+    , md = ""
+    , cells = getCd cc
+    }
+
+
+initExample : Model
+initExample =
     let
         cells =
             markdownBody

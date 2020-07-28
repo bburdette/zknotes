@@ -422,6 +422,9 @@ update msg model =
                 EditListing.New ->
                     ( { model | state = Edit Edit.initNew login }, Cmd.none )
 
+                EditListing.Example ->
+                    ( { model | state = Edit Edit.initExample login }, Cmd.none )
+
                 EditListing.Selected id ->
                     ( { model | state = BlogWait model.state BmEdit }
                     , sendUIMsg model.location
