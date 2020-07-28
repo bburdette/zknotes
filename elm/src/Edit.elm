@@ -155,7 +155,7 @@ mkRenderer cellDict =
     , codeSpan = code
     , link =
         \{ title, destination } body ->
-            E.newTabLink
+            E.link
                 [ E.htmlAttribute (Html.Attributes.style "display" "inline-flex") ]
                 { url = destination
                 , label =

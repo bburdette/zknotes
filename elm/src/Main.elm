@@ -43,6 +43,8 @@ type Msg
     | ShowMessageMsg ShowMessage.Msg
     | UserReplyData (Result Http.Error UI.ServerResponse)
     | PublicReplyData (Result Http.Error PI.ServerResponse)
+    | LoadUrl String
+    | InternalUrl Url
     | Noop
 
 
@@ -78,6 +80,7 @@ type alias Model =
     , size : Util.Size
     , location : String
     , navkey : Browser.Navigation.Key
+    , seed : Seed
     }
 
 
@@ -181,6 +184,19 @@ sendPIMsg location msg =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case ( msg, model.state ) of
+        ( InternalUrl url, _ ) ->
+            let
+                mblogin =
+                    stateLogin model.state
+
+                ( state, cmd ) =
+                    parseUrl url
+                        |> Maybe.map
+                            (routeState model.location model.seed)
+                        |> Maybe.withDefault ( model.state, Cmd.none )
+            in
+            ( { model | state = state }, cmd )
+
         ( LoginMsg lm, Login ls ) ->
             let
                 ( lmod, lcmd ) =
@@ -248,6 +264,7 @@ update msg model =
                                                 { message = "loading articles"
                                                 }
                                                 { uid = lmod.userId, pwd = lmod.password }
+                                        , seed = lmod.seed -- save the seed!
                                       }
                                     , sendUIMsg model.location
                                         { uid =
@@ -438,15 +455,19 @@ init flags url key =
         _ =
             Debug.log "parsed: " (parseUrl url)
 
+        seed =
+            initialSeed (flags.seed + 7)
+
         ( state, cmd ) =
             parseUrl url
-                |> Maybe.map (routeState flags.location flags.seed)
-                |> Maybe.withDefault ( initLogin flags.seed, Cmd.none )
+                |> Maybe.map (routeState flags.location seed)
+                |> Maybe.withDefault ( initLogin seed, Cmd.none )
     in
     ( { state = state
       , size = { width = flags.width, height = flags.height }
       , location = flags.location
       , navkey = key
+      , seed = seed
       }
     , cmd
     )
@@ -468,12 +489,16 @@ parseUrl url =
         url
 
 
-initLogin : Int -> State
+initLogin : Seed -> State
 initLogin seed =
-    Login <| Login.initialModel Nothing "mahbloag" (initialSeed (seed + 7))
+    Login <| Login.initialModel Nothing "mahbloag" seed
 
 
-routeState : String -> Int -> Route -> ( State, Cmd Msg )
+
+--
+
+
+routeState : String -> Seed -> Route -> ( State, Cmd Msg )
 routeState location seed route =
     case route of
         PublicBlog id ->
@@ -488,6 +513,20 @@ routeState location seed route =
             ( initLogin seed, Cmd.none )
 
 
+urlRequest : Browser.UrlRequest -> Msg
+urlRequest ur =
+    let
+        _ =
+            Debug.log "ur: " ur
+    in
+    case ur of
+        Browser.Internal url ->
+            InternalUrl url
+
+        Browser.External str ->
+            LoadUrl str
+
+
 main : Platform.Program Flags Model Msg
 main =
     Browser.application
@@ -495,6 +534,14 @@ main =
         , view = view
         , update = update
         , subscriptions = \model -> Sub.none
-        , onUrlRequest = \_ -> Noop -- UrlRequest -> msg
-        , onUrlChange = \_ -> Noop -- Url -> msg
+        , onUrlRequest = urlRequest
+        , onUrlChange =
+            \uc ->
+                let
+                    _ =
+                        Debug.log "uc: " uc
+                in
+                Noop
+
+        -- Url -> msg
         }
