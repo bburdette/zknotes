@@ -91,11 +91,9 @@ initFull : Data.FullBlogEntry -> Model
 initFull blogentry =
     let
         cells =
-            Debug.log "newcells"
-                (markdownBody
-                    |> mdCells
-                    |> Result.withDefault (CellDict Dict.empty)
-                )
+            blogentry.content
+                |> mdCells
+                |> Result.withDefault (CellDict Dict.empty)
 
         ( cc, result ) =
             evalCellsFully
@@ -104,7 +102,7 @@ initFull blogentry =
     { id = Just blogentry.id
     , title = blogentry.title
     , md = blogentry.content
-    , cells = Debug.log "evaled cells: " <| getCd cc
+    , cells = getCd cc
     }
 
 
@@ -112,20 +110,18 @@ initNew : Model
 initNew =
     let
         cells =
-            Debug.log "newcells"
-                (markdownBody
-                    |> mdCells
-                    |> Result.withDefault (CellDict Dict.empty)
-                )
+            markdownBody
+                |> mdCells
+                |> Result.withDefault (CellDict Dict.empty)
 
         ( cc, result ) =
             evalCellsFully
                 (mkCc cells)
     in
     { id = Nothing
-    , title = ""
-    , md = ""
-    , cells = Debug.log "evaled cells: " <| getCd cc
+    , title = "example"
+    , md = markdownBody
+    , cells = getCd cc
     }
 
 

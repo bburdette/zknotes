@@ -69,7 +69,7 @@ initFull blogentry =
     let
         cells =
             Debug.log "newcells"
-                (markdownBody
+                (blogentry.content
                     |> mdCells
                     |> Result.withDefault (CellDict Dict.empty)
                 )
@@ -90,7 +90,7 @@ initSbe blogentry =
     let
         cells =
             Debug.log "newcells"
-                (markdownBody
+                (blogentry.content
                     |> mdCells
                     |> Result.withDefault (CellDict Dict.empty)
                 )
@@ -121,8 +121,8 @@ initNew =
                 (mkCc cells)
     in
     { id = Nothing
-    , title = ""
-    , md = ""
+    , title = "example"
+    , md = markdownBody
     , cells = Debug.log "evaled cells: " <| getCd cc
     }
 
