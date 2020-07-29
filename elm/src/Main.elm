@@ -497,16 +497,12 @@ initLogin seed =
     Login <| Login.initialModel Nothing "mahbloag" seed
 
 
-
---
-
-
 routeState : String -> Seed -> Route -> ( State, Cmd Msg )
 routeState location seed route =
     case route of
         PublicBlog id ->
             ( PubShowMessage
-                { message = "loading articles"
+                { message = "loading article"
                 }
             , sendPIMsg location
                 (PI.GetBlogEntry id)
