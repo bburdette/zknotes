@@ -17,7 +17,7 @@ pub struct FullBlogEntry {
   id: i64,
   title: String,
   content: String,
-  user: i64,
+  blog: i64,
   createdate: i64,
   changeddate: i64,
 }
@@ -46,7 +46,6 @@ pub struct User {
   pub salt: String,
   pub email: String,
   pub registration_key: Option<String>,
-  // current_tb: Option<i32>,
 }
 
 pub fn dbinit(dbfile: &Path) -> rusqlite::Result<()> {
@@ -67,13 +66,27 @@ pub fn dbinit(dbfile: &Path) -> rusqlite::Result<()> {
     params![],
   )?;
 
-  println!("pre tag");
+  println!("pre blog");
   conn.execute(
-    "CREATE TABLE tag (
-                id          INTEGER NOT NULL PRIMARY KEY,
-                name        TEXT NOT NULL UNIQUE,
-                user				INTEGER NOT NULL,
-                FOREIGN KEY(user) REFERENCES user(id)
+    "CREATE TABLE blog (
+                id          	INTEGER NOT NULL PRIMARY KEY,
+                name 					TEXT NOT NULL,
+                createdate 		INTEGER NOT NULL,
+                changeddate 	INTEGER NOT NULL
+                )",
+    params![],
+  )?;
+
+  println!("pre bm");
+  conn.execute(
+    "CREATE TABLE blogmember (
+                user 					INTEGER NOT NULL,
+                blog          INTEGER NOT NULL,
+                createdate 		INTEGER NOT NULL,
+                changeddate 	INTEGER NOT NULL,
+                FOREIGN KEY(user) REFERENCES user(id),
+                FOREIGN KEY(blog) REFERENCES blog(id),
+                CONSTRAINT unq UNIQUE (user, blog)
                 )",
     params![],
   )?;
@@ -84,22 +97,24 @@ pub fn dbinit(dbfile: &Path) -> rusqlite::Result<()> {
                 id          	INTEGER NOT NULL PRIMARY KEY,
                 title					TEXT NOT NULL,
                 content 			TEXT NOT NULL,
-                user 					INTEGER NOT NULL,
+                blog 					INTEGER NOT NULL,
                 createdate 		INTEGER NOT NULL,
                 changeddate 	INTEGER NOT NULL,
-                FOREIGN KEY(user) REFERENCES user(id)
+                FOREIGN KEY(blog) REFERENCES blog(id)
                 )",
     params![],
   )?;
 
-  println!("pre bt");
+  println!("pre bl");
   conn.execute(
-    "CREATE TABLE blogtag (
-                tagid     		   INTEGER NOT NULL,
-                blogentryid      INTEGER NOT NULL,
-                FOREIGN KEY(tagid) REFERENCES tag(id),
-                FOREIGN KEY(blogentryid) REFERENCES blogentry(id),
-                CONSTRAINT unq UNIQUE (tagid, blogentryid)
+    "CREATE TABLE bloglink (
+                blogleft   		 INTEGER NOT NULL,
+                blogright      INTEGER NOT NULL,
+                linkblog 			 INTEGER,
+                FOREIGN KEY(linkblog) REFERENCES blogentry(id),
+                FOREIGN KEY(blogleft) REFERENCES blogentry(id),
+                FOREIGN KEY(blogright) REFERENCES blogentry(id),
+                CONSTRAINT unq UNIQUE (blogleft, blogright)
                 )",
     params![],
   )?;
@@ -243,7 +258,7 @@ pub fn read_blogentry(dbfile: &Path, id: i64) -> Result<FullBlogEntry, Box<dyn E
   let conn = Connection::open(dbfile)?;
 
   let rbe = conn.query_row(
-    "SELECT title, content, user, createdate, changeddate
+    "SELECT title, content, blog, createdate, changeddate
       FROM blogentry WHERE id = ?1",
     params![id],
     |row| {
@@ -251,7 +266,7 @@ pub fn read_blogentry(dbfile: &Path, id: i64) -> Result<FullBlogEntry, Box<dyn E
         id: id,
         title: row.get(0)?,
         content: row.get(1)?,
-        user: row.get(2)?,
+        blog: row.get(2)?,
         createdate: row.get(3)?,
         changeddate: row.get(4)?,
       })
