@@ -12,6 +12,7 @@ type SendMsg
     | GetZkNote Int
     | DeleteZkNote Int
     | SaveZkNote Data.SaveZkNote
+    | SaveZk Data.SaveZk
 
 
 type ServerResponse
@@ -21,7 +22,7 @@ type ServerResponse
     | InvalidUserOrPwd
     | LoggedIn
     | ZkNoteListing (List Data.ZkListNote)
-    | ZkListing (List Data.ZkList)
+    | ZkListing (List Data.Zk)
     | SavedZkNote Int
     | DeletedZkNote Int
     | ZkNote Data.FullZkNote
@@ -77,6 +78,14 @@ encodeSendMsg sm uid pwd =
                 , ( "data", Data.encodeSaveZkNote sbe )
                 ]
 
+        SaveZk sbe ->
+            JE.object
+                [ ( "what", JE.string "savezk" )
+                , ( "uid", JE.string uid )
+                , ( "pwd", JE.string pwd )
+                , ( "data", Data.encodeSaveZk sbe )
+                ]
+
 
 encodeEmail : String -> JE.Value
 encodeEmail email =
@@ -109,7 +118,7 @@ serverResponseDecoder =
                     JD.map ServerError (JD.at [ "content" ] JD.string)
 
                 "zklisting" ->
-                    JD.map ZkListing (JD.at [ "content" ] <| JD.list Data.decodeZkList)
+                    JD.map ZkListing (JD.at [ "content" ] <| JD.list Data.decodeZk)
 
                 "zknotelisting" ->
                     JD.map ZkNoteListing (JD.at [ "content" ] <| JD.list Data.decodeZkListNote)

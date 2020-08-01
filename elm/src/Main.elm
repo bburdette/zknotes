@@ -9,6 +9,7 @@ import Data
 import Dict exposing (Dict)
 import EditListing
 import EditZk
+import EditZkNote
 import Element exposing (Element)
 import Element.Background as EBk
 import Element.Border as EBd
@@ -297,21 +298,27 @@ update msg model =
                                     , Cmd.none
                                     )
 
-                        UI.ZkNote fbe ->
+                        UI.ZkNote zkn ->
                             case state of
                                 EditListing _ login ->
-                                    ( { model | state = EditZk (EditZk.initFull fbe) login }, Cmd.none )
+                                    -- ( { model | state = EditZkNote (EditZkNote.initFull zkn) login }, Cmd.none )
+                                    ( { model | state = BadError (BadError.initialModel "zknoteeditunimplmeented") state }
+                                    , Cmd.none
+                                    )
 
                                 ZkWait bwstate mode ->
                                     case mode of
                                         BmView ->
-                                            ( { model | state = EView (View.initFull fbe) bwstate }, Cmd.none )
+                                            ( { model | state = EView (View.initFull zkn) bwstate }, Cmd.none )
 
                                         BmEdit ->
                                             case stateLogin state of
                                                 Just login ->
-                                                    ( { model | state = EditZk (EditZk.initFull fbe) login }, Cmd.none )
+                                                    ( { model | state = BadError (BadError.initialModel "zknoteeditunimplmeented") state }
+                                                    , Cmd.none
+                                                    )
 
+                                                -- ( { model | state = EditZk (EditZk.initFull zkn) login }, Cmd.none )
                                                 Nothing ->
                                                     ( { model | state = BadError (BadError.initialModel "can't edit - not logged in!") state }, Cmd.none )
 
@@ -375,11 +382,11 @@ update msg model =
                     EditZk.update em es
             in
             case ecmd of
-                EditZk.Save sbe ->
+                EditZk.Save zk ->
                     ( { model | state = EditZk emod login }
                     , sendUIMsg model.location
                         login
-                        (UI.SaveZkNote sbe)
+                        (UI.SaveZk zk)
                     )
 
                 EditZk.None ->
@@ -413,13 +420,15 @@ update msg model =
                     )
 
                 EditZk.View sbe ->
-                    -- issue delete and go back to listing.
-                    ( { model
-                        | state = EView (View.initSbe sbe) model.state
-                      }
+                    ( { model | state = BadError (BadError.initialModel "EditZk.View sbe -> unimplmeented") model.state }
                     , Cmd.none
                     )
 
+        --                 ( { model
+        --     | state = EView (View.initSbe sbe) model.state
+        --   }
+        -- , Cmd.none
+        -- )
         ( EditListingMsg em, EditListing es login ) ->
             let
                 ( emod, ecmd ) =

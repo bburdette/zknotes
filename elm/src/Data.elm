@@ -4,12 +4,19 @@ import Json.Decode as JD
 import Json.Encode as JE
 
 
-type alias ZkList =
+type alias Zk =
     { id : Int
     , name : String
     , description : String
     , createdate : Int
     , changeddate : Int
+    }
+
+
+type alias SaveZk =
+    { id : Maybe Int
+    , name : String
+    , description : String
     }
 
 
@@ -50,15 +57,26 @@ encodeSaveZkNote sbe =
                ]
 
 
+encodeSaveZk : SaveZk -> JE.Value
+encodeSaveZk sbe =
+    JE.object <|
+        (Maybe.map (\id -> [ ( "id", JE.int id ) ]) sbe.id
+            |> Maybe.withDefault []
+        )
+            ++ [ ( "name", JE.string sbe.name )
+               , ( "description", JE.string sbe.description )
+               ]
+
+
 type alias Login =
     { uid : String
     , pwd : String
     }
 
 
-decodeZkList : JD.Decoder ZkList
-decodeZkList =
-    JD.map5 ZkList
+decodeZk : JD.Decoder Zk
+decodeZk =
+    JD.map5 Zk
         (JD.field "id" JD.int)
         (JD.field "name" JD.string)
         (JD.field "description" JD.string)

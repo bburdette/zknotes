@@ -24,7 +24,7 @@ import Schelme.Show exposing (showTerm)
 type Msg
     = OnMarkdownInput String
     | OnSchelmeCodeChanged String String
-    | OnTitleChanged String
+    | OnNameChanged String
     | SavePress
     | DonePress
     | DeletePress
@@ -33,7 +33,7 @@ type Msg
 
 type alias Model =
     { id : Maybe Int
-    , title : String
+    , name : String
     , md : String
     , cells : CellDict
     }
@@ -41,9 +41,9 @@ type alias Model =
 
 type Command
     = None
-    | Save Data.SaveZkNote
+    | Save Data.SaveZk
     | Done
-    | View Data.SaveZkNote
+    | View Data.SaveZk
     | Delete Int
 
 
@@ -58,10 +58,10 @@ view model =
             , EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just DeletePress, label = E.text "Delete" }
             ]
         , EI.text []
-            { onChange = OnTitleChanged
-            , text = model.title
+            { onChange = OnNameChanged
+            , text = model.name
             , placeholder = Nothing
-            , label = EI.labelLeft [] (E.text "title")
+            , label = EI.labelLeft [] (E.text "name")
             }
         , E.row [ E.width E.fill ]
             [ EI.multiline [ E.width (E.px 400) ]
@@ -87,11 +87,11 @@ view model =
         ]
 
 
-initFull : Data.FullZkNote -> Model
-initFull blogentry =
+initFull : Data.Zk -> Model
+initFull zk =
     let
         cells =
-            blogentry.content
+            zk.description
                 |> mdCells
                 |> Result.withDefault (CellDict Dict.empty)
 
@@ -99,9 +99,9 @@ initFull blogentry =
             evalCellsFully
                 (mkCc cells)
     in
-    { id = Just blogentry.id
-    , title = blogentry.title
-    , md = blogentry.content
+    { id = Just zk.id
+    , name = zk.name
+    , md = zk.description
     , cells = getCd cc
     }
 
@@ -119,7 +119,7 @@ initNew =
                 (mkCc cells)
     in
     { id = Nothing
-    , title = ""
+    , name = ""
     , md = ""
     , cells = getCd cc
     }
@@ -138,7 +138,7 @@ initExample =
                 (mkCc cells)
     in
     { id = Nothing
-    , title = "example"
+    , name = "example"
     , md = markdownBody
     , cells = getCd cc
     }
@@ -156,8 +156,8 @@ update msg model =
             ( model
             , Save
                 { id = model.id
-                , title = model.title
-                , content = model.md
+                , name = model.name
+                , description = model.md
                 }
             )
 
@@ -165,8 +165,8 @@ update msg model =
             ( model
             , View
                 { id = model.id
-                , title = model.title
-                , content = model.md
+                , name = model.name
+                , description = model.md
                 }
             )
 
@@ -181,8 +181,8 @@ update msg model =
                 Nothing ->
                     ( model, None )
 
-        OnTitleChanged t ->
-            ( { model | title = t }, None )
+        OnNameChanged t ->
+            ( { model | name = t }, None )
 
         OnMarkdownInput newMarkdown ->
             let

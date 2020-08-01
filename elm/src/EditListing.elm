@@ -19,7 +19,7 @@ type Msg
 
 
 type alias Model =
-    { entries : List Data.ZkList
+    { entries : List Data.Zk
     }
 
 
