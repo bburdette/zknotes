@@ -1,4 +1,4 @@
-module Edit exposing (Command(..), Model, Msg(..), initExample, initFull, initNew, setId, update, view)
+module EditZk exposing (Command(..), Model, Msg(..), initExample, initFull, initNew, setId, update, view)
 
 import CellCommon exposing (..)
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
