@@ -149,39 +149,39 @@ fn user_interface_loggedin(
       content: serde_json::Value::Null, // return api token that expires?
     }),
     "getlisting" => {
-      let entries = sqldata::bloglisting(Path::new(&config.db), uid)?;
+      let entries = sqldata::zklisting(Path::new(&config.db), uid)?;
       Ok(ServerResponse {
         what: "listing".to_string(),
         content: serde_json::to_value(entries)?, // return api token that expires?
       })
     }
-    "getblogentry" => {
+    "getzknote" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let id: i64 = serde_json::from_value(msgdata.clone())?;
 
-      let entry = sqldata::read_blogentry(Path::new(&config.db), id)?;
+      let note = sqldata::read_zknote(Path::new(&config.db), id)?;
       Ok(ServerResponse {
-        what: "blogentry".to_string(),
-        content: serde_json::to_value(entry)?,
+        what: "zknote".to_string(),
+        content: serde_json::to_value(note)?,
       })
     }
-    "deleteblogentry" => {
+    "deletezknote" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let id: i64 = serde_json::from_value(msgdata.clone())?;
 
-      sqldata::delete_blogentry(Path::new(&config.db), uid, id)?;
+      sqldata::delete_zknote(Path::new(&config.db), uid, id)?;
       Ok(ServerResponse {
-        what: "deletedblogentry".to_string(),
+        what: "deletedzknote".to_string(),
         content: serde_json::to_value(id)?,
       })
     }
-    "saveblogentry" => {
+    "savezknote" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let sbe: sqldata::SaveBlogEntry = serde_json::from_value(msgdata.clone())?;
+      let sbe: sqldata::SaveZkNote = serde_json::from_value(msgdata.clone())?;
 
-      let beid = sqldata::save_blogentry(&config.db.as_path(), uid, &sbe)?;
+      let beid = sqldata::save_zknote(&config.db.as_path(), uid, &sbe)?;
       Ok(ServerResponse {
-        what: "savedblogentry".to_string(),
+        what: "savedzknote".to_string(),
         content: serde_json::to_value(beid)?,
       })
     }
@@ -199,14 +199,14 @@ pub fn public_interface(
 ) -> Result<ServerResponse, Box<dyn Error>> {
   info!("process_public_json, what={}", msg.what.as_str());
   match msg.what.as_str() {
-    "getblogentry" => {
+    "getzknote" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let id: i64 = serde_json::from_value(msgdata.clone())?;
 
-      let entry = sqldata::read_blogentry(&config.db.as_path(), id)?;
+      let note = sqldata::read_zknote(&config.db.as_path(), id)?;
       Ok(ServerResponse {
-        what: "blogentry".to_string(),
-        content: serde_json::to_value(entry)?,
+        what: "zknote".to_string(),
+        content: serde_json::to_value(note)?,
       })
     }
     wat => Err(Box::new(simple_error::SimpleError::new(format!(
