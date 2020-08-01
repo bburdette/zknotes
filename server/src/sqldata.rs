@@ -24,7 +24,7 @@ pub struct ZkList {
   changeddate: i64,
 }
 
-#[derive(Serialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct SaveZk {
   id: Option<i64>,
   name: String,
@@ -400,7 +400,7 @@ pub fn delete_zknote(dbfile: &Path, uid: i64, noteid: i64) -> Result<(), Box<dyn
   Ok(())
 }
 
-pub fn zknotelisting(dbfile: &Path, zk: i64, user: i64) -> rusqlite::Result<Vec<ZkNoteList>> {
+pub fn zknotelisting(dbfile: &Path, user: i64, zk: i64) -> rusqlite::Result<Vec<ZkNoteList>> {
   let conn = Connection::open(dbfile)?;
 
   let mut pstmt = conn.prepare(
