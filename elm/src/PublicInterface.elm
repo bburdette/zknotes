@@ -7,18 +7,18 @@ import Util
 
 
 type SendMsg
-    = GetBlogEntry Int
+    = GetZkNote Int
 
 
 type ServerResponse
     = ServerError String
-    | BlogEntry Data.FullBlogEntry
+    | ZkNote Data.FullZkNote
 
 
 encodeSendMsg : SendMsg -> JE.Value
 encodeSendMsg sm =
     case sm of
-        GetBlogEntry beid ->
+        GetZkNote beid ->
             JE.object
                 [ ( "what", JE.string "getblogentry" )
                 , ( "data", JE.int beid )
@@ -31,7 +31,7 @@ serverResponseDecoder =
         (\what ->
             case what of
                 "blogentry" ->
-                    JD.map BlogEntry (JD.at [ "content" ] <| Data.decodeFullBlogEntry)
+                    JD.map ZkNote (JD.at [ "content" ] <| Data.decodeFullZkNote)
 
                 "server error" ->
                     JD.map ServerError (JD.at [ "content" ] JD.string)

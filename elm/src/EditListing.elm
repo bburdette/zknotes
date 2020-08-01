@@ -19,7 +19,7 @@ type Msg
 
 
 type alias Model =
-    { entries : List Data.BlogListEntry
+    { entries : List Data.ZkList
     }
 
 
@@ -41,7 +41,7 @@ view model =
             :: List.map
                 (\e ->
                     E.row [ E.spacing 8 ]
-                        [ E.text e.title
+                        [ E.text e.name
                         , EI.button Common.buttonStyle { onPress = Just (SelectPress e.id), label = E.text "edit" }
                         , EI.button Common.buttonStyle { onPress = Just (ViewPress e.id), label = E.text "view" }
                         , E.link [ Font.color TC.darkBlue, Font.underline ] { url = "blog/" ++ String.fromInt e.id, label = E.text "link" }

@@ -41,9 +41,9 @@ type alias Model =
 
 type Command
     = None
-    | Save Data.SaveBlogEntry
+    | Save Data.SaveZkNote
     | Done
-    | View Data.SaveBlogEntry
+    | View Data.SaveZkNote
     | Delete Int
 
 
@@ -87,7 +87,7 @@ view model =
         ]
 
 
-initFull : Data.FullBlogEntry -> Model
+initFull : Data.FullZkNote -> Model
 initFull blogentry =
     let
         cells =

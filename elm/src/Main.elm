@@ -48,7 +48,7 @@ type Msg
     | Noop
 
 
-type BlogMode
+type ZkMode
     = BmView
     | BmEdit
 
@@ -62,7 +62,7 @@ type State
     | BadError BadError.Model State
     | ShowMessage ShowMessage.Model Data.Login
     | PubShowMessage ShowMessage.Model
-    | BlogWait State BlogMode
+    | ZkWait State ZkMode
 
 
 type alias Flags =
@@ -111,7 +111,7 @@ stateLogin state =
         PubShowMessage _ ->
             Nothing
 
-        BlogWait bwstate _ ->
+        ZkWait bwstate _ ->
             stateLogin bwstate
 
 
@@ -142,7 +142,7 @@ viewState size state =
         BadError em _ ->
             Element.map BadErrorMsg <| BadError.view em
 
-        BlogWait innerState _ ->
+        ZkWait innerState _ ->
             Element.map (\_ -> Noop) (viewState size innerState)
 
 
@@ -238,7 +238,7 @@ update msg model =
                         PI.ServerError e ->
                             ( { model | state = BadError (BadError.initialModel e) state }, Cmd.none )
 
-                        PI.BlogEntry fbe ->
+                        PI.ZkNote fbe ->
                             ( { model | state = View (View.initFull fbe) }, Cmd.none )
 
         ( UserReplyData urd, state ) ->
@@ -280,7 +280,7 @@ update msg model =
                                     , Cmd.none
                                     )
 
-                        UI.EntryListing l ->
+                        UI.ZkListing l ->
                             case state of
                                 ShowMessage _ login ->
                                     ( { model | state = EditListing { entries = l } login }, Cmd.none )
@@ -290,12 +290,19 @@ update msg model =
                                     , Cmd.none
                                     )
 
-                        UI.BlogEntry fbe ->
+                        UI.ZkNoteListing l ->
+                            case state of
+                                _ ->
+                                    ( { model | state = BadError (BadError.initialModel "zknotelisiting unimplmeented") state }
+                                    , Cmd.none
+                                    )
+
+                        UI.ZkNote fbe ->
                             case state of
                                 EditListing _ login ->
                                     ( { model | state = Edit (Edit.initFull fbe) login }, Cmd.none )
 
-                                BlogWait bwstate mode ->
+                                ZkWait bwstate mode ->
                                     case mode of
                                         BmView ->
                                             ( { model | state = EView (View.initFull fbe) bwstate }, Cmd.none )
@@ -311,7 +318,7 @@ update msg model =
                                 _ ->
                                     ( { model | state = BadError (BadError.initialModel "unexpected blog message") state }, Cmd.none )
 
-                        UI.SavedBlogEntry beid ->
+                        UI.SavedZkNote beid ->
                             case state of
                                 Edit emod login ->
                                     ( { model | state = Edit (Edit.setId emod beid) login }, Cmd.none )
@@ -319,7 +326,7 @@ update msg model =
                                 _ ->
                                     ( { model | state = BadError (BadError.initialModel "unexpected blog message") state }, Cmd.none )
 
-                        UI.DeletedBlogEntry beid ->
+                        UI.DeletedZkNote beid ->
                             case state of
                                 ShowMessage _ login ->
                                     ( model
@@ -372,7 +379,7 @@ update msg model =
                     ( { model | state = Edit emod login }
                     , sendUIMsg model.location
                         login
-                        (UI.SaveBlogEntry sbe)
+                        (UI.SaveZkNote sbe)
                     )
 
                 Edit.None ->
@@ -402,7 +409,7 @@ update msg model =
                       }
                     , sendUIMsg model.location
                         login
-                        (UI.DeleteBlogEntry id)
+                        (UI.DeleteZkNote id)
                     )
 
                 Edit.View sbe ->
@@ -426,17 +433,17 @@ update msg model =
                     ( { model | state = Edit Edit.initExample login }, Cmd.none )
 
                 EditListing.Selected id ->
-                    ( { model | state = BlogWait model.state BmEdit }
+                    ( { model | state = ZkWait model.state BmEdit }
                     , sendUIMsg model.location
                         login
-                        (UI.GetBlogEntry id)
+                        (UI.GetZkNote id)
                     )
 
                 EditListing.View id ->
-                    ( { model | state = BlogWait model.state BmView }
+                    ( { model | state = ZkWait model.state BmView }
                     , sendUIMsg model.location
                         login
-                        (UI.GetBlogEntry id)
+                        (UI.GetZkNote id)
                     )
 
         ( BadErrorMsg bm, BadError bs prevstate ) ->
@@ -477,14 +484,14 @@ init flags url key =
 
 
 type Route
-    = PublicBlog Int
+    = PublicZk Int
     | Fail
 
 
 parseUrl : Url -> Maybe Route
 parseUrl url =
     UP.parse
-        (UP.map (\i -> PublicBlog i) <|
+        (UP.map (\i -> PublicZk i) <|
             UP.s
                 "blog"
                 </> UP.int
@@ -500,12 +507,12 @@ initLogin seed =
 routeState : String -> Seed -> Route -> ( State, Cmd Msg )
 routeState location seed route =
     case route of
-        PublicBlog id ->
+        PublicZk id ->
             ( PubShowMessage
                 { message = "loading article"
                 }
             , sendPIMsg location
-                (PI.GetBlogEntry id)
+                (PI.GetZkNote id)
             )
 
         Fail ->

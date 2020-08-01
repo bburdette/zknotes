@@ -64,12 +64,12 @@ view model =
         ]
 
 
-initFull : Data.FullBlogEntry -> Model
-initFull blogentry =
+initFull : Data.FullZkNote -> Model
+initFull zknote =
     let
         cells =
             Debug.log "newcells"
-                (blogentry.content
+                (zknote.content
                     |> mdCells
                     |> Result.withDefault (CellDict Dict.empty)
                 )
@@ -78,19 +78,19 @@ initFull blogentry =
             evalCellsFully
                 (mkCc cells)
     in
-    { id = Just blogentry.id
-    , title = blogentry.title
-    , md = blogentry.content
+    { id = Just zknote.id
+    , title = zknote.title
+    , md = zknote.content
     , cells = Debug.log "evaled cells: " <| getCd cc
     }
 
 
-initSbe : Data.SaveBlogEntry -> Model
-initSbe blogentry =
+initSbe : Data.SaveZkNote -> Model
+initSbe zknote =
     let
         cells =
             Debug.log "newcells"
-                (blogentry.content
+                (zknote.content
                     |> mdCells
                     |> Result.withDefault (CellDict Dict.empty)
                 )
@@ -99,9 +99,9 @@ initSbe blogentry =
             evalCellsFully
                 (mkCc cells)
     in
-    { id = blogentry.id
-    , title = blogentry.title
-    , md = blogentry.content
+    { id = zknote.id
+    , title = zknote.title
+    , md = zknote.content
     , cells = Debug.log "evaled cells: " <| getCd cc
     }
 

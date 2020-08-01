@@ -306,10 +306,10 @@ pub fn zklisting(dbfile: &Path, user: i64) -> rusqlite::Result<Vec<ZkList>> {
   let conn = Connection::open(dbfile)?;
 
   let mut pstmt = conn.prepare(
-    "SELECT id, title, createdate, changeddate
+    "SELECT id, name, description, createdate, changeddate
       FROM zk, zkmember
       where zkmember.user = ?1
-      and zknote.zk = zknote.id",
+      and zkmember.zk = zk.id",
   )?;
 
   let rec_iter = pstmt.query_map(params![user], |row| {

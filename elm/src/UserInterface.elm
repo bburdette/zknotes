@@ -9,9 +9,9 @@ type SendMsg
     = Register String
     | Login
     | GetListing
-    | GetBlogEntry Int
-    | DeleteBlogEntry Int
-    | SaveBlogEntry Data.SaveBlogEntry
+    | GetZkNote Int
+    | DeleteZkNote Int
+    | SaveZkNote Data.SaveZkNote
 
 
 type ServerResponse
@@ -20,10 +20,11 @@ type ServerResponse
     | UnregisteredUser
     | InvalidUserOrPwd
     | LoggedIn
-    | EntryListing (List Data.BlogListEntry)
-    | SavedBlogEntry Int
-    | DeletedBlogEntry Int
-    | BlogEntry Data.FullBlogEntry
+    | ZkNoteListing (List Data.ZkListNote)
+    | ZkListing (List Data.ZkList)
+    | SavedZkNote Int
+    | DeletedZkNote Int
+    | ZkNote Data.FullZkNote
     | ServerError String
 
 
@@ -47,33 +48,33 @@ encodeSendMsg sm uid pwd =
 
         GetListing ->
             JE.object
-                [ ( "what", JE.string "getlisting" )
+                [ ( "what", JE.string "getzklisting" )
                 , ( "uid", JE.string uid )
                 , ( "pwd", JE.string pwd )
                 ]
 
-        GetBlogEntry id ->
+        GetZkNote id ->
             JE.object
-                [ ( "what", JE.string "getblogentry" )
+                [ ( "what", JE.string "getzknote" )
                 , ( "uid", JE.string uid )
                 , ( "pwd", JE.string pwd )
                 , ( "data", JE.int id )
                 ]
 
-        DeleteBlogEntry id ->
+        DeleteZkNote id ->
             JE.object
-                [ ( "what", JE.string "deleteblogentry" )
+                [ ( "what", JE.string "deletezknote" )
                 , ( "uid", JE.string uid )
                 , ( "pwd", JE.string pwd )
                 , ( "data", JE.int id )
                 ]
 
-        SaveBlogEntry sbe ->
+        SaveZkNote sbe ->
             JE.object
-                [ ( "what", JE.string "saveblogentry" )
+                [ ( "what", JE.string "savezknote" )
                 , ( "uid", JE.string uid )
                 , ( "pwd", JE.string pwd )
-                , ( "data", Data.encodeSaveBlogEntry sbe )
+                , ( "data", Data.encodeSaveZkNote sbe )
                 ]
 
 
@@ -107,17 +108,20 @@ serverResponseDecoder =
                 "server error" ->
                     JD.map ServerError (JD.at [ "content" ] JD.string)
 
-                "listing" ->
-                    JD.map EntryListing (JD.at [ "content" ] <| JD.list Data.decodeBlogListEntry)
+                "zklisting" ->
+                    JD.map ZkListing (JD.at [ "content" ] <| JD.list Data.decodeZkList)
+
+                "zknotelisting" ->
+                    JD.map ZkNoteListing (JD.at [ "content" ] <| JD.list Data.decodeZkListNote)
 
                 "savedblogentry" ->
-                    JD.map SavedBlogEntry (JD.at [ "content" ] <| JD.int)
+                    JD.map SavedZkNote (JD.at [ "content" ] <| JD.int)
 
                 "deletedblogentry" ->
-                    JD.map DeletedBlogEntry (JD.at [ "content" ] <| JD.int)
+                    JD.map DeletedZkNote (JD.at [ "content" ] <| JD.int)
 
                 "blogentry" ->
-                    JD.map BlogEntry (JD.at [ "content" ] <| Data.decodeFullBlogEntry)
+                    JD.map ZkNote (JD.at [ "content" ] <| Data.decodeFullZkNote)
 
                 wat ->
                     JD.succeed
