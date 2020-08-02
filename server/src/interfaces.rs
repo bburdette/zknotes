@@ -159,7 +159,7 @@ fn user_interface_loggedin(
 
       let zkid = sqldata::save_zk(&config.db.as_path(), uid, &sz)?;
       Ok(ServerResponse {
-        what: "savedzknote".to_string(),
+        what: "savedzk".to_string(),
         content: serde_json::to_value(zkid)?,
       })
     }

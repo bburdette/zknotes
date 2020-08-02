@@ -7,8 +7,8 @@ import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..),
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
 import Data
 import Dict exposing (Dict)
-import EditListing
 import EditZk
+import EditZkListing
 import EditZkNote
 import Element exposing (Element)
 import Element.Background as EBk
@@ -40,7 +40,7 @@ type Msg
     | BadErrorMsg BadError.Msg
     | ViewMsg View.Msg
     | EditZkMsg EditZk.Msg
-    | EditListingMsg EditListing.Msg
+    | EditZkListingMsg EditZkListing.Msg
     | ShowMessageMsg ShowMessage.Msg
     | UserReplyData (Result Http.Error UI.ServerResponse)
     | PublicReplyData (Result Http.Error PI.ServerResponse)
@@ -57,7 +57,7 @@ type ZkMode
 type State
     = Login Login.Model
     | EditZk EditZk.Model Data.Login
-    | EditListing EditListing.Model Data.Login
+    | EditZkListing EditZkListing.Model Data.Login
     | View View.Model
     | EView View.Model State
     | BadError BadError.Model State
@@ -94,7 +94,7 @@ stateLogin state =
         EditZk _ login ->
             Just login
 
-        EditListing _ login ->
+        EditZkListing _ login ->
             Just login
 
         View _ ->
@@ -122,8 +122,8 @@ viewState size state =
         Login lem ->
             Element.map LoginMsg <| Login.view size lem
 
-        EditListing em _ ->
-            Element.map EditListingMsg <| EditListing.view em
+        EditZkListing em _ ->
+            Element.map EditZkListingMsg <| EditZkListing.view em
 
         ShowMessage em _ ->
             Element.map ShowMessageMsg <| ShowMessage.view em
@@ -284,7 +284,7 @@ update msg model =
                         UI.ZkListing l ->
                             case state of
                                 ShowMessage _ login ->
-                                    ( { model | state = EditListing { entries = l } login }, Cmd.none )
+                                    ( { model | state = EditZkListing { entries = l } login }, Cmd.none )
 
                                 _ ->
                                     ( { model | state = BadError (BadError.initialModel "unexpected login reply") state }
@@ -300,7 +300,7 @@ update msg model =
 
                         UI.ZkNote zkn ->
                             case state of
-                                EditListing _ login ->
+                                EditZkListing _ login ->
                                     -- ( { model | state = EditZkNote (EditZkNote.initFull zkn) login }, Cmd.none )
                                     ( { model | state = BadError (BadError.initialModel "zknoteeditunimplmeented") state }
                                     , Cmd.none
@@ -325,11 +325,18 @@ update msg model =
                                 _ ->
                                     ( { model | state = BadError (BadError.initialModel "unexpected blog message") state }, Cmd.none )
 
-                        UI.SavedZkNote beid ->
+                        UI.SavedZk beid ->
                             case state of
                                 EditZk emod login ->
                                     ( { model | state = EditZk (EditZk.setId emod beid) login }, Cmd.none )
 
+                                _ ->
+                                    ( { model | state = BadError (BadError.initialModel "unexpected blog message") state }, Cmd.none )
+
+                        UI.SavedZkNote beid ->
+                            case state of
+                                -- EditZkNote emod login ->
+                                --     ( { model | state = EditZkNote (EditZkNote.setId emod beid) login }, Cmd.none )
                                 _ ->
                                     ( { model | state = BadError (BadError.initialModel "unexpected blog message") state }, Cmd.none )
 
@@ -429,26 +436,26 @@ update msg model =
         --   }
         -- , Cmd.none
         -- )
-        ( EditListingMsg em, EditListing es login ) ->
+        ( EditZkListingMsg em, EditZkListing es login ) ->
             let
                 ( emod, ecmd ) =
-                    EditListing.update em es
+                    EditZkListing.update em es
             in
             case ecmd of
-                EditListing.New ->
+                EditZkListing.New ->
                     ( { model | state = EditZk EditZk.initNew login }, Cmd.none )
 
-                EditListing.Example ->
+                EditZkListing.Example ->
                     ( { model | state = EditZk EditZk.initExample login }, Cmd.none )
 
-                EditListing.Selected id ->
+                EditZkListing.Selected id ->
                     ( { model | state = ZkWait model.state BmEdit }
                     , sendUIMsg model.location
                         login
                         (UI.GetZkNote id)
                     )
 
-                EditListing.View id ->
+                EditZkListing.View id ->
                     ( { model | state = ZkWait model.state BmView }
                     , sendUIMsg model.location
                         login

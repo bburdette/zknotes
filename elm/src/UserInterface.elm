@@ -24,6 +24,7 @@ type ServerResponse
     | ZkNoteListing (List Data.ZkListNote)
     | ZkListing (List Data.Zk)
     | SavedZkNote Int
+    | SavedZk Int
     | DeletedZkNote Int
     | ZkNote Data.FullZkNote
     | ServerError String
@@ -123,13 +124,16 @@ serverResponseDecoder =
                 "zknotelisting" ->
                     JD.map ZkNoteListing (JD.at [ "content" ] <| JD.list Data.decodeZkListNote)
 
-                "savedblogentry" ->
+                "savedzk" ->
+                    JD.map SavedZk (JD.at [ "content" ] <| JD.int)
+
+                "savedzknote" ->
                     JD.map SavedZkNote (JD.at [ "content" ] <| JD.int)
 
-                "deletedblogentry" ->
+                "deletedzknote" ->
                     JD.map DeletedZkNote (JD.at [ "content" ] <| JD.int)
 
-                "blogentry" ->
+                "zknote" ->
                     JD.map ZkNote (JD.at [ "content" ] <| Data.decodeFullZkNote)
 
                 wat ->
