@@ -49,6 +49,7 @@ type Command
     | Done
     | View Data.SaveZkNote
     | Delete Int
+    | Switch Int
 
 
 view : Model -> Element Msg
@@ -198,7 +199,7 @@ update msg model =
             ( { model | md = model.md ++ "\n[" ++ zkln.title ++ "](/blog/" ++ String.fromInt zkln.id ++ ")" }, None )
 
         SwitchPress zkln ->
-            ( model, None )
+            ( model, Switch zkln.id )
 
         DonePress ->
             ( model, Done )

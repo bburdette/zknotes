@@ -56,6 +56,7 @@ type WaitMode
     = WmView
     | WmZk Data.Zk
     | WmZkl (List Data.ZkListNote) Data.Zk
+    | WmZklm (Maybe (List Data.ZkListNote)) (Maybe Data.FullZkNote) Data.Zk (List Data.ZkListNote -> Data.FullZkNote -> Data.Zk -> State)
 
 
 type State
@@ -316,6 +317,16 @@ update msg model =
                                         ( WmZk zk, Just login ) ->
                                             ( { model | state = EditZkNoteListing { zk = zk, notes = l } login }, Cmd.none )
 
+                                        ( WmZklm Nothing mbzkn zk tostate, Just login ) ->
+                                            case mbzkn of
+                                                Just zkn ->
+                                                    ( { model | state = tostate l zkn zk }
+                                                    , Cmd.none
+                                                    )
+
+                                                Nothing ->
+                                                    ( { model | state = ZkWait zwstate (WmZklm (Just l) mbzkn zk tostate) }, Cmd.none )
+
                                         _ ->
                                             ( { model | state = BadError (BadError.initialModel "unexpected reply") state }
                                             , Cmd.none
@@ -341,6 +352,14 @@ update msg model =
 
                                         WmZk zk ->
                                             ( { model | state = BadError (BadError.initialModel "can't edit - no zklist!") state }, Cmd.none )
+
+                                        WmZklm mbzkl mbzkn zk tostate ->
+                                            case mbzkl of
+                                                Just zkl ->
+                                                    ( { model | state = tostate zkl zkn zk }, Cmd.none )
+
+                                                Nothing ->
+                                                    ( { model | state = ZkWait bwstate (WmZklm mbzkl (Just zkn) zk tostate) }, Cmd.none )
 
                                         WmZkl zkl zk ->
                                             case stateLogin state of
@@ -517,6 +536,29 @@ update msg model =
                     , sendUIMsg model.location
                         login
                         (UI.DeleteZk id)
+                    )
+
+                EditZkNote.Switch id ->
+                    ( { model
+                        | state =
+                            ZkWait
+                                (ShowMessage
+                                    { message = "loading articles"
+                                    }
+                                    login
+                                )
+                                (WmZklm Nothing Nothing emod.zk (\zkl zkn zk -> EditZkNote (EditZkNote.initFull zk zkl zkn) login))
+                      }
+                    , Cmd.batch
+                        [ sendUIMsg model.location
+                            login
+                            (UI.GetZkNoteListing
+                                es.zk.id
+                            )
+                        , sendUIMsg model.location
+                            login
+                            (UI.GetZkNote id)
+                        ]
                     )
 
                 EditZkNote.View sbe ->
