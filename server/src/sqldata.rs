@@ -16,7 +16,7 @@ pub struct FullZkNote {
 }
 
 #[derive(Serialize, Debug, Clone)]
-pub struct ZkList {
+pub struct Zk {
   id: i64,
   name: String,
   description: String,
@@ -43,6 +43,7 @@ pub struct ZkNoteList {
 #[derive(Deserialize, Debug, Clone)]
 pub struct SaveZkNote {
   id: Option<i64>,
+  zk: i64,
   title: String,
   content: String,
 }
@@ -302,7 +303,7 @@ pub fn delete_zk(dbfile: &Path, uid: i64, id: i64) -> Result<(), Box<dyn Error>>
   // }))
 }
 
-pub fn zklisting(dbfile: &Path, user: i64) -> rusqlite::Result<Vec<ZkList>> {
+pub fn zklisting(dbfile: &Path, user: i64) -> rusqlite::Result<Vec<Zk>> {
   let conn = Connection::open(dbfile)?;
 
   let mut pstmt = conn.prepare(
@@ -313,7 +314,7 @@ pub fn zklisting(dbfile: &Path, user: i64) -> rusqlite::Result<Vec<ZkList>> {
   )?;
 
   let rec_iter = pstmt.query_map(params![user], |row| {
-    Ok(ZkList {
+    Ok(Zk {
       id: row.get(0)?,
       name: row.get(1)?,
       description: row.get(2)?,
@@ -336,6 +337,27 @@ pub fn zklisting(dbfile: &Path, user: i64) -> rusqlite::Result<Vec<ZkList>> {
   Ok(pv)
 }
 
+pub fn read_zk(dbfile: &Path, id: i64) -> Result<Zk, Box<dyn Error>> {
+  let conn = Connection::open(dbfile)?;
+
+  let rbe = conn.query_row(
+    "SELECT name, description, createdate, changeddate
+      FROM zk WHERE id = ?1",
+    params![id],
+    |row| {
+      Ok(Zk {
+        id: id,
+        name: row.get(0)?,
+        description: row.get(1)?,
+        createdate: row.get(2)?,
+        changeddate: row.get(3)?,
+      })
+    },
+  )?;
+
+  Ok(rbe)
+}
+
 // zknote CRUD
 
 pub fn save_zknote(dbfile: &Path, uid: i64, note: &SaveZkNote) -> Result<i64, Box<dyn Error>> {
@@ -356,9 +378,9 @@ pub fn save_zknote(dbfile: &Path, uid: i64, note: &SaveZkNote) -> Result<i64, Bo
     None => {
       println!("adding zknote: {}", note.title);
       conn.execute(
-        "INSERT INTO zknote (title, content, user, createdate, changeddate)
+        "INSERT INTO zknote (title, content, zk, createdate, changeddate)
          VALUES (?1, ?2, ?3, ?4, ?5)",
-        params![note.title, note.content, uid, now, now],
+        params![note.title, note.content, note.zk, now, now],
       )?;
 
       Ok(conn.last_insert_rowid())
@@ -406,7 +428,7 @@ pub fn zknotelisting(dbfile: &Path, user: i64, zk: i64) -> rusqlite::Result<Vec<
   let mut pstmt = conn.prepare(
     "SELECT id, title, createdate, changeddate
       FROM zknote where zk = ?1 and
-        zk IN (select id from zk where user = ?2",
+        zk IN (select zk from zkmember where user = ?2)",
   )?;
 
   let pdfinfo_iter = pstmt.query_map(params![zk, user], |row| {

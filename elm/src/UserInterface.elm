@@ -8,7 +8,10 @@ import Json.Encode as JE
 type SendMsg
     = Register String
     | Login
-    | GetListing
+    | GetZkListing
+    | GetZk Int
+    | DeleteZk Int
+    | GetZkNoteListing Int
     | GetZkNote Int
     | DeleteZkNote Int
     | SaveZkNote Data.SaveZkNote
@@ -23,8 +26,9 @@ type ServerResponse
     | LoggedIn
     | ZkNoteListing (List Data.ZkListNote)
     | ZkListing (List Data.Zk)
-    | SavedZkNote Int
     | SavedZk Int
+    | DeletedZk Int
+    | SavedZkNote Int
     | DeletedZkNote Int
     | ZkNote Data.FullZkNote
     | ServerError String
@@ -48,11 +52,35 @@ encodeSendMsg sm uid pwd =
                 , ( "pwd", JE.string pwd )
                 ]
 
-        GetListing ->
+        GetZkListing ->
             JE.object
                 [ ( "what", JE.string "getzklisting" )
                 , ( "uid", JE.string uid )
                 , ( "pwd", JE.string pwd )
+                ]
+
+        GetZk id ->
+            JE.object
+                [ ( "what", JE.string "getzk" )
+                , ( "uid", JE.string uid )
+                , ( "pwd", JE.string pwd )
+                , ( "data", JE.int id )
+                ]
+
+        DeleteZk id ->
+            JE.object
+                [ ( "what", JE.string "deletezk" )
+                , ( "uid", JE.string uid )
+                , ( "pwd", JE.string pwd )
+                , ( "data", JE.int id )
+                ]
+
+        GetZkNoteListing id ->
+            JE.object
+                [ ( "what", JE.string "getzknotelisting" )
+                , ( "uid", JE.string uid )
+                , ( "pwd", JE.string pwd )
+                , ( "data", JE.int id )
                 ]
 
         GetZkNote id ->
@@ -126,6 +154,9 @@ serverResponseDecoder =
 
                 "savedzk" ->
                     JD.map SavedZk (JD.at [ "content" ] <| JD.int)
+
+                "deletedzk" ->
+                    JD.map DeletedZk (JD.at [ "content" ] <| JD.int)
 
                 "savedzknote" ->
                     JD.map SavedZkNote (JD.at [ "content" ] <| JD.int)

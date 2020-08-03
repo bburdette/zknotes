@@ -33,6 +33,7 @@ type Msg
 
 type alias Model =
     { id : Maybe Int
+    , zk : Data.Zk
     , title : String
     , md : String
     , cells : CellDict
@@ -51,7 +52,8 @@ view : Model -> Element Msg
 view model =
     E.column
         [ E.width E.fill ]
-        [ E.row [ E.width E.fill ]
+        [ E.text "Edit Zk Note"
+        , E.row [ E.width E.fill ]
             [ EI.button Common.buttonStyle { onPress = Just SavePress, label = E.text "Save" }
             , EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "Done" }
             , EI.button Common.buttonStyle { onPress = Just ViewPress, label = E.text "View" }
@@ -87,11 +89,11 @@ view model =
         ]
 
 
-initFull : Data.FullZkNote -> Model
-initFull blogentry =
+initFull : Data.Zk -> Data.FullZkNote -> Model
+initFull zk zknote =
     let
         cells =
-            blogentry.content
+            zknote.content
                 |> mdCells
                 |> Result.withDefault (CellDict Dict.empty)
 
@@ -99,15 +101,16 @@ initFull blogentry =
             evalCellsFully
                 (mkCc cells)
     in
-    { id = Just blogentry.id
-    , title = blogentry.title
-    , md = blogentry.content
+    { id = Just zknote.id
+    , zk = zk
+    , title = zknote.title
+    , md = zknote.content
     , cells = getCd cc
     }
 
 
-initNew : Model
-initNew =
+initNew : Data.Zk -> Model
+initNew zk =
     let
         cells =
             ""
@@ -119,14 +122,15 @@ initNew =
                 (mkCc cells)
     in
     { id = Nothing
+    , zk = zk
     , title = ""
     , md = ""
     , cells = getCd cc
     }
 
 
-initExample : Model
-initExample =
+initExample : Data.Zk -> Model
+initExample zk =
     let
         cells =
             markdownBody
@@ -138,6 +142,7 @@ initExample =
                 (mkCc cells)
     in
     { id = Nothing
+    , zk = zk
     , title = "example"
     , md = markdownBody
     , cells = getCd cc
@@ -156,6 +161,7 @@ update msg model =
             ( model
             , Save
                 { id = model.id
+                , zk = model.zk.id
                 , title = model.title
                 , content = model.md
                 }
@@ -165,6 +171,7 @@ update msg model =
             ( model
             , View
                 { id = model.id
+                , zk = model.zk.id
                 , title = model.title
                 , content = model.md
                 }

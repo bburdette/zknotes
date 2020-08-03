@@ -1,4 +1,4 @@
-module EditZkListing exposing (..)
+module EditZkNoteListing exposing (..)
 
 import Common
 import Data
@@ -12,21 +12,20 @@ import TangoColors as TC
 
 
 type Msg
-    = SelectPress Data.Zk
+    = SelectPress Int
     | ViewPress Int
-    | NotesPress Data.Zk
     | NewPress
     | ExamplePress
 
 
 type alias Model =
-    { zks : List Data.Zk
+    { zk : Data.Zk
+    , notes : List Data.ZkListNote
     }
 
 
 type Command
-    = Selected Data.Zk
-    | Notes Data.Zk
+    = Selected Int
     | View Int
     | New
     | Example
@@ -36,21 +35,21 @@ view : Model -> Element Msg
 view model =
     E.column [ E.spacing 8, E.padding 8 ] <|
         E.row [ E.spacing 20 ]
-            [ E.text "Select a ZettelKasten"
+            [ E.text model.zk.name
+            , E.text "Select a Zk Note"
             , EI.button Common.buttonStyle { onPress = Just NewPress, label = E.text "new" }
             , EI.button Common.buttonStyle { onPress = Just ExamplePress, label = E.text "example" }
             ]
             :: List.map
                 (\e ->
                     E.row [ E.spacing 8 ]
-                        [ E.text e.name
-                        , EI.button Common.buttonStyle { onPress = Just (SelectPress e), label = E.text "edit" }
+                        [ E.text e.title
+                        , EI.button Common.buttonStyle { onPress = Just (SelectPress e.id), label = E.text "edit" }
                         , EI.button Common.buttonStyle { onPress = Just (ViewPress e.id), label = E.text "view" }
-                        , EI.button Common.buttonStyle { onPress = Just (NotesPress e), label = E.text "notes" }
                         , E.link [ Font.color TC.darkBlue, Font.underline ] { url = "blog/" ++ String.fromInt e.id, label = E.text "link" }
                         ]
                 )
-                model.zks
+                model.notes
 
 
 update : Msg -> Model -> ( Model, Command )
@@ -59,11 +58,6 @@ update msg model =
         SelectPress id ->
             ( model
             , Selected id
-            )
-
-        NotesPress id ->
-            ( model
-            , Notes id
             )
 
         ViewPress id ->

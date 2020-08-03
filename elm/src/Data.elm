@@ -31,6 +31,7 @@ type alias ZkListNote =
 
 type alias FullZkNote =
     { id : Int
+    , zk : Int
     , title : String
     , content : String
     , user : Int
@@ -41,19 +42,21 @@ type alias FullZkNote =
 
 type alias SaveZkNote =
     { id : Maybe Int
+    , zk : Int
     , title : String
     , content : String
     }
 
 
 encodeSaveZkNote : SaveZkNote -> JE.Value
-encodeSaveZkNote sbe =
+encodeSaveZkNote zkn =
     JE.object <|
-        (Maybe.map (\id -> [ ( "id", JE.int id ) ]) sbe.id
+        (Maybe.map (\id -> [ ( "id", JE.int id ) ]) zkn.id
             |> Maybe.withDefault []
         )
-            ++ [ ( "title", JE.string sbe.title )
-               , ( "content", JE.string sbe.content )
+            ++ [ ( "zk", JE.int zkn.zk )
+               , ( "title", JE.string zkn.title )
+               , ( "content", JE.string zkn.content )
                ]
 
 
@@ -96,8 +99,9 @@ decodeZkListNote =
 
 decodeFullZkNote : JD.Decoder FullZkNote
 decodeFullZkNote =
-    JD.map6 FullZkNote
+    JD.map7 FullZkNote
         (JD.field "id" JD.int)
+        (JD.field "zk" JD.int)
         (JD.field "title" JD.string)
         (JD.field "content" JD.string)
         (JD.field "zk" JD.int)

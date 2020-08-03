@@ -40,11 +40,6 @@ pub struct RegistrationData {
   email: String,
 }
 
-#[derive(Deserialize, Debug)]
-pub struct GetZkNoteListing {
-  zkid: i64,
-}
-
 pub fn user_interface(config: &Config, msg: UserMessage) -> Result<ServerResponse, Box<dyn Error>> {
   info!("got a user message: {}", msg.what);
   if msg.what.as_str() == "register" {
@@ -172,12 +167,22 @@ fn user_interface_loggedin(
     }
     "getzknotelisting" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let gznl: GetZkNoteListing = serde_json::from_value(msgdata.clone())?;
+      let zkid: i64 = serde_json::from_value(msgdata.clone())?;
 
-      let entries = sqldata::zknotelisting(Path::new(&config.db), uid, gznl.zkid)?;
+      let entries = sqldata::zknotelisting(Path::new(&config.db), uid, zkid)?;
       Ok(ServerResponse {
         what: "zknotelisting".to_string(),
         content: serde_json::to_value(entries)?, // return api token that expires?
+      })
+    }
+    "getzk" => {
+      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      let id: i64 = serde_json::from_value(msgdata.clone())?;
+
+      let zk = sqldata::read_zk(Path::new(&config.db), id)?;
+      Ok(ServerResponse {
+        what: "zk".to_string(),
+        content: serde_json::to_value(zk)?,
       })
     }
     "getzknote" => {
