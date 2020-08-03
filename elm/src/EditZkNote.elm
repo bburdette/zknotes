@@ -29,6 +29,8 @@ type Msg
     | DonePress
     | DeletePress
     | ViewPress
+    | SwitchPress Data.ZkListNote
+    | LinkPress Data.ZkListNote
 
 
 type alias Model =
@@ -87,7 +89,16 @@ view model =
                 Err errors ->
                     E.text errors
             , E.column []
-                (List.map (\zkln -> E.text zkln.title) model.zklist)
+                (List.map
+                    (\zkln ->
+                        E.row []
+                            [ E.text zkln.title
+                            , EI.button Common.buttonStyle { onPress = Just (LinkPress zkln), label = E.text "Link" }
+                            , EI.button Common.buttonStyle { onPress = Just (SwitchPress zkln), label = E.text "Edit" }
+                            ]
+                    )
+                    model.zklist
+                )
             ]
         ]
 
@@ -182,6 +193,12 @@ update msg model =
                 , content = model.md
                 }
             )
+
+        LinkPress zkln ->
+            ( { model | md = model.md ++ "\n[" ++ zkln.title ++ "](/blog/" ++ String.fromInt zkln.id ++ ")" }, None )
+
+        SwitchPress zkln ->
+            ( model, None )
 
         DonePress ->
             ( model, Done )
