@@ -34,6 +34,7 @@ type Msg
 type alias Model =
     { id : Maybe Int
     , zk : Data.Zk
+    , zklist : List Data.ZkListNote
     , title : String
     , md : String
     , cells : CellDict
@@ -85,12 +86,14 @@ view model =
 
                 Err errors ->
                     E.text errors
+            , E.column []
+                (List.map (\zkln -> E.text zkln.title) model.zklist)
             ]
         ]
 
 
-initFull : Data.Zk -> Data.FullZkNote -> Model
-initFull zk zknote =
+initFull : Data.Zk -> List Data.ZkListNote -> Data.FullZkNote -> Model
+initFull zk zkl zknote =
     let
         cells =
             zknote.content
@@ -103,14 +106,15 @@ initFull zk zknote =
     in
     { id = Just zknote.id
     , zk = zk
+    , zklist = zkl
     , title = zknote.title
     , md = zknote.content
     , cells = getCd cc
     }
 
 
-initNew : Data.Zk -> Model
-initNew zk =
+initNew : Data.Zk -> List Data.ZkListNote -> Model
+initNew zk zkl =
     let
         cells =
             ""
@@ -123,14 +127,15 @@ initNew zk =
     in
     { id = Nothing
     , zk = zk
+    , zklist = zkl
     , title = ""
     , md = ""
     , cells = getCd cc
     }
 
 
-initExample : Data.Zk -> Model
-initExample zk =
+initExample : Data.Zk -> List Data.ZkListNote -> Model
+initExample zk zkl =
     let
         cells =
             markdownBody
@@ -143,6 +148,7 @@ initExample zk =
     in
     { id = Nothing
     , zk = zk
+    , zklist = zkl
     , title = "example"
     , md = markdownBody
     , cells = getCd cc

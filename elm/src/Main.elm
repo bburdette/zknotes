@@ -55,6 +55,7 @@ type Msg
 type WaitMode
     = WmView
     | WmZk Data.Zk
+    | WmZkl (List Data.ZkListNote) Data.Zk
 
 
 type State
@@ -339,9 +340,12 @@ update msg model =
                                             ( { model | state = EView (View.initFull zkn) bwstate }, Cmd.none )
 
                                         WmZk zk ->
+                                            ( { model | state = BadError (BadError.initialModel "can't edit - no zklist!") state }, Cmd.none )
+
+                                        WmZkl zkl zk ->
                                             case stateLogin state of
                                                 Just login ->
-                                                    ( { model | state = EditZkNote (EditZkNote.initFull zk zkn) login }, Cmd.none )
+                                                    ( { model | state = EditZkNote (EditZkNote.initFull zk zkl zkn) login }, Cmd.none )
 
                                                 Nothing ->
                                                     ( { model | state = BadError (BadError.initialModel "can't edit - not logged in!") state }, Cmd.none )
@@ -565,16 +569,16 @@ update msg model =
             in
             case ecmd of
                 EditZkNoteListing.New ->
-                    ( { model | state = EditZkNote (EditZkNote.initNew emod.zk) login }, Cmd.none )
+                    ( { model | state = EditZkNote (EditZkNote.initNew emod.zk es.notes) login }, Cmd.none )
 
                 EditZkNoteListing.Example ->
-                    ( { model | state = EditZkNote (EditZkNote.initExample emod.zk) login }, Cmd.none )
+                    ( { model | state = EditZkNote (EditZkNote.initExample emod.zk es.notes) login }, Cmd.none )
 
                 EditZkNoteListing.Selected id ->
                     ( { model
                         | state =
                             ZkWait (ShowMessage { message = "loading zknote" } login)
-                                (WmZk emod.zk)
+                                (WmZkl emod.notes emod.zk)
                       }
                     , sendUIMsg model.location
                         login
