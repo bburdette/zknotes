@@ -71,6 +71,7 @@ type State
     | ShowMessage ShowMessage.Model Data.Login
     | PubShowMessage ShowMessage.Model
     | ZkWait State WaitMode
+    | Wait State (State -> Msg -> ( State, Cmd Msg ))
 
 
 type alias Flags =
@@ -128,6 +129,9 @@ stateLogin state =
         ZkWait bwstate _ ->
             stateLogin bwstate
 
+        Wait wstate _ ->
+            stateLogin wstate
+
 
 viewState : Util.Size -> State -> Element Msg
 viewState size state =
@@ -163,6 +167,9 @@ viewState size state =
             Element.map BadErrorMsg <| BadError.view em
 
         ZkWait innerState _ ->
+            Element.map (\_ -> Noop) (viewState size innerState)
+
+        Wait innerState _ ->
             Element.map (\_ -> Noop) (viewState size innerState)
 
 
@@ -204,6 +211,13 @@ sendPIMsg location msg =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case ( msg, model.state ) of
+        ( _, Wait wst wfn ) ->
+            let
+                ( nst, cmd ) =
+                    wfn model.state msg
+            in
+            ( { model | state = nst }, cmd )
+
         ( InternalUrl url, _ ) ->
             let
                 mblogin =
@@ -371,7 +385,7 @@ update msg model =
 
                                 -- ( { model | state = BadError (BadError.initialModel "unexpected message") bwstate }, Cmd.none )
                                 _ ->
-                                    ( { model | state = BadError (BadError.initialModel "unexpected blog message") state }, Cmd.none )
+                                    ( { model | state = BadError (BadError.initialModel <| "unexpected blog message: zknote") state }, Cmd.none )
 
                         UI.SavedZk beid ->
                             case state of
@@ -379,7 +393,7 @@ update msg model =
                                     ( { model | state = EditZk (EditZk.setId emod beid) login }, Cmd.none )
 
                                 _ ->
-                                    ( { model | state = BadError (BadError.initialModel "unexpected blog message") state }, Cmd.none )
+                                    ( { model | state = BadError (BadError.initialModel "unexpected blog message: savedzk") state }, Cmd.none )
 
                         UI.DeletedZk beid ->
                             case state of
@@ -397,7 +411,9 @@ update msg model =
                                     ( { model | state = EditZkNote (EditZkNote.setId emod beid) login }, Cmd.none )
 
                                 _ ->
-                                    ( { model | state = BadError (BadError.initialModel "unexpected blog message") state }, Cmd.none )
+                                    -- ( { model | state = BadError (BadError.initialModel "unexpected blog message: savedzknote") state }, Cmd.none )
+                                    -- just ignore if we're not editing a new note.
+                                    ( model, Cmd.none )
 
                         UI.DeletedZkNote beid ->
                             ( model, Cmd.none )
@@ -494,19 +510,8 @@ update msg model =
             let
                 ( emod, ecmd ) =
                     EditZkNote.update em es
-            in
-            case ecmd of
-                EditZkNote.Save zk ->
-                    ( { model | state = EditZkNote emod login }
-                    , sendUIMsg model.location
-                        login
-                        (UI.SaveZkNote zk)
-                    )
 
-                EditZkNote.None ->
-                    ( { model | state = EditZkNote emod login }, Cmd.none )
-
-                EditZkNote.Done ->
+                backtolisting =
                     ( { model
                         | state =
                             ZkWait
@@ -523,6 +528,47 @@ update msg model =
                             es.zk.id
                         )
                     )
+            in
+            case ecmd of
+                EditZkNote.Save szk ->
+                    ( { model
+                        | state =
+                            Wait
+                                (ShowMessage
+                                    { message = "loading articles"
+                                    }
+                                    login
+                                )
+                                (\st ms ->
+                                    case ms of
+                                        UserReplyData (Ok (UI.SavedZkNote id)) ->
+                                            ( st
+                                            , sendUIMsg model.location
+                                                login
+                                                (UI.GetZkNoteListing
+                                                    es.zk.id
+                                                )
+                                            )
+
+                                        UserReplyData (Ok (UI.ZkNoteListing l)) ->
+                                            ( EditZkNoteListing { zk = es.zk, notes = l } login, Cmd.none )
+
+                                        _ ->
+                                            ( BadError (BadError.initialModel "unexpected message!") model.state
+                                            , Cmd.none
+                                            )
+                                )
+                      }
+                    , sendUIMsg model.location
+                        login
+                        (UI.SaveZkNote szk)
+                    )
+
+                EditZkNote.None ->
+                    ( { model | state = EditZkNote emod login }, Cmd.none )
+
+                EditZkNote.Revert ->
+                    backtolisting
 
                 EditZkNote.Delete id ->
                     -- issue delete and go back to listing.

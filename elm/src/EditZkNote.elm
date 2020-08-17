@@ -26,7 +26,7 @@ type Msg
     | OnSchelmeCodeChanged String String
     | OnTitleChanged String
     | SavePress
-    | DonePress
+    | RevertPress
     | DeletePress
     | ViewPress
     | SwitchPress Data.ZkListNote
@@ -46,7 +46,7 @@ type alias Model =
 type Command
     = None
     | Save Data.SaveZkNote
-    | Done
+    | Revert
     | View Data.SaveZkNote
     | Delete Int
     | Switch Int
@@ -59,7 +59,7 @@ view model =
         [ E.text "Edit Zk Note"
         , E.row [ E.width E.fill ]
             [ EI.button Common.buttonStyle { onPress = Just SavePress, label = E.text "Save" }
-            , EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "Done" }
+            , EI.button Common.buttonStyle { onPress = Just RevertPress, label = E.text "Revert" }
             , EI.button Common.buttonStyle { onPress = Just ViewPress, label = E.text "View" }
             , EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just DeletePress, label = E.text "Delete" }
             ]
@@ -201,8 +201,8 @@ update msg model =
         SwitchPress zkln ->
             ( model, Switch zkln.id )
 
-        DonePress ->
-            ( model, Done )
+        RevertPress ->
+            ( model, Revert )
 
         DeletePress ->
             case model.id of
