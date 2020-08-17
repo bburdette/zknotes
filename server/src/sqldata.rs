@@ -230,6 +230,9 @@ pub fn save_zk(dbfile: &Path, uid: i64, savezk: &SaveZk) -> Result<i64, Box<dyn 
   match savezk.id {
     Some(id) => {
       println!("updating zk: {}", savezk.name);
+
+      // TODO ensure user auth here.
+
       conn.execute(
         "UPDATE zk SET name = ?1, description = ?2, changeddate = ?3
          WHERE id = ?4",
@@ -364,6 +367,8 @@ pub fn save_zknote(dbfile: &Path, uid: i64, note: &SaveZkNote) -> Result<i64, Bo
   let conn = Connection::open(dbfile)?;
 
   let now = naiow()?;
+
+  // TODO ensure user auth here.
 
   match note.id {
     Some(id) => {
