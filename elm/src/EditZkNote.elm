@@ -57,9 +57,9 @@ view model =
     E.column
         [ E.width E.fill ]
         [ E.text "Edit Zk Note"
-        , E.row [ E.width E.fill ]
-            [ EI.button Common.buttonStyle { onPress = Just SavePress, label = E.text "Save" }
-            , EI.button Common.buttonStyle { onPress = Just RevertPress, label = E.text "Revert" }
+        , E.row [ E.width E.fill, E.spacing 8 ]
+            [ EI.button Common.buttonStyle { onPress = Just SavePress, label = E.text "Done" }
+            , EI.button Common.buttonStyle { onPress = Just RevertPress, label = E.text "Cancel" }
             , EI.button Common.buttonStyle { onPress = Just ViewPress, label = E.text "View" }
             , EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just DeletePress, label = E.text "Delete" }
             ]
@@ -89,16 +89,22 @@ view model =
 
                 Err errors ->
                     E.text errors
-            , E.column []
+            , E.column [ E.spacing 8 ]
                 (List.map
                     (\zkln ->
-                        E.row []
-                            [ E.text zkln.title
-                            , EI.button Common.buttonStyle { onPress = Just (LinkPress zkln), label = E.text "Link" }
+                        E.row [ E.spacing 8 ]
+                            [ EI.button Common.buttonStyle { onPress = Just (LinkPress zkln), label = E.text "Link" }
                             , EI.button Common.buttonStyle { onPress = Just (SwitchPress zkln), label = E.text "Edit" }
+                            , E.text zkln.title
                             ]
                     )
-                    model.zklist
+                 <|
+                    case model.id of
+                        Just id ->
+                            List.filter (\zkl -> zkl.id /= id) model.zklist
+
+                        Nothing ->
+                            model.zklist
                 )
             ]
         ]
@@ -218,11 +224,9 @@ update msg model =
         OnMarkdownInput newMarkdown ->
             let
                 cells =
-                    Debug.log "newcells"
-                        (newMarkdown
-                            |> mdCells
-                            |> Result.withDefault (CellDict Dict.empty)
-                        )
+                    newMarkdown
+                        |> mdCells
+                        |> Result.withDefault (CellDict Dict.empty)
 
                 ( cc, result ) =
                     evalCellsFully
@@ -230,7 +234,7 @@ update msg model =
             in
             ( { model
                 | md = newMarkdown
-                , cells = Debug.log "evaled cells: " <| getCd cc
+                , cells = getCd cc
               }
             , None
             )

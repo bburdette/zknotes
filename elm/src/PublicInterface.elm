@@ -20,7 +20,7 @@ encodeSendMsg sm =
     case sm of
         GetZkNote beid ->
             JE.object
-                [ ( "what", JE.string "getblogentry" )
+                [ ( "what", JE.string "getzknote" )
                 , ( "data", JE.int beid )
                 ]
 
