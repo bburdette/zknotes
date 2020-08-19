@@ -48,7 +48,7 @@ view model =
 
                         -- , EI.button Common.buttonStyle { onPress = Just (ViewPress e.id), label = E.text "view" }
                         , EI.button Common.buttonStyle { onPress = Just (NotesPress e), label = E.text "notes" }
-                        , E.link [ Font.color TC.darkBlue, Font.underline ] { url = "blog/" ++ String.fromInt e.id, label = E.text "link" }
+                        , E.link [ Font.color TC.darkBlue, Font.underline ] { url = "note/" ++ String.fromInt e.id, label = E.text "link" }
                         ]
                 )
                 model.zks

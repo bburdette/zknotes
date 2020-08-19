@@ -215,7 +215,7 @@ update msg model =
             )
 
         LinkPress zkln ->
-            ( { model | md = model.md ++ "\n[" ++ zkln.title ++ "](/blog/" ++ String.fromInt zkln.id ++ ")" }, None )
+            ( { model | md = model.md ++ "\n[" ++ zkln.title ++ "](/note/" ++ String.fromInt zkln.id ++ ")" }, None )
 
         SwitchPress zkln ->
             ( model, Switch zkln.id )

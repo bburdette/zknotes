@@ -385,7 +385,7 @@ update msg model =
 
                                 -- ( { model | state = BadError (BadError.initialModel "unexpected message") bwstate }, Cmd.none )
                                 _ ->
-                                    ( { model | state = BadError (BadError.initialModel <| "unexpected blog message: zknote") state }, Cmd.none )
+                                    ( { model | state = BadError (BadError.initialModel <| "unexpected message: zknote") state }, Cmd.none )
 
                         UI.SavedZk beid ->
                             case state of
@@ -393,7 +393,7 @@ update msg model =
                                     ( { model | state = EditZk (EditZk.setId emod beid) login }, Cmd.none )
 
                                 _ ->
-                                    ( { model | state = BadError (BadError.initialModel "unexpected blog message: savedzk") state }, Cmd.none )
+                                    ( { model | state = BadError (BadError.initialModel "unexpected message: savedzk") state }, Cmd.none )
 
                         UI.DeletedZk beid ->
                             case state of
@@ -411,7 +411,7 @@ update msg model =
                                     ( { model | state = EditZkNote (EditZkNote.setId emod beid) login }, Cmd.none )
 
                                 _ ->
-                                    -- ( { model | state = BadError (BadError.initialModel "unexpected blog message: savedzknote") state }, Cmd.none )
+                                    -- ( { model | state = BadError (BadError.initialModel "unexpected message: savedzknote") state }, Cmd.none )
                                     -- just ignore if we're not editing a new note.
                                     ( model, Cmd.none )
 
@@ -730,7 +730,7 @@ parseUrl url =
     UP.parse
         (UP.map (\i -> PublicZk i) <|
             UP.s
-                "blog"
+                "note"
                 </> UP.int
         )
         url
