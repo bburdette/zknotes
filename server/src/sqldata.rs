@@ -11,6 +11,7 @@ pub struct FullZkNote {
   title: String,
   content: String,
   zk: i64,
+  public: bool,
   createdate: i64,
   changeddate: i64,
 }
@@ -29,6 +30,7 @@ pub struct SaveZk {
   id: Option<i64>,
   name: String,
   description: String,
+  public: bool,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -45,6 +47,7 @@ pub struct SaveZkNote {
   id: Option<i64>,
   zk: i64,
   title: String,
+  public: bool,
   content: String,
 }
 
@@ -61,7 +64,7 @@ pub struct User {
 pub fn dbinit(dbfile: &Path) -> rusqlite::Result<()> {
   let conn = Connection::open(dbfile)?;
 
-  println!("pre user");
+  // println!("pre user");
   // create the pdfinfo table.
   conn.execute(
     "CREATE TABLE user (
@@ -76,7 +79,7 @@ pub fn dbinit(dbfile: &Path) -> rusqlite::Result<()> {
     params![],
   )?;
 
-  println!("pre zk");
+  // println!("pre zk");
   conn.execute(
     "CREATE TABLE zk (
                 id            INTEGER NOT NULL PRIMARY KEY,
@@ -88,7 +91,7 @@ pub fn dbinit(dbfile: &Path) -> rusqlite::Result<()> {
     params![],
   )?;
 
-  println!("pre bm");
+  // println!("pre bm");
   conn.execute(
     "CREATE TABLE zkmember (
                 user          INTEGER NOT NULL,
@@ -100,12 +103,13 @@ pub fn dbinit(dbfile: &Path) -> rusqlite::Result<()> {
     params![],
   )?;
 
-  println!("pre be");
+  // println!("pre be");
   conn.execute(
     "CREATE TABLE zknote (
                 id            INTEGER NOT NULL PRIMARY KEY,
                 title         TEXT NOT NULL,
                 content       TEXT NOT NULL,
+                public        BOOL NOT NULL,
                 zk            INTEGER NOT NULL,
                 createdate    INTEGER NOT NULL,
                 changeddate   INTEGER NOT NULL,
@@ -114,7 +118,7 @@ pub fn dbinit(dbfile: &Path) -> rusqlite::Result<()> {
     params![],
   )?;
 
-  println!("pre bl");
+  // println!("pre bl");
   conn.execute(
     "CREATE TABLE zklink (
                 zkleft        INTEGER NOT NULL,
@@ -383,9 +387,9 @@ pub fn save_zknote(dbfile: &Path, uid: i64, note: &SaveZkNote) -> Result<i64, Bo
     None => {
       println!("adding zknote: {}", note.title);
       conn.execute(
-        "INSERT INTO zknote (title, content, zk, createdate, changeddate)
-         VALUES (?1, ?2, ?3, ?4, ?5)",
-        params![note.title, note.content, note.zk, now, now],
+        "INSERT INTO zknote (title, content, zk, public, createdate, changeddate)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![note.title, note.content, note.zk, note.public, now, now],
       )?;
 
       Ok(conn.last_insert_rowid())
@@ -397,7 +401,7 @@ pub fn read_zknote(dbfile: &Path, id: i64) -> Result<FullZkNote, Box<dyn Error>>
   let conn = Connection::open(dbfile)?;
 
   let rbe = conn.query_row(
-    "SELECT title, content, zk, createdate, changeddate
+    "SELECT title, content, zk, public, createdate, changeddate
       FROM zknote WHERE id = ?1",
     params![id],
     |row| {
@@ -406,8 +410,9 @@ pub fn read_zknote(dbfile: &Path, id: i64) -> Result<FullZkNote, Box<dyn Error>>
         title: row.get(0)?,
         content: row.get(1)?,
         zk: row.get(2)?,
-        createdate: row.get(3)?,
-        changeddate: row.get(4)?,
+        public: row.get(3)?,
+        createdate: row.get(4)?,
+        changeddate: row.get(5)?,
       })
     },
   )?;

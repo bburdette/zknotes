@@ -31,12 +31,14 @@ type Msg
     | ViewPress
     | SwitchPress Data.ZkListNote
     | LinkPress Data.ZkListNote
+    | PublicPress Bool
 
 
 type alias Model =
     { id : Maybe Int
     , zk : Data.Zk
     , zklist : List Data.ZkListNote
+    , public : Bool
     , title : String
     , md : String
     , cells : CellDict
@@ -68,6 +70,12 @@ view model =
             , text = model.title
             , placeholder = Nothing
             , label = EI.labelLeft [] (E.text "title")
+            }
+        , EI.checkbox []
+            { onChange = PublicPress
+            , icon = EI.defaultCheckbox
+            , checked = model.public
+            , label = EI.labelLeft [] (E.text "public")
             }
         , E.row [ E.width E.fill ]
             [ EI.multiline [ E.width (E.px 400) ]
@@ -125,6 +133,7 @@ initFull zk zkl zknote =
     { id = Just zknote.id
     , zk = zk
     , zklist = zkl
+    , public = zknote.public
     , title = zknote.title
     , md = zknote.content
     , cells = getCd cc
@@ -146,6 +155,7 @@ initNew zk zkl =
     { id = Nothing
     , zk = zk
     , zklist = zkl
+    , public = False
     , title = ""
     , md = ""
     , cells = getCd cc
@@ -167,6 +177,7 @@ initExample zk zkl =
     { id = Nothing
     , zk = zk
     , zklist = zkl
+    , public = False
     , title = "example"
     , md = markdownBody
     , cells = getCd cc
@@ -188,6 +199,7 @@ update msg model =
                 , zk = model.zk.id
                 , title = model.title
                 , content = model.md
+                , public = model.public
                 }
             )
 
@@ -198,6 +210,7 @@ update msg model =
                 , zk = model.zk.id
                 , title = model.title
                 , content = model.md
+                , public = model.public
                 }
             )
 
@@ -206,6 +219,9 @@ update msg model =
 
         SwitchPress zkln ->
             ( model, Switch zkln.id )
+
+        PublicPress v ->
+            ( { model | public = v }, None )
 
         RevertPress ->
             ( model, Revert )

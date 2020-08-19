@@ -553,6 +553,9 @@ update msg model =
                                         UserReplyData (Ok (UI.ZkNoteListing l)) ->
                                             ( EditZkNoteListing { zk = es.zk, notes = l } login, Cmd.none )
 
+                                        UserReplyData (Ok (UI.ServerError e)) ->
+                                            ( BadError (BadError.initialModel e) st, Cmd.none )
+
                                         _ ->
                                             ( BadError (BadError.initialModel "unexpected message!") model.state
                                             , Cmd.none

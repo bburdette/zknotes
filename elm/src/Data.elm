@@ -34,7 +34,7 @@ type alias FullZkNote =
     , zk : Int
     , title : String
     , content : String
-    , user : Int
+    , public : Bool
     , createdate : Int
     , changeddate : Int
     }
@@ -43,6 +43,7 @@ type alias FullZkNote =
 type alias SaveZkNote =
     { id : Maybe Int
     , zk : Int
+    , public : Bool
     , title : String
     , content : String
     }
@@ -57,6 +58,7 @@ encodeSaveZkNote zkn =
             ++ [ ( "zk", JE.int zkn.zk )
                , ( "title", JE.string zkn.title )
                , ( "content", JE.string zkn.content )
+               , ( "public", JE.bool zkn.public )
                ]
 
 
@@ -104,6 +106,6 @@ decodeFullZkNote =
         (JD.field "zk" JD.int)
         (JD.field "title" JD.string)
         (JD.field "content" JD.string)
-        (JD.field "zk" JD.int)
+        (JD.field "public" JD.bool)
         (JD.field "createdate" JD.int)
         (JD.field "changeddate" JD.int)
