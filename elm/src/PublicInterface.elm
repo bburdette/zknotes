@@ -30,7 +30,7 @@ serverResponseDecoder =
     JD.andThen
         (\what ->
             case what of
-                "blogentry" ->
+                "zknote" ->
                     JD.map ZkNote (JD.at [ "content" ] <| Data.decodeFullZkNote)
 
                 "server error" ->
