@@ -408,7 +408,7 @@ update msg model =
                         UI.SavedZkNote beid ->
                             case state of
                                 EditZkNote emod login ->
-                                    ( { model | state = EditZkNote (EditZkNote.setId emod beid) login }, Cmd.none )
+                                    ( { model | state = EditZkNote (EditZkNote.gotId emod beid) login }, Cmd.none )
 
                                 _ ->
                                     -- ( { model | state = BadError (BadError.initialModel "unexpected message: savedzknote") state }, Cmd.none )

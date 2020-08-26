@@ -1,4 +1,4 @@
-module EditZkNote exposing (Command(..), Model, Msg(..), initExample, initFull, initNew, setId, update, view)
+module EditZkNote exposing (Command(..), Model, Msg(..), dirty, gotId, initExample, initFull, initNew, sznFromModel, update, view)
 
 import CellCommon exposing (..)
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
@@ -239,9 +239,10 @@ initExample zk zkl =
     }
 
 
-setId : Model -> Int -> Model
-setId model beid =
-    { model | id = Just beid }
+gotId : Model -> Int -> Model
+gotId model id =
+    -- if we already have an ID, keep it.
+    { model | id = Just (model.id |> Maybe.withDefault id) }
 
 
 update : Msg -> Model -> ( Model, Command )
