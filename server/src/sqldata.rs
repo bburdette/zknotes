@@ -30,7 +30,6 @@ pub struct SaveZk {
   id: Option<i64>,
   name: String,
   description: String,
-  public: bool,
 }
 
 #[derive(Serialize, Debug, Clone)]
