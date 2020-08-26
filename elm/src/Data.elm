@@ -49,6 +49,16 @@ type alias SaveZkNote =
     }
 
 
+saveZkNoteFromFull : FullZkNote -> SaveZkNote
+saveZkNoteFromFull fzn =
+    { id = Just fzn.id
+    , zk = fzn.zk
+    , public = fzn.public
+    , title = fzn.title
+    , content = fzn.content
+    }
+
+
 encodeSaveZkNote : SaveZkNote -> JE.Value
 encodeSaveZkNote zkn =
     JE.object <|

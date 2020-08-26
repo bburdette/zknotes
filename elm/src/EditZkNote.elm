@@ -19,6 +19,7 @@ import Markdown.Html
 import Markdown.Parser
 import Markdown.Renderer
 import Schelme.Show exposing (showTerm)
+import TangoColors as TC
 
 
 type Msg
@@ -42,6 +43,7 @@ type alias Model =
     , title : String
     , md : String
     , cells : CellDict
+    , revert : Maybe Data.SaveZkNote
     }
 
 
@@ -54,6 +56,24 @@ type Command
     | Switch Int
 
 
+dirty : Model -> Bool
+dirty model =
+    model.revert
+        |> Maybe.map
+            (\r ->
+                not <|
+                    r.id
+                        == model.id
+                        && r.public
+                        == model.public
+                        && r.title
+                        == model.title
+                        && r.content
+                        == model.md
+            )
+        |> Maybe.withDefault True
+
+
 view : Model -> Element Msg
 view model =
     E.column
@@ -63,6 +83,12 @@ view model =
             [ EI.button Common.buttonStyle { onPress = Just SavePress, label = E.text "Done" }
             , EI.button Common.buttonStyle { onPress = Just RevertPress, label = E.text "Cancel" }
             , EI.button Common.buttonStyle { onPress = Just ViewPress, label = E.text "View" }
+            , case dirty model of
+                True ->
+                    E.row [ Font.color TC.red ] [ E.text "dirty" ]
+
+                False ->
+                    E.none
             , EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just DeletePress, label = E.text "Delete" }
             ]
         , EI.text []
@@ -137,6 +163,7 @@ initFull zk zkl zknote =
     , title = zknote.title
     , md = zknote.content
     , cells = getCd cc
+    , revert = Just (Data.saveZkNoteFromFull zknote)
     }
 
 
@@ -159,6 +186,7 @@ initNew zk zkl =
     , title = ""
     , md = ""
     , cells = getCd cc
+    , revert = Nothing
     }
 
 
@@ -181,6 +209,7 @@ initExample zk zkl =
     , title = "example"
     , md = markdownBody
     , cells = getCd cc
+    , revert = Nothing
     }
 
 
