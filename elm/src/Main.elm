@@ -530,7 +530,7 @@ update msg model =
                     )
             in
             case ecmd of
-                EditZkNote.Save szk ->
+                EditZkNote.SaveExit szk ->
                     ( { model
                         | state =
                             Wait
@@ -562,6 +562,13 @@ update msg model =
                                             )
                                 )
                       }
+                    , sendUIMsg model.location
+                        login
+                        (UI.SaveZkNote szk)
+                    )
+
+                EditZkNote.Save szk ->
+                    ( { model | state = EditZkNote emod login }
                     , sendUIMsg model.location
                         login
                         (UI.SaveZkNote szk)

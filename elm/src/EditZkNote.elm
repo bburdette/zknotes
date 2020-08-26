@@ -27,6 +27,7 @@ type Msg
     | OnSchelmeCodeChanged String String
     | OnTitleChanged String
     | SavePress
+    | DonePress
     | RevertPress
     | DeletePress
     | ViewPress
@@ -50,6 +51,7 @@ type alias Model =
 type Command
     = None
     | Save Data.SaveZkNote
+    | SaveExit Data.SaveZkNote
     | Revert
     | View Data.SaveZkNote
     | Delete Int
@@ -80,12 +82,12 @@ view model =
         [ E.width E.fill ]
         [ E.text "Edit Zk Note"
         , E.row [ E.width E.fill, E.spacing 8 ]
-            [ EI.button Common.buttonStyle { onPress = Just SavePress, label = E.text "Done" }
+            [ EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "Done" }
             , EI.button Common.buttonStyle { onPress = Just RevertPress, label = E.text "Cancel" }
             , EI.button Common.buttonStyle { onPress = Just ViewPress, label = E.text "View" }
             , case dirty model of
                 True ->
-                    E.row [ Font.color TC.red ] [ E.text "dirty" ]
+                    EI.button (Common.buttonStyle ++ [ EBk.color TC.darkYellow ]) { onPress = Just SavePress, label = E.text "Save" }
 
                 False ->
                     E.none
@@ -222,8 +224,24 @@ update : Msg -> Model -> ( Model, Command )
 update msg model =
     case msg of
         SavePress ->
-            ( model
+            -- TODO more reliability.  What if the save fails?
+            let
+                saveZkn =
+                    { id = model.id
+                    , zk = model.zk.id
+                    , title = model.title
+                    , content = model.md
+                    , public = model.public
+                    }
+            in
+            ( { model | revert = Just saveZkn }
             , Save
+                saveZkn
+            )
+
+        DonePress ->
+            ( model
+            , SaveExit
                 { id = model.id
                 , zk = model.zk.id
                 , title = model.title
