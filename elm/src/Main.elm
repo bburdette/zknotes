@@ -617,6 +617,32 @@ update msg model =
                         ]
                     )
 
+                EditZkNote.SaveSwitch szkn id ->
+                    ( { model
+                        | state =
+                            ZkWait
+                                (ShowMessage
+                                    { message = "loading articles"
+                                    }
+                                    login
+                                )
+                                (WmZklm Nothing Nothing emod.zk (\zkl zkn zk -> EditZkNote (EditZkNote.initFull zk zkl zkn) login))
+                      }
+                    , Cmd.batch
+                        [ sendUIMsg model.location
+                            login
+                            (UI.GetZkNoteListing
+                                es.zk.id
+                            )
+                        , sendUIMsg model.location
+                            login
+                            (UI.GetZkNote id)
+                        , sendUIMsg model.location
+                            login
+                            (UI.SaveZkNote szkn)
+                        ]
+                    )
+
                 EditZkNote.View sbe ->
                     ( { model | state = BadError (BadError.initialModel "EditZkNote.View sbe -> unimplmeented") model.state }
                     , Cmd.none

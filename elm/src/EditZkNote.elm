@@ -56,6 +56,17 @@ type Command
     | View Data.SaveZkNote
     | Delete Int
     | Switch Int
+    | SaveSwitch Data.SaveZkNote Int
+
+
+sznFromModel : Model -> Data.SaveZkNote
+sznFromModel model =
+    { id = model.id
+    , zk = model.zk.id
+    , title = model.title
+    , content = model.md
+    , public = model.public
+    }
 
 
 dirty : Model -> Bool
@@ -78,14 +89,27 @@ dirty model =
 
 view : Model -> Element Msg
 view model =
+    let
+        isdirty =
+            dirty model
+
+        dirtybutton =
+            if isdirty then
+                Common.buttonStyle ++ [ EBk.color TC.darkYellow ]
+
+            else
+                Common.buttonStyle
+    in
     E.column
         [ E.width E.fill ]
         [ E.text "Edit Zk Note"
         , E.row [ E.width E.fill, E.spacing 8 ]
-            [ EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "Done" }
+            [ EI.button
+                dirtybutton
+                { onPress = Just DonePress, label = E.text "Done" }
             , EI.button Common.buttonStyle { onPress = Just RevertPress, label = E.text "Cancel" }
             , EI.button Common.buttonStyle { onPress = Just ViewPress, label = E.text "View" }
-            , case dirty model of
+            , case isdirty of
                 True ->
                     EI.button (Common.buttonStyle ++ [ EBk.color TC.darkYellow ]) { onPress = Just SavePress, label = E.text "Save" }
 
@@ -130,7 +154,7 @@ view model =
                     (\zkln ->
                         E.row [ E.spacing 8 ]
                             [ EI.button Common.buttonStyle { onPress = Just (LinkPress zkln), label = E.text "Link" }
-                            , EI.button Common.buttonStyle { onPress = Just (SwitchPress zkln), label = E.text "Edit" }
+                            , EI.button dirtybutton { onPress = Just (SwitchPress zkln), label = E.text "Edit" }
                             , E.text zkln.title
                             ]
                     )
@@ -227,12 +251,7 @@ update msg model =
             -- TODO more reliability.  What if the save fails?
             let
                 saveZkn =
-                    { id = model.id
-                    , zk = model.zk.id
-                    , title = model.title
-                    , content = model.md
-                    , public = model.public
-                    }
+                    sznFromModel model
             in
             ( { model | revert = Just saveZkn }
             , Save
@@ -242,30 +261,24 @@ update msg model =
         DonePress ->
             ( model
             , SaveExit
-                { id = model.id
-                , zk = model.zk.id
-                , title = model.title
-                , content = model.md
-                , public = model.public
-                }
+                (sznFromModel model)
             )
 
         ViewPress ->
             ( model
             , View
-                { id = model.id
-                , zk = model.zk.id
-                , title = model.title
-                , content = model.md
-                , public = model.public
-                }
+                (sznFromModel model)
             )
 
         LinkPress zkln ->
             ( { model | md = model.md ++ "\n[" ++ zkln.title ++ "](/note/" ++ String.fromInt zkln.id ++ ")" }, None )
 
         SwitchPress zkln ->
-            ( model, Switch zkln.id )
+            if dirty model then
+                ( model, SaveSwitch (sznFromModel model) zkln.id )
+
+            else
+                ( model, Switch zkln.id )
 
         PublicPress v ->
             ( { model | public = v }, None )
