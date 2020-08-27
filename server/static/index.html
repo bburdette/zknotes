@@ -25,6 +25,45 @@
         console.log("clearstorage");
         localStorage.clear();
       }
+
+      function getSelected() {
+          var text = "";
+          if (window.getSelection
+          && window.getSelection().toString()
+          // && $(window.getSelection()).attr('type') != "Caret"
+          )
+          {
+              text = window.getSelection();
+              return text;
+          }
+          else if (document.getSelection
+          && document.getSelection().toString()
+          //&& $(document.getSelection()).attr('type') != "Caret"
+          )
+          {
+              text = document.getSelection();
+              return text;
+          }
+          else {
+              var selection = document.selection && document.selection.createRange();
+
+              if (!(typeof selection === "undefined")
+              && selection.text
+              && selection.text.toString()) {
+                  text = selection.text;
+                  return text;
+              }
+          }
+
+          return "";
+      }
+      function getSelectedText () {
+        var text = getSelected();
+        console.log("selected 'text': " + JSON.stringify(text));
+        app.ports.receiveSelectedText.send(text);
+      }
+
+      
       app = Elm.Main.init({
         node: document.getElementById('elm'),
         flags: { seed : Math.floor(Math.random()*0x0FFFFFFF), 
@@ -33,8 +72,9 @@
                  debugstring : "initial-info", 
                  width : window.innerWidth, 
                  height : window.innerHeight }});
-      app.ports.storeLocalVal.subscribe(storeVal);
-      app.ports.getLocalVal.subscribe(getVal);
+      // app.ports.storeLocalVal.subscribe(storeVal);
+      // app.ports.getLocalVal.subscribe(getVal);
+      app.ports.getSelectedText.subscribe(getSelectedText);
     </script>
   </body>
 </html>

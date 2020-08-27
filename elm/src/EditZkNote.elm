@@ -1,4 +1,4 @@
-module EditZkNote exposing (Command(..), Model, Msg(..), dirty, gotId, initExample, initFull, initNew, sznFromModel, update, view)
+module EditZkNote exposing (Command(..), Model, Msg(..), dirty, gotId, gotSelectedText, initExample, initFull, initNew, sznFromModel, update, view)
 
 import CellCommon exposing (..)
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
@@ -31,6 +31,7 @@ type Msg
     | RevertPress
     | DeletePress
     | ViewPress
+    | NewPress
     | SwitchPress Data.ZkListNote
     | LinkPress Data.ZkListNote
     | PublicPress Bool
@@ -57,6 +58,7 @@ type Command
     | Delete Int
     | Switch Int
     | SaveSwitch Data.SaveZkNote Int
+    | New (Maybe Data.SaveZkNote)
 
 
 sznFromModel : Model -> Data.SaveZkNote
@@ -111,10 +113,11 @@ view model =
             , EI.button Common.buttonStyle { onPress = Just ViewPress, label = E.text "View" }
             , case isdirty of
                 True ->
-                    EI.button (Common.buttonStyle ++ [ EBk.color TC.darkYellow ]) { onPress = Just SavePress, label = E.text "Save" }
+                    EI.button dirtybutton { onPress = Just SavePress, label = E.text "Save" }
 
                 False ->
                     E.none
+            , EI.button dirtybutton { onPress = Just NewPress, label = E.text "New" }
             , EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just DeletePress, label = E.text "Delete" }
             ]
         , EI.text []
@@ -245,6 +248,11 @@ gotId model id =
     { model | id = Just (model.id |> Maybe.withDefault id) }
 
 
+gotSelectedText : Model -> String -> Model
+gotSelectedText model s =
+    { model | title = s }
+
+
 update : Msg -> Model -> ( Model, Command )
 update msg model =
     case msg of
@@ -269,6 +277,18 @@ update msg model =
             ( model
             , View
                 (sznFromModel model)
+            )
+
+        NewPress ->
+            ( model
+            , New <|
+                case dirty model of
+                    False ->
+                        Nothing
+
+                    True ->
+                        Just
+                            (sznFromModel model)
             )
 
         LinkPress zkln ->

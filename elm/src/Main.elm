@@ -1,4 +1,4 @@
-module Main exposing (main)
+port module Main exposing (main)
 
 import BadError
 import Browser
@@ -20,6 +20,7 @@ import Element.Region
 import Html exposing (Attribute, Html)
 import Html.Attributes
 import Http
+import Json.Decode as JD
 import Login
 import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..))
 import Markdown.Html
@@ -49,6 +50,7 @@ type Msg
     | PublicReplyData (Result Http.Error PI.ServerResponse)
     | LoadUrl String
     | InternalUrl Url
+    | SelectedText JD.Value
     | Noop
 
 
@@ -217,6 +219,19 @@ update msg model =
                     wfn model.state msg
             in
             ( { model | state = nst }, cmd )
+
+        ( SelectedText jv, state ) ->
+            case JD.decodeValue JD.string jv of
+                Ok str ->
+                    case state of
+                        EditZkNote emod login ->
+                            ( { model | state = EditZkNote (EditZkNote.gotSelectedText emod str) login }, Cmd.none )
+
+                        _ ->
+                            ( model, Cmd.none )
+
+                Err e ->
+                    ( { model | state = BadError (BadError.initialModel <| JD.errorToString e) model.state }, Cmd.none )
 
         ( InternalUrl url, _ ) ->
             let
@@ -411,20 +426,12 @@ update msg model =
                                     ( { model | state = EditZkNote (EditZkNote.gotId emod beid) login }, Cmd.none )
 
                                 _ ->
-                                    -- ( { model | state = BadError (BadError.initialModel "unexpected message: savedzknote") state }, Cmd.none )
                                     -- just ignore if we're not editing a new note.
                                     ( model, Cmd.none )
 
                         UI.DeletedZkNote beid ->
                             ( model, Cmd.none )
 
-                        -- case state of
-                        --     ShowMessage _ login ->
-                        --         ( model
-                        --         , sendUIMsg model.location login UI.GetZkNoteListing
-                        --         )
-                        --     _ ->
-                        --         ( { model | state = BadError (BadError.initialModel "unexpected message") state }, Cmd.none )
                         UI.UserExists ->
                             ( { model | state = BadError (BadError.initialModel "Can't register - User exists already!") state }, Cmd.none )
 
@@ -648,6 +655,22 @@ update msg model =
                     , Cmd.none
                     )
 
+                EditZkNote.New mbsave ->
+                    ( { model | state = EditZkNote (EditZkNote.initNew emod.zk emod.zklist) login }
+                    , Cmd.batch <|
+                        getSelectedText ()
+                            :: (case mbsave of
+                                    Just sv ->
+                                        [ sendUIMsg model.location
+                                            login
+                                            (UI.SaveZkNote sv)
+                                        ]
+
+                                    Nothing ->
+                                        []
+                               )
+                    )
+
         ( EditZkListingMsg em, EditZkListing es login ) ->
             let
                 ( emod, ecmd ) =
@@ -809,7 +832,8 @@ main =
         { init = init
         , view = view
         , update = update
-        , subscriptions = \model -> Sub.none
+        , subscriptions =
+            \_ -> receiveSelectedText SelectedText
         , onUrlRequest = urlRequest
         , onUrlChange =
             \uc ->
@@ -818,6 +842,10 @@ main =
                         Debug.log "uc: " uc
                 in
                 Noop
-
-        -- Url -> msg
         }
+
+
+port getSelectedText : () -> Cmd msg
+
+
+port receiveSelectedText : (JD.Value -> msg) -> Sub msg
