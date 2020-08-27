@@ -223,9 +223,26 @@ update msg model =
         ( SelectedText jv, state ) ->
             case JD.decodeValue JD.string jv of
                 Ok str ->
+                    let
+                        _ =
+                            Debug.log "SelectedText jv: " str
+                    in
                     case state of
                         EditZkNote emod login ->
-                            ( { model | state = EditZkNote (EditZkNote.gotSelectedText emod str) login }, Cmd.none )
+                            let
+                                ( s, cmd ) =
+                                    EditZkNote.gotSelectedText emod str
+                            in
+                            case cmd of
+                                EditZkNote.Save szk ->
+                                    ( { model | state = EditZkNote s login }
+                                    , sendUIMsg model.location
+                                        login
+                                        (UI.SaveZkNote szk)
+                                    )
+
+                                _ ->
+                                    ( { model | state = EditZkNote s login }, Cmd.none )
 
                         _ ->
                             ( model, Cmd.none )
@@ -655,20 +672,9 @@ update msg model =
                     , Cmd.none
                     )
 
-                EditZkNote.New mbsave ->
-                    ( { model | state = EditZkNote (EditZkNote.initNew emod.zk emod.zklist) login }
-                    , Cmd.batch <|
-                        getSelectedText ()
-                            :: (case mbsave of
-                                    Just sv ->
-                                        [ sendUIMsg model.location
-                                            login
-                                            (UI.SaveZkNote sv)
-                                        ]
-
-                                    Nothing ->
-                                        []
-                               )
+                EditZkNote.GetSelectedText id ->
+                    ( { model | state = EditZkNote emod login }
+                    , getSelectedText (Just id)
                     )
 
         ( EditZkListingMsg em, EditZkListing es login ) ->
@@ -845,7 +851,7 @@ main =
         }
 
 
-port getSelectedText : () -> Cmd msg
+port getSelectedText : Maybe String -> Cmd msg
 
 
 port receiveSelectedText : (JD.Value -> msg) -> Sub msg

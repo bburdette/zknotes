@@ -58,7 +58,7 @@ type Command
     | Delete Int
     | Switch Int
     | SaveSwitch Data.SaveZkNote Int
-    | New (Maybe Data.SaveZkNote)
+    | GetSelectedText String
 
 
 sznFromModel : Model -> Data.SaveZkNote
@@ -133,7 +133,10 @@ view model =
             , label = EI.labelLeft [] (E.text "public")
             }
         , E.row [ E.width E.fill ]
-            [ EI.multiline [ E.width (E.px 400) ]
+            [ EI.multiline
+                [ E.width (E.px 400)
+                , E.htmlAttribute (Html.Attributes.id "mdtext")
+                ]
                 { onChange = OnMarkdownInput
                 , text = model.md
                 , placeholder = Nothing
@@ -248,9 +251,24 @@ gotId model id =
     { model | id = Just (model.id |> Maybe.withDefault id) }
 
 
-gotSelectedText : Model -> String -> Model
+gotSelectedText : Model -> String -> ( Model, Command )
 gotSelectedText model s =
-    { model | title = s }
+    let
+        _ =
+            Debug.log "gotSelectedText model: " model
+
+        nmod =
+            initNew model.zk model.zklist
+    in
+    ( { nmod | title = s }
+    , case dirty model of
+        False ->
+            None
+
+        True ->
+            Save
+                (sznFromModel model)
+    )
 
 
 update : Msg -> Model -> ( Model, Command )
@@ -281,14 +299,7 @@ update msg model =
 
         NewPress ->
             ( model
-            , New <|
-                case dirty model of
-                    False ->
-                        Nothing
-
-                    True ->
-                        Just
-                            (sznFromModel model)
+            , GetSelectedText "mdtext"
             )
 
         LinkPress zkln ->

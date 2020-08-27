@@ -25,40 +25,39 @@
         console.log("clearstorage");
         localStorage.clear();
       }
-
-      function getSelected() {
+      function getRegularSelectionText() {
           var text = "";
-          if (window.getSelection
-          && window.getSelection().toString()
-          // && $(window.getSelection()).attr('type') != "Caret"
-          )
-          {
-              text = window.getSelection();
-              return text;
+          if (window.getSelection) {
+              text = window.getSelection().toString();
+          } else if (document.selection && document.selection.type != "Control") {
+              text = document.selection.createRange().text;
           }
-          else if (document.getSelection
-          && document.getSelection().toString()
-          //&& $(document.getSelection()).attr('type') != "Caret"
-          )
-          {
-              text = document.getSelection();
-              return text;
-          }
-          else {
-              var selection = document.selection && document.selection.createRange();
-
-              if (!(typeof selection === "undefined")
-              && selection.text
-              && selection.text.toString()) {
-                  text = selection.text;
-                  return text;
-              }
-          }
-
-          return "";
+          console.log("getselectiontext result: " + text);
+          return text;
       }
-      function getSelectedText () {
-        var text = getSelected();
+
+      function getSelectionText(id) {
+          if (id == null) {
+            return getRegularSelectionText();
+          }
+          var text = "";
+          var activeEl = document.getElementById(id);
+          console.log("acstive element: " + JSON.stringify(activeEl));
+          var activeElTagName = activeEl ? activeEl.tagName.toLowerCase() : null;
+          if (
+            (activeElTagName == "textarea") || (activeElTagName == "input" &&
+            /^(?:text|search|password|tel|url)$/i.test(activeEl.type)) &&
+            (typeof activeEl.selectionStart == "number")
+          ) {
+              text = activeEl.value.slice(activeEl.selectionStart, activeEl.selectionEnd);
+          } else if (window.getSelection) {
+              text = window.getSelection().toString();
+          }
+          console.log("gst result: " + text);
+          return text;
+      }
+      function getSelectedText (id) {
+        var text = getSelectionText(id);
         console.log("selected 'text': " + JSON.stringify(text));
         app.ports.receiveSelectedText.send(text);
       }
