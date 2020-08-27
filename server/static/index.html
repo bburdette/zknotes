@@ -25,6 +25,8 @@
         console.log("clearstorage");
         localStorage.clear();
       }
+
+      // all we'd use in a saner world.  textarea highlighted text is ok here with chrome.
       function getRegularSelectionText() {
           var text = "";
           if (window.getSelection) {
@@ -32,17 +34,19 @@
           } else if (document.selection && document.selection.type != "Control") {
               text = document.selection.createRange().text;
           }
-          console.log("getselectiontext result: " + text);
+          // console.log("getselectiontext result: " + text);
           return text;
       }
 
+      // because firefox has a bug we use this to get highlighted text from a textarea.
+      // textarea id required.
       function getSelectionText(id) {
           if (id == null) {
             return getRegularSelectionText();
           }
           var text = "";
           var activeEl = document.getElementById(id);
-          console.log("acstive element: " + JSON.stringify(activeEl));
+          // console.log("acstive element: " + JSON.stringify(activeEl));
           var activeElTagName = activeEl ? activeEl.tagName.toLowerCase() : null;
           if (
             (activeElTagName == "textarea") || (activeElTagName == "input" &&
@@ -53,12 +57,13 @@
           } else if (window.getSelection) {
               text = window.getSelection().toString();
           }
-          console.log("gst result: " + text);
+          // console.log("gst result: " + text);
           return text;
       }
       function getSelectedText (id) {
+        // console.log("getSelectedText" + JSON.stringify(id));
         var text = getSelectionText(id);
-        console.log("selected 'text': " + JSON.stringify(text));
+        // console.log("selected 'text': " + JSON.stringify(text));
         app.ports.receiveSelectedText.send(text);
       }
 

@@ -254,9 +254,6 @@ gotId model id =
 gotSelectedText : Model -> String -> ( Model, Command )
 gotSelectedText model s =
     let
-        _ =
-            Debug.log "gotSelectedText model: " model
-
         nmod =
             initNew model.zk model.zklist
     in
