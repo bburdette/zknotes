@@ -606,16 +606,17 @@ update msg model =
 
                 EditZkNote.Delete id ->
                     -- issue delete and go back to listing.
-                    ( { model
-                        | state =
-                            ShowMessage
-                                { message = "loading articles"
-                                }
-                                login
-                      }
-                    , sendUIMsg model.location
-                        login
-                        (UI.DeleteZk id)
+                    let
+                        ( m, c ) =
+                            backtolisting
+                    in
+                    ( m
+                    , Cmd.batch
+                        [ sendUIMsg model.location
+                            login
+                            (UI.DeleteZkNote id)
+                        , c
+                        ]
                     )
 
                 EditZkNote.Switch id ->
