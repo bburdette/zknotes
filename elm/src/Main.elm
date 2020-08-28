@@ -225,7 +225,16 @@ update msg model =
                 Ok str ->
                     let
                         _ =
+                            Debug.log "----------------" "----"
+
+                        _ =
                             Debug.log "SelectedText jv: " str
+
+                        _ =
+                            Debug.log "state: " state
+
+                        _ =
+                            Debug.log "----------------" "----"
                     in
                     case state of
                         EditZkNote emod login ->
@@ -235,7 +244,24 @@ update msg model =
                             in
                             case cmd of
                                 EditZkNote.Save szk ->
-                                    ( { model | state = EditZkNote s login }
+                                    ( { model
+                                        | state =
+                                            Wait
+                                                (ShowMessage
+                                                    { message = "waiting for zknote id"
+                                                    }
+                                                    login
+                                                )
+                                                (\st ms ->
+                                                    -- discard
+                                                    case ms of
+                                                        UserReplyData (Ok (UI.SavedZkNote _)) ->
+                                                            ( EditZkNote s login, Cmd.none )
+
+                                                        _ ->
+                                                            ( BadError (BadError.initialModel "unexpected message after zknote save") st, Cmd.none )
+                                                )
+                                      }
                                     , sendUIMsg model.location
                                         login
                                         (UI.SaveZkNote szk)
