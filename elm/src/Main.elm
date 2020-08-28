@@ -762,6 +762,20 @@ update msg model =
                         (UI.GetZk id)
                     )
 
+                EditZkNoteListing.Done ->
+                    -- back to the Zk listing.
+                    ( { model
+                        | state =
+                            ShowMessage
+                                { message = "loading zk listing"
+                                }
+                                login
+                      }
+                    , sendUIMsg model.location
+                        login
+                        UI.GetZkListing
+                    )
+
         ( BadErrorMsg bm, BadError bs prevstate ) ->
             let
                 ( bmod, bcmd ) =

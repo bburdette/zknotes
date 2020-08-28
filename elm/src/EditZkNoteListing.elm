@@ -16,6 +16,7 @@ type Msg
     | ViewPress Int
     | NewPress
     | ExamplePress
+    | DonePress
 
 
 type alias Model =
@@ -29,6 +30,7 @@ type Command
     | View Int
     | New
     | Example
+    | Done
 
 
 view : Model -> Element Msg
@@ -39,6 +41,7 @@ view model =
             , E.text "Select a Zk Note"
             , EI.button Common.buttonStyle { onPress = Just NewPress, label = E.text "new" }
             , EI.button Common.buttonStyle { onPress = Just ExamplePress, label = E.text "example" }
+            , EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "done" }
             ]
             :: List.map
                 (\e ->
@@ -70,3 +73,6 @@ update msg model =
 
         NewPress ->
             ( model, New )
+
+        DonePress ->
+            ( model, Done )
