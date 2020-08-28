@@ -262,13 +262,12 @@ gotSelectedText model s =
             initNew model.zk model.zklist
     in
     ( { nmod | title = s }
-    , case dirty model of
-        False ->
-            None
+    , if dirty model then
+        None
 
-        True ->
-            Save
-                (sznFromModel model)
+      else
+        Save
+            (sznFromModel model)
     )
 
 
