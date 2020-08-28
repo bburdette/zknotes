@@ -223,19 +223,6 @@ update msg model =
         ( SelectedText jv, state ) ->
             case JD.decodeValue JD.string jv of
                 Ok str ->
-                    let
-                        _ =
-                            Debug.log "----------------" "----"
-
-                        _ =
-                            Debug.log "SelectedText jv: " str
-
-                        _ =
-                            Debug.log "state: " state
-
-                        _ =
-                            Debug.log "----------------" "----"
-                    in
                     case state of
                         EditZkNote emod login ->
                             let
@@ -791,9 +778,6 @@ update msg model =
 init : Flags -> Url -> Browser.Navigation.Key -> ( Model, Cmd Msg )
 init flags url key =
     let
-        _ =
-            Debug.log "parsed: " (parseUrl url)
-
         seed =
             initialSeed (flags.seed + 7)
 
@@ -850,10 +834,6 @@ routeState location seed route =
 
 urlRequest : Browser.UrlRequest -> Msg
 urlRequest ur =
-    let
-        _ =
-            Debug.log "ur: " ur
-    in
     case ur of
         Browser.Internal url ->
             InternalUrl url
@@ -873,10 +853,6 @@ main =
         , onUrlRequest = urlRequest
         , onUrlChange =
             \uc ->
-                let
-                    _ =
-                        Debug.log "uc: " uc
-                in
                 Noop
         }
 

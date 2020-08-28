@@ -248,9 +248,6 @@ initExample zk zkl =
 gotId : Model -> Int -> Model
 gotId model id =
     let
-        _ =
-            Debug.log "gotId" id
-
         m1 =
             { model | id = Just (model.id |> Maybe.withDefault id) }
     in
@@ -264,16 +261,15 @@ gotSelectedText model s =
         nmod =
             initNew model.zk model.zklist
     in
-    Debug.log "gotSelectedText: "
-        ( { nmod | title = s }
-        , case dirty model of
-            False ->
-                None
+    ( { nmod | title = s }
+    , case dirty model of
+        False ->
+            None
 
-            True ->
-                Save
-                    (sznFromModel model)
-        )
+        True ->
+            Save
+                (sznFromModel model)
+    )
 
 
 update : Msg -> Model -> ( Model, Command )
