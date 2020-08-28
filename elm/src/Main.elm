@@ -610,13 +610,16 @@ update msg model =
                         ( m, c ) =
                             backtolisting
                     in
-                    ( m
-                    , Cmd.batch
-                        [ sendUIMsg model.location
-                            login
-                            (UI.DeleteZkNote id)
-                        , c
-                        ]
+                    ( { m
+                        | state =
+                            Wait m.state
+                                (\state _ ->
+                                    ( m.state, c )
+                                )
+                      }
+                    , sendUIMsg model.location
+                        login
+                        (UI.DeleteZkNote id)
                     )
 
                 EditZkNote.Switch id ->
