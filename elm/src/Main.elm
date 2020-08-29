@@ -463,13 +463,28 @@ update msg model =
                             ( model, Cmd.none )
 
                         UI.UserExists ->
-                            ( { model | state = BadError (BadError.initialModel "Can't register - User exists already!") state }, Cmd.none )
+                            case state of
+                                Login lmod ->
+                                    ( { model | state = Login <| Login.userExists lmod }, Cmd.none )
+
+                                _ ->
+                                    ( { model | state = BadError (BadError.initialModel "unexpected message") state }, Cmd.none )
 
                         UI.UnregisteredUser ->
-                            ( { model | state = BadError (BadError.initialModel "Unregistered user.  Check your spam folder!") state }, Cmd.none )
+                            case state of
+                                Login lmod ->
+                                    ( { model | state = Login <| Login.unregisteredUser lmod }, Cmd.none )
+
+                                _ ->
+                                    ( { model | state = BadError (BadError.initialModel "unexpected message") state }, Cmd.none )
 
                         UI.InvalidUserOrPwd ->
-                            ( { model | state = BadError (BadError.initialModel "Invalid username or password.") state }, Cmd.none )
+                            case state of
+                                Login lmod ->
+                                    ( { model | state = Login <| Login.invalidUserOrPwd lmod }, Cmd.none )
+
+                                _ ->
+                                    ( { model | state = BadError (BadError.initialModel "unexpected message") state }, Cmd.none )
 
         ( ViewMsg em, View es ) ->
             let
