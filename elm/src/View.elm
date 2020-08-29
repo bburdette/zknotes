@@ -39,13 +39,17 @@ type Command
     | Done
 
 
-view : Model -> Element Msg
-view model =
+view : Model -> Bool -> Element Msg
+view model loggedin =
     E.column
         [ E.width E.fill ]
-        [ E.row []
-            [ EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "Done" }
-            ]
+        [ if loggedin then
+            E.row []
+                [ EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "Done" }
+                ]
+
+          else
+            E.none
         , E.text model.title
         , E.row [ E.width E.fill ]
             [ case markdownView (mkRenderer model.cells OnSchelmeCodeChanged) model.md of

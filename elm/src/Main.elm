@@ -157,10 +157,10 @@ viewState size state =
             Element.map ShowMessageMsg <| ShowMessage.view em
 
         View em ->
-            Element.map ViewMsg <| View.view em
+            Element.map ViewMsg <| View.view em False
 
         EView em _ ->
-            Element.map ViewMsg <| View.view em
+            Element.map ViewMsg <| View.view em True
 
         EditZk em _ ->
             Element.map EditZkMsg <| EditZk.view em
@@ -774,7 +774,7 @@ update msg model =
                     ( { model | state = ZkWait model.state WmView }
                     , sendUIMsg model.location
                         login
-                        (UI.GetZk id)
+                        (UI.GetZkNote id)
                     )
 
                 EditZkNoteListing.Done ->
