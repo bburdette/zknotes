@@ -1,5 +1,5 @@
 [package]
-name = "zknote-server"
+name = "zknotes-server"
 version = "0.1.0"
 authors = ["Ben Burdette <bburdette@gmail.com>"]
 
