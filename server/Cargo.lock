@@ -2597,7 +2597,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "zknote-server"
+name = "zknotes-server"
 version = "0.1.0"
 dependencies = [
  "actix-files",
