@@ -339,6 +339,33 @@ pub fn zklisting(dbfile: &Path, user: i64) -> rusqlite::Result<Vec<Zk>> {
   Ok(pv)
 }
 
+pub fn read_zk_members(dbfile: &Path, uid: i64, zkid: i64) -> Result<Vec<String>, Box<dyn Error>> {
+  let conn = connection_open(dbfile)?;
+
+  if !is_zk_member(&conn, uid, zkid)? {
+    bail!("can't delete; user is not a member of this zk");
+  }
+
+  let mut pstmt = conn.prepare(
+    "SELECT user.name from zkmember, user where zkmember.zk = ?1 and user.id = zkmember.user",
+  )?;
+
+  let rec_iter = pstmt.query_map(params![zkid], |row| Ok(row.get(0)?))?;
+
+  let mut pv = Vec::new();
+
+  for rsrec in rec_iter {
+    match rsrec {
+      Ok(uid) => {
+        pv.push(uid);
+      }
+      Err(_) => (),
+    }
+  }
+
+  Ok(pv)
+}
+
 pub fn read_zk(dbfile: &Path, id: i64) -> Result<Zk, Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
 

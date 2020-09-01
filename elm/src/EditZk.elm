@@ -36,6 +36,7 @@ type alias Model =
     , name : String
     , md : String
     , cells : CellDict
+    , members : List String
     }
 
 
@@ -84,11 +85,16 @@ view model =
                 Err errors ->
                     E.text errors
             ]
+        , E.row [ E.spacing 8 ]
+            [ E.text "members:"
+            , E.column [] <|
+                List.map E.text model.members
+            ]
         ]
 
 
-initFull : Data.Zk -> Model
-initFull zk =
+initFull : Data.Zk -> List String -> Model
+initFull zk members =
     let
         cells =
             zk.description
@@ -103,6 +109,7 @@ initFull zk =
     , name = zk.name
     , md = zk.description
     , cells = getCd cc
+    , members = members
     }
 
 
@@ -122,6 +129,7 @@ initNew =
     , name = ""
     , md = ""
     , cells = getCd cc
+    , members = []
     }
 
 
@@ -141,6 +149,7 @@ initExample =
     , name = "example"
     , md = markdownBody
     , cells = getCd cc
+    , members = []
     }
 
 

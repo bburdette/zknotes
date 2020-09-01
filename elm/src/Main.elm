@@ -450,6 +450,9 @@ update msg model =
                                 _ ->
                                     ( { model | state = BadError (BadError.initialModel "unexpected message") state }, Cmd.none )
 
+                        UI.ZkMembers _ ->
+                            ( { model | state = BadError (BadError.initialModel "unexpected zkmembers message") state }, Cmd.none )
+
                         UI.SavedZkNote beid ->
                             case state of
                                 EditZkNote emod login ->
@@ -722,7 +725,27 @@ update msg model =
                     ( { model | state = EditZk EditZk.initExample login }, Cmd.none )
 
                 EditZkListing.Selected zk ->
-                    ( { model | state = EditZk (EditZk.initFull zk) login }, Cmd.none )
+                    ( { model
+                        | state =
+                            Wait
+                                (ShowMessage
+                                    { message = "loading zk members"
+                                    }
+                                    login
+                                )
+                                (\st ms ->
+                                    case ms of
+                                        UserReplyData (Ok (UI.ZkMembers list)) ->
+                                            ( EditZk (EditZk.initFull zk list) login, Cmd.none )
+
+                                        _ ->
+                                            ( BadError (BadError.initialModel "unexpected message instead of zk member list") st, Cmd.none )
+                                )
+                      }
+                    , sendUIMsg model.location
+                        login
+                        (UI.GetZkMembers zk.id)
+                    )
 
                 EditZkListing.Notes zk ->
                     ( { model

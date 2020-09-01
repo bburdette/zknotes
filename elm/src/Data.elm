@@ -20,6 +20,13 @@ type alias SaveZk =
     }
 
 
+
+-- type alias ZkMember =
+--     { uid : Int
+--     , name : String
+--     }
+
+
 type alias ZkListNote =
     { id : Int
     , title : String

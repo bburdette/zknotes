@@ -178,6 +178,16 @@ fn user_interface_loggedin(
         content: serde_json::to_value(id)?,
       })
     }
+    "getzkmembers" => {
+      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      let zkid: i64 = serde_json::from_value(msgdata.clone())?;
+
+      let members = sqldata::read_zk_members(Path::new(&config.db), uid, zkid)?;
+      Ok(ServerResponse {
+        what: "zkmembers".to_string(),
+        content: serde_json::to_value(members)?,
+      })
+    }
     "getzklisting" => {
       let entries = sqldata::zklisting(Path::new(&config.db), uid)?;
       Ok(ServerResponse {
