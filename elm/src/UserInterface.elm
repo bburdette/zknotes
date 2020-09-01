@@ -12,6 +12,8 @@ type SendMsg
     | GetZk Int
     | DeleteZk Int
     | GetZkMembers Int
+    | AddZkMember Data.ZkMember
+    | DeleteZkMember Data.ZkMember
     | GetZkNoteListing Int
     | GetZkNote Int
     | DeleteZkNote Int
@@ -30,6 +32,8 @@ type ServerResponse
     | SavedZk Int
     | DeletedZk Int
     | ZkMembers (List String)
+    | AddedZkMember Data.ZkMember
+    | DeletedZkMember Data.ZkMember
     | SavedZkNote Int
     | DeletedZkNote Int
     | ZkNote Data.FullZkNote
@@ -83,6 +87,22 @@ encodeSendMsg sm uid pwd =
                 , ( "uid", JE.string uid )
                 , ( "pwd", JE.string pwd )
                 , ( "data", JE.int id )
+                ]
+
+        AddZkMember zkm ->
+            JE.object
+                [ ( "what", JE.string "addzkmember" )
+                , ( "uid", JE.string uid )
+                , ( "pwd", JE.string pwd )
+                , ( "data", Data.encodeZkMember zkm )
+                ]
+
+        DeleteZkMember zkm ->
+            JE.object
+                [ ( "what", JE.string "deletezkmember" )
+                , ( "uid", JE.string uid )
+                , ( "pwd", JE.string pwd )
+                , ( "data", Data.encodeZkMember zkm )
                 ]
 
         GetZkNoteListing id ->
@@ -170,6 +190,12 @@ serverResponseDecoder =
 
                 "deletedzk" ->
                     JD.map DeletedZk (JD.at [ "content" ] <| JD.int)
+
+                "added_zkmember" ->
+                    JD.map AddedZkMember (JD.at [ "content" ] <| Data.decodeZkMember)
+
+                "deleted_zkmember" ->
+                    JD.map DeletedZkMember (JD.at [ "content" ] <| Data.decodeZkMember)
 
                 "savedzknote" ->
                     JD.map SavedZkNote (JD.at [ "content" ] <| JD.int)

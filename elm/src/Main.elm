@@ -453,6 +453,22 @@ update msg model =
                         UI.ZkMembers _ ->
                             ( { model | state = BadError (BadError.initialModel "unexpected zkmembers message") state }, Cmd.none )
 
+                        UI.AddedZkMember zkm ->
+                            case state of
+                                EditZk ezk login ->
+                                    ( { model | state = EditZk (EditZk.addedZkMember ezk zkm) login }, Cmd.none )
+
+                                _ ->
+                                    ( { model | state = BadError (BadError.initialModel "unexpected zkmembers message") state }, Cmd.none )
+
+                        UI.DeletedZkMember zkm ->
+                            case state of
+                                EditZk ezk login ->
+                                    ( { model | state = EditZk (EditZk.deletedZkMember ezk zkm) login }, Cmd.none )
+
+                                _ ->
+                                    ( { model | state = BadError (BadError.initialModel "unexpected zkmembers message") state }, Cmd.none )
+
                         UI.SavedZkNote beid ->
                             case state of
                                 EditZkNote emod login ->
@@ -559,6 +575,20 @@ update msg model =
                 EditZk.View sbe ->
                     ( { model | state = BadError (BadError.initialModel "EditZk.View sbe -> unimplmeented") model.state }
                     , Cmd.none
+                    )
+
+                EditZk.AddZkMember zkm ->
+                    ( model
+                    , sendUIMsg model.location
+                        login
+                        (UI.AddZkMember zkm)
+                    )
+
+                EditZk.DeleteZkMember zkm ->
+                    ( model
+                    , sendUIMsg model.location
+                        login
+                        (UI.DeleteZkMember zkm)
                     )
 
         ( EditZkNoteMsg em, EditZkNote es login ) ->

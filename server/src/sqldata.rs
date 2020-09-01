@@ -25,6 +25,12 @@ pub struct Zk {
   changeddate: i64,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ZkMember {
+  zkid: i64,
+  name: String,
+}
+
 #[derive(Deserialize, Debug, Clone)]
 pub struct SaveZk {
   id: Option<i64>,
@@ -364,6 +370,55 @@ pub fn read_zk_members(dbfile: &Path, uid: i64, zkid: i64) -> Result<Vec<String>
   }
 
   Ok(pv)
+}
+
+pub fn add_zk_member(dbfile: &Path, uid: i64, zkm: ZkMember) -> Result<(), Box<dyn Error>> {
+  let conn = connection_open(dbfile)?;
+
+  conn.execute("BEGIN TRANSACTION", params![])?;
+
+  if !is_zk_member(&conn, uid, zkm.zkid)? {
+    bail!("can't add; you are not a member of this zk");
+  }
+
+  let r: i64 = conn.query_row(
+    "SELECT id from user where name = ?1",
+    params![zkm.name],
+    |row| Ok(row.get(0)?),
+  )?;
+
+  conn.execute(
+    "insert into zkmember (user, zk) values (?1, ?2)",
+    params![r, zkm.zkid],
+  )?;
+
+  conn.execute("END TRANSACTION", params![])?;
+
+  Ok(())
+}
+pub fn delete_zk_member(dbfile: &Path, uid: i64, zkm: ZkMember) -> Result<(), Box<dyn Error>> {
+  let conn = connection_open(dbfile)?;
+
+  conn.execute("BEGIN TRANSACTION", params![])?;
+
+  if !is_zk_member(&conn, uid, zkm.zkid)? {
+    bail!("can't delete; you are not a member of this zk");
+  }
+
+  let r: i64 = conn.query_row(
+    "select id from user where name = ?1",
+    params![zkm.name],
+    |row| Ok(row.get(0)?),
+  )?;
+
+  conn.execute(
+    "delete from zkmember where user = ?1 and zk = ?2",
+    params![r, zkm.zkid],
+  )?;
+
+  conn.execute("END TRANSACTION", params![])?;
+
+  Ok(())
 }
 
 pub fn read_zk(dbfile: &Path, id: i64) -> Result<Zk, Box<dyn Error>> {

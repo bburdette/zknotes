@@ -1,4 +1,4 @@
-module EditZk exposing (Command(..), Model, Msg(..), initExample, initFull, initNew, setId, update, view)
+module EditZk exposing (Command(..), Model, Msg(..), addedZkMember, deletedZkMember, initExample, initFull, initNew, setId, update, view)
 
 import CellCommon exposing (..)
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
@@ -25,10 +25,13 @@ type Msg
     = OnMarkdownInput String
     | OnSchelmeCodeChanged String String
     | OnNameChanged String
+    | OnAddMemberNameChanged String
     | SavePress
     | DonePress
     | DeletePress
     | ViewPress
+    | DeleteMemberPress String
+    | AddMemberPress
 
 
 type alias Model =
@@ -36,6 +39,7 @@ type alias Model =
     , name : String
     , md : String
     , cells : CellDict
+    , addMemberName : String
     , members : List String
     }
 
@@ -46,6 +50,8 @@ type Command
     | Done
     | View Data.SaveZk
     | Delete Int
+    | AddZkMember Data.ZkMember
+    | DeleteZkMember Data.ZkMember
 
 
 view : Model -> Element Msg
@@ -85,10 +91,28 @@ view model =
                 Err errors ->
                     E.text errors
             ]
-        , E.row [ E.spacing 8 ]
-            [ E.text "members:"
-            , E.column [] <|
-                List.map E.text model.members
+        , E.row []
+            [ EI.button Common.buttonStyle { onPress = Just AddMemberPress, label = E.text "Add Member" }
+            , EI.text []
+                { onChange = OnAddMemberNameChanged
+                , text = model.addMemberName
+                , placeholder = Nothing
+                , label = EI.labelHidden "name"
+                }
+            ]
+        , E.row [ E.spacing 8, E.padding 8 ]
+            [ E.column [ E.alignTop ]
+                [ E.text "members:"
+                ]
+            , E.column [ E.spacing 8 ] <|
+                List.map
+                    (\name ->
+                        E.row [ E.spacing 8 ]
+                            [ E.text name
+                            , EI.button Common.buttonStyle { onPress = Just (DeleteMemberPress name), label = E.text "Delete" }
+                            ]
+                    )
+                    model.members
             ]
         ]
 
@@ -109,6 +133,7 @@ initFull zk members =
     , name = zk.name
     , md = zk.description
     , cells = getCd cc
+    , addMemberName = ""
     , members = members
     }
 
@@ -129,6 +154,7 @@ initNew =
     , name = ""
     , md = ""
     , cells = getCd cc
+    , addMemberName = ""
     , members = []
     }
 
@@ -149,8 +175,19 @@ initExample =
     , name = "example"
     , md = markdownBody
     , cells = getCd cc
+    , addMemberName = ""
     , members = []
     }
+
+
+addedZkMember : Model -> Data.ZkMember -> Model
+addedZkMember model zkm =
+    { model | members = List.sort (zkm.name :: model.members) }
+
+
+deletedZkMember : Model -> Data.ZkMember -> Model
+deletedZkMember model zkm =
+    { model | members = List.filter (\n -> n /= zkm.name) model.members }
 
 
 setId : Model -> Int -> Model
@@ -192,6 +229,25 @@ update msg model =
 
         OnNameChanged t ->
             ( { model | name = t }, None )
+
+        OnAddMemberNameChanged t ->
+            ( { model | addMemberName = t }, None )
+
+        DeleteMemberPress name ->
+            case model.id of
+                Just id ->
+                    ( model, DeleteZkMember { name = name, zkid = id } )
+
+                Nothing ->
+                    ( model, None )
+
+        AddMemberPress ->
+            case model.id of
+                Just id ->
+                    ( model, AddZkMember { name = model.addMemberName, zkid = id } )
+
+                Nothing ->
+                    ( model, None )
 
         OnMarkdownInput newMarkdown ->
             let

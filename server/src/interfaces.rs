@@ -188,6 +188,26 @@ fn user_interface_loggedin(
         content: serde_json::to_value(members)?,
       })
     }
+    "addzkmember" => {
+      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      let zkm: sqldata::ZkMember = serde_json::from_value(msgdata.clone())?;
+
+      sqldata::add_zk_member(Path::new(&config.db), uid, zkm.clone())?;
+      Ok(ServerResponse {
+        what: "added_zkmember".to_string(),
+        content: serde_json::to_value(zkm)?,
+      })
+    }
+    "deletezkmember" => {
+      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      let zkm: sqldata::ZkMember = serde_json::from_value(msgdata.clone())?;
+
+      sqldata::delete_zk_member(Path::new(&config.db), uid, zkm.clone())?;
+      Ok(ServerResponse {
+        what: "deleted_zkmember".to_string(),
+        content: serde_json::to_value(zkm)?,
+      })
+    }
     "getzklisting" => {
       let entries = sqldata::zklisting(Path::new(&config.db), uid)?;
       Ok(ServerResponse {

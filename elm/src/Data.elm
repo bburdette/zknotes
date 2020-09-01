@@ -4,6 +4,12 @@ import Json.Decode as JD
 import Json.Encode as JE
 
 
+type alias Login =
+    { uid : String
+    , pwd : String
+    }
+
+
 type alias Zk =
     { id : Int
     , name : String
@@ -20,11 +26,10 @@ type alias SaveZk =
     }
 
 
-
--- type alias ZkMember =
---     { uid : Int
---     , name : String
---     }
+type alias ZkMember =
+    { name : String
+    , zkid : Int
+    }
 
 
 type alias ZkListNote =
@@ -90,12 +95,6 @@ encodeSaveZk sbe =
                ]
 
 
-type alias Login =
-    { uid : String
-    , pwd : String
-    }
-
-
 decodeZk : JD.Decoder Zk
 decodeZk =
     JD.map5 Zk
@@ -104,6 +103,21 @@ decodeZk =
         (JD.field "description" JD.string)
         (JD.field "createdate" JD.int)
         (JD.field "changeddate" JD.int)
+
+
+encodeZkMember : ZkMember -> JE.Value
+encodeZkMember zkm =
+    JE.object
+        [ ( "name", JE.string zkm.name )
+        , ( "zkid", JE.int zkm.zkid )
+        ]
+
+
+decodeZkMember : JD.Decoder ZkMember
+decodeZkMember =
+    JD.map2 ZkMember
+        (JD.field "name" JD.string)
+        (JD.field "zkid" JD.int)
 
 
 decodeZkListNote : JD.Decoder ZkListNote
