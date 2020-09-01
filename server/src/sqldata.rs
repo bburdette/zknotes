@@ -60,8 +60,16 @@ pub struct User {
   pub registration_key: Option<String>,
 }
 
-pub fn dbinit(dbfile: &Path) -> rusqlite::Result<()> {
+pub fn connection_open(dbfile: &Path) -> rusqlite::Result<Connection> {
   let conn = Connection::open(dbfile)?;
+
+  conn.execute("PRAGMA foreign_keys = true;", params![])?;
+
+  Ok(conn)
+}
+
+pub fn dbinit(dbfile: &Path) -> rusqlite::Result<()> {
+  let conn = connection_open(dbfile)?;
 
   // println!("pre user");
   // create the pdfinfo table.
@@ -145,7 +153,7 @@ pub fn naiow() -> Result<i64, Box<dyn Error>> {
 // user CRUD
 
 pub fn add_user(dbfile: &Path, name: &str, hashwd: &str) -> Result<i64, Box<dyn Error>> {
-  let conn = Connection::open(dbfile)?;
+  let conn = connection_open(dbfile)?;
 
   let nowi64secs = naiow()?;
 
@@ -162,7 +170,7 @@ pub fn add_user(dbfile: &Path, name: &str, hashwd: &str) -> Result<i64, Box<dyn 
 }
 
 pub fn read_user(dbfile: &Path, name: &str) -> Result<User, Box<dyn Error>> {
-  let conn = Connection::open(dbfile)?;
+  let conn = connection_open(dbfile)?;
 
   let user = conn.query_row(
     "SELECT id, hashwd, salt, email, registration_key
@@ -184,7 +192,7 @@ pub fn read_user(dbfile: &Path, name: &str) -> Result<User, Box<dyn Error>> {
 }
 
 pub fn update_user(dbfile: &Path, user: &User) -> Result<(), Box<dyn Error>> {
-  let conn = Connection::open(dbfile)?;
+  let conn = connection_open(dbfile)?;
 
   conn.execute(
     "UPDATE user SET name = ?1, hashwd = ?2, salt = ?3, email = ?4, registration_key = ?5
@@ -210,7 +218,7 @@ pub fn new_user(
   email: String,
   registration_key: String,
 ) -> Result<i64, Box<dyn Error>> {
-  let conn = Connection::open(dbfile)?;
+  let conn = connection_open(dbfile)?;
 
   let now = naiow()?;
 
@@ -226,7 +234,7 @@ pub fn new_user(
 // zk CRUD
 
 pub fn save_zk(dbfile: &Path, uid: i64, savezk: &SaveZk) -> Result<i64, Box<dyn Error>> {
-  let conn = Connection::open(dbfile)?;
+  let conn = connection_open(dbfile)?;
 
   let now = naiow()?;
 
@@ -264,53 +272,41 @@ pub fn save_zk(dbfile: &Path, uid: i64, savezk: &SaveZk) -> Result<i64, Box<dyn 
   }
 }
 
-// pub fn read_zk(dbfile: &Path, id: i64) -> Result<FullZkNote, Box<dyn Error>> {
-//   let conn = Connection::open(dbfile)?;
+pub fn is_zk_member(conn: &Connection, uid: i64, zkid: i64) -> Result<bool, Box<dyn Error>> {
+  match conn.query_row(
+    "select user, zk from zkmember where user = ?1 and zk = ?2",
+    params![uid, zkid],
+    |row| Ok(true),
+  ) {
+    Ok(b) => Ok(b),
+    Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
+    Err(x) => Err(Box::new(x)),
+  }
+}
 
-//   let rbe = conn.query_row(
-//     "SELECT title, content, zk, createdate, changeddate
-//       FROM zk WHERE id = ?1",
-//     params![id],
-//     |row| {
-//       Ok(FullZkNote {
-//         id: id,
-//         title: row.get(0)?,
-//         content: row.get(1)?,
-//         zk: row.get(2)?,
-//         createdate: row.get(3)?,
-//         changeddate: row.get(4)?,
-//       })
-//     },
-//   )?;
+pub fn delete_zk(dbfile: &Path, uid: i64, zkid: i64) -> Result<(), Box<dyn Error>> {
+  let conn = connection_open(dbfile)?;
 
-//   Ok(rbe)
-// }
+  // start a transaction
+  conn.execute("BEGIN TRANSACTION", params![])?;
 
-pub fn delete_zk(dbfile: &Path, uid: i64, id: i64) -> Result<(), Box<dyn Error>> {
-  // let conn = Connection::open(dbfile)?;
+  if !is_zk_member(&conn, uid, zkid)? {
+    bail!("can't delete; user is not a member of this zk");
+  }
 
-  // // is this user in the zkmember table for this zk?
-  // conn.execute(
+  // delete all member entries for the zk.
+  conn.execute("DELETE FROM zkmember WHERE zk = ?1", params![zkid])?;
 
-  // // if delete successful, also remove the zmember entries.
+  // if delete successful, also remove the zmember entries.
+  conn.execute("DELETE FROM zk WHERE id = ?1", params![zkid])?;
 
-  // // only delete when user is in the zk
-  // conn.execute(
-  //   "DELETE FROM zk WHERE id = ?1
-  //     AND zk IN (SELECT zk FROM zkmember WHERE user = ?2)",
-  //   params![id, uid],
-  // )?;
-  // Ok(())
+  conn.execute("END TRANSACTION", params![])?;
 
-  bail!("unimplemented");
-
-  // Err(Box::new(simple_error::SimpleError {
-  //   err: "unimplemented".to_string(),
-  // }))
+  Ok(())
 }
 
 pub fn zklisting(dbfile: &Path, user: i64) -> rusqlite::Result<Vec<Zk>> {
-  let conn = Connection::open(dbfile)?;
+  let conn = connection_open(dbfile)?;
 
   let mut pstmt = conn.prepare(
     "SELECT id, name, description, createdate, changeddate
@@ -344,7 +340,7 @@ pub fn zklisting(dbfile: &Path, user: i64) -> rusqlite::Result<Vec<Zk>> {
 }
 
 pub fn read_zk(dbfile: &Path, id: i64) -> Result<Zk, Box<dyn Error>> {
-  let conn = Connection::open(dbfile)?;
+  let conn = connection_open(dbfile)?;
 
   let rbe = conn.query_row(
     "SELECT name, description, createdate, changeddate
@@ -367,7 +363,7 @@ pub fn read_zk(dbfile: &Path, id: i64) -> Result<Zk, Box<dyn Error>> {
 // zknote CRUD
 
 pub fn save_zknote(dbfile: &Path, uid: i64, note: &SaveZkNote) -> Result<i64, Box<dyn Error>> {
-  let conn = Connection::open(dbfile)?;
+  let conn = connection_open(dbfile)?;
 
   let now = naiow()?;
 
@@ -397,7 +393,7 @@ pub fn save_zknote(dbfile: &Path, uid: i64, note: &SaveZkNote) -> Result<i64, Bo
 }
 
 pub fn read_zknote(dbfile: &Path, id: i64) -> Result<FullZkNote, Box<dyn Error>> {
-  let conn = Connection::open(dbfile)?;
+  let conn = connection_open(dbfile)?;
 
   let rbe = conn.query_row(
     "SELECT title, content, zk, public, createdate, changeddate
@@ -419,7 +415,7 @@ pub fn read_zknote(dbfile: &Path, id: i64) -> Result<FullZkNote, Box<dyn Error>>
   Ok(rbe)
 }
 pub fn delete_zknote(dbfile: &Path, uid: i64, noteid: i64) -> Result<(), Box<dyn Error>> {
-  let conn = Connection::open(dbfile)?;
+  let conn = connection_open(dbfile)?;
 
   // only delete when user is in the zk
   conn.execute(
@@ -432,7 +428,7 @@ pub fn delete_zknote(dbfile: &Path, uid: i64, noteid: i64) -> Result<(), Box<dyn
 }
 
 pub fn zknotelisting(dbfile: &Path, user: i64, zk: i64) -> rusqlite::Result<Vec<ZkNoteList>> {
-  let conn = Connection::open(dbfile)?;
+  let conn = connection_open(dbfile)?;
 
   let mut pstmt = conn.prepare(
     "SELECT id, title, createdate, changeddate

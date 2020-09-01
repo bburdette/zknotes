@@ -158,6 +158,26 @@ fn user_interface_loggedin(
         content: serde_json::to_value(zkid)?,
       })
     }
+    "getzk" => {
+      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      let id: i64 = serde_json::from_value(msgdata.clone())?;
+
+      let zk = sqldata::read_zk(Path::new(&config.db), id)?;
+      Ok(ServerResponse {
+        what: "zk".to_string(),
+        content: serde_json::to_value(zk)?,
+      })
+    }
+    "deletezk" => {
+      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      let id: i64 = serde_json::from_value(msgdata.clone())?;
+
+      sqldata::delete_zk(Path::new(&config.db), uid, id)?;
+      Ok(ServerResponse {
+        what: "deletedzk".to_string(),
+        content: serde_json::to_value(id)?,
+      })
+    }
     "getzklisting" => {
       let entries = sqldata::zklisting(Path::new(&config.db), uid)?;
       Ok(ServerResponse {
@@ -173,16 +193,6 @@ fn user_interface_loggedin(
       Ok(ServerResponse {
         what: "zknotelisting".to_string(),
         content: serde_json::to_value(entries)?, // return api token that expires?
-      })
-    }
-    "getzk" => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let id: i64 = serde_json::from_value(msgdata.clone())?;
-
-      let zk = sqldata::read_zk(Path::new(&config.db), id)?;
-      Ok(ServerResponse {
-        what: "zk".to_string(),
-        content: serde_json::to_value(zk)?,
       })
     }
     "getzknote" => {
