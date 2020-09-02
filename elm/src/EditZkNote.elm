@@ -263,11 +263,11 @@ gotSelectedText model s =
     in
     ( { nmod | title = s }
     , if dirty model then
-        None
-
-      else
         Save
             (sznFromModel model)
+
+      else
+        None
     )
 
 

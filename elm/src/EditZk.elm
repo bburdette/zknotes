@@ -252,11 +252,9 @@ update msg model =
         OnMarkdownInput newMarkdown ->
             let
                 cells =
-                    Debug.log "newcells"
-                        (newMarkdown
-                            |> mdCells
-                            |> Result.withDefault (CellDict Dict.empty)
-                        )
+                    newMarkdown
+                        |> mdCells
+                        |> Result.withDefault (CellDict Dict.empty)
 
                 ( cc, result ) =
                     evalCellsFully
@@ -264,7 +262,7 @@ update msg model =
             in
             ( { model
                 | md = newMarkdown
-                , cells = Debug.log "evaled cells: " <| getCd cc
+                , cells = getCd cc
               }
             , None
             )

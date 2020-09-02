@@ -72,11 +72,9 @@ initFull : Data.FullZkNote -> Model
 initFull zknote =
     let
         cells =
-            Debug.log "newcells"
-                (zknote.content
-                    |> mdCells
-                    |> Result.withDefault (CellDict Dict.empty)
-                )
+            zknote.content
+                |> mdCells
+                |> Result.withDefault (CellDict Dict.empty)
 
         ( cc, result ) =
             evalCellsFully
@@ -85,7 +83,7 @@ initFull zknote =
     { id = Just zknote.id
     , title = zknote.title
     , md = zknote.content
-    , cells = Debug.log "evaled cells: " <| getCd cc
+    , cells = getCd cc
     }
 
 
@@ -93,11 +91,9 @@ initSbe : Data.SaveZkNote -> Model
 initSbe zknote =
     let
         cells =
-            Debug.log "newcells"
-                (zknote.content
-                    |> mdCells
-                    |> Result.withDefault (CellDict Dict.empty)
-                )
+            zknote.content
+                |> mdCells
+                |> Result.withDefault (CellDict Dict.empty)
 
         ( cc, result ) =
             evalCellsFully
@@ -106,7 +102,7 @@ initSbe zknote =
     { id = zknote.id
     , title = zknote.title
     , md = zknote.content
-    , cells = Debug.log "evaled cells: " <| getCd cc
+    , cells = getCd cc
     }
 
 
@@ -114,11 +110,9 @@ initNew : Model
 initNew =
     let
         cells =
-            Debug.log "newcells"
-                (markdownBody
-                    |> mdCells
-                    |> Result.withDefault (CellDict Dict.empty)
-                )
+            markdownBody
+                |> mdCells
+                |> Result.withDefault (CellDict Dict.empty)
 
         ( cc, result ) =
             evalCellsFully
@@ -127,7 +121,7 @@ initNew =
     { id = Nothing
     , title = "example"
     , md = markdownBody
-    , cells = Debug.log "evaled cells: " <| getCd cc
+    , cells = getCd cc
     }
 
 

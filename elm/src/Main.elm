@@ -177,7 +177,7 @@ viewState size state =
 
 view : Model -> { title : String, body : List (Html Msg) }
 view model =
-    { title = "mah bloag!"
+    { title = "zknotes"
     , body =
         [ Element.layout [] <|
             viewState model.size model.state
@@ -243,7 +243,11 @@ update msg model =
                                                     -- discard
                                                     case ms of
                                                         UserReplyData (Ok (UI.SavedZkNote _)) ->
-                                                            ( EditZkNote s login, Cmd.none )
+                                                            ( EditZkNote
+                                                                s
+                                                                login
+                                                            , Cmd.none
+                                                            )
 
                                                         _ ->
                                                             ( BadError (BadError.initialModel "unexpected message after zknote save") st, Cmd.none )
@@ -896,7 +900,7 @@ parseUrl url =
 
 initLogin : Seed -> State
 initLogin seed =
-    Login <| Login.initialModel Nothing "mahbloag" seed
+    Login <| Login.initialModel Nothing "zknotes" seed
 
 
 routeState : String -> Seed -> Route -> ( State, Cmd Msg )
