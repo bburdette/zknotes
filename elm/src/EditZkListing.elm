@@ -35,23 +35,32 @@ type Command
 view : Model -> Element Msg
 view model =
     E.column [ E.spacing 8, E.padding 8 ] <|
-        E.row [ E.spacing 20 ]
+        [ E.row [ E.spacing 20 ]
             [ E.text "Select a ZettelKasten"
             , EI.button Common.buttonStyle { onPress = Just NewPress, label = E.text "new" }
             , EI.button Common.buttonStyle { onPress = Just ExamplePress, label = E.text "example" }
             ]
-            :: List.map
-                (\e ->
-                    E.row [ E.spacing 8 ]
-                        [ E.text e.name
-                        , EI.button Common.buttonStyle { onPress = Just (SelectPress e), label = E.text "edit" }
-
-                        -- , EI.button Common.buttonStyle { onPress = Just (ViewPress e.id), label = E.text "view" }
-                        , EI.button Common.buttonStyle { onPress = Just (NotesPress e), label = E.text "notes" }
-                        , E.link [ Font.color TC.darkBlue, Font.underline ] { url = "note/" ++ String.fromInt e.id, label = E.text "link" }
-                        ]
-                )
-                model.zks
+        , E.table [ E.spacing 8 ]
+            { data = model.zks
+            , columns =
+                [ { header = E.none
+                  , width = E.shrink
+                  , view =
+                        \n ->
+                            E.text n.name
+                  }
+                , { header = E.none
+                  , width = E.shrink
+                  , view =
+                        \n ->
+                            E.row [ E.spacing 8 ]
+                                [ EI.button Common.buttonStyle { onPress = Just (NotesPress n), label = E.text "notes" }
+                                , EI.button Common.buttonStyle { onPress = Just (SelectPress n), label = E.text "edit" }
+                                ]
+                  }
+                ]
+            }
+        ]
 
 
 update : Msg -> Model -> ( Model, Command )
