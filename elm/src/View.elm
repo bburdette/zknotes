@@ -1,4 +1,4 @@
-module View exposing (Command(..), Model, Msg(..), initFull, initNew, initSbe, setId, update, view)
+module View exposing (Command(..), Model, Msg(..), initFull, update, view)
 
 import CellCommon exposing (..)
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
@@ -27,7 +27,7 @@ type Msg
 
 
 type alias Model =
-    { id : Maybe Int
+    { id : Int
     , title : String
     , md : String
     , cells : CellDict
@@ -80,54 +80,11 @@ initFull zknote =
             evalCellsFully
                 (mkCc cells)
     in
-    { id = Just zknote.id
-    , title = zknote.title
-    , md = zknote.content
-    , cells = getCd cc
-    }
-
-
-initSbe : Data.SaveZkNote -> Model
-initSbe zknote =
-    let
-        cells =
-            zknote.content
-                |> mdCells
-                |> Result.withDefault (CellDict Dict.empty)
-
-        ( cc, result ) =
-            evalCellsFully
-                (mkCc cells)
-    in
     { id = zknote.id
     , title = zknote.title
     , md = zknote.content
     , cells = getCd cc
     }
-
-
-initNew : Model
-initNew =
-    let
-        cells =
-            markdownBody
-                |> mdCells
-                |> Result.withDefault (CellDict Dict.empty)
-
-        ( cc, result ) =
-            evalCellsFully
-                (mkCc cells)
-    in
-    { id = Nothing
-    , title = "example"
-    , md = markdownBody
-    , cells = getCd cc
-    }
-
-
-setId : Model -> Int -> Model
-setId model beid =
-    { model | id = Just beid }
 
 
 update : Msg -> Model -> ( Model, Command )

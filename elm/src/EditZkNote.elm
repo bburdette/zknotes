@@ -270,7 +270,13 @@ addListNote model szn szkn =
             , changeddate = szkn.changeddate
             }
     in
-    { model | zklist = replaceOrAdd model.zklist zln (\a b -> a.id == b.id) (\a b -> { b | createdate = a.createdate }) }
+    { model
+        | zklist =
+            replaceOrAdd model.zklist
+                zln
+                (\a b -> a.id == b.id)
+                (\a b -> { b | createdate = a.createdate })
+    }
 
 
 gotId : Model -> Int -> Model

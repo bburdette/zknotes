@@ -31,6 +31,7 @@ import Random exposing (Seed, initialSeed)
 import Schelme.Show exposing (showTerm)
 import ShowMessage
 import Url exposing (Url)
+import Url.Builder as UB
 import Url.Parser as UP exposing ((</>))
 import UserInterface as UI
 import Util
@@ -133,6 +134,31 @@ stateLogin state =
 
         Wait wstate _ ->
             stateLogin wstate
+
+
+routeState : String -> Seed -> Maybe Data.Login -> Route -> ( State, Cmd Msg )
+routeState location seed mblogin route =
+    case route of
+        PublicZk id ->
+            ( PubShowMessage
+                { message = "loading article"
+                }
+            , sendPIMsg location
+                (PI.GetZkNote id)
+            )
+
+        Fail ->
+            ( initLogin seed, Cmd.none )
+
+
+stateRoute : State -> Route
+stateRoute state =
+    case state of
+        View vst ->
+            PublicZk vst.id
+
+        _ ->
+            Fail
 
 
 viewState : Util.Size -> State -> Element Msg
@@ -275,7 +301,7 @@ update msg model =
                 ( state, cmd ) =
                     parseUrl url
                         |> Maybe.map
-                            (routeState model.location model.seed)
+                            (routeState model.location model.seed mblogin)
                         |> Maybe.withDefault ( model.state, Cmd.none )
             in
             ( { model | state = state }, cmd )
@@ -322,7 +348,15 @@ update msg model =
                             ( { model | state = BadError (BadError.initialModel e) state }, Cmd.none )
 
                         PI.ZkNote fbe ->
-                            ( { model | state = View (View.initFull fbe) }, Cmd.none )
+                            let
+                                vstate =
+                                    View (View.initFull fbe)
+                            in
+                            -- TODO: set url
+                            ( { model | state = vstate }
+                            , Browser.Navigation.pushUrl model.navkey
+                                (routeUrl (stateRoute vstate))
+                            )
 
         ( UserReplyData urd, state ) ->
             case urd of
@@ -869,7 +903,7 @@ init flags url key =
 
         ( state, cmd ) =
             parseUrl url
-                |> Maybe.map (routeState flags.location seed)
+                |> Maybe.map (routeState flags.location seed Nothing)
                 |> Maybe.withDefault ( initLogin seed, Cmd.none )
     in
     ( { state = state
@@ -898,24 +932,19 @@ parseUrl url =
         url
 
 
+routeUrl : Route -> String
+routeUrl route =
+    case route of
+        PublicZk id ->
+            UB.relative [ "note", String.fromInt id ] []
+
+        Fail ->
+            UB.relative [] []
+
+
 initLogin : Seed -> State
 initLogin seed =
     Login <| Login.initialModel Nothing "zknotes" seed
-
-
-routeState : String -> Seed -> Route -> ( State, Cmd Msg )
-routeState location seed route =
-    case route of
-        PublicZk id ->
-            ( PubShowMessage
-                { message = "loading article"
-                }
-            , sendPIMsg location
-                (PI.GetZkNote id)
-            )
-
-        Fail ->
-            ( initLogin seed, Cmd.none )
 
 
 urlRequest : Browser.UrlRequest -> Msg
