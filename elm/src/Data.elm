@@ -35,8 +35,14 @@ type alias ZkMember =
 type alias ZkListNote =
     { id : Int
     , title : String
-    , user : Int
+    , zk : Int
     , createdate : Int
+    , changeddate : Int
+    }
+
+
+type alias SavedZkNote =
+    { id : Int
     , changeddate : Int
     }
 
@@ -127,6 +133,13 @@ decodeZkListNote =
         (JD.field "title" JD.string)
         (JD.field "zk" JD.int)
         (JD.field "createdate" JD.int)
+        (JD.field "changeddate" JD.int)
+
+
+decodeSavedZkNote : JD.Decoder SavedZkNote
+decodeSavedZkNote =
+    JD.map2 SavedZkNote
+        (JD.field "id" JD.int)
         (JD.field "changeddate" JD.int)
 
 

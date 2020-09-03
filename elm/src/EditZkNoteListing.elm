@@ -46,13 +46,13 @@ view model =
         , E.table [ E.spacing 8 ]
             { data = model.notes
             , columns =
-                [ { header = E.text "note"
+                [ { header = E.none
                   , width = E.shrink
                   , view =
                         \n ->
                             E.text n.title
                   }
-                , { header = E.text ""
+                , { header = E.none
                   , width = E.shrink
                   , view =
                         \n ->

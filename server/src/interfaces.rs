@@ -249,10 +249,10 @@ fn user_interface_loggedin(
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let sbe: sqldata::SaveZkNote = serde_json::from_value(msgdata.clone())?;
 
-      let beid = sqldata::save_zknote(&config.db.as_path(), uid, &sbe)?;
+      let s = sqldata::save_zknote(&config.db.as_path(), uid, &sbe)?;
       Ok(ServerResponse {
         what: "savedzknote".to_string(),
-        content: serde_json::to_value(beid)?,
+        content: serde_json::to_value(s)?,
       })
     }
     wat => Err(Box::new(simple_error::SimpleError::new(format!(

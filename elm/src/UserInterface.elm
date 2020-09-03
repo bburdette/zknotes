@@ -34,7 +34,7 @@ type ServerResponse
     | ZkMembers (List String)
     | AddedZkMember Data.ZkMember
     | DeletedZkMember Data.ZkMember
-    | SavedZkNote Int
+    | SavedZkNote Data.SavedZkNote
     | DeletedZkNote Int
     | ZkNote Data.FullZkNote
     | ServerError String
@@ -198,7 +198,7 @@ serverResponseDecoder =
                     JD.map DeletedZkMember (JD.at [ "content" ] <| Data.decodeZkMember)
 
                 "savedzknote" ->
-                    JD.map SavedZkNote (JD.at [ "content" ] <| JD.int)
+                    JD.map SavedZkNote (JD.at [ "content" ] <| Data.decodeSavedZkNote)
 
                 "deletedzknote" ->
                     JD.map DeletedZkNote (JD.at [ "content" ] <| JD.int)

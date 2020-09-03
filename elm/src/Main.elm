@@ -242,9 +242,9 @@ update msg model =
                                                 (\st ms ->
                                                     -- discard
                                                     case ms of
-                                                        UserReplyData (Ok (UI.SavedZkNote _)) ->
+                                                        UserReplyData (Ok (UI.SavedZkNote szkn)) ->
                                                             ( EditZkNote
-                                                                s
+                                                                (EditZkNote.addListNote s szk szkn)
                                                                 login
                                                             , Cmd.none
                                                             )
@@ -473,10 +473,10 @@ update msg model =
                                 _ ->
                                     ( { model | state = BadError (BadError.initialModel "unexpected zkmembers message") state }, Cmd.none )
 
-                        UI.SavedZkNote beid ->
+                        UI.SavedZkNote szkn ->
                             case state of
                                 EditZkNote emod login ->
-                                    ( { model | state = EditZkNote (EditZkNote.gotId emod beid) login }, Cmd.none )
+                                    ( { model | state = EditZkNote (EditZkNote.gotId emod szkn.id) login }, Cmd.none )
 
                                 _ ->
                                     -- just ignore if we're not editing a new note.

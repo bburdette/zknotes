@@ -39,11 +39,17 @@ pub struct SaveZk {
 }
 
 #[derive(Serialize, Debug, Clone)]
-pub struct ZkNoteList {
+pub struct ZkListNote {
   id: i64,
   title: String,
   zk: i64,
   createdate: i64,
+  changeddate: i64,
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub struct SavedZkNote {
+  id: i64,
   changeddate: i64,
 }
 
@@ -148,7 +154,7 @@ pub fn dbinit(dbfile: &Path) -> rusqlite::Result<()> {
   Ok(())
 }
 
-pub fn naiow() -> Result<i64, Box<dyn Error>> {
+pub fn now() -> Result<i64, Box<dyn Error>> {
   let nowsecs = SystemTime::now()
     .duration_since(SystemTime::UNIX_EPOCH)
     .map(|n| n.as_secs())?;
@@ -161,7 +167,7 @@ pub fn naiow() -> Result<i64, Box<dyn Error>> {
 pub fn add_user(dbfile: &Path, name: &str, hashwd: &str) -> Result<i64, Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
 
-  let nowi64secs = naiow()?;
+  let nowi64secs = now()?;
 
   println!("adding user: {}", name);
   let wat = conn.execute(
@@ -226,7 +232,7 @@ pub fn new_user(
 ) -> Result<i64, Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
 
-  let now = naiow()?;
+  let now = now()?;
 
   let user = conn.execute(
     "INSERT INTO user (name, hashwd, salt, email, registration_key, createdate)
@@ -242,7 +248,7 @@ pub fn new_user(
 pub fn save_zk(dbfile: &Path, uid: i64, savezk: &SaveZk) -> Result<i64, Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
 
-  let now = naiow()?;
+  let now = now()?;
 
   match savezk.id {
     Some(id) => {
@@ -444,10 +450,14 @@ pub fn read_zk(dbfile: &Path, id: i64) -> Result<Zk, Box<dyn Error>> {
 
 // zknote CRUD
 
-pub fn save_zknote(dbfile: &Path, uid: i64, note: &SaveZkNote) -> Result<i64, Box<dyn Error>> {
+pub fn save_zknote(
+  dbfile: &Path,
+  uid: i64,
+  note: &SaveZkNote,
+) -> Result<SavedZkNote, Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
 
-  let now = naiow()?;
+  let now = now()?;
 
   // TODO ensure user auth here.
 
@@ -459,7 +469,10 @@ pub fn save_zknote(dbfile: &Path, uid: i64, note: &SaveZkNote) -> Result<i64, Bo
          WHERE id = ?4",
         params![note.title, note.content, now, note.id],
       )?;
-      Ok(id)
+      Ok(SavedZkNote {
+        id: id,
+        changeddate: now,
+      })
     }
     None => {
       println!("adding zknote: {}", note.title);
@@ -468,8 +481,10 @@ pub fn save_zknote(dbfile: &Path, uid: i64, note: &SaveZkNote) -> Result<i64, Bo
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
         params![note.title, note.content, note.zk, note.public, now, now],
       )?;
-
-      Ok(conn.last_insert_rowid())
+      Ok(SavedZkNote {
+        id: conn.last_insert_rowid(),
+        changeddate: now,
+      })
     }
   }
 }
@@ -509,7 +524,7 @@ pub fn delete_zknote(dbfile: &Path, uid: i64, noteid: i64) -> Result<(), Box<dyn
   Ok(())
 }
 
-pub fn zknotelisting(dbfile: &Path, user: i64, zk: i64) -> rusqlite::Result<Vec<ZkNoteList>> {
+pub fn zknotelisting(dbfile: &Path, user: i64, zk: i64) -> rusqlite::Result<Vec<ZkListNote>> {
   let conn = connection_open(dbfile)?;
 
   let mut pstmt = conn.prepare(
@@ -519,7 +534,7 @@ pub fn zknotelisting(dbfile: &Path, user: i64, zk: i64) -> rusqlite::Result<Vec<
   )?;
 
   let pdfinfo_iter = pstmt.query_map(params![zk, user], |row| {
-    Ok(ZkNoteList {
+    Ok(ZkListNote {
       id: row.get(0)?,
       title: row.get(1)?,
       zk: zk,

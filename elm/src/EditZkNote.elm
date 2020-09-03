@@ -1,4 +1,4 @@
-module EditZkNote exposing (Command(..), Model, Msg(..), dirty, gotId, gotSelectedText, initExample, initFull, initNew, sznFromModel, update, view)
+module EditZkNote exposing (Command(..), Model, Msg(..), addListNote, dirty, gotId, gotSelectedText, initExample, initFull, initNew, replaceOrAdd, sznFromModel, update, view)
 
 import CellCommon exposing (..)
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
@@ -243,6 +243,34 @@ initExample zk zkl =
     , cells = getCd cc
     , revert = Nothing
     }
+
+
+replaceOrAdd : List a -> a -> (a -> a -> Bool) -> (a -> a -> a) -> List a
+replaceOrAdd items replacement compare mergef =
+    case items of
+        l :: r ->
+            if compare l replacement then
+                mergef l replacement :: r
+
+            else
+                l :: replaceOrAdd r replacement compare mergef
+
+        [] ->
+            [ replacement ]
+
+
+addListNote : Model -> Data.SaveZkNote -> Data.SavedZkNote -> Model
+addListNote model szn szkn =
+    let
+        zln =
+            { id = szkn.id
+            , title = szn.title
+            , zk = szn.zk
+            , createdate = szkn.changeddate
+            , changeddate = szkn.changeddate
+            }
+    in
+    { model | zklist = replaceOrAdd model.zklist zln (\a b -> a.id == b.id) (\a b -> { b | createdate = a.createdate }) }
 
 
 gotId : Model -> Int -> Model
