@@ -936,10 +936,10 @@ routeUrl : Route -> String
 routeUrl route =
     case route of
         PublicZk id ->
-            UB.relative [ "note", String.fromInt id ] []
+            UB.absolute [ "note", String.fromInt id ] []
 
         Fail ->
-            UB.relative [] []
+            UB.absolute [] []
 
 
 initLogin : Seed -> State
