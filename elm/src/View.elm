@@ -1,4 +1,4 @@
-module View exposing (Command(..), Model, Msg(..), initFull, update, view)
+module View exposing (Command(..), Model, Msg(..), initFull, initSzn, update, view)
 
 import CellCommon exposing (..)
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
@@ -27,7 +27,7 @@ type Msg
 
 
 type alias Model =
-    { id : Int
+    { id : Maybe Int
     , title : String
     , md : String
     , cells : CellDict
@@ -70,6 +70,25 @@ view model loggedin =
 
 initFull : Data.FullZkNote -> Model
 initFull zknote =
+    let
+        cells =
+            zknote.content
+                |> mdCells
+                |> Result.withDefault (CellDict Dict.empty)
+
+        ( cc, result ) =
+            evalCellsFully
+                (mkCc cells)
+    in
+    { id = Just zknote.id
+    , title = zknote.title
+    , md = zknote.content
+    , cells = getCd cc
+    }
+
+
+initSzn : Data.SaveZkNote -> Model
+initSzn zknote =
     let
         cells =
             zknote.content

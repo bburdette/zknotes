@@ -156,7 +156,12 @@ stateRoute : State -> Route
 stateRoute state =
     case state of
         View vst ->
-            PublicZk vst.id
+            case vst.id of
+                Just id ->
+                    PublicZk id
+
+                Nothing ->
+                    Fail
 
         _ ->
             Fail
@@ -788,10 +793,8 @@ update msg model =
                         ]
                     )
 
-                EditZkNote.View sbe ->
-                    ( { model | state = BadError (BadError.initialModel "EditZkNote.View sbe -> unimplmeented") model.state }
-                    , Cmd.none
-                    )
+                EditZkNote.View szn ->
+                    ( { model | state = EView (View.initSzn szn) (EditZkNote es login) }, Cmd.none )
 
                 EditZkNote.GetSelectedText id ->
                     ( { model | state = EditZkNote emod login }
