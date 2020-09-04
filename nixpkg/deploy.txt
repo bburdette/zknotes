@@ -1,0 +1,26 @@
+building and deploying the server.
+
+- update the default.nix with the new commit from git.  invalidate the sha256 hash so it won't just use the 
+previous one without building.  leave the cargo hash alone, unless the cargo toml or lock has changed.
+
+- build the package, with /build.sh.
+
+./build.sh
+
+- use the path in nix-copy-closure:
+
+nix-copy-closure --to root@practica.site /nix/store/9v77vwy5zzv38mvh5a93yk02h2y94xq8-zknotes-server-1.0
+
+- then on the server remote the old one
+
+nix-env -e zknotes-server
+
+- and install the new one by path name.
+
+nix-env -I /nix/store/9v77vwy5zzv38mvh5a93yk02h2y94xq8-zknotes-server-1.0
+
+- and then collect garbage to remove the old package.
+
+nix-collect-garbage
+
+- currently I'm not including any config or static files with the server.  copy up as needed!
