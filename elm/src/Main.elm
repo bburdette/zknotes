@@ -810,9 +810,6 @@ update msg model =
                 EditZkListing.New ->
                     ( { model | state = EditZk EditZk.initNew login }, Cmd.none )
 
-                EditZkListing.Example ->
-                    ( { model | state = EditZk EditZk.initExample login }, Cmd.none )
-
                 EditZkListing.Selected zk ->
                     ( { model
                         | state =

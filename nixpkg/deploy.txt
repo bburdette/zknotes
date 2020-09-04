@@ -17,7 +17,7 @@ nix-env -e zknotes-server
 
 - and install the new one by path name.
 
-nix-env -I /nix/store/9v77vwy5zzv38mvh5a93yk02h2y94xq8-zknotes-server-1.0
+nix-env -i /nix/store/9v77vwy5zzv38mvh5a93yk02h2y94xq8-zknotes-server-1.0
 
 - and then collect garbage to remove the old package.
 

@@ -16,7 +16,6 @@ type Msg
     | ViewPress Int
     | NotesPress Data.Zk
     | NewPress
-    | ExamplePress
 
 
 type alias Model =
@@ -29,7 +28,6 @@ type Command
     | Notes Data.Zk
     | View Int
     | New
-    | Example
 
 
 view : Model -> Element Msg
@@ -38,7 +36,6 @@ view model =
         [ E.row [ E.spacing 20 ]
             [ E.text "Select a ZettelKasten"
             , EI.button Common.buttonStyle { onPress = Just NewPress, label = E.text "new" }
-            , EI.button Common.buttonStyle { onPress = Just ExamplePress, label = E.text "example" }
             ]
         , E.table [ E.spacing 8 ]
             { data = model.zks
@@ -80,9 +77,6 @@ update msg model =
             ( model
             , View id
             )
-
-        ExamplePress ->
-            ( model, Example )
 
         NewPress ->
             ( model, New )

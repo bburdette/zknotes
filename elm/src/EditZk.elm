@@ -1,4 +1,4 @@
-module EditZk exposing (Command(..), Model, Msg(..), addedZkMember, deletedZkMember, initExample, initFull, initNew, setId, update, view)
+module EditZk exposing (Command(..), Model, Msg(..), addedZkMember, deletedZkMember, initFull, initNew, setId, update, view)
 
 import CellCommon exposing (..)
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
@@ -153,27 +153,6 @@ initNew =
     { id = Nothing
     , name = ""
     , md = ""
-    , cells = getCd cc
-    , addMemberName = ""
-    , members = []
-    }
-
-
-initExample : Model
-initExample =
-    let
-        cells =
-            markdownBody
-                |> mdCells
-                |> Result.withDefault (CellDict Dict.empty)
-
-        ( cc, result ) =
-            evalCellsFully
-                (mkCc cells)
-    in
-    { id = Nothing
-    , name = "example"
-    , md = markdownBody
     , cells = getCd cc
     , addMemberName = ""
     , members = []
