@@ -52,6 +52,7 @@ type Msg
     | LoadUrl String
     | InternalUrl Url
     | SelectedText JD.Value
+    | UrlChanged Url
     | Noop
 
 
@@ -245,6 +246,23 @@ update msg model =
                     wfn model.state msg
             in
             ( { model | state = nst }, cmd )
+
+        ( UrlChanged url, state ) ->
+            case parseUrl url of
+                Just route ->
+                    if route == stateRoute state then
+                        ( model, Cmd.none )
+
+                    else
+                        let
+                            ( st, cmd ) =
+                                routeState model.location model.seed (stateLogin state) route
+                        in
+                        ( { model | state = st }, cmd )
+
+                Nothing ->
+                    -- load other site??
+                    ( model, Browser.Navigation.load (Url.toString url) )
 
         ( SelectedText jv, state ) ->
             case JD.decodeValue JD.string jv of
@@ -966,9 +984,7 @@ main =
         , subscriptions =
             \_ -> receiveSelectedText SelectedText
         , onUrlRequest = urlRequest
-        , onUrlChange =
-            \uc ->
-                Noop
+        , onUrlChange = UrlChanged
         }
 
 

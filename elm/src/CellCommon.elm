@@ -87,7 +87,12 @@ mkRenderer cellDict onchanged =
     , codeSpan = code
     , link =
         \{ title, destination } body ->
-            E.link
+            (if String.contains ":" destination then
+                E.newTabLink
+
+             else
+                E.link
+            )
                 [ E.htmlAttribute (Html.Attributes.style "display" "inline-flex") ]
                 { url = destination
                 , label =
