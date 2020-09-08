@@ -31,6 +31,7 @@ type Msg
     | RevertPress
     | DeletePress
     | ViewPress
+    | LinksPress
     | NewPress
     | SwitchPress Data.ZkListNote
     | LinkPress Data.ZkListNote
@@ -111,6 +112,7 @@ view model =
                 { onPress = Just DonePress, label = E.text "Done" }
             , EI.button Common.buttonStyle { onPress = Just RevertPress, label = E.text "Cancel" }
             , EI.button Common.buttonStyle { onPress = Just ViewPress, label = E.text "View" }
+            , EI.button Common.buttonStyle { onPress = Just LinksPress, label = E.text "Links" }
             , case isdirty of
                 True ->
                     EI.button dirtybutton { onPress = Just SavePress, label = E.text "Save" }
@@ -136,6 +138,7 @@ view model =
             [ EI.multiline
                 [ E.width (E.px 400)
                 , E.htmlAttribute (Html.Attributes.id "mdtext")
+                , E.alignTop
                 ]
                 { onChange = OnMarkdownInput
                 , text = model.md
@@ -150,12 +153,16 @@ view model =
                         , E.padding 80
                         , E.width (E.fill |> E.maximum 1000)
                         , E.centerX
+                        , E.alignTop
                         ]
                         rendered
 
                 Err errors ->
                     E.text errors
-            , E.column [ E.spacing 8 ]
+            , E.column
+                [ E.spacing 8
+                , E.alignTop
+                ]
                 (List.map
                     (\zkln ->
                         E.row [ E.spacing 8 ]
@@ -329,6 +336,36 @@ update msg model =
             ( model
             , View
                 (sznFromModel model)
+            )
+
+        LinksPress ->
+            let
+                blah =
+                    model.md
+                        |> Markdown.Parser.parse
+                        |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
+
+                _ =
+                    case blah of
+                        Err _ ->
+                            []
+
+                        Ok blocks ->
+                            Debug.log "links:" <|
+                                CellCommon.inlineFoldl
+                                    (\inline links ->
+                                        case inline of
+                                            Block.Link str mbstr moarinlines ->
+                                                str :: links
+
+                                            _ ->
+                                                links
+                                    )
+                                    []
+                                    blocks
+            in
+            ( model
+            , None
             )
 
         NewPress ->

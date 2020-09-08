@@ -1,4 +1,4 @@
-module CellCommon exposing (blockCells, cellView, code, codeBlock, defCell, heading, markdownBody, markdownView, mdCells, mkRenderer, rawTextToId, showRunState)
+module CellCommon exposing (blockCells, cellView, code, codeBlock, defCell, heading, inlineFoldl, markdownBody, markdownView, mdCells, mkRenderer, rawTextToId, showRunState)
 
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
@@ -326,3 +326,124 @@ markdownBody =
 >
 </cell>
 """
+
+
+inlineFoldl : (Inline -> acc -> acc) -> acc -> List Block -> acc
+inlineFoldl function top_acc list =
+    let
+        bfn =
+            \block acc ->
+                case block of
+                    Block.HtmlBlock html ->
+                        acc
+
+                    Block.UnorderedList listItems ->
+                        List.foldl
+                            (\(ListItem _ inlines) liacc ->
+                                List.foldl function liacc inlines
+                            )
+                            acc
+                            listItems
+
+                    Block.OrderedList int lists ->
+                        List.foldl
+                            (\inlines lacc ->
+                                List.foldl function lacc inlines
+                            )
+                            acc
+                            lists
+
+                    Block.BlockQuote _ ->
+                        acc
+
+                    -- These cases don't have nested blocks
+                    -- So no recursion needed
+                    Block.Heading _ inlines ->
+                        List.foldl function acc inlines
+
+                    Block.Paragraph inlines ->
+                        List.foldl function acc inlines
+
+                    Block.Table labels lists ->
+                        let
+                            lacc =
+                                List.foldl
+                                    (\inlines iacc ->
+                                        List.foldl function iacc inlines
+                                    )
+                                    acc
+                                    (List.map .label labels)
+                        in
+                        List.foldl
+                            (\inlines iacc ->
+                                List.foldl function iacc inlines
+                            )
+                            lacc
+                            lists
+
+                    Block.CodeBlock _ ->
+                        acc
+
+                    Block.ThematicBreak ->
+                        acc
+    in
+    Block.foldl bfn top_acc list
+
+
+
+-- case list of
+--   [] -> acc
+--   block :: moreblocks ->
+--     case block of
+--   | UnorderedList (List (ListItem Inline))
+--   | OrderedList Int (List (List Inline))
+--   | BlockQuote (List Block)
+--     -- Leaf Blocks With Inlines
+--   | Heading HeadingLevel (List Inline)
+--   | Paragraph (List Inline)
+--   | Table (List { label : List Inline, alignment : Maybe Alignment }) (List (List Inline))
+--     -- Leaf Blocks Without Inlines
+--   | CodeBlock { body : String, language : Maybe String }
+--   | ThematicBreak
+{- foldl : (Block -> acc -> acc) -> acc -> List Block -> acc
+   foldl function acc list =
+       case list of
+           [] ->
+               acc
+
+           block :: remainingBlocks ->
+               case block of
+                   HtmlBlock html ->
+                       case html of
+                           HtmlElement _ _ children ->
+                               foldl function (function block acc) (children ++ remainingBlocks)
+
+                           _ ->
+                               foldl function (function block acc) remainingBlocks
+
+                   UnorderedList listItems ->
+                       foldl function (function block acc) remainingBlocks
+
+                   OrderedList int lists ->
+                       foldl function (function block acc) remainingBlocks
+
+                   BlockQuote blocks ->
+                       foldl function (function block acc) (blocks ++ remainingBlocks)
+
+                   -- These cases don't have nested blocks
+                   -- So no recursion needed
+                   Heading _ _ ->
+                       foldl function (function block acc) remainingBlocks
+
+                   Paragraph _ ->
+                       foldl function (function block acc) remainingBlocks
+
+                   Table _ _ ->
+                       foldl function (function block acc) remainingBlocks
+
+                   CodeBlock _ ->
+                       foldl function (function block acc) remainingBlocks
+
+                   ThematicBreak ->
+                       foldl function (function block acc) remainingBlocks
+-}
