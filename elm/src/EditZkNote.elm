@@ -20,6 +20,8 @@ import Markdown.Parser
 import Markdown.Renderer
 import Schelme.Show exposing (showTerm)
 import TangoColors as TC
+import Url as U
+import Url.Parser as UP exposing ((</>))
 
 
 type Msg
@@ -312,6 +314,15 @@ gotSelectedText model s =
     )
 
 
+noteLink : String -> Maybe Int
+noteLink str =
+    -- hack allows parsing /note/<N>
+    -- other urls will be invalid which is fine.
+    U.fromString ("http://wat" ++ str)
+        |> Maybe.andThen
+            (UP.parse (UP.s "note" </> UP.int))
+
+
 update : Msg -> Model -> ( Model, Command )
 update msg model =
     case msg of
@@ -346,17 +357,31 @@ update msg model =
                         |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
 
                 _ =
-                    case blah of
-                        Err _ ->
-                            []
+                    case ( blah, model.id ) of
+                        ( Err _, _ ) ->
+                            Debug.log "linkserr:" <|
+                                []
 
-                        Ok blocks ->
+                        ( Ok blocks, Nothing ) ->
+                            Debug.log "linksnothing:" <|
+                                []
+
+                        ( Ok blocks, Just id ) ->
                             Debug.log "links:" <|
                                 CellCommon.inlineFoldl
                                     (\inline links ->
                                         case inline of
                                             Block.Link str mbstr moarinlines ->
-                                                str :: links
+                                                case noteLink str of
+                                                    Just rid ->
+                                                        { left = id
+                                                        , right = rid
+                                                        , zknote = Nothing
+                                                        }
+                                                            :: links
+
+                                                    Nothing ->
+                                                        links
 
                                             _ ->
                                                 links
