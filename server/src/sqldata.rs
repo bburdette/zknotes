@@ -66,8 +66,13 @@ pub struct SaveZkNote {
 pub struct ZkLink {
   left: i64,
   right: i64,
-  zk: i64,
   linkzknote: Option<i64>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ZkLinks {
+  zk: i64,
+  links: Vec<ZkLink>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -566,26 +571,36 @@ pub fn zknotelisting(dbfile: &Path, user: i64, zk: i64) -> rusqlite::Result<Vec<
   Ok(pv)
 }
 
-pub fn save_zklink(conn: &Connection, uid: i64, zklink: &ZkLink) -> Result<(), Box<dyn Error>> {
-  if !is_zk_member(&conn, uid, zklink.zk)? {
-    bail!("can't save zklink; user is not a member of this zk");
-  }
-
+pub fn save_zklink(
+  conn: &Connection,
+  uid: i64,
+  zk: i64,
+  zklink: &ZkLink,
+) -> Result<(), Box<dyn Error>> {
   conn.execute(
     "INSERT INTO zklink (left, right, zk, linkzknote) values (?1, ?2, ?3, ?4)
       ON CONFLICT UPDATE zklink SET linkzknote = ?4, where left = ?1, right = ?2, zk = ?3",
-    params![zklink.left, zklink.right, zklink.zk, zklink.linkzknote],
+    params![zklink.left, zklink.right, zk, zklink.linkzknote],
   )?;
   Ok(())
 }
 
-pub fn save_zklinks(dbfile: &Path, uid: i64, zklinks: Vec<ZkLink>) -> Result<(), Box<dyn Error>> {
+pub fn save_zklinks(
+  dbfile: &Path,
+  uid: i64,
+  zk: i64,
+  zklinks: Vec<ZkLink>,
+) -> Result<(), Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
 
   conn.execute("BEGIN TRANSACTION", params![])?;
 
+  if !is_zk_member(&conn, uid, zk)? {
+    bail!("can't save zklink; user is not a member of this zk");
+  }
+
   for zklink in zklinks.iter() {
-    save_zklink(&conn, uid, &zklink)?;
+    save_zklink(&conn, uid, zk, &zklink)?;
   }
 
   conn.execute("END TRANSACTION", params![])?;
@@ -614,8 +629,7 @@ pub fn read_zklinks(
     Ok(ZkLink {
       left: row.get(0)?,
       right: row.get(1)?,
-      zk: zk,
-      linkzknote: row.get(3)?,
+      linkzknote: row.get(2)?,
     })
   })?;
 

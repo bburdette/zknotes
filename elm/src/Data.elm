@@ -67,6 +67,58 @@ type alias SaveZkNote =
     }
 
 
+type alias ZkLink =
+    { left : Int
+    , right : Int
+    , zknote : Maybe Int
+    }
+
+
+type alias ZkLinks =
+    { zk : Int
+    , links : List ZkLink
+    }
+
+
+encodeZkLinks : ZkLinks -> JE.Value
+encodeZkLinks zklinks =
+    JE.object
+        [ ( "zk", JE.int zklinks.zk )
+        , ( "links", JE.list encodeZkLink zklinks.links )
+        ]
+
+
+decodeZkLinks : JD.Decoder ZkLinks
+decodeZkLinks =
+    JD.map2 ZkLinks
+        (JD.field "zk" JD.int)
+        (JD.field "links" (JD.list decodeZkLink))
+
+
+encodeZkLink : ZkLink -> JE.Value
+encodeZkLink zklink =
+    JE.object <|
+        [ ( "left", JE.int zklink.left )
+        , ( "right", JE.int zklink.right )
+        ]
+            ++ (zklink.zknote
+                    |> Maybe.map
+                        (\id ->
+                            [ ( "linkzknote", JE.int id ) ]
+                        )
+                    |> Maybe.withDefault
+                        []
+               )
+
+
+decodeZkLink : JD.Decoder ZkLink
+decodeZkLink =
+    JD.map3 ZkLink
+        (JD.field "left" JD.int)
+        (JD.field "right" JD.int)
+        (JD.maybe (JD.field "linkzknote" JD.int))
+
+
 saveZkNoteFromFull : FullZkNote -> SaveZkNote
 saveZkNoteFromFull fzn =
     { id = Just fzn.id
