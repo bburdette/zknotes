@@ -328,6 +328,32 @@ markdownBody =
 """
 
 
+
+{- pullLinks : List Block -> List String
+   pullLinks blocks =
+       blocks
+           |> inlineFoldl
+               (\inline links ->
+                   case inline of
+                       Block.Link str mbstr moreinlines ->
+                           str :: links
+
+                       _ ->
+                           links
+               )
+               []
+
+
+   testPullLinks =
+       [ Block.Heading Block.H1 [ Block.Text "Document" ]
+       , Block.Heading Block.H2 [ Block.Link "/note/50" (Just "interesting document") [] ]
+       , Block.Heading Block.H3 [ Block.Text "Subsection" ]
+       , Block.Heading Block.H2 [ Block.Link "/note/51" (Just "more interesting document") [] ]
+       ]
+           |> pullLinks
+-}
+
+
 inlineFoldl : (Inline -> acc -> acc) -> acc -> List Block -> acc
 inlineFoldl function top_acc list =
     let
@@ -356,8 +382,6 @@ inlineFoldl function top_acc list =
                     Block.BlockQuote _ ->
                         acc
 
-                    -- These cases don't have nested blocks
-                    -- So no recursion needed
                     Block.Heading _ inlines ->
                         List.foldl function acc inlines
 
@@ -388,62 +412,3 @@ inlineFoldl function top_acc list =
                         acc
     in
     Block.foldl bfn top_acc list
-
-
-
--- case list of
---   [] -> acc
---   block :: moreblocks ->
---     case block of
---   | UnorderedList (List (ListItem Inline))
---   | OrderedList Int (List (List Inline))
---   | BlockQuote (List Block)
---     -- Leaf Blocks With Inlines
---   | Heading HeadingLevel (List Inline)
---   | Paragraph (List Inline)
---   | Table (List { label : List Inline, alignment : Maybe Alignment }) (List (List Inline))
---     -- Leaf Blocks Without Inlines
---   | CodeBlock { body : String, language : Maybe String }
---   | ThematicBreak
-{- foldl : (Block -> acc -> acc) -> acc -> List Block -> acc
-   foldl function acc list =
-       case list of
-           [] ->
-               acc
-
-           block :: remainingBlocks ->
-               case block of
-                   HtmlBlock html ->
-                       case html of
-                           HtmlElement _ _ children ->
-                               foldl function (function block acc) (children ++ remainingBlocks)
-
-                           _ ->
-                               foldl function (function block acc) remainingBlocks
-
-                   UnorderedList listItems ->
-                       foldl function (function block acc) remainingBlocks
-
-                   OrderedList int lists ->
-                       foldl function (function block acc) remainingBlocks
-
-                   BlockQuote blocks ->
-                       foldl function (function block acc) (blocks ++ remainingBlocks)
-
-                   -- These cases don't have nested blocks
-                   -- So no recursion needed
-                   Heading _ _ ->
-                       foldl function (function block acc) remainingBlocks
-
-                   Paragraph _ ->
-                       foldl function (function block acc) remainingBlocks
-
-                   Table _ _ ->
-                       foldl function (function block acc) remainingBlocks
-
-                   CodeBlock _ ->
-                       foldl function (function block acc) remainingBlocks
-
-                   ThematicBreak ->
-                       foldl function (function block acc) remainingBlocks
--}
