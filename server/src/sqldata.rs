@@ -71,8 +71,8 @@ pub struct ZkLink {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ZkLinks {
-  zk: i64,
-  links: Vec<ZkLink>,
+  pub zk: i64,
+  pub links: Vec<ZkLink>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -152,15 +152,15 @@ pub fn dbinit(dbfile: &Path) -> rusqlite::Result<()> {
   // println!("pre bl");
   conn.execute(
     "CREATE TABLE zklink (
-                zkleft        INTEGER NOT NULL,
-                zkright       INTEGER NOT NULL,
+                left          INTEGER NOT NULL,
+                right         INTEGER NOT NULL,
                 zk            INTEGER NOT NULL,
                 linkzknote    INTEGER,
-                FOREIGN KEY(linkzk) REFERENCES zknote(id),
-                FOREIGN KEY(zkleft) REFERENCES zknote(id),
-                FOREIGN KEY(zkright) REFERENCES zknote(id),
+                FOREIGN KEY(linkzknote) REFERENCES zknote(id),
+                FOREIGN KEY(left) REFERENCES zknote(id),
+                FOREIGN KEY(right) REFERENCES zknote(id),
                 FOREIGN KEY(zk) REFERENCES zk(id),
-                CONSTRAINT unq UNIQUE (zkleft, zkright)
+                CONSTRAINT unq UNIQUE (left, right, zk)
                 )",
     params![],
   )?;
@@ -579,7 +579,7 @@ pub fn save_zklink(
 ) -> Result<(), Box<dyn Error>> {
   conn.execute(
     "INSERT INTO zklink (left, right, zk, linkzknote) values (?1, ?2, ?3, ?4)
-      ON CONFLICT UPDATE zklink SET linkzknote = ?4, where left = ?1, right = ?2, zk = ?3",
+      ON CONFLICT (left, right, zk) DO UPDATE SET linkzknote = ?4 where left = ?1 and right = ?2 and zk = ?3",
     params![zklink.left, zklink.right, zk, zklink.linkzknote],
   )?;
   Ok(())

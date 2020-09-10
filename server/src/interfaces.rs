@@ -255,6 +255,16 @@ fn user_interface_loggedin(
         content: serde_json::to_value(s)?,
       })
     }
+    "savezklinks" => {
+      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      let msg: sqldata::ZkLinks = serde_json::from_value(msgdata.clone())?;
+
+      let s = sqldata::save_zklinks(&config.db.as_path(), uid, msg.zk, msg.links)?;
+      Ok(ServerResponse {
+        what: "savedzklinks".to_string(),
+        content: serde_json::to_value(s)?,
+      })
+    }
     wat => Err(Box::new(simple_error::SimpleError::new(format!(
       "invalid 'what' code:'{}'",
       wat

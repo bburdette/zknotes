@@ -801,6 +801,14 @@ update msg model =
                     , getSelectedText (Just id)
                     )
 
+                EditZkNote.SaveLinks zklinks ->
+                    ( { model | state = EditZkNote emod login }
+                    , sendUIMsg model.location
+                        login
+                      <|
+                        UI.SaveZkLinks zklinks
+                    )
+
         ( EditZkListingMsg em, EditZkListing es login ) ->
             let
                 ( emod, ecmd ) =

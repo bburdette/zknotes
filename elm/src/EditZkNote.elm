@@ -62,6 +62,7 @@ type Command
     | Switch Int
     | SaveSwitch Data.SaveZkNote Int
     | GetSelectedText String
+    | SaveLinks Data.ZkLinks
 
 
 sznFromModel : Model -> Data.SaveZkNote
@@ -356,7 +357,7 @@ update msg model =
                         |> Markdown.Parser.parse
                         |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
 
-                _ =
+                zklinks =
                     case ( blah, model.id ) of
                         ( Err _, _ ) ->
                             Debug.log "linkserr:" <|
@@ -390,7 +391,15 @@ update msg model =
                                     blocks
             in
             ( model
-            , None
+            , case zklinks of
+                [] ->
+                    None
+
+                a :: b ->
+                    SaveLinks
+                        { zk = model.zk.id
+                        , links = a :: b
+                        }
             )
 
         NewPress ->

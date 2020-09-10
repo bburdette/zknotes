@@ -19,6 +19,7 @@ type SendMsg
     | DeleteZkNote Int
     | SaveZkNote Data.SaveZkNote
     | SaveZk Data.SaveZk
+    | SaveZkLinks Data.ZkLinks
 
 
 type ServerResponse
@@ -143,6 +144,14 @@ encodeSendMsg sm uid pwd =
                 , ( "uid", JE.string uid )
                 , ( "pwd", JE.string pwd )
                 , ( "data", Data.encodeSaveZk sbe )
+                ]
+
+        SaveZkLinks zklinks ->
+            JE.object
+                [ ( "what", JE.string "savezklinks" )
+                , ( "uid", JE.string uid )
+                , ( "pwd", JE.string pwd )
+                , ( "data", Data.encodeZkLinks zklinks )
                 ]
 
 
