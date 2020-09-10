@@ -62,6 +62,14 @@ pub struct SaveZkNote {
   content: String,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ZkLink {
+  left: i64,
+  right: i64,
+  zk: i64,
+  linkzknote: Option<i64>,
+}
+
 #[derive(Deserialize, Serialize, Debug)]
 pub struct User {
   pub id: i64,
@@ -84,7 +92,6 @@ pub fn dbinit(dbfile: &Path) -> rusqlite::Result<()> {
   let conn = connection_open(dbfile)?;
 
   // println!("pre user");
-  // create the pdfinfo table.
   conn.execute(
     "CREATE TABLE user (
                 id          INTEGER NOT NULL PRIMARY KEY,
@@ -142,10 +149,12 @@ pub fn dbinit(dbfile: &Path) -> rusqlite::Result<()> {
     "CREATE TABLE zklink (
                 zkleft        INTEGER NOT NULL,
                 zkright       INTEGER NOT NULL,
-                linkzk        INTEGER,
+                zk            INTEGER NOT NULL,
+                linkzknote    INTEGER,
                 FOREIGN KEY(linkzk) REFERENCES zknote(id),
                 FOREIGN KEY(zkleft) REFERENCES zknote(id),
                 FOREIGN KEY(zkright) REFERENCES zknote(id),
+                FOREIGN KEY(zk) REFERENCES zk(id),
                 CONSTRAINT unq UNIQUE (zkleft, zkright)
                 )",
     params![],
@@ -533,7 +542,7 @@ pub fn zknotelisting(dbfile: &Path, user: i64, zk: i64) -> rusqlite::Result<Vec<
         zk IN (select zk from zkmember where user = ?2)",
   )?;
 
-  let pdfinfo_iter = pstmt.query_map(params![zk, user], |row| {
+  let rec_iter = pstmt.query_map(params![zk, user], |row| {
     Ok(ZkListNote {
       id: row.get(0)?,
       title: row.get(1)?,
@@ -545,10 +554,77 @@ pub fn zknotelisting(dbfile: &Path, user: i64, zk: i64) -> rusqlite::Result<Vec<
 
   let mut pv = Vec::new();
 
-  for rspdfinfo in pdfinfo_iter {
-    match rspdfinfo {
-      Ok(pdfinfo) => {
-        pv.push(pdfinfo);
+  for rsrec in rec_iter {
+    match rsrec {
+      Ok(rec) => {
+        pv.push(rec);
+      }
+      Err(_) => (),
+    }
+  }
+
+  Ok(pv)
+}
+
+pub fn save_zklink(conn: &Connection, uid: i64, zklink: &ZkLink) -> Result<(), Box<dyn Error>> {
+  if !is_zk_member(&conn, uid, zklink.zk)? {
+    bail!("can't save zklink; user is not a member of this zk");
+  }
+
+  conn.execute(
+    "INSERT INTO zklink (left, right, zk, linkzknote) values (?1, ?2, ?3, ?4)
+      ON CONFLICT UPDATE zklink SET linkzknote = ?4, where left = ?1, right = ?2, zk = ?3",
+    params![zklink.left, zklink.right, zklink.zk, zklink.linkzknote],
+  )?;
+  Ok(())
+}
+
+pub fn save_zklinks(dbfile: &Path, uid: i64, zklinks: Vec<ZkLink>) -> Result<(), Box<dyn Error>> {
+  let conn = connection_open(dbfile)?;
+
+  conn.execute("BEGIN TRANSACTION", params![])?;
+
+  for zklink in zklinks.iter() {
+    save_zklink(&conn, uid, &zklink)?;
+  }
+
+  conn.execute("END TRANSACTION", params![])?;
+
+  Ok(())
+}
+
+pub fn read_zklinks(
+  dbfile: &Path,
+  uid: i64,
+  zk: i64,
+  zknote: i64,
+) -> Result<Vec<ZkLink>, Box<dyn Error>> {
+  let conn = connection_open(dbfile)?;
+
+  if !is_zk_member(&conn, uid, zk)? {
+    bail!("can't read_zklinks; user is not a member of this zk");
+  }
+
+  let mut pstmt = conn.prepare(
+    "SELECT left, right, zklinknote
+      FROM zklink where zk = ?1 and (left = ?2 or right = ?2)",
+  )?;
+
+  let rec_iter = pstmt.query_map(params![zk, zknote], |row| {
+    Ok(ZkLink {
+      left: row.get(0)?,
+      right: row.get(1)?,
+      zk: zk,
+      linkzknote: row.get(3)?,
+    })
+  })?;
+
+  let mut pv = Vec::new();
+
+  for rsrec in rec_iter {
+    match rsrec {
+      Ok(rec) => {
+        pv.push(rec);
       }
       Err(_) => (),
     }
