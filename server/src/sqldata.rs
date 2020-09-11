@@ -64,11 +64,11 @@ pub struct SaveZkNote {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ZkLink {
-  left: i64,
-  right: i64,
+  from: i64,
+  to: i64,
   linkzknote: Option<i64>,
-  leftname: Option<String>,
-  rightname: Option<String>,
+  fromname: Option<String>,
+  toname: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -160,15 +160,15 @@ pub fn dbinit(dbfile: &Path) -> rusqlite::Result<()> {
   // println!("pre bl");
   conn.execute(
     "CREATE TABLE zklink (
-                left          INTEGER NOT NULL,
-                right         INTEGER NOT NULL,
+                fromid        INTEGER NOT NULL,
+                toid          INTEGER NOT NULL,
                 zk            INTEGER NOT NULL,
                 linkzknote    INTEGER,
                 FOREIGN KEY(linkzknote) REFERENCES zknote(id),
-                FOREIGN KEY(left) REFERENCES zknote(id),
-                FOREIGN KEY(right) REFERENCES zknote(id),
+                FOREIGN KEY(fromid) REFERENCES zknote(id),
+                FOREIGN KEY(toid) REFERENCES zknote(id),
                 FOREIGN KEY(zk) REFERENCES zk(id),
-                CONSTRAINT unq UNIQUE (left, right, zk)
+                CONSTRAINT unq UNIQUE (fromid, toid, zk)
                 )",
     params![],
   )?;
@@ -586,9 +586,9 @@ pub fn save_zklink(
   zklink: &ZkLink,
 ) -> Result<(), Box<dyn Error>> {
   conn.execute(
-    "INSERT INTO zklink (left, right, zk, linkzknote) values (?1, ?2, ?3, ?4)
-      ON CONFLICT (left, right, zk) DO UPDATE SET linkzknote = ?4 where left = ?1 and right = ?2 and zk = ?3",
-    params![zklink.left, zklink.right, zk, zklink.linkzknote],
+    "INSERT INTO zklink (fromid, toid, zk, linkzknote) values (?1, ?2, ?3, ?4)
+      ON CONFLICT (fromid, toid, zk) DO UPDATE SET linkzknote = ?4 where fromid = ?1 and toid = ?2 and zk = ?3",
+    params![zklink.from, zklink.to, zk, zklink.linkzknote],
   )?;
   Ok(())
 }
@@ -628,21 +628,21 @@ pub fn read_zklinks(
   }
 
   let mut pstmt = conn.prepare(
-    "SELECT left, right, linkzknote, L.title, R.title
+    "SELECT fromid, toid, linkzknote, L.title, R.title
       FROM zklink 
-      INNER JOIN zknote as L ON zklink.left = L.id
-      INNER JOIN zknote as R ON zklink.right = R.id
-      where zklink.zk = ?1 and (zklink.left = ?2 or zklink.right = ?2)
+      INNER JOIN zknote as L ON zklink.fromid = L.id
+      INNER JOIN zknote as R ON zklink.toid = R.id
+      where zklink.zk = ?1 and (zklink.fromid = ?2 or zklink.toid = ?2)
       ",
   )?;
 
   let rec_iter = pstmt.query_map(params![gzl.zk, gzl.zknote], |row| {
     Ok(ZkLink {
-      left: row.get(0)?,
-      right: row.get(1)?,
+      from: row.get(0)?,
+      to: row.get(1)?,
       linkzknote: row.get(2)?,
-      leftname: row.get(3)?,
-      rightname: row.get(4)?,
+      fromname: row.get(3)?,
+      toname: row.get(4)?,
     })
   })?;
 

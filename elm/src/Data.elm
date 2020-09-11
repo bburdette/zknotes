@@ -68,11 +68,11 @@ type alias SaveZkNote =
 
 
 type alias ZkLink =
-    { left : Int
-    , right : Int
+    { from : Int
+    , to : Int
     , zknote : Maybe Int
-    , leftname : Maybe String
-    , rightname : Maybe String
+    , fromname : Maybe String
+    , toname : Maybe String
     }
 
 
@@ -114,8 +114,8 @@ decodeZkLinks =
 encodeZkLink : ZkLink -> JE.Value
 encodeZkLink zklink =
     JE.object <|
-        [ ( "left", JE.int zklink.left )
-        , ( "right", JE.int zklink.right )
+        [ ( "from", JE.int zklink.from )
+        , ( "to", JE.int zklink.to )
         ]
             ++ (zklink.zknote
                     |> Maybe.map
@@ -130,11 +130,11 @@ encodeZkLink zklink =
 decodeZkLink : JD.Decoder ZkLink
 decodeZkLink =
     JD.map5 ZkLink
-        (JD.field "left" JD.int)
-        (JD.field "right" JD.int)
+        (JD.field "from" JD.int)
+        (JD.field "to" JD.int)
         (JD.maybe (JD.field "linkzknote" JD.int))
-        (JD.maybe (JD.field "leftname" JD.string))
-        (JD.maybe (JD.field "rightname" JD.string))
+        (JD.maybe (JD.field "fromname" JD.string))
+        (JD.maybe (JD.field "toname" JD.string))
 
 
 saveZkNoteFromFull : FullZkNote -> SaveZkNote

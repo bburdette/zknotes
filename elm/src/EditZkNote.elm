@@ -78,11 +78,11 @@ sznFromModel model =
 
 zkLinkName : Data.ZkLink -> Int -> String
 zkLinkName zklink noteid =
-    if noteid == zklink.left then
-        zklink.rightname |> Maybe.withDefault (String.fromInt zklink.right)
+    if noteid == zklink.from then
+        zklink.toname |> Maybe.withDefault (String.fromInt zklink.to)
 
-    else if noteid == zklink.right then
-        zklink.leftname |> Maybe.withDefault (String.fromInt zklink.left)
+    else if noteid == zklink.to then
+        zklink.fromname |> Maybe.withDefault (String.fromInt zklink.from)
 
     else
         "link error"
@@ -403,11 +403,11 @@ update msg model =
                                             Block.Link str mbstr moarinlines ->
                                                 case noteLink str of
                                                     Just rid ->
-                                                        { left = id
-                                                        , right = rid
+                                                        { from = id
+                                                        , to = rid
                                                         , zknote = Nothing
-                                                        , leftname = Nothing
-                                                        , rightname = Nothing
+                                                        , fromname = Nothing
+                                                        , toname = Nothing
                                                         }
                                                             :: links
 
