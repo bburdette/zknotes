@@ -265,6 +265,20 @@ fn user_interface_loggedin(
         content: serde_json::to_value(s)?,
       })
     }
+    "getzklinks" => {
+      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      let gzl: sqldata::GetZkLinks = serde_json::from_value(msgdata.clone())?;
+
+      let s = sqldata::read_zklinks(&config.db.as_path(), uid, &gzl)?;
+      let zklinks = sqldata::ZkLinks {
+        zk: gzl.zk,
+        links: s,
+      };
+      Ok(ServerResponse {
+        what: "zklinks".to_string(),
+        content: serde_json::to_value(zklinks)?,
+      })
+    }
     wat => Err(Box::new(simple_error::SimpleError::new(format!(
       "invalid 'what' code:'{}'",
       wat

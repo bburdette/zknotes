@@ -80,6 +80,20 @@ type alias ZkLinks =
     }
 
 
+type alias GetZkLinks =
+    { zknote : Int
+    , zk : Int
+    }
+
+
+encodeGetZkLinks : GetZkLinks -> JE.Value
+encodeGetZkLinks gzl =
+    JE.object
+        [ ( "zknote", JE.int gzl.zknote )
+        , ( "zk", JE.int gzl.zk )
+        ]
+
+
 encodeZkLinks : ZkLinks -> JE.Value
 encodeZkLinks zklinks =
     JE.object

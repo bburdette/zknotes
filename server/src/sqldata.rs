@@ -76,6 +76,12 @@ pub struct ZkLinks {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
+pub struct GetZkLinks {
+  pub zknote: i64,
+  pub zk: i64,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
 pub struct User {
   pub id: i64,
   pub name: String,
@@ -611,21 +617,20 @@ pub fn save_zklinks(
 pub fn read_zklinks(
   dbfile: &Path,
   uid: i64,
-  zk: i64,
-  zknote: i64,
+  gzl: &GetZkLinks,
 ) -> Result<Vec<ZkLink>, Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
 
-  if !is_zk_member(&conn, uid, zk)? {
+  if !is_zk_member(&conn, uid, gzl.zk)? {
     bail!("can't read_zklinks; user is not a member of this zk");
   }
 
   let mut pstmt = conn.prepare(
-    "SELECT left, right, zklinknote
+    "SELECT left, right, linkzknote
       FROM zklink where zk = ?1 and (left = ?2 or right = ?2)",
   )?;
 
-  let rec_iter = pstmt.query_map(params![zk, zknote], |row| {
+  let rec_iter = pstmt.query_map(params![gzl.zk, gzl.zknote], |row| {
     Ok(ZkLink {
       left: row.get(0)?,
       right: row.get(1)?,

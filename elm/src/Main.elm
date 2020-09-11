@@ -242,6 +242,49 @@ sendPIMsg location msg =
         }
 
 
+type alias NwState =
+    { zk : Data.Zk
+    , login : Data.Login
+    , mbzknotelisting : Maybe (List Data.ZkListNote)
+    , mbzklinks : Maybe Data.ZkLinks
+    , mbzknote : Maybe Data.FullZkNote
+    }
+
+
+notewait : NwState -> State -> Msg -> ( State, Cmd Msg )
+notewait nwstate state wmsg =
+    let
+        n =
+            case wmsg of
+                UserReplyData (Ok (UI.ZkLinks zkl)) ->
+                    { nwstate | mbzklinks = Just zkl }
+
+                UserReplyData (Ok (UI.ZkNote zkn)) ->
+                    { nwstate | mbzknote = Just zkn }
+
+                UserReplyData (Ok (UI.ZkNoteListing zknl)) ->
+                    { nwstate | mbzknotelisting = Just zknl }
+
+                -- UserReplyData (Err e) ->
+                --     ( BadError (BadError.initialModel <| Util.httpErrorString e) state, Cmd.none )
+                _ ->
+                    let
+                        _ =
+                            Debug.log "bad wmsg: " wmsg
+                    in
+                    nwstate
+
+        _ =
+            Debug.log "n: " n
+    in
+    case ( n.mbzknotelisting, n.mbzklinks, n.mbzknote ) of
+        ( Just zknl, Just zkl, Just zkn ) ->
+            ( EditZkNote (EditZkNote.initFull n.zk zknl zkn zkl) n.login, Cmd.none )
+
+        _ ->
+            ( Wait state (notewait n), Cmd.none )
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case ( msg, model.state ) of
@@ -484,8 +527,9 @@ update msg model =
                                         WmZkl zkl zk ->
                                             case stateLogin state of
                                                 Just login ->
-                                                    ( { model | state = EditZkNote (EditZkNote.initFull zk zkl zkn) login }, Cmd.none )
+                                                    ( { model | state = BadError (BadError.initialModel "obsolete branch") state }, Cmd.none )
 
+                                                -- ( { model | state = EditZkNote (EditZkNote.initFull zk zkl zkn) login }, Cmd.none )
                                                 Nothing ->
                                                     ( { model | state = BadError (BadError.initialModel "can't edit - not logged in!") state }, Cmd.none )
 
@@ -540,6 +584,16 @@ update msg model =
                                     ( model, Cmd.none )
 
                         UI.DeletedZkNote beid ->
+                            ( model, Cmd.none )
+
+                        UI.SavedZkLinks ->
+                            ( model, Cmd.none )
+
+                        UI.ZkLinks zkl ->
+                            let
+                                _ =
+                                    Debug.log "Zklinks: " zkl
+                            in
                             ( model, Cmd.none )
 
                         UI.UserExists ->
@@ -747,13 +801,19 @@ update msg model =
                 EditZkNote.Switch id ->
                     ( { model
                         | state =
-                            ZkWait
+                            Wait
                                 (ShowMessage
-                                    { message = "loading articles"
-                                    }
+                                    { message = "loading zknote" }
                                     login
                                 )
-                                (WmZklm Nothing Nothing emod.zk (\zkl zkn zk -> EditZkNote (EditZkNote.initFull zk zkl zkn) login))
+                                (notewait
+                                    { zk = emod.zk
+                                    , login = login
+                                    , mbzknotelisting = Nothing
+                                    , mbzklinks = Nothing
+                                    , mbzknote = Nothing
+                                    }
+                                )
                       }
                     , Cmd.batch
                         [ sendUIMsg model.location
@@ -764,19 +824,28 @@ update msg model =
                         , sendUIMsg model.location
                             login
                             (UI.GetZkNote id)
+                        , sendUIMsg model.location
+                            login
+                            (UI.GetZkLinks { zknote = id, zk = emod.zk.id })
                         ]
                     )
 
                 EditZkNote.SaveSwitch szkn id ->
                     ( { model
                         | state =
-                            ZkWait
+                            Wait
                                 (ShowMessage
-                                    { message = "loading articles"
-                                    }
+                                    { message = "loading zknote" }
                                     login
                                 )
-                                (WmZklm Nothing Nothing emod.zk (\zkl zkn zk -> EditZkNote (EditZkNote.initFull zk zkl zkn) login))
+                                (notewait
+                                    { zk = emod.zk
+                                    , login = login
+                                    , mbzknotelisting = Nothing
+                                    , mbzklinks = Nothing
+                                    , mbzknote = Nothing
+                                    }
+                                )
                       }
                     , Cmd.batch
                         [ sendUIMsg model.location
@@ -787,6 +856,9 @@ update msg model =
                         , sendUIMsg model.location
                             login
                             (UI.GetZkNote id)
+                        , sendUIMsg model.location
+                            login
+                            (UI.GetZkLinks { zknote = id, zk = emod.zk.id })
                         , sendUIMsg model.location
                             login
                             (UI.SaveZkNote szkn)
@@ -879,12 +951,28 @@ update msg model =
                 EditZkNoteListing.Selected id ->
                     ( { model
                         | state =
-                            ZkWait (ShowMessage { message = "loading zknote" } login)
-                                (WmZkl emod.notes emod.zk)
+                            Wait
+                                (ShowMessage
+                                    { message = "loading zknote" }
+                                    login
+                                )
+                                (notewait
+                                    { zk = emod.zk
+                                    , login = login
+                                    , mbzknotelisting = Just emod.notes
+                                    , mbzklinks = Nothing
+                                    , mbzknote = Nothing
+                                    }
+                                )
                       }
-                    , sendUIMsg model.location
-                        login
-                        (UI.GetZkNote id)
+                    , Cmd.batch
+                        [ sendUIMsg model.location
+                            login
+                            (UI.GetZkNote id)
+                        , sendUIMsg model.location
+                            login
+                            (UI.GetZkLinks { zknote = id, zk = emod.zk.id })
+                        ]
                     )
 
                 EditZkNoteListing.View id ->

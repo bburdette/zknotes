@@ -44,6 +44,7 @@ type alias Model =
     { id : Maybe Int
     , zk : Data.Zk
     , zklist : List Data.ZkListNote
+    , zklinks : List Data.ZkLink
     , public : Bool
     , title : String
     , md : String
@@ -186,8 +187,8 @@ view model =
         ]
 
 
-initFull : Data.Zk -> List Data.ZkListNote -> Data.FullZkNote -> Model
-initFull zk zkl zknote =
+initFull : Data.Zk -> List Data.ZkListNote -> Data.FullZkNote -> Data.ZkLinks -> Model
+initFull zk zkl zknote zklinks =
     let
         cells =
             zknote.content
@@ -201,6 +202,7 @@ initFull zk zkl zknote =
     { id = Just zknote.id
     , zk = zk
     , zklist = zkl
+    , zklinks = zklinks.links
     , public = zknote.public
     , title = zknote.title
     , md = zknote.content
@@ -224,6 +226,7 @@ initNew zk zkl =
     { id = Nothing
     , zk = zk
     , zklist = zkl
+    , zklinks = []
     , public = False
     , title = ""
     , md = ""
@@ -247,6 +250,7 @@ initExample zk zkl =
     { id = Nothing
     , zk = zk
     , zklist = zkl
+    , zklinks = []
     , public = False
     , title = "example"
     , md = markdownBody
