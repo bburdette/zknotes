@@ -139,17 +139,21 @@ view model =
             , label = EI.labelLeft [] (E.text "public")
             }
         , E.row [ E.width E.fill ]
-            [ EI.multiline
-                [ E.width (E.px 400)
-                , E.htmlAttribute (Html.Attributes.id "mdtext")
-                , E.alignTop
-                ]
-                { onChange = OnMarkdownInput
-                , text = model.md
-                , placeholder = Nothing
-                , label = EI.labelHidden "Markdown input"
-                , spellcheck = False
-                }
+            [ E.column []
+                (EI.multiline
+                    [ E.width (E.px 400)
+                    , E.htmlAttribute (Html.Attributes.id "mdtext")
+                    , E.alignTop
+                    ]
+                    { onChange = OnMarkdownInput
+                    , text = model.md
+                    , placeholder = Nothing
+                    , label = EI.labelHidden "Markdown input"
+                    , spellcheck = False
+                    }
+                    :: List.map (\zkl -> E.row [ E.spacing 8 ] [ E.text <| String.fromInt zkl.left, E.text <| String.fromInt zkl.right ])
+                        model.zklinks
+                )
             , case markdownView (mkRenderer model.cells OnSchelmeCodeChanged) model.md of
                 Ok rendered ->
                     E.column
