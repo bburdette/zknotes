@@ -71,6 +71,8 @@ type alias ZkLink =
     { left : Int
     , right : Int
     , zknote : Maybe Int
+    , leftname : Maybe String
+    , rightname : Maybe String
     }
 
 
@@ -127,10 +129,12 @@ encodeZkLink zklink =
 
 decodeZkLink : JD.Decoder ZkLink
 decodeZkLink =
-    JD.map3 ZkLink
+    JD.map5 ZkLink
         (JD.field "left" JD.int)
         (JD.field "right" JD.int)
         (JD.maybe (JD.field "linkzknote" JD.int))
+        (JD.maybe (JD.field "leftname" JD.string))
+        (JD.maybe (JD.field "rightname" JD.string))
 
 
 saveZkNoteFromFull : FullZkNote -> SaveZkNote

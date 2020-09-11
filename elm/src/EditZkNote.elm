@@ -76,6 +76,18 @@ sznFromModel model =
     }
 
 
+zkLinkName : Data.ZkLink -> Int -> String
+zkLinkName zklink noteid =
+    if noteid == zklink.left then
+        zklink.rightname |> Maybe.withDefault (String.fromInt zklink.right)
+
+    else if noteid == zklink.right then
+        zklink.leftname |> Maybe.withDefault (String.fromInt zklink.left)
+
+    else
+        "link error"
+
+
 dirty : Model -> Bool
 dirty model =
     model.revert
@@ -151,7 +163,15 @@ view model =
                     , label = EI.labelHidden "Markdown input"
                     , spellcheck = False
                     }
-                    :: List.map (\zkl -> E.row [ E.spacing 8 ] [ E.text <| String.fromInt zkl.left, E.text <| String.fromInt zkl.right ])
+                    :: List.map
+                        (\zkl ->
+                            E.row [ E.spacing 8 ]
+                                [ model.id
+                                    |> Maybe.map (zkLinkName zkl)
+                                    |> Maybe.withDefault ""
+                                    |> E.text
+                                ]
+                        )
                         model.zklinks
                 )
             , case markdownView (mkRenderer model.cells OnSchelmeCodeChanged) model.md of
@@ -386,6 +406,8 @@ update msg model =
                                                         { left = id
                                                         , right = rid
                                                         , zknote = Nothing
+                                                        , leftname = Nothing
+                                                        , rightname = Nothing
                                                         }
                                                             :: links
 

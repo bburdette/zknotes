@@ -67,6 +67,8 @@ pub struct ZkLink {
   left: i64,
   right: i64,
   linkzknote: Option<i64>,
+  leftname: Option<String>,
+  rightname: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -626,8 +628,12 @@ pub fn read_zklinks(
   }
 
   let mut pstmt = conn.prepare(
-    "SELECT left, right, linkzknote
-      FROM zklink where zk = ?1 and (left = ?2 or right = ?2)",
+    "SELECT left, right, linkzknote, L.title, R.title
+      FROM zklink 
+      INNER JOIN zknote as L ON zklink.left = L.id
+      INNER JOIN zknote as R ON zklink.right = R.id
+      where zklink.zk = ?1 and (zklink.left = ?2 or zklink.right = ?2)
+      ",
   )?;
 
   let rec_iter = pstmt.query_map(params![gzl.zk, gzl.zknote], |row| {
@@ -635,6 +641,8 @@ pub fn read_zklinks(
       left: row.get(0)?,
       right: row.get(1)?,
       linkzknote: row.get(2)?,
+      leftname: row.get(3)?,
+      rightname: row.get(4)?,
     })
   })?;
 
