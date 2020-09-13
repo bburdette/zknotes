@@ -3,6 +3,7 @@ use serde_json;
 use std::convert::TryInto;
 use std::error::Error;
 use std::path::Path;
+use std::time::Duration;
 use std::time::SystemTime;
 
 #[derive(Serialize, Debug, Clone)]
@@ -95,6 +96,14 @@ pub struct User {
 
 pub fn connection_open(dbfile: &Path) -> rusqlite::Result<Connection> {
   let conn = Connection::open(dbfile)?;
+
+  // conn.busy_timeout(Duration::from_millis(500))?;
+  conn.busy_handler(Some(|count| {
+    println!("busy_handler: {}", count);
+    let d = Duration::from_millis(500);
+    std::thread::sleep(d);
+    true
+  }));
 
   conn.execute("PRAGMA foreign_keys = true;", params![])?;
 
@@ -477,7 +486,9 @@ pub fn save_zknote(
   uid: i64,
   note: &SaveZkNote,
 ) -> Result<SavedZkNote, Box<dyn Error>> {
+  println!("prezkn conn");
   let conn = connection_open(dbfile)?;
+  println!("postzkn conn");
 
   let now = now()?;
 
@@ -491,6 +502,7 @@ pub fn save_zknote(
          WHERE id = ?4",
         params![note.title, note.content, now, note.id],
       )?;
+      println!("updated zknote: {}", note.title);
       Ok(SavedZkNote {
         id: id,
         changeddate: now,
@@ -599,19 +611,25 @@ pub fn save_zklinks(
   zk: i64,
   zklinks: Vec<ZkLink>,
 ) -> Result<(), Box<dyn Error>> {
+  println!("prezklink conn");
   let conn = connection_open(dbfile)?;
+  println!("postzklink conn");
 
-  conn.execute("BEGIN TRANSACTION", params![])?;
+  // conn.execute("BEGIN TRANSACTION", params![])?;
+  println!("postzklink begin trans");
 
   if !is_zk_member(&conn, uid, zk)? {
     bail!("can't save zklink; user is not a member of this zk");
   }
 
+  println!("pre saves");
+
   for zklink in zklinks.iter() {
     save_zklink(&conn, uid, zk, &zklink)?;
   }
 
-  conn.execute("END TRANSACTION", params![])?;
+  // conn.execute("END TRANSACTION", params![])?;
+  println!("postzklink trans");
 
   Ok(())
 }

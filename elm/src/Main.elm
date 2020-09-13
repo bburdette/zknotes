@@ -322,7 +322,7 @@ update msg model =
                                     EditZkNote.gotSelectedText emod str
                             in
                             case cmd of
-                                EditZkNote.Save szk ->
+                                EditZkNote.Save szk zklinks ->
                                     ( { model
                                         | state =
                                             Wait
@@ -345,9 +345,18 @@ update msg model =
                                                             ( BadError (BadError.initialModel "unexpected message after zknote save") st, Cmd.none )
                                                 )
                                       }
-                                    , sendUIMsg model.location
-                                        login
-                                        (UI.SaveZkNote szk)
+                                    , Cmd.batch
+                                        [ sendUIMsg model.location
+                                            login
+                                            (UI.SaveZkNote szk)
+                                        , sendUIMsg model.location
+                                            login
+                                          <|
+                                            UI.SaveZkLinks
+                                                { zk = emod.zk.id
+                                                , links = zklinks
+                                                }
+                                        ]
                                     )
 
                                 _ ->
@@ -730,7 +739,7 @@ update msg model =
                     )
             in
             case ecmd of
-                EditZkNote.SaveExit szk ->
+                EditZkNote.SaveExit szk zklinks ->
                     ( { model
                         | state =
                             Wait
@@ -762,16 +771,34 @@ update msg model =
                                             )
                                 )
                       }
-                    , sendUIMsg model.location
-                        login
-                        (UI.SaveZkNote szk)
+                    , Cmd.batch
+                        [ sendUIMsg model.location
+                            login
+                            (UI.SaveZkNote szk)
+                        , sendUIMsg model.location
+                            login
+                          <|
+                            UI.SaveZkLinks
+                                { zk = emod.zk.id
+                                , links = zklinks
+                                }
+                        ]
                     )
 
-                EditZkNote.Save szk ->
+                EditZkNote.Save szk zklinks ->
                     ( { model | state = EditZkNote emod login }
-                    , sendUIMsg model.location
-                        login
-                        (UI.SaveZkNote szk)
+                    , Cmd.batch
+                        [ sendUIMsg model.location
+                            login
+                            (UI.SaveZkNote szk)
+                        , sendUIMsg model.location
+                            login
+                          <|
+                            UI.SaveZkLinks
+                                { zk = emod.zk.id
+                                , links = zklinks
+                                }
+                        ]
                     )
 
                 EditZkNote.None ->

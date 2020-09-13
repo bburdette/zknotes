@@ -22,6 +22,7 @@ import Schelme.Show exposing (showTerm)
 import TangoColors as TC
 import Url as U
 import Url.Parser as UP exposing ((</>))
+import Util
 
 
 type Msg
@@ -45,6 +46,7 @@ type alias Model =
     , zk : Data.Zk
     , zklist : List Data.ZkListNote
     , zklinks : List Data.ZkLink
+    , initialzklinks : List Data.ZkLink
     , public : Bool
     , title : String
     , md : String
@@ -55,8 +57,8 @@ type alias Model =
 
 type Command
     = None
-    | Save Data.SaveZkNote
-    | SaveExit Data.SaveZkNote
+    | Save Data.SaveZkNote (List Data.ZkLink)
+    | SaveExit Data.SaveZkNote (List Data.ZkLink)
     | Revert
     | View Data.SaveZkNote
     | Delete Int
@@ -102,6 +104,8 @@ dirty model =
                         == model.title
                         && r.content
                         == model.md
+                        && model.zklinks
+                        == model.initialzklinks
             )
         |> Maybe.withDefault True
 
@@ -194,7 +198,18 @@ view model =
                 (List.map
                     (\zkln ->
                         E.row [ E.spacing 8 ]
-                            [ EI.button Common.buttonStyle { onPress = Just (LinkPress zkln), label = E.text "Link" }
+                            [ case model.id of
+                                Just _ ->
+                                    EI.button Common.buttonStyle
+                                        { onPress = Just <| LinkPress zkln
+                                        , label = E.text "Link"
+                                        }
+
+                                Nothing ->
+                                    EI.button (Common.buttonStyle ++ [ EBk.color TC.grey ])
+                                        { onPress = Nothing
+                                        , label = E.text "Link"
+                                        }
                             , EI.button dirtybutton { onPress = Just (SwitchPress zkln), label = E.text "Edit" }
                             , E.text zkln.title
                             ]
@@ -227,6 +242,7 @@ initFull zk zkl zknote zklinks =
     , zk = zk
     , zklist = zkl
     , zklinks = zklinks.links
+    , initialzklinks = zklinks.links
     , public = zknote.public
     , title = zknote.title
     , md = zknote.content
@@ -251,6 +267,7 @@ initNew zk zkl =
     , zk = zk
     , zklist = zkl
     , zklinks = []
+    , initialzklinks = []
     , public = False
     , title = ""
     , md = ""
@@ -275,6 +292,7 @@ initExample zk zkl =
     , zk = zk
     , zklist = zkl
     , zklinks = []
+    , initialzklinks = []
     , public = False
     , title = "example"
     , md = markdownBody
@@ -337,6 +355,7 @@ gotSelectedText model s =
     , if dirty model then
         Save
             (sznFromModel model)
+            model.zklinks
 
       else
         None
@@ -361,15 +380,20 @@ update msg model =
                 saveZkn =
                     sznFromModel model
             in
-            ( { model | revert = Just saveZkn }
+            ( { model
+                | revert = Just saveZkn
+                , initialzklinks = model.zklinks
+              }
             , Save
                 saveZkn
+                model.zklinks
             )
 
         DonePress ->
             ( model
             , SaveExit
                 (sznFromModel model)
+                model.zklinks
             )
 
         ViewPress ->
@@ -438,8 +462,34 @@ update msg model =
             )
 
         LinkPress zkln ->
-            ( { model | md = model.md ++ "\n[" ++ zkln.title ++ "](/note/" ++ String.fromInt zkln.id ++ ")" }, None )
+            -- add a zklink, or newlink?
+            case model.id of
+                Just id ->
+                    ( { model
+                        | zklinks =
+                            if
+                                Util.trueforany
+                                    (\zkl -> zkl.from == id && zkl.to == zkln.id)
+                                    model.zklinks
+                            then
+                                model.zklinks
 
+                            else
+                                { from = id
+                                , to = zkln.id
+                                , zknote = Nothing
+                                , fromname = Nothing
+                                , toname = Just zkln.title
+                                }
+                                    :: model.zklinks
+                      }
+                    , None
+                    )
+
+                Nothing ->
+                    ( model, None )
+
+        -- ( { model | md = model.md ++ "\n[" ++ zkln.title ++ "](/note/" ++ String.fromInt zkln.id ++ ")" }, None )
         SwitchPress zkln ->
             if dirty model then
                 ( model, SaveSwitch (sznFromModel model) zkln.id )

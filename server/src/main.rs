@@ -85,7 +85,7 @@ fn public(
   match interfaces::public_interface(&state, item.into_inner()) {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
-      error!("uh oh, 'public' err: {:?}", e);
+      error!("'public' err: {:?}", e);
       let se = ServerResponse {
         what: "server error".to_string(),
         content: serde_json::Value::String(e.to_string()),
@@ -101,7 +101,7 @@ fn user(state: web::Data<Config>, item: web::Json<UserMessage>, _req: HttpReques
   match interfaces::user_interface(&state, item.into_inner()) {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
-      error!("uh oh, 'user' err: {:?}", e);
+      error!("'user' err: {:?}", e);
       let se = ServerResponse {
         what: "server error".to_string(),
         content: serde_json::Value::String(e.to_string()),
