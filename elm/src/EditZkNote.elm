@@ -36,7 +36,7 @@ type Msg
     | ViewPress
     | LinksPress
     | NewPress
-    | SwitchPress Data.ZkListNote
+    | SwitchPress Int
     | LinkPress Data.ZkListNote
     | PublicPress Bool
     | RemoveLink Data.ZkLink
@@ -111,22 +111,32 @@ dirty model =
         |> Maybe.withDefault True
 
 
-showZkl : Maybe Int -> Data.ZkLink -> Element Msg
-showZkl id zkl =
+showZkl : List (E.Attribute Msg) -> Maybe Int -> Data.ZkLink -> Element Msg
+showZkl dirtybutton id zkl =
+    let
+        ( dir, otherid ) =
+            case ( Just zkl.from == id, Just zkl.to == id ) of
+                ( True, False ) ->
+                    ( E.text "->", Just zkl.to )
+
+                ( False, True ) ->
+                    ( E.text "<-", Just zkl.from )
+
+                _ ->
+                    ( E.text "", Nothing )
+    in
     E.row [ E.spacing 8, E.width E.fill ]
-        [ case ( Just zkl.from == id, Just zkl.to == id ) of
-            ( True, False ) ->
-                E.text "->"
-
-            ( False, True ) ->
-                E.text "<-"
-
-            _ ->
-                E.text ""
+        [ dir
         , id
             |> Maybe.map (zkLinkName zkl)
             |> Maybe.withDefault ""
             |> E.text
+        , case otherid of
+            Just zknoteid ->
+                EI.button (dirtybutton ++ [ E.alignRight ]) { onPress = Just (SwitchPress zknoteid), label = E.text "↗" }
+
+            Nothing ->
+                E.none
         , EI.button (Common.buttonStyle ++ [ E.alignRight ])
             { onPress = Just (MdLink zkl)
             , label = E.text "^"
@@ -198,7 +208,7 @@ view model =
                     -- show the links.
                     :: E.row [ Font.bold ] [ E.text "links" ]
                     :: List.map
-                        (showZkl model.id)
+                        (showZkl dirtybutton model.id)
                         (Dict.values model.zklDict)
                 )
             , case markdownView (mkRenderer model.cells OnSchelmeCodeChanged) model.md of
@@ -233,7 +243,7 @@ view model =
                                         { onPress = Nothing
                                         , label = E.text "Link"
                                         }
-                            , EI.button dirtybutton { onPress = Just (SwitchPress zkln), label = E.text "Edit" }
+                            , EI.button dirtybutton { onPress = Just (SwitchPress zkln.id), label = E.text "Edit" }
                             , E.text zkln.title
                             ]
                     )
@@ -605,12 +615,12 @@ update msg model =
             , None
             )
 
-        SwitchPress zkln ->
+        SwitchPress id ->
             if dirty model then
-                ( model, SaveSwitch (sznFromModel model) zkln.id )
+                ( model, SaveSwitch (sznFromModel model) id )
 
             else
-                ( model, Switch zkln.id )
+                ( model, Switch id )
 
         PublicPress v ->
             ( { model | public = v }, None )
