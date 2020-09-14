@@ -40,6 +40,7 @@ type Msg
     | LinkPress Data.ZkListNote
     | PublicPress Bool
     | RemoveLink Data.ZkLink
+    | MdLink Data.ZkLink
 
 
 type alias Model =
@@ -177,8 +178,12 @@ view model =
                                     |> Maybe.withDefault ""
                                     |> E.text
                                 , EI.button (Common.buttonStyle ++ [ E.alignRight ])
+                                    { onPress = Just (MdLink zkl)
+                                    , label = E.text "^"
+                                    }
+                                , EI.button (Common.buttonStyle ++ [ E.alignRight ])
                                     { onPress = Just (RemoveLink zkl)
-                                    , label = E.text "Remove"
+                                    , label = E.text "X"
                                     }
                                 ]
                         )
@@ -551,6 +556,33 @@ update msg model =
         RemoveLink zkln ->
             ( { model
                 | zklDict = Dict.remove (zklKey zkln) model.zklDict
+              }
+            , None
+            )
+
+        MdLink zkln ->
+            let
+                ( title, id ) =
+                    if Just zkln.from == model.id then
+                        ( Maybe.withDefault "" zkln.toname, zkln.to )
+
+                    else
+                        ( Maybe.withDefault "" zkln.fromname, zkln.from )
+            in
+            ( { model
+                | md =
+                    model.md
+                        ++ (if model.md == "" then
+                                "["
+
+                            else
+                                "\n\n["
+                           )
+                        ++ title
+                        ++ "]("
+                        ++ "/note/"
+                        ++ String.fromInt id
+                        ++ ")"
               }
             , None
             )
