@@ -111,6 +111,33 @@ dirty model =
         |> Maybe.withDefault True
 
 
+showZkl : Maybe Int -> Data.ZkLink -> Element Msg
+showZkl id zkl =
+    E.row [ E.spacing 8, E.width E.fill ]
+        [ case ( Just zkl.from == id, Just zkl.to == id ) of
+            ( True, False ) ->
+                E.text "->"
+
+            ( False, True ) ->
+                E.text "<-"
+
+            _ ->
+                E.text ""
+        , id
+            |> Maybe.map (zkLinkName zkl)
+            |> Maybe.withDefault ""
+            |> E.text
+        , EI.button (Common.buttonStyle ++ [ E.alignRight ])
+            { onPress = Just (MdLink zkl)
+            , label = E.text "^"
+            }
+        , EI.button (Common.buttonStyle ++ [ E.alignRight ])
+            { onPress = Just (RemoveLink zkl)
+            , label = E.text "X"
+            }
+        ]
+
+
 view : Model -> Element Msg
 view model =
     let
@@ -171,22 +198,7 @@ view model =
                     -- show the links.
                     :: E.row [ Font.bold ] [ E.text "links" ]
                     :: List.map
-                        (\zkl ->
-                            E.row [ E.spacing 8, E.width E.fill ]
-                                [ model.id
-                                    |> Maybe.map (zkLinkName zkl)
-                                    |> Maybe.withDefault ""
-                                    |> E.text
-                                , EI.button (Common.buttonStyle ++ [ E.alignRight ])
-                                    { onPress = Just (MdLink zkl)
-                                    , label = E.text "^"
-                                    }
-                                , EI.button (Common.buttonStyle ++ [ E.alignRight ])
-                                    { onPress = Just (RemoveLink zkl)
-                                    , label = E.text "X"
-                                    }
-                                ]
-                        )
+                        (showZkl model.id)
                         (Dict.values model.zklDict)
                 )
             , case markdownView (mkRenderer model.cells OnSchelmeCodeChanged) model.md of
