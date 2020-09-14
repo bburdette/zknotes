@@ -491,39 +491,45 @@ update msg model =
                         |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
 
                 zklDict =
-                    case ( blah, model.id ) of
-                        ( Err _, _ ) ->
-                            []
+                    Debug.log "zklDict" <|
+                        case ( blah, model.id ) of
+                            ( Err _, _ ) ->
+                                Dict.empty
 
-                        ( Ok blocks, Nothing ) ->
-                            []
+                            ( Ok blocks, Nothing ) ->
+                                Dict.empty
 
-                        ( Ok blocks, Just id ) ->
-                            CellCommon.inlineFoldl
-                                (\inline links ->
-                                    case inline of
-                                        Block.Link str mbstr moarinlines ->
-                                            case noteLink str of
-                                                Just rid ->
-                                                    { from = id
-                                                    , to = rid
-                                                    , zknote = Nothing
-                                                    , fromname = Nothing
-                                                    , toname = Nothing
-                                                    , delete = Nothing
-                                                    }
-                                                        :: links
+                            ( Ok blocks, Just id ) ->
+                                CellCommon.inlineFoldl
+                                    (\inline links ->
+                                        case inline of
+                                            Block.Link str mbstr moarinlines ->
+                                                case noteLink str of
+                                                    Just rid ->
+                                                        let
+                                                            zkl =
+                                                                { from = id
+                                                                , to = rid
+                                                                , zknote = Nothing
+                                                                , fromname = Nothing
+                                                                , toname = mbstr
+                                                                , delete = Nothing
+                                                                }
+                                                        in
+                                                        ( zklKey zkl, zkl )
+                                                            :: links
 
-                                                Nothing ->
-                                                    links
+                                                    Nothing ->
+                                                        links
 
-                                        _ ->
-                                            links
-                                )
-                                []
-                                blocks
+                                            _ ->
+                                                links
+                                    )
+                                    []
+                                    blocks
+                                    |> Dict.fromList
             in
-            ( model, None )
+            ( { model | zklDict = Dict.union model.zklDict zklDict }, None )
 
         NewPress ->
             ( model
