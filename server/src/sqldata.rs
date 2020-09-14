@@ -202,13 +202,11 @@ pub fn add_user(dbfile: &Path, name: &str, hashwd: &str) -> Result<i64, Box<dyn 
   let nowi64secs = now()?;
 
   println!("adding user: {}", name);
-  let wat = conn.execute(
+  conn.execute(
     "INSERT INTO user (name, hashwd, createdate)
                 VALUES (?1, ?2, ?3)",
     params![name, hashwd, nowi64secs],
   )?;
-
-  println!("wat: {}", wat);
 
   Ok(conn.last_insert_rowid())
 }
@@ -285,7 +283,6 @@ pub fn save_zk(dbfile: &Path, uid: i64, savezk: &SaveZk) -> Result<i64, Box<dyn 
   match savezk.id {
     Some(id) => {
       println!("updating zk: {}", savezk.name);
-
       // TODO ensure user auth here.
 
       conn.execute(
@@ -487,9 +484,7 @@ pub fn save_zknote(
   uid: i64,
   note: &SaveZkNote,
 ) -> Result<SavedZkNote, Box<dyn Error>> {
-  println!("prezkn conn");
   let conn = connection_open(dbfile)?;
-  println!("postzkn conn");
 
   let now = now()?;
 
@@ -497,20 +492,17 @@ pub fn save_zknote(
 
   match note.id {
     Some(id) => {
-      println!("updating zknote: {}", note.title);
       conn.execute(
         "UPDATE zknote SET title = ?1, content = ?2, changeddate = ?3, public = ?4
          WHERE id = ?5",
         params![note.title, note.content, now, note.public, note.id],
       )?;
-      println!("updated zknote: {}", note.title);
       Ok(SavedZkNote {
         id: id,
         changeddate: now,
       })
     }
     None => {
-      println!("adding zknote: {}", note.title);
       conn.execute(
         "INSERT INTO zknote (title, content, zk, public, createdate, changeddate)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
@@ -599,13 +591,11 @@ pub fn save_zklink(
   zklink: &ZkLink,
 ) -> Result<(), Box<dyn Error>> {
   if zklink.delete == Some(true) {
-    println!("zklink delete: {:?}", zklink);
     conn.execute(
       "DELETE FROM zklink WHERE fromid = ?1 and toid = ?2 and zk = ?3",
       params![zklink.from, zklink.to, zk],
     )?;
   } else {
-    println!("zklink insert: {:?}", zklink);
     conn.execute(
       "INSERT INTO zklink (fromid, toid, zk, linkzknote) values (?1, ?2, ?3, ?4)
         ON CONFLICT (fromid, toid, zk) DO UPDATE SET linkzknote = ?4 where fromid = ?1 and toid = ?2 and zk = ?3",
@@ -621,25 +611,19 @@ pub fn save_zklinks(
   zk: i64,
   zklinks: Vec<ZkLink>,
 ) -> Result<(), Box<dyn Error>> {
-  println!("prezklink conn");
   let conn = connection_open(dbfile)?;
-  println!("postzklink conn");
 
   // conn.execute("BEGIN TRANSACTION", params![])?;
-  println!("postzklink begin trans");
 
   if !is_zk_member(&conn, uid, zk)? {
     bail!("can't save zklink; user is not a member of this zk");
   }
-
-  println!("pre saves");
 
   for zklink in zklinks.iter() {
     save_zklink(&conn, uid, zk, &zklink)?;
   }
 
   // conn.execute("END TRANSACTION", params![])?;
-  println!("postzklink trans");
 
   Ok(())
 }
