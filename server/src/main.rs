@@ -20,6 +20,7 @@ extern crate log;
 extern crate rusqlite;
 #[macro_use]
 extern crate serde_derive;
+extern crate barrel;
 extern crate base64;
 
 mod config;

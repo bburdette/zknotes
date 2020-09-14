@@ -1,3 +1,5 @@
+use barrel::backend::Sqlite;
+use barrel::{types, Migration};
 use rusqlite::{params, Connection};
 use serde_json;
 use std::convert::TryInto;
@@ -111,6 +113,118 @@ pub fn connection_open(dbfile: &Path) -> rusqlite::Result<Connection> {
   Ok(conn)
 }
 
+/*
+
+
+CREATE TABLE user (
+                id          INTEGER NOT NULL PRIMARY KEY,
+                name        TEXT NOT NULL UNIQUE,
+                hashwd      TEXT NOT NULL,
+                salt        TEXT NOT NULL,
+                email       TEXT NOT NULL,
+                registration_key  TEXT,
+                createdate  INTEGER NOT NULL
+                );
+CREATE TABLE zk (
+                id            INTEGER NOT NULL PRIMARY KEY,
+                name          TEXT NOT NULL,
+                description   TEXT NOT NULL,
+                createdate    INTEGER NOT NULL,
+                changeddate   INTEGER NOT NULL
+                );
+CREATE TABLE zkmember (
+                user          INTEGER NOT NULL,
+                zk            INTEGER NOT NULL,
+                FOREIGN KEY(user) REFERENCES user(id),
+                FOREIGN KEY(zk) REFERENCES zk(id),
+                CONSTRAINT unq UNIQUE (user, zk)
+                );
+CREATE TABLE zknote (
+                id            INTEGER NOT NULL PRIMARY KEY,
+                title         TEXT NOT NULL,
+                content       TEXT NOT NULL,
+                public        BOOL NOT NULL,
+                zk            INTEGER NOT NULL,
+                createdate    INTEGER NOT NULL,
+                changeddate   INTEGER NOT NULL,
+                FOREIGN KEY(zk) REFERENCES zk(id)
+                );
+CREATE TABLE zklink (
+                zkleft        INTEGER NOT NULL,
+                zkright       INTEGER NOT NULL,
+                linkzk        INTEGER,
+                FOREIGN KEY(linkzk) REFERENCES zknote(id),
+                FOREIGN KEY(zkleft) REFERENCES zknote(id),
+                FOREIGN KEY(zkright) REFERENCES zknote(id),
+                CONSTRAINT unq UNIQUE (zkleft, zkright)
+                );
+
+
+*/
+
+pub fn initialdb() -> Migration {
+  let mut m = Migration::new();
+
+  m.create_table("user", |t| {
+    t.add_column(
+      "id",
+      types::integer()
+        .primary(true)
+        .increments(true)
+        .nullable(false),
+    );
+    t.add_column("name", types::text().nullable(false).unique(true));
+    t.add_column("hashwd", types::text().nullable(false));
+    t.add_column("salt", types::text().nullable(false));
+    t.add_column("email", types::text().nullable(false));
+    t.add_column("registration_key", types::text().nullable(true));
+    t.add_column("createdate", types::integer().nullable(false));
+  });
+
+  m.create_table("zk", |t| {
+    t.add_column(
+      "id",
+      types::integer()
+        .primary(true)
+        .increments(true)
+        .nullable(false),
+    );
+    t.add_column("name", types::text().nullable(false));
+    t.add_column("description", types::text().nullable(false));
+    t.add_column("createdate", types::integer().nullable(false));
+    t.add_column("changeddate", types::integer().nullable(false));
+  });
+
+  m.create_table("zkmember", |t| {
+    t.add_column("user", types::foreign("user", "id").nullable(false));
+    t.add_column("zk", types::foreign("zk", "id").nullable(false));
+  });
+
+  m.create_table("zknote", |t| {
+    t.add_column(
+      "id",
+      types::integer()
+        .primary(true)
+        .increments(true)
+        .nullable(false),
+    );
+    t.add_column("title", types::text().nullable(false));
+    t.add_column("content", types::text().nullable(false));
+    t.add_column("public", types::boolean().nullable(false));
+    t.add_column("zk", types::foreign("zk", "id").nullable(false));
+    t.add_column("createdate", types::integer().nullable(false));
+    t.add_column("changeddate", types::integer().nullable(false));
+  });
+
+  m.create_table("zklink", |t| {
+    t.add_column("zkleft", types::foreign("zknote", "id").nullable(false));
+    t.add_column("zkright", types::foreign("zknote", "id").nullable(false));
+    t.add_column("linkzk", types::foreign("zknote", "id").nullable(true));
+    t.add_index("unq", types::index(vec!["zkleft", "zkright"]).unique(true));
+  });
+
+  m
+}
 pub fn dbinit(dbfile: &Path) -> rusqlite::Result<()> {
   let conn = connection_open(dbfile)?;
 

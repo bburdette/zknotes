@@ -25,3 +25,4 @@ json = "*"
 reqwest = "0.9.24"
 lettre = "0.9"
 lettre_email = "0.9"
+barrel = { version = "0.6.5", features = ["sqlite3"] }
