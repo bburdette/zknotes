@@ -39,14 +39,15 @@ type Msg
     | SwitchPress Data.ZkListNote
     | LinkPress Data.ZkListNote
     | PublicPress Bool
+    | RemoveLink Data.ZkLink
 
 
 type alias Model =
     { id : Maybe Int
     , zk : Data.Zk
     , zklist : List Data.ZkListNote
-    , zklinks : List Data.ZkLink
-    , initialzklinks : List Data.ZkLink
+    , zklDict : Dict String Data.ZkLink
+    , initialZklDict : Dict String Data.ZkLink
     , public : Bool
     , title : String
     , md : String
@@ -65,7 +66,6 @@ type Command
     | Switch Int
     | SaveSwitch Data.SaveZkNote Int
     | GetSelectedText String
-    | SaveLinks Data.ZkLinks
 
 
 sznFromModel : Model -> Data.SaveZkNote
@@ -104,8 +104,8 @@ dirty model =
                         == model.title
                         && r.content
                         == model.md
-                        && model.zklinks
-                        == model.initialzklinks
+                        && Dict.keys model.zklDict
+                        == Dict.keys model.initialZklDict
             )
         |> Maybe.withDefault True
 
@@ -155,7 +155,7 @@ view model =
             , label = EI.labelLeft [] (E.text "public")
             }
         , E.row [ E.width E.fill ]
-            [ E.column []
+            [ E.column [ E.spacing 8 ]
                 (EI.multiline
                     [ E.width (E.px 400)
                     , E.htmlAttribute (Html.Attributes.id "mdtext")
@@ -167,16 +167,22 @@ view model =
                     , label = EI.labelHidden "Markdown input"
                     , spellcheck = False
                     }
+                    -- show the links.
+                    :: E.row [ Font.bold ] [ E.text "links" ]
                     :: List.map
                         (\zkl ->
-                            E.row [ E.spacing 8 ]
+                            E.row [ E.spacing 8, E.width E.fill ]
                                 [ model.id
                                     |> Maybe.map (zkLinkName zkl)
                                     |> Maybe.withDefault ""
                                     |> E.text
+                                , EI.button (Common.buttonStyle ++ [ E.alignRight ])
+                                    { onPress = Just (RemoveLink zkl)
+                                    , label = E.text "Remove"
+                                    }
                                 ]
                         )
-                        model.zklinks
+                        (Dict.values model.zklDict)
                 )
             , case markdownView (mkRenderer model.cells OnSchelmeCodeChanged) model.md of
                 Ok rendered ->
@@ -226,8 +232,30 @@ view model =
         ]
 
 
+
+{- zkLinkDict : TDict ( Int, Int ) String Data.ZkLink
+   zkLinkDict =
+       TD.empty (\( a, b ) -> String.fromInt a ++ ":" ++ String.fromInt b)
+           (\str ->
+               case String.split ":" str of
+                   [ a, b ] ->
+                       ( String.toInt a, String.toInt b )
+
+                   _ ->
+                       ( -1, -1 )
+           )
+
+
+-}
+
+
+zklKey : Data.ZkLink -> String
+zklKey zkl =
+    String.fromInt zkl.from ++ ":" ++ String.fromInt zkl.to
+
+
 initFull : Data.Zk -> List Data.ZkListNote -> Data.FullZkNote -> Data.ZkLinks -> Model
-initFull zk zkl zknote zklinks =
+initFull zk zkl zknote zklDict =
     let
         cells =
             zknote.content
@@ -241,8 +269,8 @@ initFull zk zkl zknote zklinks =
     { id = Just zknote.id
     , zk = zk
     , zklist = zkl
-    , zklinks = zklinks.links
-    , initialzklinks = zklinks.links
+    , zklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) zklDict.links)
+    , initialZklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) zklDict.links)
     , public = zknote.public
     , title = zknote.title
     , md = zknote.content
@@ -266,8 +294,8 @@ initNew zk zkl =
     { id = Nothing
     , zk = zk
     , zklist = zkl
-    , zklinks = []
-    , initialzklinks = []
+    , zklDict = Dict.empty
+    , initialZklDict = Dict.empty
     , public = False
     , title = ""
     , md = ""
@@ -291,8 +319,8 @@ initExample zk zkl =
     { id = Nothing
     , zk = zk
     , zklist = zkl
-    , zklinks = []
-    , initialzklinks = []
+    , zklDict = Dict.empty
+    , initialZklDict = Dict.empty
     , public = False
     , title = "example"
     , md = markdownBody
@@ -355,7 +383,7 @@ gotSelectedText model s =
     , if dirty model then
         Save
             (sznFromModel model)
-            model.zklinks
+            (Dict.values model.zklDict)
 
       else
         None
@@ -371,6 +399,54 @@ noteLink str =
             (UP.parse (UP.s "note" </> UP.int))
 
 
+compareZklinks : Data.ZkLink -> Data.ZkLink -> Order
+compareZklinks left right =
+    case compare left.from right.from of
+        EQ ->
+            compare left.to right.to
+
+        ltgt ->
+            ltgt
+
+
+
+-- saveLinks : List Data.ZkLink -> List Data.ZkLink -> List Data.ZkLink
+-- saveLinks current initial =
+--     let
+--         curr =
+--             List.sortWith compareZklinks current
+--         init =
+--             List.sortWith compareZklinks initial
+--         duofold left right =
+--             case ( left, right ) of
+--                 ( [], [] ) ->
+--                     []
+--                 ( la :: lb, [] ) ->
+--                     la :: lb
+--                 ( [], ra :: rb ) ->
+--                     List.map (\zkl -> { zkl | delete = Just True }) (ra :: rb)
+--                 ( la :: lb, ra :: rb ) ->
+--                     case compareZklinks la ra of
+--                         EQ ->
+--                             la :: duofold lb rb
+--                         LT ->
+--                             la :: duofold lb (ra :: rb)
+--                         GT ->
+--                             { ra | delete = Just True } :: duofold (la :: lb) rb
+--     in
+--     curr
+
+
+saveZkLinkList : Model -> List Data.ZkLink
+saveZkLinkList model =
+    List.map
+        (\zkl -> { zkl | delete = Nothing })
+        (Dict.values (Dict.diff model.zklDict model.initialZklDict))
+        ++ List.map
+            (\zkl -> { zkl | delete = Just True })
+            (Dict.values (Dict.diff model.initialZklDict model.zklDict))
+
+
 update : Msg -> Model -> ( Model, Command )
 update msg model =
     case msg of
@@ -382,18 +458,18 @@ update msg model =
             in
             ( { model
                 | revert = Just saveZkn
-                , initialzklinks = model.zklinks
+                , initialZklDict = model.zklDict
               }
             , Save
                 saveZkn
-                model.zklinks
+                (saveZkLinkList model)
             )
 
         DonePress ->
             ( model
             , SaveExit
                 (sznFromModel model)
-                model.zklinks
+                (saveZkLinkList model)
             )
 
         ViewPress ->
@@ -409,52 +485,40 @@ update msg model =
                         |> Markdown.Parser.parse
                         |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
 
-                zklinks =
+                zklDict =
                     case ( blah, model.id ) of
                         ( Err _, _ ) ->
-                            Debug.log "linkserr:" <|
-                                []
+                            []
 
                         ( Ok blocks, Nothing ) ->
-                            Debug.log "linksnothing:" <|
-                                []
+                            []
 
                         ( Ok blocks, Just id ) ->
-                            Debug.log "links:" <|
-                                CellCommon.inlineFoldl
-                                    (\inline links ->
-                                        case inline of
-                                            Block.Link str mbstr moarinlines ->
-                                                case noteLink str of
-                                                    Just rid ->
-                                                        { from = id
-                                                        , to = rid
-                                                        , zknote = Nothing
-                                                        , fromname = Nothing
-                                                        , toname = Nothing
-                                                        }
-                                                            :: links
+                            CellCommon.inlineFoldl
+                                (\inline links ->
+                                    case inline of
+                                        Block.Link str mbstr moarinlines ->
+                                            case noteLink str of
+                                                Just rid ->
+                                                    { from = id
+                                                    , to = rid
+                                                    , zknote = Nothing
+                                                    , fromname = Nothing
+                                                    , toname = Nothing
+                                                    , delete = Nothing
+                                                    }
+                                                        :: links
 
-                                                    Nothing ->
-                                                        links
+                                                Nothing ->
+                                                    links
 
-                                            _ ->
-                                                links
-                                    )
-                                    []
-                                    blocks
+                                        _ ->
+                                            links
+                                )
+                                []
+                                blocks
             in
-            ( model
-            , case zklinks of
-                [] ->
-                    None
-
-                a :: b ->
-                    SaveLinks
-                        { zk = model.zk.id
-                        , links = a :: b
-                        }
-            )
+            ( model, None )
 
         NewPress ->
             ( model
@@ -465,23 +529,18 @@ update msg model =
             -- add a zklink, or newlink?
             case model.id of
                 Just id ->
+                    let
+                        nzkl =
+                            { from = id
+                            , to = zkln.id
+                            , zknote = Nothing
+                            , fromname = Nothing
+                            , toname = Just zkln.title
+                            , delete = Nothing
+                            }
+                    in
                     ( { model
-                        | zklinks =
-                            if
-                                Util.trueforany
-                                    (\zkl -> zkl.from == id && zkl.to == zkln.id)
-                                    model.zklinks
-                            then
-                                model.zklinks
-
-                            else
-                                { from = id
-                                , to = zkln.id
-                                , zknote = Nothing
-                                , fromname = Nothing
-                                , toname = Just zkln.title
-                                }
-                                    :: model.zklinks
+                        | zklDict = Dict.insert (zklKey nzkl) nzkl model.zklDict
                       }
                     , None
                     )
@@ -489,7 +548,13 @@ update msg model =
                 Nothing ->
                     ( model, None )
 
-        -- ( { model | md = model.md ++ "\n[" ++ zkln.title ++ "](/note/" ++ String.fromInt zkln.id ++ ")" }, None )
+        RemoveLink zkln ->
+            ( { model
+                | zklDict = Dict.remove (zklKey zkln) model.zklDict
+              }
+            , None
+            )
+
         SwitchPress zkln ->
             if dirty model then
                 ( model, SaveSwitch (sznFromModel model) zkln.id )

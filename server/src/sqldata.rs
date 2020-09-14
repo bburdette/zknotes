@@ -67,6 +67,7 @@ pub struct SaveZkNote {
 pub struct ZkLink {
   from: i64,
   to: i64,
+  delete: Option<bool>,
   linkzknote: Option<i64>,
   fromname: Option<String>,
   toname: Option<String>,
@@ -498,9 +499,9 @@ pub fn save_zknote(
     Some(id) => {
       println!("updating zknote: {}", note.title);
       conn.execute(
-        "UPDATE zknote SET title = ?1, content = ?2, changeddate = ?3
-         WHERE id = ?4",
-        params![note.title, note.content, now, note.id],
+        "UPDATE zknote SET title = ?1, content = ?2, changeddate = ?3, public = ?4
+         WHERE id = ?5",
+        params![note.title, note.content, now, note.public, note.id],
       )?;
       println!("updated zknote: {}", note.title);
       Ok(SavedZkNote {
@@ -597,11 +598,20 @@ pub fn save_zklink(
   zk: i64,
   zklink: &ZkLink,
 ) -> Result<(), Box<dyn Error>> {
-  conn.execute(
-    "INSERT INTO zklink (fromid, toid, zk, linkzknote) values (?1, ?2, ?3, ?4)
-      ON CONFLICT (fromid, toid, zk) DO UPDATE SET linkzknote = ?4 where fromid = ?1 and toid = ?2 and zk = ?3",
-    params![zklink.from, zklink.to, zk, zklink.linkzknote],
-  )?;
+  if zklink.delete == Some(true) {
+    println!("zklink delete: {:?}", zklink);
+    conn.execute(
+      "DELETE FROM zklink WHERE fromid = ?1 and toid = ?2 and zk = ?3",
+      params![zklink.from, zklink.to, zk],
+    )?;
+  } else {
+    println!("zklink insert: {:?}", zklink);
+    conn.execute(
+      "INSERT INTO zklink (fromid, toid, zk, linkzknote) values (?1, ?2, ?3, ?4)
+        ON CONFLICT (fromid, toid, zk) DO UPDATE SET linkzknote = ?4 where fromid = ?1 and toid = ?2 and zk = ?3",
+      params![zklink.from, zklink.to, zk, zklink.linkzknote],
+    )?;
+  }
   Ok(())
 }
 
@@ -658,6 +668,7 @@ pub fn read_zklinks(
     Ok(ZkLink {
       from: row.get(0)?,
       to: row.get(1)?,
+      delete: None,
       linkzknote: row.get(2)?,
       fromname: row.get(3)?,
       toname: row.get(4)?,

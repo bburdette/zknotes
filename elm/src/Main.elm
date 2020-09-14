@@ -273,9 +273,6 @@ notewait nwstate state wmsg =
                             Debug.log "bad wmsg: " wmsg
                     in
                     nwstate
-
-        _ =
-            Debug.log "n: " n
     in
     case ( n.mbzknotelisting, n.mbzklinks, n.mbzknote ) of
         ( Just zknl, Just zkl, Just zkn ) ->
@@ -759,6 +756,9 @@ update msg model =
                                                 )
                                             )
 
+                                        UserReplyData (Ok UI.SavedZkLinks) ->
+                                            ( st, Cmd.none )
+
                                         UserReplyData (Ok (UI.ZkNoteListing l)) ->
                                             ( EditZkNoteListing { zk = es.zk, notes = l } login, Cmd.none )
 
@@ -898,14 +898,6 @@ update msg model =
                 EditZkNote.GetSelectedText id ->
                     ( { model | state = EditZkNote emod login }
                     , getSelectedText (Just id)
-                    )
-
-                EditZkNote.SaveLinks zklinks ->
-                    ( { model | state = EditZkNote emod login }
-                    , sendUIMsg model.location
-                        login
-                      <|
-                        UI.SaveZkLinks zklinks
                     )
 
         ( EditZkListingMsg em, EditZkListing es login ) ->
