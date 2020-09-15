@@ -1,7 +1,10 @@
 building and deploying the server.
 
-- update the default.nix with the new commit from git.  invalidate the sha256 hash so it won't just use the 
-previous one without building.  leave the cargo hash alone, unless the cargo toml or lock has changed.
+NEW COMMIT:
+- update the default.nix:
+  1) with the new commit from git.  invalidate the sha256 hash so it won't just use the 
+previous one without building.  
+  2) if the cargo toml or lock has changed, then change the cargo hash.  otherwise leave it.
 
 - build the package, with /build.sh.
 
