@@ -30,6 +30,7 @@ mod sqldata;
 mod util;
 
 use actix_files::NamedFile;
+use barrel::backend::Sqlite;
 // use actix_web::http::{Method, StatusCode};
 use actix_web::middleware::Logger;
 use actix_web::{
@@ -189,13 +190,9 @@ fn err_main() -> Result<(), Box<dyn Error>> {
 
   let config = load_config();
 
-  if !config.db.as_path().exists() {
-    sqldata::dbinit(config.db.as_path())?;
-  }
-
   println!("config: {:?}", config);
 
-  // let sys = actix_rt::System::new("pdf-server");
+  sqldata::dbinit(config.db.as_path())?;
 
   let c = web::Data::new(config.clone());
   HttpServer::new(move || {

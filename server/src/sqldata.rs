@@ -225,77 +225,78 @@ pub fn initialdb() -> Migration {
 
   m
 }
-pub fn dbinit(dbfile: &Path) -> rusqlite::Result<()> {
+
+pub fn udpate1() -> Migration {
+  let mut m = Migration::new();
+
+  // can't rename columns in sqlite, so drop and recreate table.
+  // shouldn't be any links in the old style one anyway.
+  m.drop_table("zklink");
+
+  m.create_table("zklink", |t| {
+    t.add_column("fromid", types::foreign("zknote", "id").nullable(false));
+    t.add_column("toid", types::foreign("zknote", "id").nullable(false));
+    t.add_column("zk", types::foreign("zknote", "id").nullable(true));
+    t.add_column("linkzknote", types::foreign("zknote", "id").nullable(true));
+    t.add_index(
+      "unq",
+      types::index(vec!["fromid", "toid", "zk"]).unique(true),
+    );
+  });
+
+  // table for storing single values.
+  m.create_table("singlevalue", |t| {
+    t.add_column("name", types::text().nullable(false).unique(true));
+    t.add_column("value", types::text().nullable(false));
+  });
+
+  m
+}
+
+pub fn get_single_value(conn: &Connection, name: &str) -> Result<Option<String>, Box<dyn Error>> {
+  match conn.query_row(
+    "select value from singlevalue where name = ?1",
+    params![name],
+    |row| Ok(row.get(0)?),
+  ) {
+    Ok(v) => Ok(Some(v)),
+    Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+    Err(x) => Err(Box::new(x)),
+  }
+}
+
+pub fn set_single_value(conn: &Connection, name: &str, value: &str) -> Result<(), Box<dyn Error>> {
+  conn.execute(
+    "INSERT INTO singlevalue (name, value) values (?1, ?2)
+        ON CONFLICT (name) DO UPDATE SET value = ?2 where name = ?1",
+    params![name, value],
+  )?;
+  Ok(())
+}
+
+pub fn dbinit(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+  let exists = dbfile.exists();
+
   let conn = connection_open(dbfile)?;
 
-  // println!("pre user");
-  conn.execute(
-    "CREATE TABLE user (
-                id          INTEGER NOT NULL PRIMARY KEY,
-                name        TEXT NOT NULL UNIQUE,
-                hashwd      TEXT NOT NULL,
-                salt        TEXT NOT NULL,
-                email       TEXT NOT NULL,
-                registration_key  TEXT,
-                createdate  INTEGER NOT NULL
-                )",
-    params![],
-  )?;
+  if !exists {
+    println!("initialdb");
+    conn.execute_batch(initialdb().make::<Sqlite>().as_str())?;
+  }
 
-  // println!("pre zk");
-  conn.execute(
-    "CREATE TABLE zk (
-                id            INTEGER NOT NULL PRIMARY KEY,
-                name          TEXT NOT NULL,
-                description   TEXT NOT NULL,
-                createdate    INTEGER NOT NULL,
-                changeddate   INTEGER NOT NULL
-                )",
-    params![],
-  )?;
+  match get_single_value(&conn, "migration_level") {
+    Err(_) => {
+      println!("udpate1");
+      conn.execute_batch(udpate1().make::<Sqlite>().as_str())?;
+      set_single_value(&conn, "migration_level", "1")?;
+    }
+    Ok(v) => {
+      // nothing beyond udpate1 yet.
+    }
+  }
+  println!("db up to date.");
 
-  // println!("pre bm");
-  conn.execute(
-    "CREATE TABLE zkmember (
-                user          INTEGER NOT NULL,
-                zk            INTEGER NOT NULL,
-                FOREIGN KEY(user) REFERENCES user(id),
-                FOREIGN KEY(zk) REFERENCES zk(id),
-                CONSTRAINT unq UNIQUE (user, zk)
-                )",
-    params![],
-  )?;
-
-  // println!("pre be");
-  conn.execute(
-    "CREATE TABLE zknote (
-                id            INTEGER NOT NULL PRIMARY KEY,
-                title         TEXT NOT NULL,
-                content       TEXT NOT NULL,
-                public        BOOL NOT NULL,
-                zk            INTEGER NOT NULL,
-                createdate    INTEGER NOT NULL,
-                changeddate   INTEGER NOT NULL,
-                FOREIGN KEY(zk) REFERENCES zk(id)
-                )",
-    params![],
-  )?;
-
-  // println!("pre bl");
-  conn.execute(
-    "CREATE TABLE zklink (
-                fromid        INTEGER NOT NULL,
-                toid          INTEGER NOT NULL,
-                zk            INTEGER NOT NULL,
-                linkzknote    INTEGER,
-                FOREIGN KEY(linkzknote) REFERENCES zknote(id),
-                FOREIGN KEY(fromid) REFERENCES zknote(id),
-                FOREIGN KEY(toid) REFERENCES zknote(id),
-                FOREIGN KEY(zk) REFERENCES zk(id),
-                CONSTRAINT unq UNIQUE (fromid, toid, zk)
-                )",
-    params![],
-  )?;
+  // conn.execute_batch(initialdb().make::<Sqlite>().as_str());
 
   Ok(())
 }
