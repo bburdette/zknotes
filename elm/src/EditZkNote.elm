@@ -259,23 +259,6 @@ view model =
         ]
 
 
-
-{- zkLinkDict : TDict ( Int, Int ) String Data.ZkLink
-   zkLinkDict =
-       TD.empty (\( a, b ) -> String.fromInt a ++ ":" ++ String.fromInt b)
-           (\str ->
-               case String.split ":" str of
-                   [ a, b ] ->
-                       ( String.toInt a, String.toInt b )
-
-                   _ ->
-                       ( -1, -1 )
-           )
-
-
--}
-
-
 zklKey : Data.ZkLink -> String
 zklKey zkl =
     String.fromInt zkl.from ++ ":" ++ String.fromInt zkl.to
@@ -434,34 +417,6 @@ compareZklinks left right =
 
         ltgt ->
             ltgt
-
-
-
--- saveLinks : List Data.ZkLink -> List Data.ZkLink -> List Data.ZkLink
--- saveLinks current initial =
---     let
---         curr =
---             List.sortWith compareZklinks current
---         init =
---             List.sortWith compareZklinks initial
---         duofold left right =
---             case ( left, right ) of
---                 ( [], [] ) ->
---                     []
---                 ( la :: lb, [] ) ->
---                     la :: lb
---                 ( [], ra :: rb ) ->
---                     List.map (\zkl -> { zkl | delete = Just True }) (ra :: rb)
---                 ( la :: lb, ra :: rb ) ->
---                     case compareZklinks la ra of
---                         EQ ->
---                             la :: duofold lb rb
---                         LT ->
---                             la :: duofold lb (ra :: rb)
---                         GT ->
---                             { ra | delete = Just True } :: duofold (la :: lb) rb
---     in
---     curr
 
 
 saveZkLinkList : Model -> List Data.ZkLink

@@ -328,32 +328,6 @@ markdownBody =
 """
 
 
-
-{- pullLinks : List Block -> List String
-   pullLinks blocks =
-       blocks
-           |> inlineFoldl
-               (\inline links ->
-                   case inline of
-                       Block.Link str mbstr moreinlines ->
-                           str :: links
-
-                       _ ->
-                           links
-               )
-               []
-
-
-   testPullLinks =
-       [ Block.Heading Block.H1 [ Block.Text "Document" ]
-       , Block.Heading Block.H2 [ Block.Link "/note/50" (Just "interesting document") [] ]
-       , Block.Heading Block.H3 [ Block.Text "Subsection" ]
-       , Block.Heading Block.H2 [ Block.Link "/note/51" (Just "more interesting document") [] ]
-       ]
-           |> pullLinks
--}
-
-
 inlineFoldl : (Inline -> acc -> acc) -> acc -> List Block -> acc
 inlineFoldl function top_acc list =
     let

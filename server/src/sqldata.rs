@@ -113,55 +113,6 @@ pub fn connection_open(dbfile: &Path) -> rusqlite::Result<Connection> {
   Ok(conn)
 }
 
-/*
-
-
-CREATE TABLE user (
-                id          INTEGER NOT NULL PRIMARY KEY,
-                name        TEXT NOT NULL UNIQUE,
-                hashwd      TEXT NOT NULL,
-                salt        TEXT NOT NULL,
-                email       TEXT NOT NULL,
-                registration_key  TEXT,
-                createdate  INTEGER NOT NULL
-                );
-CREATE TABLE zk (
-                id            INTEGER NOT NULL PRIMARY KEY,
-                name          TEXT NOT NULL,
-                description   TEXT NOT NULL,
-                createdate    INTEGER NOT NULL,
-                changeddate   INTEGER NOT NULL
-                );
-CREATE TABLE zkmember (
-                user          INTEGER NOT NULL,
-                zk            INTEGER NOT NULL,
-                FOREIGN KEY(user) REFERENCES user(id),
-                FOREIGN KEY(zk) REFERENCES zk(id),
-                CONSTRAINT unq UNIQUE (user, zk)
-                );
-CREATE TABLE zknote (
-                id            INTEGER NOT NULL PRIMARY KEY,
-                title         TEXT NOT NULL,
-                content       TEXT NOT NULL,
-                public        BOOL NOT NULL,
-                zk            INTEGER NOT NULL,
-                createdate    INTEGER NOT NULL,
-                changeddate   INTEGER NOT NULL,
-                FOREIGN KEY(zk) REFERENCES zk(id)
-                );
-CREATE TABLE zklink (
-                zkleft        INTEGER NOT NULL,
-                zkright       INTEGER NOT NULL,
-                linkzk        INTEGER,
-                FOREIGN KEY(linkzk) REFERENCES zknote(id),
-                FOREIGN KEY(zkleft) REFERENCES zknote(id),
-                FOREIGN KEY(zkright) REFERENCES zknote(id),
-                CONSTRAINT unq UNIQUE (zkleft, zkright)
-                );
-
-
-*/
-
 pub fn initialdb() -> Migration {
   let mut m = Migration::new();
 
