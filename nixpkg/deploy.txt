@@ -11,7 +11,7 @@ previous one without building.  leave the cargo hash alone, unless the cargo tom
 
 nix-copy-closure --to root@practica.site /nix/store/9v77vwy5zzv38mvh5a93yk02h2y94xq8-zknotes-server-1.0
 
-- then on the server remote the old one
+- then on the server remove the old one
 
 nix-env -e zknotes-server
 
