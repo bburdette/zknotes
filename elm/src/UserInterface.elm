@@ -19,6 +19,8 @@ type SendMsg
     | DeleteZkNote Int
     | SaveZkNote Data.SaveZkNote
     | SaveZk Data.SaveZk
+    | SaveZkLinks Data.ZkLinks
+    | GetZkLinks Data.GetZkLinks
 
 
 type ServerResponse
@@ -38,6 +40,8 @@ type ServerResponse
     | DeletedZkNote Int
     | ZkNote Data.FullZkNote
     | ServerError String
+    | SavedZkLinks
+    | ZkLinks Data.ZkLinks
 
 
 encodeSendMsg : SendMsg -> String -> String -> JE.Value
@@ -145,6 +149,22 @@ encodeSendMsg sm uid pwd =
                 , ( "data", Data.encodeSaveZk sbe )
                 ]
 
+        SaveZkLinks zklinks ->
+            JE.object
+                [ ( "what", JE.string "savezklinks" )
+                , ( "uid", JE.string uid )
+                , ( "pwd", JE.string pwd )
+                , ( "data", Data.encodeZkLinks zklinks )
+                ]
+
+        GetZkLinks gzl ->
+            JE.object
+                [ ( "what", JE.string "getzklinks" )
+                , ( "uid", JE.string uid )
+                , ( "pwd", JE.string pwd )
+                , ( "data", Data.encodeGetZkLinks gzl )
+                ]
+
 
 encodeEmail : String -> JE.Value
 encodeEmail email =
@@ -205,6 +225,12 @@ serverResponseDecoder =
 
                 "zknote" ->
                     JD.map ZkNote (JD.at [ "content" ] <| Data.decodeFullZkNote)
+
+                "savedzklinks" ->
+                    JD.succeed SavedZkLinks
+
+                "zklinks" ->
+                    JD.map ZkLinks (JD.field "content" Data.decodeZkLinks)
 
                 wat ->
                     JD.succeed

@@ -372,6 +372,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "barrel"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d67c978b1322c8031145b1f6c236fc371292f52c565bc96018b2971afcbffe1"
+
+[[package]]
 name = "base64"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1194,9 +1200,9 @@ checksum = "755456fae044e6fa1ebbbd1b3e902ae19e73097ed4ed87bb79934a867c007bc3"
 
 [[package]]
 name = "libsqlite3-sys"
-version = "0.16.0"
+version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e5b95e89c330291768dc840238db7f9e204fd208511ab6319b56193a7f2ae25"
+checksum = "1e704a02bcaecd4a08b93a23f6be59d0bd79cd161e0963e9499165a0a35df7bd"
 dependencies = [
  "pkg-config",
  "vcpkg",
@@ -1474,7 +1480,7 @@ dependencies = [
  "libc",
  "redox_syscall",
  "rustc_version",
- "smallvec",
+ "smallvec 0.6.13",
  "winapi 0.3.9",
 ]
 
@@ -1824,9 +1830,9 @@ dependencies = [
 
 [[package]]
 name = "rusqlite"
-version = "0.20.0"
+version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a194373ef527035645a1bc21b10dc2125f73497e6e155771233eb187aedd051"
+checksum = "45d0fd62e1df63d254714e6cb40d0a0e82e7a1623e7a27f679d851af092ae58b"
 dependencies = [
  "bitflags",
  "fallible-iterator",
@@ -1834,6 +1840,7 @@ dependencies = [
  "libsqlite3-sys",
  "lru-cache",
  "memchr",
+ "smallvec 1.4.2",
  "time",
 ]
 
@@ -2009,6 +2016,12 @@ checksum = "f7b0758c52e15a8b5e3691eae6cc559f08eee9406e548a4477ba4e67770a82b6"
 dependencies = [
  "maybe-uninit",
 ]
+
+[[package]]
+name = "smallvec"
+version = "1.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fbee7696b84bbf3d89a1c2eccff0850e3047ed46bfcd2e92c29a2d074d57e252"
 
 [[package]]
 name = "socket2"
@@ -2322,7 +2335,7 @@ dependencies = [
  "lazy_static",
  "log",
  "rand 0.6.5",
- "smallvec",
+ "smallvec 0.6.13",
  "socket2",
  "tokio-executor",
  "tokio-io",
@@ -2347,7 +2360,7 @@ dependencies = [
  "log",
  "lru-cache",
  "resolv-conf",
- "smallvec",
+ "smallvec 0.6.13",
  "tokio-executor",
  "trust-dns-proto",
 ]
@@ -2603,6 +2616,7 @@ dependencies = [
  "actix-files",
  "actix-rt",
  "actix-web",
+ "barrel",
  "base64 0.2.1",
  "crypto-hash",
  "env_logger",

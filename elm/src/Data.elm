@@ -67,6 +67,89 @@ type alias SaveZkNote =
     }
 
 
+type alias ZkLink =
+    { from : Int
+    , to : Int
+    , zknote : Maybe Int
+    , fromname : Maybe String
+    , toname : Maybe String
+    , delete : Maybe Bool
+    }
+
+
+type alias ZkLinks =
+    { zk : Int
+    , links : List ZkLink
+    }
+
+
+type alias SaveZkLinks =
+    { zk : Int
+    , saveLinks : List ZkLink
+    , deleteLinks : List ZkLink
+    }
+
+
+type alias GetZkLinks =
+    { zknote : Int
+    , zk : Int
+    }
+
+
+encodeGetZkLinks : GetZkLinks -> JE.Value
+encodeGetZkLinks gzl =
+    JE.object
+        [ ( "zknote", JE.int gzl.zknote )
+        , ( "zk", JE.int gzl.zk )
+        ]
+
+
+encodeZkLinks : ZkLinks -> JE.Value
+encodeZkLinks zklinks =
+    JE.object
+        [ ( "zk", JE.int zklinks.zk )
+        , ( "links", JE.list encodeZkLink zklinks.links )
+        ]
+
+
+decodeZkLinks : JD.Decoder ZkLinks
+decodeZkLinks =
+    JD.map2 ZkLinks
+        (JD.field "zk" JD.int)
+        (JD.field "links" (JD.list decodeZkLink))
+
+
+encodeZkLink : ZkLink -> JE.Value
+encodeZkLink zklink =
+    JE.object <|
+        [ ( "from", JE.int zklink.from )
+        , ( "to", JE.int zklink.to )
+        ]
+            ++ (zklink.delete
+                    |> Maybe.map (\b -> [ ( "delete", JE.bool b ) ])
+                    |> Maybe.withDefault []
+               )
+            ++ (zklink.zknote
+                    |> Maybe.map
+                        (\id ->
+                            [ ( "linkzknote", JE.int id ) ]
+                        )
+                    |> Maybe.withDefault
+                        []
+               )
+
+
+decodeZkLink : JD.Decoder ZkLink
+decodeZkLink =
+    JD.map6 ZkLink
+        (JD.field "from" JD.int)
+        (JD.field "to" JD.int)
+        (JD.maybe (JD.field "linkzknote" JD.int))
+        (JD.maybe (JD.field "fromname" JD.string))
+        (JD.maybe (JD.field "toname" JD.string))
+        (JD.succeed Nothing)
+
+
 saveZkNoteFromFull : FullZkNote -> SaveZkNote
 saveZkNoteFromFull fzn =
     { id = Just fzn.id

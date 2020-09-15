@@ -6,7 +6,7 @@ authors = ["Ben Burdette <bburdette@gmail.com>"]
 [dependencies]
 base64 = "0.2.1"
 env_logger = "0.5.13"
-rusqlite = "0.20.0"
+rusqlite = "0.23.0"
 log = "0.4.0"
 actix-web = "1.0.8"
 actix-rt = "0.2.5"
@@ -25,3 +25,4 @@ json = "*"
 reqwest = "0.9.24"
 lettre = "0.9"
 lettre_email = "0.9"
+barrel = { version = "0.6.5", features = ["sqlite3"] }

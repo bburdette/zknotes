@@ -1,4 +1,4 @@
-module CellCommon exposing (blockCells, cellView, code, codeBlock, defCell, heading, markdownBody, markdownView, mdCells, mkRenderer, rawTextToId, showRunState)
+module CellCommon exposing (blockCells, cellView, code, codeBlock, defCell, heading, inlineFoldl, markdownBody, markdownView, mdCells, mkRenderer, rawTextToId, showRunState)
 
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
@@ -326,3 +326,63 @@ markdownBody =
 >
 </cell>
 """
+
+
+inlineFoldl : (Inline -> acc -> acc) -> acc -> List Block -> acc
+inlineFoldl function top_acc list =
+    let
+        bfn =
+            \block acc ->
+                case block of
+                    Block.HtmlBlock html ->
+                        acc
+
+                    Block.UnorderedList listItems ->
+                        List.foldl
+                            (\(ListItem _ inlines) liacc ->
+                                List.foldl function liacc inlines
+                            )
+                            acc
+                            listItems
+
+                    Block.OrderedList int lists ->
+                        List.foldl
+                            (\inlines lacc ->
+                                List.foldl function lacc inlines
+                            )
+                            acc
+                            lists
+
+                    Block.BlockQuote _ ->
+                        acc
+
+                    Block.Heading _ inlines ->
+                        List.foldl function acc inlines
+
+                    Block.Paragraph inlines ->
+                        List.foldl function acc inlines
+
+                    Block.Table labels lists ->
+                        let
+                            lacc =
+                                List.foldl
+                                    (\inlines iacc ->
+                                        List.foldl function iacc inlines
+                                    )
+                                    acc
+                                    (List.map .label labels)
+                        in
+                        List.foldl
+                            (\inlines iacc ->
+                                List.foldl function iacc inlines
+                            )
+                            lacc
+                            lists
+
+                    Block.CodeBlock _ ->
+                        acc
+
+                    Block.ThematicBreak ->
+                        acc
+    in
+    Block.foldl bfn top_acc list

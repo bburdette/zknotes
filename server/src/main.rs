@@ -20,6 +20,7 @@ extern crate log;
 extern crate rusqlite;
 #[macro_use]
 extern crate serde_derive;
+extern crate barrel;
 extern crate base64;
 
 mod config;
@@ -80,12 +81,12 @@ fn public(
   item: web::Json<PublicMessage>,
   _req: HttpRequest,
 ) -> HttpResponse {
-  println!("model: {:?}", &item);
+  println!("public msg: {:?}", &item);
 
   match interfaces::public_interface(&state, item.into_inner()) {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
-      error!("uh oh, 'public' err: {:?}", e);
+      error!("'public' err: {:?}", e);
       let se = ServerResponse {
         what: "server error".to_string(),
         content: serde_json::Value::String(e.to_string()),
@@ -96,12 +97,12 @@ fn public(
 }
 
 fn user(state: web::Data<Config>, item: web::Json<UserMessage>, _req: HttpRequest) -> HttpResponse {
-  println!("model: {:?}", &item);
+  println!("user msg: {:?}", &item);
 
   match interfaces::user_interface(&state, item.into_inner()) {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
-      error!("uh oh, 'user' err: {:?}", e);
+      error!("'user' err: {:?}", e);
       let se = ServerResponse {
         what: "server error".to_string(),
         content: serde_json::Value::String(e.to_string()),
@@ -188,13 +189,9 @@ fn err_main() -> Result<(), Box<dyn Error>> {
 
   let config = load_config();
 
-  if !config.db.as_path().exists() {
-    sqldata::dbinit(config.db.as_path())?;
-  }
-
   println!("config: {:?}", config);
 
-  // let sys = actix_rt::System::new("pdf-server");
+  sqldata::dbinit(config.db.as_path())?;
 
   let c = web::Data::new(config.clone());
   HttpServer::new(move || {

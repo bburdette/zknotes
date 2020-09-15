@@ -20,6 +20,9 @@ import Markdown.Parser
 import Markdown.Renderer
 import Schelme.Show exposing (showTerm)
 import TangoColors as TC
+import Url as U
+import Url.Parser as UP exposing ((</>))
+import Util
 
 
 type Msg
@@ -31,16 +34,21 @@ type Msg
     | RevertPress
     | DeletePress
     | ViewPress
+    | LinksPress
     | NewPress
-    | SwitchPress Data.ZkListNote
+    | SwitchPress Int
     | LinkPress Data.ZkListNote
     | PublicPress Bool
+    | RemoveLink Data.ZkLink
+    | MdLink Data.ZkLink
 
 
 type alias Model =
     { id : Maybe Int
     , zk : Data.Zk
     , zklist : List Data.ZkListNote
+    , zklDict : Dict String Data.ZkLink
+    , initialZklDict : Dict String Data.ZkLink
     , public : Bool
     , title : String
     , md : String
@@ -51,8 +59,8 @@ type alias Model =
 
 type Command
     = None
-    | Save Data.SaveZkNote
-    | SaveExit Data.SaveZkNote
+    | Save Data.SaveZkNote (List Data.ZkLink)
+    | SaveExit Data.SaveZkNote (List Data.ZkLink)
     | Revert
     | View Data.SaveZkNote
     | Delete Int
@@ -71,6 +79,18 @@ sznFromModel model =
     }
 
 
+zkLinkName : Data.ZkLink -> Int -> String
+zkLinkName zklink noteid =
+    if noteid == zklink.from then
+        zklink.toname |> Maybe.withDefault (String.fromInt zklink.to)
+
+    else if noteid == zklink.to then
+        zklink.fromname |> Maybe.withDefault (String.fromInt zklink.from)
+
+    else
+        "link error"
+
+
 dirty : Model -> Bool
 dirty model =
     model.revert
@@ -85,8 +105,47 @@ dirty model =
                         == model.title
                         && r.content
                         == model.md
+                        && Dict.keys model.zklDict
+                        == Dict.keys model.initialZklDict
             )
         |> Maybe.withDefault True
+
+
+showZkl : List (E.Attribute Msg) -> Maybe Int -> Data.ZkLink -> Element Msg
+showZkl dirtybutton id zkl =
+    let
+        ( dir, otherid ) =
+            case ( Just zkl.from == id, Just zkl.to == id ) of
+                ( True, False ) ->
+                    ( E.text "->", Just zkl.to )
+
+                ( False, True ) ->
+                    ( E.text "<-", Just zkl.from )
+
+                _ ->
+                    ( E.text "", Nothing )
+    in
+    E.row [ E.spacing 8, E.width E.fill ]
+        [ dir
+        , id
+            |> Maybe.map (zkLinkName zkl)
+            |> Maybe.withDefault ""
+            |> E.text
+        , case otherid of
+            Just zknoteid ->
+                EI.button (dirtybutton ++ [ E.alignRight ]) { onPress = Just (SwitchPress zknoteid), label = E.text "↗" }
+
+            Nothing ->
+                E.none
+        , EI.button (Common.buttonStyle ++ [ E.alignRight ])
+            { onPress = Just (MdLink zkl)
+            , label = E.text "^"
+            }
+        , EI.button (Common.buttonStyle ++ [ E.alignRight ])
+            { onPress = Just (RemoveLink zkl)
+            , label = E.text "X"
+            }
+        ]
 
 
 view : Model -> Element Msg
@@ -111,6 +170,7 @@ view model =
                 { onPress = Just DonePress, label = E.text "Done" }
             , EI.button Common.buttonStyle { onPress = Just RevertPress, label = E.text "Cancel" }
             , EI.button Common.buttonStyle { onPress = Just ViewPress, label = E.text "View" }
+            , EI.button Common.buttonStyle { onPress = Just LinksPress, label = E.text "Links" }
             , case isdirty of
                 True ->
                     EI.button dirtybutton { onPress = Just SavePress, label = E.text "Save" }
@@ -133,16 +193,24 @@ view model =
             , label = EI.labelLeft [] (E.text "public")
             }
         , E.row [ E.width E.fill ]
-            [ EI.multiline
-                [ E.width (E.px 400)
-                , E.htmlAttribute (Html.Attributes.id "mdtext")
-                ]
-                { onChange = OnMarkdownInput
-                , text = model.md
-                , placeholder = Nothing
-                , label = EI.labelHidden "Markdown input"
-                , spellcheck = False
-                }
+            [ E.column [ E.spacing 8 ]
+                (EI.multiline
+                    [ E.width (E.px 400)
+                    , E.htmlAttribute (Html.Attributes.id "mdtext")
+                    , E.alignTop
+                    ]
+                    { onChange = OnMarkdownInput
+                    , text = model.md
+                    , placeholder = Nothing
+                    , label = EI.labelHidden "Markdown input"
+                    , spellcheck = False
+                    }
+                    -- show the links.
+                    :: E.row [ Font.bold ] [ E.text "links" ]
+                    :: List.map
+                        (showZkl dirtybutton model.id)
+                        (Dict.values model.zklDict)
+                )
             , case markdownView (mkRenderer model.cells OnSchelmeCodeChanged) model.md of
                 Ok rendered ->
                     E.column
@@ -150,17 +218,32 @@ view model =
                         , E.padding 80
                         , E.width (E.fill |> E.maximum 1000)
                         , E.centerX
+                        , E.alignTop
                         ]
                         rendered
 
                 Err errors ->
                     E.text errors
-            , E.column [ E.spacing 8 ]
+            , E.column
+                [ E.spacing 8
+                , E.alignTop
+                ]
                 (List.map
                     (\zkln ->
                         E.row [ E.spacing 8 ]
-                            [ EI.button Common.buttonStyle { onPress = Just (LinkPress zkln), label = E.text "Link" }
-                            , EI.button dirtybutton { onPress = Just (SwitchPress zkln), label = E.text "Edit" }
+                            [ case model.id of
+                                Just _ ->
+                                    EI.button Common.buttonStyle
+                                        { onPress = Just <| LinkPress zkln
+                                        , label = E.text "Link"
+                                        }
+
+                                Nothing ->
+                                    EI.button (Common.buttonStyle ++ [ EBk.color TC.grey ])
+                                        { onPress = Nothing
+                                        , label = E.text "Link"
+                                        }
+                            , EI.button dirtybutton { onPress = Just (SwitchPress zkln.id), label = E.text "Edit" }
                             , E.text zkln.title
                             ]
                     )
@@ -176,8 +259,13 @@ view model =
         ]
 
 
-initFull : Data.Zk -> List Data.ZkListNote -> Data.FullZkNote -> Model
-initFull zk zkl zknote =
+zklKey : Data.ZkLink -> String
+zklKey zkl =
+    String.fromInt zkl.from ++ ":" ++ String.fromInt zkl.to
+
+
+initFull : Data.Zk -> List Data.ZkListNote -> Data.FullZkNote -> Data.ZkLinks -> Model
+initFull zk zkl zknote zklDict =
     let
         cells =
             zknote.content
@@ -191,6 +279,8 @@ initFull zk zkl zknote =
     { id = Just zknote.id
     , zk = zk
     , zklist = zkl
+    , zklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) zklDict.links)
+    , initialZklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) zklDict.links)
     , public = zknote.public
     , title = zknote.title
     , md = zknote.content
@@ -214,6 +304,8 @@ initNew zk zkl =
     { id = Nothing
     , zk = zk
     , zklist = zkl
+    , zklDict = Dict.empty
+    , initialZklDict = Dict.empty
     , public = False
     , title = ""
     , md = ""
@@ -237,6 +329,8 @@ initExample zk zkl =
     { id = Nothing
     , zk = zk
     , zklist = zkl
+    , zklDict = Dict.empty
+    , initialZklDict = Dict.empty
     , public = False
     , title = "example"
     , md = markdownBody
@@ -299,10 +393,40 @@ gotSelectedText model s =
     , if dirty model then
         Save
             (sznFromModel model)
+            (Dict.values model.zklDict)
 
       else
         None
     )
+
+
+noteLink : String -> Maybe Int
+noteLink str =
+    -- hack allows parsing /note/<N>
+    -- other urls will be invalid which is fine.
+    U.fromString ("http://wat" ++ str)
+        |> Maybe.andThen
+            (UP.parse (UP.s "note" </> UP.int))
+
+
+compareZklinks : Data.ZkLink -> Data.ZkLink -> Order
+compareZklinks left right =
+    case compare left.from right.from of
+        EQ ->
+            compare left.to right.to
+
+        ltgt ->
+            ltgt
+
+
+saveZkLinkList : Model -> List Data.ZkLink
+saveZkLinkList model =
+    List.map
+        (\zkl -> { zkl | delete = Nothing })
+        (Dict.values (Dict.diff model.zklDict model.initialZklDict))
+        ++ List.map
+            (\zkl -> { zkl | delete = Just True })
+            (Dict.values (Dict.diff model.initialZklDict model.zklDict))
 
 
 update : Msg -> Model -> ( Model, Command )
@@ -314,15 +438,20 @@ update msg model =
                 saveZkn =
                     sznFromModel model
             in
-            ( { model | revert = Just saveZkn }
+            ( { model
+                | revert = Just saveZkn
+                , initialZklDict = model.zklDict
+              }
             , Save
                 saveZkn
+                (saveZkLinkList model)
             )
 
         DonePress ->
             ( model
             , SaveExit
                 (sznFromModel model)
+                (saveZkLinkList model)
             )
 
         ViewPress ->
@@ -331,20 +460,122 @@ update msg model =
                 (sznFromModel model)
             )
 
+        LinksPress ->
+            let
+                blah =
+                    model.md
+                        |> Markdown.Parser.parse
+                        |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
+
+                zklDict =
+                    Debug.log "zklDict" <|
+                        case ( blah, model.id ) of
+                            ( Err _, _ ) ->
+                                Dict.empty
+
+                            ( Ok blocks, Nothing ) ->
+                                Dict.empty
+
+                            ( Ok blocks, Just id ) ->
+                                CellCommon.inlineFoldl
+                                    (\inline links ->
+                                        case inline of
+                                            Block.Link str mbstr moarinlines ->
+                                                case noteLink str of
+                                                    Just rid ->
+                                                        let
+                                                            zkl =
+                                                                { from = id
+                                                                , to = rid
+                                                                , zknote = Nothing
+                                                                , fromname = Nothing
+                                                                , toname = mbstr
+                                                                , delete = Nothing
+                                                                }
+                                                        in
+                                                        ( zklKey zkl, zkl )
+                                                            :: links
+
+                                                    Nothing ->
+                                                        links
+
+                                            _ ->
+                                                links
+                                    )
+                                    []
+                                    blocks
+                                    |> Dict.fromList
+            in
+            ( { model | zklDict = Dict.union model.zklDict zklDict }, None )
+
         NewPress ->
             ( model
             , GetSelectedText "mdtext"
             )
 
         LinkPress zkln ->
-            ( { model | md = model.md ++ "\n[" ++ zkln.title ++ "](/note/" ++ String.fromInt zkln.id ++ ")" }, None )
+            -- add a zklink, or newlink?
+            case model.id of
+                Just id ->
+                    let
+                        nzkl =
+                            { from = id
+                            , to = zkln.id
+                            , zknote = Nothing
+                            , fromname = Nothing
+                            , toname = Just zkln.title
+                            , delete = Nothing
+                            }
+                    in
+                    ( { model
+                        | zklDict = Dict.insert (zklKey nzkl) nzkl model.zklDict
+                      }
+                    , None
+                    )
 
-        SwitchPress zkln ->
+                Nothing ->
+                    ( model, None )
+
+        RemoveLink zkln ->
+            ( { model
+                | zklDict = Dict.remove (zklKey zkln) model.zklDict
+              }
+            , None
+            )
+
+        MdLink zkln ->
+            let
+                ( title, id ) =
+                    if Just zkln.from == model.id then
+                        ( Maybe.withDefault "" zkln.toname, zkln.to )
+
+                    else
+                        ( Maybe.withDefault "" zkln.fromname, zkln.from )
+            in
+            ( { model
+                | md =
+                    model.md
+                        ++ (if model.md == "" then
+                                "["
+
+                            else
+                                "\n\n["
+                           )
+                        ++ title
+                        ++ "]("
+                        ++ "/note/"
+                        ++ String.fromInt id
+                        ++ ")"
+              }
+            , None
+            )
+
+        SwitchPress id ->
             if dirty model then
-                ( model, SaveSwitch (sznFromModel model) zkln.id )
+                ( model, SaveSwitch (sznFromModel model) id )
 
             else
-                ( model, Switch zkln.id )
+                ( model, Switch id )
 
         PublicPress v ->
             ( { model | public = v }, None )
