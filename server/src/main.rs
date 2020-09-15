@@ -30,7 +30,6 @@ mod sqldata;
 mod util;
 
 use actix_files::NamedFile;
-use barrel::backend::Sqlite;
 // use actix_web::http::{Method, StatusCode};
 use actix_web::middleware::Logger;
 use actix_web::{

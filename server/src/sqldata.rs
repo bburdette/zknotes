@@ -1,7 +1,6 @@
 use barrel::backend::Sqlite;
 use barrel::{types, Migration};
 use rusqlite::{params, Connection};
-use serde_json;
 use std::convert::TryInto;
 use std::error::Error;
 use std::path::Path;
@@ -106,7 +105,7 @@ pub fn connection_open(dbfile: &Path) -> rusqlite::Result<Connection> {
     let d = Duration::from_millis(500);
     std::thread::sleep(d);
     true
-  }));
+  }))?;
 
   conn.execute("PRAGMA foreign_keys = true;", params![])?;
 
@@ -241,7 +240,7 @@ pub fn dbinit(dbfile: &Path) -> Result<(), Box<dyn Error>> {
       conn.execute_batch(udpate1().make::<Sqlite>().as_str())?;
       set_single_value(&conn, "migration_level", "1")?;
     }
-    Ok(v) => {
+    Ok(_) => {
       // nothing beyond udpate1 yet.
     }
   }
@@ -330,7 +329,7 @@ pub fn new_user(
 
   let now = now()?;
 
-  let user = conn.execute(
+  conn.execute(
     "INSERT INTO user (name, hashwd, salt, email, registration_key, createdate)
       VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
     params![name, hashwd, salt, email, registration_key, now],
@@ -383,7 +382,7 @@ pub fn is_zk_member(conn: &Connection, uid: i64, zkid: i64) -> Result<bool, Box<
   match conn.query_row(
     "select user, zk from zkmember where user = ?1 and zk = ?2",
     params![uid, zkid],
-    |row| Ok(true),
+    |_row| Ok(true),
   ) {
     Ok(b) => Ok(b),
     Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
