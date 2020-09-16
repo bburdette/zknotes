@@ -197,7 +197,10 @@ view model =
             , E.spacing 10
             , E.alignTop
             ]
-            [ E.column [ E.spacing 8 ]
+            [ E.column
+                [ E.spacing 8
+                , E.alignTop
+                ]
                 (EI.multiline
                     [ E.width (E.px 400)
                     , E.htmlAttribute (Html.Attributes.id "mdtext")
@@ -218,11 +221,12 @@ view model =
             , case markdownView (mkRenderer model.cells OnSchelmeCodeChanged) model.md of
                 Ok rendered ->
                     E.column
-                        [ E.paddingXY 30 0
+                        [ E.paddingXY 30 15
                         , E.width (E.fill |> E.maximum 1000)
                         , E.centerX
                         , E.alignTop
                         , E.spacing 8
+                        , EBk.color TC.lightGrey
                         ]
                         [ E.text model.title
                         , E.column
