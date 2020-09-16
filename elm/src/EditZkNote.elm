@@ -411,7 +411,7 @@ gotSelectedText model s =
     , if dirty model then
         Save
             (sznFromModel model)
-            (Dict.values model.zklDict)
+            (saveZkLinkList model)
 
       else
         None
