@@ -265,13 +265,16 @@ notewait nwstate state wmsg =
                 UserReplyData (Ok (UI.ZkNoteListing zknl)) ->
                     { nwstate | mbzknotelisting = Just zknl }
 
+                UserReplyData (Ok UI.SavedZkLinks) ->
+                    nwstate
+
+                UserReplyData (Ok (UI.SavedZkNote _)) ->
+                    nwstate
+
+                -- TODO error state for errors, error state for unexpected msgs.
                 -- UserReplyData (Err e) ->
-                --     ( BadError (BadError.initialModel <| Util.httpErrorString e) state, Cmd.none )
+                --     BadError (BadError.initialModel <| Util.httpErrorString e) state
                 _ ->
-                    let
-                        _ =
-                            Debug.log "bad wmsg: " wmsg
-                    in
                     nwstate
     in
     case ( n.mbzknotelisting, n.mbzklinks, n.mbzknote ) of
@@ -596,10 +599,6 @@ update msg model =
                             ( model, Cmd.none )
 
                         UI.ZkLinks zkl ->
-                            let
-                                _ =
-                                    Debug.log "Zklinks: " zkl
-                            in
                             ( model, Cmd.none )
 
                         UI.UserExists ->
@@ -857,7 +856,7 @@ update msg model =
                         ]
                     )
 
-                EditZkNote.SaveSwitch szkn id ->
+                EditZkNote.SaveSwitch szkn zklinks id ->
                     ( { model
                         | state =
                             Wait
@@ -889,6 +888,13 @@ update msg model =
                         , sendUIMsg model.location
                             login
                             (UI.SaveZkNote szkn)
+                        , sendUIMsg model.location
+                            login
+                          <|
+                            UI.SaveZkLinks
+                                { zk = emod.zk.id
+                                , links = zklinks
+                                }
                         ]
                     )
 

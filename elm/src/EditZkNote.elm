@@ -65,7 +65,7 @@ type Command
     | View Data.SaveZkNote
     | Delete Int
     | Switch Int
-    | SaveSwitch Data.SaveZkNote Int
+    | SaveSwitch Data.SaveZkNote (List Data.ZkLink) Int
     | GetSelectedText String
 
 
@@ -162,7 +162,7 @@ view model =
                 Common.buttonStyle
     in
     E.column
-        [ E.width E.fill ]
+        [ E.width E.fill, E.spacing 8 ]
         [ E.text "Edit Zk Note"
         , E.row [ E.width E.fill, E.spacing 8 ]
             [ EI.button
@@ -194,6 +194,7 @@ view model =
             }
         , E.row
             [ E.width E.fill
+            , E.spacing 10
             , E.alignTop
             ]
             [ E.column [ E.spacing 8 ]
@@ -217,13 +218,23 @@ view model =
             , case markdownView (mkRenderer model.cells OnSchelmeCodeChanged) model.md of
                 Ok rendered ->
                     E.column
-                        [ E.spacing 30
-                        , E.padding 80
+                        [ E.paddingXY 30 0
                         , E.width (E.fill |> E.maximum 1000)
                         , E.centerX
                         , E.alignTop
+                        , E.spacing 8
                         ]
-                        rendered
+                        [ E.text model.title
+                        , E.column
+                            [ E.padding 20
+                            , E.width (E.fill |> E.maximum 1000)
+                            , E.centerX
+                            , E.alignTop
+                            , EBd.width 3
+                            , EBd.color TC.darkGrey
+                            ]
+                            rendered
+                        ]
 
                 Err errors ->
                     E.text errors
@@ -471,43 +482,42 @@ update msg model =
                         |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
 
                 zklDict =
-                    Debug.log "zklDict" <|
-                        case ( blah, model.id ) of
-                            ( Err _, _ ) ->
-                                Dict.empty
+                    case ( blah, model.id ) of
+                        ( Err _, _ ) ->
+                            Dict.empty
 
-                            ( Ok blocks, Nothing ) ->
-                                Dict.empty
+                        ( Ok blocks, Nothing ) ->
+                            Dict.empty
 
-                            ( Ok blocks, Just id ) ->
-                                CellCommon.inlineFoldl
-                                    (\inline links ->
-                                        case inline of
-                                            Block.Link str mbstr moarinlines ->
-                                                case noteLink str of
-                                                    Just rid ->
-                                                        let
-                                                            zkl =
-                                                                { from = id
-                                                                , to = rid
-                                                                , zknote = Nothing
-                                                                , fromname = Nothing
-                                                                , toname = mbstr
-                                                                , delete = Nothing
-                                                                }
-                                                        in
-                                                        ( zklKey zkl, zkl )
-                                                            :: links
+                        ( Ok blocks, Just id ) ->
+                            CellCommon.inlineFoldl
+                                (\inline links ->
+                                    case inline of
+                                        Block.Link str mbstr moarinlines ->
+                                            case noteLink str of
+                                                Just rid ->
+                                                    let
+                                                        zkl =
+                                                            { from = id
+                                                            , to = rid
+                                                            , zknote = Nothing
+                                                            , fromname = Nothing
+                                                            , toname = mbstr
+                                                            , delete = Nothing
+                                                            }
+                                                    in
+                                                    ( zklKey zkl, zkl )
+                                                        :: links
 
-                                                    Nothing ->
-                                                        links
+                                                Nothing ->
+                                                    links
 
-                                            _ ->
-                                                links
-                                    )
-                                    []
-                                    blocks
-                                    |> Dict.fromList
+                                        _ ->
+                                            links
+                                )
+                                []
+                                blocks
+                                |> Dict.fromList
             in
             ( { model | zklDict = Dict.union model.zklDict zklDict }, None )
 
@@ -575,7 +585,7 @@ update msg model =
 
         SwitchPress id ->
             if dirty model then
-                ( model, SaveSwitch (sznFromModel model) id )
+                ( model, SaveSwitch (sznFromModel model) (saveZkLinkList model) id )
 
             else
                 ( model, Switch id )
