@@ -203,6 +203,27 @@ pub fn udpate1() -> Migration {
   m
 }
 
+pub fn udpate2() -> Migration {
+  let mut m = Migration::new();
+
+  // can't change keys or constraints in sqlite, so drop and recreate table.
+  // shouldn't be any links in the old style one anyway.
+  m.drop_table("zklink");
+
+  m.create_table("zklink", |t| {
+    t.add_column("fromid", types::foreign("zknote", "id").nullable(false));
+    t.add_column("toid", types::foreign("zknote", "id").nullable(false));
+    t.add_column("zk", types::foreign("zk", "id").nullable(false));
+    t.add_column("linkzknote", types::foreign("zknote", "id").nullable(true));
+    t.add_index(
+      "unq",
+      types::index(vec!["fromid", "toid", "zk"]).unique(true),
+    );
+  });
+
+  m
+}
+
 pub fn get_single_value(conn: &Connection, name: &str) -> Result<Option<String>, Box<dyn Error>> {
   match conn.query_row(
     "select value from singlevalue where name = ?1",
@@ -238,10 +259,21 @@ pub fn dbinit(dbfile: &Path) -> Result<(), Box<dyn Error>> {
     Err(_) => {
       println!("udpate1");
       conn.execute_batch(udpate1().make::<Sqlite>().as_str())?;
-      set_single_value(&conn, "migration_level", "1")?;
+      conn.execute_batch(udpate2().make::<Sqlite>().as_str())?;
+      set_single_value(&conn, "migration_level", "2")?;
     }
-    Ok(_) => {
-      // nothing beyond udpate1 yet.
+    Ok(None) => {
+      println!("udpate1");
+      conn.execute_batch(udpate1().make::<Sqlite>().as_str())?;
+      conn.execute_batch(udpate2().make::<Sqlite>().as_str())?;
+      set_single_value(&conn, "migration_level", "2")?;
+    }
+    Ok(Some(level)) => {
+      if level == "1" {
+        println!("udpate2");
+        conn.execute_batch(udpate2().make::<Sqlite>().as_str())?;
+      }
+      set_single_value(&conn, "migration_level", "2")?;
     }
   }
   println!("db up to date.");
@@ -678,8 +710,6 @@ pub fn save_zklinks(
 ) -> Result<(), Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
 
-  // conn.execute("BEGIN TRANSACTION", params![])?;
-
   if !is_zk_member(&conn, uid, zk)? {
     bail!("can't save zklink; user is not a member of this zk");
   }
@@ -687,8 +717,6 @@ pub fn save_zklinks(
   for zklink in zklinks.iter() {
     save_zklink(&conn, uid, zk, &zklink)?;
   }
-
-  // conn.execute("END TRANSACTION", params![])?;
 
   Ok(())
 }

@@ -25,8 +25,8 @@ pub struct AppState {
 pub struct UserMessage {
   pub uid: String,
   pwd: String,
-  what: String,
-  data: Option<serde_json::Value>,
+  pub what: String,
+  pub data: Option<serde_json::Value>,
 }
 
 #[derive(Deserialize, Debug)]
