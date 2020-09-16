@@ -192,7 +192,10 @@ view model =
             , checked = model.public
             , label = EI.labelLeft [] (E.text "public")
             }
-        , E.row [ E.width E.fill ]
+        , E.row
+            [ E.width E.fill
+            , E.alignTop
+            ]
             [ E.column [ E.spacing 8 ]
                 (EI.multiline
                     [ E.width (E.px 400)
