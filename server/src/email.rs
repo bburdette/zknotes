@@ -19,7 +19,7 @@ pub fn send_registration(
     )?,
     "Practica registration".to_string(),
     (format!(
-      "Hey click on this crazy link, {} user '{}'!  \
+      "Click the link to complete registration, {} user '{}'!  \
        {}/register/{}/{}",
       appname, uid, mainsite, uid, reg_id
     ))
@@ -30,7 +30,7 @@ pub fn send_registration(
   util::write_string(
     "last-email.txt",
     (format!(
-      "Hey click on this crazy link, {} user '{}'!  \
+      "Click the link to complete registration, {} user '{}'!  \
        {}/register/{}/{}",
       appname, uid, domain, uid, reg_id
     ))
