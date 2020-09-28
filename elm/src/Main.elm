@@ -29,6 +29,7 @@ import Markdown.Renderer
 import PublicInterface as PI
 import Random exposing (Seed, initialSeed)
 import Schelme.Show exposing (showTerm)
+import SearchPanel as SP
 import ShowMessage
 import Url exposing (Url)
 import Url.Builder as UB
@@ -487,7 +488,7 @@ update msg model =
                                 ZkWait zwstate wm ->
                                     case ( wm, stateLogin zwstate ) of
                                         ( WmZk zk, Just login ) ->
-                                            ( { model | state = EditZkNoteListing { zk = zk, notes = l } login }, Cmd.none )
+                                            ( { model | state = EditZkNoteListing { zk = zk, notes = l, spmodel = SP.initModel } login }, Cmd.none )
 
                                         ( WmZklm Nothing mbzkn zk tostate, Just login ) ->
                                             case mbzkn of
@@ -759,7 +760,7 @@ update msg model =
                                             ( st, Cmd.none )
 
                                         UserReplyData (Ok (UI.ZkNoteListing l)) ->
-                                            ( EditZkNoteListing { zk = es.zk, notes = l } login, Cmd.none )
+                                            ( EditZkNoteListing { zk = es.zk, notes = l, spmodel = SP.initModel } login, Cmd.none )
 
                                         UserReplyData (Ok (UI.ServerError e)) ->
                                             ( BadError (BadError.initialModel e) st, Cmd.none )
@@ -967,6 +968,9 @@ update msg model =
                     EditZkNoteListing.update em es
             in
             case ecmd of
+                EditZkNoteListing.None ->
+                    ( { model | state = EditZkNoteListing emod login }, Cmd.none )
+
                 EditZkNoteListing.New ->
                     ( { model | state = EditZkNote (EditZkNote.initNew emod.zk es.notes) login }, Cmd.none )
 

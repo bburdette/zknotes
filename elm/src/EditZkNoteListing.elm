@@ -18,11 +18,13 @@ type Msg
     | NewPress
     | ExamplePress
     | DonePress
+    | SPMsg SP.Msg
 
 
 type alias Model =
     { zk : Data.Zk
     , notes : List Data.ZkListNote
+    , spmodel : SP.Model
     }
 
 
@@ -32,6 +34,7 @@ type Command
     | New
     | Example
     | Done
+    | None
 
 
 view : Model -> Element Msg
@@ -44,6 +47,7 @@ view model =
             , EI.button Common.buttonStyle { onPress = Just ExamplePress, label = E.text "example" }
             , EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "done" }
             ]
+        , E.map SPMsg <| SP.view { width = 1000, height = 1000 } 0 model.spmodel
         , E.table [ E.spacing 8 ]
             { data = model.notes
             , columns =
@@ -89,3 +93,6 @@ update msg model =
 
         DonePress ->
             ( model, Done )
+
+        SPMsg _ ->
+            ( model, None )
