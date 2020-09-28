@@ -94,5 +94,9 @@ update msg model =
         DonePress ->
             ( model, Done )
 
-        SPMsg _ ->
-            ( model, None )
+        SPMsg m ->
+            let
+                ( nm, cm ) =
+                    SP.update m model.spmodel
+            in
+            ( { model | spmodel = nm }, None )

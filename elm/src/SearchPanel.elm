@@ -44,6 +44,7 @@ initModel =
 type Msg
     = SearchText String
     | SearchDetails
+    | SearchClick
     | ToggleHelp
     | Clear
     | TogglePrev
@@ -55,6 +56,7 @@ type Msg
 type Command
     = None
     | Save
+    | Search TagSearch
 
 
 addToSearch : String -> Search -> Search
@@ -179,7 +181,16 @@ view winsize nblevel model =
                 { onChange = SearchText
                 , text = model.searchText
                 , placeholder = Nothing
-                , label = Input.labelLeft [] <| row [ centerY ] [ text "search:" ]
+                , label =
+                    Input.labelLeft [] <|
+                        row [ centerY ]
+                            [ case model.search of
+                                TagSearch (Ok _) ->
+                                    Input.button buttonStyle { onPress = Just SearchClick, label = text "search:" }
+
+                                _ ->
+                                    Input.button (buttonStyle ++ [ Background.color Color.grey ]) { onPress = Nothing, label = text "search:" }
+                            ]
                 }
 
         ddbutton =
@@ -340,6 +351,14 @@ update msg model =
 
         SearchDetails ->
             ( { model | showParse = not model.showParse }, None )
+
+        SearchClick ->
+            case model.search of
+                TagSearch (Ok s) ->
+                    ( model, Search s )
+
+                _ ->
+                    ( model, None )
 
         ToggleHelp ->
             ( { model | showHelp = not model.showHelp }, None )
