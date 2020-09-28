@@ -1,6 +1,8 @@
-module SearchParser exposing (AndOr(..), FieldText(..), SearchMod(..), TSText(..), TagSearch(..), andor, extractTagSearches, fieldString, fieldText, fields, oplistParser, printAndOr, printSearchMod, printTagSearch, searchMod, searchMods, searchTerm, showAndOr, showSearchMod, showTagSearch, singleTerm, spaces, tagSearchParser)
+module SearchParser exposing (AndOr(..), FieldText(..), Search(..), SearchMod(..), TSText(..), TagSearch(..), andor, extractTagSearches, fieldString, fieldText, fields, oplistParser, printAndOr, printSearchMod, printTagSearch, searchMod, searchMods, searchTerm, showAndOr, showSearchMod, showTagSearch, singleTerm, spaces, tagSearchParser)
 
-import ItemStuff exposing (ItemIndexer, ItemStuff)
+--import Tag exposing (Tag, TagId, tagByName, tagNames, tagSetParents)
+-- import ItemStuff exposing (ItemIndexer, ItemStuff)
+
 import ParseHelp exposing (listOf)
 import Parser
     exposing
@@ -21,7 +23,6 @@ import Parser
         , symbol
         )
 import TDict exposing (TDict)
-import Tag exposing (Tag, TagId, tagByName, tagNames, tagSetParents)
 import Util exposing (first, rest)
 
 
@@ -29,8 +30,12 @@ type SearchMod
     = CaseSensitive
     | ExactMatch
     | ParentTag
-    | AncestorTag
     | Description
+
+
+type Search
+    = TagSearch (Result (List Parser.DeadEnd) TagSearch)
+    | NoSearch
 
 
 type TagSearch
@@ -60,9 +65,6 @@ showSearchMod mod =
 
         ParentTag ->
             "ParentTag"
-
-        AncestorTag ->
-            "AncestorTag"
 
         Description ->
             "Description"
@@ -103,9 +105,6 @@ printSearchMod mod =
         ParentTag ->
             "t"
 
-        AncestorTag ->
-            "a"
-
         Description ->
             "d"
 
@@ -142,8 +141,6 @@ searchMod =
             |. symbol "e"
         , succeed ParentTag
             |. symbol "t"
-        , succeed AncestorTag
-            |. symbol "a"
         , succeed Description
             |. symbol "d"
         ]

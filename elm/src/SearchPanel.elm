@@ -1,5 +1,8 @@
 module SearchPanel exposing (Command(..), Model, Msg(..), addTagToSearch, addTagToSearchPrev, addToSearch, initModel, toggleHelpButton, update, updateSearchText, view)
 
+-- import Search exposing (Search(..), TSResult(..))
+-- import Tag exposing (Tag, TagId)
+
 import Common exposing (buttonStyle)
 import Element exposing (..)
 import Element.Background as Background
@@ -8,11 +11,9 @@ import Element.Events exposing (onClick)
 import Element.Font as Font
 import Element.Input as Input
 import Parser
-import Search exposing (Search(..), TSResult(..))
 import SearchHelpPanel
-import SearchParser exposing (AndOr(..), SearchMod(..), TSText, TagSearch(..), tagSearchParser)
+import SearchParser exposing (AndOr(..), Search(..), SearchMod(..), TSText, TagSearch(..), tagSearchParser)
 import TDict exposing (TDict)
-import Tag exposing (Tag, TagId)
 import TangoColors as Color
 import Util exposing (Size)
 
@@ -56,18 +57,14 @@ type Command
     | Save
 
 
-addToSearch : String -> Bool -> Search -> Search
-addToSearch name ancestor search =
+addToSearch : String -> Search -> Search
+addToSearch name search =
     let
         term =
             SearchTerm
                 [ CaseSensitive
                 , ExactMatch
-                , if ancestor then
-                    AncestorTag
-
-                  else
-                    ParentTag
+                , ParentTag
                 ]
                 name
     in
@@ -82,11 +79,11 @@ addToSearch name ancestor search =
             TagSearch (Ok (Boolex s And term))
 
 
-addTagToSearch : Model -> String -> Bool -> Model
-addTagToSearch model name ancestor =
+addTagToSearch : Model -> String -> Model
+addTagToSearch model name =
     let
         s =
-            addToSearch name ancestor model.search
+            addToSearch name model.search
     in
     case s of
         TagSearch (Ok ts) ->
@@ -99,15 +96,11 @@ addTagToSearch model name ancestor =
             model
 
 
-addTagToSearchPrev : Model -> String -> Bool -> Model
-addTagToSearchPrev model name ancestor =
+addTagToSearchPrev : Model -> String -> Model
+addTagToSearchPrev model name =
     let
         at =
-            if ancestor then
-                "a"
-
-            else
-                "t"
+            "t"
     in
     updateSearchText model <|
         if model.searchText == "" then
