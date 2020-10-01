@@ -3,6 +3,8 @@ module SearchParser exposing (AndOr(..), FieldText(..), Search(..), SearchMod(..
 --import Tag exposing (Tag, TagId, tagByName, tagNames, tagSetParents)
 -- import ItemStuff exposing (ItemIndexer, ItemStuff)
 
+import Json.Decode as JD
+import Json.Encode as JE
 import ParseHelp exposing (listOf)
 import Parser
     exposing
@@ -29,7 +31,7 @@ import Util exposing (first, rest)
 type SearchMod
     = CaseSensitive
     | ExactMatch
-    | ParentTag
+    | Tag
     | Description
 
 
@@ -54,6 +56,23 @@ type TSText
     | Search TagSearch
 
 
+
+{- encodeTagSearch : TagSearch ->  JE.Value
+   encodeTagSearch ts =
+     case ts of
+       SearchTerm (List SearchMod) String ->
+         JE.object
+           ["searchterm", ]
+
+       Not nts ->
+         JE.object
+           ["type", "not"
+           "ts", encodeTagSearch nts]
+
+       Boolex TagSearch AndOr TagSearch ->
+-}
+
+
 showSearchMod : SearchMod -> String
 showSearchMod mod =
     case mod of
@@ -63,8 +82,8 @@ showSearchMod mod =
         ExactMatch ->
             "ExactMatch"
 
-        ParentTag ->
-            "ParentTag"
+        Tag ->
+            "Tag"
 
         Description ->
             "Description"
@@ -102,7 +121,7 @@ printSearchMod mod =
         ExactMatch ->
             "e"
 
-        ParentTag ->
+        Tag ->
             "t"
 
         Description ->
@@ -139,7 +158,7 @@ searchMod =
             |. symbol "c"
         , succeed ExactMatch
             |. symbol "e"
-        , succeed ParentTag
+        , succeed Tag
             |. symbol "t"
         , succeed Description
             |. symbol "d"

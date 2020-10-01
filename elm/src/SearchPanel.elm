@@ -66,7 +66,7 @@ addToSearch name search =
             SearchTerm
                 [ CaseSensitive
                 , ExactMatch
-                , ParentTag
+                , Tag
                 ]
                 name
     in
