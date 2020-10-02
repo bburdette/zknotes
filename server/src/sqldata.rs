@@ -224,6 +224,78 @@ pub fn udpate2() -> Migration {
   m
 }
 
+pub fn udpate3(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+  // db connection without foreign key checking.
+  let conn = Connection::open(dbfile)?;
+  let mut m1 = Migration::new();
+
+  // temp table to hold zknote data.
+  m1.create_table("zknotetemp", |t| {
+    t.add_column(
+      "id",
+      types::integer()
+        .primary(true)
+        .increments(true)
+        .nullable(false),
+    );
+    t.add_column("title", types::text().nullable(false));
+    t.add_column("content", types::text().nullable(false));
+    t.add_column("public", types::boolean().nullable(false));
+    t.add_column("pubid", types::text().nullable(true).unique(true));
+    t.add_column("zk", types::foreign("zk", "id").nullable(false));
+    t.add_column("createdate", types::integer().nullable(false));
+    t.add_column("changeddate", types::integer().nullable(false));
+  });
+
+  conn.execute_batch(m1.make::<Sqlite>().as_str())?;
+
+  // copy everything from zknote.
+  conn.execute(
+    "INSERT INTO zknotetemp (id, title, content, public, pubid, zk, createdate, changeddate)
+        select id, title, content, public, NULL, zk, createdate, changeddate from zknote",
+    params![],
+  )?;
+
+  let mut m2 = Migration::new();
+  // drop zknote.
+  m2.drop_table("zknote");
+
+  // new zknote with new column.
+  m2.create_table("zknote", |t| {
+    t.add_column(
+      "id",
+      types::integer()
+        .primary(true)
+        .increments(true)
+        .nullable(false),
+    );
+    t.add_column("title", types::text().nullable(false));
+    t.add_column("content", types::text().nullable(false));
+    t.add_column("public", types::boolean().nullable(false));
+    t.add_column("pubid", types::text().nullable(true).unique(true));
+    t.add_column("zk", types::foreign("zk", "id").nullable(false));
+    t.add_column("createdate", types::integer().nullable(false));
+    t.add_column("changeddate", types::integer().nullable(false));
+  });
+
+  conn.execute_batch(m2.make::<Sqlite>().as_str())?;
+
+  // copy everything from zknotetemp.
+  conn.execute(
+    "INSERT INTO zknote (id, title, content, public, pubid, zk, createdate, changeddate)
+        select id, title, content, public, pubid, zk, createdate, changeddate from zknotetemp",
+    params![],
+  )?;
+
+  let mut m3 = Migration::new();
+  // drop zknotetemp.
+  m3.drop_table("zknotetemp");
+
+  conn.execute_batch(m3.make::<Sqlite>().as_str())?;
+
+  Ok(())
+}
+
 pub fn get_single_value(conn: &Connection, name: &str) -> Result<Option<String>, Box<dyn Error>> {
   match conn.query_row(
     "select value from singlevalue where name = ?1",
@@ -255,30 +327,35 @@ pub fn dbinit(dbfile: &Path) -> Result<(), Box<dyn Error>> {
     conn.execute_batch(initialdb().make::<Sqlite>().as_str())?;
   }
 
-  match get_single_value(&conn, "migration_level") {
-    Err(_) => {
-      println!("udpate1");
-      conn.execute_batch(udpate1().make::<Sqlite>().as_str())?;
-      conn.execute_batch(udpate2().make::<Sqlite>().as_str())?;
-      set_single_value(&conn, "migration_level", "2")?;
-    }
-    Ok(None) => {
-      println!("udpate1");
-      conn.execute_batch(udpate1().make::<Sqlite>().as_str())?;
-      conn.execute_batch(udpate2().make::<Sqlite>().as_str())?;
-      set_single_value(&conn, "migration_level", "2")?;
-    }
+  let nlevel = match get_single_value(&conn, "migration_level") {
+    Err(_) => 0,
+    Ok(None) => 0,
     Ok(Some(level)) => {
-      if level == "1" {
-        println!("udpate2");
-        conn.execute_batch(udpate2().make::<Sqlite>().as_str())?;
-      }
-      set_single_value(&conn, "migration_level", "2")?;
+      let l = level.parse::<i32>()?;
+      l
     }
-  }
-  println!("db up to date.");
+  };
 
-  // conn.execute_batch(initialdb().make::<Sqlite>().as_str());
+  if nlevel < 1 {
+    println!("udpate1");
+    conn.execute_batch(udpate1().make::<Sqlite>().as_str())?;
+    set_single_value(&conn, "migration_level", "1")?;
+  }
+
+  if nlevel < 2 {
+    println!("udpate2");
+    conn.execute_batch(udpate2().make::<Sqlite>().as_str())?;
+    set_single_value(&conn, "migration_level", "2")?;
+  }
+  if nlevel < 3 {
+    println!("udpate3");
+    // conn.execute_batch(udpate3().make::<Sqlite>().as_str())?;
+    // use a connection without foreign key stuff?
+    udpate3(&dbfile)?;
+    set_single_value(&conn, "migration_level", "3")?;
+  }
+
+  println!("db up to date.");
 
   Ok(())
 }
