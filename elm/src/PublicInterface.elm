@@ -8,6 +8,7 @@ import Util
 
 type SendMsg
     = GetZkNote Int
+    | GetZkNotePubId String
 
 
 type ServerResponse
@@ -18,10 +19,16 @@ type ServerResponse
 encodeSendMsg : SendMsg -> JE.Value
 encodeSendMsg sm =
     case sm of
-        GetZkNote beid ->
+        GetZkNote id ->
             JE.object
                 [ ( "what", JE.string "getzknote" )
-                , ( "data", JE.int beid )
+                , ( "data", JE.int id )
+                ]
+
+        GetZkNotePubId pubid ->
+            JE.object
+                [ ( "what", JE.string "getzknotepubid" )
+                , ( "data", JE.string pubid )
                 ]
 
 

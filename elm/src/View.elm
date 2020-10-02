@@ -28,6 +28,7 @@ type Msg
 
 type alias Model =
     { id : Maybe Int
+    , pubid : Maybe String
     , title : String
     , md : String
     , cells : CellDict
@@ -81,6 +82,7 @@ initFull zknote =
                 (mkCc cells)
     in
     { id = Just zknote.id
+    , pubid = zknote.pubid
     , title = zknote.title
     , md = zknote.content
     , cells = getCd cc
@@ -100,6 +102,7 @@ initSzn zknote =
                 (mkCc cells)
     in
     { id = zknote.id
+    , pubid = zknote.pubid
     , title = zknote.title
     , md = zknote.content
     , cells = getCd cc
