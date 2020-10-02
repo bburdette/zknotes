@@ -14,6 +14,7 @@ pub struct FullZkNote {
   content: String,
   zk: i64,
   public: bool,
+  pubid: Option<String>,
   createdate: i64,
   changeddate: i64,
 }
@@ -61,6 +62,7 @@ pub struct SaveZkNote {
   zk: i64,
   title: String,
   public: bool,
+  pubid: Option<String>,
   content: String,
 }
 
@@ -667,9 +669,16 @@ pub fn save_zknote(
   match note.id {
     Some(id) => {
       conn.execute(
-        "UPDATE zknote SET title = ?1, content = ?2, changeddate = ?3, public = ?4
-         WHERE id = ?5",
-        params![note.title, note.content, now, note.public, note.id],
+        "UPDATE zknote SET title = ?1, content = ?2, changeddate = ?3, public = ?4, pubid = ?5
+         WHERE id = ?6",
+        params![
+          note.title,
+          note.content,
+          now,
+          note.public,
+          note.pubid,
+          note.id
+        ],
       )?;
       Ok(SavedZkNote {
         id: id,
@@ -678,9 +687,16 @@ pub fn save_zknote(
     }
     None => {
       conn.execute(
-        "INSERT INTO zknote (title, content, zk, public, createdate, changeddate)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        params![note.title, note.content, note.zk, note.public, now, now],
+        "INSERT INTO zknote (title, content, zk, public, pubid, createdate, changeddate)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6)",
+        params![
+          note.title,
+          note.content,
+          note.zk,
+          note.public,
+          note.pubid,
+          now
+        ],
       )?;
       Ok(SavedZkNote {
         id: conn.last_insert_rowid(),
@@ -694,7 +710,7 @@ pub fn read_zknote(dbfile: &Path, id: i64) -> Result<FullZkNote, Box<dyn Error>>
   let conn = connection_open(dbfile)?;
 
   let rbe = conn.query_row(
-    "SELECT title, content, zk, public, createdate, changeddate
+    "SELECT title, content, zk, public, pubid, createdate, changeddate
       FROM zknote WHERE id = ?1",
     params![id],
     |row| {
@@ -704,8 +720,9 @@ pub fn read_zknote(dbfile: &Path, id: i64) -> Result<FullZkNote, Box<dyn Error>>
         content: row.get(1)?,
         zk: row.get(2)?,
         public: row.get(3)?,
-        createdate: row.get(4)?,
-        changeddate: row.get(5)?,
+        pubid: row.get(4)?,
+        createdate: row.get(5)?,
+        changeddate: row.get(6)?,
       })
     },
   )?;

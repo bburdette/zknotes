@@ -29,6 +29,7 @@ type Msg
     = OnMarkdownInput String
     | OnSchelmeCodeChanged String String
     | OnTitleChanged String
+    | OnPubidChanged String
     | SavePress
     | DonePress
     | RevertPress
@@ -50,6 +51,7 @@ type alias Model =
     , zklDict : Dict String Data.ZkLink
     , initialZklDict : Dict String Data.ZkLink
     , public : Bool
+    , pubidtxt : String
     , title : String
     , md : String
     , cells : CellDict
@@ -76,7 +78,17 @@ sznFromModel model =
     , title = model.title
     , content = model.md
     , public = model.public
+    , pubid = toPubId model.public model.pubidtxt
     }
+
+
+toPubId : Bool -> String -> Maybe String
+toPubId public pubidtxt =
+    if public && pubidtxt /= "" then
+        Just pubidtxt
+
+    else
+        Nothing
 
 
 zkLinkName : Data.ZkLink -> Int -> String
@@ -101,6 +113,8 @@ dirty model =
                         == model.id
                         && r.public
                         == model.public
+                        && r.pubid
+                        == toPubId model.public model.pubidtxt
                         && r.title
                         == model.title
                         && r.content
@@ -186,12 +200,24 @@ view model =
             , placeholder = Nothing
             , label = EI.labelLeft [] (E.text "title")
             }
-        , EI.checkbox []
-            { onChange = PublicPress
-            , icon = EI.defaultCheckbox
-            , checked = model.public
-            , label = EI.labelLeft [] (E.text "public")
-            }
+        , E.row []
+            [ EI.checkbox []
+                { onChange = PublicPress
+                , icon = EI.defaultCheckbox
+                , checked = model.public
+                , label = EI.labelLeft [] (E.text "public")
+                }
+            , if model.public then
+                EI.text []
+                    { onChange = OnPubidChanged
+                    , text = model.pubidtxt
+                    , placeholder = Nothing
+                    , label = EI.labelLeft [] (E.text "article id")
+                    }
+
+              else
+                E.none
+            ]
         , E.row
             [ E.width E.fill
             , E.spacing 10
@@ -300,6 +326,7 @@ initFull zk zkl zknote zklDict =
     , zklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) zklDict.links)
     , initialZklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) zklDict.links)
     , public = zknote.public
+    , pubidtxt = zknote.pubid |> Maybe.withDefault ""
     , title = zknote.title
     , md = zknote.content
     , cells = getCd cc
@@ -325,6 +352,7 @@ initNew zk zkl =
     , zklDict = Dict.empty
     , initialZklDict = Dict.empty
     , public = False
+    , pubidtxt = ""
     , title = ""
     , md = ""
     , cells = getCd cc
@@ -350,6 +378,7 @@ initExample zk zkl =
     , zklDict = Dict.empty
     , initialZklDict = Dict.empty
     , public = False
+    , pubidtxt = ""
     , title = "example"
     , md = markdownBody
     , cells = getCd cc
@@ -610,6 +639,9 @@ update msg model =
 
         OnTitleChanged t ->
             ( { model | title = t }, None )
+
+        OnPubidChanged t ->
+            ( { model | pubidtxt = t }, None )
 
         OnMarkdownInput newMarkdown ->
             let
