@@ -164,12 +164,17 @@ stateRoute : State -> Route
 stateRoute state =
     case state of
         View vst ->
-            case vst.id of
-                Just id ->
-                    PublicZk id
+            case vst.pubid of
+                Just pubid ->
+                    PublicZkPubId pubid
 
                 Nothing ->
-                    Fail
+                    case vst.id of
+                        Just id ->
+                            PublicZk id
+
+                        Nothing ->
+                            Fail
 
         _ ->
             Fail

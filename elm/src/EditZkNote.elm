@@ -256,7 +256,8 @@ view model =
                         ]
                         [ E.text model.title
                         , E.column
-                            [ E.padding 20
+                            [ E.spacing 30
+                            , E.padding 20
                             , E.width (E.fill |> E.maximum 1000)
                             , E.centerX
                             , E.alignTop
