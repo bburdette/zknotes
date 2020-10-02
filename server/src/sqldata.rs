@@ -729,6 +729,31 @@ pub fn read_zknote(dbfile: &Path, id: i64) -> Result<FullZkNote, Box<dyn Error>>
 
   Ok(rbe)
 }
+
+pub fn read_zknotepubid(dbfile: &Path, pubid: &str) -> Result<FullZkNote, Box<dyn Error>> {
+  let conn = connection_open(dbfile)?;
+
+  let rbe = conn.query_row(
+    "SELECT id, title, content, zk, public, pubid, createdate, changeddate
+      FROM zknote WHERE pubid = ?1",
+    params![pubid],
+    |row| {
+      Ok(FullZkNote {
+        id: row.get(0)?,
+        title: row.get(1)?,
+        content: row.get(2)?,
+        zk: row.get(3)?,
+        public: row.get(4)?,
+        pubid: row.get(5)?,
+        createdate: row.get(6)?,
+        changeddate: row.get(7)?,
+      })
+    },
+  )?;
+
+  Ok(rbe)
+}
+
 pub fn delete_zknote(dbfile: &Path, uid: i64, noteid: i64) -> Result<(), Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
 

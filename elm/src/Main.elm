@@ -148,6 +148,14 @@ routeState location seed mblogin route =
                 (PI.GetZkNote id)
             )
 
+        PublicZkPubId pubid ->
+            ( PubShowMessage
+                { message = "loading article"
+                }
+            , sendPIMsg location
+                (PI.GetZkNotePubId pubid)
+            )
+
         Fail ->
             ( initLogin seed, Cmd.none )
 
@@ -1057,16 +1065,23 @@ init flags url key =
 
 type Route
     = PublicZk Int
+    | PublicZkPubId String
     | Fail
 
 
 parseUrl : Url -> Maybe Route
 parseUrl url =
     UP.parse
-        (UP.map (\i -> PublicZk i) <|
-            UP.s
-                "note"
-                </> UP.int
+        (UP.oneOf
+            [ UP.map (\i -> PublicZk i) <|
+                UP.s
+                    "note"
+                    </> UP.int
+            , UP.map (\i -> PublicZkPubId i) <|
+                UP.s
+                    "page"
+                    </> UP.string
+            ]
         )
         url
 
@@ -1076,6 +1091,9 @@ routeUrl route =
     case route of
         PublicZk id ->
             UB.absolute [ "note", String.fromInt id ] []
+
+        PublicZkPubId pubid ->
+            UB.absolute [ "page", pubid ] []
 
         Fail ->
             UB.absolute [] []
