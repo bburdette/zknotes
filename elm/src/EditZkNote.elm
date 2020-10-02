@@ -21,6 +21,7 @@ import Markdown.Renderer
 import Schelme.Show exposing (showTerm)
 import TangoColors as TC
 import Url as U
+import Url.Builder as UB
 import Url.Parser as UP exposing ((</>))
 import Util
 
@@ -162,6 +163,21 @@ showZkl dirtybutton id zkl =
         ]
 
 
+pageLink : Model -> Maybe String
+pageLink model =
+    model.id
+        |> Maybe.andThen
+            (\id ->
+                toPubId model.public model.pubidtxt
+                    |> Maybe.map
+                        (\pubid ->
+                            UB.relative [ "page", pubid ] []
+                        )
+                    |> Util.mapNothing
+                        (UB.relative [ "note", String.fromInt id ] [])
+            )
+
+
 view : Model -> Element Msg
 view model =
     let
@@ -200,8 +216,8 @@ view model =
             , placeholder = Nothing
             , label = EI.labelLeft [] (E.text "title")
             }
-        , E.row []
-            [ EI.checkbox []
+        , E.row [ E.spacing 8, E.width E.shrink ]
+            [ EI.checkbox [ E.width E.shrink ]
                 { onChange = PublicPress
                 , icon = EI.defaultCheckbox
                 , checked = model.public
@@ -217,6 +233,12 @@ view model =
 
               else
                 E.none
+            , case pageLink model of
+                Just pl ->
+                    E.link Common.linkStyle { url = pl, label = E.text pl }
+
+                Nothing ->
+                    E.none
             ]
         , E.row
             [ E.width E.fill

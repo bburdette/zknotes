@@ -1082,7 +1082,7 @@ parseUrl url =
                 UP.s
                     "note"
                     </> UP.int
-            , UP.map (\i -> PublicZkPubId i) <|
+            , UP.map (\i -> PublicZkPubId (Maybe.withDefault "" (Url.percentDecode i))) <|
                 UP.s
                     "page"
                     </> UP.string
