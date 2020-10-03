@@ -21,6 +21,7 @@ import Markdown.Renderer
 import Schelme.Show exposing (showTerm)
 import TangoColors as TC
 import Url as U
+import Url.Builder as UB
 import Url.Parser as UP exposing ((</>))
 import Util
 
@@ -29,6 +30,7 @@ type Msg
     = OnMarkdownInput String
     | OnSchelmeCodeChanged String String
     | OnTitleChanged String
+    | OnPubidChanged String
     | SavePress
     | DonePress
     | RevertPress
@@ -48,12 +50,13 @@ type alias Model =
     , zk : Data.Zk
     , zklist : List Data.ZkListNote
     , zklDict : Dict String Data.ZkLink
-    , initialZklDict : Dict String Data.ZkLink
     , public : Bool
+    , pubidtxt : String
     , title : String
     , md : String
     , cells : CellDict
     , revert : Maybe Data.SaveZkNote
+    , initialZklDict : Dict String Data.ZkLink
     }
 
 
@@ -76,7 +79,17 @@ sznFromModel model =
     , title = model.title
     , content = model.md
     , public = model.public
+    , pubid = toPubId model.public model.pubidtxt
     }
+
+
+toPubId : Bool -> String -> Maybe String
+toPubId public pubidtxt =
+    if public && pubidtxt /= "" then
+        Just pubidtxt
+
+    else
+        Nothing
 
 
 zkLinkName : Data.ZkLink -> Int -> String
@@ -97,16 +110,12 @@ dirty model =
         |> Maybe.map
             (\r ->
                 not <|
-                    r.id
-                        == model.id
-                        && r.public
-                        == model.public
-                        && r.title
-                        == model.title
-                        && r.content
-                        == model.md
-                        && Dict.keys model.zklDict
-                        == Dict.keys model.initialZklDict
+                    (r.id == model.id)
+                        && (r.public == model.public)
+                        && (r.pubid == toPubId model.public model.pubidtxt)
+                        && (r.title == model.title)
+                        && (r.content == model.md)
+                        && (Dict.keys model.zklDict == Dict.keys model.initialZklDict)
             )
         |> Maybe.withDefault True
 
@@ -148,6 +157,21 @@ showZkl dirtybutton id zkl =
         ]
 
 
+pageLink : Model -> Maybe String
+pageLink model =
+    model.id
+        |> Maybe.andThen
+            (\id ->
+                toPubId model.public model.pubidtxt
+                    |> Maybe.map
+                        (\pubid ->
+                            UB.relative [ "page", pubid ] []
+                        )
+                    |> Util.mapNothing
+                        (UB.relative [ "note", String.fromInt id ] [])
+            )
+
+
 view : Model -> Element Msg
 view model =
     let
@@ -186,12 +210,30 @@ view model =
             , placeholder = Nothing
             , label = EI.labelLeft [] (E.text "title")
             }
-        , EI.checkbox []
-            { onChange = PublicPress
-            , icon = EI.defaultCheckbox
-            , checked = model.public
-            , label = EI.labelLeft [] (E.text "public")
-            }
+        , E.row [ E.spacing 8, E.width E.shrink ]
+            [ EI.checkbox [ E.width E.shrink ]
+                { onChange = PublicPress
+                , icon = EI.defaultCheckbox
+                , checked = model.public
+                , label = EI.labelLeft [] (E.text "public")
+                }
+            , if model.public then
+                EI.text []
+                    { onChange = OnPubidChanged
+                    , text = model.pubidtxt
+                    , placeholder = Nothing
+                    , label = EI.labelLeft [] (E.text "article id")
+                    }
+
+              else
+                E.none
+            , case pageLink model of
+                Just pl ->
+                    E.link Common.linkStyle { url = pl, label = E.text pl }
+
+                Nothing ->
+                    E.none
+            ]
         , E.row
             [ E.width E.fill
             , E.spacing 10
@@ -230,7 +272,8 @@ view model =
                         ]
                         [ E.text model.title
                         , E.column
-                            [ E.padding 20
+                            [ E.spacing 30
+                            , E.padding 20
                             , E.width (E.fill |> E.maximum 1000)
                             , E.centerX
                             , E.alignTop
@@ -300,6 +343,7 @@ initFull zk zkl zknote zklDict =
     , zklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) zklDict.links)
     , initialZklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) zklDict.links)
     , public = zknote.public
+    , pubidtxt = zknote.pubid |> Maybe.withDefault ""
     , title = zknote.title
     , md = zknote.content
     , cells = getCd cc
@@ -325,6 +369,7 @@ initNew zk zkl =
     , zklDict = Dict.empty
     , initialZklDict = Dict.empty
     , public = False
+    , pubidtxt = ""
     , title = ""
     , md = ""
     , cells = getCd cc
@@ -350,6 +395,7 @@ initExample zk zkl =
     , zklDict = Dict.empty
     , initialZklDict = Dict.empty
     , public = False
+    , pubidtxt = ""
     , title = "example"
     , md = markdownBody
     , cells = getCd cc
@@ -610,6 +656,9 @@ update msg model =
 
         OnTitleChanged t ->
             ( { model | title = t }, None )
+
+        OnPubidChanged t ->
+            ( { model | pubidtxt = t }, None )
 
         OnMarkdownInput newMarkdown ->
             let

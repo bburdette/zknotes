@@ -14,7 +14,7 @@ previous one without building.
 
 nix-copy-closure --to root@practica.site /nix/store/9v77vwy5zzv38mvh5a93yk02h2y94xq8-zknotes-server-1.0
 
-- then on the server remove the old one
+- then on the server remove the old one (user practica2)
 
 nix-env -e zknotes-server
 
@@ -26,4 +26,5 @@ nix-env -i /nix/store/9v77vwy5zzv38mvh5a93yk02h2y94xq8-zknotes-server-1.0
 
 nix-collect-garbage
 
-- currently I'm not including any config or static files with the server.  copy up as needed!
+- currently I'm not including any config or static files with the server.  copy up as needed!  
+elm deploy is over in the elm folder, ../elm

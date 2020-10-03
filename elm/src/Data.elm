@@ -53,6 +53,7 @@ type alias FullZkNote =
     , title : String
     , content : String
     , public : Bool
+    , pubid : Maybe String
     , createdate : Int
     , changeddate : Int
     }
@@ -62,6 +63,7 @@ type alias SaveZkNote =
     { id : Maybe Int
     , zk : Int
     , public : Bool
+    , pubid : Maybe String
     , title : String
     , content : String
     }
@@ -155,6 +157,7 @@ saveZkNoteFromFull fzn =
     { id = Just fzn.id
     , zk = fzn.zk
     , public = fzn.public
+    , pubid = fzn.pubid
     , title = fzn.title
     , content = fzn.content
     }
@@ -166,6 +169,9 @@ encodeSaveZkNote zkn =
         (Maybe.map (\id -> [ ( "id", JE.int id ) ]) zkn.id
             |> Maybe.withDefault []
         )
+            ++ (Maybe.map (\pubid -> [ ( "pubid", JE.string pubid ) ]) zkn.pubid
+                    |> Maybe.withDefault []
+               )
             ++ [ ( "zk", JE.int zkn.zk )
                , ( "title", JE.string zkn.title )
                , ( "content", JE.string zkn.content )
@@ -228,11 +234,12 @@ decodeSavedZkNote =
 
 decodeFullZkNote : JD.Decoder FullZkNote
 decodeFullZkNote =
-    JD.map7 FullZkNote
+    JD.map8 FullZkNote
         (JD.field "id" JD.int)
         (JD.field "zk" JD.int)
         (JD.field "title" JD.string)
         (JD.field "content" JD.string)
         (JD.field "public" JD.bool)
+        (JD.field "pubid" (JD.maybe JD.string))
         (JD.field "createdate" JD.int)
         (JD.field "changeddate" JD.int)

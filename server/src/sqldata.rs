@@ -13,7 +13,8 @@ pub struct FullZkNote {
   title: String,
   content: String,
   zk: i64,
-  public: bool,
+  pub public: bool,
+  pubid: Option<String>,
   createdate: i64,
   changeddate: i64,
 }
@@ -61,6 +62,7 @@ pub struct SaveZkNote {
   zk: i64,
   title: String,
   public: bool,
+  pubid: Option<String>,
   content: String,
 }
 
@@ -224,6 +226,78 @@ pub fn udpate2() -> Migration {
   m
 }
 
+pub fn udpate3(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+  // db connection without foreign key checking.
+  let conn = Connection::open(dbfile)?;
+  let mut m1 = Migration::new();
+
+  // temp table to hold zknote data.
+  m1.create_table("zknotetemp", |t| {
+    t.add_column(
+      "id",
+      types::integer()
+        .primary(true)
+        .increments(true)
+        .nullable(false),
+    );
+    t.add_column("title", types::text().nullable(false));
+    t.add_column("content", types::text().nullable(false));
+    t.add_column("public", types::boolean().nullable(false));
+    t.add_column("pubid", types::text().nullable(true).unique(true));
+    t.add_column("zk", types::foreign("zk", "id").nullable(false));
+    t.add_column("createdate", types::integer().nullable(false));
+    t.add_column("changeddate", types::integer().nullable(false));
+  });
+
+  conn.execute_batch(m1.make::<Sqlite>().as_str())?;
+
+  // copy everything from zknote.
+  conn.execute(
+    "INSERT INTO zknotetemp (id, title, content, public, pubid, zk, createdate, changeddate)
+        select id, title, content, public, NULL, zk, createdate, changeddate from zknote",
+    params![],
+  )?;
+
+  let mut m2 = Migration::new();
+  // drop zknote.
+  m2.drop_table("zknote");
+
+  // new zknote with new column.
+  m2.create_table("zknote", |t| {
+    t.add_column(
+      "id",
+      types::integer()
+        .primary(true)
+        .increments(true)
+        .nullable(false),
+    );
+    t.add_column("title", types::text().nullable(false));
+    t.add_column("content", types::text().nullable(false));
+    t.add_column("public", types::boolean().nullable(false));
+    t.add_column("pubid", types::text().nullable(true).unique(true));
+    t.add_column("zk", types::foreign("zk", "id").nullable(false));
+    t.add_column("createdate", types::integer().nullable(false));
+    t.add_column("changeddate", types::integer().nullable(false));
+  });
+
+  conn.execute_batch(m2.make::<Sqlite>().as_str())?;
+
+  // copy everything from zknotetemp.
+  conn.execute(
+    "INSERT INTO zknote (id, title, content, public, pubid, zk, createdate, changeddate)
+        select id, title, content, public, pubid, zk, createdate, changeddate from zknotetemp",
+    params![],
+  )?;
+
+  let mut m3 = Migration::new();
+  // drop zknotetemp.
+  m3.drop_table("zknotetemp");
+
+  conn.execute_batch(m3.make::<Sqlite>().as_str())?;
+
+  Ok(())
+}
+
 pub fn get_single_value(conn: &Connection, name: &str) -> Result<Option<String>, Box<dyn Error>> {
   match conn.query_row(
     "select value from singlevalue where name = ?1",
@@ -255,30 +329,33 @@ pub fn dbinit(dbfile: &Path) -> Result<(), Box<dyn Error>> {
     conn.execute_batch(initialdb().make::<Sqlite>().as_str())?;
   }
 
-  match get_single_value(&conn, "migration_level") {
-    Err(_) => {
-      println!("udpate1");
-      conn.execute_batch(udpate1().make::<Sqlite>().as_str())?;
-      conn.execute_batch(udpate2().make::<Sqlite>().as_str())?;
-      set_single_value(&conn, "migration_level", "2")?;
-    }
-    Ok(None) => {
-      println!("udpate1");
-      conn.execute_batch(udpate1().make::<Sqlite>().as_str())?;
-      conn.execute_batch(udpate2().make::<Sqlite>().as_str())?;
-      set_single_value(&conn, "migration_level", "2")?;
-    }
+  let nlevel = match get_single_value(&conn, "migration_level") {
+    Err(_) => 0,
+    Ok(None) => 0,
     Ok(Some(level)) => {
-      if level == "1" {
-        println!("udpate2");
-        conn.execute_batch(udpate2().make::<Sqlite>().as_str())?;
-      }
-      set_single_value(&conn, "migration_level", "2")?;
+      let l = level.parse::<i32>()?;
+      l
     }
-  }
-  println!("db up to date.");
+  };
 
-  // conn.execute_batch(initialdb().make::<Sqlite>().as_str());
+  if nlevel < 1 {
+    println!("udpate1");
+    conn.execute_batch(udpate1().make::<Sqlite>().as_str())?;
+    set_single_value(&conn, "migration_level", "1")?;
+  }
+
+  if nlevel < 2 {
+    println!("udpate2");
+    conn.execute_batch(udpate2().make::<Sqlite>().as_str())?;
+    set_single_value(&conn, "migration_level", "2")?;
+  }
+  if nlevel < 3 {
+    println!("udpate3");
+    udpate3(&dbfile)?;
+    set_single_value(&conn, "migration_level", "3")?;
+  }
+
+  println!("db up to date.");
 
   Ok(())
 }
@@ -378,16 +455,19 @@ pub fn save_zk(dbfile: &Path, uid: i64, savezk: &SaveZk) -> Result<i64, Box<dyn 
   let now = now()?;
 
   match savezk.id {
-    Some(id) => {
+    Some(zkid) => {
       println!("updating zk: {}", savezk.name);
-      // TODO ensure user auth here.
+
+      if !is_zk_member(&conn, uid, zkid)? {
+        bail!("can't update zk; user is not a member");
+      }
 
       conn.execute(
         "UPDATE zk SET name = ?1, description = ?2, changeddate = ?3
          WHERE id = ?4",
-        params![savezk.name, savezk.description, now, savezk.id],
+        params![savezk.name, savezk.description, now, zkid],
       )?;
-      Ok(id)
+      Ok(zkid)
     }
     None => {
       println!("adding zk: {}", savezk.name);
@@ -414,6 +494,23 @@ pub fn is_zk_member(conn: &Connection, uid: i64, zkid: i64) -> Result<bool, Box<
   match conn.query_row(
     "select user, zk from zkmember where user = ?1 and zk = ?2",
     params![uid, zkid],
+    |_row| Ok(true),
+  ) {
+    Ok(b) => Ok(b),
+    Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
+    Err(x) => Err(Box::new(x)),
+  }
+}
+
+pub fn is_zknote_member(
+  conn: &Connection,
+  uid: i64,
+  zknoteid: i64,
+) -> Result<bool, Box<dyn Error>> {
+  match conn.query_row(
+    "select zkmember.user, zkmember.zk from zkmember, zknote where zkmember.user = ?1 and zkmember.zk = zknote.zk
+      and zknote.id = ?2",
+    params![uid, zknoteid],
     |_row| Ok(true),
   ) {
     Ok(b) => Ok(b),
@@ -590,9 +687,16 @@ pub fn save_zknote(
   match note.id {
     Some(id) => {
       conn.execute(
-        "UPDATE zknote SET title = ?1, content = ?2, changeddate = ?3, public = ?4
-         WHERE id = ?5",
-        params![note.title, note.content, now, note.public, note.id],
+        "UPDATE zknote SET title = ?1, content = ?2, changeddate = ?3, public = ?4, pubid = ?5
+         WHERE id = ?6",
+        params![
+          note.title,
+          note.content,
+          now,
+          note.public,
+          note.pubid,
+          note.id
+        ],
       )?;
       Ok(SavedZkNote {
         id: id,
@@ -601,9 +705,16 @@ pub fn save_zknote(
     }
     None => {
       conn.execute(
-        "INSERT INTO zknote (title, content, zk, public, createdate, changeddate)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        params![note.title, note.content, note.zk, note.public, now, now],
+        "INSERT INTO zknote (title, content, zk, public, pubid, createdate, changeddate)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6)",
+        params![
+          note.title,
+          note.content,
+          note.zk,
+          note.public,
+          note.pubid,
+          now
+        ],
       )?;
       Ok(SavedZkNote {
         id: conn.last_insert_rowid(),
@@ -613,11 +724,20 @@ pub fn save_zknote(
   }
 }
 
-pub fn read_zknote(dbfile: &Path, id: i64) -> Result<FullZkNote, Box<dyn Error>> {
+pub fn read_zknote(dbfile: &Path, uid: Option<i64>, id: i64) -> Result<FullZkNote, Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
 
+  match uid {
+    Some(uid) => {
+      if !is_zknote_member(&conn, uid, id)? {
+        bail!("can't read zknote; you are not a member of this zk");
+      }
+    }
+    _ => {}
+  }
+
   let rbe = conn.query_row(
-    "SELECT title, content, zk, public, createdate, changeddate
+    "SELECT title, content, zk, public, pubid, createdate, changeddate
       FROM zknote WHERE id = ?1",
     params![id],
     |row| {
@@ -627,14 +747,65 @@ pub fn read_zknote(dbfile: &Path, id: i64) -> Result<FullZkNote, Box<dyn Error>>
         content: row.get(1)?,
         zk: row.get(2)?,
         public: row.get(3)?,
-        createdate: row.get(4)?,
-        changeddate: row.get(5)?,
+        pubid: row.get(4)?,
+        createdate: row.get(5)?,
+        changeddate: row.get(6)?,
       })
     },
   )?;
 
+  match uid {
+    None => {
+      bail!("can't read zknote; note is private");
+    }
+    _ => {}
+  }
+
   Ok(rbe)
 }
+
+pub fn read_zknotepubid(
+  dbfile: &Path,
+  uid: Option<i64>,
+  pubid: &str,
+) -> Result<FullZkNote, Box<dyn Error>> {
+  let conn = connection_open(dbfile)?;
+
+  let rbe = conn.query_row(
+    "SELECT id, title, content, zk, public, pubid, createdate, changeddate
+      FROM zknote WHERE pubid = ?1",
+    params![pubid],
+    |row| {
+      Ok(FullZkNote {
+        id: row.get(0)?,
+        title: row.get(1)?,
+        content: row.get(2)?,
+        zk: row.get(3)?,
+        public: row.get(4)?,
+        pubid: row.get(5)?,
+        createdate: row.get(6)?,
+        changeddate: row.get(7)?,
+      })
+    },
+  )?;
+
+  match uid {
+    Some(uid) => {
+      if !is_zknote_member(&conn, uid, rbe.id)? {
+        bail!("can't read zknote; you are not a member of this zk");
+      }
+    }
+    None => {
+      if !rbe.public {
+        bail!("can't read zknote; note is private");
+      }
+    }
+    _ => {}
+  }
+
+  Ok(rbe)
+}
+
 pub fn delete_zknote(dbfile: &Path, uid: i64, noteid: i64) -> Result<(), Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
 
@@ -681,27 +852,6 @@ pub fn zknotelisting(dbfile: &Path, user: i64, zk: i64) -> rusqlite::Result<Vec<
   Ok(pv)
 }
 
-pub fn save_zklink(
-  conn: &Connection,
-  uid: i64,
-  zk: i64,
-  zklink: &ZkLink,
-) -> Result<(), Box<dyn Error>> {
-  if zklink.delete == Some(true) {
-    conn.execute(
-      "DELETE FROM zklink WHERE fromid = ?1 and toid = ?2 and zk = ?3",
-      params![zklink.from, zklink.to, zk],
-    )?;
-  } else {
-    conn.execute(
-      "INSERT INTO zklink (fromid, toid, zk, linkzknote) values (?1, ?2, ?3, ?4)
-        ON CONFLICT (fromid, toid, zk) DO UPDATE SET linkzknote = ?4 where fromid = ?1 and toid = ?2 and zk = ?3",
-      params![zklink.from, zklink.to, zk, zklink.linkzknote],
-    )?;
-  }
-  Ok(())
-}
-
 pub fn save_zklinks(
   dbfile: &Path,
   uid: i64,
@@ -715,7 +865,18 @@ pub fn save_zklinks(
   }
 
   for zklink in zklinks.iter() {
-    save_zklink(&conn, uid, zk, &zklink)?;
+    if zklink.delete == Some(true) {
+      conn.execute(
+        "DELETE FROM zklink WHERE fromid = ?1 and toid = ?2 and zk = ?3",
+        params![zklink.from, zklink.to, zk],
+      )?;
+    } else {
+      conn.execute(
+        "INSERT INTO zklink (fromid, toid, zk, linkzknote) values (?1, ?2, ?3, ?4)
+          ON CONFLICT (fromid, toid, zk) DO UPDATE SET linkzknote = ?4 where fromid = ?1 and toid = ?2 and zk = ?3",
+        params![zklink.from, zklink.to, zk, zklink.linkzknote],
+      )?;
+    }
   }
 
   Ok(())
