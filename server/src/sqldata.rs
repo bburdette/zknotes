@@ -13,7 +13,7 @@ pub struct FullZkNote {
   title: String,
   content: String,
   zk: i64,
-  public: bool,
+  pub public: bool,
   pubid: Option<String>,
   createdate: i64,
   changeddate: i64,
