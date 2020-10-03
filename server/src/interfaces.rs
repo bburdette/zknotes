@@ -229,7 +229,7 @@ fn user_interface_loggedin(
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let id: i64 = serde_json::from_value(msgdata.clone())?;
 
-      let note = sqldata::read_zknote(Path::new(&config.db), id)?;
+      let note = sqldata::read_zknote(Path::new(&config.db), Some(uid), id)?;
       Ok(ServerResponse {
         what: "zknote".to_string(),
         content: serde_json::to_value(note)?,
@@ -298,7 +298,7 @@ pub fn public_interface(
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let id: i64 = serde_json::from_value(msgdata.clone())?;
 
-      let note = sqldata::read_zknote(&config.db.as_path(), id)?;
+      let note = sqldata::read_zknote(&config.db.as_path(), None, id)?;
       if note.public {
         Ok(ServerResponse {
           what: "zknote".to_string(),

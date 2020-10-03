@@ -351,8 +351,6 @@ pub fn dbinit(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   }
   if nlevel < 3 {
     println!("udpate3");
-    // conn.execute_batch(udpate3().make::<Sqlite>().as_str())?;
-    // use a connection without foreign key stuff?
     udpate3(&dbfile)?;
     set_single_value(&conn, "migration_level", "3")?;
   }
@@ -457,16 +455,19 @@ pub fn save_zk(dbfile: &Path, uid: i64, savezk: &SaveZk) -> Result<i64, Box<dyn 
   let now = now()?;
 
   match savezk.id {
-    Some(id) => {
+    Some(zkid) => {
       println!("updating zk: {}", savezk.name);
-      // TODO ensure user auth here.
+
+      if !is_zk_member(&conn, uid, zkid)? {
+        bail!("can't update zk; user is not a member");
+      }
 
       conn.execute(
         "UPDATE zk SET name = ?1, description = ?2, changeddate = ?3
          WHERE id = ?4",
-        params![savezk.name, savezk.description, now, savezk.id],
+        params![savezk.name, savezk.description, now, zkid],
       )?;
-      Ok(id)
+      Ok(zkid)
     }
     None => {
       println!("adding zk: {}", savezk.name);
@@ -493,6 +494,23 @@ pub fn is_zk_member(conn: &Connection, uid: i64, zkid: i64) -> Result<bool, Box<
   match conn.query_row(
     "select user, zk from zkmember where user = ?1 and zk = ?2",
     params![uid, zkid],
+    |_row| Ok(true),
+  ) {
+    Ok(b) => Ok(b),
+    Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
+    Err(x) => Err(Box::new(x)),
+  }
+}
+
+pub fn is_zknote_member(
+  conn: &Connection,
+  uid: i64,
+  zknoteid: i64,
+) -> Result<bool, Box<dyn Error>> {
+  match conn.query_row(
+    "select user, zk from zkmember, zknote where zkmember.user = ?1 and zkmember.zk = zknote.zk
+      and zknote.id = ?2",
+    params![uid, zknoteid],
     |_row| Ok(true),
   ) {
     Ok(b) => Ok(b),
@@ -706,8 +724,17 @@ pub fn save_zknote(
   }
 }
 
-pub fn read_zknote(dbfile: &Path, id: i64) -> Result<FullZkNote, Box<dyn Error>> {
+pub fn read_zknote(dbfile: &Path, uid: Option<i64>, id: i64) -> Result<FullZkNote, Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
+
+  match uid {
+    Some(uid) => {
+      if !is_zknote_member(&conn, uid, id)? {
+        bail!("can't read zknote; you are not a member of this zk");
+      }
+    }
+    _ => {}
+  }
 
   let rbe = conn.query_row(
     "SELECT title, content, zk, public, pubid, createdate, changeddate
@@ -726,6 +753,13 @@ pub fn read_zknote(dbfile: &Path, id: i64) -> Result<FullZkNote, Box<dyn Error>>
       })
     },
   )?;
+
+  match uid {
+    None => {
+      bail!("can't read zknote; note is private");
+    }
+    _ => {}
+  }
 
   Ok(rbe)
 }
