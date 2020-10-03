@@ -229,7 +229,7 @@ fn user_interface_loggedin(
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let id: i64 = serde_json::from_value(msgdata.clone())?;
 
-      let note = sqldata::read_zknote(Path::new(&config.db), id)?;
+      let note = sqldata::read_zknote(Path::new(&config.db), Some(uid), id)?;
       Ok(ServerResponse {
         what: "zknote".to_string(),
         content: serde_json::to_value(note)?,
@@ -298,21 +298,35 @@ pub fn public_interface(
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let id: i64 = serde_json::from_value(msgdata.clone())?;
 
-      let note = sqldata::read_zknote(&config.db.as_path(), id)?;
-      Ok(ServerResponse {
-        what: "zknote".to_string(),
-        content: serde_json::to_value(note)?,
-      })
+      let note = sqldata::read_zknote(&config.db.as_path(), None, id)?;
+      if note.public {
+        Ok(ServerResponse {
+          what: "zknote".to_string(),
+          content: serde_json::to_value(note)?,
+        })
+      } else {
+        Ok(ServerResponse {
+          what: "privatezknote".to_string(),
+          content: serde_json::to_value(note)?,
+        })
+      }
     }
     "getzknotepubid" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let pubid: String = serde_json::from_value(msgdata.clone())?;
 
-      let note = sqldata::read_zknotepubid(Path::new(&config.db), pubid.as_str())?;
-      Ok(ServerResponse {
-        what: "zknote".to_string(),
-        content: serde_json::to_value(note)?,
-      })
+      let note = sqldata::read_zknotepubid(Path::new(&config.db), None, pubid.as_str())?;
+      if note.public {
+        Ok(ServerResponse {
+          what: "zknote".to_string(),
+          content: serde_json::to_value(note)?,
+        })
+      } else {
+        Ok(ServerResponse {
+          what: "privatezknote".to_string(),
+          content: serde_json::to_value(note)?,
+        })
+      }
     }
     wat => Err(Box::new(simple_error::SimpleError::new(format!(
       "invalid 'what' code:'{}'",
