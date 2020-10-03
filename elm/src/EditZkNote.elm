@@ -50,13 +50,13 @@ type alias Model =
     , zk : Data.Zk
     , zklist : List Data.ZkListNote
     , zklDict : Dict String Data.ZkLink
-    , initialZklDict : Dict String Data.ZkLink
     , public : Bool
     , pubidtxt : String
     , title : String
     , md : String
     , cells : CellDict
     , revert : Maybe Data.SaveZkNote
+    , initialZklDict : Dict String Data.ZkLink
     }
 
 
@@ -110,18 +110,12 @@ dirty model =
         |> Maybe.map
             (\r ->
                 not <|
-                    r.id
-                        == model.id
-                        && r.public
-                        == model.public
-                        && r.pubid
-                        == toPubId model.public model.pubidtxt
-                        && r.title
-                        == model.title
-                        && r.content
-                        == model.md
-                        && Dict.keys model.zklDict
-                        == Dict.keys model.initialZklDict
+                    (r.id == model.id)
+                        && (r.public == model.public)
+                        && (r.pubid == toPubId model.public model.pubidtxt)
+                        && (r.title == model.title)
+                        && (r.content == model.md)
+                        && (Dict.keys model.zklDict == Dict.keys model.initialZklDict)
             )
         |> Maybe.withDefault True
 
