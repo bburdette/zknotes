@@ -508,7 +508,7 @@ pub fn is_zknote_member(
   zknoteid: i64,
 ) -> Result<bool, Box<dyn Error>> {
   match conn.query_row(
-    "select user, zk from zkmember, zknote where zkmember.user = ?1 and zkmember.zk = zknote.zk
+    "select zkmember.user, zkmember.zk from zkmember, zknote where zkmember.user = ?1 and zkmember.zk = zknote.zk
       and zknote.id = ?2",
     params![uid, zknoteid],
     |_row| Ok(true),
@@ -834,27 +834,6 @@ pub fn zknotelisting(dbfile: &Path, user: i64, zk: i64) -> rusqlite::Result<Vec<
   Ok(pv)
 }
 
-pub fn save_zklink(
-  conn: &Connection,
-  uid: i64,
-  zk: i64,
-  zklink: &ZkLink,
-) -> Result<(), Box<dyn Error>> {
-  if zklink.delete == Some(true) {
-    conn.execute(
-      "DELETE FROM zklink WHERE fromid = ?1 and toid = ?2 and zk = ?3",
-      params![zklink.from, zklink.to, zk],
-    )?;
-  } else {
-    conn.execute(
-      "INSERT INTO zklink (fromid, toid, zk, linkzknote) values (?1, ?2, ?3, ?4)
-        ON CONFLICT (fromid, toid, zk) DO UPDATE SET linkzknote = ?4 where fromid = ?1 and toid = ?2 and zk = ?3",
-      params![zklink.from, zklink.to, zk, zklink.linkzknote],
-    )?;
-  }
-  Ok(())
-}
-
 pub fn save_zklinks(
   dbfile: &Path,
   uid: i64,
@@ -868,7 +847,18 @@ pub fn save_zklinks(
   }
 
   for zklink in zklinks.iter() {
-    save_zklink(&conn, uid, zk, &zklink)?;
+    if zklink.delete == Some(true) {
+      conn.execute(
+        "DELETE FROM zklink WHERE fromid = ?1 and toid = ?2 and zk = ?3",
+        params![zklink.from, zklink.to, zk],
+      )?;
+    } else {
+      conn.execute(
+        "INSERT INTO zklink (fromid, toid, zk, linkzknote) values (?1, ?2, ?3, ?4)
+          ON CONFLICT (fromid, toid, zk) DO UPDATE SET linkzknote = ?4 where fromid = ?1 and toid = ?2 and zk = ?3",
+        params![zklink.from, zklink.to, zk, zklink.linkzknote],
+      )?;
+    }
   }
 
   Ok(())
