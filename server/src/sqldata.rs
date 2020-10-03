@@ -764,7 +764,11 @@ pub fn read_zknote(dbfile: &Path, uid: Option<i64>, id: i64) -> Result<FullZkNot
   Ok(rbe)
 }
 
-pub fn read_zknotepubid(dbfile: &Path, pubid: &str) -> Result<FullZkNote, Box<dyn Error>> {
+pub fn read_zknotepubid(
+  dbfile: &Path,
+  uid: Option<i64>,
+  pubid: &str,
+) -> Result<FullZkNote, Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
 
   let rbe = conn.query_row(
@@ -784,6 +788,20 @@ pub fn read_zknotepubid(dbfile: &Path, pubid: &str) -> Result<FullZkNote, Box<dy
       })
     },
   )?;
+
+  match uid {
+    Some(uid) => {
+      if !is_zknote_member(&conn, uid, rbe.id)? {
+        bail!("can't read zknote; you are not a member of this zk");
+      }
+    }
+    None => {
+      if !rbe.public {
+        bail!("can't read zknote; note is private");
+      }
+    }
+    _ => {}
+  }
 
   Ok(rbe)
 }

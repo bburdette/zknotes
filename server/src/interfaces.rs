@@ -315,7 +315,7 @@ pub fn public_interface(
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let pubid: String = serde_json::from_value(msgdata.clone())?;
 
-      let note = sqldata::read_zknotepubid(Path::new(&config.db), pubid.as_str())?;
+      let note = sqldata::read_zknotepubid(Path::new(&config.db), None, pubid.as_str())?;
       if note.public {
         Ok(ServerResponse {
           what: "zknote".to_string(),
