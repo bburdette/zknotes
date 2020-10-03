@@ -1,4 +1,4 @@
-module SearchParser exposing (AndOr(..), FieldText(..), Search(..), SearchMod(..), TSText(..), TagSearch(..), andor, extractTagSearches, fieldString, fieldText, fields, oplistParser, printAndOr, printSearchMod, printTagSearch, searchMod, searchMods, searchTerm, showAndOr, showSearchMod, showTagSearch, singleTerm, spaces, tagSearchParser)
+module SearchParser exposing (AndOr(..), FieldText(..), Search(..), SearchMod(..), TSText(..), TagSearch(..), andor, encodeSearchMod, encodeTagSearch, extractTagSearches, fieldString, fieldText, fields, oplistParser, printAndOr, printSearchMod, printTagSearch, searchMod, searchMods, searchTerm, showAndOr, showSearchMod, showTagSearch, singleTerm, spaces, tagSearchParser)
 
 --import Tag exposing (Tag, TagId, tagByName, tagNames, tagSetParents)
 -- import ItemStuff exposing (ItemIndexer, ItemStuff)
@@ -56,21 +56,54 @@ type TSText
     | Search TagSearch
 
 
+encodeSearchMod : SearchMod -> JE.Value
+encodeSearchMod smod =
+    case smod of
+        CaseSensitive ->
+            JE.string "CaseSensitive"
 
-{- encodeTagSearch : TagSearch ->  JE.Value
-   encodeTagSearch ts =
-     case ts of
-       SearchTerm (List SearchMod) String ->
-         JE.object
-           ["searchterm", ]
+        ExactMatch ->
+            JE.string "ExactMatch"
 
-       Not nts ->
-         JE.object
-           ["type", "not"
-           "ts", encodeTagSearch nts]
+        Tag ->
+            JE.string "Tag"
 
-       Boolex TagSearch AndOr TagSearch ->
--}
+        Description ->
+            JE.string "Description"
+
+
+encodeTagSearch : TagSearch -> JE.Value
+encodeTagSearch ts =
+    case ts of
+        SearchTerm smods termstr ->
+            JE.object
+                [ ( "type", JE.string "searchterm" )
+                , ( "mods", JE.list encodeSearchMod smods )
+                , ( "term", JE.string termstr )
+                ]
+
+        Not nts ->
+            JE.object
+                [ ( "type", JE.string "not" )
+                , ( "ts", encodeTagSearch nts )
+                ]
+
+        Boolex ts1 ao ts2 ->
+            JE.object
+                [ ( "type", JE.string "boolex" )
+                , ( "ts1", encodeTagSearch ts1 )
+                , ( "ao"
+                  , JE.string
+                        (case ao of
+                            And ->
+                                "and"
+
+                            Or ->
+                                "or"
+                        )
+                  )
+                , ( "ts2", encodeTagSearch ts2 )
+                ]
 
 
 showSearchMod : SearchMod -> String

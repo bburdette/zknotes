@@ -24,6 +24,7 @@ extern crate barrel;
 extern crate base64;
 
 mod config;
+mod data;
 mod email;
 mod interfaces;
 mod sqldata;
@@ -183,6 +184,13 @@ fn main() {
 }
 
 fn err_main() -> Result<(), Box<dyn Error>> {
+  let ts = data::TagSearch::SearchTerm {
+    smods: [data::SearchMod::CaseSensitive].to_vec(),
+    term: "blah".to_string(),
+  };
+
+  println!("{}", serde_json::to_value(ts)?.to_string());
+
   env_logger::init();
 
   info!("server init!");
