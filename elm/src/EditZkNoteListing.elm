@@ -9,6 +9,7 @@ import Element.Font as Font
 import Element.Input as EI
 import Element.Region
 import SearchPanel as SP
+import SearchParser exposing (TagSearch(..))
 import TangoColors as TC
 
 
@@ -35,6 +36,7 @@ type Command
     | Example
     | Done
     | None
+    | Search TagSearch
 
 
 view : Model -> Element Msg
@@ -98,5 +100,16 @@ update msg model =
             let
                 ( nm, cm ) =
                     SP.update m model.spmodel
+
+                mod =
+                    { model | spmodel = nm }
             in
-            ( { model | spmodel = nm }, None )
+            case cm of
+                SP.None ->
+                    ( mod, None )
+
+                SP.Save ->
+                    ( mod, None )
+
+                SP.Search ts ->
+                    ( mod, Search ts )

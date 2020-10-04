@@ -1038,6 +1038,13 @@ update msg model =
                         UI.GetZkListing
                     )
 
+                EditZkNoteListing.Search ts ->
+                    ( { model | state = EditZkNoteListing emod login }
+                    , sendUIMsg model.location
+                        login
+                        (UI.SearchZkNotes ts)
+                    )
+
         ( BadErrorMsg bm, BadError bs prevstate ) ->
             let
                 ( bmod, bcmd ) =

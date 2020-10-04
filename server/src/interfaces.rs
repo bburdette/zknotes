@@ -1,5 +1,6 @@
 use config::Config;
 use crypto_hash::{hex_digest, Algorithm};
+use data;
 use email;
 use serde_json::Value;
 use simple_error;
@@ -235,7 +236,17 @@ fn user_interface_loggedin(
         content: serde_json::to_value(note)?,
       })
     }
+    "searchzknotes" => {
+      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      let search: data::TagSearch = serde_json::from_value(msgdata.clone())?;
 
+      println!("search: {:?}", search);
+      // let note = sqldata::read_zknote(Path::new(&config.db), Some(uid), id)?;
+      Ok(ServerResponse {
+        what: "unimplemented".to_string(),
+        content: serde_json::Value::Null,
+      })
+    }
     "deletezknote" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let id: i64 = serde_json::from_value(msgdata.clone())?;
