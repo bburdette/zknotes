@@ -1,6 +1,7 @@
 use barrel::backend::Sqlite;
 use barrel::{types, Migration};
-use rusqlite::{params, Connection};
+use data;
+use rusqlite::{params, Connection, ToSql};
 use std::convert::TryInto;
 use std::error::Error;
 use std::path::Path;
@@ -835,6 +836,41 @@ pub fn zknotelisting(dbfile: &Path, user: i64, zk: i64) -> rusqlite::Result<Vec<
       zk: zk,
       createdate: row.get(2)?,
       changeddate: row.get(3)?,
+    })
+  })?;
+
+  let mut pv = Vec::new();
+
+  for rsrec in rec_iter {
+    match rsrec {
+      Ok(rec) => {
+        pv.push(rec);
+      }
+      Err(_) => (),
+    }
+  }
+
+  Ok(pv)
+}
+
+pub fn search_zknotes(
+  dbfile: &Path,
+  user: i64,
+  search: &data::TagSearch,
+) -> rusqlite::Result<Vec<ZkListNote>> {
+  let conn = connection_open(dbfile)?;
+
+  let (sql, args) = data::buildSql(user, search.clone());
+
+  let mut pstmt = conn.prepare(sql.as_str())?;
+
+  let rec_iter = pstmt.query_map(args.as_slice(), |row| {
+    Ok(ZkListNote {
+      id: row.get(0)?,
+      title: row.get(1)?,
+      zk: row.get(2)?,
+      createdate: row.get(3)?,
+      changeddate: row.get(4)?,
     })
   })?;
 

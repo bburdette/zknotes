@@ -189,7 +189,7 @@ fn err_main() -> Result<(), Box<dyn Error>> {
     term: "blah".to_string(),
   };
 
-  println!("{}", serde_json::to_value(ts)?.to_string());
+  println!("{:?}", data::buildSql(0, ts));
 
   env_logger::init();
 
