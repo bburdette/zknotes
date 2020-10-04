@@ -10,7 +10,7 @@ use std::time::SystemTime;
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub enum TagSearch {
   SearchTerm {
-    smods: Vec<SearchMod>,
+    mods: Vec<SearchMod>,
     term: String,
   },
   Not {

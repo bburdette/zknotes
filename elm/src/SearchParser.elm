@@ -77,32 +77,41 @@ encodeTagSearch ts =
     case ts of
         SearchTerm smods termstr ->
             JE.object
-                [ ( "type", JE.string "searchterm" )
-                , ( "mods", JE.list encodeSearchMod smods )
-                , ( "term", JE.string termstr )
+                [ ( "SearchTerm"
+                  , JE.object
+                        [ ( "mods", JE.list encodeSearchMod smods )
+                        , ( "term", JE.string termstr )
+                        ]
+                  )
                 ]
 
         Not nts ->
             JE.object
-                [ ( "type", JE.string "not" )
-                , ( "ts", encodeTagSearch nts )
+                [ ( "Not"
+                  , JE.object
+                        [ ( "ts", encodeTagSearch nts )
+                        ]
+                  )
                 ]
 
         Boolex ts1 ao ts2 ->
             JE.object
-                [ ( "type", JE.string "boolex" )
-                , ( "ts1", encodeTagSearch ts1 )
-                , ( "ao"
-                  , JE.string
-                        (case ao of
-                            And ->
-                                "and"
+                [ ( "Boolex"
+                  , JE.object
+                        [ ( "ts1", encodeTagSearch ts1 )
+                        , ( "ao"
+                          , JE.string
+                                (case ao of
+                                    And ->
+                                        "And"
 
-                            Or ->
-                                "or"
-                        )
+                                    Or ->
+                                        "Or"
+                                )
+                          )
+                        , ( "ts2", encodeTagSearch ts2 )
+                        ]
                   )
-                , ( "ts2", encodeTagSearch ts2 )
                 ]
 
 

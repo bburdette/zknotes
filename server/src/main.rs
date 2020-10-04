@@ -185,7 +185,7 @@ fn main() {
 
 fn err_main() -> Result<(), Box<dyn Error>> {
   let ts = data::TagSearch::SearchTerm {
-    smods: [data::SearchMod::CaseSensitive].to_vec(),
+    mods: [data::SearchMod::CaseSensitive].to_vec(),
     term: "blah".to_string(),
   };
 
