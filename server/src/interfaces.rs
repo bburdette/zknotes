@@ -246,7 +246,7 @@ fn user_interface_loggedin(
       // let note = sqldata::read_zknote(Path::new(&config.db), Some(uid), id)?;
       let entries = sqldata::search_zknotes(Path::new(&config.db), uid, &search)?;
       Ok(ServerResponse {
-        what: "unimplemented".to_string(),
+        what: "zknotelisting".to_string(),
         content: serde_json::to_value(entries)?,
       })
     }

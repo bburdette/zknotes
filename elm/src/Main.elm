@@ -518,6 +518,11 @@ update msg model =
                                             , Cmd.none
                                             )
 
+                                EditZkNoteListing znlstate login_ ->
+                                    ( { model | state = EditZkNoteListing { znlstate | notes = l } login_ }
+                                    , Cmd.none
+                                    )
+
                                 _ ->
                                     ( { model | state = BadError (BadError.initialModel "unexpected zknote listing") state }
                                     , Cmd.none
