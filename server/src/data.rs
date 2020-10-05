@@ -8,6 +8,12 @@ use std::time::Duration;
 use std::time::SystemTime;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct ZkNoteSearch {
+  pub tagsearch: TagSearch,
+  pub zks: Vec<i64>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub enum TagSearch {
   SearchTerm {
     mods: Vec<SearchMod>,

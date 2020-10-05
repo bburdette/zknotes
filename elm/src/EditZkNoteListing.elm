@@ -36,7 +36,7 @@ type Command
     | Example
     | Done
     | None
-    | Search TagSearch
+    | Search Data.ZkNoteSearch
 
 
 view : Model -> Element Msg
@@ -112,4 +112,4 @@ update msg model =
                     ( mod, None )
 
                 SP.Search ts ->
-                    ( mod, Search ts )
+                    ( mod, Search { tagSearch = ts, zks = [ model.zk.id ] } )

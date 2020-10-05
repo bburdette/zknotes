@@ -1043,11 +1043,11 @@ update msg model =
                         UI.GetZkListing
                     )
 
-                EditZkNoteListing.Search ts ->
+                EditZkNoteListing.Search s ->
                     ( { model | state = EditZkNoteListing emod login }
                     , sendUIMsg model.location
                         login
-                        (UI.SearchZkNotes ts)
+                        (UI.SearchZkNotes s)
                     )
 
         ( BadErrorMsg bm, BadError bs prevstate ) ->

@@ -22,7 +22,7 @@ type SendMsg
     | SaveZk Data.SaveZk
     | SaveZkLinks Data.ZkLinks
     | GetZkLinks Data.GetZkLinks
-    | SearchZkNotes SP.TagSearch
+    | SearchZkNotes Data.ZkNoteSearch
 
 
 type ServerResponse
@@ -167,12 +167,12 @@ encodeSendMsg sm uid pwd =
                 , ( "data", Data.encodeGetZkLinks gzl )
                 ]
 
-        SearchZkNotes ts ->
+        SearchZkNotes s ->
             JE.object
                 [ ( "what", JE.string "searchzknotes" )
                 , ( "uid", JE.string uid )
                 , ( "pwd", JE.string pwd )
-                , ( "data", SP.encodeTagSearch ts )
+                , ( "data", Data.encodeZkNoteSearch s )
                 ]
 
 
