@@ -1,8 +1,5 @@
 module SearchParser exposing (AndOr(..), FieldText(..), SearchMod(..), TSText(..), TagSearch(..), andor, encodeSearchMod, encodeTagSearch, extractTagSearches, fieldString, fieldText, fields, oplistParser, printAndOr, printSearchMod, printTagSearch, searchMod, searchMods, searchTerm, showAndOr, showSearchMod, showTagSearch, singleTerm, spaces, tagSearchParser)
 
---import Tag exposing (Tag, TagId, tagByName, tagNames, tagSetParents)
--- import ItemStuff exposing (ItemIndexer, ItemStuff)
-
 import Json.Decode as JD
 import Json.Encode as JE
 import ParseHelp exposing (listOf)
