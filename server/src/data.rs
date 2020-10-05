@@ -43,14 +43,24 @@ pub enum AndOr {
   Or,
 }
 
-pub fn buildSql(uid: i64, search: TagSearch) -> (String, Vec<String>) {
-  let (cls, mut clsargs) = buildSqlClause(false, search);
-  let mut sqlbase = "SELECT id, title, zk, createdate, changeddate
-      FROM zknote where zk IN (select zk from zkmember where user = ?)"
-    .to_string();
+pub fn buildSql(uid: i64, search: ZkNoteSearch) -> (String, Vec<String>) {
+  let (cls, mut clsargs) = buildSqlClause(false, search.tagsearch);
+
+  let zklist = format!("{:?}", search.zks)
+    .replace("[", "(")
+    .replace("]", ")");
+
+  println!("zklist: {}", zklist);
+
+  let mut sqlbase = format!(
+    "SELECT id, title, zk, createdate, changeddate
+      FROM zknote where zk IN (select zk from zkmember where user = ?) and
+      zk in {}",
+    zklist
+  );
   let mut args = vec![uid.to_string()];
 
-  if args.is_empty() {
+  if clsargs.is_empty() {
     (sqlbase, args)
   } else {
     sqlbase.push_str(" and ");

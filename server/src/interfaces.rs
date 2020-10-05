@@ -241,7 +241,7 @@ fn user_interface_loggedin(
       // let search: data::TagSearch = serde_json::from_value(msgdata.clone())?;
       let search: data::ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
 
-      let entries = sqldata::search_zknotes(Path::new(&config.db), uid, &search.tagsearch)?;
+      let entries = sqldata::search_zknotes(Path::new(&config.db), uid, &search)?;
       Ok(ServerResponse {
         what: "zknotelisting".to_string(),
         content: serde_json::to_value(entries)?,

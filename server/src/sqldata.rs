@@ -856,11 +856,13 @@ pub fn zknotelisting(dbfile: &Path, user: i64, zk: i64) -> rusqlite::Result<Vec<
 pub fn search_zknotes(
   dbfile: &Path,
   user: i64,
-  search: &data::TagSearch,
+  search: &data::ZkNoteSearch,
 ) -> rusqlite::Result<Vec<ZkListNote>> {
   let conn = connection_open(dbfile)?;
 
   let (sql, args) = data::buildSql(user, search.clone());
+
+  println!("sql, args: {}, \n{:?}", sql, args);
 
   let mut pstmt = conn.prepare(sql.as_str())?;
 
