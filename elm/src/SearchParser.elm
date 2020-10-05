@@ -1,4 +1,4 @@
-module SearchParser exposing (AndOr(..), FieldText(..), Search(..), SearchMod(..), TSText(..), TagSearch(..), andor, encodeSearchMod, encodeTagSearch, extractTagSearches, fieldString, fieldText, fields, oplistParser, printAndOr, printSearchMod, printTagSearch, searchMod, searchMods, searchTerm, showAndOr, showSearchMod, showTagSearch, singleTerm, spaces, tagSearchParser)
+module SearchParser exposing (AndOr(..), FieldText(..), SearchMod(..), TSText(..), TagSearch(..), andor, encodeSearchMod, encodeTagSearch, extractTagSearches, fieldString, fieldText, fields, oplistParser, printAndOr, printSearchMod, printTagSearch, searchMod, searchMods, searchTerm, showAndOr, showSearchMod, showTagSearch, singleTerm, spaces, tagSearchParser)
 
 --import Tag exposing (Tag, TagId, tagByName, tagNames, tagSetParents)
 -- import ItemStuff exposing (ItemIndexer, ItemStuff)
@@ -28,16 +28,17 @@ import TDict exposing (TDict)
 import Util exposing (first, rest)
 
 
+type alias ZkNoteSearch =
+    { tagsearch : TagSearch
+    , zks : List Int
+    }
+
+
 type SearchMod
     = CaseSensitive
     | ExactMatch
     | Tag
     | Description
-
-
-type Search
-    = TagSearch (Result (List Parser.DeadEnd) TagSearch)
-    | NoSearch
 
 
 type TagSearch

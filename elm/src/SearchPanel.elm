@@ -1,8 +1,5 @@
 module SearchPanel exposing (Command(..), Model, Msg(..), addTagToSearch, addTagToSearchPrev, addToSearch, initModel, toggleHelpButton, update, updateSearchText, view)
 
--- import Search exposing (Search(..), TSResult(..))
--- import Tag exposing (Tag, TagId)
-
 import Common exposing (buttonStyle)
 import Element exposing (..)
 import Element.Background as Background
@@ -12,10 +9,15 @@ import Element.Font as Font
 import Element.Input as Input
 import Parser
 import SearchHelpPanel
-import SearchParser exposing (AndOr(..), Search(..), SearchMod(..), TSText, TagSearch(..), tagSearchParser)
+import SearchParser exposing (AndOr(..), SearchMod(..), TSText, TagSearch(..), tagSearchParser)
 import TDict exposing (TDict)
 import TangoColors as Color
 import Util exposing (Size)
+
+
+type Search
+    = TagSearch (Result (List Parser.DeadEnd) TagSearch)
+    | NoSearch
 
 
 type alias Model =

@@ -184,12 +184,6 @@ fn main() {
 }
 
 fn err_main() -> Result<(), Box<dyn Error>> {
-  let ts = data::TagSearch::SearchTerm {
-    mods: [data::SearchMod::CaseSensitive].to_vec(),
-    term: "blah".to_string(),
-  };
-
-  println!("{:?}", data::buildSql(0, ts));
 
   env_logger::init();
 

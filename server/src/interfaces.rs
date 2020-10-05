@@ -240,10 +240,6 @@ fn user_interface_loggedin(
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let search: data::TagSearch = serde_json::from_value(msgdata.clone())?;
 
-      println!("{:?}", data::buildSql(uid, search.clone()));
-
-      //      println!("search: {:?}", search);
-      // let note = sqldata::read_zknote(Path::new(&config.db), Some(uid), id)?;
       let entries = sqldata::search_zknotes(Path::new(&config.db), uid, &search)?;
       Ok(ServerResponse {
         what: "zknotelisting".to_string(),

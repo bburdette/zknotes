@@ -63,7 +63,6 @@ fn buildSqlClause(not: bool, search: TagSearch) -> (String, Vec<String>) {
           vec![format!("%{}%", term).to_string()],
         )
       } else {
-        // \"%?%\"
         (
           "title like ?".to_string(),
           vec![format!("%{}%", term).to_string()],
