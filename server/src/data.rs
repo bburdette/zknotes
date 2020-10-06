@@ -50,8 +50,6 @@ pub fn buildSql(uid: i64, search: ZkNoteSearch) -> (String, Vec<String>) {
     .replace("[", "(")
     .replace("]", ")");
 
-  println!("zklist: {}", zklist);
-
   let mut sqlbase = format!(
     "SELECT id, title, zk, createdate, changeddate
       FROM zknote where zk IN (select zk from zkmember where user = ?) and
@@ -87,12 +85,19 @@ fn buildSqlClause(not: bool, search: TagSearch) -> (String, Vec<String>) {
         }
       }
       let field = if desc { "content" } else { "title" };
-      let nots = if not { "not" } else { "" };
+      let notstr = match (not, exact) {
+        (true, false) => "not",
+        (false, false) => "",
+        (true, true) => "!",
+        (false, true) => "",
+      };
 
       if tag {
-        // get the matching tag ids.
-
-        let clause = format!("{} {} like ?", field, nots);
+        let clause = if exact {
+          format!("{} {}= ?", field, notstr)
+        } else {
+          format!("{} {} like ?", field, notstr)
+        };
 
         (
           format!(
@@ -107,15 +112,27 @@ fn buildSqlClause(not: bool, search: TagSearch) -> (String, Vec<String>) {
                and {}))",
             clause, clause
           ),
-          vec![
-            format!("%{}%", term).to_string(),
-            format!("%{}%", term).to_string(),
-          ],
+          if exact {
+            vec![term.clone(), term]
+          } else {
+            vec![
+              format!("%{}%", term).to_string(),
+              format!("%{}%", term).to_string(),
+            ]
+          },
         )
       } else {
         (
-          format!("{} {} like ?", field, nots),
-          vec![format!("%{}%", term).to_string()],
+          if exact {
+            format!("{} {}= ?", field, notstr)
+          } else {
+            format!("{} {} like ?", field, notstr)
+          },
+          if exact {
+            vec![term]
+          } else {
+            vec![format!("%{}%", term).to_string()]
+          },
         )
       }
     }
@@ -124,18 +141,15 @@ fn buildSqlClause(not: bool, search: TagSearch) -> (String, Vec<String>) {
       let (mut cl1, mut arg1) = buildSqlClause(false, *ts1);
       let (mut cl2, mut arg2) = buildSqlClause(false, *ts2);
       let mut cls = String::new();
-      println!("ao: {:?}", ao);
       let conj = match ao {
         AndOr::Or => " or ",
         AndOr::And => " and ",
       };
-      println!("conj: {}", conj);
       cls.push_str("(");
       cls.push_str(cl1.as_str());
       cls.push_str(conj);
       cls.push_str(cl2.as_str());
       cls.push_str(")");
-      println!("cls: {}", cls);
       arg1.append(&mut arg2);
       (cls, arg1)
     }
