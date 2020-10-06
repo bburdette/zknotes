@@ -292,9 +292,11 @@ view model =
             , E.column
                 [ E.spacing 8
                 , E.alignTop
+
+                -- , E.width (E.shrink |> E.minimum 300)
                 ]
                 ((E.map SPMsg <|
-                    SP.view { width = 1000, height = 1000 } 0 model.spmodel
+                    SP.view True 0 model.spmodel
                  )
                     :: (List.map
                             (\zkln ->

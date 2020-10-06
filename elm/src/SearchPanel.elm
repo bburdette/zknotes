@@ -151,8 +151,8 @@ selectPrevSearch searches =
         )
 
 
-view : Size -> Int -> Model -> Element Msg
-view winsize nblevel model =
+view : Bool -> Int -> Model -> Element Msg
+view narrow nblevel model =
     let
         inputcolor =
             case model.search of
@@ -231,9 +231,6 @@ view winsize nblevel model =
                 , label = text "x"
                 }
             ]
-
-        narrow =
-            winsize.width < 600
 
         showborder =
             model.showParse || narrow

@@ -49,7 +49,7 @@ view model =
             , EI.button Common.buttonStyle { onPress = Just ExamplePress, label = E.text "example" }
             , EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "done" }
             ]
-        , E.map SPMsg <| SP.view { width = 1000, height = 1000 } 0 model.spmodel
+        , E.map SPMsg <| SP.view False 0 model.spmodel
         , E.table [ E.spacing 8 ]
             { data = model.notes
             , columns =
