@@ -19,6 +19,7 @@ import Markdown.Html
 import Markdown.Parser
 import Markdown.Renderer
 import Schelme.Show exposing (showTerm)
+import SearchPanel as SP
 import TangoColors as TC
 import Url as U
 import Url.Builder as UB
@@ -43,6 +44,7 @@ type Msg
     | PublicPress Bool
     | RemoveLink Data.ZkLink
     | MdLink Data.ZkLink
+    | SPMsg SP.Msg
 
 
 type alias Model =
@@ -57,6 +59,7 @@ type alias Model =
     , cells : CellDict
     , revert : Maybe Data.SaveZkNote
     , initialZklDict : Dict String Data.ZkLink
+    , spmodel : SP.Model
     }
 
 
@@ -70,6 +73,7 @@ type Command
     | Switch Int
     | SaveSwitch Data.SaveZkNote (List Data.ZkLink) Int
     | GetSelectedText String
+    | Search Data.ZkNoteSearch
 
 
 sznFromModel : Model -> Data.SaveZkNote
@@ -289,32 +293,36 @@ view model =
                 [ E.spacing 8
                 , E.alignTop
                 ]
-                (List.map
-                    (\zkln ->
-                        E.row [ E.spacing 8 ]
-                            [ case model.id of
-                                Just _ ->
-                                    EI.button Common.buttonStyle
-                                        { onPress = Just <| LinkPress zkln
-                                        , label = E.text "Link"
-                                        }
+                ((E.map SPMsg <|
+                    SP.view { width = 1000, height = 1000 } 0 model.spmodel
+                 )
+                    :: (List.map
+                            (\zkln ->
+                                E.row [ E.spacing 8 ]
+                                    [ case model.id of
+                                        Just _ ->
+                                            EI.button Common.buttonStyle
+                                                { onPress = Just <| LinkPress zkln
+                                                , label = E.text "Link"
+                                                }
+
+                                        Nothing ->
+                                            EI.button (Common.buttonStyle ++ [ EBk.color TC.grey ])
+                                                { onPress = Nothing
+                                                , label = E.text "Link"
+                                                }
+                                    , EI.button dirtybutton { onPress = Just (SwitchPress zkln.id), label = E.text "Edit" }
+                                    , E.text zkln.title
+                                    ]
+                            )
+                        <|
+                            case model.id of
+                                Just id ->
+                                    List.filter (\zkl -> zkl.id /= id) model.zklist
 
                                 Nothing ->
-                                    EI.button (Common.buttonStyle ++ [ EBk.color TC.grey ])
-                                        { onPress = Nothing
-                                        , label = E.text "Link"
-                                        }
-                            , EI.button dirtybutton { onPress = Just (SwitchPress zkln.id), label = E.text "Edit" }
-                            , E.text zkln.title
-                            ]
-                    )
-                 <|
-                    case model.id of
-                        Just id ->
-                            List.filter (\zkl -> zkl.id /= id) model.zklist
-
-                        Nothing ->
-                            model.zklist
+                                    model.zklist
+                       )
                 )
             ]
         ]
@@ -325,8 +333,8 @@ zklKey zkl =
     String.fromInt zkl.from ++ ":" ++ String.fromInt zkl.to
 
 
-initFull : Data.Zk -> List Data.ZkListNote -> Data.FullZkNote -> Data.ZkLinks -> Model
-initFull zk zkl zknote zklDict =
+initFull : Data.Zk -> List Data.ZkListNote -> Data.FullZkNote -> Data.ZkLinks -> SP.Model -> Model
+initFull zk zkl zknote zklDict spm =
     let
         cells =
             zknote.content
@@ -348,11 +356,12 @@ initFull zk zkl zknote zklDict =
     , md = zknote.content
     , cells = getCd cc
     , revert = Just (Data.saveZkNoteFromFull zknote)
+    , spmodel = spm
     }
 
 
-initNew : Data.Zk -> List Data.ZkListNote -> Model
-initNew zk zkl =
+initNew : Data.Zk -> List Data.ZkListNote -> SP.Model -> Model
+initNew zk zkl spm =
     let
         cells =
             ""
@@ -374,11 +383,12 @@ initNew zk zkl =
     , md = ""
     , cells = getCd cc
     , revert = Nothing
+    , spmodel = spm
     }
 
 
-initExample : Data.Zk -> List Data.ZkListNote -> Model
-initExample zk zkl =
+initExample : Data.Zk -> List Data.ZkListNote -> SP.Model -> Model
+initExample zk zkl spm =
     let
         cells =
             markdownBody
@@ -400,6 +410,7 @@ initExample zk zkl =
     , md = markdownBody
     , cells = getCd cc
     , revert = Nothing
+    , spmodel = spm
     }
 
 
@@ -451,7 +462,7 @@ gotSelectedText : Model -> String -> ( Model, Command )
 gotSelectedText model s =
     let
         nmod =
-            initNew model.zk model.zklist
+            initNew model.zk model.zklist model.spmodel
     in
     ( { nmod | title = s }
     , if dirty model then
@@ -696,3 +707,21 @@ update msg model =
               }
             , None
             )
+
+        SPMsg m ->
+            let
+                ( nm, cm ) =
+                    SP.update m model.spmodel
+
+                mod =
+                    { model | spmodel = nm }
+            in
+            case cm of
+                SP.None ->
+                    ( mod, None )
+
+                SP.Save ->
+                    ( mod, None )
+
+                SP.Search ts ->
+                    ( mod, Search { tagSearch = ts, zks = [ model.zk.id ] } )

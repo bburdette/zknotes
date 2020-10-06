@@ -262,6 +262,7 @@ type alias NwState =
     , mbzknotelisting : Maybe (List Data.ZkListNote)
     , mbzklinks : Maybe Data.ZkLinks
     , mbzknote : Maybe Data.FullZkNote
+    , spmodel : SP.Model
     }
 
 
@@ -293,7 +294,7 @@ notewait nwstate state wmsg =
     in
     case ( n.mbzknotelisting, n.mbzklinks, n.mbzknote ) of
         ( Just zknl, Just zkl, Just zkn ) ->
-            ( EditZkNote (EditZkNote.initFull n.zk zknl zkn zkl) n.login, Cmd.none )
+            ( EditZkNote (EditZkNote.initFull n.zk zknl zkn zkl n.spmodel) n.login, Cmd.none )
 
         _ ->
             ( Wait state (notewait n), Cmd.none )
@@ -520,6 +521,11 @@ update msg model =
 
                                 EditZkNoteListing znlstate login_ ->
                                     ( { model | state = EditZkNoteListing { znlstate | notes = l } login_ }
+                                    , Cmd.none
+                                    )
+
+                                EditZkNote znstate login_ ->
+                                    ( { model | state = EditZkNote { znstate | zklist = l } login_ }
                                     , Cmd.none
                                     )
 
@@ -857,6 +863,7 @@ update msg model =
                                     , mbzknotelisting = Nothing
                                     , mbzklinks = Nothing
                                     , mbzknote = Nothing
+                                    , spmodel = emod.spmodel
                                     }
                                 )
                       }
@@ -889,6 +896,7 @@ update msg model =
                                     , mbzknotelisting = Nothing
                                     , mbzklinks = Nothing
                                     , mbzknote = Nothing
+                                    , spmodel = emod.spmodel
                                     }
                                 )
                       }
@@ -923,6 +931,13 @@ update msg model =
                 EditZkNote.GetSelectedText id ->
                     ( { model | state = EditZkNote emod login }
                     , getSelectedText (Just id)
+                    )
+
+                EditZkNote.Search s ->
+                    ( { model | state = EditZkNote emod login }
+                    , sendUIMsg model.location
+                        login
+                        (UI.SearchZkNotes s)
                     )
 
         ( EditZkListingMsg em, EditZkListing es login ) ->
@@ -990,10 +1005,10 @@ update msg model =
                     ( { model | state = EditZkNoteListing emod login }, Cmd.none )
 
                 EditZkNoteListing.New ->
-                    ( { model | state = EditZkNote (EditZkNote.initNew emod.zk es.notes) login }, Cmd.none )
+                    ( { model | state = EditZkNote (EditZkNote.initNew emod.zk es.notes emod.spmodel) login }, Cmd.none )
 
                 EditZkNoteListing.Example ->
-                    ( { model | state = EditZkNote (EditZkNote.initExample emod.zk es.notes) login }, Cmd.none )
+                    ( { model | state = EditZkNote (EditZkNote.initExample emod.zk es.notes emod.spmodel) login }, Cmd.none )
 
                 EditZkNoteListing.Selected id ->
                     ( { model
@@ -1009,6 +1024,7 @@ update msg model =
                                     , mbzknotelisting = Just emod.notes
                                     , mbzklinks = Nothing
                                     , mbzknote = Nothing
+                                    , spmodel = emod.spmodel
                                     }
                                 )
                       }
