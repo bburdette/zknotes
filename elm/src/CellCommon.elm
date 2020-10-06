@@ -173,7 +173,9 @@ mkRenderer cellDict onchanged =
     , tableHeaderCell =
         \maybeAlignment children ->
             E.paragraph [] children
-    , tableCell = E.paragraph []
+    , tableCell =
+        \maybeAlignment children ->
+            E.paragraph [] children
     }
 
 
@@ -362,9 +364,9 @@ inlineFoldl function top_acc list =
                     Block.Paragraph inlines ->
                         List.foldl function acc inlines
 
-                    Block.Table labels lists ->
+                    Block.Table labels listses ->
                         let
-                            lacc =
+                            llacc =
                                 List.foldl
                                     (\inlines iacc ->
                                         List.foldl function iacc inlines
@@ -373,11 +375,16 @@ inlineFoldl function top_acc list =
                                     (List.map .label labels)
                         in
                         List.foldl
-                            (\inlines iacc ->
-                                List.foldl function iacc inlines
+                            (\lists lacc ->
+                                List.foldl
+                                    (\inlines iacc ->
+                                        List.foldl function iacc inlines
+                                    )
+                                    lacc
+                                    lists
                             )
-                            lacc
-                            lists
+                            llacc
+                            listses
 
                     Block.CodeBlock _ ->
                         acc
