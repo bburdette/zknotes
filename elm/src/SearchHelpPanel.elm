@@ -105,11 +105,8 @@ view nblevel hmod =
                     column [ width fill ]
                         [ showLine "the quoted strings can take a number of modifiers:"
                         , thingAndDef 4 "t'string1' =" "match items with a parent tag that contains 'string1' in its name."
-                        , thingAndDef 4 "c'String1' =" "match items whose name contains String1, with that specific case (capital S, lower case tring)"
                         , thingAndDef 4 "e'String1' =" "match items whose names are exactly 'String1', no more, no less."
-                        , thingAndDef 4 "a'string1' =" "match items with an 'ancestor' tag containing string1.  That could be a parent tag of the item, or grandparent tag, or great-grandparent tag, etc."
-                        , thingAndDef 4 "d'elements' =" "match items with the string 'elements' in their description."
-                        , thingAndDef 4 "aec'Music' =" "match items with an ancestor with name exactly 'Music'.  'music' is not matched, nor is 'music stuff'."
+                        , thingAndDef 4 "n'elements' =" "match items with the string 'elements' in the note body.."
                         ]
 
                 FullMonty ->

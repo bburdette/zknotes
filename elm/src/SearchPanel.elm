@@ -66,8 +66,7 @@ addToSearch name search =
     let
         term =
             SearchTerm
-                [ CaseSensitive
-                , ExactMatch
+                [ ExactMatch
                 , Tag
                 ]
                 name

@@ -31,10 +31,9 @@ pub enum TagSearch {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub enum SearchMod {
-  CaseSensitive,
   ExactMatch,
   Tag,
-  Description,
+  Note,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -71,17 +70,15 @@ pub fn buildSql(uid: i64, search: ZkNoteSearch) -> (String, Vec<String>) {
 fn buildSqlClause(not: bool, search: TagSearch) -> (String, Vec<String>) {
   match search {
     TagSearch::SearchTerm { mods, term } => {
-      let mut case = false;
       let mut exact = false;
       let mut tag = false;
       let mut desc = false;
 
       for m in mods {
         match m {
-          SearchMod::CaseSensitive => case = true,
           SearchMod::ExactMatch => exact = true,
           SearchMod::Tag => tag = true,
-          SearchMod::Description => desc = true,
+          SearchMod::Note => desc = true,
         }
       }
       let field = if desc { "content" } else { "title" };

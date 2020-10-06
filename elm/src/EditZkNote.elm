@@ -292,8 +292,6 @@ view model =
             , E.column
                 [ E.spacing 8
                 , E.alignTop
-
-                -- , E.width (E.shrink |> E.minimum 300)
                 ]
                 ((E.map SPMsg <|
                     SP.view True 0 model.spmodel

@@ -32,10 +32,9 @@ type alias ZkNoteSearch =
 
 
 type SearchMod
-    = CaseSensitive
-    | ExactMatch
+    = ExactMatch
     | Tag
-    | Description
+    | Note
 
 
 type TagSearch
@@ -57,17 +56,14 @@ type TSText
 encodeSearchMod : SearchMod -> JE.Value
 encodeSearchMod smod =
     case smod of
-        CaseSensitive ->
-            JE.string "CaseSensitive"
-
         ExactMatch ->
             JE.string "ExactMatch"
 
         Tag ->
             JE.string "Tag"
 
-        Description ->
-            JE.string "Description"
+        Note ->
+            JE.string "Note"
 
 
 encodeTagSearch : TagSearch -> JE.Value
@@ -116,17 +112,14 @@ encodeTagSearch ts =
 showSearchMod : SearchMod -> String
 showSearchMod mod =
     case mod of
-        CaseSensitive ->
-            "CaseSensitive"
-
         ExactMatch ->
             "ExactMatch"
 
         Tag ->
             "Tag"
 
-        Description ->
-            "Description"
+        Note ->
+            "Note"
 
 
 showAndOr : AndOr -> String
@@ -155,17 +148,14 @@ showTagSearch ts =
 printSearchMod : SearchMod -> String
 printSearchMod mod =
     case mod of
-        CaseSensitive ->
-            "c"
-
         ExactMatch ->
             "e"
 
         Tag ->
             "t"
 
-        Description ->
-            "d"
+        Note ->
+            "n"
 
 
 printAndOr : AndOr -> String
@@ -194,14 +184,12 @@ printTagSearch ts =
 searchMod : Parser SearchMod
 searchMod =
     oneOf
-        [ succeed CaseSensitive
-            |. symbol "c"
-        , succeed ExactMatch
+        [ succeed ExactMatch
             |. symbol "e"
         , succeed Tag
             |. symbol "t"
-        , succeed Description
-            |. symbol "d"
+        , succeed Note
+            |. symbol "n"
         ]
 
 
