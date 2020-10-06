@@ -1,5 +1,6 @@
 use barrel::backend::Sqlite;
 use barrel::{types, Migration};
+use data;
 use rusqlite::{params, Connection};
 use std::convert::TryInto;
 use std::error::Error;
@@ -370,16 +371,22 @@ pub fn now() -> Result<i64, Box<dyn Error>> {
 
 // user CRUD
 
-pub fn add_user(dbfile: &Path, name: &str, hashwd: &str) -> Result<i64, Box<dyn Error>> {
+pub fn new_user(
+  dbfile: &Path,
+  name: String,
+  hashwd: String,
+  salt: String,
+  email: String,
+  registration_key: String,
+) -> Result<i64, Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
 
-  let nowi64secs = now()?;
+  let now = now()?;
 
-  println!("adding user: {}", name);
   conn.execute(
-    "INSERT INTO user (name, hashwd, createdate)
-                VALUES (?1, ?2, ?3)",
-    params![name, hashwd, nowi64secs],
+    "INSERT INTO user (name, hashwd, salt, email, registration_key, createdate)
+      VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+    params![name, hashwd, salt, email, registration_key, now],
   )?;
 
   Ok(conn.last_insert_rowid())
@@ -424,27 +431,6 @@ pub fn update_user(dbfile: &Path, user: &User) -> Result<(), Box<dyn Error>> {
   )?;
 
   Ok(())
-}
-
-pub fn new_user(
-  dbfile: &Path,
-  name: String,
-  hashwd: String,
-  salt: String,
-  email: String,
-  registration_key: String,
-) -> Result<i64, Box<dyn Error>> {
-  let conn = connection_open(dbfile)?;
-
-  let now = now()?;
-
-  conn.execute(
-    "INSERT INTO user (name, hashwd, salt, email, registration_key, createdate)
-      VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-    params![name, hashwd, salt, email, registration_key, now],
-  )?;
-
-  Ok(conn.last_insert_rowid())
 }
 
 // zk CRUD
@@ -682,7 +668,9 @@ pub fn save_zknote(
 
   let now = now()?;
 
-  // TODO ensure user auth here.
+  if !is_zk_member(&conn, uid, note.zk)? {
+    bail!("can't save note; you are not a member of this zk");
+  }
 
   match note.id {
     Some(id) => {
@@ -800,7 +788,6 @@ pub fn read_zknotepubid(
         bail!("can't read zknote; note is private");
       }
     }
-    _ => {}
   }
 
   Ok(rbe)
@@ -835,6 +822,43 @@ pub fn zknotelisting(dbfile: &Path, user: i64, zk: i64) -> rusqlite::Result<Vec<
       zk: zk,
       createdate: row.get(2)?,
       changeddate: row.get(3)?,
+    })
+  })?;
+
+  let mut pv = Vec::new();
+
+  for rsrec in rec_iter {
+    match rsrec {
+      Ok(rec) => {
+        pv.push(rec);
+      }
+      Err(_) => (),
+    }
+  }
+
+  Ok(pv)
+}
+
+pub fn search_zknotes(
+  dbfile: &Path,
+  user: i64,
+  search: &data::ZkNoteSearch,
+) -> rusqlite::Result<Vec<ZkListNote>> {
+  let conn = connection_open(dbfile)?;
+
+  let (sql, args) = data::build_sql(user, search.clone());
+
+  println!("sql, args: {}, \n{:?}", sql, args);
+
+  let mut pstmt = conn.prepare(sql.as_str())?;
+
+  let rec_iter = pstmt.query_map(args.as_slice(), |row| {
+    Ok(ZkListNote {
+      id: row.get(0)?,
+      title: row.get(1)?,
+      zk: row.get(2)?,
+      createdate: row.get(3)?,
+      changeddate: row.get(4)?,
     })
   })?;
 

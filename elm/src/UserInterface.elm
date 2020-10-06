@@ -3,6 +3,7 @@ module UserInterface exposing (SendMsg(..), ServerResponse(..), encodeEmail, enc
 import Data
 import Json.Decode as JD
 import Json.Encode as JE
+import SearchParser as SP
 
 
 type SendMsg
@@ -21,6 +22,7 @@ type SendMsg
     | SaveZk Data.SaveZk
     | SaveZkLinks Data.ZkLinks
     | GetZkLinks Data.GetZkLinks
+    | SearchZkNotes Data.ZkNoteSearch
 
 
 type ServerResponse
@@ -163,6 +165,14 @@ encodeSendMsg sm uid pwd =
                 , ( "uid", JE.string uid )
                 , ( "pwd", JE.string pwd )
                 , ( "data", Data.encodeGetZkLinks gzl )
+                ]
+
+        SearchZkNotes s ->
+            JE.object
+                [ ( "what", JE.string "searchzknotes" )
+                , ( "uid", JE.string uid )
+                , ( "pwd", JE.string pwd )
+                , ( "data", Data.encodeZkNoteSearch s )
                 ]
 
 

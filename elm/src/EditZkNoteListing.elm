@@ -8,6 +8,8 @@ import Element.Border as EBd
 import Element.Font as Font
 import Element.Input as EI
 import Element.Region
+import SearchPanel as SP
+import SearchParser exposing (TagSearch(..))
 import TangoColors as TC
 
 
@@ -17,11 +19,13 @@ type Msg
     | NewPress
     | ExamplePress
     | DonePress
+    | SPMsg SP.Msg
 
 
 type alias Model =
     { zk : Data.Zk
     , notes : List Data.ZkListNote
+    , spmodel : SP.Model
     }
 
 
@@ -31,6 +35,8 @@ type Command
     | New
     | Example
     | Done
+    | None
+    | Search Data.ZkNoteSearch
 
 
 view : Model -> Element Msg
@@ -43,6 +49,7 @@ view model =
             , EI.button Common.buttonStyle { onPress = Just ExamplePress, label = E.text "example" }
             , EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "done" }
             ]
+        , E.map SPMsg <| SP.view False 0 model.spmodel
         , E.table [ E.spacing 8 ]
             { data = model.notes
             , columns =
@@ -88,3 +95,21 @@ update msg model =
 
         DonePress ->
             ( model, Done )
+
+        SPMsg m ->
+            let
+                ( nm, cm ) =
+                    SP.update m model.spmodel
+
+                mod =
+                    { model | spmodel = nm }
+            in
+            case cm of
+                SP.None ->
+                    ( mod, None )
+
+                SP.Save ->
+                    ( mod, None )
+
+                SP.Search ts ->
+                    ( mod, Search { tagSearch = ts, zks = [ model.zk.id ] } )

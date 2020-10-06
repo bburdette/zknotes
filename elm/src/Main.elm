@@ -29,6 +29,7 @@ import Markdown.Renderer
 import PublicInterface as PI
 import Random exposing (Seed, initialSeed)
 import Schelme.Show exposing (showTerm)
+import SearchPanel as SP
 import ShowMessage
 import Url exposing (Url)
 import Url.Builder as UB
@@ -261,6 +262,7 @@ type alias NwState =
     , mbzknotelisting : Maybe (List Data.ZkListNote)
     , mbzklinks : Maybe Data.ZkLinks
     , mbzknote : Maybe Data.FullZkNote
+    , spmodel : SP.Model
     }
 
 
@@ -292,7 +294,7 @@ notewait nwstate state wmsg =
     in
     case ( n.mbzknotelisting, n.mbzklinks, n.mbzknote ) of
         ( Just zknl, Just zkl, Just zkn ) ->
-            ( EditZkNote (EditZkNote.initFull n.zk zknl zkn zkl) n.login, Cmd.none )
+            ( EditZkNote (EditZkNote.initFull n.zk zknl zkn zkl n.spmodel) n.login, Cmd.none )
 
         _ ->
             ( Wait state (notewait n), Cmd.none )
@@ -500,7 +502,7 @@ update msg model =
                                 ZkWait zwstate wm ->
                                     case ( wm, stateLogin zwstate ) of
                                         ( WmZk zk, Just login ) ->
-                                            ( { model | state = EditZkNoteListing { zk = zk, notes = l } login }, Cmd.none )
+                                            ( { model | state = EditZkNoteListing { zk = zk, notes = l, spmodel = SP.initModel } login }, Cmd.none )
 
                                         ( WmZklm Nothing mbzkn zk tostate, Just login ) ->
                                             case mbzkn of
@@ -516,6 +518,16 @@ update msg model =
                                             ( { model | state = BadError (BadError.initialModel "unexpected reply") state }
                                             , Cmd.none
                                             )
+
+                                EditZkNoteListing znlstate login_ ->
+                                    ( { model | state = EditZkNoteListing { znlstate | notes = l } login_ }
+                                    , Cmd.none
+                                    )
+
+                                EditZkNote znstate login_ ->
+                                    ( { model | state = EditZkNote { znstate | zklist = l } login_ }
+                                    , Cmd.none
+                                    )
 
                                 _ ->
                                     ( { model | state = BadError (BadError.initialModel "unexpected zknote listing") state }
@@ -772,7 +784,7 @@ update msg model =
                                             ( st, Cmd.none )
 
                                         UserReplyData (Ok (UI.ZkNoteListing l)) ->
-                                            ( EditZkNoteListing { zk = es.zk, notes = l } login, Cmd.none )
+                                            ( EditZkNoteListing { zk = es.zk, notes = l, spmodel = SP.initModel } login, Cmd.none )
 
                                         UserReplyData (Ok (UI.ServerError e)) ->
                                             ( BadError (BadError.initialModel e) st, Cmd.none )
@@ -851,6 +863,7 @@ update msg model =
                                     , mbzknotelisting = Nothing
                                     , mbzklinks = Nothing
                                     , mbzknote = Nothing
+                                    , spmodel = emod.spmodel
                                     }
                                 )
                       }
@@ -883,6 +896,7 @@ update msg model =
                                     , mbzknotelisting = Nothing
                                     , mbzklinks = Nothing
                                     , mbzknote = Nothing
+                                    , spmodel = emod.spmodel
                                     }
                                 )
                       }
@@ -917,6 +931,13 @@ update msg model =
                 EditZkNote.GetSelectedText id ->
                     ( { model | state = EditZkNote emod login }
                     , getSelectedText (Just id)
+                    )
+
+                EditZkNote.Search s ->
+                    ( { model | state = EditZkNote emod login }
+                    , sendUIMsg model.location
+                        login
+                        (UI.SearchZkNotes s)
                     )
 
         ( EditZkListingMsg em, EditZkListing es login ) ->
@@ -980,11 +1001,14 @@ update msg model =
                     EditZkNoteListing.update em es
             in
             case ecmd of
+                EditZkNoteListing.None ->
+                    ( { model | state = EditZkNoteListing emod login }, Cmd.none )
+
                 EditZkNoteListing.New ->
-                    ( { model | state = EditZkNote (EditZkNote.initNew emod.zk es.notes) login }, Cmd.none )
+                    ( { model | state = EditZkNote (EditZkNote.initNew emod.zk es.notes emod.spmodel) login }, Cmd.none )
 
                 EditZkNoteListing.Example ->
-                    ( { model | state = EditZkNote (EditZkNote.initExample emod.zk es.notes) login }, Cmd.none )
+                    ( { model | state = EditZkNote (EditZkNote.initExample emod.zk es.notes emod.spmodel) login }, Cmd.none )
 
                 EditZkNoteListing.Selected id ->
                     ( { model
@@ -1000,6 +1024,7 @@ update msg model =
                                     , mbzknotelisting = Just emod.notes
                                     , mbzklinks = Nothing
                                     , mbzknote = Nothing
+                                    , spmodel = emod.spmodel
                                     }
                                 )
                       }
@@ -1032,6 +1057,13 @@ update msg model =
                     , sendUIMsg model.location
                         login
                         UI.GetZkListing
+                    )
+
+                EditZkNoteListing.Search s ->
+                    ( { model | state = EditZkNoteListing emod login }
+                    , sendUIMsg model.location
+                        login
+                        (UI.SearchZkNotes s)
                     )
 
         ( BadErrorMsg bm, BadError bs prevstate ) ->

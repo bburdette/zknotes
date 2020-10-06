@@ -2,6 +2,7 @@ module Data exposing (..)
 
 import Json.Decode as JD
 import Json.Encode as JE
+import SearchParser as SP
 
 
 type alias Login =
@@ -96,6 +97,20 @@ type alias GetZkLinks =
     { zknote : Int
     , zk : Int
     }
+
+
+type alias ZkNoteSearch =
+    { tagSearch : SP.TagSearch
+    , zks : List Int
+    }
+
+
+encodeZkNoteSearch : ZkNoteSearch -> JE.Value
+encodeZkNoteSearch zns =
+    JE.object
+        [ ( "tagsearch", SP.encodeTagSearch zns.tagSearch )
+        , ( "zks", JE.list JE.int zns.zks )
+        ]
 
 
 encodeGetZkLinks : GetZkLinks -> JE.Value

@@ -1,5 +1,6 @@
 use config::Config;
 use crypto_hash::{hex_digest, Algorithm};
+use data;
 use email;
 use serde_json::Value;
 use simple_error;
@@ -212,7 +213,7 @@ fn user_interface_loggedin(
       let entries = sqldata::zklisting(Path::new(&config.db), uid)?;
       Ok(ServerResponse {
         what: "zklisting".to_string(),
-        content: serde_json::to_value(entries)?, // return api token that expires?
+        content: serde_json::to_value(entries)?,
       })
     }
     "getzknotelisting" => {
@@ -222,7 +223,7 @@ fn user_interface_loggedin(
       let entries = sqldata::zknotelisting(Path::new(&config.db), uid, zkid)?;
       Ok(ServerResponse {
         what: "zknotelisting".to_string(),
-        content: serde_json::to_value(entries)?, // return api token that expires?
+        content: serde_json::to_value(entries)?,
       })
     }
     "getzknote" => {
@@ -235,7 +236,17 @@ fn user_interface_loggedin(
         content: serde_json::to_value(note)?,
       })
     }
+    "searchzknotes" => {
+      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      // let search: data::TagSearch = serde_json::from_value(msgdata.clone())?;
+      let search: data::ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
 
+      let entries = sqldata::search_zknotes(Path::new(&config.db), uid, &search)?;
+      Ok(ServerResponse {
+        what: "zknotelisting".to_string(),
+        content: serde_json::to_value(entries)?,
+      })
+    }
     "deletezknote" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let id: i64 = serde_json::from_value(msgdata.clone())?;
