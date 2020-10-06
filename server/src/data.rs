@@ -69,21 +69,48 @@ pub fn buildSql(uid: i64, search: ZkNoteSearch) -> (String, Vec<String>) {
     (sqlbase, args)
   }
 }
+/*
+
+  list = ( select id from zknote where
+          -- clauses)
+
+  select * from zknote where
+    (id = zlink.from and zlink.to in (list)
+    or id = zlink.to and zlink.from in (list))
+
+--- or -----
+
+  select * from zknote where
+    (id = zlink.from and zlink.to in (select id from zknote where
+          -- clauses)
+    or id = zlink.to and zlink.from in (select id from zknote where
+          -- clauses))
+
+select title from zknote where title != "wat";
+*/
 
 fn buildSqlClause(not: bool, search: TagSearch) -> (String, Vec<String>) {
   match search {
     TagSearch::SearchTerm { mods, term } => {
-      if not {
-        (
-          "title not like ?".to_string(),
-          vec![format!("%{}%", term).to_string()],
-        )
-      } else {
-        (
-          "title like ?".to_string(),
-          vec![format!("%{}%", term).to_string()],
-        )
+      let mut case = false;
+      let mut exact = false;
+      let mut tag = false;
+      let mut desc = false;
+
+      for m in mods {
+        match m {
+          SearchMod::CaseSensitive => case = true,
+          SearchMod::ExactMatch => exact = true,
+          SearchMod::Tag => tag = true,
+          SearchMod::Description => desc = true,
+        }
       }
+      let field = if desc { "content" } else { "title" };
+      let nots = if not { "not" } else { "" };
+      (
+        format!("{} {} like ?", field, nots),
+        vec![format!("%{}%", term).to_string()],
+      )
     }
     TagSearch::Not { ts } => buildSqlClause(true, *ts),
     TagSearch::Boolex { ts1, ao, ts2 } => {
