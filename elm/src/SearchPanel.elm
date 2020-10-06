@@ -187,11 +187,11 @@ view narrow nblevel model =
                     Input.labelLeft [] <|
                         row [ centerY ]
                             [ case model.search of
-                                TagSearch (Ok _) ->
-                                    Input.button buttonStyle { onPress = Just SearchClick, label = text "search:" }
+                                TagSearch (Err _) ->
+                                    Input.button (buttonStyle ++ [ Background.color Color.grey ]) { onPress = Nothing, label = text "search:" }
 
                                 _ ->
-                                    Input.button (buttonStyle ++ [ Background.color Color.grey ]) { onPress = Nothing, label = text "search:" }
+                                    Input.button buttonStyle { onPress = Just SearchClick, label = text "search:" }
                             ]
                 }
 
@@ -355,6 +355,9 @@ update msg model =
             case model.search of
                 TagSearch (Ok s) ->
                     ( model, Search s )
+
+                NoSearch ->
+                    ( model, Search <| SearchTerm [] "" )
 
                 _ ->
                     ( model, None )
