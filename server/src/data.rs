@@ -69,25 +69,6 @@ pub fn buildSql(uid: i64, search: ZkNoteSearch) -> (String, Vec<String>) {
     (sqlbase, args)
   }
 }
-/*
-
-  list = ( select id from zknote where
-          -- clauses)
-
-  select * from zknote where
-    (id = zlink.from and zlink.to in (list)
-    or id = zlink.to and zlink.from in (list))
-
---- or -----
-
-  select * from zknote where
-    (id = zlink.from and zlink.to in (select id from zknote where
-          -- clauses)
-    or id = zlink.to and zlink.from in (select id from zknote where
-          -- clauses))
-
-select title from zknote where title != "wat";
-*/
 
 fn buildSqlClause(not: bool, search: TagSearch) -> (String, Vec<String>) {
   match search {
@@ -107,10 +88,36 @@ fn buildSqlClause(not: bool, search: TagSearch) -> (String, Vec<String>) {
       }
       let field = if desc { "content" } else { "title" };
       let nots = if not { "not" } else { "" };
-      (
-        format!("{} {} like ?", field, nots),
-        vec![format!("%{}%", term).to_string()],
-      )
+
+      if tag {
+        // get the matching tag ids.
+
+        let clause = format!("{} {} like ?", field, nots);
+
+        (
+          format!(
+            "(0 < (select count(zkn.id) from zknote as zkn, zklink
+             where zkn.id = zklink.fromid
+               and zklink.toid = zknote.id
+               and {})
+          or
+          0 < (select count(zkn.id) from zknote as zkn, zklink
+             where zkn.id = zklink.toid
+               and zklink.fromid = zknote.id
+               and {}))",
+            clause, clause
+          ),
+          vec![
+            format!("%{}%", term).to_string(),
+            format!("%{}%", term).to_string(),
+          ],
+        )
+      } else {
+        (
+          format!("{} {} like ?", field, nots),
+          vec![format!("%{}%", term).to_string()],
+        )
+      }
     }
     TagSearch::Not { ts } => buildSqlClause(true, *ts),
     TagSearch::Boolex { ts1, ao, ts2 } => {
