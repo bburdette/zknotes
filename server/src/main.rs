@@ -33,17 +33,11 @@ mod util;
 use actix_files::NamedFile;
 // use actix_web::http::{Method, StatusCode};
 use actix_web::middleware::Logger;
-use actix_web::{
-  http, middleware, web, App, FromRequest, HttpMessage, HttpRequest, HttpResponse, HttpServer,
-  Responder, Result,
-};
+use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Result};
 use config::Config;
-use futures::future::Future;
 use interfaces::{PublicMessage, ServerResponse, UserMessage};
 use std::error::Error;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, RwLock};
-use std::time::SystemTime;
 
 fn favicon(_req: &HttpRequest) -> Result<NamedFile> {
   let stpath = Path::new("static/favicon.ico");
@@ -184,7 +178,6 @@ fn main() {
 }
 
 fn err_main() -> Result<(), Box<dyn Error>> {
-
   env_logger::init();
 
   info!("server init!");

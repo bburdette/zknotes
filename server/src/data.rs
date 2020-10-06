@@ -1,12 +1,3 @@
-use barrel::backend::Sqlite;
-use barrel::{types, Migration};
-use rusqlite::{params, Connection};
-use std::convert::TryInto;
-use std::error::Error;
-use std::path::Path;
-use std::time::Duration;
-use std::time::SystemTime;
-
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ZkNoteSearch {
   pub tagsearch: TagSearch,
@@ -42,8 +33,8 @@ pub enum AndOr {
   Or,
 }
 
-pub fn buildSql(uid: i64, search: ZkNoteSearch) -> (String, Vec<String>) {
-  let (cls, mut clsargs) = buildSqlClause(false, search.tagsearch);
+pub fn build_sql(uid: i64, search: ZkNoteSearch) -> (String, Vec<String>) {
+  let (cls, mut clsargs) = build_sql_clause(false, search.tagsearch);
 
   let zklist = format!("{:?}", search.zks)
     .replace("[", "(")
@@ -67,7 +58,7 @@ pub fn buildSql(uid: i64, search: ZkNoteSearch) -> (String, Vec<String>) {
   }
 }
 
-fn buildSqlClause(not: bool, search: TagSearch) -> (String, Vec<String>) {
+fn build_sql_clause(not: bool, search: TagSearch) -> (String, Vec<String>) {
   match search {
     TagSearch::SearchTerm { mods, term } => {
       let mut exact = false;
@@ -133,10 +124,10 @@ fn buildSqlClause(not: bool, search: TagSearch) -> (String, Vec<String>) {
         )
       }
     }
-    TagSearch::Not { ts } => buildSqlClause(true, *ts),
+    TagSearch::Not { ts } => build_sql_clause(true, *ts),
     TagSearch::Boolex { ts1, ao, ts2 } => {
-      let (mut cl1, mut arg1) = buildSqlClause(false, *ts1);
-      let (mut cl2, mut arg2) = buildSqlClause(false, *ts2);
+      let (cl1, mut arg1) = build_sql_clause(false, *ts1);
+      let (cl2, mut arg2) = build_sql_clause(false, *ts2);
       let mut cls = String::new();
       let conj = match ao {
         AndOr::Or => " or ",
