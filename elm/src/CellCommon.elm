@@ -166,10 +166,10 @@ mkRenderer cellDict onchanged =
                 |> Markdown.Html.withAttribute "name"
                 |> Markdown.Html.withAttribute "schelmecode"
             ]
-    , table = E.column []
-    , tableHeader = E.column []
-    , tableBody = E.column []
-    , tableRow = E.row []
+    , table = E.column [ E.width <| E.fill ]
+    , tableHeader = E.column [ E.width <| E.fill, Font.bold, Font.underline, E.spacing 8 ]
+    , tableBody = E.column [ E.width <| E.fill ]
+    , tableRow = E.row [ E.width E.fill ]
     , tableHeaderCell =
         \maybeAlignment children ->
             E.paragraph [] children
