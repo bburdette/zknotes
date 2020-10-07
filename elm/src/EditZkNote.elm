@@ -14,6 +14,7 @@ import Element.Input as EI
 import Element.Region as ER
 import Html exposing (Attribute, Html)
 import Html.Attributes
+import InlineFoldl exposing (inlineFoldl)
 import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..))
 import Markdown.Html
 import Markdown.Parser
@@ -551,7 +552,7 @@ update msg model =
                             Dict.empty
 
                         ( Ok blocks, Just id ) ->
-                            CellCommon.inlineFoldl
+                            inlineFoldl
                                 (\inline links ->
                                     case inline of
                                         Block.Link str mbstr moarinlines ->
