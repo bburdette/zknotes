@@ -67,6 +67,11 @@ view model =
                                 [ EI.button Common.buttonStyle { onPress = Just (SelectPress n.id), label = E.text "edit" }
                                 , EI.button Common.buttonStyle { onPress = Just (ViewPress n.id), label = E.text "view" }
                                 , E.link [ Font.color TC.darkBlue, Font.underline ] { url = "note/" ++ String.fromInt n.id, label = E.text "link" }
+                                , if n.public then
+                                    E.text "public"
+
+                                  else
+                                    E.text "      "
                                 ]
                   }
                 ]

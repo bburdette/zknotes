@@ -435,6 +435,7 @@ addListNote model szn szkn =
             { id = szkn.id
             , title = szn.title
             , zk = szn.zk
+            , public = szn.public
             , createdate = szkn.changeddate
             , changeddate = szkn.changeddate
             }

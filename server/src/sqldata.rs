@@ -47,6 +47,7 @@ pub struct ZkListNote {
   id: i64,
   title: String,
   zk: i64,
+  public: bool,
   createdate: i64,
   changeddate: i64,
 }
@@ -810,7 +811,7 @@ pub fn zknotelisting(dbfile: &Path, user: i64, zk: i64) -> rusqlite::Result<Vec<
   let conn = connection_open(dbfile)?;
 
   let mut pstmt = conn.prepare(
-    "SELECT id, title, createdate, changeddate
+    "SELECT id, title, public, createdate, changeddate
       FROM zknote where zk = ?1 and
         zk IN (select zk from zkmember where user = ?2)",
   )?;
@@ -820,8 +821,9 @@ pub fn zknotelisting(dbfile: &Path, user: i64, zk: i64) -> rusqlite::Result<Vec<
       id: row.get(0)?,
       title: row.get(1)?,
       zk: zk,
-      createdate: row.get(2)?,
-      changeddate: row.get(3)?,
+      public: row.get(2)?,
+      createdate: row.get(3)?,
+      changeddate: row.get(4)?,
     })
   })?;
 
@@ -857,8 +859,9 @@ pub fn search_zknotes(
       id: row.get(0)?,
       title: row.get(1)?,
       zk: row.get(2)?,
-      createdate: row.get(3)?,
-      changeddate: row.get(4)?,
+      public: row.get(3)?,
+      createdate: row.get(4)?,
+      changeddate: row.get(5)?,
     })
   })?;
 
