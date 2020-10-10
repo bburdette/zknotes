@@ -41,7 +41,7 @@ pub fn build_sql(uid: i64, search: ZkNoteSearch) -> (String, Vec<String>) {
     .replace("]", ")");
 
   let mut sqlbase = format!(
-    "SELECT id, title, zk, createdate, changeddate
+    "SELECT id, title, zk, public, createdate, changeddate
       FROM zknote where zk IN (select zk from zkmember where user = ?) and
       zk in {}",
     zklist
