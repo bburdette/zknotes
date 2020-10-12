@@ -715,23 +715,56 @@ update msg model =
                 backtolisting =
                     ( { model
                         | state =
-                            Wait
-                                (ShowMessage
-                                    { message = "loading articles"
-                                    }
-                                    login
-                                )
-                                (listingwait login es.zk)
+                            EditZkNoteListing { zk = emod.zk, notes = emod.zklist, spmodel = emod.spmodel } login
                       }
-                    , sendUIMsg model.location
-                        login
-                        (UI.GetZkNoteListing
-                            es.zk.id
-                        )
+                    , Cmd.none
                     )
             in
             case ecmd of
                 EditZkNote.SaveExit szk zklinks ->
+                    let
+                        gotres =
+                            ( EditZkNoteListing
+                                { zk = es.zk
+                                , notes = emod.zklist
+                                , spmodel = emod.spmodel
+                                }
+                                login
+                            , case SP.getSearch emod.spmodel of
+                                Just s ->
+                                    sendUIMsg model.location
+                                        login
+                                        (UI.SearchZkNotes { tagSearch = s, zks = [ emod.zk.id ] })
+
+                                Nothing ->
+                                    Cmd.none
+                            )
+
+                        savefn : Bool -> Bool -> State -> Msg -> ( State, Cmd Msg )
+                        savefn gotsn gotsl st ms =
+                            case ms of
+                                UserReplyData (Ok (UI.SavedZkNote szn)) ->
+                                    if gotsl then
+                                        gotres
+
+                                    else
+                                        ( Wait st (savefn True False), Cmd.none )
+
+                                UserReplyData (Ok UI.SavedZkLinks) ->
+                                    if gotsn then
+                                        gotres
+
+                                    else
+                                        ( Wait st (savefn False True), Cmd.none )
+
+                                UserReplyData (Ok (UI.ServerError e)) ->
+                                    ( BadError (BadError.initialModel e) st, Cmd.none )
+
+                                _ ->
+                                    ( BadError (BadError.initialModel "unexpected message!") model.state
+                                    , Cmd.none
+                                    )
+                    in
                     ( { model
                         | state =
                             Wait
@@ -740,31 +773,7 @@ update msg model =
                                     }
                                     login
                                 )
-                                (\st ms ->
-                                    case ms of
-                                        UserReplyData (Ok (UI.SavedZkNote id)) ->
-                                            ( st
-                                            , sendUIMsg model.location
-                                                login
-                                                (UI.GetZkNoteListing
-                                                    es.zk.id
-                                                )
-                                            )
-
-                                        UserReplyData (Ok UI.SavedZkLinks) ->
-                                            ( st, Cmd.none )
-
-                                        UserReplyData (Ok (UI.ZkNoteListing l)) ->
-                                            ( EditZkNoteListing { zk = es.zk, notes = l, spmodel = SP.initModel } login, Cmd.none )
-
-                                        UserReplyData (Ok (UI.ServerError e)) ->
-                                            ( BadError (BadError.initialModel e) st, Cmd.none )
-
-                                        _ ->
-                                            ( BadError (BadError.initialModel "unexpected message!") model.state
-                                            , Cmd.none
-                                            )
-                                )
+                                (savefn False False)
                       }
                     , Cmd.batch
                         [ sendUIMsg model.location

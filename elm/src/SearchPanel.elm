@@ -1,4 +1,4 @@
-module SearchPanel exposing (Command(..), Model, Msg(..), addTagToSearch, addTagToSearchPrev, addToSearch, initModel, toggleHelpButton, update, updateSearchText, view)
+module SearchPanel exposing (Command(..), Model, Msg(..), Search(..), addTagToSearch, addTagToSearchPrev, addToSearch, getSearch, initModel, selectPrevSearch, toggleHelpButton, update, updateSearchText, view)
 
 import Common exposing (buttonStyle)
 import Element exposing (..)
@@ -59,6 +59,19 @@ type Command
     = None
     | Save
     | Search TagSearch
+
+
+getSearch : Model -> Maybe TagSearch
+getSearch model =
+    case model.search of
+        TagSearch (Ok s) ->
+            Just s
+
+        NoSearch ->
+            Just <| SearchTerm [] ""
+
+        _ ->
+            Nothing
 
 
 addToSearch : String -> Search -> Search
@@ -351,15 +364,14 @@ update msg model =
             ( { model | showParse = not model.showParse }, None )
 
         SearchClick ->
-            case model.search of
-                TagSearch (Ok s) ->
-                    ( model, Search s )
+            ( model
+            , case getSearch model of
+                Just s ->
+                    Search s
 
-                NoSearch ->
-                    ( model, Search <| SearchTerm [] "" )
-
-                _ ->
-                    ( model, None )
+                Nothing ->
+                    None
+            )
 
         ToggleHelp ->
             ( { model | showHelp = not model.showHelp }, None )

@@ -525,9 +525,13 @@ update msg model =
 
         DonePress ->
             ( model
-            , SaveExit
-                (sznFromModel model)
-                (saveZkLinkList model)
+            , if dirty model then
+                SaveExit
+                    (sznFromModel model)
+                    (saveZkLinkList model)
+
+              else
+                Revert
             )
 
         ViewPress ->
