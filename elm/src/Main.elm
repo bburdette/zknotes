@@ -57,13 +57,6 @@ type Msg
     | Noop
 
 
-type WaitMode
-    = WmView
-    | WmZk Data.Zk
-    | WmZkl (List Data.ZkListNote) Data.Zk
-    | WmZklm (Maybe (List Data.ZkListNote)) (Maybe Data.FullZkNote) Data.Zk (List Data.ZkListNote -> Data.FullZkNote -> Data.Zk -> State)
-
-
 type State
     = Login Login.Model
     | EditZk EditZk.Model Data.Login
@@ -75,7 +68,6 @@ type State
     | BadError BadError.Model State
     | ShowMessage ShowMessage.Model Data.Login
     | PubShowMessage ShowMessage.Model
-    | ZkWait State WaitMode
     | Wait State (State -> Msg -> ( State, Cmd Msg ))
 
 
@@ -130,9 +122,6 @@ stateLogin state =
 
         PubShowMessage _ ->
             Nothing
-
-        ZkWait bwstate _ ->
-            stateLogin bwstate
 
         Wait wstate _ ->
             stateLogin wstate
@@ -213,9 +202,6 @@ viewState size state =
 
         BadError em _ ->
             Element.map BadErrorMsg <| BadError.view em
-
-        ZkWait innerState _ ->
-            Element.map (\_ -> Noop) (viewState size innerState)
 
         Wait innerState _ ->
             Element.map (\_ -> Noop) (viewState size innerState)
@@ -298,6 +284,36 @@ notewait nwstate state wmsg =
 
         _ ->
             ( Wait state (notewait n), Cmd.none )
+
+
+listingwait : Data.Login -> Data.Zk -> State -> Msg -> ( State, Cmd Msg )
+listingwait login zk st ms =
+    case ms of
+        UserReplyData (Ok (UI.ZkNoteListing l)) ->
+            ( EditZkNoteListing { zk = zk, notes = l, spmodel = SP.initModel } login, Cmd.none )
+
+        UserReplyData (Ok (UI.ServerError e)) ->
+            ( BadError (BadError.initialModel e) st, Cmd.none )
+
+        _ ->
+            ( BadError (BadError.initialModel "unexpected message!") st
+            , Cmd.none
+            )
+
+
+noteviewwait : State -> State -> Msg -> ( State, Cmd Msg )
+noteviewwait backstate st ms =
+    case ms of
+        UserReplyData (Ok (UI.ZkNote zkn)) ->
+            ( EView (View.initFull zkn) backstate, Cmd.none )
+
+        UserReplyData (Ok (UI.ServerError e)) ->
+            ( BadError (BadError.initialModel e) st, Cmd.none )
+
+        _ ->
+            ( BadError (BadError.initialModel "unexpected message!") st
+            , Cmd.none
+            )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -499,26 +515,6 @@ update msg model =
 
                         UI.ZkNoteListing l ->
                             case state of
-                                ZkWait zwstate wm ->
-                                    case ( wm, stateLogin zwstate ) of
-                                        ( WmZk zk, Just login ) ->
-                                            ( { model | state = EditZkNoteListing { zk = zk, notes = l, spmodel = SP.initModel } login }, Cmd.none )
-
-                                        ( WmZklm Nothing mbzkn zk tostate, Just login ) ->
-                                            case mbzkn of
-                                                Just zkn ->
-                                                    ( { model | state = tostate l zkn zk }
-                                                    , Cmd.none
-                                                    )
-
-                                                Nothing ->
-                                                    ( { model | state = ZkWait zwstate (WmZklm (Just l) mbzkn zk tostate) }, Cmd.none )
-
-                                        _ ->
-                                            ( { model | state = BadError (BadError.initialModel "unexpected reply") state }
-                                            , Cmd.none
-                                            )
-
                                 EditZkNoteListing znlstate login_ ->
                                     ( { model | state = EditZkNoteListing { znlstate | notes = l } login_ }
                                     , Cmd.none
@@ -541,31 +537,6 @@ update msg model =
                                     ( { model | state = BadError (BadError.initialModel "zknoteeditunimplmeented") state }
                                     , Cmd.none
                                     )
-
-                                ZkWait bwstate mode ->
-                                    case mode of
-                                        WmView ->
-                                            ( { model | state = EView (View.initFull zkn) bwstate }, Cmd.none )
-
-                                        WmZk zk ->
-                                            ( { model | state = BadError (BadError.initialModel "can't edit - no zklist!") state }, Cmd.none )
-
-                                        WmZklm mbzkl mbzkn zk tostate ->
-                                            case mbzkl of
-                                                Just zkl ->
-                                                    ( { model | state = tostate zkl zkn zk }, Cmd.none )
-
-                                                Nothing ->
-                                                    ( { model | state = ZkWait bwstate (WmZklm mbzkl (Just zkn) zk tostate) }, Cmd.none )
-
-                                        WmZkl zkl zk ->
-                                            case stateLogin state of
-                                                Just login ->
-                                                    ( { model | state = BadError (BadError.initialModel "obsolete branch") state }, Cmd.none )
-
-                                                -- ( { model | state = EditZkNote (EditZkNote.initFull zk zkl zkn) login }, Cmd.none )
-                                                Nothing ->
-                                                    ( { model | state = BadError (BadError.initialModel "can't edit - not logged in!") state }, Cmd.none )
 
                                 -- ( { model | state = BadError (BadError.initialModel "unexpected message") bwstate }, Cmd.none )
                                 _ ->
@@ -744,13 +715,13 @@ update msg model =
                 backtolisting =
                     ( { model
                         | state =
-                            ZkWait
+                            Wait
                                 (ShowMessage
                                     { message = "loading articles"
                                     }
                                     login
                                 )
-                                (WmZk emod.zk)
+                                (listingwait login es.zk)
                       }
                     , sendUIMsg model.location
                         login
@@ -975,13 +946,13 @@ update msg model =
                 EditZkListing.Notes zk ->
                     ( { model
                         | state =
-                            ZkWait
+                            Wait
                                 (ShowMessage
                                     { message = "loading articles"
                                     }
                                     login
                                 )
-                                (WmZk zk)
+                                (listingwait login zk)
                       }
                     , sendUIMsg model.location
                         login
@@ -989,7 +960,16 @@ update msg model =
                     )
 
                 EditZkListing.View id ->
-                    ( { model | state = ZkWait model.state WmView }
+                    ( { model
+                        | state =
+                            Wait
+                                (ShowMessage
+                                    { message = "loading zk members"
+                                    }
+                                    login
+                                )
+                                (noteviewwait model.state)
+                      }
                     , sendUIMsg model.location
                         login
                         (UI.GetZk id)
@@ -1039,7 +1019,15 @@ update msg model =
                     )
 
                 EditZkNoteListing.View id ->
-                    ( { model | state = ZkWait model.state WmView }
+                    ( { model
+                        | state =
+                            Wait
+                                (ShowMessage
+                                    { message = "loading zknote" }
+                                    login
+                                )
+                                (noteviewwait model.state)
+                      }
                     , sendUIMsg model.location
                         login
                         (UI.GetZkNote id)
