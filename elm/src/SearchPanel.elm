@@ -8,8 +8,8 @@ import Element.Events exposing (onClick)
 import Element.Font as Font
 import Element.Input as Input
 import Parser
+import Search as S exposing (AndOr(..), SearchMod(..), TSText, TagSearch(..), tagSearchParser)
 import SearchHelpPanel
-import SearchParser exposing (AndOr(..), SearchMod(..), TSText, TagSearch(..), tagSearchParser)
 import TDict exposing (TDict)
 import TangoColors as Color
 import Util exposing (Size)
@@ -92,7 +92,7 @@ addTagToSearch model name =
         TagSearch (Ok ts) ->
             { model
                 | search = s
-                , searchText = SearchParser.printTagSearch ts
+                , searchText = S.printTagSearch ts
             }
 
         _ ->
@@ -122,7 +122,7 @@ updateSearchText model txt =
                 TagSearch <| Parser.run tagSearchParser txt
 
             else
-                TagSearch <| Ok <| SearchParser.SearchTerm [] txt
+                TagSearch <| Ok <| S.SearchTerm [] txt
     }
 
 
@@ -278,7 +278,7 @@ view narrow nblevel model =
                                     [ column [ width fill ]
                                         [ paragraph [ spacing 3, width fill ]
                                             [ text "search expression:"
-                                            , paragraph [] [ text <| SearchParser.printTagSearch ts ]
+                                            , paragraph [] [ text <| S.printTagSearch ts ]
                                             , el [ alignRight ] <| toggleHelpButton model.showHelp
                                             ]
                                         , if model.showHelp then

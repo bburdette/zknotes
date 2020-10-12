@@ -2,7 +2,7 @@ module Data exposing (..)
 
 import Json.Decode as JD
 import Json.Encode as JE
-import SearchParser as SP
+import Search as SP
 
 
 type alias Login =

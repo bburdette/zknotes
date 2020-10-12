@@ -3,7 +3,7 @@ module UserInterface exposing (SendMsg(..), ServerResponse(..), encodeEmail, enc
 import Data
 import Json.Decode as JD
 import Json.Encode as JE
-import SearchParser as SP
+import Search as S
 
 
 type SendMsg

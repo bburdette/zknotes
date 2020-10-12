@@ -1,4 +1,4 @@
-module SearchParser exposing (AndOr(..), FieldText(..), SearchMod(..), TSText(..), TagSearch(..), andor, encodeSearchMod, encodeTagSearch, extractTagSearches, fieldString, fieldText, fields, oplistParser, printAndOr, printSearchMod, printTagSearch, searchMod, searchMods, searchTerm, showAndOr, showSearchMod, showTagSearch, singleTerm, spaces, tagSearchParser)
+module Search exposing (AndOr(..), FieldText(..), SearchMod(..), TSText(..), TagSearch(..), andor, encodeSearchMod, encodeTagSearch, extractTagSearches, fieldString, fieldText, fields, oplistParser, printAndOr, printSearchMod, printTagSearch, searchMod, searchMods, searchTerm, showAndOr, showSearchMod, showTagSearch, singleTerm, spaces, tagSearchParser)
 
 import Json.Decode as JD
 import Json.Encode as JE

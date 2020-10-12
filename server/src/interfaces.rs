@@ -59,7 +59,6 @@ pub fn user_interface(config: &Config, msg: UserMessage) -> Result<ServerRespons
         // get email from 'data'.
         let msgdata = Option::ok_or(msg.data, "malformed registration data")?;
         let rd: RegistrationData = serde_json::from_value(msgdata)?;
-        // TODO: make a real registration key
         let registration_key = Uuid::new_v4().to_string();
         let salt = util::salt_string();
 
