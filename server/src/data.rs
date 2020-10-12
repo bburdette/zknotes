@@ -2,6 +2,8 @@
 pub struct ZkNoteSearch {
   pub tagsearch: TagSearch,
   pub zks: Vec<i64>,
+  pub offset: i64,
+  pub limit: Option<i64>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -40,6 +42,11 @@ pub fn build_sql(uid: i64, search: ZkNoteSearch) -> (String, Vec<String>) {
     .replace("[", "(")
     .replace("]", ")");
 
+  let limclause = match search.limit {
+    Some(lm) => format!(" limit {} offset {}", lm, search.offset),
+    None => format!(" offset {}", search.offset),
+  };
+
   let mut sqlbase = format!(
     "SELECT id, title, zk, public, createdate, changeddate
       FROM zknote where zk IN (select zk from zkmember where user = ?) and
@@ -49,11 +56,16 @@ pub fn build_sql(uid: i64, search: ZkNoteSearch) -> (String, Vec<String>) {
   let mut args = vec![uid.to_string()];
 
   if clsargs.is_empty() {
+    sqlbase.push_str(limclause.as_str());
+
     (sqlbase, args)
   } else {
     sqlbase.push_str(" and ");
     sqlbase.push_str(cls.as_str());
+    sqlbase.push_str(limclause.as_str());
+
     args.append(&mut clsargs);
+
     (sqlbase, args)
   }
 }

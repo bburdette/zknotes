@@ -103,15 +103,22 @@ type alias GetZkLinks =
 type alias ZkNoteSearch =
     { tagSearch : SP.TagSearch
     , zks : List Int
+    , offset : Int
+    , limit : Maybe Int
     }
 
 
 encodeZkNoteSearch : ZkNoteSearch -> JE.Value
 encodeZkNoteSearch zns =
-    JE.object
+    JE.object <|
         [ ( "tagsearch", SP.encodeTagSearch zns.tagSearch )
         , ( "zks", JE.list JE.int zns.zks )
+        , ( "offset", JE.int zns.offset )
         ]
+            ++ (zns.limit
+                    |> Maybe.map (\i -> [ ( "limit", JE.int i ) ])
+                    |> Maybe.withDefault []
+               )
 
 
 encodeGetZkLinks : GetZkLinks -> JE.Value

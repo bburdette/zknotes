@@ -1,7 +1,7 @@
-module PaginationPanel exposing (Command(..), Model, Msg(..), addTagToSearch, addTagToSearchPrev, addToSearch, initModel, toggleHelpButton, update, updateSearchText, view)
+module PaginationPanel exposing (Command(..), Model, Msg(..), initModel, update, view)
 
 import Common exposing (buttonStyle)
-import Element exposing (..)
+import Element as E exposing (Element)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Events exposing (onClick)
@@ -17,14 +17,14 @@ import Util exposing (Size)
 
 type alias Model =
     { increment : Int
-    , lower : Int
+    , offset : Int
     }
 
 
 initModel : Model
 initModel =
-    { increment = 50
-    , lower = 0
+    { increment = 5
+    , offset = 0
     }
 
 
@@ -40,14 +40,14 @@ type Command
 
 view : Model -> Element Msg
 view model =
-    row []
+    E.row [ E.spacing 8 ]
         [ Input.button buttonStyle
             { onPress = Just PrevClick
-            , label = text "prev"
+            , label = E.text "prev"
             }
         , Input.button buttonStyle
             { onPress = Just NextClick
-            , label = text "next"
+            , label = E.text "next"
             }
         ]
 
@@ -55,12 +55,12 @@ view model =
 update : Msg -> Model -> ( Model, Command )
 update msg model =
     case msg of
-        NextClick ->
-            ( { model | lower = lower + increment }
+        PrevClick ->
+            ( { model | offset = max (model.offset - model.increment) 0 }
             , RangeChanged
             )
 
-        PrevClick ->
-            ( { model | lower = max (lower + increment) 0 }
+        NextClick ->
+            ( { model | offset = model.offset + model.increment }
             , RangeChanged
             )

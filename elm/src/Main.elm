@@ -290,7 +290,7 @@ listingwait : Data.Login -> Data.Zk -> State -> Msg -> ( State, Cmd Msg )
 listingwait login zk st ms =
     case ms of
         UserReplyData (Ok (UI.ZkNoteListing l)) ->
-            ( EditZkNoteListing { zk = zk, notes = l, spmodel = SP.initModel } login, Cmd.none )
+            ( EditZkNoteListing { zk = zk, notes = l, spmodel = SP.initModel zk.id } login, Cmd.none )
 
         UserReplyData (Ok (UI.ServerError e)) ->
             ( BadError (BadError.initialModel e) st, Cmd.none )
@@ -755,7 +755,7 @@ update msg model =
                                             ( st, Cmd.none )
 
                                         UserReplyData (Ok (UI.ZkNoteListing l)) ->
-                                            ( EditZkNoteListing { zk = es.zk, notes = l, spmodel = SP.initModel } login, Cmd.none )
+                                            ( EditZkNoteListing { zk = es.zk, notes = l, spmodel = SP.initModel es.zk.id } login, Cmd.none )
 
                                         UserReplyData (Ok (UI.ServerError e)) ->
                                             ( BadError (BadError.initialModel e) st, Cmd.none )

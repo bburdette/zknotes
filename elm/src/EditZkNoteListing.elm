@@ -117,4 +117,4 @@ update msg model =
                     ( mod, None )
 
                 SP.Search ts ->
-                    ( mod, Search { tagSearch = ts, zks = [ model.zk.id ] } )
+                    ( mod, Search ts )
