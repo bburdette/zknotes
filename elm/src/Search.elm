@@ -1,4 +1,4 @@
-module Search exposing (AndOr(..), FieldText(..), SearchMod(..), TSText(..), TagSearch(..), ZkNoteSearch, andor, defaultSearch, encodeSearchMod, encodeTagSearch, encodeZkNoteSearch, extractTagSearches, fieldString, fieldText, fields, oplistParser, printAndOr, printSearchMod, printTagSearch, searchMod, searchMods, searchTerm, showAndOr, showSearchMod, showTagSearch, singleTerm, spaces, tagSearchParser)
+module Search exposing (AndOr(..), FieldText(..), SearchMod(..), TSText(..), TagSearch(..), ZkNoteSearch, andor, defaultSearch, defaultSearchLimit, encodeSearchMod, encodeTagSearch, encodeZkNoteSearch, extractTagSearches, fieldString, fieldText, fields, oplistParser, printAndOr, printSearchMod, printTagSearch, searchMod, searchMods, searchTerm, showAndOr, showSearchMod, showTagSearch, singleTerm, spaces, tagSearchParser)
 
 import Json.Decode as JD
 import Json.Encode as JE
@@ -33,12 +33,17 @@ type alias ZkNoteSearch =
     }
 
 
+defaultSearchLimit : Int
+defaultSearchLimit =
+    5
+
+
 defaultSearch : Int -> ZkNoteSearch
 defaultSearch zkid =
     { tagSearch = SearchTerm [] ""
     , zks = [ zkid ]
     , offset = 0
-    , limit = Just 50
+    , limit = Just defaultSearchLimit
     }
 
 

@@ -23,7 +23,7 @@ type alias Model =
 
 initModel : Model
 initModel =
-    { increment = 5
+    { increment = S.defaultSearchLimit
     , offset = 0
     }
 
