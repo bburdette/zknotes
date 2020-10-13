@@ -1,4 +1,4 @@
-module Search exposing (AndOr(..), FieldText(..), SearchMod(..), TSText(..), TagSearch(..), andor, encodeSearchMod, encodeTagSearch, extractTagSearches, fieldString, fieldText, fields, oplistParser, printAndOr, printSearchMod, printTagSearch, searchMod, searchMods, searchTerm, showAndOr, showSearchMod, showTagSearch, singleTerm, spaces, tagSearchParser)
+module Search exposing (AndOr(..), FieldText(..), SearchMod(..), TSText(..), TagSearch(..), ZkNoteSearch, andor, defaultSearch, encodeSearchMod, encodeTagSearch, encodeZkNoteSearch, extractTagSearches, fieldString, fieldText, fields, oplistParser, printAndOr, printSearchMod, printTagSearch, searchMod, searchMods, searchTerm, showAndOr, showSearchMod, showTagSearch, singleTerm, spaces, tagSearchParser)
 
 import Json.Decode as JD
 import Json.Encode as JE
@@ -26,8 +26,19 @@ import Util exposing (first, rest)
 
 
 type alias ZkNoteSearch =
-    { tagsearch : TagSearch
+    { tagSearch : TagSearch
     , zks : List Int
+    , offset : Int
+    , limit : Maybe Int
+    }
+
+
+defaultSearch : Int -> ZkNoteSearch
+defaultSearch zkid =
+    { tagSearch = SearchTerm [] ""
+    , zks = [ zkid ]
+    , offset = 0
+    , limit = Just 50
     }
 
 
@@ -107,6 +118,19 @@ encodeTagSearch ts =
                         ]
                   )
                 ]
+
+
+encodeZkNoteSearch : ZkNoteSearch -> JE.Value
+encodeZkNoteSearch zns =
+    JE.object <|
+        [ ( "tagsearch", encodeTagSearch zns.tagSearch )
+        , ( "zks", JE.list JE.int zns.zks )
+        , ( "offset", JE.int zns.offset )
+        ]
+            ++ (zns.limit
+                    |> Maybe.map (\i -> [ ( "limit", JE.int i ) ])
+                    |> Maybe.withDefault []
+               )
 
 
 showSearchMod : SearchMod -> String

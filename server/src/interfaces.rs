@@ -215,16 +215,6 @@ fn user_interface_loggedin(
         content: serde_json::to_value(entries)?,
       })
     }
-    "getzknotelisting" => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let zkid: i64 = serde_json::from_value(msgdata.clone())?;
-
-      let entries = sqldata::zknotelisting(Path::new(&config.db), uid, zkid)?;
-      Ok(ServerResponse {
-        what: "zknotelisting".to_string(),
-        content: serde_json::to_value(entries)?,
-      })
-    }
     "getzknote" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let id: i64 = serde_json::from_value(msgdata.clone())?;
@@ -240,10 +230,10 @@ fn user_interface_loggedin(
       // let search: data::TagSearch = serde_json::from_value(msgdata.clone())?;
       let search: data::ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
 
-      let entries = sqldata::search_zknotes(Path::new(&config.db), uid, &search)?;
+      let res = sqldata::search_zknotes(Path::new(&config.db), uid, &search)?;
       Ok(ServerResponse {
-        what: "zknotelisting".to_string(),
-        content: serde_json::to_value(entries)?,
+        what: "zknotesearchresult".to_string(),
+        content: serde_json::to_value(res)?,
       })
     }
     "deletezknote" => {

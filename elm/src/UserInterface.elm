@@ -15,14 +15,13 @@ type SendMsg
     | GetZkMembers Int
     | AddZkMember Data.ZkMember
     | DeleteZkMember Data.ZkMember
-    | GetZkNoteListing Int
     | GetZkNote Int
     | DeleteZkNote Int
     | SaveZkNote Data.SaveZkNote
     | SaveZk Data.SaveZk
     | SaveZkLinks Data.ZkLinks
     | GetZkLinks Data.GetZkLinks
-    | SearchZkNotes Data.ZkNoteSearch
+    | SearchZkNotes S.ZkNoteSearch
 
 
 type ServerResponse
@@ -31,7 +30,7 @@ type ServerResponse
     | UnregisteredUser
     | InvalidUserOrPwd
     | LoggedIn
-    | ZkNoteListing (List Data.ZkListNote)
+    | ZkNoteSearchResult Data.ZkNoteSearchResult
     | ZkListing (List Data.Zk)
     | SavedZk Int
     | DeletedZk Int
@@ -111,14 +110,6 @@ encodeSendMsg sm uid pwd =
                 , ( "data", Data.encodeZkMember zkm )
                 ]
 
-        GetZkNoteListing id ->
-            JE.object
-                [ ( "what", JE.string "getzknotelisting" )
-                , ( "uid", JE.string uid )
-                , ( "pwd", JE.string pwd )
-                , ( "data", JE.int id )
-                ]
-
         GetZkNote id ->
             JE.object
                 [ ( "what", JE.string "getzknote" )
@@ -172,7 +163,7 @@ encodeSendMsg sm uid pwd =
                 [ ( "what", JE.string "searchzknotes" )
                 , ( "uid", JE.string uid )
                 , ( "pwd", JE.string pwd )
-                , ( "data", Data.encodeZkNoteSearch s )
+                , ( "data", S.encodeZkNoteSearch s )
                 ]
 
 
@@ -209,8 +200,8 @@ serverResponseDecoder =
                 "zklisting" ->
                     JD.map ZkListing (JD.at [ "content" ] <| JD.list Data.decodeZk)
 
-                "zknotelisting" ->
-                    JD.map ZkNoteListing (JD.at [ "content" ] <| JD.list Data.decodeZkListNote)
+                "zknotesearchresult" ->
+                    JD.map ZkNoteSearchResult (JD.at [ "content" ] <| Data.decodeZkNoteSearchResult)
 
                 "zkmembers" ->
                     JD.map ZkMembers (JD.at [ "content" ] <| JD.list JD.string)

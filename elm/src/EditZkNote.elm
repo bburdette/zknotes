@@ -19,6 +19,7 @@ import Markdown.Html
 import Markdown.Parser
 import Markdown.Renderer
 import Schelme.Show exposing (showTerm)
+import Search as S
 import SearchPanel as SP
 import TangoColors as TC
 import Url as U
@@ -50,7 +51,7 @@ type Msg
 type alias Model =
     { id : Maybe Int
     , zk : Data.Zk
-    , zklist : List Data.ZkListNote
+    , zknSearchResult : Data.ZkNoteSearchResult
     , zklDict : Dict String Data.ZkLink
     , public : Bool
     , pubidtxt : String
@@ -73,7 +74,7 @@ type Command
     | Switch Int
     | SaveSwitch Data.SaveZkNote (List Data.ZkLink) Int
     | GetSelectedText String
-    | Search Data.ZkNoteSearch
+    | Search S.ZkNoteSearch
 
 
 sznFromModel : Model -> Data.SaveZkNote
@@ -318,10 +319,10 @@ view model =
                         <|
                             case model.id of
                                 Just id ->
-                                    List.filter (\zkl -> zkl.id /= id) model.zklist
+                                    List.filter (\zkl -> zkl.id /= id) model.zknSearchResult.notes
 
                                 Nothing ->
-                                    model.zklist
+                                    model.zknSearchResult.notes
                        )
                 )
             ]
@@ -333,7 +334,7 @@ zklKey zkl =
     String.fromInt zkl.from ++ ":" ++ String.fromInt zkl.to
 
 
-initFull : Data.Zk -> List Data.ZkListNote -> Data.FullZkNote -> Data.ZkLinks -> SP.Model -> Model
+initFull : Data.Zk -> Data.ZkNoteSearchResult -> Data.FullZkNote -> Data.ZkLinks -> SP.Model -> Model
 initFull zk zkl zknote zklDict spm =
     let
         cells =
@@ -347,7 +348,7 @@ initFull zk zkl zknote zklDict spm =
     in
     { id = Just zknote.id
     , zk = zk
-    , zklist = zkl
+    , zknSearchResult = zkl
     , zklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) zklDict.links)
     , initialZklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) zklDict.links)
     , public = zknote.public
@@ -360,7 +361,7 @@ initFull zk zkl zknote zklDict spm =
     }
 
 
-initNew : Data.Zk -> List Data.ZkListNote -> SP.Model -> Model
+initNew : Data.Zk -> Data.ZkNoteSearchResult -> SP.Model -> Model
 initNew zk zkl spm =
     let
         cells =
@@ -374,7 +375,7 @@ initNew zk zkl spm =
     in
     { id = Nothing
     , zk = zk
-    , zklist = zkl
+    , zknSearchResult = zkl
     , zklDict = Dict.empty
     , initialZklDict = Dict.empty
     , public = False
@@ -387,7 +388,7 @@ initNew zk zkl spm =
     }
 
 
-initExample : Data.Zk -> List Data.ZkListNote -> SP.Model -> Model
+initExample : Data.Zk -> Data.ZkNoteSearchResult -> SP.Model -> Model
 initExample zk zkl spm =
     let
         cells =
@@ -401,7 +402,7 @@ initExample zk zkl spm =
     in
     { id = Nothing
     , zk = zk
-    , zklist = zkl
+    , zknSearchResult = zkl
     , zklDict = Dict.empty
     , initialZklDict = Dict.empty
     , public = False
@@ -441,11 +442,17 @@ addListNote model szn szkn =
             }
     in
     { model
-        | zklist =
-            replaceOrAdd model.zklist
-                zln
-                (\a b -> a.id == b.id)
-                (\a b -> { b | createdate = a.createdate })
+        | zknSearchResult =
+            model.zknSearchResult
+                |> (\zsr ->
+                        { zsr
+                            | notes =
+                                replaceOrAdd model.zknSearchResult.notes
+                                    zln
+                                    (\a b -> a.id == b.id)
+                                    (\a b -> { b | createdate = a.createdate })
+                        }
+                   )
     }
 
 
@@ -463,7 +470,7 @@ gotSelectedText : Model -> String -> ( Model, Command )
 gotSelectedText model s =
     let
         nmod =
-            initNew model.zk model.zklist model.spmodel
+            initNew model.zk model.zknSearchResult model.spmodel
     in
     ( { nmod | title = s }
     , if dirty model then

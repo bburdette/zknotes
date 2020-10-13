@@ -41,7 +41,7 @@ type Msg
 type Command
     = None
     | Save
-    | Search Data.ZkNoteSearch
+    | Search S.ZkNoteSearch
 
 
 view : Bool -> Int -> Model -> Element Msg

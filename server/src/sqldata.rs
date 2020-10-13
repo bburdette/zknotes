@@ -53,6 +53,12 @@ pub struct ZkListNote {
 }
 
 #[derive(Serialize, Debug, Clone)]
+pub struct ZkNoteSearchResult {
+  notes: Vec<ZkListNote>,
+  offset: i64,
+}
+
+#[derive(Serialize, Debug, Clone)]
 pub struct SavedZkNote {
   id: i64,
   changeddate: i64,
@@ -845,7 +851,7 @@ pub fn search_zknotes(
   dbfile: &Path,
   user: i64,
   search: &data::ZkNoteSearch,
-) -> rusqlite::Result<Vec<ZkListNote>> {
+) -> rusqlite::Result<ZkNoteSearchResult> {
   let conn = connection_open(dbfile)?;
 
   let (sql, args) = data::build_sql(user, search.clone());
@@ -876,7 +882,10 @@ pub fn search_zknotes(
     }
   }
 
-  Ok(pv)
+  Ok(ZkNoteSearchResult {
+    notes: pv,
+    offset: search.offset,
+  })
 }
 
 pub fn save_zklinks(
