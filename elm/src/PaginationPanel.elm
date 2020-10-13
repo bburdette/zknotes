@@ -43,8 +43,7 @@ type Command
 
 searchResultUpdated : Data.ZkNoteSearchResult -> Model -> Model
 searchResultUpdated zsr model =
-    Debug.log "searchResultUpdated"
-        { model | end = List.length zsr.notes < model.increment }
+    { model | end = List.length zsr.notes < model.increment }
 
 
 view : Model -> Element Msg
