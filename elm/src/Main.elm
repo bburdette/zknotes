@@ -91,41 +91,50 @@ type alias Model =
     }
 
 
-stateLogin : State -> Maybe Data.Login
-stateLogin state =
-    case state of
-        Login lmod ->
-            Just { uid = lmod.userId, pwd = lmod.password }
+type Route
+    = PublicZk Int
+    | PublicZkPubId String
+    | Fail
 
-        EditZk _ login ->
-            Just login
 
-        EditZkListing _ login ->
-            Just login
+urlRequest : Browser.UrlRequest -> Msg
+urlRequest ur =
+    case ur of
+        Browser.Internal url ->
+            InternalUrl url
 
-        EditZkNote _ login ->
-            Just login
+        Browser.External str ->
+            LoadUrl str
 
-        EditZkNoteListing _ login ->
-            Just login
 
-        View _ ->
-            Nothing
+parseUrl : Url -> Maybe Route
+parseUrl url =
+    UP.parse
+        (UP.oneOf
+            [ UP.map (\i -> PublicZk i) <|
+                UP.s
+                    "note"
+                    </> UP.int
+            , UP.map (\i -> PublicZkPubId (Maybe.withDefault "" (Url.percentDecode i))) <|
+                UP.s
+                    "page"
+                    </> UP.string
+            ]
+        )
+        url
 
-        EView _ evstate ->
-            stateLogin evstate
 
-        BadError _ bestate ->
-            stateLogin bestate
+routeUrl : Route -> String
+routeUrl route =
+    case route of
+        PublicZk id ->
+            UB.absolute [ "note", String.fromInt id ] []
 
-        ShowMessage _ login ->
-            Just login
+        PublicZkPubId pubid ->
+            UB.absolute [ "page", pubid ] []
 
-        PubShowMessage _ ->
-            Nothing
-
-        Wait wstate _ ->
-            stateLogin wstate
+        Fail ->
+            UB.absolute [] []
 
 
 routeState : String -> Seed -> Maybe Data.Login -> Route -> ( State, Cmd Msg )
@@ -208,14 +217,41 @@ viewState size state =
             Element.map (\_ -> Noop) (viewState size innerState)
 
 
-view : Model -> { title : String, body : List (Html Msg) }
-view model =
-    { title = "zknotes"
-    , body =
-        [ Element.layout [] <|
-            viewState model.size model.state
-        ]
-    }
+stateLogin : State -> Maybe Data.Login
+stateLogin state =
+    case state of
+        Login lmod ->
+            Just { uid = lmod.userId, pwd = lmod.password }
+
+        EditZk _ login ->
+            Just login
+
+        EditZkListing _ login ->
+            Just login
+
+        EditZkNote _ login ->
+            Just login
+
+        EditZkNoteListing _ login ->
+            Just login
+
+        View _ ->
+            Nothing
+
+        EView _ evstate ->
+            stateLogin evstate
+
+        BadError _ bestate ->
+            stateLogin bestate
+
+        ShowMessage _ login ->
+            Just login
+
+        PubShowMessage _ ->
+            Nothing
+
+        Wait wstate _ ->
+            stateLogin wstate
 
 
 sendUIMsg : String -> Data.Login -> UI.SendMsg -> Cmd Msg
@@ -315,6 +351,16 @@ noteviewwait backstate st ms =
             ( BadError (BadError.initialModel "unexpected message!") st
             , Cmd.none
             )
+
+
+view : Model -> { title : String, body : List (Html Msg) }
+view model =
+    { title = "zknotes"
+    , body =
+        [ Element.layout [] <|
+            viewState model.size model.state
+        ]
+    }
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -1108,55 +1154,9 @@ init flags url key =
     )
 
 
-type Route
-    = PublicZk Int
-    | PublicZkPubId String
-    | Fail
-
-
-parseUrl : Url -> Maybe Route
-parseUrl url =
-    UP.parse
-        (UP.oneOf
-            [ UP.map (\i -> PublicZk i) <|
-                UP.s
-                    "note"
-                    </> UP.int
-            , UP.map (\i -> PublicZkPubId (Maybe.withDefault "" (Url.percentDecode i))) <|
-                UP.s
-                    "page"
-                    </> UP.string
-            ]
-        )
-        url
-
-
-routeUrl : Route -> String
-routeUrl route =
-    case route of
-        PublicZk id ->
-            UB.absolute [ "note", String.fromInt id ] []
-
-        PublicZkPubId pubid ->
-            UB.absolute [ "page", pubid ] []
-
-        Fail ->
-            UB.absolute [] []
-
-
 initLogin : Seed -> State
 initLogin seed =
     Login <| Login.initialModel Nothing "zknotes" seed
-
-
-urlRequest : Browser.UrlRequest -> Msg
-urlRequest ur =
-    case ur of
-        Browser.Internal url ->
-            InternalUrl url
-
-        Browser.External str ->
-            LoadUrl str
 
 
 main : Platform.Program Flags Model Msg
