@@ -1,4 +1,4 @@
-module SearchPanel exposing (Command(..), Model, Msg(..), initModel, update, view)
+module SearchPanel exposing (Command(..), Model, Msg(..), initModel, searchResultUpdated, update, view)
 
 import Common exposing (buttonStyle)
 import Data
@@ -31,6 +31,11 @@ initModel zkid =
     , paginationModel = PP.initModel
     , zkid = zkid
     }
+
+
+searchResultUpdated : Data.ZkNoteSearchResult -> Model -> Model
+searchResultUpdated zsr model =
+    { model | paginationModel = PP.searchResultUpdated zsr model.paginationModel }
 
 
 type Msg

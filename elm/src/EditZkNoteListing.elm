@@ -39,6 +39,14 @@ type Command
     | Search S.ZkNoteSearch
 
 
+updateSearchResult : Data.ZkNoteSearchResult -> Model -> Model
+updateSearchResult zsr model =
+    { model
+        | notes = zsr
+        , spmodel = SP.searchResultUpdated zsr model.spmodel
+    }
+
+
 view : Model -> Element Msg
 view model =
     E.column [ E.spacing 8, E.padding 8 ]

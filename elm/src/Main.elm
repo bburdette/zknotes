@@ -517,12 +517,12 @@ update msg model =
                         UI.ZkNoteSearchResult sr ->
                             case state of
                                 EditZkNoteListing znlstate login_ ->
-                                    ( { model | state = EditZkNoteListing { znlstate | notes = sr } login_ }
+                                    ( { model | state = EditZkNoteListing (EditZkNoteListing.updateSearchResult sr znlstate) login_ }
                                     , Cmd.none
                                     )
 
                                 EditZkNote znstate login_ ->
-                                    ( { model | state = EditZkNote { znstate | zknSearchResult = sr } login_ }
+                                    ( { model | state = EditZkNote (EditZkNote.updateSearchResult sr znstate) login_ }
                                     , Cmd.none
                                     )
 
@@ -531,15 +531,8 @@ update msg model =
                                     , Cmd.none
                                     )
 
-                        UI.ZkNote zkn ->
+                        UI.ZkNote _ ->
                             case state of
-                                EditZkListing _ login ->
-                                    -- ( { model | state = EditZkNote (EditZkNote.initFull zkn) login }, Cmd.none )
-                                    ( { model | state = BadError (BadError.initialModel "zknoteeditunimplmeented") state }
-                                    , Cmd.none
-                                    )
-
-                                -- ( { model | state = BadError (BadError.initialModel "unexpected message") bwstate }, Cmd.none )
                                 _ ->
                                     ( { model | state = BadError (BadError.initialModel <| "unexpected message: zknote") state }, Cmd.none )
 
@@ -551,7 +544,7 @@ update msg model =
                                 _ ->
                                     ( { model | state = BadError (BadError.initialModel "unexpected message: savedzk") state }, Cmd.none )
 
-                        UI.DeletedZk beid ->
+                        UI.DeletedZk _ ->
                             case state of
                                 ShowMessage _ login ->
                                     ( model

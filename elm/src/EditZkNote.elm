@@ -1,4 +1,4 @@
-module EditZkNote exposing (Command(..), Model, Msg(..), addListNote, dirty, gotId, gotSelectedText, initExample, initFull, initNew, replaceOrAdd, sznFromModel, update, view)
+module EditZkNote exposing (Command(..), Model, Msg(..), addListNote, compareZklinks, dirty, gotId, gotSelectedText, initExample, initFull, initNew, noteLink, pageLink, replaceOrAdd, saveZkLinkList, showZkl, sznFromModel, toPubId, update, updateSearchResult, view, zkLinkName, zklKey)
 
 import CellCommon exposing (..)
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
@@ -85,6 +85,14 @@ sznFromModel model =
     , content = model.md
     , public = model.public
     , pubid = toPubId model.public model.pubidtxt
+    }
+
+
+updateSearchResult : Data.ZkNoteSearchResult -> Model -> Model
+updateSearchResult zsr model =
+    { model
+        | zknSearchResult = zsr
+        , spmodel = SP.searchResultUpdated zsr model.spmodel
     }
 
 
