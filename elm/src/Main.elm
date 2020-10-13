@@ -29,6 +29,7 @@ import Markdown.Renderer
 import PublicInterface as PI
 import Random exposing (Seed, initialSeed)
 import Schelme.Show exposing (showTerm)
+import Search as S
 import SearchPanel as SP
 import ShowMessage
 import Url exposing (Url)
@@ -245,7 +246,7 @@ sendPIMsg location msg =
 type alias NwState =
     { zk : Data.Zk
     , login : Data.Login
-    , mbzknotelisting : Maybe (List Data.ZkListNote)
+    , mbzknotesearchresult : Maybe Data.ZkNoteSearchResult
     , mbzklinks : Maybe Data.ZkLinks
     , mbzknote : Maybe Data.FullZkNote
     , spmodel : SP.Model
@@ -263,8 +264,8 @@ notewait nwstate state wmsg =
                 UserReplyData (Ok (UI.ZkNote zkn)) ->
                     { nwstate | mbzknote = Just zkn }
 
-                UserReplyData (Ok (UI.ZkNoteListing zknl)) ->
-                    { nwstate | mbzknotelisting = Just zknl }
+                UserReplyData (Ok (UI.ZkNoteSearchResult zksr)) ->
+                    { nwstate | mbzknotesearchresult = Just zksr }
 
                 UserReplyData (Ok UI.SavedZkLinks) ->
                     nwstate
@@ -278,7 +279,7 @@ notewait nwstate state wmsg =
                 _ ->
                     nwstate
     in
-    case ( n.mbzknotelisting, n.mbzklinks, n.mbzknote ) of
+    case ( n.mbzknotesearchresult, n.mbzklinks, n.mbzknote ) of
         ( Just zknl, Just zkl, Just zkn ) ->
             ( EditZkNote (EditZkNote.initFull n.zk zknl zkn zkl n.spmodel) n.login, Cmd.none )
 
@@ -289,8 +290,8 @@ notewait nwstate state wmsg =
 listingwait : Data.Login -> Data.Zk -> State -> Msg -> ( State, Cmd Msg )
 listingwait login zk st ms =
     case ms of
-        UserReplyData (Ok (UI.ZkNoteListing l)) ->
-            ( EditZkNoteListing { zk = zk, notes = l, spmodel = SP.initModel } login, Cmd.none )
+        UserReplyData (Ok (UI.ZkNoteSearchResult rs)) ->
+            ( EditZkNoteListing { zk = zk, notes = rs, spmodel = SP.initModel zk.id } login, Cmd.none )
 
         UserReplyData (Ok (UI.ServerError e)) ->
             ( BadError (BadError.initialModel e) st, Cmd.none )
@@ -513,15 +514,15 @@ update msg model =
                                     , Cmd.none
                                     )
 
-                        UI.ZkNoteListing l ->
+                        UI.ZkNoteSearchResult sr ->
                             case state of
                                 EditZkNoteListing znlstate login_ ->
-                                    ( { model | state = EditZkNoteListing { znlstate | notes = l } login_ }
+                                    ( { model | state = EditZkNoteListing (EditZkNoteListing.updateSearchResult sr znlstate) login_ }
                                     , Cmd.none
                                     )
 
                                 EditZkNote znstate login_ ->
-                                    ( { model | state = EditZkNote { znstate | zklist = l } login_ }
+                                    ( { model | state = EditZkNote (EditZkNote.updateSearchResult sr znstate) login_ }
                                     , Cmd.none
                                     )
 
@@ -530,15 +531,8 @@ update msg model =
                                     , Cmd.none
                                     )
 
-                        UI.ZkNote zkn ->
+                        UI.ZkNote _ ->
                             case state of
-                                EditZkListing _ login ->
-                                    -- ( { model | state = EditZkNote (EditZkNote.initFull zkn) login }, Cmd.none )
-                                    ( { model | state = BadError (BadError.initialModel "zknoteeditunimplmeented") state }
-                                    , Cmd.none
-                                    )
-
-                                -- ( { model | state = BadError (BadError.initialModel "unexpected message") bwstate }, Cmd.none )
                                 _ ->
                                     ( { model | state = BadError (BadError.initialModel <| "unexpected message: zknote") state }, Cmd.none )
 
@@ -550,7 +544,7 @@ update msg model =
                                 _ ->
                                     ( { model | state = BadError (BadError.initialModel "unexpected message: savedzk") state }, Cmd.none )
 
-                        UI.DeletedZk beid ->
+                        UI.DeletedZk _ ->
                             case state of
                                 ShowMessage _ login ->
                                     ( model
@@ -715,9 +709,11 @@ update msg model =
                 backtolisting =
                     ( { model
                         | state =
-                            EditZkNoteListing { zk = emod.zk, notes = emod.zklist, spmodel = emod.spmodel } login
+                            EditZkNoteListing { zk = emod.zk, notes = emod.zknSearchResult, spmodel = emod.spmodel } login
                       }
-                    , Cmd.none
+                    , sendUIMsg model.location
+                        login
+                        (UI.SearchZkNotes (S.defaultSearch es.zk.id))
                     )
             in
             case ecmd of
@@ -726,7 +722,7 @@ update msg model =
                         gotres =
                             ( EditZkNoteListing
                                 { zk = es.zk
-                                , notes = emod.zklist
+                                , notes = emod.zknSearchResult
                                 , spmodel = emod.spmodel
                                 }
                                 login
@@ -734,7 +730,7 @@ update msg model =
                                 Just s ->
                                     sendUIMsg model.location
                                         login
-                                        (UI.SearchZkNotes { tagSearch = s, zks = [ emod.zk.id ] })
+                                        (UI.SearchZkNotes s)
 
                                 Nothing ->
                                     Cmd.none
@@ -773,6 +769,25 @@ update msg model =
                                     }
                                     login
                                 )
+                                -- (\st ms ->
+                                --     case ms of
+                                --         UserReplyData (Ok (UI.SavedZkNote id)) ->
+                                --             ( st
+                                --             , sendUIMsg model.location
+                                --                 login
+                                --                 (UI.SearchZkNotes <| S.defaultSearch es.zk.id)
+                                --             )
+                                --         UserReplyData (Ok UI.SavedZkLinks) ->
+                                --             ( st, Cmd.none )
+                                --         UserReplyData (Ok (UI.ZkNoteSearchResult l)) ->
+                                --             ( EditZkNoteListing { zk = es.zk, notes = l, spmodel = SP.initModel es.zk.id } login, Cmd.none )
+                                --         UserReplyData (Ok (UI.ServerError e)) ->
+                                --             ( BadError (BadError.initialModel e) st, Cmd.none )
+                                --         _ ->
+                                --             ( BadError (BadError.initialModel "unexpected message!") model.state
+                                --             , Cmd.none
+                                --             )
+                                -- )
                                 (savefn False False)
                       }
                     , Cmd.batch
@@ -840,7 +855,7 @@ update msg model =
                                 (notewait
                                     { zk = emod.zk
                                     , login = login
-                                    , mbzknotelisting = Nothing
+                                    , mbzknotesearchresult = Nothing
                                     , mbzklinks = Nothing
                                     , mbzknote = Nothing
                                     , spmodel = emod.spmodel
@@ -850,9 +865,7 @@ update msg model =
                     , Cmd.batch
                         [ sendUIMsg model.location
                             login
-                            (UI.GetZkNoteListing
-                                es.zk.id
-                            )
+                            (UI.SearchZkNotes <| S.defaultSearch es.zk.id)
                         , sendUIMsg model.location
                             login
                             (UI.GetZkNote id)
@@ -873,7 +886,7 @@ update msg model =
                                 (notewait
                                     { zk = emod.zk
                                     , login = login
-                                    , mbzknotelisting = Nothing
+                                    , mbzknotesearchresult = Nothing
                                     , mbzklinks = Nothing
                                     , mbzknote = Nothing
                                     , spmodel = emod.spmodel
@@ -883,9 +896,7 @@ update msg model =
                     , Cmd.batch
                         [ sendUIMsg model.location
                             login
-                            (UI.GetZkNoteListing
-                                es.zk.id
-                            )
+                            (UI.SearchZkNotes <| S.defaultSearch es.zk.id)
                         , sendUIMsg model.location
                             login
                             (UI.GetZkNote id)
@@ -965,7 +976,7 @@ update msg model =
                       }
                     , sendUIMsg model.location
                         login
-                        (UI.GetZkNoteListing zk.id)
+                        (UI.SearchZkNotes <| S.defaultSearch zk.id)
                     )
 
                 EditZkListing.View id ->
@@ -1010,7 +1021,7 @@ update msg model =
                                 (notewait
                                     { zk = emod.zk
                                     , login = login
-                                    , mbzknotelisting = Just emod.notes
+                                    , mbzknotesearchresult = Just emod.notes
                                     , mbzklinks = Nothing
                                     , mbzknote = Nothing
                                     , spmodel = emod.spmodel

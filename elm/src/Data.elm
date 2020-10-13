@@ -2,7 +2,7 @@ module Data exposing (..)
 
 import Json.Decode as JD
 import Json.Encode as JE
-import SearchParser as SP
+import Search as S
 
 
 type alias Login =
@@ -40,6 +40,12 @@ type alias ZkListNote =
     , public : Bool
     , createdate : Int
     , changeddate : Int
+    }
+
+
+type alias ZkNoteSearchResult =
+    { notes : List ZkListNote
+    , offset : Int
     }
 
 
@@ -98,20 +104,6 @@ type alias GetZkLinks =
     { zknote : Int
     , zk : Int
     }
-
-
-type alias ZkNoteSearch =
-    { tagSearch : SP.TagSearch
-    , zks : List Int
-    }
-
-
-encodeZkNoteSearch : ZkNoteSearch -> JE.Value
-encodeZkNoteSearch zns =
-    JE.object
-        [ ( "tagsearch", SP.encodeTagSearch zns.tagSearch )
-        , ( "zks", JE.list JE.int zns.zks )
-        ]
 
 
 encodeGetZkLinks : GetZkLinks -> JE.Value
@@ -240,6 +232,13 @@ decodeZkListNote =
         (JD.field "public" JD.bool)
         (JD.field "createdate" JD.int)
         (JD.field "changeddate" JD.int)
+
+
+decodeZkNoteSearchResult : JD.Decoder ZkNoteSearchResult
+decodeZkNoteSearchResult =
+    JD.map2 ZkNoteSearchResult
+        (JD.field "notes" (JD.list decodeZkListNote))
+        (JD.field "offset" JD.int)
 
 
 decodeSavedZkNote : JD.Decoder SavedZkNote

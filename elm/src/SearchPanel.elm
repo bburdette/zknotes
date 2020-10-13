@@ -1,380 +1,120 @@
-module SearchPanel exposing (Command(..), Model, Msg(..), Search(..), addTagToSearch, addTagToSearchPrev, addToSearch, getSearch, initModel, selectPrevSearch, toggleHelpButton, update, updateSearchText, view)
+module SearchPanel exposing (Command(..), Model, Msg(..), getSearch, initModel, searchResultUpdated, update, view)
 
 import Common exposing (buttonStyle)
-import Element exposing (..)
+import Data
+import Element as E exposing (..)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Events exposing (onClick)
 import Element.Font as Font
 import Element.Input as Input
+import PaginationPanel as PP
 import Parser
+import Search as S exposing (AndOr(..), SearchMod(..), TSText, TagSearch(..), tagSearchParser)
 import SearchHelpPanel
-import SearchParser exposing (AndOr(..), SearchMod(..), TSText, TagSearch(..), tagSearchParser)
 import TDict exposing (TDict)
+import TagSearchPanel as TSP
 import TangoColors as Color
 import Util exposing (Size)
 
 
-type Search
-    = TagSearch (Result (List Parser.DeadEnd) TagSearch)
-    | NoSearch
-
-
 type alias Model =
-    { searchText : String
-    , search : Search
-    , showParse : Bool
-    , showHelp : Bool
-    , helpPanel : SearchHelpPanel.Model
-    , showPrevs : Bool
-    , prevSearches : List String
+    { tagSearchModel : TSP.Model
+    , paginationModel : PP.Model
+    , zkid : Int
     }
 
 
-initModel : Model
-initModel =
-    { searchText = ""
-    , search = NoSearch
-    , showParse = False
-    , showHelp = False
-    , helpPanel = SearchHelpPanel.init
-    , showPrevs = False
-    , prevSearches = []
+initModel : Int -> Model
+initModel zkid =
+    { tagSearchModel = TSP.initModel
+    , paginationModel = PP.initModel
+    , zkid = zkid
     }
+
+
+searchResultUpdated : Data.ZkNoteSearchResult -> Model -> Model
+searchResultUpdated zsr model =
+    { model | paginationModel = PP.searchResultUpdated zsr model.paginationModel }
+
+
+getSearch : Model -> Maybe S.ZkNoteSearch
+getSearch model =
+    TSP.getSearch model.tagSearchModel
+        |> Maybe.map
+            (\s ->
+                { tagSearch = s
+                , zks = [ model.zkid ]
+                , offset = model.paginationModel.offset
+                , limit = Just model.paginationModel.increment
+                }
+            )
 
 
 type Msg
-    = SearchText String
-    | SearchDetails
-    | SearchClick
-    | ToggleHelp
-    | Clear
-    | TogglePrev
-    | PrevSelected String
-    | SaveSearch
-    | HelpMsg SearchHelpPanel.Msg
+    = TSPMsg TSP.Msg
+    | PPMsg PP.Msg
 
 
 type Command
     = None
     | Save
-    | Search TagSearch
-
-
-getSearch : Model -> Maybe TagSearch
-getSearch model =
-    case model.search of
-        TagSearch (Ok s) ->
-            Just s
-
-        NoSearch ->
-            Just <| SearchTerm [] ""
-
-        _ ->
-            Nothing
-
-
-addToSearch : String -> Search -> Search
-addToSearch name search =
-    let
-        term =
-            SearchTerm
-                [ ExactMatch
-                , Tag
-                ]
-                name
-    in
-    case search of
-        NoSearch ->
-            TagSearch (Ok term)
-
-        TagSearch (Err e) ->
-            TagSearch (Err e)
-
-        TagSearch (Ok s) ->
-            TagSearch (Ok (Boolex s And term))
-
-
-addTagToSearch : Model -> String -> Model
-addTagToSearch model name =
-    let
-        s =
-            addToSearch name model.search
-    in
-    case s of
-        TagSearch (Ok ts) ->
-            { model
-                | search = s
-                , searchText = SearchParser.printTagSearch ts
-            }
-
-        _ ->
-            model
-
-
-addTagToSearchPrev : Model -> String -> Model
-addTagToSearchPrev model name =
-    let
-        at =
-            "t"
-    in
-    updateSearchText model <|
-        if model.searchText == "" then
-            at ++ "ec'" ++ name ++ "'"
-
-        else
-            model.searchText ++ " & " ++ at ++ "ec'" ++ name ++ "'"
-
-
-updateSearchText : Model -> String -> Model
-updateSearchText model txt =
-    { model
-        | searchText = txt
-        , search =
-            if String.contains "'" txt then
-                TagSearch <| Parser.run tagSearchParser txt
-
-            else
-                TagSearch <| Ok <| SearchParser.SearchTerm [] txt
-    }
-
-
-selectPrevSearch : List String -> Element Msg
-selectPrevSearch searches =
-    column
-        [ width fill
-        , centerX
-        , centerY
-        , Border.color Color.black
-        , Border.width 2
-        , Background.color Color.white
-        ]
-        (List.map
-            (\s ->
-                row
-                    [ mouseOver [ Background.color Color.lightBlue ]
-                    , mouseDown [ Background.color Color.darkBlue ]
-                    , onClick (PrevSelected s)
-                    , width fill
-                    ]
-                    [ text s ]
-            )
-            searches
-        )
+    | Search S.ZkNoteSearch
 
 
 view : Bool -> Int -> Model -> Element Msg
 view narrow nblevel model =
-    let
-        inputcolor =
-            case model.search of
-                TagSearch ts ->
-                    case ts of
-                        Ok _ ->
-                            []
-
-                        Err _ ->
-                            [ Background.color <| rgb255 255 128 128 ]
-
-                NoSearch ->
-                    []
-
-        attribs =
-            width fill :: inputcolor
-
-        tiattribs =
-            if model.showPrevs then
-                below (selectPrevSearch model.prevSearches) :: attribs
-
-            else
-                attribs
-
-        tinput =
-            Input.text
-                tiattribs
-                { onChange = SearchText
-                , text = model.searchText
-                , placeholder = Nothing
-                , label =
-                    Input.labelLeft [] <|
-                        row [ centerY ]
-                            [ case model.search of
-                                TagSearch (Err _) ->
-                                    Input.button (buttonStyle ++ [ Background.color Color.grey ]) { onPress = Nothing, label = text "search:" }
-
-                                _ ->
-                                    Input.button buttonStyle { onPress = Just SearchClick, label = text "search:" }
-                            ]
-                }
-
-        ddbutton =
-            Input.button buttonStyle
-                { onPress = Just TogglePrev
-                , label =
-                    text <|
-                        if model.showPrevs then
-                            "∧"
-
-                        else
-                            "∨"
-                }
-
-        buttons =
-            [ if List.any (\elt -> elt == model.searchText) model.prevSearches then
-                none
-
-              else
-                Input.button buttonStyle
-                    { onPress = Just SaveSearch
-                    , label = text "save"
-                    }
-            , Input.button buttonStyle
-                { onPress = Just SearchDetails
-                , label =
-                    text <|
-                        if model.showParse then
-                            "-"
-
-                        else
-                            "?"
-                }
-            , Input.button buttonStyle
-                { onPress = Just Clear
-                , label = text "x"
-                }
-            ]
-
-        showborder =
-            model.showParse || narrow
-    in
-    column
-        (if showborder then
-            [ Border.color Color.darkBlue
-            , Border.width 3
-            , padding 2
-            , width fill
-            ]
-
-         else
-            [ width fill ]
-        )
-        ((if narrow then
-            [ row [ width fill, spacing 3 ] [ tinput, ddbutton ]
-            , row [ spacing 3, alignRight ] buttons
-            ]
-
-          else
-            [ row [ width fill, spacing 3 ]
-                (tinput :: ddbutton :: buttons)
-            ]
-         )
-            ++ (if model.showParse then
-                    case model.search of
-                        TagSearch rts ->
-                            case rts of
-                                Err e ->
-                                    [ column [ width fill ]
-                                        [ row [ spacing 3, width fill ]
-                                            [ text "Syntax error:"
-                                            , paragraph [] [ text (Util.deadEndsToString e) ]
-                                            , el [ alignRight ] <| toggleHelpButton model.showHelp
-                                            ]
-                                        , if model.showHelp then
-                                            Element.map HelpMsg <| SearchHelpPanel.view nblevel model.helpPanel
-
-                                          else
-                                            Element.none
-                                        ]
-                                    ]
-
-                                Ok ts ->
-                                    [ column [ width fill ]
-                                        [ paragraph [ spacing 3, width fill ]
-                                            [ text "search expression:"
-                                            , paragraph [] [ text <| SearchParser.printTagSearch ts ]
-                                            , el [ alignRight ] <| toggleHelpButton model.showHelp
-                                            ]
-                                        , if model.showHelp then
-                                            Element.map HelpMsg <| SearchHelpPanel.view nblevel model.helpPanel
-
-                                          else
-                                            Element.none
-                                        ]
-                                    ]
-
-                        NoSearch ->
-                            [ Element.map HelpMsg <|
-                                SearchHelpPanel.view nblevel model.helpPanel
-                            ]
-
-                else
-                    []
-               )
-        )
-
-
-toggleHelpButton : Bool -> Element Msg
-toggleHelpButton showHelp =
-    Input.button buttonStyle
-        { onPress = Just ToggleHelp
-        , label =
-            case showHelp of
-                True ->
-                    text "hide search help"
-
-                False ->
-                    text "show search help"
-        }
+    column []
+        [ E.map TSPMsg <| TSP.view narrow nblevel model.tagSearchModel
+        , E.map PPMsg <| PP.view model.paginationModel
+        ]
 
 
 update : Msg -> Model -> ( Model, Command )
 update msg model =
     case msg of
-        SearchText txt ->
-            ( updateSearchText model txt
-            , None
-            )
+        TSPMsg m ->
+            let
+                ( nm, cmd ) =
+                    TSP.update m model.tagSearchModel
+            in
+            case cmd of
+                TSP.None ->
+                    ( { model | tagSearchModel = nm }, None )
 
-        Clear ->
-            ( { model
-                | searchText = ""
-                , search = NoSearch
-              }
-            , None
-            )
+                TSP.Save ->
+                    ( { model | tagSearchModel = nm }, None )
 
-        TogglePrev ->
-            ( { model | showPrevs = not model.showPrevs }
-            , None
-            )
+                TSP.Search ts ->
+                    ( { model | tagSearchModel = nm, paginationModel = PP.initModel }
+                    , Search <|
+                        { tagSearch = ts
+                        , zks = [ model.zkid ]
+                        , offset = model.paginationModel.offset
+                        , limit = Just model.paginationModel.increment
+                        }
+                    )
 
-        PrevSelected ps ->
-            ( updateSearchText
-                { model
-                    | showPrevs = False
-                }
-                ps
-            , None
-            )
+        PPMsg m ->
+            let
+                ( nm, cmd ) =
+                    PP.update m model.paginationModel
+            in
+            case cmd of
+                PP.None ->
+                    ( { model | paginationModel = nm }, None )
 
-        SaveSearch ->
-            ( { model | prevSearches = model.searchText :: model.prevSearches }, Save )
+                PP.RangeChanged ->
+                    case TSP.getSearch model.tagSearchModel of
+                        Just ts ->
+                            ( { model | paginationModel = nm }
+                            , Search
+                                { tagSearch = ts
+                                , zks = [ model.zkid ]
+                                , offset = nm.offset
+                                , limit = Just nm.increment
+                                }
+                            )
 
-        SearchDetails ->
-            ( { model | showParse = not model.showParse }, None )
-
-        SearchClick ->
-            ( model
-            , case getSearch model of
-                Just s ->
-                    Search s
-
-                Nothing ->
-                    None
-            )
-
-        ToggleHelp ->
-            ( { model | showHelp = not model.showHelp }, None )
-
-        HelpMsg hmsg ->
-            ( { model | helpPanel = SearchHelpPanel.update model.helpPanel hmsg }, None )
+                        Nothing ->
+                            ( { model | paginationModel = nm }, None )

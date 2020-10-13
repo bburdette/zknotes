@@ -8,8 +8,8 @@ import Element.Border as EBd
 import Element.Font as Font
 import Element.Input as EI
 import Element.Region
+import Search as S exposing (TagSearch(..))
 import SearchPanel as SP
-import SearchParser exposing (TagSearch(..))
 import TangoColors as TC
 
 
@@ -24,7 +24,7 @@ type Msg
 
 type alias Model =
     { zk : Data.Zk
-    , notes : List Data.ZkListNote
+    , notes : Data.ZkNoteSearchResult
     , spmodel : SP.Model
     }
 
@@ -36,7 +36,15 @@ type Command
     | Example
     | Done
     | None
-    | Search Data.ZkNoteSearch
+    | Search S.ZkNoteSearch
+
+
+updateSearchResult : Data.ZkNoteSearchResult -> Model -> Model
+updateSearchResult zsr model =
+    { model
+        | notes = zsr
+        , spmodel = SP.searchResultUpdated zsr model.spmodel
+    }
 
 
 view : Model -> Element Msg
@@ -51,7 +59,7 @@ view model =
             ]
         , E.map SPMsg <| SP.view False 0 model.spmodel
         , E.table [ E.spacing 8 ]
-            { data = model.notes
+            { data = model.notes.notes
             , columns =
                 [ { header = E.none
                   , width = E.shrink
@@ -117,4 +125,4 @@ update msg model =
                     ( mod, None )
 
                 SP.Search ts ->
-                    ( mod, Search { tagSearch = ts, zks = [ model.zk.id ] } )
+                    ( mod, Search ts )
