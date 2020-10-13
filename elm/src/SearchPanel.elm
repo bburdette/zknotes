@@ -1,4 +1,4 @@
-module SearchPanel exposing (Command(..), Model, Msg(..), initModel, searchResultUpdated, update, view)
+module SearchPanel exposing (Command(..), Model, Msg(..), getSearch, initModel, searchResultUpdated, update, view)
 
 import Common exposing (buttonStyle)
 import Data
@@ -38,6 +38,19 @@ searchResultUpdated zsr model =
     { model | paginationModel = PP.searchResultUpdated zsr model.paginationModel }
 
 
+getSearch : Model -> Maybe S.ZkNoteSearch
+getSearch model =
+    TSP.getSearch model.tagSearchModel
+        |> Maybe.map
+            (\s ->
+                { tagSearch = s
+                , zks = [ model.zkid ]
+                , offset = model.paginationModel.offset
+                , limit = Just model.paginationModel.increment
+                }
+            )
+
+
 type Msg
     = TSPMsg TSP.Msg
     | PPMsg PP.Msg
@@ -73,8 +86,8 @@ update msg model =
                     ( { model | tagSearchModel = nm }, None )
 
                 TSP.Search ts ->
-                    ( { model | tagSearchModel = nm }
-                    , Search
+                    ( { model | tagSearchModel = nm, paginationModel = PP.initModel }
+                    , Search <|
                         { tagSearch = ts
                         , zks = [ model.zkid ]
                         , offset = model.paginationModel.offset

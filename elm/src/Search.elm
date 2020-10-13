@@ -35,7 +35,7 @@ type alias ZkNoteSearch =
 
 defaultSearchLimit : Int
 defaultSearchLimit =
-    5
+    25
 
 
 defaultSearch : Int -> ZkNoteSearch
