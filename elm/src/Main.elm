@@ -175,6 +175,7 @@ routeState model route =
                         , mbzknote = Nothing
                         , spmodel = st.spmodel
                         , navkey = model.navkey
+                        , pushUrl = False -- no need to pushUrl after load, since obvs is already in history.
                         }
                         id
 
@@ -189,6 +190,7 @@ routeState model route =
                         , mbzknote = Nothing
                         , spmodel = st.spmodel
                         , navkey = model.navkey
+                        , pushUrl = False -- no need to pushUrl after load, since obvs is already in history.
                         }
                         id
 
@@ -341,6 +343,7 @@ type alias NwState =
     , mbzknote : Maybe Data.FullZkNote
     , spmodel : SP.Model
     , navkey : Browser.Navigation.Key
+    , pushUrl : Bool
     }
 
 
@@ -377,7 +380,11 @@ notewait nwstate state wmsg =
                     EditZkNote (EditZkNote.initFull n.zk zknl zkn zkl n.spmodel) n.login
             in
             ( st
-            , Browser.Navigation.pushUrl n.navkey (routeUrl (stateRoute st))
+            , if n.pushUrl then
+                Browser.Navigation.pushUrl n.navkey (routeUrl (stateRoute st))
+
+              else
+                Cmd.none
             )
 
         _ ->
@@ -1006,6 +1013,7 @@ update msg model =
                                     , mbzknote = Nothing
                                     , spmodel = emod.spmodel
                                     , navkey = model.navkey
+                                    , pushUrl = True
                                     }
                                 )
                       }
@@ -1038,6 +1046,7 @@ update msg model =
                                     , mbzknote = Nothing
                                     , spmodel = emod.spmodel
                                     , navkey = model.navkey
+                                    , pushUrl = True
                                     }
                                 )
                       }
@@ -1174,6 +1183,7 @@ update msg model =
                                     , mbzknote = Nothing
                                     , spmodel = emod.spmodel
                                     , navkey = model.navkey
+                                    , pushUrl = True
                                     }
                                 )
                       }
@@ -1243,7 +1253,7 @@ init flags url key =
             initialSeed (flags.seed + 7)
 
         model =
-            { state = PubShowMessage { message = "" }
+            { state = PubShowMessage { message = "initial state" }
             , size = { width = flags.width, height = flags.height }
             , location = flags.location
             , navkey = key
