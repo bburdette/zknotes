@@ -46,6 +46,13 @@ type Msg
     | RemoveLink Data.ZkLink
     | MdLink Data.ZkLink
     | SPMsg SP.Msg
+    | NavChoiceChanged NavChoice
+
+
+type NavChoice
+    = NcEdit
+    | NcView
+    | NcSearch
 
 
 type alias Model =
@@ -61,6 +68,7 @@ type alias Model =
     , revert : Maybe Data.SaveZkNote
     , initialZklDict : Dict String Data.ZkLink
     , spmodel : SP.Model
+    , navchoice : NavChoice
     }
 
 
@@ -185,9 +193,12 @@ pageLink model =
             )
 
 
-view : Model -> Element Msg
-view model =
+view : Util.Size -> Model -> Element Msg
+view size model =
     let
+        _ =
+            Debug.log "sie:" size
+
         isdirty =
             dirty model
 
@@ -197,6 +208,93 @@ view model =
 
             else
                 Common.buttonStyle
+
+        mdedit =
+            E.column
+                [ E.spacing 8
+                , E.alignTop
+                ]
+                (EI.multiline
+                    [ E.width (E.px 400)
+                    , E.htmlAttribute (Html.Attributes.id "mdtext")
+                    , E.alignTop
+                    ]
+                    { onChange = OnMarkdownInput
+                    , text = model.md
+                    , placeholder = Nothing
+                    , label = EI.labelHidden "Markdown input"
+                    , spellcheck = False
+                    }
+                    -- show the links.
+                    :: E.row [ Font.bold ] [ E.text "links" ]
+                    :: List.map
+                        (showZkl dirtybutton model.id)
+                        (Dict.values model.zklDict)
+                )
+
+        mdview =
+            case markdownView (mkRenderer model.cells OnSchelmeCodeChanged) model.md of
+                Ok rendered ->
+                    E.column
+                        [ E.paddingXY 30 15
+                        , E.width (E.fill |> E.maximum 1000)
+                        , E.centerX
+                        , E.alignTop
+                        , E.spacing 8
+                        , EBk.color TC.lightGrey
+                        ]
+                        [ E.text model.title
+                        , E.column
+                            [ E.spacing 30
+                            , E.padding 20
+                            , E.width (E.fill |> E.maximum 1000)
+                            , E.centerX
+                            , E.alignTop
+                            , EBd.width 3
+                            , EBd.color TC.darkGrey
+                            ]
+                            rendered
+                        ]
+
+                Err errors ->
+                    E.text errors
+
+        searchPanel =
+            E.column
+                [ E.spacing 8
+                , E.alignTop
+                ]
+                ((E.map SPMsg <|
+                    SP.view True 0 model.spmodel
+                 )
+                    :: (List.map
+                            (\zkln ->
+                                E.row [ E.spacing 8 ]
+                                    [ case model.id of
+                                        Just _ ->
+                                            EI.button Common.buttonStyle
+                                                { onPress = Just <| LinkPress zkln
+                                                , label = E.text "Link"
+                                                }
+
+                                        Nothing ->
+                                            EI.button (Common.buttonStyle ++ [ EBk.color TC.grey ])
+                                                { onPress = Nothing
+                                                , label = E.text "Link"
+                                                }
+                                    , EI.button dirtybutton { onPress = Just (SwitchPress zkln.id), label = E.text "Edit" }
+                                    , E.text zkln.title
+                                    ]
+                            )
+                        <|
+                            case model.id of
+                                Just id ->
+                                    List.filter (\zkl -> zkl.id /= id) model.zknSearchResult.notes
+
+                                Nothing ->
+                                    model.zknSearchResult.notes
+                       )
+                )
     in
     E.column
         [ E.width E.fill, E.spacing 8 ]
@@ -247,93 +345,27 @@ view model =
                 Nothing ->
                     E.none
             ]
-        , E.row
-            [ E.width E.fill
-            , E.spacing 10
-            , E.alignTop
-            ]
-            [ E.column
-                [ E.spacing 8
+        , if size.width > 800 then
+            E.row
+                [ E.width E.fill
+                , E.spacing 8
                 , E.alignTop
                 ]
-                (EI.multiline
-                    [ E.width (E.px 400)
-                    , E.htmlAttribute (Html.Attributes.id "mdtext")
-                    , E.alignTop
-                    ]
-                    { onChange = OnMarkdownInput
-                    , text = model.md
-                    , placeholder = Nothing
-                    , label = EI.labelHidden "Markdown input"
-                    , spellcheck = False
-                    }
-                    -- show the links.
-                    :: E.row [ Font.bold ] [ E.text "links" ]
-                    :: List.map
-                        (showZkl dirtybutton model.id)
-                        (Dict.values model.zklDict)
-                )
-            , case markdownView (mkRenderer model.cells OnSchelmeCodeChanged) model.md of
-                Ok rendered ->
-                    E.column
-                        [ E.paddingXY 30 15
-                        , E.width (E.fill |> E.maximum 1000)
-                        , E.centerX
-                        , E.alignTop
-                        , E.spacing 8
-                        , EBk.color TC.lightGrey
-                        ]
-                        [ E.text model.title
-                        , E.column
-                            [ E.spacing 30
-                            , E.padding 20
-                            , E.width (E.fill |> E.maximum 1000)
-                            , E.centerX
-                            , E.alignTop
-                            , EBd.width 3
-                            , EBd.color TC.darkGrey
-                            ]
-                            rendered
-                        ]
+                [ mdedit, mdview, searchPanel ]
 
-                Err errors ->
-                    E.text errors
-            , E.column
-                [ E.spacing 8
-                , E.alignTop
+          else
+            E.column [ E.width E.fill ]
+                [ Common.navbar 0 model.navchoice NavChoiceChanged [ ( NcEdit, "Edit" ), ( NcView, "View" ), ( NcSearch, "Search" ) ]
+                , case model.navchoice of
+                    NcEdit ->
+                        mdedit
+
+                    NcView ->
+                        mdview
+
+                    NcSearch ->
+                        searchPanel
                 ]
-                ((E.map SPMsg <|
-                    SP.view True 0 model.spmodel
-                 )
-                    :: (List.map
-                            (\zkln ->
-                                E.row [ E.spacing 8 ]
-                                    [ case model.id of
-                                        Just _ ->
-                                            EI.button Common.buttonStyle
-                                                { onPress = Just <| LinkPress zkln
-                                                , label = E.text "Link"
-                                                }
-
-                                        Nothing ->
-                                            EI.button (Common.buttonStyle ++ [ EBk.color TC.grey ])
-                                                { onPress = Nothing
-                                                , label = E.text "Link"
-                                                }
-                                    , EI.button dirtybutton { onPress = Just (SwitchPress zkln.id), label = E.text "Edit" }
-                                    , E.text zkln.title
-                                    ]
-                            )
-                        <|
-                            case model.id of
-                                Just id ->
-                                    List.filter (\zkl -> zkl.id /= id) model.zknSearchResult.notes
-
-                                Nothing ->
-                                    model.zknSearchResult.notes
-                       )
-                )
-            ]
         ]
 
 
@@ -366,6 +398,7 @@ initFull zk zkl zknote zklDict spm =
     , cells = getCd cc
     , revert = Just (Data.saveZkNoteFromFull zknote)
     , spmodel = spm
+    , navchoice = NcEdit
     }
 
 
@@ -393,6 +426,7 @@ initNew zk zkl spm =
     , cells = getCd cc
     , revert = Nothing
     , spmodel = spm
+    , navchoice = NcEdit
     }
 
 
@@ -420,6 +454,7 @@ initExample zk zkl spm =
     , cells = getCd cc
     , revert = Nothing
     , spmodel = spm
+    , navchoice = NcEdit
     }
 
 
@@ -745,3 +780,6 @@ update msg model =
 
                 SP.Search ts ->
                     ( mod, Search ts )
+
+        NavChoiceChanged nc ->
+            ( { model | navchoice = nc }, None )
