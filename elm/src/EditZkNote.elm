@@ -1,4 +1,28 @@
-module EditZkNote exposing (Command(..), Model, Msg(..), addListNote, compareZklinks, dirty, gotId, gotSelectedText, initExample, initFull, initNew, noteLink, pageLink, replaceOrAdd, saveZkLinkList, showZkl, sznFromModel, toPubId, update, updateSearchResult, view, zkLinkName, zklKey)
+module EditZkNote exposing
+    ( Command(..)
+    , Model
+    , Msg(..)
+    , addListNote
+    , compareZklinks
+    , dirty
+    , gotId
+    , gotSelectedText
+    , initExample
+    , initFull
+    , initNew
+    , noteLink
+    , pageLink
+    , replaceOrAdd
+    , saveZkLinkList
+    , showZkl
+    , sznFromModel
+    , toPubId
+    , update
+    , updateSearchResult
+    , view
+    , zkLinkName
+    , zklKey
+    )
 
 import CellCommon exposing (..)
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
@@ -298,7 +322,10 @@ view size model =
     in
     E.column
         [ E.width E.fill, E.spacing 8 ]
-        [ E.text "Edit Zk Note"
+        [ E.row [ E.width E.fill, E.spacing 8 ]
+            [ E.text "Edit Zk Note"
+            , EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just DeletePress, label = E.text "Delete" }
+            ]
         , E.row [ E.width E.fill, E.spacing 8 ]
             [ EI.button
                 dirtybutton
@@ -313,7 +340,6 @@ view size model =
                 False ->
                     E.none
             , EI.button dirtybutton { onPress = Just NewPress, label = E.text "New" }
-            , EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just DeletePress, label = E.text "Delete" }
             ]
         , EI.text []
             { onChange = OnTitleChanged
@@ -355,7 +381,13 @@ view size model =
 
           else
             E.column [ E.width E.fill ]
-                [ Common.navbar 0 model.navchoice NavChoiceChanged [ ( NcEdit, "Edit" ), ( NcView, "View" ), ( NcSearch, "Search" ) ]
+                [ Common.navbar 0
+                    model.navchoice
+                    NavChoiceChanged
+                    [ ( NcView, "View" )
+                    , ( NcEdit, "Edit" )
+                    , ( NcSearch, "Search" )
+                    ]
                 , case model.navchoice of
                     NcEdit ->
                         mdedit
@@ -398,7 +430,7 @@ initFull zk zkl zknote zklDict spm =
     , cells = getCd cc
     , revert = Just (Data.saveZkNoteFromFull zknote)
     , spmodel = spm
-    , navchoice = NcEdit
+    , navchoice = NcView
     }
 
 
@@ -454,7 +486,7 @@ initExample zk zkl spm =
     , cells = getCd cc
     , revert = Nothing
     , spmodel = spm
-    , navchoice = NcEdit
+    , navchoice = NcView
     }
 
 
