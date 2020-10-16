@@ -91,51 +91,68 @@ type alias Model =
     }
 
 
-stateLogin : State -> Maybe Data.Login
-stateLogin state =
-    case state of
-        Login lmod ->
-            Just { uid = lmod.userId, pwd = lmod.password }
-
-        EditZk _ login ->
-            Just login
-
-        EditZkListing _ login ->
-            Just login
-
-        EditZkNote _ login ->
-            Just login
-
-        EditZkNoteListing _ login ->
-            Just login
-
-        View _ ->
-            Nothing
-
-        EView _ evstate ->
-            stateLogin evstate
-
-        BadError _ bestate ->
-            stateLogin bestate
-
-        ShowMessage _ login ->
-            Just login
-
-        PubShowMessage _ ->
-            Nothing
-
-        Wait wstate _ ->
-            stateLogin wstate
+type Route
+    = PublicZkNote Int
+    | PublicZkPubId String
+    | EditZkNoteR Int
+    | Fail
 
 
-routeState : String -> Seed -> Maybe Data.Login -> Route -> ( State, Cmd Msg )
-routeState location seed mblogin route =
+urlRequest : Browser.UrlRequest -> Msg
+urlRequest ur =
+    case ur of
+        Browser.Internal url ->
+            InternalUrl url
+
+        Browser.External str ->
+            LoadUrl str
+
+
+parseUrl : Url -> Maybe Route
+parseUrl url =
+    UP.parse
+        (UP.oneOf
+            [ UP.map PublicZkNote <|
+                UP.s
+                    "note"
+                    </> UP.int
+            , UP.map (\i -> PublicZkPubId (Maybe.withDefault "" (Url.percentDecode i))) <|
+                UP.s
+                    "page"
+                    </> UP.string
+            , UP.map EditZkNoteR <|
+                UP.s
+                    "editnote"
+                    </> UP.int
+            ]
+        )
+        url
+
+
+routeUrl : Route -> String
+routeUrl route =
     case route of
-        PublicZk id ->
+        PublicZkNote id ->
+            UB.absolute [ "note", String.fromInt id ] []
+
+        PublicZkPubId pubid ->
+            UB.absolute [ "page", pubid ] []
+
+        EditZkNoteR id ->
+            UB.absolute [ "editnote", String.fromInt id ] []
+
+        Fail ->
+            UB.absolute [] []
+
+
+routeState : Model -> Route -> ( State, Cmd Msg )
+routeState model route =
+    case route of
+        PublicZkNote id ->
             ( PubShowMessage
                 { message = "loading article"
                 }
-            , sendPIMsg location
+            , sendPIMsg model.location
                 (PI.GetZkNote id)
             )
 
@@ -143,12 +160,51 @@ routeState location seed mblogin route =
             ( PubShowMessage
                 { message = "loading article"
                 }
-            , sendPIMsg location
+            , sendPIMsg model.location
                 (PI.GetZkNotePubId pubid)
             )
 
+        EditZkNoteR id ->
+            case model.state of
+                EditZkNote st login ->
+                    loadnote model
+                        { zk = st.zk
+                        , login = login
+                        , mbzknotesearchresult = Just st.zknSearchResult
+                        , mbzklinks = Nothing
+                        , mbzknote = Nothing
+                        , spmodel = st.spmodel
+                        , navkey = model.navkey
+                        , pushUrl = False -- no need to pushUrl after load, since obvs is already in history.
+                        }
+                        id
+
+                -- load the zknote in question.  will it load?
+                -- should ZkNote block the load if unsaved?  I guess.
+                EditZkNoteListing st login ->
+                    loadnote model
+                        { zk = st.zk
+                        , login = login
+                        , mbzknotesearchresult = Just st.notes
+                        , mbzklinks = Nothing
+                        , mbzknote = Nothing
+                        , spmodel = st.spmodel
+                        , navkey = model.navkey
+                        , pushUrl = False -- no need to pushUrl after load, since obvs is already in history.
+                        }
+                        id
+
+                _ ->
+                    -- take the search results and state and load away.
+                    ( BadError
+                        { errorMessage = "note load unimplemented from this state!"
+                        }
+                        model.state
+                    , Cmd.none
+                    )
+
         Fail ->
-            ( initLogin seed, Cmd.none )
+            ( initLogin model.seed, Cmd.none )
 
 
 stateRoute : State -> Route
@@ -162,10 +218,15 @@ stateRoute state =
                 Nothing ->
                     case vst.id of
                         Just id ->
-                            PublicZk id
+                            PublicZkNote id
 
                         Nothing ->
                             Fail
+
+        EditZkNote st login ->
+            st.id
+                |> Maybe.map EditZkNoteR
+                |> Maybe.withDefault Fail
 
         _ ->
             Fail
@@ -208,14 +269,41 @@ viewState size state =
             Element.map (\_ -> Noop) (viewState size innerState)
 
 
-view : Model -> { title : String, body : List (Html Msg) }
-view model =
-    { title = "zknotes"
-    , body =
-        [ Element.layout [] <|
-            viewState model.size model.state
-        ]
-    }
+stateLogin : State -> Maybe Data.Login
+stateLogin state =
+    case state of
+        Login lmod ->
+            Just { uid = lmod.userId, pwd = lmod.password }
+
+        EditZk _ login ->
+            Just login
+
+        EditZkListing _ login ->
+            Just login
+
+        EditZkNote _ login ->
+            Just login
+
+        EditZkNoteListing _ login ->
+            Just login
+
+        View _ ->
+            Nothing
+
+        EView _ evstate ->
+            stateLogin evstate
+
+        BadError _ bestate ->
+            stateLogin bestate
+
+        ShowMessage _ login ->
+            Just login
+
+        PubShowMessage _ ->
+            Nothing
+
+        Wait wstate _ ->
+            stateLogin wstate
 
 
 sendUIMsg : String -> Data.Login -> UI.SendMsg -> Cmd Msg
@@ -250,6 +338,8 @@ type alias NwState =
     , mbzklinks : Maybe Data.ZkLinks
     , mbzknote : Maybe Data.FullZkNote
     , spmodel : SP.Model
+    , navkey : Browser.Navigation.Key
+    , pushUrl : Bool
     }
 
 
@@ -281,10 +371,57 @@ notewait nwstate state wmsg =
     in
     case ( n.mbzknotesearchresult, n.mbzklinks, n.mbzknote ) of
         ( Just zknl, Just zkl, Just zkn ) ->
-            ( EditZkNote (EditZkNote.initFull n.zk zknl zkn zkl n.spmodel) n.login, Cmd.none )
+            let
+                st =
+                    EditZkNote (EditZkNote.initFull n.zk zknl zkn zkl n.spmodel) n.login
+            in
+            ( st
+            , if n.pushUrl then
+                Browser.Navigation.pushUrl n.navkey (routeUrl (stateRoute st))
+
+              else
+                Cmd.none
+            )
 
         _ ->
             ( Wait state (notewait n), Cmd.none )
+
+
+loadnote : Model -> NwState -> Int -> ( State, Cmd Msg )
+loadnote model nwstate zknid =
+    let
+        nws =
+            { nwstate | mbzklinks = Nothing, mbzknote = Nothing }
+    in
+    ( Wait
+        (ShowMessage
+            { message = "loading zknote" }
+            nws.login
+        )
+        (notewait nws)
+    , Cmd.batch <|
+        (case nws.mbzknotesearchresult of
+            Nothing ->
+                [ sendUIMsg model.location
+                    nws.login
+                    (UI.SearchZkNotes
+                        (SP.getSearch nws.spmodel
+                            |> Maybe.withDefault (S.defaultSearch nws.zk.id)
+                        )
+                    )
+                ]
+
+            Just rs ->
+                []
+        )
+            ++ [ sendUIMsg model.location
+                    nws.login
+                    (UI.GetZkNote zknid)
+               , sendUIMsg model.location
+                    nws.login
+                    (UI.GetZkLinks { zknote = zknid, zk = nws.zk.id })
+               ]
+    )
 
 
 listingwait : Data.Login -> Data.Zk -> State -> Msg -> ( State, Cmd Msg )
@@ -317,6 +454,16 @@ noteviewwait backstate st ms =
             )
 
 
+view : Model -> { title : String, body : List (Html Msg) }
+view model =
+    { title = "zknotes"
+    , body =
+        [ Element.layout [] <|
+            viewState model.size model.state
+        ]
+    }
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case ( msg, model.state ) of
@@ -336,7 +483,7 @@ update msg model =
                     else
                         let
                             ( st, cmd ) =
-                                routeState model.location model.seed (stateLogin state) route
+                                routeState model route
                         in
                         ( { model | state = st }, cmd )
 
@@ -407,8 +554,7 @@ update msg model =
 
                 ( state, cmd ) =
                     parseUrl url
-                        |> Maybe.map
-                            (routeState model.location model.seed mblogin)
+                        |> Maybe.map (routeState model)
                         |> Maybe.withDefault ( model.state, Cmd.none )
             in
             ( { model | state = state }, cmd )
@@ -459,7 +605,6 @@ update msg model =
                                 vstate =
                                     View (View.initFull fbe)
                             in
-                            -- TODO: set url
                             ( { model | state = vstate }
                             , Browser.Navigation.pushUrl model.navkey
                                 (routeUrl (stateRoute vstate))
@@ -769,25 +914,6 @@ update msg model =
                                     }
                                     login
                                 )
-                                -- (\st ms ->
-                                --     case ms of
-                                --         UserReplyData (Ok (UI.SavedZkNote id)) ->
-                                --             ( st
-                                --             , sendUIMsg model.location
-                                --                 login
-                                --                 (UI.SearchZkNotes <| S.defaultSearch es.zk.id)
-                                --             )
-                                --         UserReplyData (Ok UI.SavedZkLinks) ->
-                                --             ( st, Cmd.none )
-                                --         UserReplyData (Ok (UI.ZkNoteSearchResult l)) ->
-                                --             ( EditZkNoteListing { zk = es.zk, notes = l, spmodel = SP.initModel es.zk.id } login, Cmd.none )
-                                --         UserReplyData (Ok (UI.ServerError e)) ->
-                                --             ( BadError (BadError.initialModel e) st, Cmd.none )
-                                --         _ ->
-                                --             ( BadError (BadError.initialModel "unexpected message!") model.state
-                                --             , Cmd.none
-                                --             )
-                                -- )
                                 (savefn False False)
                       }
                     , Cmd.batch
@@ -845,64 +971,40 @@ update msg model =
                     )
 
                 EditZkNote.Switch id ->
-                    ( { model
-                        | state =
-                            Wait
-                                (ShowMessage
-                                    { message = "loading zknote" }
-                                    login
-                                )
-                                (notewait
-                                    { zk = emod.zk
-                                    , login = login
-                                    , mbzknotesearchresult = Nothing
-                                    , mbzklinks = Nothing
-                                    , mbzknote = Nothing
-                                    , spmodel = emod.spmodel
-                                    }
-                                )
-                      }
-                    , Cmd.batch
-                        [ sendUIMsg model.location
-                            login
-                            (UI.SearchZkNotes <| S.defaultSearch es.zk.id)
-                        , sendUIMsg model.location
-                            login
-                            (UI.GetZkNote id)
-                        , sendUIMsg model.location
-                            login
-                            (UI.GetZkLinks { zknote = id, zk = emod.zk.id })
-                        ]
-                    )
+                    let
+                        ( st, cmd ) =
+                            loadnote model
+                                { zk = emod.zk
+                                , login = login
+                                , mbzknotesearchresult = Nothing
+                                , mbzklinks = Nothing
+                                , mbzknote = Nothing
+                                , spmodel = emod.spmodel
+                                , navkey = model.navkey
+                                , pushUrl = True
+                                }
+                                id
+                    in
+                    ( { model | state = st }, cmd )
 
                 EditZkNote.SaveSwitch szkn zklinks id ->
-                    ( { model
-                        | state =
-                            Wait
-                                (ShowMessage
-                                    { message = "loading zknote" }
-                                    login
-                                )
-                                (notewait
-                                    { zk = emod.zk
-                                    , login = login
-                                    , mbzknotesearchresult = Nothing
-                                    , mbzklinks = Nothing
-                                    , mbzknote = Nothing
-                                    , spmodel = emod.spmodel
-                                    }
-                                )
-                      }
+                    let
+                        ( st, cmd ) =
+                            loadnote model
+                                { zk = emod.zk
+                                , login = login
+                                , mbzknotesearchresult = Nothing
+                                , mbzklinks = Nothing
+                                , mbzknote = Nothing
+                                , spmodel = emod.spmodel
+                                , navkey = model.navkey
+                                , pushUrl = True
+                                }
+                                id
+                    in
+                    ( { model | state = st }
                     , Cmd.batch
-                        [ sendUIMsg model.location
-                            login
-                            (UI.SearchZkNotes <| S.defaultSearch es.zk.id)
-                        , sendUIMsg model.location
-                            login
-                            (UI.GetZkNote id)
-                        , sendUIMsg model.location
-                            login
-                            (UI.GetZkLinks { zknote = id, zk = emod.zk.id })
+                        [ cmd
                         , sendUIMsg model.location
                             login
                             (UI.SaveZkNote szkn)
@@ -1011,32 +1113,21 @@ update msg model =
                     ( { model | state = EditZkNote (EditZkNote.initExample emod.zk es.notes emod.spmodel) login }, Cmd.none )
 
                 EditZkNoteListing.Selected id ->
-                    ( { model
-                        | state =
-                            Wait
-                                (ShowMessage
-                                    { message = "loading zknote" }
-                                    login
-                                )
-                                (notewait
-                                    { zk = emod.zk
-                                    , login = login
-                                    , mbzknotesearchresult = Just emod.notes
-                                    , mbzklinks = Nothing
-                                    , mbzknote = Nothing
-                                    , spmodel = emod.spmodel
-                                    }
-                                )
-                      }
-                    , Cmd.batch
-                        [ sendUIMsg model.location
-                            login
-                            (UI.GetZkNote id)
-                        , sendUIMsg model.location
-                            login
-                            (UI.GetZkLinks { zknote = id, zk = emod.zk.id })
-                        ]
-                    )
+                    let
+                        ( st, cmd ) =
+                            loadnote model
+                                { zk = emod.zk
+                                , login = login
+                                , mbzknotesearchresult = Just emod.notes
+                                , mbzklinks = Nothing
+                                , mbzknote = Nothing
+                                , spmodel = emod.spmodel
+                                , navkey = model.navkey
+                                , pushUrl = True
+                                }
+                                id
+                    in
+                    ( { model | state = st }, cmd )
 
                 EditZkNoteListing.View id ->
                     ( { model
@@ -1093,70 +1184,30 @@ init flags url key =
         seed =
             initialSeed (flags.seed + 7)
 
+        model =
+            { state = PubShowMessage { message = "initial state" }
+            , size = { width = flags.width, height = flags.height }
+            , location = flags.location
+            , navkey = key
+            , seed = seed
+            }
+
         ( state, cmd ) =
             parseUrl url
-                |> Maybe.map (routeState flags.location seed Nothing)
+                |> Maybe.map
+                    (routeState
+                        model
+                    )
                 |> Maybe.withDefault ( initLogin seed, Cmd.none )
     in
-    ( { state = state
-      , size = { width = flags.width, height = flags.height }
-      , location = flags.location
-      , navkey = key
-      , seed = seed
-      }
+    ( { model | state = state }
     , cmd
     )
-
-
-type Route
-    = PublicZk Int
-    | PublicZkPubId String
-    | Fail
-
-
-parseUrl : Url -> Maybe Route
-parseUrl url =
-    UP.parse
-        (UP.oneOf
-            [ UP.map (\i -> PublicZk i) <|
-                UP.s
-                    "note"
-                    </> UP.int
-            , UP.map (\i -> PublicZkPubId (Maybe.withDefault "" (Url.percentDecode i))) <|
-                UP.s
-                    "page"
-                    </> UP.string
-            ]
-        )
-        url
-
-
-routeUrl : Route -> String
-routeUrl route =
-    case route of
-        PublicZk id ->
-            UB.absolute [ "note", String.fromInt id ] []
-
-        PublicZkPubId pubid ->
-            UB.absolute [ "page", pubid ] []
-
-        Fail ->
-            UB.absolute [] []
 
 
 initLogin : Seed -> State
 initLogin seed =
     Login <| Login.initialModel Nothing "zknotes" seed
-
-
-urlRequest : Browser.UrlRequest -> Msg
-urlRequest ur =
-    case ur of
-        Browser.Internal url ->
-            InternalUrl url
-
-        Browser.External str ->
-            LoadUrl str
 
 
 main : Platform.Program Flags Model Msg
