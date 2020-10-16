@@ -196,12 +196,8 @@ routeState model route =
 
                 _ ->
                     -- take the search results and state and load away.
-                    let
-                        _ =
-                            Debug.log "unimpile state: " model.state
-                    in
                     ( BadError
-                        { errorMessage = "note load unimpilementedi from this state!"
+                        { errorMessage = "note load unimplemented from this state!"
                         }
                         model.state
                     , Cmd.none
@@ -479,10 +475,6 @@ update msg model =
             ( { model | state = nst }, cmd )
 
         ( UrlChanged url, state ) ->
-            let
-                _ =
-                    Debug.log "urlchanged: " url
-            in
             case parseUrl url of
                 Just route ->
                     if route == stateRoute state then
