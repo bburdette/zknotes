@@ -922,25 +922,6 @@ update msg model =
                                     }
                                     login
                                 )
-                                -- (\st ms ->
-                                --     case ms of
-                                --         UserReplyData (Ok (UI.SavedZkNote id)) ->
-                                --             ( st
-                                --             , sendUIMsg model.location
-                                --                 login
-                                --                 (UI.SearchZkNotes <| S.defaultSearch es.zk.id)
-                                --             )
-                                --         UserReplyData (Ok UI.SavedZkLinks) ->
-                                --             ( st, Cmd.none )
-                                --         UserReplyData (Ok (UI.ZkNoteSearchResult l)) ->
-                                --             ( EditZkNoteListing { zk = es.zk, notes = l, spmodel = SP.initModel es.zk.id } login, Cmd.none )
-                                --         UserReplyData (Ok (UI.ServerError e)) ->
-                                --             ( BadError (BadError.initialModel e) st, Cmd.none )
-                                --         _ ->
-                                --             ( BadError (BadError.initialModel "unexpected message!") model.state
-                                --             , Cmd.none
-                                --             )
-                                -- )
                                 (savefn False False)
                       }
                     , Cmd.batch
@@ -998,68 +979,40 @@ update msg model =
                     )
 
                 EditZkNote.Switch id ->
-                    ( { model
-                        | state =
-                            Wait
-                                (ShowMessage
-                                    { message = "loading zknote" }
-                                    login
-                                )
-                                (notewait
-                                    { zk = emod.zk
-                                    , login = login
-                                    , mbzknotesearchresult = Nothing
-                                    , mbzklinks = Nothing
-                                    , mbzknote = Nothing
-                                    , spmodel = emod.spmodel
-                                    , navkey = model.navkey
-                                    , pushUrl = True
-                                    }
-                                )
-                      }
-                    , Cmd.batch
-                        [ sendUIMsg model.location
-                            login
-                            (UI.SearchZkNotes <| S.defaultSearch es.zk.id)
-                        , sendUIMsg model.location
-                            login
-                            (UI.GetZkNote id)
-                        , sendUIMsg model.location
-                            login
-                            (UI.GetZkLinks { zknote = id, zk = emod.zk.id })
-                        ]
-                    )
+                    let
+                        ( st, cmd ) =
+                            loadnote model
+                                { zk = emod.zk
+                                , login = login
+                                , mbzknotesearchresult = Nothing
+                                , mbzklinks = Nothing
+                                , mbzknote = Nothing
+                                , spmodel = emod.spmodel
+                                , navkey = model.navkey
+                                , pushUrl = True
+                                }
+                                id
+                    in
+                    ( { model | state = st }, cmd )
 
                 EditZkNote.SaveSwitch szkn zklinks id ->
-                    ( { model
-                        | state =
-                            Wait
-                                (ShowMessage
-                                    { message = "loading zknote" }
-                                    login
-                                )
-                                (notewait
-                                    { zk = emod.zk
-                                    , login = login
-                                    , mbzknotesearchresult = Nothing
-                                    , mbzklinks = Nothing
-                                    , mbzknote = Nothing
-                                    , spmodel = emod.spmodel
-                                    , navkey = model.navkey
-                                    , pushUrl = True
-                                    }
-                                )
-                      }
+                    let
+                        ( st, cmd ) =
+                            loadnote model
+                                { zk = emod.zk
+                                , login = login
+                                , mbzknotesearchresult = Nothing
+                                , mbzklinks = Nothing
+                                , mbzknote = Nothing
+                                , spmodel = emod.spmodel
+                                , navkey = model.navkey
+                                , pushUrl = True
+                                }
+                                id
+                    in
+                    ( { model | state = st }
                     , Cmd.batch
-                        [ sendUIMsg model.location
-                            login
-                            (UI.SearchZkNotes <| S.defaultSearch es.zk.id)
-                        , sendUIMsg model.location
-                            login
-                            (UI.GetZkNote id)
-                        , sendUIMsg model.location
-                            login
-                            (UI.GetZkLinks { zknote = id, zk = emod.zk.id })
+                        [ cmd
                         , sendUIMsg model.location
                             login
                             (UI.SaveZkNote szkn)
@@ -1168,34 +1121,21 @@ update msg model =
                     ( { model | state = EditZkNote (EditZkNote.initExample emod.zk es.notes emod.spmodel) login }, Cmd.none )
 
                 EditZkNoteListing.Selected id ->
-                    ( { model
-                        | state =
-                            Wait
-                                (ShowMessage
-                                    { message = "loading zknote" }
-                                    login
-                                )
-                                (notewait
-                                    { zk = emod.zk
-                                    , login = login
-                                    , mbzknotesearchresult = Just emod.notes
-                                    , mbzklinks = Nothing
-                                    , mbzknote = Nothing
-                                    , spmodel = emod.spmodel
-                                    , navkey = model.navkey
-                                    , pushUrl = True
-                                    }
-                                )
-                      }
-                    , Cmd.batch
-                        [ sendUIMsg model.location
-                            login
-                            (UI.GetZkNote id)
-                        , sendUIMsg model.location
-                            login
-                            (UI.GetZkLinks { zknote = id, zk = emod.zk.id })
-                        ]
-                    )
+                    let
+                        ( st, cmd ) =
+                            loadnote model
+                                { zk = emod.zk
+                                , login = login
+                                , mbzknotesearchresult = Just emod.notes
+                                , mbzklinks = Nothing
+                                , mbzknote = Nothing
+                                , spmodel = emod.spmodel
+                                , navkey = model.navkey
+                                , pushUrl = True
+                                }
+                                id
+                    in
+                    ( { model | state = st }, cmd )
 
                 EditZkNoteListing.View id ->
                     ( { model
