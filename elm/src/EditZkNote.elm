@@ -217,11 +217,24 @@ pageLink model =
             )
 
 
+type WClass
+    = Narrow
+    | Medium
+    | Wide
+
+
 view : Util.Size -> Model -> Element Msg
 view size model =
     let
-        _ =
-            Debug.log "sie:" size
+        wclass =
+            if size.width < 800 then
+                Narrow
+
+            else if size.width > 1700 then
+                Wide
+
+            else
+                Medium
 
         isdirty =
             dirty model
@@ -287,9 +300,17 @@ view size model =
             E.column
                 [ E.spacing 8
                 , E.alignTop
+                , E.alignRight
+
+                -- , E.alignRight
+                , if wclass == Narrow then
+                    E.width E.shrink
+
+                  else
+                    E.width <| E.px 500
                 ]
                 ((E.map SPMsg <|
-                    SP.view True 0 model.spmodel
+                    SP.view (wclass == Narrow) 0 model.spmodel
                  )
                     :: (List.map
                             (\zkln ->
@@ -307,7 +328,18 @@ view size model =
                                                 , label = E.text "Link"
                                                 }
                                     , EI.button dirtybutton { onPress = Just (SwitchPress zkln.id), label = E.text "Edit" }
-                                    , E.text zkln.title
+                                    , E.row
+                                        [ E.width E.fill
+                                        ]
+                                        [ E.text <|
+                                            Util.truncateDots zkln.title
+                                                (if wclass == Wide then
+                                                    35
+
+                                                 else
+                                                    20
+                                                )
+                                        ]
                                     ]
                             )
                         <|
@@ -371,33 +403,61 @@ view size model =
                 Nothing ->
                     E.none
             ]
-        , if size.width > 800 then
-            E.row
-                [ E.width E.fill
-                , E.spacing 8
-                , E.alignTop
-                ]
-                [ mdedit, mdview, searchPanel ]
-
-          else
-            E.column [ E.width E.fill ]
-                [ Common.navbar 0
-                    model.navchoice
-                    NavChoiceChanged
-                    [ ( NcView, "View" )
-                    , ( NcEdit, "Edit" )
-                    , ( NcSearch, "Search" )
+        , case wclass of
+            Wide ->
+                E.row
+                    [ E.width E.fill
+                    , E.spacing 8
+                    , E.alignTop
                     ]
-                , case model.navchoice of
-                    NcEdit ->
-                        mdedit
+                    [ mdedit, mdview, searchPanel ]
 
-                    NcView ->
-                        mdview
+            Medium ->
+                E.row [ E.width E.fill ]
+                    [ E.column [ E.width E.fill, E.alignTop ]
+                        [ Common.navbar 2
+                            (if model.navchoice == NcSearch then
+                                NcView
 
-                    NcSearch ->
-                        searchPanel
-                ]
+                             else
+                                model.navchoice
+                            )
+                            NavChoiceChanged
+                            [ ( NcView, "View" )
+                            , ( NcEdit, "Edit" )
+                            ]
+                        , case model.navchoice of
+                            NcEdit ->
+                                mdedit
+
+                            NcView ->
+                                mdview
+
+                            NcSearch ->
+                                mdview
+                        ]
+                    , searchPanel
+                    ]
+
+            Narrow ->
+                E.column [ E.width E.fill ]
+                    [ Common.navbar 2
+                        model.navchoice
+                        NavChoiceChanged
+                        [ ( NcView, "View" )
+                        , ( NcEdit, "Edit" )
+                        , ( NcSearch, "Search" )
+                        ]
+                    , case model.navchoice of
+                        NcEdit ->
+                            mdedit
+
+                        NcView ->
+                            mdview
+
+                        NcSearch ->
+                            searchPanel
+                    ]
         ]
 
 
@@ -429,7 +489,7 @@ initFull zk zkl zknote zklDict spm =
     , md = zknote.content
     , cells = getCd cc
     , revert = Just (Data.saveZkNoteFromFull zknote)
-    , spmodel = spm
+    , spmodel = SP.searchResultUpdated zkl spm
     , navchoice = NcView
     }
 
@@ -457,7 +517,7 @@ initNew zk zkl spm =
     , md = ""
     , cells = getCd cc
     , revert = Nothing
-    , spmodel = spm
+    , spmodel = SP.searchResultUpdated zkl spm
     , navchoice = NcEdit
     }
 
