@@ -2,6 +2,7 @@ port module Main exposing (main)
 
 import BadError
 import Browser
+import Browser.Events
 import Browser.Navigation
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
@@ -55,6 +56,7 @@ type Msg
     | InternalUrl Url
     | SelectedText JD.Value
     | UrlChanged Url
+    | WindowSize Util.Size
     | Noop
 
 
@@ -242,7 +244,7 @@ viewState size state =
             Element.map EditZkListingMsg <| EditZkListing.view em
 
         EditZkNote em _ ->
-            Element.map EditZkNoteMsg <| EditZkNote.view em
+            Element.map EditZkNoteMsg <| EditZkNote.view size em
 
         EditZkNoteListing em _ ->
             Element.map EditZkNoteListingMsg <| EditZkNoteListing.view em
@@ -428,7 +430,15 @@ listingwait : Data.Login -> Data.Zk -> State -> Msg -> ( State, Cmd Msg )
 listingwait login zk st ms =
     case ms of
         UserReplyData (Ok (UI.ZkNoteSearchResult rs)) ->
-            ( EditZkNoteListing { zk = zk, notes = rs, spmodel = SP.initModel zk.id } login, Cmd.none )
+            ( EditZkNoteListing
+                { zk = zk
+                , notes = rs
+                , spmodel =
+                    SP.searchResultUpdated rs (SP.initModel zk.id)
+                }
+                login
+            , Cmd.none
+            )
 
         UserReplyData (Ok (UI.ServerError e)) ->
             ( BadError (BadError.initialModel e) st, Cmd.none )
@@ -473,6 +483,9 @@ update msg model =
                     wfn model.state msg
             in
             ( { model | state = nst }, cmd )
+
+        ( WindowSize s, _ ) ->
+            ( { model | size = s }, Cmd.none )
 
         ( UrlChanged url, state ) ->
             case parseUrl url of
@@ -1217,7 +1230,11 @@ main =
         , view = view
         , update = update
         , subscriptions =
-            \_ -> receiveSelectedText SelectedText
+            \_ ->
+                Sub.batch
+                    [ receiveSelectedText SelectedText
+                    , Browser.Events.onResize (\w h -> WindowSize { width = w, height = h })
+                    ]
         , onUrlRequest = urlRequest
         , onUrlChange = UrlChanged
         }
