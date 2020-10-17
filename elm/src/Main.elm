@@ -196,17 +196,29 @@ routeState model route =
                         }
                         id
 
-                _ ->
-                    -- take the search results and state and load away.
-                    ( BadError
-                        { errorMessage = "note load unimplemented from this state!"
-                        }
-                        model.state
-                    , Cmd.none
-                    )
+                st ->
+                    case stateLogin st of
+                        Just login ->
+                            -- uh, no zk?  have to load it?
+                            -- I guess check for membership/load zk
+                            -- take the search results and state and load away.
+                            -- don't know the zk for the note.
+                            ( BadError
+                                { errorMessage = "note load unimplemented from this state!"
+                                }
+                                model.state
+                            , Browser.Navigation.replaceUrl model.navkey ""
+                            )
+
+                        Nothing ->
+                            ( initLogin model.seed
+                            , Browser.Navigation.replaceUrl model.navkey ""
+                            )
 
         Fail ->
-            ( initLogin model.seed, Cmd.none )
+            ( initLogin model.seed
+            , Browser.Navigation.replaceUrl model.navkey ""
+            )
 
 
 stateRoute : State -> Route
@@ -1211,7 +1223,10 @@ init flags url key =
                     (routeState
                         model
                     )
-                |> Maybe.withDefault ( initLogin seed, Cmd.none )
+                |> Maybe.withDefault
+                    ( initLogin seed
+                    , Browser.Navigation.replaceUrl key ""
+                    )
     in
     ( { model | state = state }
     , cmd
