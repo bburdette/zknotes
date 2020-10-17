@@ -144,7 +144,7 @@ view size model =
             [ Common.navbar 0
                 model.mode
                 SetMode
-                [ ( LoginMode, "Log in" ), ( RegistrationMode, "Register" ) ]
+                [ ( LoginMode, "log in" ), ( RegistrationMode, "register" ) ]
             ]
         , if model.sent then
             sentView model
@@ -197,13 +197,13 @@ registrationView model =
             { onChange = EmailUpdate
             , text = model.email
             , placeholder = Nothing
-            , label = Input.labelLeft [] <| text "Email:"
+            , label = Input.labelLeft [] <| text "email:"
             }
         , Input.text []
             { onChange = IdUpdate
             , text = model.userId
             , placeholder = Nothing
-            , label = Input.labelLeft [] <| text "User id:"
+            , label = Input.labelLeft [] <| text "user id:"
             }
         , Input.currentPassword []
             { onChange = PasswordUpdate
