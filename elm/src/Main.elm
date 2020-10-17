@@ -430,7 +430,15 @@ listingwait : Data.Login -> Data.Zk -> State -> Msg -> ( State, Cmd Msg )
 listingwait login zk st ms =
     case ms of
         UserReplyData (Ok (UI.ZkNoteSearchResult rs)) ->
-            ( EditZkNoteListing { zk = zk, notes = rs, spmodel = SP.initModel zk.id } login, Cmd.none )
+            ( EditZkNoteListing
+                { zk = zk
+                , notes = rs
+                , spmodel =
+                    SP.searchResultUpdated rs (SP.initModel zk.id)
+                }
+                login
+            , Cmd.none
+            )
 
         UserReplyData (Ok (UI.ServerError e)) ->
             ( BadError (BadError.initialModel e) st, Cmd.none )

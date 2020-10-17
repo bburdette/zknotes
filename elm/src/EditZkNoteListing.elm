@@ -11,6 +11,7 @@ import Element.Region
 import Search as S exposing (TagSearch(..))
 import SearchPanel as SP
 import TangoColors as TC
+import Util
 
 
 type Msg
@@ -49,23 +50,23 @@ updateSearchResult zsr model =
 
 view : Model -> Element Msg
 view model =
-    E.column [ E.spacing 8, E.padding 8 ]
-        [ E.text model.zk.name
+    E.column [ E.spacing 8, E.padding 8, E.width E.shrink, E.centerX ]
+        [ E.row [] [ E.text "zettelkasten: ", E.row [ Font.bold ] [ E.text model.zk.name ] ]
         , E.row [ E.spacing 8 ]
-            [ E.text "Select a Zk Note"
+            [ E.text "select a zk note"
             , EI.button Common.buttonStyle { onPress = Just NewPress, label = E.text "new" }
             , EI.button Common.buttonStyle { onPress = Just ExamplePress, label = E.text "example" }
             , EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "done" }
             ]
         , E.map SPMsg <| SP.view False 0 model.spmodel
-        , E.table [ E.spacing 8 ]
+        , E.table [ E.spacing 8, E.width E.shrink ]
             { data = model.notes.notes
             , columns =
                 [ { header = E.none
                   , width = E.shrink
                   , view =
                         \n ->
-                            E.text n.title
+                            E.text (Util.truncateDots n.title 50)
                   }
                 , { header = E.none
                   , width = E.shrink

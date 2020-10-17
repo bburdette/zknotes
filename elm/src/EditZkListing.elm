@@ -32,9 +32,9 @@ type Command
 
 view : Model -> Element Msg
 view model =
-    E.column [ E.spacing 8, E.padding 8 ] <|
+    E.column [ E.spacing 8, E.padding 8, E.centerX ] <|
         [ E.row [ E.spacing 20 ]
-            [ E.text "Select a ZettelKasten"
+            [ E.text "select a zettelkasten"
             , EI.button Common.buttonStyle { onPress = Just NewPress, label = E.text "new" }
             ]
         , E.table [ E.spacing 8 ]

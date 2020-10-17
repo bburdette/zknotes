@@ -57,25 +57,25 @@ type Command
 view : Model -> Element Msg
 view model =
     E.column
-        [ E.width E.fill ]
-        [ E.row [ E.width E.fill ]
-            [ EI.button Common.buttonStyle { onPress = Just SavePress, label = E.text "Save" }
-            , EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "Done" }
-            , EI.button Common.buttonStyle { onPress = Just ViewPress, label = E.text "View" }
-            , EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just DeletePress, label = E.text "Delete" }
+        [ E.width E.fill, E.padding 8, E.centerX ]
+        [ E.row [ E.width E.fill, E.spacing 8 ]
+            [ EI.button Common.buttonStyle { onPress = Just SavePress, label = E.text "save" }
+            , EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "done" }
+            , EI.button Common.buttonStyle { onPress = Just ViewPress, label = E.text "view" }
+            , EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just DeletePress, label = E.text "delete" }
             ]
         , EI.text []
             { onChange = OnNameChanged
             , text = model.name
             , placeholder = Nothing
-            , label = EI.labelLeft [] (E.text "name")
+            , label = EI.labelLeft [] (E.text "zettelkasten name")
             }
         , E.row [ E.width E.fill ]
             [ EI.multiline [ E.width (E.px 400) ]
                 { onChange = OnMarkdownInput
                 , text = model.md
                 , placeholder = Nothing
-                , label = EI.labelHidden "Markdown input"
+                , label = EI.labelAbove [] <| E.text "description"
                 , spellcheck = False
                 }
             , case markdownView (mkRenderer model.cells OnSchelmeCodeChanged) model.md of
@@ -92,7 +92,7 @@ view model =
                     E.text errors
             ]
         , E.row []
-            [ EI.button Common.buttonStyle { onPress = Just AddMemberPress, label = E.text "Add Member" }
+            [ EI.button Common.buttonStyle { onPress = Just AddMemberPress, label = E.text "add member" }
             , EI.text []
                 { onChange = OnAddMemberNameChanged
                 , text = model.addMemberName

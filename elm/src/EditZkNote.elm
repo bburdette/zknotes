@@ -319,15 +319,15 @@ view size model =
                                         Just _ ->
                                             EI.button Common.buttonStyle
                                                 { onPress = Just <| LinkPress zkln
-                                                , label = E.text "Link"
+                                                , label = E.text "link"
                                                 }
 
                                         Nothing ->
                                             EI.button (Common.buttonStyle ++ [ EBk.color TC.grey ])
                                                 { onPress = Nothing
-                                                , label = E.text "Link"
+                                                , label = E.text "link"
                                                 }
-                                    , EI.button dirtybutton { onPress = Just (SwitchPress zkln.id), label = E.text "Edit" }
+                                    , EI.button dirtybutton { onPress = Just (SwitchPress zkln.id), label = E.text "edit" }
                                     , E.row
                                         [ E.width E.fill
                                         ]
@@ -355,23 +355,23 @@ view size model =
     E.column
         [ E.width E.fill, E.spacing 8 ]
         [ E.row [ E.width E.fill, E.spacing 8 ]
-            [ E.text "Edit Zk Note"
-            , EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just DeletePress, label = E.text "Delete" }
+            [ E.text "edit zk note"
+            , EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just DeletePress, label = E.text "delete" }
             ]
         , E.row [ E.width E.fill, E.spacing 8 ]
             [ EI.button
                 dirtybutton
-                { onPress = Just DonePress, label = E.text "Done" }
-            , EI.button Common.buttonStyle { onPress = Just RevertPress, label = E.text "Cancel" }
-            , EI.button Common.buttonStyle { onPress = Just ViewPress, label = E.text "View" }
-            , EI.button Common.buttonStyle { onPress = Just LinksPress, label = E.text "Links" }
+                { onPress = Just DonePress, label = E.text "done" }
+            , EI.button Common.buttonStyle { onPress = Just RevertPress, label = E.text "cancel" }
+            , EI.button Common.buttonStyle { onPress = Just ViewPress, label = E.text "view" }
+            , EI.button Common.buttonStyle { onPress = Just LinksPress, label = E.text "links" }
             , case isdirty of
                 True ->
-                    EI.button dirtybutton { onPress = Just SavePress, label = E.text "Save" }
+                    EI.button dirtybutton { onPress = Just SavePress, label = E.text "save" }
 
                 False ->
                     E.none
-            , EI.button dirtybutton { onPress = Just NewPress, label = E.text "New" }
+            , EI.button dirtybutton { onPress = Just NewPress, label = E.text "new" }
             ]
         , EI.text []
             { onChange = OnTitleChanged
@@ -423,8 +423,8 @@ view size model =
                                 model.navchoice
                             )
                             NavChoiceChanged
-                            [ ( NcView, "View" )
-                            , ( NcEdit, "Edit" )
+                            [ ( NcView, "view" )
+                            , ( NcEdit, "edit" )
                             ]
                         , case model.navchoice of
                             NcEdit ->
@@ -444,9 +444,9 @@ view size model =
                     [ Common.navbar 2
                         model.navchoice
                         NavChoiceChanged
-                        [ ( NcView, "View" )
-                        , ( NcEdit, "Edit" )
-                        , ( NcSearch, "Search" )
+                        [ ( NcView, "view" )
+                        , ( NcEdit, "edit" )
+                        , ( NcSearch, "search" )
                         ]
                     , case model.navchoice of
                         NcEdit ->
