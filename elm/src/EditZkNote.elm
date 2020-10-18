@@ -210,10 +210,10 @@ pageLink model =
                 toPubId model.public model.pubidtxt
                     |> Maybe.map
                         (\pubid ->
-                            UB.relative [ "page", pubid ] []
+                            UB.absolute [ "page", pubid ] []
                         )
                     |> Util.mapNothing
-                        (UB.relative [ "note", String.fromInt id ] [])
+                        (UB.absolute [ "note", String.fromInt id ] [])
             )
 
 
