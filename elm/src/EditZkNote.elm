@@ -273,24 +273,28 @@ view size model =
             case markdownView (mkRenderer model.cells OnSchelmeCodeChanged) model.md of
                 Ok rendered ->
                     E.column
-                        [ E.paddingXY 30 15
-                        , E.width (E.fill |> E.maximum 1000)
+                        [ E.width E.fill
                         , E.centerX
                         , E.alignTop
-                        , E.spacing 8
-                        , EBk.color TC.lightGrey
                         ]
-                        [ E.text model.title
-                        , E.column
-                            [ E.spacing 30
-                            , E.padding 20
-                            , E.width (E.fill |> E.maximum 1000)
-                            , E.centerX
-                            , E.alignTop
-                            , EBd.width 3
-                            , EBd.color TC.darkGrey
+                        [ E.column
+                            [ E.centerX
+                            , E.paddingXY 30 15
+                            , E.spacing 8
+                            , EBk.color TC.lightGrey
                             ]
-                            rendered
+                            [ E.text model.title
+                            , E.column
+                                [ E.spacing 30
+                                , E.padding 20
+                                , E.width (E.fill |> E.maximum 1000)
+                                , E.centerX
+                                , E.alignTop
+                                , EBd.width 3
+                                , EBd.color TC.darkGrey
+                                ]
+                                rendered
+                            ]
                         ]
 
                 Err errors ->
