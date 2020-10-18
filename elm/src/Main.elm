@@ -149,6 +149,10 @@ routeUrl route =
 
 routeState : Model -> Route -> ( State, Cmd Msg )
 routeState model route =
+    let
+        _ =
+            Debug.log "route: " route
+    in
     case route of
         PublicZkNote id ->
             ( PubShowMessage
@@ -169,6 +173,10 @@ routeState model route =
         EditZkNoteR id ->
             case model.state of
                 EditZkNote st login ->
+                    let
+                        _ =
+                            Debug.log "EditZkNote st login ->" id
+                    in
                     loadnote model
                         { zk = st.zk
                         , login = login
@@ -184,6 +192,10 @@ routeState model route =
                 -- load the zknote in question.  will it load?
                 -- should ZkNote block the load if unsaved?  I guess.
                 EditZkNoteListing st login ->
+                    let
+                        _ =
+                            Debug.log "EditZkNoteListing st login ->" id
+                    in
                     loadnote model
                         { zk = st.zk
                         , login = login
@@ -207,17 +219,19 @@ routeState model route =
                                 { errorMessage = "note load unimplemented from this state!"
                                 }
                                 model.state
-                            , Browser.Navigation.replaceUrl model.navkey ""
+                            , Browser.Navigation.replaceUrl model.navkey "/"
                             )
 
                         Nothing ->
                             ( initLogin model.seed
-                            , Browser.Navigation.replaceUrl model.navkey ""
+                            , Cmd.none
+                              -- Browser.Navigation.replaceUrl model.navkey "/"
                             )
 
         Fail ->
             ( initLogin model.seed
-            , Browser.Navigation.replaceUrl model.navkey ""
+            , Cmd.none
+              --Browser.Navigation.replaceUrl model.navkey "/"
             )
 
 
@@ -502,6 +516,10 @@ update msg model =
         ( UrlChanged url, state ) ->
             case parseUrl url of
                 Just route ->
+                    let
+                        _ =
+                            Debug.log "urlchanged: " ( url, route )
+                    in
                     if route == stateRoute state then
                         ( model, Cmd.none )
 
@@ -513,6 +531,10 @@ update msg model =
                         ( { model | state = st }, cmd )
 
                 Nothing ->
+                    let
+                        _ =
+                            Debug.log "urlchanged, nothing: " url
+                    in
                     -- load other site??
                     ( model, Browser.Navigation.load (Url.toString url) )
 
@@ -1225,7 +1247,8 @@ init flags url key =
                     )
                 |> Maybe.withDefault
                     ( initLogin seed
-                    , Browser.Navigation.replaceUrl key ""
+                    , Cmd.none
+                      -- , Browser.Navigation.replaceUrl key "/"
                     )
     in
     ( { model | state = state }
