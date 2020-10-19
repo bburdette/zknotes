@@ -250,10 +250,20 @@ view size model =
             E.column
                 [ E.spacing 8
                 , E.alignTop
+                , E.width
+                    (case wclass of
+                        Narrow ->
+                            E.fill
+
+                        Medium ->
+                            E.fill
+
+                        Wide ->
+                            E.px 400
+                    )
                 ]
                 (EI.multiline
-                    [ E.width (E.px 400)
-                    , E.htmlAttribute (Html.Attributes.id "mdtext")
+                    [ E.htmlAttribute (Html.Attributes.id "mdtext")
                     , E.alignTop
                     ]
                     { onChange = OnMarkdownInput
@@ -305,13 +315,17 @@ view size model =
                 [ E.spacing 8
                 , E.alignTop
                 , E.alignRight
+                , E.width
+                    (case wclass of
+                        Narrow ->
+                            E.fill
 
-                -- , E.alignRight
-                , if wclass == Narrow then
-                    E.width E.shrink
+                        Medium ->
+                            E.px 400
 
-                  else
-                    E.width <| E.px 500
+                        Wide ->
+                            E.px 400
+                    )
                 ]
                 ((E.map SPMsg <|
                     SP.view (wclass == Narrow) 0 model.spmodel
