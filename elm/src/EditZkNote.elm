@@ -293,7 +293,7 @@ view size model =
                             , E.spacing 8
                             , EBk.color TC.lightGrey
                             ]
-                            [ E.text model.title
+                            [ E.paragraph [] [ E.text model.title ]
                             , E.column
                                 [ E.spacing 30
                                 , E.padding 20
