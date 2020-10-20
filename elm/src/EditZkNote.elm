@@ -29,6 +29,7 @@ import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..),
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
 import Common
 import Data
+import Dialog as D
 import Dict exposing (Dict)
 import Element as E exposing (Element)
 import Element.Background as EBk
@@ -71,6 +72,7 @@ type Msg
     | MdLink Data.ZkLink
     | SPMsg SP.Msg
     | NavChoiceChanged NavChoice
+    | DialogMsg D.Msg
 
 
 type NavChoice
@@ -93,6 +95,7 @@ type alias Model =
     , initialZklDict : Dict String Data.ZkLink
     , spmodel : SP.Model
     , navchoice : NavChoice
+    , dialog : Maybe D.Model
     }
 
 
@@ -225,6 +228,16 @@ type WClass
 
 view : Util.Size -> Model -> Element Msg
 view size model =
+    case model.dialog of
+        Just dialog ->
+            D.view size dialog |> E.map DialogMsg
+
+        Nothing ->
+            zknview size model
+
+
+zknview : Util.Size -> Model -> Element Msg
+zknview size model =
     let
         wclass =
             if size.width < 800 then
@@ -509,6 +522,7 @@ initFull zk zkl zknote zklDict spm =
     , revert = Just (Data.saveZkNoteFromFull zknote)
     , spmodel = SP.searchResultUpdated zkl spm
     , navchoice = NcView
+    , dialog = Nothing
     }
 
 
@@ -537,6 +551,7 @@ initNew zk zkl spm =
     , revert = Nothing
     , spmodel = SP.searchResultUpdated zkl spm
     , navchoice = NcEdit
+    , dialog = Nothing
     }
 
 
@@ -565,6 +580,7 @@ initExample zk zkl spm =
     , revert = Nothing
     , spmodel = spm
     , navchoice = NcView
+    , dialog = Nothing
     }
 
 
@@ -823,9 +839,23 @@ update msg model =
             ( model, Revert )
 
         DeletePress ->
-            case model.id of
-                Just id ->
-                    ( model, Delete id )
+            ( { model | dialog = Just <| D.init "delete this note?" (\size -> E.map (\_ -> ()) (view size model)) }, None )
+
+        DialogMsg dm ->
+            case model.dialog of
+                Just dmod ->
+                    case ( D.update dm dmod, model.id ) of
+                        ( D.Cancel, _ ) ->
+                            ( { model | dialog = Nothing }, None )
+
+                        ( D.Ok, Nothing ) ->
+                            ( { model | dialog = Nothing }, None )
+
+                        ( D.Ok, Just id ) ->
+                            ( { model | dialog = Nothing }, Delete id )
+
+                        ( D.Dialog dmod2, _ ) ->
+                            ( { model | dialog = Just dmod2 }, None )
 
                 Nothing ->
                     ( model, None )

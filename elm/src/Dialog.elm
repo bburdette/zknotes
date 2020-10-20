@@ -15,8 +15,8 @@ import Time
 import Util
 
 
-type Transition prevmodel
-    = Dialog (Model prevmodel)
+type Transition
+    = Dialog Model
     | Ok
     | Cancel
 
@@ -27,22 +27,20 @@ type Msg
     | Noop
 
 
-type alias Model prevmodel =
+type alias Model =
     { message : String
-    , prevModel : prevmodel
-    , prevRender : prevmodel -> Element ()
+    , underLay : Util.Size -> Element ()
     }
 
 
-init : String -> a -> (a -> Element ()) -> Model a
-init message prevmod render =
+init : String -> (Util.Size -> Element ()) -> Model
+init message underLay =
     { message = message
-    , prevModel = prevmod
-    , prevRender = render
+    , underLay = underLay
     }
 
 
-update : Msg -> Model a -> Transition a
+update : Msg -> Model -> Transition
 update msg model =
     case msg of
         OkClick ->
@@ -55,19 +53,19 @@ update msg model =
             Dialog model
 
 
-view : Model a -> Html Msg
-view model =
-    E.layout
+view : Util.Size -> Model -> Element Msg
+view size model =
+    E.column
         [ E.height E.fill
         , E.width E.fill
         , E.inFront (overlay model)
         ]
-        (model.prevRender model.prevModel
+        [ model.underLay size
             |> E.map (\_ -> Noop)
-        )
+        ]
 
 
-overlay : Model a -> Element Msg
+overlay : Model -> Element Msg
 overlay model =
     E.column
         [ E.height E.fill
@@ -79,7 +77,7 @@ overlay model =
         []
 
 
-dialogView : Model a -> Element Msg
+dialogView : Model -> Element Msg
 dialogView model =
     E.column
         [ EB.color <| E.rgb 0 0 0
