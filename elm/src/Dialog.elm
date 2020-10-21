@@ -98,7 +98,7 @@ dialogView model =
         ]
         [ E.row [ E.centerX ] [ E.text model.message ]
         , E.row [ E.width E.fill ]
-            [ EI.button buttonStyle { label = E.text "Ok", onPress = Just OkClick }
-            , EI.button (buttonStyle ++ [ E.alignRight ]) { label = E.text "Cancel", onPress = Just CancelClick }
+            [ EI.button buttonStyle { label = E.text "ok", onPress = Just OkClick }
+            , EI.button (buttonStyle ++ [ E.alignRight ]) { label = E.text "cancel", onPress = Just CancelClick }
             ]
         ]
