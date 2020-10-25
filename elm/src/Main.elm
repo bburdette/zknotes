@@ -247,7 +247,7 @@ viewState size state =
             Element.map EditZkNoteMsg <| EditZkNote.view size em
 
         EditZkNoteListing em _ ->
-            Element.map EditZkNoteListingMsg <| EditZkNoteListing.view em
+            Element.map EditZkNoteListingMsg <| EditZkNoteListing.view size em
 
         ShowMessage em _ ->
             Element.map ShowMessageMsg <| ShowMessage.view em
