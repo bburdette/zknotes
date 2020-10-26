@@ -521,7 +521,7 @@ initFull zk zkl zknote zklDict spm =
     , cells = getCd cc
     , revert = Just (Data.saveZkNoteFromFull zknote)
     , spmodel = SP.searchResultUpdated zkl spm
-    , navchoice = NcView
+    , navchoice = NcEdit
     , dialog = Nothing
     }
 
@@ -579,7 +579,7 @@ initExample zk zkl spm =
     , cells = getCd cc
     , revert = Nothing
     , spmodel = spm
-    , navchoice = NcView
+    , navchoice = NcEdit
     , dialog = Nothing
     }
 
