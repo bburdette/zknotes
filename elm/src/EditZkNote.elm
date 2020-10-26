@@ -29,6 +29,7 @@ import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..),
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
 import Common
 import Data
+import Dialog as D
 import Dict exposing (Dict)
 import Element as E exposing (Element)
 import Element.Background as EBk
@@ -71,6 +72,7 @@ type Msg
     | MdLink Data.ZkLink
     | SPMsg SP.Msg
     | NavChoiceChanged NavChoice
+    | DialogMsg D.Msg
 
 
 type NavChoice
@@ -93,6 +95,7 @@ type alias Model =
     , initialZklDict : Dict String Data.ZkLink
     , spmodel : SP.Model
     , navchoice : NavChoice
+    , dialog : Maybe D.Model
     }
 
 
@@ -210,10 +213,10 @@ pageLink model =
                 toPubId model.public model.pubidtxt
                     |> Maybe.map
                         (\pubid ->
-                            UB.relative [ "page", pubid ] []
+                            UB.absolute [ "page", pubid ] []
                         )
                     |> Util.mapNothing
-                        (UB.relative [ "note", String.fromInt id ] [])
+                        (UB.absolute [ "note", String.fromInt id ] [])
             )
 
 
@@ -225,6 +228,16 @@ type WClass
 
 view : Util.Size -> Model -> Element Msg
 view size model =
+    case model.dialog of
+        Just dialog ->
+            D.view size dialog |> E.map DialogMsg
+
+        Nothing ->
+            zknview size model
+
+
+zknview : Util.Size -> Model -> Element Msg
+zknview size model =
     let
         wclass =
             if size.width < 800 then
@@ -250,10 +263,20 @@ view size model =
             E.column
                 [ E.spacing 8
                 , E.alignTop
+                , E.width
+                    (case wclass of
+                        Narrow ->
+                            E.fill
+
+                        Medium ->
+                            E.fill
+
+                        Wide ->
+                            E.px 500
+                    )
                 ]
                 (EI.multiline
-                    [ E.width (E.px 400)
-                    , E.htmlAttribute (Html.Attributes.id "mdtext")
+                    [ E.htmlAttribute (Html.Attributes.id "mdtext")
                     , E.alignTop
                     ]
                     { onChange = OnMarkdownInput
@@ -273,41 +296,65 @@ view size model =
             case markdownView (mkRenderer model.cells OnSchelmeCodeChanged) model.md of
                 Ok rendered ->
                     E.column
-                        [ E.paddingXY 30 15
-                        , E.width (E.fill |> E.maximum 1000)
+                        [ E.width E.fill
                         , E.centerX
                         , E.alignTop
-                        , E.spacing 8
-                        , EBk.color TC.lightGrey
                         ]
-                        [ E.text model.title
-                        , E.column
-                            [ E.spacing 30
-                            , E.padding 20
-                            , E.width (E.fill |> E.maximum 1000)
-                            , E.centerX
-                            , E.alignTop
-                            , EBd.width 3
-                            , EBd.color TC.darkGrey
+                        [ E.column
+                            [ E.centerX
+                            , E.paddingXY 30 15
+                            , E.spacing 8
+                            , EBk.color TC.lightGrey
                             ]
-                            rendered
+                            [ E.paragraph [] [ E.text model.title ]
+                            , E.column
+                                [ E.spacing 30
+                                , E.padding 20
+                                , E.width (E.fill |> E.maximum 1000)
+                                , E.centerX
+                                , E.alignTop
+                                , EBd.width 3
+                                , EBd.color TC.darkGrey
+                                ]
+                                rendered
+                            ]
                         ]
 
                 Err errors ->
                     E.text errors
 
         searchPanel =
+            let
+                spwidth =
+                    case wclass of
+                        Narrow ->
+                            E.fill
+
+                        Medium ->
+                            E.px 400
+
+                        Wide ->
+                            E.px 400
+
+                spxwidth =
+                    case wclass of
+                        Narrow ->
+                            size.width
+
+                        Medium ->
+                            400
+
+                        Wide ->
+                            400
+
+                titlemaxconst =
+                    135
+            in
             E.column
                 [ E.spacing 8
                 , E.alignTop
                 , E.alignRight
-
-                -- , E.alignRight
-                , if wclass == Narrow then
-                    E.width E.shrink
-
-                  else
-                    E.width <| E.px 500
+                , E.width spwidth
                 ]
                 ((E.map SPMsg <|
                     SP.view (wclass == Narrow) 0 model.spmodel
@@ -329,16 +376,12 @@ view size model =
                                                 }
                                     , EI.button dirtybutton { onPress = Just (SwitchPress zkln.id), label = E.text "edit" }
                                     , E.row
-                                        [ E.width E.fill
+                                        [ E.clipX
+                                        , E.centerY
+                                        , E.height E.fill
+                                        , E.width (E.px <| spxwidth - titlemaxconst)
                                         ]
-                                        [ E.text <|
-                                            Util.truncateDots zkln.title
-                                                (if wclass == Wide then
-                                                    35
-
-                                                 else
-                                                    20
-                                                )
+                                        [ E.text zkln.title
                                         ]
                                     ]
                             )
@@ -490,7 +533,8 @@ initFull zk zkl zknote zklDict spm =
     , cells = getCd cc
     , revert = Just (Data.saveZkNoteFromFull zknote)
     , spmodel = SP.searchResultUpdated zkl spm
-    , navchoice = NcView
+    , navchoice = NcEdit
+    , dialog = Nothing
     }
 
 
@@ -519,6 +563,7 @@ initNew zk zkl spm =
     , revert = Nothing
     , spmodel = SP.searchResultUpdated zkl spm
     , navchoice = NcEdit
+    , dialog = Nothing
     }
 
 
@@ -546,7 +591,8 @@ initExample zk zkl spm =
     , cells = getCd cc
     , revert = Nothing
     , spmodel = spm
-    , navchoice = NcView
+    , navchoice = NcEdit
+    , dialog = Nothing
     }
 
 
@@ -591,14 +637,19 @@ addListNote model szn szkn =
     }
 
 
-gotId : Model -> Int -> Model
+gotId : Model -> Int -> ( Model, Bool )
 gotId model id =
     let
+        -- if we already have an ID, keep it.
         m1 =
             { model | id = Just (model.id |> Maybe.withDefault id) }
     in
-    -- if we already have an ID, keep it.
-    { m1 | revert = Just <| sznFromModel m1 }
+    ( { m1 | revert = Just <| sznFromModel m1 }
+    , -- returning true means the id changed, so probably need to change the url.
+      model.id
+        |> Maybe.map (\_ -> False)
+        |> Maybe.withDefault True
+    )
 
 
 gotSelectedText : Model -> String -> ( Model, Command )
@@ -805,9 +856,23 @@ update msg model =
             ( model, Revert )
 
         DeletePress ->
-            case model.id of
-                Just id ->
-                    ( model, Delete id )
+            ( { model | dialog = Just <| D.init "delete this note?" (\size -> E.map (\_ -> ()) (view size model)) }, None )
+
+        DialogMsg dm ->
+            case model.dialog of
+                Just dmod ->
+                    case ( D.update dm dmod, model.id ) of
+                        ( D.Cancel, _ ) ->
+                            ( { model | dialog = Nothing }, None )
+
+                        ( D.Ok, Nothing ) ->
+                            ( { model | dialog = Nothing }, None )
+
+                        ( D.Ok, Just id ) ->
+                            ( { model | dialog = Nothing }, Delete id )
+
+                        ( D.Dialog dmod2, _ ) ->
+                            ( { model | dialog = Just dmod2 }, None )
 
                 Nothing ->
                     ( model, None )

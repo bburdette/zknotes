@@ -273,7 +273,7 @@ viewState size state =
             Element.map EditZkNoteMsg <| EditZkNote.view size em
 
         EditZkNoteListing em _ ->
-            Element.map EditZkNoteListingMsg <| EditZkNoteListing.view em
+            Element.map EditZkNoteListingMsg <| EditZkNoteListing.view size em
 
         ShowMessage em _ ->
             Element.map ShowMessageMsg <| ShowMessage.view em
@@ -768,7 +768,20 @@ update msg model =
                         UI.SavedZkNote szkn ->
                             case state of
                                 EditZkNote emod login ->
-                                    ( { model | state = EditZkNote (EditZkNote.gotId emod szkn.id) login }, Cmd.none )
+                                    let
+                                        ( eznst, pushurl ) =
+                                            EditZkNote.gotId emod szkn.id
+
+                                        st =
+                                            EditZkNote eznst login
+                                    in
+                                    ( { model | state = st }
+                                    , if pushurl then
+                                        Browser.Navigation.pushUrl model.navkey (routeUrl (stateRoute st))
+
+                                      else
+                                        Cmd.none
+                                    )
 
                                 _ ->
                                     -- just ignore if we're not editing a new note.

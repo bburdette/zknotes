@@ -64,7 +64,7 @@ type Command
 
 view : Bool -> Int -> Model -> Element Msg
 view narrow nblevel model =
-    column []
+    column [ E.width E.fill, E.spacing 8 ]
         [ E.map TSPMsg <| TSP.view narrow nblevel model.tagSearchModel
         , E.map PPMsg <| PP.view model.paginationModel
         ]

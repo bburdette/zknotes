@@ -48,9 +48,13 @@ updateSearchResult zsr model =
     }
 
 
-view : Model -> Element Msg
-view model =
-    E.column [ E.spacing 8, E.padding 8, E.width E.shrink, E.centerX ]
+view : Util.Size -> Model -> Element Msg
+view size model =
+    let
+        titlemaxconst =
+            245
+    in
+    E.column [ E.spacing 8, E.padding 8, E.width (E.maximum 500 E.fill), E.centerX ]
         [ E.row [] [ E.text "zettelkasten: ", E.row [ Font.bold ] [ E.text model.zk.name ] ]
         , E.row [ E.spacing 8 ]
             [ E.text "select a zk note"
@@ -58,15 +62,32 @@ view model =
             , EI.button Common.buttonStyle { onPress = Just ExamplePress, label = E.text "example" }
             , EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "done" }
             ]
-        , E.map SPMsg <| SP.view False 0 model.spmodel
-        , E.table [ E.spacing 8, E.width E.shrink ]
+        , E.map SPMsg <|
+            SP.view
+                (if size.width < 500 then
+                    True
+
+                 else
+                    False
+                )
+                0
+                model.spmodel
+        , E.table [ E.spacing 10, E.width (E.maximum 500 E.fill), E.centerX ]
             { data = model.notes.notes
             , columns =
                 [ { header = E.none
-                  , width = E.shrink
+                  , width =
+                        E.px <| min 500 size.width - titlemaxconst
                   , view =
                         \n ->
-                            E.text (Util.truncateDots n.title 50)
+                            E.row
+                                [ E.clipX
+                                , E.centerY
+                                , E.height E.fill
+                                , E.width (E.px <| min 500 size.width - titlemaxconst)
+                                ]
+                                [ E.text n.title
+                                ]
                   }
                 , { header = E.none
                   , width = E.shrink
