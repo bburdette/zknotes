@@ -72,21 +72,7 @@ view size model =
                 )
                 0
                 model.spmodel
-
-        {- , E.row [ E.width E.fill ]
-           [ E.map SPMsg <|
-               SP.view
-                   (if size.width < 500 then
-                       True
-
-                    else
-                       False
-                   )
-                   0
-                   model.spmodel
-           ]
-        -}
-        , E.table [ E.spacing 8, E.width (E.maximum 500 E.fill), E.centerX ]
+        , E.table [ E.spacing 10, E.width (E.maximum 500 E.fill), E.centerX ]
             { data = model.notes.notes
             , columns =
                 [ { header = E.none
@@ -96,10 +82,11 @@ view size model =
                         \n ->
                             E.row
                                 [ E.clipX
+                                , E.centerY
+                                , E.height E.fill
                                 , E.width (E.px <| min 500 size.width - titlemaxconst)
                                 ]
-                                [ -- E.text (Util.truncateDots n.title 50)
-                                  E.text n.title
+                                [ E.text n.title
                                 ]
                   }
                 , { header = E.none

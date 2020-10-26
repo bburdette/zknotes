@@ -272,7 +272,7 @@ zknview size model =
                             E.fill
 
                         Wide ->
-                            E.px 400
+                            E.px 500
                     )
                 ]
                 (EI.multiline
@@ -324,12 +324,9 @@ zknview size model =
                     E.text errors
 
         searchPanel =
-            E.column
-                [ E.spacing 8
-                , E.alignTop
-                , E.alignRight
-                , E.width
-                    (case wclass of
+            let
+                spwidth =
+                    case wclass of
                         Narrow ->
                             E.fill
 
@@ -338,7 +335,26 @@ zknview size model =
 
                         Wide ->
                             E.px 400
-                    )
+
+                spxwidth =
+                    case wclass of
+                        Narrow ->
+                            size.width
+
+                        Medium ->
+                            400
+
+                        Wide ->
+                            400
+
+                titlemaxconst =
+                    135
+            in
+            E.column
+                [ E.spacing 8
+                , E.alignTop
+                , E.alignRight
+                , E.width spwidth
                 ]
                 ((E.map SPMsg <|
                     SP.view (wclass == Narrow) 0 model.spmodel
@@ -360,16 +376,12 @@ zknview size model =
                                                 }
                                     , EI.button dirtybutton { onPress = Just (SwitchPress zkln.id), label = E.text "edit" }
                                     , E.row
-                                        [ E.width E.fill
+                                        [ E.clipX
+                                        , E.centerY
+                                        , E.height E.fill
+                                        , E.width (E.px <| spxwidth - titlemaxconst)
                                         ]
-                                        [ E.text <|
-                                            Util.truncateDots zkln.title
-                                                (if wclass == Wide then
-                                                    35
-
-                                                 else
-                                                    20
-                                                )
+                                        [ E.text zkln.title
                                         ]
                                     ]
                             )
