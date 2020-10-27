@@ -84,12 +84,6 @@ type alias Flags =
     }
 
 
-type SRAction
-    = Save
-    | Replace
-    | None
-
-
 type alias SavedRoute =
     { route : Route
     , save : Bool
@@ -584,7 +578,8 @@ update msg model =
                                     psr =
                                         model.savedRoute
                                 in
-                                ( { model | state = st, savedRoute = { psr | save = False } }, rscmd )
+                                -- switch to new route so we won't write over it.
+                                ( { model | state = st, savedRoute = stateRoute st }, rscmd )
 
                         Nothing ->
                             let
