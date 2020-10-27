@@ -84,12 +84,19 @@ type alias Flags =
     }
 
 
+type alias SavedRoute =
+    { route : Route
+    , save : Bool
+    }
+
+
 type alias Model =
     { state : State
     , size : Util.Size
     , location : String
     , navkey : Browser.Navigation.Key
     , seed : Seed
+    , savedRoute : SavedRoute
     }
 
 
@@ -97,7 +104,23 @@ type Route
     = PublicZkNote Int
     | PublicZkPubId String
     | EditZkNoteR Int
-    | Fail
+    | Top
+
+
+routeTitle : Route -> String
+routeTitle route =
+    case route of
+        PublicZkNote id ->
+            "zknote " ++ String.fromInt id
+
+        PublicZkPubId id ->
+            "zknote " ++ id
+
+        EditZkNoteR id ->
+            "zknote " ++ String.fromInt id
+
+        Top ->
+            "zknote"
 
 
 urlRequest : Browser.UrlRequest -> Msg
@@ -126,6 +149,7 @@ parseUrl url =
                 UP.s
                     "editnote"
                     </> UP.int
+            , UP.map Top <| UP.top
             ]
         )
         url
@@ -143,95 +167,122 @@ routeUrl route =
         EditZkNoteR id ->
             UB.absolute [ "editnote", String.fromInt id ] []
 
-        Fail ->
+        Top ->
             UB.absolute [] []
 
 
-routeState : Model -> Route -> ( State, Cmd Msg )
+routeState : Model -> Route -> Maybe ( State, Cmd Msg )
 routeState model route =
     case route of
         PublicZkNote id ->
-            ( PubShowMessage
-                { message = "loading article"
-                }
-            , sendPIMsg model.location
-                (PI.GetZkNote id)
-            )
+            Just
+                ( PubShowMessage
+                    { message = "loading article"
+                    }
+                , sendPIMsg model.location
+                    (PI.GetZkNote id)
+                )
 
         PublicZkPubId pubid ->
-            ( PubShowMessage
-                { message = "loading article"
-                }
-            , sendPIMsg model.location
-                (PI.GetZkNotePubId pubid)
-            )
+            Just
+                ( PubShowMessage
+                    { message = "loading article"
+                    }
+                , sendPIMsg model.location
+                    (PI.GetZkNotePubId pubid)
+                )
 
         EditZkNoteR id ->
             case model.state of
                 EditZkNote st login ->
-                    loadnote model
-                        { zk = st.zk
-                        , login = login
-                        , mbzknotesearchresult = Just st.zknSearchResult
-                        , mbzklinks = Nothing
-                        , mbzknote = Nothing
-                        , spmodel = st.spmodel
-                        , navkey = model.navkey
-                        , pushUrl = False -- no need to pushUrl after load, since obvs is already in history.
-                        }
-                        id
+                    Just <|
+                        loadnote model
+                            { zk = st.zk
+                            , login = login
+                            , mbzknotesearchresult = Just st.zknSearchResult
+                            , mbzklinks = Nothing
+                            , mbzknote = Nothing
+                            , spmodel = st.spmodel
+                            , navkey = model.navkey
+                            }
+                            id
 
                 -- load the zknote in question.  will it load?
                 -- should ZkNote block the load if unsaved?  I guess.
                 EditZkNoteListing st login ->
-                    loadnote model
-                        { zk = st.zk
-                        , login = login
-                        , mbzknotesearchresult = Just st.notes
-                        , mbzklinks = Nothing
-                        , mbzknote = Nothing
-                        , spmodel = st.spmodel
-                        , navkey = model.navkey
-                        , pushUrl = False -- no need to pushUrl after load, since obvs is already in history.
-                        }
-                        id
+                    Just <|
+                        loadnote model
+                            { zk = st.zk
+                            , login = login
+                            , mbzknotesearchresult = Just st.notes
+                            , mbzklinks = Nothing
+                            , mbzknote = Nothing
+                            , spmodel = st.spmodel
+                            , navkey = model.navkey
+                            }
+                            id
 
-                _ ->
-                    -- take the search results and state and load away.
-                    ( BadError
-                        { errorMessage = "note load unimplemented from this state!"
-                        }
-                        model.state
-                    , Cmd.none
-                    )
+                st ->
+                    case stateLogin st of
+                        Just login ->
+                            -- uh, no zk?  have to load it?
+                            -- I guess check for membership/load zk
+                            -- take the search results and state and load away.
+                            -- don't know the zk for the note.
+                            Just
+                                ( BadError
+                                    { errorMessage = "note load unimplemented from this state!"
+                                    }
+                                    model.state
+                                , Cmd.none
+                                  -- , Browser.Navigation.replaceUrl model.navkey "/"
+                                )
 
-        Fail ->
-            ( initLogin model.seed, Cmd.none )
+                        Nothing ->
+                            Nothing
+
+        Top ->
+            if (stateRoute model.state).route == Top then
+                Just ( model.state, Cmd.none )
+
+            else
+                Nothing
 
 
-stateRoute : State -> Route
+stateRoute : State -> SavedRoute
 stateRoute state =
     case state of
         View vst ->
             case vst.pubid of
                 Just pubid ->
-                    PublicZkPubId pubid
+                    { route = PublicZkPubId pubid
+                    , save = True
+                    }
 
                 Nothing ->
                     case vst.id of
                         Just id ->
-                            PublicZkNote id
+                            { route = PublicZkNote id
+                            , save = True
+                            }
 
                         Nothing ->
-                            Fail
+                            { route = Top
+                            , save = False
+                            }
 
         EditZkNote st login ->
-            st.id
-                |> Maybe.map EditZkNoteR
-                |> Maybe.withDefault Fail
+            { route =
+                st.id
+                    |> Maybe.map EditZkNoteR
+                    |> Maybe.withDefault Top
+            , save = True
+            }
 
         _ ->
-            Fail
+            { route = Top
+            , save = False
+            }
 
 
 viewState : Util.Size -> State -> Element Msg
@@ -341,7 +392,6 @@ type alias NwState =
     , mbzknote : Maybe Data.FullZkNote
     , spmodel : SP.Model
     , navkey : Browser.Navigation.Key
-    , pushUrl : Bool
     }
 
 
@@ -378,11 +428,7 @@ notewait nwstate state wmsg =
                     EditZkNote (EditZkNote.initFull n.zk zknl zkn zkl n.spmodel) n.login
             in
             ( st
-            , if n.pushUrl then
-                Browser.Navigation.pushUrl n.navkey (routeUrl (stateRoute st))
-
-              else
-                Cmd.none
+            , Cmd.none
             )
 
         _ ->
@@ -466,7 +512,7 @@ noteviewwait backstate st ms =
 
 view : Model -> { title : String, body : List (Html Msg) }
 view model =
-    { title = "zknotes"
+    { title = routeTitle model.savedRoute.route
     , body =
         [ Element.layout [] <|
             viewState model.size model.state
@@ -474,8 +520,82 @@ view model =
     }
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
+{-| urlUpdate: all URL code shall go here! regular code shall not worry about urls!
+this function calls actualupdate where the app stuff happens.
+url messages and state based url changes are done here.
+-}
+urlupdate : Msg -> Model -> ( Model, Cmd Msg )
+urlupdate msg model =
+    let
+        ( nm, cmd ) =
+            case msg of
+                InternalUrl url ->
+                    let
+                        ( state, icmd ) =
+                            parseUrl url
+                                |> Maybe.andThen (routeState model)
+                                |> Maybe.withDefault ( model.state, Cmd.none )
+                    in
+                    ( { model | state = state }, icmd )
+
+                LoadUrl urlstr ->
+                    -- load foreign site
+                    ( model, Browser.Navigation.load urlstr )
+
+                UrlChanged url ->
+                    -- we get this from forward and back buttons.  if the user changes the url
+                    -- in the browser address bar, its a site reload so this isn't called.
+                    case parseUrl url of
+                        Just route ->
+                            if route == (stateRoute model.state).route then
+                                ( model, Cmd.none )
+
+                            else
+                                case routeState model route of
+                                    Just ( st, rscmd ) ->
+                                        -- swap out the savedRoute, so we don't write over history.
+                                        ( { model | state = st, savedRoute = stateRoute st }, rscmd )
+
+                                    Nothing ->
+                                        ( model, Cmd.none )
+
+                        Nothing ->
+                            -- load foreign site
+                            ( model, Browser.Navigation.load (Url.toString url) )
+
+                _ ->
+                    -- not an url related message!  pass it on to the 'actualupdate'
+                    -- this is where all the app stuff happens.
+                    actualupdate msg model
+
+        sr =
+            stateRoute nm.state
+    in
+    -- when the route changes, change the address bar, optionally pushing what's there to
+    -- browser history.
+    if sr.route /= nm.savedRoute.route then
+        ( { nm | savedRoute = sr }
+        , if model.savedRoute.save then
+            Cmd.batch
+                [ cmd
+                , Browser.Navigation.pushUrl nm.navkey
+                    (routeUrl sr.route)
+                ]
+
+          else
+            Cmd.batch
+                [ cmd
+                , Browser.Navigation.replaceUrl nm.navkey
+                    (routeUrl sr.route)
+                ]
+        )
+
+    else
+        ( nm, cmd )
+
+
+actualupdate : Msg -> Model -> ( Model, Cmd Msg )
+actualupdate msg model =
     case ( msg, model.state ) of
         ( _, Wait wst wfn ) ->
             let
@@ -486,23 +606,6 @@ update msg model =
 
         ( WindowSize s, _ ) ->
             ( { model | size = s }, Cmd.none )
-
-        ( UrlChanged url, state ) ->
-            case parseUrl url of
-                Just route ->
-                    if route == stateRoute state then
-                        ( model, Cmd.none )
-
-                    else
-                        let
-                            ( st, cmd ) =
-                                routeState model route
-                        in
-                        ( { model | state = st }, cmd )
-
-                Nothing ->
-                    -- load other site??
-                    ( model, Browser.Navigation.load (Url.toString url) )
 
         ( SelectedText jv, state ) ->
             case JD.decodeValue JD.string jv of
@@ -560,18 +663,6 @@ update msg model =
                 Err e ->
                     ( { model | state = BadError (BadError.initialModel <| JD.errorToString e) model.state }, Cmd.none )
 
-        ( InternalUrl url, _ ) ->
-            let
-                mblogin =
-                    stateLogin model.state
-
-                ( state, cmd ) =
-                    parseUrl url
-                        |> Maybe.map (routeState model)
-                        |> Maybe.withDefault ( model.state, Cmd.none )
-            in
-            ( { model | state = state }, cmd )
-
         ( LoginMsg lm, Login ls ) ->
             let
                 ( lmod, lcmd ) =
@@ -619,8 +710,7 @@ update msg model =
                                     View (View.initFull fbe)
                             in
                             ( { model | state = vstate }
-                            , Browser.Navigation.pushUrl model.navkey
-                                (routeUrl (stateRoute vstate))
+                            , Cmd.none
                             )
 
         ( UserReplyData urd, state ) ->
@@ -735,18 +825,14 @@ update msg model =
                             case state of
                                 EditZkNote emod login ->
                                     let
-                                        ( eznst, pushurl ) =
+                                        eznst =
                                             EditZkNote.gotId emod szkn.id
 
                                         st =
                                             EditZkNote eznst login
                                     in
                                     ( { model | state = st }
-                                    , if pushurl then
-                                        Browser.Navigation.pushUrl model.navkey (routeUrl (stateRoute st))
-
-                                      else
-                                        Cmd.none
+                                    , Cmd.none
                                     )
 
                                 _ ->
@@ -882,9 +968,12 @@ update msg model =
                         | state =
                             EditZkNoteListing { zk = emod.zk, notes = emod.zknSearchResult, spmodel = emod.spmodel } login
                       }
-                    , sendUIMsg model.location
-                        login
-                        (UI.SearchZkNotes (S.defaultSearch es.zk.id))
+                    , Cmd.batch
+                        [ sendUIMsg model.location
+                            login
+                            (UI.SearchZkNotes (S.defaultSearch es.zk.id))
+                        , Cmd.none
+                        ]
                     )
             in
             case ecmd of
@@ -1007,7 +1096,6 @@ update msg model =
                                 , mbzknote = Nothing
                                 , spmodel = emod.spmodel
                                 , navkey = model.navkey
-                                , pushUrl = True
                                 }
                                 id
                     in
@@ -1024,7 +1112,6 @@ update msg model =
                                 , mbzknote = Nothing
                                 , spmodel = emod.spmodel
                                 , navkey = model.navkey
-                                , pushUrl = True
                                 }
                                 id
                     in
@@ -1149,7 +1236,6 @@ update msg model =
                                 , mbzknote = Nothing
                                 , spmodel = emod.spmodel
                                 , navkey = model.navkey
-                                , pushUrl = True
                                 }
                                 id
                     in
@@ -1216,15 +1302,28 @@ init flags url key =
             , location = flags.location
             , navkey = key
             , seed = seed
+            , savedRoute = { route = Top, save = False }
             }
 
         ( state, cmd ) =
             parseUrl url
-                |> Maybe.map
+                |> Maybe.andThen
+                    (\s ->
+                        case s of
+                            Top ->
+                                Nothing
+
+                            _ ->
+                                Just s
+                    )
+                |> Maybe.andThen
                     (routeState
                         model
                     )
-                |> Maybe.withDefault ( initLogin seed, Cmd.none )
+                |> Maybe.withDefault
+                    ( initLogin seed
+                    , Browser.Navigation.replaceUrl key "/"
+                    )
     in
     ( { model | state = state }
     , cmd
@@ -1241,7 +1340,7 @@ main =
     Browser.application
         { init = init
         , view = view
-        , update = update
+        , update = urlupdate
         , subscriptions =
             \_ ->
                 Sub.batch
