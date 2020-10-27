@@ -175,7 +175,7 @@ routeUrl route =
             UB.absolute [] []
 
 
-routeState : Model -> Route -> ( State, Cmd Msg )
+routeState : Model -> Route -> Maybe ( State, Cmd Msg )
 routeState model route =
     let
         _ =
@@ -183,20 +183,22 @@ routeState model route =
     in
     case route of
         PublicZkNote id ->
-            ( PubShowMessage
-                { message = "loading article"
-                }
-            , sendPIMsg model.location
-                (PI.GetZkNote id)
-            )
+            Just
+                ( PubShowMessage
+                    { message = "loading article"
+                    }
+                , sendPIMsg model.location
+                    (PI.GetZkNote id)
+                )
 
         PublicZkPubId pubid ->
-            ( PubShowMessage
-                { message = "loading article"
-                }
-            , sendPIMsg model.location
-                (PI.GetZkNotePubId pubid)
-            )
+            Just
+                ( PubShowMessage
+                    { message = "loading article"
+                    }
+                , sendPIMsg model.location
+                    (PI.GetZkNotePubId pubid)
+                )
 
         EditZkNoteR id ->
             case model.state of
@@ -205,16 +207,17 @@ routeState model route =
                         _ =
                             Debug.log "EditZkNote st login ->" id
                     in
-                    loadnote model
-                        { zk = st.zk
-                        , login = login
-                        , mbzknotesearchresult = Just st.zknSearchResult
-                        , mbzklinks = Nothing
-                        , mbzknote = Nothing
-                        , spmodel = st.spmodel
-                        , navkey = model.navkey
-                        }
-                        id
+                    Just <|
+                        loadnote model
+                            { zk = st.zk
+                            , login = login
+                            , mbzknotesearchresult = Just st.zknSearchResult
+                            , mbzklinks = Nothing
+                            , mbzknote = Nothing
+                            , spmodel = st.spmodel
+                            , navkey = model.navkey
+                            }
+                            id
 
                 -- load the zknote in question.  will it load?
                 -- should ZkNote block the load if unsaved?  I guess.
@@ -223,16 +226,17 @@ routeState model route =
                         _ =
                             Debug.log "EditZkNoteListing st login ->" id
                     in
-                    loadnote model
-                        { zk = st.zk
-                        , login = login
-                        , mbzknotesearchresult = Just st.notes
-                        , mbzklinks = Nothing
-                        , mbzknote = Nothing
-                        , spmodel = st.spmodel
-                        , navkey = model.navkey
-                        }
-                        id
+                    Just <|
+                        loadnote model
+                            { zk = st.zk
+                            , login = login
+                            , mbzknotesearchresult = Just st.notes
+                            , mbzklinks = Nothing
+                            , mbzknote = Nothing
+                            , spmodel = st.spmodel
+                            , navkey = model.navkey
+                            }
+                            id
 
                 st ->
                     case stateLogin st of
@@ -241,28 +245,24 @@ routeState model route =
                             -- I guess check for membership/load zk
                             -- take the search results and state and load away.
                             -- don't know the zk for the note.
-                            ( BadError
-                                { errorMessage = "note load unimplemented from this state!"
-                                }
-                                model.state
-                            , Cmd.none
-                              -- , Browser.Navigation.replaceUrl model.navkey "/"
-                            )
+                            Just
+                                ( BadError
+                                    { errorMessage = "note load unimplemented from this state!"
+                                    }
+                                    model.state
+                                , Cmd.none
+                                  -- , Browser.Navigation.replaceUrl model.navkey "/"
+                                )
 
                         Nothing ->
-                            ( initLogin model.seed
-                            , Cmd.none
-                              -- Browser.Navigation.replaceUrl model.navkey "/"
-                            )
+                            Nothing
 
         Top ->
             if (stateRoute model.state).route == Top then
-                ( model.state, Cmd.none )
+                Just ( model.state, Cmd.none )
 
             else
-                ( initLogin model.seed
-                , Cmd.none
-                )
+                Nothing
 
 
 stateRoute : State -> SavedRoute
@@ -543,12 +543,9 @@ update msg model =
             case msg of
                 InternalUrl url ->
                     let
-                        mblogin =
-                            stateLogin model.state
-
                         ( state, icmd ) =
                             parseUrl url
-                                |> Maybe.map (routeState model)
+                                |> Maybe.andThen (routeState model)
                                 |> Maybe.withDefault ( model.state, Cmd.none )
                     in
                     ( { model | state = state }, icmd )
@@ -571,15 +568,12 @@ update msg model =
                                 ( model, Cmd.none )
 
                             else
-                                let
-                                    ( st, rscmd ) =
-                                        routeState model route
+                                case routeState model route of
+                                    Just ( st, rscmd ) ->
+                                        ( { model | state = st, savedRoute = stateRoute st }, rscmd )
 
-                                    psr =
-                                        model.savedRoute
-                                in
-                                -- switch to new route so we won't write over it.
-                                ( { model | state = st, savedRoute = stateRoute st }, rscmd )
+                                    Nothing ->
+                                        ( model, Cmd.none )
 
                         Nothing ->
                             let
@@ -1354,7 +1348,7 @@ init flags url key =
                             _ ->
                                 Just s
                     )
-                |> Maybe.map
+                |> Maybe.andThen
                     (routeState
                         model
                     )
