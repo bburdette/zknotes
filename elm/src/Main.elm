@@ -520,8 +520,12 @@ view model =
     }
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
+{-| urlUpdate: all URL code shall go here! regular code shall not worry about urls!
+this function calls actualupdate where the app stuff happens.
+url messages and state based url changes are done here.
+-}
+urlupdate : Msg -> Model -> ( Model, Cmd Msg )
+urlupdate msg model =
     let
         ( nm, cmd ) =
             case msg of
@@ -534,10 +538,13 @@ update msg model =
                     in
                     ( { model | state = state }, icmd )
 
-                LoadUrl url ->
-                    ( model, Cmd.none )
+                LoadUrl urlstr ->
+                    -- load foreign site
+                    ( model, Browser.Navigation.load urlstr )
 
                 UrlChanged url ->
+                    -- we get this from forward and back buttons.  if the user changes the url
+                    -- in the browser address bar, its a site reload so this isn't called.
                     case parseUrl url of
                         Just route ->
                             if route == (stateRoute model.state).route then
@@ -546,6 +553,7 @@ update msg model =
                             else
                                 case routeState model route of
                                     Just ( st, rscmd ) ->
+                                        -- swap out the savedRoute, so we don't write over history.
                                         ( { model | state = st, savedRoute = stateRoute st }, rscmd )
 
                                     Nothing ->
@@ -556,11 +564,15 @@ update msg model =
                             ( model, Browser.Navigation.load (Url.toString url) )
 
                 _ ->
+                    -- not an url related message!  pass it on to the 'actualupdate'
+                    -- this is where all the app stuff happens.
                     actualupdate msg model
 
         sr =
             stateRoute nm.state
     in
+    -- when the route changes, change the address bar, optionally pushing what's there to
+    -- browser history.
     if sr.route /= nm.savedRoute.route then
         ( { nm | savedRoute = sr }
         , if model.savedRoute.save then
@@ -1328,7 +1340,7 @@ main =
     Browser.application
         { init = init
         , view = view
-        , update = update
+        , update = urlupdate
         , subscriptions =
             \_ ->
                 Sub.batch
