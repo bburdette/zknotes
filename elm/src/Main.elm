@@ -97,7 +97,7 @@ type Route
     = PublicZkNote Int
     | PublicZkPubId String
     | EditZkNoteR Int
-    | Fail
+    | Top
 
 
 urlRequest : Browser.UrlRequest -> Msg
@@ -126,6 +126,7 @@ parseUrl url =
                 UP.s
                     "editnote"
                     </> UP.int
+            , UP.map Top <| UP.top
             ]
         )
         url
@@ -143,7 +144,7 @@ routeUrl route =
         EditZkNoteR id ->
             UB.absolute [ "editnote", String.fromInt id ] []
 
-        Fail ->
+        Top ->
             UB.absolute [] []
 
 
@@ -228,11 +229,15 @@ routeState model route =
                               -- Browser.Navigation.replaceUrl model.navkey "/"
                             )
 
-        Fail ->
-            ( initLogin model.seed
-            , Cmd.none
-              --Browser.Navigation.replaceUrl model.navkey "/"
-            )
+        Top ->
+            if stateRoute model.state == Top then
+                ( model.state, Cmd.none )
+
+            else
+                ( initLogin model.seed
+                , Cmd.none
+                  --Browser.Navigation.replaceUrl model.navkey "/"
+                )
 
 
 stateRoute : State -> Route
@@ -249,15 +254,15 @@ stateRoute state =
                             PublicZkNote id
 
                         Nothing ->
-                            Fail
+                            Top
 
         EditZkNote st login ->
             st.id
                 |> Maybe.map EditZkNoteR
-                |> Maybe.withDefault Fail
+                |> Maybe.withDefault Top
 
         _ ->
-            Fail
+            Top
 
 
 viewState : Util.Size -> State -> Element Msg
@@ -535,7 +540,7 @@ update msg model =
                         _ =
                             Debug.log "urlchanged, nothing: " url
                     in
-                    -- load other site??
+                    -- load foreign site
                     ( model, Browser.Navigation.load (Url.toString url) )
 
         ( SelectedText jv, state ) ->
@@ -916,9 +921,14 @@ update msg model =
                         | state =
                             EditZkNoteListing { zk = emod.zk, notes = emod.zknSearchResult, spmodel = emod.spmodel } login
                       }
-                    , sendUIMsg model.location
-                        login
-                        (UI.SearchZkNotes (S.defaultSearch es.zk.id))
+                    , Cmd.batch
+                        [ sendUIMsg model.location
+                            login
+                            (UI.SearchZkNotes (S.defaultSearch es.zk.id))
+                        , Browser.Navigation.pushUrl model.navkey "/"
+
+                        -- , Browser.Navigation.replaceUrl model.navkey "/"
+                        ]
                     )
             in
             case ecmd of
@@ -1254,14 +1264,22 @@ init flags url key =
 
         ( state, cmd ) =
             parseUrl url
+                |> Maybe.andThen
+                    (\s ->
+                        case s of
+                            Top ->
+                                Nothing
+
+                            _ ->
+                                Just s
+                    )
                 |> Maybe.map
                     (routeState
                         model
                     )
                 |> Maybe.withDefault
                     ( initLogin seed
-                    , Cmd.none
-                      -- , Browser.Navigation.replaceUrl key "/"
+                    , Browser.Navigation.replaceUrl key "/"
                     )
     in
     ( { model | state = state }
