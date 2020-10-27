@@ -637,19 +637,14 @@ addListNote model szn szkn =
     }
 
 
-gotId : Model -> Int -> ( Model, Bool )
+gotId : Model -> Int -> Model
 gotId model id =
     let
         -- if we already have an ID, keep it.
         m1 =
             { model | id = Just (model.id |> Maybe.withDefault id) }
     in
-    ( { m1 | revert = Just <| sznFromModel m1 }
-    , -- returning true means the id changed, so probably need to change the url.
-      model.id
-        |> Maybe.map (\_ -> False)
-        |> Maybe.withDefault True
-    )
+    { m1 | revert = Just <| sznFromModel m1 }
 
 
 gotSelectedText : Model -> String -> ( Model, Command )

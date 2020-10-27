@@ -84,12 +84,19 @@ type alias Flags =
     }
 
 
+type alias SavedRoute =
+    { route : Route
+    , save : Bool
+    }
+
+
 type alias Model =
     { state : State
     , size : Util.Size
     , location : String
     , navkey : Browser.Navigation.Key
     , seed : Seed
+    , savedRoute : SavedRoute
     }
 
 
@@ -186,7 +193,6 @@ routeState model route =
                         , mbzknote = Nothing
                         , spmodel = st.spmodel
                         , navkey = model.navkey
-                        , pushUrl = False -- no need to pushUrl after load, since obvs is already in history.
                         }
                         id
 
@@ -205,7 +211,6 @@ routeState model route =
                         , mbzknote = Nothing
                         , spmodel = st.spmodel
                         , navkey = model.navkey
-                        , pushUrl = False -- no need to pushUrl after load, since obvs is already in history.
                         }
                         id
 
@@ -220,7 +225,8 @@ routeState model route =
                                 { errorMessage = "note load unimplemented from this state!"
                                 }
                                 model.state
-                            , Browser.Navigation.replaceUrl model.navkey "/"
+                            , Cmd.none
+                              -- , Browser.Navigation.replaceUrl model.navkey "/"
                             )
 
                         Nothing ->
@@ -230,39 +236,49 @@ routeState model route =
                             )
 
         Top ->
-            if stateRoute model.state == Top then
+            if (stateRoute model.state).route == Top then
                 ( model.state, Cmd.none )
 
             else
                 ( initLogin model.seed
                 , Cmd.none
-                  --Browser.Navigation.replaceUrl model.navkey "/"
                 )
 
 
-stateRoute : State -> Route
+stateRoute : State -> SavedRoute
 stateRoute state =
     case state of
         View vst ->
             case vst.pubid of
                 Just pubid ->
-                    PublicZkPubId pubid
+                    { route = PublicZkPubId pubid
+                    , save = True
+                    }
 
                 Nothing ->
                     case vst.id of
                         Just id ->
-                            PublicZkNote id
+                            { route = PublicZkNote id
+                            , save = True
+                            }
 
                         Nothing ->
-                            Top
+                            { route = Top
+                            , save = False
+                            }
 
         EditZkNote st login ->
-            st.id
-                |> Maybe.map EditZkNoteR
-                |> Maybe.withDefault Top
+            { route =
+                st.id
+                    |> Maybe.map EditZkNoteR
+                    |> Maybe.withDefault Top
+            , save = True
+            }
 
         _ ->
-            Top
+            { route = Top
+            , save = False
+            }
 
 
 viewState : Util.Size -> State -> Element Msg
@@ -372,7 +388,6 @@ type alias NwState =
     , mbzknote : Maybe Data.FullZkNote
     , spmodel : SP.Model
     , navkey : Browser.Navigation.Key
-    , pushUrl : Bool
     }
 
 
@@ -409,11 +424,7 @@ notewait nwstate state wmsg =
                     EditZkNote (EditZkNote.initFull n.zk zknl zkn zkl n.spmodel) n.login
             in
             ( st
-            , if n.pushUrl then
-                Browser.Navigation.pushUrl n.navkey (routeUrl (stateRoute st))
-
-              else
-                Cmd.none
+            , Cmd.none
             )
 
         _ ->
@@ -507,6 +518,40 @@ view model =
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
+    let
+        ( nm, cmd ) =
+            actualupdate msg model
+
+        sr =
+            stateRoute nm.state
+    in
+    if sr.route /= model.savedRoute.route then
+        let
+            _ =
+                Debug.log "new route: " ( sr, model.savedRoute )
+        in
+        ( { nm | savedRoute = sr }
+        , if model.savedRoute.save then
+            Cmd.batch
+                [ cmd
+                , Browser.Navigation.pushUrl nm.navkey
+                    (routeUrl sr.route)
+                ]
+
+          else
+            Cmd.batch
+                [ cmd
+                , Browser.Navigation.replaceUrl nm.navkey
+                    (routeUrl sr.route)
+                ]
+        )
+
+    else
+        ( nm, cmd )
+
+
+actualupdate : Msg -> Model -> ( Model, Cmd Msg )
+actualupdate msg model =
     case ( msg, model.state ) of
         ( _, Wait wst wfn ) ->
             let
@@ -525,7 +570,7 @@ update msg model =
                         _ =
                             Debug.log "urlchanged: " ( url, route )
                     in
-                    if route == stateRoute state then
+                    if route == (stateRoute state).route then
                         ( model, Cmd.none )
 
                     else
@@ -658,8 +703,7 @@ update msg model =
                                     View (View.initFull fbe)
                             in
                             ( { model | state = vstate }
-                            , Browser.Navigation.pushUrl model.navkey
-                                (routeUrl (stateRoute vstate))
+                            , Cmd.none
                             )
 
         ( UserReplyData urd, state ) ->
@@ -774,18 +818,14 @@ update msg model =
                             case state of
                                 EditZkNote emod login ->
                                     let
-                                        ( eznst, pushurl ) =
+                                        eznst =
                                             EditZkNote.gotId emod szkn.id
 
                                         st =
                                             EditZkNote eznst login
                                     in
                                     ( { model | state = st }
-                                    , if pushurl then
-                                        Browser.Navigation.pushUrl model.navkey (routeUrl (stateRoute st))
-
-                                      else
-                                        Cmd.none
+                                    , Cmd.none
                                     )
 
                                 _ ->
@@ -925,8 +965,9 @@ update msg model =
                         [ sendUIMsg model.location
                             login
                             (UI.SearchZkNotes (S.defaultSearch es.zk.id))
-                        , Browser.Navigation.pushUrl model.navkey "/"
+                        , Cmd.none
 
+                        -- , Browser.Navigation.pushUrl model.navkey "/"
                         -- , Browser.Navigation.replaceUrl model.navkey "/"
                         ]
                     )
@@ -1051,7 +1092,6 @@ update msg model =
                                 , mbzknote = Nothing
                                 , spmodel = emod.spmodel
                                 , navkey = model.navkey
-                                , pushUrl = True
                                 }
                                 id
                     in
@@ -1068,7 +1108,6 @@ update msg model =
                                 , mbzknote = Nothing
                                 , spmodel = emod.spmodel
                                 , navkey = model.navkey
-                                , pushUrl = True
                                 }
                                 id
                     in
@@ -1193,7 +1232,6 @@ update msg model =
                                 , mbzknote = Nothing
                                 , spmodel = emod.spmodel
                                 , navkey = model.navkey
-                                , pushUrl = True
                                 }
                                 id
                     in
@@ -1260,6 +1298,7 @@ init flags url key =
             , location = flags.location
             , navkey = key
             , seed = seed
+            , savedRoute = { route = Top, save = False }
             }
 
         ( state, cmd ) =
