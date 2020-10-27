@@ -125,10 +125,6 @@ routeTitle route =
 
 urlRequest : Browser.UrlRequest -> Msg
 urlRequest ur =
-    let
-        _ =
-            Debug.log "urlrequest: " ur
-    in
     case ur of
         Browser.Internal url ->
             InternalUrl url
@@ -177,10 +173,6 @@ routeUrl route =
 
 routeState : Model -> Route -> Maybe ( State, Cmd Msg )
 routeState model route =
-    let
-        _ =
-            Debug.log "routeState: " route
-    in
     case route of
         PublicZkNote id ->
             Just
@@ -203,10 +195,6 @@ routeState model route =
         EditZkNoteR id ->
             case model.state of
                 EditZkNote st login ->
-                    let
-                        _ =
-                            Debug.log "EditZkNote st login ->" id
-                    in
                     Just <|
                         loadnote model
                             { zk = st.zk
@@ -222,10 +210,6 @@ routeState model route =
                 -- load the zknote in question.  will it load?
                 -- should ZkNote block the load if unsaved?  I guess.
                 EditZkNoteListing st login ->
-                    let
-                        _ =
-                            Debug.log "EditZkNoteListing st login ->" id
-                    in
                     Just <|
                         loadnote model
                             { zk = st.zk
@@ -551,19 +535,11 @@ update msg model =
                     ( { model | state = state }, icmd )
 
                 LoadUrl url ->
-                    let
-                        _ =
-                            Debug.log "loadurl: " url
-                    in
                     ( model, Cmd.none )
 
                 UrlChanged url ->
                     case parseUrl url of
                         Just route ->
-                            let
-                                _ =
-                                    Debug.log "urlchanged: " ( url, route )
-                            in
                             if route == (stateRoute model.state).route then
                                 ( model, Cmd.none )
 
@@ -576,13 +552,8 @@ update msg model =
                                         ( model, Cmd.none )
 
                         Nothing ->
-                            let
-                                _ =
-                                    Debug.log "urlchanged, foreign url: " url
-                            in
                             -- load foreign site
-                            -- ( model, Browser.Navigation.load (Url.toString url) )
-                            ( model, Cmd.none )
+                            ( model, Browser.Navigation.load (Url.toString url) )
 
                 _ ->
                     actualupdate msg model
@@ -591,16 +562,8 @@ update msg model =
             stateRoute nm.state
     in
     if sr.route /= nm.savedRoute.route then
-        let
-            _ =
-                Debug.log "new route: " ( sr, model.savedRoute )
-        in
         ( { nm | savedRoute = sr }
         , if model.savedRoute.save then
-            let
-                _ =
-                    Debug.log "pushurl" (routeUrl sr.route)
-            in
             Cmd.batch
                 [ cmd
                 , Browser.Navigation.pushUrl nm.navkey
@@ -608,10 +571,6 @@ update msg model =
                 ]
 
           else
-            let
-                _ =
-                    Debug.log "replaceurl" (routeUrl sr.route)
-            in
             Cmd.batch
                 [ cmd
                 , Browser.Navigation.replaceUrl nm.navkey
@@ -1002,9 +961,6 @@ actualupdate msg model =
                             login
                             (UI.SearchZkNotes (S.defaultSearch es.zk.id))
                         , Cmd.none
-
-                        -- , Browser.Navigation.pushUrl model.navkey "/"
-                        -- , Browser.Navigation.replaceUrl model.navkey "/"
                         ]
                     )
             in
