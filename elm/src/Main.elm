@@ -84,6 +84,12 @@ type alias Flags =
     }
 
 
+type SRAction
+    = Save
+    | Replace
+    | None
+
+
 type alias SavedRoute =
     { route : Route
     , save : Bool
@@ -107,8 +113,28 @@ type Route
     | Top
 
 
+routeTitle : Route -> String
+routeTitle route =
+    case route of
+        PublicZkNote id ->
+            "zknote " ++ String.fromInt id
+
+        PublicZkPubId id ->
+            "zknote " ++ id
+
+        EditZkNoteR id ->
+            "zknote " ++ String.fromInt id
+
+        Top ->
+            "zknote"
+
+
 urlRequest : Browser.UrlRequest -> Msg
 urlRequest ur =
+    let
+        _ =
+            Debug.log "urlrequest: " ur
+    in
     case ur of
         Browser.Internal url ->
             InternalUrl url
@@ -159,7 +185,7 @@ routeState : Model -> Route -> ( State, Cmd Msg )
 routeState model route =
     let
         _ =
-            Debug.log "route: " route
+            Debug.log "routeState: " route
     in
     case route of
         PublicZkNote id ->
@@ -508,7 +534,7 @@ noteviewwait backstate st ms =
 
 view : Model -> { title : String, body : List (Html Msg) }
 view model =
-    { title = "zknotes"
+    { title = routeTitle model.savedRoute.route
     , body =
         [ Element.layout [] <|
             viewState model.size model.state
@@ -520,18 +546,72 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     let
         ( nm, cmd ) =
-            actualupdate msg model
+            case msg of
+                InternalUrl url ->
+                    let
+                        mblogin =
+                            stateLogin model.state
+
+                        ( state, icmd ) =
+                            parseUrl url
+                                |> Maybe.map (routeState model)
+                                |> Maybe.withDefault ( model.state, Cmd.none )
+                    in
+                    ( { model | state = state }, icmd )
+
+                LoadUrl url ->
+                    let
+                        _ =
+                            Debug.log "loadurl: " url
+                    in
+                    ( model, Cmd.none )
+
+                UrlChanged url ->
+                    case parseUrl url of
+                        Just route ->
+                            let
+                                _ =
+                                    Debug.log "urlchanged: " ( url, route )
+                            in
+                            if route == (stateRoute model.state).route then
+                                ( model, Cmd.none )
+
+                            else
+                                let
+                                    ( st, rscmd ) =
+                                        routeState model route
+
+                                    psr =
+                                        model.savedRoute
+                                in
+                                ( { model | state = st, savedRoute = { psr | save = False } }, rscmd )
+
+                        Nothing ->
+                            let
+                                _ =
+                                    Debug.log "urlchanged, foreign url: " url
+                            in
+                            -- load foreign site
+                            -- ( model, Browser.Navigation.load (Url.toString url) )
+                            ( model, Cmd.none )
+
+                _ ->
+                    actualupdate msg model
 
         sr =
             stateRoute nm.state
     in
-    if sr.route /= model.savedRoute.route then
+    if sr.route /= nm.savedRoute.route then
         let
             _ =
                 Debug.log "new route: " ( sr, model.savedRoute )
         in
         ( { nm | savedRoute = sr }
         , if model.savedRoute.save then
+            let
+                _ =
+                    Debug.log "pushurl" (routeUrl sr.route)
+            in
             Cmd.batch
                 [ cmd
                 , Browser.Navigation.pushUrl nm.navkey
@@ -539,6 +619,10 @@ update msg model =
                 ]
 
           else
+            let
+                _ =
+                    Debug.log "replaceurl" (routeUrl sr.route)
+            in
             Cmd.batch
                 [ cmd
                 , Browser.Navigation.replaceUrl nm.navkey
@@ -562,31 +646,6 @@ actualupdate msg model =
 
         ( WindowSize s, _ ) ->
             ( { model | size = s }, Cmd.none )
-
-        ( UrlChanged url, state ) ->
-            case parseUrl url of
-                Just route ->
-                    let
-                        _ =
-                            Debug.log "urlchanged: " ( url, route )
-                    in
-                    if route == (stateRoute state).route then
-                        ( model, Cmd.none )
-
-                    else
-                        let
-                            ( st, cmd ) =
-                                routeState model route
-                        in
-                        ( { model | state = st }, cmd )
-
-                Nothing ->
-                    let
-                        _ =
-                            Debug.log "urlchanged, nothing: " url
-                    in
-                    -- load foreign site
-                    ( model, Browser.Navigation.load (Url.toString url) )
 
         ( SelectedText jv, state ) ->
             case JD.decodeValue JD.string jv of
@@ -643,18 +702,6 @@ actualupdate msg model =
 
                 Err e ->
                     ( { model | state = BadError (BadError.initialModel <| JD.errorToString e) model.state }, Cmd.none )
-
-        ( InternalUrl url, _ ) ->
-            let
-                mblogin =
-                    stateLogin model.state
-
-                ( state, cmd ) =
-                    parseUrl url
-                        |> Maybe.map (routeState model)
-                        |> Maybe.withDefault ( model.state, Cmd.none )
-            in
-            ( { model | state = state }, cmd )
 
         ( LoginMsg lm, Login ls ) ->
             let
