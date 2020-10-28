@@ -7,25 +7,11 @@
     <style>html,head,body { padding:0; margin:0; } 
       body { font-family: calibri, helvetica, arial, sans-serif; }</style>
     <script type="text/javascript" src="/static/main.js"></script>
+    <script type="text/javascript" src="/static/localvals.js"></script>
   </head>
   <body>
     <div id="elm"></div> 
     <script type="text/javascript">
-      function storeVal( [name, val] ) { 
-        localStorage.setItem(name, val); 
-        console.log("js storeVal storing " + name + ", " + val);
-      }
-
-      function getVal( [forstr, name] ) { 
-        console.log("js getVal getting " + name + "," + localStorage.getItem(name) + " for " + forstr);
-        app.ports.localVal.send([forstr, name,localStorage.getItem(name)]); 
-      }
-
-      function clearStorage () {
-        console.log("clearstorage");
-        localStorage.clear();
-      }
-
       // all we'd use in a saner world.  textarea highlighted text is ok here with chrome.
       function getRegularSelectionText() {
           var text = "";
@@ -67,6 +53,18 @@
         app.ports.receiveSelectedText.send(text);
       }
 
+      var uid = localStorage.getItem("uid");
+      var pwd = localStorage.getItem("pwd");
+      console.log("uid: ", uid);
+      console.log("pwd: ", pwd);
+
+      var login = null;
+
+      if (uid && pwd) {
+        login = { uid : uid, pwd : pwd };
+      }
+
+      console.log("login: ", login);
       
       app = Elm.Main.init({
         node: document.getElementById('elm'),
@@ -75,9 +73,11 @@
                  useragent : navigator.userAgent, 
                  debugstring : "initial-info", 
                  width : window.innerWidth, 
-                 height : window.innerHeight }});
-      // app.ports.storeLocalVal.subscribe(storeVal);
+                 height : window.innerHeight,
+                 login : login}});
+      app.ports.storeLocalVal.subscribe(storeVal);
       // app.ports.getLocalVal.subscribe(getVal);
+      // app.ports.clearLocalStorage.subscribe(clearStorage);
       app.ports.getSelectedText.subscribe(getSelectedText);
     </script>
   </body>

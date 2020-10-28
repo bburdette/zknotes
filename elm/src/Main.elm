@@ -22,6 +22,7 @@ import Html exposing (Attribute, Html)
 import Html.Attributes
 import Http
 import Json.Decode as JD
+import LocalStorage as LS
 import Login
 import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..))
 import Markdown.Html
@@ -81,6 +82,7 @@ type alias Flags =
     , debugstring : String
     , width : Int
     , height : Int
+    , login : Maybe Data.Login
     }
 
 
@@ -738,13 +740,17 @@ actualupdate msg model =
                                                 { uid = lmod.userId, pwd = lmod.password }
                                         , seed = lmod.seed -- save the seed!
                                       }
-                                    , sendUIMsg model.location
-                                        { uid =
-                                            lmod.userId
-                                        , pwd =
-                                            lmod.password
-                                        }
-                                        UI.GetZkListing
+                                    , Cmd.batch
+                                        [ sendUIMsg model.location
+                                            { uid =
+                                                lmod.userId
+                                            , pwd =
+                                                lmod.password
+                                            }
+                                            UI.GetZkListing
+                                        , LS.storeLocalVal { name = "uid", value = lmod.userId }
+                                        , LS.storeLocalVal { name = "pwd", value = lmod.password }
+                                        ]
                                     )
 
                                 _ ->
@@ -1293,17 +1299,37 @@ actualupdate msg model =
 init : Flags -> Url -> Browser.Navigation.Key -> ( Model, Cmd Msg )
 init flags url key =
     let
+        _ =
+            Debug.log "flags" flags
+
         seed =
             initialSeed (flags.seed + 7)
 
         model =
-            { state = PubShowMessage { message = "initial state" }
+            { state =
+                case flags.login of
+                    Nothing ->
+                        PubShowMessage { message = "initial state" }
+
+                    Just login ->
+                        ShowMessage { message = "logging in" } login
             , size = { width = flags.width, height = flags.height }
             , location = flags.location
             , navkey = key
             , seed = seed
             , savedRoute = { route = Top, save = False }
             }
+
+        lgincmd =
+            case flags.login of
+                Nothing ->
+                    []
+
+                Just login ->
+                    [ sendUIMsg model.location
+                        login
+                        UI.Login
+                    ]
 
         ( state, cmd ) =
             parseUrl url
@@ -1326,7 +1352,7 @@ init flags url key =
                     )
     in
     ( { model | state = state }
-    , cmd
+    , Cmd.batch <| cmd :: lgincmd
     )
 
 
