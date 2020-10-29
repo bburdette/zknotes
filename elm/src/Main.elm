@@ -363,10 +363,6 @@ stateLogin state =
 
 sendUIMsg : String -> Data.Login -> UI.SendMsg -> Cmd Msg
 sendUIMsg location login msg =
-    let
-        _ =
-            Debug.log "sendUIMsg" ( login, msg )
-    in
     Http.post
         { url = location ++ "/user"
         , body =
@@ -735,10 +731,6 @@ actualupdate msg model =
                         UI.LoggedIn ->
                             case stateLogin state of
                                 Just login ->
-                                    let
-                                        _ =
-                                            Debug.log "loggedin, login: " login
-                                    in
                                     -- we're logged in!  Get article listing.
                                     ( { model
                                         | state =
@@ -1172,6 +1164,14 @@ actualupdate msg model =
                 EditZkListing.New ->
                     ( { model | state = EditZk EditZk.initNew login }, Cmd.none )
 
+                EditZkListing.Logout ->
+                    ( { model | state = Login (Login.initialModel Nothing "zknotes" model.seed) }
+                    , Cmd.batch
+                        [ LS.storeLocalVal { name = "uid", value = "" }
+                        , LS.storeLocalVal { name = "pwd", value = "" }
+                        ]
+                    )
+
                 EditZkListing.Selected zk ->
                     ( { model
                         | state =
@@ -1310,9 +1310,6 @@ actualupdate msg model =
 init : Flags -> Url -> Browser.Navigation.Key -> ( Model, Cmd Msg )
 init flags url key =
     let
-        _ =
-            Debug.log "flags" flags
-
         seed =
             initialSeed (flags.seed + 7)
 
@@ -1358,11 +1355,16 @@ init flags url key =
                         model
                     )
                 |> Maybe.withDefault
-                    ( initLogin (Debug.log "initlogin login: " flags.login) seed
+                    ( case flags.login of
+                        Just _ ->
+                            model.state
+
+                        Nothing ->
+                            initLogin flags.login seed
                     , Browser.Navigation.replaceUrl key "/"
                     )
     in
-    ( { model | state = Debug.log "init state: " state }
+    ( { model | state = state }
     , Cmd.batch <| cmd :: lgincmd
     )
 
