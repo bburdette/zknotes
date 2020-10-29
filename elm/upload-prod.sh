@@ -1,1 +1,1 @@
-scp ../server/static/main.js practica2@practica.site:~/zknotes/static/
+scp -r ../server/static practica2@practica.site:~/zknotes/

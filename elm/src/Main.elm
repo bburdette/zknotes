@@ -22,6 +22,7 @@ import Html exposing (Attribute, Html)
 import Html.Attributes
 import Http
 import Json.Decode as JD
+import LocalStorage as LS
 import Login
 import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..))
 import Markdown.Html
@@ -81,6 +82,7 @@ type alias Flags =
     , debugstring : String
     , width : Int
     , height : Int
+    , login : Maybe Data.Login
     }
 
 
@@ -727,24 +729,31 @@ actualupdate msg model =
                             ( model, Cmd.none )
 
                         UI.LoggedIn ->
-                            case state of
-                                Login lmod ->
+                            case stateLogin state of
+                                Just login ->
                                     -- we're logged in!  Get article listing.
                                     ( { model
                                         | state =
                                             ShowMessage
                                                 { message = "loading articles"
                                                 }
-                                                { uid = lmod.userId, pwd = lmod.password }
-                                        , seed = lmod.seed -- save the seed!
+                                                login
+                                        , seed =
+                                            case state of
+                                                -- save the seed if we're leaving login state.
+                                                Login lmod ->
+                                                    lmod.seed
+
+                                                _ ->
+                                                    model.seed
                                       }
-                                    , sendUIMsg model.location
-                                        { uid =
-                                            lmod.userId
-                                        , pwd =
-                                            lmod.password
-                                        }
-                                        UI.GetZkListing
+                                    , Cmd.batch
+                                        [ sendUIMsg model.location
+                                            login
+                                            UI.GetZkListing
+                                        , LS.storeLocalVal { name = "uid", value = login.uid }
+                                        , LS.storeLocalVal { name = "pwd", value = login.pwd }
+                                        ]
                                     )
 
                                 _ ->
@@ -800,7 +809,7 @@ actualupdate msg model =
                                     )
 
                                 _ ->
-                                    ( { model | state = BadError (BadError.initialModel "unexpected message") state }, Cmd.none )
+                                    ( { model | state = BadError (BadError.initialModel "unexpected message - DeletedZk") state }, Cmd.none )
 
                         UI.ZkMembers _ ->
                             ( { model | state = BadError (BadError.initialModel "unexpected zkmembers message") state }, Cmd.none )
@@ -854,7 +863,7 @@ actualupdate msg model =
                                     ( { model | state = Login <| Login.userExists lmod }, Cmd.none )
 
                                 _ ->
-                                    ( { model | state = BadError (BadError.initialModel "unexpected message") state }, Cmd.none )
+                                    ( { model | state = BadError (BadError.initialModel "unexpected message - UserExists") state }, Cmd.none )
 
                         UI.UnregisteredUser ->
                             case state of
@@ -862,7 +871,7 @@ actualupdate msg model =
                                     ( { model | state = Login <| Login.unregisteredUser lmod }, Cmd.none )
 
                                 _ ->
-                                    ( { model | state = BadError (BadError.initialModel "unexpected message") state }, Cmd.none )
+                                    ( { model | state = BadError (BadError.initialModel "unexpected message - UnregisteredUser") state }, Cmd.none )
 
                         UI.InvalidUserOrPwd ->
                             case state of
@@ -870,7 +879,7 @@ actualupdate msg model =
                                     ( { model | state = Login <| Login.invalidUserOrPwd lmod }, Cmd.none )
 
                                 _ ->
-                                    ( { model | state = BadError (BadError.initialModel "unexpected message") state }, Cmd.none )
+                                    ( { model | state = BadError (BadError.initialModel "unexpected message - InvalidUserOrPwd") state }, Cmd.none )
 
         ( ViewMsg em, View es ) ->
             let
@@ -1155,6 +1164,14 @@ actualupdate msg model =
                 EditZkListing.New ->
                     ( { model | state = EditZk EditZk.initNew login }, Cmd.none )
 
+                EditZkListing.Logout ->
+                    ( { model | state = Login (Login.initialModel Nothing "zknotes" model.seed) }
+                    , Cmd.batch
+                        [ LS.storeLocalVal { name = "uid", value = "" }
+                        , LS.storeLocalVal { name = "pwd", value = "" }
+                        ]
+                    )
+
                 EditZkListing.Selected zk ->
                     ( { model
                         | state =
@@ -1297,13 +1314,30 @@ init flags url key =
             initialSeed (flags.seed + 7)
 
         model =
-            { state = PubShowMessage { message = "initial state" }
+            { state =
+                case flags.login of
+                    Nothing ->
+                        PubShowMessage { message = "initial state" }
+
+                    Just login ->
+                        ShowMessage { message = "logging in" } login
             , size = { width = flags.width, height = flags.height }
             , location = flags.location
             , navkey = key
             , seed = seed
             , savedRoute = { route = Top, save = False }
             }
+
+        lgincmd =
+            case flags.login of
+                Nothing ->
+                    []
+
+                Just login ->
+                    [ sendUIMsg model.location
+                        login
+                        UI.Login
+                    ]
 
         ( state, cmd ) =
             parseUrl url
@@ -1321,18 +1355,23 @@ init flags url key =
                         model
                     )
                 |> Maybe.withDefault
-                    ( initLogin seed
+                    ( case flags.login of
+                        Just _ ->
+                            model.state
+
+                        Nothing ->
+                            initLogin flags.login seed
                     , Browser.Navigation.replaceUrl key "/"
                     )
     in
     ( { model | state = state }
-    , cmd
+    , Cmd.batch <| cmd :: lgincmd
     )
 
 
-initLogin : Seed -> State
-initLogin seed =
-    Login <| Login.initialModel Nothing "zknotes" seed
+initLogin : Maybe Data.Login -> Seed -> State
+initLogin mblogin seed =
+    Login <| Login.initialModel mblogin "zknotes" seed
 
 
 main : Platform.Program Flags Model Msg
