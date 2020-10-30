@@ -168,8 +168,8 @@ dirty model =
         |> Maybe.withDefault True
 
 
-showZkl : List (E.Attribute Msg) -> Maybe Int -> Data.ZkLink -> Element Msg
-showZkl dirtybutton id zkl =
+showZkl : Int -> List (E.Attribute Msg) -> Maybe Int -> Data.ZkLink -> Element Msg
+showZkl width dirtybutton id zkl =
     let
         ( dir, otherid ) =
             case ( Just zkl.from == id, Just zkl.to == id ) of
@@ -187,7 +187,16 @@ showZkl dirtybutton id zkl =
         , id
             |> Maybe.map (zkLinkName zkl)
             |> Maybe.withDefault ""
-            |> E.text
+            |> (\s ->
+                    E.row
+                        [ E.clipX
+                        , E.centerY
+                        , E.height E.fill
+                        , E.width (E.px <| width - 160)
+                        ]
+                        [ E.text s
+                        ]
+               )
         , case otherid of
             Just zknoteid ->
                 EI.button (dirtybutton ++ [ E.alignRight ]) { onPress = Just (SwitchPress zknoteid), label = E.text "↗" }
@@ -259,7 +268,30 @@ zknview size model =
             else
                 Common.buttonStyle
 
+        spxwidth =
+            case wclass of
+                Narrow ->
+                    size.width
+
+                Medium ->
+                    400
+
+                Wide ->
+                    400
+
         mdedit =
+            let
+                mdeditwidth =
+                    case wclass of
+                        Narrow ->
+                            size.width
+
+                        Medium ->
+                            size.width - spxwidth
+
+                        Wide ->
+                            500
+            in
             E.column
                 [ E.spacing 8
                 , E.alignTop
@@ -288,7 +320,7 @@ zknview size model =
                     -- show the links.
                     :: E.row [ Font.bold ] [ E.text "links" ]
                     :: List.map
-                        (showZkl dirtybutton model.id)
+                        (showZkl mdeditwidth dirtybutton model.id)
                         (Dict.values model.zklDict)
                 )
 
@@ -336,17 +368,6 @@ zknview size model =
                         Wide ->
                             E.px 400
 
-                spxwidth =
-                    case wclass of
-                        Narrow ->
-                            size.width
-
-                        Medium ->
-                            400
-
-                        Wide ->
-                            400
-
                 titlemaxconst =
                     135
             in
@@ -374,7 +395,8 @@ zknview size model =
                                                 { onPress = Nothing
                                                 , label = E.text "link"
                                                 }
-                                    , EI.button dirtybutton { onPress = Just (SwitchPress zkln.id), label = E.text "edit" }
+                                    , EI.button dirtybutton
+                                        { onPress = Just (SwitchPress zkln.id), label = E.text "edit" }
                                     , E.row
                                         [ E.clipX
                                         , E.centerY
