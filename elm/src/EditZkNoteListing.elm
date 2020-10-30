@@ -62,16 +62,7 @@ view size model =
             , EI.button Common.buttonStyle { onPress = Just ExamplePress, label = E.text "example" }
             , EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "done" }
             ]
-        , E.map SPMsg <|
-            SP.view
-                (if size.width < 500 then
-                    True
-
-                 else
-                    False
-                )
-                0
-                model.spmodel
+        , E.map SPMsg <| SP.view (size.width < 500) 0 model.spmodel
         , E.table [ E.spacing 10, E.width (E.maximum 500 E.fill), E.centerX ]
             { data = model.notes.notes
             , columns =
@@ -84,7 +75,7 @@ view size model =
                                 [ E.clipX
                                 , E.centerY
                                 , E.height E.fill
-                                , E.width (E.px <| min 500 size.width - titlemaxconst)
+                                , E.width E.fill
                                 ]
                                 [ E.text n.title
                                 ]

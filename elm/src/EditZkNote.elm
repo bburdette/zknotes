@@ -168,8 +168,8 @@ dirty model =
         |> Maybe.withDefault True
 
 
-showZkl : Int -> List (E.Attribute Msg) -> Maybe Int -> Data.ZkLink -> Element Msg
-showZkl width dirtybutton id zkl =
+showZkl : List (E.Attribute Msg) -> Maybe Int -> Data.ZkLink -> Element Msg
+showZkl dirtybutton id zkl =
     let
         ( dir, otherid ) =
             case ( Just zkl.from == id, Just zkl.to == id ) of
@@ -192,7 +192,7 @@ showZkl width dirtybutton id zkl =
                         [ E.clipX
                         , E.centerY
                         , E.height E.fill
-                        , E.width (E.px <| width - 160)
+                        , E.width E.fill
                         ]
                         [ E.text s
                         ]
@@ -268,30 +268,7 @@ zknview size model =
             else
                 Common.buttonStyle
 
-        spxwidth =
-            case wclass of
-                Narrow ->
-                    size.width
-
-                Medium ->
-                    400
-
-                Wide ->
-                    400
-
         mdedit =
-            let
-                mdeditwidth =
-                    case wclass of
-                        Narrow ->
-                            size.width
-
-                        Medium ->
-                            size.width - spxwidth
-
-                        Wide ->
-                            500
-            in
             E.column
                 [ E.spacing 8
                 , E.alignTop
@@ -320,7 +297,7 @@ zknview size model =
                     -- show the links.
                     :: E.row [ Font.bold ] [ E.text "links" ]
                     :: List.map
-                        (showZkl mdeditwidth dirtybutton model.id)
+                        (showZkl dirtybutton model.id)
                         (Dict.values model.zklDict)
                 )
 
@@ -367,9 +344,6 @@ zknview size model =
 
                         Wide ->
                             E.px 400
-
-                titlemaxconst =
-                    135
             in
             E.column
                 [ E.spacing 8
@@ -382,7 +356,7 @@ zknview size model =
                  )
                     :: (List.map
                             (\zkln ->
-                                E.row [ E.spacing 8 ]
+                                E.row [ E.spacing 8, E.width E.fill ]
                                     [ case model.id of
                                         Just _ ->
                                             EI.button Common.buttonStyle
@@ -399,9 +373,10 @@ zknview size model =
                                         { onPress = Just (SwitchPress zkln.id), label = E.text "edit" }
                                     , E.row
                                         [ E.clipX
-                                        , E.centerY
+
+                                        -- , E.centerY
                                         , E.height E.fill
-                                        , E.width (E.px <| spxwidth - titlemaxconst)
+                                        , E.width E.fill
                                         ]
                                         [ E.text zkln.title
                                         ]
@@ -418,7 +393,7 @@ zknview size model =
                 )
     in
     E.column
-        [ E.width E.fill, E.spacing 8 ]
+        [ E.width E.fill, E.spacing 8, E.padding 8 ]
         [ E.row [ E.width E.fill, E.spacing 8 ]
             [ E.text "edit zk note"
             , EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just DeletePress, label = E.text "delete" }
@@ -478,7 +453,7 @@ zknview size model =
                     [ mdedit, mdview, searchPanel ]
 
             Medium ->
-                E.row [ E.width E.fill ]
+                E.row [ E.width E.fill, E.spacing 8 ]
                     [ E.column [ E.width E.fill, E.alignTop ]
                         [ Common.navbar 2
                             (if model.navchoice == NcSearch then
