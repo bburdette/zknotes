@@ -51,10 +51,13 @@ updateSearchResult zsr model =
 view : Util.Size -> Model -> Element Msg
 view size model =
     let
+        maxwidth =
+            700
+
         titlemaxconst =
             245
     in
-    E.column [ E.spacing 8, E.padding 8, E.width (E.maximum 500 E.fill), E.centerX ]
+    E.column [ E.spacing 8, E.padding 8, E.width (E.maximum maxwidth E.fill), E.centerX ]
         [ E.row [] [ E.text "zettelkasten: ", E.row [ Font.bold ] [ E.text model.zk.name ] ]
         , E.row [ E.spacing 8 ]
             [ E.text "select a zk note"
@@ -62,13 +65,13 @@ view size model =
             , EI.button Common.buttonStyle { onPress = Just ExamplePress, label = E.text "example" }
             , EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "done" }
             ]
-        , E.map SPMsg <| SP.view (size.width < 500) 0 model.spmodel
-        , E.table [ E.spacing 10, E.width (E.maximum 500 E.fill), E.centerX ]
+        , E.map SPMsg <| SP.view (size.width < maxwidth) 0 model.spmodel
+        , E.table [ E.spacing 10, E.width (E.maximum maxwidth E.fill), E.centerX ]
             { data = model.notes.notes
             , columns =
                 [ { header = E.none
                   , width =
-                        E.px <| min 500 size.width - titlemaxconst
+                        E.px <| min maxwidth size.width - titlemaxconst
                   , view =
                         \n ->
                             E.row
