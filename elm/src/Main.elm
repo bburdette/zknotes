@@ -127,10 +127,6 @@ routeTitle route =
 
 urlRequest : Browser.UrlRequest -> Msg
 urlRequest ur =
-    let
-        _ =
-            Debug.log "urlRequest" ur
-    in
     case ur of
         Browser.Internal url ->
             InternalUrl url
@@ -563,9 +559,6 @@ urlupdate msg model =
             case msg of
                 InternalUrl url ->
                     let
-                        _ =
-                            Debug.log "internalurl: " url
-
                         ( state, icmd ) =
                             parseUrl url
                                 |> Maybe.andThen (routeState model)
@@ -574,19 +567,11 @@ urlupdate msg model =
                     ( { model | state = state }, icmd )
 
                 LoadUrl urlstr ->
-                    let
-                        _ =
-                            Debug.log "loadurl: " urlstr
-                    in
                     -- load foreign site
                     -- ( model, Browser.Navigation.load urlstr )
                     ( model, Cmd.none )
 
                 UrlChanged url ->
-                    let
-                        _ =
-                            Debug.log "UrlChanged: " url
-                    in
                     -- we get this from forward and back buttons.  if the user changes the url
                     -- in the browser address bar, its a site reload so this isn't called.
                     case parseUrl url of
