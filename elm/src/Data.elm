@@ -113,8 +113,29 @@ type alias GetZkLinks =
     }
 
 
+type alias GetZkNoteEdit =
+    { zknote : Int
+    , zk : Int
+    }
+
+
+type alias ZkNoteEdit =
+    { zk : Maybe Zk
+    , zknote : ZkNote
+    , links : List ZkLink
+    }
+
+
 encodeGetZkLinks : GetZkLinks -> JE.Value
 encodeGetZkLinks gzl =
+    JE.object
+        [ ( "zknote", JE.int gzl.zknote )
+        , ( "zk", JE.int gzl.zk )
+        ]
+
+
+encodeGetZkNoteEdit : GetZkNoteEdit -> JE.Value
+encodeGetZkNoteEdit gzl =
     JE.object
         [ ( "zknote", JE.int gzl.zknote )
         , ( "zk", JE.int gzl.zk )
@@ -266,3 +287,11 @@ decodeZkNote =
         (JD.field "pubid" (JD.maybe JD.string))
         (JD.field "createdate" JD.int)
         (JD.field "changeddate" JD.int)
+
+
+decodeZkNoteEdit : JD.Decoder ZkNoteEdit
+decodeZkNoteEdit =
+    JD.map3 ZkNoteEdit
+        (JD.field "zk" (JD.maybe decodeZk))
+        (JD.field "zknote" decodeZkNote)
+        (JD.field "links" (JD.list decodeZkLink))

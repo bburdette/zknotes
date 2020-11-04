@@ -97,6 +97,19 @@ pub struct GetZkLinks {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
+pub struct GetZkNoteEdit {
+  pub zknote: i64,
+  pub zk: i64,
+}
+
+#[derive(Serialize, Debug)]
+pub struct ZkNoteEdit {
+  pub zknote: ZkNote,
+  pub zk: Option<Zk>,
+  pub links: Vec<ZkLink>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
 pub struct User {
   pub id: i64,
   pub name: String,
@@ -925,6 +938,145 @@ pub fn read_zklinks(
 ) -> Result<Vec<ZkLink>, Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
 
+  if !is_zk_member(&conn, uid, gzl.zk)? {
+    bail!("can't read_zklinks; user is not a member of this zk");
+  }
+
+  let mut pstmt = conn.prepare(
+    "SELECT fromid, toid, linkzknote, L.title, R.title
+      FROM zklink 
+      INNER JOIN zknote as L ON zklink.fromid = L.id
+      INNER JOIN zknote as R ON zklink.toid = R.id
+      where zklink.zk = ?1 and (zklink.fromid = ?2 or zklink.toid = ?2)
+      ",
+  )?;
+
+  let rec_iter = pstmt.query_map(params![gzl.zk, gzl.zknote], |row| {
+    Ok(ZkLink {
+      from: row.get(0)?,
+      to: row.get(1)?,
+      delete: None,
+      linkzknote: row.get(2)?,
+      fromname: row.get(3)?,
+      toname: row.get(4)?,
+    })
+  })?;
+
+  let mut pv = Vec::new();
+
+  for rsrec in rec_iter {
+    match rsrec {
+      Ok(rec) => {
+        pv.push(rec);
+      }
+      Err(_) => (),
+    }
+  }
+
+  Ok(pv)
+}
+
+pub fn read_zknoteedit(
+  conn: &Connection,
+  uid: i64,
+  gzl: &GetZkNoteEdit,
+) -> Result<ZkNoteEdit, Box<dyn Error>> {
+  if !is_zk_member(&conn, uid, gzl.zk)? {
+    bail!("can't read_zknote; user is not a member of this zk");
+  }
+
+  let zknote = read_zknote2(conn, Some(uid), gzl.zknote)?;
+
+  // If the note belongs to the zk indicated in the query, then DON'T get the zk.
+  // Otherwise, the UI has the wrong zk, so load it up and send it.
+  let zk = if zknote.zk == gzl.zk {
+    None
+  } else {
+    Some(read_zk2(conn, zknote.zk)?)
+  };
+
+  let zklinks = read_zklinks2(
+    conn,
+    uid,
+    &GetZkLinks {
+      zk: zknote.zk,
+      zknote: zknote.id,
+    },
+  )?;
+
+  Ok(ZkNoteEdit {
+    zk: zk,
+    zknote: zknote,
+    links: zklinks,
+  })
+}
+
+pub fn read_zk2(conn: &Connection, id: i64) -> Result<Zk, Box<dyn Error>> {
+  let rbe = conn.query_row(
+    "SELECT name, description, createdate, changeddate
+      FROM zk WHERE id = ?1",
+    params![id],
+    |row| {
+      Ok(Zk {
+        id: id,
+        name: row.get(0)?,
+        description: row.get(1)?,
+        createdate: row.get(2)?,
+        changeddate: row.get(3)?,
+      })
+    },
+  )?;
+
+  Ok(rbe)
+}
+
+pub fn read_zknote2(
+  conn: &Connection,
+  uid: Option<i64>,
+  id: i64,
+) -> Result<ZkNote, Box<dyn Error>> {
+  match uid {
+    Some(uid) => {
+      if !is_zknote_member(&conn, uid, id)? {
+        bail!("can't read zknote; you are not a member of this zk");
+      }
+    }
+    _ => {}
+  }
+
+  let rbe = conn.query_row(
+    "SELECT title, content, zk, public, pubid, createdate, changeddate
+      FROM zknote WHERE id = ?1",
+    params![id],
+    |row| {
+      Ok(ZkNote {
+        id: id,
+        title: row.get(0)?,
+        content: row.get(1)?,
+        zk: row.get(2)?,
+        public: row.get(3)?,
+        pubid: row.get(4)?,
+        createdate: row.get(5)?,
+        changeddate: row.get(6)?,
+      })
+    },
+  )?;
+
+  match uid {
+    None => {
+      bail!("can't read zknote; note is private");
+    }
+    _ => {}
+  }
+
+  Ok(rbe)
+}
+
+pub fn read_zklinks2(
+  conn: &Connection,
+  uid: i64,
+  gzl: &GetZkLinks,
+) -> Result<Vec<ZkLink>, Box<dyn Error>> {
   if !is_zk_member(&conn, uid, gzl.zk)? {
     bail!("can't read_zklinks; user is not a member of this zk");
   }

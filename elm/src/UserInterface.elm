@@ -16,7 +16,7 @@ type SendMsg
     | AddZkMember Data.ZkMember
     | DeleteZkMember Data.ZkMember
     | GetZkNote Int
-      -- | GetZkNoteAndAccomplices Int Int
+    | GetZkNoteEdit Data.GetZkNoteEdit
     | DeleteZkNote Int
     | SaveZkNote Data.SaveZkNote
     | SaveZk Data.SaveZk
@@ -117,6 +117,14 @@ encodeSendMsg sm uid pwd =
                 , ( "uid", JE.string uid )
                 , ( "pwd", JE.string pwd )
                 , ( "data", JE.int id )
+                ]
+
+        GetZkNoteEdit zkne ->
+            JE.object
+                [ ( "what", JE.string "getzknoteedit" )
+                , ( "uid", JE.string uid )
+                , ( "pwd", JE.string pwd )
+                , ( "data", Data.encodeGetZkNoteEdit zkne )
                 ]
 
         DeleteZkNote id ->
