@@ -99,7 +99,7 @@ pub struct GetZkLinks {
 #[derive(Deserialize, Serialize, Debug)]
 pub struct GetZkNoteEdit {
   pub zknote: i64,
-  pub zk: i64,
+  pub zk: Option<i64>,
 }
 
 #[derive(Serialize, Debug)]
@@ -981,15 +981,12 @@ pub fn read_zknoteedit(
   uid: i64,
   gzl: &GetZkNoteEdit,
 ) -> Result<ZkNoteEdit, Box<dyn Error>> {
-  if !is_zk_member(&conn, uid, gzl.zk)? {
-    bail!("can't read_zknote; user is not a member of this zk");
-  }
-
+  // should do an ownership check for us
   let zknote = read_zknote2(conn, Some(uid), gzl.zknote)?;
 
   // If the note belongs to the zk indicated in the query, then DON'T get the zk.
   // Otherwise, the UI has the wrong zk, so load it up and send it.
-  let zk = if zknote.zk == gzl.zk {
+  let zk = if Some(zknote.zk) == gzl.zk {
     None
   } else {
     Some(read_zk2(conn, zknote.zk)?)

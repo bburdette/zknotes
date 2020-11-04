@@ -41,6 +41,7 @@ type ServerResponse
     | SavedZkNote Data.SavedZkNote
     | DeletedZkNote Int
     | ZkNote Data.ZkNote
+    | ZkNoteEdit Data.ZkNoteEdit
     | ServerError String
     | SavedZkLinks
     | ZkLinks Data.ZkLinks
@@ -235,6 +236,9 @@ serverResponseDecoder =
 
                 "zknote" ->
                     JD.map ZkNote (JD.at [ "content" ] <| Data.decodeZkNote)
+
+                "zknoteedit" ->
+                    JD.map ZkNoteEdit (JD.at [ "content" ] <| Data.decodeZkNoteEdit)
 
                 "savedzklinks" ->
                     JD.succeed SavedZkLinks

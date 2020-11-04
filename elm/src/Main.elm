@@ -190,7 +190,7 @@ routeState model route =
                             login
                         , sendUIMsg model.location
                             login
-                            (UI.GetZkNote id)
+                            (UI.GetZkNoteEdit { zknote = id, zk = Nothing })
                         )
 
                 Nothing ->
@@ -835,6 +835,27 @@ actualupdate msg model =
                             case state of
                                 _ ->
                                     ( { model | state = BadError (BadError.initialModel <| "unexpected message: zknote") state }, Cmd.none )
+
+                        UI.ZkNoteEdit zne ->
+                            case ( stateLogin state, zne.zk ) of
+                                ( Just login, Just zk ) ->
+                                    ( { model
+                                        | state =
+                                            EditZkNote
+                                                (EditZkNote.initFull
+                                                    zk
+                                                    { notes = [], offset = 0 }
+                                                    zne.zknote
+                                                    { zk = zne.zknote.zk, links = zne.links }
+                                                    (SP.initModel zk.id)
+                                                )
+                                                login
+                                      }
+                                    , Cmd.none
+                                    )
+
+                                _ ->
+                                    ( { model | state = BadError (BadError.initialModel <| "unexpected message: zknoteedit") state }, Cmd.none )
 
                         UI.SavedZk beid ->
                             case state of

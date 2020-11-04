@@ -115,7 +115,7 @@ type alias GetZkLinks =
 
 type alias GetZkNoteEdit =
     { zknote : Int
-    , zk : Int
+    , zk : Maybe Int
     }
 
 
@@ -137,9 +137,15 @@ encodeGetZkLinks gzl =
 encodeGetZkNoteEdit : GetZkNoteEdit -> JE.Value
 encodeGetZkNoteEdit gzl =
     JE.object
-        [ ( "zknote", JE.int gzl.zknote )
-        , ( "zk", JE.int gzl.zk )
-        ]
+        (( "zknote", JE.int gzl.zknote )
+            :: (case gzl.zk of
+                    Just zk ->
+                        [ ( "zk", JE.int zk ) ]
+
+                    Nothing ->
+                        []
+               )
+        )
 
 
 encodeZkLinks : ZkLinks -> JE.Value
