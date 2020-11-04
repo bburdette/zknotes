@@ -159,7 +159,8 @@ fn user_interface_loggedin(
     "getzk" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let id: i64 = serde_json::from_value(msgdata.clone())?;
-      let zk = sqldata::read_zk(Path::new(&config.db), id)?;
+      let conn = sqldata::connection_open(config.db.as_path())?;
+      let zk = sqldata::read_zk(&conn, id)?;
       Ok(ServerResponse {
         what: "zk".to_string(),
         content: serde_json::to_value(zk)?,
@@ -211,7 +212,8 @@ fn user_interface_loggedin(
     "getzknote" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let id: i64 = serde_json::from_value(msgdata.clone())?;
-      let note = sqldata::read_zknote(Path::new(&config.db), Some(uid), id)?;
+      let conn = sqldata::connection_open(config.db.as_path())?;
+      let note = sqldata::read_zknote(&conn, Some(uid), id)?;
       Ok(ServerResponse {
         what: "zknote".to_string(),
         content: serde_json::to_value(note)?,
@@ -266,7 +268,8 @@ fn user_interface_loggedin(
     "getzklinks" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let gzl: sqldata::GetZkLinks = serde_json::from_value(msgdata.clone())?;
-      let s = sqldata::read_zklinks(&config.db.as_path(), uid, &gzl)?;
+      let conn = sqldata::connection_open(config.db.as_path())?;
+      let s = sqldata::read_zklinks(&conn, uid, &gzl)?;
       let zklinks = sqldata::ZkLinks {
         zk: gzl.zk,
         links: s,
@@ -293,7 +296,8 @@ pub fn public_interface(
     "getzknote" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let id: i64 = serde_json::from_value(msgdata.clone())?;
-      let note = sqldata::read_zknote(&config.db.as_path(), None, id)?;
+      let conn = sqldata::connection_open(config.db.as_path())?;
+      let note = sqldata::read_zknote(&conn, None, id)?;
       if note.public {
         Ok(ServerResponse {
           what: "zknote".to_string(),
