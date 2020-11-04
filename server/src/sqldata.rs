@@ -9,7 +9,7 @@ use std::time::Duration;
 use std::time::SystemTime;
 
 #[derive(Serialize, Debug, Clone)]
-pub struct FullZkNote {
+pub struct ZkNote {
   id: i64,
   title: String,
   content: String,
@@ -719,7 +719,7 @@ pub fn save_zknote(
   }
 }
 
-pub fn read_zknote(dbfile: &Path, uid: Option<i64>, id: i64) -> Result<FullZkNote, Box<dyn Error>> {
+pub fn read_zknote(dbfile: &Path, uid: Option<i64>, id: i64) -> Result<ZkNote, Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
 
   match uid {
@@ -736,7 +736,7 @@ pub fn read_zknote(dbfile: &Path, uid: Option<i64>, id: i64) -> Result<FullZkNot
       FROM zknote WHERE id = ?1",
     params![id],
     |row| {
-      Ok(FullZkNote {
+      Ok(ZkNote {
         id: id,
         title: row.get(0)?,
         content: row.get(1)?,
@@ -763,7 +763,7 @@ pub fn read_zknotepubid(
   dbfile: &Path,
   uid: Option<i64>,
   pubid: &str,
-) -> Result<FullZkNote, Box<dyn Error>> {
+) -> Result<ZkNote, Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
 
   let rbe = conn.query_row(
@@ -771,7 +771,7 @@ pub fn read_zknotepubid(
       FROM zknote WHERE pubid = ?1",
     params![pubid],
     |row| {
-      Ok(FullZkNote {
+      Ok(ZkNote {
         id: row.get(0)?,
         title: row.get(1)?,
         content: row.get(2)?,

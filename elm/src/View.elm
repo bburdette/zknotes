@@ -69,7 +69,7 @@ view model loggedin =
         ]
 
 
-initFull : Data.FullZkNote -> Model
+initFull : Data.ZkNote -> Model
 initFull zknote =
     let
         cells =

@@ -506,7 +506,7 @@ zklKey zkl =
     String.fromInt zkl.from ++ ":" ++ String.fromInt zkl.to
 
 
-initFull : Data.Zk -> Data.ZkNoteSearchResult -> Data.FullZkNote -> Data.ZkLinks -> SP.Model -> Model
+initFull : Data.Zk -> Data.ZkNoteSearchResult -> Data.ZkNote -> Data.ZkLinks -> SP.Model -> Model
 initFull zk zkl zknote zklDict spm =
     let
         cells =
@@ -528,7 +528,7 @@ initFull zk zkl zknote zklDict spm =
     , title = zknote.title
     , md = zknote.content
     , cells = getCd cc
-    , revert = Just (Data.saveZkNoteFromFull zknote)
+    , revert = Just (Data.saveZkNote zknote)
     , spmodel = SP.searchResultUpdated zkl spm
     , navchoice = NcEdit
     , dialog = Nothing

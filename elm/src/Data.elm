@@ -55,7 +55,7 @@ type alias SavedZkNote =
     }
 
 
-type alias FullZkNote =
+type alias ZkNote =
     { id : Int
     , zk : Int
     , title : String
@@ -84,6 +84,13 @@ type alias ZkLink =
     , fromname : Maybe String
     , toname : Maybe String
     , delete : Maybe Bool
+    }
+
+
+type alias ZkNoteAndAccomplices =
+    { zk : Maybe Zk
+    , zknote : ZkNote
+    , links : List ZkLink
     }
 
 
@@ -160,8 +167,8 @@ decodeZkLink =
         (JD.succeed Nothing)
 
 
-saveZkNoteFromFull : FullZkNote -> SaveZkNote
-saveZkNoteFromFull fzn =
+saveZkNote : ZkNote -> SaveZkNote
+saveZkNote fzn =
     { id = Just fzn.id
     , zk = fzn.zk
     , public = fzn.public
@@ -248,9 +255,9 @@ decodeSavedZkNote =
         (JD.field "changeddate" JD.int)
 
 
-decodeFullZkNote : JD.Decoder FullZkNote
-decodeFullZkNote =
-    JD.map8 FullZkNote
+decodeZkNote : JD.Decoder ZkNote
+decodeZkNote =
+    JD.map8 ZkNote
         (JD.field "id" JD.int)
         (JD.field "zk" JD.int)
         (JD.field "title" JD.string)

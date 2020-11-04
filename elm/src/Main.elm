@@ -421,7 +421,7 @@ type alias NwState =
     , login : Data.Login
     , mbzknotesearchresult : Maybe Data.ZkNoteSearchResult
     , mbzklinks : Maybe Data.ZkLinks
-    , mbzknote : Maybe Data.FullZkNote
+    , mbzknote : Maybe Data.ZkNote
     , spmodel : SP.Model
     , navkey : Browser.Navigation.Key
     }
