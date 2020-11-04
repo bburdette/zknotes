@@ -16,6 +16,7 @@ type SendMsg
     | AddZkMember Data.ZkMember
     | DeleteZkMember Data.ZkMember
     | GetZkNote Int
+    | GetZkNoteEdit Data.GetZkNoteEdit
     | DeleteZkNote Int
     | SaveZkNote Data.SaveZkNote
     | SaveZk Data.SaveZk
@@ -39,7 +40,8 @@ type ServerResponse
     | DeletedZkMember Data.ZkMember
     | SavedZkNote Data.SavedZkNote
     | DeletedZkNote Int
-    | ZkNote Data.FullZkNote
+    | ZkNote Data.ZkNote
+    | ZkNoteEdit Data.ZkNoteEdit
     | ServerError String
     | SavedZkLinks
     | ZkLinks Data.ZkLinks
@@ -116,6 +118,14 @@ encodeSendMsg sm uid pwd =
                 , ( "uid", JE.string uid )
                 , ( "pwd", JE.string pwd )
                 , ( "data", JE.int id )
+                ]
+
+        GetZkNoteEdit zkne ->
+            JE.object
+                [ ( "what", JE.string "getzknoteedit" )
+                , ( "uid", JE.string uid )
+                , ( "pwd", JE.string pwd )
+                , ( "data", Data.encodeGetZkNoteEdit zkne )
                 ]
 
         DeleteZkNote id ->
@@ -225,7 +235,10 @@ serverResponseDecoder =
                     JD.map DeletedZkNote (JD.at [ "content" ] <| JD.int)
 
                 "zknote" ->
-                    JD.map ZkNote (JD.at [ "content" ] <| Data.decodeFullZkNote)
+                    JD.map ZkNote (JD.at [ "content" ] <| Data.decodeZkNote)
+
+                "zknoteedit" ->
+                    JD.map ZkNoteEdit (JD.at [ "content" ] <| Data.decodeZkNoteEdit)
 
                 "savedzklinks" ->
                     JD.succeed SavedZkLinks

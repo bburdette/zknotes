@@ -55,7 +55,7 @@ type alias SavedZkNote =
     }
 
 
-type alias FullZkNote =
+type alias ZkNote =
     { id : Int
     , zk : Int
     , title : String
@@ -87,6 +87,13 @@ type alias ZkLink =
     }
 
 
+type alias ZkNoteAndAccomplices =
+    { zk : Maybe Zk
+    , zknote : ZkNote
+    , links : List ZkLink
+    }
+
+
 type alias ZkLinks =
     { zk : Int
     , links : List ZkLink
@@ -106,12 +113,39 @@ type alias GetZkLinks =
     }
 
 
+type alias GetZkNoteEdit =
+    { zknote : Int
+    , zk : Maybe Int
+    }
+
+
+type alias ZkNoteEdit =
+    { zk : Maybe Zk
+    , zknote : ZkNote
+    , links : List ZkLink
+    }
+
+
 encodeGetZkLinks : GetZkLinks -> JE.Value
 encodeGetZkLinks gzl =
     JE.object
         [ ( "zknote", JE.int gzl.zknote )
         , ( "zk", JE.int gzl.zk )
         ]
+
+
+encodeGetZkNoteEdit : GetZkNoteEdit -> JE.Value
+encodeGetZkNoteEdit gzl =
+    JE.object
+        (( "zknote", JE.int gzl.zknote )
+            :: (case gzl.zk of
+                    Just zk ->
+                        [ ( "zk", JE.int zk ) ]
+
+                    Nothing ->
+                        []
+               )
+        )
 
 
 encodeZkLinks : ZkLinks -> JE.Value
@@ -160,8 +194,8 @@ decodeZkLink =
         (JD.succeed Nothing)
 
 
-saveZkNoteFromFull : FullZkNote -> SaveZkNote
-saveZkNoteFromFull fzn =
+saveZkNote : ZkNote -> SaveZkNote
+saveZkNote fzn =
     { id = Just fzn.id
     , zk = fzn.zk
     , public = fzn.public
@@ -248,9 +282,9 @@ decodeSavedZkNote =
         (JD.field "changeddate" JD.int)
 
 
-decodeFullZkNote : JD.Decoder FullZkNote
-decodeFullZkNote =
-    JD.map8 FullZkNote
+decodeZkNote : JD.Decoder ZkNote
+decodeZkNote =
+    JD.map8 ZkNote
         (JD.field "id" JD.int)
         (JD.field "zk" JD.int)
         (JD.field "title" JD.string)
@@ -259,3 +293,11 @@ decodeFullZkNote =
         (JD.field "pubid" (JD.maybe JD.string))
         (JD.field "createdate" JD.int)
         (JD.field "changeddate" JD.int)
+
+
+decodeZkNoteEdit : JD.Decoder ZkNoteEdit
+decodeZkNoteEdit =
+    JD.map3 ZkNoteEdit
+        (JD.field "zk" (JD.maybe decodeZk))
+        (JD.field "zknote" decodeZkNote)
+        (JD.field "links" (JD.list decodeZkLink))

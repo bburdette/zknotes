@@ -9,7 +9,7 @@ use std::time::Duration;
 use std::time::SystemTime;
 
 #[derive(Serialize, Debug, Clone)]
-pub struct FullZkNote {
+pub struct ZkNote {
   id: i64,
   title: String,
   content: String,
@@ -94,6 +94,19 @@ pub struct ZkLinks {
 pub struct GetZkLinks {
   pub zknote: i64,
   pub zk: i64,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct GetZkNoteEdit {
+  pub zknote: i64,
+  pub zk: Option<i64>,
+}
+
+#[derive(Serialize, Debug)]
+pub struct ZkNoteEdit {
+  pub zknote: ZkNote,
+  pub zk: Option<Zk>,
+  pub links: Vec<ZkLink>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -643,9 +656,7 @@ pub fn delete_zk_member(dbfile: &Path, uid: i64, zkm: ZkMember) -> Result<(), Bo
   Ok(())
 }
 
-pub fn read_zk(dbfile: &Path, id: i64) -> Result<Zk, Box<dyn Error>> {
-  let conn = connection_open(dbfile)?;
-
+pub fn read_zk(conn: &Connection, id: i64) -> Result<Zk, Box<dyn Error>> {
   let rbe = conn.query_row(
     "SELECT name, description, createdate, changeddate
       FROM zk WHERE id = ?1",
@@ -719,9 +730,7 @@ pub fn save_zknote(
   }
 }
 
-pub fn read_zknote(dbfile: &Path, uid: Option<i64>, id: i64) -> Result<FullZkNote, Box<dyn Error>> {
-  let conn = connection_open(dbfile)?;
-
+pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNote, Box<dyn Error>> {
   match uid {
     Some(uid) => {
       if !is_zknote_member(&conn, uid, id)? {
@@ -736,7 +745,7 @@ pub fn read_zknote(dbfile: &Path, uid: Option<i64>, id: i64) -> Result<FullZkNot
       FROM zknote WHERE id = ?1",
     params![id],
     |row| {
-      Ok(FullZkNote {
+      Ok(ZkNote {
         id: id,
         title: row.get(0)?,
         content: row.get(1)?,
@@ -763,7 +772,7 @@ pub fn read_zknotepubid(
   dbfile: &Path,
   uid: Option<i64>,
   pubid: &str,
-) -> Result<FullZkNote, Box<dyn Error>> {
+) -> Result<ZkNote, Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
 
   let rbe = conn.query_row(
@@ -771,7 +780,7 @@ pub fn read_zknotepubid(
       FROM zknote WHERE pubid = ?1",
     params![pubid],
     |row| {
-      Ok(FullZkNote {
+      Ok(ZkNote {
         id: row.get(0)?,
         title: row.get(1)?,
         content: row.get(2)?,
@@ -919,12 +928,10 @@ pub fn save_zklinks(
 }
 
 pub fn read_zklinks(
-  dbfile: &Path,
+  conn: &Connection,
   uid: i64,
   gzl: &GetZkLinks,
 ) -> Result<Vec<ZkLink>, Box<dyn Error>> {
-  let conn = connection_open(dbfile)?;
-
   if !is_zk_member(&conn, uid, gzl.zk)? {
     bail!("can't read_zklinks; user is not a member of this zk");
   }
@@ -961,4 +968,36 @@ pub fn read_zklinks(
   }
 
   Ok(pv)
+}
+
+pub fn read_zknoteedit(
+  conn: &Connection,
+  uid: i64,
+  gzl: &GetZkNoteEdit,
+) -> Result<ZkNoteEdit, Box<dyn Error>> {
+  // should do an ownership check for us
+  let zknote = read_zknote(conn, Some(uid), gzl.zknote)?;
+
+  // If the note belongs to the zk indicated in the query, then DON'T get the zk.
+  // Otherwise, the UI has the wrong zk, so load it up and send it.
+  let zk = if Some(zknote.zk) == gzl.zk {
+    None
+  } else {
+    Some(read_zk(conn, zknote.zk)?)
+  };
+
+  let zklinks = read_zklinks(
+    conn,
+    uid,
+    &GetZkLinks {
+      zk: zknote.zk,
+      zknote: zknote.id,
+    },
+  )?;
+
+  Ok(ZkNoteEdit {
+    zk: zk,
+    zknote: zknote,
+    links: zklinks,
+  })
 }

@@ -177,15 +177,41 @@ routeState : Model -> Route -> Maybe ( State, Cmd Msg )
 routeState model route =
     case route of
         PublicZkNote id ->
-            Just
-                ( PubShowMessage
-                    { message = "loading article"
-                    }
-                , sendPIMsg model.location
-                    (PI.GetZkNote id)
-                )
+            case stateLogin model.state of
+                Just login ->
+                    Just
+                        ( ShowMessage
+                            { message = "loading article"
+                            }
+                            login
+                        , sendUIMsg model.location
+                            login
+                            (UI.GetZkNoteEdit { zknote = id, zk = Nothing })
+                        )
+
+                Nothing ->
+                    Just
+                        ( PubShowMessage
+                            { message = "loading article"
+                            }
+                        , sendPIMsg model.location
+                            (PI.GetZkNote id)
+                        )
 
         PublicZkPubId pubid ->
+            {- case stateLogin model.state of
+               Just login ->
+                   Just
+                       ( ShowMessage
+                           { message = "loading article"
+                           }
+                       , sendPIMsg model.location
+                           (UI.GetZkNotePubId pubid)
+                       )
+
+               Nothing ->
+                   Just
+            -}
             Just
                 ( PubShowMessage
                     { message = "loading article"
@@ -391,7 +417,7 @@ type alias NwState =
     , login : Data.Login
     , mbzknotesearchresult : Maybe Data.ZkNoteSearchResult
     , mbzklinks : Maybe Data.ZkLinks
-    , mbzknote : Maybe Data.FullZkNote
+    , mbzknote : Maybe Data.ZkNote
     , spmodel : SP.Model
     , navkey : Browser.Navigation.Key
     }
@@ -542,7 +568,8 @@ urlupdate msg model =
 
                 LoadUrl urlstr ->
                     -- load foreign site
-                    ( model, Browser.Navigation.load urlstr )
+                    -- ( model, Browser.Navigation.load urlstr )
+                    ( model, Cmd.none )
 
                 UrlChanged url ->
                     -- we get this from forward and back buttons.  if the user changes the url
@@ -563,7 +590,8 @@ urlupdate msg model =
 
                         Nothing ->
                             -- load foreign site
-                            ( model, Browser.Navigation.load (Url.toString url) )
+                            -- ( model, Browser.Navigation.load (Url.toString url) )
+                            ( model, Cmd.none )
 
                 _ ->
                     -- not an url related message!  pass it on to the 'actualupdate'
@@ -793,6 +821,27 @@ actualupdate msg model =
                                 _ ->
                                     ( { model | state = BadError (BadError.initialModel <| "unexpected message: zknote") state }, Cmd.none )
 
+                        UI.ZkNoteEdit zne ->
+                            case ( stateLogin state, zne.zk ) of
+                                ( Just login, Just zk ) ->
+                                    ( { model
+                                        | state =
+                                            EditZkNote
+                                                (EditZkNote.initFull
+                                                    zk
+                                                    { notes = [], offset = 0 }
+                                                    zne.zknote
+                                                    { zk = zne.zknote.zk, links = zne.links }
+                                                    (SP.initModel zk.id)
+                                                )
+                                                login
+                                      }
+                                    , Cmd.none
+                                    )
+
+                                _ ->
+                                    ( { model | state = BadError (BadError.initialModel <| "unexpected message: zknoteedit") state }, Cmd.none )
+
                         UI.SavedZk beid ->
                             case state of
                                 EditZk emod login ->
@@ -879,7 +928,14 @@ actualupdate msg model =
                                     ( { model | state = Login <| Login.invalidUserOrPwd lmod }, Cmd.none )
 
                                 _ ->
-                                    ( { model | state = BadError (BadError.initialModel "unexpected message - InvalidUserOrPwd") state }, Cmd.none )
+                                    ( { model
+                                        | state =
+                                            BadError
+                                                (BadError.initialModel "unexpected message - InvalidUserOrPwd")
+                                                (Login (Login.initialModel Nothing "zknotes" model.seed))
+                                      }
+                                    , Cmd.none
+                                    )
 
         ( ViewMsg em, View es ) ->
             let
