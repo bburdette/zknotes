@@ -127,6 +127,10 @@ routeTitle route =
 
 urlRequest : Browser.UrlRequest -> Msg
 urlRequest ur =
+    let
+        _ =
+            Debug.log "urlRequest" ur
+    in
     case ur of
         Browser.Internal url ->
             InternalUrl url
@@ -177,15 +181,41 @@ routeState : Model -> Route -> Maybe ( State, Cmd Msg )
 routeState model route =
     case route of
         PublicZkNote id ->
-            Just
-                ( PubShowMessage
-                    { message = "loading article"
-                    }
-                , sendPIMsg model.location
-                    (PI.GetZkNote id)
-                )
+            case stateLogin model.state of
+                Just login ->
+                    Just
+                        ( ShowMessage
+                            { message = "loading article"
+                            }
+                            login
+                        , sendUIMsg model.location
+                            login
+                            (UI.GetZkNote id)
+                        )
+
+                Nothing ->
+                    Just
+                        ( PubShowMessage
+                            { message = "loading article"
+                            }
+                        , sendPIMsg model.location
+                            (PI.GetZkNote id)
+                        )
 
         PublicZkPubId pubid ->
+            {- case stateLogin model.state of
+               Just login ->
+                   Just
+                       ( ShowMessage
+                           { message = "loading article"
+                           }
+                       , sendPIMsg model.location
+                           (UI.GetZkNotePubId pubid)
+                       )
+
+               Nothing ->
+                   Just
+            -}
             Just
                 ( PubShowMessage
                     { message = "loading article"
@@ -533,6 +563,9 @@ urlupdate msg model =
             case msg of
                 InternalUrl url ->
                     let
+                        _ =
+                            Debug.log "internalurl: " url
+
                         ( state, icmd ) =
                             parseUrl url
                                 |> Maybe.andThen (routeState model)
@@ -541,10 +574,19 @@ urlupdate msg model =
                     ( { model | state = state }, icmd )
 
                 LoadUrl urlstr ->
+                    let
+                        _ =
+                            Debug.log "loadurl: " urlstr
+                    in
                     -- load foreign site
-                    ( model, Browser.Navigation.load urlstr )
+                    -- ( model, Browser.Navigation.load urlstr )
+                    ( model, Cmd.none )
 
                 UrlChanged url ->
+                    let
+                        _ =
+                            Debug.log "UrlChanged: " url
+                    in
                     -- we get this from forward and back buttons.  if the user changes the url
                     -- in the browser address bar, its a site reload so this isn't called.
                     case parseUrl url of
@@ -563,7 +605,8 @@ urlupdate msg model =
 
                         Nothing ->
                             -- load foreign site
-                            ( model, Browser.Navigation.load (Url.toString url) )
+                            -- ( model, Browser.Navigation.load (Url.toString url) )
+                            ( model, Cmd.none )
 
                 _ ->
                     -- not an url related message!  pass it on to the 'actualupdate'
@@ -879,7 +922,14 @@ actualupdate msg model =
                                     ( { model | state = Login <| Login.invalidUserOrPwd lmod }, Cmd.none )
 
                                 _ ->
-                                    ( { model | state = BadError (BadError.initialModel "unexpected message - InvalidUserOrPwd") state }, Cmd.none )
+                                    ( { model
+                                        | state =
+                                            BadError
+                                                (BadError.initialModel "unexpected message - InvalidUserOrPwd")
+                                                (Login (Login.initialModel Nothing "zknotes" model.seed))
+                                      }
+                                    , Cmd.none
+                                    )
 
         ( ViewMsg em, View es ) ->
             let
