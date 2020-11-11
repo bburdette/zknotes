@@ -404,7 +404,8 @@ zknview size model =
                 { onPress = Just DonePress, label = E.text "done" }
             , EI.button Common.buttonStyle { onPress = Just RevertPress, label = E.text "cancel" }
             , EI.button Common.buttonStyle { onPress = Just ViewPress, label = E.text "view" }
-            , EI.button Common.buttonStyle { onPress = Just LinksPress, label = E.text "links" }
+
+            -- , EI.button Common.buttonStyle { onPress = Just LinksPress, label = E.text "links" }
             , case isdirty of
                 True ->
                     EI.button dirtybutton { onPress = Just SavePress, label = E.text "save" }
