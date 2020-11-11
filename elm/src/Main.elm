@@ -666,8 +666,15 @@ actualupdate msg model =
                                                             , Cmd.none
                                                             )
 
+                                                        UserReplyData (Ok UI.SavedZkLinks) ->
+                                                            ( st, Cmd.none )
+
                                                         _ ->
-                                                            ( BadError (BadError.initialModel "unexpected message after zknote save") st, Cmd.none )
+                                                            ( BadError
+                                                                (BadError.initialModel "unexpected message after zknote save")
+                                                                st
+                                                            , Cmd.none
+                                                            )
                                                 )
                                       }
                                     , Cmd.batch
