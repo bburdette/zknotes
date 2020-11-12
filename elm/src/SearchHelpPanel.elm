@@ -104,7 +104,7 @@ view nblevel hmod =
                 Modifiers ->
                     column [ width fill ]
                         [ showLine "the quoted strings can take a number of modifiers:"
-                        , thingAndDef 4 "t'string1' =" "match items with a parent tag that contains 'string1' in its name."
+                        , thingAndDef 4 "t'string1' =" "match items that link to items with 'string1' in the name."
                         , thingAndDef 4 "e'String1' =" "match items whose names are exactly 'String1', no more, no less."
                         , thingAndDef 4 "n'elements' =" "match items with the string 'elements' in the note body.."
                         ]
@@ -112,7 +112,7 @@ view nblevel hmod =
                 FullMonty ->
                     column [ width fill ]
                         [ showLine "put all the elements together to make complex queries!  For instance "
-                        , thingAndDef 2 "a'sheet music' & t'tango' & ea'G' =" "match items with an ancestor tag 'sheet music', a parent tag 'tango', and an exact ancestor tag of 'G'."
+                        , thingAndDef 2 "t'sheet music' & 'tango' & te'G' =" "match items linked to 'sheet music', with 'tango' in the name, and also linking to an item named 'G'"
                         ]
             ]
         ]
