@@ -319,6 +319,150 @@ pub fn udpate3(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   Ok(())
 }
 
+pub fn udpate4(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+  // db connection without foreign key checking.
+  let conn = Connection::open(dbfile)?;
+  let mut m1 = Migration::new();
+
+  // temp table to hold zknote data.
+  m1.create_table("zknotetemp", |t| {
+    t.add_column(
+      "id",
+      types::integer()
+        .primary(true)
+        .increments(true)
+        .nullable(false),
+    );
+    t.add_column("title", types::text().nullable(false));
+    t.add_column("content", types::text().nullable(false));
+    // t.add_column("public", types::boolean().nullable(false));
+    t.add_column("pubid", types::text().nullable(true).unique(true));
+    t.add_column("user", types::foreign("user", "id").nullable(false));
+    t.add_column("createdate", types::integer().nullable(false));
+    t.add_column("changeddate", types::integer().nullable(false));
+  });
+  m1.create_table("zklinktemp", |t| {
+    t.add_column("fromid", types::foreign("zknote", "id").nullable(false));
+    t.add_column("toid", types::foreign("zknote", "id").nullable(false));
+    t.add_column("user", types::foreign("user", "id").nullable(false));
+    t.add_column("linkzknote", types::foreign("zknote", "id").nullable(true));
+    t.add_index(
+      "unqtemp",
+      types::index(vec!["fromid", "toid", "user"]).unique(true),
+    );
+  });
+  conn.execute_batch(m1.make::<Sqlite>().as_str())?;
+
+  // only user 2 will keep their stuff!  that's me.
+  conn.execute("delete from zkmember where user <> 2", params![])?;
+
+  // copy everything from zknote.
+  conn.execute(
+    "INSERT INTO zknotetemp (id, title, content, pubid, user, createdate, changeddate)
+        select zknote.id, title, content, pubid, user.id, zknote.createdate, zknote.changeddate from zknote, user
+        where user.id in (select user from zkmember where zkmember.zk = zknote.zk)",
+    params![],
+  )?;
+
+  // copy everything from zklink.
+  conn.execute(
+    "INSERT INTO zklinktemp (fromid, toid, user)
+        select fromid, toid, user.id from zklink, user
+        where user.id in (select user from zkmember where zkmember.zk = zklink.zk)",
+    params![],
+  )?;
+
+  let mut m2 = Migration::new();
+  // drop zknote.
+  m2.drop_table("zknote");
+  m2.drop_table("zkmember");
+  m2.drop_table("zk");
+  m2.drop_table("zklink");
+
+  // new zknote with new column.
+  m2.create_table("zknote", |t| {
+    t.add_column(
+      "id",
+      types::integer()
+        .primary(true)
+        .increments(true)
+        .nullable(false),
+    );
+    t.add_column("title", types::text().nullable(false));
+    t.add_column("content", types::text().nullable(false));
+    // t.add_column("public", types::boolean().nullable(false));
+    t.add_column("pubid", types::text().nullable(true).unique(true));
+    t.add_column("user", types::foreign("user", "id").nullable(false));
+    t.add_column("createdate", types::integer().nullable(false));
+    t.add_column("changeddate", types::integer().nullable(false));
+  });
+
+  m2.create_table("zklink", |t| {
+    t.add_column("fromid", types::foreign("zknote", "id").nullable(false));
+    t.add_column("toid", types::foreign("zknote", "id").nullable(false));
+    t.add_column("user", types::foreign("user", "id").nullable(false));
+    t.add_column("linkzknote", types::foreign("zknote", "id").nullable(true));
+    t.add_index(
+      "zklinkunq",
+      types::index(vec!["fromid", "toid", "user"]).unique(true),
+    );
+  });
+
+  conn.execute_batch(m2.make::<Sqlite>().as_str())?;
+
+  // copy everything from zknotetemp.
+  conn.execute(
+    "INSERT INTO zknote (id, title, content, pubid, user, createdate, changeddate)
+        select id, title, content, pubid, user, createdate, changeddate from zknotetemp",
+    params![],
+  )?;
+
+  // copy everything from zklinktemp.
+  conn.execute(
+    "INSERT INTO zklink (fromid, toid, user, linkzknote)
+        select fromid, toid, user, linkzknote from zklinktemp",
+    params![],
+  )?;
+
+  let now = now()?;
+
+  // create system user.
+  conn.execute(
+    "INSERT INTO user (name, hashwd, salt, email, registration_key, createdate)
+      VALUES ('system', '', '', '', null, ?1)",
+    params![now],
+  )?;
+  let sysid = conn.last_insert_rowid();
+
+  // system tags.
+  conn.execute(
+    "INSERT INTO zknote (title, content, pubid, user, createdate, changeddate)
+      VALUES ('public', '', null, ?1, ?2, ?3)",
+    params![sysid, now, now],
+  )?;
+
+  conn.execute(
+    "INSERT INTO zknote (title, content, pubid, user, createdate, changeddate)
+      VALUES ('share', '', null, ?1, ?2, ?3)",
+    params![sysid, now, now],
+  )?;
+
+  conn.execute(
+    "INSERT INTO zknote (title, content, pubid, user, createdate, changeddate)
+      VALUES ('search', '', null, ?1, ?2, ?3)",
+    params![sysid, now, now],
+  )?;
+
+  let mut m3 = Migration::new();
+  // drop zknotetemp.
+  m3.drop_table("zknotetemp");
+  m3.drop_table("zklinktemp");
+
+  conn.execute_batch(m3.make::<Sqlite>().as_str())?;
+
+  Ok(())
+}
+
 pub fn get_single_value(conn: &Connection, name: &str) -> Result<Option<String>, Box<dyn Error>> {
   match conn.query_row(
     "select value from singlevalue where name = ?1",
@@ -374,6 +518,11 @@ pub fn dbinit(dbfile: &Path) -> Result<(), Box<dyn Error>> {
     println!("udpate3");
     udpate3(&dbfile)?;
     set_single_value(&conn, "migration_level", "3")?;
+  }
+  if nlevel < 4 {
+    println!("udpate4");
+    udpate4(&dbfile)?;
+    set_single_value(&conn, "migration_level", "4")?;
   }
 
   println!("db up to date.");
