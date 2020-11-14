@@ -27,7 +27,6 @@ import Util exposing (first, rest)
 
 type alias ZkNoteSearch =
     { tagSearch : TagSearch
-    , zks : List Int
     , offset : Int
     , limit : Maybe Int
     }
@@ -38,10 +37,9 @@ defaultSearchLimit =
     25
 
 
-defaultSearch : Int -> ZkNoteSearch
-defaultSearch zkid =
+defaultSearch : ZkNoteSearch
+defaultSearch =
     { tagSearch = SearchTerm [] ""
-    , zks = [ zkid ]
     , offset = 0
     , limit = Just defaultSearchLimit
     }
@@ -129,7 +127,6 @@ encodeZkNoteSearch : ZkNoteSearch -> JE.Value
 encodeZkNoteSearch zns =
     JE.object <|
         [ ( "tagsearch", encodeTagSearch zns.tagSearch )
-        , ( "zks", JE.list JE.int zns.zks )
         , ( "offset", JE.int zns.offset )
         ]
             ++ (zns.limit

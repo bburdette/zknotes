@@ -10,17 +10,17 @@ use std::time::SystemTime;
 
 #[derive(Serialize, Debug, Clone)]
 pub struct ZkNote {
-  id: i64,
+  pub id: i64,
   title: String,
   content: String,
-  zk: i64,
-  pub public: bool,
+  user: i64,
+  // pub public: bool,
   pubid: Option<String>,
   createdate: i64,
   changeddate: i64,
 }
 
-#[derive(Serialize, Debug, Clone)]
+/*#[derive(Serialize, Debug, Clone)]
 pub struct Zk {
   id: i64,
   name: String,
@@ -41,13 +41,12 @@ pub struct SaveZk {
   name: String,
   description: String,
 }
-
+*/
 #[derive(Serialize, Debug, Clone)]
 pub struct ZkListNote {
   id: i64,
   title: String,
-  zk: i64,
-  public: bool,
+  user: i64,
   createdate: i64,
   changeddate: i64,
 }
@@ -67,7 +66,6 @@ pub struct SavedZkNote {
 #[derive(Deserialize, Debug, Clone)]
 pub struct SaveZkNote {
   id: Option<i64>,
-  zk: i64,
   title: String,
   public: bool,
   pubid: Option<String>,
@@ -86,26 +84,22 @@ pub struct ZkLink {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ZkLinks {
-  pub zk: i64,
   pub links: Vec<ZkLink>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct GetZkLinks {
   pub zknote: i64,
-  pub zk: i64,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct GetZkNoteEdit {
   pub zknote: i64,
-  pub zk: Option<i64>,
 }
 
 #[derive(Serialize, Debug)]
 pub struct ZkNoteEdit {
   pub zknote: ZkNote,
-  pub zk: Option<Zk>,
   pub links: Vec<ZkLink>,
 }
 
@@ -602,226 +596,63 @@ pub fn update_user(dbfile: &Path, user: &User) -> Result<(), Box<dyn Error>> {
   Ok(())
 }
 
-// zk CRUD
-
-pub fn save_zk(dbfile: &Path, uid: i64, savezk: &SaveZk) -> Result<i64, Box<dyn Error>> {
-  let conn = connection_open(dbfile)?;
-
-  let now = now()?;
-
-  match savezk.id {
-    Some(zkid) => {
-      println!("updating zk: {}", savezk.name);
-
-      if !is_zk_member(&conn, uid, zkid)? {
-        bail!("can't update zk; user is not a member");
-      }
-
-      conn.execute(
-        "UPDATE zk SET name = ?1, description = ?2, changeddate = ?3
-         WHERE id = ?4",
-        params![savezk.name, savezk.description, now, zkid],
-      )?;
-      Ok(zkid)
-    }
-    None => {
-      println!("adding zk: {}", savezk.name);
-      conn.execute(
-        "INSERT INTO zk (name, description, createdate, changeddate)
-         VALUES (?1, ?2, ?3, ?4)",
-        params![savezk.name, savezk.description, now, now],
-      )?;
-
-      let zkid = conn.last_insert_rowid();
-
-      conn.execute(
-        "INSERT INTO zkmember (zk, user)
-         VALUES (?1, ?2)",
-        params![zkid, uid],
-      )?;
-
-      Ok(zkid)
-    }
-  }
-}
-
-pub fn is_zk_member(conn: &Connection, uid: i64, zkid: i64) -> Result<bool, Box<dyn Error>> {
-  match conn.query_row(
-    "select user, zk from zkmember where user = ?1 and zk = ?2",
-    params![uid, zkid],
-    |_row| Ok(true),
-  ) {
-    Ok(b) => Ok(b),
-    Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
-    Err(x) => Err(Box::new(x)),
-  }
-}
-
-pub fn is_zknote_member(
+pub fn is_zknote_shared(
   conn: &Connection,
   uid: i64,
   zknoteid: i64,
 ) -> Result<bool, Box<dyn Error>> {
+  Ok(false)
+  // let shareid = match conn.query_row(
+  //   "select id from
+  //     zknote, user
+  //     where zknote.title = \"share\"
+  //     and user.name = \"system\"
+  //     and zknote.user = user.id",
+  //   params![],
+  //   |row| row.get(0)?);
+
+  // //
+
+  // match conn.query_row(
+  //   "select count(*) from
+  //     zklink A, zklink B, zknote
+  //     where A.leftid = ?1 and A.rightid = B.leftid and B.rightid = ?2
+  //     and zknote.id = ?2 and zknote.user = ?3",
+  //   params![zknoteid, shareid, uid],
+  //   |_row| Ok(true),
+  // ) {
+  //   Ok(b) => Ok(b),
+  //   Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
+  //   Err(x) => Err(Box::new(x)),
+  // }
+}
+
+pub fn is_zknote_public(conn: &Connection, zknoteid: i64) -> Result<bool, Box<dyn Error>> {
+  let pubid: i64 = conn.query_row(
+    "select id from
+      zknote, user
+      where zknote.title = \"public\"
+      and user.name = \"system\"
+      and zknote.user = user.id",
+    params![],
+    |row| Ok(row.get(0)?),
+  )?;
+
   match conn.query_row(
-    "select zkmember.user, zkmember.zk from zkmember, zknote where zkmember.user = ?1 and zkmember.zk = zknote.zk
-      and zknote.id = ?2",
-    params![uid, zknoteid],
-    |_row| Ok(true),
+    "select count(*) from
+      zklink, zknote R
+      where (zklinks.left = ?1 and zklinks.right = ?2)
+      or (zklinks.left = ?2  and zklinks.right = ?1)",
+    params![zknoteid, pubid],
+    |row| {
+      let i: i64 = row.get(0)?;
+      Ok(i)
+    },
   ) {
-    Ok(b) => Ok(b),
+    Ok(count) => Ok(count > 0),
     Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
     Err(x) => Err(Box::new(x)),
   }
-}
-
-pub fn delete_zk(dbfile: &Path, uid: i64, zkid: i64) -> Result<(), Box<dyn Error>> {
-  let conn = connection_open(dbfile)?;
-
-  // start a transaction
-  conn.execute("BEGIN TRANSACTION", params![])?;
-
-  if !is_zk_member(&conn, uid, zkid)? {
-    bail!("can't delete; user is not a member of this zk");
-  }
-
-  // delete all member entries for the zk.
-  conn.execute("DELETE FROM zkmember WHERE zk = ?1", params![zkid])?;
-
-  // if delete successful, also remove the zmember entries.
-  conn.execute("DELETE FROM zk WHERE id = ?1", params![zkid])?;
-
-  conn.execute("END TRANSACTION", params![])?;
-
-  Ok(())
-}
-
-pub fn zklisting(dbfile: &Path, user: i64) -> rusqlite::Result<Vec<Zk>> {
-  let conn = connection_open(dbfile)?;
-
-  let mut pstmt = conn.prepare(
-    "SELECT id, name, description, createdate, changeddate
-      FROM zk, zkmember
-      where zkmember.user = ?1
-      and zkmember.zk = zk.id",
-  )?;
-
-  let rec_iter = pstmt.query_map(params![user], |row| {
-    Ok(Zk {
-      id: row.get(0)?,
-      name: row.get(1)?,
-      description: row.get(2)?,
-      createdate: row.get(3)?,
-      changeddate: row.get(4)?,
-    })
-  })?;
-
-  let mut pv = Vec::new();
-
-  for rsrec in rec_iter {
-    match rsrec {
-      Ok(rec) => {
-        pv.push(rec);
-      }
-      Err(_) => (),
-    }
-  }
-
-  Ok(pv)
-}
-
-pub fn read_zk_members(dbfile: &Path, uid: i64, zkid: i64) -> Result<Vec<String>, Box<dyn Error>> {
-  let conn = connection_open(dbfile)?;
-
-  if !is_zk_member(&conn, uid, zkid)? {
-    bail!("can't delete; user is not a member of this zk");
-  }
-
-  let mut pstmt = conn.prepare(
-    "SELECT user.name from zkmember, user where zkmember.zk = ?1 and user.id = zkmember.user",
-  )?;
-
-  let rec_iter = pstmt.query_map(params![zkid], |row| Ok(row.get(0)?))?;
-
-  let mut pv = Vec::new();
-
-  for rsrec in rec_iter {
-    match rsrec {
-      Ok(uid) => {
-        pv.push(uid);
-      }
-      Err(_) => (),
-    }
-  }
-
-  Ok(pv)
-}
-
-pub fn add_zk_member(dbfile: &Path, uid: i64, zkm: ZkMember) -> Result<(), Box<dyn Error>> {
-  let conn = connection_open(dbfile)?;
-
-  conn.execute("BEGIN TRANSACTION", params![])?;
-
-  if !is_zk_member(&conn, uid, zkm.zkid)? {
-    bail!("can't add; you are not a member of this zk");
-  }
-
-  let r: i64 = conn.query_row(
-    "SELECT id from user where name = ?1",
-    params![zkm.name],
-    |row| Ok(row.get(0)?),
-  )?;
-
-  conn.execute(
-    "insert into zkmember (user, zk) values (?1, ?2)",
-    params![r, zkm.zkid],
-  )?;
-
-  conn.execute("END TRANSACTION", params![])?;
-
-  Ok(())
-}
-pub fn delete_zk_member(dbfile: &Path, uid: i64, zkm: ZkMember) -> Result<(), Box<dyn Error>> {
-  let conn = connection_open(dbfile)?;
-
-  conn.execute("BEGIN TRANSACTION", params![])?;
-
-  if !is_zk_member(&conn, uid, zkm.zkid)? {
-    bail!("can't delete; you are not a member of this zk");
-  }
-
-  let r: i64 = conn.query_row(
-    "select id from user where name = ?1",
-    params![zkm.name],
-    |row| Ok(row.get(0)?),
-  )?;
-
-  conn.execute(
-    "delete from zkmember where user = ?1 and zk = ?2",
-    params![r, zkm.zkid],
-  )?;
-
-  conn.execute("END TRANSACTION", params![])?;
-
-  Ok(())
-}
-
-pub fn read_zk(conn: &Connection, id: i64) -> Result<Zk, Box<dyn Error>> {
-  let rbe = conn.query_row(
-    "SELECT name, description, createdate, changeddate
-      FROM zk WHERE id = ?1",
-    params![id],
-    |row| {
-      Ok(Zk {
-        id: id,
-        name: row.get(0)?,
-        description: row.get(1)?,
-        createdate: row.get(2)?,
-        changeddate: row.get(3)?,
-      })
-    },
-  )?;
-
-  Ok(rbe)
 }
 
 // zknote CRUD
@@ -835,23 +666,16 @@ pub fn save_zknote(
 
   let now = now()?;
 
-  if !is_zk_member(&conn, uid, note.zk)? {
-    bail!("can't save note; you are not a member of this zk");
-  }
+  // if !is_zk_member(&conn, uid, note.zk)? {
+  //   bail!("can't save note; you are not a member of this zk");
+  // }
 
   match note.id {
     Some(id) => {
       conn.execute(
-        "UPDATE zknote SET title = ?1, content = ?2, changeddate = ?3, public = ?4, pubid = ?5
-         WHERE id = ?6",
-        params![
-          note.title,
-          note.content,
-          now,
-          note.public,
-          note.pubid,
-          note.id
-        ],
+        "UPDATE zknote SET title = ?1, content = ?2, changeddate = ?3, pubid = ?4
+         WHERE id = ?5 and user = ?6",
+        params![note.title, note.content, now, note.pubid, note.id, uid],
       )?;
       Ok(SavedZkNote {
         id: id,
@@ -860,16 +684,9 @@ pub fn save_zknote(
     }
     None => {
       conn.execute(
-        "INSERT INTO zknote (title, content, zk, public, pubid, createdate, changeddate)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6)",
-        params![
-          note.title,
-          note.content,
-          note.zk,
-          note.public,
-          note.pubid,
-          now
-        ],
+        "INSERT INTO zknote (title, content, user, pubid, createdate, changeddate)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![note.title, note.content, uid, note.public, note.pubid, now],
       )?;
       Ok(SavedZkNote {
         id: conn.last_insert_rowid(),
@@ -880,17 +697,17 @@ pub fn save_zknote(
 }
 
 pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNote, Box<dyn Error>> {
-  match uid {
-    Some(uid) => {
-      if !is_zknote_member(&conn, uid, id)? {
-        bail!("can't read zknote; you are not a member of this zk");
-      }
-    }
-    _ => {}
-  }
+  // match uid {
+  //   Some(uid) => {
+  //     if !is_zknote_member(&conn, uid, id)? {
+  //       bail!("can't read zknote; you are not a member of this zk");
+  //     }
+  //   }
+  //   _ => {}
+  // }
 
-  let rbe = conn.query_row(
-    "SELECT title, content, zk, public, pubid, createdate, changeddate
+  let note = conn.query_row(
+    "SELECT title, content, user, pubid, createdate, changeddate
       FROM zknote WHERE id = ?1",
     params![id],
     |row| {
@@ -898,34 +715,49 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
         id: id,
         title: row.get(0)?,
         content: row.get(1)?,
-        zk: row.get(2)?,
-        public: row.get(3)?,
-        pubid: row.get(4)?,
-        createdate: row.get(5)?,
-        changeddate: row.get(6)?,
+        user: row.get(2)?,
+        pubid: row.get(3)?,
+        createdate: row.get(4)?,
+        changeddate: row.get(5)?,
       })
     },
   )?;
 
-  match uid {
-    None => {
-      bail!("can't read zknote; note is private");
-    }
-    _ => {}
+  if uid == Some(note.user) {
+    Ok(note)
+  } else if is_zknote_public(conn, id)? {
+    Ok(note)
+  } else {
+    bail!("can't read zknote; note is private")
   }
-
-  Ok(rbe)
 }
 
+// pub fn is_public(conn: &Connection, zknoteid: i64) -> Result<Bool, Box<dyn Error>> {
+//   let rbe = conn.query_row(
+//     "SELECT id, title, content, user, pubid, createdate, changeddate
+//       FROM zknote WHERE pubid = ?1",
+//     params![pubid],
+//     |row| {
+//       Ok(ZkNote {
+//         id: row.get(0)?,
+//         title: row.get(1)?,
+//         content: row.get(2)?,
+//         user: row.get(3)?,
+//         pubid: row.get(4)?,
+//         createdate: row.get(5)?,
+//         changeddate: row.get(7)?,
+//       })
+//     },
+//   )?;
+// }
+
 pub fn read_zknotepubid(
-  dbfile: &Path,
+  conn: &Connection,
   uid: Option<i64>,
   pubid: &str,
 ) -> Result<ZkNote, Box<dyn Error>> {
-  let conn = connection_open(dbfile)?;
-
-  let rbe = conn.query_row(
-    "SELECT id, title, content, zk, public, pubid, createdate, changeddate
+  let note = conn.query_row(
+    "SELECT id, title, content, user, pubid, createdate, changeddate
       FROM zknote WHERE pubid = ?1",
     params![pubid],
     |row| {
@@ -933,10 +765,9 @@ pub fn read_zknotepubid(
         id: row.get(0)?,
         title: row.get(1)?,
         content: row.get(2)?,
-        zk: row.get(3)?,
-        public: row.get(4)?,
-        pubid: row.get(5)?,
-        createdate: row.get(6)?,
+        user: row.get(3)?,
+        pubid: row.get(4)?,
+        createdate: row.get(5)?,
         changeddate: row.get(7)?,
       })
     },
@@ -944,18 +775,19 @@ pub fn read_zknotepubid(
 
   match uid {
     Some(uid) => {
-      if !is_zknote_member(&conn, uid, rbe.id)? {
+      // if !is_zknote_member(&conn, uid, note.id)? {
+      if note.user != uid {
         bail!("can't read zknote; you are not a member of this zk");
       }
     }
     None => {
-      if !rbe.public {
+      if !is_zknote_public(&conn, note.id)? {
         bail!("can't read zknote; note is private");
       }
     }
   }
 
-  Ok(rbe)
+  Ok(note)
 }
 
 pub fn delete_zknote(dbfile: &Path, uid: i64, noteid: i64) -> Result<(), Box<dyn Error>> {
@@ -971,7 +803,7 @@ pub fn delete_zknote(dbfile: &Path, uid: i64, noteid: i64) -> Result<(), Box<dyn
   Ok(())
 }
 
-pub fn zknotelisting(dbfile: &Path, user: i64, zk: i64) -> rusqlite::Result<Vec<ZkListNote>> {
+/*pub fn zknotelisting(dbfile: &Path, user: i64, zk: i64) -> rusqlite::Result<Vec<ZkListNote>> {
   let conn = connection_open(dbfile)?;
 
   let mut pstmt = conn.prepare(
@@ -980,14 +812,12 @@ pub fn zknotelisting(dbfile: &Path, user: i64, zk: i64) -> rusqlite::Result<Vec<
         zk IN (select zk from zkmember where user = ?2)",
   )?;
 
-  let rec_iter = pstmt.query_map(params![zk, user], |row| {
+  let rec_iter = pstmt.query_map(params![user], |row| {
     Ok(ZkListNote {
       id: row.get(0)?,
       title: row.get(1)?,
-      zk: zk,
-      public: row.get(2)?,
-      createdate: row.get(3)?,
-      changeddate: row.get(4)?,
+      createdate: row.get(2)?,
+      changeddate: row.get(3)?,
     })
   })?;
 
@@ -1004,7 +834,7 @@ pub fn zknotelisting(dbfile: &Path, user: i64, zk: i64) -> rusqlite::Result<Vec<
 
   Ok(pv)
 }
-
+*/
 pub fn search_zknotes(
   dbfile: &Path,
   user: i64,
@@ -1022,10 +852,9 @@ pub fn search_zknotes(
     Ok(ZkListNote {
       id: row.get(0)?,
       title: row.get(1)?,
-      zk: row.get(2)?,
-      public: row.get(3)?,
-      createdate: row.get(4)?,
-      changeddate: row.get(5)?,
+      user: row.get(2)?,
+      createdate: row.get(3)?,
+      changeddate: row.get(4)?,
     })
   })?;
 
@@ -1046,29 +875,24 @@ pub fn search_zknotes(
   })
 }
 
-pub fn save_zklinks(
-  dbfile: &Path,
-  uid: i64,
-  zk: i64,
-  zklinks: Vec<ZkLink>,
-) -> Result<(), Box<dyn Error>> {
+pub fn save_zklinks(dbfile: &Path, uid: i64, zklinks: Vec<ZkLink>) -> Result<(), Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
 
-  if !is_zk_member(&conn, uid, zk)? {
-    bail!("can't save zklink; user is not a member of this zk");
-  }
+  // if !is_zk_member(&conn, uid, zk)? {
+  //   bail!("can't save zklink; user is not a member of this zk");
+  // }
 
   for zklink in zklinks.iter() {
     if zklink.delete == Some(true) {
       conn.execute(
-        "DELETE FROM zklink WHERE fromid = ?1 and toid = ?2 and zk = ?3",
-        params![zklink.from, zklink.to, zk],
+        "DELETE FROM zklink WHERE fromid = ?1 and toid = ?2 and user = ?3",
+        params![zklink.from, zklink.to, uid],
       )?;
     } else {
       conn.execute(
-        "INSERT INTO zklink (fromid, toid, zk, linkzknote) values (?1, ?2, ?3, ?4)
-          ON CONFLICT (fromid, toid, zk) DO UPDATE SET linkzknote = ?4 where fromid = ?1 and toid = ?2 and zk = ?3",
-        params![zklink.from, zklink.to, zk, zklink.linkzknote],
+        "INSERT INTO zklink (fromid, toid, user, linkzknote) values (?1, ?2, ?3, ?4)
+          ON CONFLICT (fromid, toid, user) DO UPDATE SET linkzknote = ?4 where fromid = ?1 and toid = ?2 and user = ?3",
+        params![zklink.from, zklink.to, uid, zklink.linkzknote],
       )?;
     }
   }
@@ -1081,20 +905,20 @@ pub fn read_zklinks(
   uid: i64,
   gzl: &GetZkLinks,
 ) -> Result<Vec<ZkLink>, Box<dyn Error>> {
-  if !is_zk_member(&conn, uid, gzl.zk)? {
-    bail!("can't read_zklinks; user is not a member of this zk");
-  }
+  // if !is_zk_member(&conn, uid, gzl.zk)? {
+  //   bail!("can't read_zklinks; user is not a member of this zk");
+  // }
 
   let mut pstmt = conn.prepare(
     "SELECT fromid, toid, linkzknote, L.title, R.title
       FROM zklink 
       INNER JOIN zknote as L ON zklink.fromid = L.id
       INNER JOIN zknote as R ON zklink.toid = R.id
-      where zklink.zk = ?1 and (zklink.fromid = ?2 or zklink.toid = ?2)
+      where zklink.user = ?1 and (zklink.fromid = ?2 or zklink.toid = ?2)
       ",
   )?;
 
-  let rec_iter = pstmt.query_map(params![gzl.zk, gzl.zknote], |row| {
+  let rec_iter = pstmt.query_map(params![uid, gzl.zknote], |row| {
     Ok(ZkLink {
       from: row.get(0)?,
       to: row.get(1)?,
@@ -1127,25 +951,9 @@ pub fn read_zknoteedit(
   // should do an ownership check for us
   let zknote = read_zknote(conn, Some(uid), gzl.zknote)?;
 
-  // If the note belongs to the zk indicated in the query, then DON'T get the zk.
-  // Otherwise, the UI has the wrong zk, so load it up and send it.
-  let zk = if Some(zknote.zk) == gzl.zk {
-    None
-  } else {
-    Some(read_zk(conn, zknote.zk)?)
-  };
-
-  let zklinks = read_zklinks(
-    conn,
-    uid,
-    &GetZkLinks {
-      zk: zknote.zk,
-      zknote: zknote.id,
-    },
-  )?;
+  let zklinks = read_zklinks(conn, uid, &GetZkLinks { zknote: zknote.id })?;
 
   Ok(ZkNoteEdit {
-    zk: zk,
     zknote: zknote,
     links: zklinks,
   })

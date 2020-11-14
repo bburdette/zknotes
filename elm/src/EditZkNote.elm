@@ -2,7 +2,7 @@ module EditZkNote exposing
     ( Command(..)
     , Model
     , Msg(..)
-    , addListNote
+    -- , addListNote
     , compareZklinks
     , dirty
     , gotId
@@ -83,7 +83,6 @@ type NavChoice
 
 type alias Model =
     { id : Maybe Int
-    , zk : Data.Zk
     , zknSearchResult : Data.ZkNoteSearchResult
     , zklDict : Dict String Data.ZkLink
     , public : Bool
@@ -115,10 +114,8 @@ type Command
 sznFromModel : Model -> Data.SaveZkNote
 sznFromModel model =
     { id = model.id
-    , zk = model.zk.id
     , title = model.title
     , content = model.md
-    , public = model.public
     , pubid = toPubId model.public model.pubidtxt
     }
 
@@ -159,7 +156,6 @@ dirty model =
             (\r ->
                 not <|
                     (r.id == model.id)
-                        && (r.public == model.public)
                         && (r.pubid == toPubId model.public model.pubidtxt)
                         && (r.title == model.title)
                         && (r.content == model.md)
@@ -507,8 +503,8 @@ zklKey zkl =
     String.fromInt zkl.from ++ ":" ++ String.fromInt zkl.to
 
 
-initFull : Data.Zk -> Data.ZkNoteSearchResult -> Data.ZkNote -> Data.ZkLinks -> SP.Model -> Model
-initFull zk zkl zknote zklDict spm =
+initFull : Data.ZkNoteSearchResult -> Data.ZkNote -> Data.ZkLinks -> SP.Model -> Model
+initFull zkl zknote zklDict spm =
     let
         cells =
             zknote.content
@@ -520,7 +516,6 @@ initFull zk zkl zknote zklDict spm =
                 (mkCc cells)
     in
     { id = Just zknote.id
-    , zk = zk
     , zknSearchResult = zkl
     , zklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) zklDict.links)
     , initialZklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) zklDict.links)
@@ -536,8 +531,8 @@ initFull zk zkl zknote zklDict spm =
     }
 
 
-initNew : Data.Zk -> Data.ZkNoteSearchResult -> SP.Model -> Model
-initNew zk zkl spm =
+initNew : Data.ZkNoteSearchResult -> SP.Model -> Model
+initNew zkl spm =
     let
         cells =
             ""
@@ -549,7 +544,6 @@ initNew zk zkl spm =
                 (mkCc cells)
     in
     { id = Nothing
-    , zk = zk
     , zknSearchResult = zkl
     , zklDict = Dict.empty
     , initialZklDict = Dict.empty
@@ -565,8 +559,8 @@ initNew zk zkl spm =
     }
 
 
-initExample : Data.Zk -> Data.ZkNoteSearchResult -> SP.Model -> Model
-initExample zk zkl spm =
+initExample : Data.ZkNoteSearchResult -> SP.Model -> Model
+initExample zkl spm =
     let
         cells =
             markdownBody
@@ -578,7 +572,6 @@ initExample zk zkl spm =
                 (mkCc cells)
     in
     { id = Nothing
-    , zk = zk
     , zknSearchResult = zkl
     , zklDict = Dict.empty
     , initialZklDict = Dict.empty
@@ -608,14 +601,14 @@ replaceOrAdd items replacement compare mergef =
             [ replacement ]
 
 
-addListNote : Model -> Data.SaveZkNote -> Data.SavedZkNote -> Model
-addListNote model szn szkn =
+
+{-addListNote : Model -> Int -> Data.SaveZkNote -> Data.SavedZkNote -> Model
+addListNote model uid szn szkn =
     let
         zln =
             { id = szkn.id
+            , user = uid
             , title = szn.title
-            , zk = szn.zk
-            , public = szn.public
             , createdate = szkn.changeddate
             , changeddate = szkn.changeddate
             }
@@ -634,7 +627,7 @@ addListNote model szn szkn =
                    )
     }
 
-
+-}
 gotId : Model -> Int -> Model
 gotId model id =
     let
@@ -649,7 +642,7 @@ gotSelectedText : Model -> String -> ( Model, Command )
 gotSelectedText model s =
     let
         nmod =
-            initNew model.zk model.zknSearchResult model.spmodel
+            initNew model.zknSearchResult model.spmodel
     in
     ( { nmod | title = s }
     , if dirty model then

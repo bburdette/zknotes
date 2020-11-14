@@ -21,15 +21,13 @@ import Util exposing (Size)
 type alias Model =
     { tagSearchModel : TSP.Model
     , paginationModel : PP.Model
-    , zkid : Int
     }
 
 
-initModel : Int -> Model
-initModel zkid =
+initModel : Model
+initModel =
     { tagSearchModel = TSP.initModel
     , paginationModel = PP.initModel
-    , zkid = zkid
     }
 
 
@@ -44,7 +42,6 @@ getSearch model =
         |> Maybe.map
             (\s ->
                 { tagSearch = s
-                , zks = [ model.zkid ]
                 , offset = model.paginationModel.offset
                 , limit = Just model.paginationModel.increment
                 }
@@ -89,7 +86,6 @@ update msg model =
                     ( { model | tagSearchModel = nm, paginationModel = PP.initModel }
                     , Search <|
                         { tagSearch = ts
-                        , zks = [ model.zkid ]
                         , offset = model.paginationModel.offset
                         , limit = Just model.paginationModel.increment
                         }
@@ -110,7 +106,6 @@ update msg model =
                             ( { model | paginationModel = nm }
                             , Search
                                 { tagSearch = ts
-                                , zks = [ model.zkid ]
                                 , offset = nm.offset
                                 , limit = Just nm.increment
                                 }
