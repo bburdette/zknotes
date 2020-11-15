@@ -629,7 +629,7 @@ pub fn is_zknote_shared(
 
 pub fn is_zknote_public(conn: &Connection, zknoteid: i64) -> Result<bool, Box<dyn Error>> {
   let pubid: i64 = conn.query_row(
-    "select id from
+    "select zknote.id from
       zknote, user
       where zknote.title = \"public\"
       and user.name = \"system\"
@@ -641,8 +641,8 @@ pub fn is_zknote_public(conn: &Connection, zknoteid: i64) -> Result<bool, Box<dy
   match conn.query_row(
     "select count(*) from
       zklink, zknote R
-      where (zklinks.left = ?1 and zklinks.right = ?2)
-      or (zklinks.left = ?2  and zklinks.right = ?1)",
+      where (zklink.fromid = ?1 and zklink.toid = ?2)
+      or (zklink.fromid = ?2  and zklink.toid = ?1)",
     params![zknoteid, pubid],
     |row| {
       let i: i64 = row.get(0)?;
@@ -706,6 +706,7 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
   //   _ => {}
   // }
 
+  println!("read_zknote uid, id {:?}, {}", uid, id);
   let note = conn.query_row(
     "SELECT title, content, user, pubid, createdate, changeddate
       FROM zknote WHERE id = ?1",
@@ -722,6 +723,8 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
       })
     },
   )?;
+
+  println!("read_zknote {:?}", note);
 
   if uid == Some(note.user) {
     Ok(note)

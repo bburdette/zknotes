@@ -420,41 +420,57 @@ type alias NwState =
 notewait : NwState -> State -> Msg -> ( State, Cmd Msg )
 notewait nwstate state wmsg =
     let
+        _ =
+            Debug.log "notewait msg: " wmsg
+
         n =
             case wmsg of
                 UserReplyData (Ok (UI.ZkLinks zkl)) ->
-                    { nwstate | mbzklinks = Just zkl }
+                    Ok { nwstate | mbzklinks = Just zkl }
 
                 UserReplyData (Ok (UI.ZkNote zkn)) ->
-                    { nwstate | mbzknote = Just zkn }
+                    Ok { nwstate | mbzknote = Just zkn }
 
                 UserReplyData (Ok (UI.ZkNoteSearchResult zksr)) ->
-                    { nwstate | mbzknotesearchresult = Just zksr }
+                    Ok { nwstate | mbzknotesearchresult = Just zksr }
 
                 UserReplyData (Ok UI.SavedZkLinks) ->
-                    nwstate
+                    Ok nwstate
 
                 UserReplyData (Ok (UI.SavedZkNote _)) ->
-                    nwstate
+                    Ok nwstate
 
                 -- TODO error state for errors, error state for unexpected msgs.
-                -- UserReplyData (Err e) ->
-                --     BadError (BadError.initialModel <| Util.httpErrorString e) state
-                _ ->
-                    nwstate
-    in
-    case ( n.mbzknotesearchresult, n.mbzklinks, n.mbzknote ) of
-        ( Just zknl, Just zkl, Just zkn ) ->
-            let
-                st =
-                    EditZkNote (EditZkNote.initFull zknl zkn zkl n.spmodel) n.login
-            in
-            ( st
-            , Cmd.none
-            )
+                UserReplyData (Err e) ->
+                    Err (BadError (BadError.initialModel <| Util.httpErrorString e) state)
 
-        _ ->
-            ( Wait state (notewait n), Cmd.none )
+                _ ->
+                    Ok nwstate
+
+        mbf =
+            \mb -> Maybe.map (\_ -> True) mb |> Maybe.withDefault False
+    in
+    case n of
+        Ok nws ->
+            let
+                _ =
+                    Debug.log "nwstate: " ( mbf nws.mbzknotesearchresult, mbf nws.mbzklinks, mbf nws.mbzknote )
+            in
+            case ( nws.mbzknotesearchresult, nws.mbzklinks, nws.mbzknote ) of
+                ( Just zknl, Just zkl, Just zkn ) ->
+                    let
+                        st =
+                            EditZkNote (EditZkNote.initFull zknl zkn zkl nws.spmodel) nws.login
+                    in
+                    ( st
+                    , Cmd.none
+                    )
+
+                _ ->
+                    ( Wait state (notewait nws), Cmd.none )
+
+        Err es ->
+            ( es, Cmd.none )
 
 
 loadnote : Model -> NwState -> Int -> ( State, Cmd Msg )
@@ -1322,7 +1338,14 @@ actualupdate msg model =
                         (UI.GetZkNote id)
                     )
 
-                -- EditZkNoteListing.Done ->
+                EditZkNoteListing.Done ->
+                    ( { model | state = Login (Login.initialModel Nothing "zknotes" model.seed) }
+                    , Cmd.batch
+                        [ LS.storeLocalVal { name = "uid", value = "" }
+                        , LS.storeLocalVal { name = "pwd", value = "" }
+                        ]
+                    )
+
                 --     -- back to the Zk listing.
                 --     ( { model
                 --         | state =

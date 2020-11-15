@@ -59,11 +59,11 @@ pub fn build_sql(uid: i64, search: ZkNoteSearch) -> (String, Vec<String>) {
     (sqlbase, args)
   } else {
     // sqlbase.push_str(" and ");
-    // sqlbase.push_str(" where ");
-    // sqlbase.push_str(cls.as_str());
-    // sqlbase.push_str(limclause.as_str());
+    sqlbase.push_str(" where ");
+    sqlbase.push_str(cls.as_str());
+    sqlbase.push_str(limclause.as_str());
 
-    // args.append(&mut clsargs);
+    args.append(&mut clsargs);
 
     (sqlbase, args)
   }

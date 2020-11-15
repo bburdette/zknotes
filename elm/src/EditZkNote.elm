@@ -1,8 +1,9 @@
 module EditZkNote exposing
     ( Command(..)
     , Model
-    , Msg(..)
-    -- , addListNote
+    ,  Msg(..)
+       -- , addListNote
+
     , compareZklinks
     , dirty
     , gotId
@@ -519,7 +520,7 @@ initFull zkl zknote zklDict spm =
     , zknSearchResult = zkl
     , zklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) zklDict.links)
     , initialZklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) zklDict.links)
-    , public = zknote.public
+    , public = False
     , pubidtxt = zknote.pubid |> Maybe.withDefault ""
     , title = zknote.title
     , md = zknote.content
@@ -602,32 +603,34 @@ replaceOrAdd items replacement compare mergef =
 
 
 
-{-addListNote : Model -> Int -> Data.SaveZkNote -> Data.SavedZkNote -> Model
-addListNote model uid szn szkn =
-    let
-        zln =
-            { id = szkn.id
-            , user = uid
-            , title = szn.title
-            , createdate = szkn.changeddate
-            , changeddate = szkn.changeddate
-            }
-    in
-    { model
-        | zknSearchResult =
-            model.zknSearchResult
-                |> (\zsr ->
-                        { zsr
-                            | notes =
-                                replaceOrAdd model.zknSearchResult.notes
-                                    zln
-                                    (\a b -> a.id == b.id)
-                                    (\a b -> { b | createdate = a.createdate })
-                        }
-                   )
-    }
+{- addListNote : Model -> Int -> Data.SaveZkNote -> Data.SavedZkNote -> Model
+   addListNote model uid szn szkn =
+       let
+           zln =
+               { id = szkn.id
+               , user = uid
+               , title = szn.title
+               , createdate = szkn.changeddate
+               , changeddate = szkn.changeddate
+               }
+       in
+       { model
+           | zknSearchResult =
+               model.zknSearchResult
+                   |> (\zsr ->
+                           { zsr
+                               | notes =
+                                   replaceOrAdd model.zknSearchResult.notes
+                                       zln
+                                       (\a b -> a.id == b.id)
+                                       (\a b -> { b | createdate = a.createdate })
+                           }
+                      )
+       }
 
 -}
+
+
 gotId : Model -> Int -> Model
 gotId model id =
     let

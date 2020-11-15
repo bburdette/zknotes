@@ -34,7 +34,7 @@ type Command
     | View Int
     | New
     | Example
-      -- | Done
+    | Done
     | None
     | Search S.ZkNoteSearch
 
@@ -121,7 +121,7 @@ update msg model =
             ( model, New )
 
         DonePress ->
-            ( model, None )
+            ( model, Done )
 
         SPMsg m ->
             let

@@ -61,7 +61,8 @@ type alias ZkNote =
     , user : Int
     , title : String
     , content : String
-    , public : Bool
+
+    -- , public : Bool
     , pubid : Maybe String
     , createdate : Int
     , changeddate : Int
@@ -265,12 +266,12 @@ decodeSavedZkNote =
 
 decodeZkNote : JD.Decoder ZkNote
 decodeZkNote =
-    JD.map8 ZkNote
+    JD.map7 ZkNote
         (JD.field "id" JD.int)
         (JD.field "user" JD.int)
         (JD.field "title" JD.string)
         (JD.field "content" JD.string)
-        (JD.field "public" JD.bool)
+        -- (JD.field "public" JD.bool)
         (JD.field "pubid" (JD.maybe JD.string))
         (JD.field "createdate" JD.int)
         (JD.field "changeddate" JD.int)
