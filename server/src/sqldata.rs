@@ -345,6 +345,23 @@ pub fn udpate4(dbfile: &Path) -> Result<(), Box<dyn Error>> {
       types::index(vec!["fromid", "toid", "user"]).unique(true),
     );
   });
+  m1.create_table("usertemp", |t| {
+    t.add_column(
+      "id",
+      types::integer()
+        .primary(true)
+        .increments(true)
+        .nullable(false),
+    );
+    t.add_column("name", types::text().nullable(false).unique(true));
+    t.add_column("hashwd", types::text().nullable(false));
+    t.add_column("zknote", types::foreign("zknote", "id").nullable(true));
+    t.add_column("salt", types::text().nullable(false));
+    t.add_column("email", types::text().nullable(false));
+    t.add_column("registration_key", types::text().nullable(true));
+    t.add_column("createdate", types::integer().nullable(false));
+  });
+
   conn.execute_batch(m1.make::<Sqlite>().as_str())?;
 
   // only user 2 will keep their stuff!  that's me.
@@ -366,14 +383,40 @@ pub fn udpate4(dbfile: &Path) -> Result<(), Box<dyn Error>> {
     params![],
   )?;
 
+  // copy everything from user.
+  conn.execute(
+    "INSERT INTO usertemp (id, name, hashwd, salt, email, registration_key, createdate)
+        select id, name, hashwd, salt, email, registration_key, createdate from user",
+    params![],
+  )?;
+
   let mut m2 = Migration::new();
   // drop zknote.
   m2.drop_table("zknote");
   m2.drop_table("zkmember");
   m2.drop_table("zk");
   m2.drop_table("zklink");
+  m2.drop_table("user");
 
-  // new zknote with new column.
+  // new user table with new column, 'zknote'
+  m2.create_table("user", |t| {
+    t.add_column(
+      "id",
+      types::integer()
+        .primary(true)
+        .increments(true)
+        .nullable(false),
+    );
+    t.add_column("name", types::text().nullable(false).unique(true));
+    t.add_column("hashwd", types::text().nullable(false));
+    t.add_column("zknote", types::foreign("zknote", "id").nullable(true));
+    t.add_column("salt", types::text().nullable(false));
+    t.add_column("email", types::text().nullable(false));
+    t.add_column("registration_key", types::text().nullable(true));
+    t.add_column("createdate", types::integer().nullable(false));
+  });
+
+  // new zknote with column 'user' instead of 'zk'.
   m2.create_table("zknote", |t| {
     t.add_column(
       "id",
@@ -384,6 +427,7 @@ pub fn udpate4(dbfile: &Path) -> Result<(), Box<dyn Error>> {
     );
     t.add_column("title", types::text().nullable(false));
     t.add_column("content", types::text().nullable(false));
+    t.add_column("sysdata", types::text().nullable(true));
     // t.add_column("public", types::boolean().nullable(false));
     t.add_column("pubid", types::text().nullable(true).unique(true));
     t.add_column("user", types::foreign("user", "id").nullable(false));
@@ -391,6 +435,7 @@ pub fn udpate4(dbfile: &Path) -> Result<(), Box<dyn Error>> {
     t.add_column("changeddate", types::integer().nullable(false));
   });
 
+  // new zklink with column 'user' instead of 'zk'.
   m2.create_table("zklink", |t| {
     t.add_column("fromid", types::foreign("zknote", "id").nullable(false));
     t.add_column("toid", types::foreign("zknote", "id").nullable(false));
@@ -418,6 +463,13 @@ pub fn udpate4(dbfile: &Path) -> Result<(), Box<dyn Error>> {
     params![],
   )?;
 
+  // copy everything from usertemp.
+  conn.execute(
+    "INSERT INTO user (id, name, hashwd, salt, email, registration_key, createdate)
+        select id, name, hashwd, salt, email, registration_key, createdate from usertemp",
+    params![],
+  )?;
+
   let now = now()?;
 
   // create system user.
@@ -442,15 +494,35 @@ pub fn udpate4(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   )?;
 
   conn.execute(
-    "INSERT INTO zknote (title, content, pubid, user, createdate, changeddate)
-      VALUES ('search', '', null, ?1, ?2, ?3)",
+    "insert into zknote (title, content, pubid, user, createdate, changeddate)
+      values ('search', '', null, ?1, ?2, ?3)",
     params![sysid, now, now],
+  )?;
+
+  conn.execute(
+    "insert into zknote (title, content, pubid, user, createdate, changeddate)
+      values ('user', '', null, ?1, ?2, ?3)",
+    params![sysid, now, now],
+  )?;
+
+  // create user zknotes.
+  conn.execute(
+    "insert into zknote (sysdata, title, content, pubid, user, createdate, changeddate)
+       select id, name, '', null, ?1, ?2, ?3 from user",
+    params![sysid, now, now],
+  )?;
+
+  // ids of notes into user recs.
+  conn.execute(
+    "update user set zknote = (select id from zknote where title = user.name and zknote.user = ?1)",
+    params![sysid],
   )?;
 
   let mut m3 = Migration::new();
   // drop zknotetemp.
   m3.drop_table("zknotetemp");
   m3.drop_table("zklinktemp");
+  m3.drop_table("usertemp");
 
   conn.execute_batch(m3.make::<Sqlite>().as_str())?;
 
@@ -544,12 +616,54 @@ pub fn new_user(
 ) -> Result<i64, Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
 
+  let usernoteid = note_id(&conn, "system", "user")?;
+  let publicnoteid = note_id(&conn, "system", "public")?;
+  let systemid = user_id(&conn, "system")?;
+
   let now = now()?;
 
+  // make a corresponding note,
   conn.execute(
-    "INSERT INTO user (name, hashwd, salt, email, registration_key, createdate)
+    "INSERT INTO zknote (title, content, user, createdate, changeddate)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+    params![name, "", systemid, now, now],
+  )?;
+
+  let zknid = conn.last_insert_rowid();
+
+  // make a user record.
+  conn.execute(
+    "INSERT INTO user (name, zknote, hashwd, salt, email, registration_key, createdate)
       VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-    params![name, hashwd, salt, email, registration_key, now],
+    params![name, zknid, hashwd, salt, email, registration_key, now],
+  )?;
+
+  let uid = conn.last_insert_rowid();
+
+  conn.execute(
+    "update zknote set sysdata = ?1
+        where id = ?2",
+    params![systemid, uid.to_string().as_str()],
+  )?;
+
+  // indicate a 'user' record, and 'public'
+  save_zklink(&conn, zknid, usernoteid, systemid, None)?;
+  save_zklink(&conn, zknid, publicnoteid, systemid, None)?;
+
+  Ok(uid)
+}
+
+pub fn save_zklink(
+  conn: &Connection,
+  fromid: i64,
+  toid: i64,
+  user: i64,
+  linkzknote: Option<i64>,
+) -> Result<i64, Box<dyn Error>> {
+  conn.execute(
+    "INSERT INTO zklink (fromid, toid, user, linkzknote) values (?1, ?2, ?3, ?4)
+      ON CONFLICT (fromid, toid, user) DO UPDATE SET linkzknote = ?4 where fromid = ?1 and toid = ?2 and user = ?3",
+    params![fromid, toid, user, linkzknote],
   )?;
 
   Ok(conn.last_insert_rowid())
@@ -596,12 +710,45 @@ pub fn update_user(dbfile: &Path, user: &User) -> Result<(), Box<dyn Error>> {
   Ok(())
 }
 
+pub fn note_id(conn: &Connection, name: &str, title: &str) -> Result<i64, Box<dyn Error>> {
+  let id: i64 = conn.query_row(
+    "select id from
+      zknote, user
+      where zknote.title = ?2
+      and user.name = ?1
+      and zknote.user = user.id",
+    params![name, title],
+    |row| Ok(row.get(0)?),
+  )?;
+  Ok(id)
+}
+
+pub fn user_id(conn: &Connection, name: &str) -> Result<i64, Box<dyn Error>> {
+  let id: i64 = conn.query_row(
+    "select id from user
+      and user.name = ?1",
+    params![name],
+    |row| Ok(row.get(0)?),
+  )?;
+  Ok(id)
+}
+
 pub fn is_zknote_shared(
   conn: &Connection,
   uid: i64,
   zknoteid: i64,
 ) -> Result<bool, Box<dyn Error>> {
   Ok(false)
+
+  /* shared means there is:
+   * a note linked to this note.
+   * that note is linked to system:share
+   * that note is also linked to system:user:this-user
+   *
+
+
+  */
+
   // let shareid = match conn.query_row(
   //   "select id from
   //     zknote, user
