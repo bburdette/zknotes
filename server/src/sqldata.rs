@@ -1,7 +1,7 @@
 use barrel::backend::Sqlite;
 use barrel::{types, Migration};
-use data;
 use rusqlite::{params, Connection};
+use search;
 use std::convert::TryInto;
 use std::error::Error;
 use std::path::Path;
@@ -988,11 +988,11 @@ pub fn delete_zknote(dbfile: &Path, uid: i64, noteid: i64) -> Result<(), Box<dyn
 pub fn search_zknotes(
   dbfile: &Path,
   user: i64,
-  search: &data::ZkNoteSearch,
+  search: &search::ZkNoteSearch,
 ) -> rusqlite::Result<ZkNoteSearchResult> {
   let conn = connection_open(dbfile)?;
 
-  let (sql, args) = data::build_sql(user, search.clone());
+  let (sql, args) = search::build_sql(user, search.clone());
 
   println!("sql, args: {}, \n{:?}", sql, args);
 

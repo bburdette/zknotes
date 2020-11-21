@@ -26,6 +26,7 @@ pub enum SearchMod {
   ExactMatch,
   Tag,
   Note,
+  User,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -75,12 +76,14 @@ fn build_sql_clause(not: bool, search: TagSearch) -> (String, Vec<String>) {
       let mut exact = false;
       let mut tag = false;
       let mut desc = false;
+      let mut user = false;
 
       for m in mods {
         match m {
           SearchMod::ExactMatch => exact = true,
           SearchMod::Tag => tag = true,
           SearchMod::Note => desc = true,
+          SearchMod::User => user = true,
         }
       }
       let field = if desc { "content" } else { "title" };

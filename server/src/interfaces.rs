@@ -1,7 +1,7 @@
 use config::Config;
 use crypto_hash::{hex_digest, Algorithm};
-use data;
 use email;
+use search;
 use serde_json::Value;
 use simple_error;
 use sqldata;
@@ -231,7 +231,7 @@ fn user_interface_loggedin(
     }
     "searchzknotes" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let search: data::ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
+      let search: search::ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
       let res = sqldata::search_zknotes(Path::new(&config.db), uid, &search)?;
       Ok(ServerResponse {
         what: "zknotesearchresult".to_string(),
