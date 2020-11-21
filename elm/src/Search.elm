@@ -49,6 +49,7 @@ type SearchMod
     = ExactMatch
     | Tag
     | Note
+    | User
 
 
 type TagSearch
@@ -78,6 +79,9 @@ encodeSearchMod smod =
 
         Note ->
             JE.string "Note"
+
+        User ->
+            JE.string "User"
 
 
 encodeTagSearch : TagSearch -> JE.Value
@@ -147,6 +151,9 @@ showSearchMod mod =
         Note ->
             "Note"
 
+        User ->
+            "User"
+
 
 showAndOr : AndOr -> String
 showAndOr ao =
@@ -183,6 +190,9 @@ printSearchMod mod =
         Note ->
             "n"
 
+        User ->
+            "u"
+
 
 printAndOr : AndOr -> String
 printAndOr ao =
@@ -216,6 +226,8 @@ searchMod =
             |. symbol "t"
         , succeed Note
             |. symbol "n"
+        , succeed User
+            |. symbol "u"
         ]
 
 

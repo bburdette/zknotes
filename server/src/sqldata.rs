@@ -719,7 +719,7 @@ pub fn note_id(conn: &Connection, name: &str, title: &str) -> Result<i64, Box<dy
 pub fn user_id(conn: &Connection, name: &str) -> Result<i64, Box<dyn Error>> {
   let id: i64 = conn.query_row(
     "select id from user
-      and user.name = ?1",
+      where user.name = ?1",
     params![name],
     |row| Ok(row.get(0)?),
   )?;

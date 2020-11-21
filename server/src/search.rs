@@ -1,5 +1,6 @@
 use rusqlite::{params, Connection};
-use sqldata::{connection_open, ZkListNote};
+use sqldata::{connection_open, user_id, ZkListNote};
+use std::error::Error;
 use std::path::Path;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -46,13 +47,11 @@ pub struct ZkNoteSearchResult {
 }
 
 pub fn search_zknotes(
-  dbfile: &Path,
+  conn: &Connection,
   user: i64,
   search: &ZkNoteSearch,
-) -> rusqlite::Result<ZkNoteSearchResult> {
-  let conn = connection_open(dbfile)?;
-
-  let (sql, args) = build_sql(&conn, user, search.clone());
+) -> Result<ZkNoteSearchResult, Box<dyn Error>> {
+  let (sql, args) = build_sql(&conn, user, search.clone())?;
 
   println!("sql, args: {}, \n{:?}", sql, args);
 
@@ -85,8 +84,14 @@ pub fn search_zknotes(
   })
 }
 
-pub fn build_sql(conn: &Connection, uid: i64, search: ZkNoteSearch) -> (String, Vec<String>) {
-  let (cls, mut clsargs) = build_sql_clause(false, search.tagsearch);
+pub fn build_sql(
+  conn: &Connection,
+  uid: i64,
+  search: ZkNoteSearch,
+) -> Result<(String, Vec<String>), Box<dyn Error>> {
+  println!("pref builds");
+  let (cls, mut clsargs) = build_sql_clause(&conn, uid, false, search.tagsearch)?;
+  println!("post builds");
 
   // let zklist = format!("{:?}", search.zks)
   //   .replace("[", "(")
@@ -107,7 +112,7 @@ pub fn build_sql(conn: &Connection, uid: i64, search: ZkNoteSearch) -> (String, 
   if clsargs.is_empty() {
     sqlbase.push_str(limclause.as_str());
 
-    (sqlbase, args)
+    Ok((sqlbase, args))
   } else {
     // sqlbase.push_str(" and ");
     sqlbase.push_str(" where ");
@@ -116,12 +121,17 @@ pub fn build_sql(conn: &Connection, uid: i64, search: ZkNoteSearch) -> (String, 
 
     args.append(&mut clsargs);
 
-    (sqlbase, args)
+    Ok((sqlbase, args))
   }
 }
 
-fn build_sql_clause(not: bool, search: TagSearch) -> (String, Vec<String>) {
-  match search {
+fn build_sql_clause(
+  conn: &Connection,
+  uid: i64,
+  not: bool,
+  search: TagSearch,
+) -> Result<(String, Vec<String>), Box<dyn Error>> {
+  let (cls, args) = match search {
     TagSearch::SearchTerm { mods, term } => {
       let mut exact = false;
       let mut tag = false;
@@ -144,7 +154,13 @@ fn build_sql_clause(not: bool, search: TagSearch) -> (String, Vec<String>) {
         (false, true) => "",
       };
 
-      if tag {
+      if user {
+        let user = user_id(conn, &term)?;
+        (
+          format!("zknote.user {}= ?", notstr),
+          vec![format!("{}", user)],
+        )
+      } else if tag {
         let clause = if exact {
           format!("{} {}= ?", field, notstr)
         } else {
@@ -152,6 +168,7 @@ fn build_sql_clause(not: bool, search: TagSearch) -> (String, Vec<String>) {
         };
 
         (
+          // clause
           format!(
             "(0 < (select count(zkn.id) from zknote as zkn, zklink
              where zkn.id = zklink.fromid
@@ -164,6 +181,7 @@ fn build_sql_clause(not: bool, search: TagSearch) -> (String, Vec<String>) {
                and {}))",
             clause, clause
           ),
+          // args
           if exact {
             vec![term.clone(), term]
           } else {
@@ -175,11 +193,13 @@ fn build_sql_clause(not: bool, search: TagSearch) -> (String, Vec<String>) {
         )
       } else {
         (
+          // clause
           if exact {
             format!("{} {}= ?", field, notstr)
           } else {
             format!("{} {} like ?", field, notstr)
           },
+          // args
           if exact {
             vec![term]
           } else {
@@ -188,10 +208,10 @@ fn build_sql_clause(not: bool, search: TagSearch) -> (String, Vec<String>) {
         )
       }
     }
-    TagSearch::Not { ts } => build_sql_clause(true, *ts),
+    TagSearch::Not { ts } => build_sql_clause(&conn, uid, true, *ts)?,
     TagSearch::Boolex { ts1, ao, ts2 } => {
-      let (cl1, mut arg1) = build_sql_clause(false, *ts1);
-      let (cl2, mut arg2) = build_sql_clause(false, *ts2);
+      let (cl1, mut arg1) = build_sql_clause(&conn, uid, false, *ts1)?;
+      let (cl2, mut arg2) = build_sql_clause(&conn, uid, false, *ts2)?;
       let mut cls = String::new();
       let conj = match ao {
         AndOr::Or => " or ",
@@ -205,5 +225,6 @@ fn build_sql_clause(not: bool, search: TagSearch) -> (String, Vec<String>) {
       arg1.append(&mut arg2);
       (cls, arg1)
     }
-  }
+  };
+  Ok((cls, args))
 }

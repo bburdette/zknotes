@@ -222,7 +222,7 @@ fn user_interface_loggedin(
     "getzknoteedit" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let gzne: sqldata::GetZkNoteEdit = serde_json::from_value(msgdata.clone())?;
-      let conn = sqldata::connection_open(Path::new(&config.db))?;
+      let conn = sqldata::connection_open(config.db.as_path())?;
       let note = sqldata::read_zknoteedit(&conn, uid, &gzne)?;
       Ok(ServerResponse {
         what: "zknoteedit".to_string(),
@@ -232,7 +232,8 @@ fn user_interface_loggedin(
     "searchzknotes" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let search: search::ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
-      let res = search::search_zknotes(Path::new(&config.db), uid, &search)?;
+      let conn = sqldata::connection_open(config.db.as_path())?;
+      let res = search::search_zknotes(&conn, uid, &search)?;
       Ok(ServerResponse {
         what: "zknotesearchresult".to_string(),
         content: serde_json::to_value(res)?,
