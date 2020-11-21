@@ -1,3 +1,7 @@
+use rusqlite::{params, Connection};
+use sqldata::{connection_open, ZkListNote};
+use std::path::Path;
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ZkNoteSearch {
   pub tagsearch: TagSearch,
@@ -35,7 +39,53 @@ pub enum AndOr {
   Or,
 }
 
-pub fn build_sql(uid: i64, search: ZkNoteSearch) -> (String, Vec<String>) {
+#[derive(Serialize, Debug, Clone)]
+pub struct ZkNoteSearchResult {
+  notes: Vec<ZkListNote>,
+  offset: i64,
+}
+
+pub fn search_zknotes(
+  dbfile: &Path,
+  user: i64,
+  search: &ZkNoteSearch,
+) -> rusqlite::Result<ZkNoteSearchResult> {
+  let conn = connection_open(dbfile)?;
+
+  let (sql, args) = build_sql(&conn, user, search.clone());
+
+  println!("sql, args: {}, \n{:?}", sql, args);
+
+  let mut pstmt = conn.prepare(sql.as_str())?;
+
+  let rec_iter = pstmt.query_map(args.as_slice(), |row| {
+    Ok(ZkListNote {
+      id: row.get(0)?,
+      title: row.get(1)?,
+      user: row.get(2)?,
+      createdate: row.get(3)?,
+      changeddate: row.get(4)?,
+    })
+  })?;
+
+  let mut pv = Vec::new();
+
+  for rsrec in rec_iter {
+    match rsrec {
+      Ok(rec) => {
+        pv.push(rec);
+      }
+      Err(_) => (),
+    }
+  }
+
+  Ok(ZkNoteSearchResult {
+    notes: pv,
+    offset: search.offset,
+  })
+}
+
+pub fn build_sql(conn: &Connection, uid: i64, search: ZkNoteSearch) -> (String, Vec<String>) {
   let (cls, mut clsargs) = build_sql_clause(false, search.tagsearch);
 
   // let zklist = format!("{:?}", search.zks)

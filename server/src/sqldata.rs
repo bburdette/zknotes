@@ -1,7 +1,6 @@
 use barrel::backend::Sqlite;
 use barrel::{types, Migration};
 use rusqlite::{params, Connection};
-use search;
 use std::convert::TryInto;
 use std::error::Error;
 use std::path::Path;
@@ -44,17 +43,11 @@ pub struct SaveZk {
 */
 #[derive(Serialize, Debug, Clone)]
 pub struct ZkListNote {
-  id: i64,
-  title: String,
-  user: i64,
-  createdate: i64,
-  changeddate: i64,
-}
-
-#[derive(Serialize, Debug, Clone)]
-pub struct ZkNoteSearchResult {
-  notes: Vec<ZkListNote>,
-  offset: i64,
+  pub id: i64,
+  pub title: String,
+  pub user: i64,
+  pub createdate: i64,
+  pub changeddate: i64,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -985,45 +978,6 @@ pub fn delete_zknote(dbfile: &Path, uid: i64, noteid: i64) -> Result<(), Box<dyn
   Ok(pv)
 }
 */
-pub fn search_zknotes(
-  dbfile: &Path,
-  user: i64,
-  search: &search::ZkNoteSearch,
-) -> rusqlite::Result<ZkNoteSearchResult> {
-  let conn = connection_open(dbfile)?;
-
-  let (sql, args) = search::build_sql(user, search.clone());
-
-  println!("sql, args: {}, \n{:?}", sql, args);
-
-  let mut pstmt = conn.prepare(sql.as_str())?;
-
-  let rec_iter = pstmt.query_map(args.as_slice(), |row| {
-    Ok(ZkListNote {
-      id: row.get(0)?,
-      title: row.get(1)?,
-      user: row.get(2)?,
-      createdate: row.get(3)?,
-      changeddate: row.get(4)?,
-    })
-  })?;
-
-  let mut pv = Vec::new();
-
-  for rsrec in rec_iter {
-    match rsrec {
-      Ok(rec) => {
-        pv.push(rec);
-      }
-      Err(_) => (),
-    }
-  }
-
-  Ok(ZkNoteSearchResult {
-    notes: pv,
-    offset: search.offset,
-  })
-}
 
 pub fn save_zklinks(dbfile: &Path, uid: i64, zklinks: Vec<ZkLink>) -> Result<(), Box<dyn Error>> {
   let conn = connection_open(dbfile)?;

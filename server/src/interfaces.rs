@@ -232,7 +232,7 @@ fn user_interface_loggedin(
     "searchzknotes" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let search: search::ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
-      let res = sqldata::search_zknotes(Path::new(&config.db), uid, &search)?;
+      let res = search::search_zknotes(Path::new(&config.db), uid, &search)?;
       Ok(ServerResponse {
         what: "zknotesearchresult".to_string(),
         content: serde_json::to_value(res)?,
