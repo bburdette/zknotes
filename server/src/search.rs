@@ -147,30 +147,36 @@ fn build_sql_clause(
         }
       }
       let field = if desc { "content" } else { "title" };
-      let notstr = match (not, exact) {
-        (true, false) => "not",
-        (false, false) => "",
-        (true, true) => "!",
-        (false, true) => "",
-      };
 
       if user {
         let user = user_id(conn, &term)?;
+        let notstr = match not {
+          true => "!",
+          false => "",
+        };
         (
           format!("zknote.user {}= ?", notstr),
           vec![format!("{}", user)],
         )
-      } else if tag {
-        let clause = if exact {
-          format!("{} {}= ?", field, notstr)
-        } else {
-          format!("{} {} like ?", field, notstr)
+      } else {
+        let notstr = match (not, exact) {
+          (true, false) => "not",
+          (false, false) => "",
+          (true, true) => "!",
+          (false, true) => "",
         };
 
-        (
-          // clause
-          format!(
-            "(0 < (select count(zkn.id) from zknote as zkn, zklink
+        if tag {
+          let clause = if exact {
+            format!("{} {}= ?", field, notstr)
+          } else {
+            format!("{} {} like ?", field, notstr)
+          };
+
+          (
+            // clause
+            format!(
+              "(0 < (select count(zkn.id) from zknote as zkn, zklink
              where zkn.id = zklink.fromid
                and zklink.toid = zknote.id
                and {})
@@ -179,33 +185,34 @@ fn build_sql_clause(
              where zkn.id = zklink.toid
                and zklink.fromid = zknote.id
                and {}))",
-            clause, clause
-          ),
-          // args
-          if exact {
-            vec![term.clone(), term]
-          } else {
-            vec![
-              format!("%{}%", term).to_string(),
-              format!("%{}%", term).to_string(),
-            ]
-          },
-        )
-      } else {
-        (
-          // clause
-          if exact {
-            format!("{} {}= ?", field, notstr)
-          } else {
-            format!("{} {} like ?", field, notstr)
-          },
-          // args
-          if exact {
-            vec![term]
-          } else {
-            vec![format!("%{}%", term).to_string()]
-          },
-        )
+              clause, clause
+            ),
+            // args
+            if exact {
+              vec![term.clone(), term]
+            } else {
+              vec![
+                format!("%{}%", term).to_string(),
+                format!("%{}%", term).to_string(),
+              ]
+            },
+          )
+        } else {
+          (
+            // clause
+            if exact {
+              format!("{} {}= ?", field, notstr)
+            } else {
+              format!("{} {} like ?", field, notstr)
+            },
+            // args
+            if exact {
+              vec![term]
+            } else {
+              vec![format!("%{}%", term).to_string()]
+            },
+          )
+        }
       }
     }
     TagSearch::Not { ts } => build_sql_clause(&conn, uid, true, *ts)?,

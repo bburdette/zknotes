@@ -480,6 +480,8 @@ pub fn udpate4(dbfile: &Path) -> Result<(), Box<dyn Error>> {
     params![sysid, now, now],
   )?;
 
+  let publicid = conn.last_insert_rowid();
+
   conn.execute(
     "INSERT INTO zknote (title, content, pubid, user, createdate, changeddate)
       VALUES ('share', '', null, ?1, ?2, ?3)",
@@ -509,6 +511,14 @@ pub fn udpate4(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   conn.execute(
     "update user set zknote = (select id from zknote where title = user.name and zknote.user = ?1)",
     params![sysid],
+  )?;
+
+  // link system recs to public.
+  conn.execute(
+    "insert into zklink (fromid, toid, user)
+     select id, ?1, ?2 from
+      zknote where zknote.user = ?2",
+    params![publicid, sysid],
   )?;
 
   let mut m3 = Migration::new();
