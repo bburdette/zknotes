@@ -60,7 +60,6 @@ pub struct SavedZkNote {
 pub struct SaveZkNote {
   id: Option<i64>,
   title: String,
-  public: bool,
   pubid: Option<String>,
   content: String,
 }
@@ -836,7 +835,7 @@ pub fn save_zknote(
       conn.execute(
         "INSERT INTO zknote (title, content, user, pubid, createdate, changeddate)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        params![note.title, note.content, uid, note.public, note.pubid, now],
+        params![note.title, note.content, uid, note.pubid, now, now],
       )?;
       Ok(SavedZkNote {
         id: conn.last_insert_rowid(),
