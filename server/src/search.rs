@@ -1,5 +1,5 @@
 use rusqlite::{params, Connection};
-use sqldata::{connection_open, user_id, ZkListNote};
+use sqldata::{connection_open, note_id, user_id, ZkListNote};
 use std::error::Error;
 use std::path::Path;
 
@@ -97,32 +97,56 @@ pub fn build_sql(
   //   .replace("[", "(")
   //   .replace("]", ")");
 
+  let publicid = note_id(&conn, "system", "public")?;
+
   let limclause = match search.limit {
     Some(lm) => format!(" limit {} offset {}", lm, search.offset),
     None => format!(" offset {}", search.offset),
   };
 
+  // notes that are mine.
   let mut sqlbase = format!(
     "SELECT id, title, user, createdate, changeddate
-      FROM zknote "
+      FROM zknote N where N.user = ?"
   );
-  // let mut args = vec![uid.to_string()];
-  let mut args = vec![];
+  let mut baseargs = vec![uid.to_string()];
+  // notes that are public, and not mine.
+  let mut sqlpub = format!(
+    "SELECT N.id, N.title, N.user, N.createdate, N.changeddate
+      FROM zknote N, zklink L
+      where N.user != ? and L.fromid = N.id and L.toid = ?"
+  );
+  let mut pubargs = vec![uid.to_string(), publicid.to_string()];
 
-  if clsargs.is_empty() {
-    sqlbase.push_str(limclause.as_str());
+  // local ftn to add clause and args.
+  let mut addcls = |sql: &mut String, args: &mut Vec<String>| {
+    if !args.is_empty() {
+      sql.push_str(" and ");
+      sql.push_str(cls.as_str());
 
-    Ok((sqlbase, args))
-  } else {
-    // sqlbase.push_str(" and ");
-    sqlbase.push_str(" where ");
-    sqlbase.push_str(cls.as_str());
-    sqlbase.push_str(limclause.as_str());
+      // clone, otherwise no clause vals next time!
+      let mut pendargs = clsargs.clone();
+      args.append(&mut pendargs);
+    }
+  };
 
-    args.append(&mut clsargs);
+  //
+  addcls(&mut sqlbase, &mut baseargs);
+  addcls(&mut sqlpub, &mut pubargs);
 
-    Ok((sqlbase, args))
-  }
+  // combine the queries.
+  sqlbase.push_str(" union ");
+  sqlbase.push_str(sqlpub.as_str());
+
+  baseargs.append(&mut pubargs);
+
+  // add limit clause to the end.
+  sqlbase.push_str(limclause.as_str());
+
+  println!("sqlbase: {}", sqlbase);
+  println!("baseargs: {:?}", baseargs);
+
+  Ok((sqlbase, baseargs))
 }
 
 fn build_sql_clause(
@@ -154,10 +178,7 @@ fn build_sql_clause(
           true => "!",
           false => "",
         };
-        (
-          format!("zknote.user {}= ?", notstr),
-          vec![format!("{}", user)],
-        )
+        (format!("N.user {}= ?", notstr), vec![format!("{}", user)])
       } else {
         let notstr = match (not, exact) {
           (true, false) => "not",
@@ -168,9 +189,9 @@ fn build_sql_clause(
 
         if tag {
           let clause = if exact {
-            format!("{} {}= ?", field, notstr)
+            format!("N.{} {}= ?", field, notstr)
           } else {
-            format!("{} {} like ?", field, notstr)
+            format!("N.{} {} like ?", field, notstr)
           };
 
           (
@@ -201,9 +222,9 @@ fn build_sql_clause(
           (
             // clause
             if exact {
-              format!("{} {}= ?", field, notstr)
+              format!("N.{} {}= ?", field, notstr)
             } else {
-              format!("{} {} like ?", field, notstr)
+              format!("N.{} {} like ?", field, notstr)
             },
             // args
             if exact {

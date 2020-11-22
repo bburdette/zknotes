@@ -714,7 +714,7 @@ pub fn update_user(dbfile: &Path, user: &User) -> Result<(), Box<dyn Error>> {
 
 pub fn note_id(conn: &Connection, name: &str, title: &str) -> Result<i64, Box<dyn Error>> {
   let id: i64 = conn.query_row(
-    "select id from
+    "select zknote.id from
       zknote, user
       where zknote.title = ?2
       and user.name = ?1
