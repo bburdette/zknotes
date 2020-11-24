@@ -166,8 +166,8 @@ dirty model =
         |> Maybe.withDefault True
 
 
-showZkl : List (E.Attribute Msg) -> Maybe Int -> Data.ZkLink -> Element Msg
-showZkl dirtybutton id zkl =
+showZkl : List (E.Attribute Msg) -> Int -> Maybe Int -> Data.ZkLink -> Element Msg
+showZkl dirtybutton user id zkl =
     let
         ( dir, otherid ) =
             case ( Just zkl.from == id, Just zkl.to == id ) of
@@ -205,10 +205,17 @@ showZkl dirtybutton id zkl =
             { onPress = Just (MdLink zkl)
             , label = E.text "^"
             }
-        , EI.button (Common.buttonStyle ++ [ E.alignRight ])
-            { onPress = Just (RemoveLink zkl)
-            , label = E.text "X"
-            }
+        , if user == zkl.user then
+            EI.button (Common.buttonStyle ++ [ E.alignRight ])
+                { onPress = Just (RemoveLink zkl)
+                , label = E.text "X"
+                }
+
+          else
+            EI.button (Common.buttonStyle ++ [ E.alignRight, EBk.color TC.darkGray ])
+                { onPress = Nothing
+                , label = E.text "X"
+                }
         ]
 
 
@@ -295,7 +302,7 @@ zknview size model =
                     -- show the links.
                     :: E.row [ Font.bold ] [ E.text "links" ]
                     :: List.map
-                        (showZkl dirtybutton model.id)
+                        (showZkl dirtybutton model.user model.id)
                         (Dict.values model.zklDict)
                 )
 
