@@ -74,6 +74,7 @@ type Msg
     | SPMsg SP.Msg
     | NavChoiceChanged NavChoice
     | DialogMsg D.Msg
+    | Noop String
 
 
 type NavChoice
@@ -85,6 +86,7 @@ type NavChoice
 type alias Model =
     { id : Maybe Int
     , user : Int
+    , noteUser : Int
     , zknSearchResult : Data.ZkNoteSearchResult
     , zklDict : Dict String Data.ZkLink
     , public : Bool
@@ -273,6 +275,11 @@ zknview size model =
             else
                 Common.buttonStyle
 
+        nonme =
+            Debug.log "nonme" <|
+                model.user
+                    /= model.noteUser
+
         mdedit =
             E.column
                 [ E.spacing 8
@@ -290,10 +297,20 @@ zknview size model =
                     )
                 ]
                 (EI.multiline
-                    [ E.htmlAttribute (Html.Attributes.id "mdtext")
+                    [ if nonme then
+                        Font.color TC.darkGrey
+
+                      else
+                        Font.color TC.black
+                    , E.htmlAttribute (Html.Attributes.id "mdtext")
                     , E.alignTop
                     ]
-                    { onChange = OnMarkdownInput
+                    { onChange =
+                        if nonme then
+                            Noop
+
+                        else
+                            OnMarkdownInput
                     , text = model.md
                     , placeholder = Nothing
                     , label = EI.labelHidden "Markdown input"
@@ -470,7 +487,13 @@ zknview size model =
                             )
                             NavChoiceChanged
                             [ ( NcView, "view" )
-                            , ( NcEdit, "edit" )
+                            , ( NcEdit
+                              , if nonme then
+                                    "markdown"
+
+                                else
+                                    "edit"
+                              )
                             ]
                         , case model.navchoice of
                             NcEdit ->
@@ -491,7 +514,13 @@ zknview size model =
                         model.navchoice
                         NavChoiceChanged
                         [ ( NcView, "view" )
-                        , ( NcEdit, "edit" )
+                        , ( NcEdit
+                          , if nonme then
+                                "markdown"
+
+                            else
+                                "edit"
+                          )
                         , ( NcSearch, "search" )
                         ]
                     , case model.navchoice of
@@ -526,6 +555,7 @@ initFull user zkl zknote zklDict spm =
     in
     { id = Just zknote.id
     , user = user
+    , noteUser = zknote.user
     , zknSearchResult = zkl
     , zklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) zklDict.links)
     , initialZklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) zklDict.links)
@@ -555,6 +585,7 @@ initNew user zkl spm =
     in
     { id = Nothing
     , user = user
+    , noteUser = user
     , zknSearchResult = zkl
     , zklDict = Dict.empty
     , initialZklDict = Dict.empty
@@ -584,6 +615,7 @@ initExample user zkl spm =
     in
     { id = Nothing
     , user = user
+    , noteUser = user
     , zknSearchResult = zkl
     , zklDict = Dict.empty
     , initialZklDict = Dict.empty
@@ -942,3 +974,6 @@ update msg model =
 
         NavChoiceChanged nc ->
             ( { model | navchoice = nc }, None )
+
+        Noop _ ->
+            ( model, None )
