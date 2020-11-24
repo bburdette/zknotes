@@ -5,13 +5,22 @@ import Json.Encode as JE
 import Search as S
 
 
-type alias Login =
+type alias LoggedIn =
     { uid : String
     , pwd : String
+    , id : Int
+    }
+
+
+type alias Login a =
+    { a
+        | uid : String
+        , pwd : String
     }
 
 
 
+--
 {- type alias Zk =
        { id : Int
        , name : String
@@ -80,6 +89,7 @@ type alias SaveZkNote =
 type alias ZkLink =
     { from : Int
     , to : Int
+    , user : Int
     , zknote : Maybe Int
     , fromname : Maybe String
     , toname : Maybe String
@@ -152,6 +162,7 @@ encodeZkLink zklink =
     JE.object <|
         [ ( "from", JE.int zklink.from )
         , ( "to", JE.int zklink.to )
+        , ( "user", JE.int zklink.user )
         ]
             ++ (zklink.delete
                     |> Maybe.map (\b -> [ ( "delete", JE.bool b ) ])
@@ -169,9 +180,10 @@ encodeZkLink zklink =
 
 decodeZkLink : JD.Decoder ZkLink
 decodeZkLink =
-    JD.map6 ZkLink
+    JD.map7 ZkLink
         (JD.field "from" JD.int)
         (JD.field "to" JD.int)
+        (JD.field "user" JD.int)
         (JD.maybe (JD.field "linkzknote" JD.int))
         (JD.maybe (JD.field "fromname" JD.string))
         (JD.maybe (JD.field "toname" JD.string))

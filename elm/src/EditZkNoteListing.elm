@@ -24,7 +24,8 @@ type Msg
 
 
 type alias Model =
-    { notes : Data.ZkNoteSearchResult
+    { uid : Int
+    , notes : Data.ZkNoteSearchResult
     , spmodel : SP.Model
     }
 
@@ -86,9 +87,17 @@ view size model =
                   , view =
                         \n ->
                             E.row [ E.spacing 8 ]
-                                [ EI.button Common.buttonStyle { onPress = Just (SelectPress n.id), label = E.text "edit" }
+                                [ if n.user == model.uid then
+                                    EI.button Common.buttonStyle { onPress = Just (SelectPress n.id), label = E.text "edit" }
 
-                                -- , EI.button Common.buttonStyle { onPress = Just (ViewPress n.id), label = E.text "view" }
+                                  else
+                                    EI.button
+                                        (Common.buttonStyle
+                                            ++ [ EBk.color TC.darkGray
+                                               ]
+                                        )
+                                        { onPress = Just (ViewPress n.id), label = E.text "view" }
+
                                 -- , E.link [ Font.color TC.darkBlue, Font.underline ] { url = "note/" ++ String.fromInt n.id, label = E.text "link" }
                                 -- , if n.public then
                                 --     E.text "public"

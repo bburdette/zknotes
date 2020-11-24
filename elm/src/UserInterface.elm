@@ -30,7 +30,7 @@ type ServerResponse
     | UserExists
     | UnregisteredUser
     | InvalidUserOrPwd
-    | LoggedIn 
+    | LoggedIn Int
     | ZkNoteSearchResult Data.ZkNoteSearchResult
       -- | ZkListing (List Data.Zk)
       -- | SavedZk Int
@@ -200,8 +200,7 @@ serverResponseDecoder =
                     JD.succeed UserExists
 
                 "logged in" ->
-                    JD.succeed LoggedIn 
-                    -- JD.map LoggedIn (JD.at [ "content" ] JD.int)
+                    JD.map LoggedIn (JD.at [ "content" ] JD.int)
 
                 "invalid user or pwd" ->
                     JD.succeed InvalidUserOrPwd

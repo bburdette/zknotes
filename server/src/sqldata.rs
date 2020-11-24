@@ -68,8 +68,9 @@ pub struct SaveZkNote {
 pub struct ZkLink {
   from: i64,
   to: i64,
-  delete: Option<bool>,
+  user: i64,
   linkzknote: Option<i64>,
+  delete: Option<bool>,
   fromname: Option<String>,
   toname: Option<String>,
 }
@@ -1022,23 +1023,50 @@ pub fn read_zklinks(
   //   bail!("can't read_zklinks; user is not a member of this zk");
   // }
 
+  // either zklinks that are mine, or
+  // zklinks where both endpoints are
+  // 	(public or mine)
+  // 	  public: zknote links to public.
+  //
+  let pubid = note_id(&conn, "system", "public")?;
+
   let mut pstmt = conn.prepare(
-    "SELECT fromid, toid, linkzknote, L.title, R.title
-      FROM zklink 
-      INNER JOIN zknote as L ON zklink.fromid = L.id
-      INNER JOIN zknote as R ON zklink.toid = R.id
-      where zklink.user = ?1 and (zklink.fromid = ?2 or zklink.toid = ?2)
+    // zklinks that are mine.
+    // not-mine zklinks with from = this note and toid = note that ISA public.
+    // not-mine zlinks with from = note that is public, and to = this.
+    "SELECT A.fromid, A.toid, A.user, A.linkzknote, L.title, R.title
+      FROM zklink A
+      INNER JOIN zknote as L ON A.fromid = L.id
+      INNER JOIN zknote as R ON A.toid = R.id
+      where A.user = ?1 and (A.fromid = ?2 or A.toid = ?2)
+      union
+    SELECT A.fromid, A.toid, A.user, A.linkzknote, L.title, R.title
+      FROM zklink A, zklink B
+      INNER JOIN zknote as L ON A.fromid = L.id
+      INNER JOIN zknote as R ON A.toid = R.id
+      where A.user != ?1 and A.fromid = ?2
+      and B.fromid = A.toid
+      and B.toid = ?3
+      union
+    SELECT A.fromid, A.toid, A.user, A.linkzknote, L.title, R.title
+      FROM zklink A, zklink B
+      INNER JOIN zknote as L ON A.fromid = L.id
+      INNER JOIN zknote as R ON A.toid = R.id
+      where A.user != ?1 and A.toid = ?2
+      and B.fromid = A.fromid
+      and B.toid = ?3
       ",
   )?;
 
-  let rec_iter = pstmt.query_map(params![uid, gzl.zknote], |row| {
+  let rec_iter = pstmt.query_map(params![uid, gzl.zknote, pubid], |row| {
     Ok(ZkLink {
       from: row.get(0)?,
       to: row.get(1)?,
+      user: row.get(2)?,
       delete: None,
-      linkzknote: row.get(2)?,
-      fromname: row.get(3)?,
-      toname: row.get(4)?,
+      linkzknote: row.get(3)?,
+      fromname: row.get(4)?,
+      toname: row.get(5)?,
     })
   })?;
 

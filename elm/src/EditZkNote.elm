@@ -84,6 +84,7 @@ type NavChoice
 
 type alias Model =
     { id : Maybe Int
+    , user : Int
     , zknSearchResult : Data.ZkNoteSearchResult
     , zklDict : Dict String Data.ZkLink
     , public : Bool
@@ -504,8 +505,8 @@ zklKey zkl =
     String.fromInt zkl.from ++ ":" ++ String.fromInt zkl.to
 
 
-initFull : Data.ZkNoteSearchResult -> Data.ZkNote -> Data.ZkLinks -> SP.Model -> Model
-initFull zkl zknote zklDict spm =
+initFull : Int -> Data.ZkNoteSearchResult -> Data.ZkNote -> Data.ZkLinks -> SP.Model -> Model
+initFull user zkl zknote zklDict spm =
     let
         cells =
             zknote.content
@@ -517,6 +518,7 @@ initFull zkl zknote zklDict spm =
                 (mkCc cells)
     in
     { id = Just zknote.id
+    , user = user
     , zknSearchResult = zkl
     , zklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) zklDict.links)
     , initialZklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) zklDict.links)
@@ -532,8 +534,8 @@ initFull zkl zknote zklDict spm =
     }
 
 
-initNew : Data.ZkNoteSearchResult -> SP.Model -> Model
-initNew zkl spm =
+initNew : Int -> Data.ZkNoteSearchResult -> SP.Model -> Model
+initNew user zkl spm =
     let
         cells =
             ""
@@ -545,6 +547,7 @@ initNew zkl spm =
                 (mkCc cells)
     in
     { id = Nothing
+    , user = user
     , zknSearchResult = zkl
     , zklDict = Dict.empty
     , initialZklDict = Dict.empty
@@ -560,8 +563,8 @@ initNew zkl spm =
     }
 
 
-initExample : Data.ZkNoteSearchResult -> SP.Model -> Model
-initExample zkl spm =
+initExample : Int -> Data.ZkNoteSearchResult -> SP.Model -> Model
+initExample user zkl spm =
     let
         cells =
             markdownBody
@@ -573,6 +576,7 @@ initExample zkl spm =
                 (mkCc cells)
     in
     { id = Nothing
+    , user = user
     , zknSearchResult = zkl
     , zklDict = Dict.empty
     , initialZklDict = Dict.empty
@@ -645,7 +649,7 @@ gotSelectedText : Model -> String -> ( Model, Command )
 gotSelectedText model s =
     let
         nmod =
-            initNew model.zknSearchResult model.spmodel
+            initNew model.user model.zknSearchResult model.spmodel
     in
     ( { nmod | title = s }
     , if dirty model then
@@ -748,6 +752,7 @@ update msg model =
                                                         zkl =
                                                             { from = id
                                                             , to = rid
+                                                            , user = model.user
                                                             , zknote = Nothing
                                                             , fromname = Nothing
                                                             , toname = mbstr
@@ -782,6 +787,7 @@ update msg model =
                         nzkl =
                             { from = id
                             , to = zkln.id
+                            , user = model.user
                             , zknote = Nothing
                             , fromname = Nothing
                             , toname = Just zkln.title
