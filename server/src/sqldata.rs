@@ -516,6 +516,7 @@ pub fn udpate4(dbfile: &Path) -> Result<(), Box<dyn Error>> {
       values ('user', '', null, ?1, ?2, ?3)",
     params![sysid, now, now],
   )?;
+  let userid = conn.last_insert_rowid();
 
   // create user zknotes.
   conn.execute(
@@ -529,6 +530,15 @@ pub fn udpate4(dbfile: &Path) -> Result<(), Box<dyn Error>> {
     "update user set zknote = (select id from zknote where title = user.name and zknote.user = ?1)",
     params![sysid],
   )?;
+
+  // link user recs to user.
+  conn.execute(
+    "insert into zklink (fromid, toid, user)
+     select zknote.id, ?1, ?2 from
+      zknote, user where zknote.user = ?2 and zknote.title = user.name",
+    params![userid, sysid],
+  )?;
+  // select zknote.id from zknote, user where zknote.user = 8 and zknote.title = user.name;
 
   // link system recs to public.
   conn.execute(

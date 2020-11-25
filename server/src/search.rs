@@ -106,7 +106,7 @@ pub fn build_sql(
 
   // notes that are mine.
   let mut sqlbase = format!(
-    "SELECT id, title, user, createdate, changeddate
+    "SELECT N.id, N.title, N.user, N.createdate, N.changeddate
       FROM zknote N where N.user = ?"
   );
   let mut baseargs = vec![uid.to_string()];
@@ -189,9 +189,9 @@ fn build_sql_clause(
 
         if tag {
           let clause = if exact {
-            format!("N.{} {}= ?", field, notstr)
+            format!("zkn.{} {}= ?", field, notstr)
           } else {
-            format!("N.{} {} like ?", field, notstr)
+            format!("zkn.{} {} like ?", field, notstr)
           };
 
           (
@@ -199,12 +199,12 @@ fn build_sql_clause(
             format!(
               "(0 < (select count(zkn.id) from zknote as zkn, zklink
              where zkn.id = zklink.fromid
-               and zklink.toid = zknote.id
+               and zklink.toid = N.id
                and {})
           or
           0 < (select count(zkn.id) from zknote as zkn, zklink
              where zkn.id = zklink.toid
-               and zklink.fromid = zknote.id
+               and zklink.fromid = N.id
                and {}))",
               clause, clause
             ),
