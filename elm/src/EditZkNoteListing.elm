@@ -88,15 +88,17 @@ view size model =
                         \n ->
                             E.row [ E.spacing 8 ]
                                 [ if n.user == model.uid then
-                                    EI.button Common.buttonStyle { onPress = Just (SelectPress n.id), label = E.text "edit" }
+                                    EI.button
+                                        Common.buttonStyle
+                                        { onPress = Just (SelectPress n.id), label = E.text "edit" }
 
                                   else
                                     EI.button
                                         (Common.buttonStyle
-                                            ++ [ EBk.color TC.darkGray
+                                            ++ [ EBk.color TC.lightBlue
                                                ]
                                         )
-                                        { onPress = Just (ViewPress n.id), label = E.text "view" }
+                                        { onPress = Just (SelectPress n.id), label = E.text "show" }
 
                                 -- , E.link [ Font.color TC.darkBlue, Font.underline ] { url = "note/" ++ String.fromInt n.id, label = E.text "link" }
                                 -- , if n.public then

@@ -378,6 +378,10 @@ zknview size model =
                  )
                     :: (List.map
                             (\zkln ->
+                                let
+                                    lnnonme =
+                                        zkln.user /= model.user
+                                in
                                 E.row [ E.spacing 8, E.width E.fill ]
                                     [ case model.id of
                                         Just _ ->
@@ -391,12 +395,28 @@ zknview size model =
                                                 { onPress = Nothing
                                                 , label = E.text "link"
                                                 }
-                                    , EI.button dirtybutton
-                                        { onPress = Just (SwitchPress zkln.id), label = E.text "edit" }
+                                    , EI.button
+                                        (case ( isdirty, lnnonme ) of
+                                            ( True, True ) ->
+                                                dirtybutton
+
+                                            ( False, True ) ->
+                                                Common.buttonStyle ++ [ EBk.color TC.lightBlue ]
+
+                                            _ ->
+                                                dirtybutton
+                                        )
+                                        { onPress =
+                                            Just (SwitchPress zkln.id)
+                                        , label =
+                                            if lnnonme then
+                                                E.text "show"
+
+                                            else
+                                                E.text "edit"
+                                        }
                                     , E.row
                                         [ E.clipX
-
-                                        -- , E.centerY
                                         , E.height E.fill
                                         , E.width E.fill
                                         ]
@@ -436,8 +456,19 @@ zknview size model =
                     E.none
             , EI.button dirtybutton { onPress = Just NewPress, label = E.text "new" }
             ]
-        , EI.text []
-            { onChange = OnTitleChanged
+        , EI.text
+            (if nonme then
+                [ Font.color TC.darkGrey ]
+
+             else
+                []
+            )
+            { onChange =
+                if nonme then
+                    Noop
+
+                else
+                    OnTitleChanged
             , text = model.title
             , placeholder = Nothing
             , label = EI.labelLeft [] (E.text "title")
