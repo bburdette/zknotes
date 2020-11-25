@@ -772,7 +772,7 @@ actualupdate msg model =
                         UI.RegistrationSent ->
                             ( model, Cmd.none )
 
-                        UI.LoggedIn id ->
+                        UI.LoggedIn logindata ->
                             let
                                 getlisting =
                                     \login ->
@@ -805,14 +805,14 @@ actualupdate msg model =
                             in
                             case stateLogin state of
                                 Just login ->
-                                    getlisting { login | id = id }
+                                    getlisting { login | id = logindata.userid }
 
                                 Nothing ->
                                     case state of
                                         Login lm ->
                                             let
                                                 login =
-                                                    { uid = lm.userId, pwd = lm.password, id = id }
+                                                    { uid = lm.userId, pwd = lm.password, id = logindata.userid }
                                             in
                                             -- we're logged in!  Get article listing.
                                             getlisting login

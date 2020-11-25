@@ -19,6 +19,14 @@ type alias Login a =
     }
 
 
+type alias LoginData =
+    { userid : Int
+    , publicid : Int
+    , shareid : Int
+    , searchid : Int
+    }
+
+
 
 --
 {- type alias Zk =
@@ -294,3 +302,12 @@ decodeZkNoteEdit =
     JD.map2 ZkNoteEdit
         (JD.field "zknote" decodeZkNote)
         (JD.field "links" (JD.list decodeZkLink))
+
+
+decodeLoginData : JD.Decoder LoginData
+decodeLoginData =
+    JD.map4 LoginData
+        (JD.field "userid" JD.int)
+        (JD.field "publicid" JD.int)
+        (JD.field "shareid" JD.int)
+        (JD.field "searchid" JD.int)

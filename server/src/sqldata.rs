@@ -106,6 +106,23 @@ pub struct User {
   pub registration_key: Option<String>,
 }
 
+#[derive(Deserialize, Serialize, Debug)]
+pub struct LoginData {
+  pub userid: i64,
+  pub publicid: i64,
+  pub shareid: i64,
+  pub searchid: i64,
+}
+
+pub fn login_data(conn: &Connection, uid: i64) -> Result<LoginData, Box<dyn Error>> {
+  Ok(LoginData {
+    userid: uid,
+    publicid: note_id(conn, "system", "public")?,
+    shareid: note_id(conn, "system", "share")?,
+    searchid: note_id(conn, "system", "search")?,
+  })
+}
+
 pub fn connection_open(dbfile: &Path) -> rusqlite::Result<Connection> {
   let conn = Connection::open(dbfile)?;
 

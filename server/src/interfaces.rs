@@ -143,10 +143,13 @@ fn user_interface_loggedin(
   msg: &UserMessage,
 ) -> Result<ServerResponse, Box<dyn Error>> {
   match msg.what.as_str() {
-    "login" => Ok(ServerResponse {
-      what: "logged in".to_string(),
-      content: serde_json::to_value(uid)?,
-    }),
+    "login" => {
+      let conn = sqldata::connection_open(config.db.as_path())?;
+      Ok(ServerResponse {
+        what: "logged in".to_string(),
+        content: serde_json::to_value(sqldata::login_data(&conn, uid)?)?,
+      })
+    }
     // "savezk" => {
     //   let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
     //   let sz: sqldata::SaveZk = serde_json::from_value(msgdata.clone())?;
