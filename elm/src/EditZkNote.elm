@@ -89,7 +89,6 @@ type alias Model =
     , noteUser : Int
     , zknSearchResult : Data.ZkNoteSearchResult
     , zklDict : Dict String Data.ZkLink
-    , public : Bool
     , pubidtxt : String
     , title : String
     , md : String
@@ -120,7 +119,7 @@ sznFromModel model =
     { id = model.id
     , title = model.title
     , content = model.md
-    , pubid = toPubId model.public model.pubidtxt
+    , pubid = toPubId (isPublic model) model.pubidtxt
     }
 
 
@@ -160,7 +159,7 @@ dirty model =
             (\r ->
                 not <|
                     (r.id == model.id)
-                        && (r.pubid == toPubId model.public model.pubidtxt)
+                        && (r.pubid == toPubId (isPublic model) model.pubidtxt)
                         && (r.title == model.title)
                         && (r.content == model.md)
                         && (Dict.keys model.zklDict == Dict.keys model.initialZklDict)
@@ -226,7 +225,7 @@ pageLink model =
     model.id
         |> Maybe.andThen
             (\id ->
-                toPubId model.public model.pubidtxt
+                toPubId (isPublic model) model.pubidtxt
                     |> Maybe.map
                         (\pubid ->
                             UB.absolute [ "page", pubid ] []
@@ -322,6 +321,9 @@ zknview size model =
                         (showZkl dirtybutton model.ld.userid model.id)
                         (Dict.values model.zklDict)
                 )
+
+        public =
+            isPublic model
 
         mdview =
             case markdownView (mkRenderer model.cells OnSchelmeCodeChanged) model.md of
@@ -477,10 +479,10 @@ zknview size model =
             [ EI.checkbox [ E.width E.shrink ]
                 { onChange = PublicPress
                 , icon = EI.defaultCheckbox
-                , checked = model.public
+                , checked = public
                 , label = EI.labelLeft [] (E.text "public")
                 }
-            , if model.public then
+            , if public then
                 EI.text []
                     { onChange = OnPubidChanged
                     , text = model.pubidtxt
@@ -567,9 +569,19 @@ zknview size model =
         ]
 
 
-zklKey : Data.ZkLink -> String
+zklKey : { a | from : Int, to : Int } -> String
 zklKey zkl =
     String.fromInt zkl.from ++ ":" ++ String.fromInt zkl.to
+
+
+linksWith : List Data.ZkLink -> Int -> Bool
+linksWith links pubid =
+    Util.trueforany (\l -> l.from == pubid || l.to == pubid) links
+
+
+isPublic : Model -> Bool
+isPublic model =
+    linksWith (Dict.values model.zklDict) model.ld.publicid
 
 
 initFull : Data.LoginData -> Data.ZkNoteSearchResult -> Data.ZkNote -> Data.ZkLinks -> SP.Model -> Model
@@ -590,7 +602,6 @@ initFull ld zkl zknote zklDict spm =
     , zknSearchResult = zkl
     , zklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) zklDict.links)
     , initialZklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) zklDict.links)
-    , public = False
     , pubidtxt = zknote.pubid |> Maybe.withDefault ""
     , title = zknote.title
     , md = zknote.content
@@ -620,7 +631,6 @@ initNew ld zkl spm =
     , zknSearchResult = zkl
     , zklDict = Dict.empty
     , initialZklDict = Dict.empty
-    , public = False
     , pubidtxt = ""
     , title = ""
     , md = ""
@@ -650,7 +660,6 @@ initExample ld zkl spm =
     , zknSearchResult = zkl
     , zklDict = Dict.empty
     , initialZklDict = Dict.empty
-    , public = False
     , pubidtxt = ""
     , title = "example"
     , md = markdownBody
@@ -914,8 +923,39 @@ update msg model =
             else
                 ( model, Switch id )
 
-        PublicPress v ->
-            ( { model | public = v }, None )
+        PublicPress _ ->
+            case model.id of
+                Nothing ->
+                    ( model, None )
+
+                Just id ->
+                    if isPublic model then
+                        ( { model
+                            | zklDict =
+                                model.zklDict
+                                    |> Dict.remove (zklKey { from = id, to = model.ld.publicid })
+                                    |> Dict.remove (zklKey { from = model.ld.publicid, to = id })
+                          }
+                        , None
+                        )
+
+                    else
+                        let
+                            nzkl =
+                                { from = id
+                                , to = model.ld.publicid
+                                , user = model.ld.userid
+                                , zknote = Nothing
+                                , fromname = Nothing
+                                , toname = Just "public"
+                                , delete = Nothing
+                                }
+                        in
+                        ( { model
+                            | zklDict = Dict.insert (zklKey nzkl) nzkl model.zklDict
+                          }
+                        , None
+                        )
 
         RevertPress ->
             ( model, Revert )

@@ -926,10 +926,14 @@ pub fn read_zknotepubid(
   uid: Option<i64>,
   pubid: &str,
 ) -> Result<ZkNote, Box<dyn Error>> {
+  let publicid = note_id(&conn, "system", "public")?;
   let note = conn.query_row(
-    "SELECT id, title, content, user, pubid, createdate, changeddate
-      FROM zknote WHERE pubid = ?1",
-    params![pubid],
+    "select A.id, A.title, A.content, A.user, A.pubid, A.createdate, A.changeddate
+      from zknote A, zklink L where A.pubid = ?1
+      and ((A.id = L.fromid
+      and L.toid = ?2) or (A.id = L.toid
+      and L.fromid = ?2))",
+    params![pubid, publicid],
     |row| {
       Ok(ZkNote {
         id: row.get(0)?,
@@ -938,7 +942,7 @@ pub fn read_zknotepubid(
         user: row.get(3)?,
         pubid: row.get(4)?,
         createdate: row.get(5)?,
-        changeddate: row.get(7)?,
+        changeddate: row.get(6)?,
       })
     },
   )?;
