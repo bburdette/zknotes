@@ -106,14 +106,14 @@ pub fn build_sql(
 
   // notes that are mine.
   let mut sqlbase = format!(
-    "SELECT N.id, N.title, N.user, N.createdate, N.changeddate
-      FROM zknote N where N.user = ?"
+    "select N.id, N.title, N.user, N.createdate, N.changeddate
+      from zknote N where N.user = ?"
   );
   let mut baseargs = vec![uid.to_string()];
   // notes that are public, and not mine.
   let mut sqlpub = format!(
-    "SELECT N.id, N.title, N.user, N.createdate, N.changeddate
-      FROM zknote N, zklink L
+    "select N.id, N.title, N.user, N.createdate, N.changeddate
+      from zknote N, zklink L
       where N.user != ? and L.fromid = N.id and L.toid = ?"
   );
   let mut pubargs = vec![uid.to_string(), publicid.to_string()];

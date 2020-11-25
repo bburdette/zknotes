@@ -278,8 +278,8 @@ pub fn udpate3(dbfile: &Path) -> Result<(), Box<dyn Error>> {
 
   // copy everything from zknote.
   conn.execute(
-    "INSERT INTO zknotetemp (id, title, content, public, pubid, zk, createdate, changeddate)
-        select id, title, content, public, NULL, zk, createdate, changeddate from zknote",
+    "insert into zknotetemp (id, title, content, public, pubid, zk, createdate, changeddate)
+        select id, title, content, public, null, zk, createdate, changeddate from zknote",
     params![],
   )?;
 
@@ -309,7 +309,7 @@ pub fn udpate3(dbfile: &Path) -> Result<(), Box<dyn Error>> {
 
   // copy everything from zknotetemp.
   conn.execute(
-    "INSERT INTO zknote (id, title, content, public, pubid, zk, createdate, changeddate)
+    "insert into zknote (id, title, content, public, pubid, zk, createdate, changeddate)
         select id, title, content, public, pubid, zk, createdate, changeddate from zknotetemp",
     params![],
   )?;
@@ -379,7 +379,7 @@ pub fn udpate4(dbfile: &Path) -> Result<(), Box<dyn Error>> {
 
   // copy everything from zknote.
   conn.execute(
-    "INSERT INTO zknotetemp (id, title, content, pubid, user, createdate, changeddate)
+    "insert into zknotetemp (id, title, content, pubid, user, createdate, changeddate)
         select zknote.id, title, content, pubid, user.id, zknote.createdate, zknote.changeddate from zknote, user
         where user.id in (select user from zkmember where zkmember.zk = zknote.zk)",
     params![],
@@ -387,7 +387,7 @@ pub fn udpate4(dbfile: &Path) -> Result<(), Box<dyn Error>> {
 
   // copy everything from zklink.
   conn.execute(
-    "INSERT INTO zklinktemp (fromid, toid, user)
+    "insert into zklinktemp (fromid, toid, user)
         select fromid, toid, user.id from zklink, user
         where user.id in (select user from zkmember where zkmember.zk = zklink.zk)",
     params![],
@@ -395,7 +395,7 @@ pub fn udpate4(dbfile: &Path) -> Result<(), Box<dyn Error>> {
 
   // copy everything from user.
   conn.execute(
-    "INSERT INTO usertemp (id, name, hashwd, salt, email, registration_key, createdate)
+    "insert into usertemp (id, name, hashwd, salt, email, registration_key, createdate)
         select id, name, hashwd, salt, email, registration_key, createdate from user",
     params![],
   )?;
@@ -461,21 +461,21 @@ pub fn udpate4(dbfile: &Path) -> Result<(), Box<dyn Error>> {
 
   // copy everything from zknotetemp.
   conn.execute(
-    "INSERT INTO zknote (id, title, content, pubid, user, createdate, changeddate)
+    "insert into zknote (id, title, content, pubid, user, createdate, changeddate)
         select id, title, content, pubid, user, createdate, changeddate from zknotetemp",
     params![],
   )?;
 
   // copy everything from zklinktemp.
   conn.execute(
-    "INSERT INTO zklink (fromid, toid, user, linkzknote)
+    "insert into zklink (fromid, toid, user, linkzknote)
         select fromid, toid, user, linkzknote from zklinktemp",
     params![],
   )?;
 
   // copy everything from usertemp.
   conn.execute(
-    "INSERT INTO user (id, name, hashwd, salt, email, registration_key, createdate)
+    "insert into user (id, name, hashwd, salt, email, registration_key, createdate)
         select id, name, hashwd, salt, email, registration_key, createdate from usertemp",
     params![],
   )?;
@@ -484,24 +484,24 @@ pub fn udpate4(dbfile: &Path) -> Result<(), Box<dyn Error>> {
 
   // create system user.
   conn.execute(
-    "INSERT INTO user (name, hashwd, salt, email, registration_key, createdate)
-      VALUES ('system', '', '', '', null, ?1)",
+    "insert into user (name, hashwd, salt, email, registration_key, createdate)
+      values ('system', '', '', '', null, ?1)",
     params![now],
   )?;
   let sysid = conn.last_insert_rowid();
 
   // system tags.
   conn.execute(
-    "INSERT INTO zknote (title, content, pubid, user, createdate, changeddate)
-      VALUES ('public', '', null, ?1, ?2, ?3)",
+    "insert into zknote (title, content, pubid, user, createdate, changeddate)
+      values ('public', '', null, ?1, ?2, ?3)",
     params![sysid, now, now],
   )?;
 
   let publicid = conn.last_insert_rowid();
 
   conn.execute(
-    "INSERT INTO zknote (title, content, pubid, user, createdate, changeddate)
-      VALUES ('share', '', null, ?1, ?2, ?3)",
+    "insert into zknote (title, content, pubid, user, createdate, changeddate)
+      values ('share', '', null, ?1, ?2, ?3)",
     params![sysid, now, now],
   )?;
 
@@ -573,8 +573,8 @@ pub fn get_single_value(conn: &Connection, name: &str) -> Result<Option<String>,
 
 pub fn set_single_value(conn: &Connection, name: &str, value: &str) -> Result<(), Box<dyn Error>> {
   conn.execute(
-    "INSERT INTO singlevalue (name, value) values (?1, ?2)
-        ON CONFLICT (name) DO UPDATE SET value = ?2 where name = ?1",
+    "insert into singlevalue (name, value) values (?1, ?2)
+        on conflict (name) do update set value = ?2 where name = ?1",
     params![name, value],
   )?;
   Ok(())
@@ -654,8 +654,8 @@ pub fn new_user(
 
   // make a corresponding note,
   conn.execute(
-    "INSERT INTO zknote (title, content, user, createdate, changeddate)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+    "insert into zknote (title, content, user, createdate, changeddate)
+     values (?1, ?2, ?3, ?4, ?5, ?6)",
     params![name, "", systemid, now, now],
   )?;
 
@@ -663,8 +663,8 @@ pub fn new_user(
 
   // make a user record.
   conn.execute(
-    "INSERT INTO user (name, zknote, hashwd, salt, email, registration_key, createdate)
-      VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+    "insert into user (name, zknote, hashwd, salt, email, registration_key, createdate)
+      values (?1, ?2, ?3, ?4, ?5, ?6)",
     params![name, zknid, hashwd, salt, email, registration_key, now],
   )?;
 
@@ -691,8 +691,8 @@ pub fn save_zklink(
   linkzknote: Option<i64>,
 ) -> Result<i64, Box<dyn Error>> {
   conn.execute(
-    "INSERT INTO zklink (fromid, toid, user, linkzknote) values (?1, ?2, ?3, ?4)
-      ON CONFLICT (fromid, toid, user) DO UPDATE SET linkzknote = ?4 where fromid = ?1 and toid = ?2 and user = ?3",
+    "insert into zklink (fromid, toid, user, linkzknote) values (?1, ?2, ?3, ?4)
+      on conflict (fromid, toid, user) do update set linkzknote = ?4 where fromid = ?1 and toid = ?2 and user = ?3",
     params![fromid, toid, user, linkzknote],
   )?;
 
@@ -703,8 +703,8 @@ pub fn read_user(dbfile: &Path, name: &str) -> Result<User, Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
 
   let user = conn.query_row(
-    "SELECT id, hashwd, salt, email, registration_key
-      FROM user WHERE name = ?1",
+    "select id, hashwd, salt, email, registration_key
+      from user where name = ?1",
     params![name],
     |row| {
       Ok(User {
@@ -725,8 +725,8 @@ pub fn update_user(dbfile: &Path, user: &User) -> Result<(), Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
 
   conn.execute(
-    "UPDATE user SET name = ?1, hashwd = ?2, salt = ?3, email = ?4, registration_key = ?5
-     WHERE id = ?6",
+    "update user set name = ?1, hashwd = ?2, salt = ?3, email = ?4, registration_key = ?5
+     where id = ?6",
     params![
       user.name,
       user.hashwd,
@@ -850,8 +850,8 @@ pub fn save_zknote(
   match note.id {
     Some(id) => {
       conn.execute(
-        "UPDATE zknote SET title = ?1, content = ?2, changeddate = ?3, pubid = ?4
-         WHERE id = ?5 and user = ?6",
+        "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4
+         where id = ?5 and user = ?6",
         params![note.title, note.content, now, note.pubid, note.id, uid],
       )?;
       Ok(SavedZkNote {
@@ -861,8 +861,8 @@ pub fn save_zknote(
     }
     None => {
       conn.execute(
-        "INSERT INTO zknote (title, content, user, pubid, createdate, changeddate)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        "insert into zknote (title, content, user, pubid, createdate, changeddate)
+         values (?1, ?2, ?3, ?4, ?5, ?6)",
         params![note.title, note.content, uid, note.pubid, now, now],
       )?;
       Ok(SavedZkNote {
@@ -885,8 +885,8 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
 
   println!("read_zknote uid, id {:?}, {}", uid, id);
   let note = conn.query_row(
-    "SELECT title, content, user, pubid, createdate, changeddate
-      FROM zknote WHERE id = ?1",
+    "select title, content, user, pubid, createdate, changeddate
+      from zknote where id = ?1",
     params![id],
     |row| {
       Ok(ZkNote {
@@ -979,8 +979,8 @@ pub fn delete_zknote(dbfile: &Path, uid: i64, noteid: i64) -> Result<(), Box<dyn
 
   // only delete when user is in the zk
   conn.execute(
-    "DELETE FROM zknote WHERE id = ?1 
-      AND zk IN (SELECT zk FROM zkmember WHERE user = ?2)",
+    "delete from zknote where id = ?1 
+      and zk in (select zk from zkmember where user = ?2)",
     params![noteid, uid],
   )?;
 
@@ -1030,13 +1030,13 @@ pub fn save_zklinks(dbfile: &Path, uid: i64, zklinks: Vec<ZkLink>) -> Result<(),
   for zklink in zklinks.iter() {
     if zklink.delete == Some(true) {
       conn.execute(
-        "DELETE FROM zklink WHERE fromid = ?1 and toid = ?2 and user = ?3",
+        "delete from zklink where fromid = ?1 and toid = ?2 and user = ?3",
         params![zklink.from, zklink.to, uid],
       )?;
     } else {
       conn.execute(
-        "INSERT INTO zklink (fromid, toid, user, linkzknote) values (?1, ?2, ?3, ?4)
-          ON CONFLICT (fromid, toid, user) DO UPDATE SET linkzknote = ?4 where fromid = ?1 and toid = ?2 and user = ?3",
+        "insert into zklink (fromid, toid, user, linkzknote) values (?1, ?2, ?3, ?4)
+          on conflict (fromid, toid, user) do update set linkzknote = ?4 where fromid = ?1 and toid = ?2 and user = ?3",
         params![zklink.from, zklink.to, uid, zklink.linkzknote],
       )?;
     }
@@ -1065,24 +1065,24 @@ pub fn read_zklinks(
     // zklinks that are mine.
     // not-mine zklinks with from = this note and toid = note that ISA public.
     // not-mine zlinks with from = note that is public, and to = this.
-    "SELECT A.fromid, A.toid, A.user, A.linkzknote, L.title, R.title
-      FROM zklink A
-      INNER JOIN zknote as L ON A.fromid = L.id
-      INNER JOIN zknote as R ON A.toid = R.id
+    "select A.fromid, A.toid, A.user, A.linkzknote, L.title, R.title
+      from zklink A
+      inner join zknote as L ON A.fromid = L.id
+      inner join zknote as R ON A.toid = R.id
       where A.user = ?1 and (A.fromid = ?2 or A.toid = ?2)
       union
-    SELECT A.fromid, A.toid, A.user, A.linkzknote, L.title, R.title
-      FROM zklink A, zklink B
-      INNER JOIN zknote as L ON A.fromid = L.id
-      INNER JOIN zknote as R ON A.toid = R.id
+    select A.fromid, A.toid, A.user, A.linkzknote, L.title, R.title
+      from zklink A, zklink B
+      inner join zknote as L ON A.fromid = L.id
+      inner join zknote as R ON A.toid = R.id
       where A.user != ?1 and A.fromid = ?2
       and B.fromid = A.toid
       and B.toid = ?3
       union
-    SELECT A.fromid, A.toid, A.user, A.linkzknote, L.title, R.title
-      FROM zklink A, zklink B
-      INNER JOIN zknote as L ON A.fromid = L.id
-      INNER JOIN zknote as R ON A.toid = R.id
+    select A.fromid, A.toid, A.user, A.linkzknote, L.title, R.title
+      from zklink A, zklink B
+      inner join zknote as L ON A.fromid = L.id
+      inner join zknote as R ON A.toid = R.id
       where A.user != ?1 and A.toid = ?2
       and B.fromid = A.fromid
       and B.toid = ?3
