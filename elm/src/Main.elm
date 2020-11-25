@@ -73,6 +73,7 @@ type State
     | BadError BadError.Model State
     | ShowMessage ShowMessage.Model Data.LoggedIn
     | PubShowMessage ShowMessage.Model
+    | LoginShowMessage ShowMessage.Model (Data.Login {})
     | Wait State (State -> Msg -> ( State, Cmd Msg ))
 
 
@@ -83,7 +84,7 @@ type alias Flags =
     , debugstring : String
     , width : Int
     , height : Int
-    , login : Maybe Data.LoggedIn
+    , login : Maybe (Data.Login {})
     }
 
 
@@ -332,6 +333,9 @@ viewState size state =
         PubShowMessage em ->
             Element.map ShowMessageMsg <| ShowMessage.view em
 
+        LoginShowMessage em _ ->
+            Element.map ShowMessageMsg <| ShowMessage.view em
+
         View em ->
             Element.map ViewMsg <| View.view em False
 
@@ -376,6 +380,9 @@ stateLogin state =
             Just login
 
         PubShowMessage _ ->
+            Nothing
+
+        LoginShowMessage _ _ ->
             Nothing
 
         Wait wstate _ ->
@@ -460,7 +467,7 @@ notewait nwstate state wmsg =
                 ( Just zknl, Just zkl, Just zkn ) ->
                     let
                         st =
-                            EditZkNote (EditZkNote.initFull nws.login.id zknl zkn zkl nws.spmodel) nws.login
+                            EditZkNote (EditZkNote.initFull nws.login.ld zknl zkn zkl nws.spmodel) nws.login
                     in
                     ( st
                     , Cmd.none
@@ -515,7 +522,7 @@ listingwait login st ms =
     case ms of
         UserReplyData (Ok (UI.ZkNoteSearchResult rs)) ->
             ( EditZkNoteListing
-                { uid = login.id
+                { uid = login.ld.userid
                 , notes = rs
                 , spmodel =
                     SP.searchResultUpdated rs SP.initModel
@@ -799,20 +806,27 @@ actualupdate msg model =
                                                 )
                                             , LS.storeLocalVal { name = "uid", value = login.uid }
                                             , LS.storeLocalVal { name = "pwd", value = login.pwd }
-                                            , LS.storeLocalVal { name = "id", value = String.fromInt login.id }
                                             ]
                                         )
                             in
                             case stateLogin state of
                                 Just login ->
-                                    getlisting { login | id = logindata.userid }
+                                    getlisting { login | ld = logindata }
 
                                 Nothing ->
                                     case state of
                                         Login lm ->
                                             let
                                                 login =
-                                                    { uid = lm.userId, pwd = lm.password, id = logindata.userid }
+                                                    { uid = lm.userId, pwd = lm.password, ld = logindata }
+                                            in
+                                            -- we're logged in!  Get article listing.
+                                            getlisting login
+
+                                        LoginShowMessage _ li ->
+                                            let
+                                                login =
+                                                    { uid = li.uid, pwd = li.pwd, ld = logindata }
                                             in
                                             -- we're logged in!  Get article listing.
                                             getlisting login
@@ -835,7 +849,7 @@ actualupdate msg model =
                                     )
 
                                 ShowMessage _ login ->
-                                    ( { model | state = EditZkNoteListing { uid = login.id, notes = sr, spmodel = SP.initModel } login }
+                                    ( { model | state = EditZkNoteListing { uid = login.ld.userid, notes = sr, spmodel = SP.initModel } login }
                                     , Cmd.none
                                     )
 
@@ -855,7 +869,7 @@ actualupdate msg model =
                                     ( { model
                                         | state =
                                             EditZkNote
-                                                (EditZkNote.initFull login.id
+                                                (EditZkNote.initFull login.ld
                                                     { notes = [], offset = 0 }
                                                     zne.zknote
                                                     { links = zne.links }
@@ -1069,7 +1083,7 @@ actualupdate msg model =
                 backtolisting =
                     ( { model
                         | state =
-                            EditZkNoteListing { uid = login.id, notes = emod.zknSearchResult, spmodel = emod.spmodel } login
+                            EditZkNoteListing { uid = login.ld.userid, notes = emod.zknSearchResult, spmodel = emod.spmodel } login
                       }
                     , Cmd.batch
                         [ sendUIMsg model.location
@@ -1084,7 +1098,7 @@ actualupdate msg model =
                     let
                         gotres =
                             ( EditZkNoteListing
-                                { uid = login.id
+                                { uid = login.ld.userid
                                 , notes = emod.zknSearchResult
                                 , spmodel = emod.spmodel
                                 }
@@ -1320,10 +1334,10 @@ actualupdate msg model =
                     ( { model | state = EditZkNoteListing emod login }, Cmd.none )
 
                 EditZkNoteListing.New ->
-                    ( { model | state = EditZkNote (EditZkNote.initNew login.id es.notes emod.spmodel) login }, Cmd.none )
+                    ( { model | state = EditZkNote (EditZkNote.initNew login.ld es.notes emod.spmodel) login }, Cmd.none )
 
                 EditZkNoteListing.Example ->
-                    ( { model | state = EditZkNote (EditZkNote.initExample login.id es.notes emod.spmodel) login }, Cmd.none )
+                    ( { model | state = EditZkNote (EditZkNote.initExample login.ld es.notes emod.spmodel) login }, Cmd.none )
 
                 EditZkNoteListing.Selected id ->
                     let
@@ -1408,7 +1422,7 @@ init flags url key =
                         PubShowMessage { message = "initial state" }
 
                     Just login ->
-                        ShowMessage { message = "logging in" } login
+                        LoginShowMessage { message = "logging in" } login
             , size = { width = flags.width, height = flags.height }
             , location = flags.location
             , navkey = key
@@ -1457,7 +1471,7 @@ init flags url key =
     )
 
 
-initLogin : Maybe Data.LoggedIn -> Seed -> State
+initLogin : Maybe (Data.Login {}) -> Seed -> State
 initLogin mblogin seed =
     Login <| Login.initialModel (mblogin |> Maybe.map (\l -> { uid = l.uid, pwd = l.pwd })) "zknotes" seed
 

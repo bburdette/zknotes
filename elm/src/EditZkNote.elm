@@ -85,7 +85,7 @@ type NavChoice
 
 type alias Model =
     { id : Maybe Int
-    , user : Int
+    , ld : Data.LoginData
     , noteUser : Int
     , zknSearchResult : Data.ZkNoteSearchResult
     , zklDict : Dict String Data.ZkLink
@@ -277,7 +277,7 @@ zknview size model =
 
         nonme =
             Debug.log "nonme" <|
-                model.user
+                model.ld.userid
                     /= model.noteUser
 
         mdedit =
@@ -319,7 +319,7 @@ zknview size model =
                     -- show the links.
                     :: E.row [ Font.bold ] [ E.text "links" ]
                     :: List.map
-                        (showZkl dirtybutton model.user model.id)
+                        (showZkl dirtybutton model.ld.userid model.id)
                         (Dict.values model.zklDict)
                 )
 
@@ -380,7 +380,7 @@ zknview size model =
                             (\zkln ->
                                 let
                                     lnnonme =
-                                        zkln.user /= model.user
+                                        zkln.user /= model.ld.userid
                                 in
                                 E.row [ E.spacing 8, E.width E.fill ]
                                     [ case model.id of
@@ -572,8 +572,8 @@ zklKey zkl =
     String.fromInt zkl.from ++ ":" ++ String.fromInt zkl.to
 
 
-initFull : Int -> Data.ZkNoteSearchResult -> Data.ZkNote -> Data.ZkLinks -> SP.Model -> Model
-initFull user zkl zknote zklDict spm =
+initFull : Data.LoginData -> Data.ZkNoteSearchResult -> Data.ZkNote -> Data.ZkLinks -> SP.Model -> Model
+initFull ld zkl zknote zklDict spm =
     let
         cells =
             zknote.content
@@ -585,7 +585,7 @@ initFull user zkl zknote zklDict spm =
                 (mkCc cells)
     in
     { id = Just zknote.id
-    , user = user
+    , ld = ld
     , noteUser = zknote.user
     , zknSearchResult = zkl
     , zklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) zklDict.links)
@@ -602,8 +602,8 @@ initFull user zkl zknote zklDict spm =
     }
 
 
-initNew : Int -> Data.ZkNoteSearchResult -> SP.Model -> Model
-initNew user zkl spm =
+initNew : Data.LoginData -> Data.ZkNoteSearchResult -> SP.Model -> Model
+initNew ld zkl spm =
     let
         cells =
             ""
@@ -615,8 +615,8 @@ initNew user zkl spm =
                 (mkCc cells)
     in
     { id = Nothing
-    , user = user
-    , noteUser = user
+    , ld = ld
+    , noteUser = ld.userid
     , zknSearchResult = zkl
     , zklDict = Dict.empty
     , initialZklDict = Dict.empty
@@ -632,8 +632,8 @@ initNew user zkl spm =
     }
 
 
-initExample : Int -> Data.ZkNoteSearchResult -> SP.Model -> Model
-initExample user zkl spm =
+initExample : Data.LoginData -> Data.ZkNoteSearchResult -> SP.Model -> Model
+initExample ld zkl spm =
     let
         cells =
             markdownBody
@@ -645,8 +645,8 @@ initExample user zkl spm =
                 (mkCc cells)
     in
     { id = Nothing
-    , user = user
-    , noteUser = user
+    , ld = ld
+    , noteUser = ld.userid
     , zknSearchResult = zkl
     , zklDict = Dict.empty
     , initialZklDict = Dict.empty
@@ -719,7 +719,7 @@ gotSelectedText : Model -> String -> ( Model, Command )
 gotSelectedText model s =
     let
         nmod =
-            initNew model.user model.zknSearchResult model.spmodel
+            initNew model.ld model.zknSearchResult model.spmodel
     in
     ( { nmod | title = s }
     , if dirty model then
@@ -822,7 +822,7 @@ update msg model =
                                                         zkl =
                                                             { from = id
                                                             , to = rid
-                                                            , user = model.user
+                                                            , user = model.ld.userid
                                                             , zknote = Nothing
                                                             , fromname = Nothing
                                                             , toname = mbstr
@@ -857,7 +857,7 @@ update msg model =
                         nzkl =
                             { from = id
                             , to = zkln.id
-                            , user = model.user
+                            , user = model.ld.userid
                             , zknote = Nothing
                             , fromname = Nothing
                             , toname = Just zkln.title

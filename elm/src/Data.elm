@@ -8,7 +8,7 @@ import Search as S
 type alias LoggedIn =
     { uid : String
     , pwd : String
-    , id : Int
+    , ld : LoginData
     }
 
 
