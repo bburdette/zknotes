@@ -201,8 +201,8 @@ fn build_sql_clause(
              where zkn.id = zklink.fromid
                and zklink.toid = N.id
                and {})
-          or
-          0 < (select count(zkn.id) from zknote as zkn, zklink
+            or
+                0 < (select count(zkn.id) from zknote as zkn, zklink
              where zkn.id = zklink.toid
                and zklink.fromid = N.id
                and {}))",

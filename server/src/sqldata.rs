@@ -980,7 +980,7 @@ pub fn delete_zknote(dbfile: &Path, uid: i64, noteid: i64) -> Result<(), Box<dyn
   // only delete when user is in the zk
   conn.execute(
     "delete from zknote where id = ?1 
-      and zk in (select zk from zkmember where user = ?2)",
+      and user = ?2",
     params![noteid, uid],
   )?;
 
