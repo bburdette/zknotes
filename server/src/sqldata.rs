@@ -763,57 +763,49 @@ pub fn user_id(conn: &Connection, name: &str) -> Result<i64, Box<dyn Error>> {
   Ok(id)
 }
 
+pub fn user_note_id(conn: &Connection, uid: i64) -> Result<i64, Box<dyn Error>> {
+  let id: i64 = conn.query_row(
+    "select zknote from user
+      where user.id = ?1",
+    params![uid],
+    |row| Ok(row.get(0)?),
+  )?;
+  Ok(id)
+}
+
+// "select * from
+//   zklink L, zklink M, zklink U where
+//     L.fromid = 288 and L.toid = M.fromid and M.toid = 274 and
+//     ((U.fromid = 278 and U.toid = M.fromid) or (U.fromid = M.fromid and U.toid = 278))",
+
 pub fn is_zknote_shared(
   conn: &Connection,
-  uid: i64,
   zknoteid: i64,
+  uid: i64,
 ) -> Result<bool, Box<dyn Error>> {
-  Ok(false)
+  let shareid: i64 = note_id(conn, "system", "share")?;
+  let usernoteid: i64 = user_note_id(&conn, uid)?;
 
-  /* shared means there is:
-   * a note linked to this note.
-   * that note is linked to system:share
-   * that note is also linked to system:user:this-user
-   *
-
-
-  */
-
-  // let shareid = match conn.query_row(
-  //   "select id from
-  //     zknote, user
-  //     where zknote.title = \"share\"
-  //     and user.name = \"system\"
-  //     and zknote.user = user.id",
-  //   params![],
-  //   |row| row.get(0)?);
-
-  // //
-
-  // match conn.query_row(
-  //   "select count(*) from
-  //     zklink A, zklink B, zknote
-  //     where A.leftid = ?1 and A.rightid = B.leftid and B.rightid = ?2
-  //     and zknote.id = ?2 and zknote.user = ?3",
-  //   params![zknoteid, shareid, uid],
-  //   |_row| Ok(true),
-  // ) {
-  //   Ok(b) => Ok(b),
-  //   Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
-  //   Err(x) => Err(Box::new(x)),
-  // }
+  println!("is_zknote_shared {} {} {}", zknoteid, shareid, usernoteid);
+  match conn.query_row(
+    "select count(*) from
+      zklink L, zklink M, zklink U where
+        L.fromid = ?1 and L.toid = M.fromid and M.toid = ?2 and
+        ((U.fromid = ?3 and U.toid = M.fromid) or (U.fromid = M.fromid and U.toid = ?3))",
+    params![zknoteid, shareid, usernoteid],
+    |row| {
+      let i: i64 = row.get(0)?;
+      Ok(i)
+    },
+  ) {
+    Ok(count) => Ok(count > 0),
+    Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
+    Err(x) => Err(Box::new(x)),
+  }
 }
 
 pub fn is_zknote_public(conn: &Connection, zknoteid: i64) -> Result<bool, Box<dyn Error>> {
-  let pubid: i64 = conn.query_row(
-    "select zknote.id from
-      zknote, user
-      where zknote.title = \"public\"
-      and user.name = \"system\"
-      and zknote.user = user.id",
-    params![],
-    |row| Ok(row.get(0)?),
-  )?;
+  let pubid: i64 = note_id(conn, "system", "public")?;
 
   match conn.query_row(
     "select count(*) from
@@ -908,7 +900,16 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
   } else if is_zknote_public(conn, id)? {
     Ok(note)
   } else {
-    bail!("can't read zknote; note is private")
+    match uid {
+      Some(uid) => {
+        if is_zknote_shared(conn, id, uid)? {
+          Ok(note)
+        } else {
+          bail!("can't read zknote; note is private")
+        }
+      }
+      None => bail!("can't read zknote; note is private"),
+    }
   }
 }
 

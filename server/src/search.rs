@@ -1,4 +1,5 @@
 use rusqlite::{params, Connection};
+use sqldata;
 use sqldata::{connection_open, note_id, user_id, ZkListNote};
 use std::error::Error;
 use std::path::Path;
@@ -99,6 +100,8 @@ pub fn build_sql(
 
   let publicid = note_id(&conn, "system", "public")?;
 
+  let shareid = note_id(&conn, "system", "share")?;
+
   let limclause = match search.limit {
     Some(lm) => format!(" limit {} offset {}", lm, search.offset),
     None => format!(" offset {}", search.offset),
@@ -117,6 +120,34 @@ pub fn build_sql(
       where N.user != ? and L.fromid = N.id and L.toid = ?"
   );
   let mut pubargs = vec![uid.to_string(), publicid.to_string()];
+
+  let mut sqlshare = format!(
+    "select N.id, N.title, N.user, N.createdate, N.changeddate
+      from zknote N, zklink L, zklink M, zklink U
+      where N.user != ? and L.fromid = N.id and L.toid = M.fromid and M.toid = ?
+      and
+        ((U.fromid = ? and U.toid = M.fromid) or (U.fromid = M.fromid and U.toid = ?))",
+  );
+
+  let usernoteid = sqldata::user_note_id(&conn, uid)?;
+
+  let mut shareargs = vec![
+    uid.to_string(),
+    shareid.to_string(),
+    usernoteid.to_string(),
+    usernoteid.to_string(),
+  ];
+  //     "select N.id, N.title, N.user, N.createdate, N.changeddate
+  //       from zknote N, zklink L, zklink M, zklink U
+  //       where N.user != 2 and L.fromid = N.id and L.toid = M.fromid and M.toid = 274
+  //       and
+  //         ((U.fromid = 2 and U.toid = M.fromid) or (U.fromid = M.fromid and U.toid = 2))",
+
+  // select *
+  //       from zknote N, zklink L, zklink M
+  //       where N.user != 2 and L.fromid = N.id and L.toid = M.fromid and M.toid = 274
+
+  println!("shareargs {:?}", shareargs);
 
   // local ftn to add clause and args.
   let mut addcls = |sql: &mut String, args: &mut Vec<String>| {
@@ -137,8 +168,11 @@ pub fn build_sql(
   // combine the queries.
   sqlbase.push_str(" union ");
   sqlbase.push_str(sqlpub.as_str());
+  sqlbase.push_str(" union ");
+  sqlbase.push_str(sqlshare.as_str());
 
   baseargs.append(&mut pubargs);
+  baseargs.append(&mut shareargs);
 
   // add limit clause to the end.
   sqlbase.push_str(limclause.as_str());
