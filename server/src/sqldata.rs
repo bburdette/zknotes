@@ -13,7 +13,6 @@ pub struct ZkNote {
   title: String,
   content: String,
   user: i64,
-  // pub public: bool,
   pubid: Option<String>,
   createdate: i64,
   changeddate: i64,
@@ -759,7 +758,6 @@ pub fn is_zknote_shared(
   let shareid: i64 = note_id(conn, "system", "share")?;
   let usernoteid: i64 = user_note_id(&conn, uid)?;
 
-  println!("is_zknote_shared {} {} {}", zknoteid, shareid, usernoteid);
   match conn.query_row(
     "select count(*) from
       zklink L, zklink M, zklink U where
@@ -835,7 +833,6 @@ pub fn save_zknote(
 }
 
 pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNote, Box<dyn Error>> {
-  println!("read_zknote uid, id {:?}, {}", uid, id);
   let note = conn.query_row(
     "select title, content, user, pubid, createdate, changeddate
       from zknote where id = ?1",
@@ -852,8 +849,6 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
       })
     },
   )?;
-
-  println!("read_zknote {:?}", note);
 
   if uid == Some(note.user) {
     Ok(note)
