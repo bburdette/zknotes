@@ -632,7 +632,7 @@ pub fn new_user(
   // make a corresponding note,
   conn.execute(
     "insert into zknote (title, content, user, createdate, changeddate)
-     values (?1, ?2, ?3, ?4, ?5, ?6)",
+     values (?1, ?2, ?3, ?4, ?5)",
     params![name, "", systemid, now, now],
   )?;
 
@@ -641,7 +641,7 @@ pub fn new_user(
   // make a user record.
   conn.execute(
     "insert into user (name, zknote, hashwd, salt, email, registration_key, createdate)
-      values (?1, ?2, ?3, ?4, ?5, ?6)",
+      values (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
     params![name, zknid, hashwd, salt, email, registration_key, now],
   )?;
 
