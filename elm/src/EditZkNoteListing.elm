@@ -99,12 +99,6 @@ view size model =
                                                ]
                                         )
                                         { onPress = Just (SelectPress n.id), label = E.text "show" }
-
-                                -- , E.link [ Font.color TC.darkBlue, Font.underline ] { url = "note/" ++ String.fromInt n.id, label = E.text "link" }
-                                -- , if n.public then
-                                --     E.text "public"
-                                --   else
-                                --     E.text "      "
                                 ]
                   }
                 ]

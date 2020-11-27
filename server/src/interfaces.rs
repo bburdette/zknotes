@@ -150,68 +150,7 @@ fn user_interface_loggedin(
         content: serde_json::to_value(sqldata::login_data(&conn, uid)?)?,
       })
     }
-    // "savezk" => {
-    //   let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-    //   let sz: sqldata::SaveZk = serde_json::from_value(msgdata.clone())?;
-    //   let zkid = sqldata::save_zk(&config.db.as_path(), uid, &sz)?;
-    //   Ok(ServerResponse {
-    //     what: "savedzk".to_string(),
-    //     content: serde_json::to_value(zkid)?,
-    //   })
-    // }
-    // "getzk" => {
-    //   let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-    //   let id: i64 = serde_json::from_value(msgdata.clone())?;
-    //   let conn = sqldata::connection_open(config.db.as_path())?;
-    //   let zk = sqldata::read_zk(&conn, id)?;
-    //   Ok(ServerResponse {
-    //     what: "zk".to_string(),
-    //     content: serde_json::to_value(zk)?,
-    //   })
-    // }
-    // "deletezk" => {
-    //   let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-    //   let id: i64 = serde_json::from_value(msgdata.clone())?;
-    //   sqldata::delete_zk(Path::new(&config.db), uid, id)?;
-    //   Ok(ServerResponse {
-    //     what: "deletedzk".to_string(),
-    //     content: serde_json::to_value(id)?,
-    //   })
-    // }
-    // "getzkmembers" => {
-    //   let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-    //   let zkid: i64 = serde_json::from_value(msgdata.clone())?;
-    //   let members = sqldata::read_zk_members(Path::new(&config.db), uid, zkid)?;
-    //   Ok(ServerResponse {
-    //     what: "zkmembers".to_string(),
-    //     content: serde_json::to_value(members)?,
-    //   })
-    // }
-    // "addzkmember" => {
-    //   let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-    //   let zkm: sqldata::ZkMember = serde_json::from_value(msgdata.clone())?;
-    //   sqldata::add_zk_member(Path::new(&config.db), uid, zkm.clone())?;
-    //   Ok(ServerResponse {
-    //     what: "added_zkmember".to_string(),
-    //     content: serde_json::to_value(zkm)?,
-    //   })
-    // }
-    // "deletezkmember" => {
-    //   let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-    //   let zkm: sqldata::ZkMember = serde_json::from_value(msgdata.clone())?;
-    //   sqldata::delete_zk_member(Path::new(&config.db), uid, zkm.clone())?;
-    //   Ok(ServerResponse {
-    //     what: "deleted_zkmember".to_string(),
-    //     content: serde_json::to_value(zkm)?,
-    //   })
-    // }
-    // "getzklisting" => {
-    //   let entries = sqldata::zklisting(Path::new(&config.db), uid)?;
-    //   Ok(ServerResponse {
-    //     what: "zklisting".to_string(),
-    //     content: serde_json::to_value(entries)?,
-    //   })
-    // }
+
     "getzknote" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let id: i64 = serde_json::from_value(msgdata.clone())?;

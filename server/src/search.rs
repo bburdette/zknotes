@@ -54,8 +54,6 @@ pub fn search_zknotes(
 ) -> Result<ZkNoteSearchResult, Box<dyn Error>> {
   let (sql, args) = build_sql(&conn, user, search.clone())?;
 
-  println!("sql, args: {}, \n{:?}", sql, args);
-
   let mut pstmt = conn.prepare(sql.as_str())?;
 
   let rec_iter = pstmt.query_map(args.as_slice(), |row| {
@@ -90,13 +88,7 @@ pub fn build_sql(
   uid: i64,
   search: ZkNoteSearch,
 ) -> Result<(String, Vec<String>), Box<dyn Error>> {
-  println!("pref builds");
   let (cls, mut clsargs) = build_sql_clause(&conn, uid, false, search.tagsearch)?;
-  println!("post builds");
-
-  // let zklist = format!("{:?}", search.zks)
-  //   .replace("[", "(")
-  //   .replace("]", ")");
 
   let publicid = note_id(&conn, "system", "public")?;
 
@@ -137,17 +129,6 @@ pub fn build_sql(
     usernoteid.to_string(),
     usernoteid.to_string(),
   ];
-  //     "select N.id, N.title, N.user, N.createdate, N.changeddate
-  //       from zknote N, zklink L, zklink M, zklink U
-  //       where N.user != 2 and L.fromid = N.id and L.toid = M.fromid and M.toid = 274
-  //       and
-  //         ((U.fromid = 2 and U.toid = M.fromid) or (U.fromid = M.fromid and U.toid = 2))",
-
-  // select *
-  //       from zknote N, zklink L, zklink M
-  //       where N.user != 2 and L.fromid = N.id and L.toid = M.fromid and M.toid = 274
-
-  println!("shareargs {:?}", shareargs);
 
   // local ftn to add clause and args.
   let mut addcls = |sql: &mut String, args: &mut Vec<String>| {
@@ -176,9 +157,6 @@ pub fn build_sql(
 
   // add limit clause to the end.
   sqlbase.push_str(limclause.as_str());
-
-  println!("sqlbase: {}", sqlbase);
-  println!("baseargs: {:?}", baseargs);
 
   Ok((sqlbase, baseargs))
 }

@@ -19,28 +19,6 @@ pub struct ZkNote {
   changeddate: i64,
 }
 
-/*#[derive(Serialize, Debug, Clone)]
-pub struct Zk {
-  id: i64,
-  name: String,
-  description: String,
-  createdate: i64,
-  changeddate: i64,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ZkMember {
-  zkid: i64,
-  name: String,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct SaveZk {
-  id: Option<i64>,
-  name: String,
-  description: String,
-}
-*/
 #[derive(Serialize, Debug, Clone)]
 pub struct ZkListNote {
   pub id: i64,
@@ -773,11 +751,6 @@ pub fn user_note_id(conn: &Connection, uid: i64) -> Result<i64, Box<dyn Error>> 
   Ok(id)
 }
 
-// "select * from
-//   zklink L, zklink M, zklink U where
-//     L.fromid = 288 and L.toid = M.fromid and M.toid = 274 and
-//     ((U.fromid = 278 and U.toid = M.fromid) or (U.fromid = M.fromid and U.toid = 278))",
-
 pub fn is_zknote_shared(
   conn: &Connection,
   zknoteid: i64,
@@ -835,10 +808,6 @@ pub fn save_zknote(
 
   let now = now()?;
 
-  // if !is_zk_member(&conn, uid, note.zk)? {
-  //   bail!("can't save note; you are not a member of this zk");
-  // }
-
   match note.id {
     Some(id) => {
       conn.execute(
@@ -866,15 +835,6 @@ pub fn save_zknote(
 }
 
 pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNote, Box<dyn Error>> {
-  // match uid {
-  //   Some(uid) => {
-  //     if !is_zknote_member(&conn, uid, id)? {
-  //       bail!("can't read zknote; you are not a member of this zk");
-  //     }
-  //   }
-  //   _ => {}
-  // }
-
   println!("read_zknote uid, id {:?}, {}", uid, id);
   let note = conn.query_row(
     "select title, content, user, pubid, createdate, changeddate
@@ -912,25 +872,6 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
     }
   }
 }
-
-// pub fn is_public(conn: &Connection, zknoteid: i64) -> Result<Bool, Box<dyn Error>> {
-//   let rbe = conn.query_row(
-//     "SELECT id, title, content, user, pubid, createdate, changeddate
-//       FROM zknote WHERE pubid = ?1",
-//     params![pubid],
-//     |row| {
-//       Ok(ZkNote {
-//         id: row.get(0)?,
-//         title: row.get(1)?,
-//         content: row.get(2)?,
-//         user: row.get(3)?,
-//         pubid: row.get(4)?,
-//         createdate: row.get(5)?,
-//         changeddate: row.get(7)?,
-//       })
-//     },
-//   )?;
-// }
 
 pub fn read_zknotepubid(
   conn: &Connection,
@@ -988,45 +929,8 @@ pub fn delete_zknote(dbfile: &Path, uid: i64, noteid: i64) -> Result<(), Box<dyn
   Ok(())
 }
 
-/*pub fn zknotelisting(dbfile: &Path, user: i64, zk: i64) -> rusqlite::Result<Vec<ZkListNote>> {
-  let conn = connection_open(dbfile)?;
-
-  let mut pstmt = conn.prepare(
-    "SELECT id, title, public, createdate, changeddate
-      FROM zknote where zk = ?1 and
-        zk IN (select zk from zkmember where user = ?2)",
-  )?;
-
-  let rec_iter = pstmt.query_map(params![user], |row| {
-    Ok(ZkListNote {
-      id: row.get(0)?,
-      title: row.get(1)?,
-      createdate: row.get(2)?,
-      changeddate: row.get(3)?,
-    })
-  })?;
-
-  let mut pv = Vec::new();
-
-  for rsrec in rec_iter {
-    match rsrec {
-      Ok(rec) => {
-        pv.push(rec);
-      }
-      Err(_) => (),
-    }
-  }
-
-  Ok(pv)
-}
-*/
-
 pub fn save_zklinks(dbfile: &Path, uid: i64, zklinks: Vec<ZkLink>) -> Result<(), Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
-
-  // if !is_zk_member(&conn, uid, zk)? {
-  //   bail!("can't save zklink; user is not a member of this zk");
-  // }
 
   for zklink in zklinks.iter() {
     if zklink.delete == Some(true) {
@@ -1034,7 +938,7 @@ pub fn save_zklinks(dbfile: &Path, uid: i64, zklinks: Vec<ZkLink>) -> Result<(),
         "delete from zklink where fromid = ?1 and toid = ?2 and user = ?3",
         params![zklink.from, zklink.to, uid],
       )?;
-    } else {
+    } else if zklink.user == uid {
       conn.execute(
         "insert into zklink (fromid, toid, user, linkzknote) values (?1, ?2, ?3, ?4)
           on conflict (fromid, toid, user) do update set linkzknote = ?4 where fromid = ?1 and toid = ?2 and user = ?3",
@@ -1051,20 +955,13 @@ pub fn read_zklinks(
   uid: i64,
   gzl: &GetZkLinks,
 ) -> Result<Vec<ZkLink>, Box<dyn Error>> {
-  // if !is_zk_member(&conn, uid, gzl.zk)? {
-  //   bail!("can't read_zklinks; user is not a member of this zk");
-  // }
-
-  // either zklinks that are mine, or
-  // zklinks where both endpoints are
-  // 	(public or mine)
-  // 	  public: zknote links to public.
-  //
   let pubid = note_id(&conn, "system", "public")?;
 
   let mut pstmt = conn.prepare(
     // zklinks that are mine.
+    // +
     // not-mine zklinks with from = this note and toid = note that ISA public.
+    // +
     // not-mine zlinks with from = note that is public, and to = this.
     "select A.fromid, A.toid, A.user, A.linkzknote, L.title, R.title
       from zklink A

@@ -275,9 +275,8 @@ zknview size model =
                 Common.buttonStyle
 
         nonme =
-            Debug.log "nonme" <|
-                model.ld.userid
-                    /= model.noteUser
+            model.ld.userid
+                /= model.noteUser
 
         mdedit =
             E.column
