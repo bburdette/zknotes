@@ -27,31 +27,6 @@ type alias LoginData =
     }
 
 
-
---
-{- type alias Zk =
-       { id : Int
-       , name : String
-       , description : String
-       , createdate : Int
-       , changeddate : Int
-       }
-
-
-   type alias SaveZk =
-       { id : Maybe Int
-       , name : String
-       , description : String
-       }
-
-
-   type alias ZkMember =
-       { name : String
-       , zkid : Int
-       }
--}
-
-
 type alias ZkListNote =
     { id : Int
     , user : Int
@@ -78,8 +53,6 @@ type alias ZkNote =
     , user : Int
     , title : String
     , content : String
-
-    -- , public : Bool
     , pubid : Maybe String
     , createdate : Int
     , changeddate : Int
@@ -219,45 +192,6 @@ encodeSaveZkNote zkn =
             ++ [ ( "title", JE.string zkn.title )
                , ( "content", JE.string zkn.content )
                ]
-
-
-
-{- encodeSaveZk : SaveZk -> JE.Value
-   encodeSaveZk sbe =
-       JE.object <|
-           (Maybe.map (\id -> [ ( "id", JE.int id ) ]) sbe.id
-               |> Maybe.withDefault []
-           )
-               ++ [ ( "name", JE.string sbe.name )
-                  , ( "description", JE.string sbe.description )
-                  ]
-
-
-   decodeZk : JD.Decoder Zk
-   decodeZk =
-       JD.map5 Zk
-           (JD.field "id" JD.int)
-           (JD.field "name" JD.string)
-           (JD.field "description" JD.string)
-           (JD.field "createdate" JD.int)
-           (JD.field "changeddate" JD.int)
-
-
-   encodeZkMember : ZkMember -> JE.Value
-   encodeZkMember zkm =
-       JE.object
-           [ ( "name", JE.string zkm.name )
-           , ( "zkid", JE.int zkm.zkid )
-           ]
-
-
-   decodeZkMember : JD.Decoder ZkMember
-   decodeZkMember =
-       JD.map2 ZkMember
-           (JD.field "name" JD.string)
-           (JD.field "zkid" JD.int)
-
--}
 
 
 decodeZkListNote : JD.Decoder ZkListNote
