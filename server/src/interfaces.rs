@@ -1,7 +1,7 @@
 use config::Config;
 use crypto_hash::{hex_digest, Algorithm};
-use data;
 use email;
+use search;
 use serde_json::Value;
 use simple_error;
 use sqldata;
@@ -143,72 +143,14 @@ fn user_interface_loggedin(
   msg: &UserMessage,
 ) -> Result<ServerResponse, Box<dyn Error>> {
   match msg.what.as_str() {
-    "login" => Ok(ServerResponse {
-      what: "logged in".to_string(),
-      content: serde_json::Value::Null, // return api token that expires?
-    }),
-    "savezk" => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let sz: sqldata::SaveZk = serde_json::from_value(msgdata.clone())?;
-      let zkid = sqldata::save_zk(&config.db.as_path(), uid, &sz)?;
-      Ok(ServerResponse {
-        what: "savedzk".to_string(),
-        content: serde_json::to_value(zkid)?,
-      })
-    }
-    "getzk" => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let id: i64 = serde_json::from_value(msgdata.clone())?;
+    "login" => {
       let conn = sqldata::connection_open(config.db.as_path())?;
-      let zk = sqldata::read_zk(&conn, id)?;
       Ok(ServerResponse {
-        what: "zk".to_string(),
-        content: serde_json::to_value(zk)?,
+        what: "logged in".to_string(),
+        content: serde_json::to_value(sqldata::login_data(&conn, uid)?)?,
       })
     }
-    "deletezk" => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let id: i64 = serde_json::from_value(msgdata.clone())?;
-      sqldata::delete_zk(Path::new(&config.db), uid, id)?;
-      Ok(ServerResponse {
-        what: "deletedzk".to_string(),
-        content: serde_json::to_value(id)?,
-      })
-    }
-    "getzkmembers" => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let zkid: i64 = serde_json::from_value(msgdata.clone())?;
-      let members = sqldata::read_zk_members(Path::new(&config.db), uid, zkid)?;
-      Ok(ServerResponse {
-        what: "zkmembers".to_string(),
-        content: serde_json::to_value(members)?,
-      })
-    }
-    "addzkmember" => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let zkm: sqldata::ZkMember = serde_json::from_value(msgdata.clone())?;
-      sqldata::add_zk_member(Path::new(&config.db), uid, zkm.clone())?;
-      Ok(ServerResponse {
-        what: "added_zkmember".to_string(),
-        content: serde_json::to_value(zkm)?,
-      })
-    }
-    "deletezkmember" => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let zkm: sqldata::ZkMember = serde_json::from_value(msgdata.clone())?;
-      sqldata::delete_zk_member(Path::new(&config.db), uid, zkm.clone())?;
-      Ok(ServerResponse {
-        what: "deleted_zkmember".to_string(),
-        content: serde_json::to_value(zkm)?,
-      })
-    }
-    "getzklisting" => {
-      let entries = sqldata::zklisting(Path::new(&config.db), uid)?;
-      Ok(ServerResponse {
-        what: "zklisting".to_string(),
-        content: serde_json::to_value(entries)?,
-      })
-    }
+
     "getzknote" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let id: i64 = serde_json::from_value(msgdata.clone())?;
@@ -222,7 +164,7 @@ fn user_interface_loggedin(
     "getzknoteedit" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let gzne: sqldata::GetZkNoteEdit = serde_json::from_value(msgdata.clone())?;
-      let conn = sqldata::connection_open(Path::new(&config.db))?;
+      let conn = sqldata::connection_open(config.db.as_path())?;
       let note = sqldata::read_zknoteedit(&conn, uid, &gzne)?;
       Ok(ServerResponse {
         what: "zknoteedit".to_string(),
@@ -231,8 +173,9 @@ fn user_interface_loggedin(
     }
     "searchzknotes" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let search: data::ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
-      let res = sqldata::search_zknotes(Path::new(&config.db), uid, &search)?;
+      let search: search::ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
+      let conn = sqldata::connection_open(config.db.as_path())?;
+      let res = search::search_zknotes(&conn, uid, &search)?;
       Ok(ServerResponse {
         what: "zknotesearchresult".to_string(),
         content: serde_json::to_value(res)?,
@@ -259,7 +202,7 @@ fn user_interface_loggedin(
     "savezklinks" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let msg: sqldata::ZkLinks = serde_json::from_value(msgdata.clone())?;
-      let s = sqldata::save_zklinks(&config.db.as_path(), uid, msg.zk, msg.links)?;
+      let s = sqldata::save_zklinks(&config.db.as_path(), uid, msg.links)?;
       Ok(ServerResponse {
         what: "savedzklinks".to_string(),
         content: serde_json::to_value(s)?,
@@ -270,10 +213,7 @@ fn user_interface_loggedin(
       let gzl: sqldata::GetZkLinks = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.db.as_path())?;
       let s = sqldata::read_zklinks(&conn, uid, &gzl)?;
-      let zklinks = sqldata::ZkLinks {
-        zk: gzl.zk,
-        links: s,
-      };
+      let zklinks = sqldata::ZkLinks { links: s };
       Ok(ServerResponse {
         what: "zklinks".to_string(),
         content: serde_json::to_value(zklinks)?,
@@ -298,7 +238,7 @@ pub fn public_interface(
       let id: i64 = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.db.as_path())?;
       let note = sqldata::read_zknote(&conn, None, id)?;
-      if note.public {
+      if sqldata::is_zknote_public(&conn, note.id)? {
         Ok(ServerResponse {
           what: "zknote".to_string(),
           content: serde_json::to_value(note)?,
@@ -306,15 +246,16 @@ pub fn public_interface(
       } else {
         Ok(ServerResponse {
           what: "privatezknote".to_string(),
-          content: serde_json::to_value(note)?,
+          content: serde_json::to_value(note.id)?,
         })
       }
     }
     "getzknotepubid" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let pubid: String = serde_json::from_value(msgdata.clone())?;
-      let note = sqldata::read_zknotepubid(Path::new(&config.db), None, pubid.as_str())?;
-      if note.public {
+      let conn = sqldata::connection_open(config.db.as_path())?;
+      let note = sqldata::read_zknotepubid(&conn, None, pubid.as_str())?;
+      if sqldata::is_zknote_public(&conn, note.id)? {
         Ok(ServerResponse {
           what: "zknote".to_string(),
           content: serde_json::to_value(note)?,
@@ -322,7 +263,7 @@ pub fn public_interface(
       } else {
         Ok(ServerResponse {
           what: "privatezknote".to_string(),
-          content: serde_json::to_value(note)?,
+          content: serde_json::to_value(note.id)?,
         })
       }
     }

@@ -24,7 +24,7 @@ type Msg
 
 
 type alias Model =
-    { zk : Data.Zk
+    { uid : Int
     , notes : Data.ZkNoteSearchResult
     , spmodel : SP.Model
     }
@@ -58,8 +58,7 @@ view size model =
             245
     in
     E.column [ E.spacing 8, E.padding 8, E.width (E.maximum maxwidth E.fill), E.centerX ]
-        [ E.row [] [ E.text "zettelkasten: ", E.row [ Font.bold ] [ E.text model.zk.name ] ]
-        , E.row [ E.spacing 8 ]
+        [ E.row [ E.spacing 8 ]
             [ E.text "select a zk note"
             , EI.button Common.buttonStyle { onPress = Just NewPress, label = E.text "new" }
             , EI.button Common.buttonStyle { onPress = Just ExamplePress, label = E.text "example" }
@@ -88,15 +87,18 @@ view size model =
                   , view =
                         \n ->
                             E.row [ E.spacing 8 ]
-                                [ EI.button Common.buttonStyle { onPress = Just (SelectPress n.id), label = E.text "edit" }
-
-                                -- , EI.button Common.buttonStyle { onPress = Just (ViewPress n.id), label = E.text "view" }
-                                -- , E.link [ Font.color TC.darkBlue, Font.underline ] { url = "note/" ++ String.fromInt n.id, label = E.text "link" }
-                                , if n.public then
-                                    E.text "public"
+                                [ if n.user == model.uid then
+                                    EI.button
+                                        Common.buttonStyle
+                                        { onPress = Just (SelectPress n.id), label = E.text "edit" }
 
                                   else
-                                    E.text "      "
+                                    EI.button
+                                        (Common.buttonStyle
+                                            ++ [ EBk.color TC.lightBlue
+                                               ]
+                                        )
+                                        { onPress = Just (SelectPress n.id), label = E.text "show" }
                                 ]
                   }
                 ]

@@ -24,9 +24,9 @@ extern crate barrel;
 extern crate base64;
 
 mod config;
-mod data;
 mod email;
 mod interfaces;
+mod search;
 mod sqldata;
 mod util;
 

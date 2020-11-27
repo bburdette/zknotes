@@ -27,7 +27,6 @@ import Util exposing (first, rest)
 
 type alias ZkNoteSearch =
     { tagSearch : TagSearch
-    , zks : List Int
     , offset : Int
     , limit : Maybe Int
     }
@@ -38,10 +37,9 @@ defaultSearchLimit =
     25
 
 
-defaultSearch : Int -> ZkNoteSearch
-defaultSearch zkid =
+defaultSearch : ZkNoteSearch
+defaultSearch =
     { tagSearch = SearchTerm [] ""
-    , zks = [ zkid ]
     , offset = 0
     , limit = Just defaultSearchLimit
     }
@@ -51,6 +49,7 @@ type SearchMod
     = ExactMatch
     | Tag
     | Note
+    | User
 
 
 type TagSearch
@@ -80,6 +79,9 @@ encodeSearchMod smod =
 
         Note ->
             JE.string "Note"
+
+        User ->
+            JE.string "User"
 
 
 encodeTagSearch : TagSearch -> JE.Value
@@ -129,7 +131,6 @@ encodeZkNoteSearch : ZkNoteSearch -> JE.Value
 encodeZkNoteSearch zns =
     JE.object <|
         [ ( "tagsearch", encodeTagSearch zns.tagSearch )
-        , ( "zks", JE.list JE.int zns.zks )
         , ( "offset", JE.int zns.offset )
         ]
             ++ (zns.limit
@@ -149,6 +150,9 @@ showSearchMod mod =
 
         Note ->
             "Note"
+
+        User ->
+            "User"
 
 
 showAndOr : AndOr -> String
@@ -186,6 +190,9 @@ printSearchMod mod =
         Note ->
             "n"
 
+        User ->
+            "u"
+
 
 printAndOr : AndOr -> String
 printAndOr ao =
@@ -219,6 +226,8 @@ searchMod =
             |. symbol "t"
         , succeed Note
             |. symbol "n"
+        , succeed User
+            |. symbol "u"
         ]
 
 
