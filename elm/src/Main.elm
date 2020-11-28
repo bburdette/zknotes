@@ -315,10 +315,10 @@ viewState size state =
             Element.map ShowMessageMsg <| ShowMessage.view em
 
         View em ->
-            Element.map ViewMsg <| View.view em False
+            Element.map ViewMsg <| View.view size.width em False
 
         EView em _ ->
-            Element.map ViewMsg <| View.view em True
+            Element.map ViewMsg <| View.view size.width em True
 
         BadError em _ ->
             Element.map BadErrorMsg <| BadError.view em

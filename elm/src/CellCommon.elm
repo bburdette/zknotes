@@ -74,8 +74,8 @@ defCell s =
     { code = s, prog = Err "", runstate = RsErr "" }
 
 
-mkRenderer : CellDict -> (String -> String -> a) -> Markdown.Renderer.Renderer (Element a)
-mkRenderer cellDict onchanged =
+mkRenderer : Int -> CellDict -> (String -> String -> a) -> Markdown.Renderer.Renderer (Element a)
+mkRenderer maxw cellDict onchanged =
     { heading = heading
     , paragraph =
         E.paragraph
@@ -106,10 +106,18 @@ mkRenderer cellDict onchanged =
         \image ->
             case image.title of
                 Just title ->
-                    E.image [ E.width E.fill ] { src = image.src, description = image.alt }
+                    E.image [ E.width <| E.maximum maxw E.shrink ] { src = image.src, description = image.alt }
 
                 Nothing ->
-                    E.image [ E.width E.fill ] { src = image.src, description = image.alt }
+                    E.image [ E.width <| E.maximum maxw E.shrink ] { src = image.src, description = image.alt }
+
+    {- case image.title of
+       Just title ->
+           E.image [ E.width E.fill ] { src = image.src, description = image.alt }
+
+       Nothing ->
+           E.image [ E.width E.fill ] { src = image.src, description = image.alt }
+    -}
     , blockQuote =
         \children ->
             E.column

@@ -324,8 +324,23 @@ zknview size model =
         public =
             isPublic model
 
+        -- super lame math because images suck in html/elm-ui
+        mdw =
+            min 1000
+                (case wclass of
+                    Narrow ->
+                        size.width
+
+                    Medium ->
+                        size.width - 400 - 8
+
+                    Wide ->
+                        size.width - 400 - 500 - 16
+                )
+                - (60 * 2 + 6)
+
         mdview =
-            case markdownView (mkRenderer model.cells OnSchelmeCodeChanged) model.md of
+            case markdownView (mkRenderer mdw model.cells OnSchelmeCodeChanged) model.md of
                 Ok rendered ->
                     E.column
                         [ E.width E.fill

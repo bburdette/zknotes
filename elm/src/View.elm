@@ -40,8 +40,12 @@ type Command
     | Done
 
 
-view : Model -> Bool -> Element Msg
-view model loggedin =
+view : Int -> Model -> Bool -> Element Msg
+view maxw model loggedin =
+    let
+        mw =
+            min maxw 1000 - 160
+    in
     E.column
         [ E.width E.fill ]
         [ if loggedin then
@@ -53,7 +57,7 @@ view model loggedin =
             E.none
         , E.text model.title
         , E.row [ E.width E.fill ]
-            [ case markdownView (mkRenderer model.cells OnSchelmeCodeChanged) model.md of
+            [ case markdownView (mkRenderer mw model.cells OnSchelmeCodeChanged) model.md of
                 Ok rendered ->
                     E.column
                         [ E.spacing 30
