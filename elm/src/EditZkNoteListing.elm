@@ -62,7 +62,7 @@ view size model =
             [ E.text "select a zk note"
             , EI.button Common.buttonStyle { onPress = Just NewPress, label = E.text "new" }
             , EI.button Common.buttonStyle { onPress = Just ExamplePress, label = E.text "example" }
-            , EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "done" }
+            , EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "logout" }
             ]
         , E.map SPMsg <| SP.view (size.width < maxwidth) 0 model.spmodel
         , E.table [ E.spacing 10, E.width (E.maximum maxwidth E.fill), E.centerX ]
