@@ -928,17 +928,19 @@ pub fn save_zklinks(dbfile: &Path, uid: i64, zklinks: Vec<ZkLink>) -> Result<(),
   let conn = connection_open(dbfile)?;
 
   for zklink in zklinks.iter() {
-    if zklink.delete == Some(true) {
-      conn.execute(
-        "delete from zklink where fromid = ?1 and toid = ?2 and user = ?3",
-        params![zklink.from, zklink.to, uid],
-      )?;
-    } else if zklink.user == uid {
-      conn.execute(
+    if zklink.user == uid {
+      if zklink.delete == Some(true) {
+        conn.execute(
+          "delete from zklink where fromid = ?1 and toid = ?2 and user = ?3",
+          params![zklink.from, zklink.to, uid],
+        )?;
+      } else {
+        conn.execute(
         "insert into zklink (fromid, toid, user, linkzknote) values (?1, ?2, ?3, ?4)
           on conflict (fromid, toid, user) do update set linkzknote = ?4 where fromid = ?1 and toid = ?2 and user = ?3",
         params![zklink.from, zklink.to, uid, zklink.linkzknote],
       )?;
+      }
     }
   }
 
