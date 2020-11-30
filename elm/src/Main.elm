@@ -66,7 +66,7 @@ type State
     | BadError BadError.Model State
     | ShowMessage ShowMessage.Model Data.LoggedIn
     | PubShowMessage ShowMessage.Model
-    | LoginShowMessage ShowMessage.Model (Data.Login {})
+    | LoginShowMessage ShowMessage.Model (Data.Login {}) Url
     | Wait State (State -> Msg -> ( State, Cmd Msg ))
 
 
@@ -233,18 +233,16 @@ routeState model route =
                 st ->
                     case stateLogin st of
                         Just login ->
-                            -- uh, no zk?  have to load it?
-                            -- I guess check for membership/load zk
-                            -- take the search results and state and load away.
-                            -- don't know the zk for the note.
-                            Just
-                                ( BadError
-                                    { errorMessage = "note load unimplemented from this state!"
+                            Just <|
+                                loadnote model
+                                    { login = login
+                                    , mbzknotesearchresult = Nothing
+                                    , mbzklinks = Nothing
+                                    , mbzknote = Nothing
+                                    , spmodel = SP.initModel
+                                    , navkey = model.navkey
                                     }
-                                    model.state
-                                , Cmd.none
-                                  -- , Browser.Navigation.replaceUrl model.navkey "/"
-                                )
+                                    id
 
                         Nothing ->
                             Nothing
@@ -311,7 +309,7 @@ viewState size state =
         PubShowMessage em ->
             Element.map ShowMessageMsg <| ShowMessage.view em
 
-        LoginShowMessage em _ ->
+        LoginShowMessage em _ _ ->
             Element.map ShowMessageMsg <| ShowMessage.view em
 
         View em ->
@@ -354,7 +352,7 @@ stateLogin state =
         PubShowMessage _ ->
             Nothing
 
-        LoginShowMessage _ _ ->
+        LoginShowMessage _ _ _ ->
             Nothing
 
         Wait wstate _ ->
@@ -774,32 +772,50 @@ actualupdate msg model =
                                             ]
                                         )
                             in
-                            case stateLogin state of
-                                Just login ->
-                                    getlisting { login | ld = logindata }
+                            case state of
+                                Login lm ->
+                                    let
+                                        login =
+                                            { uid = lm.userId, pwd = lm.password, ld = logindata }
+                                    in
+                                    -- we're logged in!  Get article listing.
+                                    getlisting login
 
-                                Nothing ->
-                                    case state of
-                                        Login lm ->
-                                            let
-                                                login =
-                                                    { uid = lm.userId, pwd = lm.password, ld = logindata }
-                                            in
-                                            -- we're logged in!  Get article listing.
-                                            getlisting login
+                                LoginShowMessage _ li url ->
+                                    let
+                                        login =
+                                            { uid = li.uid, pwd = li.pwd, ld = logindata }
 
-                                        LoginShowMessage _ li ->
-                                            let
-                                                login =
-                                                    { uid = li.uid, pwd = li.pwd, ld = logindata }
-                                            in
-                                            -- we're logged in!  Get article listing.
-                                            getlisting login
+                                        lgmod =
+                                            { model | state = ShowMessage { message = "logged in" } login }
 
-                                        _ ->
-                                            ( { model | state = BadError (BadError.initialModel "unexpected login reply") state }
-                                            , Cmd.none
-                                            )
+                                        ( m, cmd ) =
+                                            parseUrl url
+                                                |> Maybe.andThen
+                                                    (\s ->
+                                                        case s of
+                                                            Top ->
+                                                                Nothing
+
+                                                            _ ->
+                                                                Just s
+                                                    )
+                                                |> Maybe.andThen
+                                                    (routeState
+                                                        lgmod
+                                                    )
+                                                |> Maybe.map (\( st, cm ) -> ( { model | state = st }, cm ))
+                                                |> Maybe.withDefault
+                                                    (getlisting login)
+                                    in
+                                    ( m, cmd )
+
+                                -- we're logged in!  Get article listing.
+                                -- getlisting login
+                                _ ->
+                                    ( { model | state = BadError (BadError.initialModel "unexpected login reply") state }
+                                    , Cmd.none
+                                    )
 
                         UI.ZkNoteSearchResult sr ->
                             case state of
@@ -1190,13 +1206,7 @@ init flags url key =
             initialSeed (flags.seed + 7)
 
         model =
-            { state =
-                case flags.login of
-                    Nothing ->
-                        PubShowMessage { message = "initial state" }
-
-                    Just login ->
-                        LoginShowMessage { message = "logging in" } login
+            { state = PubShowMessage { message = "initial state" }
             , size = { width = flags.width, height = flags.height }
             , location = flags.location
             , navkey = key
@@ -1204,44 +1214,42 @@ init flags url key =
             , savedRoute = { route = Top, save = False }
             }
 
-        lgincmd =
+        ( state, cmd ) =
             case flags.login of
                 Nothing ->
-                    []
+                    parseUrl url
+                        |> Maybe.andThen
+                            (\s ->
+                                case s of
+                                    Top ->
+                                        Nothing
+
+                                    _ ->
+                                        Just s
+                            )
+                        |> Maybe.andThen
+                            (routeState
+                                model
+                            )
+                        |> Maybe.withDefault
+                            ( case flags.login of
+                                Just _ ->
+                                    model.state
+
+                                Nothing ->
+                                    initLogin flags.login seed
+                            , Browser.Navigation.replaceUrl key "/"
+                            )
 
                 Just login ->
-                    [ sendUIMsg model.location
+                    ( LoginShowMessage { message = "logging in" } login url
+                    , sendUIMsg model.location
                         login
                         UI.Login
-                    ]
-
-        ( state, cmd ) =
-            parseUrl url
-                |> Maybe.andThen
-                    (\s ->
-                        case s of
-                            Top ->
-                                Nothing
-
-                            _ ->
-                                Just s
-                    )
-                |> Maybe.andThen
-                    (routeState
-                        model
-                    )
-                |> Maybe.withDefault
-                    ( case flags.login of
-                        Just _ ->
-                            model.state
-
-                        Nothing ->
-                            initLogin flags.login seed
-                    , Browser.Navigation.replaceUrl key "/"
                     )
     in
     ( { model | state = state }
-    , Cmd.batch <| cmd :: lgincmd
+    , cmd
     )
 
 
