@@ -18,7 +18,6 @@ type Msg
     = SelectPress Int
     | ViewPress Int
     | NewPress
-    | ExamplePress
     | DonePress
     | SPMsg SP.Msg
 
@@ -34,7 +33,6 @@ type Command
     = Selected Int
     | View Int
     | New
-    | Example
     | Done
     | None
     | Search S.ZkNoteSearch
@@ -61,7 +59,6 @@ view size model =
         [ E.row [ E.spacing 8 ]
             [ E.text "select a zk note"
             , EI.button Common.buttonStyle { onPress = Just NewPress, label = E.text "new" }
-            , EI.button Common.buttonStyle { onPress = Just ExamplePress, label = E.text "example" }
             , EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "logout" }
             ]
         , E.map SPMsg <| SP.view (size.width < maxwidth) 0 model.spmodel
@@ -118,9 +115,6 @@ update msg model =
             ( model
             , View id
             )
-
-        ExamplePress ->
-            ( model, Example )
 
         NewPress ->
             ( model, New )

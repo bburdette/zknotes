@@ -1125,9 +1125,6 @@ actualupdate msg model =
                 EditZkNoteListing.New ->
                     ( { model | state = EditZkNote (EditZkNote.initNew login.ld es.notes emod.spmodel) login }, Cmd.none )
 
-                EditZkNoteListing.Example ->
-                    ( { model | state = EditZkNote (EditZkNote.initExample login.ld es.notes emod.spmodel) login }, Cmd.none )
-
                 EditZkNoteListing.Selected id ->
                     let
                         ( st, cmd ) =

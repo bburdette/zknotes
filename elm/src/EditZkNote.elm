@@ -8,7 +8,6 @@ module EditZkNote exposing
     , dirty
     , gotId
     , gotSelectedText
-    , initExample
     , initFull
     , initNew
     , noteLink
@@ -651,35 +650,6 @@ initNew ld zkl spm =
     , cells = getCd cc
     , revert = Nothing
     , spmodel = SP.searchResultUpdated zkl spm
-    , navchoice = NcEdit
-    , dialog = Nothing
-    }
-
-
-initExample : Data.LoginData -> Data.ZkNoteSearchResult -> SP.Model -> Model
-initExample ld zkl spm =
-    let
-        cells =
-            markdownBody
-                |> mdCells
-                |> Result.withDefault (CellDict Dict.empty)
-
-        ( cc, result ) =
-            evalCellsFully
-                (mkCc cells)
-    in
-    { id = Nothing
-    , ld = ld
-    , noteUser = ld.userid
-    , zknSearchResult = zkl
-    , zklDict = Dict.empty
-    , initialZklDict = Dict.empty
-    , pubidtxt = ""
-    , title = "example"
-    , md = markdownBody
-    , cells = getCd cc
-    , revert = Nothing
-    , spmodel = spm
     , navchoice = NcEdit
     , dialog = Nothing
     }

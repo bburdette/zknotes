@@ -56,8 +56,6 @@
       var uid = localStorage.getItem("uid");
       var pwd = localStorage.getItem("pwd");
       var id = localStorage.getItem("id");
-      console.log("uid: ", uid);
-      console.log("pwd: ", pwd);
 
       var login = null;
 
@@ -65,8 +63,6 @@
         login = { uid : uid, pwd : pwd, id : Number(id) };
       }
 
-      console.log("login: ", login);
-      
       app = Elm.Main.init({
         node: document.getElementById('elm'),
         flags: { seed : Math.floor(Math.random()*0x0FFFFFFF), 

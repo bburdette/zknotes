@@ -1,4 +1,4 @@
-module CellCommon exposing (blockCells, cellView, code, codeBlock, defCell, heading, markdownBody, markdownView, mdCells, mkRenderer, rawTextToId, showRunState)
+module CellCommon exposing (blockCells, cellView, code, codeBlock, defCell, heading, markdownView, mdCells, mkRenderer, rawTextToId, showRunState)
 
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
@@ -308,31 +308,3 @@ codeBlock details =
             ]
         ]
         (E.text details.body)
-
-
-markdownBody : String
-markdownBody =
-    """# Markdown Schelme Cells!
-
-###[elm-markdown](https://github.com/dillonkearns/elm-markdown) + [schelme](https://github.com/bburdette/schelme) + [cellme](https://github.com/bburdette/cellme) + [elm-ui](https://github.com/mdgriffith/elm-ui)
-
-#####Kind of a spreadsheet,  but with named cells instead of a grid.
-
-<cell
-  name="inches"
-  schelmeCode="5"
->
-</cell>
-
-<cell
-  name="millimeters"
-  schelmeCode="(* (cv /'inches/') 25.4)"
->
-</cell>
-
-<cell
-  name="furlongs"
-  schelmeCode="(/ (cv /'inches/') (* 12 660))"
->
-</cell>
-"""
