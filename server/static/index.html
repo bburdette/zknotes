@@ -55,12 +55,11 @@
 
       var uid = localStorage.getItem("uid");
       var pwd = localStorage.getItem("pwd");
-      var id = localStorage.getItem("id");
 
       var login = null;
 
-      if (uid && pwd && id) {
-        login = { uid : uid, pwd : pwd, id : Number(id) };
+      if (uid && pwd) {
+        login = { uid : uid, pwd : pwd };
       }
 
       app = Elm.Main.init({
