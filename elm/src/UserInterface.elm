@@ -1,4 +1,4 @@
-module UserInterface exposing (SendMsg(..), ServerResponse(..), encodeEmail, encodeSendMsg, serverResponseDecoder)
+module UserInterface exposing (SendMsg(..), ServerResponse(..), encodeEmail, encodeSendMsg, serverResponseDecoder, showServerResponse)
 
 import Data
 import Json.Decode as JD
@@ -32,6 +32,49 @@ type ServerResponse
     | ServerError String
     | SavedZkLinks
     | ZkLinks Data.ZkLinks
+
+
+showServerResponse : ServerResponse -> String
+showServerResponse sr =
+    case sr of
+        RegistrationSent ->
+            "RegistrationSent"
+
+        UserExists ->
+            "UserExists"
+
+        UnregisteredUser ->
+            "UnregisteredUser"
+
+        InvalidUserOrPwd ->
+            "InvalidUserOrPwd"
+
+        LoggedIn _ ->
+            "LoggedIn"
+
+        ZkNoteSearchResult _ ->
+            "ZkNoteSearchResult"
+
+        SavedZkNote _ ->
+            "SavedZkNote"
+
+        DeletedZkNote _ ->
+            "DeletedZkNote"
+
+        ZkNote _ ->
+            "ZkNote"
+
+        ZkNoteEdit _ ->
+            "ZkNoteEdit"
+
+        ServerError _ ->
+            "ServerError"
+
+        SavedZkLinks ->
+            "SavedZkLinks"
+
+        ZkLinks _ ->
+            "ZkLinks"
 
 
 encodeSendMsg : SendMsg -> String -> String -> JE.Value

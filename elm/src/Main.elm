@@ -291,6 +291,96 @@ stateRoute state =
             }
 
 
+showMessage : Msg -> String
+showMessage msg =
+    case msg of
+        LoginMsg _ ->
+            "LoginMsg"
+
+        BadErrorMsg _ ->
+            "BadErrorMsg"
+
+        ViewMsg _ ->
+            "ViewMsg"
+
+        EditZkNoteMsg _ ->
+            "EditZkNoteMsg"
+
+        EditZkNoteListingMsg _ ->
+            "EditZkNoteListingMsg"
+
+        ShowMessageMsg _ ->
+            "ShowMessageMsg"
+
+        UserReplyData _ ->
+            "UserReplyData"
+
+        PublicReplyData _ ->
+            "PublicReplyData"
+
+        LoadUrl _ ->
+            "LoadUrl"
+
+        InternalUrl _ ->
+            "InternalUrl"
+
+        SelectedText _ ->
+            "SelectedText"
+
+        UrlChanged _ ->
+            "UrlChanged"
+
+        WindowSize _ ->
+            "WindowSize"
+
+        Noop ->
+            "Noop"
+
+
+showState : State -> String
+showState state =
+    case state of
+        Login _ ->
+            "Login"
+
+        EditZkNote _ _ ->
+            "EditZkNote"
+
+        EditZkNoteListing _ _ ->
+            "EditZkNoteListing"
+
+        View _ ->
+            "View"
+
+        EView _ _ ->
+            "EView"
+
+        BadError _ _ ->
+            "BadError"
+
+        ShowMessage _ _ ->
+            "ShowMessage"
+
+        PubShowMessage _ ->
+            "PubShowMessage"
+
+        LoginShowMessage _ _ _ ->
+            "LoginShowMessage"
+
+        Wait _ _ ->
+            "Wait"
+
+
+unexpectedMsg : State -> Msg -> State
+unexpectedMsg state msg =
+    unexpectedMessage state (showMessage msg)
+
+
+unexpectedMessage : State -> String -> State
+unexpectedMessage state msg =
+    BadError (BadError.initialModel <| "unexpected message - " ++ msg ++ "; state was " ++ showState state) state
+
+
 viewState : Util.Size -> State -> Element Msg
 viewState size state =
     case state of
@@ -498,7 +588,7 @@ listingwait login st ms =
             ( BadError (BadError.initialModel e) st, Cmd.none )
 
         _ ->
-            ( BadError (BadError.initialModel "unexpected message!") st
+            ( unexpectedMsg st ms
             , Cmd.none
             )
 
@@ -513,7 +603,7 @@ noteviewwait backstate st ms =
             ( BadError (BadError.initialModel e) st, Cmd.none )
 
         _ ->
-            ( BadError (BadError.initialModel "unexpected message!") st
+            ( unexpectedMsg st ms
             , Cmd.none
             )
 
@@ -650,9 +740,7 @@ actualupdate msg model =
                                                             ( st, Cmd.none )
 
                                                         _ ->
-                                                            ( BadError
-                                                                (BadError.initialModel "unexpected message after zknote save")
-                                                                st
+                                                            ( unexpectedMsg st ms
                                                             , Cmd.none
                                                             )
                                                 )
@@ -813,7 +901,7 @@ actualupdate msg model =
                                 -- we're logged in!  Get article listing.
                                 -- getlisting login
                                 _ ->
-                                    ( { model | state = BadError (BadError.initialModel "unexpected login reply") state }
+                                    ( { model | state = unexpectedMessage state "LoggedIn" }
                                     , Cmd.none
                                     )
 
@@ -835,14 +923,16 @@ actualupdate msg model =
                                     )
 
                                 _ ->
-                                    ( { model | state = BadError (BadError.initialModel "unexpected zknote listing") state }
+                                    ( { model | state = unexpectedMessage state (UI.showServerResponse uiresponse) }
                                     , Cmd.none
                                     )
 
                         UI.ZkNote _ ->
                             case state of
                                 _ ->
-                                    ( { model | state = BadError (BadError.initialModel <| "unexpected message: zknote") state }, Cmd.none )
+                                    ( { model | state = unexpectedMessage state (UI.showServerResponse uiresponse) }
+                                    , Cmd.none
+                                    )
 
                         UI.ZkNoteEdit zne ->
                             case stateLogin state of
@@ -862,7 +952,9 @@ actualupdate msg model =
                                     )
 
                                 _ ->
-                                    ( { model | state = BadError (BadError.initialModel <| "unexpected message: zknoteedit") state }, Cmd.none )
+                                    ( { model | state = unexpectedMessage state (UI.showServerResponse uiresponse) }
+                                    , Cmd.none
+                                    )
 
                         UI.SavedZkNote szkn ->
                             case state of
@@ -897,7 +989,9 @@ actualupdate msg model =
                                     ( { model | state = Login <| Login.userExists lmod }, Cmd.none )
 
                                 _ ->
-                                    ( { model | state = BadError (BadError.initialModel "unexpected message - UserExists") state }, Cmd.none )
+                                    ( { model | state = unexpectedMessage state (UI.showServerResponse uiresponse) }
+                                    , Cmd.none
+                                    )
 
                         UI.UnregisteredUser ->
                             case state of
@@ -905,7 +999,9 @@ actualupdate msg model =
                                     ( { model | state = Login <| Login.unregisteredUser lmod }, Cmd.none )
 
                                 _ ->
-                                    ( { model | state = BadError (BadError.initialModel "unexpected message - UnregisteredUser") state }, Cmd.none )
+                                    ( { model | state = unexpectedMessage state (UI.showServerResponse uiresponse) }
+                                    , Cmd.none
+                                    )
 
                         UI.InvalidUserOrPwd ->
                             case state of
@@ -913,12 +1009,7 @@ actualupdate msg model =
                                     ( { model | state = Login <| Login.invalidUserOrPwd lmod }, Cmd.none )
 
                                 _ ->
-                                    ( { model
-                                        | state =
-                                            BadError
-                                                (BadError.initialModel "unexpected message - InvalidUserOrPwd")
-                                                (Login (Login.initialModel Nothing "zknotes" model.seed))
-                                      }
+                                    ( { model | state = unexpectedMessage (Login (Login.initialModel Nothing "zknotes" model.seed)) (UI.showServerResponse uiresponse) }
                                     , Cmd.none
                                     )
 
@@ -956,12 +1047,14 @@ actualupdate msg model =
                         | state =
                             EditZkNoteListing { uid = login.ld.userid, notes = emod.zknSearchResult, spmodel = emod.spmodel } login
                       }
-                    , Cmd.batch
-                        [ sendUIMsg model.location
-                            login
-                            (UI.SearchZkNotes S.defaultSearch)
-                        , Cmd.none
-                        ]
+                    , case SP.getSearch emod.spmodel of
+                        Just s ->
+                            sendUIMsg model.location
+                                login
+                                (UI.SearchZkNotes s)
+
+                        Nothing ->
+                            Cmd.none
                     )
             in
             case ecmd of
@@ -1005,7 +1098,7 @@ actualupdate msg model =
                                     ( BadError (BadError.initialModel e) st, Cmd.none )
 
                                 _ ->
-                                    ( BadError (BadError.initialModel "unexpected message!") model.state
+                                    ( unexpectedMsg model.state ms
                                     , Cmd.none
                                     )
                     in

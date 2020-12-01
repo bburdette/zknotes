@@ -92,7 +92,7 @@ fn public(
 }
 
 fn user(state: web::Data<Config>, item: web::Json<UserMessage>, _req: HttpRequest) -> HttpResponse {
-  println!("user msg: {:?}", &item.data);
+  println!("user msg: {}, {:?}", &item.what, &item.data);
 
   match interfaces::user_interface(&state, item.into_inner()) {
     Ok(sr) => HttpResponse::Ok().json(sr),
