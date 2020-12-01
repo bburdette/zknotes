@@ -277,6 +277,12 @@ zknview size model =
             model.ld.userid
                 /= model.noteUser
 
+        showLinks =
+            E.row [ Font.bold ] [ E.text "links" ]
+                :: List.map
+                    (showZkl dirtybutton model.ld.userid model.id)
+                    (Dict.values model.zklDict)
+
         mdedit =
             E.column
                 [ E.spacing 8
@@ -290,7 +296,8 @@ zknview size model =
                             E.fill
 
                         Wide ->
-                            E.px 500
+                            E.fill
+                     -- E.px 500
                     )
                 ]
                 (EI.multiline
@@ -314,10 +321,7 @@ zknview size model =
                     , spellcheck = False
                     }
                     -- show the links.
-                    :: E.row [ Font.bold ] [ E.text "links" ]
-                    :: List.map
-                        (showZkl dirtybutton model.ld.userid model.id)
-                        (Dict.values model.zklDict)
+                    :: showLinks
                 )
 
         public =
@@ -345,7 +349,9 @@ zknview size model =
                         [ E.width E.fill
                         , E.centerX
                         , E.alignTop
+                        , E.spacing 8
                         ]
+                    <|
                         [ E.column
                             [ E.centerX
                             , E.paddingXY 30 15
@@ -365,6 +371,12 @@ zknview size model =
                                 rendered
                             ]
                         ]
+                            ++ (if wclass == Wide then
+                                    []
+
+                                else
+                                    showLinks
+                               )
 
                 Err errors ->
                     E.text errors
@@ -621,7 +633,7 @@ initFull ld zkl zknote zklDict spm =
     , cells = getCd cc
     , revert = Just (Data.saveZkNote zknote)
     , spmodel = SP.searchResultUpdated zkl spm
-    , navchoice = NcEdit
+    , navchoice = NcView
     , dialog = Nothing
     }
 
