@@ -53,7 +53,7 @@ view size model =
             700
 
         titlemaxconst =
-            245
+            85
     in
     E.column [ E.spacing 8, E.padding 8, E.width (E.maximum maxwidth E.fill), E.centerX ]
         [ E.row [ E.spacing 8 ]
@@ -62,11 +62,13 @@ view size model =
             , EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "logout" }
             ]
         , E.map SPMsg <| SP.view (size.width < maxwidth) 0 model.spmodel
-        , E.table [ E.spacing 10, E.width (E.maximum maxwidth E.fill), E.centerX ]
+        , E.table [ E.spacing 10, E.width E.fill, E.centerX ]
             { data = model.notes.notes
             , columns =
                 [ { header = E.none
                   , width =
+                        -- E.fill
+                        -- clipX doesn't work unless max width is here in px, it seems.
                         E.px <| min maxwidth size.width - titlemaxconst
                   , view =
                         \n ->
