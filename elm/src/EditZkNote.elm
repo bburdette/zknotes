@@ -297,8 +297,8 @@ zknview size model =
 
                         Wide ->
                             E.fill
-                     -- E.px 500
                     )
+                , E.paddingXY 25 0
                 ]
                 (EI.multiline
                     [ if nonme then
