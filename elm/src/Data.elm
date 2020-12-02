@@ -231,6 +231,13 @@ decodeZkNote =
         (JD.field "changeddate" JD.int)
 
 
+decodeZkNoteAndAccomplices : JD.Decoder ZkNoteAndAccomplices
+decodeZkNoteAndAccomplices =
+    JD.map2 ZkNoteAndAccomplices
+        (JD.field "zknote" decodeZkNote)
+        (JD.field "links" (JD.list decodeZkLink))
+
+
 decodeZkNoteEdit : JD.Decoder ZkNoteEdit
 decodeZkNoteEdit =
     JD.map2 ZkNoteEdit

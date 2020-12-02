@@ -241,7 +241,10 @@ pub fn public_interface(
       if sqldata::is_zknote_public(&conn, note.id)? {
         Ok(ServerResponse {
           what: "zknote".to_string(),
-          content: serde_json::to_value(note)?,
+          content: serde_json::to_value(sqldata::ZkNoteAndAccomplices {
+            links: sqldata::read_public_zklinks(&conn, note.id)?,
+            zknote: note,
+          })?,
         })
       } else {
         Ok(ServerResponse {
@@ -258,7 +261,10 @@ pub fn public_interface(
       if sqldata::is_zknote_public(&conn, note.id)? {
         Ok(ServerResponse {
           what: "zknote".to_string(),
-          content: serde_json::to_value(note)?,
+          content: serde_json::to_value(sqldata::ZkNoteAndAccomplices {
+            links: sqldata::read_public_zklinks(&conn, note.id)?,
+            zknote: note,
+          })?,
         })
       } else {
         Ok(ServerResponse {

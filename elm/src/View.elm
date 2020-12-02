@@ -19,11 +19,13 @@ import Markdown.Html
 import Markdown.Parser
 import Markdown.Renderer
 import Schelme.Show exposing (showTerm)
+import TangoColors as TC
 
 
 type Msg
     = OnSchelmeCodeChanged String String
     | DonePress
+    | SwitchPress Int
 
 
 type alias Model =
@@ -32,12 +34,63 @@ type alias Model =
     , title : String
     , md : String
     , cells : CellDict
+    , zklinks : List Data.ZkLink
     }
 
 
 type Command
     = None
     | Done
+    | Switch Int
+
+
+zkLinkName : Data.ZkLink -> Int -> String
+zkLinkName zklink noteid =
+    if noteid == zklink.from then
+        zklink.toname |> Maybe.withDefault (String.fromInt zklink.to)
+
+    else if noteid == zklink.to then
+        zklink.fromname |> Maybe.withDefault (String.fromInt zklink.from)
+
+    else
+        "link error"
+
+
+showZkl : Int -> Data.ZkLink -> Element Msg
+showZkl id zkl =
+    let
+        ( dir, otherid ) =
+            case ( zkl.from == id, zkl.to == id ) of
+                ( True, False ) ->
+                    ( E.text "->", Just zkl.to )
+
+                ( False, True ) ->
+                    ( E.text "<-", Just zkl.from )
+
+                _ ->
+                    ( E.text "", Nothing )
+    in
+    E.row [ E.spacing 8, E.width E.fill ]
+        [ dir
+        , id
+            |> zkLinkName zkl
+            |> (\s ->
+                    E.row
+                        [ E.clipX
+                        , E.centerY
+                        , E.height E.fill
+                        , E.width E.fill
+                        ]
+                        [ E.text s
+                        ]
+               )
+        , case otherid of
+            Just zknoteid ->
+                EI.button [ E.alignRight ] { onPress = Just (SwitchPress zknoteid), label = E.text "↗" }
+
+            Nothing ->
+                E.none
+        ]
 
 
 view : Int -> Model -> Bool -> Element Msg
@@ -48,15 +101,15 @@ view maxw model loggedin =
     in
     E.column
         [ E.width E.fill ]
-        [ if loggedin then
+        ([ if loggedin then
             E.row []
                 [ EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "Done" }
                 ]
 
-          else
+           else
             E.none
-        , E.text model.title
-        , E.row [ E.width E.fill ]
+         , E.text model.title
+         , E.row [ E.width E.fill ]
             [ case markdownView (mkRenderer mw model.cells OnSchelmeCodeChanged) model.md of
                 Ok rendered ->
                     E.column
@@ -70,12 +123,26 @@ view maxw model loggedin =
                 Err errors ->
                     E.text errors
             ]
-        ]
+         ]
+            ++ (model.id
+                    |> Maybe.map
+                        (\id ->
+                            E.row [ Font.bold ] [ E.text "links" ]
+                                :: List.map
+                                    (showZkl id)
+                                    model.zklinks
+                        )
+                    |> Maybe.withDefault []
+               )
+        )
 
 
-initFull : Data.ZkNote -> Model
-initFull zknote =
+initFull : Data.ZkNoteAndAccomplices -> Model
+initFull zknaa =
     let
+        zknote =
+            zknaa.zknote
+
         cells =
             zknote.content
                 |> mdCells
@@ -90,11 +157,12 @@ initFull zknote =
     , title = zknote.title
     , md = zknote.content
     , cells = getCd cc
+    , zklinks = zknaa.links
     }
 
 
-initSzn : Data.SaveZkNote -> Model
-initSzn zknote =
+initSzn : Data.SaveZkNote -> List Data.ZkLink -> Model
+initSzn zknote links =
     let
         cells =
             zknote.content
@@ -110,6 +178,7 @@ initSzn zknote =
     , title = zknote.title
     , md = zknote.content
     , cells = getCd cc
+    , zklinks = links
     }
 
 
@@ -118,6 +187,9 @@ update msg model =
     case msg of
         DonePress ->
             ( model, Done )
+
+        SwitchPress id ->
+            ( model, Switch id )
 
         OnSchelmeCodeChanged name string ->
             let

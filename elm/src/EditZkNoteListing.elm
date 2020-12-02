@@ -16,7 +16,6 @@ import Util
 
 type Msg
     = SelectPress Int
-    | ViewPress Int
     | NewPress
     | DonePress
     | SPMsg SP.Msg
@@ -31,7 +30,6 @@ type alias Model =
 
 type Command
     = Selected Int
-    | View Int
     | New
     | Done
     | None
@@ -111,11 +109,6 @@ update msg model =
         SelectPress id ->
             ( model
             , Selected id
-            )
-
-        ViewPress id ->
-            ( model
-            , View id
             )
 
         NewPress ->

@@ -73,6 +73,12 @@ pub struct ZkNoteEdit {
   pub links: Vec<ZkLink>,
 }
 
+#[derive(Serialize, Debug)]
+pub struct ZkNoteAndAccomplices {
+  pub zknote: ZkNote,
+  pub links: Vec<ZkLink>,
+}
+
 #[derive(Deserialize, Serialize, Debug)]
 pub struct User {
   pub id: i64,
@@ -986,6 +992,49 @@ pub fn read_zklinks(
   )?;
 
   let rec_iter = pstmt.query_map(params![uid, gzl.zknote, pubid], |row| {
+    Ok(ZkLink {
+      from: row.get(0)?,
+      to: row.get(1)?,
+      user: row.get(2)?,
+      delete: None,
+      linkzknote: row.get(3)?,
+      fromname: row.get(4)?,
+      toname: row.get(5)?,
+    })
+  })?;
+
+  let mut pv = Vec::new();
+
+  for rsrec in rec_iter {
+    match rsrec {
+      Ok(rec) => {
+        pv.push(rec);
+      }
+      Err(_) => (),
+    }
+  }
+
+  Ok(pv)
+}
+
+pub fn read_public_zklinks(conn: &Connection, noteid: i64) -> Result<Vec<ZkLink>, Box<dyn Error>> {
+  let pubid = note_id(&conn, "system", "public")?;
+
+  let mut pstmt = conn.prepare(
+    // return zklinks that link to or from notes that link to 'public'.
+    "select A.fromid, A.toid, A.user, A.linkzknote, L.title, R.title
+      from zklink A, zklink B
+      inner join zknote as L ON A.fromid = L.id
+      inner join zknote as R ON A.toid = R.id
+      where (A.toid = ?1
+      and B.fromid = A.fromid
+      and B.toid = ?2) or (A.fromid = ?1
+      and B.toid = A.toid
+      and B.fromid = ?2)
+      ",
+  )?;
+
+  let rec_iter = pstmt.query_map(params![noteid, pubid], |row| {
     Ok(ZkLink {
       from: row.get(0)?,
       to: row.get(1)?,
