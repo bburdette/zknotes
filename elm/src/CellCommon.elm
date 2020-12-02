@@ -134,7 +134,7 @@ mkRenderer maxw cellDict onchanged =
                     |> List.map
                         (\(ListItem task children) ->
                             E.row [ E.spacing 5 ]
-                                [ E.row
+                                [ E.paragraph
                                     [ E.alignTop ]
                                     ((case task of
                                         IncompleteTask ->
