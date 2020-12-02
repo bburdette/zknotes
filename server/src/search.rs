@@ -105,6 +105,7 @@ pub fn build_sql(
       from zknote N where N.user = ?"
   );
   let mut baseargs = vec![uid.to_string()];
+
   // notes that are public, and not mine.
   let mut sqlpub = format!(
     "select N.id, N.title, N.user, N.createdate, N.changeddate
@@ -113,6 +114,8 @@ pub fn build_sql(
   );
   let mut pubargs = vec![uid.to_string(), publicid.to_string()];
 
+  // notes shared with a share tag.
+  let usernoteid = sqldata::user_note_id(&conn, uid)?;
   let mut sqlshare = format!(
     "select N.id, N.title, N.user, N.createdate, N.changeddate
       from zknote N, zklink L, zklink M, zklink U
@@ -120,15 +123,20 @@ pub fn build_sql(
       and
         ((U.fromid = ? and U.toid = M.fromid) or (U.fromid = M.fromid and U.toid = ?))",
   );
-
-  let usernoteid = sqldata::user_note_id(&conn, uid)?;
-
   let mut shareargs = vec![
     uid.to_string(),
     shareid.to_string(),
     usernoteid.to_string(),
     usernoteid.to_string(),
   ];
+
+  // notes that are tagged with my usernoteid, and not mine.
+  let mut sqluser = format!(
+    "select N.id, N.title, N.user, N.createdate, N.changeddate
+      from zknote N, zklink L
+      where N.user != ? and L.fromid = N.id and L.toid = ?"
+  );
+  let mut userargs = vec![uid.to_string(), usernoteid.to_string()];
 
   // local ftn to add clause and args.
   let mut addcls = |sql: &mut String, args: &mut Vec<String>| {
@@ -145,15 +153,20 @@ pub fn build_sql(
   //
   addcls(&mut sqlbase, &mut baseargs);
   addcls(&mut sqlpub, &mut pubargs);
+  addcls(&mut sqluser, &mut userargs);
 
   // combine the queries.
   sqlbase.push_str(" union ");
   sqlbase.push_str(sqlpub.as_str());
+  baseargs.append(&mut pubargs);
+
   sqlbase.push_str(" union ");
   sqlbase.push_str(sqlshare.as_str());
-
-  baseargs.append(&mut pubargs);
   baseargs.append(&mut shareargs);
+
+  sqlbase.push_str(" union ");
+  sqlbase.push_str(sqluser.as_str());
+  baseargs.append(&mut userargs);
 
   // add limit clause to the end.
   sqlbase.push_str(limclause.as_str());

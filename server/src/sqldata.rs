@@ -761,8 +761,9 @@ pub fn is_zknote_shared(
   match conn.query_row(
     "select count(*) from
       zklink L, zklink M, zklink U where
-        L.fromid = ?1 and L.toid = M.fromid and M.toid = ?2 and
-        ((U.fromid = ?3 and U.toid = M.fromid) or (U.fromid = M.fromid and U.toid = ?3))",
+        (L.fromid = ?1 and L.toid = M.fromid and M.toid = ?2 and
+        ((U.fromid = ?3 and U.toid = M.fromid) or (U.fromid = M.fromid and U.toid = ?3)))
+        or (L.fromid = ?1 and L.toid = ?3 or L.toid = ?3 and L.fromid = ?1)",
     params![zknoteid, shareid, usernoteid],
     |row| {
       let i: i64 = row.get(0)?;
