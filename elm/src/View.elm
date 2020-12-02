@@ -86,7 +86,7 @@ showZkl id zkl =
                )
         , case otherid of
             Just zknoteid ->
-                EI.button [ E.alignRight ] { onPress = Just (SwitchPress zknoteid), label = E.text "↗" }
+                EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just (SwitchPress zknoteid), label = E.text "↗" }
 
             Nothing ->
                 E.none
@@ -100,22 +100,22 @@ view maxw model loggedin =
             min maxw 1000 - 160
     in
     E.column
-        [ E.width E.fill ]
-        ([ if loggedin then
+        [ E.width (E.fill |> E.maximum 1000), E.centerX ]
+        [ if loggedin then
             E.row []
                 [ EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "Done" }
                 ]
 
-           else
+          else
             E.none
-         , E.text model.title
-         , E.row [ E.width E.fill ]
+        , E.row [ E.centerX ] [ E.text model.title ]
+        , E.row [ E.width E.fill ]
             [ case markdownView (mkRenderer mw model.cells OnSchelmeCodeChanged) model.md of
                 Ok rendered ->
                     E.column
                         [ E.spacing 30
                         , E.padding 80
-                        , E.width (E.fill |> E.maximum 1000)
+                        , E.width E.fill
                         , E.centerX
                         ]
                         rendered
@@ -123,18 +123,18 @@ view maxw model loggedin =
                 Err errors ->
                     E.text errors
             ]
-         ]
-            ++ (model.id
-                    |> Maybe.map
-                        (\id ->
-                            E.row [ Font.bold ] [ E.text "links" ]
-                                :: List.map
-                                    (showZkl id)
-                                    model.zklinks
-                        )
-                    |> Maybe.withDefault []
-               )
-        )
+        , E.column [ E.centerX, E.width (E.minimum 150 E.shrink), E.spacing 8 ]
+            (model.id
+                |> Maybe.map
+                    (\id ->
+                        E.row [ Font.bold ] [ E.text "links" ]
+                            :: List.map
+                                (showZkl id)
+                                model.zklinks
+                    )
+                |> Maybe.withDefault []
+            )
+        ]
 
 
 initFull : Data.ZkNoteAndAccomplices -> Model
