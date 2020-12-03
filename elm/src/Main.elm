@@ -593,21 +593,6 @@ listingwait login st ms =
             )
 
 
-noteviewwait : State -> State -> Msg -> ( State, Cmd Msg )
-noteviewwait backstate st ms =
-    case ms of
-        UserReplyData (Ok (UI.ZkNote zkn)) ->
-            ( EView (View.initFull zkn) backstate, Cmd.none )
-
-        UserReplyData (Ok (UI.ServerError e)) ->
-            ( DisplayError (DisplayError.initialModel e) st, Cmd.none )
-
-        _ ->
-            ( unexpectedMsg st ms
-            , Cmd.none
-            )
-
-
 view : Model -> { title : String, body : List (Html Msg) }
 view model =
     { title = routeTitle model.savedRoute.route
@@ -1025,6 +1010,17 @@ actualupdate msg model =
                 View.Done ->
                     ( { model | state = View emod }, Cmd.none )
 
+                View.Switch id ->
+                    ( { model
+                        | state =
+                            PubShowMessage
+                                { message = "loading article"
+                                }
+                      }
+                    , sendPIMsg model.location
+                        (PI.GetZkNote id)
+                    )
+
         ( ViewMsg em, EView es state ) ->
             let
                 ( emod, ecmd ) =
@@ -1036,6 +1032,9 @@ actualupdate msg model =
 
                 View.Done ->
                     ( { model | state = state }, Cmd.none )
+
+                View.Switch _ ->
+                    ( model, Cmd.none )
 
         ( EditZkNoteMsg em, EditZkNote es login ) ->
             let
@@ -1208,7 +1207,7 @@ actualupdate msg model =
                     )
 
                 EditZkNote.View szn ->
-                    ( { model | state = EView (View.initSzn szn) (EditZkNote es login) }, Cmd.none )
+                    ( { model | state = EView (View.initSzn szn []) (EditZkNote es login) }, Cmd.none )
 
                 EditZkNote.GetSelectedText id ->
                     ( { model | state = EditZkNote emod login }
@@ -1248,21 +1247,6 @@ actualupdate msg model =
                                 id
                     in
                     ( { model | state = st }, cmd )
-
-                EditZkNoteListing.View id ->
-                    ( { model
-                        | state =
-                            Wait
-                                (ShowMessage
-                                    { message = "loading zknote" }
-                                    login
-                                )
-                                (noteviewwait model.state)
-                      }
-                    , sendUIMsg model.location
-                        login
-                        (UI.GetZkNote id)
-                    )
 
                 EditZkNoteListing.Done ->
                     ( { model | state = Login (Login.initialModel Nothing "zknotes" model.seed) }
