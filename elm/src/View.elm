@@ -100,7 +100,7 @@ view maxw model loggedin =
             min maxw 1000 - 160
     in
     E.column
-        [ E.width (E.fill |> E.maximum 1000), E.centerX ]
+        [ E.width (E.fill |> E.maximum 1000), E.centerX, E.padding 10 ]
         [ if loggedin then
             E.row []
                 [ EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "Done" }

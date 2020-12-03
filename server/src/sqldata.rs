@@ -1019,22 +1019,22 @@ pub fn read_zklinks(
 
 pub fn read_public_zklinks(conn: &Connection, noteid: i64) -> Result<Vec<ZkLink>, Box<dyn Error>> {
   let pubid = note_id(&conn, "system", "public")?;
+  let sysid = user_id(&conn, "system")?;
 
   let mut pstmt = conn.prepare(
     // return zklinks that link to or from notes that link to 'public'.
     "select A.fromid, A.toid, A.user, A.linkzknote, L.title, R.title
-      from zklink A, zklink B
-      inner join zknote as L ON A.fromid = L.id
-      inner join zknote as R ON A.toid = R.id
-      where (A.toid = ?1
-      and B.fromid = A.fromid
-      and B.toid = ?2) or (A.fromid = ?1
-      and B.toid = A.toid
-      and B.fromid = ?2)
-      ",
+       from zklink A, zklink B
+       inner join zknote as L ON A.fromid = L.id
+       inner join zknote as R ON A.toid = R.id
+     where
+       (L.user != ?3 and R.user != ?3) and
+       ((A.toid = ?1 and A.fromid = B.fromid and B.toid = ?2) or
+        (A.fromid = ?1 and A.toid = B.toid and B.fromid = ?2) or
+        (A.fromid = ?1 and A.toid = B.fromid and B.toid = ?2))",
   )?;
 
-  let rec_iter = pstmt.query_map(params![noteid, pubid], |row| {
+  let rec_iter = pstmt.query_map(params![noteid, pubid, sysid], |row| {
     Ok(ZkLink {
       from: row.get(0)?,
       to: row.get(1)?,
