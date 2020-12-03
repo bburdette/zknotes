@@ -208,27 +208,33 @@ view narrow nblevel model =
                 }
 
         ddbutton =
-            Input.button buttonStyle
-                { onPress = Just TogglePrev
-                , label =
-                    text <|
-                        if model.showPrevs then
-                            "∧"
+            none
 
-                        else
-                            "∨"
-                }
+        {- save and restore search stuff, disabled for now:
 
+           was ddbutton:
+           Input.button buttonStyle
+               { onPress = Just TogglePrev
+               , label =
+                   text <|
+                       if model.showPrevs then
+                           "∧"
+                       else
+                           "∨"
+               }
+
+               from 'buttons', below.
+           if List.any (\elt -> elt == model.searchText) model.prevSearches then
+               none
+             else
+               Input.button buttonStyle
+                   { onPress = Just SaveSearch
+                   , label = text "save"
+                   }
+           ,
+        -}
         buttons =
-            [ if List.any (\elt -> elt == model.searchText) model.prevSearches then
-                none
-
-              else
-                Input.button buttonStyle
-                    { onPress = Just SaveSearch
-                    , label = text "save"
-                    }
-            , Input.button buttonStyle
+            [ Input.button buttonStyle
                 { onPress = Just SearchDetails
                 , label =
                     text <|
