@@ -756,6 +756,39 @@ pub fn user_note_id(conn: &Connection, uid: i64) -> Result<i64, Box<dyn Error>> 
   Ok(id)
 }
 
+pub fn user_shares(conn: &Connection, uid: i64) -> Result<Vec<i64>, Box<dyn Error>> {
+  let shareid = note_id(&conn, "system", "share")?;
+  let usernoteid = user_note_id(&conn, uid)?;
+
+  // user shares!
+  //   looking for notes that link to 'shareid' and link to 'usernoteid'
+  let mut pstmt = conn.prepare(
+    "select A.fromid from zklink A, zklink B
+      where A.toid = ?1 and
+        ((A.fromid = B.fromid and B.toid = ?2) or
+         (A.fromid = B.toid and B.fromid = ?2))
+     union
+    select A.toid from zklink A, zklink B
+      where A.fromid = ?1 and
+        ((A.toid = B.fromid and B.toid = ?2) or
+         (A.toid = B.toid and B.fromid = ?2))
+      ",
+  )?;
+  let rec_iter = pstmt.query_map(params![shareid, usernoteid], |row| Ok(row.get(0)?))?;
+  let mut pv = Vec::new();
+
+  for rsrec in rec_iter {
+    match rsrec {
+      Ok(rec) => {
+        pv.push(rec);
+      }
+      Err(_) => (),
+    }
+  }
+
+  Ok(pv)
+}
+
 pub fn is_zknote_shared(
   conn: &Connection,
   zknoteid: i64,
@@ -961,12 +994,31 @@ pub fn read_zklinks(
 ) -> Result<Vec<ZkLink>, Box<dyn Error>> {
   let pubid = note_id(&conn, "system", "public")?;
 
-  let mut pstmt = conn.prepare(
-    // zklinks that are mine.
-    // +
-    // not-mine zklinks with from = this note and toid = note that ISA public.
-    // +
-    // not-mine zlinks with from = note that is public, and to = this.
+  let usershares = user_shares(&conn, uid)?;
+
+  // user shares in '1,3,4,5,6' form (minus the quotes!)
+  let mut s = usershares
+    .iter()
+    .map(|x| {
+      let mut s = x.to_string();
+      s.push_str(",");
+      s
+    })
+    .collect::<String>();
+  s.truncate(s.len() - 1);
+
+  // good old fashion string templating here, since I can't figure out how to
+  // do array parameters.
+  //
+  // zklinks that are mine.
+  // +
+  // not-mine zklinks with from = this note and toid = note that ISA public.
+  // +
+  // not-mine zklinks with from = note that is public, and to = this.
+  // +
+  // not-mine zklinks with from = this, and 'to' in usershares.
+
+  let sqlstr = format!(
     "select A.fromid, A.toid, A.user, A.linkzknote, L.title, R.title
       from zklink A
       inner join zknote as L ON A.fromid = L.id
@@ -988,8 +1040,20 @@ pub fn read_zklinks(
       where A.user != ?1 and A.toid = ?2
       and B.fromid = A.fromid
       and B.toid = ?3
-      ",
-  )?;
+      union
+    select A.fromid, A.toid, A.user, A.linkzknote, L.title, R.title
+        from zklink A, zklink B
+        inner join zknote as L ON A.fromid = L.id
+        inner join zknote as R ON A.toid = R.id
+        where A.user != ?1 and
+          ((A.toid = ?2 and A.fromid = B.fromid and B.toid in ({})) or
+           (A.toid = ?2 and A.fromid = B.toid and B.fromid in ({})) or
+           (A.fromid = ?2 and A.toid = B.fromid and B.toid in ({})) or
+           (A.fromid = ?2 and A.toid = B.toid and B.fromid in ({})))",
+    s, s, s, s
+  );
+
+  let mut pstmt = conn.prepare(sqlstr.as_str())?;
 
   let rec_iter = pstmt.query_map(params![uid, gzl.zknote, pubid], |row| {
     Ok(ZkLink {
