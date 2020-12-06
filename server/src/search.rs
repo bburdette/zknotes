@@ -116,9 +116,9 @@ pub fn build_sql(
 
   // notes shared with a share tag.
   let usernoteid = sqldata::user_note_id(&conn, uid)?;
-  // clause 1: user is ?
+  // clause 1: user is not-me
   //
-  // clause 2:  is N linked to a share note?
+  // clause 2: is N linked to a share note?
   // link M is to shareid, and L links either to or from M's from.
   //
   // clause 3 is M.from (the share)
