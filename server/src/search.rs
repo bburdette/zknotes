@@ -116,10 +116,20 @@ pub fn build_sql(
 
   // notes shared with a share tag.
   let usernoteid = sqldata::user_note_id(&conn, uid)?;
+  // clause 1: user is not-me
+  //
+  // clause 2: is N linked to a share note?
+  // link M is to shareid, and L links either to or from M's from.
+  //
+  // clause 3 is M.from (the share)
+  // is that share linked to usernoteid?
   let mut sqlshare = format!(
     "select N.id, N.title, N.user, N.createdate, N.changeddate
       from zknote N, zklink L, zklink M, zklink U
-      where N.user != ? and L.fromid = N.id and L.toid = M.fromid and M.toid = ?
+      where N.user != ? and
+        (M.toid = ? and (
+          (L.fromid = N.id and L.toid = M.fromid ) or
+          (L.toid = N.id and L.fromid = M.fromid )))
       and
         ((U.fromid = ? and U.toid = M.fromid) or (U.fromid = M.fromid and U.toid = ?))",
   );
