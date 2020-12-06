@@ -1007,7 +1007,7 @@ pub fn read_zklinks(
     .collect::<String>();
   s.truncate(s.len() - 1);
 
-  // good old fashion string templating here, since I can't figure out how to
+  // good old fashioned string templating here, since I can't figure out how to
   // do array parameters.
   //
   // zklinks that are mine.
