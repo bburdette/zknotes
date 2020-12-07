@@ -417,18 +417,30 @@ zknview size model =
                                         zkln.user /= model.ld.userid
                                 in
                                 E.row [ E.spacing 8, E.width E.fill ]
-                                    [ case model.id of
-                                        Just _ ->
-                                            EI.button Common.buttonStyle
-                                                { onPress = Just <| LinkPress zkln
-                                                , label = E.text "link"
-                                                }
+                                    [ model.id
+                                        |> Maybe.andThen
+                                            (\id ->
+                                                case Dict.get (zklKey { from = id, to = zkln.id }) model.zklDict of
+                                                    Just _ ->
+                                                        Nothing
 
-                                        Nothing ->
-                                            EI.button Common.disabledButtonStyle
+                                                    Nothing ->
+                                                        Just 1
+                                            )
+                                        |> Maybe.map
+                                            (\_ ->
+                                                EI.button Common.buttonStyle
+                                                    { onPress = Just <| LinkPress zkln
+                                                    , label = E.text "link"
+                                                    }
+                                            )
+                                        |> Maybe.withDefault
+                                            (EI.button
+                                                Common.disabledButtonStyle
                                                 { onPress = Nothing
                                                 , label = E.text "link"
                                                 }
+                                            )
                                     , EI.button
                                         (case ( isdirty, lnnonme ) of
                                             ( True, True ) ->
