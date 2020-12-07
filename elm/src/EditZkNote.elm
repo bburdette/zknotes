@@ -73,7 +73,7 @@ type Msg
     | SPMsg SP.Msg
     | NavChoiceChanged NavChoice
     | DialogMsg D.Msg
-    | Noop String
+    | Noop
 
 
 type NavChoice
@@ -166,8 +166,8 @@ dirty model =
         |> Maybe.withDefault True
 
 
-showZkl : List (E.Attribute Msg) -> Int -> Maybe Int -> Data.ZkLink -> Element Msg
-showZkl dirtybutton user id zkl =
+showZkl : List (E.Attribute Msg) -> Bool -> Int -> Maybe Int -> Data.ZkLink -> Element Msg
+showZkl dirtybutton nonme user id zkl =
     let
         ( dir, otherid ) =
             case ( Just zkl.from == id, Just zkl.to == id ) of
@@ -201,10 +201,17 @@ showZkl dirtybutton user id zkl =
 
             Nothing ->
                 E.none
-        , EI.button (Common.buttonStyle ++ [ E.alignRight ])
-            { onPress = Just (MdLink zkl)
-            , label = E.text "^"
-            }
+        , if nonme then
+            EI.button (Common.disabledButtonStyle ++ [ E.alignRight ])
+                { onPress = Nothing
+                , label = E.text "^"
+                }
+
+          else
+            EI.button (Common.buttonStyle ++ [ E.alignRight ])
+                { onPress = Just (MdLink zkl)
+                , label = E.text "^"
+                }
         , if user == zkl.user then
             EI.button (Common.buttonStyle ++ [ E.alignRight ])
                 { onPress = Just (RemoveLink zkl)
@@ -280,7 +287,7 @@ zknview size model =
         showLinks =
             E.row [ EF.bold ] [ E.text "links" ]
                 :: List.map
-                    (showZkl dirtybutton model.ld.userid model.id)
+                    (showZkl dirtybutton nonme model.ld.userid model.id)
                     (Dict.values model.zklDict)
 
         mdedit =
@@ -311,7 +318,7 @@ zknview size model =
                     ]
                     { onChange =
                         if nonme then
-                            Noop
+                            always Noop
 
                         else
                             OnMarkdownInput
@@ -418,7 +425,7 @@ zknview size model =
                                                 }
 
                                         Nothing ->
-                                            EI.button (Common.buttonStyle ++ [ EBk.color TC.grey ])
+                                            EI.button Common.disabledButtonStyle
                                                 { onPress = Nothing
                                                 , label = E.text "link"
                                                 }
@@ -467,7 +474,11 @@ zknview size model =
             [ E.row [ EF.bold ] [ E.text model.ld.name ]
 
             -- , E.text "edit zk note"
-            , EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just DeletePress, label = E.text "delete" }
+            , if nonme then
+                EI.button (E.alignRight :: Common.disabledButtonStyle) { onPress = Nothing, label = E.text "delete" }
+
+              else
+                EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just DeletePress, label = E.text "delete" }
             ]
         , E.row [ E.width E.fill, E.spacing 8 ]
             [ EI.button
@@ -494,7 +505,7 @@ zknview size model =
             )
             { onChange =
                 if nonme then
-                    Noop
+                    always Noop
 
                 else
                     OnTitleChanged
@@ -504,14 +515,24 @@ zknview size model =
             }
         , E.row [ E.spacing 8, E.width E.shrink ]
             [ EI.checkbox [ E.width E.shrink ]
-                { onChange = PublicPress
+                { onChange =
+                    if nonme then
+                        always Noop
+
+                    else
+                        PublicPress
                 , icon = EI.defaultCheckbox
                 , checked = public
                 , label = EI.labelLeft [] (E.text "public")
                 }
             , if public then
                 EI.text []
-                    { onChange = OnPubidChanged
+                    { onChange =
+                        if nonme then
+                            always Noop
+
+                        else
+                            OnPubidChanged
                     , text = model.pubidtxt
                     , placeholder = Nothing
                     , label = EI.labelLeft [] (E.text "article id")
@@ -1044,5 +1065,5 @@ update msg model =
         NavChoiceChanged nc ->
             ( { model | navchoice = nc }, None )
 
-        Noop _ ->
+        Noop ->
             ( model, None )
