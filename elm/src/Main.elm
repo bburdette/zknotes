@@ -390,8 +390,8 @@ viewState size state =
         EditZkNote em _ ->
             Element.map EditZkNoteMsg <| EditZkNote.view size em
 
-        EditZkNoteListing em _ ->
-            Element.map EditZkNoteListingMsg <| EditZkNoteListing.view size em
+        EditZkNoteListing em ld ->
+            Element.map EditZkNoteListingMsg <| EditZkNoteListing.view ld.ld size em
 
         ShowMessage em _ ->
             Element.map ShowMessageMsg <| ShowMessage.view em
@@ -575,8 +575,7 @@ listingwait login st ms =
     case ms of
         UserReplyData (Ok (UI.ZkNoteSearchResult rs)) ->
             ( EditZkNoteListing
-                { uid = login.ld.userid
-                , notes = rs
+                { notes = rs
                 , spmodel =
                     SP.searchResultUpdated rs SP.initModel
                 }
@@ -903,7 +902,7 @@ actualupdate msg model =
                                     )
 
                                 ShowMessage _ login ->
-                                    ( { model | state = EditZkNoteListing { uid = login.ld.userid, notes = sr, spmodel = SP.initModel } login }
+                                    ( { model | state = EditZkNoteListing { notes = sr, spmodel = SP.initModel } login }
                                     , Cmd.none
                                     )
 
@@ -1044,7 +1043,7 @@ actualupdate msg model =
                 backtolisting =
                     ( { model
                         | state =
-                            EditZkNoteListing { uid = login.ld.userid, notes = emod.zknSearchResult, spmodel = emod.spmodel } login
+                            EditZkNoteListing { notes = emod.zknSearchResult, spmodel = emod.spmodel } login
                       }
                     , case SP.getSearch emod.spmodel of
                         Just s ->
@@ -1061,8 +1060,7 @@ actualupdate msg model =
                     let
                         gotres =
                             ( EditZkNoteListing
-                                { uid = login.ld.userid
-                                , notes = emod.zknSearchResult
+                                { notes = emod.zknSearchResult
                                 , spmodel = emod.spmodel
                                 }
                                 login

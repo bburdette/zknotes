@@ -92,6 +92,7 @@ pub struct User {
 #[derive(Deserialize, Serialize, Debug)]
 pub struct LoginData {
   pub userid: i64,
+  pub username: String,
   pub publicid: i64,
   pub shareid: i64,
   pub searchid: i64,
@@ -100,6 +101,7 @@ pub struct LoginData {
 pub fn login_data(conn: &Connection, uid: i64) -> Result<LoginData, Box<dyn Error>> {
   Ok(LoginData {
     userid: uid,
+    username: user_name(&conn, uid)?,
     publicid: note_id(conn, "system", "public")?,
     shareid: note_id(conn, "system", "share")?,
     searchid: note_id(conn, "system", "search")?,
@@ -680,6 +682,17 @@ pub fn save_zklink(
   )?;
 
   Ok(conn.last_insert_rowid())
+}
+
+pub fn user_name(conn: &Connection, uid: i64) -> Result<String, Box<dyn Error>> {
+  let user = conn.query_row(
+    "select name
+      from user where id = ?1",
+    params![uid],
+    |row| Ok(row.get(0)?),
+  )?;
+
+  Ok(user)
 }
 
 pub fn read_user(dbfile: &Path, name: &str) -> Result<User, Box<dyn Error>> {

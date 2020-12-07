@@ -21,6 +21,7 @@ type alias Login a =
 
 type alias LoginData =
     { userid : Int
+    , name : String
     , publicid : Int
     , shareid : Int
     , searchid : Int
@@ -247,8 +248,9 @@ decodeZkNoteEdit =
 
 decodeLoginData : JD.Decoder LoginData
 decodeLoginData =
-    JD.map4 LoginData
+    JD.map5 LoginData
         (JD.field "userid" JD.int)
+        (JD.field "username" JD.string)
         (JD.field "publicid" JD.int)
         (JD.field "shareid" JD.int)
         (JD.field "searchid" JD.int)

@@ -34,7 +34,7 @@ import Dict exposing (Dict)
 import Element as E exposing (Element)
 import Element.Background as EBk
 import Element.Border as EBd
-import Element.Font as Font
+import Element.Font as EF
 import Element.Input as EI
 import Element.Region as ER
 import Html exposing (Attribute, Html)
@@ -278,7 +278,7 @@ zknview size model =
                 /= model.noteUser
 
         showLinks =
-            E.row [ Font.bold ] [ E.text "links" ]
+            E.row [ EF.bold ] [ E.text "links" ]
                 :: List.map
                     (showZkl dirtybutton model.ld.userid model.id)
                     (Dict.values model.zklDict)
@@ -302,10 +302,10 @@ zknview size model =
                 ]
                 (EI.multiline
                     [ if nonme then
-                        Font.color TC.darkGrey
+                        EF.color TC.darkGrey
 
                       else
-                        Font.color TC.black
+                        EF.color TC.black
                     , E.htmlAttribute (Html.Attributes.id "mdtext")
                     , E.alignTop
                     ]
@@ -464,7 +464,9 @@ zknview size model =
     E.column
         [ E.width E.fill, E.spacing 8, E.padding 8 ]
         [ E.row [ E.width E.fill, E.spacing 8 ]
-            [ E.text "edit zk note"
+            [ E.row [ EF.bold ] [ E.text model.ld.name ]
+
+            -- , E.text "edit zk note"
             , EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just DeletePress, label = E.text "delete" }
             ]
         , E.row [ E.width E.fill, E.spacing 8 ]
@@ -485,7 +487,7 @@ zknview size model =
             ]
         , EI.text
             (if nonme then
-                [ Font.color TC.darkGrey ]
+                [ EF.color TC.darkGrey ]
 
              else
                 []
