@@ -109,7 +109,7 @@ pub fn build_sql(
   let mut sqlpub = format!(
     "select N.id, N.title, N.user, N.createdate, N.changeddate
       from zknote N, zklink L
-      where N.user != ? and L.fromid = N.id and L.toid = ?"
+      where (N.user != ? and L.fromid = N.id and L.toid = ?)"
   );
   let mut pubargs = vec![uid.to_string(), publicid.to_string()];
 
@@ -122,15 +122,15 @@ pub fn build_sql(
   //
   // clause 3 is M.from (the share)
   // is that share linked to usernoteid?
-  let sqlshare = format!(
+  let mut sqlshare = format!(
     "select N.id, N.title, N.user, N.createdate, N.changeddate
       from zknote N, zklink L, zklink M, zklink U
-      where N.user != ? and
+      where (N.user != ? and
         (M.toid = ? and (
           (L.fromid = N.id and L.toid = M.fromid ) or
           (L.toid = N.id and L.fromid = M.fromid )))
       and
-        ((U.fromid = ? and U.toid = M.fromid) or (U.fromid = M.fromid and U.toid = ?))",
+        ((U.fromid = ? and U.toid = M.fromid) or (U.fromid = M.fromid and U.toid = ?)))",
   );
   let mut shareargs = vec![
     uid.to_string(),
@@ -143,7 +143,7 @@ pub fn build_sql(
   let mut sqluser = format!(
     "select N.id, N.title, N.user, N.createdate, N.changeddate
       from zknote N, zklink L
-      where N.user != ? and L.fromid = N.id and L.toid = ?"
+      where (N.user != ? and L.fromid = N.id and L.toid = ?)"
   );
   let mut userargs = vec![uid.to_string(), usernoteid.to_string()];
 
@@ -159,10 +159,10 @@ pub fn build_sql(
     }
   };
 
-  //
   addcls(&mut sqlbase, &mut baseargs);
   addcls(&mut sqlpub, &mut pubargs);
   addcls(&mut sqluser, &mut userargs);
+  addcls(&mut sqlshare, &mut shareargs);
 
   // combine the queries.
   sqlbase.push_str(" union ");
