@@ -1,8 +1,7 @@
-use rusqlite::{params, Connection};
+use rusqlite::Connection;
 use sqldata;
-use sqldata::{connection_open, note_id, user_id, ZkListNote};
+use sqldata::{note_id, user_id, ZkListNote};
 use std::error::Error;
-use std::path::Path;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ZkNoteSearch {
@@ -88,7 +87,7 @@ pub fn build_sql(
   uid: i64,
   search: ZkNoteSearch,
 ) -> Result<(String, Vec<String>), Box<dyn Error>> {
-  let (cls, mut clsargs) = build_sql_clause(&conn, uid, false, search.tagsearch)?;
+  let (cls, clsargs) = build_sql_clause(&conn, uid, false, search.tagsearch)?;
 
   let publicid = note_id(&conn, "system", "public")?;
 
@@ -123,7 +122,7 @@ pub fn build_sql(
   //
   // clause 3 is M.from (the share)
   // is that share linked to usernoteid?
-  let mut sqlshare = format!(
+  let sqlshare = format!(
     "select N.id, N.title, N.user, N.createdate, N.changeddate
       from zknote N, zklink L, zklink M, zklink U
       where N.user != ? and
@@ -149,7 +148,7 @@ pub fn build_sql(
   let mut userargs = vec![uid.to_string(), usernoteid.to_string()];
 
   // local ftn to add clause and args.
-  let mut addcls = |sql: &mut String, args: &mut Vec<String>| {
+  let addcls = |sql: &mut String, args: &mut Vec<String>| {
     if !args.is_empty() {
       sql.push_str(" and ");
       sql.push_str(cls.as_str());
