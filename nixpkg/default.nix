@@ -18,8 +18,8 @@ rustPlatform.buildRustPackage rec {
   src = fetchFromGitHub {
     owner = "bburdette";
     repo = "zknotes";
-    rev = "d8304d3c94beca1adf568be7f677f1d36d471185";
-    sha256 = "1h0zgmqm9s04vdx6fl8c9kvn70bkflpghncdrhx8m9abq2p95by3";
+    rev = "a45b95d0337b51b05b1956a99f880daf6ca646c8";
+    sha256 = "1a11malkyfikyzz7rfn24j4l61cxydyd55hgb3b5ypq185ip0rl4";
   };
 
   # preBuild = ''
