@@ -86,6 +86,7 @@ type alias Model =
     { id : Maybe Int
     , ld : Data.LoginData
     , noteUser : Int
+    , noteUserName : String
     , zknSearchResult : Data.ZkNoteSearchResult
     , zklDict : Dict String Data.ZkLink
     , pubidtxt : String
@@ -525,6 +526,11 @@ zknview size model =
             , placeholder = Nothing
             , label = EI.labelLeft [] (E.text "title")
             }
+        , if nonme then
+            E.row [ E.spacing 8 ] [ E.text "owner", E.row [ EF.bold ] [ E.text model.noteUserName ] ]
+
+          else
+            E.none
         , E.row [ E.spacing 8, E.width E.shrink ]
             [ EI.checkbox [ E.width E.shrink ]
                 { onChange =
@@ -659,6 +665,7 @@ initFull ld zkl zknote zklDict spm =
     { id = Just zknote.id
     , ld = ld
     , noteUser = zknote.user
+    , noteUserName = zknote.username
     , zknSearchResult = zkl
     , zklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) zklDict.links)
     , initialZklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) zklDict.links)
@@ -688,6 +695,7 @@ initNew ld zkl spm =
     { id = Nothing
     , ld = ld
     , noteUser = ld.userid
+    , noteUserName = ld.name
     , zknSearchResult = zkl
     , zklDict = Dict.empty
     , initialZklDict = Dict.empty

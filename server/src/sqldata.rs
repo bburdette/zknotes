@@ -13,6 +13,7 @@ pub struct ZkNote {
   title: String,
   content: String,
   user: i64,
+  username: String,
   pubid: Option<String>,
   createdate: i64,
   changeddate: i64,
@@ -887,8 +888,8 @@ pub fn save_zknote(
 
 pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNote, Box<dyn Error>> {
   let note = conn.query_row(
-    "select title, content, user, pubid, createdate, changeddate
-      from zknote where id = ?1",
+    "select ZN.title, ZN.content, ZN.user, U.name, ZN.pubid, ZN.createdate, ZN.changeddate
+      from zknote ZN, user U where ZN.id = ?1 and U.id = ZN.user",
     params![id],
     |row| {
       Ok(ZkNote {
@@ -896,9 +897,10 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
         title: row.get(0)?,
         content: row.get(1)?,
         user: row.get(2)?,
-        pubid: row.get(3)?,
-        createdate: row.get(4)?,
-        changeddate: row.get(5)?,
+        username: row.get(3)?,
+        pubid: row.get(4)?,
+        createdate: row.get(5)?,
+        changeddate: row.get(6)?,
       })
     },
   )?;
@@ -928,11 +930,12 @@ pub fn read_zknotepubid(
 ) -> Result<ZkNote, Box<dyn Error>> {
   let publicid = note_id(&conn, "system", "public")?;
   let note = conn.query_row(
-    "select A.id, A.title, A.content, A.user, A.pubid, A.createdate, A.changeddate
-      from zknote A, zklink L where A.pubid = ?1
+    "select A.id, A.title, A.content, A.user, U.name, A.pubid, A.createdate, A.changeddate
+      from zknote A, user U, zklink L where A.pubid = ?1
       and ((A.id = L.fromid
       and L.toid = ?2) or (A.id = L.toid
-      and L.fromid = ?2))",
+      and L.fromid = ?2))
+      and U.id = A.user",
     params![pubid, publicid],
     |row| {
       Ok(ZkNote {
@@ -940,9 +943,10 @@ pub fn read_zknotepubid(
         title: row.get(1)?,
         content: row.get(2)?,
         user: row.get(3)?,
-        pubid: row.get(4)?,
-        createdate: row.get(5)?,
-        changeddate: row.get(6)?,
+        username: row.get(4)?,
+        pubid: row.get(5)?,
+        createdate: row.get(6)?,
+        changeddate: row.get(7)?,
       })
     },
   )?;
