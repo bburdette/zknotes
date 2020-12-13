@@ -98,6 +98,8 @@ pub fn build_sql(
     None => format!(" offset {}", search.offset),
   };
 
+  let ordclause = " order by N.id desc ";
+
   // notes that are mine.
   let mut sqlbase = format!(
     "select N.id, N.title, N.user, N.createdate, N.changeddate
@@ -176,6 +178,9 @@ pub fn build_sql(
   sqlbase.push_str(" union ");
   sqlbase.push_str(sqluser.as_str());
   baseargs.append(&mut userargs);
+
+  // add order clause to the end.
+  sqlbase.push_str(ordclause);
 
   // add limit clause to the end.
   sqlbase.push_str(limclause.as_str());
