@@ -117,7 +117,7 @@ routeTitle route =
             "zknote " ++ String.fromInt id
 
         Top ->
-            "zknote"
+            "zknotes"
 
 
 urlRequest : Browser.UrlRequest -> Msg
@@ -594,7 +594,13 @@ listingwait login st ms =
 
 view : Model -> { title : String, body : List (Html Msg) }
 view model =
-    { title = routeTitle model.savedRoute.route
+    { title =
+        case model.state of
+            EditZkNote ezn _ ->
+                ezn.title ++ " - zknote"
+
+            _ ->
+                routeTitle model.savedRoute.route
     , body =
         [ Element.layout [] <|
             viewState model.size model.state
