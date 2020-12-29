@@ -1,25 +1,4 @@
-module Import exposing
-    ( Command(..)
-    , Model
-    ,  Msg(..)
-       -- , addListNote
-
-    , compareZklinks
-    , gotId
-    , init
-    , noteLink
-    , pageLink
-    , replaceOrAdd
-    , saveZkLinkList
-    , showZkl
-    , sznFromModel
-    , toPubId
-    , update
-    , updateSearchResult
-    , view
-    , zkLinkName
-    , zklKey
-    )
+module Import exposing (Command(..), LinkHalf, Model, Msg(..), WClass(..), init, noteLink, showZkl, update, updateSearchResult, view, zkLinkName, zklKey, zknview)
 
 import CellCommon exposing (..)
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
@@ -52,21 +31,26 @@ import Util
 
 type Msg
     = SavePress
-    | DonePress
     | CancelPress
     | LinkPress Data.ZkListNote
-    | RemoveLink Data.ZkLink
+    | RemoveLink Int
     | SPMsg SP.Msg
     | DialogMsg D.Msg
     | Noop
 
 
+type alias LinkHalf =
+    { from : Bool
+    , to : Bool
+    , title : String
+    }
+
+
 type alias Model =
     { ld : Data.LoginData
-    , noteUser : Int
-    , noteUserName : String
+    , notes : List Data.ImportZkNote
     , zknSearchResult : Data.ZkNoteSearchResult
-    , zklDict : Dict String Data.ZkLink
+    , globlinks : Dict Int LinkHalf
     , spmodel : SP.Model
     , dialog : Maybe D.Model
     }
@@ -74,8 +58,7 @@ type alias Model =
 
 type Command
     = None
-    | Save Data.SaveZkNote (List Data.ZkLink)
-    | SaveExit Data.SaveZkNote (List Data.ZkLink)
+    | SaveExit (List Data.ImportZkNote)
     | Search S.ZkNoteSearch
     | Cancel
 
@@ -100,46 +83,33 @@ zkLinkName zklink noteid =
         "link error"
 
 
-showZkl : Int -> Maybe Int -> Data.ZkLink -> Element Msg
-showZkl user mbid zkl =
-    let
-        ( dir, otherid ) =
-            case ( Just zkl.from == mbid, Just zkl.to == mbid ) of
-                ( True, False ) ->
-                    ( E.text "->", Just zkl.to )
-
-                ( False, True ) ->
-                    ( E.text "<-", Just zkl.from )
-
-                _ ->
-                    ( E.text "", Nothing )
-    in
+showZkl : Int -> LinkHalf -> Element Msg
+showZkl id lh =
     E.row [ E.spacing 8, E.width E.fill ]
-        [ dir
-        , mbid
-            |> Maybe.map (zkLinkName zkl)
-            |> Maybe.withDefault ""
-            |> (\s ->
-                    E.row
-                        [ E.clipX
-                        , E.centerY
-                        , E.height E.fill
-                        , E.width E.fill
-                        ]
-                        [ E.text s
-                        ]
-               )
-        , if user == zkl.user then
-            EI.button (Common.buttonStyle ++ [ E.alignRight ])
-                { onPress = Just (RemoveLink zkl)
-                , label = E.text "X"
-                }
+        [ case ( lh.from, lh.to ) of
+            ( False, False ) ->
+                E.text ""
 
-          else
-            EI.button (Common.buttonStyle ++ [ E.alignRight, EBk.color TC.darkGray ])
-                { onPress = Nothing
-                , label = E.text "X"
-                }
+            ( True, False ) ->
+                E.text "<-"
+
+            ( False, True ) ->
+                E.text "->"
+
+            ( True, True ) ->
+                E.text "<- ->"
+        , E.row
+            [ E.clipX
+            , E.centerY
+            , E.height E.fill
+            , E.width E.fill
+            ]
+            [ E.text lh.title
+            ]
+        , EI.button (Common.buttonStyle ++ [ E.alignRight ])
+            { onPress = Just (RemoveLink id)
+            , label = E.text "X"
+            }
         ]
 
 
@@ -178,11 +148,8 @@ zknview size model =
         showLinks =
             E.row [ EF.bold ] [ E.text "links" ]
                 :: List.map
-                    (showZkl model.ld.userid model.id)
-                    (Dict.values model.zklDict)
-
-        public =
-            isPublic model
+                    (\( a, b ) -> showZkl a b)
+                    (Dict.toList model.globlinks)
 
         searchPanel =
             let
@@ -209,34 +176,24 @@ zknview size model =
                     :: (List.map
                             (\zkln ->
                                 let
-                                    lnnonme =
-                                        zkln.user /= model.ld.userid
+                                    tolinked =
+                                        Dict.get zkln.id model.globlinks
+                                            |> Maybe.map
+                                                (\lh -> lh.to)
+                                            |> Maybe.withDefault
+                                                False
                                 in
                                 E.row [ E.spacing 8, E.width E.fill ]
-                                    [ model.id
-                                        |> Maybe.andThen
-                                            (\id ->
-                                                case Dict.get (zklKey { from = id, to = zkln.id }) model.zklDict of
-                                                    Just _ ->
-                                                        Nothing
+                                    [ EI.button
+                                        (if tolinked then
+                                            Common.disabledButtonStyle
 
-                                                    Nothing ->
-                                                        Just 1
-                                            )
-                                        |> Maybe.map
-                                            (\_ ->
-                                                EI.button Common.buttonStyle
-                                                    { onPress = Just <| LinkPress zkln
-                                                    , label = E.text "link"
-                                                    }
-                                            )
-                                        |> Maybe.withDefault
-                                            (EI.button
-                                                Common.disabledButtonStyle
-                                                { onPress = Nothing
-                                                , label = E.text "link"
-                                                }
-                                            )
+                                         else
+                                            Common.buttonStyle
+                                        )
+                                        { onPress = Nothing
+                                        , label = E.text "link"
+                                        }
                                     , E.row
                                         [ E.clipX
                                         , E.height E.fill
@@ -247,12 +204,7 @@ zknview size model =
                                     ]
                             )
                         <|
-                            case model.id of
-                                Just id ->
-                                    List.filter (\zkl -> zkl.id /= id) model.zknSearchResult.notes
-
-                                Nothing ->
-                                    model.zknSearchResult.notes
+                            model.zknSearchResult.notes
                        )
                 )
     in
@@ -284,21 +236,12 @@ zklKey zkl =
     String.fromInt zkl.from ++ ":" ++ String.fromInt zkl.to
 
 
-linksWith : List Data.ZkLink -> Int -> Bool
-linksWith links pubid =
-    Util.trueforany (\l -> l.from == pubid || l.to == pubid) links
-
-
-isPublic : Model -> Bool
-isPublic model =
-    linksWith (Dict.values model.zklDict) model.ld.publicid
-
-
 init : Data.LoginData -> Data.ZkNoteSearchResult -> SP.Model -> Model
 init ld zkl spm =
     { ld = ld
     , zknSearchResult = zkl
-    , zklDict = Dict.empty -- Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) zklDict.links)
+    , notes = []
+    , globlinks = Dict.empty -- Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) zklDict.links)
     , spmodel = SP.searchResultUpdated zkl spm
     , dialog = Nothing
     }
@@ -313,82 +256,30 @@ noteLink str =
             (UP.parse (UP.s "note" </> UP.int))
 
 
-compareZklinks : Data.ZkLink -> Data.ZkLink -> Order
-compareZklinks left right =
-    case compare left.from right.from of
-        EQ ->
-            compare left.to right.to
-
-        ltgt ->
-            ltgt
-
-
-saveZkLinkList : Model -> List Data.ZkLink
-saveZkLinkList model =
-    List.map
-        (\zkl -> { zkl | delete = Nothing })
-        (Dict.values (Dict.diff model.zklDict model.initialZklDict))
-        ++ List.map
-            (\zkl -> { zkl | delete = Just True })
-            (Dict.values (Dict.diff model.initialZklDict model.zklDict))
-
-
 update : Msg -> Model -> ( Model, Command )
 update msg model =
     case msg of
         SavePress ->
             -- TODO more reliability.  What if the save fails?
-            let
-                saveZkn =
-                    sznFromModel model
-            in
-            ( { model
-                | revert = Just saveZkn
-                , initialZklDict = model.zklDict
-              }
-            , Save
-                saveZkn
-                (saveZkLinkList model)
-            )
-
-        DonePress ->
             ( model
-            , if dirty model then
-                SaveExit
-                    (sznFromModel model)
-                    (saveZkLinkList model)
-
-              else
-                Cancel
+            , SaveExit
+                model.notes
             )
+
+        CancelPress ->
+            ( model, Cancel )
 
         LinkPress zkln ->
             -- add a zklink, or newlink?
-            case model.id of
-                Just id ->
-                    let
-                        nzkl =
-                            { from = id
-                            , to = zkln.id
-                            , user = model.ld.userid
-                            , zknote = Nothing
-                            , fromname = Nothing
-                            , toname = Just zkln.title
-                            , delete = Nothing
-                            }
-                    in
-                    ( { model
-                        | zklDict = Dict.insert (zklKey nzkl) nzkl model.zklDict
-                      }
-                    , None
-                    )
-
-                Nothing ->
-                    ( model, None )
-
-        RemoveLink zkln ->
             ( { model
-                | zklDict = Dict.remove (zklKey zkln) model.zklDict
+                | globlinks = Dict.insert zkln.id { title = zkln.title, to = True, from = False } model.globlinks
+              }
+            , None
+            )
+
+        RemoveLink id ->
+            ( { model
+                | globlinks = Dict.remove id model.globlinks
               }
             , None
             )
@@ -396,14 +287,14 @@ update msg model =
         DialogMsg dm ->
             case model.dialog of
                 Just dmod ->
-                    case ( D.update dm dmod, model.id ) of
-                        ( D.Cancel, _ ) ->
+                    case D.update dm dmod of
+                        D.Cancel ->
                             ( { model | dialog = Nothing }, None )
 
-                        ( D.Ok, Nothing ) ->
+                        D.Ok ->
                             ( { model | dialog = Nothing }, None )
 
-                        ( D.Dialog dmod2, _ ) ->
+                        D.Dialog dmod2 ->
                             ( { model | dialog = Just dmod2 }, None )
 
                 Nothing ->
