@@ -1,4 +1,4 @@
-module Import exposing (Command(..), LinkHalf, Model, Msg(..), WClass(..), init, noteLink, showZkl, update, updateSearchResult, view, zkLinkName, zklKey, zknview)
+module Import exposing (Command(..), LinkHalf, Model, Msg(..), WClass(..), init, noteLink, showLh, update, updateSearchResult, view, zkLinkName, zklKey, zknview)
 
 import CellCommon exposing (..)
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
@@ -83,8 +83,8 @@ zkLinkName zklink noteid =
         "link error"
 
 
-showZkl : Int -> LinkHalf -> Element Msg
-showZkl id lh =
+showLh : Int -> LinkHalf -> Element Msg
+showLh id lh =
     E.row [ E.spacing 8, E.width E.fill ]
         [ case ( lh.from, lh.to ) of
             ( False, False ) ->
@@ -148,7 +148,7 @@ zknview size model =
         showLinks =
             E.row [ EF.bold ] [ E.text "links" ]
                 :: List.map
-                    (\( a, b ) -> showZkl a b)
+                    (\( a, b ) -> showLh a b)
                     (Dict.toList model.globlinks)
 
         searchPanel =
@@ -227,7 +227,7 @@ zknview size model =
             , E.spacing 8
             , E.alignTop
             ]
-            [ searchPanel ]
+            [ E.column [] showLinks, searchPanel ]
         ]
 
 
