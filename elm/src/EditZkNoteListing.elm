@@ -8,6 +8,7 @@ import Element.Border as EBd
 import Element.Font as EF
 import Element.Input as EI
 import Element.Region
+import Import
 import Search as S exposing (TagSearch(..))
 import SearchPanel as SP
 import TangoColors as TC
