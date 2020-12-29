@@ -13,6 +13,7 @@ import Element.Border as EBd
 import Element.Font as EF
 import Element.Input as EI
 import Element.Region as ER
+import File as F
 import Html exposing (Attribute, Html)
 import Html.Attributes
 import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..), inlineFoldl)
@@ -32,10 +33,12 @@ import Util
 type Msg
     = SavePress
     | CancelPress
+    | FilesPress
     | LinkPress Data.ZkListNote
     | RemoveLink Int
     | SPMsg SP.Msg
     | DialogMsg D.Msg
+    | FilesSelected F.File (List F.File)
     | Noop
 
 
@@ -60,6 +63,7 @@ type Command
     = None
     | SaveExit (List Data.ImportZkNote)
     | Search S.ZkNoteSearch
+    | SelectFiles
     | Cancel
 
 
@@ -221,6 +225,7 @@ zknview size model =
 
                 False ->
                     E.none
+            , EI.button Common.buttonStyle { onPress = Just FilesPress, label = E.text "select" }
             ]
         , E.row
             [ E.width E.fill
@@ -268,6 +273,12 @@ update msg model =
 
         CancelPress ->
             ( model, Cancel )
+
+        FilesPress ->
+            ( model, SelectFiles )
+
+        FilesSelected _ _ ->
+            ( model, None )
 
         LinkPress zkln ->
             -- add a zklink, or newlink?

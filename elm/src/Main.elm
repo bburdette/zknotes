@@ -16,6 +16,8 @@ import Element.Border as EBd
 import Element.Font as Font
 import Element.Input as EI
 import Element.Region
+import File as F
+import File.Select as FS
 import Html exposing (Attribute, Html)
 import Html.Attributes
 import Http
@@ -1292,7 +1294,28 @@ actualupdate msg model =
                 ( emod, ecmd ) =
                     Import.update em es
             in
-            ( { model | state = Import emod login }, Cmd.none )
+            case ecmd of
+                Import.None ->
+                    ( { model | state = Import emod login }, Cmd.none )
+
+                Import.SaveExit notes ->
+                    ( { model | state = Import emod login }, Cmd.none )
+
+                Import.Search s ->
+                    ( { model | state = Import emod login }
+                    , sendUIMsg model.location
+                        login
+                        (UI.SearchZkNotes s)
+                    )
+
+                Import.SelectFiles ->
+                    ( { model | state = Import emod login }
+                    , FS.files []
+                        (\a b -> ImportMsg (Import.FilesSelected a b))
+                    )
+
+                Import.Cancel ->
+                    ( { model | state = Import emod login }, Cmd.none )
 
         ( DisplayErrorMsg bm, DisplayError bs prevstate ) ->
             let
