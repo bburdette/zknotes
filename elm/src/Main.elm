@@ -1317,6 +1317,9 @@ actualupdate msg model =
                 Import.Cancel ->
                     ( { model | state = Import emod login }, Cmd.none )
 
+                Import.Command cmd ->
+                    ( model, Cmd.map ImportMsg cmd )
+
         ( DisplayErrorMsg bm, DisplayError bs prevstate ) ->
             let
                 ( bmod, bcmd ) =

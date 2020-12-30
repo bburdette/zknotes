@@ -24,6 +24,7 @@ import Schelme.Show exposing (showTerm)
 import Search as S
 import SearchPanel as SP
 import TangoColors as TC
+import Task
 import Url as U
 import Url.Builder as UB
 import Url.Parser as UP exposing ((</>))
@@ -39,6 +40,7 @@ type Msg
     | SPMsg SP.Msg
     | DialogMsg D.Msg
     | FilesSelected F.File (List F.File)
+    | FileLoaded String String
     | Noop
 
 
@@ -65,6 +67,7 @@ type Command
     | Search S.ZkNoteSearch
     | SelectFiles
     | Cancel
+    | Command (Cmd Msg)
 
 
 updateSearchResult : Data.ZkNoteSearchResult -> Model -> Model
@@ -232,7 +235,7 @@ zknview size model =
             , E.spacing 8
             , E.alignTop
             ]
-            [ E.column [] showLinks, searchPanel ]
+            [ E.column [ E.alignTop ] (List.map (\note -> E.text note.title) model.notes ++ showLinks), searchPanel ]
         ]
 
 
@@ -261,6 +264,11 @@ noteLink str =
             (UP.parse (UP.s "note" </> UP.int))
 
 
+processFile : F.File -> Data.ImportZkNote
+processFile file =
+    { title = "", content = "", fromLinks = [], toLinks = [] }
+
+
 update : Msg -> Model -> ( Model, Command )
 update msg model =
     case msg of
@@ -277,8 +285,30 @@ update msg model =
         FilesPress ->
             ( model, SelectFiles )
 
-        FilesSelected _ _ ->
-            ( model, None )
+        FileLoaded name content ->
+            ( { model
+                | notes =
+                    model.notes
+                        ++ [ { title = name
+                             , content = content
+                             , fromLinks = []
+                             , toLinks = []
+                             }
+                           ]
+              }
+            , None
+            )
+
+        FilesSelected f fs ->
+            ( model
+            , Command <|
+                Cmd.batch <|
+                    List.map
+                        (\file ->
+                            Task.perform (FileLoaded (F.name file)) (F.toString file)
+                        )
+                        (f :: fs)
+            )
 
         LinkPress zkln ->
             -- add a zklink, or newlink?
