@@ -1,4 +1,25 @@
-module Import exposing (Command(..), LinkHalf, Model, Msg(..), WClass(..), init, noteLink, showLh, update, updateSearchResult, view, zkLinkName, zklKey, zknview)
+module Import exposing
+    ( Command(..)
+    , LinkHalf
+    , Links
+    , Model
+    , Msg(..)
+    , WClass(..)
+    , decodeLinks
+    , importview
+    , init
+    , jsplit
+    , noteLink
+    , parseContent
+    , processFile
+    , rbrak
+    , showLh
+    , update
+    , updateSearchResult
+    , view
+    , zkLinkName
+    , zklKey
+    )
 
 import CellCommon exposing (..)
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
@@ -16,6 +37,7 @@ import Element.Region as ER
 import File as F
 import Html exposing (Attribute, Html)
 import Html.Attributes
+import Json.Decode as JD
 import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..), inlineFoldl)
 import Markdown.Html
 import Markdown.Parser
@@ -49,6 +71,19 @@ type alias LinkHalf =
     , to : Bool
     , title : String
     }
+
+
+type alias Links =
+    { fromlinks : List String
+    , tolinks : List String
+    }
+
+
+decodeLinks : JD.Decoder Links
+decodeLinks =
+    JD.map2 Links
+        (JD.field "fromlinks" (JD.list JD.string))
+        (JD.field "tolinks" (JD.list JD.string))
 
 
 type alias Model =
@@ -133,11 +168,11 @@ view size model =
             D.view size dialog |> E.map DialogMsg
 
         Nothing ->
-            zknview size model
+            importview size model
 
 
-zknview : Util.Size -> Model -> Element Msg
-zknview size model =
+importview : Util.Size -> Model -> Element Msg
+importview size model =
     let
         wclass =
             if size.width < 800 then
@@ -235,7 +270,21 @@ zknview size model =
             , E.spacing 8
             , E.alignTop
             ]
-            [ E.column [ E.alignTop ] (List.map (\note -> E.text note.title) model.notes ++ showLinks), searchPanel ]
+            [ E.column [ E.alignTop ]
+                (List.map
+                    (\note ->
+                        E.row []
+                            (E.text note.title
+                                :: (List.map E.text note.fromLinks
+                                        ++ List.map E.text note.toLinks
+                                   )
+                            )
+                    )
+                    model.notes
+                    ++ showLinks
+                )
+            , searchPanel
+            ]
         ]
 
 
@@ -269,6 +318,44 @@ processFile file =
     { title = "", content = "", fromLinks = [], toLinks = [] }
 
 
+parseContent : String -> Result JD.Error Links
+parseContent c =
+    JD.decodeString decodeLinks c
+
+
+jsplit : String -> ( Maybe String, String )
+jsplit s =
+    if String.left 1 s == "{" then
+        rbrak s 1 1 (String.length s)
+
+    else
+        ( Nothing, s )
+
+
+rbrak : String -> Int -> Int -> Int -> ( Maybe String, String )
+rbrak s c i l =
+    if i == l then
+        ( Nothing, s )
+
+    else
+        let
+            f =
+                String.slice i (i + 1) s
+        in
+        if f == "{" then
+            rbrak s (c + 1) (i + 1) l
+
+        else if f == "}" then
+            if c == 1 then
+                ( Just <| String.slice 0 (i + 1) s, String.slice (i + 1) l s )
+
+            else
+                rbrak s (c - 1) (i + 1) l
+
+        else
+            rbrak s c (i + 1) l
+
+
 update : Msg -> Model -> ( Model, Command )
 update msg model =
     case msg of
@@ -286,13 +373,38 @@ update msg model =
             ( model, SelectFiles )
 
         FileLoaded name content ->
+            let
+                ( mbjs, s ) =
+                    Debug.log "jsplit: " <| jsplit content
+
+                links =
+                    mbjs
+                        |> Maybe.map
+                            (\js ->
+                                parseContent js
+                                    |> (\rs ->
+                                            case rs of
+                                                Err e ->
+                                                    let
+                                                        _ =
+                                                            Debug.log "error" e
+                                                    in
+                                                    Err e
+
+                                                _ ->
+                                                    rs
+                                       )
+                                    |> Result.withDefault { fromlinks = [], tolinks = [] }
+                            )
+                        |> Maybe.withDefault { fromlinks = [], tolinks = [] }
+            in
             ( { model
                 | notes =
                     model.notes
                         ++ [ { title = name
                              , content = content
-                             , fromLinks = []
-                             , toLinks = []
+                             , fromLinks = links.fromlinks
+                             , toLinks = links.tolinks
                              }
                            ]
               }
