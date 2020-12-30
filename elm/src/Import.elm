@@ -86,6 +86,24 @@ decodeLinks =
         (JD.field "tolinks" (JD.list JD.string))
 
 
+addLinks : Data.ImportZkNote -> LinkHalf -> Data.ImportZkNote
+addLinks izn lh =
+    { izn
+        | fromLinks =
+            if lh.from then
+                lh.title :: izn.fromLinks
+
+            else
+                izn.fromLinks
+        , toLinks =
+            if lh.to then
+                lh.title :: izn.toLinks
+
+            else
+                izn.toLinks
+    }
+
+
 type alias Model =
     { ld : Data.LoginData
     , notes : List Data.ImportZkNote
@@ -185,7 +203,7 @@ importview size model =
                 Medium
 
         isdirty =
-            True
+            not <| List.isEmpty model.notes
 
         showLinks =
             E.row [ EF.bold ] [ E.text "links" ]
@@ -233,7 +251,12 @@ importview size model =
                                          else
                                             Common.buttonStyle
                                         )
-                                        { onPress = Nothing
+                                        { onPress =
+                                            if tolinked then
+                                                Nothing
+
+                                            else
+                                                Just (LinkPress zkln)
                                         , label = E.text "link"
                                         }
                                     , E.row
@@ -270,10 +293,10 @@ importview size model =
             , E.spacing 8
             , E.alignTop
             ]
-            [ E.column [ E.alignTop ]
+            [ E.column [ E.alignTop, E.spacing 8 ]
                 (List.map
                     (\note ->
-                        E.row []
+                        E.row [ E.spacing 8 ]
                             (E.text note.title
                                 :: (List.map E.text note.fromLinks
                                         ++ List.map E.text note.toLinks
@@ -360,10 +383,14 @@ update : Msg -> Model -> ( Model, Command )
 update msg model =
     case msg of
         SavePress ->
-            -- TODO more reliability.  What if the save fails?
+            let
+                gl =
+                    Dict.values model.globlinks
+            in
             ( model
-            , SaveExit
-                model.notes
+            , SaveExit <|
+                List.map (\n -> List.foldl (\glk note -> addLinks note glk) n gl)
+                    model.notes
             )
 
         CancelPress ->
@@ -375,25 +402,13 @@ update msg model =
         FileLoaded name content ->
             let
                 ( mbjs, s ) =
-                    Debug.log "jsplit: " <| jsplit content
+                    jsplit content
 
                 links =
                     mbjs
                         |> Maybe.map
                             (\js ->
                                 parseContent js
-                                    |> (\rs ->
-                                            case rs of
-                                                Err e ->
-                                                    let
-                                                        _ =
-                                                            Debug.log "error" e
-                                                    in
-                                                    Err e
-
-                                                _ ->
-                                                    rs
-                                       )
                                     |> Result.withDefault { fromlinks = [], tolinks = [] }
                             )
                         |> Maybe.withDefault { fromlinks = [], tolinks = [] }

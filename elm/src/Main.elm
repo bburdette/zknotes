@@ -924,6 +924,11 @@ actualupdate msg model =
                                     , Cmd.none
                                     )
 
+                                Import istate login_ ->
+                                    ( { model | state = Import (Import.updateSearchResult sr istate) login_ }
+                                    , Cmd.none
+                                    )
+
                                 ShowMessage _ login ->
                                     ( { model | state = EditZkNoteListing { notes = sr, spmodel = SP.initModel } login }
                                     , Cmd.none
@@ -1019,6 +1024,9 @@ actualupdate msg model =
                                     ( { model | state = unexpectedMessage (Login (Login.initialModel Nothing "zknotes" model.seed)) (UI.showServerResponse uiresponse) }
                                     , Cmd.none
                                     )
+
+                        UI.SavedImportZkNotes ->
+                            ( model, Cmd.none )
 
         ( ViewMsg em, View es ) ->
             let
@@ -1293,13 +1301,40 @@ actualupdate msg model =
             let
                 ( emod, ecmd ) =
                     Import.update em es
+
+                backtolisting =
+                    \imod ->
+                        ( { model
+                            | state =
+                                EditZkNoteListing { notes = imod.zknSearchResult, spmodel = imod.spmodel } login
+                          }
+                        , case SP.getSearch imod.spmodel of
+                            Just s ->
+                                sendUIMsg model.location
+                                    login
+                                    (UI.SearchZkNotes s)
+
+                            Nothing ->
+                                Cmd.none
+                        )
             in
             case ecmd of
                 Import.None ->
                     ( { model | state = Import emod login }, Cmd.none )
 
                 Import.SaveExit notes ->
-                    ( { model | state = Import emod login }, Cmd.none )
+                    let
+                        ( m, c ) =
+                            backtolisting emod
+                    in
+                    ( m
+                    , Cmd.batch
+                        [ sendUIMsg model.location
+                            login
+                            (UI.SaveImportZkNotes notes)
+                        , c
+                        ]
+                    )
 
                 Import.Search s ->
                     ( { model | state = Import emod login }
@@ -1315,7 +1350,7 @@ actualupdate msg model =
                     )
 
                 Import.Cancel ->
-                    ( { model | state = Import emod login }, Cmd.none )
+                    backtolisting emod
 
                 Import.Command cmd ->
                     ( model, Cmd.map ImportMsg cmd )

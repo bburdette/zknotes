@@ -16,6 +16,7 @@ type SendMsg
     | SaveZkLinks Data.ZkLinks
     | GetZkLinks Data.GetZkLinks
     | SearchZkNotes S.ZkNoteSearch
+    | SaveImportZkNotes (List Data.ImportZkNote)
 
 
 type ServerResponse
@@ -32,6 +33,7 @@ type ServerResponse
     | ServerError String
     | SavedZkLinks
     | ZkLinks Data.ZkLinks
+    | SavedImportZkNotes
 
 
 showServerResponse : ServerResponse -> String
@@ -72,6 +74,9 @@ showServerResponse sr =
 
         SavedZkLinks ->
             "SavedZkLinks"
+
+        SavedImportZkNotes ->
+            "SavedImportZkNotes"
 
         ZkLinks _ ->
             "ZkLinks"
@@ -149,6 +154,14 @@ encodeSendMsg sm uid pwd =
                 , ( "uid", JE.string uid )
                 , ( "pwd", JE.string pwd )
                 , ( "data", S.encodeZkNoteSearch s )
+                ]
+
+        SaveImportZkNotes n ->
+            JE.object
+                [ ( "what", JE.string "saveimportzknotes" )
+                , ( "uid", JE.string uid )
+                , ( "pwd", JE.string pwd )
+                , ( "data", JE.list Data.encodeImportZkNote n )
                 ]
 
 
