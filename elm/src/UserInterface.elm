@@ -213,6 +213,9 @@ serverResponseDecoder =
                 "savedzklinks" ->
                     JD.succeed SavedZkLinks
 
+                "savedimportzknotes" ->
+                    JD.succeed SavedImportZkNotes
+
                 "zklinks" ->
                     JD.map ZkLinks (JD.field "content" Data.decodeZkLinks)
 
