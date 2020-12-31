@@ -1,1 +1,1 @@
-./target/debug/zknote-server
+./target/debug/zknotes-server

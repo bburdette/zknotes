@@ -97,6 +97,10 @@ type alias SaveZkLinks =
     }
 
 
+type alias ImportZkNote =
+    { title : String, content : String, fromLinks : List String, toLinks : List String }
+
+
 type alias GetZkLinks =
     { zknote : Int
     }
@@ -255,3 +259,13 @@ decodeLoginData =
         (JD.field "publicid" JD.int)
         (JD.field "shareid" JD.int)
         (JD.field "searchid" JD.int)
+
+
+encodeImportZkNote : ImportZkNote -> JE.Value
+encodeImportZkNote izn =
+    JE.object
+        [ ( "title", JE.string izn.title )
+        , ( "content", JE.string izn.content )
+        , ( "fromLinks", JE.list JE.string izn.fromLinks )
+        , ( "toLinks", JE.list JE.string izn.toLinks )
+        ]

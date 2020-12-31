@@ -16,9 +16,12 @@ import Element.Border as EBd
 import Element.Font as Font
 import Element.Input as EI
 import Element.Region
+import File as F
+import File.Select as FS
 import Html exposing (Attribute, Html)
 import Html.Attributes
 import Http
+import Import
 import Json.Decode as JD
 import LocalStorage as LS
 import Login
@@ -46,6 +49,7 @@ type Msg
     | ViewMsg View.Msg
     | EditZkNoteMsg EditZkNote.Msg
     | EditZkNoteListingMsg EditZkNoteListing.Msg
+    | ImportMsg Import.Msg
     | ShowMessageMsg ShowMessage.Msg
     | UserReplyData (Result Http.Error UI.ServerResponse)
     | PublicReplyData (Result Http.Error PI.ServerResponse)
@@ -63,6 +67,7 @@ type State
     | EditZkNoteListing EditZkNoteListing.Model Data.LoggedIn
     | View View.Model
     | EView View.Model State
+    | Import Import.Model Data.LoggedIn
     | DisplayError DisplayError.Model State
     | ShowMessage ShowMessage.Model Data.LoggedIn
     | PubShowMessage ShowMessage.Model
@@ -309,6 +314,9 @@ showMessage msg =
         EditZkNoteListingMsg _ ->
             "EditZkNoteListingMsg"
 
+        ImportMsg _ ->
+            "ImportMsg"
+
         ShowMessageMsg _ ->
             "ShowMessageMsg"
 
@@ -354,6 +362,9 @@ showState state =
 
         EView _ _ ->
             "EView"
+
+        Import _ _ ->
+            "Import"
 
         DisplayError _ _ ->
             "DisplayError"
@@ -402,6 +413,9 @@ viewState size state =
         LoginShowMessage em _ _ ->
             Element.map ShowMessageMsg <| ShowMessage.view em
 
+        Import em _ ->
+            Element.map ImportMsg <| Import.view size em
+
         View em ->
             Element.map ViewMsg <| View.view size.width em False
 
@@ -425,6 +439,9 @@ stateLogin state =
             Just login
 
         EditZkNoteListing _ login ->
+            Just login
+
+        Import _ login ->
             Just login
 
         View _ ->
@@ -907,6 +924,11 @@ actualupdate msg model =
                                     , Cmd.none
                                     )
 
+                                Import istate login_ ->
+                                    ( { model | state = Import (Import.updateSearchResult sr istate) login_ }
+                                    , Cmd.none
+                                    )
+
                                 ShowMessage _ login ->
                                     ( { model | state = EditZkNoteListing { notes = sr, spmodel = SP.initModel } login }
                                     , Cmd.none
@@ -1002,6 +1024,9 @@ actualupdate msg model =
                                     ( { model | state = unexpectedMessage (Login (Login.initialModel Nothing "zknotes" model.seed)) (UI.showServerResponse uiresponse) }
                                     , Cmd.none
                                     )
+
+                        UI.SavedImportZkNotes ->
+                            ( model, Cmd.none )
 
         ( ViewMsg em, View es ) ->
             let
@@ -1260,12 +1285,75 @@ actualupdate msg model =
                         ]
                     )
 
+                EditZkNoteListing.Import ->
+                    ( { model | state = Import (Import.init login.ld emod.notes emod.spmodel) login }
+                    , Cmd.none
+                    )
+
                 EditZkNoteListing.Search s ->
                     ( { model | state = EditZkNoteListing emod login }
                     , sendUIMsg model.location
                         login
                         (UI.SearchZkNotes s)
                     )
+
+        ( ImportMsg em, Import es login ) ->
+            let
+                ( emod, ecmd ) =
+                    Import.update em es
+
+                backtolisting =
+                    \imod ->
+                        ( { model
+                            | state =
+                                EditZkNoteListing { notes = imod.zknSearchResult, spmodel = imod.spmodel } login
+                          }
+                        , case SP.getSearch imod.spmodel of
+                            Just s ->
+                                sendUIMsg model.location
+                                    login
+                                    (UI.SearchZkNotes s)
+
+                            Nothing ->
+                                Cmd.none
+                        )
+            in
+            case ecmd of
+                Import.None ->
+                    ( { model | state = Import emod login }, Cmd.none )
+
+                Import.SaveExit notes ->
+                    let
+                        ( m, c ) =
+                            backtolisting emod
+                    in
+                    ( m
+                    , Cmd.batch
+                        [ sendUIMsg model.location
+                            login
+                            (UI.SaveImportZkNotes notes)
+                        , c
+                        ]
+                    )
+
+                Import.Search s ->
+                    ( { model | state = Import emod login }
+                    , sendUIMsg model.location
+                        login
+                        (UI.SearchZkNotes s)
+                    )
+
+                Import.SelectFiles ->
+                    ( { model | state = Import emod login }
+                    , FS.files []
+                        (\a b -> ImportMsg (Import.FilesSelected a b))
+                    )
+
+                Import.Cancel ->
+                    backtolisting emod
+
+                Import.Command cmd ->
+                    ( model, Cmd.map ImportMsg cmd )
 
         ( DisplayErrorMsg bm, DisplayError bs prevstate ) ->
             let

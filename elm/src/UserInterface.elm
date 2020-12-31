@@ -16,6 +16,7 @@ type SendMsg
     | SaveZkLinks Data.ZkLinks
     | GetZkLinks Data.GetZkLinks
     | SearchZkNotes S.ZkNoteSearch
+    | SaveImportZkNotes (List Data.ImportZkNote)
 
 
 type ServerResponse
@@ -32,6 +33,7 @@ type ServerResponse
     | ServerError String
     | SavedZkLinks
     | ZkLinks Data.ZkLinks
+    | SavedImportZkNotes
 
 
 showServerResponse : ServerResponse -> String
@@ -72,6 +74,9 @@ showServerResponse sr =
 
         SavedZkLinks ->
             "SavedZkLinks"
+
+        SavedImportZkNotes ->
+            "SavedImportZkNotes"
 
         ZkLinks _ ->
             "ZkLinks"
@@ -151,6 +156,14 @@ encodeSendMsg sm uid pwd =
                 , ( "data", S.encodeZkNoteSearch s )
                 ]
 
+        SaveImportZkNotes n ->
+            JE.object
+                [ ( "what", JE.string "saveimportzknotes" )
+                , ( "uid", JE.string uid )
+                , ( "pwd", JE.string pwd )
+                , ( "data", JE.list Data.encodeImportZkNote n )
+                ]
+
 
 encodeEmail : String -> JE.Value
 encodeEmail email =
@@ -199,6 +212,9 @@ serverResponseDecoder =
 
                 "savedzklinks" ->
                     JD.succeed SavedZkLinks
+
+                "savedimportzknotes" ->
+                    JD.succeed SavedImportZkNotes
 
                 "zklinks" ->
                     JD.map ZkLinks (JD.field "content" Data.decodeZkLinks)

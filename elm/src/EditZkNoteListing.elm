@@ -8,6 +8,7 @@ import Element.Border as EBd
 import Element.Font as EF
 import Element.Input as EI
 import Element.Region
+import Import
 import Search as S exposing (TagSearch(..))
 import SearchPanel as SP
 import TangoColors as TC
@@ -18,6 +19,7 @@ type Msg
     = SelectPress Int
     | NewPress
     | DonePress
+    | ImportPress
     | SPMsg SP.Msg
 
 
@@ -31,6 +33,7 @@ type Command
     = Selected Int
     | New
     | Done
+    | Import
     | None
     | Search S.ZkNoteSearch
 
@@ -55,11 +58,14 @@ view ld size model =
     E.column [ E.spacing 8, E.padding 8, E.width (E.maximum maxwidth E.fill), E.centerX ]
         [ E.row [ E.spacing 8, E.width E.fill ]
             [ E.row [ EF.bold ] [ E.text ld.name ]
-            , EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just DonePress, label = E.text "logout" }
+            , EI.button
+                (E.alignRight :: Common.buttonStyle)
+                { onPress = Just DonePress, label = E.text "logout" }
             ]
         , E.row [ E.spacing 8 ]
             [ E.text "select a zk note"
             , EI.button Common.buttonStyle { onPress = Just NewPress, label = E.text "new" }
+            , EI.button Common.buttonStyle { onPress = Just ImportPress, label = E.text "import" }
             ]
         , E.map SPMsg <| SP.view (size.width < maxwidth) 0 model.spmodel
         , E.table [ E.spacing 10, E.width E.fill, E.centerX ]
@@ -118,6 +124,9 @@ update msg model =
 
         DonePress ->
             ( model, Done )
+
+        ImportPress ->
+            ( model, Import )
 
         SPMsg m ->
             let
