@@ -417,7 +417,7 @@ update msg model =
                 | notes =
                     model.notes
                         ++ [ { title = name
-                             , content = content
+                             , content = s
                              , fromLinks = links.fromlinks
                              , toLinks = links.tolinks
                              }

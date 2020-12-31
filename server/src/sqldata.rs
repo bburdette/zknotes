@@ -58,6 +58,14 @@ pub struct ZkLinks {
   pub links: Vec<ZkLink>,
 }
 
+#[derive(Deserialize, Debug, Clone)]
+pub struct ImportZkNote {
+  title: String,
+  content: String,
+  fromLinks: Vec<String>,
+  toLinks: Vec<String>,
+}
+
 #[derive(Deserialize, Serialize, Debug)]
 pub struct GetZkLinks {
   pub zknote: i64,
@@ -750,6 +758,23 @@ pub fn note_id(conn: &Connection, name: &str, title: &str) -> Result<i64, Box<dy
   Ok(id)
 }
 
+pub fn note_id2(conn: &Connection, uid: i64, title: &str) -> Result<Option<i64>, Box<dyn Error>> {
+  match conn.query_row(
+    "select zknote.id from
+      zknote
+      where zknote.title = ?2
+      and zknote.user = ?1",
+    params![uid, title],
+    |row| Ok(row.get(0)?),
+  ) {
+    Err(e) => match e {
+      QueryReturnedNoRows => Ok(None),
+      _ => Err(Box::new(e)),
+    },
+    Ok(i) => Ok(i),
+  }
+}
+
 pub fn user_id(conn: &Connection, name: &str) -> Result<i64, Box<dyn Error>> {
   let id: i64 = conn.query_row(
     "select id from user
@@ -852,12 +877,10 @@ pub fn is_zknote_public(conn: &Connection, zknoteid: i64) -> Result<bool, Box<dy
 // zknote CRUD
 
 pub fn save_zknote(
-  dbfile: &Path,
+  conn: &Connection,
   uid: i64,
   note: &SaveZkNote,
 ) -> Result<SavedZkNote, Box<dyn Error>> {
-  let conn = connection_open(dbfile)?;
-
   let now = now()?;
 
   match note.id {
@@ -1155,4 +1178,89 @@ pub fn read_zknoteedit(
     zknote: zknote,
     links: zklinks,
   })
+}
+
+pub fn save_importzknotes(
+  conn: &Connection,
+  uid: i64,
+  izns: Vec<ImportZkNote>,
+) -> Result<(), Box<dyn Error>> {
+  for izn in izns.iter() {
+    // create the note if it doesn't exist.
+    let nid = match note_id2(&conn, uid, izn.title.as_str())? {
+      Some(i) => {
+        // update the content.
+        conn.execute(
+          "update zknote set content = ?1 where
+            user = ?2 and id = ?3",
+          params![izn.content, uid, i],
+        )?;
+
+        i
+      }
+      None => {
+        // new note.
+        save_zknote(
+          &conn,
+          uid,
+          &SaveZkNote {
+            id: None,
+            title: izn.title.clone(),
+            pubid: None,
+            content: izn.content.clone(),
+          },
+        )?
+        .id
+      }
+    };
+    // now add the 'from' links.
+    for title in izn.fromLinks.iter() {
+      // if the 'from' note doesn't exist, create it.
+      let fromid = match note_id2(&conn, uid, title)? {
+        Some(n) => n,
+        None => {
+          // new note.
+          save_zknote(
+            &conn,
+            uid,
+            &SaveZkNote {
+              id: None,
+              title: title.clone(),
+              pubid: None,
+              content: "".to_string(),
+            },
+          )?
+          .id
+        }
+      };
+
+      // save link.
+      save_zklink(&conn, fromid, nid, uid, None)?;
+    }
+    // add the 'to' links (and their notes)
+    for title in izn.toLinks.iter() {
+      let toid = match note_id2(&conn, uid, title)? {
+        Some(n) => n,
+        None => {
+          // new note.
+          save_zknote(
+            &conn,
+            uid,
+            &SaveZkNote {
+              id: None,
+              title: title.clone(),
+              pubid: None,
+              content: "".to_string(),
+            },
+          )?
+          .id
+        }
+      };
+
+      // save link.
+      save_zklink(&conn, nid, toid, uid, None)?;
+    }
+  }
+
+  Ok(())
 }

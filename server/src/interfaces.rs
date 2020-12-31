@@ -193,7 +193,8 @@ fn user_interface_loggedin(
     "savezknote" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let sbe: sqldata::SaveZkNote = serde_json::from_value(msgdata.clone())?;
-      let s = sqldata::save_zknote(&config.db.as_path(), uid, &sbe)?;
+      let conn = sqldata::connection_open(config.db.as_path())?;
+      let s = sqldata::save_zknote(&conn, uid, &sbe)?;
       Ok(ServerResponse {
         what: "savedzknote".to_string(),
         content: serde_json::to_value(s)?,
@@ -217,6 +218,16 @@ fn user_interface_loggedin(
       Ok(ServerResponse {
         what: "zklinks".to_string(),
         content: serde_json::to_value(zklinks)?,
+      })
+    }
+    "saveimportzknotes" => {
+      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      let gzl: Vec<sqldata::ImportZkNote> = serde_json::from_value(msgdata.clone())?;
+      let conn = sqldata::connection_open(config.db.as_path())?;
+      sqldata::save_importzknotes(&conn, uid, gzl)?;
+      Ok(ServerResponse {
+        what: "savedimportzknotes".to_string(),
+        content: serde_json::to_value(())?,
       })
     }
     wat => Err(Box::new(simple_error::SimpleError::new(format!(
