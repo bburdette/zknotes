@@ -279,14 +279,15 @@ importview size model =
             [ E.row [ EF.bold ] [ E.text model.ld.name ]
             ]
         , E.row [ E.width E.fill, E.spacing 8 ]
-            [ EI.button Common.buttonStyle { onPress = Just CancelPress, label = E.text "cancel" }
+            [ EI.button Common.buttonStyle { onPress = Just FilesPress, label = E.text "select files" }
+            , EI.button Common.buttonStyle { onPress = Just CancelPress, label = E.text "cancel" }
             , case isdirty of
                 True ->
-                    EI.button Common.buttonStyle { onPress = Just SavePress, label = E.text "save" }
+                    EI.button (Common.buttonStyle ++ [ EBk.color TC.darkYellow ])
+                        { onPress = Just SavePress, label = E.text "save" }
 
                 False ->
                     E.none
-            , EI.button Common.buttonStyle { onPress = Just FilesPress, label = E.text "select" }
             ]
         , E.row
             [ E.width E.fill
