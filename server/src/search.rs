@@ -219,24 +219,19 @@ fn build_sql_clause(
         };
         (format!("N.user {}= ?", notstr), vec![format!("{}", user)])
       } else {
-        let notstr = match (not, exact) {
-          (true, false) => "not",
-          (false, false) => "",
-          (true, true) => "!",
-          (false, true) => "",
-        };
-
         if tag {
           let clause = if exact {
-            format!("zkn.{} {}= ?", field, notstr)
+            format!("zkn.{} = ?", field)
           } else {
-            format!("zkn.{} {} like ?", field, notstr)
+            format!("zkn.{}  like ?", field)
           };
+
+          let notstr = if not { "not" } else { "" };
 
           (
             // clause
             format!(
-              "(0 < (select count(zkn.id) from zknote as zkn, zklink
+              "{} (0 < (select count(zkn.id) from zknote as zkn, zklink
              where zkn.id = zklink.fromid
                and zklink.toid = N.id
                and {})
@@ -245,7 +240,7 @@ fn build_sql_clause(
              where zkn.id = zklink.toid
                and zklink.fromid = N.id
                and {}))",
-              clause, clause
+              notstr, clause, clause
             ),
             // args
             if exact {
@@ -258,6 +253,13 @@ fn build_sql_clause(
             },
           )
         } else {
+          let notstr = match (not, exact) {
+            (true, false) => "not",
+            (false, false) => "",
+            (true, true) => "!",
+            (false, true) => "",
+          };
+
           (
             // clause
             if exact {
