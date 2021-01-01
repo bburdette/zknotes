@@ -79,31 +79,6 @@ type alias Links =
     }
 
 
-decodeLinks : JD.Decoder Links
-decodeLinks =
-    JD.map2 Links
-        (JD.field "fromlinks" (JD.list JD.string))
-        (JD.field "tolinks" (JD.list JD.string))
-
-
-addLinks : Data.ImportZkNote -> LinkHalf -> Data.ImportZkNote
-addLinks izn lh =
-    { izn
-        | fromLinks =
-            if lh.from then
-                lh.title :: izn.fromLinks
-
-            else
-                izn.fromLinks
-        , toLinks =
-            if lh.to then
-                lh.title :: izn.toLinks
-
-            else
-                izn.toLinks
-    }
-
-
 type alias Model =
     { ld : Data.LoginData
     , notes : List Data.ImportZkNote
@@ -128,6 +103,31 @@ updateSearchResult zsr model =
     { model
         | zknSearchResult = zsr
         , spmodel = SP.searchResultUpdated zsr model.spmodel
+    }
+
+
+decodeLinks : JD.Decoder Links
+decodeLinks =
+    JD.map2 Links
+        (JD.field "fromlinks" (JD.list JD.string))
+        (JD.field "tolinks" (JD.list JD.string))
+
+
+addLinks : Data.ImportZkNote -> LinkHalf -> Data.ImportZkNote
+addLinks izn lh =
+    { izn
+        | fromLinks =
+            if lh.from then
+                lh.title :: izn.fromLinks
+
+            else
+                izn.fromLinks
+        , toLinks =
+            if lh.to then
+                lh.title :: izn.toLinks
+
+            else
+                izn.toLinks
     }
 
 

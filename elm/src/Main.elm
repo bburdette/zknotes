@@ -1326,14 +1326,21 @@ actualupdate msg model =
                     let
                         ( m, c ) =
                             backtolisting emod
+
+                        notecmds =
+                            List.map
+                                (\n ->
+                                    sendUIMsg model.location
+                                        login
+                                        (UI.SaveImportZkNotes [ n ])
+                                )
+                                notes
                     in
                     ( m
                     , Cmd.batch
-                        [ sendUIMsg model.location
-                            login
-                            (UI.SaveImportZkNotes notes)
-                        , c
-                        ]
+                        (c
+                            :: notecmds
+                        )
                     )
 
                 Import.Search s ->
