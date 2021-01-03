@@ -2635,4 +2635,14 @@ dependencies = [
  "time",
  "toml",
  "uuid 0.6.5",
+ "zkprotocol",
+]
+
+[[package]]
+name = "zkprotocol"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_derive",
+ "serde_json",
 ]

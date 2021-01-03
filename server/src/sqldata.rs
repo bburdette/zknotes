@@ -6,87 +6,11 @@ use std::error::Error;
 use std::path::Path;
 use std::time::Duration;
 use std::time::SystemTime;
-
-#[derive(Serialize, Debug, Clone)]
-pub struct ZkNote {
-  pub id: i64,
-  title: String,
-  content: String,
-  user: i64,
-  username: String,
-  pubid: Option<String>,
-  createdate: i64,
-  changeddate: i64,
-}
-
-#[derive(Serialize, Debug, Clone)]
-pub struct ZkListNote {
-  pub id: i64,
-  pub title: String,
-  pub user: i64,
-  pub createdate: i64,
-  pub changeddate: i64,
-}
-
-#[derive(Serialize, Debug, Clone)]
-pub struct SavedZkNote {
-  id: i64,
-  changeddate: i64,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct SaveZkNote {
-  id: Option<i64>,
-  title: String,
-  pubid: Option<String>,
-  content: String,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ZkLink {
-  from: i64,
-  to: i64,
-  user: i64,
-  linkzknote: Option<i64>,
-  delete: Option<bool>,
-  fromname: Option<String>,
-  toname: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ZkLinks {
-  pub links: Vec<ZkLink>,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct ImportZkNote {
-  title: String,
-  content: String,
-  fromLinks: Vec<String>,
-  toLinks: Vec<String>,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct GetZkLinks {
-  pub zknote: i64,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct GetZkNoteEdit {
-  pub zknote: i64,
-}
-
-#[derive(Serialize, Debug)]
-pub struct ZkNoteEdit {
-  pub zknote: ZkNote,
-  pub links: Vec<ZkLink>,
-}
-
-#[derive(Serialize, Debug)]
-pub struct ZkNoteAndAccomplices {
-  pub zknote: ZkNote,
-  pub links: Vec<ZkLink>,
-}
+use zkprotocol::content::{
+  GetZkLinks, GetZkNoteEdit, ImportZkNote, SaveZkNote, SavedZkNote, ZkLink,
+  ZkLinks, ZkNote, ZkNoteAndAccomplices, ZkNoteEdit,
+};
+use zkprotocol::ServerResponse;
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct User {

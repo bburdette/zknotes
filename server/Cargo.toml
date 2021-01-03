@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Ben Burdette <bburdette@gmail.com>"]
 
 [dependencies]
+zkprotocol = { path = "../zkprotocol" }
 base64 = "0.2.1"
 env_logger = "0.5.13"
 rusqlite = "0.23.0"
