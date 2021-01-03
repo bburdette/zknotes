@@ -22,6 +22,7 @@ extern crate rusqlite;
 extern crate serde_derive;
 extern crate barrel;
 extern crate base64;
+extern crate zkprotocol;
 
 mod config;
 mod email;
@@ -35,9 +36,9 @@ use actix_files::NamedFile;
 use actix_web::middleware::Logger;
 use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Result};
 use config::Config;
-use interfaces::{PublicMessage, ServerResponse, UserMessage};
 use std::error::Error;
 use std::path::{Path, PathBuf};
+use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 
 fn favicon(_req: &HttpRequest) -> Result<NamedFile> {
   let stpath = Path::new("static/favicon.ico");

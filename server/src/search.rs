@@ -1,50 +1,9 @@
 use rusqlite::Connection;
 use sqldata;
-use sqldata::{note_id, user_id, ZkListNote};
+use sqldata::{note_id, user_id};
 use std::error::Error;
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct ZkNoteSearch {
-  pub tagsearch: TagSearch,
-  pub offset: i64,
-  pub limit: Option<i64>,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub enum TagSearch {
-  SearchTerm {
-    mods: Vec<SearchMod>,
-    term: String,
-  },
-  Not {
-    ts: Box<TagSearch>,
-  },
-  Boolex {
-    ts1: Box<TagSearch>,
-    ao: AndOr,
-    ts2: Box<TagSearch>,
-  },
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub enum SearchMod {
-  ExactMatch,
-  Tag,
-  Note,
-  User,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub enum AndOr {
-  And,
-  Or,
-}
-
-#[derive(Serialize, Debug, Clone)]
-pub struct ZkNoteSearchResult {
-  notes: Vec<ZkListNote>,
-  offset: i64,
-}
+use zkprotocol::content::ZkListNote;
+use zkprotocol::search::{AndOr, SearchMod, TagSearch, ZkNoteSearch, ZkNoteSearchResult};
 
 pub fn search_zknotes(
   conn: &Connection,
