@@ -7,10 +7,8 @@ use std::path::Path;
 use std::time::Duration;
 use std::time::SystemTime;
 use zkprotocol::content::{
-  GetZkLinks, GetZkNoteEdit, ImportZkNote, SaveZkNote, SavedZkNote, ZkLink,
-  ZkLinks, ZkNote, ZkNoteAndAccomplices, ZkNoteEdit,
+  GetZkLinks, GetZkNoteEdit, ImportZkNote, SaveZkNote, SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
 };
-use zkprotocol::ServerResponse;
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct User {
@@ -692,7 +690,7 @@ pub fn note_id2(conn: &Connection, uid: i64, title: &str) -> Result<Option<i64>,
     |row| Ok(row.get(0)?),
   ) {
     Err(e) => match e {
-      QueryReturnedNoRows => Ok(None),
+      rusqlite::Error::QueryReturnedNoRows => Ok(None),
       _ => Err(Box::new(e)),
     },
     Ok(i) => Ok(i),

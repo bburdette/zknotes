@@ -1,4 +1,3 @@
-
 #[derive(Serialize, Debug, Clone)]
 pub struct ZkNote {
   pub id: i64,

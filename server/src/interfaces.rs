@@ -2,7 +2,6 @@ use config::Config;
 use crypto_hash::{hex_digest, Algorithm};
 use email;
 use search;
-use serde_json::Value;
 use simple_error;
 use sqldata;
 use std::error::Error;
@@ -12,8 +11,8 @@ use uuid::Uuid;
 use zkprotocol::content::{
   GetZkLinks, GetZkNoteEdit, ImportZkNote, SaveZkNote, ZkLinks, ZkNoteAndAccomplices,
 };
+use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 use zkprotocol::search::ZkNoteSearch;
-use zkprotocol::{PublicMessage, ServerResponse, UserMessage};
 
 #[derive(Deserialize, Debug)]
 pub struct RegistrationData {

@@ -4,7 +4,6 @@ use sqldata::{note_id, user_id};
 use std::error::Error;
 use zkprotocol::content::ZkListNote;
 use zkprotocol::search::{AndOr, SearchMod, TagSearch, ZkNoteSearch, ZkNoteSearchResult};
-use zkprotocol::ServerResponse;
 
 pub fn search_zknotes(
   conn: &Connection,

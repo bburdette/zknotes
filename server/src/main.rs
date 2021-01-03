@@ -38,7 +38,7 @@ use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Res
 use config::Config;
 use std::error::Error;
 use std::path::{Path, PathBuf};
-use zkprotocol::{PublicMessage, ServerResponse, UserMessage};
+use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 
 fn favicon(_req: &HttpRequest) -> Result<NamedFile> {
   let stpath = Path::new("static/favicon.ico");
