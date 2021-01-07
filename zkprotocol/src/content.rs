@@ -49,7 +49,7 @@ pub struct ZkLinks {
   pub links: Vec<ZkLink>,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ImportZkNote {
   pub title: String,
   pub content: String,

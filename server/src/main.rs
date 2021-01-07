@@ -1,7 +1,6 @@
 extern crate actix_files;
 extern crate actix_rt;
 extern crate actix_web;
-extern crate reqwest;
 #[macro_use]
 extern crate simple_error;
 extern crate crypto_hash;
