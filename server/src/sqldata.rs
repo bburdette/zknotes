@@ -1186,3 +1186,107 @@ pub fn save_importzknotes(
 
   Ok(())
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ZkDatabase {
+  notes: Vec<ZkNote>,
+  links: Vec<ZkLink>,
+  users: Vec<User>,
+}
+
+pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
+  let conn = connection_open(dbfile)?;
+
+  // Users
+  let mut ustmt = conn.prepare(
+    "select id, name, hashwd, salt, email, registration_key
+      from user",
+  )?;
+
+  let u_iter = ustmt.query_map(params![], |row| {
+    Ok(User {
+      id: row.get(0)?,
+      name: row.get(1)?,
+      hashwd: row.get(2)?,
+      salt: row.get(3)?,
+      email: row.get(4)?,
+      registration_key: row.get(5)?,
+    })
+  })?;
+
+  let mut uv = Vec::new();
+
+  for rsrec in u_iter {
+    match rsrec {
+      Ok(rec) => {
+        uv.push(rec);
+      }
+      Err(_) => (),
+    }
+  }
+
+  // Notes
+  let mut nstmt = conn.prepare(
+    "select ZN.id, ZN.title, ZN.content, ZN.user, U.name, ZN.pubid, ZN.createdate, ZN.changeddate
+      from zknote ZN",
+  )?;
+
+  let n_iter = nstmt.query_map(params![], |row| {
+    Ok(ZkNote {
+      id: row.get(0)?,
+      title: row.get(1)?,
+      content: row.get(2)?,
+      user: row.get(3)?,
+      username: row.get(4)?,
+      pubid: row.get(5)?,
+      createdate: row.get(6)?,
+      changeddate: row.get(7)?,
+    })
+  })?;
+
+  let mut nv = Vec::new();
+
+  for rsrec in n_iter {
+    match rsrec {
+      Ok(rec) => {
+        nv.push(rec);
+      }
+      Err(_) => (),
+    }
+  }
+
+  // Links
+  let mut lstmt = conn.prepare(
+    "select A.fromid, A.toid, A.user, A.linkzknote, L.title, R.title
+      from zklink A",
+  )?;
+
+  let l_iter = lstmt.query_map(params![], |row| {
+    Ok(ZkLink {
+      from: row.get(0)?,
+      to: row.get(1)?,
+      user: row.get(2)?,
+      delete: None,
+      linkzknote: row.get(3)?,
+      fromname: row.get(4)?,
+      toname: row.get(5)?,
+    })
+  })?;
+
+  let mut lv: Vec<ZkLink> = Vec::new();
+
+  for rsrec in l_iter {
+    match rsrec {
+      Ok(rec) => {
+        lv.push(rec);
+      }
+      Err(_) => (),
+    }
+  }
+
+  Ok(ZkDatabase {
+    notes: nv,
+    links: lv,
+    users: uv,
+  })
+}
