@@ -1227,7 +1227,7 @@ pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
 
   // Notes
   let mut nstmt = conn.prepare(
-    "select ZN.id, ZN.title, ZN.content, ZN.user, U.name, ZN.pubid, ZN.createdate, ZN.changeddate
+    "select ZN.id, ZN.title, ZN.content, ZN.user, ZN.pubid, ZN.createdate, ZN.changeddate
       from zknote ZN",
   )?;
 
@@ -1237,10 +1237,10 @@ pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
       title: row.get(1)?,
       content: row.get(2)?,
       user: row.get(3)?,
-      username: row.get(4)?,
-      pubid: row.get(5)?,
-      createdate: row.get(6)?,
-      changeddate: row.get(7)?,
+      username: "".to_string(),
+      pubid: row.get(4)?,
+      createdate: row.get(5)?,
+      changeddate: row.get(6)?,
     })
   })?;
 
@@ -1257,7 +1257,7 @@ pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
 
   // Links
   let mut lstmt = conn.prepare(
-    "select A.fromid, A.toid, A.user, A.linkzknote, L.title, R.title
+    "select A.fromid, A.toid, A.user, A.linkzknote 
       from zklink A",
   )?;
 
@@ -1268,8 +1268,8 @@ pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
       user: row.get(2)?,
       delete: None,
       linkzknote: row.get(3)?,
-      fromname: row.get(4)?,
-      toname: row.get(5)?,
+      fromname: None,
+      toname: None,
     })
   })?;
 

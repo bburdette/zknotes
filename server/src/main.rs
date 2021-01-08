@@ -194,13 +194,23 @@ fn err_main() -> Result<(), Box<dyn Error>> {
     )
     .get_matches();
 
-  // Gets a value for export if supplied by user, or defaults to "default.conf"
+  // are we exporting the DB?
   match matches.value_of("export") {
     Some(exportfile) => {
       // do that exporting...
+      let config = load_config();
+
+      sqldata::dbinit(config.db.as_path())?;
+
+      util::write_string(
+        exportfile,
+        serde_json::to_string_pretty(&sqldata::export_db(config.db.as_path())?)?.as_str(),
+      );
+
       Ok(())
     }
     None => {
+      // normal server ops
       env_logger::init();
 
       info!("server init!");
