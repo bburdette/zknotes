@@ -26,5 +26,4 @@ json = "*"
 lettre = "0.9"
 lettre_email = "0.9"
 barrel = { version = "0.6.5", features = ["sqlite3"] }
-indradb-lib = { version = "1", features = ["sled-datastore"] }
 clap = "2.33.2"
