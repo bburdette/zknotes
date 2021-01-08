@@ -1,6 +1,7 @@
 extern crate actix_files;
 extern crate actix_rt;
 extern crate actix_web;
+extern crate clap;
 #[macro_use]
 extern crate simple_error;
 extern crate crypto_hash;
@@ -31,6 +32,7 @@ mod sqldata;
 mod util;
 
 use actix_files::NamedFile;
+use clap::{Arg, SubCommand};
 // use actix_web::http::{Method, StatusCode};
 use actix_web::middleware::Logger;
 use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Result};
@@ -178,31 +180,64 @@ fn main() {
 }
 
 fn err_main() -> Result<(), Box<dyn Error>> {
-  env_logger::init();
+  let matches = clap::App::new("zknotes server")
+    .version("1.0")
+    .author("Ben Burdette")
+    .about("Does awesome things")
+    .arg(
+      Arg::with_name("export")
+        .short("e")
+        .long("export")
+        .value_name("FILE")
+        .help("Export database to json")
+        .takes_value(true),
+    )
+    .get_matches();
 
-  info!("server init!");
+  // are we exporting the DB?
+  match matches.value_of("export") {
+    Some(exportfile) => {
+      // do that exporting...
+      let config = load_config();
 
-  let config = load_config();
+      sqldata::dbinit(config.db.as_path())?;
 
-  println!("config: {:?}", config);
+      util::write_string(
+        exportfile,
+        serde_json::to_string_pretty(&sqldata::export_db(config.db.as_path())?)?.as_str(),
+      );
 
-  sqldata::dbinit(config.db.as_path())?;
+      Ok(())
+    }
+    None => {
+      // normal server ops
+      env_logger::init();
 
-  let c = web::Data::new(config.clone());
-  HttpServer::new(move || {
-    App::new()
-      .register_data(c.clone()) // <- create app with shared state
-      // enable logger
-      .wrap(middleware::Logger::default())
-      //      .route("/", web::get().to(mainpage))
-      .service(web::resource("/public").route(web::post().to(public)))
-      .service(web::resource("/user").route(web::post().to(user)))
-      .service(web::resource(r"/register/{uid}/{key}").route(web::get().to(register)))
-      .service(actix_files::Files::new("/static/", "static/"))
-      .service(web::resource("/{tail:.*}").route(web::get().to(mainpage)))
-  })
-  .bind(format!("{}:{}", config.ip, config.port))?
-  .run()?;
+      info!("server init!");
 
-  Ok(())
+      let config = load_config();
+
+      println!("config: {:?}", config);
+
+      sqldata::dbinit(config.db.as_path())?;
+
+      let c = web::Data::new(config.clone());
+      HttpServer::new(move || {
+        App::new()
+          .register_data(c.clone()) // <- create app with shared state
+          // enable logger
+          .wrap(middleware::Logger::default())
+          //      .route("/", web::get().to(mainpage))
+          .service(web::resource("/public").route(web::post().to(public)))
+          .service(web::resource("/user").route(web::post().to(user)))
+          .service(web::resource(r"/register/{uid}/{key}").route(web::get().to(register)))
+          .service(actix_files::Files::new("/static/", "static/"))
+          .service(web::resource("/{tail:.*}").route(web::get().to(mainpage)))
+      })
+      .bind(format!("{}:{}", config.ip, config.port))?
+      .run()?;
+
+      Ok(())
+    }
+  }
 }

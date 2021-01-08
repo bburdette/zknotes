@@ -26,3 +26,4 @@ json = "*"
 lettre = "0.9"
 lettre_email = "0.9"
 barrel = { version = "0.6.5", features = ["sqlite3"] }
+clap = "2.33.2"

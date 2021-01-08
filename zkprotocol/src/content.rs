@@ -1,4 +1,4 @@
-#[derive(Serialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ZkNote {
   pub id: i64,
   pub title: String,
