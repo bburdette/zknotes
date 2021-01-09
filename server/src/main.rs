@@ -37,6 +37,7 @@ mod util;
 
 use actix_files::NamedFile;
 use clap::{Arg, SubCommand};
+use user::ZkDatabase;
 // use actix_web::http::{Method, StatusCode};
 use actix_web::middleware::Logger;
 use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Result};
@@ -183,11 +184,10 @@ fn main() {
   }
 }
 
-fn err_main() -> Result<(), Box<dyn Error>> {
+fn err_main() -> Result<(), errors::Error> {
   let matches = clap::App::new("zknotes server")
     .version("1.0")
     .author("Ben Burdette")
-    .about("Does awesome things")
     .arg(
       Arg::with_name("export")
         .short("e")
@@ -196,11 +196,31 @@ fn err_main() -> Result<(), Box<dyn Error>> {
         .help("Export database to json")
         .takes_value(true),
     )
+    .arg(
+      Arg::with_name("import")
+        .short("i")
+        .long("import")
+        .value_name("FILE")
+        .help("Import database from json")
+        .takes_value(true),
+    )
     .get_matches();
 
   // are we exporting the DB?
-  match matches.value_of("export") {
-    Some(exportfile) => {
+  match (matches.value_of("import"), matches.value_of("export")) {
+    (Some(importfile), _) => {
+      // do that exporting...
+      let config = load_config();
+
+      let db = util::load_string(importfile)?;
+
+      let zd: ZkDatabase = serde_json::from_str(db.as_str())?;
+
+      indra::import_db(&zd, "indra2")?;
+
+      Ok(())
+    }
+    (_, Some(exportfile)) => {
       // do that exporting...
       let config = load_config();
 
@@ -209,11 +229,11 @@ fn err_main() -> Result<(), Box<dyn Error>> {
       util::write_string(
         exportfile,
         serde_json::to_string_pretty(&sqldata::export_db(config.db.as_path())?)?.as_str(),
-      );
+      )?;
 
       Ok(())
     }
-    None => {
+    _ => {
       // normal server ops
       env_logger::init();
 

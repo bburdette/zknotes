@@ -36,7 +36,7 @@ pub fn send_registration(
     ))
     .to_string()
     .as_str(),
-  );
+  )?;
 
   let mut mailer = SmtpTransport::new(SmtpClient::new_unencrypted_localhost()?);
   // Send the email

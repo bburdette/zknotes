@@ -5,16 +5,12 @@ use std::io;
 pub enum Error {
   // #[fail(display = "i/o error: {}", inner)]
   Io { inner: io::Error },
-  // #[fail(display = "could not parse address binding")]
   CouldNotParseBinding,
-  // #[fail(display = "validation error: {}", inner)]
   IndraV { inner: indradb::ValidationError },
-  // #[fail(display = "validation error: {}", inner)]
   Indra { inner: indradb::Error },
-  // #[fail(display = "validation error: {}", inner)]
   SerdeJs { inner: serde_json::error::Error },
-  // #[fail(display = "validation error: {}", inner)]
   Simple { inner: simple_error::SimpleError },
+  Std { inner: Box<dyn std::error::Error> },
 }
 
 impl From<io::Error> for Error {
@@ -41,5 +37,10 @@ impl From<serde_json::error::Error> for Error {
 impl From<simple_error::SimpleError> for Error {
   fn from(err: simple_error::SimpleError) -> Self {
     Error::Simple { inner: err }
+  }
+}
+impl From<Box<std::error::Error>> for Error {
+  fn from(err: Box<std::error::Error>) -> Self {
+    Error::Std { inner: err }
   }
 }

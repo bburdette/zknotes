@@ -1,13 +1,13 @@
 use indradb::Datastore;
 use indradb::Transaction;
-use std::convert::TryInto;
+// use std::convert::TryInto;
 // use std::error::Error;
 use errors;
 use indradb::{Edge, Type, Vertex};
 use simple_error::SimpleError;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+// use std::time::Duration;
 use std::time::SystemTime;
 use user::{LoginData, User, ZkDatabase};
 use uuid::Uuid;
@@ -29,7 +29,7 @@ pub fn import_db(zd: &ZkDatabase, path: &str) -> Result<(), errors::Error> {
   // 'public' 'share' 'search'
   {
     let v = indradb::Vertex::new(indradb::Type::new("system")?);
-    itr.create_vertex(&v);
+    itr.create_vertex(&v)?;
     itr.set_vertex_properties(
       indradb::VertexPropertyQuery::new(indradb::SpecificVertexQuery::single(v.id).into(), "name"),
       &serde_json::to_value("public")?,
@@ -37,7 +37,7 @@ pub fn import_db(zd: &ZkDatabase, path: &str) -> Result<(), errors::Error> {
   };
   {
     let v = indradb::Vertex::new(indradb::Type::new("system")?);
-    itr.create_vertex(&v);
+    itr.create_vertex(&v)?;
     itr.set_vertex_properties(
       indradb::VertexPropertyQuery::new(indradb::SpecificVertexQuery::single(v.id).into(), "name"),
       &serde_json::to_value("share")?,
@@ -45,7 +45,7 @@ pub fn import_db(zd: &ZkDatabase, path: &str) -> Result<(), errors::Error> {
   };
   {
     let v = indradb::Vertex::new(indradb::Type::new("system")?);
-    itr.create_vertex(&v);
+    itr.create_vertex(&v)?;
     itr.set_vertex_properties(
       indradb::VertexPropertyQuery::new(indradb::SpecificVertexQuery::single(v.id).into(), "name"),
       &serde_json::to_value("search")?,
@@ -59,7 +59,7 @@ pub fn import_db(zd: &ZkDatabase, path: &str) -> Result<(), errors::Error> {
   for u in zd.users.iter() {
     // make vertex.
     let v = indradb::Vertex::new(indradb::Type::new("user")?);
-    itr.create_vertex(&v);
+    itr.create_vertex(&v)?;
     itr.set_vertex_properties(
       indradb::VertexPropertyQuery::new(indradb::SpecificVertexQuery::single(v.id).into(), "name"),
       &serde_json::to_value(u.name.clone())?,
@@ -115,7 +115,7 @@ pub fn import_db(zd: &ZkDatabase, path: &str) -> Result<(), errors::Error> {
   for n in zd.notes.iter() {
     // make vertex.
     let v = indradb::Vertex::new(indradb::Type::new("note")?);
-    itr.create_vertex(&v);
+    itr.create_vertex(&v)?;
     itr.set_vertex_properties(
       indradb::VertexPropertyQuery::new(indradb::SpecificVertexQuery::single(v.id).into(), "title"),
       &serde_json::to_value(n.title.clone())?,
@@ -185,7 +185,7 @@ pub fn import_db(zd: &ZkDatabase, path: &str) -> Result<(), errors::Error> {
       *nids.get(&l.from).ok_or(SimpleError::new("key not found"))?,
       Type::default(),
       *nids.get(&l.to).ok_or(SimpleError::new("key not found"))?,
-    ));
+    ))?;
 
     // link to user.
 
