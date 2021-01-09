@@ -22,13 +22,17 @@ extern crate rusqlite;
 extern crate serde_derive;
 extern crate barrel;
 extern crate base64;
+extern crate indradb;
 extern crate zkprotocol;
 
 mod config;
 mod email;
+mod errors;
+mod indra;
 mod interfaces;
 mod search;
 mod sqldata;
+mod user;
 mod util;
 
 use actix_files::NamedFile;

@@ -6,28 +6,10 @@ use std::error::Error;
 use std::path::Path;
 use std::time::Duration;
 use std::time::SystemTime;
+use user::{LoginData, User};
 use zkprotocol::content::{
   GetZkLinks, GetZkNoteEdit, ImportZkNote, SaveZkNote, SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
 };
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct User {
-  pub id: i64,
-  pub name: String,
-  pub hashwd: String,
-  pub salt: String,
-  pub email: String,
-  pub registration_key: Option<String>,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct LoginData {
-  pub userid: i64,
-  pub username: String,
-  pub publicid: i64,
-  pub shareid: i64,
-  pub searchid: i64,
-}
 
 pub fn login_data(conn: &Connection, uid: i64) -> Result<LoginData, Box<dyn Error>> {
   Ok(LoginData {
