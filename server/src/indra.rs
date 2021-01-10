@@ -15,6 +15,12 @@ use zkprotocol::content::{
   GetZkLinks, GetZkNoteEdit, ImportZkNote, SaveZkNote, SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
 };
 
+pub struct SystemVs {
+  public: Uuid,
+  search: Uuid,
+  shared: Uuid,
+}
+
 pub fn import_db(zd: &ZkDatabase, path: &str) -> Result<(), errors::Error> {
   // compression factor of 5 (default)
   let sc = indradb::SledConfig::with_compression(None);
@@ -180,7 +186,7 @@ pub fn import_db(zd: &ZkDatabase, path: &str) -> Result<(), errors::Error> {
             let uid = uids
               .get(&n.user)
               .ok_or(SimpleError::new("user not found"))?;
-            save_zklink(&itr, &v.id, &uid, &uid, &Some("owner"));
+            save_zklink(&itr, &v.id, &uid, &uid, &Some("owner"))?;
 
             // save id
             nids.insert(n.id, v.id)
@@ -348,6 +354,37 @@ where
       .value
       .clone(),
   )?)
+}
+
+pub fn get_systemvs<T: indradb::Transaction>(itr: &T) -> Result<SystemVs, errors::Error> {
+  let vq = indradb::VertexQuery::Range(indradb::RangeVertexQuery::new(100).t(Type::new("System")?));
+
+  let mut public = None;
+  let mut search = None;
+  let mut shared = None;
+
+  for v in itr
+    .get_vertex_properties(indradb::VertexPropertyQuery::new(vq, "name"))?
+    .iter()
+  {
+    match serde_json::from_value::<String>(v.value.clone())?.as_str() {
+      "public" => public = Some(v.id),
+      "search" => search = Some(v.id),
+      "shared" => shared = Some(v.id),
+      _ => (),
+    }
+  }
+
+  match (public, search, shared) {
+    (Some(p), Some(se), Some(sh)) => Ok(SystemVs {
+      public: p,
+      search: se,
+      shared: sh,
+    }),
+    _ => Err(errors::Error::from(SimpleError::new(
+      "unable to find system vertices",
+    ))),
+  }
 }
 
 pub fn read_zknote<T: indradb::Transaction>(
