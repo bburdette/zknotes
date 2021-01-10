@@ -332,19 +332,22 @@ vid: &Uuid, name: &str) -> Result<JsonValue, errors::Error> {
 }
 */
 
-pub fn getprop<T: indradb::Transaction>(
+pub fn getprop<T: indradb::Transaction, R>(
   itr: &T,
   vq: &indradb::VertexQuery,
   x: &str,
-) -> Result<serde_json::Value, errors::Error> {
-  Ok(
+) -> Result<R, errors::Error>
+where
+  R: serde::de::DeserializeOwned,
+{
+  Ok(serde_json::from_value::<R>(
     itr
       .get_vertex_properties(indradb::VertexPropertyQuery::new(vq.clone(), x))?
       .first()
       .ok_or(SimpleError::new("property not found"))?
       .value
       .clone(),
-  )
+  )?)
 }
 
 pub fn read_zknote<T: indradb::Transaction>(
@@ -356,32 +359,41 @@ pub fn read_zknote<T: indradb::Transaction>(
 
   Ok(ZkNote {
     id: 1,
-    title: serde_json::from_value::<String>(getprop(itr, &vq, "title")?)?,
-    content: serde_json::from_value::<String>(getprop(itr, &vq, "content")?)?,
-    user: serde_json::from_value::<i64>(getprop(itr, &vq, "user")?)?,
-    username: serde_json::from_value::<String>(getprop(itr, &vq, "username")?)?,
-    pubid: serde_json::from_value::<Option<String>>(getprop(itr, &vq, "pubid")?)?,
-    createdate: serde_json::from_value::<i64>(getprop(itr, &vq, "createdate")?)?,
-    changeddate: serde_json::from_value::<i64>(getprop(itr, &vq, "changeddate")?)?,
+    title: getprop(itr, &vq, "title")?,
+    content: getprop(itr, &vq, "content")?,
+    user: getprop(itr, &vq, "user")?,
+    username: getprop(itr, &vq, "username")?,
+    pubid: getprop(itr, &vq, "pubid")?,
+    createdate: getprop(itr, &vq, "createdate")?,
+    changeddate: getprop(itr, &vq, "changeddate")?,
   })
   //  None => SimpleError::new("note not found"),
 
   /*
+
+      title: serde_json::from_value::<String>(getprop(itr, &vq, "title")?)?,
+      content: serde_json::from_value::<String>(getprop(itr, &vq, "content")?)?,
+      user: serde_json::from_value::<i64>(getprop(itr, &vq, "user")?)?,
+      username: serde_json::from_value::<String>(getprop(itr, &vq, "username")?)?,
+      pubid: serde_json::from_value::<Option<String>>(getprop(itr, &vq, "pubid")?)?,
+      createdate: serde_json::from_value::<i64>(getprop(itr, &vq, "createdate")?)?,
+      changeddate: serde_json::from_value::<i64>(getprop(itr, &vq, "changeddate")?)?,
+
   if uid == Some(note.user) {
-    Ok(note)
-  } else if is_zknote_public(conn, id)? {
-    Ok(note)
-  } else {
-    match uid {
-      Some(uid) => {
-        if is_zknote_shared(conn, id, uid)? {
-          Ok(note)
-        } else {
-          bail!("can't read zknote; note is private")
+      Ok(note)
+    } else if is_zknote_public(conn, id)? {
+      Ok(note)
+    } else {
+      match uid {
+        Some(uid) => {
+          if is_zknote_shared(conn, id, uid)? {
+            Ok(note)
+          } else {
+            bail!("can't read zknote; note is private")
+          }
         }
+        None => bail!("can't read zknote; note is private"),
       }
-      None => bail!("can't read zknote; note is private"),
     }
-  }
-  */
+    */
 }
