@@ -3,3 +3,4 @@ nixpkg/result
 server/static/main.js
 server/target/
 server/*.db*
+zkprotocol/target/

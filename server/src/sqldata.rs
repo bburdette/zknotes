@@ -7,6 +7,7 @@ use std::path::Path;
 use std::time::Duration;
 use std::time::SystemTime;
 use user::{LoginData, User};
+use util::now;
 use zkprotocol::content::{
   GetZkLinks, GetZkNoteEdit, ImportZkNote, SaveZkNote, SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
 };
@@ -523,15 +524,6 @@ pub fn dbinit(dbfile: &Path) -> Result<(), Box<dyn Error>> {
 
   Ok(())
 }
-
-pub fn now() -> Result<i64, Box<dyn Error>> {
-  let nowsecs = SystemTime::now()
-    .duration_since(SystemTime::UNIX_EPOCH)
-    .map(|n| n.as_secs())?;
-  let s: i64 = nowsecs.try_into()?;
-  Ok(s * 1000)
-}
-
 // user CRUD
 
 pub fn new_user(
@@ -612,7 +604,7 @@ pub fn read_user(dbfile: &Path, name: &str) -> Result<User, Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
 
   let user = conn.query_row(
-    "select id, hashwd, salt, email, registration_key
+    "select id, hashwd, salt, email, registration_key, zknote
       from user where name = ?1",
     params![name],
     |row| {
@@ -623,6 +615,7 @@ pub fn read_user(dbfile: &Path, name: &str) -> Result<User, Box<dyn Error>> {
         salt: row.get(2)?,
         email: row.get(3)?,
         registration_key: row.get(4)?,
+        zknote: row.get(5)?,
       })
     },
   )?;
@@ -1181,7 +1174,7 @@ pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
 
   // Users
   let mut ustmt = conn.prepare(
-    "select id, name, hashwd, salt, email, registration_key
+    "select id, name, hashwd, salt, email, registration_key, zknote
       from user",
   )?;
 
@@ -1193,6 +1186,7 @@ pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
       salt: row.get(3)?,
       email: row.get(4)?,
       registration_key: row.get(5)?,
+      zknote: row.get(6)?,
     })
   })?;
 
