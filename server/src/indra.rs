@@ -484,6 +484,14 @@ pub fn read_zknote<T: indradb::Transaction>(
 ) -> Result<ZkNote, errors::Error> {
   let vq = indradb::VertexQuery::Specific(indradb::SpecificVertexQuery::single(id).into());
 
+  // TODO check for access permissions.
+  // - is this note tagged with uid directly?
+  // - is this note tagged with public?
+  // - is this note shared:
+  // 	 - tagged to a note S.
+  // 	 - that links to Uid.
+  // 	 - and links to shared.
+
   Ok(ZkNote {
     id: id,
     title: getprop(itr, &vq, "title")?,
