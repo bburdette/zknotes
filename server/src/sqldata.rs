@@ -929,7 +929,7 @@ pub fn delete_zknote(dbfile: &Path, uid: i64, noteid: i64) -> Result<(), Box<dyn
 
 // delete the note AND any links to it.
 pub fn power_delete_zknote(conn: &Connection, uid: i64, noteid: i64) -> Result<(), Box<dyn Error>> {
-  // only delete when user owns theinks.
+  // only delete when user owns the links.
   conn.execute(
     "delete from zklink where
       user = ?2

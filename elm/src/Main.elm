@@ -839,7 +839,12 @@ actualupdate msg model =
                             ( model, Cmd.none )
 
                         UI.PowerDeleteComplete count ->
-                            ( model, Cmd.none )
+                            case model.state of
+                                EditZkNoteListing mod li ->
+                                    ( { model | state = EditZkNoteListing (EditZkNoteListing.onPowerDeleteComplete count li.ld mod) li }, Cmd.none )
+
+                                _ ->
+                                    ( model, Cmd.none )
 
                         UI.LoggedIn logindata ->
                             let

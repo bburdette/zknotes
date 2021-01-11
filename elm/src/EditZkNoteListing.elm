@@ -27,10 +27,15 @@ type Msg
     | DialogMsg D.Msg
 
 
+type DWhich
+    = DeleteAll
+    | DeleteComplete
+
+
 type alias Model =
     { notes : Data.ZkNoteSearchResult
     , spmodel : SP.Model
-    , dialog : Maybe D.Model
+    , dialog : Maybe ( D.Model, DWhich )
     }
 
 
@@ -44,6 +49,20 @@ type Command
     | PowerDelete S.TagSearch
 
 
+onPowerDeleteComplete : Int -> Data.LoginData -> Model -> Model
+onPowerDeleteComplete count ld model =
+    { model
+        | dialog =
+            Just <|
+                ( D.init
+                    ("deleted " ++ String.fromInt count ++ " notes")
+                    False
+                    (\size -> E.map (\_ -> ()) (listview ld size model))
+                , DeleteComplete
+                )
+    }
+
+
 updateSearchResult : Data.ZkNoteSearchResult -> Model -> Model
 updateSearchResult zsr model =
     { model
@@ -55,7 +74,7 @@ updateSearchResult zsr model =
 view : Data.LoginData -> Util.Size -> Model -> Element Msg
 view ld size model =
     case model.dialog of
-        Just dialog ->
+        Just ( dialog, _ ) ->
             D.view size dialog |> E.map DialogMsg
 
         Nothing ->
@@ -154,21 +173,24 @@ update msg model ld =
                     ( { model
                         | dialog =
                             Just <|
-                                D.init
+                                ( D.init
                                     ("delete all notes matching this search?\n" ++ S.showTagSearch s)
+                                    True
                                     (\size -> E.map (\_ -> ()) (listview ld size model))
+                                , DeleteAll
+                                )
                       }
                     , None
                     )
 
         DialogMsg dm ->
             case model.dialog of
-                Just dmod ->
-                    case D.update dm dmod of
-                        D.Cancel ->
+                Just ( dmod, dw ) ->
+                    case ( D.update dm dmod, dw ) of
+                        ( D.Cancel, _ ) ->
                             ( { model | dialog = Nothing }, None )
 
-                        D.Ok ->
+                        ( D.Ok, DeleteAll ) ->
                             case TSP.getSearch model.spmodel.tagSearchModel of
                                 Just s ->
                                     ( { model | dialog = Nothing }, PowerDelete s )
@@ -176,8 +198,11 @@ update msg model ld =
                                 Nothing ->
                                     ( { model | dialog = Nothing }, None )
 
-                        D.Dialog dmod2 ->
-                            ( { model | dialog = Just dmod2 }, None )
+                        ( D.Ok, DeleteComplete ) ->
+                            ( { model | dialog = Nothing }, None )
+
+                        ( D.Dialog dmod2, _ ) ->
+                            ( { model | dialog = Just ( dmod2, dw ) }, None )
 
                 Nothing ->
                     ( model, None )

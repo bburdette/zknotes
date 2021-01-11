@@ -29,13 +29,15 @@ type Msg
 
 type alias Model =
     { message : String
+    , showCancel : Bool
     , underLay : Util.Size -> Element ()
     }
 
 
-init : String -> (Util.Size -> Element ()) -> Model
-init message underLay =
+init : String -> Bool -> (Util.Size -> Element ()) -> Model
+init message showcancel underLay =
     { message = message
+    , showCancel = showcancel
     , underLay = underLay
     }
 
@@ -97,8 +99,12 @@ dialogView model =
                 )
         ]
         [ E.row [ E.centerX ] [ E.text model.message ]
-        , E.row [ E.width E.fill ]
+        , E.row [ E.width E.fill ] <|
             [ EI.button buttonStyle { label = E.text "ok", onPress = Just OkClick }
-            , EI.button (buttonStyle ++ [ E.alignRight ]) { label = E.text "cancel", onPress = Just CancelClick }
+            , if model.showCancel then
+                EI.button (buttonStyle ++ [ E.alignRight ]) { label = E.text "cancel", onPress = Just CancelClick }
+
+              else
+                E.none
             ]
         ]
