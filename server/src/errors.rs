@@ -39,8 +39,8 @@ impl From<simple_error::SimpleError> for Error {
     Error::Simple { inner: err }
   }
 }
-impl From<Box<std::error::Error>> for Error {
-  fn from(err: Box<std::error::Error>) -> Self {
+impl From<Box<dyn std::error::Error>> for Error {
+  fn from(err: Box<dyn std::error::Error>) -> Self {
     Error::Std { inner: err }
   }
 }
