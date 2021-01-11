@@ -3,7 +3,7 @@ use indradb::Transaction;
 // use std::convert::TryInto;
 // use std::error::Error;
 use errors;
-use indradb::{Edge, Type, Vertex};
+use indradb::{Edge, EdgeQueryExt, Type, Vertex, VertexQueryExt};
 use simple_error::SimpleError;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -11,7 +11,9 @@ use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use user::{LoginData, User, ZkDatabase};
 use uuid::Uuid;
-use zkprotocol::content::{
+use zkprotocol::content as C;
+
+use icontent::{
   GetZkLinks, GetZkNoteEdit, ImportZkNote, SaveZkNote, SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
 };
 
@@ -387,6 +389,94 @@ pub fn get_systemvs<T: indradb::Transaction>(itr: &T) -> Result<SystemVs, errors
   }
 }
 
+pub fn link_exists<T: indradb::Transaction>(
+  itr: &T,
+  from: Uuid,
+  to: Uuid,
+) -> Result<bool, errors::Error> {
+  let v = itr.get_edges(indradb::EdgeQuery::Specific(
+    indradb::SpecificEdgeQuery::single(indradb::EdgeKey::new(from, Type::default(), to)),
+  ))?;
+
+  Ok(!v.is_empty())
+}
+
+pub fn is_note_public<T: indradb::Transaction>(
+  itr: &T,
+  svs: SystemVs,
+  id: Uuid,
+) -> Result<bool, errors::Error> {
+  link_exists(itr, id, svs.public)
+}
+
+pub fn is_note_mine<T: indradb::Transaction>(
+  itr: &T,
+  svs: SystemVs,
+  id: Uuid,
+  uid: Uuid,
+) -> Result<bool, errors::Error> {
+  link_exists(itr, id, uid)
+}
+
+pub fn intersect<T: indradb::Transaction>(
+  itr: &T,
+  vq1: indradb::VertexQuery,
+  vq2: indradb::VertexQuery,
+) -> Result<Vec<Vertex>, errors::Error> {
+  let vec1 = itr.get_vertices(vq1)?;
+  let vec2 = itr.get_vertices(vq2)?;
+  let i1 = vec1.iter();
+  let mut i2 = vec2.iter();
+
+  let mut i2v = i2.next();
+  let mut i2vcheck = |v: &mut Vec<Vertex>, i: &Vertex| {
+    match i2v {
+      None => false,
+      Some(i2val) => {
+        if i == i2val {
+          v.push(i.clone());
+          false
+        } else if i.id < i2val.id {
+          // skip i.
+          false
+        } else {
+          i2v = i2.next();
+          true
+        }
+      }
+    }
+  };
+
+  let mut rv = Vec::new();
+
+  for i in i1 {
+    while i2vcheck(&mut rv, i) {}
+  }
+
+  Ok(rv)
+}
+
+/*
+pub fn is_note_shared<T: indradb::Transaction>(
+  itr: &T,
+  svs: SystemVs,
+  id: Uuid,
+  uid: Uuid,
+) -> Result<bool, errors::Error> {
+  // let vq: indradb::VertexQuery = indradb::SpecificVertexQuery::single(id).into();
+
+itr.get_vertices
+
+  let eq = indradb::SpecificVertexQuery::single(id)
+    .outbound(100000)
+    .outbound(100000)
+    .start_id(svs.shared);
+
+  // is the note connected to a note that is connected to share and to user?
+  link_exists(itr, id, svs.public)
+}
+*/
+
 pub fn read_zknote<T: indradb::Transaction>(
   itr: &T,
   uid: Option<Uuid>,
@@ -395,7 +485,7 @@ pub fn read_zknote<T: indradb::Transaction>(
   let vq = indradb::VertexQuery::Specific(indradb::SpecificVertexQuery::single(id).into());
 
   Ok(ZkNote {
-    id: 1,
+    id: id,
     title: getprop(itr, &vq, "title")?,
     content: getprop(itr, &vq, "content")?,
     user: getprop(itr, &vq, "user")?,
