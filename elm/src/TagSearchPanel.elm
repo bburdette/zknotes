@@ -70,7 +70,7 @@ getSearch model =
         NoSearch ->
             Just <| SearchTerm [] ""
 
-        _ ->
+        TagSearch (Err _) ->
             Nothing
 
 

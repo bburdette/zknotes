@@ -888,12 +888,33 @@ pub fn read_zknotepubid(
   Ok(note)
 }
 
+// delete the note; fails if there are links to it.
 pub fn delete_zknote(dbfile: &Path, uid: i64, noteid: i64) -> Result<(), Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
 
   // only delete when user is in the zk
   conn.execute(
     "delete from zknote where id = ?1 
+      and user = ?2",
+    params![noteid, uid],
+  )?;
+
+  Ok(())
+}
+
+// delete the note AND any links to it.
+pub fn power_delete_zknote(conn: &Connection, uid: i64, noteid: i64) -> Result<(), Box<dyn Error>> {
+  // only delete when user owns the links.
+  conn.execute(
+    "delete from zklink where
+      user = ?2
+      and (fromid = ?1 or toid = ?1)",
+    params![noteid, uid],
+  )?;
+
+  // only delete when user is in the zk
+  conn.execute(
+    "delete from zknote where id = ?1
       and user = ?2",
     params![noteid, uid],
   )?;
