@@ -1,9 +1,34 @@
 use rusqlite::Connection;
 use sqldata;
-use sqldata::{note_id, user_id};
+use sqldata::{note_id, power_delete_zknote, user_id};
+use std::convert::TryInto;
 use std::error::Error;
 use zkprotocol::content::ZkListNote;
 use zkprotocol::search::{AndOr, SearchMod, TagSearch, ZkNoteSearch, ZkNoteSearchResult};
+
+pub fn power_delete_zknotes(
+  conn: &Connection,
+  user: i64,
+  search: &TagSearch,
+) -> Result<i64, Box<dyn Error>> {
+  // get all, and delete all.  Maybe not a good idea for a big database, but ours is small
+  // and soon to be replaced with indradb, perhaps.
+
+  let nolimsearch = ZkNoteSearch {
+    tagsearch: search.clone(),
+    offset: 0,
+    limit: None,
+  };
+
+  let znsr = search_zknotes(conn, user, &nolimsearch)?;
+  let c = znsr.notes.len().try_into()?;
+
+  for n in znsr.notes {
+    power_delete_zknote(conn, user, n.id)?;
+  }
+
+  Ok(c)
+}
 
 pub fn search_zknotes(
   conn: &Connection,
@@ -54,7 +79,8 @@ pub fn build_sql(
 
   let limclause = match search.limit {
     Some(lm) => format!(" limit {} offset {}", lm, search.offset),
-    None => format!(" offset {}", search.offset),
+    None => "".to_string(), // no limit, no offset either
+                            // None => format!(" offset {}", search.offset),
   };
 
   let ordclause = " order by N.id desc ";
