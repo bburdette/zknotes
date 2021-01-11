@@ -595,6 +595,7 @@ listingwait login st ms =
                 { notes = rs
                 , spmodel =
                     SP.searchResultUpdated rs SP.initModel
+                , dialog = Nothing
                 }
                 login
             , Cmd.none
@@ -837,6 +838,14 @@ actualupdate msg model =
                         UI.RegistrationSent ->
                             ( model, Cmd.none )
 
+                        UI.PowerDeleteComplete count ->
+                            case model.state of
+                                EditZkNoteListing mod li ->
+                                    ( { model | state = EditZkNoteListing (EditZkNoteListing.onPowerDeleteComplete count li.ld mod) li }, Cmd.none )
+
+                                _ ->
+                                    ( model, Cmd.none )
+
                         UI.LoggedIn logindata ->
                             let
                                 getlisting =
@@ -930,7 +939,7 @@ actualupdate msg model =
                                     )
 
                                 ShowMessage _ login ->
-                                    ( { model | state = EditZkNoteListing { notes = sr, spmodel = SP.initModel } login }
+                                    ( { model | state = EditZkNoteListing { notes = sr, spmodel = SP.initModel, dialog = Nothing } login }
                                     , Cmd.none
                                     )
 
@@ -1074,7 +1083,12 @@ actualupdate msg model =
                 backtolisting =
                     ( { model
                         | state =
-                            EditZkNoteListing { notes = emod.zknSearchResult, spmodel = emod.spmodel } login
+                            EditZkNoteListing
+                                { notes = emod.zknSearchResult
+                                , spmodel = emod.spmodel
+                                , dialog = Nothing
+                                }
+                                login
                       }
                     , case SP.getSearch emod.spmodel of
                         Just s ->
@@ -1093,6 +1107,7 @@ actualupdate msg model =
                             ( EditZkNoteListing
                                 { notes = emod.zknSearchResult
                                 , spmodel = emod.spmodel
+                                , dialog = Nothing
                                 }
                                 login
                             , case SP.getSearch emod.spmodel of
@@ -1253,7 +1268,7 @@ actualupdate msg model =
         ( EditZkNoteListingMsg em, EditZkNoteListing es login ) ->
             let
                 ( emod, ecmd ) =
-                    EditZkNoteListing.update em es
+                    EditZkNoteListing.update em es login.ld
             in
             case ecmd of
                 EditZkNoteListing.None ->
@@ -1297,6 +1312,13 @@ actualupdate msg model =
                         (UI.SearchZkNotes s)
                     )
 
+                EditZkNoteListing.PowerDelete s ->
+                    ( { model | state = EditZkNoteListing emod login }
+                    , sendUIMsg model.location
+                        login
+                        (UI.PowerDelete s)
+                    )
+
         ( ImportMsg em, Import es login ) ->
             let
                 ( emod, ecmd ) =
@@ -1306,7 +1328,12 @@ actualupdate msg model =
                     \imod ->
                         ( { model
                             | state =
-                                EditZkNoteListing { notes = imod.zknSearchResult, spmodel = imod.spmodel } login
+                                EditZkNoteListing
+                                    { notes = imod.zknSearchResult
+                                    , spmodel = imod.spmodel
+                                    , dialog = Nothing
+                                    }
+                                    login
                           }
                         , case SP.getSearch imod.spmodel of
                             Just s ->

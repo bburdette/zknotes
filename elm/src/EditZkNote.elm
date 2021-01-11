@@ -1000,7 +1000,15 @@ update msg model =
             ( model, Revert )
 
         DeletePress ->
-            ( { model | dialog = Just <| D.init "delete this note?" (\size -> E.map (\_ -> ()) (view size model)) }, None )
+            ( { model
+                | dialog =
+                    Just <|
+                        D.init "delete this note?"
+                            True
+                            (\size -> E.map (\_ -> ()) (view size model))
+              }
+            , None
+            )
 
         DialogMsg dm ->
             case model.dialog of

@@ -12,7 +12,7 @@ use zkprotocol::content::{
   GetZkLinks, GetZkNoteEdit, ImportZkNote, SaveZkNote, ZkLinks, ZkNoteAndAccomplices,
 };
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
-use zkprotocol::search::ZkNoteSearch;
+use zkprotocol::search::{TagSearch, ZkNoteSearch};
 
 #[derive(Deserialize, Debug)]
 pub struct RegistrationData {
@@ -129,7 +129,6 @@ fn user_interface_loggedin(
         content: serde_json::to_value(sqldata::login_data(&conn, uid)?)?,
       })
     }
-
     "getzknote" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let id: i64 = serde_json::from_value(msgdata.clone())?;
@@ -157,6 +156,16 @@ fn user_interface_loggedin(
       let res = search::search_zknotes(&conn, uid, &search)?;
       Ok(ServerResponse {
         what: "zknotesearchresult".to_string(),
+        content: serde_json::to_value(res)?,
+      })
+    }
+    "powerdelete" => {
+      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      let search: TagSearch = serde_json::from_value(msgdata.clone())?;
+      let conn = sqldata::connection_open(config.db.as_path())?;
+      let res = search::power_delete_zknotes(&conn, uid, &search)?;
+      Ok(ServerResponse {
+        what: "powerdeletecomplete".to_string(),
         content: serde_json::to_value(res)?,
       })
     }

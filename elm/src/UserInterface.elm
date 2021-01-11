@@ -17,6 +17,7 @@ type SendMsg
     | GetZkLinks Data.GetZkLinks
     | SearchZkNotes S.ZkNoteSearch
     | SaveImportZkNotes (List Data.ImportZkNote)
+    | PowerDelete S.TagSearch
 
 
 type ServerResponse
@@ -34,6 +35,7 @@ type ServerResponse
     | SavedZkLinks
     | ZkLinks Data.ZkLinks
     | SavedImportZkNotes
+    | PowerDeleteComplete Int
 
 
 showServerResponse : ServerResponse -> String
@@ -80,6 +82,9 @@ showServerResponse sr =
 
         ZkLinks _ ->
             "ZkLinks"
+
+        PowerDeleteComplete _ ->
+            "PowerDeleteComplete"
 
 
 encodeSendMsg : SendMsg -> String -> String -> JE.Value
@@ -164,6 +169,14 @@ encodeSendMsg sm uid pwd =
                 , ( "data", JE.list Data.encodeImportZkNote n )
                 ]
 
+        PowerDelete s ->
+            JE.object
+                [ ( "what", JE.string "powerdelete" )
+                , ( "uid", JE.string uid )
+                , ( "pwd", JE.string pwd )
+                , ( "data", S.encodeTagSearch s )
+                ]
+
 
 encodeEmail : String -> JE.Value
 encodeEmail email =
@@ -218,6 +231,9 @@ serverResponseDecoder =
 
                 "zklinks" ->
                     JD.map ZkLinks (JD.field "content" Data.decodeZkLinks)
+
+                "powerdeletecomplete" ->
+                    JD.map PowerDeleteComplete (JD.field "content" JD.int)
 
                 wat ->
                     JD.succeed
