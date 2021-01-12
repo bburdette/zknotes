@@ -24,7 +24,7 @@ module EditZkNote exposing
     , zklKey
     )
 
-import CellCommon exposing (..)
+import CellCommon as CC
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
 import Common
@@ -351,7 +351,11 @@ zknview size model =
                 - (60 * 2 + 6)
 
         mdview =
-            case markdownView (mkRenderer mdw model.cells OnSchelmeCodeChanged) model.md of
+            case
+                CC.markdownHtmlView
+                    (CC.mkHtmlRenderer mdw model.cells OnSchelmeCodeChanged)
+                    model.md
+            of
                 Ok rendered ->
                     E.column
                         [ E.width E.fill
@@ -376,7 +380,7 @@ zknview size model =
                                 , EBd.width 3
                                 , EBd.color TC.darkGrey
                                 ]
-                                rendered
+                                (List.map E.html rendered)
                             ]
                         ]
                             ++ (if wclass == Wide then
@@ -655,7 +659,7 @@ initFull ld zkl zknote zklDict spm =
     let
         cells =
             zknote.content
-                |> mdCells
+                |> CC.mdCells
                 |> Result.withDefault (CellDict Dict.empty)
 
         ( cc, result ) =
@@ -685,7 +689,7 @@ initNew ld zkl spm =
     let
         cells =
             ""
-                |> mdCells
+                |> CC.mdCells
                 |> Result.withDefault (CellDict Dict.empty)
 
         ( cc, result ) =
@@ -1039,7 +1043,7 @@ update msg model =
             let
                 cells =
                     newMarkdown
-                        |> mdCells
+                        |> CC.mdCells
                         |> Result.withDefault (CellDict Dict.empty)
 
                 ( cc, result ) =
@@ -1061,7 +1065,7 @@ update msg model =
                 ( cc, result ) =
                     evalCellsFully
                         (mkCc
-                            (Dict.insert name (defCell string) cd
+                            (Dict.insert name (CC.defCell string) cd
                                 |> CellDict
                             )
                         )

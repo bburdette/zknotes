@@ -1,4 +1,4 @@
-module CellCommon exposing (blockCells, cellView, code, codeBlock, defCell, heading, markdownView, mdCells, mkRenderer, rawTextToId, showRunState)
+module CellCommon exposing (blockCells, cellView, code, codeBlock, defCell, heading, markdownHtmlView, markdownView, mdCells, mkHtmlRenderer, mkRenderer, rawTextToId, showRunState)
 
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
@@ -10,7 +10,7 @@ import Element.Font as Font
 import Element.Input as EI
 import Element.Region as ER
 import Html exposing (Attribute, Html)
-import Html.Attributes
+import Html.Attributes as Attr
 import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..))
 import Markdown.Html
 import Markdown.Parser
@@ -20,6 +20,14 @@ import Schelme.Show exposing (showTerm)
 
 markdownView : Markdown.Renderer.Renderer (Element a) -> String -> Result String (List (Element a))
 markdownView renderer markdown =
+    markdown
+        |> Markdown.Parser.parse
+        |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
+        |> Result.andThen (Markdown.Renderer.render renderer)
+
+
+markdownHtmlView : Markdown.Renderer.Renderer (Html a) -> String -> Result String (List (Html a))
+markdownHtmlView renderer markdown =
     markdown
         |> Markdown.Parser.parse
         |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
@@ -74,6 +82,206 @@ defCell s =
     { code = s, prog = Err "", runstate = RsErr "" }
 
 
+mkHtmlRenderer : Int -> CellDict -> (String -> String -> a) -> Markdown.Renderer.Renderer (Html a)
+mkHtmlRenderer maxw cellDict onchanged =
+    { heading =
+        \{ level, children } ->
+            case level of
+                Block.H1 ->
+                    Html.h1 [] children
+
+                Block.H2 ->
+                    Html.h2 [] children
+
+                Block.H3 ->
+                    Html.h3 [] children
+
+                Block.H4 ->
+                    Html.h4 [] children
+
+                Block.H5 ->
+                    Html.h5 [] children
+
+                Block.H6 ->
+                    Html.h6 [] children
+    , paragraph = Html.p []
+    , hardLineBreak = Html.br [] []
+    , blockQuote = Html.blockquote []
+    , strong =
+        \children -> Html.strong [] children
+    , emphasis =
+        \children -> Html.em [] children
+    , codeSpan =
+        \content -> Html.code [] [ Html.text content ]
+    , link =
+        \link content ->
+            case link.title of
+                Just title ->
+                    Html.a
+                        [ Attr.href link.destination
+                        , Attr.title title
+                        ]
+                        content
+
+                Nothing ->
+                    Html.a [ Attr.href link.destination ] content
+    , image =
+        \imageInfo ->
+            case imageInfo.title of
+                Just title ->
+                    Html.img
+                        [ Attr.src imageInfo.src
+                        , Attr.alt imageInfo.alt
+                        , Attr.title title
+                        ]
+                        []
+
+                Nothing ->
+                    Html.img
+                        [ Attr.src imageInfo.src
+                        , Attr.alt imageInfo.alt
+                        ]
+                        []
+    , text =
+        Html.text
+    , unorderedList =
+        \items ->
+            Html.ul []
+                (items
+                    |> List.map
+                        (\item ->
+                            case item of
+                                Block.ListItem task children ->
+                                    let
+                                        checkbox =
+                                            case task of
+                                                Block.NoTask ->
+                                                    Html.text ""
+
+                                                Block.IncompleteTask ->
+                                                    Html.input
+                                                        [ Attr.disabled True
+                                                        , Attr.checked False
+                                                        , Attr.type_ "checkbox"
+                                                        ]
+                                                        []
+
+                                                Block.CompletedTask ->
+                                                    Html.input
+                                                        [ Attr.disabled True
+                                                        , Attr.checked True
+                                                        , Attr.type_ "checkbox"
+                                                        ]
+                                                        []
+                                    in
+                                    Html.li [] (checkbox :: children)
+                        )
+                )
+    , orderedList =
+        \startingIndex items ->
+            Html.ol
+                (case startingIndex of
+                    1 ->
+                        [ Attr.start startingIndex ]
+
+                    _ ->
+                        []
+                )
+                (items
+                    |> List.map
+                        (\itemBlocks ->
+                            Html.li []
+                                itemBlocks
+                        )
+                )
+    , html =
+        Markdown.Html.oneOf
+            [ Markdown.Html.tag "u" (\htmls -> Html.div [] htmls)
+            , Markdown.Html.tag "span" (\htmls -> Html.span [] htmls)
+            , Markdown.Html.tag "strong" (\htmls -> Html.strong [] htmls)
+            , Markdown.Html.tag "table" (\htmls -> Html.table [] htmls)
+            , Markdown.Html.tag "tr" (\htmls -> Html.tr [] htmls)
+            , Markdown.Html.tag "td" (\htmls -> Html.td [] htmls)
+            , Markdown.Html.tag "tr" (\htmls -> Html.tr [] htmls)
+            , Markdown.Html.tag "sup" (\htmls -> Html.sup [] htmls)
+            , Markdown.Html.tag "p" (\htmls -> Html.p [] htmls)
+            , Markdown.Html.tag "tbody" (\htmls -> Html.tbody [] htmls)
+            , Markdown.Html.tag "li" (\htmls -> Html.li [] htmls)
+            , Markdown.Html.tag "ol" (\htmls -> Html.ol [] htmls)
+            , Markdown.Html.tag "section" (\htmls -> Html.section [] htmls)
+            , Markdown.Html.tag "a" (\htmls -> Html.a [] htmls)
+            , Markdown.Html.tag "hr" (\htmls -> Html.hr [] htmls)
+            , Markdown.Html.tag "em" (\htmls -> Html.em [] htmls)
+            , Markdown.Html.tag "sup" (\htmls -> Html.sup [] htmls)
+            ]
+    , codeBlock =
+        \{ body, language } ->
+            let
+                classes =
+                    case language of
+                        Just actualLanguage ->
+                            [ Attr.class <| "language-" ++ actualLanguage ]
+
+                        Nothing ->
+                            []
+            in
+            Html.pre []
+                [ Html.code classes
+                    [ Html.text body
+                    ]
+                ]
+    , thematicBreak = Html.hr [] []
+    , table = Html.table []
+    , tableHeader = Html.thead []
+    , tableBody = Html.tbody []
+    , tableRow = Html.tr []
+    , tableHeaderCell =
+        \maybeAlignment ->
+            let
+                attrs =
+                    maybeAlignment
+                        |> Maybe.map
+                            (\alignment ->
+                                case alignment of
+                                    Block.AlignLeft ->
+                                        "left"
+
+                                    Block.AlignCenter ->
+                                        "center"
+
+                                    Block.AlignRight ->
+                                        "right"
+                            )
+                        |> Maybe.map Attr.align
+                        |> Maybe.map List.singleton
+                        |> Maybe.withDefault []
+            in
+            Html.th attrs
+    , tableCell =
+        \maybeAlignment ->
+            let
+                attrs =
+                    maybeAlignment
+                        |> Maybe.map
+                            (\alignment ->
+                                case alignment of
+                                    Block.AlignLeft ->
+                                        "left"
+
+                                    Block.AlignCenter ->
+                                        "center"
+
+                                    Block.AlignRight ->
+                                        "right"
+                            )
+                        |> Maybe.map Attr.align
+                        |> Maybe.map List.singleton
+                        |> Maybe.withDefault []
+            in
+            Html.td attrs
+    }
+
+
 mkRenderer : Int -> CellDict -> (String -> String -> a) -> Markdown.Renderer.Renderer (Element a)
 mkRenderer maxw cellDict onchanged =
     { heading = heading
@@ -93,7 +301,7 @@ mkRenderer maxw cellDict onchanged =
              else
                 E.link
             )
-                [ E.htmlAttribute (Html.Attributes.style "display" "inline-flex") ]
+                [ E.htmlAttribute (Attr.style "display" "inline-flex") ]
                 { url = destination
                 , label =
                     E.paragraph
@@ -269,9 +477,9 @@ heading { level, rawText, children } =
         , Font.family [ Font.typeface "Montserrat" ]
         , ER.heading (Block.headingLevelToInt level)
         , E.htmlAttribute
-            (Html.Attributes.attribute "name" (rawTextToId rawText))
+            (Attr.attribute "name" (rawTextToId rawText))
         , E.htmlAttribute
-            (Html.Attributes.id (rawTextToId rawText))
+            (Attr.id (rawTextToId rawText))
         ]
         children
 
@@ -297,7 +505,7 @@ codeBlock : { body : String, language : Maybe String } -> Element msg
 codeBlock details =
     E.el
         [ EBk.color (E.rgba 0 0 0 0.03)
-        , E.htmlAttribute (Html.Attributes.style "white-space" "pre")
+        , E.htmlAttribute (Attr.style "white-space" "pre")
         , E.padding 20
         , E.width E.fill
         , Font.family
