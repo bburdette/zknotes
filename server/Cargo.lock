@@ -412,6 +412,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "bis-zknotes-server"
+version = "0.1.0"
+dependencies = [
+ "actix-files",
+ "actix-rt",
+ "actix-web",
+ "barrel",
+ "base64 0.2.1",
+ "clap",
+ "crypto-hash",
+ "env_logger",
+ "futures",
+ "json",
+ "lettre",
+ "lettre_email",
+ "log",
+ "rand 0.5.6",
+ "rusqlite",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "simple-error",
+ "time",
+ "toml",
+ "uuid 0.6.5",
+ "zkprotocol",
+]
+
+[[package]]
 name = "bitflags"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2383,35 +2412,6 @@ checksum = "d59cefebd0c892fa2dd6de581e937301d8552cb44489cdff035c6187cb63fa5e"
 dependencies = [
  "winapi 0.2.8",
  "winapi-build",
-]
-
-[[package]]
-name = "zknotes-server"
-version = "0.1.0"
-dependencies = [
- "actix-files",
- "actix-rt",
- "actix-web",
- "barrel",
- "base64 0.2.1",
- "clap",
- "crypto-hash",
- "env_logger",
- "futures",
- "json",
- "lettre",
- "lettre_email",
- "log",
- "rand 0.5.6",
- "rusqlite",
- "serde",
- "serde_derive",
- "serde_json",
- "simple-error",
- "time",
- "toml",
- "uuid 0.6.5",
- "zkprotocol",
 ]
 
 [[package]]
