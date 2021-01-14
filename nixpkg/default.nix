@@ -10,7 +10,7 @@
 # , packr
 
 rustPlatform.buildRustPackage rec {
-  pname = "zknotes-server";
+  pname = "bis-zknotes-server";
   version = "1.0";
 
   # ui = callPackage ./ui.nix { };
@@ -18,8 +18,8 @@ rustPlatform.buildRustPackage rec {
   src = fetchFromGitHub {
     owner = "bburdette";
     repo = "zknotes";
-    rev = "a536e02cd3635b507d5bc6c117cf45d7204edeb8";
-    sha256 = "02kgxmbjlgqwl959jp2zbzm1vav5a7p6rasyxwbls0jm0qjkzk7y";
+    rev = "091ae44e5fef2ab8a5fa876d859e109664a90957";
+    sha256 = "0ql4wlhyy5hwr13va8jxx9hm434724cvzlx6d1prkmdah75m401r";
   };
 
   # preBuild = ''
@@ -37,7 +37,7 @@ rustPlatform.buildRustPackage rec {
 
 
   sourceRoot = "source/server";
-  cargoSha256 = "08i913l1xv2d44ybvd0z4yjvvn0pdv1lcs0v9jn5q8d54mlf5kbh";
+  cargoSha256 = "01kqpn8iid5dik7idhcxsbzddx4kcv7mmrqy3zdirjz1s8a25bac";
   # dontMakeSourcesWritable=1;
 
   buildInputs = [openssl sqlite];
@@ -45,7 +45,7 @@ rustPlatform.buildRustPackage rec {
   nativeBuildInputs = [ pkgconfig ];
 
   meta = with stdenv.lib; {
-    description = "zknotes zettelkasten server.";
+    description = "zknotes zettelkasten server for bis.";
     homepage = https://github.com/bburdette/zknotes;
     license = with licenses; [ gpl ];
     maintainers = [ ];

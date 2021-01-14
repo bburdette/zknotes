@@ -201,6 +201,7 @@ mkHtmlRenderer maxw cellDict onchanged =
             , Markdown.Html.tag "strong" (\htmls -> Html.strong [] htmls)
             , Markdown.Html.tag "table" (\htmls -> Html.table [] htmls)
             , Markdown.Html.tag "tr" (\htmls -> Html.tr [] htmls)
+            , Markdown.Html.tag "th" (\htmls -> Html.th [] htmls)
             , Markdown.Html.tag "td" (\htmls -> Html.td [] htmls)
             , Markdown.Html.tag "tr" (\htmls -> Html.tr [] htmls)
             , Markdown.Html.tag "sup" (\htmls -> Html.sup [] htmls)
