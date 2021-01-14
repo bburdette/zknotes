@@ -196,7 +196,7 @@ mkHtmlRenderer maxw cellDict onchanged =
                 )
     , html =
         Markdown.Html.oneOf
-            [ Markdown.Html.tag "u" (\htmls -> Html.div [] htmls)
+            [ Markdown.Html.tag "u" (\htmls -> Html.u [] htmls)
             , Markdown.Html.tag "span" (\htmls -> Html.span [] htmls)
             , Markdown.Html.tag "strong" (\htmls -> Html.strong [] htmls)
             , Markdown.Html.tag "table" (\htmls -> Html.table [] htmls)
