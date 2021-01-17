@@ -620,6 +620,41 @@ where
   }
 }
 
+// todo: repeat until found or none.
+pub fn find_first_q<T: indradb::Transaction, F, Q>(
+  itr: &T,
+  vpqf: Q,
+  test: F,
+) -> Result<Option<indradb::VertexProperty>, errors::Error>
+where
+  F: FnMut(&&indradb::VertexProperty) -> bool + Copy,
+  Q: Fn(Option<Uuid>) -> Result<indradb::VertexPropertyQuery, errors::Error>,
+{
+  let mut ret = None;
+  let mut uuid = None;
+  let mut vpq = vpqf(uuid)?;
+  let mut vps = itr.get_vertex_properties(vpq)?;
+  while (!vps.is_empty()) {
+    match vps.iter().find(test) {
+      Some(r) => {
+        ret = Some(r.clone());
+        break;
+      }
+      None => match vps.last() {
+        Some(l) => {
+          vpq = vpqf(Some(l.id))?;
+          vps = itr.get_vertex_properties(vpq)?;
+        }
+        None => break,
+      },
+    }
+  }
+  match ret {
+    Some(r) => Ok(Some(r.clone())),
+    None => Ok(None),
+  }
+}
+
 pub fn test_db(path: &str) -> Result<(), errors::Error> {
   // compression factor of 5 (default)
   let sc = indradb::SledConfig::with_compression(None);
@@ -645,6 +680,28 @@ pub fn test_db(path: &str) -> Result<(), errors::Error> {
 
   let ffu = find_first(&itr, vq, |x| x.value == "meh")?;
   println!("ffu: {:?}", ffu);
+
+  let mkq = |uuid| match uuid {
+    Some(id) => Ok(indradb::VertexPropertyQuery::new(
+      indradb::RangeVertexQuery::new(100)
+        .t(Type::new("user")?)
+        .start_id(id)
+        .into(),
+      "name",
+    )),
+    None => Ok(indradb::VertexPropertyQuery::new(
+      indradb::RangeVertexQuery::new(100)
+        .t(Type::new("user")?)
+        .into(),
+      "name",
+    )),
+  };
+
+  let ffqu = find_first_q(&itr, mkq, |x| {
+    println!("testing {:?}", x);
+    x.value == "meh2"
+  })?;
+  println!("ffqu: {:?}", ffqu);
 
   // let vps = itr.get_vertex_properties(vq)?;
   // for vp in vps {
