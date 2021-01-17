@@ -8,15 +8,16 @@ use simple_error::SimpleError;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 // use std::time::Duration;
-use std::time::SystemTime;
-use user::{LoginData, User, ZkDatabase};
-use uuid::Uuid;
-use zkprotocol::content as C;
-
 use icontent::{
   GetZkLinks, GetZkNoteEdit, ImportZkNote, SaveZkNote, SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
 };
+use std::time::SystemTime;
+use user::{LoginData, User, ZkDatabase};
+use util::now;
+use uuid::Uuid;
+use zkprotocol::content as C;
 
+#[derive(Debug, Clone)]
 pub struct SystemVs {
   public: Uuid,
   search: Uuid,
@@ -39,7 +40,7 @@ pub fn import_db(zd: &ZkDatabase, path: &str) -> Result<(), errors::Error> {
     let v = indradb::Vertex::new(indradb::Type::new("system")?);
     itr.create_vertex(&v)?;
     itr.set_vertex_properties(
-      indradb::VertexPropertyQuery::new(indradb::SpecificVertexQuery::single(v.id).into(), "name"),
+      indradb::VertexPropertyQuery::new(indradb::SpecificVertexQuery::single(v.id).into(), "title"),
       &serde_json::to_value("public")?,
     )?;
     v.id
@@ -48,7 +49,7 @@ pub fn import_db(zd: &ZkDatabase, path: &str) -> Result<(), errors::Error> {
     let v = indradb::Vertex::new(indradb::Type::new("system")?);
     itr.create_vertex(&v)?;
     itr.set_vertex_properties(
-      indradb::VertexPropertyQuery::new(indradb::SpecificVertexQuery::single(v.id).into(), "name"),
+      indradb::VertexPropertyQuery::new(indradb::SpecificVertexQuery::single(v.id).into(), "title"),
       &serde_json::to_value("share")?,
     )?;
     v.id
@@ -57,7 +58,7 @@ pub fn import_db(zd: &ZkDatabase, path: &str) -> Result<(), errors::Error> {
     let v = indradb::Vertex::new(indradb::Type::new("system")?);
     itr.create_vertex(&v)?;
     itr.set_vertex_properties(
-      indradb::VertexPropertyQuery::new(indradb::SpecificVertexQuery::single(v.id).into(), "name"),
+      indradb::VertexPropertyQuery::new(indradb::SpecificVertexQuery::single(v.id).into(), "title"),
       &serde_json::to_value("search")?,
     )?;
     v.id
@@ -168,7 +169,6 @@ pub fn import_db(zd: &ZkDatabase, path: &str) -> Result<(), errors::Error> {
               }
               None => (),
             }
-
             itr.set_vertex_properties(
               indradb::VertexPropertyQuery::new(
                 indradb::SpecificVertexQuery::single(v.id).into(),
@@ -352,28 +352,30 @@ where
     itr
       .get_vertex_properties(indradb::VertexPropertyQuery::new(vq.clone(), x))?
       .first()
-      .ok_or(SimpleError::new("property not found"))?
+      .ok_or(SimpleError::new(
+        format!("property not found: {}", x).as_str(),
+      ))?
       .value
       .clone(),
   )?)
 }
 
 pub fn get_systemvs<T: indradb::Transaction>(itr: &T) -> Result<SystemVs, errors::Error> {
-  let vq = indradb::VertexQuery::Range(indradb::RangeVertexQuery::new(100).t(Type::new("System")?));
+  let vq = indradb::VertexQuery::Range(indradb::RangeVertexQuery::new(100).t(Type::new("system")?));
 
   let mut public = None;
   let mut search = None;
   let mut shared = None;
 
   for v in itr
-    .get_vertex_properties(indradb::VertexPropertyQuery::new(vq, "name"))?
+    .get_vertex_properties(indradb::VertexPropertyQuery::new(vq, "title"))?
     .iter()
   {
     match serde_json::from_value::<String>(v.value.clone())?.as_str() {
       "public" => public = Some(v.id),
       "search" => search = Some(v.id),
-      "shared" => shared = Some(v.id),
-      _ => (),
+      "share" => shared = Some(v.id),
+      wat => (),
     }
   }
 
@@ -477,12 +479,67 @@ itr.get_vertices
 }
 */
 
+pub fn save_zknote<T: indradb::Transaction>(
+  itr: &T,
+  uid: Uuid,
+  note: &SaveZkNote,
+) -> Result<SavedZkNote, errors::Error> {
+  let now = now()?;
+  let id = match note.id {
+    Some(id) => id,
+    None => {
+      let v = indradb::Vertex::new(indradb::Type::new("note")?);
+      itr.create_vertex(&v)?;
+      v.id
+    }
+  };
+  itr.set_vertex_properties(
+    indradb::VertexPropertyQuery::new(indradb::SpecificVertexQuery::single(id).into(), "title"),
+    &serde_json::to_value(&note.title)?,
+  )?;
+  itr.set_vertex_properties(
+    indradb::VertexPropertyQuery::new(indradb::SpecificVertexQuery::single(id).into(), "content"),
+    &serde_json::to_value(&note.content)?,
+  )?;
+  if let Some(pubid) = &note.pubid {
+    itr.set_vertex_properties(
+      indradb::VertexPropertyQuery::new(indradb::SpecificVertexQuery::single(id).into(), "content"),
+      &serde_json::to_value(pubid)?,
+    )?;
+  };
+
+  itr.set_vertex_properties(
+    indradb::VertexPropertyQuery::new(
+      indradb::SpecificVertexQuery::single(id).into(),
+      "createdate",
+    ),
+    &serde_json::to_value(now.clone())?,
+  )?;
+  itr.set_vertex_properties(
+    indradb::VertexPropertyQuery::new(
+      indradb::SpecificVertexQuery::single(id).into(),
+      "changeddate",
+    ),
+    &serde_json::to_value(now.clone())?,
+  )?;
+
+  // link to user.
+  save_zklink(itr, &id, &uid, &uid, &Some("owner"))?;
+
+  Ok(SavedZkNote {
+    id: id,
+    changeddate: now,
+  })
+}
+
 pub fn read_zknote<T: indradb::Transaction>(
   itr: &T,
   uid: Option<Uuid>,
   id: Uuid,
 ) -> Result<ZkNote, errors::Error> {
   let vq = indradb::VertexQuery::Specific(indradb::SpecificVertexQuery::single(id).into());
+
+  println!("avP: {:?}", itr.get_all_vertex_properties(vq.clone()));
 
   // TODO check for access permissions.
   // - is this note tagged with uid directly?
@@ -531,4 +588,22 @@ pub fn read_zknote<T: indradb::Transaction>(
       }
     }
     */
+}
+
+pub fn test_db(path: &str) -> Result<(), errors::Error> {
+  // compression factor of 5 (default)
+  let sc = indradb::SledConfig::with_compression(None);
+
+  // let ids = sc.open(dbpath.as_os_str().to_str().ok_or(bail!("blah"))?)?;
+  let ids = sc.open(path)?;
+
+  let itr = ids.transaction()?;
+
+  let svs = get_systemvs(&itr)?;
+
+  read_zknote(&itr, None, svs.public)?;
+
+  println!("indra test end");
+
+  Ok(())
 }
