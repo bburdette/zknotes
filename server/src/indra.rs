@@ -36,6 +36,7 @@ pub fn import_db(zd: &ZkDatabase, path: &str) -> Result<(), errors::Error> {
   // make system vertices.
   // necessary?
   // 'public' 'share' 'search'
+  // make these into notes?
   let pubid = {
     let v = indradb::Vertex::new(indradb::Type::new("system")?);
     itr.create_vertex(&v)?;
@@ -247,7 +248,7 @@ pub fn new_user<T: indradb::Transaction>(
   hashwd: String,
   salt: String,
   email: String,
-  registration_key: String,
+  registration_key: Option<String>,
 ) -> Result<Uuid, errors::Error> {
   let v = indradb::Vertex::new(indradb::Type::new("user")?);
   itr.create_vertex(&v)?;
@@ -271,13 +272,25 @@ pub fn new_user<T: indradb::Transaction>(
     indradb::VertexPropertyQuery::new(indradb::SpecificVertexQuery::single(v.id).into(), "email"),
     &serde_json::to_value(email.clone())?,
   )?;
-  itr.set_vertex_properties(
-    indradb::VertexPropertyQuery::new(
-      indradb::SpecificVertexQuery::single(v.id).into(),
-      "registration_key",
-    ),
-    &serde_json::to_value(registration_key.clone())?,
-  )?;
+  match registration_key {
+    Some(k) => {
+      itr.set_vertex_properties(
+        indradb::VertexPropertyQuery::new(
+          indradb::SpecificVertexQuery::single(v.id).into(),
+          "registration_key",
+        ),
+        &serde_json::to_value(k.clone())?,
+      )?;
+    }
+    None => (),
+  }
+  // itr.set_vertex_properties(
+  //   indradb::VertexPropertyQuery::new(
+  //     indradb::SpecificVertexQuery::single(v.id).into(),
+  //     "registration_key",
+  //   ),
+  //   &serde_json::to_value(registration_key.clone())?,
+  // )?;
 
   // TODO add link to 'public'
   save_zklink(itr, &v.id, &public, &v.id, &None)?;
@@ -590,6 +603,23 @@ pub fn read_zknote<T: indradb::Transaction>(
     */
 }
 
+// todo: repeat until found or none.
+pub fn find_first<T: indradb::Transaction, F>(
+  itr: &T,
+  vpq: indradb::VertexPropertyQuery,
+  test: F,
+) -> Result<Option<indradb::VertexProperty>, errors::Error>
+where
+  F: FnMut(&&indradb::VertexProperty) -> bool,
+{
+  let vps = itr.get_vertex_properties(vpq)?;
+  let ret = vps.iter().find(test);
+  match ret {
+    Some(d) => Ok(Some(d.clone())),
+    None => Ok(None),
+  }
+}
+
 pub fn test_db(path: &str) -> Result<(), errors::Error> {
   // compression factor of 5 (default)
   let sc = indradb::SledConfig::with_compression(None);
@@ -600,6 +630,35 @@ pub fn test_db(path: &str) -> Result<(), errors::Error> {
   let itr = ids.transaction()?;
 
   let svs = get_systemvs(&itr)?;
+
+  // user names
+  let vq = indradb::VertexPropertyQuery::new(
+    indradb::RangeVertexQuery::new(100)
+      .t(Type::new("user")?)
+      .into(),
+    "name",
+  );
+
+  // let vps = itr.get_vertex_properties(vq)?;
+  // let tu = vps.iter().find(|x| x.value == "meh");
+  // println!("tu: {:?}", tu);
+
+  let ffu = find_first(&itr, vq, |x| x.value == "meh")?;
+  println!("ffu: {:?}", ffu);
+
+  // let vps = itr.get_vertex_properties(vq)?;
+  // for vp in vps {
+  //   println!("prop {:?}", vp);
+  // }
+
+  let szn = SaveZkNote {
+    id: None,
+    title: "test title".to_string(),
+    pubid: None,
+    content: "test content".to_string(),
+  };
+
+  // let sid = save_zknote(&itr, uid, &szn)?;
 
   read_zknote(&itr, None, svs.public)?;
 

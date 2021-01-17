@@ -1,1 +1,5 @@
-./target/debug/zknotes-server
+clear
+
+cargo build
+
+./target/debug/zknotes-server -t
