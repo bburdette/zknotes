@@ -373,6 +373,24 @@ where
   )?)
 }
 
+pub fn getoptprop<T: indradb::Transaction, R>(
+  itr: &T,
+  vq: &indradb::VertexQuery,
+  x: &str,
+) -> Result<Option<R>, errors::Error>
+where
+  R: serde::de::DeserializeOwned,
+{
+  let r = match itr
+    .get_vertex_properties(indradb::VertexPropertyQuery::new(vq.clone(), x))?
+    .first()
+  {
+    Some(vp) => Some(serde_json::from_value::<R>(vp.value.clone())?),
+    None => None,
+  };
+  Ok(r)
+}
+
 pub fn get_systemvs<T: indradb::Transaction>(itr: &T) -> Result<SystemVs, errors::Error> {
   let vq = indradb::VertexQuery::Range(indradb::RangeVertexQuery::new(100).t(Type::new("system")?));
 
@@ -552,7 +570,7 @@ pub fn read_zknote<T: indradb::Transaction>(
 ) -> Result<ZkNote, errors::Error> {
   let vq = indradb::VertexQuery::Specific(indradb::SpecificVertexQuery::single(id).into());
 
-  println!("avP: {:?}", itr.get_all_vertex_properties(vq.clone()));
+  // println!("avP: {:?}", itr.get_all_vertex_properties(vq.clone()));
 
   // TODO check for access permissions.
   // - is this note tagged with uid directly?
@@ -562,13 +580,27 @@ pub fn read_zknote<T: indradb::Transaction>(
   // 	 - that links to Uid.
   // 	 - and links to shared.
 
+  let eq = indradb::PipeEdgeQuery::new(Box::new(vq.clone()), indradb::EdgeDirection::Outbound, 1)
+    .t(Type::new("owner")?);
+
+  let user = itr
+    .get_edges(eq)?
+    .first()
+    .ok_or(SimpleError::new("user not found!"))?
+    .key
+    .inbound_id;
+
+  let uq = indradb::VertexQuery::Specific(indradb::SpecificVertexQuery::single(user).into());
+
+  // println!("user props {:?}", itr.get_all_vertex_properties(uq.clone()));
+
   Ok(ZkNote {
     id: id,
     title: getprop(itr, &vq, "title")?,
     content: getprop(itr, &vq, "content")?,
-    user: getprop(itr, &vq, "user")?,
-    username: getprop(itr, &vq, "username")?,
-    pubid: getprop(itr, &vq, "pubid")?,
+    user: user,
+    username: getprop(itr, &uq, "name")?,
+    pubid: getoptprop(itr, &vq, "pubid")?,
     createdate: getprop(itr, &vq, "createdate")?,
     changeddate: getprop(itr, &vq, "changeddate")?,
   })
@@ -702,10 +734,7 @@ pub fn test_db(path: &str) -> Result<(), errors::Error> {
   let tuid = match find_first_q(
     &itr,
     mkpropquery("user".to_string(), "name".to_string()),
-    |x| {
-      println!("testing {:?}", x);
-      x.value == "test"
-    },
+    |x| x.value == "test",
   )? {
     Some(vp) => vp.id,
     None => new_user(
@@ -728,7 +757,9 @@ pub fn test_db(path: &str) -> Result<(), errors::Error> {
 
   let sid = save_zknote(&itr, tuid, &szn)?;
 
-  read_zknote(&itr, None, sid.id)?;
+  let zkn = read_zknote(&itr, None, sid.id)?;
+
+  println!("{}", serde_json::to_string_pretty(&zkn)?);
 
   println!("indra test end");
 
