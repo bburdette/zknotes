@@ -655,6 +655,27 @@ where
   }
 }
 
+pub fn mkpropquery(
+  vtype: String,
+  prop: String,
+) -> Box<dyn Fn(Option<Uuid>) -> Result<indradb::VertexPropertyQuery, errors::Error>> {
+  Box::new(move |uuid| match uuid {
+    Some(id) => Ok(indradb::VertexPropertyQuery::new(
+      indradb::RangeVertexQuery::new(100)
+        .t(Type::new(vtype.as_str())?)
+        .start_id(id)
+        .into(),
+      prop.as_str(),
+    )),
+    None => Ok(indradb::VertexPropertyQuery::new(
+      indradb::RangeVertexQuery::new(100)
+        .t(Type::new(vtype.as_str())?)
+        .into(),
+      prop.as_str(),
+    )),
+  })
+}
+
 pub fn test_db(path: &str) -> Result<(), errors::Error> {
   // compression factor of 5 (default)
   let sc = indradb::SledConfig::with_compression(None);
@@ -681,26 +702,30 @@ pub fn test_db(path: &str) -> Result<(), errors::Error> {
   let ffu = find_first(&itr, vq, |x| x.value == "meh")?;
   println!("ffu: {:?}", ffu);
 
-  let mkq = |uuid| match uuid {
-    Some(id) => Ok(indradb::VertexPropertyQuery::new(
-      indradb::RangeVertexQuery::new(100)
-        .t(Type::new("user")?)
-        .start_id(id)
-        .into(),
-      "name",
-    )),
-    None => Ok(indradb::VertexPropertyQuery::new(
-      indradb::RangeVertexQuery::new(100)
-        .t(Type::new("user")?)
-        .into(),
-      "name",
-    )),
-  };
+  // let mkq = |uuid| match uuid {
+  //   Some(id) => Ok(indradb::VertexPropertyQuery::new(
+  //     indradb::RangeVertexQuery::new(100)
+  //       .t(Type::new("user")?)
+  //       .start_id(id)
+  //       .into(),
+  //     "name",
+  //   )),
+  //   None => Ok(indradb::VertexPropertyQuery::new(
+  //     indradb::RangeVertexQuery::new(100)
+  //       .t(Type::new("user")?)
+  //       .into(),
+  //     "name",
+  //   )),
+  // };
 
-  let ffqu = find_first_q(&itr, mkq, |x| {
-    println!("testing {:?}", x);
-    x.value == "meh2"
-  })?;
+  let ffqu = find_first_q(
+    &itr,
+    mkpropquery("user".to_string(), "name".to_string()),
+    |x| {
+      println!("testing {:?}", x);
+      x.value == "meh2"
+    },
+  )?;
   println!("ffqu: {:?}", ffqu);
 
   // let vps = itr.get_vertex_properties(vq)?;
