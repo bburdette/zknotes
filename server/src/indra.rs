@@ -620,7 +620,6 @@ where
   }
 }
 
-// todo: repeat until found or none.
 pub fn find_first_q<T: indradb::Transaction, F, Q>(
   itr: &T,
   vpqf: Q,
@@ -688,6 +687,7 @@ pub fn test_db(path: &str) -> Result<(), errors::Error> {
   let svs = get_systemvs(&itr)?;
 
   // user names
+  /*
   let vq = indradb::VertexPropertyQuery::new(
     indradb::RangeVertexQuery::new(100)
       .t(Type::new("user")?)
@@ -695,43 +695,29 @@ pub fn test_db(path: &str) -> Result<(), errors::Error> {
     "name",
   );
 
-  // let vps = itr.get_vertex_properties(vq)?;
-  // let tu = vps.iter().find(|x| x.value == "meh");
-  // println!("tu: {:?}", tu);
-
   let ffu = find_first(&itr, vq, |x| x.value == "meh")?;
   println!("ffu: {:?}", ffu);
+  */
 
-  // let mkq = |uuid| match uuid {
-  //   Some(id) => Ok(indradb::VertexPropertyQuery::new(
-  //     indradb::RangeVertexQuery::new(100)
-  //       .t(Type::new("user")?)
-  //       .start_id(id)
-  //       .into(),
-  //     "name",
-  //   )),
-  //   None => Ok(indradb::VertexPropertyQuery::new(
-  //     indradb::RangeVertexQuery::new(100)
-  //       .t(Type::new("user")?)
-  //       .into(),
-  //     "name",
-  //   )),
-  // };
-
-  let ffqu = find_first_q(
+  let tuid = match find_first_q(
     &itr,
     mkpropquery("user".to_string(), "name".to_string()),
     |x| {
       println!("testing {:?}", x);
-      x.value == "meh2"
+      x.value == "test"
     },
-  )?;
-  println!("ffqu: {:?}", ffqu);
-
-  // let vps = itr.get_vertex_properties(vq)?;
-  // for vp in vps {
-  //   println!("prop {:?}", vp);
-  // }
+  )? {
+    Some(vp) => vp.id,
+    None => new_user(
+      &itr,
+      &svs.public,
+      "test".to_string(),
+      "".to_string(),
+      "".to_string(),
+      "test@test.com".to_string(),
+      None,
+    )?,
+  };
 
   let szn = SaveZkNote {
     id: None,
@@ -740,9 +726,9 @@ pub fn test_db(path: &str) -> Result<(), errors::Error> {
     content: "test content".to_string(),
   };
 
-  // let sid = save_zknote(&itr, uid, &szn)?;
+  let sid = save_zknote(&itr, tuid, &szn)?;
 
-  read_zknote(&itr, None, svs.public)?;
+  read_zknote(&itr, None, sid.id)?;
 
   println!("indra test end");
 
