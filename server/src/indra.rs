@@ -21,7 +21,7 @@ use zkprotocol::content as C;
 pub struct SystemVs {
   public: Uuid,
   search: Uuid,
-  shared: Uuid,
+  share: Uuid,
 }
 
 pub fn import_db(zd: &ZkDatabase, path: &str) -> Result<(), errors::Error> {
@@ -396,7 +396,7 @@ pub fn get_systemvs<T: indradb::Transaction>(itr: &T) -> Result<SystemVs, errors
 
   let mut public = None;
   let mut search = None;
-  let mut shared = None;
+  let mut share = None;
 
   for v in itr
     .get_vertex_properties(indradb::VertexPropertyQuery::new(vq, "title"))?
@@ -405,16 +405,16 @@ pub fn get_systemvs<T: indradb::Transaction>(itr: &T) -> Result<SystemVs, errors
     match serde_json::from_value::<String>(v.value.clone())?.as_str() {
       "public" => public = Some(v.id),
       "search" => search = Some(v.id),
-      "share" => shared = Some(v.id),
+      "share" => share = Some(v.id),
       wat => (),
     }
   }
 
-  match (public, search, shared) {
+  match (public, search, share) {
     (Some(p), Some(se), Some(sh)) => Ok(SystemVs {
       public: p,
       search: se,
-      shared: sh,
+      share: sh,
     }),
     _ => Err(errors::Error::from(SimpleError::new(
       "unable to find system vertices",
@@ -458,6 +458,8 @@ pub fn intersect<T: indradb::Transaction>(
 ) -> Result<Vec<Vertex>, errors::Error> {
   let vec1 = itr.get_vertices(vq1)?;
   let vec2 = itr.get_vertices(vq2)?;
+  println!("vec1: {:?}", vec1);
+  println!("vec2: {:?}", vec2);
   let i1 = vec1.iter();
   let mut i2 = vec2.iter();
 
@@ -565,6 +567,7 @@ pub fn save_zknote<T: indradb::Transaction>(
 
 pub fn read_zknote<T: indradb::Transaction>(
   itr: &T,
+  svs: &SystemVs,
   uid: Option<Uuid>,
   id: Uuid,
 ) -> Result<ZkNote, errors::Error> {
@@ -580,6 +583,7 @@ pub fn read_zknote<T: indradb::Transaction>(
   // 	 - that links to Uid.
   // 	 - and links to shared.
 
+  // get note owner.
   let eq = indradb::PipeEdgeQuery::new(Box::new(vq.clone()), indradb::EdgeDirection::Outbound, 1)
     .t(Type::new("owner")?);
 
@@ -590,9 +594,38 @@ pub fn read_zknote<T: indradb::Transaction>(
     .key
     .inbound_id;
 
-  let uq = indradb::VertexQuery::Specific(indradb::SpecificVertexQuery::single(user).into());
+  // tagged public?
+  let pq: indradb::EdgeQuery =
+    indradb::SpecificEdgeQuery::new(vec![indradb::EdgeKey::new(svs.public, Type::default(), id)])
+      .into();
+  let public = !itr.get_edges(pq)?.is_empty();
+
+  let eq = indradb::PipeEdgeQuery::new(Box::new(vq.clone()), indradb::EdgeDirection::Outbound, 1)
+    .t(Type::new("owner")?);
+
+  // share check!
+  let sq = indradb::SpecificVertexQuery::single(svs.share)
+    .inbound(1000)
+    .outbound(1000);
+  let uq = indradb::SpecificVertexQuery::single(user)
+    .inbound(1000)
+    .outbound(1000);
+
+  // let int = intersect(itr, sq.into(), uq.into());
+  // println!("intersecdt {:?}", int);
+
+  for u in itr.get_vertices(indradb::RangeVertexQuery::new(2).t(Type::new("user")?))? {
+    let uq = indradb::SpecificVertexQuery::single(u.id)
+      .inbound(1000)
+      .outbound(1000);
+    let int = intersect(itr, sq.clone().into(), uq.into());
+    println!("intersecdt {:?}", int);
+  }
 
   // println!("user props {:?}", itr.get_all_vertex_properties(uq.clone()));
+
+  // query for getting user name.
+  let uq = indradb::VertexQuery::Specific(indradb::SpecificVertexQuery::single(user).into());
 
   Ok(ZkNote {
     id: id,
@@ -757,7 +790,7 @@ pub fn test_db(path: &str) -> Result<(), errors::Error> {
 
   let sid = save_zknote(&itr, tuid, &szn)?;
 
-  let zkn = read_zknote(&itr, None, sid.id)?;
+  let zkn = read_zknote(&itr, &svs, None, sid.id)?;
 
   println!("{}", serde_json::to_string_pretty(&zkn)?);
 
