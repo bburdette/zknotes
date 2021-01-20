@@ -65,6 +65,7 @@ type Msg
     | ViewPress
     | LinksPress
     | NewPress
+    | CopyPress
     | SwitchPress Int
     | LinkPress Data.ZkListNote
     | PublicPress Bool
@@ -82,19 +83,35 @@ type NavChoice
     | NcSearch
 
 
+type Direction
+    = From
+    | To
+
+
+type alias EditLink =
+    { otherid : Int
+    , direction : Direction
+    , user : Int
+    , zknote : Maybe Int
+    , fromname : Maybe String
+    , toname : Maybe String
+    , delete : Maybe Bool
+    }
+
+
 type alias Model =
     { id : Maybe Int
     , ld : Data.LoginData
     , noteUser : Int
     , noteUserName : String
     , zknSearchResult : Data.ZkNoteSearchResult
-    , zklDict : Dict String Data.ZkLink
+    , zklDict : Dict String EditLink
     , pubidtxt : String
     , title : String
     , md : String
     , cells : CellDict
     , revert : Maybe Data.SaveZkNote
-    , initialZklDict : Dict String Data.ZkLink
+    , initialZklDict : Dict String EditLink
     , spmodel : SP.Model
     , navchoice : NavChoice
     , dialog : Maybe D.Model
@@ -635,9 +652,17 @@ zknview size model =
         ]
 
 
-zklKey : { a | from : Int, to : Int } -> String
+zklKey : { a | otherid : Int, direction : Direction } -> String
 zklKey zkl =
-    String.fromInt zkl.from ++ ":" ++ String.fromInt zkl.to
+    String.fromInt zkl.otherid
+        ++ ":"
+        ++ (case zkl.direction of
+                From ->
+                    "from"
+
+                To ->
+                    "to"
+           )
 
 
 linksWith : List Data.ZkLink -> Int -> Bool
@@ -828,6 +853,17 @@ update msg model =
             )
 
         DonePress ->
+            ( model
+            , if dirty model then
+                SaveExit
+                    (sznFromModel model)
+                    (saveZkLinkList model)
+
+              else
+                Revert
+            )
+
+        CopyPress ->
             ( model
             , if dirty model then
                 SaveExit
