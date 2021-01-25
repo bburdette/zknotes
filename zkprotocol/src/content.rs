@@ -33,6 +33,27 @@ pub struct SaveZkNote {
   pub content: String,
 }
 
+#[derive(Deserialize, Debug, Clone)]
+pub enum Direction {
+  From,
+  To,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct SaveZkLink {
+  pub otherid: i64,
+  pub direction: Direction,
+  pub user: i64,
+  pub zknote: Option<i64>,
+  pub delete: Option<bool>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct SaveZkNotePlusLinks {
+  pub note: SaveZkNote,
+  pub links: Vec<SaveZkLink>,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ZkLink {
   pub from: i64,

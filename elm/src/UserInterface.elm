@@ -14,6 +14,7 @@ type SendMsg
     | DeleteZkNote Int
     | SaveZkNote Data.SaveZkNote
     | SaveZkLinks Data.ZkLinks
+    | SaveZkNotePlusLinks Data.SaveZkNotePlusLinks
     | GetZkLinks Data.GetZkLinks
     | SearchZkNotes S.ZkNoteSearch
     | SaveImportZkNotes (List Data.ImportZkNote)
@@ -135,6 +136,14 @@ encodeSendMsg sm uid pwd =
                 , ( "uid", JE.string uid )
                 , ( "pwd", JE.string pwd )
                 , ( "data", Data.encodeSaveZkNote sbe )
+                ]
+
+        SaveZkNotePlusLinks s ->
+            JE.object
+                [ ( "what", JE.string "savezknotepluslinks" )
+                , ( "uid", JE.string uid )
+                , ( "pwd", JE.string pwd )
+                , ( "data", Data.encodeSaveZkNotePlusLinks s )
                 ]
 
         SaveZkLinks zklinks ->

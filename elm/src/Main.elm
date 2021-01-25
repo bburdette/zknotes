@@ -725,7 +725,7 @@ actualupdate msg model =
                                     EditZkNote.gotSelectedText emod str
                             in
                             case cmd of
-                                EditZkNote.Save szk zklinks ->
+                                EditZkNote.Save szkpl ->
                                     ( { model
                                         | state =
                                             Wait
@@ -756,13 +756,7 @@ actualupdate msg model =
                                     , Cmd.batch
                                         [ sendUIMsg model.location
                                             login
-                                            (UI.SaveZkNote szk)
-                                        , sendUIMsg model.location
-                                            login
-                                          <|
-                                            UI.SaveZkLinks
-                                                { links = zklinks
-                                                }
+                                            (UI.SaveZkNotePlusLinks szkpl)
                                         ]
                                     )
 
@@ -1101,7 +1095,7 @@ actualupdate msg model =
                     )
             in
             case ecmd of
-                EditZkNote.SaveExit szk zklinks ->
+                EditZkNote.SaveExit snpl ->
                     let
                         gotres =
                             ( EditZkNoteListing
@@ -1155,32 +1149,16 @@ actualupdate msg model =
                                 )
                                 (savefn False False)
                       }
-                    , Cmd.batch
-                        [ sendUIMsg model.location
-                            login
-                            (UI.SaveZkNote szk)
-                        , sendUIMsg model.location
-                            login
-                          <|
-                            UI.SaveZkLinks
-                                { links = zklinks
-                                }
-                        ]
+                    , sendUIMsg model.location
+                        login
+                        (UI.SaveZkNotePlusLinks snpl)
                     )
 
-                EditZkNote.Save szk zklinks ->
+                EditZkNote.Save snpl ->
                     ( { model | state = EditZkNote emod login }
-                    , Cmd.batch
-                        [ sendUIMsg model.location
-                            login
-                            (UI.SaveZkNote szk)
-                        , sendUIMsg model.location
-                            login
-                          <|
-                            UI.SaveZkLinks
-                                { links = zklinks
-                                }
-                        ]
+                    , sendUIMsg model.location
+                        login
+                        (UI.SaveZkNotePlusLinks snpl)
                     )
 
                 EditZkNote.None ->
@@ -1222,7 +1200,7 @@ actualupdate msg model =
                     in
                     ( { model | state = st }, cmd )
 
-                EditZkNote.SaveSwitch szkn zklinks id ->
+                EditZkNote.SaveSwitch s id ->
                     let
                         ( st, cmd ) =
                             loadnote model
@@ -1240,13 +1218,7 @@ actualupdate msg model =
                         [ cmd
                         , sendUIMsg model.location
                             login
-                            (UI.SaveZkNote szkn)
-                        , sendUIMsg model.location
-                            login
-                          <|
-                            UI.SaveZkLinks
-                                { links = zklinks
-                                }
+                            (UI.SaveZkNotePlusLinks s)
                         ]
                     )
 

@@ -9,7 +9,8 @@ use std::path::Path;
 use util;
 use uuid::Uuid;
 use zkprotocol::content::{
-  GetZkLinks, GetZkNoteEdit, ImportZkNote, SaveZkNote, ZkLinks, ZkNoteAndAccomplices,
+  GetZkLinks, GetZkNoteEdit, ImportZkNote, SaveZkNote, SaveZkNotePlusLinks, ZkLinks,
+  ZkNoteAndAccomplices,
 };
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 use zkprotocol::search::{TagSearch, ZkNoteSearch};
@@ -195,6 +196,17 @@ fn user_interface_loggedin(
       Ok(ServerResponse {
         what: "savedzklinks".to_string(),
         content: serde_json::to_value(s)?,
+      })
+    }
+    "savezknotepluslinks" => {
+      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      let sznpl: SaveZkNotePlusLinks = serde_json::from_value(msgdata.clone())?;
+      let conn = sqldata::connection_open(config.db.as_path())?;
+      let szkn = sqldata::save_zknote(&conn, uid, &sznpl.note)?;
+      let s = sqldata::save_savezklinks(&conn, uid, szkn.id, sznpl.links)?;
+      Ok(ServerResponse {
+        what: "savedzknote".to_string(),
+        content: serde_json::to_value(szkn)?,
       })
     }
     "getzklinks" => {

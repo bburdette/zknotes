@@ -7,7 +7,8 @@ use std::path::Path;
 use std::time::Duration;
 use std::time::SystemTime;
 use zkprotocol::content::{
-  GetZkLinks, GetZkNoteEdit, ImportZkNote, SaveZkNote, SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
+  GetZkLinks, GetZkNoteEdit, ImportZkNote, SaveZkLink, SaveZkNote, SavedZkNote, ZkLink, ZkNote,
+  ZkNoteEdit,
 };
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -962,6 +963,36 @@ pub fn save_zklinks(dbfile: &Path, uid: i64, zklinks: Vec<ZkLink>) -> Result<(),
         "insert into zklink (fromid, toid, user, linkzknote) values (?1, ?2, ?3, ?4)
           on conflict (fromid, toid, user) do update set linkzknote = ?4 where fromid = ?1 and toid = ?2 and user = ?3",
         params![zklink.from, zklink.to, uid, zklink.linkzknote],
+      )?;
+      }
+    }
+  }
+
+  Ok(())
+}
+
+pub fn save_savezklinks(
+  conn: &Connection,
+  uid: i64,
+  zknid: i64,
+  zklinks: Vec<SaveZkLink>,
+) -> Result<(), Box<dyn Error>> {
+  for link in zklinks.iter() {
+    let (from, to) = match &link.direction {
+      From => (zknid, link.otherid),
+      To => (link.otherid, zknid),
+    };
+    if link.user == uid {
+      if link.delete == Some(true) {
+        conn.execute(
+          "delete from zklink where fromid = ?1 and toid = ?2 and user = ?3",
+          params![from, to, uid],
+        )?;
+      } else {
+        conn.execute(
+        "insert into zklink (fromid, toid, user, linkzknote) values (?1, ?2, ?3, ?4)
+          on conflict (fromid, toid, user) do update set linkzknote = ?4 where fromid = ?1 and toid = ?2 and user = ?3",
+        params![from, to, uid, link.zknote],
       )?;
       }
     }
