@@ -559,6 +559,7 @@ zknview size model =
                 { onPress = Just DonePress, label = E.text "done" }
             , EI.button Common.buttonStyle { onPress = Just RevertPress, label = E.text "cancel" }
             , EI.button Common.buttonStyle { onPress = Just ViewPress, label = E.text "view" }
+            , EI.button Common.buttonStyle { onPress = Just CopyPress, label = E.text "copy" }
 
             -- , EI.button Common.buttonStyle { onPress = Just LinksPress, label = E.text "links" }
             , case isdirty of
@@ -932,13 +933,8 @@ update msg model =
             )
 
         CopyPress ->
-            ( model
-            , if dirty model then
-                SaveExit
-                    (fullSave model)
-
-              else
-                Revert
+            ( { model | id = Nothing, title = "Copy of " ++ model.title }
+            , None
             )
 
         ViewPress ->
