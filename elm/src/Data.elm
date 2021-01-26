@@ -80,6 +80,26 @@ type alias ZkLink =
     }
 
 
+type Direction
+    = From
+    | To
+
+
+type alias SaveZkLink =
+    { otherid : Int
+    , direction : Direction
+    , user : Int
+    , zknote : Maybe Int
+    , delete : Maybe Bool
+    }
+
+
+type alias SaveZkNotePlusLinks =
+    { note : SaveZkNote
+    , links : List SaveZkLink
+    }
+
+
 type alias ZkNoteAndAccomplices =
     { zknote : ZkNote
     , links : List ZkLink
@@ -138,6 +158,28 @@ encodeZkLinks zklinks =
         ]
 
 
+encodeDirection : Direction -> JE.Value
+encodeDirection direction =
+    case direction of
+        To ->
+            JE.string "To"
+
+        From ->
+            JE.string "From"
+
+
+encodeSaveZkLink : SaveZkLink -> JE.Value
+encodeSaveZkLink s =
+    [ Just ( "otherid", JE.int s.otherid )
+    , Just ( "direction", encodeDirection s.direction )
+    , Just ( "user", JE.int s.user )
+    , s.zknote |> Maybe.map (\n -> ( "zknote", JE.int n ))
+    , s.delete |> Maybe.map (\n -> ( "delete", JE.bool n ))
+    ]
+        |> List.filterMap identity
+        |> JE.object
+
+
 decodeZkLinks : JD.Decoder ZkLinks
 decodeZkLinks =
     JD.map ZkLinks
@@ -184,6 +226,14 @@ saveZkNote fzn =
     , title = fzn.title
     , content = fzn.content
     }
+
+
+encodeSaveZkNotePlusLinks : SaveZkNotePlusLinks -> JE.Value
+encodeSaveZkNotePlusLinks s =
+    JE.object
+        [ ( "note", encodeSaveZkNote s.note )
+        , ( "links", JE.list encodeSaveZkLink s.links )
+        ]
 
 
 encodeSaveZkNote : SaveZkNote -> JE.Value

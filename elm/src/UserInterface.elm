@@ -14,6 +14,7 @@ type SendMsg
     | DeleteZkNote Int
     | SaveZkNote Data.SaveZkNote
     | SaveZkLinks Data.ZkLinks
+    | SaveZkNotePlusLinks Data.SaveZkNotePlusLinks
     | GetZkLinks Data.GetZkLinks
     | SearchZkNotes S.ZkNoteSearch
     | SaveImportZkNotes (List Data.ImportZkNote)
@@ -27,6 +28,7 @@ type ServerResponse
     | InvalidUserOrPwd
     | LoggedIn Data.LoginData
     | ZkNoteSearchResult Data.ZkNoteSearchResult
+    | SavedZkNotePlusLinks Data.SavedZkNote
     | SavedZkNote Data.SavedZkNote
     | DeletedZkNote Int
     | ZkNote Data.ZkNote
@@ -76,6 +78,9 @@ showServerResponse sr =
 
         SavedZkLinks ->
             "SavedZkLinks"
+
+        SavedZkNotePlusLinks _ ->
+            "SavedZkNotePlusLinks"
 
         SavedImportZkNotes ->
             "SavedImportZkNotes"
@@ -135,6 +140,14 @@ encodeSendMsg sm uid pwd =
                 , ( "uid", JE.string uid )
                 , ( "pwd", JE.string pwd )
                 , ( "data", Data.encodeSaveZkNote sbe )
+                ]
+
+        SaveZkNotePlusLinks s ->
+            JE.object
+                [ ( "what", JE.string "savezknotepluslinks" )
+                , ( "uid", JE.string uid )
+                , ( "pwd", JE.string pwd )
+                , ( "data", Data.encodeSaveZkNotePlusLinks s )
                 ]
 
         SaveZkLinks zklinks ->
@@ -213,6 +226,9 @@ serverResponseDecoder =
 
                 "savedzknote" ->
                     JD.map SavedZkNote (JD.at [ "content" ] <| Data.decodeSavedZkNote)
+
+                "savedzknotepluslinks" ->
+                    JD.map SavedZkNotePlusLinks (JD.at [ "content" ] <| Data.decodeSavedZkNote)
 
                 "deletedzknote" ->
                     JD.map DeletedZkNote (JD.at [ "content" ] <| JD.int)
