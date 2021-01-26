@@ -7,8 +7,8 @@ use std::path::Path;
 use std::time::Duration;
 use std::time::SystemTime;
 use zkprotocol::content::{
-  GetZkLinks, GetZkNoteEdit, ImportZkNote, SaveZkLink, SaveZkNote, SavedZkNote, ZkLink, ZkNote,
-  ZkNoteEdit,
+  Direction, GetZkLinks, GetZkNoteEdit, ImportZkNote, SaveZkLink, SaveZkNote, SavedZkNote, ZkLink,
+  ZkNote, ZkNoteEdit,
 };
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -978,9 +978,9 @@ pub fn save_savezklinks(
   zklinks: Vec<SaveZkLink>,
 ) -> Result<(), Box<dyn Error>> {
   for link in zklinks.iter() {
-    let (from, to) = match &link.direction {
-      From => (zknid, link.otherid),
-      To => (link.otherid, zknid),
+    let (from, to) = match link.direction {
+      Direction::From => (zknid, link.otherid),
+      Direction::To => (link.otherid, zknid),
     };
     if link.user == uid {
       if link.delete == Some(true) {

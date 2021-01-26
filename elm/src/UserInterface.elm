@@ -227,6 +227,9 @@ serverResponseDecoder =
                 "savedzknote" ->
                     JD.map SavedZkNote (JD.at [ "content" ] <| Data.decodeSavedZkNote)
 
+                "savedzknotepluslinks" ->
+                    JD.map SavedZkNotePlusLinks (JD.at [ "content" ] <| Data.decodeSavedZkNote)
+
                 "deletedzknote" ->
                     JD.map DeletedZkNote (JD.at [ "content" ] <| JD.int)
 
