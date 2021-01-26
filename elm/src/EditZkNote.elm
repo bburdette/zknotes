@@ -92,38 +92,10 @@ type alias EditLink =
     }
 
 
-elToSzl : EditLink -> Data.SaveZkLink
-elToSzl el =
-    { otherid = el.otherid
-    , direction = el.direction
-    , user = el.user
-    , zknote = el.zknote
-    , delete = el.delete
-    }
-
-
-elToSzkl : Int -> EditLink -> Data.ZkLink
-elToSzkl this el =
-    case el.direction of
-        From ->
-            { from = this
-            , to = el.otherid
-            , user = el.user
-            , zknote = Nothing
-            , fromname = Nothing
-            , toname = Nothing
-            , delete = Nothing
-            }
-
-        To ->
-            { from = el.otherid
-            , to = this
-            , user = el.user
-            , zknote = Nothing
-            , fromname = Nothing
-            , toname = Nothing
-            , delete = Nothing
-            }
+type WClass
+    = Narrow
+    | Medium
+    | Wide
 
 
 type alias Model =
@@ -156,6 +128,40 @@ type Command
     | SaveSwitch Data.SaveZkNotePlusLinks Int
     | GetSelectedText String
     | Search S.ZkNoteSearch
+
+
+elToSzl : EditLink -> Data.SaveZkLink
+elToSzl el =
+    { otherid = el.otherid
+    , direction = el.direction
+    , user = el.user
+    , zknote = el.zknote
+    , delete = el.delete
+    }
+
+
+elToSzkl : Int -> EditLink -> Data.ZkLink
+elToSzkl this el =
+    case el.direction of
+        From ->
+            { from = this
+            , to = el.otherid
+            , user = el.user
+            , zknote = Nothing
+            , fromname = Nothing
+            , toname = Nothing
+            , delete = Nothing
+            }
+
+        To ->
+            { from = el.otherid
+            , to = this
+            , user = el.user
+            , zknote = Nothing
+            , fromname = Nothing
+            , toname = Nothing
+            , delete = Nothing
+            }
 
 
 sznFromModel : Model -> Data.SaveZkNote
@@ -297,12 +303,6 @@ pageLink model =
                     |> Util.mapNothing
                         (UB.absolute [ "note", String.fromInt id ] [])
             )
-
-
-type WClass
-    = Narrow
-    | Medium
-    | Wide
 
 
 view : Util.Size -> Model -> Element Msg
@@ -892,17 +892,6 @@ compareZklinks left right =
 
         ltgt ->
             ltgt
-
-
-
--- saveZkLinkList : Model -> List Data.ZkLink
--- saveZkLinkList model =
---     List.map
---         (\zkl -> { zkl | delete = Nothing })
---         (Dict.values (Dict.diff model.zklDict model.initialZklDict))
---         ++ List.map
---             (\zkl -> { zkl | delete = Just True })
---             (Dict.values (Dict.diff model.initialZklDict model.zklDict))
 
 
 update : Msg -> Model -> ( Model, Command )
