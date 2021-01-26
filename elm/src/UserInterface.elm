@@ -28,6 +28,7 @@ type ServerResponse
     | InvalidUserOrPwd
     | LoggedIn Data.LoginData
     | ZkNoteSearchResult Data.ZkNoteSearchResult
+    | SavedZkNotePlusLinks Data.SavedZkNote
     | SavedZkNote Data.SavedZkNote
     | DeletedZkNote Int
     | ZkNote Data.ZkNote
@@ -77,6 +78,9 @@ showServerResponse sr =
 
         SavedZkLinks ->
             "SavedZkLinks"
+
+        SavedZkNotePlusLinks _ ->
+            "SavedZkNotePlusLinks"
 
         SavedImportZkNotes ->
             "SavedImportZkNotes"

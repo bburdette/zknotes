@@ -205,7 +205,7 @@ fn user_interface_loggedin(
       let szkn = sqldata::save_zknote(&conn, uid, &sznpl.note)?;
       let s = sqldata::save_savezklinks(&conn, uid, szkn.id, sznpl.links)?;
       Ok(ServerResponse {
-        what: "savedzknote".to_string(),
+        what: "savedzknotepluslinks".to_string(),
         content: serde_json::to_value(szkn)?,
       })
     }

@@ -989,6 +989,24 @@ actualupdate msg model =
                                     -- just ignore if we're not editing a new note.
                                     ( model, Cmd.none )
 
+                        UI.SavedZkNotePlusLinks szkn ->
+                            case state of
+                                EditZkNote emod login ->
+                                    let
+                                        eznst =
+                                            EditZkNote.gotId emod szkn.id
+
+                                        st =
+                                            EditZkNote eznst login
+                                    in
+                                    ( { model | state = st }
+                                    , Cmd.none
+                                    )
+
+                                _ ->
+                                    -- just ignore if we're not editing a new note.
+                                    ( model, Cmd.none )
+
                         UI.DeletedZkNote beid ->
                             ( model, Cmd.none )
 
