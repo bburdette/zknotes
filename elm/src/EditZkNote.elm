@@ -922,7 +922,11 @@ update msg model =
             )
 
         CopyPress ->
-            ( { model | id = Nothing, title = "Copy of " ++ model.title }
+            ( { model
+                | id = Nothing
+                , title = "Copy of " ++ model.title
+                , initialZklDict = Dict.empty
+              }
             , None
             )
 
