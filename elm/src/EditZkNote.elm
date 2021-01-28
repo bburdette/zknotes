@@ -475,19 +475,16 @@ zknview size model =
                                         zkln.user /= model.ld.userid
                                 in
                                 E.row [ E.spacing 8, E.width E.fill ]
-                                    [ model.id
-                                        |> Maybe.andThen
-                                            (\id ->
-                                                case
-                                                    Dict.get (zklKey { direction = To, otherid = zkln.id })
-                                                        model.zklDict
-                                                of
-                                                    Just _ ->
-                                                        Nothing
+                                    [ (case
+                                        Dict.get (zklKey { direction = To, otherid = zkln.id })
+                                            model.zklDict
+                                       of
+                                        Just _ ->
+                                            Nothing
 
-                                                    Nothing ->
-                                                        Just 1
-                                            )
+                                        Nothing ->
+                                            Just 1
+                                      )
                                         |> Maybe.map
                                             (\_ ->
                                                 EI.button Common.buttonStyle
