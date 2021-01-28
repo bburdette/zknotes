@@ -1,4 +1,5 @@
 elm/elm-stuff/
+elm/upload-prod.sh
 nixpkg/result
 server/static/main.js
 server/target/
