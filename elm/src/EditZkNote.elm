@@ -922,6 +922,11 @@ update msg model =
             ( { model
                 | id = Nothing
                 , title = "Copy of " ++ model.title
+                , pubidtxt = "" -- otherwise we get a conflict on save.
+                , zklDict =
+                    model.zklDict
+                        |> Dict.remove (zklKey { otherid = model.ld.publicid, direction = To })
+                        |> Dict.remove (zklKey { otherid = model.ld.publicid, direction = From })
                 , initialZklDict = Dict.empty
               }
             , None
