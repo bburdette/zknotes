@@ -472,7 +472,8 @@ pub fn intersect<T: indradb::Transaction>(
           v.push(i.clone());
           false
         } else if i.id < i2val.id {
-          // skip i.
+          // here we're depending on ordering of the UUIDs, but they aren't ordered!
+          // because they aren't ordered, you just have to get all of them to do intersection.
           false
         } else {
           i2v = i2.next();
@@ -604,6 +605,13 @@ pub fn read_zknote<T: indradb::Transaction>(
     .t(Type::new("owner")?);
 
   // share check!
+  //
+  // given a note N, is there another note that connects to svs.share?
+  // to find:
+  // 	 1) get all notes that N connects to.
+  // 	 2) of those, do any connect to share?
+  // 	 	 find out with edge queries
+  //
   let sq = indradb::SpecificVertexQuery::single(svs.share)
     .inbound(1000)
     .outbound(1000);
