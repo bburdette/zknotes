@@ -897,10 +897,14 @@ update msg model =
     case msg of
         RestoreSearch s ->
             let
-                _ =
-                    Debug.log "restoresearch " s
+                spmodel =
+                    SP.setSearchString model.spmodel s
             in
-            ( { model | spmodel = SP.setSearchString model.spmodel s }, None )
+            ( { model | spmodel = spmodel }
+            , SP.getSearch spmodel
+                |> Maybe.map Search
+                |> Maybe.withDefault None
+            )
 
         SavePress ->
             -- TODO more reliability.  What if the save fails?
