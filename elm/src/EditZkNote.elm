@@ -73,6 +73,7 @@ type Msg
     | SPMsg SP.Msg
     | NavChoiceChanged NavChoice
     | DialogMsg D.Msg
+    | RestoreSearch String
     | Noop
 
 
@@ -408,7 +409,7 @@ zknview size model =
                 - (60 * 2 + 6)
 
         mdview =
-            case markdownView (mkRenderer mdw model.cells OnSchelmeCodeChanged) model.md of
+            case markdownView (mkRenderer RestoreSearch mdw model.cells OnSchelmeCodeChanged) model.md of
                 Ok rendered ->
                     E.column
                         [ E.width E.fill
@@ -466,7 +467,7 @@ zknview size model =
                 , E.width spwidth
                 ]
                 ((E.map SPMsg <|
-                    SP.view (wclass == Narrow) 0 model.spmodel
+                    SP.view True (wclass == Narrow) 0 model.spmodel
                  )
                     :: (List.map
                             (\zkln ->
@@ -894,6 +895,13 @@ compareZklinks left right =
 update : Msg -> Model -> ( Model, Command )
 update msg model =
     case msg of
+        RestoreSearch s ->
+            let
+                _ =
+                    Debug.log "restoresearch " s
+            in
+            ( { model | spmodel = SP.setSearchString model.spmodel s }, None )
+
         SavePress ->
             -- TODO more reliability.  What if the save fails?
             let
@@ -1169,6 +1177,22 @@ update msg model =
 
                 SP.Save ->
                     ( mod, None )
+
+                SP.Copy s ->
+                    ( { mod
+                        | md =
+                            model.md
+                                ++ (if model.md == "" then
+                                        "<search query=\""
+
+                                    else
+                                        "\n\n<search query=\""
+                                   )
+                                ++ s
+                                ++ "\"/>"
+                      }
+                    , None
+                    )
 
                 SP.Search ts ->
                     ( mod, Search ts )

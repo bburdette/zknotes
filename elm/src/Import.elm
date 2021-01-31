@@ -231,7 +231,7 @@ importview size model =
                 , E.width spwidth
                 ]
                 ((E.map SPMsg <|
-                    SP.view (wclass == Narrow) 0 model.spmodel
+                    SP.view False (wclass == Narrow) 0 model.spmodel
                  )
                     :: (List.map
                             (\zkln ->
@@ -482,6 +482,9 @@ update msg model =
                     ( mod, None )
 
                 SP.Save ->
+                    ( mod, None )
+
+                SP.Copy _ ->
                     ( mod, None )
 
                 SP.Search ts ->

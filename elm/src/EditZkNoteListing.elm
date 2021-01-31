@@ -103,7 +103,7 @@ listview ld size model =
             , EI.button Common.buttonStyle { onPress = Just ImportPress, label = E.text "import" }
             , EI.button Common.buttonStyle { onPress = Just PowerDeletePress, label = E.text "delete all" }
             ]
-        , E.map SPMsg <| SP.view (size.width < maxwidth) 0 model.spmodel
+        , E.map SPMsg <| SP.view False (size.width < maxwidth) 0 model.spmodel
         , E.table [ E.spacing 10, E.width E.fill, E.centerX ]
             { data = model.notes.notes
             , columns =
@@ -220,6 +220,9 @@ update msg model ld =
                     ( mod, None )
 
                 SP.Save ->
+                    ( mod, None )
+
+                SP.Copy _ ->
                     ( mod, None )
 
                 SP.Search ts ->
