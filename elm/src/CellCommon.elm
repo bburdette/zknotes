@@ -200,8 +200,8 @@ searchView restoreSearchMsg search renderedChildren =
         (E.el [ EF.italic ] (E.text "search: ")
             :: E.text search
             :: EI.button
-                buttonStyle
-                { label = E.text ">"
+                (buttonStyle ++ [ EBk.color TC.darkGray ])
+                { label = E.el [ E.centerY, EF.color TC.blue, EF.bold ] <| E.text ">"
                 , onPress = Just <| restoreSearchMsg search
                 }
             :: renderedChildren

@@ -1192,7 +1192,7 @@ update msg model =
                                     else
                                         "\n\n<search query=\""
                                    )
-                                ++ s
+                                ++ String.replace "&" "&amp;" s
                                 ++ "\"/>"
                       }
                     , None
