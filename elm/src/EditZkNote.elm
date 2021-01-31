@@ -73,6 +73,7 @@ type Msg
     | SPMsg SP.Msg
     | NavChoiceChanged NavChoice
     | DialogMsg D.Msg
+    | RestoreSearch String
     | Noop
 
 
@@ -408,11 +409,12 @@ zknview size model =
                 - (60 * 2 + 6)
 
         mdview =
-            case
-                CC.markdownHtmlView
-                    (CC.mkHtmlRenderer mdw model.cells OnSchelmeCodeChanged)
-                    model.md
-            of
+            -- case
+            --     CC.markdownHtmlView
+            --         (CC.mkHtmlRenderer mdw model.cells OnSchelmeCodeChanged)
+            --         model.md
+            -- of
+            case CC.markdownView (CC.mkRenderer RestoreSearch mdw model.cells OnSchelmeCodeChanged) model.md of
                 Ok rendered ->
                     E.column
                         [ E.width E.fill
@@ -437,7 +439,7 @@ zknview size model =
                                 , EBd.width 3
                                 , EBd.color TC.darkGrey
                                 ]
-                                (List.map E.html rendered)
+                                rendered
                             ]
                         ]
                             ++ (if wclass == Wide then
@@ -470,7 +472,7 @@ zknview size model =
                 , E.width spwidth
                 ]
                 ((E.map SPMsg <|
-                    SP.view (wclass == Narrow) 0 model.spmodel
+                    SP.view True (wclass == Narrow) 0 model.spmodel
                  )
                     :: (List.map
                             (\zkln ->
@@ -898,6 +900,17 @@ compareZklinks left right =
 update : Msg -> Model -> ( Model, Command )
 update msg model =
     case msg of
+        RestoreSearch s ->
+            let
+                spmodel =
+                    SP.setSearchString model.spmodel s
+            in
+            ( { model | spmodel = spmodel }
+            , SP.getSearch spmodel
+                |> Maybe.map Search
+                |> Maybe.withDefault None
+            )
+
         SavePress ->
             -- TODO more reliability.  What if the save fails?
             let
@@ -926,6 +939,11 @@ update msg model =
             ( { model
                 | id = Nothing
                 , title = "Copy of " ++ model.title
+                , pubidtxt = "" -- otherwise we get a conflict on save.
+                , zklDict =
+                    model.zklDict
+                        |> Dict.remove (zklKey { otherid = model.ld.publicid, direction = To })
+                        |> Dict.remove (zklKey { otherid = model.ld.publicid, direction = From })
                 , initialZklDict = Dict.empty
               }
             , None
@@ -1168,6 +1186,22 @@ update msg model =
 
                 SP.Save ->
                     ( mod, None )
+
+                SP.Copy s ->
+                    ( { mod
+                        | md =
+                            model.md
+                                ++ (if model.md == "" then
+                                        "<search query=\""
+
+                                    else
+                                        "\n\n<search query=\""
+                                   )
+                                ++ String.replace "&" "&amp;" s
+                                ++ "\"/>"
+                      }
+                    , None
+                    )
 
                 SP.Search ts ->
                     ( mod, Search ts )

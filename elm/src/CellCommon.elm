@@ -2,11 +2,12 @@ module CellCommon exposing (blockCells, cellView, code, codeBlock, defCell, head
 
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
+import Common exposing (buttonStyle)
 import Dict exposing (Dict)
 import Element as E exposing (Element)
 import Element.Background as EBk
 import Element.Border as EBd
-import Element.Font as Font
+import Element.Font as EF
 import Element.Input as EI
 import Element.Region as ER
 import Html exposing (Attribute, Html)
@@ -16,6 +17,7 @@ import Markdown.Html
 import Markdown.Parser
 import Markdown.Renderer
 import Schelme.Show exposing (showTerm)
+import TangoColors as TC
 
 
 markdownView : Markdown.Renderer.Renderer (Element a) -> String -> Result String (List (Element a))
@@ -292,16 +294,16 @@ mkHtmlRenderer maxw cellDict onchanged =
     }
 
 
-mkRenderer : Int -> CellDict -> (String -> String -> a) -> Markdown.Renderer.Renderer (Element a)
-mkRenderer maxw cellDict onchanged =
+mkRenderer : (String -> a) -> Int -> CellDict -> (String -> String -> a) -> Markdown.Renderer.Renderer (Element a)
+mkRenderer restoreSearchMsg maxw cellDict onchanged =
     { heading = heading
     , paragraph =
         E.paragraph
             [ E.spacing 15 ]
     , thematicBreak = E.none
     , text = E.text
-    , strong = \content -> E.row [ Font.bold ] content
-    , emphasis = \content -> E.row [ Font.italic ] content
+    , strong = \content -> E.row [ EF.bold ] content
+    , emphasis = \content -> E.row [ EF.italic ] content
     , codeSpan = code
     , link =
         \{ title, destination } body ->
@@ -315,7 +317,7 @@ mkRenderer maxw cellDict onchanged =
                 { url = destination
                 , label =
                     E.paragraph
-                        [ Font.color (E.rgb255 0 0 255)
+                        [ EF.color (E.rgb255 0 0 255)
                         ]
                         body
                 }
@@ -391,9 +393,14 @@ mkRenderer maxw cellDict onchanged =
                 )
                 |> Markdown.Html.withAttribute "name"
                 |> Markdown.Html.withAttribute "schelmecode"
+            , Markdown.Html.tag "search"
+                (\search renderedChildren ->
+                    searchView restoreSearchMsg search renderedChildren
+                )
+                |> Markdown.Html.withAttribute "query"
             ]
     , table = E.column [ E.width <| E.fill ]
-    , tableHeader = E.column [ E.width <| E.fill, Font.bold, Font.underline, E.spacing 8 ]
+    , tableHeader = E.column [ E.width <| E.fill, EF.bold, EF.underline, E.spacing 8 ]
     , tableBody = E.column [ E.width <| E.fill ]
     , tableRow = E.row [ E.width E.fill ]
     , tableHeaderCell =
@@ -403,6 +410,20 @@ mkRenderer maxw cellDict onchanged =
         \maybeAlignment children ->
             E.paragraph [] children
     }
+
+
+searchView : (String -> a) -> String -> List (Element a) -> Element a
+searchView restoreSearchMsg search renderedChildren =
+    E.row [ EBk.color TC.darkGray, E.padding 3, E.spacing 3 ]
+        (E.el [ EF.italic ] (E.text "search: ")
+            :: E.text search
+            :: EI.button
+                (buttonStyle ++ [ EBk.color TC.darkGray ])
+                { label = E.el [ E.centerY, EF.color TC.blue, EF.bold ] <| E.text ">"
+                , onPress = Just <| restoreSearchMsg search
+                }
+            :: renderedChildren
+        )
 
 
 cellView : CellDict -> List (Element a) -> String -> String -> (String -> String -> a) -> Element a
@@ -417,12 +438,12 @@ cellView (CellDict cellDict) renderedChildren name schelmeCode onchanged =
         , E.padding 20
         , E.spacing 30
         , E.centerX
-        , Font.center
+        , EF.center
         ]
         (E.row [ E.spacing 20 ]
             [ E.el
-                [ Font.bold
-                , Font.size 30
+                [ EF.bold
+                , EF.size 30
                 ]
                 (E.text name)
             , EI.text []
@@ -453,7 +474,7 @@ showRunState cell =
                 E.text <| showTerm term
 
             RsErr s ->
-                E.el [ Font.color <| E.rgb 1 0.1 0.1 ] <| E.text <| "err: " ++ s
+                E.el [ EF.color <| E.rgb 1 0.1 0.1 ] <| E.text <| "err: " ++ s
 
             RsUnevaled ->
                 E.text <| "unevaled"
@@ -472,7 +493,7 @@ rawTextToId rawText =
 heading : { level : Block.HeadingLevel, rawText : String, children : List (Element msg) } -> Element msg
 heading { level, rawText, children } =
     E.paragraph
-        [ Font.size
+        [ EF.size
             (case level of
                 Block.H1 ->
                     36
@@ -483,8 +504,8 @@ heading { level, rawText, children } =
                 _ ->
                     20
             )
-        , Font.bold
-        , Font.family [ Font.typeface "Montserrat" ]
+        , EF.bold
+        , EF.family [ EF.typeface "Montserrat" ]
         , ER.heading (Block.headingLevelToInt level)
         , E.htmlAttribute
             (Attr.attribute "name" (rawTextToId rawText))
@@ -501,8 +522,8 @@ code snippet =
             (E.rgba 0 0 0 0.04)
         , EBd.rounded 2
         , E.paddingXY 5 3
-        , Font.family
-            [ Font.external
+        , EF.family
+            [ EF.external
                 { url = "https://fonts.googleapis.com/css?family=Source+Code+Pro"
                 , name = "Source Code Pro"
                 }
@@ -518,8 +539,8 @@ codeBlock details =
         , E.htmlAttribute (Attr.style "white-space" "pre")
         , E.padding 20
         , E.width E.fill
-        , Font.family
-            [ Font.external
+        , EF.family
+            [ EF.external
                 { url = "https://fonts.googleapis.com/css?family=Source+Code+Pro"
                 , name = "Source Code Pro"
                 }
