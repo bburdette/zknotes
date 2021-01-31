@@ -26,6 +26,7 @@ type Msg
     = OnSchelmeCodeChanged String String
     | DonePress
     | SwitchPress Int
+    | Noop
 
 
 type alias Model =
@@ -110,7 +111,7 @@ view maxw model loggedin =
             E.none
         , E.row [ E.centerX ] [ E.text model.title ]
         , E.row [ E.width E.fill ]
-            [ case markdownView (mkRenderer mw model.cells OnSchelmeCodeChanged) model.md of
+            [ case markdownView (mkRenderer (\_ -> Noop) mw model.cells OnSchelmeCodeChanged) model.md of
                 Ok rendered ->
                     E.column
                         [ E.spacing 30
@@ -185,6 +186,9 @@ initSzn zknote links =
 update : Msg -> Model -> ( Model, Command )
 update msg model =
     case msg of
+        Noop ->
+            ( model, None )
+
         DonePress ->
             ( model, Done )
 

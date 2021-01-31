@@ -74,6 +74,7 @@ getSearch model =
             Nothing
 
 
+
 addToSearch : String -> Search -> Search
 addToSearch name search =
     let
