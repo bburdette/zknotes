@@ -1,4 +1,4 @@
-module SearchPanel exposing (Command(..), Model, Msg(..), getSearch, initModel, searchResultUpdated, update, view)
+module SearchPanel exposing (Command(..), Model, Msg(..), getSearch, initModel, searchResultUpdated, setSearchString, update, view)
 
 import Common exposing (buttonStyle)
 import Data
@@ -7,7 +7,7 @@ import Element.Background as Background
 import Element.Border as Border
 import Element.Events exposing (onClick)
 import Element.Font as Font
-import Element.Input as Input
+import Element.Input as EI
 import PaginationPanel as PP
 import Parser
 import Search as S exposing (AndOr(..), SearchMod(..), TSText, TagSearch(..), tagSearchParser)
@@ -48,28 +48,48 @@ getSearch model =
             )
 
 
+setSearchString : Model -> String -> Model
+setSearchString model string =
+    { model | tagSearchModel = TSP.updateSearchText model.tagSearchModel string }
+
+
 type Msg
     = TSPMsg TSP.Msg
     | PPMsg PP.Msg
+    | CopyClicked
 
 
 type Command
     = None
     | Save
     | Search S.ZkNoteSearch
+    | Copy String
 
 
-view : Bool -> Int -> Model -> Element Msg
-view narrow nblevel model =
+view : Bool -> Bool -> Int -> Model -> Element Msg
+view showCopy narrow nblevel model =
     column [ E.width E.fill, E.spacing 8 ]
         [ E.map TSPMsg <| TSP.view narrow nblevel model.tagSearchModel
-        , E.map PPMsg <| PP.view model.paginationModel
+        , E.row [ E.width E.fill ]
+            [ E.map PPMsg <| PP.view model.paginationModel
+            , if showCopy then
+                EI.button (E.alignRight :: buttonStyle)
+                    { label = E.text "< Copy"
+                    , onPress = Just CopyClicked
+                    }
+
+              else
+                E.none
+            ]
         ]
 
 
 update : Msg -> Model -> ( Model, Command )
 update msg model =
     case msg of
+        CopyClicked ->
+            ( model, Copy model.tagSearchModel.searchText )
+
         TSPMsg m ->
             let
                 ( nm, cmd ) =
