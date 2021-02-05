@@ -115,19 +115,6 @@ pub fn import_db(zd: &ZkDatabase, path: &str) -> Result<(), errors::Error> {
   // note ids.
   let mut nids = HashMap::new();
 
-  /*
-  pub struct ZkNote {
-    pub id: i64,
-    pub title: String,
-    pub content: String,
-    pub user: i64,
-    pub username: String,
-    pub pubid: Option<String>,
-    pub createdate: i64,
-    pub changeddate: i64,
-  }
-  */
-
   // TODO replace user notes with users.
   for n in zd.notes.iter() {
     match n.title.as_str() {
@@ -198,17 +185,6 @@ pub fn import_db(zd: &ZkDatabase, path: &str) -> Result<(), errors::Error> {
       }
     };
   }
-  /*
-  pub struct ZkLink {
-    pub from: i64,
-    pub to: i64,
-    pub user: i64,
-    pub linkzknote: Option<i64>,
-    pub delete: Option<bool>,
-    pub fromname: Option<String>,
-    pub toname: Option<String>,
-  }
-  */
   for l in zd.links.iter() {
     // make link.
     // let e = indradb::Edge::new_with_current_datetime(indradb::EdgeKey::new(
@@ -231,16 +207,6 @@ pub fn import_db(zd: &ZkDatabase, path: &str) -> Result<(), errors::Error> {
   Ok(())
 }
 
-/*
-pub struct User {
-  pub id: i64,
-  pub name: String,
-  pub hashwd: String,
-  pub salt: String,
-  pub email: String,
-  pub registration_key: Option<String>,
-}
-*/
 pub fn new_user<T: indradb::Transaction>(
   itr: &T,
   public: &Uuid,
@@ -298,6 +264,35 @@ pub fn new_user<T: indradb::Transaction>(
   Ok(v.id)
 }
 
+pub fn read_user<T: indradb::Transaction>(itr: &T, name: String) -> Result<User, errors::Error> {
+  let tuid = find_first_q(
+    itr,
+    mkpropquery("user".to_string(), "name".to_string()),
+    |x| x.value == "test",
+  )?
+  .ok_or(SimpleError::new("user not found"))?
+  .id;
+
+  let uq: indradb::VertexQuery = indradb::SpecificVertexQuery::single(tuid).into();
+
+  let vpq = indradb::VertexPropertyQuery::new(uq.clone(), "name");
+
+  for u in itr.get_vertex_properties(vpq).iter() {
+    println!("user: {:?}", u);
+  }
+
+  Ok(User {
+    // id: tuid,
+    id: 0,
+    zknote: 0,
+    name: name,
+    hashwd: getprop(itr, &uq, "hashwd")?,
+    salt: getprop(itr, &uq, "salt")?,
+    email: getprop(itr, &uq, "email")?,
+    registration_key: getoptprop(itr, &uq, "registration_key")?,
+  })
+}
+
 pub fn save_zklink<T: indradb::Transaction>(
   itr: &T,
   fromid: &Uuid,
@@ -343,15 +338,6 @@ pub fn save_zklink<T: indradb::Transaction>(
 
   Ok(ret)
 }
-
-/*
-pub fn get_vertex_property<T: indradb::Transaction>(
-  itr: &T,
-vid: &Uuid, name: &str) -> Result<JsonValue, errors::Error> {
-
-  indradb::get_ver
-}
-*/
 
 pub fn getprop<T: indradb::Transaction, R>(
   itr: &T,
@@ -725,19 +711,9 @@ pub fn test_db(path: &str) -> Result<(), errors::Error> {
 
   let svs = get_systemvs(&itr)?;
 
+  println!("read_user: {:?}", read_user(&itr, "ben".to_string())?);
+
   // user names
-  /*
-  let vq = indradb::VertexPropertyQuery::new(
-    indradb::RangeVertexQuery::new(100)
-      .t(Type::new("user")?)
-      .into(),
-    "name",
-  );
-
-  let ffu = find_first(&itr, vq, |x| x.value == "meh")?;
-  println!("ffu: {:?}", ffu);
-  */
-
   let tuid = match find_first_q(
     &itr,
     mkpropquery("user".to_string(), "name".to_string()),

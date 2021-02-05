@@ -15,6 +15,8 @@ use zkprotocol::content::{
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 use zkprotocol::search::{TagSearch, ZkNoteSearch};
 
+use indra as I;
+
 #[derive(Deserialize, Debug)]
 pub struct RegistrationData {
   email: String,
