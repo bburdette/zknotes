@@ -436,7 +436,7 @@ pub fn link_exists<T: indradb::Transaction>(
 
 pub fn is_note_public<T: indradb::Transaction>(
   itr: &T,
-  svs: SystemVs,
+  svs: &SystemVs,
   id: Uuid,
 ) -> Result<bool, errors::Error> {
   link_exists(itr, id, svs.public)
@@ -444,7 +444,6 @@ pub fn is_note_public<T: indradb::Transaction>(
 
 pub fn is_note_mine<T: indradb::Transaction>(
   itr: &T,
-  svs: SystemVs,
   id: Uuid,
   uid: Uuid,
 ) -> Result<bool, errors::Error> {
@@ -493,27 +492,6 @@ pub fn intersect<T: indradb::Transaction>(
 
   Ok(rv)
 }
-
-/*
-pub fn is_note_shared<T: indradb::Transaction>(
-  itr: &T,
-  svs: SystemVs,
-  id: Uuid,
-  uid: Uuid,
-) -> Result<bool, errors::Error> {
-  // let vq: indradb::VertexQuery = indradb::SpecificVertexQuery::single(id).into();
-
-itr.get_vertices
-
-  let eq = indradb::SpecificVertexQuery::single(id)
-    .outbound(100000)
-    .outbound(100000)
-    .start_id(svs.shared);
-
-  // is the note connected to a note that is connected to share and to user?
-  link_exists(itr, id, svs.public)
-}
-*/
 
 pub fn save_zknote<T: indradb::Transaction>(
   itr: &T,
@@ -568,24 +546,8 @@ pub fn save_zknote<T: indradb::Transaction>(
   })
 }
 
-pub fn read_zknote<T: indradb::Transaction>(
-  itr: &T,
-  svs: &SystemVs,
-  uid: Option<Uuid>,
-  id: Uuid,
-) -> Result<ZkNote, errors::Error> {
+pub fn note_owner<T: indradb::Transaction>(itr: &T, id: Uuid) -> Result<Uuid, errors::Error> {
   let vq = indradb::VertexQuery::Specific(indradb::SpecificVertexQuery::single(id).into());
-
-  // println!("avP: {:?}", itr.get_all_vertex_properties(vq.clone()));
-
-  // TODO check for access permissions.
-  // - is this note tagged with uid directly?
-  // - is this note tagged with public?
-  // - is this note shared:
-  // 	 - tagged to a note S.
-  // 	 - that links to Uid.
-  // 	 - and links to shared.
-
   // get note owner.
   let eq = indradb::PipeEdgeQuery::new(Box::new(vq.clone()), indradb::EdgeDirection::Outbound, 1)
     .t(Type::new("owner")?);
@@ -597,33 +559,20 @@ pub fn read_zknote<T: indradb::Transaction>(
     .key
     .inbound_id;
 
-  // tagged public?
-  let pq: indradb::EdgeQuery =
-    indradb::SpecificEdgeQuery::new(vec![indradb::EdgeKey::new(svs.public, Type::default(), id)])
-      .into();
-  let public = !itr.get_edges(pq)?.is_empty();
+  Ok(user)
+}
 
-  let eq = indradb::PipeEdgeQuery::new(Box::new(vq.clone()), indradb::EdgeDirection::Outbound, 1)
-    .t(Type::new("owner")?);
-
-  // share check!
-  //
-  // given a note N, is there another note that connects to svs.share?
-  // to find:
-  // 	 1) get all notes that N connects to.
-  // 	 2) of those, do any connect to share?
-  // 	 	 find out with edge queries
-  // 	 and of THOSE, do any connect to uid?
-  //
-  // 	 note -> share x
-  // 	 user -> share y
-  // 	 where x == y
-
-  // get the vertices for this note.
+pub fn is_note_shared<T: indradb::Transaction>(
+  itr: &T,
+  svs: &SystemVs,
+  uid: Uuid,
+  id: Uuid,
+) -> Result<bool, errors::Error> {
+  // get the edges for this note.
   let sq = indradb::SpecificVertexQuery::single(id).outbound(1000); // outbound edges.
-  let es: Vec<Edge> = itr.get_edges(sq)?; // edges, actually; the vertex ids are the outbound ends.
+  let es: Vec<Edge> = itr.get_edges(sq)?; // the vertex ids are the outbound ends.
 
-  // any connections between those and share?
+  // any connections between the vertices and svs.share?
   let eks = es
     .iter()
     .map(|x: &Edge| indradb::EdgeKey::new(x.key.outbound_id, Type::default(), svs.share))
@@ -635,17 +584,48 @@ pub fn read_zknote<T: indradb::Transaction>(
   let eq2: Vec<EdgeKey> = itr
     .get_edges(share_q)?
     .iter()
-    .map(|x: &Edge| indradb::EdgeKey::new(x.key.inbound_id, Type::default(), user))
+    .map(|x: &Edge| indradb::EdgeKey::new(x.key.inbound_id, Type::default(), uid))
     .collect();
 
   let shared = !eq2.is_empty();
 
-  // did we get any?
-  println!("eq2: {:?}", eq2);
+  Ok(shared)
+}
 
-  println!("user: {}", user);
-  println!("public: {}", public);
-  println!("shared: {}", shared);
+pub fn is_note_accessible<T: indradb::Transaction>(
+  itr: &T,
+  svs: &SystemVs,
+  uid: Option<Uuid>,
+  id: Uuid,
+) -> Result<bool, errors::Error> {
+  let accessible = is_note_public(itr, svs, id)?
+    || match uid {
+      Some(uid) => is_note_mine(itr, id, uid)? || is_note_shared(itr, svs, id, uid)?,
+      None => false,
+    };
+  Ok(accessible)
+}
+
+pub fn read_zknote<T: indradb::Transaction>(
+  itr: &T,
+  svs: &SystemVs,
+  uid: Option<Uuid>,
+  id: Uuid,
+) -> Result<ZkNote, errors::Error> {
+  let accessible = is_note_accessible(itr, svs, uid, id)?;
+
+  let vq = indradb::VertexQuery::Specific(indradb::SpecificVertexQuery::single(id).into());
+
+  // get note owner.
+  let eq = indradb::PipeEdgeQuery::new(Box::new(vq.clone()), indradb::EdgeDirection::Outbound, 1)
+    .t(Type::new("owner")?);
+
+  let user = itr
+    .get_edges(eq)?
+    .first()
+    .ok_or(SimpleError::new("user not found!"))?
+    .key
+    .inbound_id;
 
   // query for getting user name.
   let uq = indradb::VertexQuery::Specific(indradb::SpecificVertexQuery::single(user).into());
@@ -660,35 +640,6 @@ pub fn read_zknote<T: indradb::Transaction>(
     createdate: getprop(itr, &vq, "createdate")?,
     changeddate: getprop(itr, &vq, "changeddate")?,
   })
-  //  None => SimpleError::new("note not found"),
-
-  /*
-
-      title: serde_json::from_value::<String>(getprop(itr, &vq, "title")?)?,
-      content: serde_json::from_value::<String>(getprop(itr, &vq, "content")?)?,
-      user: serde_json::from_value::<i64>(getprop(itr, &vq, "user")?)?,
-      username: serde_json::from_value::<String>(getprop(itr, &vq, "username")?)?,
-      pubid: serde_json::from_value::<Option<String>>(getprop(itr, &vq, "pubid")?)?,
-      createdate: serde_json::from_value::<i64>(getprop(itr, &vq, "createdate")?)?,
-      changeddate: serde_json::from_value::<i64>(getprop(itr, &vq, "changeddate")?)?,
-
-  if uid == Some(note.user) {
-      Ok(note)
-    } else if is_zknote_public(conn, id)? {
-      Ok(note)
-    } else {
-      match uid {
-        Some(uid) => {
-          if is_zknote_shared(conn, id, uid)? {
-            Ok(note)
-          } else {
-            bail!("can't read zknote; note is private")
-          }
-        }
-        None => bail!("can't read zknote; note is private"),
-      }
-    }
-    */
 }
 
 // todo: repeat until found or none.
