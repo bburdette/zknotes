@@ -3,7 +3,7 @@ use indradb::Transaction;
 // use std::convert::TryInto;
 // use std::error::Error;
 use errors;
-use indradb::{Edge, EdgeQueryExt, Type, Vertex, VertexQueryExt};
+use indradb::{Edge, EdgeKey, EdgeQueryExt, Type, Vertex, VertexQueryExt};
 use simple_error::SimpleError;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -451,6 +451,8 @@ pub fn is_note_mine<T: indradb::Transaction>(
   link_exists(itr, id, uid)
 }
 
+// THIS ASSUMES SEQUENTIALITY
+// which is a bad assumption.  invalid!
 pub fn intersect<T: indradb::Transaction>(
   itr: &T,
   vq1: indradb::VertexQuery,
@@ -611,26 +613,39 @@ pub fn read_zknote<T: indradb::Transaction>(
   // 	 1) get all notes that N connects to.
   // 	 2) of those, do any connect to share?
   // 	 	 find out with edge queries
+  // 	 and of THOSE, do any connect to uid?
   //
-  let sq = indradb::SpecificVertexQuery::single(svs.share)
-    .inbound(1000)
-    .outbound(1000);
-  let uq = indradb::SpecificVertexQuery::single(user)
-    .inbound(1000)
-    .outbound(1000);
+  // 	 note -> share x
+  // 	 user -> share y
+  // 	 where x == y
 
-  // let int = intersect(itr, sq.into(), uq.into());
-  // println!("intersecdt {:?}", int);
+  // get the vertices for this note.
+  let sq = indradb::SpecificVertexQuery::single(id).outbound(1000); // outbound edges.
+  let es: Vec<Edge> = itr.get_edges(sq)?; // edges, actually; the vertex ids are the outbound ends.
 
-  for u in itr.get_vertices(indradb::RangeVertexQuery::new(2).t(Type::new("user")?))? {
-    let uq = indradb::SpecificVertexQuery::single(u.id)
-      .inbound(1000)
-      .outbound(1000);
-    let int = intersect(itr, sq.clone().into(), uq.into());
-    println!("intersecdt {:?}", int);
-  }
+  // any connections between those and share?
+  let eks = es
+    .iter()
+    .map(|x: &Edge| indradb::EdgeKey::new(x.key.outbound_id, Type::default(), svs.share))
+    .collect();
 
-  // println!("user props {:?}", itr.get_all_vertex_properties(uq.clone()));
+  let share_q: indradb::EdgeQuery = indradb::SpecificEdgeQuery::new(eks).into();
+
+  // any of those connect to our user?
+  let eq2: Vec<EdgeKey> = itr
+    .get_edges(share_q)?
+    .iter()
+    .map(|x: &Edge| indradb::EdgeKey::new(x.key.inbound_id, Type::default(), user))
+    .collect();
+
+  let shared = !eq2.is_empty();
+
+  // did we get any?
+  println!("eq2: {:?}", eq2);
+
+  println!("user: {}", user);
+  println!("public: {}", public);
+  println!("shared: {}", shared);
 
   // query for getting user name.
   let uq = indradb::VertexQuery::Specific(indradb::SpecificVertexQuery::single(user).into());
