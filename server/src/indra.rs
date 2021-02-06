@@ -880,18 +880,34 @@ pub fn test_db(path: &str) -> Result<(), errors::Error> {
     )?,
   };
 
-  let szn = SaveZkNote {
+  let szn1 = SaveZkNote {
     id: None,
-    title: "test title".to_string(),
+    title: "test title 1".to_string(),
     pubid: None,
-    content: "test content".to_string(),
+    content: "test content 1".to_string(),
   };
+  let sid1 = save_zknote(&itr, tuid, &szn1)?;
 
-  let sid = save_zknote(&itr, tuid, &szn)?;
+  let szn2 = SaveZkNote {
+    id: None,
+    title: "test title 2".to_string(),
+    pubid: None,
+    content: "test content 2".to_string(),
+  };
+  let sid2 = save_zknote(&itr, tuid, &szn2)?;
 
-  let zkn = read_zknote(&itr, &svs, None, sid.id)?;
+  save_zklink(&itr, &sid1.id, &sid2.id, &tuid, &None)?;
+  let zklinks = read_zklinks(&itr, &svs, Some(tuid), sid1.id)?;
+  println!("zklinkes: {:?}", zklinks);
 
+  let zkn = read_zknote(&itr, &svs, None, sid1.id)?;
   println!("{}", serde_json::to_string_pretty(&zkn)?);
+
+  let zkne1 = read_zknoteedit(&itr, tuid, &GetZkNoteEdit { zknote: sid1.id })?;
+  println!("{}", serde_json::to_string_pretty(&zkne1)?);
+
+  let zkne2 = read_zknoteedit(&itr, tuid, &GetZkNoteEdit { zknote: sid2.id })?;
+  println!("{}", serde_json::to_string_pretty(&zkne2)?);
 
   println!("indra test end");
 
