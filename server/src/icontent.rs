@@ -1,4 +1,12 @@
 use uuid::Uuid;
+#[derive(Deserialize, Serialize, Debug)]
+pub struct LoginData {
+  pub userid: Uuid,
+  pub username: String,
+  pub publicid: Uuid,
+  pub shareid: Uuid,
+  pub searchid: Uuid,
+}
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ZkNote {
   pub id: Uuid,
@@ -13,9 +21,9 @@ pub struct ZkNote {
 
 #[derive(Serialize, Debug, Clone)]
 pub struct ZkListNote {
-  pub id: i64,
+  pub id: Uuid,
   pub title: String,
-  pub user: i64,
+  pub user: Uuid,
   pub createdate: i64,
   pub changeddate: i64,
 }
@@ -38,7 +46,8 @@ pub struct SaveZkNote {
 pub struct ZkLink {
   pub from: Uuid,
   pub to: Uuid,
-  pub user: Uuid,
+  pub mine: bool,   // did I create this link?
+  pub others: bool, // am I sole owner or do others own too
   pub delete: Option<bool>,
   pub fromname: Option<String>,
   pub toname: Option<String>,

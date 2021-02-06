@@ -3,16 +3,17 @@ use indradb::Transaction;
 // use std::convert::TryInto;
 // use std::error::Error;
 use errors;
-use indradb::{Edge, EdgeKey, EdgeQueryExt, Type, Vertex, VertexQueryExt};
+use indradb::{Edge, EdgeKey, EdgeProperty, EdgeQueryExt, Type, Vertex, VertexQueryExt};
 use simple_error::SimpleError;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 // use std::time::Duration;
 use icontent::{
-  GetZkLinks, GetZkNoteEdit, ImportZkNote, SaveZkNote, SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
+  GetZkLinks, GetZkNoteEdit, ImportZkNote, LoginData, SaveZkNote, SavedZkNote, ZkLink, ZkNote,
+  ZkNoteEdit,
 };
 use std::time::SystemTime;
-use user::{LoginData, User, ZkDatabase};
+use user::{User, ZkDatabase};
 use util::now;
 use uuid::Uuid;
 use zkprotocol::content as C;
@@ -198,7 +199,41 @@ pub fn import_db(zd: &ZkDatabase, path: &str) -> Result<(), errors::Error> {
       *nids.get(&l.to).ok_or(SimpleError::new("key not found"))?,
     ))?;
 
-    // link to user.
+    // make type be user id?
+    // then easy to search on links for that user.
+    // but what about search for any link?  have to specify type in search.
+
+    // make id a property:
+    // "<uuid>" true
+    // how to determine if no users have the link anymore then?
+    // 		more common to search links than to delete links.  optimize for that.
+    // 		on delete, get_all_edge_properties() perhaps, or at least count them.
+    // 		could keep a count on the edge in a property.  GENIAL
+
+    // "is link mine"
+    // 	getprop(<uuid>)
+    // "search only on my links"
+    // 	get links, propsearch my id.
+    // "delete link"
+    // 	remove id, decrement counter.  0?
+    // "create link"
+    // 	find link, add id.
+    // 	create link, add id.
+    // "get all users of link"
+    // 	get_all_edge_properties()
+    // 	convert all to uuid, the ones that succeed are ids.  ew.
+    // "delete user"
+    // 	propquery of <uuid> gets links.
+    // "delete vertex"
+    // 	are vertices ever deleted?  flag as deleted?
+    // 	change type to deleted?
+    // vertex history, link history?
+    //
+    // link to user?
+    // is uid a property?
+    // can't have links from links to users.
+    // users array?  ugh
+    // ditch link ownership??
 
     // save id
     // nids.insert(n.id, v.id);
@@ -293,6 +328,21 @@ pub fn read_user<T: indradb::Transaction>(itr: &T, name: String) -> Result<User,
   })
 }
 
+pub fn login_data<T: indradb::Transaction>(itr: &T, uid: Uuid) -> Result<LoginData, errors::Error> {
+  let svs = get_systemvs(itr)?;
+
+  // TODO: make login token that expires!
+  let uq = indradb::VertexQuery::Specific(indradb::SpecificVertexQuery::single(uid).into());
+
+  Ok(LoginData {
+    userid: uid,
+    username: getprop(itr, &uq, "name")?,
+    publicid: svs.public,
+    shareid: svs.share,
+    searchid: svs.search,
+  })
+}
+
 pub fn save_zklink<T: indradb::Transaction>(
   itr: &T,
   fromid: &Uuid,
@@ -372,6 +422,24 @@ where
     .first()
   {
     Some(vp) => Some(serde_json::from_value::<R>(vp.value.clone())?),
+    None => None,
+  };
+  Ok(r)
+}
+
+pub fn getoptedgeprop<T: indradb::Transaction, R>(
+  itr: &T,
+  eq: &indradb::EdgeQuery,
+  x: &str,
+) -> Result<Option<R>, errors::Error>
+where
+  R: serde::de::DeserializeOwned,
+{
+  let r = match itr
+    .get_edge_properties(indradb::EdgePropertyQuery::new(eq.clone(), x))?
+    .first()
+  {
+    Some(ep) => Some(serde_json::from_value::<R>(ep.value.clone())?),
     None => None,
   };
   Ok(r)
@@ -627,6 +695,87 @@ pub fn read_zknote<T: indradb::Transaction>(
     changeddate: getprop(itr, &vq, "changeddate")?,
   })
 }
+
+pub fn read_zklinks<T: indradb::Transaction>(
+  itr: &T,
+  svs: &SystemVs,
+  uid: Option<Uuid>,
+  id: Uuid,
+) -> Result<Vec<ZkLink>, errors::Error> {
+  let ib = indradb::SpecificVertexQuery::single(id).inbound(1000);
+  // let ob = indradb::SpecificVertexQuery::single(id).into().outbound(1000);
+
+  let mut links = Vec::new();
+
+  for e in itr.get_edges(ib)?.iter() {
+    assert_eq!(e.key.inbound_id, id);
+
+    if is_note_accessible(itr, svs, uid, id)? {
+      let nq: indradb::VertexQuery = indradb::SpecificVertexQuery::single(e.key.outbound_id).into();
+
+      let eq: indradb::EdgeQuery = indradb::SpecificEdgeQuery::single(e.key.clone()).into();
+
+      // let uidstr = uid.to_string();
+      let count: i64 = itr
+        .get_edge_properties(indradb::EdgePropertyQuery::new(eq.clone(), "count"))?
+        .first()
+        .and_then(|ep| ep.value.as_i64())
+        .unwrap_or(0);
+
+      let mine: bool = uid
+        .and_then(|id| getoptedgeprop(itr, &eq, id.to_string().as_str()).ok())
+        .unwrap_or(None)
+        .unwrap_or(false);
+
+      // create link for every user??
+      links.push(ZkLink {
+        from: e.key.outbound_id,
+        to: id,
+        mine: mine,
+        others: (count > (if mine { 1 } else { 0 })),
+        delete: None,
+        fromname: getprop(itr, &nq, "title")?,
+        toname: None,
+      });
+    }
+  }
+
+  Ok(links)
+}
+
+pub fn read_zknoteedit<T: indradb::Transaction>(
+  itr: &T,
+  uid: Uuid,
+  gzl: &GetZkNoteEdit,
+) -> Result<ZkNoteEdit, errors::Error> {
+  let svs = get_systemvs(itr)?;
+
+  // should do an ownership check for us
+  let zknote = read_zknote(itr, &svs, Some(uid), gzl.zknote)?;
+
+  let zklinks = read_zklinks(itr, &svs, Some(uid), zknote.id)?;
+
+  Ok(ZkNoteEdit {
+    zknote: zknote,
+    links: zklinks,
+  })
+}
+
+/*
+pub fn search_zknotes<T: indradb::Transaction>(
+  itr: &T,
+  uid: Uuid,
+  search: &ZkNoteSearch,
+) -> Result<ZkNoteSearchResult, errors::Error> {
+}
+
+pub fn power_delete_zknotes<T: indradb::Transaction>(
+  itr: &T,
+  uid: Uuid,
+  search: &TagSearch,
+) -> Result<i64, errors::Error> {
+}
+*/
 
 // todo: repeat until found or none.
 pub fn find_first<T: indradb::Transaction, F>(
