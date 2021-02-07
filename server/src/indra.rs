@@ -890,110 +890,142 @@ pub fn mkpropquery(
   })
 }
 
-pub fn test_db(path: &str) -> Result<(), errors::Error> {
-  // compression factor of 5 (default)
-  let sc = indradb::SledConfig::with_compression(None);
+#[cfg(test)]
+mod test {
+  use super::*;
+  use std::fs;
 
-  // let ids = sc.open(dbpath.as_os_str().to_str().ok_or(bail!("blah"))?)?;
-  let ids = sc.open(path)?;
+  pub fn test_db() -> Result<(), errors::Error> {
+    println!("test-db starrt");
+    let path = "indra-test";
+    {
+      println!("test-db starrt2");
+      // compression factor of 5 (default)
+      let sc = indradb::SledConfig::with_compression(None);
 
-  let itr = ids.transaction()?;
+      // let ids = sc.open(dbpath.as_os_str().to_str().ok_or(bail!("blah"))?)?;
+      // let ids = sc.open(path)?;
 
-  let svs = get_systemvs(&itr)?;
+      import_db(
+        &ZkDatabase {
+          notes: Vec::new(),
+          links: Vec::new(),
+          users: Vec::new(),
+        },
+        path,
+      )?;
 
-  println!("read_user: {:?}", read_user(&itr, "ben".to_string())?);
+      let ids = sc.open(path)?;
+      let itr = ids.transaction()?;
 
-  // user names
-  let tuid = match find_first_q(
-    &itr,
-    mkpropquery("user".to_string(), "name".to_string()),
-    |x| x.value == "test",
-  )? {
-    Some(vp) => vp.id,
-    None => new_user(
-      &itr,
-      &svs.public,
-      "test".to_string(),
-      "".to_string(),
-      "".to_string(),
-      "test@test.com".to_string(),
-      None,
-    )?,
-  };
+      let svs = get_systemvs(&itr)?;
 
-  let tuid2 = match find_first_q(
-    &itr,
-    mkpropquery("user".to_string(), "name".to_string()),
-    |x| x.value == "test2",
-  )? {
-    Some(vp) => vp.id,
-    None => new_user(
-      &itr,
-      &svs.public,
-      "test2".to_string(),
-      "".to_string(),
-      "".to_string(),
-      "test2@test.com".to_string(),
-      None,
-    )?,
-  };
+      // println!("read_user: {:?}", read_user(&itr, "ben".to_string())?);
 
-  let szn1 = SaveZkNote {
-    id: None,
-    title: "test title 1".to_string(),
-    pubid: None,
-    content: "test content 1".to_string(),
-  };
-  let sid1 = save_zknote(&itr, tuid, &szn1)?;
+      // make test users.
+      let tuid = match find_first_q(
+        &itr,
+        mkpropquery("user".to_string(), "name".to_string()),
+        |x| x.value == "test",
+      )? {
+        Some(vp) => vp.id,
+        None => new_user(
+          &itr,
+          &svs.public,
+          "test".to_string(),
+          "".to_string(),
+          "".to_string(),
+          "test@test.com".to_string(),
+          None,
+        )?,
+      };
 
-  let szn2 = SaveZkNote {
-    id: None,
-    title: "test title 2".to_string(),
-    pubid: None,
-    content: "test content 2".to_string(),
-  };
-  let sid2 = save_zknote(&itr, tuid, &szn2)?;
+      let tuid2 = match find_first_q(
+        &itr,
+        mkpropquery("user".to_string(), "name".to_string()),
+        |x| x.value == "test2",
+      )? {
+        Some(vp) => vp.id,
+        None => new_user(
+          &itr,
+          &svs.public,
+          "test2".to_string(),
+          "".to_string(),
+          "".to_string(),
+          "test2@test.com".to_string(),
+          None,
+        )?,
+      };
 
-  let szn3 = SaveZkNote {
-    id: None,
-    title: "test title 3".to_string(),
-    pubid: None,
-    content: "test content 3".to_string(),
-  };
-  let sid3 = save_zknote(&itr, tuid2, &szn3)?;
+      let szn1 = SaveZkNote {
+        id: None,
+        title: "test title 1".to_string(),
+        pubid: None,
+        content: "test content 1".to_string(),
+      };
+      let sid1 = save_zknote(&itr, tuid, &szn1)?;
 
-  let szn4 = SaveZkNote {
-    id: None,
-    title: "test title 4".to_string(),
-    pubid: Some("publicccc note".to_string()),
-    content: "test content 4".to_string(),
-  };
-  let sid4 = save_zknote(&itr, tuid2, &szn4)?;
-  save_zklink(&itr, &sid4.id, &svs.public, &tuid2, &None)?;
+      let szn2 = SaveZkNote {
+        id: None,
+        title: "test title 2".to_string(),
+        pubid: None,
+        content: "test content 2".to_string(),
+      };
+      let sid2 = save_zknote(&itr, tuid, &szn2)?;
 
-  println!(
-    "note1 access {}",
-    is_note_accessible(&itr, &svs, Some(tuid), sid1.id)?
-  );
-  println!(
-    "note2 access {}",
-    is_note_accessible(&itr, &svs, Some(tuid), sid2.id)?
-  );
+      let szn3 = SaveZkNote {
+        id: None,
+        title: "test title 3".to_string(),
+        pubid: None,
+        content: "test content 3".to_string(),
+      };
+      let sid3 = save_zknote(&itr, tuid2, &szn3)?;
 
-  save_zklink(&itr, &sid1.id, &sid2.id, &tuid, &None)?;
-  let zklinks = read_zklinks(&itr, &svs, Some(tuid), sid1.id)?;
-  println!("zklinkes: {:?}", zklinks);
+      let szn4 = SaveZkNote {
+        id: None,
+        title: "test title 4".to_string(),
+        pubid: Some("publicccc note".to_string()),
+        content: "test content 4".to_string(),
+      };
+      let sid4 = save_zknote(&itr, tuid2, &szn4)?;
+      save_zklink(&itr, &sid4.id, &svs.public, &tuid2, &None)?;
 
-  let zkn = read_zknote(&itr, &svs, None, sid1.id)?;
-  println!("{}", serde_json::to_string_pretty(&zkn)?);
+      println!(
+        "note1 access {}",
+        is_note_accessible(&itr, &svs, Some(tuid), sid1.id)?
+      );
+      println!(
+        "note2 access {}",
+        is_note_accessible(&itr, &svs, Some(tuid), sid2.id)?
+      );
 
-  let zkne1 = read_zknoteedit(&itr, tuid, &GetZkNoteEdit { zknote: sid1.id })?;
-  println!("{}", serde_json::to_string_pretty(&zkne1)?);
+      save_zklink(&itr, &sid1.id, &sid2.id, &tuid, &None)?;
+      let zklinks = read_zklinks(&itr, &svs, Some(tuid), sid1.id)?;
+      println!("zklinkes: {:?}", zklinks);
 
-  let zkne2 = read_zknoteedit(&itr, tuid, &GetZkNoteEdit { zknote: sid2.id })?;
-  println!("{}", serde_json::to_string_pretty(&zkne2)?);
+      let zkn = read_zknote(&itr, &svs, None, sid1.id)?;
+      println!("{}", serde_json::to_string_pretty(&zkn)?);
 
-  println!("indra test end");
+      let zkne1 = read_zknoteedit(&itr, tuid, &GetZkNoteEdit { zknote: sid1.id })?;
+      println!("{}", serde_json::to_string_pretty(&zkne1)?);
 
-  Ok(())
+      let zkne2 = read_zknoteedit(&itr, tuid, &GetZkNoteEdit { zknote: sid2.id })?;
+      println!("{}", serde_json::to_string_pretty(&zkne2)?);
+
+      println!("indra test end");
+    }
+    // delete the test db.
+    fs::remove_dir_all(path)?;
+    Ok(())
+  }
+  #[test]
+  pub fn test_db_runner() {
+    println!("test_db_runner");
+    match test_db() {
+      Ok(()) => (),
+      Err(e) => {
+        panic!(format!("{:?}", e));
+      }
+    }
+  }
 }

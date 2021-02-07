@@ -204,12 +204,6 @@ fn err_main() -> Result<(), errors::Error> {
         .help("Import database from json")
         .takes_value(true),
     )
-    .arg(
-      Arg::with_name("indra-test")
-        .short("t")
-        .long("indratest")
-        .help("run indra tests"),
-    )
     .get_matches();
 
   // are we exporting the DB?
@@ -240,14 +234,6 @@ fn err_main() -> Result<(), errors::Error> {
         exportfile,
         serde_json::to_string_pretty(&sqldata::export_db(config.db.as_path())?)?.as_str(),
       )?;
-
-      Ok(())
-    }
-    (_, _, true) => {
-      // do some indra stuff!
-      let config = load_config();
-
-      indra::test_db("indra2")?;
 
       Ok(())
     }
