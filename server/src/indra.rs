@@ -898,6 +898,8 @@ mod test {
   pub fn test_db() -> Result<(), errors::Error> {
     println!("test-db starrt");
     let path = "indra-test";
+    // delete the db if its there.
+    fs::remove_dir_all(path)?;
     {
       println!("test-db starrt2");
       // compression factor of 5 (default)
