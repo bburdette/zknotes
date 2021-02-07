@@ -478,11 +478,12 @@ pub fn get_systemvs<T: indradb::Transaction>(itr: &T) -> Result<SystemVs, errors
 
 pub fn link_exists<T: indradb::Transaction>(
   itr: &T,
+  ltype: &indradb::Type,
   from: Uuid,
   to: Uuid,
 ) -> Result<bool, errors::Error> {
   let v = itr.get_edges(indradb::EdgeQuery::Specific(
-    indradb::SpecificEdgeQuery::single(indradb::EdgeKey::new(from, Type::default(), to)),
+    indradb::SpecificEdgeQuery::single(indradb::EdgeKey::new(from, ltype.clone(), to)),
   ))?;
 
   Ok(!v.is_empty())
@@ -493,7 +494,7 @@ pub fn is_note_public<T: indradb::Transaction>(
   svs: &SystemVs,
   id: Uuid,
 ) -> Result<bool, errors::Error> {
-  link_exists(itr, id, svs.public)
+  link_exists(itr, &Type::default(), id, svs.public)
 }
 
 pub fn is_note_mine<T: indradb::Transaction>(
@@ -501,7 +502,7 @@ pub fn is_note_mine<T: indradb::Transaction>(
   id: Uuid,
   uid: Uuid,
 ) -> Result<bool, errors::Error> {
-  link_exists(itr, id, uid)
+  link_exists(itr, &Type::new("owner")?, id, uid)
 }
 
 // THIS ASSUMES SEQUENTIALITY
@@ -702,15 +703,18 @@ pub fn read_zklinks<T: indradb::Transaction>(
   uid: Option<Uuid>,
   id: Uuid,
 ) -> Result<Vec<ZkLink>, errors::Error> {
-  let ib = indradb::SpecificVertexQuery::single(id).inbound(1000);
-  // let ob = indradb::SpecificVertexQuery::single(id).into().outbound(1000);
+  let ib = indradb::SpecificVertexQuery::single(id)
+    .inbound(1000)
+    .t(Type::default());
 
   let mut links = Vec::new();
 
   for e in itr.get_edges(ib)?.iter() {
+    println!("inbound {:?}", e);
     assert_eq!(e.key.inbound_id, id);
 
     if is_note_accessible(itr, svs, uid, id)? {
+      println!("ib accissesible");
       let nq: indradb::VertexQuery = indradb::SpecificVertexQuery::single(e.key.outbound_id).into();
 
       let eq: indradb::EdgeQuery = indradb::SpecificEdgeQuery::single(e.key.clone()).into();
@@ -734,8 +738,45 @@ pub fn read_zklinks<T: indradb::Transaction>(
         mine: mine,
         others: (count > (if mine { 1 } else { 0 })),
         delete: None,
-        fromname: getprop(itr, &nq, "title")?,
+        fromname: getoptprop(itr, &nq, "title")?,
         toname: None,
+      });
+    }
+  }
+
+  let ob = indradb::SpecificVertexQuery::single(id)
+    .outbound(1000)
+    .t(Type::default());
+  for e in itr.get_edges(ob)?.iter() {
+    println!("outbound {:?}", e);
+    assert_eq!(e.key.outbound_id, id);
+
+    if is_note_accessible(itr, svs, uid, id)? {
+      let nq: indradb::VertexQuery = indradb::SpecificVertexQuery::single(e.key.inbound_id).into();
+
+      let eq: indradb::EdgeQuery = indradb::SpecificEdgeQuery::single(e.key.clone()).into();
+
+      // let uidstr = uid.to_string();
+      let count: i64 = itr
+        .get_edge_properties(indradb::EdgePropertyQuery::new(eq.clone(), "count"))?
+        .first()
+        .and_then(|ep| ep.value.as_i64())
+        .unwrap_or(0);
+
+      let mine: bool = uid
+        .and_then(|id| getoptedgeprop(itr, &eq, id.to_string().as_str()).ok())
+        .unwrap_or(None)
+        .unwrap_or(false);
+
+      // create link for every user??
+      links.push(ZkLink {
+        from: id,
+        to: e.key.inbound_id,
+        mine: mine,
+        others: (count > (if mine { 1 } else { 0 })),
+        delete: None,
+        fromname: None,
+        toname: getoptprop(itr, &nq, "title")?,
       });
     }
   }
@@ -880,6 +921,23 @@ pub fn test_db(path: &str) -> Result<(), errors::Error> {
     )?,
   };
 
+  let tuid2 = match find_first_q(
+    &itr,
+    mkpropquery("user".to_string(), "name".to_string()),
+    |x| x.value == "test2",
+  )? {
+    Some(vp) => vp.id,
+    None => new_user(
+      &itr,
+      &svs.public,
+      "test2".to_string(),
+      "".to_string(),
+      "".to_string(),
+      "test2@test.com".to_string(),
+      None,
+    )?,
+  };
+
   let szn1 = SaveZkNote {
     id: None,
     title: "test title 1".to_string(),
@@ -895,6 +953,32 @@ pub fn test_db(path: &str) -> Result<(), errors::Error> {
     content: "test content 2".to_string(),
   };
   let sid2 = save_zknote(&itr, tuid, &szn2)?;
+
+  let szn3 = SaveZkNote {
+    id: None,
+    title: "test title 3".to_string(),
+    pubid: None,
+    content: "test content 3".to_string(),
+  };
+  let sid3 = save_zknote(&itr, tuid2, &szn3)?;
+
+  let szn4 = SaveZkNote {
+    id: None,
+    title: "test title 4".to_string(),
+    pubid: Some("publicccc note".to_string()),
+    content: "test content 4".to_string(),
+  };
+  let sid4 = save_zknote(&itr, tuid2, &szn4)?;
+  save_zklink(&itr, &sid4.id, &svs.public, &tuid2, &None)?;
+
+  println!(
+    "note1 access {}",
+    is_note_accessible(&itr, &svs, Some(tuid), sid1.id)?
+  );
+  println!(
+    "note2 access {}",
+    is_note_accessible(&itr, &svs, Some(tuid), sid2.id)?
+  );
 
   save_zklink(&itr, &sid1.id, &sid2.id, &tuid, &None)?;
   let zklinks = read_zklinks(&itr, &svs, Some(tuid), sid1.id)?;
