@@ -310,12 +310,6 @@ pub fn read_user<T: indradb::Transaction>(itr: &T, name: String) -> Result<User,
 
   let uq: indradb::VertexQuery = indradb::SpecificVertexQuery::single(tuid).into();
 
-  let vpq = indradb::VertexPropertyQuery::new(uq.clone(), "name");
-
-  for u in itr.get_vertex_properties(vpq).iter() {
-    println!("user: {:?}", u);
-  }
-
   Ok(User {
     // id: tuid,
     id: 0,
@@ -505,49 +499,6 @@ pub fn is_note_mine<T: indradb::Transaction>(
   link_exists(itr, &Type::new("owner")?, id, uid)
 }
 
-// THIS ASSUMES SEQUENTIALITY
-// which is a bad assumption.  invalid!
-pub fn intersect<T: indradb::Transaction>(
-  itr: &T,
-  vq1: indradb::VertexQuery,
-  vq2: indradb::VertexQuery,
-) -> Result<Vec<Vertex>, errors::Error> {
-  let vec1 = itr.get_vertices(vq1)?;
-  let vec2 = itr.get_vertices(vq2)?;
-  println!("vec1: {:?}", vec1);
-  println!("vec2: {:?}", vec2);
-  let i1 = vec1.iter();
-  let mut i2 = vec2.iter();
-
-  let mut i2v = i2.next();
-  let mut i2vcheck = |v: &mut Vec<Vertex>, i: &Vertex| {
-    match i2v {
-      None => false,
-      Some(i2val) => {
-        if i == i2val {
-          v.push(i.clone());
-          false
-        } else if i.id < i2val.id {
-          // here we're depending on ordering of the UUIDs, but they aren't ordered!
-          // because they aren't ordered, you just have to get all of them to do intersection.
-          false
-        } else {
-          i2v = i2.next();
-          true
-        }
-      }
-    }
-  };
-
-  let mut rv = Vec::new();
-
-  for i in i1 {
-    while i2vcheck(&mut rv, i) {}
-  }
-
-  Ok(rv)
-}
-
 pub fn save_zknote<T: indradb::Transaction>(
   itr: &T,
   uid: Uuid,
@@ -627,15 +578,11 @@ pub fn is_note_shared<T: indradb::Transaction>(
   let sq = indradb::SpecificVertexQuery::single(id).inbound(1000); // edges where inbound = id?
   let es: Vec<Edge> = itr.get_edges(sq)?; // the vertex ids are the outbound ends.
 
-  println!("es: {:?}", es);
-
   // any connections between the vertices and svs.share?
   let eks = es
     .iter()
     .map(|x: &Edge| indradb::EdgeKey::new(svs.share, Type::default(), x.key.outbound_id))
     .collect();
-
-  println!("eks: {:?}", eks);
 
   let share_q: indradb::EdgeQuery = indradb::SpecificEdgeQuery::new(eks).into();
 
@@ -645,17 +592,6 @@ pub fn is_note_shared<T: indradb::Transaction>(
     .iter()
     .map(|x: &Edge| indradb::EdgeKey::new(uid, Type::default(), x.key.inbound_id))
     .collect();
-
-  println!("eq2: {:?}", eq2);
-
-  // any of those connect to our user?
-  // let eq3: Vec<EdgeKey> = itr
-  //   .get_edges(share_q)?
-  //   .iter()
-  //   .map(|x: &Edge| indradb::EdgeKey::new(x.key.inbound_id, Type::default(), uid))
-  //   .collect();
-
-  // println!("eq3: {:?}", eks);
 
   let shared = !eq2.is_empty();
 
@@ -697,11 +633,6 @@ pub fn read_zknote<T: indradb::Transaction>(
     .key
     .outbound_id;
 
-  println!(
-    "all user promps: {:?}",
-    itr.get_all_vertex_properties(indradb::SpecificVertexQuery::single(user))?
-  );
-
   // query for getting user name.
   let uq = indradb::VertexQuery::Specific(indradb::SpecificVertexQuery::single(user).into());
 
@@ -730,11 +661,9 @@ pub fn read_zklinks<T: indradb::Transaction>(
   let mut links = Vec::new();
 
   for e in itr.get_edges(ib)?.iter() {
-    println!("inbound {:?}", e);
     assert_eq!(e.key.inbound_id, id);
 
     if is_note_accessible(itr, svs, uid, id)? {
-      println!("ib accissesible");
       let nq: indradb::VertexQuery = indradb::SpecificVertexQuery::single(e.key.outbound_id).into();
 
       let eq: indradb::EdgeQuery = indradb::SpecificEdgeQuery::single(e.key.clone()).into();
@@ -768,7 +697,6 @@ pub fn read_zklinks<T: indradb::Transaction>(
     .outbound(1000)
     .t(Type::default());
   for e in itr.get_edges(ob)?.iter() {
-    println!("outbound {:?}", e);
     assert_eq!(e.key.outbound_id, id);
 
     if is_note_accessible(itr, svs, uid, id)? {
@@ -921,7 +849,6 @@ mod test {
     // delete the db if its there.
     fs::remove_dir_all(path);
     {
-      println!("test-db starrt2");
       // compression factor of 5 (default)
       let sc = indradb::SledConfig::with_compression(None);
 
@@ -1017,11 +944,6 @@ mod test {
       assert_eq!(false, is_note_public(&itr, &svs, sid2.id)?);
       assert_eq!(false, is_note_public(&itr, &svs, sid1.id)?);
 
-      println!("inm: {}", is_note_mine(&itr, sid1.id, tuid1)?);
-      println!("inm: {}", is_note_mine(&itr, sid3.id, tuid1)?);
-      println!("inm: {}", is_note_mine(&itr, sid1.id, tuid2)?);
-      println!("inm: {}", is_note_mine(&itr, sid4.id, tuid2)?);
-
       assert_eq!(true, is_note_mine(&itr, sid1.id, tuid1)?);
       assert_eq!(false, is_note_mine(&itr, sid3.id, tuid1)?);
       assert_eq!(false, is_note_mine(&itr, sid1.id, tuid2)?);
@@ -1037,11 +959,8 @@ mod test {
       };
       let sid_share = save_zknote(&itr, tuid2, &szn_share)?;
       save_zklink(&itr, &sid_share.id, &svs.share, &tuid2, &None)?;
-      println!("svs.xhare: {}", svs.share);
-      // share szn3 with it.
+      // link szn3 to it.
       save_zklink(&itr, &sid3.id, &sid_share.id, &tuid2, &None)?;
-      println!("sid3 to share: sid3: {}", sid3.id);
-      println!("share: {}", sid_share.id);
 
       // hook user tuid1 with the share.
       save_zklink(&itr, &tuid1, &sid_share.id, &tuid2, &None)?;
@@ -1051,9 +970,6 @@ mod test {
       assert_eq!(false, is_note_shared(&itr, &svs, tuid1, sid4.id)?);
       // user 1 should not be able to see the unshared note.
       assert_eq!(true, is_note_shared(&itr, &svs, tuid1, sid3.id)?);
-
-      // Some(uid) => is_note_mine(itr, id, uid)?
-      // || is_note_shared(itr, svs, id, uid)?,
 
       assert_eq!(true, is_note_accessible(&itr, &svs, Some(tuid1), sid1.id)?);
       assert_eq!(true, is_note_accessible(&itr, &svs, Some(tuid1), sid3.id)?);
@@ -1065,18 +981,16 @@ mod test {
 
       save_zklink(&itr, &sid1.id, &sid2.id, &tuid1, &None)?;
       let zklinks = read_zklinks(&itr, &svs, Some(tuid1), sid1.id)?;
-      println!("zklinkes: {:?}", zklinks);
+      // println!("zklinkes: {:?}", zklinks);
 
       let zkn = read_zknote(&itr, &svs, None, sid1.id)?;
-      println!("read_zknote {}", serde_json::to_string_pretty(&zkn)?);
+      // println!("read_zknote {}", serde_json::to_string_pretty(&zkn)?);
 
       let zkne1 = read_zknoteedit(&itr, tuid1, &GetZkNoteEdit { zknote: sid1.id })?;
-      println!("read_zknote {}", serde_json::to_string_pretty(&zkne1)?);
+      // println!("read_zknote {}", serde_json::to_string_pretty(&zkne1)?);
 
       let zkne2 = read_zknoteedit(&itr, tuid2, &GetZkNoteEdit { zknote: sid2.id })?;
-      println!("read_zknote {}", serde_json::to_string_pretty(&zkne2)?);
-
-      assert_eq!(1, 2);
+      // println!("read_zknote {}", serde_json::to_string_pretty(&zkne2)?);
 
       println!("indra test end");
     }
