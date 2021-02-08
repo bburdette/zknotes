@@ -9,8 +9,8 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 // use std::time::Duration;
 use icontent::{
-  GetZkLinks, GetZkNoteEdit, ImportZkNote, LoginData, SaveZkNote, SavedZkNote, ZkLink, ZkNote,
-  ZkNoteEdit,
+  GetZkLinks, GetZkNoteEdit, ImportZkNote, LoginData, SaveZkNote, SavedZkNote, UserId, ZkLink,
+  ZkNote, ZkNoteEdit,
 };
 use std::time::SystemTime;
 use user::{User, ZkDatabase};
@@ -68,7 +68,7 @@ pub fn import_db(zd: &ZkDatabase, path: &str) -> Result<(), errors::Error> {
 
   // makin users.
   // hashmap of sqlite ids to uuids.
-  let mut uids = HashMap::new();
+  let mut uids: HashMap<i64, UserId> = HashMap::new();
 
   let mut unotes = HashMap::new();
 
@@ -108,9 +108,11 @@ pub fn import_db(zd: &ZkDatabase, path: &str) -> Result<(), errors::Error> {
       None => (),
     }
 
+    let uid = UserId(v.id);
+
     // save id
-    uids.insert(u.id, v.id);
-    unotes.insert(u.zknote, v.id);
+    uids.insert(u.id, uid);
+    unotes.insert(u.zknote, uid);
   }
 
   // note ids.
@@ -126,7 +128,7 @@ pub fn import_db(zd: &ZkDatabase, path: &str) -> Result<(), errors::Error> {
         // is this a user note?
         match unotes.get(&n.id) {
           // yes - link to the user vertex instead of making a note.
-          Some(id) => nids.insert(n.id, *id),
+          Some(id) => nids.insert(n.id, id.0),
           // no - make a note.
           None => {
             // make vertex.
@@ -177,7 +179,7 @@ pub fn import_db(zd: &ZkDatabase, path: &str) -> Result<(), errors::Error> {
             let uid = uids
               .get(&n.user)
               .ok_or(SimpleError::new("user not found"))?;
-            save_zklink(&itr, &v.id, &uid, &uid, &Some("owner"))?;
+            save_zklink(&itr, &v.id, &uid.0, &uid, &Some("owner"))?;
 
             // save id
             nids.insert(n.id, v.id)
@@ -250,7 +252,7 @@ pub fn new_user<T: indradb::Transaction>(
   salt: String,
   email: String,
   registration_key: Option<String>,
-) -> Result<Uuid, errors::Error> {
+) -> Result<UserId, errors::Error> {
   let v = indradb::Vertex::new(indradb::Type::new("user")?);
   itr.create_vertex(&v)?;
 
@@ -293,10 +295,12 @@ pub fn new_user<T: indradb::Transaction>(
   //   &serde_json::to_value(registration_key.clone())?,
   // )?;
 
-  // TODO add link to 'public'
-  save_zklink(itr, &v.id, &public, &v.id, &None)?;
+  let uid = UserId(v.id);
 
-  Ok(v.id)
+  // TODO add link to 'public'
+  save_zklink(itr, &v.id, &public, &uid, &None)?;
+
+  Ok(uid)
 }
 
 pub fn read_user<T: indradb::Transaction>(itr: &T, name: String) -> Result<User, errors::Error> {
@@ -322,11 +326,14 @@ pub fn read_user<T: indradb::Transaction>(itr: &T, name: String) -> Result<User,
   })
 }
 
-pub fn login_data<T: indradb::Transaction>(itr: &T, uid: Uuid) -> Result<LoginData, errors::Error> {
+pub fn login_data<T: indradb::Transaction>(
+  itr: &T,
+  uid: UserId,
+) -> Result<LoginData, errors::Error> {
   let svs = get_systemvs(itr)?;
 
   // TODO: make login token that expires!
-  let uq = indradb::VertexQuery::Specific(indradb::SpecificVertexQuery::single(uid).into());
+  let uq = indradb::VertexQuery::Specific(indradb::SpecificVertexQuery::single(uid.0).into());
 
   Ok(LoginData {
     userid: uid,
@@ -341,7 +348,7 @@ pub fn save_zklink<T: indradb::Transaction>(
   itr: &T,
   fromid: &Uuid,
   toid: &Uuid,
-  user: &Uuid,
+  user: &UserId,
   ltype: &Option<&str>,
 ) -> Result<bool, errors::Error> {
   // link owner.
@@ -369,7 +376,7 @@ pub fn save_zklink<T: indradb::Transaction>(
     *fromid,
   );
 
-  let useruuid = user.to_string();
+  let useruuid = user.0.to_string();
 
   let ret = itr.create_edge(&ek)?;
   itr.set_edge_properties(
@@ -494,14 +501,14 @@ pub fn is_note_public<T: indradb::Transaction>(
 pub fn is_note_mine<T: indradb::Transaction>(
   itr: &T,
   id: Uuid,
-  uid: Uuid,
+  uid: UserId,
 ) -> Result<bool, errors::Error> {
-  link_exists(itr, &Type::new("owner")?, id, uid)
+  link_exists(itr, &Type::new("owner")?, id, uid.0)
 }
 
 pub fn save_zknote<T: indradb::Transaction>(
   itr: &T,
-  uid: Uuid,
+  uid: UserId,
   note: &SaveZkNote,
 ) -> Result<SavedZkNote, errors::Error> {
   let now = now()?;
@@ -544,7 +551,7 @@ pub fn save_zknote<T: indradb::Transaction>(
   )?;
 
   // link to user.
-  save_zklink(itr, &id, &uid, &uid, &Some("owner"))?;
+  save_zklink(itr, &id, &uid.0, &uid, &Some("owner"))?;
 
   Ok(SavedZkNote {
     id: id,
@@ -571,7 +578,7 @@ pub fn note_owner<T: indradb::Transaction>(itr: &T, id: Uuid) -> Result<Uuid, er
 pub fn is_note_shared<T: indradb::Transaction>(
   itr: &T,
   svs: &SystemVs,
-  uid: Uuid,
+  uid: UserId,
   id: Uuid,
 ) -> Result<bool, errors::Error> {
   // get the edges for this note.
@@ -590,7 +597,7 @@ pub fn is_note_shared<T: indradb::Transaction>(
   let eq2: Vec<EdgeKey> = itr
     .get_edges(share_q)?
     .iter()
-    .map(|x: &Edge| indradb::EdgeKey::new(uid, Type::default(), x.key.inbound_id))
+    .map(|x: &Edge| indradb::EdgeKey::new(uid.0, Type::default(), x.key.inbound_id))
     .collect();
 
   let shared = !eq2.is_empty();
@@ -601,7 +608,7 @@ pub fn is_note_shared<T: indradb::Transaction>(
 pub fn is_note_accessible<T: indradb::Transaction>(
   itr: &T,
   svs: &SystemVs,
-  uid: Option<Uuid>,
+  uid: Option<UserId>,
   id: Uuid,
 ) -> Result<bool, errors::Error> {
   let accessible = is_note_public(itr, svs, id)?
@@ -615,7 +622,7 @@ pub fn is_note_accessible<T: indradb::Transaction>(
 pub fn read_zknote<T: indradb::Transaction>(
   itr: &T,
   svs: &SystemVs,
-  uid: Option<Uuid>,
+  uid: Option<UserId>,
   id: Uuid,
 ) -> Result<ZkNote, errors::Error> {
   let accessible = is_note_accessible(itr, svs, uid, id)?;
@@ -626,15 +633,17 @@ pub fn read_zknote<T: indradb::Transaction>(
   let eq = indradb::PipeEdgeQuery::new(Box::new(vq.clone()), indradb::EdgeDirection::Inbound, 1)
     .t(Type::new("owner")?);
 
-  let user = itr
-    .get_edges(eq)?
-    .first()
-    .ok_or(SimpleError::new("user not found!"))?
-    .key
-    .outbound_id;
+  let user = UserId(
+    itr
+      .get_edges(eq)?
+      .first()
+      .ok_or(SimpleError::new("user not found!"))?
+      .key
+      .outbound_id,
+  );
 
   // query for getting user name.
-  let uq = indradb::VertexQuery::Specific(indradb::SpecificVertexQuery::single(user).into());
+  let uq = indradb::VertexQuery::Specific(indradb::SpecificVertexQuery::single(user.0).into());
 
   Ok(ZkNote {
     id: id,
@@ -651,7 +660,7 @@ pub fn read_zknote<T: indradb::Transaction>(
 pub fn read_zklinks<T: indradb::Transaction>(
   itr: &T,
   svs: &SystemVs,
-  uid: Option<Uuid>,
+  uid: Option<UserId>,
   id: Uuid,
 ) -> Result<Vec<ZkLink>, errors::Error> {
   let ib = indradb::SpecificVertexQuery::single(id)
@@ -676,7 +685,7 @@ pub fn read_zklinks<T: indradb::Transaction>(
         .unwrap_or(0);
 
       let mine: bool = uid
-        .and_then(|id| getoptedgeprop(itr, &eq, id.to_string().as_str()).ok())
+        .and_then(|id| getoptedgeprop(itr, &eq, id.0.to_string().as_str()).ok())
         .unwrap_or(None)
         .unwrap_or(false);
 
@@ -712,7 +721,7 @@ pub fn read_zklinks<T: indradb::Transaction>(
         .unwrap_or(0);
 
       let mine: bool = uid
-        .and_then(|id| getoptedgeprop(itr, &eq, id.to_string().as_str()).ok())
+        .and_then(|id| getoptedgeprop(itr, &eq, id.0.to_string().as_str()).ok())
         .unwrap_or(None)
         .unwrap_or(false);
 
@@ -734,7 +743,7 @@ pub fn read_zklinks<T: indradb::Transaction>(
 
 pub fn read_zknoteedit<T: indradb::Transaction>(
   itr: &T,
-  uid: Uuid,
+  uid: UserId,
   gzl: &GetZkNoteEdit,
 ) -> Result<ZkNoteEdit, errors::Error> {
   let svs = get_systemvs(itr)?;
@@ -753,14 +762,14 @@ pub fn read_zknoteedit<T: indradb::Transaction>(
 /*
 pub fn search_zknotes<T: indradb::Transaction>(
   itr: &T,
-  uid: Uuid,
+  uid: UserId,
   search: &ZkNoteSearch,
 ) -> Result<ZkNoteSearchResult, errors::Error> {
 }
 
 pub fn power_delete_zknotes<T: indradb::Transaction>(
   itr: &T,
-  uid: Uuid,
+  uid: UserId,
   search: &TagSearch,
 ) -> Result<i64, errors::Error> {
 }
@@ -877,7 +886,7 @@ mod test {
         mkpropquery("user".to_string(), "name".to_string()),
         |x| x.value == "test",
       )? {
-        Some(vp) => vp.id,
+        Some(vp) => UserId(vp.id),
         None => new_user(
           &itr,
           &svs.public,
@@ -894,7 +903,7 @@ mod test {
         mkpropquery("user".to_string(), "name".to_string()),
         |x| x.value == "test2",
       )? {
-        Some(vp) => vp.id,
+        Some(vp) => UserId(vp.id),
         None => new_user(
           &itr,
           &svs.public,
@@ -963,8 +972,8 @@ mod test {
       save_zklink(&itr, &sid3.id, &sid_share.id, &tuid2, &None)?;
 
       // hook user tuid1 with the share.
-      save_zklink(&itr, &tuid1, &sid_share.id, &tuid2, &None)?;
-      println!("tuid1 {}", tuid1);
+      save_zklink(&itr, &tuid1.0, &sid_share.id, &tuid2, &None)?;
+      println!("tuid1 {}", tuid1.0);
 
       // now user 1 should be able to see the note in share.
       assert_eq!(false, is_note_shared(&itr, &svs, tuid1, sid4.id)?);

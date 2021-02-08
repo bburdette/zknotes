@@ -1,7 +1,11 @@
-use uuid::Uuid;
+pub use uuid::Uuid;
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+pub struct UserId(pub Uuid);
+
 #[derive(Deserialize, Serialize, Debug)]
 pub struct LoginData {
-  pub userid: Uuid,
+  pub userid: UserId,
   pub username: String,
   pub publicid: Uuid,
   pub shareid: Uuid,
@@ -12,7 +16,7 @@ pub struct ZkNote {
   pub id: Uuid,
   pub title: String,
   pub content: String,
-  pub user: Uuid,
+  pub user: UserId,
   pub username: String,
   pub pubid: Option<String>,
   pub createdate: i64,
@@ -23,7 +27,7 @@ pub struct ZkNote {
 pub struct ZkListNote {
   pub id: Uuid,
   pub title: String,
-  pub user: Uuid,
+  pub user: UserId,
   pub createdate: i64,
   pub changeddate: i64,
 }
