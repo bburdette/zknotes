@@ -30,6 +30,7 @@ mod email;
 mod errors;
 mod indra;
 mod interfaces;
+mod isearch;
 mod search;
 mod sqldata;
 mod user;

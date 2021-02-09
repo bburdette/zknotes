@@ -12,6 +12,7 @@ use icontent::{
   GetZkLinks, GetZkNoteEdit, ImportZkNote, LoginData, SaveZkNote, SavedZkNote, UserId, ZkLink,
   ZkNote, ZkNoteEdit,
 };
+use isearch::{ZkNoteSearch, ZkNoteSearchResult};
 use std::time::SystemTime;
 use user::{User, ZkDatabase};
 use util::now;
@@ -802,7 +803,7 @@ where
   Q: Fn(Option<Uuid>) -> Result<indradb::VertexPropertyQuery, errors::Error>,
 {
   let mut ret = None;
-  let mut uuid = None;
+  let uuid = None;
   let mut vpq = vpqf(uuid)?;
   let mut vps = itr.get_vertex_properties(vpq)?;
   while (!vps.is_empty()) {
@@ -973,7 +974,6 @@ mod test {
 
       // hook user tuid1 with the share.
       save_zklink(&itr, &tuid1.0, &sid_share.id, &tuid2, &None)?;
-      println!("tuid1 {}", tuid1.0);
 
       // now user 1 should be able to see the note in share.
       assert_eq!(false, is_note_shared(&itr, &svs, tuid1, sid4.id)?);
@@ -1017,4 +1017,42 @@ mod test {
       }
     }
   }
+}
+
+pub fn search_zknotes<T: indradb::Transaction>(
+  itr: &T,
+  user: UserId,
+  search: &ZkNoteSearch,
+) -> Result<ZkNoteSearchResult, errors::Error> {
+  // of all the notes accessible to this user, find notes that match the query.
+
+  let (sql, args) = build_sql(&conn, user, search.clone())?;
+
+  let mut pstmt = conn.prepare(sql.as_str())?;
+
+  let rec_iter = pstmt.query_map(args.as_slice(), |row| {
+    Ok(ZkListNote {
+      id: row.get(0)?,
+      title: row.get(1)?,
+      user: row.get(2)?,
+      createdate: row.get(3)?,
+      changeddate: row.get(4)?,
+    })
+  })?;
+
+  let mut pv = Vec::new();
+
+  for rsrec in rec_iter {
+    match rsrec {
+      Ok(rec) => {
+        pv.push(rec);
+      }
+      Err(_) => (),
+    }
+  }
+
+  Ok(ZkNoteSearchResult {
+    notes: pv,
+    offset: search.offset,
+  })
 }
