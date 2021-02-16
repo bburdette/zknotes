@@ -1,4 +1,5 @@
 use crate::icontent::ZkListNote;
+use uuid::Uuid;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ZkNoteSearch {

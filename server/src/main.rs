@@ -29,6 +29,7 @@ mod config;
 mod email;
 mod errors;
 mod indra;
+mod indra_util;
 mod interfaces;
 mod isearch;
 mod search;

@@ -12,6 +12,7 @@ use icontent::{
   GetZkLinks, GetZkNoteEdit, ImportZkNote, LoginData, SaveZkNote, SavedZkNote, UserId, ZkLink,
   ZkNote, ZkNoteEdit,
 };
+use indra_util::{getoptedgeprop, getoptprop, getprop};
 use isearch::{ZkNoteSearch, ZkNoteSearchResult};
 use std::time::SystemTime;
 use user::{User, ZkDatabase};
@@ -389,62 +390,6 @@ pub fn save_zklink<T: indradb::Transaction>(
   )?;
 
   Ok(ret)
-}
-
-pub fn getprop<T: indradb::Transaction, R>(
-  itr: &T,
-  vq: &indradb::VertexQuery,
-  x: &str,
-) -> Result<R, errors::Error>
-where
-  R: serde::de::DeserializeOwned,
-{
-  Ok(serde_json::from_value::<R>(
-    itr
-      .get_vertex_properties(indradb::VertexPropertyQuery::new(vq.clone(), x))?
-      .first()
-      .ok_or(SimpleError::new(
-        format!("property not found: {}", x).as_str(),
-      ))?
-      .value
-      .clone(),
-  )?)
-}
-
-pub fn getoptprop<T: indradb::Transaction, R>(
-  itr: &T,
-  vq: &indradb::VertexQuery,
-  x: &str,
-) -> Result<Option<R>, errors::Error>
-where
-  R: serde::de::DeserializeOwned,
-{
-  let r = match itr
-    .get_vertex_properties(indradb::VertexPropertyQuery::new(vq.clone(), x))?
-    .first()
-  {
-    Some(vp) => Some(serde_json::from_value::<R>(vp.value.clone())?),
-    None => None,
-  };
-  Ok(r)
-}
-
-pub fn getoptedgeprop<T: indradb::Transaction, R>(
-  itr: &T,
-  eq: &indradb::EdgeQuery,
-  x: &str,
-) -> Result<Option<R>, errors::Error>
-where
-  R: serde::de::DeserializeOwned,
-{
-  let r = match itr
-    .get_edge_properties(indradb::EdgePropertyQuery::new(eq.clone(), x))?
-    .first()
-  {
-    Some(ep) => Some(serde_json::from_value::<R>(ep.value.clone())?),
-    None => None,
-  };
-  Ok(r)
 }
 
 pub fn get_systemvs<T: indradb::Transaction>(itr: &T) -> Result<SystemVs, errors::Error> {
@@ -1024,35 +969,20 @@ pub fn search_zknotes<T: indradb::Transaction>(
   user: UserId,
   search: &ZkNoteSearch,
 ) -> Result<ZkNoteSearchResult, errors::Error> {
-  // of all the notes accessible to this user, find notes that match the query.
+  //  let uq = indradb::SpecificVertexQuery::single(user.0).into();
 
-  let (sql, args) = build_sql(&conn, user, search.clone())?;
+  // uq.inbound()
 
-  let mut pstmt = conn.prepare(sql.as_str())?;
-
-  let rec_iter = pstmt.query_map(args.as_slice(), |row| {
-    Ok(ZkListNote {
-      id: row.get(0)?,
-      title: row.get(1)?,
-      user: row.get(2)?,
-      createdate: row.get(3)?,
-      changeddate: row.get(4)?,
-    })
-  })?;
-
-  let mut pv = Vec::new();
-
-  for rsrec in rec_iter {
-    match rsrec {
-      Ok(rec) => {
-        pv.push(rec);
-      }
-      Err(_) => (),
-    }
-  }
+  // Ok(ZkListNote {
+  //   id: row.get(0)?,
+  //   title: row.get(1)?,
+  //   user: row.get(2)?,
+  //   createdate: row.get(3)?,
+  //   changeddate: row.get(4)?,
+  // )};
 
   Ok(ZkNoteSearchResult {
-    notes: pv,
+    notes: Vec::new(),
     offset: search.offset,
   })
 }

@@ -5,3 +5,9 @@ server/static/main.js
 server/target/
 server/*.db*
 zkprotocol/target/
+zkprotocol/Cargo.lock
+elm/node_modules/
+elm/dist/
+server/last-email.txt
+elm/.cache/
+server/indra*
