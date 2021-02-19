@@ -12,7 +12,7 @@ use icontent::{
   GetZkLinks, GetZkNoteEdit, ImportZkNote, LoginData, SaveZkNote, SavedZkNote, UserId, ZkLink,
   ZkNote, ZkNoteEdit,
 };
-use indra_util::{getoptedgeprop, getoptprop, getprop};
+use indra_util::{find_all_q, find_first_q, getoptedgeprop, getoptprop, getprop};
 use isearch::{ZkNoteSearch, ZkNoteSearchResult};
 use std::time::SystemTime;
 use user::{User, ZkDatabase};
@@ -721,57 +721,6 @@ pub fn power_delete_zknotes<T: indradb::Transaction>(
 }
 */
 
-// todo: repeat until found or none.
-pub fn find_first<T: indradb::Transaction, F>(
-  itr: &T,
-  vpq: indradb::VertexPropertyQuery,
-  test: F,
-) -> Result<Option<indradb::VertexProperty>, errors::Error>
-where
-  F: FnMut(&&indradb::VertexProperty) -> bool,
-{
-  let vps = itr.get_vertex_properties(vpq)?;
-  let ret = vps.iter().find(test);
-  match ret {
-    Some(d) => Ok(Some(d.clone())),
-    None => Ok(None),
-  }
-}
-
-pub fn find_first_q<T: indradb::Transaction, F, Q>(
-  itr: &T,
-  vpqf: Q,
-  test: F,
-) -> Result<Option<indradb::VertexProperty>, errors::Error>
-where
-  F: FnMut(&&indradb::VertexProperty) -> bool + Copy,
-  Q: Fn(Option<Uuid>) -> Result<indradb::VertexPropertyQuery, errors::Error>,
-{
-  let mut ret = None;
-  let uuid = None;
-  let mut vpq = vpqf(uuid)?;
-  let mut vps = itr.get_vertex_properties(vpq)?;
-  while (!vps.is_empty()) {
-    match vps.iter().find(test) {
-      Some(r) => {
-        ret = Some(r.clone());
-        break;
-      }
-      None => match vps.last() {
-        Some(l) => {
-          vpq = vpqf(Some(l.id))?;
-          vps = itr.get_vertex_properties(vpq)?;
-        }
-        None => break,
-      },
-    }
-  }
-  match ret {
-    Some(r) => Ok(Some(r.clone())),
-    None => Ok(None),
-  }
-}
-
 pub fn mkpropquery(
   vtype: String,
   prop: String,
@@ -969,7 +918,19 @@ pub fn search_zknotes<T: indradb::Transaction>(
   user: UserId,
   search: &ZkNoteSearch,
 ) -> Result<ZkNoteSearchResult, errors::Error> {
-  //  let uq = indradb::SpecificVertexQuery::single(user.0).into();
+  let uq = indradb::SpecificVertexQuery::single(user.0);
+
+  // try this:
+  // 	 from the query, make a test that can be run on a given vertex.
+  // 	 get all vertices for the current user, iterate through and return matches.
+  // 	 repeat for share vertices, public vertices.
+  // queries that are t'whatever' are really searches.
+  //
+  // first, resolve the UUIDs of all t'tag' things.
+
+  let urecs = uq.inbound(10000).inbound(10000);
+
+  // find_all(itr, urecs
 
   // uq.inbound()
 
