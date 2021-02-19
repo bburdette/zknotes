@@ -98,10 +98,9 @@ listview ld size model =
                 { onPress = Just DonePress, label = E.text "logout" }
             ]
         , E.row [ E.spacing 8 ]
-            [ E.text "select a zk note"
-            , EI.button Common.buttonStyle { onPress = Just NewPress, label = E.text "new" }
+            [ EI.button Common.buttonStyle { onPress = Just NewPress, label = E.text "new" }
             , EI.button Common.buttonStyle { onPress = Just ImportPress, label = E.text "import" }
-            , EI.button Common.buttonStyle { onPress = Just PowerDeletePress, label = E.text "delete all" }
+            , EI.button Common.buttonStyle { onPress = Just PowerDeletePress, label = E.text "delete..." }
             ]
         , E.map SPMsg <| SP.view False (size.width < maxwidth) 0 model.spmodel
         , E.table [ E.spacing 10, E.width E.fill, E.centerX ]
