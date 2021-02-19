@@ -333,11 +333,15 @@ zknview size model =
             dirty model
 
         dirtybutton =
-            if isdirty then
-                Common.buttonStyle ++ [ EBk.color TC.darkYellow ]
+            mkdirtystyle Common.buttonStyle
 
-            else
-                Common.buttonStyle
+        mkdirtystyle =
+            \style ->
+                if isdirty then
+                    style ++ [ EBk.color TC.darkYellow ]
+
+                else
+                    style
 
         nonme =
             model.ld.userid
@@ -447,6 +451,9 @@ zknview size model =
                 Err errors ->
                     E.text errors
 
+        parabuttonstyle =
+            Common.buttonStyle ++ [ E.paddingXY 10 0 ]
+
         searchPanel =
             let
                 spwidth =
@@ -538,6 +545,14 @@ zknview size model =
                                     model.zknSearchResult.notes
                        )
                 )
+
+        showpagelink =
+            case pageLink model of
+                Just pl ->
+                    E.link Common.linkStyle { url = pl, label = E.text pl }
+
+                Nothing ->
+                    E.none
     in
     E.column
         [ E.width E.fill, E.spacing 8, E.padding 8 ]
@@ -551,23 +566,26 @@ zknview size model =
               else
                 EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just DeletePress, label = E.text "delete" }
             ]
-        , E.row [ E.width E.fill, E.spacing 8 ]
-            [ EI.button
-                dirtybutton
-                { onPress = Just DonePress, label = E.text "done" }
-            , EI.button Common.buttonStyle { onPress = Just RevertPress, label = E.text "cancel" }
-            , EI.button Common.buttonStyle { onPress = Just ViewPress, label = E.text "view" }
-            , EI.button Common.buttonStyle { onPress = Just CopyPress, label = E.text "copy" }
+        , E.paragraph
+            [ E.width E.fill, E.spacingXY 3 17 ]
+          <|
+            List.intersperse (E.text " ")
+                [ EI.button
+                    (mkdirtystyle parabuttonstyle)
+                    { onPress = Just DonePress, label = E.text "done" }
+                , EI.button parabuttonstyle { onPress = Just RevertPress, label = E.text "cancel" }
+                , EI.button parabuttonstyle { onPress = Just ViewPress, label = E.text "view" }
+                , EI.button parabuttonstyle { onPress = Just CopyPress, label = E.text "copy" }
 
-            -- , EI.button Common.buttonStyle { onPress = Just LinksPress, label = E.text "links" }
-            , case isdirty of
-                True ->
-                    EI.button dirtybutton { onPress = Just SavePress, label = E.text "save" }
+                -- , EI.button parabuttonstyle { onPress = Just LinksPress, label = E.text"links" }
+                , case isdirty of
+                    True ->
+                        EI.button (mkdirtystyle parabuttonstyle) { onPress = Just SavePress, label = E.text "save" }
 
-                False ->
-                    E.none
-            , EI.button dirtybutton { onPress = Just NewPress, label = E.text "new" }
-            ]
+                    False ->
+                        E.none
+                , EI.button (mkdirtystyle parabuttonstyle) { onPress = Just NewPress, label = E.text "new" }
+                ]
         , EI.text
             (if nonme then
                 [ EF.color TC.darkGrey ]
@@ -590,7 +608,7 @@ zknview size model =
 
           else
             E.none
-        , E.row [ E.spacing 8, E.width E.shrink ]
+        , E.row [ E.spacing 8, E.width E.fill ]
             [ EI.checkbox [ E.width E.shrink ]
                 { onChange =
                     if nonme then
@@ -603,7 +621,7 @@ zknview size model =
                 , label = EI.labelLeft [] (E.text "public")
                 }
             , if public then
-                EI.text []
+                EI.text [ E.width E.fill ]
                     { onChange =
                         if nonme then
                             always Noop
@@ -617,13 +635,17 @@ zknview size model =
 
               else
                 E.none
-            , case pageLink model of
-                Just pl ->
-                    E.link Common.linkStyle { url = pl, label = E.text pl }
+            , if wclass /= Narrow then
+                showpagelink
 
-                Nothing ->
-                    E.none
+              else
+                E.none
             ]
+        , if wclass == Narrow then
+            showpagelink
+
+          else
+            E.none
         , case wclass of
             Wide ->
                 E.row
