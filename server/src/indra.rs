@@ -393,7 +393,7 @@ pub fn save_zklink<T: indradb::Transaction>(
 }
 
 pub fn get_systemvs<T: indradb::Transaction>(itr: &T) -> Result<SystemVs, errors::Error> {
-  let vq = indradb::VertexQuery::Range(indradb::RangeVertexQuery::new(100).t(Type::new("system")?));
+  let vq = indradb::VertexQuery::Range(indradb::RangeVertexQuery::new().t(Type::new("system")?));
 
   let mut public = None;
   let mut search = None;
@@ -508,8 +508,9 @@ pub fn save_zknote<T: indradb::Transaction>(
 pub fn note_owner<T: indradb::Transaction>(itr: &T, id: Uuid) -> Result<Uuid, errors::Error> {
   let vq = indradb::VertexQuery::Specific(indradb::SpecificVertexQuery::single(id).into());
   // get note owner.
-  let eq = indradb::PipeEdgeQuery::new(Box::new(vq.clone()), indradb::EdgeDirection::Outbound, 1)
-    .t(Type::new("owner")?);
+  let eq = indradb::PipeEdgeQuery::new(Box::new(vq.clone()), indradb::EdgeDirection::Outbound)
+    .t(Type::new("owner")?)
+    .limit(1);
 
   let user = itr
     .get_edges(eq)?
@@ -528,7 +529,7 @@ pub fn is_note_shared<T: indradb::Transaction>(
   id: Uuid,
 ) -> Result<bool, errors::Error> {
   // get the edges for this note.
-  let sq = indradb::SpecificVertexQuery::single(id).inbound(1000); // edges where inbound = id?
+  let sq = indradb::SpecificVertexQuery::single(id).inbound(); // edges where inbound = id?
   let es: Vec<Edge> = itr.get_edges(sq)?; // the vertex ids are the outbound ends.
 
   // any connections between the vertices and svs.share?
@@ -576,7 +577,8 @@ pub fn read_zknote<T: indradb::Transaction>(
   let vq = indradb::VertexQuery::Specific(indradb::SpecificVertexQuery::single(id).into());
 
   // get note owner.
-  let eq = indradb::PipeEdgeQuery::new(Box::new(vq.clone()), indradb::EdgeDirection::Inbound, 1)
+  let eq = indradb::PipeEdgeQuery::new(Box::new(vq.clone()), indradb::EdgeDirection::Inbound)
+    .limit(1)
     .t(Type::new("owner")?);
 
   let user = UserId(
@@ -610,7 +612,7 @@ pub fn read_zklinks<T: indradb::Transaction>(
   id: Uuid,
 ) -> Result<Vec<ZkLink>, errors::Error> {
   let ib = indradb::SpecificVertexQuery::single(id)
-    .inbound(1000)
+    .inbound()
     .t(Type::default());
 
   let mut links = Vec::new();
@@ -649,7 +651,7 @@ pub fn read_zklinks<T: indradb::Transaction>(
   }
 
   let ob = indradb::SpecificVertexQuery::single(id)
-    .outbound(1000)
+    .outbound()
     .t(Type::default());
   for e in itr.get_edges(ob)?.iter() {
     assert_eq!(e.key.outbound_id, id);
@@ -727,14 +729,14 @@ pub fn mkpropquery(
 ) -> Box<dyn Fn(Option<Uuid>) -> Result<indradb::VertexPropertyQuery, errors::Error>> {
   Box::new(move |uuid| match uuid {
     Some(id) => Ok(indradb::VertexPropertyQuery::new(
-      indradb::RangeVertexQuery::new(100)
+      indradb::RangeVertexQuery::new()
         .t(Type::new(vtype.as_str())?)
         .start_id(id)
         .into(),
       prop.as_str(),
     )),
     None => Ok(indradb::VertexPropertyQuery::new(
-      indradb::RangeVertexQuery::new(100)
+      indradb::RangeVertexQuery::new()
         .t(Type::new(vtype.as_str())?)
         .into(),
       prop.as_str(),
@@ -928,7 +930,7 @@ pub fn search_zknotes<T: indradb::Transaction>(
   //
   // first, resolve the UUIDs of all t'tag' things.
 
-  let urecs = uq.inbound(10000).inbound(10000);
+  let urecs = uq.inbound().inbound();
 
   // find_all(itr, urecs
 

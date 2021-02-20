@@ -27,4 +27,4 @@ lettre = "0.9"
 lettre_email = "0.9"
 barrel = { version = "0.6.5", features = ["sqlite3"] }
 clap = "2.33.2"
-indradb-lib = { version = "1", features = ["sled-datastore"] }
+indradb-lib = { version = "2.1.0", features = ["sled-datastore"] }
