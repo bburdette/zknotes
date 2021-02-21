@@ -629,6 +629,8 @@ pub fn read_zklistnote<T: indradb::Transaction>(
       .outbound_id,
   );
 
+  println!("allprops {:?}", itr.get_all_vertex_properties(vq.clone())?);
+
   Ok(ZkListNote {
     id: id,
     title: getprop(itr, &vq, "title")?,
@@ -953,10 +955,12 @@ mod test {
         )?
       );
 
+      println!("----------------search test -------------------------");
+
       let zklns = search_zknotes(
         &itr,
         &svs,
-        tuid1,
+        tuid2,
         &ZkNoteSearch {
           tagsearch: TagSearch::SearchTerm {
             mods: Vec::new(),
@@ -969,7 +973,7 @@ mod test {
 
       println!("{:?}", zklns);
 
-      assert_eq!(zklns.notes.len(), 1);
+      assert_ne!(zklns.notes.len(), 0);
 
       println!("indra test end");
     }
@@ -994,6 +998,7 @@ pub fn checknote<T: indradb::Transaction>(
   uuid: Uuid,
   ts: &TagSearch,
 ) -> Result<bool, errors::Error> {
+  println!("checknote: {:?}", uuid);
   match ts {
     TagSearch::SearchTerm { mods, term } => {
       let mut exact = false;
@@ -1023,8 +1028,11 @@ pub fn checknote<T: indradb::Transaction>(
 
       let mut ret = false;
       for p in vps {
+        println!("pval: {:?}", p.value);
         match p.value.to_string().to_lowercase().find(term) {
           Some(_) => {
+            println!("found: {}", term);
+
             ret = true;
             break;
           }
@@ -1044,13 +1052,16 @@ pub fn tagsearch<T: indradb::Transaction>(
   search: &TagSearch,
 ) -> Result<Vec<Uuid>, errors::Error> {
   // lets search notes this user owns.
-  let uq = indradb::SpecificVertexQuery::single(user.0);
+  let uq = indradb::SpecificVertexQuery::single(user.0)
+    .outbound()
+    .inbound();
 
   let verts = itr.get_vertices(uq)?;
 
   let mut res = Vec::new();
 
   for v in verts {
+    println!("v1: {:?}", v);
     if checknote(itr, v.id, search)? {
       res.push(v.id);
     }
@@ -1067,10 +1078,14 @@ pub fn search_zknotes<T: indradb::Transaction>(
 ) -> Result<ZkNoteSearchResult, errors::Error> {
   let ids = tagsearch(itr, user, &search.tagsearch)?;
 
+  println!("ids: {:?}", ids);
+
   let mut notes = Vec::new();
 
   for id in ids {
-    notes.push(read_zklistnote(itr, systemvs, Some(user), id)?);
+    let zkln = read_zklistnote(itr, systemvs, Some(user), id)?;
+    println!("zkln {:?}", zkln);
+    notes.push(zkln);
   }
 
   // Ok(ZkListNote {
@@ -1082,7 +1097,7 @@ pub fn search_zknotes<T: indradb::Transaction>(
   // )};
 
   Ok(ZkNoteSearchResult {
-    notes: Vec::new(),
+    notes: notes,
     offset: search.offset,
   })
 }
