@@ -1088,14 +1088,6 @@ pub fn search_zknotes<T: indradb::Transaction>(
     notes.push(zkln);
   }
 
-  // Ok(ZkListNote {
-  //   id: row.get(0)?,
-  //   title: row.get(1)?,
-  //   user: row.get(2)?,
-  //   createdate: row.get(3)?,
-  //   changeddate: row.get(4)?,
-  // )};
-
   Ok(ZkNoteSearchResult {
     notes: notes,
     offset: search.offset,
