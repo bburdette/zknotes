@@ -13,7 +13,7 @@ use icontent::{
   ZkListNote, ZkNote, ZkNoteEdit,
 };
 use indra_util::{find_all_q, find_first_q, getoptedgeprop, getoptprop, getprop};
-use isearch::{SearchMod, TagSearch, ZkNoteSearch, ZkNoteSearchResult};
+use isearch::{AndOr, SearchMod, TagSearch, ZkNoteSearch, ZkNoteSearchResult};
 use std::time::SystemTime;
 use user::{User, ZkDatabase};
 use util::now;
@@ -955,8 +955,6 @@ mod test {
         )?
       );
 
-      println!("----------------search test -------------------------");
-
       let zklns = search_zknotes(
         &itr,
         &svs,
@@ -974,6 +972,74 @@ mod test {
       println!("{:?}", zklns);
 
       assert_ne!(zklns.notes.len(), 0);
+
+      let zklnsNOT = search_zknotes(
+        &itr,
+        &svs,
+        tuid2,
+        &ZkNoteSearch {
+          tagsearch: TagSearch::Not {
+            ts: Box::new(TagSearch::SearchTerm {
+              mods: Vec::new(),
+              term: "test".to_string(),
+            }),
+          },
+          offset: None,
+          limit: None,
+        },
+      )?;
+
+      assert_eq!(zklnsNOT.notes.len(), 0);
+
+      println!("----------------search AND test -------------------------");
+
+      let zklnsAND = search_zknotes(
+        &itr,
+        &svs,
+        tuid2,
+        &ZkNoteSearch {
+          tagsearch: TagSearch::Boolex {
+            ts1: Box::new(TagSearch::SearchTerm {
+              mods: Vec::new(),
+              term: "test".to_string(),
+            }),
+            ao: AndOr::And,
+            ts2: Box::new(TagSearch::SearchTerm {
+              mods: Vec::new(),
+              term: "4".to_string(),
+            }),
+          },
+          offset: None,
+          limit: None,
+        },
+      )?;
+
+      assert_eq!(zklnsAND.notes.len(), 1);
+
+      println!("----------------search OR test -------------------------");
+
+      let zklnsOR = search_zknotes(
+        &itr,
+        &svs,
+        tuid2,
+        &ZkNoteSearch {
+          tagsearch: TagSearch::Boolex {
+            ts1: Box::new(TagSearch::SearchTerm {
+              mods: Vec::new(),
+              term: "3".to_string(),
+            }),
+            ao: AndOr::Or,
+            ts2: Box::new(TagSearch::SearchTerm {
+              mods: Vec::new(),
+              term: "4".to_string(),
+            }),
+          },
+          offset: None,
+          limit: None,
+        },
+      )?;
+
+      assert_eq!(zklnsOR.notes.len(), 1);
 
       println!("indra test end");
     }
@@ -1041,8 +1107,11 @@ pub fn checknote<T: indradb::Transaction>(
       }
       Ok(ret)
     }
-    TagSearch::Not { ts } => Ok(false),
-    TagSearch::Boolex { ts1, ao, ts2 } => Ok(false),
+    TagSearch::Not { ts } => Ok(!checknote(itr, uuid, ts)?),
+    TagSearch::Boolex { ts1, ao, ts2 } => Ok(match ao {
+      AndOr::Or => checknote(itr, uuid, ts1)? || checknote(itr, uuid, ts2)?,
+      AndOr::And => checknote(itr, uuid, ts1)? && checknote(itr, uuid, ts2)?,
+    }),
   }
 }
 
