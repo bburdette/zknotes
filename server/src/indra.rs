@@ -13,7 +13,7 @@ use icontent::{
   ZkListNote, ZkNote, ZkNoteEdit,
 };
 use indra_util::{find_all_q, find_first_q, getoptedgeprop, getoptprop, getprop};
-use isearch::{TagSearch, ZkNoteSearch, ZkNoteSearchResult};
+use isearch::{SearchMod, TagSearch, ZkNoteSearch, ZkNoteSearchResult};
 use std::time::SystemTime;
 use user::{User, ZkDatabase};
 use util::now;
@@ -1007,16 +1007,16 @@ pub fn checknote<T: indradb::Transaction>(
       let mut user = false;
       for m in mods {
         match m {
-          ExactMatch => {
+          SearchMod::ExactMatch => {
             exact = true;
           }
-          Tag => {
+          SearchMod::Tag => {
             tag = true;
           }
-          Note => {
+          SearchMod::Note => {
             note = true;
           }
-          User => {
+          SearchMod::User => {
             user = true;
           }
         }
