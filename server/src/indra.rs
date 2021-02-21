@@ -13,7 +13,7 @@ use icontent::{
   ZkNote, ZkNoteEdit,
 };
 use indra_util::{find_all_q, find_first_q, getoptedgeprop, getoptprop, getprop};
-use isearch::{ZkNoteSearch, ZkNoteSearchResult};
+use isearch::{TagSearch, ZkNoteSearch, ZkNoteSearchResult};
 use std::time::SystemTime;
 use user::{User, ZkDatabase};
 use util::now;
@@ -897,6 +897,29 @@ mod test {
       let zkne2 = read_zknoteedit(&itr, tuid2, &GetZkNoteEdit { zknote: sid2.id })?;
       // println!("read_zknote {}", serde_json::to_string_pretty(&zkne2)?);
 
+      assert_eq!(
+        true,
+        checknote(
+          &itr,
+          sid4.id,
+          &TagSearch::SearchTerm {
+            mods: Vec::new(),
+            term: "4".to_string()
+          }
+        )?
+      );
+      assert_eq!(
+        false,
+        checknote(
+          &itr,
+          sid4.id,
+          &TagSearch::SearchTerm {
+            mods: Vec::new(),
+            term: "5".to_string()
+          }
+        )?
+      );
+
       println!("indra test end");
     }
     // delete the test db.
@@ -914,6 +937,86 @@ mod test {
     }
   }
 }
+
+pub fn checknote<T: indradb::Transaction>(
+  itr: &T,
+  uuid: Uuid,
+  ts: &TagSearch,
+) -> Result<bool, errors::Error> {
+  match ts {
+    TagSearch::SearchTerm { mods, term } => {
+      let mut exact = false;
+      let mut tag = false;
+      let mut note = false;
+      let mut user = false;
+      for m in mods {
+        match m {
+          ExactMatch => {
+            exact = true;
+          }
+          Tag => {
+            tag = true;
+          }
+          Note => {
+            note = true;
+          }
+          User => {
+            user = true;
+          }
+        }
+      }
+
+      let q = indradb::SpecificVertexQuery::single(uuid).into();
+      let vpq = indradb::VertexPropertyQuery::new(q, "title");
+      let mut vps = itr.get_vertex_properties(vpq)?;
+
+      let mut ret = false;
+      for p in vps {
+        match p.value.to_string().to_lowercase().find(term) {
+          Some(_) => {
+            ret = true;
+            break;
+          }
+          None => {}
+        }
+      }
+      Ok(ret)
+    }
+    TagSearch::Not { ts } => Ok(false),
+    TagSearch::Boolex { ts1, ao, ts2 } => Ok(false),
+  }
+}
+
+/*
+pub fn tagsearch<T: indradb::Transaction>(
+  itr: &T,
+  user: UserId,
+  search: &TagSearch,
+) -> Result<Vec<Uuid>, errors::Error> {
+  // lets search notes this user owns.
+  let uq = indradb::SpecificVertexQuery::single(user.0);
+
+  // straightforward property search only.
+
+  match search.tagsearch {
+    SearchTerm st => {
+      ExactMatch => {
+      }
+      Tag => {
+      }
+      Note => {
+      }
+      User => {
+      }
+    }
+    Not n => {
+    }
+    Boolex bx {
+    }
+
+  }
+}
+*/
 
 pub fn search_zknotes<T: indradb::Transaction>(
   itr: &T,

@@ -76,7 +76,7 @@ where
   }
 }
 
-// first first in a query that matches the test.
+// like find_first, but keeps going.
 pub fn find_all<T: indradb::Transaction, F>(
   itr: &T,
   vpq: indradb::VertexPropertyQuery,
@@ -98,7 +98,7 @@ where
   // }
 }
 
-// like find_first, but keeps going.
+// first first in a query that matches the test.
 pub fn find_first_q<T: indradb::Transaction, F, Q>(
   itr: &T,
   vpqf: Q,
