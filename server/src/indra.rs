@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 // use std::time::Duration;
 use icontent::{
   GetZkLinks, GetZkNoteEdit, ImportZkNote, LoginData, SaveZkNote, SavedZkNote, UserId, ZkLink,
-  ZkNote, ZkNoteEdit,
+  ZkListNote, ZkNote, ZkNoteEdit,
 };
 use indra_util::{find_all_q, find_first_q, getoptedgeprop, getoptprop, getprop};
 use isearch::{TagSearch, ZkNoteSearch, ZkNoteSearchResult};
@@ -605,6 +605,39 @@ pub fn read_zknote<T: indradb::Transaction>(
   })
 }
 
+pub fn read_zklistnote<T: indradb::Transaction>(
+  itr: &T,
+  svs: &SystemVs,
+  uid: Option<UserId>,
+  id: Uuid,
+) -> Result<ZkListNote, errors::Error> {
+  let accessible = is_note_accessible(itr, svs, uid, id)?;
+
+  let vq = indradb::VertexQuery::Specific(indradb::SpecificVertexQuery::single(id).into());
+
+  // get note owner.
+  let eq = indradb::PipeEdgeQuery::new(Box::new(vq.clone()), indradb::EdgeDirection::Inbound)
+    .limit(1)
+    .t(Type::new("owner")?);
+
+  let user = UserId(
+    itr
+      .get_edges(eq)?
+      .first()
+      .ok_or(SimpleError::new("user not found!"))?
+      .key
+      .outbound_id,
+  );
+
+  Ok(ZkListNote {
+    id: id,
+    title: getprop(itr, &vq, "title")?,
+    user: user,
+    createdate: getprop(itr, &vq, "createdate")?,
+    changeddate: getprop(itr, &vq, "changeddate")?,
+  })
+}
+
 pub fn read_zklinks<T: indradb::Transaction>(
   itr: &T,
   svs: &SystemVs,
@@ -920,6 +953,24 @@ mod test {
         )?
       );
 
+      let zklns = search_zknotes(
+        &itr,
+        &svs,
+        tuid1,
+        &ZkNoteSearch {
+          tagsearch: TagSearch::SearchTerm {
+            mods: Vec::new(),
+            term: "test".to_string(),
+          },
+          offset: None,
+          limit: None,
+        },
+      )?;
+
+      println!("{:?}", zklns);
+
+      assert_eq!(zklns.notes.len(), 1);
+
       println!("indra test end");
     }
     // delete the test db.
@@ -987,7 +1038,6 @@ pub fn checknote<T: indradb::Transaction>(
   }
 }
 
-/*
 pub fn tagsearch<T: indradb::Transaction>(
   itr: &T,
   user: UserId,
@@ -996,48 +1046,32 @@ pub fn tagsearch<T: indradb::Transaction>(
   // lets search notes this user owns.
   let uq = indradb::SpecificVertexQuery::single(user.0);
 
-  // straightforward property search only.
+  let verts = itr.get_vertices(uq)?;
 
-  match search.tagsearch {
-    SearchTerm st => {
-      ExactMatch => {
-      }
-      Tag => {
-      }
-      Note => {
-      }
-      User => {
-      }
-    }
-    Not n => {
-    }
-    Boolex bx {
-    }
+  let mut res = Vec::new();
 
+  for v in verts {
+    if checknote(itr, v.id, search)? {
+      res.push(v.id);
+    }
   }
+
+  Ok(res)
 }
-*/
 
 pub fn search_zknotes<T: indradb::Transaction>(
   itr: &T,
+  systemvs: &SystemVs,
   user: UserId,
   search: &ZkNoteSearch,
 ) -> Result<ZkNoteSearchResult, errors::Error> {
-  let uq = indradb::SpecificVertexQuery::single(user.0);
+  let ids = tagsearch(itr, user, &search.tagsearch)?;
 
-  // try this:
-  // 	 from the query, make a test that can be run on a given vertex.
-  // 	 get all vertices for the current user, iterate through and return matches.
-  // 	 repeat for share vertices, public vertices.
-  // queries that are t'whatever' are really searches.
-  //
-  // first, resolve the UUIDs of all t'tag' things.
+  let mut notes = Vec::new();
 
-  let urecs = uq.inbound().inbound();
-
-  // find_all(itr, urecs
-
-  // uq.inbound()
+  for id in ids {
+    notes.push(read_zklistnote(itr, systemvs, Some(user), id)?);
+  }
 
   // Ok(ZkListNote {
   //   id: row.get(0)?,
