@@ -1,1 +1,2 @@
-cargo watch -x run
+cargo watch -w src/ -w ../zkprotocol/src/ -x run
+# cargo watch -x run
