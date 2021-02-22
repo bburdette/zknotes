@@ -9,8 +9,8 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 // use std::time::Duration;
 use icontent::{
-  GetZkLinks, GetZkNoteEdit, ImportZkNote, LoginData, SaveZkNote, SavedZkNote, UserId, ZkLink,
-  ZkListNote, ZkNote, ZkNoteEdit,
+  Direction, GetZkLinks, GetZkNoteEdit, ImportZkNote, LoginData, SaveZkLink, SaveZkNote,
+  SavedZkNote, UserId, ZkLink, ZkListNote, ZkNote, ZkNoteEdit,
 };
 use indra_util::{find_all_q, find_first_q, getoptedgeprop, getoptprop, getprop};
 use isearch::{AndOr, SearchMod, TagSearch, ZkNoteSearch, ZkNoteSearchResult};
@@ -352,7 +352,7 @@ pub fn save_zklink<T: indradb::Transaction>(
   toid: &Uuid,
   user: &UserId,
   ltype: &Option<&str>,
-) -> Result<bool, errors::Error> {
+) -> Result<i64, errors::Error> {
   // link owner.
   // Uuid into type?
   //  then multiple links between things, per owner.
@@ -380,16 +380,117 @@ pub fn save_zklink<T: indradb::Transaction>(
 
   let useruuid = user.0.to_string();
 
-  let ret = itr.create_edge(&ek)?;
+  itr.create_edge(&ek)?;
+
+  // add the user.
   itr.set_edge_properties(
     indradb::EdgePropertyQuery::new(
-      indradb::EdgeQuery::Specific(indradb::SpecificEdgeQuery::single(ek)),
+      indradb::EdgeQuery::Specific(indradb::SpecificEdgeQuery::single(ek.clone())),
       useruuid,
     ),
     &serde_json::to_value(true)?,
   )?;
 
-  Ok(ret)
+  // increment user count.
+  let ucount =
+    indradb::EdgePropertyQuery::new(indradb::SpecificEdgeQuery::single(ek).into(), "usercount");
+
+  match itr.get_edge_properties(ucount.clone())?.first() {
+    Some(c) => {
+      let count = c.value.as_i64().ok_or(simple_error::SimpleError::new(
+        format!("edge user count not a number! {}", c.value)
+          .to_string()
+          .as_str(),
+      ))?;
+      itr.set_edge_properties(ucount, &serde_json::to_value(count + 1)?)?;
+      Ok(count + 1)
+    }
+    None => {
+      itr.set_edge_properties(ucount, &serde_json::to_value(1)?)?;
+      Ok(1)
+    }
+  }
+}
+
+pub fn delete_zklink<T: indradb::Transaction>(
+  itr: &T,
+  fromid: &Uuid,
+  toid: &Uuid,
+  user: &UserId,
+  ltype: &Option<&str>,
+) -> Result<i64, errors::Error> {
+  let ek = indradb::EdgeKey::new(
+    *toid,
+    match ltype {
+      Some(t) => Type::new(t.to_string())?,
+      None => Type::default(),
+    },
+    *fromid,
+  );
+
+  let useruuid = user.0.to_string();
+
+  // is this user on the edge now?
+  let ueq = indradb::EdgePropertyQuery::new(
+    indradb::SpecificEdgeQuery::single(ek.clone()).into(),
+    useruuid,
+  );
+
+  match itr.get_edge_properties(ueq.clone())?.first() {
+    None => Ok(0),
+    Some(_) => {
+      // remove the user
+      itr.delete_edge_properties(ueq)?;
+
+      // decrement user count.
+      let ucount = indradb::EdgePropertyQuery::new(
+        indradb::SpecificEdgeQuery::single(ek.clone()).into(),
+        "usercount",
+      );
+
+      let eps = itr.get_edge_properties(ucount.clone())?;
+      let c = eps.first().ok_or(simple_error::SimpleError::new(
+        "user count wasn't found on this edge",
+      ))?;
+      let count = c.value.as_i64().ok_or(simple_error::SimpleError::new(
+        format!("edge user count not a number! {}", c.value)
+          .to_string()
+          .as_str(),
+      ))?;
+
+      if count == 1 {
+        // last user out, delete the edge
+        itr.delete_edges(indradb::SpecificEdgeQuery::single(ek))?;
+        Ok(0)
+      } else {
+        itr.set_edge_properties(ucount, &serde_json::to_value(count - 1)?)?;
+        Ok(count - 1)
+      }
+    }
+  }
+}
+
+pub fn save_savezklinks<T: indradb::Transaction>(
+  itr: &T,
+  userid: UserId,
+  zknid: Uuid,
+  zklinks: Vec<SaveZkLink>,
+) -> Result<(), errors::Error> {
+  for link in zklinks.iter() {
+    let (from, to) = match link.direction {
+      Direction::From => (zknid, link.otherid),
+      Direction::To => (link.otherid, zknid),
+    };
+    if link.user.0 == userid.0 {
+      if link.delete == Some(true) {
+        delete_zklink(itr, &from, &to, &userid, &None)?;
+      } else {
+        save_zklink(itr, &from, &to, &userid, &None)?;
+      }
+    }
+  }
+
+  Ok(())
 }
 
 pub fn get_systemvs<T: indradb::Transaction>(itr: &T) -> Result<SystemVs, errors::Error> {
@@ -640,6 +741,20 @@ pub fn read_zklistnote<T: indradb::Transaction>(
   })
 }
 
+pub fn delete_zknote<T: indradb::Transaction>(
+  itr: &T,
+  uid: UserId,
+  id: Uuid,
+) -> Result<(), errors::Error> {
+  if !is_note_mine(itr, id, uid)? {
+    Err(simple_error::SimpleError::new("can't delete another user's note.").into())
+  } else {
+    let vq = indradb::VertexQuery::Specific(indradb::SpecificVertexQuery::single(id).into());
+    itr.delete_vertices(vq)?;
+    Ok(())
+  }
+}
+
 pub fn read_zklinks<T: indradb::Transaction>(
   itr: &T,
   svs: &SystemVs,
@@ -743,13 +858,6 @@ pub fn read_zknoteedit<T: indradb::Transaction>(
 }
 
 /*
-pub fn search_zknotes<T: indradb::Transaction>(
-  itr: &T,
-  uid: UserId,
-  search: &ZkNoteSearch,
-) -> Result<ZkNoteSearchResult, errors::Error> {
-}
-
 pub fn power_delete_zknotes<T: indradb::Transaction>(
   itr: &T,
   uid: UserId,
@@ -789,6 +897,7 @@ mod test {
     let path = "indra-test";
     // delete the db if its there.
     fs::remove_dir_all(path);
+
     {
       // compression factor of 5 (default)
       let sc = indradb::SledConfig::with_compression(None);
