@@ -20,17 +20,18 @@ import Markdown.Parser
 import Markdown.Renderer
 import Schelme.Show exposing (showTerm)
 import TangoColors as TC
+import UUID exposing (UUID)
 
 
 type Msg
     = OnSchelmeCodeChanged String String
     | DonePress
-    | SwitchPress Int
+    | SwitchPress UUID
     | Noop
 
 
 type alias Model =
-    { id : Maybe Int
+    { id : Maybe UUID
     , pubid : Maybe String
     , title : String
     , md : String
@@ -42,22 +43,22 @@ type alias Model =
 type Command
     = None
     | Done
-    | Switch Int
+    | Switch UUID
 
 
-zkLinkName : Data.ZkLink -> Int -> String
+zkLinkName : Data.ZkLink -> UUID -> String
 zkLinkName zklink noteid =
     if noteid == zklink.from then
-        zklink.toname |> Maybe.withDefault (String.fromInt zklink.to)
+        zklink.toname |> Maybe.withDefault (UUID.toString zklink.to)
 
     else if noteid == zklink.to then
-        zklink.fromname |> Maybe.withDefault (String.fromInt zklink.from)
+        zklink.fromname |> Maybe.withDefault (UUID.toString zklink.from)
 
     else
         "link error"
 
 
-showZkl : Int -> Data.ZkLink -> Element Msg
+showZkl : UUID -> Data.ZkLink -> Element Msg
 showZkl id zkl =
     let
         ( dir, otherid ) =

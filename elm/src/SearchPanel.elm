@@ -42,7 +42,9 @@ getSearch model =
         |> Maybe.map
             (\s ->
                 { tagSearch = s
-                , offset = model.paginationModel.offset
+
+                -- , offset = model.paginationModel.offset
+                , offset = Nothing
                 , limit = Just model.paginationModel.increment
                 }
             )
@@ -106,7 +108,9 @@ update msg model =
                     ( { model | tagSearchModel = nm, paginationModel = PP.initModel }
                     , Search <|
                         { tagSearch = ts
-                        , offset = model.paginationModel.offset
+
+                        -- , offset = model.paginationModel.offset
+                        , offset = Nothing
                         , limit = Just model.paginationModel.increment
                         }
                     )
@@ -126,7 +130,9 @@ update msg model =
                             ( { model | paginationModel = nm }
                             , Search
                                 { tagSearch = ts
-                                , offset = nm.offset
+
+                                -- , offset = nm.offset
+                                , offset = Nothing
                                 , limit = Just nm.increment
                                 }
                             )

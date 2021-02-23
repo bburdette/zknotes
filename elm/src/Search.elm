@@ -22,12 +22,13 @@ import Parser
         , symbol
         )
 import TDict exposing (TDict)
+import UUID exposing (UUID)
 import Util exposing (first, rest)
 
 
 type alias ZkNoteSearch =
     { tagSearch : TagSearch
-    , offset : Int
+    , offset : Maybe UUID
     , limit : Maybe Int
     }
 
@@ -40,7 +41,7 @@ defaultSearchLimit =
 defaultSearch : ZkNoteSearch
 defaultSearch =
     { tagSearch = SearchTerm [] ""
-    , offset = 0
+    , offset = Nothing
     , limit = Just defaultSearchLimit
     }
 
@@ -130,9 +131,14 @@ encodeTagSearch ts =
 encodeZkNoteSearch : ZkNoteSearch -> JE.Value
 encodeZkNoteSearch zns =
     JE.object <|
-        [ ( "tagsearch", encodeTagSearch zns.tagSearch )
-        , ( "offset", JE.int zns.offset )
-        ]
+        [ ( "tagsearch", encodeTagSearch zns.tagSearch ) ]
+            ++ (zns.offset
+                    |> Maybe.map
+                        (\o ->
+                            [ ( "offset", UUID.toValue o ) ]
+                        )
+                    |> Maybe.withDefault []
+               )
             ++ (zns.limit
                     |> Maybe.map (\i -> [ ( "limit", JE.int i ) ])
                     |> Maybe.withDefault []

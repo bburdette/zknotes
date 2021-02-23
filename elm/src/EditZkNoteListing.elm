@@ -14,11 +14,12 @@ import Search as S exposing (TagSearch(..))
 import SearchPanel as SP
 import TagSearchPanel as TSP
 import TangoColors as TC
+import UUID exposing (UUID)
 import Util
 
 
 type Msg
-    = SelectPress Int
+    = SelectPress UUID
     | NewPress
     | DonePress
     | ImportPress
@@ -40,7 +41,7 @@ type alias Model =
 
 
 type Command
-    = Selected Int
+    = Selected UUID
     | New
     | Done
     | Import

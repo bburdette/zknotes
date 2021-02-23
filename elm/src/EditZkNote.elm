@@ -3,8 +3,8 @@ module EditZkNote exposing
     , Model
     ,  Msg(..)
        -- , addListNote
+       -- , compareZklinks
 
-    , compareZklinks
     , dirty
     , gotId
     , gotSelectedText
@@ -47,6 +47,7 @@ import Schelme.Show exposing (showTerm)
 import Search as S
 import SearchPanel as SP
 import TangoColors as TC
+import UUID exposing (UUID)
 import Url as U
 import Url.Builder as UB
 import Url.Parser as UP exposing ((</>))
@@ -65,7 +66,7 @@ type Msg
     | ViewPress
     | NewPress
     | CopyPress
-    | SwitchPress Int
+    | SwitchPress UUID
     | LinkPress Data.ZkListNote
     | PublicPress Bool
     | RemoveLink EditLink
@@ -84,10 +85,9 @@ type NavChoice
 
 
 type alias EditLink =
-    { otherid : Int
+    { otherid : UUID
     , direction : Direction
-    , user : Int
-    , zknote : Maybe Int
+    , user : UUID
     , othername : Maybe String
     , delete : Maybe Bool
     }
@@ -100,9 +100,9 @@ type WClass
 
 
 type alias Model =
-    { id : Maybe Int
+    { id : Maybe UUID
     , ld : Data.LoginData
-    , noteUser : Int
+    , noteUser : UUID
     , noteUserName : String
     , zknSearchResult : Data.ZkNoteSearchResult
     , zklDict : Dict String EditLink
@@ -124,9 +124,9 @@ type Command
     | SaveExit Data.SaveZkNotePlusLinks
     | Revert
     | View Data.SaveZkNote
-    | Delete Int
-    | Switch Int
-    | SaveSwitch Data.SaveZkNotePlusLinks Int
+    | Delete UUID
+    | Switch UUID
+    | SaveSwitch Data.SaveZkNotePlusLinks UUID
     | GetSelectedText String
     | Search S.ZkNoteSearch
 
@@ -136,19 +136,17 @@ elToSzl el =
     { otherid = el.otherid
     , direction = el.direction
     , user = el.user
-    , zknote = el.zknote
     , delete = el.delete
     }
 
 
-elToSzkl : Int -> EditLink -> Data.ZkLink
+elToSzkl : UUID -> EditLink -> Data.ZkLink
 elToSzkl this el =
     case el.direction of
         From ->
             { from = this
             , to = el.otherid
             , user = el.user
-            , zknote = Nothing
             , fromname = Nothing
             , toname = Nothing
             , delete = Nothing
@@ -158,7 +156,6 @@ elToSzkl this el =
             { from = el.otherid
             , to = this
             , user = el.user
-            , zknote = Nothing
             , fromname = Nothing
             , toname = Nothing
             , delete = Nothing
@@ -208,13 +205,13 @@ toPubId public pubidtxt =
         Nothing
 
 
-zkLinkName : Data.ZkLink -> Int -> String
+zkLinkName : Data.ZkLink -> UUID -> String
 zkLinkName zklink noteid =
     if noteid == zklink.from then
-        zklink.toname |> Maybe.withDefault (String.fromInt zklink.to)
+        zklink.toname |> Maybe.withDefault (UUID.toString zklink.to)
 
     else if noteid == zklink.to then
-        zklink.fromname |> Maybe.withDefault (String.fromInt zklink.from)
+        zklink.fromname |> Maybe.withDefault (UUID.toString zklink.from)
 
     else
         "link error"
@@ -235,7 +232,7 @@ dirty model =
         |> Maybe.withDefault True
 
 
-showZkl : List (E.Attribute Msg) -> Bool -> Int -> Maybe Int -> EditLink -> Element Msg
+showZkl : List (E.Attribute Msg) -> Bool -> UUID -> Maybe UUID -> EditLink -> Element Msg
 showZkl dirtybutton nonme user id zkl =
     let
         ( dir, otherid ) =
@@ -302,7 +299,7 @@ pageLink model =
                             UB.absolute [ "page", pubid ] []
                         )
                     |> Util.mapNothing
-                        (UB.absolute [ "note", String.fromInt id ] [])
+                        (UB.absolute [ "note", UUID.toString id ] [])
             )
 
 
@@ -716,9 +713,9 @@ zknview size model =
         ]
 
 
-zklKey : { a | otherid : Int, direction : Direction } -> String
+zklKey : { a | otherid : UUID, direction : Direction } -> String
 zklKey zkl =
-    String.fromInt zkl.otherid
+    UUID.toString zkl.otherid
         ++ ":"
         ++ (case zkl.direction of
                 From ->
@@ -729,7 +726,7 @@ zklKey zkl =
            )
 
 
-linksWith : List EditLink -> Int -> Bool
+linksWith : List EditLink -> UUID -> Bool
 linksWith links linkid =
     Util.trueforany (\l -> l.otherid == linkid) links
 
@@ -739,7 +736,7 @@ isPublic model =
     linksWith (Dict.values model.zklDict) model.ld.publicid
 
 
-toEditLink : Int -> Data.ZkLink -> EditLink
+toEditLink : UUID -> Data.ZkLink -> EditLink
 toEditLink id zkl =
     let
         ( oid, direction ) =
@@ -752,7 +749,6 @@ toEditLink id zkl =
     { otherid = oid
     , direction = direction
     , user = zkl.user
-    , zknote = zkl.zknote
     , othername = Just <| zkLinkName zkl id
     , delete = zkl.delete
     }
@@ -869,7 +865,7 @@ replaceOrAdd items replacement compare mergef =
 -}
 
 
-gotId : Model -> Int -> Model
+gotId : Model -> UUID -> Model
 gotId model id =
     let
         -- if we already have an ID, keep it.
@@ -904,14 +900,14 @@ noteLink str =
             (UP.parse (UP.s "note" </> UP.int))
 
 
-compareZklinks : Data.ZkLink -> Data.ZkLink -> Order
-compareZklinks left right =
-    case compare left.from right.from of
-        EQ ->
-            compare left.to right.to
 
-        ltgt ->
-            ltgt
+-- compareZklinks : Data.ZkLink -> Data.ZkLink -> Order
+-- compareZklinks left right =
+--     case compare left.from right.from of
+--         EQ ->
+--             compare left.to right.to
+--         ltgt ->
+--             ltgt
 
 
 update : Msg -> Model -> ( Model, Command )
@@ -1032,7 +1028,6 @@ update msg model =
                     { direction = To
                     , otherid = zkln.id
                     , user = model.ld.userid
-                    , zknote = Nothing
                     , othername = Just zkln.title
                     , delete = Nothing
                     }
@@ -1067,7 +1062,7 @@ update msg model =
                         ++ title
                         ++ "]("
                         ++ "/note/"
-                        ++ String.fromInt id
+                        ++ UUID.toString id
                         ++ ")"
               }
             , None
@@ -1102,7 +1097,6 @@ update msg model =
                                 { direction = To
                                 , otherid = model.ld.publicid
                                 , user = model.ld.userid
-                                , zknote = Nothing
                                 , othername = Just "public"
                                 , delete = Nothing
                                 }

@@ -4,14 +4,15 @@ import Data
 import Json.Decode as JD
 import Json.Encode as JE
 import Search as S
+import UUID exposing (UUID)
 
 
 type SendMsg
     = Register String
     | Login
-    | GetZkNote Int
+    | GetZkNote UUID
     | GetZkNoteEdit Data.GetZkNoteEdit
-    | DeleteZkNote Int
+    | DeleteZkNote UUID
     | SaveZkNote Data.SaveZkNote
     | SaveZkLinks Data.ZkLinks
     | SaveZkNotePlusLinks Data.SaveZkNotePlusLinks
@@ -30,7 +31,7 @@ type ServerResponse
     | ZkNoteSearchResult Data.ZkNoteSearchResult
     | SavedZkNotePlusLinks Data.SavedZkNote
     | SavedZkNote Data.SavedZkNote
-    | DeletedZkNote Int
+    | DeletedZkNote UUID
     | ZkNote Data.ZkNote
     | ZkNoteEdit Data.ZkNoteEdit
     | ServerError String
@@ -115,7 +116,7 @@ encodeSendMsg sm uid pwd =
                 [ ( "what", JE.string "getzknote" )
                 , ( "uid", JE.string uid )
                 , ( "pwd", JE.string pwd )
-                , ( "data", JE.int id )
+                , ( "data", UUID.toValue id )
                 ]
 
         GetZkNoteEdit zkne ->
@@ -131,7 +132,7 @@ encodeSendMsg sm uid pwd =
                 [ ( "what", JE.string "deletezknote" )
                 , ( "uid", JE.string uid )
                 , ( "pwd", JE.string pwd )
-                , ( "data", JE.int id )
+                , ( "data", UUID.toValue id )
                 ]
 
         SaveZkNote sbe ->
@@ -231,7 +232,7 @@ serverResponseDecoder =
                     JD.map SavedZkNotePlusLinks (JD.at [ "content" ] <| Data.decodeSavedZkNote)
 
                 "deletedzknote" ->
-                    JD.map DeletedZkNote (JD.at [ "content" ] <| JD.int)
+                    JD.map DeletedZkNote (JD.at [ "content" ] <| UUID.jsonDecoder)
 
                 "zknote" ->
                     JD.map ZkNote (JD.at [ "content" ] <| Data.decodeZkNote)

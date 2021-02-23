@@ -47,6 +47,7 @@ import Search as S
 import SearchPanel as SP
 import TangoColors as TC
 import Task
+import UUID exposing (UUID)
 import Url as U
 import Url.Builder as UB
 import Url.Parser as UP exposing ((</>))
@@ -58,7 +59,7 @@ type Msg
     | CancelPress
     | FilesPress
     | LinkPress Data.ZkListNote
-    | RemoveLink Int
+    | RemoveLink UUID
     | SPMsg SP.Msg
     | DialogMsg D.Msg
     | FilesSelected F.File (List F.File)
@@ -83,7 +84,7 @@ type alias Model =
     { ld : Data.LoginData
     , notes : List Data.ImportZkNote
     , zknSearchResult : Data.ZkNoteSearchResult
-    , globlinks : Dict Int LinkHalf
+    , globlinks : Dict String LinkHalf
     , spmodel : SP.Model
     , dialog : Maybe D.Model
     }
@@ -131,19 +132,19 @@ addLinks izn lh =
     }
 
 
-zkLinkName : Data.ZkLink -> Int -> String
+zkLinkName : Data.ZkLink -> UUID -> String
 zkLinkName zklink noteid =
     if noteid == zklink.from then
-        zklink.toname |> Maybe.withDefault (String.fromInt zklink.to)
+        zklink.toname |> Maybe.withDefault (UUID.toString zklink.to)
 
     else if noteid == zklink.to then
-        zklink.fromname |> Maybe.withDefault (String.fromInt zklink.from)
+        zklink.fromname |> Maybe.withDefault (UUID.toString zklink.from)
 
     else
         "link error"
 
 
-showLh : Int -> LinkHalf -> Element Msg
+showLh : UUID -> LinkHalf -> Element Msg
 showLh id lh =
     E.row [ E.spacing 8, E.width E.fill ]
         [ case ( lh.from, lh.to ) of
@@ -207,8 +208,12 @@ importview size model =
 
         showLinks =
             E.row [ EF.bold ] [ E.text "links" ]
-                :: List.map
-                    (\( a, b ) -> showLh a b)
+                :: List.filterMap
+                    (\( a, b ) ->
+                        UUID.fromString a
+                            |> Result.map (\id -> Just <| showLh id b)
+                            |> Result.withDefault Nothing
+                    )
                     (Dict.toList model.globlinks)
 
         searchPanel =
@@ -237,7 +242,7 @@ importview size model =
                             (\zkln ->
                                 let
                                     tolinked =
-                                        Dict.get zkln.id model.globlinks
+                                        Dict.get (UUID.toString zkln.id) model.globlinks
                                             |> Maybe.map
                                                 (\lh -> lh.to)
                                             |> Maybe.withDefault
@@ -441,14 +446,14 @@ update msg model =
         LinkPress zkln ->
             -- add a zklink, or newlink?
             ( { model
-                | globlinks = Dict.insert zkln.id { title = zkln.title, to = True, from = False } model.globlinks
+                | globlinks = Dict.insert (UUID.toString zkln.id) { title = zkln.title, to = True, from = False } model.globlinks
               }
             , None
             )
 
         RemoveLink id ->
             ( { model
-                | globlinks = Dict.remove id model.globlinks
+                | globlinks = Dict.remove (UUID.toString id) model.globlinks
               }
             , None
             )

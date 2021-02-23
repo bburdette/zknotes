@@ -35,6 +35,7 @@ import Schelme.Show exposing (showTerm)
 import Search as S
 import SearchPanel as SP
 import ShowMessage
+import UUID exposing (UUID)
 import Url exposing (Url)
 import Url.Builder as UB
 import Url.Parser as UP exposing ((</>))
@@ -103,9 +104,9 @@ type alias Model =
 
 
 type Route
-    = PublicZkNote Int
+    = PublicZkNote String
     | PublicZkPubId String
-    | EditZkNoteR Int
+    | EditZkNoteR String
     | Top
 
 
@@ -113,13 +114,13 @@ routeTitle : Route -> String
 routeTitle route =
     case route of
         PublicZkNote id ->
-            "zknote " ++ String.fromInt id
+            "zknote " ++ id
 
         PublicZkPubId id ->
             "zknote " ++ id
 
         EditZkNoteR id ->
-            "zknote " ++ String.fromInt id
+            "zknote " ++ id
 
         Top ->
             "zknotes"
@@ -142,7 +143,7 @@ parseUrl url =
             [ UP.map PublicZkNote <|
                 UP.s
                     "note"
-                    </> UP.int
+                    </> UP.string
             , UP.map (\i -> PublicZkPubId (Maybe.withDefault "" (Url.percentDecode i))) <|
                 UP.s
                     "page"
@@ -150,7 +151,7 @@ parseUrl url =
             , UP.map EditZkNoteR <|
                 UP.s
                     "editnote"
-                    </> UP.int
+                    </> UP.string
             , UP.map Top <| UP.top
             ]
         )
@@ -161,13 +162,13 @@ routeUrl : Route -> String
 routeUrl route =
     case route of
         PublicZkNote id ->
-            UB.absolute [ "note", String.fromInt id ] []
+            UB.absolute [ "note", id ] []
 
         PublicZkPubId pubid ->
             UB.absolute [ "page", pubid ] []
 
         EditZkNoteR id ->
-            UB.absolute [ "editnote", String.fromInt id ] []
+            UB.absolute [ "editnote", id ] []
 
         Top ->
             UB.absolute [] []
@@ -177,8 +178,8 @@ routeState : Model -> Route -> Maybe ( State, Cmd Msg )
 routeState model route =
     case route of
         PublicZkNote id ->
-            case stateLogin model.state of
-                Just login ->
+            case ( stateLogin model.state, UUID.fromString id ) of
+                ( Just login, Ok uuid ) ->
                     Just
                         ( ShowMessage
                             { message = "loading article"
@@ -186,17 +187,21 @@ routeState model route =
                             login
                         , sendUIMsg model.location
                             login
-                            (UI.GetZkNoteEdit { zknote = id })
+                            (UI.GetZkNoteEdit { zknote = uuid })
                         )
 
-                Nothing ->
+                ( Nothing, Ok uuid ) ->
                     Just
                         ( PubShowMessage
                             { message = "loading article"
                             }
                         , sendPIMsg model.location
-                            (PI.GetZkNote id)
+                            (PI.GetZkNote uuid)
                         )
+
+                _ ->
+                    -- TODO error handling for bad uuid
+                    Nothing
 
         PublicZkPubId pubid ->
             Just
@@ -207,9 +212,9 @@ routeState model route =
                     (PI.GetZkNotePubId pubid)
                 )
 
-        EditZkNoteR id ->
-            case model.state of
-                EditZkNote st login ->
+        EditZkNoteR idstr ->
+            case ( model.state, UUID.fromString idstr ) of
+                ( EditZkNote st login, Ok id ) ->
                     Just <|
                         loadnote model
                             { login = login
@@ -223,7 +228,7 @@ routeState model route =
 
                 -- load the zknote in question.  will it load?
                 -- should ZkNote block the load if unsaved?  I guess.
-                EditZkNoteListing st login ->
+                ( EditZkNoteListing st login, Ok id ) ->
                     Just <|
                         loadnote model
                             { login = login
@@ -235,7 +240,7 @@ routeState model route =
                             }
                             id
 
-                st ->
+                ( st, Ok id ) ->
                     case stateLogin st of
                         Just login ->
                             Just <|
@@ -251,6 +256,9 @@ routeState model route =
 
                         Nothing ->
                             Nothing
+
+                _ ->
+                    Nothing
 
         Top ->
             if (stateRoute model.state).route == Top then
@@ -273,7 +281,7 @@ stateRoute state =
                 Nothing ->
                     case vst.id of
                         Just id ->
-                            { route = PublicZkNote id
+                            { route = PublicZkNote (UUID.toString id)
                             , save = True
                             }
 
@@ -285,7 +293,7 @@ stateRoute state =
         EditZkNote st login ->
             { route =
                 st.id
-                    |> Maybe.map EditZkNoteR
+                    |> Maybe.map (\id -> EditZkNoteR (UUID.toString id))
                     |> Maybe.withDefault Top
             , save = True
             }
@@ -550,7 +558,7 @@ notewait nwstate state wmsg =
             ( es, Cmd.none )
 
 
-loadnote : Model -> NwState -> Int -> ( State, Cmd Msg )
+loadnote : Model -> NwState -> UUID -> ( State, Cmd Msg )
 loadnote model nwstate zknid =
     let
         nws =
@@ -956,7 +964,7 @@ actualupdate msg model =
                                         | state =
                                             EditZkNote
                                                 (EditZkNote.initFull login.ld
-                                                    { notes = [], offset = 0 }
+                                                    { notes = [], offset = Nothing }
                                                     zne.zknote
                                                     { links = zne.links }
                                                     SP.initModel

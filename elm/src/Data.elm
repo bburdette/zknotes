@@ -40,7 +40,7 @@ type alias ZkListNote =
 
 type alias ZkNoteSearchResult =
     { notes : List ZkListNote
-    , offset : UUID
+    , offset : Maybe UUID
     }
 
 
@@ -253,7 +253,7 @@ decodeZkNoteSearchResult : JD.Decoder ZkNoteSearchResult
 decodeZkNoteSearchResult =
     JD.map2 ZkNoteSearchResult
         (JD.field "notes" (JD.list decodeZkListNote))
-        (JD.field "offset" UUID.jsonDecoder)
+        (JD.field "offset" (JD.maybe UUID.jsonDecoder))
 
 
 decodeSavedZkNote : JD.Decoder SavedZkNote

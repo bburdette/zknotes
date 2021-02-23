@@ -3,11 +3,12 @@ module PublicInterface exposing (SendMsg(..), ServerResponse(..), encodeSendMsg,
 import Data
 import Json.Decode as JD
 import Json.Encode as JE
+import UUID exposing (UUID)
 import Util
 
 
 type SendMsg
-    = GetZkNote Int
+    = GetZkNote UUID
     | GetZkNotePubId String
 
 
@@ -22,7 +23,7 @@ encodeSendMsg sm =
         GetZkNote id ->
             JE.object
                 [ ( "what", JE.string "getzknote" )
-                , ( "data", JE.int id )
+                , ( "data", UUID.toValue id )
                 ]
 
         GetZkNotePubId pubid ->
