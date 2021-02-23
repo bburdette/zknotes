@@ -3,6 +3,7 @@ module Data exposing (..)
 import Json.Decode as JD
 import Json.Encode as JE
 import Search as S
+import UUID exposing (UUID)
 
 
 type alias LoggedIn =
@@ -20,17 +21,17 @@ type alias Login a =
 
 
 type alias LoginData =
-    { userid : Int
+    { userid : UUID
     , name : String
-    , publicid : Int
-    , shareid : Int
-    , searchid : Int
+    , publicid : UUID
+    , shareid : UUID
+    , searchid : UUID
     }
 
 
 type alias ZkListNote =
-    { id : Int
-    , user : Int
+    { id : UUID
+    , user : UUID
     , title : String
     , createdate : Int
     , changeddate : Int
@@ -39,19 +40,19 @@ type alias ZkListNote =
 
 type alias ZkNoteSearchResult =
     { notes : List ZkListNote
-    , offset : Int
+    , offset : UUID
     }
 
 
 type alias SavedZkNote =
-    { id : Int
+    { id : UUID
     , changeddate : Int
     }
 
 
 type alias ZkNote =
-    { id : Int
-    , user : Int
+    { id : UUID
+    , user : UUID
     , username : String
     , title : String
     , content : String
@@ -62,7 +63,7 @@ type alias ZkNote =
 
 
 type alias SaveZkNote =
-    { id : Maybe Int
+    { id : Maybe UUID
     , pubid : Maybe String
     , title : String
     , content : String
@@ -70,10 +71,9 @@ type alias SaveZkNote =
 
 
 type alias ZkLink =
-    { from : Int
-    , to : Int
-    , user : Int
-    , zknote : Maybe Int
+    { from : UUID
+    , to : UUID
+    , user : UUID
     , fromname : Maybe String
     , toname : Maybe String
     , delete : Maybe Bool
@@ -86,10 +86,9 @@ type Direction
 
 
 type alias SaveZkLink =
-    { otherid : Int
+    { otherid : UUID
     , direction : Direction
-    , user : Int
-    , zknote : Maybe Int
+    , user : UUID
     , delete : Maybe Bool
     }
 
@@ -122,12 +121,12 @@ type alias ImportZkNote =
 
 
 type alias GetZkLinks =
-    { zknote : Int
+    { zknote : UUID
     }
 
 
 type alias GetZkNoteEdit =
-    { zknote : Int
+    { zknote : UUID
     }
 
 
@@ -140,14 +139,14 @@ type alias ZkNoteEdit =
 encodeGetZkLinks : GetZkLinks -> JE.Value
 encodeGetZkLinks gzl =
     JE.object
-        [ ( "zknote", JE.int gzl.zknote )
+        [ ( "zknote", UUID.toValue gzl.zknote )
         ]
 
 
 encodeGetZkNoteEdit : GetZkNoteEdit -> JE.Value
 encodeGetZkNoteEdit gzl =
     JE.object
-        [ ( "zknote", JE.int gzl.zknote )
+        [ ( "zknote", UUID.toValue gzl.zknote )
         ]
 
 
@@ -170,10 +169,9 @@ encodeDirection direction =
 
 encodeSaveZkLink : SaveZkLink -> JE.Value
 encodeSaveZkLink s =
-    [ Just ( "otherid", JE.int s.otherid )
+    [ Just ( "otherid", UUID.toValue s.otherid )
     , Just ( "direction", encodeDirection s.direction )
-    , Just ( "user", JE.int s.user )
-    , s.zknote |> Maybe.map (\n -> ( "zknote", JE.int n ))
+    , Just ( "user", UUID.toValue s.user )
     , s.delete |> Maybe.map (\n -> ( "delete", JE.bool n ))
     ]
         |> List.filterMap identity
@@ -189,31 +187,22 @@ decodeZkLinks =
 encodeZkLink : ZkLink -> JE.Value
 encodeZkLink zklink =
     JE.object <|
-        [ ( "from", JE.int zklink.from )
-        , ( "to", JE.int zklink.to )
-        , ( "user", JE.int zklink.user )
+        [ ( "from", UUID.toValue zklink.from )
+        , ( "to", UUID.toValue zklink.to )
+        , ( "user", UUID.toValue zklink.user )
         ]
             ++ (zklink.delete
                     |> Maybe.map (\b -> [ ( "delete", JE.bool b ) ])
                     |> Maybe.withDefault []
                )
-            ++ (zklink.zknote
-                    |> Maybe.map
-                        (\id ->
-                            [ ( "linkzknote", JE.int id ) ]
-                        )
-                    |> Maybe.withDefault
-                        []
-               )
 
 
 decodeZkLink : JD.Decoder ZkLink
 decodeZkLink =
-    JD.map7 ZkLink
-        (JD.field "from" JD.int)
-        (JD.field "to" JD.int)
-        (JD.field "user" JD.int)
-        (JD.maybe (JD.field "linkzknote" JD.int))
+    JD.map6 ZkLink
+        (JD.field "from" UUID.jsonDecoder)
+        (JD.field "to" UUID.jsonDecoder)
+        (JD.field "user" UUID.jsonDecoder)
         (JD.maybe (JD.field "fromname" JD.string))
         (JD.maybe (JD.field "toname" JD.string))
         (JD.succeed Nothing)
@@ -239,7 +228,7 @@ encodeSaveZkNotePlusLinks s =
 encodeSaveZkNote : SaveZkNote -> JE.Value
 encodeSaveZkNote zkn =
     JE.object <|
-        (Maybe.map (\id -> [ ( "id", JE.int id ) ]) zkn.id
+        (Maybe.map (\id -> [ ( "id", UUID.toValue id ) ]) zkn.id
             |> Maybe.withDefault []
         )
             ++ (Maybe.map (\pubid -> [ ( "pubid", JE.string pubid ) ]) zkn.pubid
@@ -253,8 +242,8 @@ encodeSaveZkNote zkn =
 decodeZkListNote : JD.Decoder ZkListNote
 decodeZkListNote =
     JD.map5 ZkListNote
-        (JD.field "id" JD.int)
-        (JD.field "user" JD.int)
+        (JD.field "id" UUID.jsonDecoder)
+        (JD.field "user" UUID.jsonDecoder)
         (JD.field "title" JD.string)
         (JD.field "createdate" JD.int)
         (JD.field "changeddate" JD.int)
@@ -264,21 +253,21 @@ decodeZkNoteSearchResult : JD.Decoder ZkNoteSearchResult
 decodeZkNoteSearchResult =
     JD.map2 ZkNoteSearchResult
         (JD.field "notes" (JD.list decodeZkListNote))
-        (JD.field "offset" JD.int)
+        (JD.field "offset" UUID.jsonDecoder)
 
 
 decodeSavedZkNote : JD.Decoder SavedZkNote
 decodeSavedZkNote =
     JD.map2 SavedZkNote
-        (JD.field "id" JD.int)
+        (JD.field "id" UUID.jsonDecoder)
         (JD.field "changeddate" JD.int)
 
 
 decodeZkNote : JD.Decoder ZkNote
 decodeZkNote =
     JD.map8 ZkNote
-        (JD.field "id" JD.int)
-        (JD.field "user" JD.int)
+        (JD.field "id" UUID.jsonDecoder)
+        (JD.field "user" UUID.jsonDecoder)
         (JD.field "username" JD.string)
         (JD.field "title" JD.string)
         (JD.field "content" JD.string)
@@ -304,11 +293,11 @@ decodeZkNoteEdit =
 decodeLoginData : JD.Decoder LoginData
 decodeLoginData =
     JD.map5 LoginData
-        (JD.field "userid" JD.int)
+        (JD.field "userid" UUID.jsonDecoder)
         (JD.field "username" JD.string)
-        (JD.field "publicid" JD.int)
-        (JD.field "shareid" JD.int)
-        (JD.field "searchid" JD.int)
+        (JD.field "publicid" UUID.jsonDecoder)
+        (JD.field "shareid" UUID.jsonDecoder)
+        (JD.field "searchid" UUID.jsonDecoder)
 
 
 encodeImportZkNote : ImportZkNote -> JE.Value
