@@ -6,6 +6,7 @@ pub struct Config {
   pub port: u16,
   pub createdirs: bool,
   pub db: PathBuf,
+  pub indradb: PathBuf,
   pub mainsite: String,
   pub appname: String,
   pub domain: String,

@@ -28,6 +28,8 @@ extern crate zkprotocol;
 mod config;
 mod email;
 mod errors;
+mod icontent;
+mod importdb;
 mod indra;
 mod indra_util;
 mod interfaces;
@@ -38,12 +40,12 @@ mod user;
 mod util;
 use actix_files::NamedFile;
 use clap::{Arg, SubCommand};
-mod icontent;
 use user::ZkDatabase;
 // use actix_web::http::{Method, StatusCode};
 use actix_web::middleware::Logger;
 use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Result};
 use config::Config;
+use indra as I;
 use std::error::Error;
 use std::path::{Path, PathBuf};
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
@@ -109,45 +111,53 @@ fn user(state: web::Data<Config>, item: web::Json<UserMessage>, _req: HttpReques
       error!("'user' err: {:?}", e);
       let se = ServerResponse {
         what: "server error".to_string(),
-        content: serde_json::Value::String(e.to_string()),
+        content: serde_json::Value::String(format!("{:?}", e)),
       };
       HttpResponse::Ok().json(se)
     }
   }
 }
 
-fn register(state: web::Data<Config>, req: HttpRequest) -> HttpResponse {
+fn register(config: web::Data<Config>, req: HttpRequest) -> HttpResponse {
   info!("registration: uid: {:?}", req.match_info().get("uid"));
-  match (req.match_info().get("uid"), req.match_info().get("key")) {
-    (Some(uid), Some(key)) => {
-      // read user record.  does the reg key match?
-      match sqldata::read_user(state.db.as_path(), uid) {
-        Ok(user) => {
-          println!("user {:?}", user);
-          println!("user.registration_key {:?}", user.registration_key);
-          println!("key {}", key);
-          if user.registration_key == Some(key.to_string()) {
-            let mut mu = user;
-            mu.registration_key = None;
-            match sqldata::update_user(state.db.as_path(), &mu) {
-              Ok(_) => HttpResponse::Ok().body(
-                format!(
-                  "<h1>You are registered!<h1> <a href=\"{}\">\
-                 Proceed to the main site</a>",
-                  state.mainsite
-                )
-                .to_string(),
-              ),
-              Err(_e) => HttpResponse::Ok().body("<h1>registration failed</h1>".to_string()),
+
+  match I::getTransaction(&config.indradb) {
+    Err(e) => HttpResponse::Ok().body(format!("{:?}", e)),
+    Ok(itr) => {
+      match (req.match_info().get("uid"), req.match_info().get("key")) {
+        (Some(uid), Some(key)) => {
+          // read user record.  does the reg key match?
+          match I::read_user(&itr, &uid.to_string()) {
+            Ok(user) => {
+              println!("user {:?}", user);
+              println!("user.registration_key {:?}", user.registration_key);
+              println!("key {}", key);
+              if user.registration_key == Some(key.to_string()) {
+                let mut mu = user;
+                mu.registration_key = None;
+                match I::save_user(&itr, &mu) {
+                  Ok(_) => HttpResponse::Ok().body(
+                    format!(
+                      "<h1>You are registered!<h1> <a href=\"{}\">\
+                     Proceed to the main site</a>",
+                      config.mainsite
+                    )
+                    .to_string(),
+                  ),
+                  Err(_e) => HttpResponse::Ok().body("<h1>registration failed</h1>".to_string()),
+                }
+              } else {
+                HttpResponse::Ok().body("<h1>registration failed</h1>".to_string())
+              }
             }
-          } else {
-            HttpResponse::Ok().body("<h1>registration failed</h1>".to_string())
+            Err(_e) => {
+              HttpResponse::Ok().body("registration key or user doesn't match".to_string())
+            }
           }
         }
-        Err(_e) => HttpResponse::Ok().body("registration key or user doesn't match".to_string()),
+        _ => HttpResponse::Ok().body("Uid, key not found!".to_string()),
       }
     }
-    _ => HttpResponse::Ok().body("Uid, key not found!".to_string()),
   }
 }
 
@@ -157,6 +167,7 @@ fn defcon() -> Config {
     port: 8000,
     createdirs: false,
     db: PathBuf::from("./mahbloag.db"),
+    indradb: PathBuf::from("./indra2"),
     mainsite: "https:://mahbloag.practica.site/".to_string(),
     appname: "mahbloag".to_string(),
     domain: "practica.site".to_string(),
@@ -222,7 +233,7 @@ fn err_main() -> Result<(), errors::Error> {
 
       let zd: ZkDatabase = serde_json::from_str(db.as_str())?;
 
-      indra::import_db(&zd, "indra2")?;
+      importdb::import_db(&zd, "indra2")?;
 
       Ok(())
     }

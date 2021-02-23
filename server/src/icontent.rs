@@ -4,6 +4,17 @@ pub use uuid::Uuid;
 pub struct UserId(pub Uuid);
 
 #[derive(Deserialize, Serialize, Debug)]
+pub struct User {
+  pub id: UserId,
+  pub name: String,
+  pub hashwd: String,
+  pub salt: String,
+  pub email: String,
+  pub registration_key: Option<String>,
+  // pub zknote: i64,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
 pub struct LoginData {
   pub userid: UserId,
   pub username: String,
@@ -11,6 +22,7 @@ pub struct LoginData {
   pub shareid: Uuid,
   pub searchid: Uuid,
 }
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ZkNote {
   pub id: Uuid,
