@@ -24,6 +24,8 @@ pub struct RegistrationData {
 
 pub fn user_interface(config: &Config, msg: UserMessage) -> Result<ServerResponse, errors::Error> {
   let itr = I::getTransaction(&config.indradb.as_path())?;
+
+  println!("got transaction");
   if msg.what.as_str() == "register" {
     // do the registration thing.
     // user already exists?
@@ -116,7 +118,7 @@ pub fn user_interface(config: &Config, msg: UserMessage) -> Result<ServerRespons
               })
             } else {
               // finally!  processing messages as logged in user.
-              user_interface_loggedin(&config, userdata.id, &msg)
+              user_interface_loggedin(&itr, &config, userdata.id, &msg)
             }
           }
         }
@@ -129,25 +131,22 @@ fn se(s: &str) -> simple_error::SimpleError {
   simple_error::SimpleError::new(s)
 }
 
-fn user_interface_loggedin(
+fn user_interface_loggedin<T: indradb::Transaction>(
+  itr: &T,
   config: &Config,
   uid: UserId,
   msg: &UserMessage,
 ) -> Result<ServerResponse, errors::Error> {
   match msg.what.as_str() {
-    "login" => {
-      let itr = I::getTransaction(config.indradb.as_path())?;
-      Ok(ServerResponse {
-        what: "logged in".to_string(),
-        content: serde_json::to_value(I::login_data(&itr, uid)?)?,
-      })
-    }
+    "login" => Ok(ServerResponse {
+      what: "logged in".to_string(),
+      content: serde_json::to_value(I::login_data(itr, uid)?)?,
+    }),
     "getzknote" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), se("malformed json data"))?;
       let id: Uuid = serde_json::from_value(msgdata.clone())?;
-      let itr = I::getTransaction(config.indradb.as_path())?;
-      let svs = I::get_systemvs(&itr)?;
-      let note = I::read_zknote(&itr, &svs, Some(uid), id)?;
+      let svs = I::get_systemvs(itr)?;
+      let note = I::read_zknote(itr, &svs, Some(uid), id)?;
       Ok(ServerResponse {
         what: "zknote".to_string(),
         content: serde_json::to_value(note)?,
@@ -156,8 +155,7 @@ fn user_interface_loggedin(
     "getzknoteedit" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), se("malformed json data"))?;
       let gzne: GetZkNoteEdit = serde_json::from_value(msgdata.clone())?;
-      let itr = I::getTransaction(config.indradb.as_path())?;
-      let note = I::read_zknoteedit(&itr, uid, &gzne)?;
+      let note = I::read_zknoteedit(itr, uid, &gzne)?;
       Ok(ServerResponse {
         what: "zknoteedit".to_string(),
         content: serde_json::to_value(note)?,
@@ -166,9 +164,8 @@ fn user_interface_loggedin(
     "searchzknotes" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), se("malformed json data"))?;
       let search: ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
-      let itr = I::getTransaction(config.indradb.as_path())?;
-      let svs = I::get_systemvs(&itr)?;
-      let res = I::search_zknotes(&itr, &svs, uid, &search)?;
+      let svs = I::get_systemvs(itr)?;
+      let res = I::search_zknotes(itr, &svs, uid, &search)?;
       Ok(ServerResponse {
         what: "zknotesearchresult".to_string(),
         content: serde_json::to_value(res)?,
@@ -177,8 +174,7 @@ fn user_interface_loggedin(
     // "powerdelete" => {
     //   let msgdata = Option::ok_or(msg.data.as_ref(), se("malformed json data"))?;
     //   let search: TagSearch = serde_json::from_value(msgdata.clone())?;
-    //   let itr = I::getTransaction(config.indradb.as_path())?;
-    //   let res = search::power_delete_zknotes(&itr, uid, &search)?;
+    //   let res = search::power_delete_zknotes(itr, uid, &search)?;
     //   Ok(ServerResponse {
     //     what: "powerdeletecomplete".to_string(),
     //     content: serde_json::to_value(res)?,
@@ -186,9 +182,8 @@ fn user_interface_loggedin(
     // }
     "deletezknote" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), se("malformed json data"))?;
-      let itr = I::getTransaction(config.indradb.as_path())?;
       let id: Uuid = serde_json::from_value(msgdata.clone())?;
-      I::delete_zknote(&itr, uid, id)?;
+      I::delete_zknote(itr, uid, id)?;
       Ok(ServerResponse {
         what: "deletedzknote".to_string(),
         content: serde_json::to_value(id)?,
@@ -197,8 +192,7 @@ fn user_interface_loggedin(
     "savezknote" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), se("malformed json data"))?;
       let sbe: SaveZkNote = serde_json::from_value(msgdata.clone())?;
-      let itr = I::getTransaction(config.indradb.as_path())?;
-      let s = I::save_zknote(&itr, uid, &sbe)?;
+      let s = I::save_zknote(itr, uid, &sbe)?;
       Ok(ServerResponse {
         what: "savedzknote".to_string(),
         content: serde_json::to_value(s)?,
@@ -207,8 +201,7 @@ fn user_interface_loggedin(
     // "savezklinks" => {
     //   let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
     //   let msg: ZkLinks = serde_json::from_value(msgdata.clone())?;
-    //   let itr = I::getTransaction(config.indradb.as_path())?;
-    //   let s = I::save_zklinks(&itr, uid, msg.links)?;
+    //   let s = I::save_zklinks(itr, uid, msg.links)?;
     //   Ok(ServerResponse {
     //     what: "savedzklinks".to_string(),
     //     content: serde_json::to_value(s)?,
@@ -217,9 +210,8 @@ fn user_interface_loggedin(
     "savezknotepluslinks" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), se("malformed json data"))?;
       let sznpl: SaveZkNotePlusLinks = serde_json::from_value(msgdata.clone())?;
-      let itr = I::getTransaction(config.indradb.as_path())?;
-      let szkn = I::save_zknote(&itr, uid, &sznpl.note)?;
-      let s = I::save_savezklinks(&itr, uid, szkn.id, sznpl.links)?;
+      let szkn = I::save_zknote(itr, uid, &sznpl.note)?;
+      let s = I::save_savezklinks(itr, uid, szkn.id, sznpl.links)?;
       Ok(ServerResponse {
         what: "savedzknotepluslinks".to_string(),
         content: serde_json::to_value(szkn)?,
@@ -228,9 +220,8 @@ fn user_interface_loggedin(
     "getzklinks" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), se("malformed json data"))?;
       let noteid: Uuid = serde_json::from_value(msgdata.clone())?;
-      let itr = I::getTransaction(config.indradb.as_path())?;
-      let svs = I::get_systemvs(&itr)?;
-      let s = I::read_zklinks(&itr, &svs, Some(uid), noteid)?;
+      let svs = I::get_systemvs(itr)?;
+      let s = I::read_zklinks(itr, &svs, Some(uid), noteid)?;
       let zklinks = ZkLinks { links: s };
       Ok(ServerResponse {
         what: "zklinks".to_string(),
@@ -240,8 +231,7 @@ fn user_interface_loggedin(
     // "saveimportzknotes" => {
     //   let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
     //   let gzl: Vec<ImportZkNote> = serde_json::from_value(msgdata.clone())?;
-    //   let itr = I::getTransaction(config.indradb.as_path())?;
-    //   I::save_importzknotes(&itr, uid, gzl)?;
+    //   I::save_importzknotes(itr, uid, gzl)?;
     //   Ok(ServerResponse {
     //     what: "savedimportzknotes".to_string(),
     //     content: serde_json::to_value(())?,

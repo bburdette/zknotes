@@ -233,7 +233,7 @@ fn err_main() -> Result<(), errors::Error> {
 
       let zd: ZkDatabase = serde_json::from_str(db.as_str())?;
 
-      importdb::import_db(&zd, "indra2")?;
+      importdb::import_db(&zd, &config.indradb)?;
 
       Ok(())
     }

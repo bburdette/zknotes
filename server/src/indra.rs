@@ -130,13 +130,23 @@ pub fn save_user<T: indradb::Transaction>(itr: &T, user: &User) -> Result<(), er
 }
 
 pub fn read_user<T: indradb::Transaction>(itr: &T, name: &String) -> Result<User, errors::Error> {
+  println!("read_user {}", name);
+
+  let jn = serde_json::to_value(name)?;
+
   let tuid = find_first_q(
     itr,
     mkpropquery("user".to_string(), "name".to_string()),
-    |x| x.value == "test",
+    |x| {
+      println!("name: {}", x.value);
+      println!("cjn: {:?}", jn);
+      x.value == jn
+    },
   )?
   .ok_or(SimpleError::new("user not found"))?
   .id;
+
+  println!("user found: {}", tuid);
 
   let uq: indradb::VertexQuery = indradb::SpecificVertexQuery::single(tuid).into();
 
