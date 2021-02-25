@@ -11,12 +11,12 @@ type SendMsg
     = Register String
     | Login
     | GetZkNote UUID
-    | GetZkNoteEdit Data.GetZkNoteEdit
+    | GetZkNoteEdit UUID
+    | GetZkLinks UUID
     | DeleteZkNote UUID
     | SaveZkNote Data.SaveZkNote
     | SaveZkLinks Data.ZkLinks
     | SaveZkNotePlusLinks Data.SaveZkNotePlusLinks
-    | GetZkLinks Data.GetZkLinks
     | SearchZkNotes S.ZkNoteSearch
     | SaveImportZkNotes (List Data.ImportZkNote)
     | PowerDelete S.TagSearch
@@ -124,7 +124,7 @@ encodeSendMsg sm uid pwd =
                 [ ( "what", JE.string "getzknoteedit" )
                 , ( "uid", JE.string uid )
                 , ( "pwd", JE.string pwd )
-                , ( "data", Data.encodeGetZkNoteEdit zkne )
+                , ( "data", UUID.toValue zkne )
                 ]
 
         DeleteZkNote id ->
@@ -164,7 +164,7 @@ encodeSendMsg sm uid pwd =
                 [ ( "what", JE.string "getzklinks" )
                 , ( "uid", JE.string uid )
                 , ( "pwd", JE.string pwd )
-                , ( "data", Data.encodeGetZkLinks gzl )
+                , ( "data", UUID.toValue gzl )
                 ]
 
         SearchZkNotes s ->

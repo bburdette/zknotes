@@ -187,7 +187,7 @@ routeState model route =
                             login
                         , sendUIMsg model.location
                             login
-                            (UI.GetZkNoteEdit { zknote = uuid })
+                            (UI.GetZkNoteEdit uuid)
                         )
 
                 ( Nothing, Ok uuid ) ->
@@ -590,7 +590,7 @@ loadnote model nwstate zknid =
                     (UI.GetZkNote zknid)
                , sendUIMsg model.location
                     nws.login
-                    (UI.GetZkLinks { zknote = zknid })
+                    (UI.GetZkLinks zknid)
                ]
     )
 

@@ -30,8 +30,10 @@ pub fn getTransaction(path: &Path) -> Result<indradb::SledTransaction, errors::E
   println!("getTransaction: {:?}", path);
 
   let sc = indradb::SledConfig::with_compression(None);
+  println!("got sc");
 
   let ids = sc.open(path)?;
+  println!("got ids");
 
   Ok(ids.transaction()?)
 }
@@ -78,8 +80,17 @@ pub fn new_user<T: indradb::Transaction>(
   }
   let uid = UserId(v.id);
 
-  // TODO add link to 'public'
+  // add link to 'public'
   save_zklink(itr, &v.id, &public, &uid, &None)?;
+
+  // give it note fields too, so it can be retrieved like a note in queries.
+  let szn = SaveZkNote {
+    id: Some(v.id),
+    title: name.clone(),
+    pubid: None,
+    content: "".to_string(),
+  };
+  save_zknote(itr, uid, &szn);
 
   Ok(uid)
 }
@@ -391,6 +402,9 @@ pub fn save_zknote<T: indradb::Transaction>(
   note: &SaveZkNote,
 ) -> Result<SavedZkNote, errors::Error> {
   let now = now()?;
+
+  // If we're creating a new note, create it with note type.
+  // otherwise, we'll just keep the existing vertex type.
   let id = match note.id {
     Some(id) => id,
     None => {
@@ -448,7 +462,7 @@ pub fn note_owner<T: indradb::Transaction>(itr: &T, id: Uuid) -> Result<Uuid, er
   let user = itr
     .get_edges(eq)?
     .first()
-    .ok_or(SimpleError::new("user not found!"))?
+    .ok_or(SimpleError::new("user not found1!"))?
     .key
     .inbound_id;
 
@@ -518,7 +532,7 @@ pub fn read_zknote<T: indradb::Transaction>(
     itr
       .get_edges(eq)?
       .first()
-      .ok_or(SimpleError::new("user not found!"))?
+      .ok_or(SimpleError::new("user not found2!"))?
       .key
       .outbound_id,
   );
@@ -548,6 +562,8 @@ pub fn read_zklistnote<T: indradb::Transaction>(
 
   let vq = indradb::VertexQuery::Specific(indradb::SpecificVertexQuery::single(id).into());
 
+  println!("all props: {:?}", itr.get_all_vertex_properties(vq.clone()));
+
   // get note owner.
   let eq = indradb::PipeEdgeQuery::new(Box::new(vq.clone()), indradb::EdgeDirection::Inbound)
     .limit(1)
@@ -557,7 +573,7 @@ pub fn read_zklistnote<T: indradb::Transaction>(
     itr
       .get_edges(eq)?
       .first()
-      .ok_or(SimpleError::new("user not found!"))?
+      .ok_or(SimpleError::new("owner not found3!"))?
       .key
       .outbound_id,
   );
@@ -1063,7 +1079,8 @@ pub fn tagsearch<T: indradb::Transaction>(
   // lets search notes this user owns.
   let uq = indradb::SpecificVertexQuery::single(user.0)
     .outbound()
-    .inbound();
+    .inbound()
+    .t(indradb::Type::new("note")?);
 
   let verts = itr.get_vertices(uq)?;
 

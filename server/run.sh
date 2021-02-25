@@ -2,4 +2,4 @@ clear
 
 cargo build
 
-./target/debug/zknotes-server -t
+./target/debug/zknotes-server 

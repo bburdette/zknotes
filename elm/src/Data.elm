@@ -120,34 +120,10 @@ type alias ImportZkNote =
     { title : String, content : String, fromLinks : List String, toLinks : List String }
 
 
-type alias GetZkLinks =
-    { zknote : UUID
-    }
-
-
-type alias GetZkNoteEdit =
-    { zknote : UUID
-    }
-
-
 type alias ZkNoteEdit =
     { zknote : ZkNote
     , links : List ZkLink
     }
-
-
-encodeGetZkLinks : GetZkLinks -> JE.Value
-encodeGetZkLinks gzl =
-    JE.object
-        [ ( "zknote", UUID.toValue gzl.zknote )
-        ]
-
-
-encodeGetZkNoteEdit : GetZkNoteEdit -> JE.Value
-encodeGetZkNoteEdit gzl =
-    JE.object
-        [ ( "zknote", UUID.toValue gzl.zknote )
-        ]
 
 
 encodeZkLinks : ZkLinks -> JE.Value
