@@ -1216,7 +1216,7 @@ actualupdate msg model =
                         ( st, cmd ) =
                             loadnote model
                                 { login = login
-                                , mbzknotesearchresult = Nothing
+                                , mbzknotesearchresult = Just emod.zknSearchResult
                                 , mbzklinks = Nothing
                                 , mbzknote = Nothing
                                 , spmodel = emod.spmodel
@@ -1231,7 +1231,7 @@ actualupdate msg model =
                         ( st, cmd ) =
                             loadnote model
                                 { login = login
-                                , mbzknotesearchresult = Nothing
+                                , mbzknotesearchresult = Just emod.zknSearchResult
                                 , mbzklinks = Nothing
                                 , mbzknote = Nothing
                                 , spmodel = emod.spmodel
