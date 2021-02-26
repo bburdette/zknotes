@@ -1,5 +1,6 @@
+use indradb::SledDatastore;
 use std::path::PathBuf;
-
+use std::sync::{Arc, Mutex};
 #[derive(Deserialize, Debug, Clone)]
 pub struct Config {
   pub ip: String,
@@ -10,4 +11,9 @@ pub struct Config {
   pub mainsite: String,
   pub appname: String,
   pub domain: String,
+}
+
+pub struct State {
+  pub config: Config,
+  pub db: SledDatastore,
 }

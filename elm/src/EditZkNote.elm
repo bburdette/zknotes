@@ -87,7 +87,7 @@ type NavChoice
 type alias EditLink =
     { otherid : UUID
     , direction : Direction
-    , user : UUID
+    , mine : Bool
     , othername : Maybe String
     , delete : Maybe Bool
     }
@@ -135,7 +135,6 @@ elToSzl : EditLink -> Data.SaveZkLink
 elToSzl el =
     { otherid = el.otherid
     , direction = el.direction
-    , user = el.user
     , delete = el.delete
     }
 
@@ -146,7 +145,7 @@ elToSzkl this el =
         From ->
             { from = this
             , to = el.otherid
-            , user = el.user
+            , mine = el.mine
             , fromname = Nothing
             , toname = Nothing
             , delete = Nothing
@@ -155,7 +154,7 @@ elToSzkl this el =
         To ->
             { from = el.otherid
             , to = this
-            , user = el.user
+            , mine = el.mine
             , fromname = Nothing
             , toname = Nothing
             , delete = Nothing
@@ -274,7 +273,7 @@ showZkl dirtybutton nonme user id zkl =
                 { onPress = Just (MdLink zkl)
                 , label = E.text "^"
                 }
-        , if user == zkl.user then
+        , if zkl.mine then
             EI.button (Common.buttonStyle ++ [ E.alignRight ])
                 { onPress = Just (RemoveLink zkl)
                 , label = E.text "X"
@@ -748,7 +747,7 @@ toEditLink id zkl =
     in
     { otherid = oid
     , direction = direction
-    , user = zkl.user
+    , mine = zkl.mine
     , othername = Just <| zkLinkName zkl id
     , delete = zkl.delete
     }
@@ -1027,7 +1026,9 @@ update msg model =
                 nzkl =
                     { direction = To
                     , otherid = zkln.id
-                    , user = model.ld.userid
+                    , mine = True
+
+                    -- , user = model.ld.userid
                     , othername = Just zkln.title
                     , delete = Nothing
                     }
@@ -1096,7 +1097,7 @@ update msg model =
                             nzkl =
                                 { direction = To
                                 , otherid = model.ld.publicid
-                                , user = model.ld.userid
+                                , mine = True
                                 , othername = Just "public"
                                 , delete = Nothing
                                 }

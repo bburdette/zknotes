@@ -73,7 +73,7 @@ type alias SaveZkNote =
 type alias ZkLink =
     { from : UUID
     , to : UUID
-    , user : UUID
+    , mine : Bool
     , fromname : Maybe String
     , toname : Maybe String
     , delete : Maybe Bool
@@ -88,7 +88,6 @@ type Direction
 type alias SaveZkLink =
     { otherid : UUID
     , direction : Direction
-    , user : UUID
     , delete : Maybe Bool
     }
 
@@ -147,7 +146,8 @@ encodeSaveZkLink : SaveZkLink -> JE.Value
 encodeSaveZkLink s =
     [ Just ( "otherid", UUID.toValue s.otherid )
     , Just ( "direction", encodeDirection s.direction )
-    , Just ( "user", UUID.toValue s.user )
+
+    -- , Just ( "user", UUID.toValue s.user )
     , s.delete |> Maybe.map (\n -> ( "delete", JE.bool n ))
     ]
         |> List.filterMap identity
@@ -165,7 +165,7 @@ encodeZkLink zklink =
     JE.object <|
         [ ( "from", UUID.toValue zklink.from )
         , ( "to", UUID.toValue zklink.to )
-        , ( "user", UUID.toValue zklink.user )
+        , ( "mine", JE.bool zklink.mine )
         ]
             ++ (zklink.delete
                     |> Maybe.map (\b -> [ ( "delete", JE.bool b ) ])
@@ -178,7 +178,7 @@ decodeZkLink =
     JD.map6 ZkLink
         (JD.field "from" UUID.jsonDecoder)
         (JD.field "to" UUID.jsonDecoder)
-        (JD.field "user" UUID.jsonDecoder)
+        (JD.field "mine" JD.bool)
         (JD.maybe (JD.field "fromname" JD.string))
         (JD.maybe (JD.field "toname" JD.string))
         (JD.succeed Nothing)

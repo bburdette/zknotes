@@ -1,9 +1,11 @@
-use indradb::Datastore;
-use indradb::Transaction;
 // use std::convert::TryInto;
 // use std::error::Error;
 use errors;
-use indradb::{Edge, EdgeKey, EdgeProperty, EdgeQueryExt, Type, Vertex, VertexQueryExt};
+use indradb::Datastore;
+use indradb::{
+  Edge, EdgeKey, EdgeProperty, EdgeQueryExt, SledDatastore, SledTransaction, Transaction, Type,
+  Vertex, VertexQueryExt,
+};
 use simple_error::SimpleError;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -25,7 +27,7 @@ pub struct SystemVs {
   pub search: Uuid,
   pub share: Uuid,
 }
-
+/*
 pub fn getTransaction(path: &Path) -> Result<indradb::SledTransaction, errors::Error> {
   println!("getTransaction: {:?}", path);
 
@@ -36,7 +38,7 @@ pub fn getTransaction(path: &Path) -> Result<indradb::SledTransaction, errors::E
   println!("got ids");
 
   Ok(ids.transaction()?)
-}
+}*/
 
 pub fn new_user<T: indradb::Transaction>(
   itr: &T,
@@ -141,23 +143,17 @@ pub fn save_user<T: indradb::Transaction>(itr: &T, user: &User) -> Result<(), er
 }
 
 pub fn read_user<T: indradb::Transaction>(itr: &T, name: &String) -> Result<User, errors::Error> {
-  println!("read_user {}", name);
+  // println!("read_user {}", name);
 
   let jn = serde_json::to_value(name)?;
 
   let tuid = find_first_q(
     itr,
     mkpropquery("user".to_string(), "name".to_string()),
-    |x| {
-      println!("name: {}", x.value);
-      println!("cjn: {:?}", jn);
-      x.value == jn
-    },
+    |x| x.value == jn,
   )?
   .ok_or(SimpleError::new("user not found"))?
   .id;
-
-  println!("user found: {}", tuid);
 
   let uq: indradb::VertexQuery = indradb::SpecificVertexQuery::single(tuid).into();
 
@@ -223,6 +219,7 @@ pub fn save_zklink<T: indradb::Transaction>(
 
   let useruuid = user.0.to_string();
 
+  println!("creating edge: {:?}", ek);
   itr.create_edge(&ek)?;
 
   // add the user.
@@ -562,7 +559,7 @@ pub fn read_zklistnote<T: indradb::Transaction>(
 
   let vq = indradb::VertexQuery::Specific(indradb::SpecificVertexQuery::single(id).into());
 
-  println!("all props: {:?}", itr.get_all_vertex_properties(vq.clone()));
+  // println!("all props: {:?}", itr.get_all_vertex_properties(vq.clone()));
 
   // get note owner.
   let eq = indradb::PipeEdgeQuery::new(Box::new(vq.clone()), indradb::EdgeDirection::Inbound)
@@ -578,7 +575,7 @@ pub fn read_zklistnote<T: indradb::Transaction>(
       .outbound_id,
   );
 
-  println!("allprops {:?}", itr.get_all_vertex_properties(vq.clone())?);
+  // println!("allprops {:?}", itr.get_all_vertex_properties(vq.clone())?);
 
   Ok(ZkListNote {
     id: id,
@@ -609,81 +606,94 @@ pub fn read_zklinks<T: indradb::Transaction>(
   uid: Option<UserId>,
   id: Uuid,
 ) -> Result<Vec<ZkLink>, errors::Error> {
-  let ib = indradb::SpecificVertexQuery::single(id)
-    .inbound()
-    .t(Type::default());
+  let ib = indradb::SpecificVertexQuery::single(id).inbound();
+  // .t(Type::default());
 
-  let mut links = Vec::new();
+  println!("read_zklinks - is_note_accessible(itr, svs, uid, id)?;");
 
-  for e in itr.get_edges(ib)?.iter() {
-    assert_eq!(e.key.inbound_id, id);
+  if !is_note_accessible(itr, svs, uid, id)? {
+    println!("no");
+    Ok(Vec::new())
+  } else {
+    println!("yes");
+    let mut links = Vec::new();
 
-    if is_note_accessible(itr, svs, uid, id)? {
-      let nq: indradb::VertexQuery = indradb::SpecificVertexQuery::single(e.key.outbound_id).into();
+    for e in itr.get_edges(ib)?.iter() {
+      assert_eq!(e.key.inbound_id, id);
 
-      let eq: indradb::EdgeQuery = indradb::SpecificEdgeQuery::single(e.key.clone()).into();
+      println!("got inbound edge: {:?}", e);
 
-      // let uidstr = uid.to_string();
-      let count: i64 = itr
-        .get_edge_properties(indradb::EdgePropertyQuery::new(eq.clone(), "count"))?
-        .first()
-        .and_then(|ep| ep.value.as_i64())
-        .unwrap_or(0);
+      if is_note_accessible(itr, svs, uid, e.key.outbound_id)? {
+        println!("is accessible: {:?}", id);
+        let nq: indradb::VertexQuery =
+          indradb::SpecificVertexQuery::single(e.key.outbound_id).into();
 
-      let mine: bool = uid
-        .and_then(|id| getoptedgeprop(itr, &eq, id.0.to_string().as_str()).ok())
-        .unwrap_or(None)
-        .unwrap_or(false);
+        let eq: indradb::EdgeQuery = indradb::SpecificEdgeQuery::single(e.key.clone()).into();
 
-      // create link for every user??
-      links.push(ZkLink {
-        from: e.key.outbound_id,
-        to: id,
-        mine: mine,
-        others: (count > (if mine { 1 } else { 0 })),
-        delete: None,
-        fromname: getoptprop(itr, &nq, "title")?,
-        toname: None,
-      });
+        // let uidstr = uid.to_string();
+        let count: i64 = itr
+          .get_edge_properties(indradb::EdgePropertyQuery::new(eq.clone(), "count"))?
+          .first()
+          .and_then(|ep| ep.value.as_i64())
+          .unwrap_or(0);
+
+        let mine: bool = uid
+          .and_then(|id| getoptedgeprop(itr, &eq, id.0.to_string().as_str()).ok())
+          .unwrap_or(None)
+          .unwrap_or(false);
+
+        // create link for every user??
+        links.push(ZkLink {
+          from: e.key.outbound_id,
+          to: id,
+          mine: mine,
+          others: (count > (if mine { 1 } else { 0 })),
+          delete: None,
+          fromname: getoptprop(itr, &nq, "title")?,
+          toname: None,
+        });
+      }
     }
-  }
 
-  let ob = indradb::SpecificVertexQuery::single(id)
-    .outbound()
-    .t(Type::default());
-  for e in itr.get_edges(ob)?.iter() {
-    assert_eq!(e.key.outbound_id, id);
+    let ob = indradb::SpecificVertexQuery::single(id).outbound();
+    // .t(Type::default());
+    for e in itr.get_edges(ob)?.iter() {
+      assert_eq!(e.key.outbound_id, id);
 
-    if is_note_accessible(itr, svs, uid, id)? {
-      let nq: indradb::VertexQuery = indradb::SpecificVertexQuery::single(e.key.inbound_id).into();
-      let eq: indradb::EdgeQuery = indradb::SpecificEdgeQuery::single(e.key.clone()).into();
+      println!("got outbound edge: {:?}", e);
 
-      // let uidstr = uid.to_string();
-      let count: i64 = itr
-        .get_edge_properties(indradb::EdgePropertyQuery::new(eq.clone(), "count"))?
-        .first()
-        .and_then(|ep| ep.value.as_i64())
-        .unwrap_or(0);
+      if is_note_accessible(itr, svs, uid, e.key.inbound_id)? {
+        let nq: indradb::VertexQuery =
+          indradb::SpecificVertexQuery::single(e.key.inbound_id).into();
+        let eq: indradb::EdgeQuery = indradb::SpecificEdgeQuery::single(e.key.clone()).into();
 
-      let mine: bool = uid
-        .and_then(|id| getoptedgeprop(itr, &eq, id.0.to_string().as_str()).ok())
-        .unwrap_or(None)
-        .unwrap_or(false);
+        // let uidstr = uid.to_string();
+        let count: i64 = itr
+          .get_edge_properties(indradb::EdgePropertyQuery::new(eq.clone(), "count"))?
+          .first()
+          .and_then(|ep| ep.value.as_i64())
+          .unwrap_or(0);
 
-      // create link for every user??
-      links.push(ZkLink {
-        from: id,
-        to: e.key.inbound_id,
-        mine: mine,
-        others: (count > (if mine { 1 } else { 0 })),
-        delete: None,
-        fromname: None,
-        toname: getoptprop(itr, &nq, "title")?,
-      });
+        let mine: bool = uid
+          .and_then(|id| getoptedgeprop(itr, &eq, id.0.to_string().as_str()).ok())
+          .unwrap_or(None)
+          .unwrap_or(false);
+
+        // create link for every user??
+        links.push(ZkLink {
+          from: id,
+          to: e.key.inbound_id,
+          mine: mine,
+          others: (count > (if mine { 1 } else { 0 })),
+          delete: None,
+          fromname: None,
+          toname: getoptprop(itr, &nq, "title")?,
+        });
+      }
     }
-  }
 
-  Ok(links)
+    Ok(links)
+  }
 }
 
 pub fn read_zknoteedit<T: indradb::Transaction>(
@@ -1020,7 +1030,7 @@ pub fn checknote<T: indradb::Transaction>(
   uuid: Uuid,
   ts: &TagSearch,
 ) -> Result<bool, errors::Error> {
-  println!("checknote: {:?}", uuid);
+  // println!("checknote: {:?}", uuid);
   match ts {
     TagSearch::SearchTerm { mods, term } => {
       let mut exact = false;
@@ -1050,10 +1060,10 @@ pub fn checknote<T: indradb::Transaction>(
 
       let mut ret = false;
       for p in vps {
-        println!("pval: {:?}", p.value);
+        // println!("pval: {:?}", p.value);
         match p.value.to_string().to_lowercase().find(term) {
           Some(_) => {
-            println!("found: {}", term);
+            // println!("found: {}", term);
 
             ret = true;
             break;
@@ -1087,7 +1097,7 @@ pub fn tagsearch<T: indradb::Transaction>(
   let mut res = Vec::new();
 
   for v in verts {
-    println!("v1: {:?}", v);
+    // println!("v1: {:?}", v);
     if checknote(itr, v.id, search)? {
       res.push(v.id);
     }
@@ -1104,13 +1114,13 @@ pub fn search_zknotes<T: indradb::Transaction>(
 ) -> Result<ZkNoteSearchResult, errors::Error> {
   let ids = tagsearch(itr, user, &search.tagsearch)?;
 
-  println!("ids: {:?}", ids);
+  // println!("ids: {:?}", ids);
 
   let mut notes = Vec::new();
 
   for id in ids {
     let zkln = read_zklistnote(itr, systemvs, Some(user), id)?;
-    println!("zkln {:?}", zkln);
+    // println!("zkln {:?}", zkln);
     notes.push(zkln);
   }
 

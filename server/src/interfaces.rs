@@ -1,4 +1,4 @@
-use config::Config;
+use config::State;
 use crypto_hash::{hex_digest, Algorithm};
 use email;
 use icontent::{
@@ -11,6 +11,7 @@ use simple_error;
 // use I;
 use errors;
 use indra as I;
+use indradb::Datastore;
 use std::error::Error;
 use std::path::Path;
 use util;
@@ -22,8 +23,8 @@ pub struct RegistrationData {
   email: String,
 }
 
-pub fn user_interface(config: &Config, msg: UserMessage) -> Result<ServerResponse, errors::Error> {
-  let itr = I::getTransaction(&config.indradb.as_path())?;
+pub fn user_interface(state: &State, msg: UserMessage) -> Result<ServerResponse, errors::Error> {
+  let itr = state.db.transaction()?;
 
   println!("got transaction");
   if msg.what.as_str() == "register" {
@@ -66,9 +67,9 @@ pub fn user_interface(config: &Config, msg: UserMessage) -> Result<ServerRespons
 
         // send a registration email.
         email::send_registration(
-          config.appname.as_str(),
-          config.domain.as_str(),
-          config.mainsite.as_str(),
+          state.config.appname.as_str(),
+          state.config.domain.as_str(),
+          state.config.mainsite.as_str(),
           rd.email.as_str(),
           msg.uid.as_str(),
           registration_key.as_str(),
@@ -76,8 +77,8 @@ pub fn user_interface(config: &Config, msg: UserMessage) -> Result<ServerRespons
 
         // notify the admin.
         email::send_registration_notification(
-          config.appname.as_str(),
-          config.domain.as_str(),
+          state.config.appname.as_str(),
+          state.config.domain.as_str(),
           "bburdettte@protonmail.com",
           rd.email.as_str(),
           msg.uid.as_str(),
@@ -118,7 +119,7 @@ pub fn user_interface(config: &Config, msg: UserMessage) -> Result<ServerRespons
               })
             } else {
               // finally!  processing messages as logged in user.
-              user_interface_loggedin(&itr, &config, userdata.id, &msg)
+              user_interface_loggedin(&itr, &state, userdata.id, &msg)
             }
           }
         }
@@ -133,7 +134,7 @@ fn se(s: &str) -> simple_error::SimpleError {
 
 fn user_interface_loggedin<T: indradb::Transaction>(
   itr: &T,
-  config: &Config,
+  state: &State,
   uid: UserId,
   msg: &UserMessage,
 ) -> Result<ServerResponse, errors::Error> {
@@ -222,6 +223,7 @@ fn user_interface_loggedin<T: indradb::Transaction>(
       let noteid: Uuid = serde_json::from_value(msgdata.clone())?;
       let svs = I::get_systemvs(itr)?;
       let s = I::read_zklinks(itr, &svs, Some(uid), noteid)?;
+      println!("zklinks: {:?}", s.len());
       let zklinks = ZkLinks { links: s };
       Ok(ServerResponse {
         what: "zklinks".to_string(),
@@ -243,7 +245,7 @@ fn user_interface_loggedin<T: indradb::Transaction>(
 
 // public json msgs don't require login.
 pub fn public_interface(
-  config: &Config,
+  state: &State,
   msg: PublicMessage,
 ) -> Result<ServerResponse, Box<dyn Error>> {
   info!("process_public_json, what={}", msg.what.as_str());
@@ -252,7 +254,7 @@ pub fn public_interface(
     "getzknote" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let id: i64 = serde_json::from_value(msgdata.clone())?;
-      let itr = I::getTransaction(config.indradb.as_path())?;
+      let itr = I::getTransaction(state.indradb.as_path())?;
       let note = I::read_zknote(&itr, None, id)?;
       if I::is_zknote_public(&itr, note.id)? {
         Ok(ServerResponse {
@@ -272,7 +274,7 @@ pub fn public_interface(
     "getzknotepubid" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let pubid: String = serde_json::from_value(msgdata.clone())?;
-      let itr = I::getTransaction(config.indradb.as_path())?;
+      let itr = I::getTransaction(state.indradb.as_path())?;
       let note = I::read_zknotepubid(&itr, None, pubid.as_str())?;
       if I::is_zknote_public(&itr, note.id)? {
         Ok(ServerResponse {

@@ -31,6 +31,7 @@ mod errors;
 mod icontent;
 mod importdb;
 mod indra;
+use indradb::Datastore;
 mod indra_util;
 mod interfaces;
 mod isearch;
@@ -44,7 +45,7 @@ use user::ZkDatabase;
 // use actix_web::http::{Method, StatusCode};
 use actix_web::middleware::Logger;
 use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Result};
-use config::Config;
+use config::{Config, State};
 use indra as I;
 use std::error::Error;
 use std::path::{Path, PathBuf};
@@ -61,7 +62,7 @@ fn sitemap(_req: &HttpRequest) -> Result<NamedFile> {
 }
 
 // simple index handler
-fn mainpage(_state: web::Data<Config>, req: HttpRequest) -> HttpResponse {
+fn mainpage(_state: web::Data<State>, req: HttpRequest) -> HttpResponse {
   info!(
     "remote ip: {:?}, request:{:?}",
     req.connection_info().remote(),
@@ -83,7 +84,7 @@ fn mainpage(_state: web::Data<Config>, req: HttpRequest) -> HttpResponse {
 }
 
 fn public(
-  state: web::Data<Config>,
+  state: web::Data<State>,
   item: web::Json<PublicMessage>,
   _req: HttpRequest,
 ) -> HttpResponse {
@@ -102,7 +103,7 @@ fn public(
   }
 }
 
-fn user(state: web::Data<Config>, item: web::Json<UserMessage>, _req: HttpRequest) -> HttpResponse {
+fn user(state: web::Data<State>, item: web::Json<UserMessage>, _req: HttpRequest) -> HttpResponse {
   println!("user msg: {}, {:?}", &item.what, &item.data);
 
   match interfaces::user_interface(&state, item.into_inner()) {
@@ -118,10 +119,10 @@ fn user(state: web::Data<Config>, item: web::Json<UserMessage>, _req: HttpReques
   }
 }
 
-fn register(config: web::Data<Config>, req: HttpRequest) -> HttpResponse {
+fn register(state: web::Data<State>, req: HttpRequest) -> HttpResponse {
   info!("registration: uid: {:?}", req.match_info().get("uid"));
 
-  match I::getTransaction(&config.indradb) {
+  match state.db.transaction() {
     Err(e) => HttpResponse::Ok().body(format!("{:?}", e)),
     Ok(itr) => {
       match (req.match_info().get("uid"), req.match_info().get("key")) {
@@ -140,7 +141,7 @@ fn register(config: web::Data<Config>, req: HttpRequest) -> HttpResponse {
                     format!(
                       "<h1>You are registered!<h1> <a href=\"{}\">\
                      Proceed to the main site</a>",
-                      config.mainsite
+                      state.config.mainsite
                     )
                     .to_string(),
                   ),
@@ -261,8 +262,16 @@ fn err_main() -> Result<(), errors::Error> {
       println!("config: {:?}", config);
 
       sqldata::dbinit(config.db.as_path())?;
+      let sc = indradb::SledConfig::with_compression(None);
+      println!("got sc");
 
-      let c = web::Data::new(config.clone());
+      let ids = sc.open(config.indradb.clone())?;
+      println!("got ids");
+
+      let c = web::Data::new(State {
+        config: config.clone(),
+        db: ids,
+      });
       HttpServer::new(move || {
         App::new()
           .register_data(c.clone()) // <- create app with shared state
