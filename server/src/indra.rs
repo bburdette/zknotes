@@ -1025,10 +1025,22 @@ mod test {
   }
 }
 
+#[derive(Eq, Debug, PartialEq, Clone, Hash)]
+pub struct TagTerm {
+  pub exact: bool,
+  pub note: bool,
+  pub user: bool,
+  pub term: String,
+}
+
+// impl std::cmp::PartialEq for TagTerm {}
+
 pub fn checknote<T: indradb::Transaction>(
   itr: &T,
   uuid: Uuid,
   ts: &TagSearch,
+  user: &UserId,
+  mut tcache: &mut HashMap<TagTerm, Vec<Uuid>>,
 ) -> Result<bool, errors::Error> {
   // println!("checknote: {:?}", uuid);
   match ts {
@@ -1036,7 +1048,7 @@ pub fn checknote<T: indradb::Transaction>(
       let mut exact = false;
       let mut tag = false;
       let mut note = false;
-      let mut user = false;
+      let mut usermod = false;
       for m in mods {
         match m {
           SearchMod::ExactMatch => {
@@ -1049,41 +1061,93 @@ pub fn checknote<T: indradb::Transaction>(
             note = true;
           }
           SearchMod::User => {
-            user = true;
+            usermod = true;
           }
         }
       }
 
-      let q = indradb::SpecificVertexQuery::single(uuid).into();
-      let vpq = indradb::VertexPropertyQuery::new(q, "title");
-      let mut vps = itr.get_vertex_properties(vpq)?;
+      let ret = if tag {
+        let tt = TagTerm {
+          exact: exact,
+          note: note,
+          user: usermod,
+          term: term.clone(),
+        };
 
-      let mut ret = false;
-      for p in vps {
-        // println!("pval: {:?}", p.value);
-        match p.value.to_string().to_lowercase().find(term) {
-          Some(_) => {
-            // println!("found: {}", term);
-
-            ret = true;
-            break;
+        let uuids = match tcache.get(&tt) {
+          Some(uuids) => uuids,
+          None => {
+            let mods = mods
+              .iter()
+              .filter(|m| **m != SearchMod::Tag)
+              .map(|m| m.clone())
+              .collect();
+            let ts = TagSearch::SearchTerm {
+              mods: mods,
+              term: term.clone(),
+            };
+            println!("tagsearcing with ts: {:?}", ts);
+            let uuids = tagsearch(itr, user, &ts)?;
+            println!("result: {:?}", uuids);
+            tcache.insert(tt.clone(), uuids);
+            tcache
+              .get(&tt)
+              .ok_or(simple_error::SimpleError::new("wat"))?
           }
-          None => {}
+        };
+
+        if uuids.is_empty() {
+          false
+        } else {
+          let mut eks = Vec::new();
+          for id in uuids {
+            eks.push(indradb::EdgeKey::new(uuid, indradb::Type::default(), *id));
+            eks.push(indradb::EdgeKey::new(*id, indradb::Type::default(), uuid));
+          }
+
+          let edges = itr.get_edges(indradb::SpecificEdgeQuery::new(eks))?;
+          println!("edges: {:?}", edges);
+          !edges.is_empty()
         }
-      }
+      } else {
+        let q = indradb::SpecificVertexQuery::single(uuid).into();
+        let vpq = indradb::VertexPropertyQuery::new(q, "title");
+        let vps = itr.get_vertex_properties(vpq)?;
+
+        let mut ret = false;
+        for p in vps {
+          // println!("pval: {:?}", p.value);
+          match p.value.to_string().to_lowercase().find(term) {
+            Some(_) => {
+              // println!("found: {}", term);
+
+              ret = true;
+              break;
+            }
+            None => {}
+          }
+        }
+        ret
+      };
       Ok(ret)
     }
-    TagSearch::Not { ts } => Ok(!checknote(itr, uuid, ts)?),
+    TagSearch::Not { ts } => Ok(!checknote(itr, uuid, ts, &user, &mut tcache)?),
     TagSearch::Boolex { ts1, ao, ts2 } => Ok(match ao {
-      AndOr::Or => checknote(itr, uuid, ts1)? || checknote(itr, uuid, ts2)?,
-      AndOr::And => checknote(itr, uuid, ts1)? && checknote(itr, uuid, ts2)?,
+      AndOr::Or => {
+        checknote(itr, uuid, ts1, &user, &mut tcache)?
+          || checknote(itr, uuid, ts2, &user, &mut tcache)?
+      }
+      AndOr::And => {
+        checknote(itr, uuid, ts1, &user, &mut tcache)?
+          && checknote(itr, uuid, ts2, &user, &mut tcache)?
+      }
     }),
   }
 }
 
 pub fn tagsearch<T: indradb::Transaction>(
   itr: &T,
-  user: UserId,
+  user: &UserId,
   search: &TagSearch,
 ) -> Result<Vec<Uuid>, errors::Error> {
   // lets search notes this user owns.
@@ -1092,13 +1156,15 @@ pub fn tagsearch<T: indradb::Transaction>(
     .inbound()
     .t(indradb::Type::new("note")?);
 
+  let mut tcache = HashMap::new();
+
   let verts = itr.get_vertices(uq)?;
 
   let mut res = Vec::new();
 
   for v in verts {
     // println!("v1: {:?}", v);
-    if checknote(itr, v.id, search)? {
+    if checknote(itr, v.id, search, &user, &mut tcache)? {
       res.push(v.id);
     }
   }
@@ -1112,7 +1178,7 @@ pub fn search_zknotes<T: indradb::Transaction>(
   user: UserId,
   search: &ZkNoteSearch,
 ) -> Result<ZkNoteSearchResult, errors::Error> {
-  let ids = tagsearch(itr, user, &search.tagsearch)?;
+  let ids = tagsearch(itr, &user, &search.tagsearch)?;
 
   // println!("ids: {:?}", ids);
 

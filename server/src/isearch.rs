@@ -24,7 +24,7 @@ pub enum TagSearch {
   },
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(PartialEq, Eq, Deserialize, Serialize, Debug, Clone)]
 pub enum SearchMod {
   ExactMatch,
   Tag,
