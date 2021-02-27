@@ -1111,20 +1111,40 @@ pub fn checknote<T: indradb::Transaction>(
         }
       } else {
         let q = indradb::SpecificVertexQuery::single(uuid).into();
-        let vpq = indradb::VertexPropertyQuery::new(q, "title");
+        let vpq = if note {
+          indradb::VertexPropertyQuery::new(q, "content")
+        } else {
+          indradb::VertexPropertyQuery::new(q, "title")
+        };
         let vps = itr.get_vertex_properties(vpq)?;
 
         let mut ret = false;
-        for p in vps {
-          // println!("pval: {:?}", p.value);
-          match p.value.to_string().to_lowercase().find(term) {
-            Some(_) => {
-              // println!("found: {}", term);
-
-              ret = true;
-              break;
+        if exact {
+          for p in vps {
+            match p.value.as_str() {
+              Some(s) => {
+                if s == *term {
+                  ret = true;
+                  break;
+                }
+              }
+              None => (),
             }
-            None => {}
+          }
+        } else {
+          for p in vps {
+            match p
+              .value
+              .to_string()
+              .to_lowercase()
+              .find(&term.to_lowercase())
+            {
+              Some(_) => {
+                ret = true;
+                break;
+              }
+              None => {}
+            }
           }
         }
         ret
