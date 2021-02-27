@@ -31,6 +31,7 @@ mod errors;
 mod icontent;
 mod importdb;
 mod indra;
+mod indratest;
 use indradb::Datastore;
 mod indra_util;
 mod interfaces;
