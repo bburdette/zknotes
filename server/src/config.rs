@@ -1,3 +1,4 @@
+use icontent::SystemVs;
 use indradb::SledDatastore;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -16,4 +17,5 @@ pub struct Config {
 pub struct State {
   pub config: Config,
   pub db: SledDatastore,
+  pub svs: SystemVs,
 }

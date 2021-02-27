@@ -269,9 +269,12 @@ fn err_main() -> Result<(), errors::Error> {
       let ids = sc.open(config.indradb.clone())?;
       println!("got ids");
 
+      let svs = I::get_systemvs(&ids.transaction()?)?;
+
       let c = web::Data::new(State {
         config: config.clone(),
         db: ids,
+        svs: svs,
       });
       HttpServer::new(move || {
         App::new()

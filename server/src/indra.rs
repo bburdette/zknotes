@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 // use std::time::Duration;
 use icontent::{
   Direction, GetZkLinks, GetZkNoteEdit, ImportZkNote, LoginData, SaveZkLink, SaveZkNote,
-  SavedZkNote, User, UserId, ZkLink, ZkListNote, ZkNote, ZkNoteEdit,
+  SavedZkNote, SystemVs, User, UserId, ZkLink, ZkListNote, ZkNote, ZkNoteEdit,
 };
 use indra_util::{find_all_q, find_first_q, getoptedgeprop, getoptprop, getprop};
 use isearch::{AndOr, SearchMod, TagSearch, ZkNoteSearch, ZkNoteSearchResult};
@@ -20,13 +20,6 @@ use std::time::SystemTime;
 use util::now;
 use uuid::Uuid;
 use zkprotocol::content as C;
-
-#[derive(Debug, Clone)]
-pub struct SystemVs {
-  pub public: Uuid,
-  pub search: Uuid,
-  pub share: Uuid,
-}
 
 pub fn new_user<T: indradb::Transaction>(
   itr: &T,

@@ -1,5 +1,12 @@
 pub use uuid::Uuid;
 
+#[derive(Debug, Clone)]
+pub struct SystemVs {
+  pub public: Uuid,
+  pub search: Uuid,
+  pub share: Uuid,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub struct UserId(pub Uuid);
 

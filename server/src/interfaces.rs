@@ -139,18 +139,14 @@ fn user_interface_loggedin<T: indradb::Transaction>(
   msg: &UserMessage,
 ) -> Result<ServerResponse, errors::Error> {
   match msg.what.as_str() {
-    "login" => {
-      let svs = I::get_systemvs(itr)?;
-      Ok(ServerResponse {
-        what: "logged in".to_string(),
-        content: serde_json::to_value(I::login_data(itr, &svs, uid)?)?,
-      })
-    }
+    "login" => Ok(ServerResponse {
+      what: "logged in".to_string(),
+      content: serde_json::to_value(I::login_data(itr, &state.svs, uid)?)?,
+    }),
     "getzknote" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), se("malformed json data"))?;
       let id: Uuid = serde_json::from_value(msgdata.clone())?;
-      let svs = I::get_systemvs(itr)?;
-      let note = I::read_zknote(itr, &svs, Some(uid), id)?;
+      let note = I::read_zknote(itr, &state.svs, Some(uid), id)?;
       Ok(ServerResponse {
         what: "zknote".to_string(),
         content: serde_json::to_value(note)?,
@@ -159,8 +155,7 @@ fn user_interface_loggedin<T: indradb::Transaction>(
     "getzknoteedit" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), se("malformed json data"))?;
       let id: Uuid = serde_json::from_value(msgdata.clone())?;
-      let svs = I::get_systemvs(itr)?;
-      let note = I::read_zknoteedit(itr, &svs, uid, id)?;
+      let note = I::read_zknoteedit(itr, &state.svs, uid, id)?;
       Ok(ServerResponse {
         what: "zknoteedit".to_string(),
         content: serde_json::to_value(note)?,
@@ -169,8 +164,7 @@ fn user_interface_loggedin<T: indradb::Transaction>(
     "searchzknotes" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), se("malformed json data"))?;
       let search: ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
-      let svs = I::get_systemvs(itr)?;
-      let res = I::search_zknotes(itr, &svs, uid, &search)?;
+      let res = I::search_zknotes(itr, &state.svs, uid, &search)?;
       Ok(ServerResponse {
         what: "zknotesearchresult".to_string(),
         content: serde_json::to_value(res)?,
@@ -225,8 +219,7 @@ fn user_interface_loggedin<T: indradb::Transaction>(
     "getzklinks" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), se("malformed json data"))?;
       let noteid: Uuid = serde_json::from_value(msgdata.clone())?;
-      let svs = I::get_systemvs(itr)?;
-      let s = I::read_zklinks(itr, &svs, Some(uid), noteid)?;
+      let s = I::read_zklinks(itr, &state.svs, Some(uid), noteid)?;
       println!("zklinks: {:?}", s.len());
       let zklinks = ZkLinks { links: s };
       Ok(ServerResponse {
