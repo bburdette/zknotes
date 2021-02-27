@@ -139,10 +139,13 @@ fn user_interface_loggedin<T: indradb::Transaction>(
   msg: &UserMessage,
 ) -> Result<ServerResponse, errors::Error> {
   match msg.what.as_str() {
-    "login" => Ok(ServerResponse {
-      what: "logged in".to_string(),
-      content: serde_json::to_value(I::login_data(itr, uid)?)?,
-    }),
+    "login" => {
+      let svs = I::get_systemvs(itr)?;
+      Ok(ServerResponse {
+        what: "logged in".to_string(),
+        content: serde_json::to_value(I::login_data(itr, &svs, uid)?)?,
+      })
+    }
     "getzknote" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), se("malformed json data"))?;
       let id: Uuid = serde_json::from_value(msgdata.clone())?;
@@ -156,7 +159,8 @@ fn user_interface_loggedin<T: indradb::Transaction>(
     "getzknoteedit" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), se("malformed json data"))?;
       let id: Uuid = serde_json::from_value(msgdata.clone())?;
-      let note = I::read_zknoteedit(itr, uid, id)?;
+      let svs = I::get_systemvs(itr)?;
+      let note = I::read_zknoteedit(itr, &svs, uid, id)?;
       Ok(ServerResponse {
         what: "zknoteedit".to_string(),
         content: serde_json::to_value(note)?,

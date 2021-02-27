@@ -155,10 +155,9 @@ pub fn read_user<T: indradb::Transaction>(itr: &T, name: &String) -> Result<User
 
 pub fn login_data<T: indradb::Transaction>(
   itr: &T,
+  svs: &SystemVs,
   uid: UserId,
 ) -> Result<LoginData, errors::Error> {
-  let svs = get_systemvs(itr)?;
-
   // TODO: make login token that expires!
   let uq = indradb::VertexQuery::Specific(indradb::SpecificVertexQuery::single(uid.0).into());
 
@@ -693,11 +692,10 @@ pub fn read_zklinks<T: indradb::Transaction>(
 
 pub fn read_zknoteedit<T: indradb::Transaction>(
   itr: &T,
+  svs: &SystemVs,
   uid: UserId,
   id: Uuid,
 ) -> Result<ZkNoteEdit, errors::Error> {
-  let svs = get_systemvs(itr)?;
-
   println!("read_zknoteedit");
 
   // should do an ownership check for us
