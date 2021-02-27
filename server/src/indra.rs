@@ -27,18 +27,6 @@ pub struct SystemVs {
   pub search: Uuid,
   pub share: Uuid,
 }
-/*
-pub fn getTransaction(path: &Path) -> Result<indradb::SledTransaction, errors::Error> {
-  println!("getTransaction: {:?}", path);
-
-  let sc = indradb::SledConfig::with_compression(None);
-  println!("got sc");
-
-  let ids = sc.open(path)?;
-  println!("got ids");
-
-  Ok(ids.transaction()?)
-}*/
 
 pub fn new_user<T: indradb::Transaction>(
   itr: &T,
@@ -143,8 +131,6 @@ pub fn save_user<T: indradb::Transaction>(itr: &T, user: &User) -> Result<(), er
 }
 
 pub fn read_user<T: indradb::Transaction>(itr: &T, name: &String) -> Result<User, errors::Error> {
-  // println!("read_user {}", name);
-
   let jn = serde_json::to_value(name)?;
 
   let tuid = find_first_q(
@@ -219,7 +205,6 @@ pub fn save_zklink<T: indradb::Transaction>(
 
   let useruuid = user.0.to_string();
 
-  println!("creating edge: {:?}", ek);
   itr.create_edge(&ek)?;
 
   // add the user.
@@ -518,6 +503,16 @@ pub fn read_zknote<T: indradb::Transaction>(
 ) -> Result<ZkNote, errors::Error> {
   let accessible = is_note_accessible(itr, svs, uid, id)?;
 
+  (if accessible {
+    Ok(())
+  } else {
+    Err(simple_error::SimpleError::new(
+      "permission error: can't access this note",
+    ))
+  })?;
+
+  // TODO: deny access ^
+
   let vq = indradb::VertexQuery::Specific(indradb::SpecificVertexQuery::single(id).into());
 
   // get note owner.
@@ -699,14 +694,16 @@ pub fn read_zklinks<T: indradb::Transaction>(
 pub fn read_zknoteedit<T: indradb::Transaction>(
   itr: &T,
   uid: UserId,
-  gzl: &GetZkNoteEdit,
+  id: Uuid,
 ) -> Result<ZkNoteEdit, errors::Error> {
   let svs = get_systemvs(itr)?;
 
-  // should do an ownership check for us
-  let zknote = read_zknote(itr, &svs, Some(uid), gzl.zknote)?;
+  println!("read_zknoteedit");
 
-  let zklinks = read_zklinks(itr, &svs, Some(uid), zknote.id)?;
+  // should do an ownership check for us
+  let zknote = read_zknote(itr, &svs, Some(uid), id)?;
+
+  let zklinks = read_zklinks(itr, &svs, Some(uid), id)?;
 
   Ok(ZkNoteEdit {
     zknote: zknote,
@@ -743,8 +740,6 @@ pub fn mkpropquery(
     )),
   })
 }
-
-
 
 #[derive(Eq, Debug, PartialEq, Clone, Hash)]
 pub struct TagTerm {
@@ -827,7 +822,6 @@ pub fn checknote<T: indradb::Transaction>(
           }
 
           let edges = itr.get_edges(indradb::SpecificEdgeQuery::new(eks))?;
-          println!("edges: {:?}", edges);
           !edges.is_empty()
         }
       } else {
@@ -904,7 +898,6 @@ pub fn tagsearch<T: indradb::Transaction>(
   let mut res = Vec::new();
 
   for v in verts {
-    // println!("v1: {:?}", v);
     if checknote(itr, v.id, search, &user, &mut tcache)? {
       res.push(v.id);
     }
@@ -921,13 +914,10 @@ pub fn search_zknotes<T: indradb::Transaction>(
 ) -> Result<ZkNoteSearchResult, errors::Error> {
   let ids = tagsearch(itr, &user, &search.tagsearch)?;
 
-  // println!("ids: {:?}", ids);
-
   let mut notes = Vec::new();
 
   for id in ids {
     let zkln = read_zklistnote(itr, systemvs, Some(user), id)?;
-    // println!("zkln {:?}", zkln);
     notes.push(zkln);
   }
 

@@ -155,8 +155,8 @@ fn user_interface_loggedin<T: indradb::Transaction>(
     }
     "getzknoteedit" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), se("malformed json data"))?;
-      let gzne: GetZkNoteEdit = serde_json::from_value(msgdata.clone())?;
-      let note = I::read_zknoteedit(itr, uid, &gzne)?;
+      let id: Uuid = serde_json::from_value(msgdata.clone())?;
+      let note = I::read_zknoteedit(itr, uid, id)?;
       Ok(ServerResponse {
         what: "zknoteedit".to_string(),
         content: serde_json::to_value(note)?,

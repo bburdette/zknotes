@@ -49,7 +49,7 @@ pub fn import_db(zd: &ZkDatabase, path: &Path) -> Result<(), errors::Error> {
     pubid: None,
     content: "".to_string(),
   };
-  save_zknote(&itr, sysuid, &szn);
+  save_zknote(&itr, sysuid, &szn)?;
 
   let shareid = {
     let v = indradb::Vertex::new(indradb::Type::new("system")?);
@@ -61,7 +61,7 @@ pub fn import_db(zd: &ZkDatabase, path: &Path) -> Result<(), errors::Error> {
       pubid: None,
       content: "".to_string(),
     };
-    save_zknote(&itr, sysuid, &szn);
+    save_zknote(&itr, sysuid, &szn)?;
     v.id
   };
 
@@ -74,7 +74,7 @@ pub fn import_db(zd: &ZkDatabase, path: &Path) -> Result<(), errors::Error> {
       pubid: None,
       content: "".to_string(),
     };
-    save_zknote(&itr, sysuid, &szn);
+    save_zknote(&itr, sysuid, &szn)?;
     v.id
   };
 
@@ -121,6 +121,18 @@ pub fn import_db(zd: &ZkDatabase, path: &Path) -> Result<(), errors::Error> {
     }
 
     let uid = UserId(v.id);
+
+    // users should be notes too.
+    save_zknote(
+      &itr,
+      sysuid,
+      &SaveZkNote {
+        id: Some(v.id),
+        title: u.name.clone(),
+        pubid: None,
+        content: "".to_string(),
+      },
+    )?;
 
     // save id
     uids.insert(u.id, uid);
