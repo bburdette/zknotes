@@ -744,6 +744,7 @@ pub struct TagTerm {
 
 pub fn checknote<T: indradb::Transaction>(
   itr: &T,
+  svs: &SystemVs,
   uuid: Uuid,
   ts: &TagSearch,
   user: &UserId,
@@ -794,7 +795,7 @@ pub fn checknote<T: indradb::Transaction>(
               term: term.clone(),
             };
             println!("tagsearcing with ts: {:?}", ts);
-            let uuids = tagsearch(itr, user, &ts)?;
+            let uuids = tagsearch(itr, &svs, user, &ts)?;
             println!("result: {:?}", uuids);
             tcache.insert(tt.clone(), uuids);
             tcache
@@ -857,15 +858,15 @@ pub fn checknote<T: indradb::Transaction>(
       };
       Ok(ret)
     }
-    TagSearch::Not { ts } => Ok(!checknote(itr, uuid, ts, &user, &mut tcache)?),
+    TagSearch::Not { ts } => Ok(!checknote(itr, &svs, uuid, ts, &user, &mut tcache)?),
     TagSearch::Boolex { ts1, ao, ts2 } => Ok(match ao {
       AndOr::Or => {
-        checknote(itr, uuid, ts1, &user, &mut tcache)?
-          || checknote(itr, uuid, ts2, &user, &mut tcache)?
+        checknote(itr, &svs, uuid, ts1, &user, &mut tcache)?
+          || checknote(itr, &svs, uuid, ts2, &user, &mut tcache)?
       }
       AndOr::And => {
-        checknote(itr, uuid, ts1, &user, &mut tcache)?
-          && checknote(itr, uuid, ts2, &user, &mut tcache)?
+        checknote(itr, &svs, uuid, ts1, &user, &mut tcache)?
+          && checknote(itr, &svs, uuid, ts2, &user, &mut tcache)?
       }
     }),
   }
@@ -873,23 +874,130 @@ pub fn checknote<T: indradb::Transaction>(
 
 pub fn tagsearch<T: indradb::Transaction>(
   itr: &T,
+  svs: &SystemVs,
   user: &UserId,
   search: &TagSearch,
 ) -> Result<Vec<Uuid>, errors::Error> {
+  let mut tcache = HashMap::new();
+  let mut res = Vec::new();
+
   // lets search notes this user owns.
   let uq = indradb::SpecificVertexQuery::single(user.0)
     .outbound()
     .inbound()
     .t(indradb::Type::new("note")?);
 
-  let mut tcache = HashMap::new();
-
   let verts = itr.get_vertices(uq)?;
 
-  let mut res = Vec::new();
+  for v in verts {
+    if checknote(itr, &svs, v.id, search, &user, &mut tcache)? {
+      res.push(v.id);
+    }
+  }
+  // search public notes.
+  let pq = indradb::SpecificVertexQuery::single(svs.public)
+    .outbound()
+    .inbound()
+    .t(indradb::Type::new("note")?);
+
+  let verts = itr.get_vertices(pq)?;
 
   for v in verts {
-    if checknote(itr, v.id, search, &user, &mut tcache)? {
+    if checknote(itr, &svs, v.id, search, &user, &mut tcache)? {
+      res.push(v.id);
+    }
+  }
+
+  // search shared notes.
+  let sq = indradb::SpecificVertexQuery::single(svs.share)
+    .outbound()
+    .inbound()
+    .t(indradb::Type::new("note")?);
+
+  // all 'shares'
+  let shares = itr.get_vertices(sq)?;
+
+  let mut eksfrom = Vec::new();
+  let mut eksto = Vec::new();
+
+  // all shares that connect user to share.
+  for v in shares {
+    println!(
+      "share: {:?}\n\n\n",
+      itr.get_vertex_properties(indradb::VertexPropertyQuery::new(
+        indradb::SpecificVertexQuery::single(v.id).into(),
+        "title"
+      ))?
+    );
+    // from user to the share.
+    eksfrom.push(indradb::EdgeKey::new(
+      v.id,
+      indradb::Type::default(),
+      user.0,
+    ));
+    // from the share to the user.
+    eksto.push(indradb::EdgeKey::new(
+      user.0,
+      indradb::Type::default(),
+      v.id,
+    ));
+  }
+  let mut usershares = Vec::new();
+
+  let sq = indradb::SpecificEdgeQuery::new(eksfrom).outbound();
+  // .t(indradb::Type::new("note")?);
+
+  let sharesfrom = itr.get_vertices(sq)?;
+
+  for v in sharesfrom {
+    println!(
+      "vertfrom: {:?}\n\n\n",
+      itr.get_vertex_properties(indradb::VertexPropertyQuery::new(
+        indradb::SpecificVertexQuery::single(v.id).into(),
+        "title"
+      ))?
+    );
+    usershares.push(v.id);
+  }
+
+  let sq = indradb::SpecificEdgeQuery::new(eksto).inbound();
+  // .t(indradb::Type::new("note")?);
+
+  let sharesto = itr.get_vertices(sq)?;
+
+  for v in sharesto {
+    println!(
+      "vertto: {:?}\n\n\n",
+      itr.get_vertex_properties(indradb::VertexPropertyQuery::new(
+        indradb::SpecificVertexQuery::single(v.id).into(),
+        "title"
+      ))?
+    );
+    if checknote(itr, &svs, v.id, search, &user, &mut tcache)? {
+      usershares.push(v.id);
+    }
+  }
+
+  let sq = indradb::SpecificVertexQuery::new(usershares.clone())
+    .inbound()
+    .outbound();
+
+  let sharenotes = itr.get_vertices(sq)?;
+
+  for v in sharenotes {
+    if checknote(itr, &svs, v.id, search, &user, &mut tcache)? {
+      res.push(v.id);
+    }
+  }
+
+  let sq = indradb::SpecificVertexQuery::new(usershares)
+    .outbound()
+    .inbound();
+
+  let sharenotes = itr.get_vertices(sq)?;
+
+  for v in sharenotes {
+    if checknote(itr, &svs, v.id, search, &user, &mut tcache)? {
       res.push(v.id);
     }
   }
@@ -899,16 +1007,16 @@ pub fn tagsearch<T: indradb::Transaction>(
 
 pub fn search_zknotes<T: indradb::Transaction>(
   itr: &T,
-  systemvs: &SystemVs,
+  svs: &SystemVs,
   user: UserId,
   search: &ZkNoteSearch,
 ) -> Result<ZkNoteSearchResult, errors::Error> {
-  let ids = tagsearch(itr, &user, &search.tagsearch)?;
+  let ids = tagsearch(itr, &svs, &user, &search.tagsearch)?;
 
   let mut notes = Vec::new();
 
   for id in ids {
-    let zkln = read_zklistnote(itr, systemvs, Some(user), id)?;
+    let zkln = read_zklistnote(itr, svs, Some(user), id)?;
     notes.push(zkln);
   }
 
