@@ -4,7 +4,7 @@ use uuid::Uuid;
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ZkNoteSearch {
   pub tagsearch: TagSearch,
-  pub offset: Option<Uuid>,
+  pub offset: i64,
   pub limit: Option<i64>,
 }
 
@@ -41,5 +41,5 @@ pub enum AndOr {
 #[derive(Serialize, Debug, Clone)]
 pub struct ZkNoteSearchResult {
   pub notes: Vec<ZkListNote>,
-  pub offset: Option<Uuid>,
+  pub offset: i64,
 }

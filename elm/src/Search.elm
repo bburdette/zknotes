@@ -28,7 +28,7 @@ import Util exposing (first, rest)
 
 type alias ZkNoteSearch =
     { tagSearch : TagSearch
-    , offset : Maybe UUID
+    , offset : Int
     , limit : Maybe Int
     }
 
@@ -41,7 +41,7 @@ defaultSearchLimit =
 defaultSearch : ZkNoteSearch
 defaultSearch =
     { tagSearch = SearchTerm [] ""
-    , offset = Nothing
+    , offset = 0
     , limit = Just defaultSearchLimit
     }
 
@@ -131,14 +131,9 @@ encodeTagSearch ts =
 encodeZkNoteSearch : ZkNoteSearch -> JE.Value
 encodeZkNoteSearch zns =
     JE.object <|
-        [ ( "tagsearch", encodeTagSearch zns.tagSearch ) ]
-            ++ (zns.offset
-                    |> Maybe.map
-                        (\o ->
-                            [ ( "offset", UUID.toValue o ) ]
-                        )
-                    |> Maybe.withDefault []
-               )
+        [ ( "tagsearch", encodeTagSearch zns.tagSearch )
+        , ( "offset", JE.int zns.offset )
+        ]
             ++ (zns.limit
                     |> Maybe.map (\i -> [ ( "limit", JE.int i ) ])
                     |> Maybe.withDefault []

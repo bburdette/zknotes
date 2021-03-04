@@ -18,7 +18,6 @@ pub struct User {
   pub salt: String,
   pub email: String,
   pub registration_key: Option<String>,
-  // pub zknote: i64,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
