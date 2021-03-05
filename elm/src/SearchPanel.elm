@@ -106,7 +106,7 @@ update msg model =
                     ( { model | tagSearchModel = nm, paginationModel = PP.initModel }
                     , Search <|
                         { tagSearch = ts
-                        , offset = model.paginationModel.offset
+                        , offset = 0
                         , limit = Just model.paginationModel.increment
                         }
                     )
