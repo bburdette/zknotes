@@ -880,14 +880,8 @@ pub fn tagsearch<T: indradb::Transaction>(
   let mut tcache = HashMap::new();
   let mut res = Vec::new();
 
-  // lets search notes this user owns.
-  let uq = indradb::SpecificVertexQuery::single(user.0)
-    .outbound()
-    .inbound()
-    .t(indradb::Type::new("note")?);
-
-  let verts = itr.get_vertices(uq)?;
-
+  // closure function to add items only after we've reached 'offset'
+  // and before we've reached 'limit'.
   let additem = |vecs: &mut Vec<Uuid>, count: &mut i64, uuid| {
     if *count >= offset {
       if limit.map(|l| *count < offset + l).unwrap_or(true) {
@@ -895,13 +889,22 @@ pub fn tagsearch<T: indradb::Transaction>(
         vecs.push(uuid);
         true
       } else {
-        false // we're over the limit!
+        // we're over the limit!  stop collecting uuids.
+        false
       }
     } else {
       *count = *count + 1;
       true
     }
   };
+
+  // lets search notes this user owns.
+  let uq = indradb::SpecificVertexQuery::single(user.0)
+    .outbound()
+    .inbound()
+    .t(indradb::Type::new("note")?);
+
+  let verts = itr.get_vertices(uq)?;
 
   let mut count = 0;
 
@@ -1024,7 +1027,7 @@ pub fn tagsearch<T: indradb::Transaction>(
       for v in sharenotes {
         if checknote(itr, &svs, v.id, search, &user, &mut tcache)? {
           if !additem(&mut res, &mut count, v.id) {
-            limitreached = true;
+            // limitreached = true;
             break;
           }
         }
