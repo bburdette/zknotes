@@ -1,6 +1,12 @@
+elm/node_modules/
+elm/dist/
+elm/.cache/
 elm/elm-stuff/
 elm/upload-prod.sh
+zkprotocol/Cargo.lock
+zkprotocol/target
 nixpkg/result
 server/static/main.js
 server/target/
+server/indra/
 server/*.db*
