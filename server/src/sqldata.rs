@@ -1,6 +1,9 @@
 use barrel::backend::Sqlite;
 use barrel::{types, Migration};
+use log::{debug, error, info, log_enabled, Level};
 use rusqlite::{params, Connection};
+use serde_derive::{Deserialize, Serialize};
+use simple_error::bail;
 use std::convert::TryInto;
 use std::error::Error;
 use std::path::Path;

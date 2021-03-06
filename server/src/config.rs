@@ -1,3 +1,4 @@
+use serde_derive::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 #[derive(Deserialize, Debug, Clone)]

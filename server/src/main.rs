@@ -1,29 +1,3 @@
-extern crate actix_files;
-extern crate actix_rt;
-extern crate actix_web;
-extern crate clap;
-#[macro_use]
-extern crate simple_error;
-extern crate crypto_hash;
-extern crate env_logger;
-extern crate futures;
-extern crate json;
-extern crate lettre;
-extern crate lettre_email;
-extern crate rand;
-extern crate serde_json;
-extern crate time;
-extern crate toml;
-extern crate uuid;
-#[macro_use]
-extern crate log;
-extern crate rusqlite;
-#[macro_use]
-extern crate serde_derive;
-extern crate barrel;
-extern crate base64;
-extern crate zkprotocol;
-
 mod config;
 mod email;
 mod interfaces;
@@ -33,7 +7,8 @@ mod util;
 
 use actix_files::NamedFile;
 use clap::{Arg, SubCommand};
-// use actix_web::http::{Method, StatusCode};
+use actix_session::{CookieSession, Session};
+use log::{debug, error, log_enabled, info, Level};
 use actix_web::middleware::Logger;
 use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Result};
 use config::Config;
@@ -52,10 +27,10 @@ fn sitemap(_req: &HttpRequest) -> Result<NamedFile> {
 }
 
 // simple index handler
-fn mainpage(_state: web::Data<Config>, req: HttpRequest) -> HttpResponse {
+fn mainpage(session: Session,_state: web::Data<Config>, req: HttpRequest) -> HttpResponse {
   info!(
     "remote ip: {:?}, request:{:?}",
-    req.connection_info().remote(),
+    req.connection_info(),
     req
   );
 
@@ -179,7 +154,8 @@ fn main() {
   }
 }
 
-fn err_main() -> Result<(), Box<dyn Error>> {
+#[actix_web::main]
+async fn err_main() -> Result<(), Box<dyn Error>> {
   let matches = clap::App::new("zknotes server")
     .version("1.0")
     .author("Ben Burdette")
@@ -205,7 +181,7 @@ fn err_main() -> Result<(), Box<dyn Error>> {
       util::write_string(
         exportfile,
         serde_json::to_string_pretty(&sqldata::export_db(config.db.as_path())?)?.as_str(),
-      );
+      )?;
 
       Ok(())
     }
@@ -224,7 +200,11 @@ fn err_main() -> Result<(), Box<dyn Error>> {
       let c = web::Data::new(config.clone());
       HttpServer::new(move || {
         App::new()
-          .register_data(c.clone()) // <- create app with shared state
+          .wrap(
+            CookieSession::signed(&[0; 32]) // <- create cookie based session middleware
+              .secure(true),
+          )
+          .data(c.clone()) // <- create app with shared state
           // enable logger
           .wrap(middleware::Logger::default())
           //      .route("/", web::get().to(mainpage))
@@ -235,7 +215,8 @@ fn err_main() -> Result<(), Box<dyn Error>> {
           .service(web::resource("/{tail:.*}").route(web::get().to(mainpage)))
       })
       .bind(format!("{}:{}", config.ip, config.port))?
-      .run()?;
+      .run()
+      .await?;
 
       Ok(())
     }
