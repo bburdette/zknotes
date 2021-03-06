@@ -15,6 +15,7 @@ use config::Config;
 use std::error::Error;
 use std::path::{Path, PathBuf};
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
+use std::sync::{Arc, Mutex};
 
 fn favicon(_req: &HttpRequest) -> Result<NamedFile> {
   let stpath = Path::new("static/favicon.ico");
@@ -27,12 +28,16 @@ fn sitemap(_req: &HttpRequest) -> Result<NamedFile> {
 }
 
 // simple index handler
-fn mainpage(session: Session,_state: web::Data<Config>, req: HttpRequest) -> HttpResponse {
+fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
   info!(
     "remote ip: {:?}, request:{:?}",
     req.connection_info(),
     req
   );
+
+  if let Ok(v) = serde_json::to_value(5) {
+    session.set("test", v);
+  }
 
   match util::load_string("static/index.html") {
     Ok(s) => {
@@ -49,13 +54,13 @@ fn mainpage(session: Session,_state: web::Data<Config>, req: HttpRequest) -> Htt
 }
 
 fn public(
-  state: web::Data<Config>,
+  data: web::Data<Config>,
   item: web::Json<PublicMessage>,
   _req: HttpRequest,
 ) -> HttpResponse {
   println!("public msg: {:?}", &item);
 
-  match interfaces::public_interface(&state, item.into_inner()) {
+  match interfaces::public_interface(&data, item.into_inner()) {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'public' err: {:?}", e);
@@ -68,10 +73,12 @@ fn public(
   }
 }
 
-fn user(state: web::Data<Config>, item: web::Json<UserMessage>, _req: HttpRequest) -> HttpResponse {
+fn user(session: Session, data: web::Data<Config>, item: web::Json<UserMessage>, _req: HttpRequest) -> HttpResponse {
   println!("user msg: {}, {:?}", &item.what, &item.data);
 
-  match interfaces::user_interface(&state, item.into_inner()) {
+  println!("session val: {:?}", session.get("test")?);
+
+  match interfaces::user_interface(&session, &data, item.into_inner()) {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'user' err: {:?}", e);
@@ -84,12 +91,12 @@ fn user(state: web::Data<Config>, item: web::Json<UserMessage>, _req: HttpReques
   }
 }
 
-fn register(state: web::Data<Config>, req: HttpRequest) -> HttpResponse {
+fn register(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
   info!("registration: uid: {:?}", req.match_info().get("uid"));
   match (req.match_info().get("uid"), req.match_info().get("key")) {
     (Some(uid), Some(key)) => {
       // read user record.  does the reg key match?
-      match sqldata::read_user(state.db.as_path(), uid) {
+      match sqldata::read_user(data.db.as_path(), uid) {
         Ok(user) => {
           println!("user {:?}", user);
           println!("user.registration_key {:?}", user.registration_key);
@@ -97,12 +104,12 @@ fn register(state: web::Data<Config>, req: HttpRequest) -> HttpResponse {
           if user.registration_key == Some(key.to_string()) {
             let mut mu = user;
             mu.registration_key = None;
-            match sqldata::update_user(state.db.as_path(), &mu) {
+            match sqldata::update_user(data.db.as_path(), &mu) {
               Ok(_) => HttpResponse::Ok().body(
                 format!(
                   "<h1>You are registered!<h1> <a href=\"{}\">\
                  Proceed to the main site</a>",
-                  state.mainsite
+                  data.mainsite
                 )
                 .to_string(),
               ),
@@ -197,17 +204,16 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
 
       sqldata::dbinit(config.db.as_path())?;
 
-      let c = web::Data::new(config.clone());
+      // let c = Arc::new(Mutex::new(web::Data::new(config.clone())));
+      let c = config.clone();
       HttpServer::new(move || {
         App::new()
+          .data(c.clone()) // <- create app with shared state
+          .wrap(middleware::Logger::default())
           .wrap(
             CookieSession::signed(&[0; 32]) // <- create cookie based session middleware
               .secure(true),
           )
-          .data(c.clone()) // <- create app with shared state
-          // enable logger
-          .wrap(middleware::Logger::default())
-          //      .route("/", web::get().to(mainpage))
           .service(web::resource("/public").route(web::post().to(public)))
           .service(web::resource("/user").route(web::post().to(user)))
           .service(web::resource(r"/register/{uid}/{key}").route(web::get().to(register)))

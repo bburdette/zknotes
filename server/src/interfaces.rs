@@ -4,6 +4,7 @@ use crate::email;
 use crate::search;
 use crate::sqldata;
 use crate::util;
+use actix_session::Session;
 use crypto_hash::{hex_digest, Algorithm};
 use log::{debug, error, info, log_enabled, Level};
 use serde_derive::{Deserialize, Serialize};
@@ -23,7 +24,11 @@ pub struct RegistrationData {
   email: String,
 }
 
-pub fn user_interface(config: &Config, msg: UserMessage) -> Result<ServerResponse, Box<dyn Error>> {
+pub fn user_interface(
+  session: &Session,
+  config: &Config,
+  msg: UserMessage,
+) -> Result<ServerResponse, Box<dyn Error>> {
   info!("got a user message: {}", msg.what);
   if msg.what.as_str() == "register" {
     // do the registration thing.
