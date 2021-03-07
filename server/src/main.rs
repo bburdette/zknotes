@@ -76,7 +76,8 @@ fn public(
 fn user(session: Session, data: web::Data<Config>, item: web::Json<UserMessage>, _req: HttpRequest) -> HttpResponse {
   println!("user msg: {}, {:?}", &item.what, &item.data);
 
-  println!("session val: {:?}", session.get("test")?);
+  let s = session.get::<i64>("test");
+  println!("session val: {:?}", s);
 
   match interfaces::user_interface(&session, &data, item.into_inner()) {
     Ok(sr) => HttpResponse::Ok().json(sr),
@@ -204,7 +205,6 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
 
       sqldata::dbinit(config.db.as_path())?;
 
-      // let c = Arc::new(Mutex::new(web::Data::new(config.clone())));
       let c = config.clone();
       HttpServer::new(move || {
         App::new()
