@@ -153,6 +153,7 @@ fn defcon() -> Config {
     mainsite: "https:://mahbloag.practica.site/".to_string(),
     appname: "mahbloag".to_string(),
     domain: "practica.site".to_string(),
+    admin_email: "admin@practica.site".to_string(),
   }
 }
 

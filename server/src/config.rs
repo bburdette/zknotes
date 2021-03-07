@@ -9,4 +9,5 @@ pub struct Config {
   pub mainsite: String,
   pub appname: String,
   pub domain: String,
+  pub admin_email: String,
 }

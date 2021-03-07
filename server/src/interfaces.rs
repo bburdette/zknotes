@@ -68,7 +68,7 @@ pub fn user_interface(config: &Config, msg: UserMessage) -> Result<ServerRespons
         email::send_registration_notification(
           config.appname.as_str(),
           config.domain.as_str(),
-          "bburdettte@protonmail.com",
+          config.admin_email.as_str(),
           rd.email.as_str(),
           msg.uid.as_str(),
           registration_key.as_str(),
