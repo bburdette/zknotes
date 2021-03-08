@@ -7,7 +7,7 @@ import Search as S
 
 
 type SendMsg
-    = Register String
+    = Register Data.Registration
     | Login Data.Login
     | GetZkNote Int
     | GetZkNoteEdit Data.GetZkNoteEdit
@@ -26,6 +26,7 @@ type ServerResponse
     | UserExists
     | UnregisteredUser
     | InvalidUserOrPwd
+    | NotLoggedIn
     | LoggedIn Data.LoginData
     | ZkNoteSearchResult Data.ZkNoteSearchResult
     | SavedZkNotePlusLinks Data.SavedZkNote
@@ -51,6 +52,9 @@ showServerResponse sr =
 
         UnregisteredUser ->
             "UnregisteredUser"
+
+        NotLoggedIn ->
+            "NotLoggedIn"
 
         InvalidUserOrPwd ->
             "InvalidUserOrPwd"
@@ -95,10 +99,10 @@ showServerResponse sr =
 encodeSendMsg : SendMsg -> JE.Value
 encodeSendMsg sm =
     case sm of
-        Register email ->
+        Register registration ->
             JE.object
                 [ ( "what", JE.string "register" )
-                , ( "data", encodeEmail email )
+                , ( "data", Data.encodeRegistration registration )
                 ]
 
         Login login ->
@@ -191,6 +195,9 @@ serverResponseDecoder =
 
                 "logged in" ->
                     JD.map LoggedIn (JD.at [ "content" ] Data.decodeLoginData)
+
+                "not logged in" ->
+                    JD.succeed NotLoggedIn
 
                 "invalid user or pwd" ->
                     JD.succeed InvalidUserOrPwd

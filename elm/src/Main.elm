@@ -799,7 +799,12 @@ actualupdate msg model =
                 Login.Register ->
                     ( { model | state = Login lmod }
                     , sendUIMsg model.location
-                        (UI.Register ls.email)
+                        (UI.Register
+                            { uid = lmod.userId
+                            , pwd = lmod.password
+                            , email = ls.email
+                            }
+                        )
                     )
 
                 Login.Login ->
@@ -1035,6 +1040,14 @@ actualupdate msg model =
                                     ( { model | state = unexpectedMessage state (UI.showServerResponse uiresponse) }
                                     , Cmd.none
                                     )
+
+                        UI.NotLoggedIn ->
+                            case state of
+                                Login lmod ->
+                                    ( { model | state = Login lmod }, Cmd.none )
+
+                                _ ->
+                                    ( { model | state = Login <| Login.initialModel Nothing "zknotes" model.seed }, Cmd.none )
 
                         UI.InvalidUserOrPwd ->
                             case state of
