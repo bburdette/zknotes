@@ -5,18 +5,18 @@ import Json.Encode as JE
 import Search as S
 
 
-type alias LoggedIn =
+type alias Login =
     { uid : String
     , pwd : String
-    , ld : LoginData
     }
 
 
-type alias Login a =
-    { a
-        | uid : String
-        , pwd : String
-    }
+encodeLogin : Login -> JE.Value
+encodeLogin l =
+    JE.object
+        [ ( "uid", JE.string l.uid )
+        , ( "pwd", JE.string l.pwd )
+        ]
 
 
 type alias LoginData =
