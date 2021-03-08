@@ -10,3 +10,4 @@ server/static/main.js
 server/target/
 server/indra/
 server/*.db*
+server/config.toml
