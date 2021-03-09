@@ -16,6 +16,8 @@ use std::error::Error;
 use std::path::{Path, PathBuf};
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 use std::sync::{Arc, Mutex};
+use serde_json;
+use uuid::Uuid;
 
 fn favicon(_req: &HttpRequest) -> Result<NamedFile> {
   let stpath = Path::new("static/favicon.ico");
@@ -27,6 +29,7 @@ fn sitemap(_req: &HttpRequest) -> Result<NamedFile> {
   Ok(NamedFile::open(stpath)?)
 }
 
+
 // simple index handler
 fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
   info!(
@@ -35,16 +38,21 @@ fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -> Http
     req
   );
 
-  if let Ok(v) = serde_json::to_value(5) {
-    session.set("test", v);
-  }
+  let s = session.get::<Uuid>("token");
+  // logged in?
+  let logindata = match interfaces::login_data_for_token(session, &data) {
+    Ok(Some(logindata)) => serde_json::to_value(logindata).unwrap_or(serde_json::Value::Null),
+    _ => serde_json::Value::Null,
+  };
+
+  println!("mainpage - token: {:?}  userdata:{:?} ", s, logindata);
 
   match util::load_string("static/index.html") {
     Ok(s) => {
-      // response
+      // search and replace with logindata!
       HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
-        .body(s)
+        .body(s.replace("{{logindata}}", logindata.to_string().as_str()))
     }
     Err(e) => {
       println!("err");
@@ -76,7 +84,7 @@ fn public(
 fn user(session: Session, data: web::Data<Config>, item: web::Json<UserMessage>, _req: HttpRequest) -> HttpResponse {
   println!("user msg: {}, {:?}", &item.what, &item.data);
 
-  let s = session.get::<i64>("test");
+  let s = session.get::<Uuid>("token");
   println!("session val: {:?}", s);
 
   match interfaces::user_interface(&session, &data, item.into_inner()) {

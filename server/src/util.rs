@@ -1,11 +1,13 @@
 use rand;
 use rand::Rng;
+use std::convert::TryInto;
 use std::error::Error;
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
 use std::path::Path;
 use std::string::*;
+use std::time::{Duration, SystemTime};
 
 pub fn load_string(file_name: &str) -> Result<String, Box<dyn Error>> {
   let path = &Path::new(&file_name);
@@ -35,4 +37,22 @@ pub fn get_rand_string(len: usize) -> String {
   }
 
   rstr
+}
+
+pub fn now() -> Result<i64, Box<dyn Error>> {
+  let nowsecs = SystemTime::now()
+    .duration_since(SystemTime::UNIX_EPOCH)
+    .map(|n| n.as_secs())?;
+  let s: i64 = nowsecs.try_into()?;
+  Ok(s * 1000)
+}
+
+pub fn is_token_expired(tokendate: i64) -> bool {
+  match now() {
+    Ok(now) => {
+      let expinterval = 7 * 24 * 60 * 60 * 1000;
+      !(now - tokendate < expinterval)
+    }
+    _ => true,
+  }
 }

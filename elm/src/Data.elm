@@ -321,7 +321,7 @@ decodeLoginData : JD.Decoder LoginData
 decodeLoginData =
     JD.map5 LoginData
         (JD.field "userid" JD.int)
-        (JD.field "username" JD.string)
+        (JD.field "name" JD.string)
         (JD.field "publicid" JD.int)
         (JD.field "shareid" JD.int)
         (JD.field "searchid" JD.int)

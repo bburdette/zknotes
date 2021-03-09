@@ -53,14 +53,7 @@
         app.ports.receiveSelectedText.send(text);
       }
 
-      var uid = localStorage.getItem("uid");
-      var pwd = localStorage.getItem("pwd");
-
-      var login = null;
-
-      if (uid && pwd) {
-        login = { uid : uid, pwd : pwd };
-      }
+      login = {{logindata}};
 
       app = Elm.Main.init({
         node: document.getElementById('elm'),
