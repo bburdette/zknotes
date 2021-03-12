@@ -49,7 +49,24 @@ pub fn now() -> Result<i64, Box<dyn Error>> {
 
 pub fn is_token_expired(token_expiration_ms: i64, tokendate: i64) -> bool {
   match now() {
-    Ok(now) => now < tokendate || (now - tokendate) < token_expiration_ms,
+    Ok(now) => now < tokendate || (now - tokendate) > token_expiration_ms,
     _ => true,
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn test_expiration() {
+    match now() {
+      Ok(now) => {
+        assert_eq!(is_token_expired(100, now), false);
+        assert_eq!(is_token_expired(100, now - 200), true);
+        assert_eq!(is_token_expired(100, now + 200), true);
+      }
+      Err(_) => assert_eq!(2, 4),
+    }
   }
 }
