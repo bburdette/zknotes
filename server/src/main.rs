@@ -105,7 +105,7 @@ fn register(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
   match (req.match_info().get("uid"), req.match_info().get("key")) {
     (Some(uid), Some(key)) => {
       // read user record.  does the reg key match?
-      match sqldata::read_user(data.db.as_path(), uid) {
+      match sqldata::read_user(data.db.as_path(), uid, None) {
         Ok(user) => {
           println!("user {:?}", user);
           println!("user.registration_key {:?}", user.registration_key);
@@ -145,6 +145,7 @@ fn defcon() -> Config {
     appname: "mahbloag".to_string(),
     domain: "practica.site".to_string(),
     admin_email: "admin@practica.site".to_string(),
+    token_expiration_ms: 7*24*60*60*1000,  // 7 days in milliseconds
   }
 }
 

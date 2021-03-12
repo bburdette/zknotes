@@ -27,20 +27,12 @@ pub fn login_data_for_token(
 
   match session.get("token")? {
     None => Ok(None),
-    Some(token) => match sqldata::read_user_by_token(&conn, token) {
-      Ok(user) => {
-        if user
-          .tokendate
-          .map(|date| is_token_expired(date))
-          .unwrap_or(false)
-        {
-          Ok(None)
-        } else {
-          Ok(Some(sqldata::login_data(&conn, user.id)?))
-        }
+    Some(token) => {
+      match sqldata::read_user_by_token(&conn, token, Some(config.token_expiration_ms)) {
+        Ok(user) => Ok(Some(sqldata::login_data(&conn, user.id)?)),
+        Err(_) => Ok(None),
       }
-      Err(_) => Ok(None),
-    },
+    }
   }
 }
 
@@ -55,7 +47,7 @@ pub fn user_interface(
     let rd: RegistrationData = serde_json::from_value(msgdata)?;
     // do the registration thing.
     // user already exists?
-    match sqldata::read_user(Path::new(&config.db), rd.uid.as_str()) {
+    match sqldata::read_user(Path::new(&config.db), rd.uid.as_str(), None) {
       Ok(_) => {
         // err - user exists.
         Ok(ServerResponse {
@@ -113,7 +105,7 @@ pub fn user_interface(
     let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
     let login: Login = serde_json::from_value(msgdata.clone())?;
 
-    let mut userdata = sqldata::read_user(Path::new(&config.db), login.uid.as_str())?;
+    let mut userdata = sqldata::read_user(Path::new(&config.db), login.uid.as_str(), None)?;
     match userdata.registration_key {
       Some(_reg_key) => Ok(ServerResponse {
         what: "unregistered user".to_string(),
@@ -156,7 +148,7 @@ pub fn user_interface(
         content: serde_json::Value::Null,
       }),
       Some(token) => {
-        match sqldata::read_user_by_token(&conn, token) {
+        match sqldata::read_user_by_token(&conn, token, Some(config.token_expiration_ms)) {
           Err(_) => Ok(ServerResponse {
             what: "invalid user or pwd".to_string(),
             content: serde_json::Value::Null,

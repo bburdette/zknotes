@@ -47,12 +47,9 @@ pub fn now() -> Result<i64, Box<dyn Error>> {
   Ok(s * 1000)
 }
 
-pub fn is_token_expired(tokendate: i64) -> bool {
+pub fn is_token_expired(token_expiration_ms: i64, tokendate: i64) -> bool {
   match now() {
-    Ok(now) => {
-      let expinterval = 7 * 24 * 60 * 60 * 1000;
-      !(now - tokendate < expinterval)
-    }
+    Ok(now) => now < tokendate || (now - tokendate) < token_expiration_ms,
     _ => true,
   }
 }

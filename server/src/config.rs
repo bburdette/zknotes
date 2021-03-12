@@ -11,4 +11,5 @@ pub struct Config {
   pub appname: String,
   pub domain: String,
   pub admin_email: String,
+  pub token_expiration_ms: i64,
 }

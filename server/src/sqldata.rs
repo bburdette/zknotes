@@ -715,7 +715,11 @@ pub fn user_name(conn: &Connection, uid: i64) -> Result<String, Box<dyn Error>> 
   Ok(user)
 }
 
-pub fn read_user(dbfile: &Path, name: &str) -> Result<User, Box<dyn Error>> {
+pub fn read_user(
+  dbfile: &Path,
+  name: &str,
+  token_expiration_ms: Option<i64>,
+) -> Result<User, Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
 
   let (mut user, tokestr) = conn.query_row(
@@ -744,10 +748,28 @@ pub fn read_user(dbfile: &Path, name: &str) -> Result<User, Box<dyn Error>> {
     None => None,
   };
 
-  Ok(user)
+  // if expiration supplied, check for token expiration.
+  match token_expiration_ms {
+    Some(texp) => {
+      if user
+        .tokendate
+        .map(|td| is_token_expired(texp, td))
+        .unwrap_or(true)
+      {
+        bail!("login expired")
+      } else {
+        Ok(user)
+      }
+    }
+    None => Ok(user),
+  }
 }
 
-pub fn read_user_by_token(conn: &Connection, token: Uuid) -> Result<User, Box<dyn Error>> {
+pub fn read_user_by_token(
+  conn: &Connection,
+  token: Uuid,
+  token_expiration_ms: Option<i64>,
+) -> Result<User, Box<dyn Error>> {
   let user = conn.query_row(
     "select id, name, hashwd, salt, email, registration_key, tokendate
       from user where token = ?1",
@@ -766,14 +788,19 @@ pub fn read_user_by_token(conn: &Connection, token: Uuid) -> Result<User, Box<dy
     },
   )?;
 
-  if user
-    .tokendate
-    .map(|td| is_token_expired(td))
-    .unwrap_or(true)
-  {
-    bail!("expired token")
-  } else {
-    Ok(user)
+  match token_expiration_ms {
+    Some(texp) => {
+      if user
+        .tokendate
+        .map(|td| is_token_expired(texp, td))
+        .unwrap_or(true)
+      {
+        bail!("login expired")
+      } else {
+        Ok(user)
+      }
+    }
+    None => Ok(user),
   }
 }
 
