@@ -1,29 +1,3 @@
-extern crate actix_files;
-extern crate actix_rt;
-extern crate actix_web;
-extern crate clap;
-#[macro_use]
-extern crate simple_error;
-extern crate crypto_hash;
-extern crate env_logger;
-extern crate futures;
-extern crate json;
-extern crate lettre;
-extern crate lettre_email;
-extern crate rand;
-extern crate serde_json;
-extern crate time;
-extern crate toml;
-extern crate uuid;
-#[macro_use]
-extern crate log;
-extern crate rusqlite;
-#[macro_use]
-extern crate serde_derive;
-extern crate barrel;
-extern crate base64;
-extern crate zkprotocol;
-
 mod config;
 mod email;
 mod interfaces;
@@ -33,13 +7,17 @@ mod util;
 
 use actix_files::NamedFile;
 use clap::{Arg, SubCommand};
-// use actix_web::http::{Method, StatusCode};
+use actix_session::{CookieSession, Session};
+use log::{debug, error, log_enabled, info, Level};
 use actix_web::middleware::Logger;
 use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Result};
 use config::Config;
 use std::error::Error;
 use std::path::{Path, PathBuf};
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
+use std::sync::{Arc, Mutex};
+use serde_json;
+use uuid::Uuid;
 
 fn favicon(_req: &HttpRequest) -> Result<NamedFile> {
   let stpath = Path::new("static/favicon.ico");
@@ -51,20 +29,30 @@ fn sitemap(_req: &HttpRequest) -> Result<NamedFile> {
   Ok(NamedFile::open(stpath)?)
 }
 
+
 // simple index handler
-fn mainpage(_state: web::Data<Config>, req: HttpRequest) -> HttpResponse {
+fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
   info!(
     "remote ip: {:?}, request:{:?}",
-    req.connection_info().remote(),
+    req.connection_info(),
     req
   );
 
+  let s = session.get::<Uuid>("token");
+  // logged in?
+  let logindata = match interfaces::login_data_for_token(session, &data) {
+    Ok(Some(logindata)) => serde_json::to_value(logindata).unwrap_or(serde_json::Value::Null),
+    _ => serde_json::Value::Null,
+  };
+
+  println!("mainpage - token: {:?}  userdata:{:?} ", s, logindata);
+
   match util::load_string("static/index.html") {
     Ok(s) => {
-      // response
+      // search and replace with logindata!
       HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
-        .body(s)
+        .body(s.replace("{{logindata}}", logindata.to_string().as_str()))
     }
     Err(e) => {
       println!("err");
@@ -74,13 +62,13 @@ fn mainpage(_state: web::Data<Config>, req: HttpRequest) -> HttpResponse {
 }
 
 fn public(
-  state: web::Data<Config>,
+  data: web::Data<Config>,
   item: web::Json<PublicMessage>,
   _req: HttpRequest,
 ) -> HttpResponse {
   println!("public msg: {:?}", &item);
 
-  match interfaces::public_interface(&state, item.into_inner()) {
+  match interfaces::public_interface(&data, item.into_inner()) {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'public' err: {:?}", e);
@@ -93,10 +81,13 @@ fn public(
   }
 }
 
-fn user(state: web::Data<Config>, item: web::Json<UserMessage>, _req: HttpRequest) -> HttpResponse {
+fn user(session: Session, data: web::Data<Config>, item: web::Json<UserMessage>, _req: HttpRequest) -> HttpResponse {
   println!("user msg: {}, {:?}", &item.what, &item.data);
 
-  match interfaces::user_interface(&state, item.into_inner()) {
+  let s = session.get::<Uuid>("token");
+  println!("session val: {:?}", s);
+
+  match interfaces::user_interface(&session, &data, item.into_inner()) {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'user' err: {:?}", e);
@@ -109,12 +100,12 @@ fn user(state: web::Data<Config>, item: web::Json<UserMessage>, _req: HttpReques
   }
 }
 
-fn register(state: web::Data<Config>, req: HttpRequest) -> HttpResponse {
+fn register(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
   info!("registration: uid: {:?}", req.match_info().get("uid"));
   match (req.match_info().get("uid"), req.match_info().get("key")) {
     (Some(uid), Some(key)) => {
       // read user record.  does the reg key match?
-      match sqldata::read_user(state.db.as_path(), uid) {
+      match sqldata::read_user(data.db.as_path(), uid, None) {
         Ok(user) => {
           println!("user {:?}", user);
           println!("user.registration_key {:?}", user.registration_key);
@@ -122,12 +113,12 @@ fn register(state: web::Data<Config>, req: HttpRequest) -> HttpResponse {
           if user.registration_key == Some(key.to_string()) {
             let mut mu = user;
             mu.registration_key = None;
-            match sqldata::update_user(state.db.as_path(), &mu) {
+            match sqldata::update_user(data.db.as_path(), &mu) {
               Ok(_) => HttpResponse::Ok().body(
                 format!(
                   "<h1>You are registered!<h1> <a href=\"{}\">\
                  Proceed to the main site</a>",
-                  state.mainsite
+                  data.mainsite
                 )
                 .to_string(),
               ),
@@ -154,6 +145,7 @@ fn defcon() -> Config {
     appname: "mahbloag".to_string(),
     domain: "practica.site".to_string(),
     admin_email: "admin@practica.site".to_string(),
+    token_expiration_ms: 7*24*60*60*1000,  // 7 days in milliseconds
   }
 }
 
@@ -180,7 +172,8 @@ fn main() {
   }
 }
 
-fn err_main() -> Result<(), Box<dyn Error>> {
+#[actix_web::main]
+async fn err_main() -> Result<(), Box<dyn Error>> {
   let matches = clap::App::new("zknotes server")
     .version("1.0")
     .author("Ben Burdette")
@@ -206,7 +199,7 @@ fn err_main() -> Result<(), Box<dyn Error>> {
       util::write_string(
         exportfile,
         serde_json::to_string_pretty(&sqldata::export_db(config.db.as_path())?)?.as_str(),
-      );
+      )?;
 
       Ok(())
     }
@@ -222,13 +215,15 @@ fn err_main() -> Result<(), Box<dyn Error>> {
 
       sqldata::dbinit(config.db.as_path())?;
 
-      let c = web::Data::new(config.clone());
+      let c = config.clone();
       HttpServer::new(move || {
         App::new()
-          .register_data(c.clone()) // <- create app with shared state
-          // enable logger
+          .data(c.clone()) // <- create app with shared state
           .wrap(middleware::Logger::default())
-          //      .route("/", web::get().to(mainpage))
+          .wrap(
+            CookieSession::signed(&[0; 32]) // <- create cookie based session middleware
+              .secure(true),
+          )
           .service(web::resource("/public").route(web::post().to(public)))
           .service(web::resource("/user").route(web::post().to(user)))
           .service(web::resource(r"/register/{uid}/{key}").route(web::get().to(register)))
@@ -236,7 +231,8 @@ fn err_main() -> Result<(), Box<dyn Error>> {
           .service(web::resource("/{tail:.*}").route(web::get().to(mainpage)))
       })
       .bind(format!("{}:{}", config.ip, config.port))?
-      .run()?;
+      .run()
+      .await?;
 
       Ok(())
     }

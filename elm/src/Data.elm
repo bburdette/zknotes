@@ -5,17 +5,16 @@ import Json.Encode as JE
 import Search as S
 
 
-type alias LoggedIn =
+type alias Registration =
     { uid : String
     , pwd : String
-    , ld : LoginData
+    , email : String
     }
 
 
-type alias Login a =
-    { a
-        | uid : String
-        , pwd : String
+type alias Login =
+    { uid : String
+    , pwd : String
     }
 
 
@@ -135,6 +134,23 @@ type alias ZkNoteEdit =
     { zknote : ZkNote
     , links : List ZkLink
     }
+
+
+encodeRegistration : Registration -> JE.Value
+encodeRegistration l =
+    JE.object
+        [ ( "uid", JE.string l.uid )
+        , ( "pwd", JE.string l.pwd )
+        , ( "email", JE.string l.email )
+        ]
+
+
+encodeLogin : Login -> JE.Value
+encodeLogin l =
+    JE.object
+        [ ( "uid", JE.string l.uid )
+        , ( "pwd", JE.string l.pwd )
+        ]
 
 
 encodeGetZkLinks : GetZkLinks -> JE.Value
@@ -305,7 +321,7 @@ decodeLoginData : JD.Decoder LoginData
 decodeLoginData =
     JD.map5 LoginData
         (JD.field "userid" JD.int)
-        (JD.field "username" JD.string)
+        (JD.field "name" JD.string)
         (JD.field "publicid" JD.int)
         (JD.field "shareid" JD.int)
         (JD.field "searchid" JD.int)

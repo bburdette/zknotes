@@ -1,6 +1,6 @@
+use crate::sqldata;
+use crate::sqldata::{note_id, power_delete_zknote, user_id};
 use rusqlite::Connection;
-use sqldata;
-use sqldata::{note_id, power_delete_zknote, user_id};
 use std::convert::TryInto;
 use std::error::Error;
 use zkprotocol::content::ZkListNote;

@@ -1,3 +1,25 @@
+#[derive(Deserialize, Debug)]
+pub struct RegistrationData {
+  pub uid: String,
+  pub pwd: String,
+  pub email: String,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct Login {
+  pub uid: String,
+  pub pwd: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct LoginData {
+  pub userid: i64,
+  pub name: String,
+  pub publicid: i64,
+  pub shareid: i64,
+  pub searchid: i64,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ZkNote {
   pub id: i64,

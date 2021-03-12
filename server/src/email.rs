@@ -1,8 +1,8 @@
+use crate::util;
 use lettre::smtp::response::Response;
 use lettre::{EmailAddress, Envelope, SendableEmail, SmtpClient, SmtpTransport, Transport};
+use log::{debug, error, info, log_enabled, Level};
 use std::error::Error;
-use util;
-
 pub fn send_registration(
   appname: &str,
   domain: &str,

@@ -7,8 +7,8 @@ import Search as S
 
 
 type SendMsg
-    = Register String
-    | Login
+    = Register Data.Registration
+    | Login Data.Login
     | GetZkNote Int
     | GetZkNoteEdit Data.GetZkNoteEdit
     | DeleteZkNote Int
@@ -26,6 +26,7 @@ type ServerResponse
     | UserExists
     | UnregisteredUser
     | InvalidUserOrPwd
+    | NotLoggedIn
     | LoggedIn Data.LoginData
     | ZkNoteSearchResult Data.ZkNoteSearchResult
     | SavedZkNotePlusLinks Data.SavedZkNote
@@ -51,6 +52,9 @@ showServerResponse sr =
 
         UnregisteredUser ->
             "UnregisteredUser"
+
+        NotLoggedIn ->
+            "NotLoggedIn"
 
         InvalidUserOrPwd ->
             "InvalidUserOrPwd"
@@ -92,101 +96,78 @@ showServerResponse sr =
             "PowerDeleteComplete"
 
 
-encodeSendMsg : SendMsg -> String -> String -> JE.Value
-encodeSendMsg sm uid pwd =
+encodeSendMsg : SendMsg -> JE.Value
+encodeSendMsg sm =
     case sm of
-        Register email ->
+        Register registration ->
             JE.object
                 [ ( "what", JE.string "register" )
-                , ( "uid", JE.string uid )
-                , ( "pwd", JE.string pwd )
-                , ( "data", encodeEmail email )
+                , ( "data", Data.encodeRegistration registration )
                 ]
 
-        Login ->
+        Login login ->
             JE.object
                 [ ( "what", JE.string "login" )
-                , ( "uid", JE.string uid )
-                , ( "pwd", JE.string pwd )
+                , ( "data", Data.encodeLogin login )
                 ]
 
         GetZkNote id ->
             JE.object
                 [ ( "what", JE.string "getzknote" )
-                , ( "uid", JE.string uid )
-                , ( "pwd", JE.string pwd )
                 , ( "data", JE.int id )
                 ]
 
         GetZkNoteEdit zkne ->
             JE.object
                 [ ( "what", JE.string "getzknoteedit" )
-                , ( "uid", JE.string uid )
-                , ( "pwd", JE.string pwd )
                 , ( "data", Data.encodeGetZkNoteEdit zkne )
                 ]
 
         DeleteZkNote id ->
             JE.object
                 [ ( "what", JE.string "deletezknote" )
-                , ( "uid", JE.string uid )
-                , ( "pwd", JE.string pwd )
                 , ( "data", JE.int id )
                 ]
 
         SaveZkNote sbe ->
             JE.object
                 [ ( "what", JE.string "savezknote" )
-                , ( "uid", JE.string uid )
-                , ( "pwd", JE.string pwd )
                 , ( "data", Data.encodeSaveZkNote sbe )
                 ]
 
         SaveZkNotePlusLinks s ->
             JE.object
                 [ ( "what", JE.string "savezknotepluslinks" )
-                , ( "uid", JE.string uid )
-                , ( "pwd", JE.string pwd )
                 , ( "data", Data.encodeSaveZkNotePlusLinks s )
                 ]
 
         SaveZkLinks zklinks ->
             JE.object
                 [ ( "what", JE.string "savezklinks" )
-                , ( "uid", JE.string uid )
-                , ( "pwd", JE.string pwd )
                 , ( "data", Data.encodeZkLinks zklinks )
                 ]
 
         GetZkLinks gzl ->
             JE.object
                 [ ( "what", JE.string "getzklinks" )
-                , ( "uid", JE.string uid )
-                , ( "pwd", JE.string pwd )
                 , ( "data", Data.encodeGetZkLinks gzl )
                 ]
 
         SearchZkNotes s ->
             JE.object
                 [ ( "what", JE.string "searchzknotes" )
-                , ( "uid", JE.string uid )
-                , ( "pwd", JE.string pwd )
                 , ( "data", S.encodeZkNoteSearch s )
                 ]
 
         SaveImportZkNotes n ->
             JE.object
                 [ ( "what", JE.string "saveimportzknotes" )
-                , ( "uid", JE.string uid )
-                , ( "pwd", JE.string pwd )
                 , ( "data", JE.list Data.encodeImportZkNote n )
                 ]
 
         PowerDelete s ->
             JE.object
                 [ ( "what", JE.string "powerdelete" )
-                , ( "uid", JE.string uid )
-                , ( "pwd", JE.string pwd )
                 , ( "data", S.encodeTagSearch s )
                 ]
 
@@ -214,6 +195,9 @@ serverResponseDecoder =
 
                 "logged in" ->
                     JD.map LoggedIn (JD.at [ "content" ] Data.decodeLoginData)
+
+                "not logged in" ->
+                    JD.succeed NotLoggedIn
 
                 "invalid user or pwd" ->
                     JD.succeed InvalidUserOrPwd
