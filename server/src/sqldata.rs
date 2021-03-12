@@ -483,16 +483,6 @@ pub fn udpate4(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   Ok(())
 }
 
-// pub fn udpate5() -> Migration {
-//   let mut m = Migration::new();
-
-//   m.change_table("user", |t| {
-//     t.add_column("securitytoken", types::text().nullable(true));
-//     t.add_column("tokenexpiration", types::integer().nullable(true));
-//   });
-
-//   m
-// }
 pub fn udpate5(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   // db connection without foreign key checking.
   let conn = Connection::open(dbfile)?;

@@ -38,14 +38,11 @@ fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -> Http
     req
   );
 
-  let s = session.get::<Uuid>("token");
   // logged in?
   let logindata = match interfaces::login_data_for_token(session, &data) {
     Ok(Some(logindata)) => serde_json::to_value(logindata).unwrap_or(serde_json::Value::Null),
     _ => serde_json::Value::Null,
   };
-
-  println!("mainpage - token: {:?}  userdata:{:?} ", s, logindata);
 
   match util::load_string("static/index.html") {
     Ok(s) => {
@@ -66,7 +63,7 @@ fn public(
   item: web::Json<PublicMessage>,
   _req: HttpRequest,
 ) -> HttpResponse {
-  println!("public msg: {:?}", &item);
+  info!("public msg: {:?}", &item);
 
   match interfaces::public_interface(&data, item.into_inner()) {
     Ok(sr) => HttpResponse::Ok().json(sr),
@@ -82,11 +79,7 @@ fn public(
 }
 
 fn user(session: Session, data: web::Data<Config>, item: web::Json<UserMessage>, _req: HttpRequest) -> HttpResponse {
-  println!("user msg: {}, {:?}", &item.what, &item.data);
-
-  let s = session.get::<Uuid>("token");
-  println!("session val: {:?}", s);
-
+  info!("user msg: {}, {:?}", &item.what, &item.data);
   match interfaces::user_interface(&session, &data, item.into_inner()) {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
@@ -107,9 +100,6 @@ fn register(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
       // read user record.  does the reg key match?
       match sqldata::read_user(data.db.as_path(), uid, None) {
         Ok(user) => {
-          println!("user {:?}", user);
-          println!("user.registration_key {:?}", user.registration_key);
-          println!("key {}", key);
           if user.registration_key == Some(key.to_string()) {
             let mut mu = user;
             mu.registration_key = None;
