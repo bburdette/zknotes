@@ -217,6 +217,7 @@ routeState model route =
                             , mbzknote = Nothing
                             , spmodel = st.spmodel
                             , navkey = model.navkey
+                            , seed = model.seed
                             }
                             id
 
@@ -231,6 +232,7 @@ routeState model route =
                             , mbzknote = Nothing
                             , spmodel = st.spmodel
                             , navkey = model.navkey
+                            , seed = model.seed
                             }
                             id
 
@@ -245,6 +247,7 @@ routeState model route =
                                     , mbzknote = Nothing
                                     , spmodel = SP.initModel
                                     , navkey = model.navkey
+                                    , seed = model.seed
                                     }
                                     id
 
@@ -494,6 +497,7 @@ type alias NwState =
     , mbzknote : Maybe Data.ZkNote
     , spmodel : SP.Model
     , navkey : Browser.Navigation.Key
+    , seed : Seed
     }
 
 
@@ -520,6 +524,9 @@ notewait nwstate state wmsg =
                 -- TODO error state for errors, error state for unexpected msgs.
                 UserReplyData (Err e) ->
                     Err (DisplayError (DisplayError.initialModel <| Util.httpErrorString e) state)
+
+                UserReplyData (Ok UI.InvalidUserOrPwd) ->
+                    Err (Login <| Login.initialModel Nothing "zknotes" nwstate.seed)
 
                 _ ->
                     Ok nwstate
@@ -1221,6 +1228,7 @@ actualupdate msg model =
                                 , mbzknote = Nothing
                                 , spmodel = emod.spmodel
                                 , navkey = model.navkey
+                                , seed = model.seed
                                 }
                                 id
                     in
@@ -1236,6 +1244,7 @@ actualupdate msg model =
                                 , mbzknote = Nothing
                                 , spmodel = emod.spmodel
                                 , navkey = model.navkey
+                                , seed = model.seed
                                 }
                                 id
                     in
@@ -1283,6 +1292,7 @@ actualupdate msg model =
                                 , mbzknote = Nothing
                                 , spmodel = emod.spmodel
                                 , navkey = model.navkey
+                                , seed = model.seed
                                 }
                                 id
                     in
