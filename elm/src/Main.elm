@@ -1409,47 +1409,63 @@ init flags url key =
         seed =
             initialSeed (flags.seed + 7)
 
-        model =
-            { state = PubShowMessage { message = "initial state" }
+        imodel =
+            { state =
+                case flags.login of
+                    Nothing ->
+                        PubShowMessage { message = "loading..." }
+
+                    Just l ->
+                        ShowMessage { message = "loading..." } l
             , size = { width = flags.width, height = flags.height }
             , location = flags.location
             , navkey = key
             , seed = seed
             , savedRoute = { route = Top, save = False }
             }
-    in
-    case flags.login of
-        Nothing ->
-            let
-                ( state, cmd ) =
-                    parseUrl url
-                        |> Maybe.andThen
-                            (\s ->
-                                case s of
-                                    Top ->
-                                        Nothing
 
-                                    _ ->
-                                        Just s
-                            )
-                        |> Maybe.andThen
-                            (routeState
-                                model
-                            )
-                        |> Maybe.withDefault
-                            ( case flags.login of
-                                Just _ ->
-                                    model.state
+        ( model, cmd ) =
+            parseUrl url
+                |> Maybe.andThen
+                    (\s ->
+                        case s of
+                            Top ->
+                                Nothing
+
+                            _ ->
+                                Just s
+                    )
+                |> Maybe.andThen
+                    (routeState
+                        imodel
+                    )
+                |> Maybe.map
+                    (\( rs, rcmd ) ->
+                        ( { imodel
+                            | state = rs
+                          }
+                        , rcmd
+                        )
+                    )
+                |> Maybe.withDefault
+                    (let
+                        ( m, c ) =
+                            case flags.login of
+                                Just login ->
+                                    getListing imodel login
 
                                 Nothing ->
-                                    initLogin seed
-                            , Browser.Navigation.replaceUrl key "/"
-                            )
-            in
-            ( { model | state = state }, cmd )
-
-        Just login ->
-            getListing model login
+                                    ( { imodel | state = initLogin seed }, Cmd.none )
+                     in
+                     ( m
+                     , Cmd.batch
+                        [ c
+                        , Browser.Navigation.replaceUrl key "/"
+                        ]
+                     )
+                    )
+    in
+    ( model, cmd )
 
 
 initLogin : Seed -> State
