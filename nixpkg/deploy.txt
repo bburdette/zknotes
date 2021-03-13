@@ -12,7 +12,7 @@ previous one without building.
 
 - use the path in nix-copy-closure:
 
-nix-copy-closure --to root@practica.site /nix/store/9v77vwy5zzv38mvh5a93yk02h2y94xq8-zknotes-server-1.0
+nix-copy-closure --to root@zknotes.com /nix/store/9v77vwy5zzv38mvh5a93yk02h2y94xq8-zknotes-server-1.0
 
 - then on the server remove the old one (user practica2)
 

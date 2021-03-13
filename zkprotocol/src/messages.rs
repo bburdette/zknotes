@@ -8,8 +8,6 @@ pub struct ServerResponse {
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct UserMessage {
-  pub uid: String,
-  pub pwd: String,
   pub what: String,
   pub data: Option<serde_json::Value>,
 }

@@ -1,30 +1,3 @@
-extern crate actix_files;
-extern crate actix_rt;
-extern crate actix_web;
-extern crate clap;
-#[macro_use]
-extern crate simple_error;
-extern crate crypto_hash;
-extern crate env_logger;
-extern crate futures;
-extern crate json;
-extern crate lettre;
-extern crate lettre_email;
-extern crate rand;
-extern crate serde_json;
-extern crate time;
-extern crate toml;
-extern crate uuid;
-#[macro_use]
-extern crate log;
-extern crate rusqlite;
-#[macro_use]
-extern crate serde_derive;
-extern crate barrel;
-extern crate base64;
-extern crate indradb;
-extern crate zkprotocol;
-
 mod config;
 mod email;
 mod errors;
@@ -44,6 +17,8 @@ use actix_files::NamedFile;
 use clap::{Arg, SubCommand};
 use user::ZkDatabase;
 // use actix_web::http::{Method, StatusCode};
+use actix_session::{CookieSession, Session};
+use log::{debug, error, log_enabled, info, Level};
 use actix_web::middleware::Logger;
 use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Result};
 use config::{Config, State};
@@ -51,6 +26,9 @@ use indra as I;
 use std::error::Error;
 use std::path::{Path, PathBuf};
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
+use std::sync::{Arc, Mutex};
+use serde_json;
+use uuid::Uuid;
 
 fn favicon(_req: &HttpRequest) -> Result<NamedFile> {
   let stpath = Path::new("static/favicon.ico");
@@ -62,20 +40,27 @@ fn sitemap(_req: &HttpRequest) -> Result<NamedFile> {
   Ok(NamedFile::open(stpath)?)
 }
 
+
 // simple index handler
-fn mainpage(_state: web::Data<State>, req: HttpRequest) -> HttpResponse {
+fn mainpage(session: Session, state: web::Data<State>, req: HttpRequest) -> HttpResponse {
   info!(
     "remote ip: {:?}, request:{:?}",
-    req.connection_info().remote(),
+    req.connection_info(),
     req
   );
 
+  // logged in?
+  let logindata = match interfaces::login_data_for_token(session, &state.config) {
+    Ok(Some(logindata)) => serde_json::to_value(logindata).unwrap_or(serde_json::Value::Null),
+    _ => serde_json::Value::Null,
+  };
+
   match util::load_string("static/index.html") {
     Ok(s) => {
-      // response
+      // search and replace with logindata!
       HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
-        .body(s)
+        .body(s.replace("{{logindata}}", logindata.to_string().as_str()))
     }
     Err(e) => {
       println!("err");
@@ -89,9 +74,9 @@ fn public(
   item: web::Json<PublicMessage>,
   _req: HttpRequest,
 ) -> HttpResponse {
-  println!("public msg: {:?}", &item);
+  info!("public msg: {:?}", &item);
 
-  match interfaces::public_interface(&state, item.into_inner()) {
+  match interfaces::public_interface(&data, item.into_inner()) {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'public' err: {:?}", e);
@@ -104,10 +89,9 @@ fn public(
   }
 }
 
-fn user(state: web::Data<State>, item: web::Json<UserMessage>, _req: HttpRequest) -> HttpResponse {
-  println!("user msg: {}, {:?}", &item.what, &item.data);
-
-  match interfaces::user_interface(&state, item.into_inner()) {
+fn user(session: Session, state: web::Data<State>, item: web::Json<UserMessage>, _req: HttpRequest) -> HttpResponse {
+  info!("user msg: {}, {:?}", &item.what, &item.data);
+  match interfaces::user_interface(&session, &state, item.into_inner()) {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'user' err: {:?}", e);
@@ -154,7 +138,7 @@ fn register(state: web::Data<State>, req: HttpRequest) -> HttpResponse {
             }
             Err(_e) => {
               HttpResponse::Ok().body("registration key or user doesn't match".to_string())
-            }
+           }
           }
         }
         _ => HttpResponse::Ok().body("Uid, key not found!".to_string()),
@@ -173,6 +157,8 @@ fn defcon() -> Config {
     mainsite: "https:://mahbloag.practica.site/".to_string(),
     appname: "mahbloag".to_string(),
     domain: "practica.site".to_string(),
+    admin_email: "admin@practica.site".to_string(),
+    token_expiration_ms: 7*24*60*60*1000,  // 7 days in milliseconds
   }
 }
 
@@ -199,7 +185,8 @@ fn main() {
   }
 }
 
-fn err_main() -> Result<(), errors::Error> {
+#[actix_web::main]
+async fn err_main() -> Result<(), errors::Error> {
   let matches = clap::App::new("zknotes server")
     .version("1.0")
     .author("Ben Burdette")
@@ -278,10 +265,12 @@ fn err_main() -> Result<(), errors::Error> {
       });
       HttpServer::new(move || {
         App::new()
-          .register_data(c.clone()) // <- create app with shared state
-          // enable logger
+          .data(c.clone()) // <- create app with shared state
           .wrap(middleware::Logger::default())
-          //      .route("/", web::get().to(mainpage))
+          .wrap(
+            CookieSession::signed(&[0; 32]) // <- create cookie based session middleware
+              .secure(true),
+          )
           .service(web::resource("/public").route(web::post().to(public)))
           .service(web::resource("/user").route(web::post().to(user)))
           .service(web::resource(r"/register/{uid}/{key}").route(web::get().to(register)))
@@ -289,7 +278,8 @@ fn err_main() -> Result<(), errors::Error> {
           .service(web::resource("/{tail:.*}").route(web::get().to(mainpage)))
       })
       .bind(format!("{}:{}", config.ip, config.port))?
-      .run()?;
+      .run()
+      .await?;
 
       Ok(())
     }

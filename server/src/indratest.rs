@@ -1,6 +1,6 @@
 // use std::convert::TryInto;
 // use std::error::Error;
-use errors;
+use crate::errors;
 use indradb::Datastore;
 use indradb::{
   Edge, EdgeKey, EdgeProperty, EdgeQueryExt, SledDatastore, SledTransaction, Transaction, Type,
@@ -10,25 +10,24 @@ use simple_error::SimpleError;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 // use std::time::Duration;
-use icontent::{
+use crate::icontent::{
   Direction, GetZkLinks, GetZkNoteEdit, ImportZkNote, LoginData, SaveZkLink, SaveZkNote,
   SavedZkNote, User, UserId, ZkLink, ZkListNote, ZkNote, ZkNoteEdit,
 };
-use importdb::import_db;
-use indra_util::{find_all_q, find_first_q, getoptedgeprop, getoptprop, getprop};
-use isearch::{AndOr, SearchMod, TagSearch, ZkNoteSearch, ZkNoteSearchResult};
-use std::time::SystemTime;
-use user::ZkDatabase;
-use util::now;
-use uuid::Uuid;
-use zkprotocol::content as C; // as U;
-
-use indra::{
+use crate::importdb::import_db;
+use crate::indra::{
   checknote, delete_zklink, delete_zknote, get_systemvs, is_note_accessible, is_note_mine,
   is_note_public, is_note_shared, link_exists, login_data, mkpropquery, new_user, note_owner,
   read_user, read_zklinks, read_zklistnote, read_zknote, read_zknoteedit, save_savezklinks,
   save_user, save_zklink, save_zknote, search_zknotes, tagsearch,
 };
+use crate::indra_util::{find_all_q, find_first_q, getoptedgeprop, getoptprop, getprop};
+use crate::isearch::{AndOr, SearchMod, TagSearch, ZkNoteSearch, ZkNoteSearchResult};
+use crate::user::ZkDatabase;
+use crate::util::now;
+use std::time::SystemTime;
+use uuid::Uuid;
+use zkprotocol::content as C; // as U;
 
 #[cfg(test)]
 mod test {

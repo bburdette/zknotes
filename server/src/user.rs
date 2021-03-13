@@ -1,3 +1,5 @@
+use serde_derive::{Deserialize, Serialize};
+use uuid::Uuid;
 use zkprotocol::content::{ZkLink, ZkNote};
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -9,6 +11,8 @@ pub struct User {
   pub email: String,
   pub registration_key: Option<String>,
   pub zknote: i64,
+  pub token: Option<Uuid>,
+  pub tokendate: Option<i64>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]

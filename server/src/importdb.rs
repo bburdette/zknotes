@@ -1,16 +1,16 @@
-use errors;
-use icontent::{
+use crate::errors;
+use crate::icontent::{
   Direction, GetZkLinks, GetZkNoteEdit, ImportZkNote, LoginData, SaveZkLink, SaveZkNote,
   SavedZkNote, User, UserId, ZkLink, ZkListNote, ZkNote, ZkNoteEdit,
 };
-use indra::{new_user, save_zklink, save_zknote};
+use crate::indra::{new_user, save_zklink, save_zknote};
+use crate::user::ZkDatabase;
 use indradb::Datastore;
 use indradb::Transaction;
 use indradb::{Edge, EdgeKey, EdgeProperty, EdgeQueryExt, Type, Vertex, VertexQueryExt};
 use simple_error::SimpleError;
 use std::collections::HashMap;
-use std::path::Path;
-use user::ZkDatabase; // as U;
+use std::path::Path; // as U;
 
 pub fn import_db(zd: &ZkDatabase, path: &Path) -> Result<(), errors::Error> {
   // compression factor of 5 (default)

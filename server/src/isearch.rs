@@ -1,4 +1,5 @@
 use crate::icontent::ZkListNote;
+use serde_derive::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

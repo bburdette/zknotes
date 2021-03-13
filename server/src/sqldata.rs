@@ -1,26 +1,39 @@
+use crate::user::User;
+use crate::util::{is_token_expired, now};
 use barrel::backend::Sqlite;
 use barrel::{types, Migration};
+use log::{debug, error, info, log_enabled, Level};
 use rusqlite::{params, Connection};
+use serde_derive::{Deserialize, Serialize};
+use simple_error::bail;
 use std::convert::TryInto;
 use std::error::Error;
 use std::path::Path;
-use std::time::Duration;
-use std::time::SystemTime;
-use user::{LoginData, User};
-use util::now;
+use std::time::{Duration, SystemTime};
+use uuid::Uuid;
 use zkprotocol::content::{
-  Direction, GetZkLinks, GetZkNoteEdit, ImportZkNote, SaveZkLink, SaveZkNote, SavedZkNote, ZkLink,
-  ZkNote, ZkNoteEdit,
+  Direction, GetZkLinks, GetZkNoteEdit, ImportZkNote, LoginData, SaveZkLink, SaveZkNote,
+  SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
 };
 
 pub fn login_data(conn: &Connection, uid: i64) -> Result<LoginData, Box<dyn Error>> {
   Ok(LoginData {
     userid: uid,
-    username: user_name(&conn, uid)?,
+    name: user_name(&conn, uid)?,
     publicid: note_id(conn, "system", "public")?,
     shareid: note_id(conn, "system", "share")?,
     searchid: note_id(conn, "system", "search")?,
   })
+}
+
+pub fn uid_for_token(conn: &Connection, token: Uuid) -> Result<i64, Box<dyn Error>> {
+  let r = conn.query_row(
+    "select id
+          from user where token = ?1",
+    params![token.to_string()],
+    |row| Ok(row.get(0)?),
+  )?;
+  Ok(r)
 }
 
 pub fn connection_open(dbfile: &Path) -> rusqlite::Result<Connection> {
@@ -459,6 +472,80 @@ pub fn udpate4(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   Ok(())
 }
 
+pub fn udpate5(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+  // db connection without foreign key checking.
+  let conn = Connection::open(dbfile)?;
+  let mut m1 = Migration::new();
+
+  m1.create_table("usertemp", |t| {
+    t.add_column(
+      "id",
+      types::integer()
+        .primary(true)
+        .increments(true)
+        .nullable(false),
+    );
+    t.add_column("name", types::text().nullable(false).unique(true));
+    t.add_column("hashwd", types::text().nullable(false));
+    t.add_column("zknote", types::foreign("zknote", "id").nullable(true));
+    t.add_column("salt", types::text().nullable(false));
+    t.add_column("email", types::text().nullable(false));
+    t.add_column("registration_key", types::text().nullable(true));
+    t.add_column("createdate", types::integer().nullable(false));
+  });
+
+  conn.execute_batch(m1.make::<Sqlite>().as_str())?;
+
+  // copy everything from user.
+  conn.execute(
+    "insert into usertemp (id, name, hashwd, zknote, salt, email, registration_key, createdate)
+        select id, name, hashwd, zknote, salt, email, registration_key, createdate from user",
+    params![],
+  )?;
+
+  let mut m2 = Migration::new();
+  m2.drop_table("user");
+
+  // new user table with new columns for session tokens.
+  m2.create_table("user", |t| {
+    t.add_column(
+      "id",
+      types::integer()
+        .primary(true)
+        .increments(true)
+        .nullable(false),
+    );
+    t.add_column("name", types::text().nullable(false).unique(true));
+    t.add_column("hashwd", types::text().nullable(false));
+    t.add_column("zknote", types::foreign("zknote", "id").nullable(true));
+    t.add_column("salt", types::text().nullable(false));
+    t.add_column("email", types::text().nullable(false));
+    t.add_column("registration_key", types::text().nullable(true));
+    t.add_column("createdate", types::integer().nullable(false));
+    t.add_column("token", types::text().nullable(true));
+    t.add_column("tokendate", types::integer().nullable(true));
+  });
+
+  conn.execute_batch(m2.make::<Sqlite>().as_str())?;
+
+  // copy everything from usertemp.
+  conn.execute(
+    "insert into user (id, name, hashwd, zknote, salt, email, registration_key, createdate)
+        select id, name, hashwd, zknote, salt, email, registration_key, createdate from usertemp",
+    params![],
+  )?;
+
+  let now = now()?;
+
+  let mut m3 = Migration::new();
+
+  m3.drop_table("usertemp");
+
+  conn.execute_batch(m3.make::<Sqlite>().as_str())?;
+
+  Ok(())
+}
+
 pub fn get_single_value(conn: &Connection, name: &str) -> Result<Option<String>, Box<dyn Error>> {
   match conn.query_row(
     "select value from singlevalue where name = ?1",
@@ -520,11 +607,17 @@ pub fn dbinit(dbfile: &Path) -> Result<(), Box<dyn Error>> {
     udpate4(&dbfile)?;
     set_single_value(&conn, "migration_level", "4")?;
   }
+  if nlevel < 5 {
+    println!("udpate5");
+    udpate5(&dbfile)?;
+    set_single_value(&conn, "migration_level", "5")?;
+  }
 
   println!("db up to date.");
 
   Ok(())
 }
+
 // user CRUD
 
 pub fn new_user(
@@ -601,44 +694,131 @@ pub fn user_name(conn: &Connection, uid: i64) -> Result<String, Box<dyn Error>> 
   Ok(user)
 }
 
-pub fn read_user(dbfile: &Path, name: &str) -> Result<User, Box<dyn Error>> {
+pub fn read_user(
+  dbfile: &Path,
+  name: &str,
+  token_expiration_ms: Option<i64>,
+) -> Result<User, Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
 
-  let user = conn.query_row(
-    "select id, hashwd, salt, email, registration_key, zknote
+  let (mut user, tokestr) = conn.query_row(
+    "select id, hashwd, salt, email, registration_key, token, tokendate
       from user where name = ?1",
     params![name],
     |row| {
+      Ok((
+        User {
+          id: row.get(0)?,
+          name: name.to_string(),
+          hashwd: row.get(1)?,
+          salt: row.get(2)?,
+          email: row.get(3)?,
+          registration_key: row.get(4)?,
+          token: None,
+          tokendate: row.get(6)?,
+        },
+        row.get::<usize, Option<String>>(5)?,
+      ))
+    },
+  )?;
+
+  user.token = match tokestr {
+    Some(s) => Some(Uuid::parse_str(s.as_str())?),
+    None => None,
+  };
+
+  // if expiration supplied, check for token expiration.
+  match token_expiration_ms {
+    Some(texp) => {
+      if user
+        .tokendate
+        .map(|td| is_token_expired(texp, td))
+        .unwrap_or(true)
+      {
+        bail!("login expired")
+      } else {
+        Ok(user)
+      }
+    }
+    None => Ok(user),
+  }
+}
+
+pub fn read_user_by_token(
+  conn: &Connection,
+  token: Uuid,
+  token_expiration_ms: Option<i64>,
+) -> Result<User, Box<dyn Error>> {
+  let user = conn.query_row(
+    "select id, name, hashwd, salt, email, registration_key, tokendate
+      from user where token = ?1",
+    params![token.to_string()],
+    |row| {
       Ok(User {
         id: row.get(0)?,
-        name: name.to_string(),
-        hashwd: row.get(1)?,
-        salt: row.get(2)?,
-        email: row.get(3)?,
-        registration_key: row.get(4)?,
-        zknote: row.get(5)?,
+        name: row.get(1)?,
+        hashwd: row.get(2)?,
+        salt: row.get(3)?,
+        email: row.get(4)?,
+        registration_key: row.get(5)?,
+        token: Some(token),
+        tokendate: row.get(6)?,
       })
     },
   )?;
 
-  Ok(user)
+  match token_expiration_ms {
+    Some(texp) => {
+      if user
+        .tokendate
+        .map(|td| is_token_expired(texp, td))
+        .unwrap_or(true)
+      {
+        bail!("login expired")
+      } else {
+        Ok(user)
+      }
+    }
+    None => Ok(user),
+  }
 }
 
 pub fn update_user(dbfile: &Path, user: &User) -> Result<(), Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
 
-  conn.execute(
-    "update user set name = ?1, hashwd = ?2, salt = ?3, email = ?4, registration_key = ?5
-     where id = ?6",
-    params![
-      user.name,
-      user.hashwd,
-      user.salt,
-      user.email,
-      user.registration_key,
-      user.id
-    ],
-  )?;
+  match (user.token, user.tokendate) {
+    (Some(token), Some(tokendate)) => {
+      conn.execute(
+        "update user set name = ?1, hashwd = ?2, salt = ?3, email = ?4, registration_key = ?5,
+            token = ?6, tokendate = ?7
+           where id = ?8",
+        params![
+          user.name,
+          user.hashwd,
+          user.salt,
+          user.email,
+          user.registration_key,
+          token.to_string(),
+          tokendate,
+          user.id,
+        ],
+      )?;
+    }
+    _ => {
+      conn.execute(
+        "update user set name = ?1, hashwd = ?2, salt = ?3, email = ?4, registration_key = ?5,
+           where id = ?6",
+        params![
+          user.name,
+          user.hashwd,
+          user.salt,
+          user.email,
+          user.registration_key,
+          user.id,
+        ],
+      )?;
+    }
+  };
 
   Ok(())
 }
@@ -1239,6 +1419,8 @@ pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
       email: row.get(4)?,
       registration_key: row.get(5)?,
       zknote: row.get(6)?,
+      token: None::<Uuid>,
+      tokendate: None,
     })
   })?;
 

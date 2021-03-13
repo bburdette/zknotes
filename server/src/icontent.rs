@@ -1,3 +1,4 @@
+use serde_derive::{Deserialize, Serialize};
 pub use uuid::Uuid;
 
 #[derive(Debug, Clone)]
@@ -18,6 +19,8 @@ pub struct User {
   pub salt: String,
   pub email: String,
   pub registration_key: Option<String>,
+  pub token: Option<Uuid>,
+  pub tokendate: Option<i64>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]

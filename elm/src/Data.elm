@@ -6,17 +6,16 @@ import Search as S
 import UUID exposing (UUID)
 
 
-type alias LoggedIn =
+type alias Registration =
     { uid : String
     , pwd : String
-    , ld : LoginData
+    , email : String
     }
 
 
-type alias Login a =
-    { a
-        | uid : String
-        , pwd : String
+type alias Login =
+    { uid : String
+    , pwd : String
     }
 
 
@@ -123,6 +122,36 @@ type alias ZkNoteEdit =
     { zknote : ZkNote
     , links : List ZkLink
     }
+
+
+encodeRegistration : Registration -> JE.Value
+encodeRegistration l =
+    JE.object
+        [ ( "uid", JE.string l.uid )
+        , ( "pwd", JE.string l.pwd )
+        , ( "email", JE.string l.email )
+        ]
+
+
+encodeLogin : Login -> JE.Value
+encodeLogin l =
+    JE.object
+        [ ( "uid", JE.string l.uid )
+        , ( "pwd", JE.string l.pwd )
+        ]
+
+
+
+-- encodeGetZkLinks : GetZkLinks -> JE.Value
+-- encodeGetZkLinks gzl =
+--     JE.object
+--         [ ( "zknote", JE.int gzl.zknote )
+--         ]
+-- encodeGetZkNoteEdit : GetZkNoteEdit -> JE.Value
+-- encodeGetZkNoteEdit gzl =
+--     JE.object
+--         [ ( "zknote", JE.int gzl.zknote )
+--         ]
 
 
 encodeZkLinks : ZkLinks -> JE.Value
@@ -270,7 +299,7 @@ decodeLoginData : JD.Decoder LoginData
 decodeLoginData =
     JD.map5 LoginData
         (JD.field "userid" UUID.jsonDecoder)
-        (JD.field "username" JD.string)
+        (JD.field "name" JD.string)
         (JD.field "publicid" UUID.jsonDecoder)
         (JD.field "shareid" UUID.jsonDecoder)
         (JD.field "searchid" UUID.jsonDecoder)

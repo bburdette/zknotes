@@ -1,4 +1,5 @@
-use errors;
+use crate::errors;
+
 use indradb::Transaction;
 use simple_error::SimpleError;
 use uuid::Uuid;

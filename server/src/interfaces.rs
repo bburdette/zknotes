@@ -1,36 +1,54 @@
-use config::State;
-use crypto_hash::{hex_digest, Algorithm};
-use email;
-use icontent::{
+use crate::config::State;
+use crate::email;
+use crate::errors;
+use crate::icontent::{
   GetZkLinks, GetZkNoteEdit, ImportZkNote, SaveZkNote, SaveZkNotePlusLinks, UserId, ZkLinks,
   ZkNoteAndAccomplices,
 };
-use isearch::{TagSearch, ZkNoteSearch};
-// use search;
-use simple_error;
-// use I;
-use errors;
-use indra as I;
+use crate::indra as I;
+use crate::isearch::{TagSearch, ZkNoteSearch};
+use crate::util;
+use crate::util::{is_token_expired, now};
+use crypto_hash::{hex_digest, Algorithm};
 use indradb::Datastore;
+use log::{debug, error, info, log_enabled, Level};
+use serde_derive::{Deserialize, Serialize};
+use simple_error;
 use std::error::Error;
 use std::path::Path;
-use util;
 use uuid::Uuid;
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 
-#[derive(Deserialize, Debug)]
-pub struct RegistrationData {
-  email: String,
+pub fn login_data_for_token(
+  session: Session,
+  config: &Config,
+) -> Result<Option<LoginData>, Box<dyn Error>> {
+  let conn = sqldata::connection_open(config.db.as_path())?;
+
+  match session.get("token")? {
+    None => Ok(None),
+    Some(token) => {
+      match sqldata::read_user_by_token(&conn, token, Some(config.token_expiration_ms)) {
+        Ok(user) => Ok(Some(sqldata::login_data(&conn, user.id)?)),
+        Err(_) => Ok(None),
+      }
+    }
+  }
 }
 
-pub fn user_interface(state: &State, msg: UserMessage) -> Result<ServerResponse, errors::Error> {
+pub fn user_interface(
+  session: &Session,
+  state: &State,
+  msg: UserMessage,
+) -> Result<ServerResponse, errors::Error> {
+  info!("got a user message: {}", msg.what);
   let itr = state.db.transaction()?;
-
-  println!("got transaction");
   if msg.what.as_str() == "register" {
+    let msgdata = Option::ok_or(msg.data, "malformed registration data")?;
+    let rd: RegistrationData = serde_json::from_value(msgdata)?;
     // do the registration thing.
     // user already exists?
-    match I::read_user(&itr, &msg.uid) {
+    match I::read_user(&itr, &rd.uid) {
       Ok(_) => {
         // err - user exists.
         Ok(ServerResponse {
@@ -41,11 +59,6 @@ pub fn user_interface(state: &State, msg: UserMessage) -> Result<ServerResponse,
       Err(_) => {
         // user does not exist, which is what we want for a new user.
         // get email from 'data'.
-        let msgdata = Option::ok_or(
-          msg.data,
-          simple_error::SimpleError::new("malformed registration data"),
-        )?;
-        let rd: RegistrationData = serde_json::from_value(msgdata)?;
         let registration_key = Uuid::new_v4().to_string();
         let salt = util::salt_string();
 
@@ -55,10 +68,10 @@ pub fn user_interface(state: &State, msg: UserMessage) -> Result<ServerResponse,
         I::new_user(
           &itr,
           &svs.public,
-          msg.uid.clone(),
+          rd.uid.clone(),
           hex_digest(
             Algorithm::SHA256,
-            (msg.pwd + salt.as_str()).into_bytes().as_slice(),
+            (rd.pwd + salt.as_str()).into_bytes().as_slice(),
           ),
           salt,
           rd.email.clone(),
@@ -71,7 +84,7 @@ pub fn user_interface(state: &State, msg: UserMessage) -> Result<ServerResponse,
           state.config.domain.as_str(),
           state.config.mainsite.as_str(),
           rd.email.as_str(),
-          msg.uid.as_str(),
+          rd.uid.as_str(),
           registration_key.as_str(),
         )?;
 
@@ -79,9 +92,9 @@ pub fn user_interface(state: &State, msg: UserMessage) -> Result<ServerResponse,
         email::send_registration_notification(
           state.config.appname.as_str(),
           state.config.domain.as_str(),
-          "bburdettte@protonmail.com",
+          config.admin_email.as_str(),
           rd.email.as_str(),
-          msg.uid.as_str(),
+          rd.uid.as_str(),
           registration_key.as_str(),
         )?;
 
@@ -91,36 +104,62 @@ pub fn user_interface(state: &State, msg: UserMessage) -> Result<ServerResponse,
         })
       }
     }
-  } else {
-    match I::read_user(&itr, &msg.uid) {
-      Err(_) => Ok(ServerResponse {
-        what: "invalid user or pwd".to_string(),
+  } else if msg.what == "login" {
+    let conn = sqldata::connection_open(config.db.as_path())?;
+    let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+    let login: Login = serde_json::from_value(msgdata.clone())?;
+
+    let mut userdata = sqldata::read_user(Path::new(&config.db), login.uid.as_str(), None)?;
+    match userdata.registration_key {
+      Some(_reg_key) => Ok(ServerResponse {
+        what: "unregistered user".to_string(),
         content: serde_json::Value::Null,
       }),
-      Ok(userdata) => {
-        // let userdata: User = serde_json::from_value(serde_json::from_str(udata.as_str())?)?;
-        match userdata.registration_key {
-          Some(_reg_key) => Ok(ServerResponse {
-            what: "unregistered user".to_string(),
+      None => {
+        if hex_digest(
+          Algorithm::SHA256,
+          (login.pwd.clone() + userdata.salt.as_str())
+            .into_bytes()
+            .as_slice(),
+        ) != userdata.hashwd
+        {
+          // don't distinguish between bad user id and bad pwd!
+          Ok(ServerResponse {
+            what: "invalid user or pwd".to_string(),
+            content: serde_json::Value::Null,
+          })
+        } else {
+          let ld = sqldata::login_data(&conn, userdata.id)?;
+          // new token here, and token date.
+          userdata.token = Some(Uuid::new_v4());
+          userdata.tokendate = Some(now()?);
+          session.set("token", userdata.token)?;
+          sqldata::update_user(config.db.as_path(), &userdata)?;
+          println!("logged in, userdata: {:?}", userdata);
+
+          Ok(ServerResponse {
+            what: "logged in".to_string(),
+            content: serde_json::to_value(ld)?,
+          })
+        }
+      }
+    }
+  } else {
+    match session.get::<Uuid>("token")? {
+      None => Ok(ServerResponse {
+        what: "not logged in".to_string(),
+        content: serde_json::Value::Null,
+      }),
+      Some(token) => {
+        match I::read_user_by_token(&conn, token, Some(state.config.token_expiration_ms)) {
+          Err(_) => Ok(ServerResponse {
+            // TODO: token expired?
+            what: "invalid user or pwd".to_string(),
             content: serde_json::Value::Null,
           }),
-          None => {
-            if hex_digest(
-              Algorithm::SHA256,
-              (msg.pwd.clone() + userdata.salt.as_str())
-                .into_bytes()
-                .as_slice(),
-            ) != userdata.hashwd
-            {
-              // don't distinguish between bad user id and bad pwd!
-              Ok(ServerResponse {
-                what: "invalid user or pwd".to_string(),
-                content: serde_json::Value::Null,
-              })
-            } else {
-              // finally!  processing messages as logged in user.
-              user_interface_loggedin(&itr, &state, userdata.id, &msg)
-            }
+          Ok(userdata) => {
+            // finally!  processing messages as logged in user.
+            user_interface_loggedin(itr, &state, userdata.id, &msg)
           }
         }
       }
@@ -139,10 +178,6 @@ fn user_interface_loggedin<T: indradb::Transaction>(
   msg: &UserMessage,
 ) -> Result<ServerResponse, errors::Error> {
   match msg.what.as_str() {
-    "login" => Ok(ServerResponse {
-      what: "logged in".to_string(),
-      content: serde_json::to_value(I::login_data(itr, &state.svs, uid)?)?,
-    }),
     "getzknote" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), se("malformed json data"))?;
       let id: Uuid = serde_json::from_value(msgdata.clone())?;

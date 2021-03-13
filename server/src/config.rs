@@ -1,7 +1,8 @@
-use icontent::SystemVs;
+use crate::icontent::SystemVs;
 use indradb::SledDatastore;
+use serde_derive::{Deserialize, Serialize};
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+
 #[derive(Deserialize, Debug, Clone)]
 pub struct Config {
   pub ip: String,
@@ -12,6 +13,8 @@ pub struct Config {
   pub mainsite: String,
   pub appname: String,
   pub domain: String,
+  pub admin_email: String,
+  pub token_expiration_ms: i64,
 }
 
 pub struct State {

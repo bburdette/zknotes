@@ -1,6 +1,6 @@
 // use std::convert::TryInto;
 // use std::error::Error;
-use errors;
+use crate::errors;
 use indradb::Datastore;
 use indradb::{
   Edge, EdgeKey, EdgeProperty, EdgeQueryExt, SledDatastore, SledTransaction, Transaction, Type,
@@ -10,14 +10,14 @@ use simple_error::SimpleError;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 // use std::time::Duration;
-use icontent::{
+use crate::icontent::{
   Direction, GetZkLinks, GetZkNoteEdit, ImportZkNote, LoginData, SaveZkLink, SaveZkNote,
   SavedZkNote, SystemVs, User, UserId, ZkLink, ZkListNote, ZkNote, ZkNoteEdit,
 };
-use indra_util::{find_all_q, find_first_q, getoptedgeprop, getoptprop, getprop};
-use isearch::{AndOr, SearchMod, TagSearch, ZkNoteSearch, ZkNoteSearchResult};
+use crate::indra_util::{find_all_q, find_first_q, getoptedgeprop, getoptprop, getprop};
+use crate::isearch::{AndOr, SearchMod, TagSearch, ZkNoteSearch, ZkNoteSearchResult};
+use crate::util::now;
 use std::time::SystemTime;
-use util::now;
 use uuid::Uuid;
 use zkprotocol::content as C;
 
@@ -136,6 +136,8 @@ pub fn read_user<T: indradb::Transaction>(itr: &T, name: &String) -> Result<User
 
   let uq: indradb::VertexQuery = indradb::SpecificVertexQuery::single(tuid).into();
 
+  // TODO token expiration check. see sqldata.
+
   Ok(User {
     id: UserId(tuid),
     name: name.clone(),
@@ -145,6 +147,7 @@ pub fn read_user<T: indradb::Transaction>(itr: &T, name: &String) -> Result<User
     registration_key: getoptprop(itr, &uq, "registration_key")?,
   })
 }
+// TODO       match I::read_user_by_token(&conn, token, Some(config.token_expiration_ms)) {
 
 pub fn login_data<T: indradb::Transaction>(
   itr: &T,
