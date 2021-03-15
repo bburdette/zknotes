@@ -106,6 +106,7 @@ type alias Model =
     , noteUserName : String
     , zknSearchResult : Data.ZkNoteSearchResult
     , zklDict : Dict String EditLink
+    , editable : Bool
     , pubidtxt : String
     , title : String
     , md : String
@@ -236,7 +237,7 @@ dirty model =
 
 
 showZkl : List (E.Attribute Msg) -> Bool -> Int -> Maybe Int -> EditLink -> Element Msg
-showZkl dirtybutton nonme user id zkl =
+showZkl dirtybutton editable user id zkl =
     let
         ( dir, otherid ) =
             case zkl.direction of
@@ -266,15 +267,15 @@ showZkl dirtybutton nonme user id zkl =
 
             Nothing ->
                 E.none
-        , if nonme then
-            EI.button (Common.disabledButtonStyle ++ [ E.alignRight ])
-                { onPress = Nothing
+        , if editable then
+            EI.button (Common.buttonStyle ++ [ E.alignRight ])
+                { onPress = Just (MdLink zkl)
                 , label = E.text "^"
                 }
 
           else
-            EI.button (Common.buttonStyle ++ [ E.alignRight ])
-                { onPress = Just (MdLink zkl)
+            EI.button (Common.disabledButtonStyle ++ [ E.alignRight ])
+                { onPress = Nothing
                 , label = E.text "^"
                 }
         , if user == zkl.user then
@@ -343,14 +344,16 @@ zknview size model =
                 else
                     style
 
-        nonme =
-            model.ld.userid
-                /= model.noteUser
+        editable =
+            model.editable
 
+        -- nonme =
+        --     model.ld.userid
+        --         /= model.noteUser
         showLinks =
             E.row [ EF.bold ] [ E.text "links" ]
                 :: List.map
-                    (showZkl dirtybutton nonme model.ld.userid model.id)
+                    (showZkl dirtybutton editable model.ld.userid model.id)
                     (Dict.values model.zklDict)
 
         mdedit =
@@ -371,20 +374,20 @@ zknview size model =
                 , E.paddingXY 25 0
                 ]
                 (EI.multiline
-                    [ if nonme then
-                        EF.color TC.darkGrey
+                    [ if editable then
+                        EF.color TC.black
 
                       else
-                        EF.color TC.black
+                        EF.color TC.darkGrey
                     , E.htmlAttribute (Html.Attributes.id "mdtext")
                     , E.alignTop
                     ]
                     { onChange =
-                        if nonme then
-                            always Noop
+                        if editable then
+                            OnMarkdownInput
 
                         else
-                            OnMarkdownInput
+                            always Noop
                     , text = model.md
                     , placeholder = Nothing
                     , label = EI.labelHidden "Markdown input"
@@ -560,11 +563,11 @@ zknview size model =
             [ E.row [ EF.bold ] [ E.text model.ld.name ]
 
             -- , E.text "edit zk note"
-            , if nonme then
-                EI.button (E.alignRight :: Common.disabledButtonStyle) { onPress = Nothing, label = E.text "delete" }
+            , if editable then
+                EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just DeletePress, label = E.text "delete" }
 
               else
-                EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just DeletePress, label = E.text "delete" }
+                EI.button (E.alignRight :: Common.disabledButtonStyle) { onPress = Nothing, label = E.text "delete" }
             ]
         , E.paragraph
             [ E.width E.fill, E.spacingXY 3 17 ]
@@ -587,35 +590,35 @@ zknview size model =
                 , EI.button (mkdirtystyle parabuttonstyle) { onPress = Just NewPress, label = E.text "new" }
                 ]
         , EI.text
-            (if nonme then
-                [ EF.color TC.darkGrey ]
+            (if editable then
+                []
 
              else
-                []
+                [ EF.color TC.darkGrey ]
             )
             { onChange =
-                if nonme then
-                    always Noop
+                if editable then
+                    OnTitleChanged
 
                 else
-                    OnTitleChanged
+                    always Noop
             , text = model.title
             , placeholder = Nothing
             , label = EI.labelLeft [] (E.text "title")
             }
-        , if nonme then
-            E.row [ E.spacing 8 ] [ E.text "owner", E.row [ EF.bold ] [ E.text model.noteUserName ] ]
+        , if editable then
+            E.none
 
           else
-            E.none
+            E.row [ E.spacing 8 ] [ E.text "owner", E.row [ EF.bold ] [ E.text model.noteUserName ] ]
         , E.row [ E.spacing 8, E.width E.fill ]
             [ EI.checkbox [ E.width E.shrink ]
                 { onChange =
-                    if nonme then
-                        always Noop
+                    if editable then
+                        PublicPress
 
                     else
-                        PublicPress
+                        always Noop
                 , icon = EI.defaultCheckbox
                 , checked = public
                 , label = EI.labelLeft [] (E.text "public")
@@ -623,11 +626,11 @@ zknview size model =
             , if public then
                 EI.text [ E.width E.fill ]
                     { onChange =
-                        if nonme then
-                            always Noop
+                        if editable then
+                            OnPubidChanged
 
                         else
-                            OnPubidChanged
+                            always Noop
                     , text = model.pubidtxt
                     , placeholder = Nothing
                     , label = EI.labelLeft [] (E.text "article id")
@@ -668,11 +671,11 @@ zknview size model =
                             NavChoiceChanged
                             [ ( NcView, "view" )
                             , ( NcEdit
-                              , if nonme then
-                                    "markdown"
+                              , if editable then
+                                    "edit"
 
                                 else
-                                    "edit"
+                                    "markdown"
                               )
                             ]
                         , case model.navchoice of
@@ -695,11 +698,11 @@ zknview size model =
                         NavChoiceChanged
                         [ ( NcView, "view" )
                         , ( NcEdit
-                          , if nonme then
-                                "markdown"
+                          , if editable then
+                                "edit"
 
                             else
-                                "edit"
+                                "markdown"
                           )
                         , ( NcSearch, "search" )
                         ]
@@ -788,6 +791,7 @@ initFull ld zkl zknote zklDict spm =
     , pubidtxt = zknote.pubid |> Maybe.withDefault ""
     , title = zknote.title
     , md = zknote.content
+    , editable = zknote.editable
     , cells = getCd cc
     , revert = Just (Data.saveZkNote zknote)
     , spmodel = SP.searchResultUpdated zkl spm
@@ -817,6 +821,7 @@ initNew ld zkl spm =
     , initialZklDict = Dict.empty
     , pubidtxt = ""
     , title = ""
+    , editable = True
     , md = ""
     , cells = getCd cc
     , revert = Nothing

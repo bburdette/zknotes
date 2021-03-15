@@ -27,6 +27,7 @@ pub struct ZkNote {
   pub content: String,
   pub user: i64,
   pub username: String,
+  pub editable: bool,
   pub pubid: Option<String>,
   pub createdate: i64,
   pub changeddate: i64,
