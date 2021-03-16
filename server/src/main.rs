@@ -212,7 +212,8 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
           .wrap(middleware::Logger::default())
           .wrap(
             CookieSession::signed(&[0; 32]) // <- create cookie based session middleware
-              .secure(true),
+              .secure(false) 								// allows for dev access
+              .max_age(10 * 24 * 60 * 60),  // 10 days
           )
           .service(web::resource("/public").route(web::post().to(public)))
           .service(web::resource("/user").route(web::post().to(user)))
