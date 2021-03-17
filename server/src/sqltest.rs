@@ -181,6 +181,9 @@ mod tests {
       Err(e) => (),
     };
 
+    // TODO test that 'public' is not treated as a share.
+    //
+    // TODO test notes linked with user BY CREATOR are editable/visible.
     Ok(())
   }
 }
