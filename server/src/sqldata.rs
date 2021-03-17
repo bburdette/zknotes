@@ -685,6 +685,50 @@ pub fn save_zklink(
   user: i64,
   linkzknote: Option<i64>,
 ) -> Result<i64, Box<dyn Error>> {
+  // ok to link to notes you don't own.
+  // can link between notes you don't own, even.
+  // but linking from a note you don't own to 'share' or 'public' is not allowed.
+  // if one note is a share, then you must be a member of that share to link, or own that share.
+
+  let shareid = note_id(&conn, "system", "share")?;
+  let publicid = note_id(&conn, "system", "public")?;
+  let usernote = user_note_id(&conn, user)?;
+
+  let authed = if fromid == shareid || fromid == publicid {
+    // can't link non-me notes to shareid or public.
+    let izm = is_zknote_mine(&conn, toid, user)?;
+    println!("toid mine?.{} {}", toid, izm);
+    izm
+  } else if toid == shareid || toid == publicid {
+    // can't link non-me notes to shareid or public.
+    let izm = is_zknote_mine(&conn, fromid, user)?;
+    println!("fromid mine?.{} {}", fromid, izm);
+    izm
+  } else if are_notes_linked(&conn, fromid, shareid)? && !are_notes_linked(&conn, usernote, fromid)?
+  {
+    // fromid is a share.
+    // user does not link to it.
+    // not allowed!
+    is_zknote_mine(&conn, fromid, user)? // unless user owns fromid.
+  } else if are_notes_linked(&conn, toid, shareid)? && !are_notes_linked(&conn, usernote, toid)? {
+    // fromid is a share.
+    // user does not link to it.
+    // not allowed!
+    is_zknote_mine(&conn, toid, user)? // unless user owns toid.
+  } else {
+    true
+  };
+
+  println!("authed {}", authed);
+
+  // yeesh.
+  let orwat: Result<(), Box<dyn Error>> = (if authed {
+    Ok(())
+  } else {
+    bail!("link not allowed")
+  });
+  let wat = orwat?;
+
   conn.execute(
     "insert into zklink (fromid, toid, user, linkzknote) values (?1, ?2, ?3, ?4)
       on conflict (fromid, toid, user) do update set linkzknote = ?4 where fromid = ?1 and toid = ?2 and user = ?3",
@@ -927,16 +971,29 @@ pub fn is_zknote_shared(
 
   println!("is_zknote_shared");
 
-  match conn.query_row(
+  // does note link to a note that links to share?
+  // and does that note link to usernoteid?
+  //
+  println!("shares parms: {}, {}, {}", zknoteid, shareid, usernoteid);
+
+  let ret = match conn.query_row(
     "select count(*)
-      from zknote N, zklink L, zklink M, zklink U
-      where (N.id != ? and
-        (M.toid = ? and (
-          (L.fromid = N.id and L.toid = M.fromid ) or
-          (L.toid = N.id and L.fromid = M.fromid )))
-      and
-        ((U.fromid = ? and U.toid = M.fromid) or (U.fromid = M.fromid and U.toid = ?)))",
-    params![zknoteid, shareid, usernoteid, usernoteid],
+      from zklink L,
+        (select U.toid id
+            from zklink U, zklink V
+            where
+              (U.fromid = ?3 and U.toid = V.fromid and V.toid = ?2) or
+              (U.fromid = ?3 and U.toid = V.toid and V.fromid = ?2)
+         union
+         select U.fromid id
+            from zklink U, zklink V
+            where
+              (U.toid = ?3 and U.fromid = V.fromid and V.toid = ?2) or
+              (U.toid = ?3 and U.fromid = V.toid and V.fromid = ?2)) shares
+      where
+        (L.fromid = shares.id and L.toid = ?1) or
+        (L.toid = shares.id and L.fromid = ?1)",
+    params![zknoteid, shareid, usernoteid],
     |row| {
       let i: i64 = row.get(0)?;
       Ok(i)
@@ -945,7 +1002,10 @@ pub fn is_zknote_shared(
     Ok(count) => Ok(count > 0),
     Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
     Err(x) => Err(Box::new(x)),
-  }
+  };
+
+  println!("shared: {:?}", ret);
+  Ok(ret?)
 
   // // bad query!
   // match conn.query_row(
@@ -974,6 +1034,45 @@ pub fn is_zknote_public(conn: &Connection, zknoteid: i64) -> Result<bool, Box<dy
       where (zklink.fromid = ?1 and zklink.toid = ?2)
       or (zklink.fromid = ?2  and zklink.toid = ?1)",
     params![zknoteid, pubid],
+    |row| {
+      let i: i64 = row.get(0)?;
+      Ok(i)
+    },
+  ) {
+    Ok(count) => Ok(count > 0),
+    Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
+    Err(x) => Err(Box::new(x)),
+  }
+}
+
+pub fn is_zknote_mine(
+  conn: &Connection,
+  zknoteid: i64,
+  userid: i64,
+) -> Result<bool, Box<dyn Error>> {
+  match conn.query_row(
+    "select count(*) from
+      zknote 
+      where id = ?1 and user = ?2",
+    params![zknoteid, userid],
+    |row| {
+      let i: i64 = row.get(0)?;
+      Ok(i)
+    },
+  ) {
+    Ok(count) => Ok(count > 0),
+    Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
+    Err(x) => Err(Box::new(x)),
+  }
+}
+
+pub fn are_notes_linked(conn: &Connection, nid1: i64, nid2: i64) -> Result<bool, Box<dyn Error>> {
+  match conn.query_row(
+    "select count(*) from
+      zklink
+      where (fromid = ?1 and toid = ?2)
+      or (toid = ?1 and fromid = ?2)",
+    params![nid1, nid2],
     |row| {
       let i: i64 = row.get(0)?;
       Ok(i)
@@ -1209,11 +1308,7 @@ pub fn save_zklinks(dbfile: &Path, uid: i64, zklinks: Vec<ZkLink>) -> Result<(),
           params![zklink.from, zklink.to, uid],
         )?;
       } else {
-        conn.execute(
-        "insert into zklink (fromid, toid, user, linkzknote) values (?1, ?2, ?3, ?4)
-          on conflict (fromid, toid, user) do update set linkzknote = ?4 where fromid = ?1 and toid = ?2 and user = ?3",
-        params![zklink.from, zklink.to, uid, zklink.linkzknote],
-      )?;
+        save_zklink(&conn, zklink.from, zklink.to, uid, zklink.linkzknote)?;
       }
     }
   }
@@ -1239,11 +1334,7 @@ pub fn save_savezklinks(
           params![from, to, uid],
         )?;
       } else {
-        conn.execute(
-        "insert into zklink (fromid, toid, user, linkzknote) values (?1, ?2, ?3, ?4)
-          on conflict (fromid, toid, user) do update set linkzknote = ?4 where fromid = ?1 and toid = ?2 and user = ?3",
-        params![from, to, uid, link.zknote],
-      )?;
+        save_zklink(&conn, from, to, uid, link.zknote)?;
       }
     }
   }
