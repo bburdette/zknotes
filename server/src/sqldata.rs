@@ -694,13 +694,13 @@ pub fn save_zklink(
   let publicid = note_id(&conn, "system", "public")?;
   let usernote = user_note_id(&conn, user)?;
 
-  let authed = if fromid == shareid || fromid == publicid {
-    // can't link non-me notes to shareid or public.
+  let authed = if fromid == shareid || fromid == publicid || fromid == usernote {
+    // can't link non-me notes to shareid or public or usernote.
     let izm = is_zknote_mine(&conn, toid, user)?;
     println!("toid mine?.{} {}", toid, izm);
     izm
-  } else if toid == shareid || toid == publicid {
-    // can't link non-me notes to shareid or public.
+  } else if toid == shareid || toid == publicid || toid == usernote {
+    // can't link non-me notes to shareid or public or usernote.
     let izm = is_zknote_mine(&conn, fromid, user)?;
     println!("fromid mine?.{} {}", fromid, izm);
     izm
@@ -721,7 +721,7 @@ pub fn save_zklink(
 
   println!("authed {}", authed);
 
-  // yeesh.
+  // yeesh.  doing this to exit with ? instead of having a big if-then to the end.
   let orwat: Result<(), Box<dyn Error>> = (if authed {
     Ok(())
   } else {
@@ -961,6 +961,7 @@ pub fn user_shares(conn: &Connection, uid: i64) -> Result<Vec<i64>, Box<dyn Erro
   Ok(pv)
 }
 
+// is there a connection between this note and uid's user note?
 pub fn is_zknote_usershared(
   conn: &Connection,
   zknoteid: i64,
@@ -1387,6 +1388,8 @@ pub fn read_zklinks(
 
   let usershares = user_shares(&conn, uid)?;
 
+  let unid = user_note_id(&conn, uid)?;
+
   // user shares in '1,3,4,5,6' form (minus the quotes!)
   let mut s = usershares
     .iter()
@@ -1407,7 +1410,9 @@ pub fn read_zklinks(
   // +
   // not-mine zklinks with from = note that is public, and to = this.
   // +
-  // not-mine zklinks with from = this, and 'to' in usershares.
+  // not-mine zklinks with from/to = this, and to/from in usershares.
+  // +
+  // not-mine zklinks from/to notes that link to my usernote.
 
   let sqlstr = format!(
     "select A.fromid, A.toid, A.user, A.linkzknote, L.title, R.title
@@ -1440,13 +1445,27 @@ pub fn read_zklinks(
           ((A.toid = ?2 and A.fromid = B.fromid and B.toid in ({})) or
            (A.toid = ?2 and A.fromid = B.toid and B.fromid in ({})) or
            (A.fromid = ?2 and A.toid = B.fromid and B.toid in ({})) or
-           (A.fromid = ?2 and A.toid = B.toid and B.fromid in ({})))",
+           (A.fromid = ?2 and A.toid = B.toid and B.fromid in ({})))
+      union
+    select A.fromid, A.toid, A.user, A.linkzknote, L.title, R.title
+        from zklink A, zklink B
+        inner join zknote as L ON A.fromid = L.id
+        inner join zknote as R ON A.toid = R.id
+        where A.user != ?1 and
+          ((A.toid = ?2 and A.fromid = B.fromid and B.toid = ?4) or
+           (A.toid = ?2 and A.fromid = B.toid and B.fromid = ?4) or
+           (A.fromid = ?2 and A.toid = B.fromid and B.toid = ?4) or
+           (A.fromid = ?2 and A.toid = B.toid and B.fromid = ?4)) ",
     s, s, s, s
   );
 
+  println!("params: {} {} {} {}", uid, gzl.zknote, pubid, unid);
+
+  println!("liknkquesl: {}", sqlstr);
+
   let mut pstmt = conn.prepare(sqlstr.as_str())?;
 
-  let rec_iter = pstmt.query_map(params![uid, gzl.zknote, pubid], |row| {
+  let rec_iter = pstmt.query_map(params![uid, gzl.zknote, pubid, unid], |row| {
     Ok(ZkLink {
       from: row.get(0)?,
       to: row.get(1)?,
