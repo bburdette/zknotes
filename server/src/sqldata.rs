@@ -685,6 +685,46 @@ pub fn save_zklink(
   user: i64,
   linkzknote: Option<i64>,
 ) -> Result<i64, Box<dyn Error>> {
+  // ok to link to notes you don't own.
+  // can link between notes you don't own, even.
+  // but linking from a note you don't own to 'share' or 'public' is not allowed.
+  // if one note is a share, then you must be a member of that share to link, or own that share.
+
+  let shareid = note_id(&conn, "system", "share")?;
+  let publicid = note_id(&conn, "system", "public")?;
+  let usernote = user_note_id(&conn, user)?;
+
+  let authed = if fromid == shareid || fromid == publicid || fromid == usernote {
+    // can't link non-me notes to shareid or public or usernote.
+    let izm = is_zknote_mine(&conn, toid, user)?;
+    izm
+  } else if toid == shareid || toid == publicid || toid == usernote {
+    // can't link non-me notes to shareid or public or usernote.
+    let izm = is_zknote_mine(&conn, fromid, user)?;
+    izm
+  } else if are_notes_linked(&conn, fromid, shareid)? && !are_notes_linked(&conn, usernote, fromid)?
+  {
+    // fromid is a share.
+    // user does not link to it.
+    // not allowed!
+    is_zknote_mine(&conn, fromid, user)? // unless user owns fromid.
+  } else if are_notes_linked(&conn, toid, shareid)? && !are_notes_linked(&conn, usernote, toid)? {
+    // fromid is a share.
+    // user does not link to it.
+    // not allowed!
+    is_zknote_mine(&conn, toid, user)? // unless user owns toid.
+  } else {
+    true
+  };
+
+  // yeesh.  doing this to exit with ? instead of having a big if-then to the end.
+  let orwat: Result<(), Box<dyn Error>> = (if authed {
+    Ok(())
+  } else {
+    bail!("link not allowed")
+  });
+  let wat = orwat?;
+
   conn.execute(
     "insert into zklink (fromid, toid, user, linkzknote) values (?1, ?2, ?3, ?4)
       on conflict (fromid, toid, user) do update set linkzknote = ?4 where fromid = ?1 and toid = ?2 and user = ?3",
@@ -917,21 +957,73 @@ pub fn user_shares(conn: &Connection, uid: i64) -> Result<Vec<i64>, Box<dyn Erro
   Ok(pv)
 }
 
+// is there a connection between this note and uid's user note?
+pub fn is_zknote_usershared(
+  conn: &Connection,
+  zknoteid: i64,
+  uid: i64,
+) -> Result<bool, Box<dyn Error>> {
+  let usernoteid: i64 = user_note_id(&conn, uid)?;
+
+  let ret = are_notes_linked(&conn, zknoteid, usernoteid)?;
+
+  Ok(ret)
+}
+
 pub fn is_zknote_shared(
   conn: &Connection,
   zknoteid: i64,
   uid: i64,
 ) -> Result<bool, Box<dyn Error>> {
   let shareid: i64 = note_id(conn, "system", "share")?;
+  let publicid: i64 = note_id(conn, "system", "public")?;
   let usernoteid: i64 = user_note_id(&conn, uid)?;
 
+  // does note link to a note that links to share?
+  // and does that note link to usernoteid?
+  //
+
+  let ret = match conn.query_row(
+    "select count(*)
+      from zklink L,
+        (select U.toid id
+            from zklink U, zklink V
+            where
+              ((U.fromid = ?3 and U.toid = V.fromid and V.toid = ?2) or
+               (U.fromid = ?3 and U.toid = V.toid and V.fromid = ?2)) and
+              U.toid != ?4
+         union
+         select U.fromid id
+            from zklink U, zklink V
+            where
+              ((U.toid = ?3 and U.fromid = V.fromid and V.toid = ?2) or
+               (U.toid = ?3 and U.fromid = V.toid and V.fromid = ?2)) and
+              U.toid != ?4 ) shares
+      where
+        (L.fromid = shares.id and L.toid = ?1) or
+        (L.toid = shares.id and L.fromid = ?1)",
+    params![zknoteid, shareid, usernoteid, publicid],
+    |row| {
+      let i: i64 = row.get(0)?;
+      Ok(i)
+    },
+  ) {
+    Ok(count) => Ok(count > 0),
+    Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
+    Err(x) => Err(Box::new(x)),
+  };
+
+  Ok(ret?)
+}
+
+pub fn is_zknote_public(conn: &Connection, zknoteid: i64) -> Result<bool, Box<dyn Error>> {
+  let pubid: i64 = note_id(conn, "system", "public")?;
   match conn.query_row(
     "select count(*) from
-      zklink L, zklink M, zklink U where
-        (L.fromid = ?1 and L.toid = M.fromid and M.toid = ?2 and
-        ((U.fromid = ?3 and U.toid = M.fromid) or (U.fromid = M.fromid and U.toid = ?3)))
-        or (L.fromid = ?1 and L.toid = ?3 or L.toid = ?3 and L.fromid = ?1)",
-    params![zknoteid, shareid, usernoteid],
+      zklink, zknote R
+      where (zklink.fromid = ?1 and zklink.toid = ?2)
+      or (zklink.fromid = ?2  and zklink.toid = ?1)",
+    params![zknoteid, pubid],
     |row| {
       let i: i64 = row.get(0)?;
       Ok(i)
@@ -943,15 +1035,34 @@ pub fn is_zknote_shared(
   }
 }
 
-pub fn is_zknote_public(conn: &Connection, zknoteid: i64) -> Result<bool, Box<dyn Error>> {
-  let pubid: i64 = note_id(conn, "system", "public")?;
-
+pub fn is_zknote_mine(
+  conn: &Connection,
+  zknoteid: i64,
+  userid: i64,
+) -> Result<bool, Box<dyn Error>> {
   match conn.query_row(
     "select count(*) from
-      zklink, zknote R
-      where (zklink.fromid = ?1 and zklink.toid = ?2)
-      or (zklink.fromid = ?2  and zklink.toid = ?1)",
-    params![zknoteid, pubid],
+      zknote 
+      where id = ?1 and user = ?2",
+    params![zknoteid, userid],
+    |row| {
+      let i: i64 = row.get(0)?;
+      Ok(i)
+    },
+  ) {
+    Ok(count) => Ok(count > 0),
+    Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
+    Err(x) => Err(Box::new(x)),
+  }
+}
+
+pub fn are_notes_linked(conn: &Connection, nid1: i64, nid2: i64) -> Result<bool, Box<dyn Error>> {
+  match conn.query_row(
+    "select count(*) from
+      zklink
+      where (fromid = ?1 and toid = ?2)
+      or (toid = ?1 and fromid = ?2)",
+    params![nid1, nid2],
     |row| {
       let i: i64 = row.get(0)?;
       Ok(i)
@@ -974,17 +1085,39 @@ pub fn save_zknote(
 
   match note.id {
     Some(id) => {
-      conn.execute(
+      // existing note.  update IF mine.
+      match conn.execute(
         "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4
          where id = ?5 and user = ?6",
         params![note.title, note.content, now, note.pubid, note.id, uid],
-      )?;
-      Ok(SavedZkNote {
-        id: id,
-        changeddate: now,
-      })
+      ) {
+        Ok(1) => Ok(SavedZkNote {
+          id: id,
+          changeddate: now,
+        }),
+        Ok(0) => {
+          match zknote_access_id(conn, Some(uid), id)? {
+            Access::ReadWrite => {
+              // update other user's record!
+              conn.execute(
+                "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4
+                 where id = ?5",
+                params![note.title, note.content, now, note.pubid, id],
+              )?;
+              Ok(SavedZkNote {
+                id: id,
+                changeddate: now,
+              })
+            }
+            _ => bail!("can't update; note is not writable"),
+          }
+        }
+        Ok(_) => bail!("unexpected update success!"),
+        Err(e) => Err(e)?,
+      }
     }
     None => {
+      // new note!
       conn.execute(
         "insert into zknote (title, content, user, pubid, createdate, changeddate)
          values (?1, ?2, ?3, ?4, ?5, ?6)",
@@ -999,7 +1132,7 @@ pub fn save_zknote(
 }
 
 pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNote, Box<dyn Error>> {
-  let note = conn.query_row(
+  let mut note = conn.query_row(
     "select ZN.title, ZN.content, ZN.user, U.name, ZN.pubid, ZN.createdate, ZN.changeddate
       from zknote ZN, user U where ZN.id = ?1 and U.id = ZN.user",
     params![id],
@@ -1010,6 +1143,7 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
         content: row.get(1)?,
         user: row.get(2)?,
         username: row.get(3)?,
+        editable: false,
         pubid: row.get(4)?,
         createdate: row.get(5)?,
         changeddate: row.get(6)?,
@@ -1017,20 +1151,90 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
     },
   )?;
 
-  if uid == Some(note.user) {
-    Ok(note)
-  } else if is_zknote_public(conn, id)? {
-    Ok(note)
-  } else {
-    match uid {
-      Some(uid) => {
-        if is_zknote_shared(conn, id, uid)? {
-          Ok(note)
-        } else {
-          bail!("can't read zknote; note is private")
-        }
+  match zknote_access(conn, uid, &note) {
+    Ok(zna) => match zna {
+      Access::ReadWrite => {
+        note.editable = true;
+        Ok(note)
       }
-      None => bail!("can't read zknote; note is private"),
+      Access::Read => {
+        note.editable = false;
+        Ok(note)
+      }
+      Access::Private => bail!("can't read zknote; note is private"),
+    },
+    Err(e) => Err(e),
+  }
+}
+
+pub enum Access {
+  Private,
+  Read,
+  ReadWrite,
+}
+
+pub fn zknote_access(
+  conn: &Connection,
+  uid: Option<i64>,
+  note: &ZkNote,
+) -> Result<Access, Box<dyn Error>> {
+  match uid {
+    Some(uid) => {
+      if uid == note.user {
+        Ok(Access::ReadWrite)
+      } else if is_zknote_usershared(conn, note.id, uid)? {
+        // editable and accessible.
+        Ok(Access::ReadWrite)
+      } else if is_zknote_shared(conn, note.id, uid)? {
+        // editable and accessible.
+        Ok(Access::ReadWrite)
+      } else if is_zknote_public(conn, note.id)? {
+        // accessible but not editable.
+        Ok(Access::Read)
+      } else {
+        Ok(Access::Private)
+      }
+    }
+    None => {
+      if is_zknote_public(conn, note.id)? {
+        // accessible but not editable.
+        Ok(Access::Read)
+      } else {
+        Ok(Access::Private)
+      }
+    }
+  }
+}
+
+pub fn zknote_access_id(
+  conn: &Connection,
+  uid: Option<i64>,
+  noteid: i64,
+) -> Result<Access, Box<dyn Error>> {
+  match uid {
+    Some(uid) => {
+      if is_zknote_mine(&conn, noteid, uid)? {
+        Ok(Access::ReadWrite)
+      } else if is_zknote_usershared(conn, noteid, uid)? {
+        // editable and accessible.
+        Ok(Access::ReadWrite)
+      } else if is_zknote_shared(conn, noteid, uid)? {
+        // editable and accessible.
+        Ok(Access::ReadWrite)
+      } else if is_zknote_public(conn, noteid)? {
+        // accessible but not editable.
+        Ok(Access::Read)
+      } else {
+        Ok(Access::Private)
+      }
+    }
+    None => {
+      if is_zknote_public(conn, noteid)? {
+        // accessible but not editable.
+        Ok(Access::Read)
+      } else {
+        Ok(Access::Private)
+      }
     }
   }
 }
@@ -1041,7 +1245,7 @@ pub fn read_zknotepubid(
   pubid: &str,
 ) -> Result<ZkNote, Box<dyn Error>> {
   let publicid = note_id(&conn, "system", "public")?;
-  let note = conn.query_row(
+  let mut note = conn.query_row(
     "select A.id, A.title, A.content, A.user, U.name, A.pubid, A.createdate, A.changeddate
       from zknote A, user U, zklink L where A.pubid = ?1
       and ((A.id = L.fromid
@@ -1056,6 +1260,7 @@ pub fn read_zknotepubid(
         content: row.get(2)?,
         user: row.get(3)?,
         username: row.get(4)?,
+        editable: false,
         pubid: row.get(5)?,
         createdate: row.get(6)?,
         changeddate: row.get(7)?,
@@ -1063,21 +1268,20 @@ pub fn read_zknotepubid(
     },
   )?;
 
-  match uid {
-    Some(uid) => {
-      // if !is_zknote_member(&conn, uid, note.id)? {
-      if note.user != uid {
-        bail!("can't read zknote; you are not a member of this zk");
+  match zknote_access(conn, uid, &note) {
+    Ok(zna) => match zna {
+      Access::ReadWrite => {
+        note.editable = true;
+        Ok(note)
       }
-    }
-    None => {
-      if !is_zknote_public(&conn, note.id)? {
-        bail!("can't read zknote; note is private");
+      Access::Read => {
+        note.editable = false;
+        Ok(note)
       }
-    }
+      Access::Private => bail!("can't read zknote; note is private"),
+    },
+    Err(e) => Err(e),
   }
-
-  Ok(note)
 }
 
 // delete the note; fails if there are links to it.
@@ -1125,11 +1329,7 @@ pub fn save_zklinks(dbfile: &Path, uid: i64, zklinks: Vec<ZkLink>) -> Result<(),
           params![zklink.from, zklink.to, uid],
         )?;
       } else {
-        conn.execute(
-        "insert into zklink (fromid, toid, user, linkzknote) values (?1, ?2, ?3, ?4)
-          on conflict (fromid, toid, user) do update set linkzknote = ?4 where fromid = ?1 and toid = ?2 and user = ?3",
-        params![zklink.from, zklink.to, uid, zklink.linkzknote],
-      )?;
+        save_zklink(&conn, zklink.from, zklink.to, uid, zklink.linkzknote)?;
       }
     }
   }
@@ -1155,11 +1355,7 @@ pub fn save_savezklinks(
           params![from, to, uid],
         )?;
       } else {
-        conn.execute(
-        "insert into zklink (fromid, toid, user, linkzknote) values (?1, ?2, ?3, ?4)
-          on conflict (fromid, toid, user) do update set linkzknote = ?4 where fromid = ?1 and toid = ?2 and user = ?3",
-        params![from, to, uid, link.zknote],
-      )?;
+        save_zklink(&conn, from, to, uid, link.zknote)?;
       }
     }
   }
@@ -1175,6 +1371,8 @@ pub fn read_zklinks(
   let pubid = note_id(&conn, "system", "public")?;
 
   let usershares = user_shares(&conn, uid)?;
+
+  let unid = user_note_id(&conn, uid)?;
 
   // user shares in '1,3,4,5,6' form (minus the quotes!)
   let mut s = usershares
@@ -1196,7 +1394,9 @@ pub fn read_zklinks(
   // +
   // not-mine zklinks with from = note that is public, and to = this.
   // +
-  // not-mine zklinks with from = this, and 'to' in usershares.
+  // not-mine zklinks with from/to = this, and to/from in usershares.
+  // +
+  // not-mine zklinks from/to notes that link to my usernote.
 
   let sqlstr = format!(
     "select A.fromid, A.toid, A.user, A.linkzknote, L.title, R.title
@@ -1229,13 +1429,23 @@ pub fn read_zklinks(
           ((A.toid = ?2 and A.fromid = B.fromid and B.toid in ({})) or
            (A.toid = ?2 and A.fromid = B.toid and B.fromid in ({})) or
            (A.fromid = ?2 and A.toid = B.fromid and B.toid in ({})) or
-           (A.fromid = ?2 and A.toid = B.toid and B.fromid in ({})))",
+           (A.fromid = ?2 and A.toid = B.toid and B.fromid in ({})))
+      union
+    select A.fromid, A.toid, A.user, A.linkzknote, L.title, R.title
+        from zklink A, zklink B
+        inner join zknote as L ON A.fromid = L.id
+        inner join zknote as R ON A.toid = R.id
+        where A.user != ?1 and
+          ((A.toid = ?2 and A.fromid = B.fromid and B.toid = ?4) or
+           (A.toid = ?2 and A.fromid = B.toid and B.fromid = ?4) or
+           (A.fromid = ?2 and A.toid = B.fromid and B.toid = ?4) or
+           (A.fromid = ?2 and A.toid = B.toid and B.fromid = ?4)) ",
     s, s, s, s
   );
 
   let mut pstmt = conn.prepare(sqlstr.as_str())?;
 
-  let rec_iter = pstmt.query_map(params![uid, gzl.zknote, pubid], |row| {
+  let rec_iter = pstmt.query_map(params![uid, gzl.zknote, pubid, unid], |row| {
     Ok(ZkLink {
       from: row.get(0)?,
       to: row.get(1)?,
@@ -1458,6 +1668,7 @@ pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
       content: row.get(2)?,
       user: row.get(3)?,
       username: "".to_string(),
+      editable: false, // not a database field; don't bother computing here.
       pubid: row.get(4)?,
       createdate: row.get(5)?,
       changeddate: row.get(6)?,

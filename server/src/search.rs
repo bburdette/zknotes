@@ -130,9 +130,15 @@ pub fn build_sql(
   let mut sqluser = format!(
     "select N.id, N.title, N.user, N.createdate, N.changeddate
       from zknote N, zklink L
-      where (N.user != ? and L.fromid = N.id and L.toid = ?)"
+      where (
+        N.user != ? and
+        ((L.fromid = N.id and L.toid = ?) or (L.toid = N.id and L.fromid = ?)))"
   );
-  let mut userargs = vec![uid.to_string(), usernoteid.to_string()];
+  let mut userargs = vec![
+    uid.to_string(),
+    usernoteid.to_string(),
+    usernoteid.to_string(),
+  ];
 
   // local ftn to add clause and args.
   let addcls = |sql: &mut String, args: &mut Vec<String>| {

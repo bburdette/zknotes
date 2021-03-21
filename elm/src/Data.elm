@@ -3,6 +3,7 @@ module Data exposing (..)
 import Json.Decode as JD
 import Json.Encode as JE
 import Search as S
+import Util exposing (andMap)
 
 
 type alias Registration =
@@ -55,6 +56,7 @@ type alias ZkNote =
     , title : String
     , content : String
     , pubid : Maybe String
+    , editable : Bool
     , createdate : Int
     , changeddate : Int
     }
@@ -292,15 +294,16 @@ decodeSavedZkNote =
 
 decodeZkNote : JD.Decoder ZkNote
 decodeZkNote =
-    JD.map8 ZkNote
-        (JD.field "id" JD.int)
-        (JD.field "user" JD.int)
-        (JD.field "username" JD.string)
-        (JD.field "title" JD.string)
-        (JD.field "content" JD.string)
-        (JD.field "pubid" (JD.maybe JD.string))
-        (JD.field "createdate" JD.int)
-        (JD.field "changeddate" JD.int)
+    JD.succeed ZkNote
+        |> andMap (JD.field "id" JD.int)
+        |> andMap (JD.field "user" JD.int)
+        |> andMap (JD.field "username" JD.string)
+        |> andMap (JD.field "title" JD.string)
+        |> andMap (JD.field "content" JD.string)
+        |> andMap (JD.field "pubid" (JD.maybe JD.string))
+        |> andMap (JD.field "editable" JD.bool)
+        |> andMap (JD.field "createdate" JD.int)
+        |> andMap (JD.field "changeddate" JD.int)
 
 
 decodeZkNoteAndAccomplices : JD.Decoder ZkNoteAndAccomplices

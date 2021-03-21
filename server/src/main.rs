@@ -4,6 +4,7 @@ mod interfaces;
 mod search;
 mod sqldata;
 mod util;
+mod sqltest;
 
 use actix_files::NamedFile;
 use clap::{Arg, SubCommand};
