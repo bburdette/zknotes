@@ -26,7 +26,12 @@ mod tests {
 
   fn err_test() -> Result<(), Box<dyn Error>> {
     let dbp = Path::new("test.db");
-    std::fs::remove_file(dbp)?;
+    match std::fs::remove_file(dbp) {
+      Ok(_) => (),
+      Err(e) => {
+        println!("error removing test.db: {}", e);
+      }
+    }
     dbinit(dbp)?;
 
     let uid1 = new_user(
