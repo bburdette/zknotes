@@ -603,11 +603,11 @@ zknview size model =
             , placeholder = Nothing
             , label = EI.labelLeft [] (E.text "title")
             }
-        , if editable then
+        , if model.noteUser == model.ld.userid then
             E.none
 
           else
-            E.row [ E.spacing 8 ] [ E.text "owner", E.row [ EF.bold ] [ E.text model.noteUserName ] ]
+            E.row [ E.spacing 8 ] [ E.text "creator", E.row [ EF.bold ] [ E.text model.noteUserName ] ]
         , E.row [ E.spacing 8, E.width E.fill ]
             [ EI.checkbox [ E.width E.shrink ]
                 { onChange =
