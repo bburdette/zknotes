@@ -697,12 +697,10 @@ pub fn save_zklink(
   let authed = if fromid == shareid || fromid == publicid || fromid == usernote {
     // can't link non-me notes to shareid or public or usernote.
     let izm = is_zknote_mine(&conn, toid, user)?;
-    println!("toid mine?.{} {}", toid, izm);
     izm
   } else if toid == shareid || toid == publicid || toid == usernote {
     // can't link non-me notes to shareid or public or usernote.
     let izm = is_zknote_mine(&conn, fromid, user)?;
-    println!("fromid mine?.{} {}", fromid, izm);
     izm
   } else if are_notes_linked(&conn, fromid, shareid)? && !are_notes_linked(&conn, usernote, fromid)?
   {
@@ -718,8 +716,6 @@ pub fn save_zklink(
   } else {
     true
   };
-
-  println!("authed {}", authed);
 
   // yeesh.  doing this to exit with ? instead of having a big if-then to the end.
   let orwat: Result<(), Box<dyn Error>> = (if authed {
@@ -970,7 +966,6 @@ pub fn is_zknote_usershared(
   let usernoteid: i64 = user_note_id(&conn, uid)?;
 
   let ret = are_notes_linked(&conn, zknoteid, usernoteid)?;
-  println!("noteslinked? {}", ret);
 
   Ok(ret)
 }
@@ -984,12 +979,9 @@ pub fn is_zknote_shared(
   let publicid: i64 = note_id(conn, "system", "public")?;
   let usernoteid: i64 = user_note_id(&conn, uid)?;
 
-  println!("is_zknote_shared");
-
   // does note link to a note that links to share?
   // and does that note link to usernoteid?
   //
-  println!("shares parms: {}, {}, {}", zknoteid, shareid, usernoteid);
 
   let ret = match conn.query_row(
     "select count(*)
@@ -1013,7 +1005,6 @@ pub fn is_zknote_shared(
     params![zknoteid, shareid, usernoteid, publicid],
     |row| {
       let i: i64 = row.get(0)?;
-      println!("count: {}", i);
       Ok(i)
     },
   ) {
@@ -1022,7 +1013,6 @@ pub fn is_zknote_shared(
     Err(x) => Err(Box::new(x)),
   };
 
-  println!("shared: {:?}", ret);
   Ok(ret?)
 }
 
@@ -1093,12 +1083,9 @@ pub fn save_zknote(
 ) -> Result<SavedZkNote, Box<dyn Error>> {
   let now = now()?;
 
-  println!("save_zknote");
-
   match note.id {
     Some(id) => {
       // existing note.  update IF mine.
-      println!("save_zknote, update if mine");
       match conn.execute(
         "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4
          where id = ?5 and user = ?6",
@@ -1109,7 +1096,6 @@ pub fn save_zknote(
           changeddate: now,
         }),
         Ok(0) => {
-          println!("save_zknote, ok 0");
           match zknote_access_id(conn, Some(uid), id)? {
             Access::ReadWrite => {
               // update other user's record!
@@ -1146,7 +1132,6 @@ pub fn save_zknote(
 }
 
 pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNote, Box<dyn Error>> {
-  println!("read_zknote");
   let mut note = conn.query_row(
     "select ZN.title, ZN.content, ZN.user, U.name, ZN.pubid, ZN.createdate, ZN.changeddate
       from zknote ZN, user U where ZN.id = ?1 and U.id = ZN.user",
@@ -1166,7 +1151,6 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
     },
   )?;
 
-  println!("read_zknote - zknote_access");
   match zknote_access(conn, uid, &note) {
     Ok(zna) => match zna {
       Access::ReadWrite => {
@@ -1458,10 +1442,6 @@ pub fn read_zklinks(
            (A.fromid = ?2 and A.toid = B.toid and B.fromid = ?4)) ",
     s, s, s, s
   );
-
-  println!("params: {} {} {} {}", uid, gzl.zknote, pubid, unid);
-
-  println!("liknkquesl: {}", sqlstr);
 
   let mut pstmt = conn.prepare(sqlstr.as_str())?;
 

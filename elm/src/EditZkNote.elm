@@ -347,9 +347,6 @@ zknview size model =
         editable =
             model.editable
 
-        -- nonme =
-        --     model.ld.userid
-        --         /= model.noteUser
         showLinks =
             E.row [ EF.bold ] [ E.text "links" ]
                 :: List.map
