@@ -1412,7 +1412,7 @@ pub fn read_zklinks(
   // +
   // not-mine zklinks with from/to = this, and to/from in usershares.
   // +
-  // not-mine zklinks from/to notes that link to my usernote.
+  // not-mine zklinks from/to notes that link to my usernote (ie shares).
 
   let sqlstr = format!(
     "select A.fromid, A.toid, A.user, A.linkzknote, L.title, R.title

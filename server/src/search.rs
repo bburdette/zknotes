@@ -18,6 +18,7 @@ pub fn power_delete_zknotes(
     tagsearch: search.clone(),
     offset: 0,
     limit: None,
+    order: None,
   };
 
   let znsr = search_zknotes(conn, user, &nolimsearch)?;
@@ -83,7 +84,7 @@ pub fn build_sql(
                             // None => format!(" offset {}", search.offset),
   };
 
-  let ordclause = " order by N.id desc ";
+  let ordclause = " order by N.changeddate desc ";
 
   // notes that are mine.
   let mut sqlbase = format!(
