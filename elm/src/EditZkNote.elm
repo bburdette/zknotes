@@ -11,6 +11,7 @@ module EditZkNote exposing
     , initFull
     , initNew
     , noteLink
+    , onCtrlS
     , pageLink
     , replaceOrAdd
     , saveZkLinkList
@@ -914,6 +915,15 @@ compareZklinks left right =
 
         ltgt ->
             ltgt
+
+
+onCtrlS : Model -> ( Model, Command )
+onCtrlS model =
+    if dirty model then
+        update SavePress model
+
+    else
+        ( model, None )
 
 
 update : Msg -> Model -> ( Model, Command )

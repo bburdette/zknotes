@@ -9,6 +9,7 @@
         "direct": {
             "bburdette/cellme": "1.0.0",
             "bburdette/schelme": "3.0.0",
+            "bburdette/toop": "1.0.1",
             "bburdette/typed-collections": "1.0.2",
             "dillonkearns/elm-markdown": "5.1.0",
             "elm/browser": "1.0.2",

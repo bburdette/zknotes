@@ -20,6 +20,7 @@ import File as F
 import File.Select as FS
 import Html exposing (Attribute, Html)
 import Html.Attributes
+import Html.Events as HE
 import Http
 import Import
 import Json.Decode as JD
@@ -35,6 +36,7 @@ import Schelme.Show exposing (showTerm)
 import Search as S
 import SearchPanel as SP
 import ShowMessage
+import Toop
 import Url exposing (Url)
 import Url.Builder as UB
 import Url.Parser as UP exposing ((</>))
@@ -58,6 +60,7 @@ type Msg
     | SelectedText JD.Value
     | UrlChanged Url
     | WindowSize Util.Size
+    | CtrlS
     | Noop
 
 
@@ -345,6 +348,9 @@ showMessage msg =
 
         Noop ->
             "Noop"
+
+        CtrlS ->
+            "CtrlS"
 
 
 showState : State -> String
@@ -646,10 +652,50 @@ view model =
             _ ->
                 routeTitle model.savedRoute.route
     , body =
-        [ Element.layout [] <|
-            viewState model.size model.state
+        [ Html.div
+            [ -- important to prevent ctrl-s on non-input item focus.
+              Html.Attributes.tabindex 0
+
+            -- blocks on ctrl-s, lets others through.
+            , onKeyDown
+            ]
+            [ Element.layout [] <|
+                viewState model.size model.state
+            ]
         ]
     }
+
+
+onKeyDown : Attribute Msg
+onKeyDown =
+    HE.preventDefaultOn "keydown"
+        (JD.map4
+            (\key ctrl alt shift ->
+                case Toop.T4 key ctrl alt shift of
+                    Toop.T4 "s" True False False ->
+                        -- ctrl-s -> prevent default!
+                        -- also, CtrlS message.
+                        ( CtrlS, True )
+
+                    _ ->
+                        -- anything else, don't prevent default!
+                        ( Noop, False )
+            )
+            (JD.field "key" JD.string)
+            (JD.field "ctrlKey" JD.bool)
+            (JD.field "altKey" JD.bool)
+            (JD.field "shiftKey" JD.bool)
+        )
+
+
+onKeyUp : msg -> Attribute msg
+onKeyUp msg =
+    HE.preventDefaultOn "keyup" (JD.map alwaysPreventDefault (JD.succeed msg))
+
+
+alwaysPreventDefault : msg -> ( msg, Bool )
+alwaysPreventDefault msg =
+    ( msg, True )
 
 
 {-| urlUpdate: all URL code shall go here! regular code shall not worry about urls!
@@ -1111,164 +1157,15 @@ actualupdate msg model =
             let
                 ( emod, ecmd ) =
                     EditZkNote.update em es
-
-                backtolisting =
-                    ( { model
-                        | state =
-                            EditZkNoteListing
-                                { notes = emod.zknSearchResult
-                                , spmodel = emod.spmodel
-                                , dialog = Nothing
-                                }
-                                login
-                      }
-                    , case SP.getSearch emod.spmodel of
-                        Just s ->
-                            sendUIMsg model.location
-                                (UI.SearchZkNotes s)
-
-                        Nothing ->
-                            Cmd.none
-                    )
             in
-            case ecmd of
-                EditZkNote.SaveExit snpl ->
-                    let
-                        gotres =
-                            ( EditZkNoteListing
-                                { notes = emod.zknSearchResult
-                                , spmodel = emod.spmodel
-                                , dialog = Nothing
-                                }
-                                login
-                            , case SP.getSearch emod.spmodel of
-                                Just s ->
-                                    sendUIMsg model.location
-                                        (UI.SearchZkNotes s)
+            handleEditZkNoteCmd model login emod ecmd
 
-                                Nothing ->
-                                    Cmd.none
-                            )
-
-                        savefn : Bool -> Bool -> State -> Msg -> ( State, Cmd Msg )
-                        savefn gotsn gotsl st ms =
-                            case ms of
-                                UserReplyData (Ok (UI.SavedZkNote szn)) ->
-                                    if gotsl then
-                                        gotres
-
-                                    else
-                                        ( Wait st (savefn True False), Cmd.none )
-
-                                UserReplyData (Ok UI.SavedZkLinks) ->
-                                    if gotsn then
-                                        gotres
-
-                                    else
-                                        ( Wait st (savefn False True), Cmd.none )
-
-                                UserReplyData (Ok (UI.ServerError e)) ->
-                                    ( DisplayError (DisplayError.initialModel e) st, Cmd.none )
-
-                                _ ->
-                                    ( unexpectedMsg model.state ms
-                                    , Cmd.none
-                                    )
-                    in
-                    ( { model
-                        | state =
-                            Wait
-                                (ShowMessage
-                                    { message = "loading articles"
-                                    }
-                                    login
-                                )
-                                (savefn False False)
-                      }
-                    , sendUIMsg model.location
-                        (UI.SaveZkNotePlusLinks snpl)
-                    )
-
-                EditZkNote.Save snpl ->
-                    ( { model | state = EditZkNote emod login }
-                    , sendUIMsg model.location
-                        (UI.SaveZkNotePlusLinks snpl)
-                    )
-
-                EditZkNote.None ->
-                    ( { model | state = EditZkNote emod login }, Cmd.none )
-
-                EditZkNote.Revert ->
-                    backtolisting
-
-                EditZkNote.Delete id ->
-                    -- issue delete and go back to listing.
-                    let
-                        ( m, c ) =
-                            backtolisting
-                    in
-                    ( { m
-                        | state =
-                            Wait m.state
-                                (\state _ ->
-                                    ( m.state, c )
-                                )
-                      }
-                    , sendUIMsg model.location
-                        (UI.DeleteZkNote id)
-                    )
-
-                EditZkNote.Switch id ->
-                    let
-                        ( st, cmd ) =
-                            loadnote model
-                                { login = login
-                                , mbzknotesearchresult = Nothing
-                                , mbzklinks = Nothing
-                                , mbzknote = Nothing
-                                , spmodel = emod.spmodel
-                                , navkey = model.navkey
-                                , seed = model.seed
-                                }
-                                id
-                    in
-                    ( { model | state = st }, cmd )
-
-                EditZkNote.SaveSwitch s id ->
-                    let
-                        ( st, cmd ) =
-                            loadnote model
-                                { login = login
-                                , mbzknotesearchresult = Nothing
-                                , mbzklinks = Nothing
-                                , mbzknote = Nothing
-                                , spmodel = emod.spmodel
-                                , navkey = model.navkey
-                                , seed = model.seed
-                                }
-                                id
-                    in
-                    ( { model | state = st }
-                    , Cmd.batch
-                        [ cmd
-                        , sendUIMsg model.location
-                            (UI.SaveZkNotePlusLinks s)
-                        ]
-                    )
-
-                EditZkNote.View szn ->
-                    ( { model | state = EView (View.initSzn szn []) (EditZkNote es login) }, Cmd.none )
-
-                EditZkNote.GetSelectedText id ->
-                    ( { model | state = EditZkNote emod login }
-                    , getSelectedText (Just id)
-                    )
-
-                EditZkNote.Search s ->
-                    ( { model | state = EditZkNote emod login }
-                    , sendUIMsg model.location
-                        (UI.SearchZkNotes s)
-                    )
+        ( CtrlS, EditZkNote es login ) ->
+            let
+                ( emod, ecmd ) =
+                    EditZkNote.onCtrlS es
+            in
+            handleEditZkNoteCmd model login emod ecmd
 
         ( EditZkNoteListingMsg em, EditZkNoteListing es login ) ->
             let
@@ -1401,6 +1298,167 @@ actualupdate msg model =
 
         ( _, _ ) ->
             ( model, Cmd.none )
+
+
+handleEditZkNoteCmd model login emod ecmd =
+    let
+        backtolisting =
+            ( { model
+                | state =
+                    EditZkNoteListing
+                        { notes = emod.zknSearchResult
+                        , spmodel = emod.spmodel
+                        , dialog = Nothing
+                        }
+                        login
+              }
+            , case SP.getSearch emod.spmodel of
+                Just s ->
+                    sendUIMsg model.location
+                        (UI.SearchZkNotes s)
+
+                Nothing ->
+                    Cmd.none
+            )
+    in
+    case ecmd of
+        EditZkNote.SaveExit snpl ->
+            let
+                gotres =
+                    ( EditZkNoteListing
+                        { notes = emod.zknSearchResult
+                        , spmodel = emod.spmodel
+                        , dialog = Nothing
+                        }
+                        login
+                    , case SP.getSearch emod.spmodel of
+                        Just s ->
+                            sendUIMsg model.location
+                                (UI.SearchZkNotes s)
+
+                        Nothing ->
+                            Cmd.none
+                    )
+
+                savefn : Bool -> Bool -> State -> Msg -> ( State, Cmd Msg )
+                savefn gotsn gotsl st ms =
+                    case ms of
+                        UserReplyData (Ok (UI.SavedZkNote szn)) ->
+                            if gotsl then
+                                gotres
+
+                            else
+                                ( Wait st (savefn True False), Cmd.none )
+
+                        UserReplyData (Ok UI.SavedZkLinks) ->
+                            if gotsn then
+                                gotres
+
+                            else
+                                ( Wait st (savefn False True), Cmd.none )
+
+                        UserReplyData (Ok (UI.ServerError e)) ->
+                            ( DisplayError (DisplayError.initialModel e) st, Cmd.none )
+
+                        _ ->
+                            ( unexpectedMsg model.state ms
+                            , Cmd.none
+                            )
+            in
+            ( { model
+                | state =
+                    Wait
+                        (ShowMessage
+                            { message = "loading articles"
+                            }
+                            login
+                        )
+                        (savefn False False)
+              }
+            , sendUIMsg model.location
+                (UI.SaveZkNotePlusLinks snpl)
+            )
+
+        EditZkNote.Save snpl ->
+            ( { model | state = EditZkNote emod login }
+            , sendUIMsg model.location
+                (UI.SaveZkNotePlusLinks snpl)
+            )
+
+        EditZkNote.None ->
+            ( { model | state = EditZkNote emod login }, Cmd.none )
+
+        EditZkNote.Revert ->
+            backtolisting
+
+        EditZkNote.Delete id ->
+            -- issue delete and go back to listing.
+            let
+                ( m, c ) =
+                    backtolisting
+            in
+            ( { m
+                | state =
+                    Wait m.state
+                        (\state _ ->
+                            ( m.state, c )
+                        )
+              }
+            , sendUIMsg model.location
+                (UI.DeleteZkNote id)
+            )
+
+        EditZkNote.Switch id ->
+            let
+                ( st, cmd ) =
+                    loadnote model
+                        { login = login
+                        , mbzknotesearchresult = Nothing
+                        , mbzklinks = Nothing
+                        , mbzknote = Nothing
+                        , spmodel = emod.spmodel
+                        , navkey = model.navkey
+                        , seed = model.seed
+                        }
+                        id
+            in
+            ( { model | state = st }, cmd )
+
+        EditZkNote.SaveSwitch s id ->
+            let
+                ( st, cmd ) =
+                    loadnote model
+                        { login = login
+                        , mbzknotesearchresult = Nothing
+                        , mbzklinks = Nothing
+                        , mbzknote = Nothing
+                        , spmodel = emod.spmodel
+                        , navkey = model.navkey
+                        , seed = model.seed
+                        }
+                        id
+            in
+            ( { model | state = st }
+            , Cmd.batch
+                [ cmd
+                , sendUIMsg model.location
+                    (UI.SaveZkNotePlusLinks s)
+                ]
+            )
+
+        EditZkNote.View szn ->
+            ( { model | state = EView (View.initSzn szn []) (EditZkNote emod login) }, Cmd.none )
+
+        EditZkNote.GetSelectedText id ->
+            ( { model | state = EditZkNote emod login }
+            , getSelectedText (Just id)
+            )
+
+        EditZkNote.Search s ->
+            ( { model | state = EditZkNote emod login }
+            , sendUIMsg model.location
+                (UI.SearchZkNotes s)
+            )
 
 
 init : Flags -> Url -> Browser.Navigation.Key -> ( Model, Cmd Msg )
