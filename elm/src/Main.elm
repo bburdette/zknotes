@@ -10,7 +10,7 @@ import Dict exposing (Dict)
 import DisplayError
 import EditZkNote
 import EditZkNoteListing
-import Element exposing (Element)
+import Element as E exposing (Element)
 import Element.Background as EBk
 import Element.Border as EBd
 import Element.Font as Font
@@ -404,37 +404,37 @@ viewState : Util.Size -> State -> Element Msg
 viewState size state =
     case state of
         Login lem ->
-            Element.map LoginMsg <| Login.view size lem
+            E.map LoginMsg <| Login.view size lem
 
         EditZkNote em _ ->
-            Element.map EditZkNoteMsg <| EditZkNote.view size em
+            E.map EditZkNoteMsg <| EditZkNote.view size em
 
         EditZkNoteListing em ld ->
-            Element.map EditZkNoteListingMsg <| EditZkNoteListing.view ld size em
+            E.map EditZkNoteListingMsg <| EditZkNoteListing.view ld size em
 
         ShowMessage em _ ->
-            Element.map ShowMessageMsg <| ShowMessage.view em
+            E.map ShowMessageMsg <| ShowMessage.view em
 
         PubShowMessage em ->
-            Element.map ShowMessageMsg <| ShowMessage.view em
+            E.map ShowMessageMsg <| ShowMessage.view em
 
         LoginShowMessage em _ _ ->
-            Element.map ShowMessageMsg <| ShowMessage.view em
+            E.map ShowMessageMsg <| ShowMessage.view em
 
         Import em _ ->
-            Element.map ImportMsg <| Import.view size em
+            E.map ImportMsg <| Import.view size em
 
         View em ->
-            Element.map ViewMsg <| View.view size.width em False
+            E.map ViewMsg <| View.view size.width em False
 
         EView em _ ->
-            Element.map ViewMsg <| View.view size.width em True
+            E.map ViewMsg <| View.view size.width em True
 
         DisplayError em _ ->
-            Element.map DisplayErrorMsg <| DisplayError.view em
+            E.map DisplayErrorMsg <| DisplayError.view em
 
         Wait innerState _ ->
-            Element.map (\_ -> Noop) (viewState size innerState)
+            E.map (\_ -> Noop) (viewState size innerState)
 
 
 stateLogin : State -> Maybe Data.LoginData
@@ -654,12 +654,14 @@ view model =
     , body =
         [ Html.div
             [ -- important to prevent ctrl-s on non-input item focus.
+              -- also has to be done in a div enclosing E.layout, rather than using
+              -- E.htmlAttribute to attach it directly.
               Html.Attributes.tabindex 0
 
             -- blocks on ctrl-s, lets others through.
             , onKeyDown
             ]
-            [ Element.layout [] <|
+            [ E.layout [] <|
                 viewState model.size model.state
             ]
         ]
