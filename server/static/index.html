@@ -32,7 +32,6 @@
           }
           var text = "";
           var activeEl = document.getElementById(id);
-          // console.log("acstive element: " + JSON.stringify(activeEl));
           var activeElTagName = activeEl ? activeEl.tagName.toLowerCase() : null;
           if (
             (activeElTagName == "textarea") || (activeElTagName == "input" &&
@@ -46,9 +45,12 @@
           // console.log("gst result: " + text);
           return text;
       }
-      function getSelectedText (id) {
+      function getSelectedText(id) {
         // console.log("getSelectedText" + JSON.stringify(id));
-        var text = getSelectionText(id);
+        var text = getRegularSelectionText(id);
+        if (text == "") {
+           text = getSelectionText(id);
+        }
         // console.log("selected 'text': " + JSON.stringify(text));
         app.ports.receiveSelectedText.send(text);
       }

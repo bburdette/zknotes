@@ -1,9 +1,7 @@
 module EditZkNote exposing
     ( Command(..)
     , Model
-    ,  Msg(..)
-       -- , addListNote
-
+    , Msg(..)
     , compareZklinks
     , dirty
     , gotId
@@ -559,8 +557,6 @@ zknview size model =
         [ E.width E.fill, E.spacing 8, E.padding 8 ]
         [ E.row [ E.width E.fill, E.spacing 8 ]
             [ E.row [ EF.bold ] [ E.text model.ld.name ]
-
-            -- , E.text "edit zk note"
             , if editable then
                 EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just DeletePress, label = E.text "delete" }
 
