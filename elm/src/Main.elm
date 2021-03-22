@@ -1452,10 +1452,6 @@ handleEditZkNoteCmd model login emod ecmd =
             ( { model | state = EView (View.initSzn szn []) (EditZkNote emod login) }, Cmd.none )
 
         EditZkNote.GetSelectedText ids ->
-            let
-                _ =
-                    Debug.log "idsbb" ids
-            in
             ( { model | state = EditZkNote emod login }
             , getSelectedText ids
             )
