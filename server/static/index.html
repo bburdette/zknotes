@@ -20,10 +20,8 @@
           } else if (document.selection && document.selection.type != "Control") {
               text = document.selection.createRange().text;
           }
-          // console.log("getselectiontext result: " + text);
           return text;
       }
-
       // because firefox has a bug we use this to get highlighted text from a textarea.
       // textarea id required.
       function getSelectionText(id) {
@@ -42,16 +40,19 @@
           } else if (window.getSelection) {
               text = window.getSelection().toString();
           }
-          // console.log("gst result: " + text);
           return text;
       }
-      function getSelectedText(id) {
-        // console.log("getSelectedText" + JSON.stringify(id));
-        var text = getRegularSelectionText(id);
+      function getSelectedText(ids) {
+        var text = getRegularSelectionText();
         if (text == "") {
-           text = getSelectionText(id);
-        }
-        // console.log("selected 'text': " + JSON.stringify(text));
+          for ( i in ids) {
+            var id = ids[i];
+            text = getSelectionText(id);
+            if (text != "") {
+              break;
+            }
+          }
+        };
         app.ports.receiveSelectedText.send(text);
       }
 

@@ -127,7 +127,7 @@ type Command
     | Delete Int
     | Switch Int
     | SaveSwitch Data.SaveZkNotePlusLinks Int
-    | GetSelectedText String
+    | GetSelectedText (List String)
     | Search S.ZkNoteSearch
 
 
@@ -585,10 +585,11 @@ zknview size model =
                 ]
         , EI.text
             (if editable then
-                []
+                [ E.htmlAttribute (Html.Attributes.id "title")
+                ]
 
              else
-                [ EF.color TC.darkGrey ]
+                [ EF.color TC.darkGrey, E.htmlAttribute (Html.Attributes.id "title") ]
             )
             { onChange =
                 if editable then
@@ -1031,7 +1032,7 @@ update msg model =
         -}
         NewPress ->
             ( model
-            , GetSelectedText "mdtext"
+            , GetSelectedText [ "title", "mdtext" ]
             )
 
         LinkPress zkln ->

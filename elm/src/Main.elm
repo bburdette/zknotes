@@ -1451,9 +1451,13 @@ handleEditZkNoteCmd model login emod ecmd =
         EditZkNote.View szn ->
             ( { model | state = EView (View.initSzn szn []) (EditZkNote emod login) }, Cmd.none )
 
-        EditZkNote.GetSelectedText id ->
+        EditZkNote.GetSelectedText ids ->
+            let
+                _ =
+                    Debug.log "idsbb" ids
+            in
             ( { model | state = EditZkNote emod login }
-            , getSelectedText (Just id)
+            , getSelectedText ids
             )
 
         EditZkNote.Search s ->
@@ -1550,7 +1554,7 @@ main =
         }
 
 
-port getSelectedText : Maybe String -> Cmd msg
+port getSelectedText : List String -> Cmd msg
 
 
 port receiveSelectedText : (JD.Value -> msg) -> Sub msg
