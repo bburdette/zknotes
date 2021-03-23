@@ -857,7 +857,7 @@ pub fn update_user(dbfile: &Path, user: &User) -> Result<(), Box<dyn Error>> {
     }
     _ => {
       conn.execute(
-        "update user set name = ?1, hashwd = ?2, salt = ?3, email = ?4, registration_key = ?5,
+        "update user set name = ?1, hashwd = ?2, salt = ?3, email = ?4, registration_key = ?5
            where id = ?6",
         params![
           user.name,
