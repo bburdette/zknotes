@@ -15,6 +15,7 @@ import SearchPanel as SP
 import TagSearchPanel as TSP
 import TangoColors as TC
 import Util
+import ZkCommon as ZC
 
 
 type Msg
@@ -114,31 +115,22 @@ listview ld size model =
                   , view =
                         \n ->
                             E.row
-                                [ E.clipX
-                                , E.centerY
-                                , E.height E.fill
+                                [ E.centerY
+
+                                -- , E.clipX
                                 , E.width E.fill
                                 ]
-                                [ E.text n.title
-                                ]
-                  }
-                , { header = E.none
-                  , width = E.shrink
-                  , view =
-                        \n ->
-                            E.row [ E.spacing 8 ]
                                 [ if n.user == ld.userid then
-                                    EI.button
-                                        Common.buttonStyle
-                                        { onPress = Just (SelectPress n.id), label = E.text "edit" }
+                                    E.link ZC.myLinkStyle
+                                        { url = Data.editNoteLink n.id
+                                        , label = E.text n.title
+                                        }
 
                                   else
-                                    EI.button
-                                        (Common.buttonStyle
-                                            ++ [ EBk.color TC.lightBlue
-                                               ]
-                                        )
-                                        { onPress = Just (SelectPress n.id), label = E.text "show" }
+                                    E.link ZC.otherLinkStyle
+                                        { url = Data.editNoteLink n.id
+                                        , label = E.text n.title
+                                        }
                                 ]
                   }
                 ]

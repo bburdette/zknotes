@@ -50,6 +50,7 @@ import Url as U
 import Url.Builder as UB
 import Url.Parser as UP exposing ((</>))
 import Util
+import ZkCommon as ZC
 
 
 type Msg
@@ -65,7 +66,8 @@ type Msg
     | NewPress
     | CopyPress
     | SwitchPress Int
-    | LinkPress Data.ZkListNote
+    | ToLinkPress Data.ZkListNote
+    | FromLinkPress Data.ZkListNote
     | PublicPress Bool
     | RemoveLink EditLink
     | MdLink EditLink
@@ -235,59 +237,65 @@ dirty model =
         |> Maybe.withDefault True
 
 
-showZkl : List (E.Attribute Msg) -> Bool -> Int -> Maybe Int -> EditLink -> Element Msg
-showZkl dirtybutton editable user id zkl =
+showZkl : Bool -> Bool -> Int -> Maybe Int -> EditLink -> Element Msg
+showZkl isDirty editable user id zkl =
     let
         ( dir, otherid ) =
             case zkl.direction of
                 To ->
-                    ( E.text "->", Just zkl.otherid )
+                    ( E.text "→", Just zkl.otherid )
 
                 From ->
-                    ( E.text "<-", Just zkl.otherid )
+                    ( E.text "←", Just zkl.otherid )
     in
     E.row [ E.spacing 8, E.width E.fill ]
-        [ dir
-        , zkl.othername
-            |> Maybe.withDefault ""
-            |> (\s ->
-                    E.row
-                        [ E.clipX
-                        , E.centerY
-                        , E.height E.fill
-                        , E.width E.fill
-                        ]
-                        [ E.text s
-                        ]
-               )
-        , case otherid of
-            Just zknoteid ->
-                EI.button (dirtybutton ++ [ E.alignRight ]) { onPress = Just (SwitchPress zknoteid), label = E.text "↗" }
-
-            Nothing ->
-                E.none
-        , if editable then
-            EI.button (Common.buttonStyle ++ [ E.alignRight ])
-                { onPress = Just (MdLink zkl)
-                , label = E.text "^"
-                }
-
-          else
-            EI.button (Common.disabledButtonStyle ++ [ E.alignRight ])
-                { onPress = Nothing
-                , label = E.text "^"
-                }
-        , if user == zkl.user then
-            EI.button (Common.buttonStyle ++ [ E.alignRight ])
+        [ if user == zkl.user then
+            EI.button (Common.buttonStyle ++ [ E.alignLeft ])
                 { onPress = Just (RemoveLink zkl)
                 , label = E.text "X"
                 }
 
           else
-            EI.button (Common.buttonStyle ++ [ E.alignRight, EBk.color TC.darkGray ])
+            EI.button (Common.buttonStyle ++ [ E.alignLeft, EBk.color TC.darkGray ])
                 { onPress = Nothing
                 , label = E.text "X"
                 }
+        , if editable then
+            EI.button (Common.buttonStyle ++ [ E.alignLeft ])
+                { onPress = Just (MdLink zkl)
+                , label = E.text "^"
+                }
+
+          else
+            EI.button (Common.disabledButtonStyle ++ [ E.alignLeft ])
+                { onPress = Nothing
+                , label = E.text "^"
+                }
+        , dir
+        , zkl.othername
+            |> Maybe.withDefault ""
+            |> (\s ->
+                    -- E.row
+                    --     [ E.clipX
+                    --     , E.centerY
+                    --     , E.height E.fill
+                    --     , E.width E.fill
+                    --     ]
+                    --     [ E.text s
+                    --     ]
+                    E.link
+                        ((if isDirty then
+                            ZC.saveLinkStyle
+
+                          else
+                            ZC.myLinkStyle
+                         )
+                            ++ [ E.clipX, E.width E.fill, E.height E.fill, E.centerY ]
+                        )
+                        { url = Data.editNoteLink zkl.otherid
+                        , label = E.row [ E.clipX, E.width E.fill, E.height E.shrink ] [ E.text s ]
+                        }
+               )
         ]
 
 
@@ -302,7 +310,7 @@ pageLink model =
                             UB.absolute [ "page", pubid ] []
                         )
                     |> Util.mapNothing
-                        (UB.absolute [ "note", String.fromInt id ] [])
+                        (UB.absolute [ "editnote", String.fromInt id ] [])
             )
 
 
@@ -314,6 +322,19 @@ view size model =
 
         Nothing ->
             zknview size model
+
+
+forsuredirtybutton =
+    Common.buttonStyle ++ [ EBk.color TC.darkYellow ]
+
+
+mkButtonStyle : Bool -> List (E.Attribute msg)
+mkButtonStyle isdirty =
+    if isdirty then
+        forsuredirtybutton
+
+    else
+        Common.buttonStyle
 
 
 zknview : Util.Size -> Model -> Element Msg
@@ -332,16 +353,8 @@ zknview size model =
         isdirty =
             dirty model
 
-        dirtybutton =
-            mkdirtystyle Common.buttonStyle
-
-        mkdirtystyle =
-            \style ->
-                if isdirty then
-                    style ++ [ EBk.color TC.darkYellow ]
-
-                else
-                    style
+        perhapsdirtybutton =
+            mkButtonStyle isdirty
 
         editable =
             model.editable
@@ -349,7 +362,7 @@ zknview size model =
         showLinks =
             E.row [ EF.bold ] [ E.text "links" ]
                 :: List.map
-                    (showZkl dirtybutton editable model.ld.userid model.id)
+                    (showZkl isdirty editable model.ld.userid model.id)
                     (Dict.values model.zklDict)
 
         mdedit =
@@ -453,6 +466,9 @@ zknview size model =
         parabuttonstyle =
             Common.buttonStyle ++ [ E.paddingXY 10 0 ]
 
+        perhapsdirtyparabuttonstyle =
+            perhapsdirtybutton ++ [ E.paddingXY 10 0 ]
+
         searchPanel =
             let
                 spwidth =
@@ -495,43 +511,91 @@ zknview size model =
                                         |> Maybe.map
                                             (\_ ->
                                                 EI.button Common.buttonStyle
-                                                    { onPress = Just <| LinkPress zkln
-                                                    , label = E.text "link"
+                                                    { onPress = Just <| ToLinkPress zkln
+                                                    , label = E.text "→"
                                                     }
                                             )
                                         |> Maybe.withDefault
                                             (EI.button
                                                 Common.disabledButtonStyle
                                                 { onPress = Nothing
-                                                , label = E.text "link"
+                                                , label = E.text "→"
                                                 }
                                             )
-                                    , EI.button
-                                        (case ( isdirty, lnnonme ) of
-                                            ( True, True ) ->
-                                                dirtybutton
+                                    , (case
+                                        Dict.get (zklKey { direction = From, otherid = zkln.id })
+                                            model.zklDict
+                                       of
+                                        Just _ ->
+                                            Nothing
 
-                                            ( False, True ) ->
-                                                Common.buttonStyle ++ [ EBk.color TC.lightBlue ]
+                                        Nothing ->
+                                            Just 1
+                                      )
+                                        |> Maybe.map
+                                            (\_ ->
+                                                EI.button Common.buttonStyle
+                                                    { onPress = Just <| FromLinkPress zkln
+                                                    , label = E.text "←"
+                                                    }
+                                            )
+                                        |> Maybe.withDefault
+                                            (EI.button
+                                                Common.disabledButtonStyle
+                                                { onPress = Nothing
+                                                , label = E.text "←"
+                                                }
+                                            )
 
-                                            _ ->
-                                                dirtybutton
-                                        )
-                                        { onPress =
-                                            Just (SwitchPress zkln.id)
-                                        , label =
-                                            if lnnonme then
-                                                E.text "show"
+                                    {- , EI.button
+                                       (case ( isdirty, lnnonme ) of
+                                           ( True, True ) ->
+                                               dirtybutton
 
-                                            else
-                                                E.text "edit"
-                                        }
+                                           ( False, True ) ->
+                                               Common.buttonStyle ++ [ EBk.color TC.lightBlue ]
+
+                                           _ ->
+                                               dirtybutton
+                                       )
+                                       { onPress =
+                                           Just (SwitchPress zkln.id)
+                                       , label =
+                                           if lnnonme then
+                                               E.text "show"
+
+                                           else
+                                               E.text "edit"
+                                       }
+                                    -}
                                     , E.row
                                         [ E.clipX
                                         , E.height E.fill
                                         , E.width E.fill
                                         ]
-                                        [ E.text zkln.title
+                                        [ if lnnonme then
+                                            E.link
+                                                (if isdirty then
+                                                    ZC.saveLinkStyle
+
+                                                 else
+                                                    ZC.otherLinkStyle
+                                                )
+                                                { url = Data.editNoteLink zkln.id
+                                                , label = E.text zkln.title
+                                                }
+
+                                          else
+                                            E.link
+                                                (if isdirty then
+                                                    ZC.saveLinkStyle
+
+                                                 else
+                                                    ZC.myLinkStyle
+                                                )
+                                                { url = Data.editNoteLink zkln.id
+                                                , label = E.text zkln.title
+                                                }
                                         ]
                                     ]
                             )
@@ -568,7 +632,7 @@ zknview size model =
           <|
             List.intersperse (E.text " ")
                 [ EI.button
-                    (mkdirtystyle parabuttonstyle)
+                    perhapsdirtyparabuttonstyle
                     { onPress = Just DonePress, label = E.text "done" }
                 , EI.button parabuttonstyle { onPress = Just RevertPress, label = E.text "cancel" }
                 , EI.button parabuttonstyle { onPress = Just ViewPress, label = E.text "view" }
@@ -577,11 +641,11 @@ zknview size model =
                 -- , EI.button parabuttonstyle { onPress = Just LinksPress, label = E.text"links" }
                 , case isdirty of
                     True ->
-                        EI.button (mkdirtystyle parabuttonstyle) { onPress = Just SavePress, label = E.text "save" }
+                        EI.button perhapsdirtyparabuttonstyle { onPress = Just SavePress, label = E.text "save" }
 
                     False ->
                         E.none
-                , EI.button (mkdirtystyle parabuttonstyle) { onPress = Just NewPress, label = E.text "new" }
+                , EI.button perhapsdirtyparabuttonstyle { onPress = Just NewPress, label = E.text "new" }
                 ]
         , EI.text
             (if editable then
@@ -1035,10 +1099,27 @@ update msg model =
             , GetSelectedText [ "title", "mdtext" ]
             )
 
-        LinkPress zkln ->
+        ToLinkPress zkln ->
             let
                 nzkl =
                     { direction = To
+                    , otherid = zkln.id
+                    , user = model.ld.userid
+                    , zknote = Nothing
+                    , othername = Just zkln.title
+                    , delete = Nothing
+                    }
+            in
+            ( { model
+                | zklDict = Dict.insert (zklKey nzkl) nzkl model.zklDict
+              }
+            , None
+            )
+
+        FromLinkPress zkln ->
+            let
+                nzkl =
+                    { direction = From
                     , otherid = zkln.id
                     , user = model.ld.userid
                     , zknote = Nothing
