@@ -255,17 +255,12 @@ showZkl isDirty editable user id zkl =
             Common.disabledButtonStyle ++ [ E.paddingXY 2 2, E.centerY ]
     in
     E.row [ E.spacing 8, E.width E.fill ]
-        [ if user == zkl.user then
-            EI.button (linkButtonStyle ++ [ E.alignLeft ])
-                { onPress = Just (RemoveLink zkl)
-                , label = E.text "X"
-                }
+        [ case otherid of
+            Just zknoteid ->
+                EI.button (mkButtonStyle linkButtonStyle isDirty ++ [ E.alignRight ]) { onPress = Just (SwitchPress zknoteid), label = E.text "↗" }
 
-          else
-            EI.button (linkButtonStyle ++ [ E.alignLeft, EBk.color TC.darkGray ])
-                { onPress = Nothing
-                , label = E.text "X"
-                }
+            Nothing ->
+                E.none
         , if editable then
             EI.button (linkButtonStyle ++ [ E.alignLeft ])
                 { onPress = Just (MdLink zkl)
@@ -277,10 +272,26 @@ showZkl isDirty editable user id zkl =
                 { onPress = Nothing
                 , label = E.text "^"
                 }
+        , if user == zkl.user then
+            EI.button (linkButtonStyle ++ [ E.alignLeft ])
+                { onPress = Just (RemoveLink zkl)
+                , label = E.text "X"
+                }
+
+          else
+            EI.button (linkButtonStyle ++ [ E.alignLeft, EBk.color TC.darkGray ])
+                { onPress = Nothing
+                , label = E.text "X"
+                }
         , dir
         , zkl.othername
             |> Maybe.withDefault ""
             |> (\s ->
+                    -- TODO: focus link.  touch text, get buttons.
+                    -- maybe keep 'open' button tho.  Make it a link?
+                    -- larger buttons too.
+                    --
+                    -- do the same thing in search results!
                     E.row
                         [ E.clipX
                         , E.centerY
@@ -301,12 +312,6 @@ showZkl isDirty editable user id zkl =
                 -- , label = E.row [ E.clipX, E.width E.fill, E.height E.shrink ] [ E.text s ]
                 -- }
                )
-        , case otherid of
-            Just zknoteid ->
-                EI.button (mkButtonStyle linkButtonStyle isDirty ++ [ E.alignRight ]) { onPress = Just (SwitchPress zknoteid), label = E.text "↗" }
-
-            Nothing ->
-                E.none
         ]
 
 

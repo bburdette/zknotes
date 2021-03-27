@@ -104,30 +104,40 @@ listview ld size model =
             , EI.button Common.buttonStyle { onPress = Just PowerDeletePress, label = E.text "delete..." }
             ]
         , E.map SPMsg <| SP.view False (size.width < maxwidth) 0 model.spmodel
-        , E.table [ E.spacing 10, E.width E.fill, E.centerX ]
+        , E.table [ E.spacing 5, E.width E.fill, E.centerX ]
             { data = model.notes.notes
             , columns =
                 [ { header = E.none
                   , width =
                         -- E.fill
                         -- clipX doesn't work unless max width is here in px, it seems.
-                        E.px <| min maxwidth size.width - titlemaxconst
+                        -- E.px <| min maxwidth size.width - titlemaxconst
+                        E.px <| min maxwidth size.width - 16
                   , view =
                         \n ->
                             E.row
                                 [ E.centerY
-
-                                -- , E.clipX
+                                , E.clipX
                                 , E.width E.fill
                                 ]
                                 [ if n.user == ld.userid then
-                                    E.link ZC.myLinkStyle
+                                    E.link
+                                        ((E.height <|
+                                            E.px 25
+                                         )
+                                            :: ZC.myLinkStyle
+                                        )
                                         { url = Data.editNoteLink n.id
                                         , label = E.text n.title
                                         }
 
                                   else
-                                    E.link ZC.otherLinkStyle
+                                    E.link
+                                        ((E.height <|
+                                            E.px 25
+                                         )
+                                            :: ZC.otherLinkStyle
+                                        )
                                         { url = Data.editNoteLink n.id
                                         , label = E.text n.title
                                         }
