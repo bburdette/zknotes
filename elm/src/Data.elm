@@ -3,7 +3,14 @@ module Data exposing (..)
 import Json.Decode as JD
 import Json.Encode as JE
 import Search as S
+import Url.Builder as UB
 import Util exposing (andMap)
+
+
+
+----------------------------------------
+-- types sent to or from the server.
+----------------------------------------
 
 
 type alias Registration =
@@ -136,6 +143,12 @@ type alias ZkNoteEdit =
     { zknote : ZkNote
     , links : List ZkLink
     }
+
+
+
+----------------------------------------
+-- Json encoders/decoders
+----------------------------------------
 
 
 encodeRegistration : Registration -> JE.Value
@@ -338,3 +351,14 @@ encodeImportZkNote izn =
         , ( "fromLinks", JE.list JE.string izn.fromLinks )
         , ( "toLinks", JE.list JE.string izn.toLinks )
         ]
+
+
+
+----------------------------------------
+-- misc functions
+----------------------------------------
+
+
+editNoteLink : Int -> String
+editNoteLink noteid =
+    UB.absolute [ "editnote", String.fromInt noteid ] []

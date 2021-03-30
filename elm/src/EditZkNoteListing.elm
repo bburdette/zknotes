@@ -15,6 +15,7 @@ import SearchPanel as SP
 import TagSearchPanel as TSP
 import TangoColors as TC
 import Util
+import ZkCommon as ZC
 
 
 type Msg
@@ -103,42 +104,43 @@ listview ld size model =
             , EI.button Common.buttonStyle { onPress = Just PowerDeletePress, label = E.text "delete..." }
             ]
         , E.map SPMsg <| SP.view False (size.width < maxwidth) 0 model.spmodel
-        , E.table [ E.spacing 10, E.width E.fill, E.centerX ]
+        , E.table [ E.spacing 5, E.width E.fill, E.centerX ]
             { data = model.notes.notes
             , columns =
                 [ { header = E.none
                   , width =
                         -- E.fill
                         -- clipX doesn't work unless max width is here in px, it seems.
-                        E.px <| min maxwidth size.width - titlemaxconst
+                        -- E.px <| min maxwidth size.width - titlemaxconst
+                        E.px <| min maxwidth size.width - 16
                   , view =
                         \n ->
                             E.row
-                                [ E.clipX
-                                , E.centerY
-                                , E.height E.fill
+                                [ E.centerY
+                                , E.clipX
                                 , E.width E.fill
                                 ]
-                                [ E.text n.title
-                                ]
-                  }
-                , { header = E.none
-                  , width = E.shrink
-                  , view =
-                        \n ->
-                            E.row [ E.spacing 8 ]
                                 [ if n.user == ld.userid then
-                                    EI.button
-                                        Common.buttonStyle
-                                        { onPress = Just (SelectPress n.id), label = E.text "edit" }
+                                    E.link
+                                        ((E.height <|
+                                            E.px 25
+                                         )
+                                            :: ZC.myLinkStyle
+                                        )
+                                        { url = Data.editNoteLink n.id
+                                        , label = E.text n.title
+                                        }
 
                                   else
-                                    EI.button
-                                        (Common.buttonStyle
-                                            ++ [ EBk.color TC.lightBlue
-                                               ]
+                                    E.link
+                                        ((E.height <|
+                                            E.px 25
+                                         )
+                                            :: ZC.otherLinkStyle
                                         )
-                                        { onPress = Just (SelectPress n.id), label = E.text "show" }
+                                        { url = Data.editNoteLink n.id
+                                        , label = E.text n.title
+                                        }
                                 ]
                   }
                 ]
