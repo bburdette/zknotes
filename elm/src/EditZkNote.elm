@@ -381,9 +381,6 @@ disabledLinkButtonStyle =
 showSr : Model -> Bool -> Data.ZkListNote -> Element Msg
 showSr model isdirty zkln =
     let
-        _ =
-            Debug.log "shotSr: " zkln
-
         lnnonme =
             zkln.user /= model.ld.userid
 
