@@ -715,8 +715,24 @@ urlupdate msg model =
                             parseUrl url
                                 |> Maybe.andThen (routeState model)
                                 |> Maybe.withDefault ( model.state, Cmd.none )
+
+                        bcmd =
+                            case model.state of
+                                EditZkNote s ld ->
+                                    if EditZkNote.dirty s then
+                                        Cmd.batch
+                                            [ icmd
+                                            , sendUIMsg model.location
+                                                (UI.SaveZkNotePlusLinks <| EditZkNote.fullSave s)
+                                            ]
+
+                                    else
+                                        icmd
+
+                                _ ->
+                                    icmd
                     in
-                    ( { model | state = state }, icmd )
+                    ( { model | state = state }, bcmd )
 
                 LoadUrl urlstr ->
                     -- load foreign site

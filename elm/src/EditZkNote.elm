@@ -4,6 +4,7 @@ module EditZkNote exposing
     , Msg(..)
     , compareZklinks
     , dirty
+    , fullSave
     , gotId
     , gotSelectedText
     , initFull
@@ -302,12 +303,17 @@ showZkl isDirty editable focusLink user id zkl =
         E.column [ E.spacing 8, E.width E.fill ]
             [ E.row [ E.spacing 8, E.width E.fill ] display
             , E.row [ E.spacing 8 ]
-                [ case otherid of
-                    Just zknoteid ->
-                        EI.button (mkButtonStyle linkButtonStyle isDirty ++ [ E.alignRight ]) { onPress = Just (SwitchPress zknoteid), label = E.text "↗" }
+                [ if user == zkl.user then
+                    EI.button (linkButtonStyle ++ [ E.alignLeft ])
+                        { onPress = Just (RemoveLink zkl)
+                        , label = E.text "X"
+                        }
 
-                    Nothing ->
-                        E.none
+                  else
+                    EI.button (linkButtonStyle ++ [ E.alignLeft, EBk.color TC.darkGray ])
+                        { onPress = Nothing
+                        , label = E.text "X"
+                        }
                 , if editable then
                     EI.button (linkButtonStyle ++ [ E.alignLeft ])
                         { onPress = Just (MdLink zkl)
@@ -319,17 +325,22 @@ showZkl isDirty editable focusLink user id zkl =
                         { onPress = Nothing
                         , label = E.text "^"
                         }
-                , if user == zkl.user then
-                    EI.button (linkButtonStyle ++ [ E.alignLeft ])
-                        { onPress = Just (RemoveLink zkl)
-                        , label = E.text "X"
-                        }
+                , case otherid of
+                    Just zknoteid ->
+                        -- EI.button (mkButtonStyle linkButtonStyle isDirty ++ [ E.alignRight ]) { onPress = Just (SwitchPress zknoteid), label = E.text "↗" }
+                        E.link
+                            (if isDirty then
+                                ZC.saveLinkStyle
 
-                  else
-                    EI.button (linkButtonStyle ++ [ E.alignLeft, EBk.color TC.darkGray ])
-                        { onPress = Nothing
-                        , label = E.text "X"
-                        }
+                             else
+                                ZC.myLinkStyle
+                            )
+                            { url = Data.editNoteLink zknoteid
+                            , label = E.text "link"
+                            }
+
+                    Nothing ->
+                        E.none
                 ]
             ]
 
