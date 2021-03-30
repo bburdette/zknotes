@@ -272,11 +272,6 @@ showZkl isDirty editable focusLink user id zkl =
             , zkl.othername
                 |> Maybe.withDefault ""
                 |> (\s ->
-                        -- TODO: focus link.  touch text, get buttons.
-                        -- maybe keep 'open' button tho.  Make it a link?
-                        -- larger buttons too.
-                        --
-                        -- do the same thing in search results!
                         E.el
                             [ E.clipX
                             , E.centerY
@@ -285,17 +280,6 @@ showZkl isDirty editable focusLink user id zkl =
                             , EE.onClick (LinkFocusPress zkl)
                             ]
                             (E.text s)
-                    -- E.link
-                    -- ((if isDirty then
-                    --     ZC.saveLinkStyle
-                    --   else
-                    --     ZC.myLinkStyle
-                    --  )
-                    --     ++ [ E.clipX, E.width E.fill, E.height E.fill, E.centerY ]
-                    -- )
-                    -- { url = Data.editNoteLink zkl.otherid
-                    -- , label = E.row [ E.clipX, E.width E.fill, E.height E.shrink ] [ E.text s ]
-                    -- }
                    )
             ]
     in
@@ -327,7 +311,6 @@ showZkl isDirty editable focusLink user id zkl =
                         }
                 , case otherid of
                     Just zknoteid ->
-                        -- EI.button (mkButtonStyle linkButtonStyle isDirty ++ [ E.alignRight ]) { onPress = Just (SwitchPress zknoteid), label = E.text "↗" }
                         E.link
                             (if isDirty then
                                 ZC.saveLinkStyle
