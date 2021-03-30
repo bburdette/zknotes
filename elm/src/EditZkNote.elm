@@ -77,6 +77,7 @@ type Msg
     | DialogMsg D.Msg
     | RestoreSearch String
     | SrFocusPress Int
+    | LinkFocusPress EditLink
     | Noop
 
 
@@ -110,6 +111,7 @@ type alias Model =
     , zknSearchResult : Data.ZkNoteSearchResult
     , focusSr : Maybe Int -- note id in search result.
     , zklDict : Dict String EditLink
+    , focusLink : Maybe EditLink
     , editable : Bool
     , pubidtxt : String
     , title : String
@@ -240,8 +242,8 @@ dirty model =
         |> Maybe.withDefault True
 
 
-showZkl : Bool -> Bool -> Int -> Maybe Int -> EditLink -> Element Msg
-showZkl isDirty editable user id zkl =
+showZkl : Bool -> Bool -> Maybe EditLink -> Int -> Maybe Int -> EditLink -> Element Msg
+showZkl isDirty editable focusLink user id zkl =
     let
         ( dir, otherid ) =
             case zkl.direction of
@@ -250,66 +252,89 @@ showZkl isDirty editable user id zkl =
 
                 From ->
                     ( E.text "←", Just zkl.otherid )
+
+        focus =
+            focusLink
+                |> Maybe.map
+                    (\l ->
+                        zkl.direction
+                            == l.direction
+                            && zkl.otherid
+                            == l.otherid
+                            && zkl.user
+                            == l.user
+                    )
+                |> Maybe.withDefault False
+
+        display =
+            [ dir
+            , zkl.othername
+                |> Maybe.withDefault ""
+                |> (\s ->
+                        -- TODO: focus link.  touch text, get buttons.
+                        -- maybe keep 'open' button tho.  Make it a link?
+                        -- larger buttons too.
+                        --
+                        -- do the same thing in search results!
+                        E.el
+                            [ E.clipX
+                            , E.centerY
+                            , E.height E.fill
+                            , E.width E.fill
+                            , EE.onClick (LinkFocusPress zkl)
+                            ]
+                            (E.text s)
+                    -- E.link
+                    -- ((if isDirty then
+                    --     ZC.saveLinkStyle
+                    --   else
+                    --     ZC.myLinkStyle
+                    --  )
+                    --     ++ [ E.clipX, E.width E.fill, E.height E.fill, E.centerY ]
+                    -- )
+                    -- { url = Data.editNoteLink zkl.otherid
+                    -- , label = E.row [ E.clipX, E.width E.fill, E.height E.shrink ] [ E.text s ]
+                    -- }
+                   )
+            ]
     in
-    E.row [ E.spacing 8, E.width E.fill ]
-        [ case otherid of
-            Just zknoteid ->
-                EI.button (mkButtonStyle linkButtonStyle isDirty ++ [ E.alignRight ]) { onPress = Just (SwitchPress zknoteid), label = E.text "↗" }
+    if focus then
+        E.column [ E.spacing 8, E.width E.fill ]
+            [ E.row [ E.spacing 8, E.width E.fill ] display
+            , E.row [ E.spacing 8 ]
+                [ case otherid of
+                    Just zknoteid ->
+                        EI.button (mkButtonStyle linkButtonStyle isDirty ++ [ E.alignRight ]) { onPress = Just (SwitchPress zknoteid), label = E.text "↗" }
 
-            Nothing ->
-                E.none
-        , if editable then
-            EI.button (linkButtonStyle ++ [ E.alignLeft ])
-                { onPress = Just (MdLink zkl)
-                , label = E.text "^"
-                }
+                    Nothing ->
+                        E.none
+                , if editable then
+                    EI.button (linkButtonStyle ++ [ E.alignLeft ])
+                        { onPress = Just (MdLink zkl)
+                        , label = E.text "^"
+                        }
 
-          else
-            EI.button (disabledLinkButtonStyle ++ [ E.alignLeft ])
-                { onPress = Nothing
-                , label = E.text "^"
-                }
-        , if user == zkl.user then
-            EI.button (linkButtonStyle ++ [ E.alignLeft ])
-                { onPress = Just (RemoveLink zkl)
-                , label = E.text "X"
-                }
+                  else
+                    EI.button (disabledLinkButtonStyle ++ [ E.alignLeft ])
+                        { onPress = Nothing
+                        , label = E.text "^"
+                        }
+                , if user == zkl.user then
+                    EI.button (linkButtonStyle ++ [ E.alignLeft ])
+                        { onPress = Just (RemoveLink zkl)
+                        , label = E.text "X"
+                        }
 
-          else
-            EI.button (linkButtonStyle ++ [ E.alignLeft, EBk.color TC.darkGray ])
-                { onPress = Nothing
-                , label = E.text "X"
-                }
-        , dir
-        , zkl.othername
-            |> Maybe.withDefault ""
-            |> (\s ->
-                    -- TODO: focus link.  touch text, get buttons.
-                    -- maybe keep 'open' button tho.  Make it a link?
-                    -- larger buttons too.
-                    --
-                    -- do the same thing in search results!
-                    E.row
-                        [ E.clipX
-                        , E.centerY
-                        , E.height E.fill
-                        , E.width E.fill
-                        ]
-                        [ E.text s
-                        ]
-                -- E.link
-                -- ((if isDirty then
-                --     ZC.saveLinkStyle
-                --   else
-                --     ZC.myLinkStyle
-                --  )
-                --     ++ [ E.clipX, E.width E.fill, E.height E.fill, E.centerY ]
-                -- )
-                -- { url = Data.editNoteLink zkl.otherid
-                -- , label = E.row [ E.clipX, E.width E.fill, E.height E.shrink ] [ E.text s ]
-                -- }
-               )
-        ]
+                  else
+                    EI.button (linkButtonStyle ++ [ E.alignLeft, EBk.color TC.darkGray ])
+                        { onPress = Nothing
+                        , label = E.text "X"
+                        }
+                ]
+            ]
+
+    else
+        E.row [ E.spacing 8, E.width E.fill ] display
 
 
 pageLink : Model -> Maybe String
@@ -485,7 +510,7 @@ zknview size model =
         showLinks =
             E.row [ EF.bold ] [ E.text "links" ]
                 :: List.map
-                    (showZkl isdirty editable model.ld.userid model.id)
+                    (showZkl isdirty editable model.focusLink model.ld.userid model.id)
                     (Dict.values model.zklDict)
 
         mdedit =
@@ -865,6 +890,7 @@ initFull ld zkl zknote zklDict spm =
                 (\zl -> ( zklKey zl, zl ))
                 links
             )
+    , focusLink = Nothing
     , pubidtxt = zknote.pubid |> Maybe.withDefault ""
     , title = zknote.title
     , md = zknote.content
@@ -897,6 +923,7 @@ initNew ld zkl spm =
     , focusSr = Nothing
     , zklDict = Dict.empty
     , initialZklDict = Dict.empty
+    , focusLink = Nothing
     , pubidtxt = ""
     , title = ""
     , editable = True
@@ -1343,6 +1370,18 @@ update msg model =
 
                     else
                         Just id
+              }
+            , None
+            )
+
+        LinkFocusPress link ->
+            ( { model
+                | focusLink =
+                    if model.focusLink == Just link then
+                        Nothing
+
+                    else
+                        Just link
               }
             , None
             )
