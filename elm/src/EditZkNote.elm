@@ -47,6 +47,7 @@ import Markdown.Renderer
 import Schelme.Show exposing (showTerm)
 import Search as S
 import SearchPanel as SP
+import TagSearchPanel as TSP
 import TangoColors as TC
 import Url as U
 import Url.Builder as UB
@@ -79,6 +80,8 @@ type Msg
     | RestoreSearch String
     | SrFocusPress Int
     | LinkFocusPress EditLink
+    | AddToSearch String
+    | AddToSearchAsTag String
     | Noop
 
 
@@ -319,7 +322,7 @@ showZkl isDirty editable focusLink user id zkl =
                                 ZC.myLinkStyle
                             )
                             { url = Data.editNoteLink zknoteid
-                            , label = E.text "link"
+                            , label = E.text "go"
                             }
 
                     Nothing ->
@@ -434,6 +437,14 @@ showSr model isdirty zkln =
                             , label = E.el [ E.centerY ] <| E.text "←"
                             }
                         )
+                , EI.button linkButtonStyle
+                    { onPress = Just (AddToSearch zkln.title)
+                    , label = E.text "^"
+                    }
+                , EI.button linkButtonStyle
+                    { onPress = Just (AddToSearchAsTag zkln.title)
+                    , label = E.text "t"
+                    }
                 , if lnnonme then
                     E.link
                         (if isdirty then
@@ -455,7 +466,7 @@ showSr model isdirty zkln =
                             ZC.myLinkStyle
                         )
                         { url = Data.editNoteLink zkln.id
-                        , label = E.text "link"
+                        , label = E.text "go"
                         }
                 ]
 
@@ -1373,6 +1384,38 @@ update msg model =
 
                     else
                         Just link
+              }
+            , None
+            )
+
+        AddToSearch title ->
+            let
+                spmod =
+                    model.spmodel
+            in
+            ( { model
+                | spmodel =
+                    { spmod
+                        | tagSearchModel =
+                            TSP.addToSearchPanel spmod.tagSearchModel [ S.ExactMatch ] title
+                    }
+              }
+            , None
+            )
+
+        AddToSearchAsTag title ->
+            let
+                spmod =
+                    model.spmodel
+            in
+            ( { model
+                | spmodel =
+                    { spmod
+                        | tagSearchModel =
+                            TSP.addToSearchPanel spmod.tagSearchModel
+                                [ S.ExactMatch, S.Tag ]
+                                title
+                    }
               }
             , None
             )

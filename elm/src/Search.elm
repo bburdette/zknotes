@@ -32,19 +32,6 @@ type alias ZkNoteSearch =
     }
 
 
-defaultSearchLimit : Int
-defaultSearchLimit =
-    25
-
-
-defaultSearch : ZkNoteSearch
-defaultSearch =
-    { tagSearch = SearchTerm [] ""
-    , offset = 0
-    , limit = Just defaultSearchLimit
-    }
-
-
 type SearchMod
     = ExactMatch
     | Tag
@@ -66,6 +53,19 @@ type AndOr
 type TSText
     = Text String
     | Search TagSearch
+
+
+defaultSearchLimit : Int
+defaultSearchLimit =
+    25
+
+
+defaultSearch : ZkNoteSearch
+defaultSearch =
+    { tagSearch = SearchTerm [] ""
+    , offset = 0
+    , limit = Just defaultSearchLimit
+    }
 
 
 encodeSearchMod : SearchMod -> JE.Value

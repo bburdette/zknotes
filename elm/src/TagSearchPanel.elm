@@ -1,4 +1,4 @@
-module TagSearchPanel exposing (Command(..), Model, Msg(..), Search(..), addTagToSearch, addTagToSearchPrev, addToSearch, getSearch, initModel, selectPrevSearch, toggleHelpButton, update, updateSearchText, view)
+module TagSearchPanel exposing (Command(..), Model, Msg(..), Search(..), addTagToSearchPrev, addToSearch, addToSearchPanel, getSearch, initModel, selectPrevSearch, toggleHelpButton, update, updateSearchText, view)
 
 import Common exposing (buttonStyle)
 import Element exposing (..)
@@ -74,15 +74,12 @@ getSearch model =
             Nothing
 
 
-
-addToSearch : String -> Search -> Search
-addToSearch name search =
+addToSearch : List SearchMod -> String -> Search -> Search
+addToSearch searchmods name search =
     let
         term =
             SearchTerm
-                [ ExactMatch
-                , Tag
-                ]
+                searchmods
                 name
     in
     case search of
@@ -96,11 +93,11 @@ addToSearch name search =
             TagSearch (Ok (Boolex s And term))
 
 
-addTagToSearch : Model -> String -> Model
-addTagToSearch model name =
+addToSearchPanel : Model -> List SearchMod -> String -> Model
+addToSearchPanel model searchmods name =
     let
         s =
-            addToSearch name model.search
+            addToSearch searchmods name model.search
     in
     case s of
         TagSearch (Ok ts) ->
