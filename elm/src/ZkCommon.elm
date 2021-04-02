@@ -8,6 +8,14 @@ import Element.Input as EI
 import TangoColors as TC
 
 
+myLinkStylePlain =
+    [ EF.color TC.darkBlue ]
+
+
+otherLinkStylePlain =
+    [ EF.color TC.lightBlue ]
+
+
 myLinkStyle =
     [ EF.color TC.black, EF.underline ]
 

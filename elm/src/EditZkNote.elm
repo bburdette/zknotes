@@ -373,11 +373,11 @@ mkButtonStyle style isdirty =
 
 
 linkButtonStyle =
-    Common.buttonStyle ++ [ E.paddingXY 2 2, E.centerY ]
+    Common.buttonStyle
 
 
 disabledLinkButtonStyle =
-    Common.disabledButtonStyle ++ [ E.paddingXY 2 2, E.centerY ]
+    Common.disabledButtonStyle
 
 
 showSr : Model -> Bool -> Data.ZkListNote -> Element Msg

@@ -125,7 +125,7 @@ listview ld size model =
                                         ((E.height <|
                                             E.px 25
                                          )
-                                            :: ZC.myLinkStyle
+                                            :: ZC.myLinkStylePlain
                                         )
                                         { url = Data.editNoteLink n.id
                                         , label = E.text n.title
@@ -136,7 +136,7 @@ listview ld size model =
                                         ((E.height <|
                                             E.px 25
                                          )
-                                            :: ZC.otherLinkStyle
+                                            :: ZC.otherLinkStylePlain
                                         )
                                         { url = Data.editNoteLink n.id
                                         , label = E.text n.title
