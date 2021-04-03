@@ -127,10 +127,10 @@ pub fn user_interface(
         } else {
           let ld = sqldata::login_data(&conn, userdata.id)?;
           // new token here, and token date.
-          userdata.token = Some(Uuid::new_v4());
-          userdata.tokendate = Some(now()?);
-          session.set("token", userdata.token)?;
-          sqldata::update_user(config.db.as_path(), &userdata)?;
+          let token = Uuid::new_v4();
+          sqldata::add_token(&conn, userdata.id, token)?;
+          session.set("token", token)?;
+          sqldata::update_user(&conn, &userdata)?;
           println!("logged in, userdata: {:?}", userdata);
 
           Ok(ServerResponse {
