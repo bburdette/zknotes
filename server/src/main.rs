@@ -104,7 +104,9 @@ fn register(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
           if user.registration_key == Some(key.to_string()) {
             let mut mu = user;
             mu.registration_key = None;
-            match sqldata::update_user(data.db.as_path(), &mu) {
+            match sqldata::connection_open(data.db.as_path()).and_then(
+              |conn| {
+                sqldata::update_user(&conn, &mu) }) {
               Ok(_) => HttpResponse::Ok().body(
                 format!(
                   "<h1>You are registered!<h1> <a href=\"{}\">\
