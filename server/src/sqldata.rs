@@ -50,7 +50,7 @@ pub fn connection_open(dbfile: &Path) -> Result<Connection, Box<dyn Error>> {
 
   // conn.busy_timeout(Duration::from_millis(500))?;
   conn.busy_handler(Some(|count| {
-    println!("busy_handler: {}", count);
+    info!("busy_handler: {}", count);
     let d = Duration::from_millis(500);
     std::thread::sleep(d);
     true
@@ -656,13 +656,13 @@ pub fn set_single_value(conn: &Connection, name: &str, value: &str) -> Result<()
   Ok(())
 }
 
-pub fn dbinit(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+pub fn dbinit(dbfile: &Path, token_expiration_ms: i64) -> Result<(), Box<dyn Error>> {
   let exists = dbfile.exists();
 
   let conn = connection_open(dbfile)?;
 
   if !exists {
-    println!("initialdb");
+    info!("initialdb");
     conn.execute_batch(initialdb().make::<Sqlite>().as_str())?;
   }
 
@@ -676,38 +676,40 @@ pub fn dbinit(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   };
 
   if nlevel < 1 {
-    println!("udpate1");
+    info!("udpate1");
     conn.execute_batch(udpate1().make::<Sqlite>().as_str())?;
     set_single_value(&conn, "migration_level", "1")?;
   }
 
   if nlevel < 2 {
-    println!("udpate2");
+    info!("udpate2");
     conn.execute_batch(udpate2().make::<Sqlite>().as_str())?;
     set_single_value(&conn, "migration_level", "2")?;
   }
   if nlevel < 3 {
-    println!("udpate3");
+    info!("udpate3");
     udpate3(&dbfile)?;
     set_single_value(&conn, "migration_level", "3")?;
   }
   if nlevel < 4 {
-    println!("udpate4");
+    info!("udpate4");
     udpate4(&dbfile)?;
     set_single_value(&conn, "migration_level", "4")?;
   }
   if nlevel < 5 {
-    println!("udpate5");
+    info!("udpate5");
     udpate5(&dbfile)?;
     set_single_value(&conn, "migration_level", "5")?;
   }
   if nlevel < 6 {
-    println!("udpate6");
+    info!("udpate6");
     udpate6(&dbfile)?;
     set_single_value(&conn, "migration_level", "6")?;
   }
 
-  println!("db up to date.");
+  info!("db up to date.");
+
+  purge_tokens(&conn, token_expiration_ms)?;
 
   Ok(())
 }
@@ -918,6 +920,30 @@ pub fn add_token(conn: &Connection, user: i64, token: Uuid) -> Result<(), Box<dy
      values (?1, ?2, ?3)",
     params![user, token.to_string(), now],
   )?;
+
+  Ok(())
+}
+
+pub fn purge_tokens(conn: &Connection, token_expiration_ms: i64) -> Result<(), Box<dyn Error>> {
+  let now = now()?;
+  let expdt = now - token_expiration_ms;
+
+  let count: i64 = conn.query_row(
+    "select count(*) from
+      token where tokendate < ?1",
+    params![expdt],
+    |row| Ok(row.get(0)?),
+  )?;
+
+  if count > 0 {
+    info!("removing {} expired token records", count);
+
+    conn.execute(
+      "delete from token
+    where tokendate < ?1",
+      params![expdt],
+    )?;
+  }
 
   Ok(())
 }

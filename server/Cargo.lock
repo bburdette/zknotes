@@ -2454,6 +2454,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "timer"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "31d42176308937165701f50638db1c31586f183f1aab416268216577aec7306b"
+dependencies = [
+ "chrono",
+]
+
+[[package]]
 name = "tinyvec"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2887,6 +2896,7 @@ dependencies = [
  "actix-web",
  "barrel",
  "base64 0.2.1",
+ "chrono",
  "clap",
  "crypto-hash",
  "env_logger",
@@ -2902,6 +2912,7 @@ dependencies = [
  "serde_json",
  "simple-error",
  "time 0.1.44",
+ "timer",
  "toml",
  "uuid 0.8.2",
  "zkprotocol",

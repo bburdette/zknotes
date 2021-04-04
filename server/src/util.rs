@@ -19,8 +19,8 @@ pub fn load_string(file_name: &str) -> Result<String, Box<dyn Error>> {
 
 pub fn write_string(file_name: &str, text: &str) -> Result<usize, Box<dyn Error>> {
   let path = &Path::new(&file_name);
-  let mut inf = File::create(path)?;
-  Ok(inf.write(text.as_bytes())?)
+  let mut outf = File::create(path)?;
+  Ok(outf.write(text.as_bytes())?)
 }
 
 pub fn salt_string() -> String {

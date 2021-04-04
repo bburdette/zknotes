@@ -3,22 +3,24 @@ mod email;
 mod interfaces;
 mod search;
 mod sqldata;
-mod util;
 mod sqltest;
+mod util;
 
 use actix_files::NamedFile;
-use clap::{Arg, SubCommand};
 use actix_session::{CookieSession, Session};
-use log::{debug, error, log_enabled, info, Level};
 use actix_web::middleware::Logger;
 use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Result};
+use chrono;
+use clap::{Arg, SubCommand};
 use config::Config;
+use log::{debug, error, info, log_enabled, Level};
+use serde_json;
 use std::error::Error;
 use std::path::{Path, PathBuf};
-use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 use std::sync::{Arc, Mutex};
-use serde_json;
+use timer;
 use uuid::Uuid;
+use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 
 fn favicon(_req: &HttpRequest) -> Result<NamedFile> {
   let stpath = Path::new("static/favicon.ico");
@@ -30,14 +32,9 @@ fn sitemap(_req: &HttpRequest) -> Result<NamedFile> {
   Ok(NamedFile::open(stpath)?)
 }
 
-
 // simple index handler
 fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
-  info!(
-    "remote ip: {:?}, request:{:?}",
-    req.connection_info(),
-    req
-  );
+  info!("remote ip: {:?}, request:{:?}", req.connection_info(), req);
 
   // logged in?
   let logindata = match interfaces::login_data_for_token(session, &data) {
@@ -79,7 +76,12 @@ fn public(
   }
 }
 
-fn user(session: Session, data: web::Data<Config>, item: web::Json<UserMessage>, _req: HttpRequest) -> HttpResponse {
+fn user(
+  session: Session,
+  data: web::Data<Config>,
+  item: web::Json<UserMessage>,
+  _req: HttpRequest,
+) -> HttpResponse {
   info!("user msg: {}, {:?}", &item.what, &item.data);
   match interfaces::user_interface(&session, &data, item.into_inner()) {
     Ok(sr) => HttpResponse::Ok().json(sr),
@@ -104,9 +106,9 @@ fn register(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
           if user.registration_key == Some(key.to_string()) {
             let mut mu = user;
             mu.registration_key = None;
-            match sqldata::connection_open(data.db.as_path()).and_then(
-              |conn| {
-                sqldata::update_user(&conn, &mu) }) {
+            match sqldata::connection_open(data.db.as_path())
+              .and_then(|conn| sqldata::update_user(&conn, &mu))
+            {
               Ok(_) => HttpResponse::Ok().body(
                 format!(
                   "<h1>You are registered!<h1> <a href=\"{}\">\
@@ -138,8 +140,16 @@ fn defcon() -> Config {
     appname: "mahbloag".to_string(),
     domain: "practica.site".to_string(),
     admin_email: "admin@practica.site".to_string(),
-    token_expiration_ms: 7*24*60*60*1000,  // 7 days in milliseconds
+    token_expiration_ms: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
   }
+}
+
+fn purge_tokens(dbfile: &Path, token_expiration_ms: i64) -> Result<(), Box<dyn Error>> {
+  let conn = sqldata::connection_open(dbfile)?;
+
+  sqldata::purge_tokens(&conn, token_expiration_ms)?;
+
+  Ok(())
 }
 
 fn load_config() -> Config {
@@ -160,7 +170,7 @@ fn load_config() -> Config {
 
 fn main() {
   match err_main() {
-    Err(e) => println!("error: {:?}", e),
+    Err(e) => error!("error: {:?}", e),
     Ok(_) => (),
   }
 }
@@ -187,7 +197,7 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
       // do that exporting...
       let config = load_config();
 
-      sqldata::dbinit(config.db.as_path())?;
+      sqldata::dbinit(config.db.as_path(), config.token_expiration_ms)?;
 
       util::write_string(
         exportfile,
@@ -204,9 +214,20 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
 
       let config = load_config();
 
-      println!("config: {:?}", config);
+      info!("config: {:?}", config);
 
-      sqldata::dbinit(config.db.as_path())?;
+      sqldata::dbinit(config.db.as_path(), config.token_expiration_ms)?;
+
+      let timer = timer::Timer::new();
+
+      let ptconfig = config.clone();
+
+      let guard = timer.schedule_repeating(chrono::Duration::days(1), move || {
+        match purge_tokens(ptconfig.db.as_path(), ptconfig.token_expiration_ms) {
+          Err(e) => error!("purge_tokens error: {}", e),
+          Ok(_) => (),
+        }
+      });
 
       let c = config.clone();
       HttpServer::new(move || {
@@ -215,8 +236,8 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
           .wrap(middleware::Logger::default())
           .wrap(
             CookieSession::signed(&[0; 32]) // <- create cookie based session middleware
-              .secure(false) 								// allows for dev access
-              .max_age(10 * 24 * 60 * 60),  // 10 days
+              .secure(false) // allows for dev access
+              .max_age(10 * 24 * 60 * 60), // 10 days
           )
           .service(web::resource("/public").route(web::post().to(public)))
           .service(web::resource("/user").route(web::post().to(user)))
