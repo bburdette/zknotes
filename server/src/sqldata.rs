@@ -620,6 +620,78 @@ pub fn udpate6(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   Ok(())
 }
 
+pub fn udpate7(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+  // db connection without foreign key checking.
+  let conn = Connection::open(dbfile)?;
+  let mut m1 = Migration::new();
+
+  m1.create_table("zknotetemp", |t| {
+    t.add_column(
+      "id",
+      types::integer()
+        .primary(true)
+        .increments(true)
+        .nullable(false),
+    );
+    t.add_column("title", types::text().nullable(false));
+    t.add_column("content", types::text().nullable(false));
+    t.add_column("sysdata", types::text().nullable(true));
+    t.add_column("pubid", types::text().nullable(true).unique(true));
+    t.add_column("user", types::foreign("user", "id").nullable(false));
+    t.add_column("createdate", types::integer().nullable(false));
+    t.add_column("changeddate", types::integer().nullable(false));
+  });
+
+  conn.execute_batch(m1.make::<Sqlite>().as_str())?;
+
+  // copy everything from zknote.
+  conn.execute(
+    "insert into zknotetemp (id, title, content, sysdata, pubid, user, createdate, changeddate)
+        select id, title, content, null, pubid, user, createdate, changeddate from zknote",
+    params![],
+  )?;
+
+  let mut m2 = Migration::new();
+
+  m2.drop_table("zknote");
+
+  // new zknote with readonly column
+  m2.create_table("zknote", |t| {
+    t.add_column(
+      "id",
+      types::integer()
+        .primary(true)
+        .increments(true)
+        .nullable(false),
+    );
+    t.add_column("title", types::text().nullable(false));
+    t.add_column("content", types::text().nullable(false));
+    t.add_column("sysdata", types::text().nullable(true));
+    t.add_column("pubid", types::text().nullable(true).unique(true));
+    t.add_column("user", types::foreign("user", "id").nullable(false));
+    t.add_column("editable", types::boolean());
+    t.add_column("createdate", types::integer().nullable(false));
+    t.add_column("changeddate", types::integer().nullable(false));
+  });
+
+  conn.execute_batch(m2.make::<Sqlite>().as_str())?;
+
+  // copy everything from zknotetemp.
+  conn.execute(
+    "insert into zknote (id, title, content, sysdata, pubid, user, editable, createdate, changeddate)
+        select id, title, content, null, pubid, user, 0, createdate, changeddate from zknotetemp",
+    params![],
+  )?;
+
+  let mut m3 = Migration::new();
+
+  m3.drop_table("zknotetemp");
+
+  conn.execute_batch(m3.make::<Sqlite>().as_str())?;
+
+  Ok(())
+}
+
 pub fn get_single_value(conn: &Connection, name: &str) -> Result<Option<String>, Box<dyn Error>> {
   match conn.query_row(
     "select value from singlevalue where name = ?1",
@@ -690,6 +762,11 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: i64) -> Result<(), Box<dyn Err
     info!("udpate6");
     udpate6(&dbfile)?;
     set_single_value(&conn, "migration_level", "6")?;
+  }
+  if nlevel < 7 {
+    info!("udpate7");
+    udpate7(&dbfile)?;
+    set_single_value(&conn, "migration_level", "7")?;
   }
 
   info!("db up to date.");
@@ -1053,8 +1130,6 @@ pub fn is_zknote_shared(
 
   // does note link to a note that links to share?
   // and does that note link to usernoteid?
-  //
-
   let ret = match conn.query_row(
     "select count(*)
       from zklink L,
@@ -1205,7 +1280,7 @@ pub fn save_zknote(
 
 pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNote, Box<dyn Error>> {
   let mut note = conn.query_row(
-    "select ZN.title, ZN.content, ZN.user, U.name, ZN.pubid, ZN.createdate, ZN.changeddate
+    "select ZN.title, ZN.content, ZN.user, U.name, ZN.pubid, ZN.editable, ZN.createdate, ZN.changeddate
       from zknote ZN, user U where ZN.id = ?1 and U.id = ZN.user",
     params![id],
     |row| {
@@ -1215,10 +1290,10 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
         content: row.get(1)?,
         user: row.get(2)?,
         username: row.get(3)?,
-        editable: false,
         pubid: row.get(4)?,
-        createdate: row.get(5)?,
-        changeddate: row.get(6)?,
+        editable: row.get(5)?,
+        createdate: row.get(6)?,
+        changeddate: row.get(7)?,
       })
     },
   )?;
@@ -1239,6 +1314,7 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
   }
 }
 
+#[derive(Debug)]
 pub enum Access {
   Private,
   Read,
@@ -1256,10 +1332,18 @@ pub fn zknote_access(
         Ok(Access::ReadWrite)
       } else if is_zknote_usershared(conn, note.id, uid)? {
         // editable and accessible.
-        Ok(Access::ReadWrite)
+        if note.editable {
+          Ok(Access::ReadWrite)
+        } else {
+          Ok(Access::Read)
+        }
       } else if is_zknote_shared(conn, note.id, uid)? {
         // editable and accessible.
-        Ok(Access::ReadWrite)
+        if note.editable {
+          Ok(Access::ReadWrite)
+        } else {
+          Ok(Access::Read)
+        }
       } else if is_zknote_public(conn, note.id)? {
         // accessible but not editable.
         Ok(Access::Read)
