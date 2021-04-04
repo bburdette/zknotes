@@ -830,11 +830,7 @@ pub fn user_name(conn: &Connection, uid: i64) -> Result<String, Box<dyn Error>> 
   Ok(user)
 }
 
-pub fn read_user(
-  dbfile: &Path,
-  name: &str,
-  token_expiration_ms: Option<i64>,
-) -> Result<User, Box<dyn Error>> {
+pub fn read_user(dbfile: &Path, name: &str) -> Result<User, Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
 
   let user = conn.query_row(

@@ -47,7 +47,7 @@ pub fn user_interface(
     let rd: RegistrationData = serde_json::from_value(msgdata)?;
     // do the registration thing.
     // user already exists?
-    match sqldata::read_user(Path::new(&config.db), rd.uid.as_str(), None) {
+    match sqldata::read_user(Path::new(&config.db), rd.uid.as_str()) {
       Ok(_) => {
         // err - user exists.
         Ok(ServerResponse {
@@ -105,7 +105,7 @@ pub fn user_interface(
     let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
     let login: Login = serde_json::from_value(msgdata.clone())?;
 
-    let mut userdata = sqldata::read_user(Path::new(&config.db), login.uid.as_str(), None)?;
+    let mut userdata = sqldata::read_user(Path::new(&config.db), login.uid.as_str())?;
     match userdata.registration_key {
       Some(_reg_key) => Ok(ServerResponse {
         what: "unregistered user".to_string(),

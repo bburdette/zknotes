@@ -101,7 +101,7 @@ fn register(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
   match (req.match_info().get("uid"), req.match_info().get("key")) {
     (Some(uid), Some(key)) => {
       // read user record.  does the reg key match?
-      match sqldata::read_user(data.db.as_path(), uid, None) {
+      match sqldata::read_user(data.db.as_path(), uid) {
         Ok(user) => {
           if user.registration_key == Some(key.to_string()) {
             let mut mu = user;
