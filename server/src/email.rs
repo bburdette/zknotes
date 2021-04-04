@@ -1,7 +1,7 @@
 use crate::util;
 use lettre::smtp::response::Response;
 use lettre::{EmailAddress, Envelope, SendableEmail, SmtpClient, SmtpTransport, Transport};
-use log::{debug, error, info, log_enabled, Level};
+use log::info;
 use std::error::Error;
 pub fn send_registration(
   appname: &str,
@@ -27,6 +27,7 @@ pub fn send_registration(
     .into_bytes(),
   );
 
+  // to help with registration for desktop use, or if the server is barred from sending email.
   util::write_string(
     "last-email.txt",
     (format!(
@@ -36,7 +37,7 @@ pub fn send_registration(
     ))
     .to_string()
     .as_str(),
-  );
+  )?;
 
   let mut mailer = SmtpTransport::new(SmtpClient::new_unencrypted_localhost()?);
   // Send the email

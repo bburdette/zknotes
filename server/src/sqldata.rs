@@ -1,14 +1,13 @@
 use crate::util::{is_token_expired, now};
 use barrel::backend::Sqlite;
 use barrel::{types, Migration};
-use log::{debug, error, info, log_enabled, Level};
+use log::info;
 use rusqlite::{params, Connection};
 use serde_derive::{Deserialize, Serialize};
 use simple_error::bail;
-use std::convert::TryInto;
 use std::error::Error;
 use std::path::Path;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 use uuid::Uuid;
 use zkprotocol::content::{
   Direction, GetZkLinks, GetZkNoteEdit, ImportZkNote, LoginData, SaveZkLink, SaveZkNote,
@@ -33,16 +32,6 @@ pub fn login_data(conn: &Connection, uid: i64) -> Result<LoginData, Box<dyn Erro
     shareid: note_id(conn, "system", "share")?,
     searchid: note_id(conn, "system", "search")?,
   })
-}
-
-pub fn uid_for_token(conn: &Connection, token: Uuid) -> Result<i64, Box<dyn Error>> {
-  let r = conn.query_row(
-    "select id
-          from user where token = ?1",
-    params![token.to_string()],
-    |row| Ok(row.get(0)?),
-  )?;
-  Ok(r)
 }
 
 pub fn connection_open(dbfile: &Path) -> Result<Connection, Box<dyn Error>> {
@@ -544,8 +533,6 @@ pub fn udpate5(dbfile: &Path) -> Result<(), Box<dyn Error>> {
     params![],
   )?;
 
-  let now = now()?;
-
   let mut m3 = Migration::new();
 
   m3.drop_table("usertemp");
@@ -623,8 +610,6 @@ pub fn udpate6(dbfile: &Path) -> Result<(), Box<dyn Error>> {
         select id, name, hashwd, zknote, salt, email, registration_key, createdate from usertemp",
     params![],
   )?;
-
-  let now = now()?;
 
   let mut m3 = Migration::new();
 
@@ -803,12 +788,12 @@ pub fn save_zklink(
   };
 
   // yeesh.  doing this to exit with ? instead of having a big if-then to the end.
-  let orwat: Result<(), Box<dyn Error>> = (if authed {
+  let orwat: Result<(), Box<dyn Error>> = if authed {
     Ok(())
   } else {
     bail!("link not allowed")
-  });
-  let wat = orwat?;
+  };
+  let _wat = orwat?;
 
   conn.execute(
     "insert into zklink (fromid, toid, user, linkzknote) values (?1, ?2, ?3, ?4)

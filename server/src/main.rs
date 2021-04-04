@@ -6,21 +6,20 @@ mod sqldata;
 mod sqltest;
 mod util;
 
-use actix_files::NamedFile;
 use actix_session::{CookieSession, Session};
-use actix_web::middleware::Logger;
 use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Result};
 use chrono;
-use clap::{Arg, SubCommand};
+use clap::Arg;
 use config::Config;
-use log::{debug, error, info, log_enabled, Level};
+use log::{error, info};
 use serde_json;
 use std::error::Error;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
 use timer;
-use uuid::Uuid;
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
+
+/*
+use actix_files::NamedFile;
 
 fn favicon(_req: &HttpRequest) -> Result<NamedFile> {
   let stpath = Path::new("static/favicon.ico");
@@ -31,6 +30,7 @@ fn sitemap(_req: &HttpRequest) -> Result<NamedFile> {
   let stpath = Path::new("static/sitemap.txt");
   Ok(NamedFile::open(stpath)?)
 }
+*/
 
 // simple index handler
 fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
@@ -222,12 +222,13 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
 
       let ptconfig = config.clone();
 
-      let guard = timer.schedule_repeating(chrono::Duration::days(1), move || {
-        match purge_tokens(ptconfig.db.as_path(), ptconfig.token_expiration_ms) {
-          Err(e) => error!("purge_tokens error: {}", e),
-          Ok(_) => (),
-        }
-      });
+      let _guard =
+        timer.schedule_repeating(chrono::Duration::days(1), move || {
+          match purge_tokens(ptconfig.db.as_path(), ptconfig.token_expiration_ms) {
+            Err(e) => error!("purge_tokens error: {}", e),
+            Ok(_) => (),
+          }
+        });
 
       let c = config.clone();
       HttpServer::new(move || {

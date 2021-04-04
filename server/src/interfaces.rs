@@ -5,12 +5,10 @@ use crate::sqldata;
 use crate::util;
 use actix_session::Session;
 use crypto_hash::{hex_digest, Algorithm};
-use log::{debug, error, info, log_enabled, Level};
-use serde_derive::{Deserialize, Serialize};
+use log::info;
 use simple_error;
 use std::error::Error;
 use std::path::Path;
-use util::{is_token_expired, now};
 use uuid::Uuid;
 use zkprotocol::content::{
   GetZkLinks, GetZkNoteEdit, ImportZkNote, Login, LoginData, RegistrationData, SaveZkNote,
@@ -105,7 +103,7 @@ pub fn user_interface(
     let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
     let login: Login = serde_json::from_value(msgdata.clone())?;
 
-    let mut userdata = sqldata::read_user(Path::new(&config.db), login.uid.as_str())?;
+    let userdata = sqldata::read_user(Path::new(&config.db), login.uid.as_str())?;
     match userdata.registration_key {
       Some(_reg_key) => Ok(ServerResponse {
         what: "unregistered user".to_string(),
@@ -242,7 +240,7 @@ fn user_interface_loggedin(
       let sznpl: SaveZkNotePlusLinks = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.db.as_path())?;
       let szkn = sqldata::save_zknote(&conn, uid, &sznpl.note)?;
-      let s = sqldata::save_savezklinks(&conn, uid, szkn.id, sznpl.links)?;
+      let _s = sqldata::save_savezklinks(&conn, uid, szkn.id, sznpl.links)?;
       Ok(ServerResponse {
         what: "savedzknotepluslinks".to_string(),
         content: serde_json::to_value(szkn)?,

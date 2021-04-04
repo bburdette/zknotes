@@ -1,14 +1,14 @@
-use crate::sqldata::*;
-use std::error::Error;
-use std::fs;
-use std::path::{Path, PathBuf};
-use zkprotocol::content::{
-  Direction, GetZkLinks, GetZkNoteEdit, ImportZkNote, LoginData, SaveZkLink, SaveZkNote,
-  SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
-};
-
 #[cfg(test)]
 mod tests {
+  use crate::sqldata::*;
+  use std::error::Error;
+  use std::fs;
+  use std::path::{Path, PathBuf};
+  use zkprotocol::content::{
+    Direction, GetZkLinks, GetZkNoteEdit, ImportZkNote, LoginData, SaveZkLink, SaveZkNote,
+    SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
+  };
+
   // Note this useful idiom: importing names from outer (for mod tests) scope.
   use super::*;
 
@@ -32,7 +32,7 @@ mod tests {
         println!("error removing test.db: {}", e);
       }
     }
-    dbinit(dbp)?;
+    dbinit(dbp, 1000000)?;
 
     let uid1 = new_user(
       dbp,

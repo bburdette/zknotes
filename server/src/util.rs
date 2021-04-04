@@ -7,7 +7,7 @@ use std::io::Read;
 use std::io::Write;
 use std::path::Path;
 use std::string::*;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 
 pub fn load_string(file_name: &str) -> Result<String, Box<dyn Error>> {
   let path = &Path::new(&file_name);
