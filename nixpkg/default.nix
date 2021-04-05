@@ -18,8 +18,8 @@ rustPlatform.buildRustPackage rec {
   src = fetchFromGitHub {
     owner = "bburdette";
     repo = "zknotes";
-    rev = "4482f27d22573b0b188cee5ed60c62fbec94f9bc";
-    sha256 = "0dzl9rg59c1n5b4z5ib0jp2c6xgg3dnpnvnc7m1a83mh6cnywyqd";
+    rev = "da29b771f722085410ea2a63a3449607cfe93c34";
+    sha256 = "0w80a8sd5np5yrpn5yd7b8n6bd10izrxn4zn07c6brkf8abhv593";
   };
 
   # preBuild = ''
@@ -37,7 +37,7 @@ rustPlatform.buildRustPackage rec {
 
 
   sourceRoot = "source/server";
-  cargoSha256 = "0is17qvwjvaw37bc4qc0cca3rvlshfbl88yv0fr4m5xn7h7ypd6c";
+  cargoSha256 = "1sx9ihzwn1vb1dx48ykzg1b9xdbjk4cbzs89labhgljhh51sr64p";
   # dontMakeSourcesWritable=1;
 
   buildInputs = [openssl sqlite];
