@@ -3,7 +3,7 @@ mod tests {
   use crate::sqldata::*;
   use std::error::Error;
   use std::fs;
-  use std::path::{Path, PathBuf};
+  use std::path::Path;
   use zkprotocol::content::{
     Direction, GetZkLinks, GetZkNoteEdit, ImportZkNote, LoginData, SaveZkLink, SaveZkNote,
     SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
@@ -26,12 +26,13 @@ mod tests {
 
   fn err_test() -> Result<(), Box<dyn Error>> {
     let dbp = Path::new("test.db");
-    match std::fs::remove_file(dbp) {
+    match fs::remove_file(dbp) {
       Ok(_) => (),
       Err(e) => {
         println!("error removing test.db: {}", e);
       }
     }
+
     dbinit(dbp, 1000000)?;
 
     let uid1 = new_user(
@@ -69,6 +70,7 @@ mod tests {
         title: "u1 note1".to_string(),
         pubid: None,
         content: "note1 content".to_string(),
+        editable: false,
       },
     )?;
 
@@ -81,6 +83,7 @@ mod tests {
         title: "u1 note2 - share".to_string(),
         pubid: None,
         content: "note1-2 content".to_string(),
+        editable: false,
       },
     )?;
 
@@ -95,16 +98,14 @@ mod tests {
         title: "u1 note3 - share".to_string(),
         pubid: None,
         content: "note1-3 content".to_string(),
+        editable: false,
       },
     )?;
 
-    println!("here1");
     save_zklink(&conn, szn1_3_share.id, shareid, uid1, None)?;
 
-    println!("here2");
     // user1 adds user 2 to user 1 share '2'.
     save_zklink(&conn, unid2, szn1_2_share.id, uid1, None)?;
-    println!("here3");
 
     // user2 adds user 2 to user1 share '3'.  should fail
     match save_zklink(&conn, unid2, szn1_3_share.id, uid2, None) {
@@ -122,6 +123,7 @@ mod tests {
         title: "u1 note4 - share".to_string(),
         pubid: None,
         content: "note1-4 content".to_string(),
+        editable: false,
       },
     )?;
     save_zklink(&conn, szn1_4.id, szn1_2_share.id, uid1, None)?;
@@ -135,6 +137,7 @@ mod tests {
         title: "u1 note5 - share".to_string(),
         pubid: None,
         content: "note1-5 content".to_string(),
+        editable: false,
       },
     )?;
     save_zklink(&conn, szn1_5.id, szn1_3_share.id, uid1, None)?;
@@ -148,11 +151,11 @@ mod tests {
         title: "u1 note4 - share".to_string(),
         pubid: None,
         content: "note1-4 content FROM USER 2".to_string(),
+        editable: false,
       },
     )?;
 
     // user 2 can't save changes to note 5.
-    println!("user 2 note 5 test");
     match save_zknote(
       &conn,
       uid2,
@@ -161,10 +164,11 @@ mod tests {
         title: "u1 note5 - share".to_string(),
         pubid: None,
         content: "note1-5 content FROM USER 2".to_string(),
+        editable: false,
       },
     ) {
       Ok(_) => assert_eq!(2, 4),
-      Err(e) => (),
+      Err(_e) => (),
     }
 
     let szn2_1 = save_zknote(
@@ -175,6 +179,7 @@ mod tests {
         title: "u2 note1".to_string(),
         pubid: None,
         content: "note2 content".to_string(),
+        editable: false,
       },
     )?;
     // Ok to link to share 2, because am a member.
@@ -183,7 +188,7 @@ mod tests {
     // should fail!
     match save_zklink(&conn, szn1_4.id, szn1_3_share.id, uid2, None) {
       Ok(_) => panic!("wat"),
-      Err(e) => (),
+      Err(_e) => (),
     };
 
     // TODO test that 'public' is not treated as a share.

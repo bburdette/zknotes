@@ -796,8 +796,8 @@ pub fn new_user(
 
   // make a corresponding note,
   conn.execute(
-    "insert into zknote (title, content, user, createdate, changeddate)
-     values (?1, ?2, ?3, ?4, ?5)",
+    "insert into zknote (title, content, user, editable, createdate, changeddate)
+     values (?1, ?2, ?3, 0, ?4, ?5)",
     params![name, "", systemid, now, now],
   )?;
 
@@ -1274,9 +1274,17 @@ pub fn save_zknote(
     None => {
       // new note!
       conn.execute(
-        "insert into zknote (title, content, user, pubid, createdate, changeddate)
-         values (?1, ?2, ?3, ?4, ?5, ?6)",
-        params![note.title, note.content, uid, note.pubid, now, now],
+        "insert into zknote (title, content, user, pubid, editable, createdate, changeddate)
+         values (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        params![
+          note.title,
+          note.content,
+          uid,
+          note.pubid,
+          note.editable,
+          now,
+          now
+        ],
       )?;
       Ok(SavedZkNote {
         id: conn.last_insert_rowid(),
