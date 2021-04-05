@@ -1234,9 +1234,17 @@ pub fn save_zknote(
     Some(id) => {
       // existing note.  update IF mine.
       match conn.execute(
-        "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4
-         where id = ?5 and user = ?6",
-        params![note.title, note.content, now, note.pubid, note.id, uid],
+        "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4, editable = ?5
+         where id = ?6 and user = ?7",
+        params![
+          note.title,
+          note.content,
+          now,
+          note.pubid,
+          note.editable,
+          note.id,
+          uid
+        ],
       ) {
         Ok(1) => Ok(SavedZkNote {
           id: id,
@@ -1245,10 +1253,10 @@ pub fn save_zknote(
         Ok(0) => {
           match zknote_access_id(conn, Some(uid), id)? {
             Access::ReadWrite => {
-              // update other user's record!
+              // update other user's record!  editable flag must be true.
               conn.execute(
                 "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4
-                 where id = ?5",
+                 where id = ?5 and editable = 1",
                 params![note.title, note.content, now, note.pubid, id],
               )?;
               Ok(SavedZkNote {
@@ -1292,6 +1300,7 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
         username: row.get(3)?,
         pubid: row.get(4)?,
         editable: row.get(5)?,
+        editableValue: row.get(5)?,
         createdate: row.get(6)?,
         changeddate: row.get(7)?,
       })
@@ -1402,7 +1411,7 @@ pub fn read_zknotepubid(
 ) -> Result<ZkNote, Box<dyn Error>> {
   let publicid = note_id(&conn, "system", "public")?;
   let mut note = conn.query_row(
-    "select A.id, A.title, A.content, A.user, U.name, A.pubid, A.createdate, A.changeddate
+    "select A.id, A.title, A.content, A.user, U.name, A.pubid, A.editable A.createdate, A.changeddate
       from zknote A, user U, zklink L where A.pubid = ?1
       and ((A.id = L.fromid
       and L.toid = ?2) or (A.id = L.toid
@@ -1416,10 +1425,11 @@ pub fn read_zknotepubid(
         content: row.get(2)?,
         user: row.get(3)?,
         username: row.get(4)?,
-        editable: false,
         pubid: row.get(5)?,
-        createdate: row.get(6)?,
-        changeddate: row.get(7)?,
+        editable: false,
+        editableValue: row.get(6)?,
+        createdate: row.get(7)?,
+        changeddate: row.get(8)?,
       })
     },
   )?;
@@ -1444,7 +1454,7 @@ pub fn read_zknotepubid(
 pub fn delete_zknote(dbfile: &Path, uid: i64, noteid: i64) -> Result<(), Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
 
-  // only delete when user is in the zk
+  // only delete when user is the owner.
   conn.execute(
     "delete from zknote where id = ?1 
       and user = ?2",
@@ -1714,6 +1724,7 @@ pub fn save_importzknotes(
             title: izn.title.clone(),
             pubid: None,
             content: izn.content.clone(),
+            editable: false,
           },
         )?
         .id
@@ -1734,6 +1745,7 @@ pub fn save_importzknotes(
               title: title.clone(),
               pubid: None,
               content: "".to_string(),
+              editable: false,
             },
           )?
           .id
@@ -1757,6 +1769,7 @@ pub fn save_importzknotes(
               title: title.clone(),
               pubid: None,
               content: "".to_string(),
+              editable: false,
             },
           )?
           .id
@@ -1811,7 +1824,7 @@ pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
 
   // Notes
   let mut nstmt = conn.prepare(
-    "select ZN.id, ZN.title, ZN.content, ZN.user, ZN.pubid, ZN.createdate, ZN.changeddate
+    "select ZN.id, ZN.title, ZN.content, ZN.user, ZN.pubid, ZN.editable, ZN.createdate, ZN.changeddate
       from zknote ZN",
   )?;
 
@@ -1822,10 +1835,11 @@ pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
       content: row.get(2)?,
       user: row.get(3)?,
       username: "".to_string(),
-      editable: false, // not a database field; don't bother computing here.
       pubid: row.get(4)?,
-      createdate: row.get(5)?,
-      changeddate: row.get(6)?,
+      editable: row.get(5)?,
+      editableValue: row.get(5)?,
+      createdate: row.get(6)?,
+      changeddate: row.get(7)?,
     })
   })?;
 

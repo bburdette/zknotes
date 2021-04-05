@@ -30,6 +30,7 @@ pub struct ZkNote {
   pub user: i64,
   pub username: String,
   pub editable: bool,
+  pub editableValue: bool,
   pub pubid: Option<String>,
   pub createdate: i64,
   pub changeddate: i64,
@@ -56,6 +57,7 @@ pub struct SaveZkNote {
   pub title: String,
   pub pubid: Option<String>,
   pub content: String,
+  pub editable: bool,
 }
 
 #[derive(Deserialize, Debug, Clone)]

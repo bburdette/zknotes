@@ -72,6 +72,7 @@ type Msg
     | ToLinkPress Data.ZkListNote
     | FromLinkPress Data.ZkListNote
     | PublicPress Bool
+    | EditablePress Bool
     | RemoveLink EditLink
     | MdLink EditLink
     | SPMsg SP.Msg
@@ -117,6 +118,7 @@ type alias Model =
     , zklDict : Dict String EditLink
     , focusLink : Maybe EditLink
     , editable : Bool
+    , editableValue : Bool
     , pubidtxt : String
     , title : String
     , md : String
@@ -182,6 +184,7 @@ sznFromModel model =
     , title = model.title
     , content = model.md
     , pubid = toPubId (isPublic model) model.pubidtxt
+    , editable = model.editableValue
     }
 
 
@@ -241,6 +244,7 @@ dirty model =
                         && (r.pubid == toPubId (isPublic model) model.pubidtxt)
                         && (r.title == model.title)
                         && (r.content == model.md)
+                        && (r.editable == model.editableValue)
                         && (Dict.keys model.zklDict == Dict.keys model.initialZklDict)
             )
         |> Maybe.withDefault True
@@ -502,6 +506,9 @@ zknview size model =
         editable =
             model.editable
 
+        mine =
+            model.noteUser == model.ld.userid
+
         showLinks =
             E.row [ EF.bold ] [ E.text "links" ]
                 :: List.map
@@ -658,7 +665,7 @@ zknview size model =
         [ E.width E.fill, E.spacing 8, E.padding 8 ]
         [ E.row [ E.width E.fill, E.spacing 8 ]
             [ E.row [ EF.bold ] [ E.text model.ld.name ]
-            , if editable then
+            , if mine then
                 EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just DeletePress, label = E.text "delete" }
 
               else
@@ -702,11 +709,30 @@ zknview size model =
             , placeholder = Nothing
             , label = EI.labelLeft [] (E.text "title")
             }
-        , if model.noteUser == model.ld.userid then
-            E.none
+        , if mine then
+            EI.checkbox [ E.width E.shrink ]
+                { onChange =
+                    if editable then
+                        EditablePress
+
+                    else
+                        always Noop
+                , icon = EI.defaultCheckbox
+                , checked = model.editableValue
+                , label = EI.labelLeft [] (E.text "editable")
+                }
 
           else
-            E.row [ E.spacing 8 ] [ E.text "creator", E.row [ EF.bold ] [ E.text model.noteUserName ] ]
+            E.row [ E.spacing 8 ]
+                [ EI.checkbox [ E.width E.shrink ]
+                    { onChange = always Noop -- can't change editable unless you're the owner.
+                    , icon = EI.defaultCheckbox
+                    , checked = model.editableValue
+                    , label = EI.labelLeft [] (E.text "editable")
+                    }
+                , E.text "creator"
+                , E.row [ EF.bold ] [ E.text model.noteUserName ]
+                ]
         , E.row [ E.spacing 8, E.width E.fill ]
             [ EI.checkbox [ E.width E.shrink ]
                 { onChange =
@@ -890,6 +916,7 @@ initFull ld zkl zknote zklDict spm =
     , title = zknote.title
     , md = zknote.content
     , editable = zknote.editable
+    , editableValue = zknote.editableValue
     , cells = getCd cc
     , revert = Just (Data.saveZkNote zknote)
     , spmodel = SP.searchResultUpdated zkl spm
@@ -922,6 +949,7 @@ initNew ld zkl spm =
     , pubidtxt = ""
     , title = ""
     , editable = True
+    , editableValue = True
     , md = ""
     , cells = getCd cc
     , revert = Nothing
@@ -1210,6 +1238,10 @@ update msg model =
 
             else
                 ( model, Switch id )
+
+        EditablePress _ ->
+            -- if we're getting this event, we should be allowed to change the value.
+            ( { model | editableValue = not model.editableValue }, None )
 
         PublicPress _ ->
             case model.id of
