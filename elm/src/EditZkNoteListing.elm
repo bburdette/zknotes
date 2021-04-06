@@ -123,7 +123,7 @@ listview ld size model =
                                 [ if n.user == ld.userid then
                                     E.link
                                         ((E.height <|
-                                            E.px 25
+                                            E.px 30
                                          )
                                             :: ZC.myLinkStylePlain
                                         )
@@ -134,7 +134,7 @@ listview ld size model =
                                   else
                                     E.link
                                         ((E.height <|
-                                            E.px 25
+                                            E.px 30
                                          )
                                             :: ZC.otherLinkStylePlain
                                         )

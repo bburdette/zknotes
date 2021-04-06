@@ -281,7 +281,7 @@ showZkl isDirty editable focusLink user id zkl =
                 |> (\s ->
                         E.el
                             [ E.clipX
-                            , E.height <| E.px 25
+                            , E.height <| E.px 30
                             , E.width E.fill
                             , EE.onClick (LinkFocusPress zkl)
                             ]
@@ -334,7 +334,7 @@ showZkl isDirty editable focusLink user id zkl =
             ]
 
     else
-        E.row [ E.spacing 8, E.width E.fill, E.height <| E.px 25 ] display
+        E.row [ E.spacing 8, E.width E.fill, E.height <| E.px 30 ] display
 
 
 pageLink : Model -> Maybe String
@@ -474,7 +474,7 @@ showSr model isdirty zkln =
                 ]
 
         listingrow =
-            E.el [ E.width E.fill, EE.onClick (SrFocusPress zkln.id), E.height <| E.px 25, E.clipX ] <| E.text zkln.title
+            E.el [ E.width E.fill, EE.onClick (SrFocusPress zkln.id), E.height <| E.px 30, E.clipX ] <| E.text zkln.title
     in
     if model.focusSr == Just zkln.id then
         -- focus result!  show controlrow.
