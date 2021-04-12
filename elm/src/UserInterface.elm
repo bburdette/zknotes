@@ -11,6 +11,7 @@ type SendMsg
     | Login Data.Login
     | GetZkNote Int
     | GetZkNoteEdit Data.GetZkNoteEdit
+    | GetZkNoteComments Data.GetZkNoteComments
     | DeleteZkNote Int
     | SaveZkNote Data.SaveZkNote
     | SaveZkLinks Data.ZkLinks
@@ -121,6 +122,12 @@ encodeSendMsg sm =
             JE.object
                 [ ( "what", JE.string "getzknoteedit" )
                 , ( "data", Data.encodeGetZkNoteEdit zkne )
+                ]
+
+        GetZkNoteComments msg ->
+            JE.object
+                [ ( "what", JE.string "getzknoteedit" )
+                , ( "data", Data.encodeGetZkNoteComments msg )
                 ]
 
         DeleteZkNote id ->

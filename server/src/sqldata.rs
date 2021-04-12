@@ -10,8 +10,8 @@ use std::path::Path;
 use std::time::Duration;
 use uuid::Uuid;
 use zkprotocol::content::{
-  Direction, GetZkLinks, GetZkNoteEdit, ImportZkNote, LoginData, SaveZkLink, SaveZkNote,
-  SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
+  Direction, GetZkLinks, GetZkNoteComments, GetZkNoteEdit, ImportZkNote, LoginData, SaveZkLink,
+  SaveZkNote, SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
 };
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -1715,6 +1715,47 @@ pub fn read_public_zklinks(conn: &Connection, noteid: i64) -> Result<Vec<ZkLink>
   }
 
   Ok(pv)
+}
+
+pub fn read_zknotecomments(
+  conn: &Connection,
+  uid: i64,
+  gznc: &GetZkNoteComments,
+) -> Result<Vec<ZkNote>, Box<dyn Error>> {
+  let cid = note_id(&conn, "system", "comment")?;
+
+  // notes with a TO link to our note
+  // and a TO link to 'comment'
+  let mut stmt = conn.prepare(
+    "select id from zknote, zklink C, zklink N
+      where N.from = id and N.to = ?1 
+         and id = C.from and C.to = ?2",
+  )?;
+  let c_iter = stmt.query_map(params![gznc.zknote, cid], |row| Ok(row.get(0)?))?;
+
+  let mut nv = Vec::new();
+
+  for id in c_iter {
+    match id {
+      Ok(id) => match read_zknote(&conn, Some(uid), id) {
+        Ok(note) => {
+          nv.push(note);
+          match gznc.limit {
+            Some(l) => {
+              if nv.len() >= l as usize {
+                break;
+              }
+            }
+            None => (),
+          }
+        }
+        Err(_) => (),
+      },
+      Err(_) => (),
+    }
+  }
+
+  Ok(nv)
 }
 
 pub fn read_zknoteedit(

@@ -115,6 +115,13 @@ pub struct GetZkNoteEdit {
   pub zknote: i64,
 }
 
+#[derive(Deserialize, Serialize, Debug)]
+pub struct GetZkNoteComments {
+  pub zknote: i64,
+  pub offset: i64,
+  pub limit: Option<i64>,
+}
+
 #[derive(Serialize, Debug)]
 pub struct ZkNoteEdit {
   pub zknote: ZkNote,

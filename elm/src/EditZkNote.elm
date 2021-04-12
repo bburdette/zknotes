@@ -883,7 +883,7 @@ toEditLink id zkl =
     }
 
 
-initFull : Data.LoginData -> Data.ZkNoteSearchResult -> Data.ZkNote -> Data.ZkLinks -> SP.Model -> Model
+initFull : Data.LoginData -> Data.ZkNoteSearchResult -> Data.ZkNote -> Data.ZkLinks -> SP.Model -> ( Model, Data.GetZkNoteComments )
 initFull ld zkl zknote zklDict spm =
     let
         cells =
@@ -898,31 +898,33 @@ initFull ld zkl zknote zklDict spm =
         links =
             List.map (toEditLink zknote.id) zklDict.links
     in
-    { id = Just zknote.id
-    , ld = ld
-    , noteUser = zknote.user
-    , noteUserName = zknote.username
-    , zknSearchResult = zkl
-    , focusSr = Nothing
-    , zklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) links)
-    , initialZklDict =
-        Dict.fromList
-            (List.map
-                (\zl -> ( zklKey zl, zl ))
-                links
-            )
-    , focusLink = Nothing
-    , pubidtxt = zknote.pubid |> Maybe.withDefault ""
-    , title = zknote.title
-    , md = zknote.content
-    , editable = zknote.editable
-    , editableValue = zknote.editableValue
-    , cells = getCd cc
-    , revert = Just (Data.saveZkNote zknote)
-    , spmodel = SP.searchResultUpdated zkl spm
-    , navchoice = NcView
-    , dialog = Nothing
-    }
+    ( { id = Just zknote.id
+      , ld = ld
+      , noteUser = zknote.user
+      , noteUserName = zknote.username
+      , zknSearchResult = zkl
+      , focusSr = Nothing
+      , zklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) links)
+      , initialZklDict =
+            Dict.fromList
+                (List.map
+                    (\zl -> ( zklKey zl, zl ))
+                    links
+                )
+      , focusLink = Nothing
+      , pubidtxt = zknote.pubid |> Maybe.withDefault ""
+      , title = zknote.title
+      , md = zknote.content
+      , editable = zknote.editable
+      , editableValue = zknote.editableValue
+      , cells = getCd cc
+      , revert = Just (Data.saveZkNote zknote)
+      , spmodel = SP.searchResultUpdated zkl spm
+      , navchoice = NcView
+      , dialog = Nothing
+      }
+    , { zknote = zknote.id, offset = 0, limit = Nothing }
+    )
 
 
 initNew : Data.LoginData -> Data.ZkNoteSearchResult -> SP.Model -> Model
