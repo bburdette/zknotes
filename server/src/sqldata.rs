@@ -692,6 +692,30 @@ pub fn udpate7(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   Ok(())
 }
 
+pub fn udpate8(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+  let conn = connection_open(dbfile)?;
+  let pubid = note_id(&conn, "system", "public")?;
+  let sysid = user_id(&conn, "system")?;
+  let now = now()?;
+
+  conn.execute(
+    "insert into zknote (title, content, pubid, editable, user,  createdate, changeddate)
+      values ('search', '', null, 0, ?1, ?2, ?3)",
+    params![sysid, now, now],
+  )?;
+
+  let zknid = conn.last_insert_rowid();
+
+  // link system recs to public.
+  conn.execute(
+    "insert into zklink (fromid, toid, user)
+     values (?1, ?2, ?3)",
+    params![zknid, pubid, sysid],
+  )?;
+
+  Ok(())
+}
+
 pub fn get_single_value(conn: &Connection, name: &str) -> Result<Option<String>, Box<dyn Error>> {
   match conn.query_row(
     "select value from singlevalue where name = ?1",
@@ -767,6 +791,11 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: i64) -> Result<(), Box<dyn Err
     info!("udpate7");
     udpate7(&dbfile)?;
     set_single_value(&conn, "migration_level", "7")?;
+  }
+  if nlevel < 8 {
+    info!("udpate8");
+    udpate8(&dbfile)?;
+    set_single_value(&conn, "migration_level", "8")?;
   }
 
   info!("db up to date.");
