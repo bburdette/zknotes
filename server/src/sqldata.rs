@@ -31,6 +31,7 @@ pub fn login_data(conn: &Connection, uid: i64) -> Result<LoginData, Box<dyn Erro
     publicid: note_id(conn, "system", "public")?,
     shareid: note_id(conn, "system", "share")?,
     searchid: note_id(conn, "system", "search")?,
+    commentid: note_id(conn, "system", "comment")?,
   })
 }
 
@@ -1548,8 +1549,8 @@ pub fn save_savezklinks(
 ) -> Result<(), Box<dyn Error>> {
   for link in zklinks.iter() {
     let (from, to) = match link.direction {
-      Direction::From => (zknid, link.otherid),
-      Direction::To => (link.otherid, zknid),
+      Direction::From => (link.otherid, zknid),
+      Direction::To => (zknid, link.otherid),
     };
     if link.user == uid {
       if link.delete == Some(true) {
@@ -1724,14 +1725,20 @@ pub fn read_zknotecomments(
 ) -> Result<Vec<ZkNote>, Box<dyn Error>> {
   let cid = note_id(&conn, "system", "comment")?;
 
+  println!("gznc.zknote, cid {}, {}", gznc.zknote, cid);
+
   // notes with a TO link to our note
   // and a TO link to 'comment'
   let mut stmt = conn.prepare(
-    "select id from zknote, zklink C, zklink N
-      where N.fromid = id and N.toid = ?1
-         and id = C.fromid and C.toid = ?2",
+    "select N.fromid from  zklink C, zklink N
+      where N.fromid = C.fromid
+      and N.toid = ?1 and C.toid = ?2",
   )?;
   let c_iter = stmt.query_map(params![gznc.zknote, cid], |row| Ok(row.get(0)?))?;
+
+  // select N.fromid from  zklink C, zklink N
+  //       where N.fromid = C.fromid
+  //       and N.toid = 2720 and C.toid = 2737;
 
   let mut nv = Vec::new();
 

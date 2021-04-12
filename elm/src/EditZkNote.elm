@@ -1,27 +1,44 @@
 module EditZkNote exposing
     ( Command(..)
+    , EditLink
     , Model
     , Msg(..)
+    , NavChoice(..)
+    , WClass(..)
+    , addComment
+    , commentsRecieved
+    , commonButtonStyle
     , compareZklinks
     , dirty
+    , disabledLinkButtonStyle
+    , elToSzkl
+    , elToSzl
     , fullSave
-    , gotId
     , gotSelectedText
     , initFull
     , initNew
+    , isPublic
+    , linkButtonStyle
+    , linksWith
+    , mkButtonStyle
     , noteLink
     , onCtrlS
+    , onSaved
     , pageLink
     , replaceOrAdd
     , saveZkLinkList
+    , showSr
     , showZkl
     , sznFromModel
+    , sznToZkn
+    , toEditLink
     , toPubId
     , update
     , updateSearchResult
     , view
     , zkLinkName
     , zklKey
+    , zknview
     )
 
 import CellCommon exposing (..)
@@ -58,6 +75,8 @@ import ZkCommon as ZC
 
 type Msg
     = OnMarkdownInput String
+    | OnCommentInput String
+    | AddComment
     | OnSchelmeCodeChanged String String
     | OnTitleChanged String
     | OnPubidChanged String
@@ -117,6 +136,9 @@ type alias Model =
     , focusSr : Maybe Int -- note id in search result.
     , zklDict : Dict String EditLink
     , focusLink : Maybe EditLink
+    , comments : List Data.ZkNote
+    , newcomment : String
+    , pendingcomment : Maybe Data.SaveZkNote
     , editable : Bool
     , editableValue : Bool
     , pubidtxt : String
@@ -151,6 +173,33 @@ elToSzl el =
     , user = el.user
     , zknote = el.zknote
     , delete = el.delete
+    }
+
+
+toEditLink : Int -> Data.ZkLink -> EditLink
+toEditLink id zkl =
+    let
+        ( oid, direction ) =
+            if zkl.to == id then
+                -- from other to this.
+                ( zkl.from, From )
+
+            else
+                -- from this to other
+                ( zkl.to, To )
+
+        _ =
+            Debug.log "toeditlink: note, link: " ( id, zkl )
+
+        _ =
+            Debug.log "toeditlink: editlink: " ( oid, direction )
+    in
+    { otherid = oid
+    , direction = direction
+    , user = zkl.user
+    , zknote = zkl.zknote
+    , othername = Just <| zkLinkName zkl id
+    , delete = zkl.delete
     }
 
 
@@ -203,6 +252,11 @@ saveZkLinkList model =
         ++ List.map
             (\zkl -> { zkl | delete = Just True })
             (List.map elToSzl (Dict.values (Dict.diff model.initialZklDict model.zklDict)))
+
+
+commentsRecieved : List Data.ZkNote -> Model -> Model
+commentsRecieved comments model =
+    { model | comments = comments }
 
 
 updateSearchResult : Data.ZkNoteSearchResult -> Model -> Model
@@ -484,6 +538,30 @@ showSr model isdirty zkln =
         listingrow
 
 
+
+-- comments should be markdown too!
+
+
+addComment : Model -> Element Msg
+addComment model =
+    E.column []
+        [ EI.multiline
+            [ EF.color TC.black
+
+            -- , E.htmlAttribute (Html.Attributes.id "mdtext")
+            , E.alignTop
+            ]
+            { onChange = OnCommentInput
+            , text = model.newcomment
+            , placeholder = Nothing
+            , label = EI.labelHidden "Comment"
+            , spellcheck = False
+            }
+        , EI.button (E.alignRight :: Common.buttonStyle)
+            { onPress = Just AddComment, label = E.text "reply" }
+        ]
+
+
 zknview : Util.Size -> Model -> Element Msg
 zknview size model =
     let
@@ -508,6 +586,13 @@ zknview size model =
 
         mine =
             model.noteUser == model.ld.userid
+
+        showComments =
+            E.row [ EF.bold ] [ E.text "comments" ]
+                :: List.map
+                    (\zkn -> E.text zkn.content)
+                    model.comments
+                ++ [ addComment model ]
 
         showLinks =
             E.row [ EF.bold ] [ E.text "links" ]
@@ -552,8 +637,9 @@ zknview size model =
                     , label = EI.labelHidden "Markdown input"
                     , spellcheck = False
                     }
+                    :: showComments
                     -- show the links.
-                    :: showLinks
+                    ++ showLinks
                 )
 
         public =
@@ -607,7 +693,7 @@ zknview size model =
                                     []
 
                                 else
-                                    showLinks
+                                    showComments ++ showLinks
                                )
 
                 Err errors ->
@@ -864,25 +950,6 @@ isPublic model =
     linksWith (Dict.values model.zklDict) model.ld.publicid
 
 
-toEditLink : Int -> Data.ZkLink -> EditLink
-toEditLink id zkl =
-    let
-        ( oid, direction ) =
-            if zkl.to == id then
-                ( zkl.from, To )
-
-            else
-                ( zkl.to, From )
-    in
-    { otherid = oid
-    , direction = direction
-    , user = zkl.user
-    , zknote = zkl.zknote
-    , othername = Just <| zkLinkName zkl id
-    , delete = zkl.delete
-    }
-
-
 initFull : Data.LoginData -> Data.ZkNoteSearchResult -> Data.ZkNote -> Data.ZkLinks -> SP.Model -> ( Model, Data.GetZkNoteComments )
 initFull ld zkl zknote zklDict spm =
     let
@@ -915,6 +982,9 @@ initFull ld zkl zknote zklDict spm =
       , pubidtxt = zknote.pubid |> Maybe.withDefault ""
       , title = zknote.title
       , md = zknote.content
+      , comments = []
+      , newcomment = ""
+      , pendingcomment = Nothing
       , editable = zknote.editable
       , editableValue = zknote.editableValue
       , cells = getCd cc
@@ -950,6 +1020,9 @@ initNew ld zkl spm =
     , focusLink = Nothing
     , pubidtxt = ""
     , title = ""
+    , comments = []
+    , newcomment = ""
+    , pendingcomment = Nothing
     , editable = True
     , editableValue = True
     , md = ""
@@ -1004,14 +1077,34 @@ replaceOrAdd items replacement compare mergef =
 -}
 
 
-gotId : Model -> Int -> Model
-gotId model id =
-    let
-        -- if we already have an ID, keep it.
-        m1 =
-            { model | id = Just (model.id |> Maybe.withDefault id) }
-    in
-    { m1 | revert = Just <| sznFromModel m1 }
+sznToZkn : Int -> String -> Data.SavedZkNote -> Data.SaveZkNote -> Data.ZkNote
+sznToZkn uid uname sdzn szn =
+    { id = sdzn.id
+    , user = uid
+    , username = uname
+    , title = szn.title
+    , content = szn.content
+    , pubid = Nothing
+    , editable = False
+    , editableValue = False
+    , createdate = sdzn.changeddate
+    , changeddate = sdzn.changeddate
+    }
+
+
+onSaved : Model -> Data.SavedZkNote -> Model
+onSaved model szn =
+    case model.pendingcomment of
+        Just pc ->
+            { model | comments = model.comments ++ [ sznToZkn model.ld.userid model.ld.name szn pc ] }
+
+        Nothing ->
+            let
+                -- if we already have an ID, keep it.
+                m1 =
+                    { model | id = Just (model.id |> Maybe.withDefault szn.id) }
+            in
+            { m1 | revert = Just <| sznFromModel m1 }
 
 
 gotSelectedText : Model -> String -> ( Model, Command )
@@ -1316,6 +1409,45 @@ update msg model =
 
         OnPubidChanged t ->
             ( { model | pubidtxt = t }, None )
+
+        OnCommentInput s ->
+            ( { model | newcomment = s }, None )
+
+        AddComment ->
+            case model.id of
+                Just id ->
+                    let
+                        nc =
+                            { id = Nothing
+                            , pubid = Nothing
+                            , title = "comment on " ++ model.title
+                            , content = model.newcomment
+                            , editable = False
+                            }
+                    in
+                    ( { model | newcomment = "", pendingcomment = Just nc }
+                    , Save
+                        { note =
+                            nc
+                        , links =
+                            [ { otherid = model.ld.commentid
+                              , direction = To
+                              , user = model.ld.userid
+                              , zknote = Nothing
+                              , delete = Nothing
+                              }
+                            , { otherid = id
+                              , direction = To
+                              , user = model.ld.userid
+                              , zknote = Nothing
+                              , delete = Nothing
+                              }
+                            ]
+                        }
+                    )
+
+                Nothing ->
+                    ( model, None )
 
         OnMarkdownInput newMarkdown ->
             let

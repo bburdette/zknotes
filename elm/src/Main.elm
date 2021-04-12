@@ -1057,12 +1057,24 @@ actualupdate msg model =
                                     , Cmd.none
                                     )
 
+                        UI.ZkNoteComments zc ->
+                            case state of
+                                EditZkNote s login ->
+                                    ( { model | state = EditZkNote (EditZkNote.commentsRecieved zc s) login }
+                                    , Cmd.none
+                                    )
+
+                                _ ->
+                                    ( { model | state = unexpectedMessage state (UI.showServerResponse uiresponse) }
+                                    , Cmd.none
+                                    )
+
                         UI.SavedZkNote szkn ->
                             case state of
                                 EditZkNote emod login ->
                                     let
                                         eznst =
-                                            EditZkNote.gotId emod szkn.id
+                                            EditZkNote.onSaved emod szkn
 
                                         st =
                                             EditZkNote eznst login
@@ -1080,7 +1092,7 @@ actualupdate msg model =
                                 EditZkNote emod login ->
                                     let
                                         eznst =
-                                            EditZkNote.gotId emod szkn.id
+                                            EditZkNote.onSaved emod szkn
 
                                         st =
                                             EditZkNote eznst login
