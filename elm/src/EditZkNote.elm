@@ -590,7 +590,24 @@ zknview size model =
         showComments =
             E.row [ EF.bold ] [ E.text "comments" ]
                 :: List.map
-                    (\zkn -> E.text zkn.content)
+                    (\zkn ->
+                        E.row [ E.width E.fill, E.spacing 8 ]
+                            [ E.paragraph [] <| [ E.text zkn.content ]
+                            , E.el [ E.alignRight ] <| E.text zkn.username
+                            , E.link
+                                (E.alignRight
+                                    :: (if isdirty then
+                                            ZC.saveLinkStyle
+
+                                        else
+                                            ZC.myLinkStyle
+                                       )
+                                )
+                                { url = Data.editNoteLink zkn.id
+                                , label = E.text "go"
+                                }
+                            ]
+                    )
                     model.comments
                 ++ [ addComment model ]
 
