@@ -700,7 +700,7 @@ pub fn udpate8(dbfile: &Path) -> Result<(), Box<dyn Error>> {
 
   conn.execute(
     "insert into zknote (title, content, pubid, editable, user,  createdate, changeddate)
-      values ('search', '', null, 0, ?1, ?2, ?3)",
+      values ('comment', '', null, 0, ?1, ?2, ?3)",
     params![sysid, now, now],
   )?;
 
@@ -1728,8 +1728,8 @@ pub fn read_zknotecomments(
   // and a TO link to 'comment'
   let mut stmt = conn.prepare(
     "select id from zknote, zklink C, zklink N
-      where N.from = id and N.to = ?1 
-         and id = C.from and C.to = ?2",
+      where N.fromid = id and N.toid = ?1
+         and id = C.fromid and C.toid = ?2",
   )?;
   let c_iter = stmt.query_map(params![gznc.zknote, cid], |row| Ok(row.get(0)?))?;
 

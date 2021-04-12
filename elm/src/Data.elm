@@ -195,7 +195,7 @@ encodeGetZkNoteComments : GetZkNoteComments -> JE.Value
 encodeGetZkNoteComments x =
     JE.object <|
         [ ( "zknote", JE.int x.zknote )
-        , ( "zknote", JE.int x.offset )
+        , ( "offset", JE.int x.offset )
         ]
             ++ (case x.limit of
                     Just l ->

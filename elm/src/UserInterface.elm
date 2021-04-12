@@ -126,7 +126,7 @@ encodeSendMsg sm =
 
         GetZkNoteComments msg ->
             JE.object
-                [ ( "what", JE.string "getzknoteedit" )
+                [ ( "what", JE.string "getzknotecomments" )
                 , ( "data", Data.encodeGetZkNoteComments msg )
                 ]
 
