@@ -32,6 +32,7 @@ type alias LoginData =
     , publicid : Int
     , shareid : Int
     , searchid : Int
+    , commentid : Int
     }
 
 
@@ -136,6 +137,13 @@ type alias GetZkLinks =
     }
 
 
+type alias GetZkNoteComments =
+    { zknote : Int
+    , offset : Int
+    , limit : Maybe Int
+    }
+
+
 type alias GetZkNoteEdit =
     { zknote : Int
     }
@@ -182,6 +190,22 @@ encodeGetZkNoteEdit gzl =
     JE.object
         [ ( "zknote", JE.int gzl.zknote )
         ]
+
+
+encodeGetZkNoteComments : GetZkNoteComments -> JE.Value
+encodeGetZkNoteComments x =
+    JE.object <|
+        [ ( "zknote", JE.int x.zknote )
+        , ( "offset", JE.int x.offset )
+        ]
+            ++ (case x.limit of
+                    Just l ->
+                        [ ( "limit", JE.int l )
+                        ]
+
+                    Nothing ->
+                        []
+               )
 
 
 encodeZkLinks : ZkLinks -> JE.Value
@@ -340,12 +364,13 @@ decodeZkNoteEdit =
 
 decodeLoginData : JD.Decoder LoginData
 decodeLoginData =
-    JD.map5 LoginData
+    JD.map6 LoginData
         (JD.field "userid" JD.int)
         (JD.field "name" JD.string)
         (JD.field "publicid" JD.int)
         (JD.field "shareid" JD.int)
         (JD.field "searchid" JD.int)
+        (JD.field "commentid" JD.int)
 
 
 encodeImportZkNote : ImportZkNote -> JE.Value

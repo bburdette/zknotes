@@ -20,6 +20,7 @@ pub struct LoginData {
   pub publicid: i64,
   pub shareid: i64,
   pub searchid: i64,
+  pub commentid: i64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -113,6 +114,13 @@ pub struct GetZkLinks {
 #[derive(Deserialize, Serialize, Debug)]
 pub struct GetZkNoteEdit {
   pub zknote: i64,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct GetZkNoteComments {
+  pub zknote: i64,
+  pub offset: i64,
+  pub limit: Option<i64>,
 }
 
 #[derive(Serialize, Debug)]

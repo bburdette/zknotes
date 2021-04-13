@@ -11,8 +11,8 @@ use std::error::Error;
 use std::path::Path;
 use uuid::Uuid;
 use zkprotocol::content::{
-  GetZkLinks, GetZkNoteEdit, ImportZkNote, Login, LoginData, RegistrationData, SaveZkNote,
-  SaveZkNotePlusLinks, ZkLinks, ZkNoteAndAccomplices,
+  GetZkLinks, GetZkNoteComments, GetZkNoteEdit, ImportZkNote, Login, LoginData, RegistrationData,
+  SaveZkNote, SaveZkNotePlusLinks, ZkLinks, ZkNoteAndAccomplices,
 };
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 use zkprotocol::search::{TagSearch, ZkNoteSearch};
@@ -185,6 +185,16 @@ fn user_interface_loggedin(
       Ok(ServerResponse {
         what: "zknoteedit".to_string(),
         content: serde_json::to_value(note)?,
+      })
+    }
+    "getzknotecomments" => {
+      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      let gzne: GetZkNoteComments = serde_json::from_value(msgdata.clone())?;
+      let conn = sqldata::connection_open(config.db.as_path())?;
+      let notes = sqldata::read_zknotecomments(&conn, uid, &gzne)?;
+      Ok(ServerResponse {
+        what: "zknotecomments".to_string(),
+        content: serde_json::to_value(notes)?,
       })
     }
     "searchzknotes" => {

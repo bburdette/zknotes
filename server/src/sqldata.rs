@@ -10,8 +10,8 @@ use std::path::Path;
 use std::time::Duration;
 use uuid::Uuid;
 use zkprotocol::content::{
-  Direction, GetZkLinks, GetZkNoteEdit, ImportZkNote, LoginData, SaveZkLink, SaveZkNote,
-  SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
+  Direction, GetZkLinks, GetZkNoteComments, GetZkNoteEdit, ImportZkNote, LoginData, SaveZkLink,
+  SaveZkNote, SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
 };
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -31,6 +31,7 @@ pub fn login_data(conn: &Connection, uid: i64) -> Result<LoginData, Box<dyn Erro
     publicid: note_id(conn, "system", "public")?,
     shareid: note_id(conn, "system", "share")?,
     searchid: note_id(conn, "system", "search")?,
+    commentid: note_id(conn, "system", "comment")?,
   })
 }
 
@@ -692,6 +693,30 @@ pub fn udpate7(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   Ok(())
 }
 
+pub fn udpate8(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+  let conn = connection_open(dbfile)?;
+  let pubid = note_id(&conn, "system", "public")?;
+  let sysid = user_id(&conn, "system")?;
+  let now = now()?;
+
+  conn.execute(
+    "insert into zknote (title, content, pubid, editable, user,  createdate, changeddate)
+      values ('comment', '', null, 0, ?1, ?2, ?3)",
+    params![sysid, now, now],
+  )?;
+
+  let zknid = conn.last_insert_rowid();
+
+  // link system recs to public.
+  conn.execute(
+    "insert into zklink (fromid, toid, user)
+     values (?1, ?2, ?3)",
+    params![zknid, pubid, sysid],
+  )?;
+
+  Ok(())
+}
+
 pub fn get_single_value(conn: &Connection, name: &str) -> Result<Option<String>, Box<dyn Error>> {
   match conn.query_row(
     "select value from singlevalue where name = ?1",
@@ -767,6 +792,11 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: i64) -> Result<(), Box<dyn Err
     info!("udpate7");
     udpate7(&dbfile)?;
     set_single_value(&conn, "migration_level", "7")?;
+  }
+  if nlevel < 8 {
+    info!("udpate8");
+    udpate8(&dbfile)?;
+    set_single_value(&conn, "migration_level", "8")?;
   }
 
   info!("db up to date.");
@@ -1519,8 +1549,8 @@ pub fn save_savezklinks(
 ) -> Result<(), Box<dyn Error>> {
   for link in zklinks.iter() {
     let (from, to) = match link.direction {
-      Direction::From => (zknid, link.otherid),
-      Direction::To => (link.otherid, zknid),
+      Direction::From => (link.otherid, zknid),
+      Direction::To => (zknid, link.otherid),
     };
     if link.user == uid {
       if link.delete == Some(true) {
@@ -1686,6 +1716,53 @@ pub fn read_public_zklinks(conn: &Connection, noteid: i64) -> Result<Vec<ZkLink>
   }
 
   Ok(pv)
+}
+
+pub fn read_zknotecomments(
+  conn: &Connection,
+  uid: i64,
+  gznc: &GetZkNoteComments,
+) -> Result<Vec<ZkNote>, Box<dyn Error>> {
+  let cid = note_id(&conn, "system", "comment")?;
+
+  println!("gznc.zknote, cid {}, {}", gznc.zknote, cid);
+
+  // notes with a TO link to our note
+  // and a TO link to 'comment'
+  let mut stmt = conn.prepare(
+    "select N.fromid from  zklink C, zklink N
+      where N.fromid = C.fromid
+      and N.toid = ?1 and C.toid = ?2",
+  )?;
+  let c_iter = stmt.query_map(params![gznc.zknote, cid], |row| Ok(row.get(0)?))?;
+
+  // select N.fromid from  zklink C, zklink N
+  //       where N.fromid = C.fromid
+  //       and N.toid = 2720 and C.toid = 2737;
+
+  let mut nv = Vec::new();
+
+  for id in c_iter {
+    match id {
+      Ok(id) => match read_zknote(&conn, Some(uid), id) {
+        Ok(note) => {
+          nv.push(note);
+          match gznc.limit {
+            Some(l) => {
+              if nv.len() >= l as usize {
+                break;
+              }
+            }
+            None => (),
+          }
+        }
+        Err(_) => (),
+      },
+      Err(_) => (),
+    }
+  }
+
+  Ok(nv)
 }
 
 pub fn read_zknoteedit(

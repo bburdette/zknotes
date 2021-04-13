@@ -219,6 +219,7 @@ routeState model route =
                             , mbzklinks = Nothing
                             , mbzknote = Nothing
                             , spmodel = st.spmodel
+                            , location = model.location
                             , navkey = model.navkey
                             , seed = model.seed
                             }
@@ -234,6 +235,7 @@ routeState model route =
                             , mbzklinks = Nothing
                             , mbzknote = Nothing
                             , spmodel = st.spmodel
+                            , location = model.location
                             , navkey = model.navkey
                             , seed = model.seed
                             }
@@ -249,6 +251,7 @@ routeState model route =
                                     , mbzklinks = Nothing
                                     , mbzknote = Nothing
                                     , spmodel = SP.initModel
+                                    , location = model.location
                                     , navkey = model.navkey
                                     , seed = model.seed
                                     }
@@ -503,6 +506,7 @@ type alias NwState =
     , mbzknote : Maybe Data.ZkNote
     , spmodel : SP.Model
     , navkey : Browser.Navigation.Key
+    , location : String
     , seed : Seed
     }
 
@@ -545,11 +549,14 @@ notewait nwstate state wmsg =
             case ( nws.mbzknotesearchresult, nws.mbzklinks, nws.mbzknote ) of
                 ( Just zknl, Just zkl, Just zkn ) ->
                     let
+                        ( ezkst, gzkc ) =
+                            EditZkNote.initFull nws.login zknl zkn zkl nws.spmodel
+
                         st =
-                            EditZkNote (EditZkNote.initFull nws.login zknl zkn zkl nws.spmodel) nws.login
+                            EditZkNote ezkst nws.login
                     in
                     ( st
-                    , Cmd.none
+                    , sendUIMsg nwstate.location <| UI.GetZkNoteComments gzkc
                     )
 
                 _ ->
@@ -1028,17 +1035,32 @@ actualupdate msg model =
                         UI.ZkNoteEdit zne ->
                             case stateLogin state of
                                 Just login ->
+                                    let
+                                        ( s, c ) =
+                                            EditZkNote.initFull login
+                                                { notes = [], offset = 0 }
+                                                zne.zknote
+                                                { links = zne.links }
+                                                SP.initModel
+                                    in
                                     ( { model
                                         | state =
                                             EditZkNote
-                                                (EditZkNote.initFull login
-                                                    { notes = [], offset = 0 }
-                                                    zne.zknote
-                                                    { links = zne.links }
-                                                    SP.initModel
-                                                )
+                                                s
                                                 login
                                       }
+                                    , sendUIMsg model.location <| UI.GetZkNoteComments c
+                                    )
+
+                                _ ->
+                                    ( { model | state = unexpectedMessage state (UI.showServerResponse uiresponse) }
+                                    , Cmd.none
+                                    )
+
+                        UI.ZkNoteComments zc ->
+                            case state of
+                                EditZkNote s login ->
+                                    ( { model | state = EditZkNote (EditZkNote.commentsRecieved zc s) login }
                                     , Cmd.none
                                     )
 
@@ -1052,7 +1074,7 @@ actualupdate msg model =
                                 EditZkNote emod login ->
                                     let
                                         eznst =
-                                            EditZkNote.gotId emod szkn.id
+                                            EditZkNote.onSaved emod szkn
 
                                         st =
                                             EditZkNote eznst login
@@ -1070,7 +1092,7 @@ actualupdate msg model =
                                 EditZkNote emod login ->
                                     let
                                         eznst =
-                                            EditZkNote.gotId emod szkn.id
+                                            EditZkNote.onSaved emod szkn
 
                                         st =
                                             EditZkNote eznst login
@@ -1206,6 +1228,7 @@ actualupdate msg model =
                                 , mbzklinks = Nothing
                                 , mbzknote = Nothing
                                 , spmodel = emod.spmodel
+                                , location = model.location
                                 , navkey = model.navkey
                                 , seed = model.seed
                                 }
@@ -1434,6 +1457,7 @@ handleEditZkNoteCmd model login emod ecmd =
                         , mbzknotesearchresult = Nothing
                         , mbzklinks = Nothing
                         , mbzknote = Nothing
+                        , location = model.location
                         , spmodel = emod.spmodel
                         , navkey = model.navkey
                         , seed = model.seed
@@ -1450,6 +1474,7 @@ handleEditZkNoteCmd model login emod ecmd =
                         , mbzknotesearchresult = Nothing
                         , mbzklinks = Nothing
                         , mbzknote = Nothing
+                        , location = model.location
                         , spmodel = emod.spmodel
                         , navkey = model.navkey
                         , seed = model.seed

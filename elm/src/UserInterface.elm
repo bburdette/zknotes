@@ -11,6 +11,7 @@ type SendMsg
     | Login Data.Login
     | GetZkNote Int
     | GetZkNoteEdit Data.GetZkNoteEdit
+    | GetZkNoteComments Data.GetZkNoteComments
     | DeleteZkNote Int
     | SaveZkNote Data.SaveZkNote
     | SaveZkLinks Data.ZkLinks
@@ -34,6 +35,7 @@ type ServerResponse
     | DeletedZkNote Int
     | ZkNote Data.ZkNote
     | ZkNoteEdit Data.ZkNoteEdit
+    | ZkNoteComments (List Data.ZkNote)
     | ServerError String
     | SavedZkLinks
     | ZkLinks Data.ZkLinks
@@ -76,6 +78,9 @@ showServerResponse sr =
 
         ZkNoteEdit _ ->
             "ZkNoteEdit"
+
+        ZkNoteComments _ ->
+            "ZkNoteComments"
 
         ServerError _ ->
             "ServerError"
@@ -121,6 +126,12 @@ encodeSendMsg sm =
             JE.object
                 [ ( "what", JE.string "getzknoteedit" )
                 , ( "data", Data.encodeGetZkNoteEdit zkne )
+                ]
+
+        GetZkNoteComments msg ->
+            JE.object
+                [ ( "what", JE.string "getzknotecomments" )
+                , ( "data", Data.encodeGetZkNoteComments msg )
                 ]
 
         DeleteZkNote id ->
@@ -222,6 +233,9 @@ serverResponseDecoder =
 
                 "zknoteedit" ->
                     JD.map ZkNoteEdit (JD.at [ "content" ] <| Data.decodeZkNoteEdit)
+
+                "zknotecomments" ->
+                    JD.map ZkNoteComments (JD.at [ "content" ] <| JD.list Data.decodeZkNote)
 
                 "savedzklinks" ->
                     JD.succeed SavedZkLinks
