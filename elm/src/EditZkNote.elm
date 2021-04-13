@@ -187,12 +187,6 @@ toEditLink id zkl =
             else
                 -- from this to other
                 ( zkl.to, To )
-
-        _ =
-            Debug.log "toeditlink: note, link: " ( id, zkl )
-
-        _ =
-            Debug.log "toeditlink: editlink: " ( oid, direction )
     in
     { otherid = oid
     , direction = direction
