@@ -532,17 +532,12 @@ showSr model isdirty zkln =
         listingrow
 
 
-
--- comments should be markdown too!
-
-
 addComment : Model -> Element Msg
 addComment model =
     E.column []
         [ EI.multiline
             [ EF.color TC.black
-
-            -- , E.htmlAttribute (Html.Attributes.id "mdtext")
+            , E.width E.fill
             , E.alignTop
             ]
             { onChange = OnCommentInput
@@ -554,6 +549,25 @@ addComment model =
         , EI.button (E.alignRight :: Common.buttonStyle)
             { onPress = Just AddComment, label = E.text "reply" }
         ]
+
+
+renderMd : CellDict -> String -> Int -> Element Msg
+renderMd cd md mdw =
+    case markdownView (mkRenderer RestoreSearch mdw cd OnSchelmeCodeChanged) md of
+        Ok rendered ->
+            E.column
+                [ E.spacing 30
+                , E.padding 20
+                , E.width (E.fill |> E.maximum 1000)
+                , E.centerX
+                , E.alignTop
+                , EBd.width 3
+                , EBd.color TC.darkGrey
+                ]
+                rendered
+
+        Err errors ->
+            E.text errors
 
 
 zknview : Util.Size -> Model -> Element Msg
@@ -581,12 +595,27 @@ zknview size model =
         mine =
             model.noteUser == model.ld.userid
 
+        -- super lame math because images suck in html/elm-ui
+        mdw =
+            min 1000
+                (case wclass of
+                    Narrow ->
+                        size.width
+
+                    Medium ->
+                        size.width - 400 - 8
+
+                    Wide ->
+                        size.width - 400 - 500 - 16
+                )
+                - (60 * 2 + 6)
+
         showComments =
             E.row [ EF.bold ] [ E.text "comments" ]
                 :: List.map
                     (\zkn ->
                         E.row [ E.width E.fill, E.spacing 8 ]
-                            [ E.paragraph [] <| [ E.text zkn.content ]
+                            [ E.paragraph [] <| [ renderMd model.cells zkn.content mdw ]
                             , E.el [ E.alignRight ] <| E.text zkn.username
                             , E.link
                                 (E.alignRight
@@ -656,59 +685,30 @@ zknview size model =
         public =
             isPublic model
 
-        -- super lame math because images suck in html/elm-ui
-        mdw =
-            min 1000
-                (case wclass of
-                    Narrow ->
-                        size.width
-
-                    Medium ->
-                        size.width - 400 - 8
-
-                    Wide ->
-                        size.width - 400 - 500 - 16
-                )
-                - (60 * 2 + 6)
-
         mdview =
-            case markdownView (mkRenderer RestoreSearch mdw model.cells OnSchelmeCodeChanged) model.md of
-                Ok rendered ->
-                    E.column
-                        [ E.width E.fill
-                        , E.centerX
-                        , E.alignTop
-                        , E.spacing 8
-                        ]
-                    <|
-                        [ E.column
-                            [ E.centerX
-                            , E.paddingXY 30 15
-                            , E.spacing 8
-                            , EBk.color TC.lightGrey
-                            ]
-                            [ E.paragraph [] [ E.text model.title ]
-                            , E.column
-                                [ E.spacing 30
-                                , E.padding 20
-                                , E.width (E.fill |> E.maximum 1000)
-                                , E.centerX
-                                , E.alignTop
-                                , EBd.width 3
-                                , EBd.color TC.darkGrey
-                                ]
-                                rendered
-                            ]
-                        ]
-                            ++ (if wclass == Wide then
-                                    []
+            E.column
+                [ E.width E.fill
+                , E.centerX
+                , E.alignTop
+                , E.spacing 8
+                ]
+            <|
+                [ E.column
+                    [ E.centerX
+                    , E.paddingXY 30 15
+                    , E.spacing 8
+                    , EBk.color TC.lightGrey
+                    ]
+                    [ E.paragraph [] [ E.text model.title ]
+                    , renderMd model.cells model.md mdw
+                    ]
+                ]
+                    ++ (if wclass == Wide then
+                            []
 
-                                else
-                                    showComments ++ showLinks
-                               )
-
-                Err errors ->
-                    E.text errors
+                        else
+                            showComments ++ showLinks
+                       )
 
         parabuttonstyle =
             Common.buttonStyle ++ [ E.paddingXY 10 0 ]
