@@ -191,6 +191,39 @@ mod tests {
       Err(_e) => (),
     };
 
+    // TODO test that pubid read works, since that broke in 'production'
+    let pubzn1 = save_zknote(
+      &conn,
+      uid1,
+      &SaveZkNote {
+        id: None,
+        title: "u1 public note1".to_string(),
+        pubid: Some("publicid1".to_string()),
+        content: "note1 content".to_string(),
+        editable: false,
+      },
+    )?;
+    // despite public id, shouldn't be able to read. because doesn't link to 'public'
+    match read_zknotepubid(&conn, None, "publicid1") {
+      Ok(_) => panic!("wat"),
+      Err(_e) => (),
+    };
+
+    let pubzn2 = save_zknote(
+      &conn,
+      uid1,
+      &SaveZkNote {
+        id: None,
+        title: "u1 public note2".to_string(),
+        pubid: Some("publicid2".to_string()),
+        content: "note1 content".to_string(),
+        editable: false,
+      },
+    )?;
+    save_zklink(&conn, pubzn2.id, publicid, uid1, None)?;
+    // should be able to read because links to 'public'.
+    read_zknotepubid(&conn, None, "publicid2")?;
+
     // TODO test that 'public' is not treated as a share.
     //
     // TODO test notes linked with user BY CREATOR are editable/visible.
