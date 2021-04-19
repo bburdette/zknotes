@@ -1449,7 +1449,7 @@ pub fn read_zknotepubid(
 ) -> Result<ZkNote, Box<dyn Error>> {
   let publicid = note_id(&conn, "system", "public")?;
   let mut note = conn.query_row(
-    "select A.id, A.title, A.content, A.user, U.name, A.pubid, A.editable A.createdate, A.changeddate
+    "select A.id, A.title, A.content, A.user, U.name, A.pubid, A.editable, A.createdate, A.changeddate
       from zknote A, user U, zklink L where A.pubid = ?1
       and ((A.id = L.fromid
       and L.toid = ?2) or (A.id = L.toid
