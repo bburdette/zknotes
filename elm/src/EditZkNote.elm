@@ -1431,7 +1431,7 @@ update msg model =
                         nc =
                             { id = Nothing
                             , pubid = Nothing
-                            , title = ""
+                            , title = "comment"
                             , content = model.newcomment
                             , editable = False
                             }
