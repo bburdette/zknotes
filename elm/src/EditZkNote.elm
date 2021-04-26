@@ -534,7 +534,9 @@ showSr model isdirty zkln =
 
 addComment : Model -> Element Msg
 addComment model =
-    E.column []
+    E.column
+        [ E.width E.fill
+        ]
         [ EI.multiline
             [ EF.color TC.black
             , E.width E.fill
@@ -546,7 +548,7 @@ addComment model =
             , label = EI.labelHidden "Comment"
             , spellcheck = False
             }
-        , EI.button (E.alignRight :: Common.buttonStyle)
+        , EI.button (E.alignLeft :: Common.buttonStyle)
             { onPress = Just AddComment, label = E.text "reply" }
         ]
 
@@ -561,8 +563,9 @@ renderMd cd md mdw =
                 , E.width (E.fill |> E.maximum 1000)
                 , E.centerX
                 , E.alignTop
-                , EBd.width 3
+                , EBd.width 2
                 , EBd.color TC.darkGrey
+                , EBk.color TC.lightGrey
                 ]
                 rendered
 
@@ -611,11 +614,11 @@ zknview size model =
                 - (60 * 2 + 6)
 
         showComments =
-            E.row [ EF.bold ] [ E.text "comments" ]
+            E.row [ EF.bold, E.width E.fill ] [ E.text "comments" ]
                 :: List.map
                     (\zkn ->
                         E.row [ E.width E.fill, E.spacing 8 ]
-                            [ E.paragraph [] <| [ renderMd model.cells zkn.content mdw ]
+                            [ renderMd model.cells zkn.content mdw
                             , E.el [ E.alignRight ] <| E.text zkn.username
                             , E.link
                                 (E.alignRight
@@ -644,17 +647,7 @@ zknview size model =
             E.column
                 [ E.spacing 8
                 , E.alignTop
-                , E.width
-                    (case wclass of
-                        Narrow ->
-                            E.fill
-
-                        Medium ->
-                            E.fill
-
-                        Wide ->
-                            E.fill
-                    )
+                , E.width E.fill
                 , E.paddingXY 25 0
                 ]
                 (EI.multiline
@@ -697,9 +690,8 @@ zknview size model =
                     [ E.centerX
                     , E.paddingXY 30 15
                     , E.spacing 8
-                    , EBk.color TC.lightGrey
                     ]
-                    [ E.paragraph [] [ E.text model.title ]
+                    [ E.paragraph [ EF.bold ] [ E.text model.title ]
                     , renderMd model.cells model.md mdw
                     ]
                 ]
