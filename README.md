@@ -8,4 +8,8 @@ zknotes is web based, and is intended to be usable on phones.  As of now there's
 
 There's a small search language - you can find documents by title, or by content, or by link with other documents, with boolean expressions combining these queries.
 
-zknotes has some multi-user features.  Notes linked to the 'public' system note are available for the internet at large to view.  You can also create 'share notes' by linking ordinary notes to the 'share' system note, and then linking users to the share note.  Those users will be able to see any notes linked to the share note.
+zknotes has some multi-user features.  
+ - Notes linked to the 'public' system note are available for the internet at large to view.  
+ - You can create 'share notes' by linking ordinary notes to the 'share' system note, and then linking users to the share note.  Those users will be able to see any notes linked to the share note.  
+ - Notes can be designated as read-only or editable.  
+ - There's also a comment system.  Notes that link to the 'comment' system note and to another note show up as comments in the web UI.
