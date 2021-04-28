@@ -643,14 +643,94 @@ zknview size model =
                     (showZkl isdirty editable model.focusLink model.ld.userid model.id)
                     (Dict.values model.zklDict)
 
-        mdedit =
+        editview =
             E.column
                 [ E.spacing 8
                 , E.alignTop
                 , E.width E.fill
-                , E.paddingXY 25 0
+                , E.paddingXY 5 0
                 ]
-                (EI.multiline
+                ([ EI.text
+                    (if editable then
+                        [ E.htmlAttribute (Html.Attributes.id "title")
+                        ]
+
+                     else
+                        [ EF.color TC.darkGrey, E.htmlAttribute (Html.Attributes.id "title") ]
+                    )
+                    { onChange =
+                        if editable then
+                            OnTitleChanged
+
+                        else
+                            always Noop
+                    , text = model.title
+                    , placeholder = Nothing
+                    , label = EI.labelLeft [] (E.text "title")
+                    }
+                 , if mine then
+                    EI.checkbox [ E.width E.shrink ]
+                        { onChange =
+                            if editable then
+                                EditablePress
+
+                            else
+                                always Noop
+                        , icon = EI.defaultCheckbox
+                        , checked = model.editableValue
+                        , label = EI.labelLeft [] (E.text "editable")
+                        }
+
+                   else
+                    E.row [ E.spacing 8 ]
+                        [ EI.checkbox [ E.width E.shrink ]
+                            { onChange = always Noop -- can't change editable unless you're the owner.
+                            , icon = EI.defaultCheckbox
+                            , checked = model.editableValue
+                            , label = EI.labelLeft [] (E.text "editable")
+                            }
+                        , E.text "creator"
+                        , E.row [ EF.bold ] [ E.text model.noteUserName ]
+                        ]
+                 , E.row [ E.spacing 8, E.width E.fill ]
+                    [ EI.checkbox [ E.width E.shrink ]
+                        { onChange =
+                            if editable then
+                                PublicPress
+
+                            else
+                                always Noop
+                        , icon = EI.defaultCheckbox
+                        , checked = public
+                        , label = EI.labelLeft [] (E.text "public")
+                        }
+                    , if public then
+                        EI.text [ E.width E.fill ]
+                            { onChange =
+                                if editable then
+                                    OnPubidChanged
+
+                                else
+                                    always Noop
+                            , text = model.pubidtxt
+                            , placeholder = Nothing
+                            , label = EI.labelLeft [] (E.text "article id")
+                            }
+
+                      else
+                        E.none
+                    , if wclass /= Narrow then
+                        showpagelink
+
+                      else
+                        E.none
+                    ]
+                 , if wclass == Narrow then
+                    showpagelink
+
+                   else
+                    E.none
+                 , EI.multiline
                     [ if editable then
                         EF.color TC.black
 
@@ -670,7 +750,8 @@ zknview size model =
                     , label = EI.labelHidden "Markdown input"
                     , spellcheck = False
                     }
-                    :: showComments
+                 ]
+                    ++ showComments
                     -- show the links.
                     ++ showLinks
                 )
@@ -780,86 +861,6 @@ zknview size model =
                         E.none
                 , EI.button perhapsdirtyparabuttonstyle { onPress = Just NewPress, label = E.text "new" }
                 ]
-        , EI.text
-            (if editable then
-                [ E.htmlAttribute (Html.Attributes.id "title")
-                ]
-
-             else
-                [ EF.color TC.darkGrey, E.htmlAttribute (Html.Attributes.id "title") ]
-            )
-            { onChange =
-                if editable then
-                    OnTitleChanged
-
-                else
-                    always Noop
-            , text = model.title
-            , placeholder = Nothing
-            , label = EI.labelLeft [] (E.text "title")
-            }
-        , if mine then
-            EI.checkbox [ E.width E.shrink ]
-                { onChange =
-                    if editable then
-                        EditablePress
-
-                    else
-                        always Noop
-                , icon = EI.defaultCheckbox
-                , checked = model.editableValue
-                , label = EI.labelLeft [] (E.text "editable")
-                }
-
-          else
-            E.row [ E.spacing 8 ]
-                [ EI.checkbox [ E.width E.shrink ]
-                    { onChange = always Noop -- can't change editable unless you're the owner.
-                    , icon = EI.defaultCheckbox
-                    , checked = model.editableValue
-                    , label = EI.labelLeft [] (E.text "editable")
-                    }
-                , E.text "creator"
-                , E.row [ EF.bold ] [ E.text model.noteUserName ]
-                ]
-        , E.row [ E.spacing 8, E.width E.fill ]
-            [ EI.checkbox [ E.width E.shrink ]
-                { onChange =
-                    if editable then
-                        PublicPress
-
-                    else
-                        always Noop
-                , icon = EI.defaultCheckbox
-                , checked = public
-                , label = EI.labelLeft [] (E.text "public")
-                }
-            , if public then
-                EI.text [ E.width E.fill ]
-                    { onChange =
-                        if editable then
-                            OnPubidChanged
-
-                        else
-                            always Noop
-                    , text = model.pubidtxt
-                    , placeholder = Nothing
-                    , label = EI.labelLeft [] (E.text "article id")
-                    }
-
-              else
-                E.none
-            , if wclass /= Narrow then
-                showpagelink
-
-              else
-                E.none
-            ]
-        , if wclass == Narrow then
-            showpagelink
-
-          else
-            E.none
         , case wclass of
             Wide ->
                 E.row
@@ -867,7 +868,7 @@ zknview size model =
                     , E.spacing 8
                     , E.alignTop
                     ]
-                    [ mdedit, mdview, searchPanel ]
+                    [ editview, mdview, searchPanel ]
 
             Medium ->
                 E.row [ E.width E.fill, E.spacing 8 ]
@@ -891,7 +892,7 @@ zknview size model =
                             ]
                         , case model.navchoice of
                             NcEdit ->
-                                mdedit
+                                editview
 
                             NcView ->
                                 mdview
@@ -919,7 +920,7 @@ zknview size model =
                         ]
                     , case model.navchoice of
                         NcEdit ->
-                            mdedit
+                            editview
 
                         NcView ->
                             mdview
