@@ -789,19 +789,18 @@ zknview size model =
         perhapsdirtyparabuttonstyle =
             perhapsdirtybutton ++ [ E.paddingXY 10 0 ]
 
+        spwidth =
+            case wclass of
+                Narrow ->
+                    E.fill
+
+                Medium ->
+                    E.px 400
+
+                Wide ->
+                    E.px 400
+
         searchPanel =
-            let
-                spwidth =
-                    case wclass of
-                        Narrow ->
-                            E.fill
-
-                        Medium ->
-                            E.px 400
-
-                        Wide ->
-                            E.px 400
-            in
             E.column
                 [ E.spacing 8
                 , E.alignTop
@@ -830,6 +829,13 @@ zknview size model =
 
                 Nothing ->
                     E.none
+
+        headingPanel : String -> List (E.Attribute Msg) -> Element Msg -> Element Msg
+        headingPanel name attribs elt =
+            E.column ([ E.spacing 12, E.alignTop ] ++ attribs)
+                [ E.el [ E.centerX, EF.bold ] <| E.text name
+                , elt
+                ]
     in
     E.column
         [ E.width E.fill, E.spacing 8, E.padding 8 ]
@@ -868,7 +874,10 @@ zknview size model =
                     , E.spacing 8
                     , E.alignTop
                     ]
-                    [ editview, mdview, searchPanel ]
+                    [ headingPanel "edit" [ E.width E.fill ] editview
+                    , headingPanel "view" [ E.width E.fill ] mdview
+                    , headingPanel "search" [ E.width spwidth ] searchPanel
+                    ]
 
             Medium ->
                 E.row [ E.width E.fill, E.spacing 8 ]
@@ -900,7 +909,7 @@ zknview size model =
                             NcSearch ->
                                 mdview
                         ]
-                    , searchPanel
+                    , headingPanel "search" [ E.width spwidth ] searchPanel
                     ]
 
             Narrow ->
