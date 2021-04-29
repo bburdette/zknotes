@@ -765,6 +765,7 @@ zknview size model =
                 , E.centerX
                 , E.alignTop
                 , E.spacing 8
+                , E.paddingXY 5 0
                 ]
             <|
                 [ E.column
@@ -789,24 +790,26 @@ zknview size model =
         perhapsdirtyparabuttonstyle =
             perhapsdirtybutton ++ [ E.paddingXY 10 0 ]
 
-        spwidth =
+        ( spwidth, sppad ) =
             case wclass of
                 Narrow ->
-                    E.fill
+                    ( E.fill, [] )
 
                 Medium ->
-                    E.px 400
+                    ( E.px 400, [ E.padding 5 ] )
 
                 Wide ->
-                    E.px 400
+                    ( E.px 400, [ E.padding 5 ] )
 
         searchPanel =
             E.column
-                [ E.spacing 8
-                , E.alignTop
-                , E.alignRight
-                , E.width spwidth
-                ]
+                ([ E.spacing 8
+                 , E.alignTop
+                 , E.alignRight
+                 , E.width spwidth
+                 ]
+                    ++ sppad
+                )
                 ((E.map SPMsg <|
                     SP.view True (wclass == Narrow) 0 model.spmodel
                  )
@@ -832,7 +835,7 @@ zknview size model =
 
         headingPanel : String -> List (E.Attribute Msg) -> Element Msg -> Element Msg
         headingPanel name attribs elt =
-            E.column ([ E.spacing 12, E.alignTop ] ++ attribs)
+            E.column ([ E.spacing 12, E.alignTop, EBd.width 1, E.height E.fill ] ++ attribs)
                 [ E.el [ E.centerX, EF.bold ] <| E.text name
                 , elt
                 ]
@@ -871,7 +874,6 @@ zknview size model =
             Wide ->
                 E.row
                     [ E.width E.fill
-                    , E.spacing 8
                     , E.alignTop
                     ]
                     [ headingPanel "edit" [ E.width E.fill ] editview
@@ -880,8 +882,11 @@ zknview size model =
                     ]
 
             Medium ->
-                E.row [ E.width E.fill, E.spacing 8 ]
-                    [ E.column [ E.width E.fill, E.alignTop ]
+                E.row
+                    [ E.width E.fill
+                    ]
+                    [ E.column
+                        [ E.spacing 12, E.alignTop, EBd.width 1, E.width E.fill, E.height E.fill ]
                         [ Common.navbar 2
                             (if model.navchoice == NcSearch then
                                 NcView
