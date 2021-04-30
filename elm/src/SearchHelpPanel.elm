@@ -91,7 +91,7 @@ view nblevel hmod =
             [ case hmod.tab of
                 Basic ->
                     column []
-                        [ showLine "You can write simple queries by typing text into the box.  Items that contain the text in their names will be shown.  If there are many items you can see more with the 'Show More' and 'Show All' buttons at the bottom of the listing" ]
+                        [ showLine "You can write simple queries by typing text into the box.  Items that contain the text in their titles will be shown." ]
 
                 Compound ->
                     column [ width fill ]
