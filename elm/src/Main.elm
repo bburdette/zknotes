@@ -492,13 +492,34 @@ sendUIMsg location msg =
 -}
 sendSearch : Model -> S.ZkNoteSearch -> Cmd Msg
 sendSearch model search =
-    Http.post
-        { url = model.location ++ "/user"
-        , body =
-            Http.jsonBody
-                (UI.encodeSendMsg (UI.SearchZkNotes search))
-        , expect = Http.expectJson UserReplyData UI.serverResponseDecoder
-        }
+    case stateLogin model.state of
+        Just ldata ->
+            let
+                searchnote =
+                    { note =
+                        { id = Nothing
+                        , pubid = Nothing
+                        , title = "search"
+                        , content = S.showTagSearch search.tagSearch
+                        , editable = False
+                        }
+                    , links =
+                        [ { otherid = ldata.shareid
+                          , direction = Data.To
+                          , user = ldata.userid
+                          , zknote = Nothing
+                          , delete = Nothing
+                          }
+                        ]
+                    }
+            in
+            Cmd.batch
+                [ sendUIMsg model.location (UI.SearchZkNotes search)
+                , sendUIMsg model.location (UI.SaveZkNotePlusLinks searchnote)
+                ]
+
+        Nothing ->
+            Cmd.none
 
 
 sendPIMsg : String -> PI.SendMsg -> Cmd Msg
