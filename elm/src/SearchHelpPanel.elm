@@ -71,7 +71,7 @@ indent elt =
 thingAndDef : Int -> String -> String -> Element Msg
 thingAndDef dportion th def =
     indent <|
-        row [ width fill ]
+        row [ width fill, spacing 8 ]
             [ paragraph [ width <| fillPortion 1 ] [ text th ]
             , paragraph [ width <| fillPortion dportion ] [ text def ]
             ]
@@ -106,7 +106,8 @@ view nblevel hmod =
                         [ showLine "the quoted strings can take a number of modifiers:"
                         , thingAndDef 4 "t'string1' =" "match items that link to items with 'string1' in the name."
                         , thingAndDef 4 "e'String1' =" "match items whose names are exactly 'String1', no more, no less."
-                        , thingAndDef 4 "n'elements' =" "match items with the string 'elements' in the note body.."
+                        , thingAndDef 4 "n'elements' =" "match items with the string 'elements' in the note body."
+                        , thingAndDef 4 "u'nick' =" "match items owned by user 'nick'."
                         ]
 
                 FullMonty ->
