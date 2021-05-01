@@ -488,6 +488,19 @@ sendUIMsg location msg =
         }
 
 
+{-| send search AND save search in db as a zknote
+-}
+sendSearch : Model -> S.ZkNoteSearch -> Cmd Msg
+sendSearch model search =
+    Http.post
+        { url = model.location ++ "/user"
+        , body =
+            Http.jsonBody
+                (UI.encodeSendMsg (UI.SearchZkNotes search))
+        , expect = Http.expectJson UserReplyData UI.serverResponseDecoder
+        }
+
+
 sendPIMsg : String -> PI.SendMsg -> Cmd Msg
 sendPIMsg location msg =
     Http.post
@@ -581,11 +594,9 @@ loadnote model nwstate zknid =
     , Cmd.batch <|
         (case nws.mbzknotesearchresult of
             Nothing ->
-                [ sendUIMsg model.location
-                    (UI.SearchZkNotes
-                        (SP.getSearch nws.spmodel
-                            |> Maybe.withDefault S.defaultSearch
-                        )
+                [ sendSearch model
+                    (SP.getSearch nws.spmodel
+                        |> Maybe.withDefault S.defaultSearch
                     )
                 ]
 
@@ -641,10 +652,8 @@ getListing model login =
                     model.seed
       }
     , Cmd.batch
-        [ sendUIMsg model.location
-            (UI.SearchZkNotes
-                S.defaultSearch
-            )
+        [ sendSearch model
+            S.defaultSearch
         ]
     )
 
@@ -953,10 +962,8 @@ actualupdate msg model =
                                                     model.seed
                                       }
                                     , Cmd.batch
-                                        [ sendUIMsg model.location
-                                            (UI.SearchZkNotes
-                                                S.defaultSearch
-                                            )
+                                        [ sendSearch model
+                                            S.defaultSearch
                                         ]
                                     )
                             in
@@ -1251,8 +1258,7 @@ actualupdate msg model =
 
                 EditZkNoteListing.Search s ->
                     ( { model | state = EditZkNoteListing emod login }
-                    , sendUIMsg model.location
-                        (UI.SearchZkNotes s)
+                    , sendSearch model s
                     )
 
                 EditZkNoteListing.PowerDelete s ->
@@ -1279,8 +1285,7 @@ actualupdate msg model =
                           }
                         , case SP.getSearch imod.spmodel of
                             Just s ->
-                                sendUIMsg model.location
-                                    (UI.SearchZkNotes s)
+                                sendSearch model s
 
                             Nothing ->
                                 Cmd.none
@@ -1312,8 +1317,7 @@ actualupdate msg model =
 
                 Import.Search s ->
                     ( { model | state = Import emod login }
-                    , sendUIMsg model.location
-                        (UI.SearchZkNotes s)
+                    , sendSearch model s
                     )
 
                 Import.SelectFiles ->
@@ -1355,8 +1359,7 @@ handleEditZkNoteCmd model login emod ecmd =
               }
             , case SP.getSearch emod.spmodel of
                 Just s ->
-                    sendUIMsg model.location
-                        (UI.SearchZkNotes s)
+                    sendSearch model s
 
                 Nothing ->
                     Cmd.none
@@ -1374,8 +1377,7 @@ handleEditZkNoteCmd model login emod ecmd =
                         login
                     , case SP.getSearch emod.spmodel of
                         Just s ->
-                            sendUIMsg model.location
-                                (UI.SearchZkNotes s)
+                            sendSearch model s
 
                         Nothing ->
                             Cmd.none
@@ -1499,8 +1501,7 @@ handleEditZkNoteCmd model login emod ecmd =
 
         EditZkNote.Search s ->
             ( { model | state = EditZkNote emod login }
-            , sendUIMsg model.location
-                (UI.SearchZkNotes s)
+            , sendSearch model s
             )
 
 
