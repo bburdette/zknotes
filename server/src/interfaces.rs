@@ -12,7 +12,7 @@ use std::path::Path;
 use uuid::Uuid;
 use zkprotocol::content::{
   GetZkLinks, GetZkNoteComments, GetZkNoteEdit, ImportZkNote, Login, LoginData, RegistrationData,
-  SaveZkNote, SaveZkNotePlusLinks, ZkLinks, ZkNoteAndAccomplices,
+  SaveZkNote, SaveZkNotePlusLinks, ZkLinks, ZkNoteEdit,
 };
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 use zkprotocol::search::{TagSearch, ZkNoteSearch};
@@ -299,7 +299,7 @@ pub fn public_interface(
       if sqldata::is_zknote_public(&conn, note.id)? {
         Ok(ServerResponse {
           what: "zknote".to_string(),
-          content: serde_json::to_value(ZkNoteAndAccomplices {
+          content: serde_json::to_value(ZkNoteEdit {
             links: sqldata::read_public_zklinks(&conn, note.id)?,
             zknote: note,
           })?,
@@ -319,7 +319,7 @@ pub fn public_interface(
       if sqldata::is_zknote_public(&conn, note.id)? {
         Ok(ServerResponse {
           what: "zknote".to_string(),
-          content: serde_json::to_value(ZkNoteAndAccomplices {
+          content: serde_json::to_value(ZkNoteEdit {
             links: sqldata::read_public_zklinks(&conn, note.id)?,
             zknote: note,
           })?,

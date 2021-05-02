@@ -1,5 +1,5 @@
 use crate::sqldata;
-use crate::sqldata::{note_id, power_delete_zknote, user_id};
+use crate::sqldata::{get_sysids, note_id, power_delete_zknote, user_id};
 use rusqlite::Connection;
 use std::convert::TryInto;
 use std::error::Error;
@@ -39,13 +39,18 @@ pub fn search_zknotes(
 
   let mut pstmt = conn.prepare(sql.as_str())?;
 
+  let sysid = user_id(&conn, "system")?;
+
   let rec_iter = pstmt.query_map(args.as_slice(), |row| {
+    let id = row.get(0)?;
+    let sysids = get_sysids(conn, sysid, id)?;
     Ok(ZkListNote {
-      id: row.get(0)?,
+      id: id,
       title: row.get(1)?,
       user: row.get(2)?,
       createdate: row.get(3)?,
       changeddate: row.get(4)?,
+      sysids: sysids,
     })
   })?;
 

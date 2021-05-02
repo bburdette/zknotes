@@ -438,6 +438,12 @@ showSr model isdirty zkln =
         lnnonme =
             zkln.user /= model.ld.userid
 
+        sysColor =
+            ZC.systemColor model.ld zkln.sysids
+
+        _ =
+            Debug.log "sysids" zkln.sysids
+
         controlrow =
             E.row [ E.spacing 8, E.width E.fill ]
                 [ (case
@@ -522,7 +528,19 @@ showSr model isdirty zkln =
                 ]
 
         listingrow =
-            E.el [ E.width E.fill, EE.onClick (SrFocusPress zkln.id), E.height <| E.px 30, E.clipX ] <| E.text zkln.title
+            E.el
+                ([ E.width E.fill
+                 , EE.onClick (SrFocusPress zkln.id)
+                 , E.height <| E.px 30
+                 , E.clipX
+                 ]
+                    ++ (sysColor
+                            |> Maybe.map (\c -> [ EBk.color c ])
+                            |> Maybe.withDefault []
+                       )
+                )
+            <|
+                E.text zkln.title
     in
     if model.focusSr == Just zkln.id then
         -- focus result!  show controlrow.
@@ -1095,8 +1113,8 @@ replaceOrAdd items replacement compare mergef =
 -}
 
 
-sznToZkn : Int -> String -> Data.SavedZkNote -> Data.SaveZkNote -> Data.ZkNote
-sznToZkn uid uname sdzn szn =
+sznToZkn : Int -> String -> List Int -> Data.SavedZkNote -> Data.SaveZkNote -> Data.ZkNote
+sznToZkn uid uname sysids sdzn szn =
     { id = sdzn.id
     , user = uid
     , username = uname
@@ -1107,6 +1125,7 @@ sznToZkn uid uname sdzn szn =
     , editableValue = False
     , createdate = sdzn.changeddate
     , changeddate = sdzn.changeddate
+    , sysids = sysids
     }
 
 
@@ -1114,7 +1133,17 @@ onSaved : Model -> Data.SavedZkNote -> Model
 onSaved model szn =
     case model.pendingcomment of
         Just pc ->
-            { model | comments = model.comments ++ [ sznToZkn model.ld.userid model.ld.name szn pc ] }
+            { model
+                | comments =
+                    model.comments
+                        ++ [ sznToZkn
+                                model.ld.userid
+                                model.ld.name
+                                [ model.ld.commentid ]
+                                szn
+                                pc
+                           ]
+            }
 
         Nothing ->
             let

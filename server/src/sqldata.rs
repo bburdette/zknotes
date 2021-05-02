@@ -1324,7 +1324,29 @@ pub fn save_zknote(
   }
 }
 
+pub fn get_sysids(conn: &Connection, sysid: i64, noteid: i64) -> Result<Vec<i64>, rusqlite::Error> {
+  let mut pstmt = conn.prepare(
+    // return system notes that are linked TO by noteid.
+    "select A.toid
+       from zklink A, zknote N
+      where
+       (A.fromid = ?1 and A.toid = N.id and N.user = ?2)",
+  )?;
+
+  let r = Ok(
+    pstmt
+      .query_map(params![noteid, sysid], |row| Ok(row.get(0)?))?
+      .filter_map(|x| x.ok())
+      .collect(),
+  );
+
+  r
+}
+
 pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNote, Box<dyn Error>> {
+  let sysid = user_id(&conn, "system")?;
+  let sysids = get_sysids(conn, sysid, id)?;
+
   let mut note = conn.query_row(
     "select ZN.title, ZN.content, ZN.user, U.name, ZN.pubid, ZN.editable, ZN.createdate, ZN.changeddate
       from zknote ZN, user U where ZN.id = ?1 and U.id = ZN.user",
@@ -1341,6 +1363,7 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
         editableValue: row.get(5)?,
         createdate: row.get(6)?,
         changeddate: row.get(7)?,
+        sysids: sysids,
       })
     },
   )?;
@@ -1468,9 +1491,14 @@ pub fn read_zknotepubid(
         editableValue: row.get(6)?,
         createdate: row.get(7)?,
         changeddate: row.get(8)?,
+        sysids: Vec::new(),
       })
     },
   )?;
+  let sysid = user_id(&conn, "system")?;
+  let sysids = get_sysids(conn, sysid, note.id)?;
+
+  note.sysids = sysids;
 
   match zknote_access(conn, uid, &note) {
     Ok(zna) => match zna {
@@ -1878,6 +1906,7 @@ pub struct ZkDatabase {
 
 pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
+  let sysid = user_id(&conn, "system")?;
 
   // Users
   let mut ustmt = conn.prepare(
@@ -1914,6 +1943,7 @@ pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
   )?;
 
   let n_iter = nstmt.query_map(params![], |row| {
+    let sysids = get_sysids(&conn, sysid, row.get(0)?)?;
     Ok(ZkNote {
       id: row.get(0)?,
       title: row.get(1)?,
@@ -1925,6 +1955,7 @@ pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
       editableValue: row.get(5)?,
       createdate: row.get(6)?,
       changeddate: row.get(7)?,
+      sysids: sysids,
     })
   })?;
 

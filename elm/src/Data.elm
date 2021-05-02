@@ -42,6 +42,7 @@ type alias ZkListNote =
     , title : String
     , createdate : Int
     , changeddate : Int
+    , sysids : List Int
     }
 
 
@@ -68,6 +69,7 @@ type alias ZkNote =
     , editableValue : Bool -- whether the user has marked it editable.
     , createdate : Int
     , changeddate : Int
+    , sysids : List Int
     }
 
 
@@ -311,12 +313,13 @@ encodeSaveZkNote zkn =
 
 decodeZkListNote : JD.Decoder ZkListNote
 decodeZkListNote =
-    JD.map5 ZkListNote
+    JD.map6 ZkListNote
         (JD.field "id" JD.int)
         (JD.field "user" JD.int)
         (JD.field "title" JD.string)
         (JD.field "createdate" JD.int)
         (JD.field "changeddate" JD.int)
+        (JD.field "sysids" (JD.list JD.int))
 
 
 decodeZkNoteSearchResult : JD.Decoder ZkNoteSearchResult
@@ -346,6 +349,7 @@ decodeZkNote =
         |> andMap (JD.field "editableValue" JD.bool)
         |> andMap (JD.field "createdate" JD.int)
         |> andMap (JD.field "changeddate" JD.int)
+        |> andMap (JD.field "sysids" <| JD.list JD.int)
 
 
 decodeZkNoteAndAccomplices : JD.Decoder ZkNoteAndAccomplices

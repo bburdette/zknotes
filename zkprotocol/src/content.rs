@@ -35,6 +35,7 @@ pub struct ZkNote {
   pub pubid: Option<String>,
   pub createdate: i64,
   pub changeddate: i64,
+  pub sysids: Vec<i64>,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -44,6 +45,7 @@ pub struct ZkListNote {
   pub user: i64,
   pub createdate: i64,
   pub changeddate: i64,
+  pub sysids: Vec<i64>,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -125,12 +127,6 @@ pub struct GetZkNoteComments {
 
 #[derive(Serialize, Debug)]
 pub struct ZkNoteEdit {
-  pub zknote: ZkNote,
-  pub links: Vec<ZkLink>,
-}
-
-#[derive(Serialize, Debug)]
-pub struct ZkNoteAndAccomplices {
   pub zknote: ZkNote,
   pub links: Vec<ZkLink>,
 }
