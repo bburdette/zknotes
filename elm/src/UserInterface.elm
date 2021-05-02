@@ -16,7 +16,7 @@ type SendMsg
     | SaveZkNote Data.SaveZkNote
     | SaveZkLinks Data.ZkLinks
     | SaveZkNotePlusLinks Data.SaveZkNotePlusLinks
-    | GetZkLinks Data.GetZkLinks
+      -- | GetZkLinks Data.GetZkLinks
     | SearchZkNotes S.ZkNoteSearch
     | SaveImportZkNotes (List Data.ImportZkNote)
     | PowerDelete S.TagSearch
@@ -158,12 +158,11 @@ encodeSendMsg sm =
                 , ( "data", Data.encodeZkLinks zklinks )
                 ]
 
-        GetZkLinks gzl ->
-            JE.object
-                [ ( "what", JE.string "getzklinks" )
-                , ( "data", Data.encodeGetZkLinks gzl )
-                ]
-
+        -- GetZkLinks gzl ->
+        --     JE.object
+        --         [ ( "what", JE.string "getzklinks" )
+        --         , ( "data", Data.encodeGetZkLinks gzl )
+        --         ]
         SearchZkNotes s ->
             JE.object
                 [ ( "what", JE.string "searchzknotes" )

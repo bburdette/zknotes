@@ -986,8 +986,8 @@ isPublic model =
     linksWith (Dict.values model.zklDict) model.ld.publicid
 
 
-initFull : Data.LoginData -> Data.ZkNoteSearchResult -> Data.ZkNote -> Data.ZkLinks -> SP.Model -> ( Model, Data.GetZkNoteComments )
-initFull ld zkl zknote zklDict spm =
+initFull : Data.LoginData -> Data.ZkNoteSearchResult -> Data.ZkNote -> List Data.EditLink -> SP.Model -> ( Model, Data.GetZkNoteComments )
+initFull ld zkl zknote dtlinks spm =
     let
         cells =
             zknote.content
@@ -999,7 +999,17 @@ initFull ld zkl zknote zklDict spm =
                 (mkCc cells)
 
         links =
-            List.map (toEditLink zknote.id) zklDict.links
+            List.map
+                (\dl ->
+                    { otherid = dl.otherid
+                    , direction = dl.direction
+                    , user = dl.user
+                    , zknote = dl.zknote
+                    , othername = dl.othername
+                    , delete = Nothing
+                    }
+                )
+                dtlinks
     in
     ( { id = Just zknote.id
       , ld = ld

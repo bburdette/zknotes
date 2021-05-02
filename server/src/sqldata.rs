@@ -10,8 +10,8 @@ use std::path::Path;
 use std::time::Duration;
 use uuid::Uuid;
 use zkprotocol::content::{
-  Direction, GetZkLinks, GetZkNoteComments, GetZkNoteEdit, ImportZkNote, LoginData, SaveZkLink,
-  SaveZkNote, SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
+  Direction, EditLink, GetZkLinks, GetZkNoteComments, GetZkNoteEdit, ImportZkNote, LoginData,
+  SaveZkLink, SaveZkNote, SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
 };
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -1599,7 +1599,7 @@ pub fn read_zklinks(
   conn: &Connection,
   uid: i64,
   gzl: &GetZkLinks,
-) -> Result<Vec<ZkLink>, Box<dyn Error>> {
+) -> Result<Vec<EditLink>, Box<dyn Error>> {
   let pubid = note_id(&conn, "system", "public")?;
 
   let usershares = user_shares(&conn, uid)?;
@@ -1676,34 +1676,61 @@ pub fn read_zklinks(
   );
 
   let mut pstmt = conn.prepare(sqlstr.as_str())?;
+  let r = Ok(
+    pstmt
+      .query_map(params![uid, gzl.zknote, pubid, unid], |row| {
+        let fromid = row.get(0)?;
+        let toid = row.get(1)?;
+        Ok(EditLink {
+          otherid: if fromid == gzl.zknote { toid } else { fromid },
+          direction: if fromid == gzl.zknote {
+            Direction::To
+          } else {
+            Direction::From
+          },
+          user: row.get(2)?,
+          zknote: row.get(3)?,
+          othername: if fromid == gzl.zknote {
+            row.get(5)?
+          } else {
+            row.get(4)?
+          },
+        })
+      })?
+      .filter_map(|x| x.ok())
+      .collect(),
+  );
+  r
+  // let rec_iter = pstmt.query_map(params![uid, gzl.zknote, pubid, unid], |row| {
+  //   Ok(ZkLink {
+  //     from: row.get(0)?,
+  //     to: row.get(1)?,
+  //     user: row.get(2)?,
+  //     delete: None,
+  //     linkzknote: row.get(3)?,
+  //     fromname: row.get(4)?,
+  //     toname: row.get(5)?,
+  //   })
+  // })?;
 
-  let rec_iter = pstmt.query_map(params![uid, gzl.zknote, pubid, unid], |row| {
-    Ok(ZkLink {
-      from: row.get(0)?,
-      to: row.get(1)?,
-      user: row.get(2)?,
-      delete: None,
-      linkzknote: row.get(3)?,
-      fromname: row.get(4)?,
-      toname: row.get(5)?,
-    })
-  })?;
+  // let mut pv = Vec::new();
 
-  let mut pv = Vec::new();
+  // for rsrec in rec_iter {
+  //   match rsrec {
+  //     Ok(rec) => {
+  //       pv.push(rec);
+  //     }
+  //     Err(_) => (),
+  //   }
+  // }
 
-  for rsrec in rec_iter {
-    match rsrec {
-      Ok(rec) => {
-        pv.push(rec);
-      }
-      Err(_) => (),
-    }
-  }
-
-  Ok(pv)
+  // Ok(pv)
 }
 
-pub fn read_public_zklinks(conn: &Connection, noteid: i64) -> Result<Vec<ZkLink>, Box<dyn Error>> {
+pub fn read_public_zklinks(
+  conn: &Connection,
+  noteid: i64,
+) -> Result<Vec<EditLink>, Box<dyn Error>> {
   let pubid = note_id(&conn, "system", "public")?;
   let sysid = user_id(&conn, "system")?;
 
@@ -1720,30 +1747,44 @@ pub fn read_public_zklinks(conn: &Connection, noteid: i64) -> Result<Vec<ZkLink>
         (A.fromid = ?1 and A.toid = B.fromid and B.toid = ?2))",
   )?;
 
-  let rec_iter = pstmt.query_map(params![noteid, pubid, sysid], |row| {
-    Ok(ZkLink {
-      from: row.get(0)?,
-      to: row.get(1)?,
-      user: row.get(2)?,
-      delete: None,
-      linkzknote: row.get(3)?,
-      fromname: row.get(4)?,
-      toname: row.get(5)?,
-    })
-  })?;
+  let r = Ok(
+    pstmt
+      .query_map(params![noteid, pubid, sysid], |row| {
+        let fromid = row.get(0)?;
+        let toid = row.get(1)?;
+        Ok(EditLink {
+          otherid: if fromid == noteid { toid } else { fromid },
+          direction: if fromid == noteid {
+            Direction::To
+          } else {
+            Direction::From
+          },
+          user: row.get(2)?,
+          zknote: row.get(3)?,
+          othername: if fromid == noteid {
+            row.get(5)?
+          } else {
+            row.get(4)?
+          },
+        })
+      })?
+      .filter_map(|x| x.ok())
+      .collect(),
+  );
+  r
 
-  let mut pv = Vec::new();
+  // let mut pv = Vec::new();
 
-  for rsrec in rec_iter {
-    match rsrec {
-      Ok(rec) => {
-        pv.push(rec);
-      }
-      Err(_) => (),
-    }
-  }
+  // for rsrec in rec_iter {
+  //   match rsrec {
+  //     Ok(rec) => {
+  //       pv.push(rec);
+  //     }
+  //     Err(_) => (),
+  //   }
+  // }
 
-  Ok(pv)
+  // Ok(pv)
 }
 
 pub fn read_zknotecomments(

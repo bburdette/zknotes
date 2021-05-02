@@ -98,6 +98,15 @@ type Direction
     | To
 
 
+type alias EditLink =
+    { otherid : Int
+    , direction : Direction
+    , user : Int
+    , zknote : Maybe Int
+    , othername : Maybe String
+    }
+
+
 type alias SaveZkLink =
     { otherid : Int
     , direction : Direction
@@ -153,7 +162,7 @@ type alias GetZkNoteEdit =
 
 type alias ZkNoteEdit =
     { zknote : ZkNote
-    , links : List ZkLink
+    , links : List EditLink
     }
 
 
@@ -227,6 +236,23 @@ encodeDirection direction =
             JE.string "From"
 
 
+decodeDirection : JD.Decoder Direction
+decodeDirection =
+    JD.string
+        |> JD.andThen
+            (\s ->
+                case s of
+                    "From" ->
+                        JD.succeed From
+
+                    "To" ->
+                        JD.succeed To
+
+                    wat ->
+                        JD.fail ("not a direction: " ++ wat)
+            )
+
+
 encodeSaveZkLink : SaveZkLink -> JE.Value
 encodeSaveZkLink s =
     [ Just ( "otherid", JE.int s.otherid )
@@ -276,6 +302,16 @@ decodeZkLink =
         (JD.maybe (JD.field "fromname" JD.string))
         (JD.maybe (JD.field "toname" JD.string))
         (JD.succeed Nothing)
+
+
+decodeEditLink : JD.Decoder EditLink
+decodeEditLink =
+    JD.map5 EditLink
+        (JD.field "otherid" JD.int)
+        (JD.field "direction" decodeDirection)
+        (JD.field "user" JD.int)
+        (JD.maybe (JD.field "zknote" JD.int))
+        (JD.maybe (JD.field "othername" JD.string))
 
 
 saveZkNote : ZkNote -> SaveZkNote
@@ -363,7 +399,7 @@ decodeZkNoteEdit : JD.Decoder ZkNoteEdit
 decodeZkNoteEdit =
     JD.map2 ZkNoteEdit
         (JD.field "zknote" decodeZkNote)
-        (JD.field "links" (JD.list decodeZkLink))
+        (JD.field "links" (JD.list decodeEditLink))
 
 
 decodeLoginData : JD.Decoder LoginData

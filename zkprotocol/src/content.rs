@@ -63,7 +63,7 @@ pub struct SaveZkNote {
   pub editable: bool,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Direction {
   From,
   To,
@@ -93,6 +93,15 @@ pub struct ZkLink {
   pub delete: Option<bool>,
   pub fromname: Option<String>,
   pub toname: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct EditLink {
+  pub otherid: i64,
+  pub direction: Direction,
+  pub user: i64,
+  pub zknote: Option<i64>,
+  pub othername: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -128,5 +137,5 @@ pub struct GetZkNoteComments {
 #[derive(Serialize, Debug)]
 pub struct ZkNoteEdit {
   pub zknote: ZkNote,
-  pub links: Vec<ZkLink>,
+  pub links: Vec<EditLink>,
 }

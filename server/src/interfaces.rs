@@ -256,17 +256,17 @@ fn user_interface_loggedin(
         content: serde_json::to_value(szkn)?,
       })
     }
-    "getzklinks" => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let gzl: GetZkLinks = serde_json::from_value(msgdata.clone())?;
-      let conn = sqldata::connection_open(config.db.as_path())?;
-      let s = sqldata::read_zklinks(&conn, uid, &gzl)?;
-      let zklinks = ZkLinks { links: s };
-      Ok(ServerResponse {
-        what: "zklinks".to_string(),
-        content: serde_json::to_value(zklinks)?,
-      })
-    }
+    // "getzklinks" => {
+    //   let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+    //   let gzl: GetZkLinks = serde_json::from_value(msgdata.clone())?;
+    //   let conn = sqldata::connection_open(config.db.as_path())?;
+    //   let s = sqldata::read_zklinks(&conn, uid, &gzl)?;
+    //   let zklinks = ZkLinks { links: s };
+    //   Ok(ServerResponse {
+    //     what: "zklinks".to_string(),
+    //     content: serde_json::to_value(zklinks)?,
+    //   })
+    // }
     "saveimportzknotes" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let gzl: Vec<ImportZkNote> = serde_json::from_value(msgdata.clone())?;
