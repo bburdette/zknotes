@@ -554,6 +554,7 @@ addComment : Model -> Element Msg
 addComment model =
     E.column
         [ E.width E.fill
+        , E.spacing 8
         ]
         [ EI.multiline
             [ EF.color TC.black
@@ -632,7 +633,7 @@ zknview size model =
                 - (60 * 2 + 6)
 
         showComments =
-            E.row [ EF.bold, E.width E.fill ] [ E.text "comments" ]
+            E.el [ EF.bold, E.width E.fill ] (E.text "comments")
                 :: List.map
                     (\zkn ->
                         E.row [ E.width E.fill, E.spacing 8 ]
