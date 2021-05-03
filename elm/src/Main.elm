@@ -24,6 +24,7 @@ import Html.Events as HE
 import Http
 import Import
 import Json.Decode as JD
+import Json.Encode as JE
 import LocalStorage as LS
 import Login
 import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..))
@@ -106,6 +107,7 @@ type alias Model =
     , navkey : Browser.Navigation.Key
     , seed : Seed
     , savedRoute : SavedRoute
+    , lastSearch : Maybe S.TagSearch
     }
 
 
@@ -488,8 +490,8 @@ sendSearch model search =
                     { note =
                         { id = Nothing
                         , pubid = Nothing
-                        , title = "search"
-                        , content = S.showTagSearch search.tagSearch
+                        , title = S.printTagSearch search.tagSearch
+                        , content = S.encodeTagSearch search.tagSearch |> JE.encode 2
                         , editable = False
                         }
                     , links =
@@ -502,11 +504,15 @@ sendSearch model search =
                         ]
                     }
             in
-            ( model
-            , Cmd.batch
-                [ sendUIMsg model.location (UI.SearchZkNotes search)
-                , sendUIMsg model.location (UI.SaveZkNotePlusLinks searchnote)
-                ]
+            ( { model | lastSearch = Just search.tagSearch }
+            , if model.lastSearch == Just search.tagSearch then
+                sendUIMsg model.location (UI.SearchZkNotes search)
+
+              else
+                Cmd.batch
+                    [ sendUIMsg model.location (UI.SearchZkNotes search)
+                    , sendUIMsg model.location (UI.SaveZkNotePlusLinks searchnote)
+                    ]
             )
 
         Nothing ->
@@ -1413,6 +1419,7 @@ init flags url key =
             , navkey = key
             , seed = seed
             , savedRoute = { route = Top, save = False }
+            , lastSearch = Nothing
             }
 
         ( model, cmd ) =
