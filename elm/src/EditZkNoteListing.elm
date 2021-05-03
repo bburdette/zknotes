@@ -116,31 +116,20 @@ listview ld size model =
                   , view =
                         \n ->
                             E.row
-                                [ E.centerY
-                                , E.clipX
-                                , E.width E.fill
-                                ]
-                                [ if n.user == ld.userid then
-                                    E.link
-                                        ((E.height <|
-                                            E.px 30
-                                         )
-                                            :: ZC.myLinkStylePlain
-                                        )
-                                        { url = Data.editNoteLink n.id
-                                        , label = E.text n.title
-                                        }
-
-                                  else
-                                    E.link
-                                        ((E.height <|
-                                            E.px 30
-                                         )
-                                            :: ZC.otherLinkStylePlain
-                                        )
-                                        { url = Data.editNoteLink n.id
-                                        , label = E.text n.title
-                                        }
+                                ([ E.centerY
+                                 , E.clipX
+                                 , E.width E.fill
+                                 ]
+                                    ++ (ZC.systemColor ld n.sysids
+                                            |> Maybe.map (\c -> [ EF.color c ])
+                                            |> Maybe.withDefault []
+                                       )
+                                )
+                                [ E.link
+                                    [ E.height <| E.px 30 ]
+                                    { url = Data.editNoteLink n.id
+                                    , label = E.text n.title
+                                    }
                                 ]
                   }
                 ]

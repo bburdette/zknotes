@@ -508,7 +508,7 @@ sendSearch model search =
                         , editable = False
                         }
                     , links =
-                        [ { otherid = ldata.shareid
+                        [ { otherid = ldata.searchid
                           , direction = Data.To
                           , user = ldata.userid
                           , zknote = Nothing

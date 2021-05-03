@@ -535,7 +535,7 @@ showSr model isdirty zkln =
                  , E.clipX
                  ]
                     ++ (sysColor
-                            |> Maybe.map (\c -> [ EBk.color c ])
+                            |> Maybe.map (\c -> [ EF.color c ])
                             |> Maybe.withDefault []
                        )
                 )
