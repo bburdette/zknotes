@@ -75,7 +75,11 @@ type State
     | ShowMessage ShowMessage.Model Data.LoginData
     | PubShowMessage ShowMessage.Model
     | LoginShowMessage ShowMessage.Model Data.LoginData Url
-    | Wait State (State -> Msg -> ( State, Cmd Msg ))
+    | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
+
+
+
+-- | WaitM State (Model -> Msg -> ( Model, Cmd Msg ))
 
 
 type alias Flags =
@@ -475,7 +479,7 @@ sendUIMsg location msg =
 
 {-| send search AND save search in db as a zknote
 -}
-sendSearch : Model -> S.ZkNoteSearch -> Cmd Msg
+sendSearch : Model -> S.ZkNoteSearch -> ( Model, Cmd Msg )
 sendSearch model search =
     case stateLogin model.state of
         Just ldata ->
@@ -498,13 +502,17 @@ sendSearch model search =
                         ]
                     }
             in
-            Cmd.batch
+            ( model
+            , Cmd.batch
                 [ sendUIMsg model.location (UI.SearchZkNotes search)
                 , sendUIMsg model.location (UI.SaveZkNotePlusLinks searchnote)
                 ]
+            )
 
         Nothing ->
-            Cmd.none
+            ( model
+            , Cmd.none
+            )
 
 
 sendPIMsg : String -> PI.SendMsg -> Cmd Msg
@@ -555,26 +563,23 @@ listingwait login st ms =
 
 getListing : Model -> Data.LoginData -> ( Model, Cmd Msg )
 getListing model login =
-    ( { model
-        | state =
-            ShowMessage
-                { message = "loading articles"
-                }
-                login
-        , seed =
-            case model.state of
-                -- save the seed if we're leaving login state.
-                Login lmod ->
-                    lmod.seed
+    sendSearch
+        { model
+            | state =
+                ShowMessage
+                    { message = "loading articles"
+                    }
+                    login
+            , seed =
+                case model.state of
+                    -- save the seed if we're leaving login state.
+                    Login lmod ->
+                        lmod.seed
 
-                _ ->
-                    model.seed
-      }
-    , Cmd.batch
-        [ sendSearch model
-            S.defaultSearch
-        ]
-    )
+                    _ ->
+                        model.seed
+        }
+        S.defaultSearch
 
 
 view : Model -> { title : String, body : List (Html Msg) }
@@ -732,10 +737,10 @@ actualupdate msg model =
     case ( msg, model.state ) of
         ( _, Wait wst wfn ) ->
             let
-                ( nst, cmd ) =
-                    wfn model.state msg
+                ( nmd, cmd ) =
+                    wfn model msg
             in
-            ( { model | state = nst }, cmd )
+            ( nmd, cmd )
 
         ( WindowSize s, _ ) ->
             ( { model | size = s }, Cmd.none )
@@ -759,17 +764,23 @@ actualupdate msg model =
                                                     }
                                                     login
                                                 )
-                                                (\st ms ->
+                                                (\md ms ->
                                                     case ms of
                                                         UserReplyData (Ok (UI.SavedZkNotePlusLinks _)) ->
-                                                            ( EditZkNote
-                                                                newnote_st
-                                                                login
+                                                            ( { model
+                                                                | state =
+                                                                    EditZkNote
+                                                                        newnote_st
+                                                                        login
+                                                              }
                                                             , Cmd.none
                                                             )
 
                                                         _ ->
-                                                            ( unexpectedMsg st ms
+                                                            ( { model
+                                                                | state =
+                                                                    unexpectedMsg model.state ms
+                                                              }
                                                             , Cmd.none
                                                             )
                                                 )
@@ -861,26 +872,23 @@ actualupdate msg model =
                         UI.LoggedIn login ->
                             let
                                 getlisting =
-                                    ( { model
-                                        | state =
-                                            ShowMessage
-                                                { message = "loading articles"
-                                                }
-                                                login
-                                        , seed =
-                                            case state of
-                                                -- save the seed if we're leaving login state.
-                                                Login lmod ->
-                                                    lmod.seed
+                                    sendSearch
+                                        { model
+                                            | state =
+                                                ShowMessage
+                                                    { message = "loading articles"
+                                                    }
+                                                    login
+                                            , seed =
+                                                case state of
+                                                    -- save the seed if we're leaving login state.
+                                                    Login lmod ->
+                                                        lmod.seed
 
-                                                _ ->
-                                                    model.seed
-                                      }
-                                    , Cmd.batch
-                                        [ sendSearch model
-                                            S.defaultSearch
-                                        ]
-                                    )
+                                                    _ ->
+                                                        model.seed
+                                        }
+                                        S.defaultSearch
                             in
                             case state of
                                 Login lm ->
@@ -1160,9 +1168,7 @@ actualupdate msg model =
                     )
 
                 EditZkNoteListing.Search s ->
-                    ( { model | state = EditZkNoteListing emod login }
-                    , sendSearch model s
-                    )
+                    sendSearch { model | state = EditZkNoteListing emod login } s
 
                 EditZkNoteListing.PowerDelete s ->
                     ( { model | state = EditZkNoteListing emod login }
@@ -1177,22 +1183,24 @@ actualupdate msg model =
 
                 backtolisting =
                     \imod ->
-                        ( { model
-                            | state =
-                                EditZkNoteListing
-                                    { notes = imod.zknSearchResult
-                                    , spmodel = imod.spmodel
-                                    , dialog = Nothing
-                                    }
-                                    login
-                          }
-                        , case SP.getSearch imod.spmodel of
+                        let
+                            nm =
+                                { model
+                                    | state =
+                                        EditZkNoteListing
+                                            { notes = imod.zknSearchResult
+                                            , spmodel = imod.spmodel
+                                            , dialog = Nothing
+                                            }
+                                            login
+                                }
+                        in
+                        case SP.getSearch imod.spmodel of
                             Just s ->
-                                sendSearch model s
+                                sendSearch nm s
 
                             Nothing ->
-                                Cmd.none
-                        )
+                                ( nm, Cmd.none )
             in
             case ecmd of
                 Import.None ->
@@ -1219,9 +1227,7 @@ actualupdate msg model =
                     )
 
                 Import.Search s ->
-                    ( { model | state = Import emod login }
-                    , sendSearch model s
-                    )
+                    sendSearch { model | state = Import emod login } s
 
                 Import.SelectFiles ->
                     ( { model | state = Import emod login }
@@ -1251,52 +1257,61 @@ actualupdate msg model =
 handleEditZkNoteCmd model login emod ecmd =
     let
         backtolisting =
-            ( { model
-                | state =
-                    EditZkNoteListing
-                        { notes = emod.zknSearchResult
-                        , spmodel = emod.spmodel
-                        , dialog = Nothing
-                        }
-                        login
-              }
-            , case SP.getSearch emod.spmodel of
+            let
+                nm =
+                    { model
+                        | state =
+                            EditZkNoteListing
+                                { notes = emod.zknSearchResult
+                                , spmodel = emod.spmodel
+                                , dialog = Nothing
+                                }
+                                login
+                    }
+            in
+            case SP.getSearch emod.spmodel of
                 Just s ->
-                    sendSearch model s
+                    sendSearch nm s
 
                 Nothing ->
-                    Cmd.none
-            )
+                    ( nm, Cmd.none )
     in
     case ecmd of
         EditZkNote.SaveExit snpl ->
             let
                 gotres =
-                    ( EditZkNoteListing
-                        { notes = emod.zknSearchResult
-                        , spmodel = emod.spmodel
-                        , dialog = Nothing
-                        }
-                        login
-                    , case SP.getSearch emod.spmodel of
+                    let
+                        nm =
+                            { model
+                                | state =
+                                    EditZkNoteListing
+                                        { notes = emod.zknSearchResult
+                                        , spmodel = emod.spmodel
+                                        , dialog = Nothing
+                                        }
+                                        login
+                            }
+                    in
+                    case SP.getSearch emod.spmodel of
                         Just s ->
-                            sendSearch model s
+                            sendSearch nm s
 
                         Nothing ->
-                            Cmd.none
-                    )
+                            ( nm, Cmd.none )
 
-                onmsg : State -> Msg -> ( State, Cmd Msg )
+                onmsg : Model -> Msg -> ( Model, Cmd Msg )
                 onmsg st ms =
                     case ms of
                         UserReplyData (Ok (UI.SavedZkNotePlusLinks szn)) ->
                             gotres
 
                         UserReplyData (Ok (UI.ServerError e)) ->
-                            ( DisplayError (DisplayError.initialModel e) st, Cmd.none )
+                            ( { model | state = DisplayError (DisplayError.initialModel e) model.state }
+                            , Cmd.none
+                            )
 
                         _ ->
-                            ( unexpectedMsg model.state ms
+                            ( { model | state = unexpectedMsg model.state ms }
                             , Cmd.none
                             )
             in
@@ -1335,8 +1350,8 @@ handleEditZkNoteCmd model login emod ecmd =
             ( { m
                 | state =
                     Wait m.state
-                        (\state _ ->
-                            ( m.state, c )
+                        (\mod _ ->
+                            ( mod, c )
                         )
               }
             , sendUIMsg model.location
@@ -1376,9 +1391,7 @@ handleEditZkNoteCmd model login emod ecmd =
             )
 
         EditZkNote.Search s ->
-            ( { model | state = EditZkNote emod login }
-            , sendSearch model s
-            )
+            sendSearch { model | state = EditZkNote emod login } s
 
 
 init : Flags -> Url -> Browser.Navigation.Key -> ( Model, Cmd Msg )
