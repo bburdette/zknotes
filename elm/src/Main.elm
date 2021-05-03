@@ -431,6 +431,19 @@ viewState size state =
             E.map (\_ -> Noop) (viewState size innerState)
 
 
+stateSearch : State -> Maybe ( SP.Model, Data.ZkNoteSearchResult )
+stateSearch state =
+    case state of
+        EditZkNote emod _ ->
+            Just ( emod.spmodel, emod.zknSearchResult )
+
+        EditZkNoteListing emod _ ->
+            Just ( emod.spmodel, emod.notes )
+
+        _ ->
+            Nothing
+
+
 stateLogin : State -> Maybe Data.LoginData
 stateLogin state =
     case state of
@@ -972,12 +985,16 @@ actualupdate msg model =
                             case stateLogin state of
                                 Just login ->
                                     let
+                                        ( spmod, sres ) =
+                                            stateSearch state
+                                                |> Maybe.withDefault ( SP.initModel, { notes = [], offset = 0 } )
+
                                         ( s, c ) =
                                             EditZkNote.initFull login
-                                                { notes = [], offset = 0 }
+                                                sres
                                                 zne.zknote
                                                 zne.links
-                                                SP.initModel
+                                                spmod
                                     in
                                     ( { model
                                         | state =
