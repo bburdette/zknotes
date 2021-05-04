@@ -41,7 +41,7 @@ type Command
     | RangeChanged
 
 
-searchResultUpdated : Data.ZkNoteSearchResult -> Model -> Model
+searchResultUpdated : Data.ZkListNoteSearchResult -> Model -> Model
 searchResultUpdated zsr model =
     { model | end = List.length zsr.notes < model.increment }
 

@@ -34,7 +34,7 @@ type DWhich
 
 
 type alias Model =
-    { notes : Data.ZkNoteSearchResult
+    { notes : Data.ZkListNoteSearchResult
     , spmodel : SP.Model
     , dialog : Maybe ( D.Model, DWhich )
     }
@@ -64,7 +64,7 @@ onPowerDeleteComplete count ld model =
     }
 
 
-updateSearchResult : Data.ZkNoteSearchResult -> Model -> Model
+updateSearchResult : Data.ZkListNoteSearchResult -> Model -> Model
 updateSearchResult zsr model =
     { model
         | notes = zsr

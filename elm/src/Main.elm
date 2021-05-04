@@ -431,7 +431,7 @@ viewState size state =
             E.map (\_ -> Noop) (viewState size innerState)
 
 
-stateSearch : State -> Maybe ( SP.Model, Data.ZkNoteSearchResult )
+stateSearch : State -> Maybe ( SP.Model, Data.ZkListNoteSearchResult )
 stateSearch state =
     case state of
         EditZkNote emod _ ->
@@ -547,7 +547,7 @@ sendPIMsg location msg =
 
 type alias NwState =
     { login : Data.LoginData
-    , mbzknotesearchresult : Maybe Data.ZkNoteSearchResult
+    , mbzknotesearchresult : Maybe Data.ZkListNoteSearchResult
     , mbzklinks : Maybe Data.ZkLinks
     , mbzknote : Maybe Data.ZkNote
     , spmodel : SP.Model
@@ -560,7 +560,7 @@ type alias NwState =
 listingwait : Data.LoginData -> State -> Msg -> ( State, Cmd Msg )
 listingwait login st ms =
     case ms of
-        UserReplyData (Ok (UI.ZkNoteSearchResult rs)) ->
+        UserReplyData (Ok (UI.ZkListNoteSearchResult rs)) ->
             ( EditZkNoteListing
                 { notes = rs
                 , spmodel =
@@ -947,10 +947,10 @@ actualupdate msg model =
                                     , Cmd.none
                                     )
 
-                        UI.ZkFullNoteSearchResult sr ->
+                        UI.ZkNoteSearchResult sr ->
                             let
                                 _ =
-                                    Debug.log " UI.ZkFullNoteSearchResult " sr
+                                    Debug.log " UI.ZkNoteSearchResult " sr
                             in
                             if sr.what == "prevSearches" then
                                 -- build prev searches list.
@@ -970,7 +970,11 @@ actualupdate msg model =
                             else
                                 ( model, Cmd.none )
 
-                        UI.ZkNoteSearchResult sr ->
+                        UI.ZkListNoteSearchResult sr ->
+                            let
+                                _ =
+                                    Debug.log "UI.ZkListNoteSearchResult" sr
+                            in
                             case state of
                                 EditZkNoteListing znlstate login_ ->
                                     ( { model | state = EditZkNoteListing (EditZkNoteListing.updateSearchResult sr znlstate) login_ }
@@ -1475,7 +1479,7 @@ init flags url key =
                 , offset = 0
                 , limit = Just 50
                 , what = "prevSearches"
-                , full = True
+                , list = False
                 }
 
         ( model, cmd ) =

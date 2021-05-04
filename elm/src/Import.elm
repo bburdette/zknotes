@@ -82,7 +82,7 @@ type alias Links =
 type alias Model =
     { ld : Data.LoginData
     , notes : List Data.ImportZkNote
-    , zknSearchResult : Data.ZkNoteSearchResult
+    , zknSearchResult : Data.ZkListNoteSearchResult
     , globlinks : Dict Int LinkHalf
     , spmodel : SP.Model
     , dialog : Maybe D.Model
@@ -98,7 +98,7 @@ type Command
     | Command (Cmd Msg)
 
 
-updateSearchResult : Data.ZkNoteSearchResult -> Model -> Model
+updateSearchResult : Data.ZkListNoteSearchResult -> Model -> Model
 updateSearchResult zsr model =
     { model
         | zknSearchResult = zsr
@@ -317,7 +317,7 @@ zklKey zkl =
     String.fromInt zkl.from ++ ":" ++ String.fromInt zkl.to
 
 
-init : Data.LoginData -> Data.ZkNoteSearchResult -> SP.Model -> Model
+init : Data.LoginData -> Data.ZkListNoteSearchResult -> SP.Model -> Model
 init ld zkl spm =
     { ld = ld
     , zknSearchResult = zkl

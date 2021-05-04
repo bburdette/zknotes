@@ -7,7 +7,7 @@ use std::convert::TryInto;
 use std::error::Error;
 use zkprotocol::content::ZkListNote;
 use zkprotocol::search::{
-  AndOr, SearchMod, TagSearch, ZkFullNoteSearchResult, ZkNoteSearch, ZkNoteSearchResult,
+  AndOr, SearchMod, TagSearch, ZkListNoteSearchResult, ZkNoteSearch, ZkNoteSearchResult,
 };
 
 pub fn power_delete_zknotes(
@@ -23,7 +23,7 @@ pub fn power_delete_zknotes(
     offset: 0,
     limit: None,
     what: "".to_string(),
-    full: false,
+    list: true,
   };
 
   let znsr = search_zknotes(conn, user, &nolimsearch)?;
@@ -51,7 +51,7 @@ pub fn search_zknotes(
   conn: &Connection,
   user: i64,
   search: &ZkNoteSearch,
-) -> Result<Either<ZkNoteSearchResult, ZkFullNoteSearchResult>, Box<dyn Error>> {
+) -> Result<Either<ZkListNoteSearchResult, ZkNoteSearchResult>, Box<dyn Error>> {
   let (sql, args) = build_sql(&conn, user, search.clone())?;
 
   let mut pstmt = conn.prepare(sql.as_str())?;
@@ -71,26 +71,8 @@ pub fn search_zknotes(
     })
   })?;
 
-  if search.full {
-    println!("full!");
-    let mut pv = Vec::new();
-
-    for rsrec in rec_iter {
-      match rsrec {
-        Ok(rec) => {
-          pv.push(sqldata::read_zknote(&conn, Some(user), rec.id)?);
-        }
-        Err(_) => (),
-      }
-    }
-
-    Ok(Right(ZkFullNoteSearchResult {
-      notes: pv,
-      offset: search.offset,
-      what: search.what.clone(),
-    }))
-  } else {
-    println!("unfull!");
+  if search.list {
+    println!("list!");
     let mut pv = Vec::new();
 
     for rsrec in rec_iter {
@@ -102,7 +84,25 @@ pub fn search_zknotes(
       }
     }
 
-    Ok(Left(ZkNoteSearchResult {
+    Ok(Left(ZkListNoteSearchResult {
+      notes: pv,
+      offset: search.offset,
+      what: search.what.clone(),
+    }))
+  } else {
+    println!("notlist!");
+    let mut pv = Vec::new();
+
+    for rsrec in rec_iter {
+      match rsrec {
+        Ok(rec) => {
+          pv.push(sqldata::read_zknote(&conn, Some(user), rec.id)?);
+        }
+        Err(_) => (),
+      }
+    }
+
+    Ok(Right(ZkNoteSearchResult {
       notes: pv,
       offset: search.offset,
       what: search.what.clone(),

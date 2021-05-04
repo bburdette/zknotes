@@ -31,7 +31,7 @@ initModel =
     }
 
 
-searchResultUpdated : Data.ZkNoteSearchResult -> Model -> Model
+searchResultUpdated : Data.ZkListNoteSearchResult -> Model -> Model
 searchResultUpdated zsr model =
     { model | paginationModel = PP.searchResultUpdated zsr model.paginationModel }
 
@@ -45,7 +45,7 @@ getSearch model =
                 , offset = model.paginationModel.offset
                 , limit = Just model.paginationModel.increment
                 , what = ""
-                , full = False
+                , list = True
                 }
             )
 
@@ -111,7 +111,7 @@ update msg model =
                         , offset = 0
                         , limit = Just model.paginationModel.increment
                         , what = ""
-                        , full = False
+                        , list = True
                         }
                     )
 
@@ -133,7 +133,7 @@ update msg model =
                                 , offset = nm.offset
                                 , limit = Just nm.increment
                                 , what = ""
-                                , full = False
+                                , list = True
                                 }
                             )
 

@@ -205,11 +205,11 @@ fn user_interface_loggedin(
       let res = search::search_zknotes(&conn, uid, &search)?;
       match res {
         Left(res) => Ok(ServerResponse {
-          what: "zknotesearchresult".to_string(),
+          what: "zklistnotesearchresult".to_string(),
           content: serde_json::to_value(res)?,
         }),
         Right(res) => Ok(ServerResponse {
-          what: "zkfullnotesearchresult".to_string(),
+          what: "zknotesearchresult".to_string(),
           content: serde_json::to_value(res)?,
         }),
       }

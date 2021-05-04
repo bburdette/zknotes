@@ -132,7 +132,7 @@ type alias Model =
     , ld : Data.LoginData
     , noteUser : Int
     , noteUserName : String
-    , zknSearchResult : Data.ZkNoteSearchResult
+    , zknSearchResult : Data.ZkListNoteSearchResult
     , focusSr : Maybe Int -- note id in search result.
     , zklDict : Dict String EditLink
     , focusLink : Maybe EditLink
@@ -253,7 +253,7 @@ commentsRecieved comments model =
     { model | comments = comments }
 
 
-updateSearchResult : Data.ZkNoteSearchResult -> Model -> Model
+updateSearchResult : Data.ZkListNoteSearchResult -> Model -> Model
 updateSearchResult zsr model =
     { model
         | zknSearchResult = zsr
@@ -987,7 +987,7 @@ isPublic model =
     linksWith (Dict.values model.zklDict) model.ld.publicid
 
 
-initFull : Data.LoginData -> Data.ZkNoteSearchResult -> Data.ZkNote -> List Data.EditLink -> SP.Model -> ( Model, Data.GetZkNoteComments )
+initFull : Data.LoginData -> Data.ZkListNoteSearchResult -> Data.ZkNote -> List Data.EditLink -> SP.Model -> ( Model, Data.GetZkNoteComments )
 initFull ld zkl zknote dtlinks spm =
     let
         cells =
@@ -1044,7 +1044,7 @@ initFull ld zkl zknote dtlinks spm =
     )
 
 
-initNew : Data.LoginData -> Data.ZkNoteSearchResult -> SP.Model -> Model
+initNew : Data.LoginData -> Data.ZkListNoteSearchResult -> SP.Model -> Model
 initNew ld zkl spm =
     let
         cells =
