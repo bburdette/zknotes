@@ -190,67 +190,66 @@ encodeEmail email =
 
 serverResponseDecoder : JD.Decoder ServerResponse
 serverResponseDecoder =
-    JD.andThen
-        (\what ->
-            case what of
-                "registration sent" ->
-                    JD.succeed RegistrationSent
+    JD.at [ "what" ]
+        JD.string
+        |> JD.andThen
+            (\what ->
+                case what of
+                    "registration sent" ->
+                        JD.succeed RegistrationSent
 
-                "unregistered user" ->
-                    JD.succeed UnregisteredUser
+                    "unregistered user" ->
+                        JD.succeed UnregisteredUser
 
-                "user exists" ->
-                    JD.succeed UserExists
+                    "user exists" ->
+                        JD.succeed UserExists
 
-                "logged in" ->
-                    JD.map LoggedIn (JD.at [ "content" ] Data.decodeLoginData)
+                    "logged in" ->
+                        JD.map LoggedIn (JD.at [ "content" ] Data.decodeLoginData)
 
-                "not logged in" ->
-                    JD.succeed NotLoggedIn
+                    "not logged in" ->
+                        JD.succeed NotLoggedIn
 
-                "invalid user or pwd" ->
-                    JD.succeed InvalidUserOrPwd
+                    "invalid user or pwd" ->
+                        JD.succeed InvalidUserOrPwd
 
-                "server error" ->
-                    JD.map ServerError (JD.at [ "content" ] JD.string)
+                    "server error" ->
+                        JD.map ServerError (JD.at [ "content" ] JD.string)
 
-                "zknotesearchresult" ->
-                    JD.map ZkNoteSearchResult (JD.at [ "content" ] <| Data.decodeZkNoteSearchResult)
+                    "zknotesearchresult" ->
+                        JD.map ZkNoteSearchResult (JD.at [ "content" ] <| Data.decodeZkNoteSearchResult)
 
-                "savedzknote" ->
-                    JD.map SavedZkNote (JD.at [ "content" ] <| Data.decodeSavedZkNote)
+                    "savedzknote" ->
+                        JD.map SavedZkNote (JD.at [ "content" ] <| Data.decodeSavedZkNote)
 
-                "savedzknotepluslinks" ->
-                    JD.map SavedZkNotePlusLinks (JD.at [ "content" ] <| Data.decodeSavedZkNote)
+                    "savedzknotepluslinks" ->
+                        JD.map SavedZkNotePlusLinks (JD.at [ "content" ] <| Data.decodeSavedZkNote)
 
-                "deletedzknote" ->
-                    JD.map DeletedZkNote (JD.at [ "content" ] <| JD.int)
+                    "deletedzknote" ->
+                        JD.map DeletedZkNote (JD.at [ "content" ] <| JD.int)
 
-                "zknote" ->
-                    JD.map ZkNote (JD.at [ "content" ] <| Data.decodeZkNote)
+                    "zknote" ->
+                        JD.map ZkNote (JD.at [ "content" ] <| Data.decodeZkNote)
 
-                "zknoteedit" ->
-                    JD.map ZkNoteEdit (JD.at [ "content" ] <| Data.decodeZkNoteEdit)
+                    "zknoteedit" ->
+                        JD.map ZkNoteEdit (JD.at [ "content" ] <| Data.decodeZkNoteEdit)
 
-                "zknotecomments" ->
-                    JD.map ZkNoteComments (JD.at [ "content" ] <| JD.list Data.decodeZkNote)
+                    "zknotecomments" ->
+                        JD.map ZkNoteComments (JD.at [ "content" ] <| JD.list Data.decodeZkNote)
 
-                "savedzklinks" ->
-                    JD.succeed SavedZkLinks
+                    "savedzklinks" ->
+                        JD.succeed SavedZkLinks
 
-                "savedimportzknotes" ->
-                    JD.succeed SavedImportZkNotes
+                    "savedimportzknotes" ->
+                        JD.succeed SavedImportZkNotes
 
-                "zklinks" ->
-                    JD.map ZkLinks (JD.field "content" Data.decodeZkLinks)
+                    "zklinks" ->
+                        JD.map ZkLinks (JD.field "content" Data.decodeZkLinks)
 
-                "powerdeletecomplete" ->
-                    JD.map PowerDeleteComplete (JD.field "content" JD.int)
+                    "powerdeletecomplete" ->
+                        JD.map PowerDeleteComplete (JD.field "content" JD.int)
 
-                wat ->
-                    JD.succeed
-                        (ServerError ("invalid 'what' from server: " ++ wat))
-        )
-        (JD.at [ "what" ]
-            JD.string
-        )
+                    wat ->
+                        JD.succeed
+                            (ServerError ("invalid 'what' from server: " ++ wat))
+            )

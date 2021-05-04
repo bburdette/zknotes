@@ -948,31 +948,46 @@ actualupdate msg model =
                                     )
 
                         UI.ZkNoteSearchResult sr ->
-                            case state of
-                                EditZkNoteListing znlstate login_ ->
-                                    ( { model | state = EditZkNoteListing (EditZkNoteListing.updateSearchResult sr znlstate) login_ }
-                                    , Cmd.none
-                                    )
+                            if sr.what == "prevSearches" then
+                                -- build prev searches list.
+                                ( { model
+                                    | prevSearches =
+                                        List.filterMap
+                                            (\zknote ->
+                                                JD.decodeString S.decodeTagSearch zknote.title
+                                                    |> Result.toMaybe
+                                            )
+                                            sr.notes
+                                  }
+                                , Cmd.none
+                                )
 
-                                EditZkNote znstate login_ ->
-                                    ( { model | state = EditZkNote (EditZkNote.updateSearchResult sr znstate) login_ }
-                                    , Cmd.none
-                                    )
+                            else
+                                case state of
+                                    EditZkNoteListing znlstate login_ ->
+                                        ( { model | state = EditZkNoteListing (EditZkNoteListing.updateSearchResult sr znlstate) login_ }
+                                        , Cmd.none
+                                        )
 
-                                Import istate login_ ->
-                                    ( { model | state = Import (Import.updateSearchResult sr istate) login_ }
-                                    , Cmd.none
-                                    )
+                                    EditZkNote znstate login_ ->
+                                        ( { model | state = EditZkNote (EditZkNote.updateSearchResult sr znstate) login_ }
+                                        , Cmd.none
+                                        )
 
-                                ShowMessage _ login ->
-                                    ( { model | state = EditZkNoteListing { notes = sr, spmodel = SP.initModel, dialog = Nothing } login }
-                                    , Cmd.none
-                                    )
+                                    Import istate login_ ->
+                                        ( { model | state = Import (Import.updateSearchResult sr istate) login_ }
+                                        , Cmd.none
+                                        )
 
-                                _ ->
-                                    ( { model | state = unexpectedMessage state (UI.showServerResponse uiresponse) }
-                                    , Cmd.none
-                                    )
+                                    ShowMessage _ login ->
+                                        ( { model | state = EditZkNoteListing { notes = sr, spmodel = SP.initModel, dialog = Nothing } login }
+                                        , Cmd.none
+                                        )
+
+                                    _ ->
+                                        ( { model | state = unexpectedMessage state (UI.showServerResponse uiresponse) }
+                                        , Cmd.none
+                                        )
 
                         UI.ZkNote _ ->
                             case state of
@@ -987,7 +1002,7 @@ actualupdate msg model =
                                     let
                                         ( spmod, sres ) =
                                             stateSearch state
-                                                |> Maybe.withDefault ( SP.initModel, { notes = [], offset = 0 } )
+                                                |> Maybe.withDefault ( SP.initModel, { notes = [], offset = 0, what = "" } )
 
                                         ( s, c ) =
                                             EditZkNote.initFull login
@@ -1438,6 +1453,21 @@ init flags url key =
             , savedRoute = { route = Top, save = False }
             , prevSearches = []
             }
+
+        prevSearchQuery =
+            \login ->
+                let
+                    ts : S.TagSearch
+                    ts =
+                        S.Boolex (S.SearchTerm [ S.ExactMatch, S.Tag ] "search")
+                            S.And
+                            (S.SearchTerm [ S.User ] login.userid)
+                in
+                { tagSearch = ts
+                , offset = 0
+                , limit = Just 50
+                , what = "prevSearches"
+                }
 
         ( model, cmd ) =
             parseUrl url

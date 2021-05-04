@@ -49,6 +49,7 @@ type alias ZkListNote =
 type alias ZkNoteSearchResult =
     { notes : List ZkListNote
     , offset : Int
+    , what : String
     }
 
 
@@ -360,9 +361,10 @@ decodeZkListNote =
 
 decodeZkNoteSearchResult : JD.Decoder ZkNoteSearchResult
 decodeZkNoteSearchResult =
-    JD.map2 ZkNoteSearchResult
+    JD.map3 ZkNoteSearchResult
         (JD.field "notes" (JD.list decodeZkListNote))
         (JD.field "offset" JD.int)
+        (JD.field "what" JD.string)
 
 
 decodeSavedZkNote : JD.Decoder SavedZkNote
