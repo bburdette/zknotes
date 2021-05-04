@@ -44,6 +44,7 @@ getSearch model =
                 { tagSearch = s
                 , offset = model.paginationModel.offset
                 , limit = Just model.paginationModel.increment
+                , what = ""
                 }
             )
 
@@ -108,6 +109,7 @@ update msg model =
                         { tagSearch = ts
                         , offset = 0
                         , limit = Just model.paginationModel.increment
+                        , what = ""
                         }
                     )
 
@@ -128,6 +130,7 @@ update msg model =
                                 { tagSearch = ts
                                 , offset = nm.offset
                                 , limit = Just nm.increment
+                                , what = ""
                                 }
                             )
 

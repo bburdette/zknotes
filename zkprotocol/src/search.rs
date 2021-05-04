@@ -5,6 +5,7 @@ pub struct ZkNoteSearch {
   pub tagsearch: TagSearch,
   pub offset: i64,
   pub limit: Option<i64>,
+  pub what: String,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -41,4 +42,5 @@ pub enum AndOr {
 pub struct ZkNoteSearchResult {
   pub notes: Vec<ZkListNote>,
   pub offset: i64,
+  pub what: String,
 }

@@ -29,6 +29,7 @@ type alias ZkNoteSearch =
     { tagSearch : TagSearch
     , offset : Int
     , limit : Maybe Int
+    , what : String
     }
 
 
@@ -65,6 +66,7 @@ defaultSearch =
     { tagSearch = SearchTerm [] ""
     , offset = 0
     , limit = Just defaultSearchLimit
+    , what = ""
     }
 
 
@@ -132,6 +134,7 @@ encodeZkNoteSearch zns =
     JE.object <|
         [ ( "tagsearch", encodeTagSearch zns.tagSearch )
         , ( "offset", JE.int zns.offset )
+        , ( "what", JE.string zns.what )
         ]
             ++ (zns.limit
                     |> Maybe.map (\i -> [ ( "limit", JE.int i ) ])

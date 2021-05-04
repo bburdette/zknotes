@@ -18,6 +18,7 @@ pub fn power_delete_zknotes(
     tagsearch: search.clone(),
     offset: 0,
     limit: None,
+    what: "".to_string(),
   };
 
   let znsr = search_zknotes(conn, user, &nolimsearch)?;
@@ -68,6 +69,7 @@ pub fn search_zknotes(
   Ok(ZkNoteSearchResult {
     notes: pv,
     offset: search.offset,
+    what: search.what.clone(),
   })
 }
 
