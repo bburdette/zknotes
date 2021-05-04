@@ -1,10 +1,14 @@
 use crate::sqldata;
 use crate::sqldata::{get_sysids, note_id, power_delete_zknote, user_id};
+use either::Either;
+use either::Either::{Left, Right};
 use rusqlite::Connection;
 use std::convert::TryInto;
 use std::error::Error;
 use zkprotocol::content::ZkListNote;
-use zkprotocol::search::{AndOr, SearchMod, TagSearch, ZkNoteSearch, ZkNoteSearchResult};
+use zkprotocol::search::{
+  AndOr, SearchMod, TagSearch, ZkFullNoteSearchResult, ZkNoteSearch, ZkNoteSearchResult,
+};
 
 pub fn power_delete_zknotes(
   conn: &Connection,
@@ -19,23 +23,35 @@ pub fn power_delete_zknotes(
     offset: 0,
     limit: None,
     what: "".to_string(),
+    full: false,
   };
 
   let znsr = search_zknotes(conn, user, &nolimsearch)?;
-  let c = znsr.notes.len().try_into()?;
+  match znsr {
+    Left(znsr) => {
+      let c = znsr.notes.len().try_into()?;
 
-  for n in znsr.notes {
-    power_delete_zknote(conn, user, n.id)?;
+      for n in znsr.notes {
+        power_delete_zknote(conn, user, n.id)?;
+      }
+      Ok(c)
+    }
+    Right(znsr) => {
+      let c = znsr.notes.len().try_into()?;
+
+      for n in znsr.notes {
+        power_delete_zknote(conn, user, n.id)?;
+      }
+      Ok(c)
+    }
   }
-
-  Ok(c)
 }
 
 pub fn search_zknotes(
   conn: &Connection,
   user: i64,
   search: &ZkNoteSearch,
-) -> Result<ZkNoteSearchResult, Box<dyn Error>> {
+) -> Result<Either<ZkNoteSearchResult, ZkFullNoteSearchResult>, Box<dyn Error>> {
   let (sql, args) = build_sql(&conn, user, search.clone())?;
 
   let mut pstmt = conn.prepare(sql.as_str())?;
@@ -55,22 +71,43 @@ pub fn search_zknotes(
     })
   })?;
 
-  let mut pv = Vec::new();
+  if search.full {
+    println!("full!");
+    let mut pv = Vec::new();
 
-  for rsrec in rec_iter {
-    match rsrec {
-      Ok(rec) => {
-        pv.push(rec);
+    for rsrec in rec_iter {
+      match rsrec {
+        Ok(rec) => {
+          pv.push(sqldata::read_zknote(&conn, Some(user), rec.id)?);
+        }
+        Err(_) => (),
       }
-      Err(_) => (),
     }
-  }
 
-  Ok(ZkNoteSearchResult {
-    notes: pv,
-    offset: search.offset,
-    what: search.what.clone(),
-  })
+    Ok(Right(ZkFullNoteSearchResult {
+      notes: pv,
+      offset: search.offset,
+      what: search.what.clone(),
+    }))
+  } else {
+    println!("unfull!");
+    let mut pv = Vec::new();
+
+    for rsrec in rec_iter {
+      match rsrec {
+        Ok(rec) => {
+          pv.push(rec);
+        }
+        Err(_) => (),
+      }
+    }
+
+    Ok(Left(ZkNoteSearchResult {
+      notes: pv,
+      offset: search.offset,
+      what: search.what.clone(),
+    }))
+  }
 }
 
 pub fn build_sql(

@@ -45,6 +45,7 @@ getSearch model =
                 , offset = model.paginationModel.offset
                 , limit = Just model.paginationModel.increment
                 , what = ""
+                , full = False
                 }
             )
 
@@ -110,6 +111,7 @@ update msg model =
                         , offset = 0
                         , limit = Just model.paginationModel.increment
                         , what = ""
+                        , full = False
                         }
                     )
 
@@ -131,6 +133,7 @@ update msg model =
                                 , offset = nm.offset
                                 , limit = Just nm.increment
                                 , what = ""
+                                , full = False
                                 }
                             )
 

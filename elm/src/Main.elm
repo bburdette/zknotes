@@ -947,47 +947,55 @@ actualupdate msg model =
                                     , Cmd.none
                                     )
 
-                        UI.ZkNoteSearchResult sr ->
+                        UI.ZkFullNoteSearchResult sr ->
+                            let
+                                _ =
+                                    Debug.log " UI.ZkFullNoteSearchResult " sr
+                            in
                             if sr.what == "prevSearches" then
                                 -- build prev searches list.
                                 ( { model
                                     | prevSearches =
-                                        List.filterMap
-                                            (\zknote ->
-                                                JD.decodeString S.decodeTagSearch zknote.title
-                                                    |> Result.toMaybe
-                                            )
-                                            sr.notes
+                                        Debug.log "prevsearches:" <|
+                                            List.filterMap
+                                                (\zknote ->
+                                                    JD.decodeString S.decodeTagSearch zknote.content
+                                                        |> Result.toMaybe
+                                                )
+                                                sr.notes
                                   }
                                 , Cmd.none
                                 )
 
                             else
-                                case state of
-                                    EditZkNoteListing znlstate login_ ->
-                                        ( { model | state = EditZkNoteListing (EditZkNoteListing.updateSearchResult sr znlstate) login_ }
-                                        , Cmd.none
-                                        )
+                                ( model, Cmd.none )
 
-                                    EditZkNote znstate login_ ->
-                                        ( { model | state = EditZkNote (EditZkNote.updateSearchResult sr znstate) login_ }
-                                        , Cmd.none
-                                        )
+                        UI.ZkNoteSearchResult sr ->
+                            case state of
+                                EditZkNoteListing znlstate login_ ->
+                                    ( { model | state = EditZkNoteListing (EditZkNoteListing.updateSearchResult sr znlstate) login_ }
+                                    , Cmd.none
+                                    )
 
-                                    Import istate login_ ->
-                                        ( { model | state = Import (Import.updateSearchResult sr istate) login_ }
-                                        , Cmd.none
-                                        )
+                                EditZkNote znstate login_ ->
+                                    ( { model | state = EditZkNote (EditZkNote.updateSearchResult sr znstate) login_ }
+                                    , Cmd.none
+                                    )
 
-                                    ShowMessage _ login ->
-                                        ( { model | state = EditZkNoteListing { notes = sr, spmodel = SP.initModel, dialog = Nothing } login }
-                                        , Cmd.none
-                                        )
+                                Import istate login_ ->
+                                    ( { model | state = Import (Import.updateSearchResult sr istate) login_ }
+                                    , Cmd.none
+                                    )
 
-                                    _ ->
-                                        ( { model | state = unexpectedMessage state (UI.showServerResponse uiresponse) }
-                                        , Cmd.none
-                                        )
+                                ShowMessage _ login ->
+                                    ( { model | state = EditZkNoteListing { notes = sr, spmodel = SP.initModel, dialog = Nothing } login }
+                                    , Cmd.none
+                                    )
+
+                                _ ->
+                                    ( { model | state = unexpectedMessage state (UI.showServerResponse uiresponse) }
+                                    , Cmd.none
+                                    )
 
                         UI.ZkNote _ ->
                             case state of
@@ -1461,12 +1469,13 @@ init flags url key =
                     ts =
                         S.Boolex (S.SearchTerm [ S.ExactMatch, S.Tag ] "search")
                             S.And
-                            (S.SearchTerm [ S.User ] login.userid)
+                            (S.SearchTerm [ S.User ] login.name)
                 in
                 { tagSearch = ts
                 , offset = 0
                 , limit = Just 50
                 , what = "prevSearches"
+                , full = True
                 }
 
         ( model, cmd ) =
@@ -1497,7 +1506,18 @@ init flags url key =
                         ( m, c ) =
                             case flags.login of
                                 Just login ->
-                                    getListing imodel login
+                                    let
+                                        ( m2, c2 ) =
+                                            getListing imodel login
+                                    in
+                                    ( m2
+                                    , Cmd.batch
+                                        [ sendUIMsg
+                                            flags.location
+                                            (UI.SearchZkNotes <| prevSearchQuery login)
+                                        , c2
+                                        ]
+                                    )
 
                                 Nothing ->
                                     ( { imodel | state = initLogin seed }, Cmd.none )

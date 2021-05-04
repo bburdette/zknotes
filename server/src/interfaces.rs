@@ -5,6 +5,7 @@ use crate::sqldata;
 use crate::util;
 use actix_session::Session;
 use crypto_hash::{hex_digest, Algorithm};
+use either::Either::{Left, Right};
 use log::info;
 use simple_error;
 use std::error::Error;
@@ -202,10 +203,16 @@ fn user_interface_loggedin(
       let search: ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.db.as_path())?;
       let res = search::search_zknotes(&conn, uid, &search)?;
-      Ok(ServerResponse {
-        what: "zknotesearchresult".to_string(),
-        content: serde_json::to_value(res)?,
-      })
+      match res {
+        Left(res) => Ok(ServerResponse {
+          what: "zknotesearchresult".to_string(),
+          content: serde_json::to_value(res)?,
+        }),
+        Right(res) => Ok(ServerResponse {
+          what: "zkfullnotesearchresult".to_string(),
+          content: serde_json::to_value(res)?,
+        }),
+      }
     }
     "powerdelete" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;

@@ -30,6 +30,7 @@ type ServerResponse
     | NotLoggedIn
     | LoggedIn Data.LoginData
     | ZkNoteSearchResult Data.ZkNoteSearchResult
+    | ZkFullNoteSearchResult Data.ZkFullNoteSearchResult
     | SavedZkNotePlusLinks Data.SavedZkNote
     | SavedZkNote Data.SavedZkNote
     | DeletedZkNote Int
@@ -66,6 +67,9 @@ showServerResponse sr =
 
         ZkNoteSearchResult _ ->
             "ZkNoteSearchResult"
+
+        ZkFullNoteSearchResult _ ->
+            "ZkFullNoteSearchResult"
 
         SavedZkNote _ ->
             "SavedZkNote"
@@ -218,6 +222,9 @@ serverResponseDecoder =
 
                     "zknotesearchresult" ->
                         JD.map ZkNoteSearchResult (JD.at [ "content" ] <| Data.decodeZkNoteSearchResult)
+
+                    "zkfullnotesearchresult" ->
+                        JD.map ZkFullNoteSearchResult (JD.at [ "content" ] <| Data.decodeZkFullNoteSearchResult)
 
                     "savedzknote" ->
                         JD.map SavedZkNote (JD.at [ "content" ] <| Data.decodeSavedZkNote)

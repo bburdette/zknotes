@@ -53,6 +53,13 @@ type alias ZkNoteSearchResult =
     }
 
 
+type alias ZkFullNoteSearchResult =
+    { notes : List ZkNote
+    , offset : Int
+    , what : String
+    }
+
+
 type alias SavedZkNote =
     { id : Int
     , changeddate : Int
@@ -363,6 +370,14 @@ decodeZkNoteSearchResult : JD.Decoder ZkNoteSearchResult
 decodeZkNoteSearchResult =
     JD.map3 ZkNoteSearchResult
         (JD.field "notes" (JD.list decodeZkListNote))
+        (JD.field "offset" JD.int)
+        (JD.field "what" JD.string)
+
+
+decodeZkFullNoteSearchResult : JD.Decoder ZkFullNoteSearchResult
+decodeZkFullNoteSearchResult =
+    JD.map3 ZkFullNoteSearchResult
+        (JD.field "notes" (JD.list decodeZkNote))
         (JD.field "offset" JD.int)
         (JD.field "what" JD.string)
 

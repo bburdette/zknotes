@@ -30,6 +30,7 @@ type alias ZkNoteSearch =
     , offset : Int
     , limit : Maybe Int
     , what : String
+    , full : Bool
     }
 
 
@@ -67,6 +68,7 @@ defaultSearch =
     , offset = 0
     , limit = Just defaultSearchLimit
     , what = ""
+    , full = False
     }
 
 
@@ -198,6 +200,7 @@ encodeZkNoteSearch zns =
         [ ( "tagsearch", encodeTagSearch zns.tagSearch )
         , ( "offset", JE.int zns.offset )
         , ( "what", JE.string zns.what )
+        , ( "full", JE.bool zns.full )
         ]
             ++ (zns.limit
                     |> Maybe.map (\i -> [ ( "limit", JE.int i ) ])
