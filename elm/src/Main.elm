@@ -107,7 +107,7 @@ type alias Model =
     , navkey : Browser.Navigation.Key
     , seed : Seed
     , savedRoute : SavedRoute
-    , lastSearch : Maybe S.TagSearch
+    , prevSearches : List S.TagSearch
     }
 
 
@@ -517,8 +517,8 @@ sendSearch model search =
                         ]
                     }
             in
-            ( { model | lastSearch = Just search.tagSearch }
-            , if model.lastSearch == Just search.tagSearch then
+            ( { model | prevSearches = search.tagSearch :: model.prevSearches }
+            , if List.head model.prevSearches == Just search.tagSearch then
                 sendUIMsg model.location (UI.SearchZkNotes search)
 
               else
@@ -1436,7 +1436,7 @@ init flags url key =
             , navkey = key
             , seed = seed
             , savedRoute = { route = Top, save = False }
-            , lastSearch = Nothing
+            , prevSearches = []
             }
 
         ( model, cmd ) =
