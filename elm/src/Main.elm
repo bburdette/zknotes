@@ -85,10 +85,6 @@ type State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
 
 
-
--- | WaitM State (Model -> Msg -> ( Model, Cmd Msg ))
-
-
 type alias Flags =
     { seed : Int
     , location : String
@@ -468,7 +464,7 @@ stateSearch state =
 stateLogin : State -> Maybe Data.LoginData
 stateLogin state =
     case state of
-        Login lmod ->
+        Login _ ->
             Nothing
 
         EditZkNote _ login ->
@@ -567,41 +563,6 @@ sendPIMsg location msg =
                 (PI.encodeSendMsg msg)
         , expect = Http.expectJson PublicReplyData PI.serverResponseDecoder
         }
-
-
-type alias NwState =
-    { login : Data.LoginData
-    , mbzknotesearchresult : Maybe Data.ZkListNoteSearchResult
-    , mbzklinks : Maybe Data.ZkLinks
-    , mbzknote : Maybe Data.ZkNote
-    , spmodel : SP.Model
-    , navkey : Browser.Navigation.Key
-    , location : String
-    , seed : Seed
-    }
-
-
-listingwait : Data.LoginData -> State -> Msg -> ( State, Cmd Msg )
-listingwait login st ms =
-    case ms of
-        UserReplyData (Ok (UI.ZkListNoteSearchResult rs)) ->
-            ( EditZkNoteListing
-                { notes = rs
-                , spmodel =
-                    SP.searchResultUpdated rs SP.initModel
-                , dialog = Nothing
-                }
-                login
-            , Cmd.none
-            )
-
-        UserReplyData (Ok (UI.ServerError e)) ->
-            ( DisplayError (DisplayError.initialModel e) st, Cmd.none )
-
-        _ ->
-            ( unexpectedMsg st ms
-            , Cmd.none
-            )
 
 
 getListing : Model -> Data.LoginData -> ( Model, Cmd Msg )
@@ -779,6 +740,23 @@ urlupdate msg model =
         ( nm, cmd )
 
 
+shDialog : Model -> Model
+shDialog model =
+    { model
+        | state =
+            SelectDialog
+                (SS.init
+                    { choices = Array.fromList <| List.map S.printTagSearch model.prevSearches
+                    , selected = Nothing
+                    , search = ""
+                    , buttonStyle = List.map (E.mapAttribute (\_ -> SS.Noop)) Common.buttonStyle
+                    }
+                    (E.map (\_ -> ()) (viewState model.size model.state))
+                )
+                model.state
+    }
+
+
 actualupdate : Msg -> Model -> ( Model, Cmd Msg )
 actualupdate msg model =
     case ( msg, model.state ) of
@@ -805,6 +783,9 @@ actualupdate msg model =
                                     case instate of
                                         EditZkNote ezn login ->
                                             EditZkNote (Tuple.first <| EditZkNote.updateSearch ts ezn) login
+
+                                        EditZkNoteListing ezn login ->
+                                            EditZkNoteListing (Tuple.first <| EditZkNoteListing.updateSearch ts ezn) login
 
                                         _ ->
                                             instate
@@ -1279,6 +1260,11 @@ actualupdate msg model =
                         (UI.PowerDelete s)
                     )
 
+                EditZkNoteListing.SearchHistory ->
+                    ( shDialog model
+                    , Cmd.none
+                    )
+
         ( ImportMsg em, Import es login ) ->
             let
                 ( emod, ecmd ) =
@@ -1497,19 +1483,7 @@ handleEditZkNoteCmd model login emod ecmd =
             sendSearch { model | state = EditZkNote emod login } s
 
         EditZkNote.SearchHistory ->
-            ( { model
-                | state =
-                    SelectDialog
-                        (SS.init
-                            { choices = Array.fromList <| List.map S.printTagSearch model.prevSearches
-                            , selected = Nothing
-                            , search = ""
-                            , buttonStyle = List.map (E.mapAttribute (\_ -> SS.Noop)) Common.buttonStyle
-                            }
-                            (E.map (\_ -> ()) (viewState model.size model.state))
-                        )
-                        model.state
-              }
+            ( shDialog model
             , Cmd.none
             )
 

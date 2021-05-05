@@ -26,6 +26,7 @@ type Msg
     | PowerDeletePress
     | SPMsg SP.Msg
     | DialogMsg D.Msg
+    | SearchHistoryPress
 
 
 type DWhich
@@ -48,6 +49,7 @@ type Command
     | None
     | Search S.ZkNoteSearch
     | PowerDelete S.TagSearch
+    | SearchHistory
 
 
 onPowerDeleteComplete : Int -> Data.LoginData -> Model -> Model
@@ -70,6 +72,15 @@ updateSearchResult zsr model =
         | notes = zsr
         , spmodel = SP.searchResultUpdated zsr model.spmodel
     }
+
+
+updateSearch : S.TagSearch -> Model -> ( Model, Command )
+updateSearch ts model =
+    ( { model
+        | spmodel = SP.setSearchString model.spmodel (S.printTagSearch ts)
+      }
+    , None
+    )
 
 
 view : Data.LoginData -> Util.Size -> Model -> Element Msg
@@ -103,6 +114,10 @@ listview ld size model =
             , EI.button Common.buttonStyle { onPress = Just ImportPress, label = E.text "import" }
             , EI.button Common.buttonStyle { onPress = Just PowerDeletePress, label = E.text "delete..." }
             ]
+        , EI.button Common.buttonStyle
+            { onPress = Just <| SearchHistoryPress
+            , label = E.el [ E.centerY ] <| E.text "Search History"
+            }
         , E.map SPMsg <| SP.view False (size.width < maxwidth) 0 model.spmodel
         , E.table [ E.spacing 5, E.width E.fill, E.centerX ]
             { data = model.notes.notes
@@ -153,6 +168,9 @@ update msg model ld =
 
         ImportPress ->
             ( model, Import )
+
+        SearchHistoryPress ->
+            ( model, SearchHistory )
 
         PowerDeletePress ->
             case TSP.getSearch model.spmodel.tagSearchModel of
