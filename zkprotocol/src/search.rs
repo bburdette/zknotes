@@ -1,10 +1,12 @@
-use crate::content::ZkListNote;
+use crate::content::{ZkListNote, ZkNote};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ZkNoteSearch {
   pub tagsearch: TagSearch,
   pub offset: i64,
   pub limit: Option<i64>,
+  pub what: String,
+  pub list: bool,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -38,7 +40,15 @@ pub enum AndOr {
 }
 
 #[derive(Serialize, Debug, Clone)]
-pub struct ZkNoteSearchResult {
+pub struct ZkListNoteSearchResult {
   pub notes: Vec<ZkListNote>,
   pub offset: i64,
+  pub what: String,
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub struct ZkNoteSearchResult {
+  pub notes: Vec<ZkNote>,
+  pub offset: i64,
+  pub what: String,
 }

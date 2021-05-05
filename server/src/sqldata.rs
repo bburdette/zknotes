@@ -10,8 +10,8 @@ use std::path::Path;
 use std::time::Duration;
 use uuid::Uuid;
 use zkprotocol::content::{
-  Direction, GetZkLinks, GetZkNoteComments, GetZkNoteEdit, ImportZkNote, LoginData, SaveZkLink,
-  SaveZkNote, SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
+  Direction, EditLink, GetZkLinks, GetZkNoteComments, GetZkNoteEdit, ImportZkNote, LoginData,
+  SaveZkLink, SaveZkNote, SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
 };
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -942,27 +942,6 @@ pub fn read_user(dbfile: &Path, name: &str) -> Result<User, Box<dyn Error>> {
   )?;
 
   Ok(user)
-
-  // user.token = match tokestr {
-  //   Some(s) => Some(Uuid::parse_str(s.as_str())?),
-  //   None => None,
-  // };
-
-  // // if expiration supplied, check for token expiration.
-  // match token_expiration_ms {
-  //   Some(texp) => {
-  //     if user
-  //       .tokendate
-  //       .map(|td| is_token_expired(texp, td))
-  //       .unwrap_or(true)
-  //     {
-  //       bail!("login expired")
-  //     } else {
-  //       Ok(user)
-  //     }
-  //   }
-  //   None => Ok(user),
-  // }
 }
 
 pub fn read_user_by_token(
@@ -1324,7 +1303,29 @@ pub fn save_zknote(
   }
 }
 
+pub fn get_sysids(conn: &Connection, sysid: i64, noteid: i64) -> Result<Vec<i64>, rusqlite::Error> {
+  let mut pstmt = conn.prepare(
+    // return system notes that are linked TO by noteid.
+    "select A.toid
+       from zklink A, zknote N
+      where
+       (A.fromid = ?1 and A.toid = N.id and N.user = ?2)",
+  )?;
+
+  let r = Ok(
+    pstmt
+      .query_map(params![noteid, sysid], |row| Ok(row.get(0)?))?
+      .filter_map(|x| x.ok())
+      .collect(),
+  );
+
+  r
+}
+
 pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNote, Box<dyn Error>> {
+  let sysid = user_id(&conn, "system")?;
+  let sysids = get_sysids(conn, sysid, id)?;
+
   let mut note = conn.query_row(
     "select ZN.title, ZN.content, ZN.user, U.name, ZN.pubid, ZN.editable, ZN.createdate, ZN.changeddate
       from zknote ZN, user U where ZN.id = ?1 and U.id = ZN.user",
@@ -1341,6 +1342,7 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
         editableValue: row.get(5)?,
         createdate: row.get(6)?,
         changeddate: row.get(7)?,
+        sysids: sysids,
       })
     },
   )?;
@@ -1468,9 +1470,14 @@ pub fn read_zknotepubid(
         editableValue: row.get(6)?,
         createdate: row.get(7)?,
         changeddate: row.get(8)?,
+        sysids: Vec::new(),
       })
     },
   )?;
+  let sysid = user_id(&conn, "system")?;
+  let sysids = get_sysids(conn, sysid, note.id)?;
+
+  note.sysids = sysids;
 
   match zknote_access(conn, uid, &note) {
     Ok(zna) => match zna {
@@ -1571,7 +1578,7 @@ pub fn read_zklinks(
   conn: &Connection,
   uid: i64,
   gzl: &GetZkLinks,
-) -> Result<Vec<ZkLink>, Box<dyn Error>> {
+) -> Result<Vec<EditLink>, Box<dyn Error>> {
   let pubid = note_id(&conn, "system", "public")?;
 
   let usershares = user_shares(&conn, uid)?;
@@ -1648,34 +1655,37 @@ pub fn read_zklinks(
   );
 
   let mut pstmt = conn.prepare(sqlstr.as_str())?;
-
-  let rec_iter = pstmt.query_map(params![uid, gzl.zknote, pubid, unid], |row| {
-    Ok(ZkLink {
-      from: row.get(0)?,
-      to: row.get(1)?,
-      user: row.get(2)?,
-      delete: None,
-      linkzknote: row.get(3)?,
-      fromname: row.get(4)?,
-      toname: row.get(5)?,
-    })
-  })?;
-
-  let mut pv = Vec::new();
-
-  for rsrec in rec_iter {
-    match rsrec {
-      Ok(rec) => {
-        pv.push(rec);
-      }
-      Err(_) => (),
-    }
-  }
-
-  Ok(pv)
+  let r = Ok(
+    pstmt
+      .query_map(params![uid, gzl.zknote, pubid, unid], |row| {
+        let fromid = row.get(0)?;
+        let toid = row.get(1)?;
+        Ok(EditLink {
+          otherid: if fromid == gzl.zknote { toid } else { fromid },
+          direction: if fromid == gzl.zknote {
+            Direction::To
+          } else {
+            Direction::From
+          },
+          user: row.get(2)?,
+          zknote: row.get(3)?,
+          othername: if fromid == gzl.zknote {
+            row.get(5)?
+          } else {
+            row.get(4)?
+          },
+        })
+      })?
+      .filter_map(|x| x.ok())
+      .collect(),
+  );
+  r
 }
 
-pub fn read_public_zklinks(conn: &Connection, noteid: i64) -> Result<Vec<ZkLink>, Box<dyn Error>> {
+pub fn read_public_zklinks(
+  conn: &Connection,
+  noteid: i64,
+) -> Result<Vec<EditLink>, Box<dyn Error>> {
   let pubid = note_id(&conn, "system", "public")?;
   let sysid = user_id(&conn, "system")?;
 
@@ -1692,30 +1702,31 @@ pub fn read_public_zklinks(conn: &Connection, noteid: i64) -> Result<Vec<ZkLink>
         (A.fromid = ?1 and A.toid = B.fromid and B.toid = ?2))",
   )?;
 
-  let rec_iter = pstmt.query_map(params![noteid, pubid, sysid], |row| {
-    Ok(ZkLink {
-      from: row.get(0)?,
-      to: row.get(1)?,
-      user: row.get(2)?,
-      delete: None,
-      linkzknote: row.get(3)?,
-      fromname: row.get(4)?,
-      toname: row.get(5)?,
-    })
-  })?;
-
-  let mut pv = Vec::new();
-
-  for rsrec in rec_iter {
-    match rsrec {
-      Ok(rec) => {
-        pv.push(rec);
-      }
-      Err(_) => (),
-    }
-  }
-
-  Ok(pv)
+  let r = Ok(
+    pstmt
+      .query_map(params![noteid, pubid, sysid], |row| {
+        let fromid = row.get(0)?;
+        let toid = row.get(1)?;
+        Ok(EditLink {
+          otherid: if fromid == noteid { toid } else { fromid },
+          direction: if fromid == noteid {
+            Direction::To
+          } else {
+            Direction::From
+          },
+          user: row.get(2)?,
+          zknote: row.get(3)?,
+          othername: if fromid == noteid {
+            row.get(5)?
+          } else {
+            row.get(4)?
+          },
+        })
+      })?
+      .filter_map(|x| x.ok())
+      .collect(),
+  );
+  r
 }
 
 pub fn read_zknotecomments(
@@ -1735,10 +1746,6 @@ pub fn read_zknotecomments(
       and N.toid = ?1 and C.toid = ?2",
   )?;
   let c_iter = stmt.query_map(params![gznc.zknote, cid], |row| Ok(row.get(0)?))?;
-
-  // select N.fromid from  zklink C, zklink N
-  //       where N.fromid = C.fromid
-  //       and N.toid = 2720 and C.toid = 2737;
 
   let mut nv = Vec::new();
 
@@ -1878,6 +1885,7 @@ pub struct ZkDatabase {
 
 pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
+  let sysid = user_id(&conn, "system")?;
 
   // Users
   let mut ustmt = conn.prepare(
@@ -1914,6 +1922,7 @@ pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
   )?;
 
   let n_iter = nstmt.query_map(params![], |row| {
+    let sysids = get_sysids(&conn, sysid, row.get(0)?)?;
     Ok(ZkNote {
       id: row.get(0)?,
       title: row.get(1)?,
@@ -1925,6 +1934,7 @@ pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
       editableValue: row.get(5)?,
       createdate: row.get(6)?,
       changeddate: row.get(7)?,
+      sysids: sysids,
     })
   })?;
 

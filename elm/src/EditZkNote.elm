@@ -25,6 +25,7 @@ module EditZkNote exposing
     , onCtrlS
     , onSaved
     , pageLink
+    , renderMd
     , replaceOrAdd
     , saveZkLinkList
     , showSr
@@ -34,6 +35,7 @@ module EditZkNote exposing
     , toEditLink
     , toPubId
     , update
+    , updateSearch
     , updateSearchResult
     , view
     , zkLinkName
@@ -87,6 +89,7 @@ type Msg
     | ViewPress
     | NewPress
     | CopyPress
+    | SearchHistoryPress
     | SwitchPress Int
     | ToLinkPress Data.ZkListNote
     | FromLinkPress Data.ZkListNote
@@ -132,7 +135,7 @@ type alias Model =
     , ld : Data.LoginData
     , noteUser : Int
     , noteUserName : String
-    , zknSearchResult : Data.ZkNoteSearchResult
+    , zknSearchResult : Data.ZkListNoteSearchResult
     , focusSr : Maybe Int -- note id in search result.
     , zklDict : Dict String EditLink
     , focusLink : Maybe EditLink
@@ -164,6 +167,7 @@ type Command
     | SaveSwitch Data.SaveZkNotePlusLinks Int
     | GetSelectedText (List String)
     | Search S.ZkNoteSearch
+    | SearchHistory
 
 
 elToSzl : EditLink -> Data.SaveZkLink
@@ -253,12 +257,21 @@ commentsRecieved comments model =
     { model | comments = comments }
 
 
-updateSearchResult : Data.ZkNoteSearchResult -> Model -> Model
+updateSearchResult : Data.ZkListNoteSearchResult -> Model -> Model
 updateSearchResult zsr model =
     { model
         | zknSearchResult = zsr
         , spmodel = SP.searchResultUpdated zsr model.spmodel
     }
+
+
+updateSearch : S.TagSearch -> Model -> ( Model, Command )
+updateSearch ts model =
+    ( { model
+        | spmodel = SP.setSearchString model.spmodel (S.printTagSearch ts)
+      }
+    , None
+    )
 
 
 toPubId : Bool -> String -> Maybe String
@@ -438,6 +451,12 @@ showSr model isdirty zkln =
         lnnonme =
             zkln.user /= model.ld.userid
 
+        sysColor =
+            ZC.systemColor model.ld zkln.sysids
+
+        _ =
+            Debug.log "sysids" zkln.sysids
+
         controlrow =
             E.row [ E.spacing 8, E.width E.fill ]
                 [ (case
@@ -522,7 +541,19 @@ showSr model isdirty zkln =
                 ]
 
         listingrow =
-            E.el [ E.width E.fill, EE.onClick (SrFocusPress zkln.id), E.height <| E.px 30, E.clipX ] <| E.text zkln.title
+            E.el
+                ([ E.width E.fill
+                 , EE.onClick (SrFocusPress zkln.id)
+                 , E.height <| E.px 30
+                 , E.clipX
+                 ]
+                    ++ (sysColor
+                            |> Maybe.map (\c -> [ EF.color c ])
+                            |> Maybe.withDefault []
+                       )
+                )
+            <|
+                E.text zkln.title
     in
     if model.focusSr == Just zkln.id then
         -- focus result!  show controlrow.
@@ -536,6 +567,7 @@ addComment : Model -> Element Msg
 addComment model =
     E.column
         [ E.width E.fill
+        , E.spacing 8
         ]
         [ EI.multiline
             [ EF.color TC.black
@@ -614,7 +646,7 @@ zknview size model =
                 - (60 * 2 + 6)
 
         showComments =
-            E.row [ EF.bold, E.width E.fill ] [ E.text "comments" ]
+            E.el [ EF.bold, E.width E.fill ] (E.text "comments")
                 :: List.map
                     (\zkn ->
                         E.row [ E.width E.fill, E.spacing 8 ]
@@ -810,9 +842,13 @@ zknview size model =
                  ]
                     ++ sppad
                 )
-                ((E.map SPMsg <|
-                    SP.view True (wclass == Narrow) 0 model.spmodel
-                 )
+                (EI.button Common.buttonStyle
+                    { onPress = Just <| SearchHistoryPress
+                    , label = E.el [ E.centerY ] <| E.text "Search History"
+                    }
+                    :: (E.map SPMsg <|
+                            SP.view True (wclass == Narrow) 0 model.spmodel
+                       )
                     :: (List.map
                             (showSr model isdirty)
                         <|
@@ -968,8 +1004,8 @@ isPublic model =
     linksWith (Dict.values model.zklDict) model.ld.publicid
 
 
-initFull : Data.LoginData -> Data.ZkNoteSearchResult -> Data.ZkNote -> Data.ZkLinks -> SP.Model -> ( Model, Data.GetZkNoteComments )
-initFull ld zkl zknote zklDict spm =
+initFull : Data.LoginData -> Data.ZkListNoteSearchResult -> Data.ZkNote -> List Data.EditLink -> SP.Model -> ( Model, Data.GetZkNoteComments )
+initFull ld zkl zknote dtlinks spm =
     let
         cells =
             zknote.content
@@ -981,7 +1017,17 @@ initFull ld zkl zknote zklDict spm =
                 (mkCc cells)
 
         links =
-            List.map (toEditLink zknote.id) zklDict.links
+            List.map
+                (\dl ->
+                    { otherid = dl.otherid
+                    , direction = dl.direction
+                    , user = dl.user
+                    , zknote = dl.zknote
+                    , othername = dl.othername
+                    , delete = Nothing
+                    }
+                )
+                dtlinks
     in
     ( { id = Just zknote.id
       , ld = ld
@@ -1015,7 +1061,7 @@ initFull ld zkl zknote zklDict spm =
     )
 
 
-initNew : Data.LoginData -> Data.ZkNoteSearchResult -> SP.Model -> Model
+initNew : Data.LoginData -> Data.ZkListNoteSearchResult -> SP.Model -> Model
 initNew ld zkl spm =
     let
         cells =
@@ -1095,8 +1141,8 @@ replaceOrAdd items replacement compare mergef =
 -}
 
 
-sznToZkn : Int -> String -> Data.SavedZkNote -> Data.SaveZkNote -> Data.ZkNote
-sznToZkn uid uname sdzn szn =
+sznToZkn : Int -> String -> List Int -> Data.SavedZkNote -> Data.SaveZkNote -> Data.ZkNote
+sznToZkn uid uname sysids sdzn szn =
     { id = sdzn.id
     , user = uid
     , username = uname
@@ -1107,6 +1153,7 @@ sznToZkn uid uname sdzn szn =
     , editableValue = False
     , createdate = sdzn.changeddate
     , changeddate = sdzn.changeddate
+    , sysids = sysids
     }
 
 
@@ -1114,7 +1161,17 @@ onSaved : Model -> Data.SavedZkNote -> Model
 onSaved model szn =
     case model.pendingcomment of
         Just pc ->
-            { model | comments = model.comments ++ [ sznToZkn model.ld.userid model.ld.name szn pc ] }
+            { model
+                | comments =
+                    model.comments
+                        ++ [ sznToZkn
+                                model.ld.userid
+                                model.ld.name
+                                [ model.ld.commentid ]
+                                szn
+                                pc
+                           ]
+            }
 
         Nothing ->
             let
@@ -1402,6 +1459,9 @@ update msg model =
               }
             , None
             )
+
+        SearchHistoryPress ->
+            ( model, SearchHistory )
 
         DialogMsg dm ->
             case model.dialog of

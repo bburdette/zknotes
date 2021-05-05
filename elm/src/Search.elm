@@ -1,4 +1,4 @@
-module Search exposing (AndOr(..), FieldText(..), SearchMod(..), TSText(..), TagSearch(..), ZkNoteSearch, andor, defaultSearch, defaultSearchLimit, encodeSearchMod, encodeTagSearch, encodeZkNoteSearch, extractTagSearches, fieldString, fieldText, fields, oplistParser, printAndOr, printSearchMod, printTagSearch, searchMod, searchMods, searchTerm, showAndOr, showSearchMod, showTagSearch, singleTerm, spaces, tagSearchParser)
+module Search exposing (AndOr(..), FieldText(..), SearchMod(..), TSText(..), TagSearch(..), ZkNoteSearch, andor, decodeAndOr, decodeSearchMod, decodeTagSearch, defaultSearch, defaultSearchLimit, encodeAndOr, encodeSearchMod, encodeTagSearch, encodeZkNoteSearch, extractTagSearches, fieldString, fieldText, fields, oplistParser, printAndOr, printSearchMod, printTagSearch, searchMod, searchMods, searchTerm, showAndOr, showSearchMod, showTagSearch, singleTerm, spaces, tagSearchParser)
 
 import Json.Decode as JD
 import Json.Encode as JE
@@ -29,6 +29,8 @@ type alias ZkNoteSearch =
     { tagSearch : TagSearch
     , offset : Int
     , limit : Maybe Int
+    , what : String
+    , list : Bool
     }
 
 
@@ -65,6 +67,8 @@ defaultSearch =
     { tagSearch = SearchTerm [] ""
     , offset = 0
     , limit = Just defaultSearchLimit
+    , what = ""
+    , list = True
     }
 
 
@@ -82,6 +86,47 @@ encodeSearchMod smod =
 
         User ->
             JE.string "User"
+
+
+decodeSearchMod : JD.Decoder SearchMod
+decodeSearchMod =
+    JD.string
+        |> JD.andThen
+            (\s ->
+                case s of
+                    "ExactMatch" ->
+                        JD.succeed ExactMatch
+
+                    "Tag" ->
+                        JD.succeed Tag
+
+                    "Note" ->
+                        JD.succeed Note
+
+                    "User" ->
+                        JD.succeed User
+
+                    wat ->
+                        JD.fail <| "invalid search mod: " ++ wat
+            )
+
+
+decodeTagSearch : JD.Decoder TagSearch
+decodeTagSearch =
+    JD.oneOf
+        [ JD.field "Not" (JD.lazy (\_ -> decodeTagSearch))
+        , JD.field "Boolex"
+            (JD.map3 Boolex
+                (JD.field "ts1" (JD.lazy (\_ -> decodeTagSearch)))
+                (JD.field "ao" decodeAndOr)
+                (JD.field "ts2" (JD.lazy (\_ -> decodeTagSearch)))
+            )
+        , JD.field "SearchTerm"
+            (JD.map2 SearchTerm
+                (JD.field "mods" (JD.list decodeSearchMod))
+                (JD.field "term" JD.string)
+            )
+        ]
 
 
 encodeTagSearch : TagSearch -> JE.Value
@@ -112,14 +157,7 @@ encodeTagSearch ts =
                   , JE.object
                         [ ( "ts1", encodeTagSearch ts1 )
                         , ( "ao"
-                          , JE.string
-                                (case ao of
-                                    And ->
-                                        "And"
-
-                                    Or ->
-                                        "Or"
-                                )
+                          , encodeAndOr ao
                           )
                         , ( "ts2", encodeTagSearch ts2 )
                         ]
@@ -127,11 +165,42 @@ encodeTagSearch ts =
                 ]
 
 
+encodeAndOr : AndOr -> JE.Value
+encodeAndOr ao =
+    JE.string
+        (case ao of
+            And ->
+                "And"
+
+            Or ->
+                "Or"
+        )
+
+
+decodeAndOr : JD.Decoder AndOr
+decodeAndOr =
+    JD.string
+        |> JD.andThen
+            (\s ->
+                case s of
+                    "And" ->
+                        JD.succeed And
+
+                    "Or" ->
+                        JD.succeed Or
+
+                    wat ->
+                        JD.fail <| "invalid and/or: " ++ wat
+            )
+
+
 encodeZkNoteSearch : ZkNoteSearch -> JE.Value
 encodeZkNoteSearch zns =
     JE.object <|
         [ ( "tagsearch", encodeTagSearch zns.tagSearch )
         , ( "offset", JE.int zns.offset )
+        , ( "what", JE.string zns.what )
+        , ( "list", JE.bool zns.list )
         ]
             ++ (zns.limit
                     |> Maybe.map (\i -> [ ( "limit", JE.int i ) ])

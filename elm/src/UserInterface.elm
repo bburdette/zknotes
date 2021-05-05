@@ -9,14 +9,14 @@ import Search as S
 type SendMsg
     = Register Data.Registration
     | Login Data.Login
-    | GetZkNote Int
+      -- | GetZkNote Int
     | GetZkNoteEdit Data.GetZkNoteEdit
     | GetZkNoteComments Data.GetZkNoteComments
     | DeleteZkNote Int
     | SaveZkNote Data.SaveZkNote
     | SaveZkLinks Data.ZkLinks
     | SaveZkNotePlusLinks Data.SaveZkNotePlusLinks
-    | GetZkLinks Data.GetZkLinks
+      -- | GetZkLinks Data.GetZkLinks
     | SearchZkNotes S.ZkNoteSearch
     | SaveImportZkNotes (List Data.ImportZkNote)
     | PowerDelete S.TagSearch
@@ -30,6 +30,7 @@ type ServerResponse
     | NotLoggedIn
     | LoggedIn Data.LoginData
     | ZkNoteSearchResult Data.ZkNoteSearchResult
+    | ZkListNoteSearchResult Data.ZkListNoteSearchResult
     | SavedZkNotePlusLinks Data.SavedZkNote
     | SavedZkNote Data.SavedZkNote
     | DeletedZkNote Int
@@ -66,6 +67,9 @@ showServerResponse sr =
 
         ZkNoteSearchResult _ ->
             "ZkNoteSearchResult"
+
+        ZkListNoteSearchResult _ ->
+            "ZkListNoteSearchResult"
 
         SavedZkNote _ ->
             "SavedZkNote"
@@ -116,12 +120,11 @@ encodeSendMsg sm =
                 , ( "data", Data.encodeLogin login )
                 ]
 
-        GetZkNote id ->
-            JE.object
-                [ ( "what", JE.string "getzknote" )
-                , ( "data", JE.int id )
-                ]
-
+        -- GetZkNote id ->
+        --     JE.object
+        --         [ ( "what", JE.string "getzknote" )
+        --         , ( "data", JE.int id )
+        --         ]
         GetZkNoteEdit zkne ->
             JE.object
                 [ ( "what", JE.string "getzknoteedit" )
@@ -158,12 +161,11 @@ encodeSendMsg sm =
                 , ( "data", Data.encodeZkLinks zklinks )
                 ]
 
-        GetZkLinks gzl ->
-            JE.object
-                [ ( "what", JE.string "getzklinks" )
-                , ( "data", Data.encodeGetZkLinks gzl )
-                ]
-
+        -- GetZkLinks gzl ->
+        --     JE.object
+        --         [ ( "what", JE.string "getzklinks" )
+        --         , ( "data", Data.encodeGetZkLinks gzl )
+        --         ]
         SearchZkNotes s ->
             JE.object
                 [ ( "what", JE.string "searchzknotes" )
@@ -192,67 +194,69 @@ encodeEmail email =
 
 serverResponseDecoder : JD.Decoder ServerResponse
 serverResponseDecoder =
-    JD.andThen
-        (\what ->
-            case what of
-                "registration sent" ->
-                    JD.succeed RegistrationSent
+    JD.at [ "what" ]
+        JD.string
+        |> JD.andThen
+            (\what ->
+                case what of
+                    "registration sent" ->
+                        JD.succeed RegistrationSent
 
-                "unregistered user" ->
-                    JD.succeed UnregisteredUser
+                    "unregistered user" ->
+                        JD.succeed UnregisteredUser
 
-                "user exists" ->
-                    JD.succeed UserExists
+                    "user exists" ->
+                        JD.succeed UserExists
 
-                "logged in" ->
-                    JD.map LoggedIn (JD.at [ "content" ] Data.decodeLoginData)
+                    "logged in" ->
+                        JD.map LoggedIn (JD.at [ "content" ] Data.decodeLoginData)
 
-                "not logged in" ->
-                    JD.succeed NotLoggedIn
+                    "not logged in" ->
+                        JD.succeed NotLoggedIn
 
-                "invalid user or pwd" ->
-                    JD.succeed InvalidUserOrPwd
+                    "invalid user or pwd" ->
+                        JD.succeed InvalidUserOrPwd
 
-                "server error" ->
-                    JD.map ServerError (JD.at [ "content" ] JD.string)
+                    "server error" ->
+                        JD.map ServerError (JD.at [ "content" ] JD.string)
 
-                "zknotesearchresult" ->
-                    JD.map ZkNoteSearchResult (JD.at [ "content" ] <| Data.decodeZkNoteSearchResult)
+                    "zknotesearchresult" ->
+                        JD.map ZkNoteSearchResult (JD.at [ "content" ] <| Data.decodeZkNoteSearchResult)
 
-                "savedzknote" ->
-                    JD.map SavedZkNote (JD.at [ "content" ] <| Data.decodeSavedZkNote)
+                    "zklistnotesearchresult" ->
+                        JD.map ZkListNoteSearchResult (JD.at [ "content" ] <| Data.decodeZkListNoteSearchResult)
 
-                "savedzknotepluslinks" ->
-                    JD.map SavedZkNotePlusLinks (JD.at [ "content" ] <| Data.decodeSavedZkNote)
+                    "savedzknote" ->
+                        JD.map SavedZkNote (JD.at [ "content" ] <| Data.decodeSavedZkNote)
 
-                "deletedzknote" ->
-                    JD.map DeletedZkNote (JD.at [ "content" ] <| JD.int)
+                    "savedzknotepluslinks" ->
+                        JD.map SavedZkNotePlusLinks (JD.at [ "content" ] <| Data.decodeSavedZkNote)
 
-                "zknote" ->
-                    JD.map ZkNote (JD.at [ "content" ] <| Data.decodeZkNote)
+                    "deletedzknote" ->
+                        JD.map DeletedZkNote (JD.at [ "content" ] <| JD.int)
 
-                "zknoteedit" ->
-                    JD.map ZkNoteEdit (JD.at [ "content" ] <| Data.decodeZkNoteEdit)
+                    "zknote" ->
+                        JD.map ZkNote (JD.at [ "content" ] <| Data.decodeZkNote)
 
-                "zknotecomments" ->
-                    JD.map ZkNoteComments (JD.at [ "content" ] <| JD.list Data.decodeZkNote)
+                    "zknoteedit" ->
+                        JD.map ZkNoteEdit (JD.at [ "content" ] <| Data.decodeZkNoteEdit)
 
-                "savedzklinks" ->
-                    JD.succeed SavedZkLinks
+                    "zknotecomments" ->
+                        JD.map ZkNoteComments (JD.at [ "content" ] <| JD.list Data.decodeZkNote)
 
-                "savedimportzknotes" ->
-                    JD.succeed SavedImportZkNotes
+                    "savedzklinks" ->
+                        JD.succeed SavedZkLinks
 
-                "zklinks" ->
-                    JD.map ZkLinks (JD.field "content" Data.decodeZkLinks)
+                    "savedimportzknotes" ->
+                        JD.succeed SavedImportZkNotes
 
-                "powerdeletecomplete" ->
-                    JD.map PowerDeleteComplete (JD.field "content" JD.int)
+                    "zklinks" ->
+                        JD.map ZkLinks (JD.field "content" Data.decodeZkLinks)
 
-                wat ->
-                    JD.succeed
-                        (ServerError ("invalid 'what' from server: " ++ wat))
-        )
-        (JD.at [ "what" ]
-            JD.string
-        )
+                    "powerdeletecomplete" ->
+                        JD.map PowerDeleteComplete (JD.field "content" JD.int)
+
+                    wat ->
+                        JD.succeed
+                            (ServerError ("invalid 'what' from server: " ++ wat))
+            )
