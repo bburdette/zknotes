@@ -12,8 +12,8 @@ use std::error::Error;
 use std::path::Path;
 use uuid::Uuid;
 use zkprotocol::content::{
-  GetZkLinks, GetZkNoteComments, GetZkNoteEdit, ImportZkNote, Login, LoginData, RegistrationData,
-  SaveZkNote, SaveZkNotePlusLinks, ZkLinks, ZkNoteEdit,
+  GetZkNoteComments, GetZkNoteEdit, ImportZkNote, Login, LoginData, RegistrationData, SaveZkNote,
+  SaveZkNotePlusLinks, ZkLinks, ZkNoteEdit,
 };
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 use zkprotocol::search::{TagSearch, ZkNoteSearch};
@@ -263,6 +263,7 @@ fn user_interface_loggedin(
         content: serde_json::to_value(szkn)?,
       })
     }
+    // read_zklinks no longer returns ZkLinks, its EditLinks now.
     // "getzklinks" => {
     //   let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
     //   let gzl: GetZkLinks = serde_json::from_value(msgdata.clone())?;
