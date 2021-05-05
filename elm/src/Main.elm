@@ -1,5 +1,6 @@
 port module Main exposing (main)
 
+import Array
 import Browser
 import Browser.Events
 import Browser.Navigation
@@ -113,7 +114,6 @@ type alias Model =
     , seed : Seed
     , savedRoute : SavedRoute
     , prevSearches : List S.TagSearch
-    , selectDialog : Maybe SS.GDModel
     }
 
 
@@ -641,7 +641,7 @@ view model =
             ]
             [ case model.state of
                 SelectDialog sdm prevstate ->
-                    Html.map SelectDialogMsg <| GD.layout { buttonStyle = buttonStyle } sdm
+                    Html.map SelectDialogMsg <| GD.layout sdm
 
                 _ ->
                     E.layout [] <| viewState model.size model.state
@@ -1477,6 +1477,23 @@ handleEditZkNoteCmd model login emod ecmd =
         EditZkNote.Search s ->
             sendSearch { model | state = EditZkNote emod login } s
 
+        EditZkNote.SearchHistory ->
+            ( { model
+                | state =
+                    SelectDialog
+                        (SS.init
+                            { choices = Array.fromList <| List.map S.printTagSearch model.prevSearches
+                            , selected = Nothing
+                            , search = ""
+                            , buttonStyle = List.map (E.mapAttribute (\_ -> SS.Noop)) Common.buttonStyle
+                            }
+                            (E.map (\_ -> ()) (viewState model.size model.state))
+                        )
+                        model.state
+              }
+            , Cmd.none
+            )
+
 
 init : Flags -> Url -> Browser.Navigation.Key -> ( Model, Cmd Msg )
 init flags url key =
@@ -1498,7 +1515,6 @@ init flags url key =
             , seed = seed
             , savedRoute = { route = Top, save = False }
             , prevSearches = []
-            , selectDialog = Nothing
             }
 
         prevSearchQuery =

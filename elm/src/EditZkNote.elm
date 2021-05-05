@@ -87,6 +87,7 @@ type Msg
     | ViewPress
     | NewPress
     | CopyPress
+    | SearchHistoryPress
     | SwitchPress Int
     | ToLinkPress Data.ZkListNote
     | FromLinkPress Data.ZkListNote
@@ -164,6 +165,7 @@ type Command
     | SaveSwitch Data.SaveZkNotePlusLinks Int
     | GetSelectedText (List String)
     | Search S.ZkNoteSearch
+    | SearchHistory
 
 
 elToSzl : EditLink -> Data.SaveZkLink
@@ -829,9 +831,13 @@ zknview size model =
                  ]
                     ++ sppad
                 )
-                ((E.map SPMsg <|
-                    SP.view True (wclass == Narrow) 0 model.spmodel
-                 )
+                (EI.button Common.buttonStyle
+                    { onPress = Just <| SearchHistoryPress
+                    , label = E.el [ E.centerY ] <| E.text "Search History"
+                    }
+                    :: (E.map SPMsg <|
+                            SP.view True (wclass == Narrow) 0 model.spmodel
+                       )
                     :: (List.map
                             (showSr model isdirty)
                         <|
@@ -1442,6 +1448,9 @@ update msg model =
               }
             , None
             )
+
+        SearchHistoryPress ->
+            ( model, SearchHistory )
 
         DialogMsg dm ->
             case model.dialog of
