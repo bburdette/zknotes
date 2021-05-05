@@ -994,29 +994,21 @@ actualupdate msg model =
                                     in
                                     ( m, cmd )
 
-                                -- we're logged in!  Get article listing.
-                                -- getlisting login
                                 _ ->
                                     ( { model | state = unexpectedMessage state "logged in" }
                                     , Cmd.none
                                     )
 
                         UI.ZkNoteSearchResult sr ->
-                            let
-                                _ =
-                                    Debug.log " UI.ZkNoteSearchResult " sr
-                            in
                             if sr.what == "prevSearches" then
-                                -- build prev searches list.
                                 ( { model
                                     | prevSearches =
-                                        Debug.log "prevsearches:" <|
-                                            List.filterMap
-                                                (\zknote ->
-                                                    JD.decodeString S.decodeTagSearch zknote.content
-                                                        |> Result.toMaybe
-                                                )
-                                                sr.notes
+                                        List.filterMap
+                                            (\zknote ->
+                                                JD.decodeString S.decodeTagSearch zknote.content
+                                                    |> Result.toMaybe
+                                            )
+                                            sr.notes
                                   }
                                 , Cmd.none
                                 )
@@ -1025,10 +1017,6 @@ actualupdate msg model =
                                 ( model, Cmd.none )
 
                         UI.ZkListNoteSearchResult sr ->
-                            let
-                                _ =
-                                    Debug.log "UI.ZkListNoteSearchResult" sr
-                            in
                             case state of
                                 EditZkNoteListing znlstate login_ ->
                                     ( { model | state = EditZkNoteListing (EditZkNoteListing.updateSearchResult sr znlstate) login_ }

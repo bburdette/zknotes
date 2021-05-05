@@ -454,9 +454,6 @@ showSr model isdirty zkln =
         sysColor =
             ZC.systemColor model.ld zkln.sysids
 
-        _ =
-            Debug.log "sysids" zkln.sysids
-
         controlrow =
             E.row [ E.spacing 8, E.width E.fill ]
                 [ (case
