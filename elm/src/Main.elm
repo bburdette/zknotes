@@ -537,16 +537,21 @@ sendSearch model search =
                         ]
                     }
             in
-            ( { model | prevSearches = search.tagSearch :: model.prevSearches }
-            , if List.head model.prevSearches == Just search.tagSearch then
-                sendUIMsg model.location (UI.SearchZkNotes search)
+            if
+                (List.head model.prevSearches == Just search.tagSearch)
+                    || (search.tagSearch == S.SearchTerm [] "")
+            then
+                ( model
+                , sendUIMsg model.location (UI.SearchZkNotes search)
+                )
 
-              else
-                Cmd.batch
+            else
+                ( { model | prevSearches = search.tagSearch :: model.prevSearches }
+                , Cmd.batch
                     [ sendUIMsg model.location (UI.SearchZkNotes search)
                     , sendUIMsg model.location (UI.SaveZkNotePlusLinks searchnote)
                     ]
-            )
+                )
 
         Nothing ->
             ( model
@@ -606,7 +611,7 @@ view model =
             , onKeyDown
             ]
             [ case model.state of
-                SelectDialog sdm prevstate ->
+                SelectDialog sdm _ ->
                     Html.map SelectDialogMsg <| GD.layout sdm
 
                 _ ->
@@ -779,18 +784,33 @@ actualupdate msg model =
                     case List.head (List.drop return model.prevSearches) of
                         Just ts ->
                             let
-                                ns =
+                                sendsearch =
+                                    sendUIMsg model.location
+                                        (UI.SearchZkNotes
+                                            { tagSearch = ts
+                                            , offset = 0
+                                            , limit = Nothing
+                                            , what = ""
+                                            , list = True
+                                            }
+                                        )
+
+                                ( ns, cmd ) =
                                     case instate of
                                         EditZkNote ezn login ->
-                                            EditZkNote (Tuple.first <| EditZkNote.updateSearch ts ezn) login
+                                            ( EditZkNote (Tuple.first <| EditZkNote.updateSearch ts ezn) login
+                                            , sendsearch
+                                            )
 
                                         EditZkNoteListing ezn login ->
-                                            EditZkNoteListing (Tuple.first <| EditZkNoteListing.updateSearch ts ezn) login
+                                            ( EditZkNoteListing (Tuple.first <| EditZkNoteListing.updateSearch ts ezn) login
+                                            , sendsearch
+                                            )
 
                                         _ ->
-                                            instate
+                                            ( instate, Cmd.none )
                             in
-                            ( { model | state = ns }, Cmd.none )
+                            ( { model | state = ns }, cmd )
 
                         Nothing ->
                             ( { model | state = instate }, Cmd.none )
