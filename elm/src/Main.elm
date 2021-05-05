@@ -240,7 +240,12 @@ routeState model route =
                         Just login ->
                             Just <|
                                 ( ShowMessage { message = "loading note..." } login
-                                , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
+                                , Cmd.batch
+                                    [ sendUIMsg
+                                        model.location
+                                        (UI.SearchZkNotes <| prevSearchQuery login)
+                                    , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
+                                    ]
                                 )
 
                         Nothing ->
@@ -1509,6 +1514,23 @@ handleEditZkNoteCmd model login emod ecmd =
             )
 
 
+prevSearchQuery =
+    \login ->
+        let
+            ts : S.TagSearch
+            ts =
+                S.Boolex (S.SearchTerm [ S.ExactMatch, S.Tag ] "search")
+                    S.And
+                    (S.SearchTerm [ S.User ] login.name)
+        in
+        { tagSearch = ts
+        , offset = 0
+        , limit = Just 50
+        , what = "prevSearches"
+        , list = False
+        }
+
+
 init : Flags -> Url -> Browser.Navigation.Key -> ( Model, Cmd Msg )
 init flags url key =
     let
@@ -1530,22 +1552,6 @@ init flags url key =
             , savedRoute = { route = Top, save = False }
             , prevSearches = []
             }
-
-        prevSearchQuery =
-            \login ->
-                let
-                    ts : S.TagSearch
-                    ts =
-                        S.Boolex (S.SearchTerm [ S.ExactMatch, S.Tag ] "search")
-                            S.And
-                            (S.SearchTerm [ S.User ] login.name)
-                in
-                { tagSearch = ts
-                , offset = 0
-                , limit = Just 50
-                , what = "prevSearches"
-                , list = False
-                }
 
         ( model, cmd ) =
             parseUrl url
