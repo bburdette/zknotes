@@ -793,7 +793,21 @@ actualupdate msg model =
                     ( { model | state = SelectDialog nmod instate }, Cmd.none )
 
                 GD.Ok return ->
-                    ( { model | state = instate }, Cmd.none )
+                    case List.head (List.drop return model.prevSearches) of
+                        Just ts ->
+                            let
+                                ns =
+                                    case instate of
+                                        EditZkNote ezn login ->
+                                            EditZkNote (Tuple.first <| EditZkNote.updateSearch ts ezn) login
+
+                                        _ ->
+                                            instate
+                            in
+                            ( { model | state = ns }, Cmd.none )
+
+                        Nothing ->
+                            ( { model | state = instate }, Cmd.none )
 
                 GD.Cancel ->
                     ( { model | state = instate }, Cmd.none )

@@ -25,6 +25,7 @@ module EditZkNote exposing
     , onCtrlS
     , onSaved
     , pageLink
+    , renderMd
     , replaceOrAdd
     , saveZkLinkList
     , showSr
@@ -34,6 +35,7 @@ module EditZkNote exposing
     , toEditLink
     , toPubId
     , update
+    , updateSearch
     , updateSearchResult
     , view
     , zkLinkName
@@ -261,6 +263,15 @@ updateSearchResult zsr model =
         | zknSearchResult = zsr
         , spmodel = SP.searchResultUpdated zsr model.spmodel
     }
+
+
+updateSearch : S.TagSearch -> Model -> ( Model, Command )
+updateSearch ts model =
+    ( { model
+        | spmodel = SP.setSearchString model.spmodel (S.printTagSearch ts)
+      }
+    , None
+    )
 
 
 toPubId : Bool -> String -> Maybe String
