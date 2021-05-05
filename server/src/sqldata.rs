@@ -942,27 +942,6 @@ pub fn read_user(dbfile: &Path, name: &str) -> Result<User, Box<dyn Error>> {
   )?;
 
   Ok(user)
-
-  // user.token = match tokestr {
-  //   Some(s) => Some(Uuid::parse_str(s.as_str())?),
-  //   None => None,
-  // };
-
-  // // if expiration supplied, check for token expiration.
-  // match token_expiration_ms {
-  //   Some(texp) => {
-  //     if user
-  //       .tokendate
-  //       .map(|td| is_token_expired(texp, td))
-  //       .unwrap_or(true)
-  //     {
-  //       bail!("login expired")
-  //     } else {
-  //       Ok(user)
-  //     }
-  //   }
-  //   None => Ok(user),
-  // }
 }
 
 pub fn read_user_by_token(
@@ -1701,30 +1680,6 @@ pub fn read_zklinks(
       .collect(),
   );
   r
-  // let rec_iter = pstmt.query_map(params![uid, gzl.zknote, pubid, unid], |row| {
-  //   Ok(ZkLink {
-  //     from: row.get(0)?,
-  //     to: row.get(1)?,
-  //     user: row.get(2)?,
-  //     delete: None,
-  //     linkzknote: row.get(3)?,
-  //     fromname: row.get(4)?,
-  //     toname: row.get(5)?,
-  //   })
-  // })?;
-
-  // let mut pv = Vec::new();
-
-  // for rsrec in rec_iter {
-  //   match rsrec {
-  //     Ok(rec) => {
-  //       pv.push(rec);
-  //     }
-  //     Err(_) => (),
-  //   }
-  // }
-
-  // Ok(pv)
 }
 
 pub fn read_public_zklinks(
@@ -1772,19 +1727,6 @@ pub fn read_public_zklinks(
       .collect(),
   );
   r
-
-  // let mut pv = Vec::new();
-
-  // for rsrec in rec_iter {
-  //   match rsrec {
-  //     Ok(rec) => {
-  //       pv.push(rec);
-  //     }
-  //     Err(_) => (),
-  //   }
-  // }
-
-  // Ok(pv)
 }
 
 pub fn read_zknotecomments(
@@ -1804,10 +1746,6 @@ pub fn read_zknotecomments(
       and N.toid = ?1 and C.toid = ?2",
   )?;
   let c_iter = stmt.query_map(params![gznc.zknote, cid], |row| Ok(row.get(0)?))?;
-
-  // select N.fromid from  zklink C, zklink N
-  //       where N.fromid = C.fromid
-  //       and N.toid = 2720 and C.toid = 2737;
 
   let mut nv = Vec::new();
 
