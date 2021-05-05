@@ -5,6 +5,7 @@ import Browser.Events
 import Browser.Navigation
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
+import Common exposing (buttonStyle)
 import Data
 import Dict exposing (Dict)
 import DisplayError
@@ -18,6 +19,7 @@ import Element.Input as EI
 import Element.Region
 import File as F
 import File.Select as FS
+import GenDialog as GD
 import Html exposing (Attribute, Html)
 import Html.Attributes
 import Html.Events as HE
@@ -36,6 +38,7 @@ import Random exposing (Seed, initialSeed)
 import Schelme.Show exposing (showTerm)
 import Search as S
 import SearchPanel as SP
+import SelectString as SS
 import ShowMessage
 import Toop
 import Url exposing (Url)
@@ -62,6 +65,7 @@ type Msg
     | UrlChanged Url
     | WindowSize Util.Size
     | CtrlS
+    | SelectDialogMsg (GD.Msg SS.Msg)
     | Noop
 
 
@@ -76,6 +80,7 @@ type State
     | ShowMessage ShowMessage.Model Data.LoginData
     | PubShowMessage ShowMessage.Model
     | LoginShowMessage ShowMessage.Model Data.LoginData Url
+    | SelectDialog SS.GDModel State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
 
 
@@ -108,6 +113,7 @@ type alias Model =
     , seed : Seed
     , savedRoute : SavedRoute
     , prevSearches : List S.TagSearch
+    , selectDialog : Maybe SS.GDModel
     }
 
 
@@ -346,6 +352,9 @@ showMessage msg =
         CtrlS ->
             "CtrlS"
 
+        SelectDialogMsg _ ->
+            "SelectDialogMsg"
+
 
 showState : State -> String
 showState state =
@@ -382,6 +391,9 @@ showState state =
 
         Wait _ _ ->
             "Wait"
+
+        SelectDialog _ _ ->
+            "SelectDialog"
 
 
 unexpectedMsg : State -> Msg -> State
@@ -429,6 +441,10 @@ viewState size state =
 
         Wait innerState _ ->
             E.map (\_ -> Noop) (viewState size innerState)
+
+        SelectDialog _ _ ->
+            -- render is at the layout level, not here.
+            E.none
 
 
 stateSearch : State -> Maybe ( SP.Model, Data.ZkListNoteSearchResult )
@@ -479,6 +495,9 @@ stateLogin state =
 
         Wait wstate _ ->
             stateLogin wstate
+
+        SelectDialog _ instate ->
+            stateLogin instate
 
 
 sendUIMsg : String -> UI.SendMsg -> Cmd Msg
@@ -620,8 +639,12 @@ view model =
             -- blocks on ctrl-s, lets others through.
             , onKeyDown
             ]
-            [ E.layout [] <|
-                viewState model.size model.state
+            [ case model.state of
+                SelectDialog sdm prevstate ->
+                    Html.map SelectDialogMsg <| GD.layout { buttonStyle = buttonStyle } sdm
+
+                _ ->
+                    E.layout [] <| viewState model.size model.state
             ]
         ]
     }
@@ -763,6 +786,17 @@ actualupdate msg model =
 
         ( WindowSize s, _ ) ->
             ( { model | size = s }, Cmd.none )
+
+        ( SelectDialogMsg sdmsg, SelectDialog sdmod instate ) ->
+            case GD.update sdmsg sdmod of
+                GD.Dialog nmod ->
+                    ( { model | state = SelectDialog nmod instate }, Cmd.none )
+
+                GD.Ok return ->
+                    ( { model | state = instate }, Cmd.none )
+
+                GD.Cancel ->
+                    ( { model | state = instate }, Cmd.none )
 
         ( SelectedText jv, state ) ->
             case JD.decodeValue JD.string jv of
@@ -1464,6 +1498,7 @@ init flags url key =
             , seed = seed
             , savedRoute = { route = Top, save = False }
             , prevSearches = []
+            , selectDialog = Nothing
             }
 
         prevSearchQuery =
