@@ -612,7 +612,7 @@ view model =
             ]
             [ case model.state of
                 SelectDialog sdm _ ->
-                    Html.map SelectDialogMsg <| GD.layout (Just { width = 400, height = 400 }) sdm
+                    Html.map SelectDialogMsg <| GD.layout (Just { width = min 600 model.size.width, height = min 500 model.size.height }) sdm
 
                 _ ->
                     E.layout [] <| viewState model.size model.state
