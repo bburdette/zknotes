@@ -35,7 +35,7 @@ type alias Model =
     , title : String
     , md : String
     , cells : CellDict
-    , zklinks : List Data.ZkLink
+    , zklinks : List Data.EditLink
     }
 
 
@@ -57,40 +57,24 @@ zkLinkName zklink noteid =
         "link error"
 
 
-showZkl : Int -> Data.ZkLink -> Element Msg
+showZkl : Int -> Data.EditLink -> Element Msg
 showZkl id zkl =
-    let
-        ( dir, otherid ) =
-            case ( zkl.from == id, zkl.to == id ) of
-                ( True, False ) ->
-                    ( E.text "->", Just zkl.to )
-
-                ( False, True ) ->
-                    ( E.text "<-", Just zkl.from )
-
-                _ ->
-                    ( E.text "", Nothing )
-    in
     E.row [ E.spacing 8, E.width E.fill ]
-        [ dir
-        , id
-            |> zkLinkName zkl
-            |> (\s ->
-                    E.row
-                        [ E.clipX
-                        , E.centerY
-                        , E.height E.fill
-                        , E.width E.fill
-                        ]
-                        [ E.text s
-                        ]
-               )
-        , case otherid of
-            Just zknoteid ->
-                EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just (SwitchPress zknoteid), label = E.text "↗" }
+        [ case zkl.direction of
+            Data.To ->
+                E.text "->"
 
-            Nothing ->
-                E.none
+            Data.From ->
+                E.text "<-"
+        , E.row
+            [ E.clipX
+            , E.centerY
+            , E.height E.fill
+            , E.width E.fill
+            ]
+            [ E.text (zkl.othername |> Maybe.withDefault "")
+            ]
+        , EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just (SwitchPress zkl.otherid), label = E.text "↗" }
         ]
 
 
@@ -138,7 +122,7 @@ view maxw model loggedin =
         ]
 
 
-initFull : Data.ZkNoteAndAccomplices -> Model
+initFull : Data.ZkNoteEdit -> Model
 initFull zknaa =
     let
         zknote =
@@ -162,7 +146,7 @@ initFull zknaa =
     }
 
 
-initSzn : Data.SaveZkNote -> List Data.ZkLink -> Model
+initSzn : Data.SaveZkNote -> List Data.EditLink -> Model
 initSzn zknote links =
     let
         cells =

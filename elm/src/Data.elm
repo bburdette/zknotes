@@ -130,12 +130,6 @@ type alias SaveZkNotePlusLinks =
     }
 
 
-type alias ZkNoteAndAccomplices =
-    { zknote : ZkNote
-    , links : List ZkLink
-    }
-
-
 type alias ZkLinks =
     { links : List ZkLink
     }
@@ -403,13 +397,6 @@ decodeZkNote =
         |> andMap (JD.field "createdate" JD.int)
         |> andMap (JD.field "changeddate" JD.int)
         |> andMap (JD.field "sysids" <| JD.list JD.int)
-
-
-decodeZkNoteAndAccomplices : JD.Decoder ZkNoteAndAccomplices
-decodeZkNoteAndAccomplices =
-    JD.map2 ZkNoteAndAccomplices
-        (JD.field "zknote" decodeZkNote)
-        (JD.field "links" (JD.list decodeZkLink))
 
 
 decodeZkNoteEdit : JD.Decoder ZkNoteEdit
