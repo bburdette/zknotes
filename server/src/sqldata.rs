@@ -1100,19 +1100,11 @@ pub fn user_shares(conn: &Connection, uid: i64) -> Result<Vec<i64>, Box<dyn Erro
          (A.toid = B.toid and B.fromid = ?2))
       ",
   )?;
-  let rec_iter = pstmt.query_map(params![shareid, usernoteid], |row| Ok(row.get(0)?))?;
-  let mut pv = Vec::new();
-
-  for rsrec in rec_iter {
-    match rsrec {
-      Ok(rec) => {
-        pv.push(rec);
-      }
-      Err(_) => (),
-    }
-  }
-
-  Ok(pv)
+  let r = pstmt
+    .query_map(params![shareid, usernoteid], |row| Ok(row.get(0)?))?
+    .filter_map(|x| x.ok())
+    .collect();
+  Ok(r)
 }
 
 // is there a connection between this note and uid's user note?
@@ -1904,16 +1896,7 @@ pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
     })
   })?;
 
-  let mut uv = Vec::new();
-
-  for rsrec in u_iter {
-    match rsrec {
-      Ok(rec) => {
-        uv.push(rec);
-      }
-      Err(_) => (),
-    }
-  }
+  let uv = u_iter.filter_map(|x| x.ok()).collect();
 
   // Notes
   let mut nstmt = conn.prepare(
@@ -1938,16 +1921,7 @@ pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
     })
   })?;
 
-  let mut nv = Vec::new();
-
-  for rsrec in n_iter {
-    match rsrec {
-      Ok(rec) => {
-        nv.push(rec);
-      }
-      Err(_) => (),
-    }
-  }
+  let nv = n_iter.filter_map(|x| x.ok()).collect();
 
   // Links
   let mut lstmt = conn.prepare(
@@ -1967,16 +1941,7 @@ pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
     })
   })?;
 
-  let mut lv: Vec<ZkLink> = Vec::new();
-
-  for rsrec in l_iter {
-    match rsrec {
-      Ok(rec) => {
-        lv.push(rec);
-      }
-      Err(_) => (),
-    }
-  }
+  let lv = l_iter.filter_map(|x| x.ok()).collect();
 
   Ok(ZkDatabase {
     notes: nv,
