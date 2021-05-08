@@ -622,9 +622,6 @@ zknview size model =
         perhapsdirtybutton =
             commonButtonStyle isdirty
 
-        editable =
-            model.editable
-
         mine =
             model.noteUser == model.ld.userid
 
@@ -632,7 +629,12 @@ zknview size model =
             isPublic model
 
         search =
-            isSearch model
+            isSearch
+                model
+
+        editable =
+            model.editable
+                && not search
 
         -- super lame math because images suck in html/elm-ui
         mdw =
@@ -707,15 +709,7 @@ zknview size model =
                 , E.width E.fill
                 , E.paddingXY 5 0
                 ]
-                ([ if search then
-                    E.row [ E.width E.fill, E.spacing 8 ]
-                        [ titleed
-                        , EI.button Common.buttonStyle
-                            { label = E.text ">", onPress = Just <| SetSearch model.title }
-                        ]
-
-                   else
-                    titleed
+                ([ titleed
                  , if mine then
                     EI.checkbox [ E.width E.shrink ]
                         { onChange =
@@ -818,7 +812,15 @@ zknview size model =
                     , E.paddingXY 30 15
                     , E.spacing 8
                     ]
-                    [ E.paragraph [ EF.bold ] [ E.text model.title ]
+                    [ if search then
+                        E.row [ E.width E.fill, E.spacing 8 ]
+                            [ E.paragraph [ EF.bold ] [ E.text model.title ]
+                            , EI.button (E.alignRight :: Common.buttonStyle)
+                                { label = E.text ">", onPress = Just <| SetSearch model.title }
+                            ]
+
+                      else
+                        E.paragraph [ EF.bold ] [ E.text model.title ]
                     , renderMd model.cells model.md mdw
                     ]
                 ]
