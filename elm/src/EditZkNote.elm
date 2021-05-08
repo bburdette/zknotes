@@ -103,8 +103,9 @@ type Msg
     | RestoreSearch String
     | SrFocusPress Int
     | LinkFocusPress EditLink
-    | AddToSearch String
+    | AddToSearch Data.ZkListNote
     | AddToSearchAsTag String
+    | SetSearch String
     | Noop
 
 
@@ -505,7 +506,7 @@ showSr model isdirty zkln =
                             }
                         )
                 , EI.button linkButtonStyle
-                    { onPress = Just (AddToSearch zkln.title)
+                    { onPress = Just (AddToSearch zkln)
                     , label = E.text "^"
                     }
                 , EI.button linkButtonStyle
@@ -627,6 +628,12 @@ zknview size model =
         mine =
             model.noteUser == model.ld.userid
 
+        public =
+            isPublic model
+
+        search =
+            isSearch model
+
         -- super lame math because images suck in html/elm-ui
         mdw =
             min 1000
@@ -673,30 +680,42 @@ zknview size model =
                     (Dict.values model.zklDict)
 
         editview =
+            let
+                titleed =
+                    EI.text
+                        (if editable then
+                            [ E.htmlAttribute (Html.Attributes.id "title")
+                            ]
+
+                         else
+                            [ EF.color TC.darkGrey, E.htmlAttribute (Html.Attributes.id "title") ]
+                        )
+                        { onChange =
+                            if editable then
+                                OnTitleChanged
+
+                            else
+                                always Noop
+                        , text = model.title
+                        , placeholder = Nothing
+                        , label = EI.labelLeft [] (E.text "title")
+                        }
+            in
             E.column
                 [ E.spacing 8
                 , E.alignTop
                 , E.width E.fill
                 , E.paddingXY 5 0
                 ]
-                ([ EI.text
-                    (if editable then
-                        [ E.htmlAttribute (Html.Attributes.id "title")
+                ([ if search then
+                    E.row [ E.width E.fill, E.spacing 8 ]
+                        [ titleed
+                        , EI.button Common.buttonStyle
+                            { label = E.text ">", onPress = Just <| SetSearch model.title }
                         ]
 
-                     else
-                        [ EF.color TC.darkGrey, E.htmlAttribute (Html.Attributes.id "title") ]
-                    )
-                    { onChange =
-                        if editable then
-                            OnTitleChanged
-
-                        else
-                            always Noop
-                    , text = model.title
-                    , placeholder = Nothing
-                    , label = EI.labelLeft [] (E.text "title")
-                    }
+                   else
+                    titleed
                  , if mine then
                     EI.checkbox [ E.width E.shrink ]
                         { onChange =
@@ -784,9 +803,6 @@ zknview size model =
                     -- show the links.
                     ++ showLinks
                 )
-
-        public =
-            isPublic model
 
         mdview =
             E.column
@@ -999,6 +1015,11 @@ linksWith links linkid =
 isPublic : Model -> Bool
 isPublic model =
     linksWith (Dict.values model.zklDict) model.ld.publicid
+
+
+isSearch : Model -> Bool
+isSearch model =
+    linksWith (Dict.values model.zklDict) model.ld.searchid
 
 
 initFull : Data.LoginData -> Data.ZkListNoteSearchResult -> Data.ZkNote -> List Data.EditLink -> SP.Model -> ( Model, Data.GetZkNoteComments )
@@ -1622,7 +1643,34 @@ update msg model =
             , None
             )
 
-        AddToSearch title ->
+        AddToSearch zkln ->
+            let
+                spmod =
+                    model.spmodel
+            in
+            if List.any ((==) model.ld.searchid) zkln.sysids then
+                ( { model
+                    | spmodel =
+                        { spmod
+                            | tagSearchModel =
+                                TSP.updateSearchText spmod.tagSearchModel zkln.title
+                        }
+                  }
+                , None
+                )
+
+            else
+                ( { model
+                    | spmodel =
+                        { spmod
+                            | tagSearchModel =
+                                TSP.addToSearchPanel spmod.tagSearchModel [ S.ExactMatch ] zkln.title
+                        }
+                  }
+                , None
+                )
+
+        SetSearch text ->
             let
                 spmod =
                     model.spmodel
@@ -1631,7 +1679,7 @@ update msg model =
                 | spmodel =
                     { spmod
                         | tagSearchModel =
-                            TSP.addToSearchPanel spmod.tagSearchModel [ S.ExactMatch ] title
+                            TSP.updateSearchText spmod.tagSearchModel text
                     }
               }
             , None
