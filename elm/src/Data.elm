@@ -33,6 +33,7 @@ type alias LoginData =
     , shareid : Int
     , searchid : Int
     , commentid : Int
+    , logid : Int
     }
 
 
@@ -408,13 +409,14 @@ decodeZkNoteEdit =
 
 decodeLoginData : JD.Decoder LoginData
 decodeLoginData =
-    JD.map6 LoginData
+    JD.map7 LoginData
         (JD.field "userid" JD.int)
         (JD.field "name" JD.string)
         (JD.field "publicid" JD.int)
         (JD.field "shareid" JD.int)
         (JD.field "searchid" JD.int)
         (JD.field "commentid" JD.int)
+        (JD.field "logid" JD.int)
 
 
 encodeImportZkNote : ImportZkNote -> JE.Value

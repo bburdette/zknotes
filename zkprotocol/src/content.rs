@@ -21,6 +21,7 @@ pub struct LoginData {
   pub shareid: i64,
   pub searchid: i64,
   pub commentid: i64,
+  pub logid: i64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
