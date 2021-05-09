@@ -812,15 +812,16 @@ zknview size model =
                     , E.paddingXY 30 15
                     , E.spacing 8
                     ]
-                    [ if search then
-                        E.row [ E.width E.fill, E.spacing 8 ]
-                            [ E.paragraph [ EF.bold ] [ E.text model.title ]
-                            , EI.button (E.alignRight :: Common.buttonStyle)
+                    [ E.row [ E.width E.fill, E.spacing 8 ]
+                        [ E.paragraph [ EF.bold ] [ E.text model.title ]
+                        , if search then
+                            EI.button (E.alignRight :: Common.buttonStyle)
                                 { label = E.text ">", onPress = Just <| SetSearch model.title }
-                            ]
 
-                      else
-                        E.paragraph [ EF.bold ] [ E.text model.title ]
+                          else
+                            EI.button (E.alignRight :: Common.buttonStyle)
+                                { label = E.text ">", onPress = Just <| AddToSearchAsTag model.title }
+                        ]
                     , renderMd model.cells model.md mdw
                     ]
                 ]
