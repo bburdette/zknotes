@@ -110,6 +110,7 @@ type alias Model =
     , seed : Seed
     , savedRoute : SavedRoute
     , prevSearches : List S.TagSearch
+    , recentNotes : List Data.ZkListNote
     }
 
 
@@ -407,14 +408,14 @@ unexpectedMessage state msg =
     DisplayError (DisplayError.initialModel <| "unexpected message - " ++ msg ++ "; state was " ++ showState state) state
 
 
-viewState : Util.Size -> State -> Element Msg
-viewState size state =
+viewState : Util.Size -> State -> Model -> Element Msg
+viewState size state model =
     case state of
         Login lem ->
             E.map LoginMsg <| Login.view size lem
 
         EditZkNote em _ ->
-            E.map EditZkNoteMsg <| EditZkNote.view size em
+            E.map EditZkNoteMsg <| EditZkNote.view size model.recentNotes em
 
         EditZkNoteListing em ld ->
             E.map EditZkNoteListingMsg <| EditZkNoteListing.view ld size em
@@ -441,7 +442,7 @@ viewState size state =
             E.map DisplayErrorMsg <| DisplayError.view em
 
         Wait innerState _ ->
-            E.map (\_ -> Noop) (viewState size innerState)
+            E.map (\_ -> Noop) (viewState size innerState model)
 
         SelectDialog _ _ ->
             -- render is at the layout level, not here.
@@ -591,6 +592,13 @@ getListing model login =
         S.defaultSearch
 
 
+addRecentZkListNote : List Data.ZkListNote -> Data.ZkListNote -> List Data.ZkListNote
+addRecentZkListNote recent zkln =
+    List.take 50 <|
+        zkln
+            :: List.filter (\x -> x.id /= zkln.id) recent
+
+
 view : Model -> { title : String, body : List (Html Msg) }
 view model =
     { title =
@@ -615,7 +623,7 @@ view model =
                     Html.map SelectDialogMsg <| GD.layout (Just { width = min 600 model.size.width, height = min 500 model.size.height }) sdm
 
                 _ ->
-                    E.layout [] <| viewState model.size model.state
+                    E.layout [] <| viewState model.size model.state model
             ]
         ]
     }
@@ -756,7 +764,7 @@ shDialog model =
                     , search = ""
                     , buttonStyle = List.map (E.mapAttribute (\_ -> SS.Noop)) Common.buttonStyle
                     }
-                    (E.map (\_ -> ()) (viewState model.size model.state))
+                    (E.map (\_ -> ()) (viewState model.size model.state model))
                 )
                 model.state
     }
@@ -1058,8 +1066,17 @@ actualupdate msg model =
                                             stateSearch state
                                                 |> Maybe.withDefault ( SP.initModel, { notes = [], offset = 0, what = "" } )
 
+                                        sor =
+                                            case state of
+                                                EditZkNote eznst _ ->
+                                                    eznst.searchOrRecent
+
+                                                _ ->
+                                                    EditZkNote.SearchView
+
                                         ( s, c ) =
                                             EditZkNote.initFull login
+                                                sor
                                                 sres
                                                 zne.zknote
                                                 zne.links
@@ -1070,6 +1087,15 @@ actualupdate msg model =
                                             EditZkNote
                                                 s
                                                 login
+                                        , recentNotes =
+                                            addRecentZkListNote model.recentNotes
+                                                { id = zne.zknote.id
+                                                , user = zne.zknote.user
+                                                , title = zne.zknote.title
+                                                , createdate = zne.zknote.createdate
+                                                , changeddate = zne.zknote.changeddate
+                                                , sysids = zne.zknote.sysids
+                                                }
                                       }
                                     , sendUIMsg model.location <| UI.GetZkNoteComments c
                                     )
@@ -1098,10 +1124,18 @@ actualupdate msg model =
                                         eznst =
                                             EditZkNote.onSaved emod szkn
 
+                                        rn =
+                                            EditZkNote.toZkListNote eznst
+                                                |> Maybe.map
+                                                    (\zkln ->
+                                                        addRecentZkListNote model.recentNotes zkln
+                                                    )
+                                                |> Maybe.withDefault model.recentNotes
+
                                         st =
                                             EditZkNote eznst login
                                     in
-                                    ( { model | state = st }
+                                    ( { model | state = st, recentNotes = rn }
                                     , Cmd.none
                                     )
 
@@ -1116,10 +1150,18 @@ actualupdate msg model =
                                         eznst =
                                             EditZkNote.onSaved emod szkn
 
+                                        rn =
+                                            EditZkNote.toZkListNote eznst
+                                                |> Maybe.map
+                                                    (\zkln ->
+                                                        addRecentZkListNote model.recentNotes zkln
+                                                    )
+                                                |> Maybe.withDefault model.recentNotes
+
                                         st =
                                             EditZkNote eznst login
                                     in
-                                    ( { model | state = st }
+                                    ( { model | state = st, recentNotes = rn }
                                     , Cmd.none
                                     )
 
@@ -1533,6 +1575,7 @@ init flags url key =
             , seed = seed
             , savedRoute = { route = Top, save = False }
             , prevSearches = []
+            , recentNotes = []
             }
 
         ( model, cmd ) =
