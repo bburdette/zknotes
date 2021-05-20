@@ -452,14 +452,14 @@ pageLink model =
             )
 
 
-view : Util.Size -> Model -> Element Msg
-view size model =
+view : Util.Size -> List Data.ZkListNote -> Model -> Element Msg
+view size recentZkns model =
     case model.dialog of
         Just dialog ->
             D.view size dialog |> E.map DialogMsg
 
         Nothing ->
-            zknview size model
+            zknview size recentZkns model
 
 
 commonButtonStyle : Bool -> List (E.Attribute msg)
@@ -641,8 +641,8 @@ renderMd cd md mdw =
             E.text errors
 
 
-zknview : Util.Size -> Model -> Element Msg
-zknview size model =
+zknview : Util.Size -> List Data.ZkListNote -> Model -> Element Msg
+zknview size recentZkns model =
     let
         wclass =
             if size.width < 800 then
@@ -1520,7 +1520,7 @@ update msg model =
                     Just <|
                         D.init "delete this note?"
                             True
-                            (\size -> E.map (\_ -> ()) (view size model))
+                            (\size -> E.map (\_ -> ()) (view size [] model))
               }
             , None
             )

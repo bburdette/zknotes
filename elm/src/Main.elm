@@ -408,14 +408,14 @@ unexpectedMessage state msg =
     DisplayError (DisplayError.initialModel <| "unexpected message - " ++ msg ++ "; state was " ++ showState state) state
 
 
-viewState : Util.Size -> State -> Element Msg
-viewState size state =
+viewState : Util.Size -> State -> Model -> Element Msg
+viewState size state model =
     case state of
         Login lem ->
             E.map LoginMsg <| Login.view size lem
 
         EditZkNote em _ ->
-            E.map EditZkNoteMsg <| EditZkNote.view size em
+            E.map EditZkNoteMsg <| EditZkNote.view size model.recentNotes em
 
         EditZkNoteListing em ld ->
             E.map EditZkNoteListingMsg <| EditZkNoteListing.view ld size em
@@ -442,7 +442,7 @@ viewState size state =
             E.map DisplayErrorMsg <| DisplayError.view em
 
         Wait innerState _ ->
-            E.map (\_ -> Noop) (viewState size innerState)
+            E.map (\_ -> Noop) (viewState size innerState model)
 
         SelectDialog _ _ ->
             -- render is at the layout level, not here.
@@ -623,7 +623,7 @@ view model =
                     Html.map SelectDialogMsg <| GD.layout (Just { width = min 600 model.size.width, height = min 500 model.size.height }) sdm
 
                 _ ->
-                    E.layout [] <| viewState model.size model.state
+                    E.layout [] <| viewState model.size model.state model
             ]
         ]
     }
@@ -764,7 +764,7 @@ shDialog model =
                     , search = ""
                     , buttonStyle = List.map (E.mapAttribute (\_ -> SS.Noop)) Common.buttonStyle
                     }
-                    (E.map (\_ -> ()) (viewState model.size model.state))
+                    (E.map (\_ -> ()) (viewState model.size model.state model))
                 )
                 model.state
     }
