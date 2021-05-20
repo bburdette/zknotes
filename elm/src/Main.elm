@@ -596,7 +596,7 @@ addRecentZkListNote : List Data.ZkListNote -> Data.ZkListNote -> List Data.ZkLis
 addRecentZkListNote recent zkln =
     List.take 50 <|
         zkln
-            :: List.filter (\x -> x.id == zkln.id) recent
+            :: List.filter (\x -> x.id /= zkln.id) recent
 
 
 view : Model -> { title : String, body : List (Html Msg) }

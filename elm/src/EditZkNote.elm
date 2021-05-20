@@ -100,6 +100,7 @@ type Msg
     | MdLink EditLink
     | SPMsg SP.Msg
     | NavChoiceChanged NavChoice
+    | SearchOrRecentChanged SearchOrRecent
     | DialogMsg D.Msg
     | RestoreSearch String
     | SrFocusPress Int
@@ -114,6 +115,11 @@ type NavChoice
     = NcEdit
     | NcView
     | NcSearch
+
+
+type SearchOrRecent
+    = SearchView
+    | RecentView
 
 
 type alias EditLink =
@@ -156,6 +162,7 @@ type alias Model =
     , initialZklDict : Dict String EditLink
     , spmodel : SP.Model
     , navchoice : NavChoice
+    , searchOrRecent : SearchOrRecent
     , dialog : Maybe D.Model
     }
 
@@ -887,7 +894,7 @@ zknview size recentZkns model =
                 Wide ->
                     ( E.px 400, [ E.padding 5 ] )
 
-        searchPanel =
+        searchOrRecentPanel =
             E.column
                 ([ E.spacing 8
                  , E.alignTop
@@ -896,24 +903,45 @@ zknview size recentZkns model =
                  ]
                     ++ sppad
                 )
-                (EI.button Common.buttonStyle
-                    { onPress = Just <| SearchHistoryPress
-                    , label = E.el [ E.centerY ] <| E.text "Search History"
-                    }
-                    :: (E.map SPMsg <|
-                            SP.view True (wclass == Narrow) 0 model.spmodel
-                       )
-                    :: (List.map
-                            (showSr model isdirty)
-                        <|
-                            case model.id of
-                                Just id ->
-                                    List.filter (\zkl -> zkl.id /= id) model.zknSearchResult.notes
+                (Common.navbar 2
+                    model.searchOrRecent
+                    SearchOrRecentChanged
+                    [ ( SearchView, "search" )
+                    , ( RecentView, "recent" )
+                    ]
+                    :: (case model.searchOrRecent of
+                            SearchView ->
+                                searchPanel
 
-                                Nothing ->
-                                    model.zknSearchResult.notes
+                            RecentView ->
+                                recentPanel
                        )
                 )
+
+        searchPanel =
+            EI.button Common.buttonStyle
+                { onPress = Just <| SearchHistoryPress
+                , label = E.el [ E.centerY ] <| E.text "Search History"
+                }
+                :: (E.map SPMsg <|
+                        SP.view True (wclass == Narrow) 0 model.spmodel
+                   )
+                :: (List.map
+                        (showSr model isdirty)
+                    <|
+                        case model.id of
+                            Just id ->
+                                List.filter (\zkl -> zkl.id /= id) model.zknSearchResult.notes
+
+                            Nothing ->
+                                model.zknSearchResult.notes
+                   )
+
+        recentPanel =
+            List.map
+                (showSr model isdirty)
+            <|
+                recentZkns
 
         showpagelink =
             case pageLink model of
@@ -968,7 +996,7 @@ zknview size recentZkns model =
                     ]
                     [ headingPanel "edit" [ E.width E.fill ] editview
                     , headingPanel "view" [ E.width E.fill ] mdview
-                    , headingPanel "search" [ E.width spwidth ] searchPanel
+                    , headingPanel "search" [ E.width spwidth ] searchOrRecentPanel
                     ]
 
             Medium ->
@@ -1004,7 +1032,7 @@ zknview size recentZkns model =
                             NcSearch ->
                                 mdview
                         ]
-                    , headingPanel "search" [ E.width spwidth ] searchPanel
+                    , headingPanel "search" [ E.width spwidth ] searchOrRecentPanel
                     ]
 
             Narrow ->
@@ -1030,7 +1058,7 @@ zknview size recentZkns model =
                             mdview
 
                         NcSearch ->
-                            searchPanel
+                            searchOrRecentPanel
                     ]
         ]
 
@@ -1116,6 +1144,7 @@ initFull ld zkl zknote dtlinks spm =
       , revert = Just (Data.saveZkNote zknote)
       , spmodel = SP.searchResultUpdated zkl spm
       , navchoice = NcView
+      , searchOrRecent = SearchView
       , dialog = Nothing
       }
     , { zknote = zknote.id, offset = 0, limit = Nothing }
@@ -1157,6 +1186,7 @@ initNew ld zkl spm =
     , revert = Nothing
     , spmodel = SP.searchResultUpdated zkl spm
     , navchoice = NcEdit
+    , searchOrRecent = SearchView
     , dialog = Nothing
     }
 
@@ -1665,6 +1695,9 @@ update msg model =
 
         NavChoiceChanged nc ->
             ( { model | navchoice = nc }, None )
+
+        SearchOrRecentChanged x ->
+            ( { model | searchOrRecent = x }, None )
 
         SrFocusPress id ->
             ( { model
