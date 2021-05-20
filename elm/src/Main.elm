@@ -1066,8 +1066,17 @@ actualupdate msg model =
                                             stateSearch state
                                                 |> Maybe.withDefault ( SP.initModel, { notes = [], offset = 0, what = "" } )
 
+                                        sor =
+                                            case state of
+                                                EditZkNote eznst _ ->
+                                                    eznst.searchOrRecent
+
+                                                _ ->
+                                                    EditZkNote.SearchView
+
                                         ( s, c ) =
                                             EditZkNote.initFull login
+                                                sor
                                                 sres
                                                 zne.zknote
                                                 zne.links

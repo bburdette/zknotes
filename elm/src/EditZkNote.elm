@@ -4,6 +4,7 @@ module EditZkNote exposing
     , Model
     , Msg(..)
     , NavChoice(..)
+    , SearchOrRecent(..)
     , WClass(..)
     , addComment
     , commentsRecieved
@@ -1091,8 +1092,8 @@ isSearch model =
     linksWith (Dict.values model.zklDict) model.ld.searchid
 
 
-initFull : Data.LoginData -> Data.ZkListNoteSearchResult -> Data.ZkNote -> List Data.EditLink -> SP.Model -> ( Model, Data.GetZkNoteComments )
-initFull ld zkl zknote dtlinks spm =
+initFull : Data.LoginData -> SearchOrRecent -> Data.ZkListNoteSearchResult -> Data.ZkNote -> List Data.EditLink -> SP.Model -> ( Model, Data.GetZkNoteComments )
+initFull ld searchOrRecent zkl zknote dtlinks spm =
     let
         cells =
             zknote.content
@@ -1144,7 +1145,7 @@ initFull ld zkl zknote dtlinks spm =
       , revert = Just (Data.saveZkNote zknote)
       , spmodel = SP.searchResultUpdated zkl spm
       , navchoice = NcView
-      , searchOrRecent = SearchView
+      , searchOrRecent = searchOrRecent
       , dialog = Nothing
       }
     , { zknote = zknote.id, offset = 0, limit = Nothing }
