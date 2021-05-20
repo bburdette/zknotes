@@ -34,6 +34,7 @@ module EditZkNote exposing
     , sznToZkn
     , toEditLink
     , toPubId
+    , toZkListNote
     , update
     , updateSearch
     , updateSearchResult
@@ -147,6 +148,8 @@ type alias Model =
     , editableValue : Bool
     , pubidtxt : String
     , title : String
+    , createdate : Maybe Int
+    , changeddate : Maybe Int
     , md : String
     , cells : CellDict
     , revert : Maybe Data.SaveZkNote
@@ -224,6 +227,41 @@ elToSzkl this el =
             , toname = Nothing
             , delete = Nothing
             }
+
+
+toZkListNote : Model -> Maybe Data.ZkListNote
+toZkListNote model =
+    case ( model.id, model.createdate, model.changeddate ) of
+        ( Just id, Just createdate, Just changeddate ) ->
+            Just
+                { id = id
+                , user = model.noteUser
+                , title = model.title
+                , createdate = createdate
+                , changeddate = changeddate
+                , sysids =
+                    List.filterMap
+                        (\el ->
+                            if
+                                List.any ((==) el.otherid)
+                                    [ model.ld.publicid
+                                    , model.ld.shareid
+                                    , model.ld.searchid
+                                    , model.ld.commentid
+                                    ]
+                                    && el.direction
+                                    == To
+                            then
+                                Just el.otherid
+
+                            else
+                                Nothing
+                        )
+                        (Dict.values model.zklDict)
+                }
+
+        _ ->
+            Nothing
 
 
 sznFromModel : Model -> Data.SaveZkNote
@@ -1072,6 +1110,8 @@ initFull ld zkl zknote dtlinks spm =
       , pendingcomment = Nothing
       , editable = zknote.editable
       , editableValue = zknote.editableValue
+      , createdate = Just zknote.createdate
+      , changeddate = Just zknote.changeddate
       , cells = getCd cc
       , revert = Just (Data.saveZkNote zknote)
       , spmodel = SP.searchResultUpdated zkl spm
@@ -1110,6 +1150,8 @@ initNew ld zkl spm =
     , pendingcomment = Nothing
     , editable = True
     , editableValue = True
+    , createdate = Nothing
+    , changeddate = Nothing
     , md = ""
     , cells = getCd cc
     , revert = Nothing
@@ -1192,6 +1234,8 @@ onSaved model szn =
                                 szn
                                 pc
                            ]
+                , createdate = model.createdate |> Util.mapNothing szn.changeddate
+                , changeddate = Just szn.changeddate
             }
 
         Nothing ->
