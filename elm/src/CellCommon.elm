@@ -180,6 +180,16 @@ mkRenderer restoreSearchMsg maxw cellDict onchanged =
                     searchView restoreSearchMsg search renderedChildren
                 )
                 |> Markdown.Html.withAttribute "query"
+            , Markdown.Html.tag "panel"
+                (\noteid renderedChildren ->
+                    case String.toInt noteid of
+                        Just id ->
+                            panelView id renderedChildren
+
+                        Nothing ->
+                            E.text "error"
+                )
+                |> Markdown.Html.withAttribute "noteid"
             ]
     , table = E.column [ E.width <| E.fill ]
     , tableHeader = E.column [ E.width <| E.fill, EF.bold, EF.underline, E.spacing 8 ]
@@ -206,6 +216,11 @@ searchView restoreSearchMsg search renderedChildren =
                 }
             :: renderedChildren
         )
+
+
+panelView : Int -> List (Element a) -> Element a
+panelView noteid renderedChildren =
+    E.text ("Note :" ++ String.fromInt noteid)
 
 
 cellView : CellDict -> List (Element a) -> String -> String -> (String -> String -> a) -> Element a
