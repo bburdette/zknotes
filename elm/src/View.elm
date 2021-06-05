@@ -35,6 +35,7 @@ type alias Model =
     , title : String
     , md : String
     , cells : CellDict
+    , panels : List Panel
     , zklinks : List Data.EditLink
     }
 
@@ -84,41 +85,49 @@ view maxw model loggedin =
         mw =
             min maxw 1000 - 160
     in
-    E.column
-        [ E.width (E.fill |> E.maximum 1000), E.centerX, E.padding 10 ]
-        [ if loggedin then
-            E.row []
-                [ EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "Done" }
+    E.row [ E.width E.fill ]
+        [ case List.head model.panels of
+            Just panel ->
+                E.text <| "panelid:" ++ String.fromInt panel.noteid
+
+            Nothing ->
+                E.none
+        , E.column
+            [ E.width (E.fill |> E.maximum 1000), E.centerX, E.padding 10 ]
+            [ if loggedin then
+                E.row []
+                    [ EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "Done" }
+                    ]
+
+              else
+                E.none
+            , E.row [ E.centerX ] [ E.text model.title ]
+            , E.row [ E.width E.fill ]
+                [ case markdownView (mkRenderer (\_ -> Noop) mw model.cells OnSchelmeCodeChanged) model.md of
+                    Ok rendered ->
+                        E.column
+                            [ E.spacing 30
+                            , E.padding 80
+                            , E.width E.fill
+                            , E.centerX
+                            ]
+                            rendered
+
+                    Err errors ->
+                        E.text errors
                 ]
-
-          else
-            E.none
-        , E.row [ E.centerX ] [ E.text model.title ]
-        , E.row [ E.width E.fill ]
-            [ case markdownView (mkRenderer (\_ -> Noop) mw model.cells OnSchelmeCodeChanged) model.md of
-                Ok rendered ->
-                    E.column
-                        [ E.spacing 30
-                        , E.padding 80
-                        , E.width E.fill
-                        , E.centerX
-                        ]
-                        rendered
-
-                Err errors ->
-                    E.text errors
+            , E.column [ E.centerX, E.width (E.minimum 150 E.shrink), E.spacing 8 ]
+                (model.id
+                    |> Maybe.map
+                        (\id ->
+                            E.row [ Font.bold ] [ E.text "links" ]
+                                :: List.map
+                                    (showZkl id)
+                                    model.zklinks
+                        )
+                    |> Maybe.withDefault []
+                )
             ]
-        , E.column [ E.centerX, E.width (E.minimum 150 E.shrink), E.spacing 8 ]
-            (model.id
-                |> Maybe.map
-                    (\id ->
-                        E.row [ Font.bold ] [ E.text "links" ]
-                            :: List.map
-                                (showZkl id)
-                                model.zklinks
-                    )
-                |> Maybe.withDefault []
-            )
         ]
 
 
@@ -133,6 +142,11 @@ initFull zknaa =
                 |> mdCells
                 |> Result.withDefault (CellDict Dict.empty)
 
+        panels =
+            zknote.content
+                |> mdPanels
+                |> Result.withDefault []
+
         ( cc, result ) =
             evalCellsFully
                 (mkCc cells)
@@ -142,6 +156,7 @@ initFull zknaa =
     , title = zknote.title
     , md = zknote.content
     , cells = getCd cc
+    , panels = panels
     , zklinks = zknaa.links
     }
 
@@ -154,6 +169,11 @@ initSzn zknote links =
                 |> mdCells
                 |> Result.withDefault (CellDict Dict.empty)
 
+        panels =
+            zknote.content
+                |> mdPanels
+                |> Result.withDefault []
+
         ( cc, result ) =
             evalCellsFully
                 (mkCc cells)
@@ -163,6 +183,7 @@ initSzn zknote links =
     , title = zknote.title
     , md = zknote.content
     , cells = getCd cc
+    , panels = panels
     , zklinks = links
     }
 

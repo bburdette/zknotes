@@ -1,4 +1,4 @@
-module CellCommon exposing (blockCells, cellView, code, codeBlock, defCell, heading, markdownView, mdCells, mkRenderer, rawTextToId, showRunState)
+module CellCommon exposing (Panel, blockCells, cellView, code, codeBlock, defCell, heading, markdownView, mdCells, mdPanels, mkRenderer, rawTextToId, showRunState)
 
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
@@ -34,6 +34,46 @@ mdCells markdown =
         |> Markdown.Parser.parse
         |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
         |> Result.map blockCells
+
+
+type alias Panel =
+    { noteid : Int }
+
+
+mdPanels : String -> Result String (List Panel)
+mdPanels markdown =
+    markdown
+        |> Markdown.Parser.parse
+        |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
+        |> Result.map blockPanels
+
+
+blockPanels : List Block -> List Panel
+blockPanels blocks =
+    blocks
+        |> List.filterMap
+            (\block ->
+                case block of
+                    Block.HtmlBlock (Block.HtmlElement tag attribs _) ->
+                        if tag == "panel" then
+                            let
+                                am =
+                                    Dict.fromList <| List.map (\trib -> ( trib.name, trib.value )) attribs
+                            in
+                            am
+                                |> Dict.get "noteid"
+                                |> Maybe.andThen String.toInt
+                                |> Maybe.andThen
+                                    (\id ->
+                                        Just { noteid = id }
+                                    )
+
+                        else
+                            Nothing
+
+                    _ ->
+                        Nothing
+            )
 
 
 blockCells : List Block -> CellDict
