@@ -1,6 +1,6 @@
 module View exposing (Command(..), Model, Msg(..), initFull, initSzn, update, view)
 
-import CellCommon exposing (..)
+import CellCommon as CC
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
 import Common
@@ -35,7 +35,7 @@ type alias Model =
     , title : String
     , md : String
     , cells : CellDict
-    , panels : List Panel
+    , panelNote : Maybe Data.ZkNote
     , zklinks : List Data.EditLink
     }
 
@@ -86,9 +86,22 @@ view maxw model loggedin =
             min maxw 1000 - 160
     in
     E.row [ E.width E.fill ]
-        [ case List.head model.panels of
+        [ case model.panelNote of
             Just panel ->
-                E.text <| "panelid:" ++ String.fromInt panel.noteid
+                E.el [ E.width <| E.px 400 ]
+                    (case CC.markdownView (CC.mkRenderer (\_ -> Noop) mw model.cells OnSchelmeCodeChanged) model.md of
+                        Ok rendered ->
+                            E.column
+                                [ E.spacing 30
+                                , E.padding 80
+                                , E.width E.fill
+                                , E.centerX
+                                ]
+                                rendered
+
+                        Err errors ->
+                            E.text errors
+                    )
 
             Nothing ->
                 E.none
@@ -103,7 +116,7 @@ view maxw model loggedin =
                 E.none
             , E.row [ E.centerX ] [ E.text model.title ]
             , E.row [ E.width E.fill ]
-                [ case markdownView (mkRenderer (\_ -> Noop) mw model.cells OnSchelmeCodeChanged) model.md of
+                [ case CC.markdownView (CC.mkRenderer (\_ -> Noop) mw model.cells OnSchelmeCodeChanged) model.md of
                     Ok rendered ->
                         E.column
                             [ E.spacing 30
@@ -139,14 +152,14 @@ initFull zknaa =
 
         cells =
             zknote.content
-                |> mdCells
+                |> CC.mdCells
                 |> Result.withDefault (CellDict Dict.empty)
 
-        panels =
-            zknote.content
-                |> mdPanels
-                |> Result.withDefault []
-
+        {- panels =
+           zknote.content
+               |> CC.mdPanels
+               |> Result.withDefault []
+        -}
         ( cc, result ) =
             evalCellsFully
                 (mkCc cells)
@@ -156,7 +169,7 @@ initFull zknaa =
     , title = zknote.title
     , md = zknote.content
     , cells = getCd cc
-    , panels = panels
+    , panelNote = zknaa.panelNote
     , zklinks = zknaa.links
     }
 
@@ -166,12 +179,12 @@ initSzn zknote links =
     let
         cells =
             zknote.content
-                |> mdCells
+                |> CC.mdCells
                 |> Result.withDefault (CellDict Dict.empty)
 
         panels =
             zknote.content
-                |> mdPanels
+                |> CC.mdPanels
                 |> Result.withDefault []
 
         ( cc, result ) =
@@ -183,7 +196,7 @@ initSzn zknote links =
     , title = zknote.title
     , md = zknote.content
     , cells = getCd cc
-    , panels = panels
+    , panelNote = Nothing
     , zklinks = links
     }
 
@@ -208,7 +221,7 @@ update msg model =
                 ( cc, result ) =
                     evalCellsFully
                         (mkCc
-                            (Dict.insert name (defCell string) cd
+                            (Dict.insert name (CC.defCell string) cd
                                 |> CellDict
                             )
                         )
