@@ -199,8 +199,7 @@ routeState model route =
                             { message = "loading article"
                             }
                             login
-                        , sendUIMsg model.location
-                            (UI.GetZkNoteEdit { zknote = id })
+                        , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
                         )
 
                 Nothing ->
@@ -208,8 +207,8 @@ routeState model route =
                         ( PubShowMessage
                             { message = "loading article"
                             }
-                        , sendPIMsg model.location
-                            (PI.GetZkNote id)
+                          -- , sendPIMsg model.location (PI.GetZkNote id)
+                        , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNote id)) PublicReplyData
                         )
 
         PublicZkPubId pubid ->
@@ -217,8 +216,8 @@ routeState model route =
                 ( PubShowMessage
                     { message = "loading article"
                     }
-                , sendPIMsg model.location
-                    (PI.GetZkNotePubId pubid)
+                  -- , sendPIMsg model.location (PI.GetZkNotePubId pubid)
+                , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNotePubId pubid)) PublicReplyData
                 )
 
         EditZkNoteR id ->
@@ -572,51 +571,6 @@ sendPIMsg location msg =
                 (PI.encodeSendMsg msg)
         , expect = Http.expectJson PublicReplyData PI.serverResponseDecoder
         }
-
-
-firstTask : String -> JE.Value -> Task Http.Error Data.ZkNoteEdit
-firstTask location jsonBody =
-    HT.post
-        { url = location
-        , body = Http.jsonBody jsonBody
-        , resolver = HT.resolveJson Data.decodeZkNoteEdit
-        }
-
-
-secondTask : String -> Data.ZkNoteEdit -> Task Http.Error Data.ZkNoteEdit
-secondTask location zknoteedit =
-    zknoteedit.zknote.content
-        |> CC.mdPanel
-        |> Maybe.map
-            (\panel ->
-                HT.post
-                    { url = location
-                    , body = Http.jsonBody <| PI.encodeSendMsg (PI.GetZkNote panel.noteid)
-                    , resolver =
-                        HT.resolveJson
-                            (Data.decodeZkNoteEdit
-                                |> JD.andThen
-                                    (\panelnoteedit ->
-                                        JD.succeed { zknoteedit | panelNote = Just panelnoteedit.zknote }
-                                    )
-                            )
-                    }
-            )
-        |> Maybe.withDefault
-            (Task.succeed
-                zknoteedit
-            )
-
-
-publicZkNote : String -> JE.Value -> Cmd Msg
-publicZkNote location jsonBody =
-    firstTask location jsonBody
-        |> Task.andThen (\zkn -> secondTask location zkn)
-        |> Task.attempt
-            (Result.map
-                PI.ZkNote
-                >> PublicReplyData
-            )
 
 
 
