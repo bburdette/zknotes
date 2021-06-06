@@ -174,8 +174,8 @@ initFull zknaa =
     }
 
 
-initSzn : Data.SaveZkNote -> List Data.EditLink -> Model
-initSzn zknote links =
+initSzn : Data.SaveZkNote -> List Data.EditLink -> Maybe Data.ZkNote -> Model
+initSzn zknote links mbpanelnote =
     let
         cells =
             zknote.content
@@ -196,7 +196,7 @@ initSzn zknote links =
     , title = zknote.title
     , md = zknote.content
     , cells = getCd cc
-    , panelNote = Nothing
+    , panelNote = mbpanelnote
     , zklinks = links
     }
 

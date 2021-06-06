@@ -1057,8 +1057,19 @@ actualupdate msg model =
                                     , Cmd.none
                                     )
 
-                        UI.ZkNote _ ->
+                        UI.ZkNote zkn ->
                             case state of
+                                EditZkNote ezn login ->
+                                    let
+                                        ( emod, ecmd ) =
+                                            EditZkNote.onZkNote zkn ezn
+                                    in
+                                    handleEditZkNoteCmd model login emod ecmd
+
+                                {- ( { model | state = EditZkNote  login }
+                                   , Cmd.none
+                                   )
+                                -}
                                 _ ->
                                     ( { model | state = unexpectedMessage state (UI.showServerResponse uiresponse) }
                                     , Cmd.none
@@ -1527,8 +1538,8 @@ handleEditZkNoteCmd model login emod ecmd =
                 ]
             )
 
-        EditZkNote.View szn ->
-            ( { model | state = EView (View.initSzn szn []) (EditZkNote emod login) }, Cmd.none )
+        EditZkNote.View szn mbpanel ->
+            ( { model | state = EView (View.initSzn szn [] mbpanel) (EditZkNote emod login) }, Cmd.none )
 
         EditZkNote.GetSelectedText ids ->
             ( { model | state = EditZkNote emod login }
@@ -1541,6 +1552,11 @@ handleEditZkNoteCmd model login emod ecmd =
         EditZkNote.SearchHistory ->
             ( shDialog model
             , Cmd.none
+            )
+
+        EditZkNote.GetZkNote id ->
+            ( { model | state = EditZkNote emod login }
+            , sendUIMsg model.location (UI.GetZkNote id)
             )
 
 
