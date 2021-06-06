@@ -1,51 +1,6 @@
-module EditZkNote exposing
-    ( Command(..)
-    , EditLink
-    , Model
-    , Msg(..)
-    , NavChoice(..)
-    , SearchOrRecent(..)
-    , WClass(..)
-    , addComment
-    , commentsRecieved
-    , commonButtonStyle
-    , compareZklinks
-    , dirty
-    , disabledLinkButtonStyle
-    , elToSzkl
-    , elToSzl
-    , fullSave
-    , gotSelectedText
-    , initFull
-    , initNew
-    , isPublic
-    , linkButtonStyle
-    , linksWith
-    , mkButtonStyle
-    , noteLink
-    , onCtrlS
-    , onSaved
-    , pageLink
-    , renderMd
-    , replaceOrAdd
-    , saveZkLinkList
-    , showSr
-    , showZkl
-    , sznFromModel
-    , sznToZkn
-    , toEditLink
-    , toPubId
-    , toZkListNote
-    , update
-    , updateSearch
-    , updateSearchResult
-    , view
-    , zkLinkName
-    , zklKey
-    , zknview
-    )
+module EditZkNote exposing (Command(..), EditLink, Model, Msg(..), NavChoice(..), SearchOrRecent(..), WClass(..), addComment, commentsRecieved, commonButtonStyle, compareZklinks, dirty, disabledLinkButtonStyle, elToSzkl, elToSzl, fullSave, gotSelectedText, initFull, initNew, isPublic, isSearch, linkButtonStyle, linksWith, mkButtonStyle, noteLink, onCtrlS, onSaved, onZkNote, pageLink, renderMd, replaceOrAdd, saveZkLinkList, showSr, showZkl, sznFromModel, sznToZkn, toEditLink, toPubId, toZkListNote, update, updateSearch, updateSearchResult, view, zkLinkName, zklKey, zknview)
 
-import CellCommon exposing (..)
+import MdCommon as MC
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
 import Common
@@ -165,6 +120,7 @@ type alias Model =
     , navchoice : NavChoice
     , searchOrRecent : SearchOrRecent
     , dialog : Maybe D.Model
+    , panelNote : Maybe Data.ZkNote
     }
 
 
@@ -173,13 +129,21 @@ type Command
     | Save Data.SaveZkNotePlusLinks
     | SaveExit Data.SaveZkNotePlusLinks
     | Revert
-    | View Data.SaveZkNote
+    | View Data.SaveZkNote (Maybe Data.ZkNote)
     | Delete Int
     | Switch Int
     | SaveSwitch Data.SaveZkNotePlusLinks Int
     | GetSelectedText (List String)
     | Search S.ZkNoteSearch
     | SearchHistory
+    | GetZkNote Int
+
+
+onZkNote : Data.ZkNote -> Model -> ( Model, Command )
+onZkNote zkn model =
+    ( { model | panelNote = Just zkn }
+    , View (sznFromModel model) (Just zkn)
+    )
 
 
 elToSzl : EditLink -> Data.SaveZkLink
@@ -631,7 +595,7 @@ addComment model =
 
 renderMd : CellDict -> String -> Int -> Element Msg
 renderMd cd md mdw =
-    case markdownView (mkRenderer RestoreSearch mdw cd OnSchelmeCodeChanged) md of
+    case MC.markdownView (MC.mkRenderer RestoreSearch mdw cd True OnSchelmeCodeChanged) md of
         Ok rendered ->
             E.column
                 [ E.spacing 30
@@ -1097,7 +1061,7 @@ initFull ld searchOrRecent zkl zknote dtlinks spm =
     let
         cells =
             zknote.content
-                |> mdCells
+                |> MC.mdCells
                 |> Result.withDefault (CellDict Dict.empty)
 
         ( cc, result ) =
@@ -1147,6 +1111,7 @@ initFull ld searchOrRecent zkl zknote dtlinks spm =
       , navchoice = NcView
       , searchOrRecent = searchOrRecent
       , dialog = Nothing
+      , panelNote = Nothing
       }
     , { zknote = zknote.id, offset = 0, limit = Nothing }
     )
@@ -1157,7 +1122,7 @@ initNew ld zkl spm =
     let
         cells =
             ""
-                |> mdCells
+                |> MC.mdCells
                 |> Result.withDefault (CellDict Dict.empty)
 
         ( cc, result ) =
@@ -1189,6 +1154,7 @@ initNew ld zkl spm =
     , navchoice = NcEdit
     , searchOrRecent = SearchView
     , dialog = Nothing
+    , panelNote = Nothing
     }
 
 
@@ -1375,10 +1341,26 @@ update msg model =
             )
 
         ViewPress ->
-            ( model
-            , View
-                (sznFromModel model)
-            )
+            case MC.mdPanel model.md of
+                Just panel ->
+                    if Maybe.map .id model.panelNote == Just panel.noteid then
+                        ( model
+                        , View
+                            (sznFromModel model)
+                            model.panelNote
+                        )
+
+                    else
+                        ( model
+                        , GetZkNote panel.noteid
+                        )
+
+                Nothing ->
+                    ( model
+                    , View
+                        (sznFromModel model)
+                        Nothing
+                    )
 
         {- LinksPress ->
            let
@@ -1627,7 +1609,7 @@ update msg model =
             let
                 cells =
                     newMarkdown
-                        |> mdCells
+                        |> MC.mdCells
                         |> Result.withDefault (CellDict Dict.empty)
 
                 ( cc, result ) =
@@ -1649,7 +1631,7 @@ update msg model =
                 ( cc, result ) =
                     evalCellsFully
                         (mkCc
-                            (Dict.insert name (defCell string) cd
+                            (Dict.insert name (MC.defCell string) cd
                                 |> CellDict
                             )
                         )

@@ -1,4 +1,4 @@
-module CellCommon exposing (blockCells, cellView, code, codeBlock, defCell, heading, markdownView, mdCells, mkRenderer, rawTextToId, showRunState)
+module MdCommon exposing (Panel, blockCells, cellView, code, codeBlock, defCell, heading, markdownView, mdCells, mdPanel, mdPanels, mkRenderer, rawTextToId, showRunState)
 
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
@@ -34,6 +34,54 @@ mdCells markdown =
         |> Markdown.Parser.parse
         |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
         |> Result.map blockCells
+
+
+type alias Panel =
+    { noteid : Int }
+
+
+mdPanel : String -> Maybe Panel
+mdPanel markdown =
+    markdown
+        |> mdPanels
+        |> Result.toMaybe
+        |> Maybe.andThen List.head
+
+
+mdPanels : String -> Result String (List Panel)
+mdPanels markdown =
+    markdown
+        |> Markdown.Parser.parse
+        |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
+        |> Result.map blockPanels
+
+
+blockPanels : List Block -> List Panel
+blockPanels blocks =
+    blocks
+        |> List.filterMap
+            (\block ->
+                case block of
+                    Block.HtmlBlock (Block.HtmlElement tag attribs _) ->
+                        if tag == "panel" then
+                            let
+                                am =
+                                    Dict.fromList <| List.map (\trib -> ( trib.name, trib.value )) attribs
+                            in
+                            am
+                                |> Dict.get "noteid"
+                                |> Maybe.andThen String.toInt
+                                |> Maybe.andThen
+                                    (\id ->
+                                        Just { noteid = id }
+                                    )
+
+                        else
+                            Nothing
+
+                    _ ->
+                        Nothing
+            )
 
 
 blockCells : List Block -> CellDict
@@ -76,8 +124,8 @@ defCell s =
     { code = s, prog = Err "", runstate = RsErr "" }
 
 
-mkRenderer : (String -> a) -> Int -> CellDict -> (String -> String -> a) -> Markdown.Renderer.Renderer (Element a)
-mkRenderer restoreSearchMsg maxw cellDict onchanged =
+mkRenderer : (String -> a) -> Int -> CellDict -> Bool -> (String -> String -> a) -> Markdown.Renderer.Renderer (Element a)
+mkRenderer restoreSearchMsg maxw cellDict showPanelElt onchanged =
     { heading = heading
     , paragraph =
         E.paragraph
@@ -180,6 +228,20 @@ mkRenderer restoreSearchMsg maxw cellDict onchanged =
                     searchView restoreSearchMsg search renderedChildren
                 )
                 |> Markdown.Html.withAttribute "query"
+            , Markdown.Html.tag "panel"
+                (\noteid renderedChildren ->
+                    case String.toInt noteid of
+                        Just id ->
+                            if showPanelElt then
+                                panelView id renderedChildren
+
+                            else
+                                E.none
+
+                        Nothing ->
+                            E.text "error"
+                )
+                |> Markdown.Html.withAttribute "noteid"
             ]
     , table = E.column [ E.width <| E.fill ]
     , tableHeader = E.column [ E.width <| E.fill, EF.bold, EF.underline, E.spacing 8 ]
@@ -206,6 +268,11 @@ searchView restoreSearchMsg search renderedChildren =
                 }
             :: renderedChildren
         )
+
+
+panelView : Int -> List (Element a) -> Element a
+panelView noteid renderedChildren =
+    E.el [ E.padding 5, EBk.color TC.darkGray ] <| E.text ("Side panel note :" ++ String.fromInt noteid)
 
 
 cellView : CellDict -> List (Element a) -> String -> String -> (String -> String -> a) -> Element a

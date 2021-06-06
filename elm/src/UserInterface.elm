@@ -9,7 +9,7 @@ import Search as S
 type SendMsg
     = Register Data.Registration
     | Login Data.Login
-      -- | GetZkNote Int
+    | GetZkNote Int
     | GetZkNoteEdit Data.GetZkNoteEdit
     | GetZkNoteComments Data.GetZkNoteComments
     | DeleteZkNote Int
@@ -120,11 +120,12 @@ encodeSendMsg sm =
                 , ( "data", Data.encodeLogin login )
                 ]
 
-        -- GetZkNote id ->
-        --     JE.object
-        --         [ ( "what", JE.string "getzknote" )
-        --         , ( "data", JE.int id )
-        --         ]
+        GetZkNote id ->
+            JE.object
+                [ ( "what", JE.string "getzknote" )
+                , ( "data", JE.int id )
+                ]
+
         GetZkNoteEdit zkne ->
             JE.object
                 [ ( "what", JE.string "getzknoteedit" )

@@ -25,6 +25,7 @@ import Html exposing (Attribute, Html)
 import Html.Attributes
 import Html.Events as HE
 import Http
+import Http.Tasks as HT
 import Import
 import Json.Decode as JD
 import Json.Encode as JE
@@ -34,6 +35,7 @@ import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..))
 import Markdown.Html
 import Markdown.Parser
 import Markdown.Renderer
+import MdCommon as MC
 import PublicInterface as PI
 import Random exposing (Seed, initialSeed)
 import Schelme.Show exposing (showTerm)
@@ -41,6 +43,7 @@ import Search as S
 import SearchPanel as SP
 import SelectString as SS
 import ShowMessage
+import Task exposing (Task)
 import Toop
 import Url exposing (Url)
 import Url.Builder as UB
@@ -196,8 +199,7 @@ routeState model route =
                             { message = "loading article"
                             }
                             login
-                        , sendUIMsg model.location
-                            (UI.GetZkNoteEdit { zknote = id })
+                        , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
                         )
 
                 Nothing ->
@@ -205,8 +207,7 @@ routeState model route =
                         ( PubShowMessage
                             { message = "loading article"
                             }
-                        , sendPIMsg model.location
-                            (PI.GetZkNote id)
+                        , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNote id)) PublicReplyData
                         )
 
         PublicZkPubId pubid ->
@@ -214,8 +215,7 @@ routeState model route =
                 ( PubShowMessage
                     { message = "loading article"
                     }
-                , sendPIMsg model.location
-                    (PI.GetZkNotePubId pubid)
+                , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNotePubId pubid)) PublicReplyData
                 )
 
         EditZkNoteR id ->
@@ -1051,8 +1051,19 @@ actualupdate msg model =
                                     , Cmd.none
                                     )
 
-                        UI.ZkNote _ ->
+                        UI.ZkNote zkn ->
                             case state of
+                                EditZkNote ezn login ->
+                                    let
+                                        ( emod, ecmd ) =
+                                            EditZkNote.onZkNote zkn ezn
+                                    in
+                                    handleEditZkNoteCmd model login emod ecmd
+
+                                {- ( { model | state = EditZkNote  login }
+                                   , Cmd.none
+                                   )
+                                -}
                                 _ ->
                                     ( { model | state = unexpectedMessage state (UI.showServerResponse uiresponse) }
                                     , Cmd.none
@@ -1521,8 +1532,8 @@ handleEditZkNoteCmd model login emod ecmd =
                 ]
             )
 
-        EditZkNote.View szn ->
-            ( { model | state = EView (View.initSzn szn []) (EditZkNote emod login) }, Cmd.none )
+        EditZkNote.View szn mbpanel ->
+            ( { model | state = EView (View.initSzn szn [] mbpanel) (EditZkNote emod login) }, Cmd.none )
 
         EditZkNote.GetSelectedText ids ->
             ( { model | state = EditZkNote emod login }
@@ -1535,6 +1546,11 @@ handleEditZkNoteCmd model login emod ecmd =
         EditZkNote.SearchHistory ->
             ( shDialog model
             , Cmd.none
+            )
+
+        EditZkNote.GetZkNote id ->
+            ( { model | state = EditZkNote emod login }
+            , sendUIMsg model.location (UI.GetZkNote id)
             )
 
 

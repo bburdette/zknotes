@@ -1,6 +1,6 @@
 module View exposing (Command(..), Model, Msg(..), initFull, initSzn, update, view)
 
-import CellCommon exposing (..)
+import MdCommon as MC
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
 import Common
@@ -35,6 +35,7 @@ type alias Model =
     , title : String
     , md : String
     , cells : CellDict
+    , panelNote : Maybe Data.ZkNote
     , zklinks : List Data.EditLink
     }
 
@@ -84,41 +85,62 @@ view maxw model loggedin =
         mw =
             min maxw 1000 - 160
     in
-    E.column
-        [ E.width (E.fill |> E.maximum 1000), E.centerX, E.padding 10 ]
-        [ if loggedin then
-            E.row []
-                [ EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "Done" }
-                ]
+    E.row [ E.width E.fill ]
+        [ case model.panelNote of
+            Just panel ->
+                E.el [ E.width <| E.px 400, E.alignTop ]
+                    (case MC.markdownView (MC.mkRenderer (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged) model.md of
+                        Ok rendered ->
+                            E.column
+                                [ E.spacing 30
+                                , E.padding 80
+                                , E.width E.fill
+                                , E.centerX
+                                ]
+                                rendered
 
-          else
-            E.none
-        , E.row [ E.centerX ] [ E.text model.title ]
-        , E.row [ E.width E.fill ]
-            [ case markdownView (mkRenderer (\_ -> Noop) mw model.cells OnSchelmeCodeChanged) model.md of
-                Ok rendered ->
-                    E.column
-                        [ E.spacing 30
-                        , E.padding 80
-                        , E.width E.fill
-                        , E.centerX
-                        ]
-                        rendered
-
-                Err errors ->
-                    E.text errors
-            ]
-        , E.column [ E.centerX, E.width (E.minimum 150 E.shrink), E.spacing 8 ]
-            (model.id
-                |> Maybe.map
-                    (\id ->
-                        E.row [ Font.bold ] [ E.text "links" ]
-                            :: List.map
-                                (showZkl id)
-                                model.zklinks
+                        Err errors ->
+                            E.text errors
                     )
-                |> Maybe.withDefault []
-            )
+
+            Nothing ->
+                E.none
+        , E.column
+            [ E.width (E.fill |> E.maximum 1000), E.centerX, E.padding 10, E.alignTop ]
+            [ if loggedin then
+                E.row []
+                    [ EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "Done" }
+                    ]
+
+              else
+                E.none
+            , E.row [ E.centerX ] [ E.text model.title ]
+            , E.row [ E.width E.fill ]
+                [ case MC.markdownView (MC.mkRenderer (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged) model.md of
+                    Ok rendered ->
+                        E.column
+                            [ E.spacing 30
+                            , E.padding 80
+                            , E.width E.fill
+                            , E.centerX
+                            ]
+                            rendered
+
+                    Err errors ->
+                        E.text errors
+                ]
+            , E.column [ E.centerX, E.width (E.minimum 150 E.shrink), E.spacing 8 ]
+                (model.id
+                    |> Maybe.map
+                        (\id ->
+                            E.row [ Font.bold ] [ E.text "links" ]
+                                :: List.map
+                                    (showZkl id)
+                                    model.zklinks
+                        )
+                    |> Maybe.withDefault []
+                )
+            ]
         ]
 
 
@@ -130,7 +152,7 @@ initFull zknaa =
 
         cells =
             zknote.content
-                |> mdCells
+                |> MC.mdCells
                 |> Result.withDefault (CellDict Dict.empty)
 
         ( cc, result ) =
@@ -142,17 +164,23 @@ initFull zknaa =
     , title = zknote.title
     , md = zknote.content
     , cells = getCd cc
+    , panelNote = zknaa.panelNote
     , zklinks = zknaa.links
     }
 
 
-initSzn : Data.SaveZkNote -> List Data.EditLink -> Model
-initSzn zknote links =
+initSzn : Data.SaveZkNote -> List Data.EditLink -> Maybe Data.ZkNote -> Model
+initSzn zknote links mbpanelnote =
     let
         cells =
             zknote.content
-                |> mdCells
+                |> MC.mdCells
                 |> Result.withDefault (CellDict Dict.empty)
+
+        panels =
+            zknote.content
+                |> MC.mdPanels
+                |> Result.withDefault []
 
         ( cc, result ) =
             evalCellsFully
@@ -163,6 +191,7 @@ initSzn zknote links =
     , title = zknote.title
     , md = zknote.content
     , cells = getCd cc
+    , panelNote = mbpanelnote
     , zklinks = links
     }
 
@@ -187,7 +216,7 @@ update msg model =
                 ( cc, result ) =
                     evalCellsFully
                         (mkCc
-                            (Dict.insert name (defCell string) cd
+                            (Dict.insert name (MC.defCell string) cd
                                 |> CellDict
                             )
                         )
