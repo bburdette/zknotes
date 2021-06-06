@@ -4,7 +4,6 @@ import Array
 import Browser
 import Browser.Events
 import Browser.Navigation
-import MdCommon as MC
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
 import Common exposing (buttonStyle)
@@ -36,6 +35,7 @@ import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..))
 import Markdown.Html
 import Markdown.Parser
 import Markdown.Renderer
+import MdCommon as MC
 import PublicInterface as PI
 import Random exposing (Seed, initialSeed)
 import Schelme.Show exposing (showTerm)
@@ -207,7 +207,6 @@ routeState model route =
                         ( PubShowMessage
                             { message = "loading article"
                             }
-                          -- , sendPIMsg model.location (PI.GetZkNote id)
                         , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNote id)) PublicReplyData
                         )
 
@@ -216,7 +215,6 @@ routeState model route =
                 ( PubShowMessage
                     { message = "loading article"
                     }
-                  -- , sendPIMsg model.location (PI.GetZkNotePubId pubid)
                 , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNotePubId pubid)) PublicReplyData
                 )
 
@@ -571,10 +569,6 @@ sendPIMsg location msg =
                 (PI.encodeSendMsg msg)
         , expect = Http.expectJson PublicReplyData PI.serverResponseDecoder
         }
-
-
-
--- import Http.Tasks exposing (get, resolveString, resolveJson)
 
 
 getListing : Model -> Data.LoginData -> ( Model, Cmd Msg )
