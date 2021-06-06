@@ -4,7 +4,7 @@ import Array
 import Browser
 import Browser.Events
 import Browser.Navigation
-import CellCommon as CC
+import MdCommon as MC
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
 import Common exposing (buttonStyle)

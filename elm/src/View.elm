@@ -1,6 +1,6 @@
 module View exposing (Command(..), Model, Msg(..), initFull, initSzn, update, view)
 
-import CellCommon as CC
+import MdCommon as MC
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
 import Common
@@ -89,7 +89,7 @@ view maxw model loggedin =
         [ case model.panelNote of
             Just panel ->
                 E.el [ E.width <| E.px 400, E.alignTop ]
-                    (case CC.markdownView (CC.mkRenderer (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged) model.md of
+                    (case MC.markdownView (MC.mkRenderer (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged) model.md of
                         Ok rendered ->
                             E.column
                                 [ E.spacing 30
@@ -116,7 +116,7 @@ view maxw model loggedin =
                 E.none
             , E.row [ E.centerX ] [ E.text model.title ]
             , E.row [ E.width E.fill ]
-                [ case CC.markdownView (CC.mkRenderer (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged) model.md of
+                [ case MC.markdownView (MC.mkRenderer (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged) model.md of
                     Ok rendered ->
                         E.column
                             [ E.spacing 30
@@ -152,7 +152,7 @@ initFull zknaa =
 
         cells =
             zknote.content
-                |> CC.mdCells
+                |> MC.mdCells
                 |> Result.withDefault (CellDict Dict.empty)
 
         ( cc, result ) =
@@ -174,12 +174,12 @@ initSzn zknote links mbpanelnote =
     let
         cells =
             zknote.content
-                |> CC.mdCells
+                |> MC.mdCells
                 |> Result.withDefault (CellDict Dict.empty)
 
         panels =
             zknote.content
-                |> CC.mdPanels
+                |> MC.mdPanels
                 |> Result.withDefault []
 
         ( cc, result ) =
@@ -216,7 +216,7 @@ update msg model =
                 ( cc, result ) =
                     evalCellsFully
                         (mkCc
-                            (Dict.insert name (CC.defCell string) cd
+                            (Dict.insert name (MC.defCell string) cd
                                 |> CellDict
                             )
                         )

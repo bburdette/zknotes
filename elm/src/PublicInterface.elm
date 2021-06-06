@@ -1,6 +1,6 @@
 module PublicInterface exposing (SendMsg(..), ServerResponse(..), encodeSendMsg, getPublicZkNote, serverResponseDecoder)
 
-import CellCommon as CC
+import MdCommon as MC
 import Data
 import Http
 import Http.Tasks as HT
@@ -70,7 +70,7 @@ secondTask location sr =
     case sr of
         ZkNote zknoteedit ->
             zknoteedit.zknote.content
-                |> CC.mdPanel
+                |> MC.mdPanel
                 |> Maybe.map
                     (\panel ->
                         HT.post

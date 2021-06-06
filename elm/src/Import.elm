@@ -21,7 +21,7 @@ module Import exposing
     , zklKey
     )
 
-import CellCommon exposing (..)
+import MdCommon exposing (..)
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
 import Common

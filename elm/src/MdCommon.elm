@@ -1,4 +1,4 @@
-module CellCommon exposing (Panel, blockCells, cellView, code, codeBlock, defCell, heading, markdownView, mdCells, mdPanel, mdPanels, mkRenderer, rawTextToId, showRunState)
+module MdCommon exposing (Panel, blockCells, cellView, code, codeBlock, defCell, heading, markdownView, mdCells, mdPanel, mdPanels, mkRenderer, rawTextToId, showRunState)
 
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)

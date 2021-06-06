@@ -1,6 +1,6 @@
 module EditZkNote exposing (Command(..), EditLink, Model, Msg(..), NavChoice(..), SearchOrRecent(..), WClass(..), addComment, commentsRecieved, commonButtonStyle, compareZklinks, dirty, disabledLinkButtonStyle, elToSzkl, elToSzl, fullSave, gotSelectedText, initFull, initNew, isPublic, isSearch, linkButtonStyle, linksWith, mkButtonStyle, noteLink, onCtrlS, onSaved, onZkNote, pageLink, renderMd, replaceOrAdd, saveZkLinkList, showSr, showZkl, sznFromModel, sznToZkn, toEditLink, toPubId, toZkListNote, update, updateSearch, updateSearchResult, view, zkLinkName, zklKey, zknview)
 
-import CellCommon as CC
+import MdCommon as MC
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
 import Common
@@ -595,7 +595,7 @@ addComment model =
 
 renderMd : CellDict -> String -> Int -> Element Msg
 renderMd cd md mdw =
-    case CC.markdownView (CC.mkRenderer RestoreSearch mdw cd True OnSchelmeCodeChanged) md of
+    case MC.markdownView (MC.mkRenderer RestoreSearch mdw cd True OnSchelmeCodeChanged) md of
         Ok rendered ->
             E.column
                 [ E.spacing 30
@@ -1061,7 +1061,7 @@ initFull ld searchOrRecent zkl zknote dtlinks spm =
     let
         cells =
             zknote.content
-                |> CC.mdCells
+                |> MC.mdCells
                 |> Result.withDefault (CellDict Dict.empty)
 
         ( cc, result ) =
@@ -1122,7 +1122,7 @@ initNew ld zkl spm =
     let
         cells =
             ""
-                |> CC.mdCells
+                |> MC.mdCells
                 |> Result.withDefault (CellDict Dict.empty)
 
         ( cc, result ) =
@@ -1341,7 +1341,7 @@ update msg model =
             )
 
         ViewPress ->
-            case CC.mdPanel model.md of
+            case MC.mdPanel model.md of
                 Just panel ->
                     if Maybe.map .id model.panelNote == Just panel.noteid then
                         ( model
@@ -1609,7 +1609,7 @@ update msg model =
             let
                 cells =
                     newMarkdown
-                        |> CC.mdCells
+                        |> MC.mdCells
                         |> Result.withDefault (CellDict Dict.empty)
 
                 ( cc, result ) =
@@ -1631,7 +1631,7 @@ update msg model =
                 ( cc, result ) =
                     evalCellsFully
                         (mkCc
-                            (Dict.insert name (CC.defCell string) cd
+                            (Dict.insert name (MC.defCell string) cd
                                 |> CellDict
                             )
                         )
