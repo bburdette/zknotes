@@ -22,7 +22,8 @@
             "elm/random": "1.0.0",
             "elm/time": "1.0.0",
             "elm/url": "1.0.0",
-            "mdgriffith/elm-ui": "1.1.8"
+            "mdgriffith/elm-ui": "1.1.8",
+            "prikhi/http-tasks": "1.0.0"
         },
         "indirect": {
             "elm/bytes": "1.0.8",

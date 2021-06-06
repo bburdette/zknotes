@@ -1,4 +1,4 @@
-module CellCommon exposing (Panel, blockCells, cellView, code, codeBlock, defCell, heading, markdownView, mdCells, mdPanels, mkRenderer, rawTextToId, showRunState)
+module CellCommon exposing (Panel, blockCells, cellView, code, codeBlock, defCell, heading, markdownView, mdCells, mdPanel, mdPanels, mkRenderer, rawTextToId, showRunState)
 
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
@@ -38,6 +38,14 @@ mdCells markdown =
 
 type alias Panel =
     { noteid : Int }
+
+
+mdPanel : String -> Maybe Panel
+mdPanel markdown =
+    markdown
+        |> mdPanels
+        |> Result.toMaybe
+        |> Maybe.andThen List.head
 
 
 mdPanels : String -> Result String (List Panel)

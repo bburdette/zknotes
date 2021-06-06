@@ -165,6 +165,7 @@ type alias GetZkNoteEdit =
 type alias ZkNoteEdit =
     { zknote : ZkNote
     , links : List EditLink
+    , panelNote : Maybe ZkNote
     }
 
 
@@ -401,9 +402,10 @@ decodeZkNote =
 
 decodeZkNoteEdit : JD.Decoder ZkNoteEdit
 decodeZkNoteEdit =
-    JD.map2 ZkNoteEdit
+    JD.map3 ZkNoteEdit
         (JD.field "zknote" decodeZkNote)
         (JD.field "links" (JD.list decodeEditLink))
+        (JD.succeed Nothing)
 
 
 decodeLoginData : JD.Decoder LoginData
