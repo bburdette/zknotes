@@ -88,8 +88,8 @@ view maxw model loggedin =
     E.row [ E.width E.fill ]
         [ case model.panelNote of
             Just panel ->
-                E.el [ E.width <| E.px 400 ]
-                    (case CC.markdownView (CC.mkRenderer (\_ -> Noop) mw model.cells OnSchelmeCodeChanged) model.md of
+                E.el [ E.width <| E.px 400, E.alignTop ]
+                    (case CC.markdownView (CC.mkRenderer (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged) model.md of
                         Ok rendered ->
                             E.column
                                 [ E.spacing 30
@@ -106,7 +106,7 @@ view maxw model loggedin =
             Nothing ->
                 E.none
         , E.column
-            [ E.width (E.fill |> E.maximum 1000), E.centerX, E.padding 10 ]
+            [ E.width (E.fill |> E.maximum 1000), E.centerX, E.padding 10, E.alignTop ]
             [ if loggedin then
                 E.row []
                     [ EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "Done" }
@@ -116,7 +116,7 @@ view maxw model loggedin =
                 E.none
             , E.row [ E.centerX ] [ E.text model.title ]
             , E.row [ E.width E.fill ]
-                [ case CC.markdownView (CC.mkRenderer (\_ -> Noop) mw model.cells OnSchelmeCodeChanged) model.md of
+                [ case CC.markdownView (CC.mkRenderer (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged) model.md of
                     Ok rendered ->
                         E.column
                             [ E.spacing 30
@@ -155,11 +155,6 @@ initFull zknaa =
                 |> CC.mdCells
                 |> Result.withDefault (CellDict Dict.empty)
 
-        {- panels =
-           zknote.content
-               |> CC.mdPanels
-               |> Result.withDefault []
-        -}
         ( cc, result ) =
             evalCellsFully
                 (mkCc cells)

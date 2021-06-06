@@ -124,8 +124,8 @@ defCell s =
     { code = s, prog = Err "", runstate = RsErr "" }
 
 
-mkRenderer : (String -> a) -> Int -> CellDict -> (String -> String -> a) -> Markdown.Renderer.Renderer (Element a)
-mkRenderer restoreSearchMsg maxw cellDict onchanged =
+mkRenderer : (String -> a) -> Int -> CellDict -> Bool -> (String -> String -> a) -> Markdown.Renderer.Renderer (Element a)
+mkRenderer restoreSearchMsg maxw cellDict showPanelElt onchanged =
     { heading = heading
     , paragraph =
         E.paragraph
@@ -232,7 +232,11 @@ mkRenderer restoreSearchMsg maxw cellDict onchanged =
                 (\noteid renderedChildren ->
                     case String.toInt noteid of
                         Just id ->
-                            panelView id renderedChildren
+                            if showPanelElt then
+                                panelView id renderedChildren
+
+                            else
+                                E.none
 
                         Nothing ->
                             E.text "error"
@@ -268,7 +272,7 @@ searchView restoreSearchMsg search renderedChildren =
 
 panelView : Int -> List (Element a) -> Element a
 panelView noteid renderedChildren =
-    E.text ("Note :" ++ String.fromInt noteid)
+    E.el [ E.padding 5, EBk.color TC.darkGray ] <| E.text ("Side panel note :" ++ String.fromInt noteid)
 
 
 cellView : CellDict -> List (Element a) -> String -> String -> (String -> String -> a) -> Element a

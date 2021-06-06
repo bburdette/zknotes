@@ -595,7 +595,7 @@ addComment model =
 
 renderMd : CellDict -> String -> Int -> Element Msg
 renderMd cd md mdw =
-    case CC.markdownView (CC.mkRenderer RestoreSearch mdw cd OnSchelmeCodeChanged) md of
+    case CC.markdownView (CC.mkRenderer RestoreSearch mdw cd True OnSchelmeCodeChanged) md of
         Ok rendered ->
             E.column
                 [ E.spacing 30
