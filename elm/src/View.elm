@@ -1,6 +1,5 @@
 module View exposing (Command(..), Model, Msg(..), initFull, initSzn, update, view)
 
-import MdCommon as MC
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
 import Common
@@ -18,6 +17,7 @@ import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..))
 import Markdown.Html
 import Markdown.Parser
 import Markdown.Renderer
+import MdCommon as MC
 import Schelme.Show exposing (showTerm)
 import TangoColors as TC
 
@@ -89,7 +89,11 @@ view maxw model loggedin =
         [ case model.panelNote of
             Just panel ->
                 E.el [ E.width <| E.px 400, E.alignTop ]
-                    (case MC.markdownView (MC.mkRenderer (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged) model.md of
+                    (case
+                        MC.markdownView
+                            (MC.mkRenderer (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged)
+                            panel.content
+                     of
                         Ok rendered ->
                             E.column
                                 [ E.spacing 30
