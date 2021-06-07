@@ -1,6 +1,5 @@
 module EditZkNote exposing (Command(..), EditLink, Model, Msg(..), NavChoice(..), SearchOrRecent(..), WClass(..), addComment, commentsRecieved, commonButtonStyle, compareZklinks, dirty, disabledLinkButtonStyle, elToSzkl, elToSzl, fullSave, gotSelectedText, initFull, initNew, isPublic, isSearch, linkButtonStyle, linksWith, mkButtonStyle, noteLink, onCtrlS, onSaved, onZkNote, pageLink, renderMd, replaceOrAdd, saveZkLinkList, showSr, showZkl, sznFromModel, sznToZkn, toEditLink, toPubId, toZkListNote, update, updateSearch, updateSearchResult, view, zkLinkName, zklKey, zknview)
 
-import MdCommon as MC
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
 import Common
@@ -20,6 +19,7 @@ import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..), 
 import Markdown.Html
 import Markdown.Parser
 import Markdown.Renderer
+import MdCommon as MC
 import Schelme.Show exposing (showTerm)
 import Search as S
 import SearchPanel as SP
@@ -1674,7 +1674,11 @@ update msg model =
                     )
 
                 SP.Search ts ->
-                    ( mod, Search ts )
+                    let
+                        zsr =
+                            mod.zknSearchResult
+                    in
+                    ( { mod | zknSearchResult = { zsr | notes = [] } }, Search ts )
 
         NavChoiceChanged nc ->
             ( { model | navchoice = nc }, None )
