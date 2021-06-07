@@ -506,9 +506,7 @@ sendUIMsg : String -> UI.SendMsg -> Cmd Msg
 sendUIMsg location msg =
     Http.post
         { url = location ++ "/user"
-        , body =
-            Http.jsonBody
-                (UI.encodeSendMsg msg)
+        , body = Http.jsonBody (UI.encodeSendMsg msg)
         , expect = Http.expectJson UserReplyData UI.serverResponseDecoder
         }
 
@@ -564,9 +562,7 @@ sendPIMsg : String -> PI.SendMsg -> Cmd Msg
 sendPIMsg location msg =
     Http.post
         { url = location ++ "/public"
-        , body =
-            Http.jsonBody
-                (PI.encodeSendMsg msg)
+        , body = Http.jsonBody (PI.encodeSendMsg msg)
         , expect = Http.expectJson PublicReplyData PI.serverResponseDecoder
         }
 
