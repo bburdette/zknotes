@@ -414,13 +414,15 @@ pageLink model =
     model.id
         |> Maybe.andThen
             (\id ->
-                toPubId (isPublic model) model.pubidtxt
-                    |> Maybe.map
-                        (\pubid ->
-                            UB.absolute [ "page", pubid ] []
-                        )
-                    |> Util.mapNothing
-                        (UB.absolute [ "editnote", String.fromInt id ] [])
+                if isPublic model then
+                    if model.pubidtxt /= "" then
+                        Just <| UB.absolute [ "page", model.pubidtxt ] []
+
+                    else
+                        Just <| UB.absolute [ "note", String.fromInt id ] []
+
+                else
+                    Just <| UB.absolute [ "editnote", String.fromInt id ] []
             )
 
 
