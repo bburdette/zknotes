@@ -187,6 +187,21 @@ view narrow nblevel model =
             else
                 attribs
 
+        sbs =
+            if narrow then
+                buttonStyle ++ [ alignLeft ]
+
+            else
+                buttonStyle
+
+        searchButton =
+            case model.search of
+                TagSearch (Err _) ->
+                    Input.button (sbs ++ [ Background.color Color.grey ]) { onPress = Nothing, label = text "search:" }
+
+                _ ->
+                    Input.button sbs { onPress = Just SearchClick, label = text "search:" }
+
         tinput =
             Input.text
                 tiattribs
@@ -194,15 +209,14 @@ view narrow nblevel model =
                 , text = model.searchText
                 , placeholder = Nothing
                 , label =
-                    Input.labelLeft [] <|
-                        row [ centerY ]
-                            [ case model.search of
-                                TagSearch (Err _) ->
-                                    Input.button (buttonStyle ++ [ Background.color Color.grey ]) { onPress = Nothing, label = text "search:" }
+                    if narrow then
+                        Input.labelHidden "search"
 
-                                _ ->
-                                    Input.button buttonStyle { onPress = Just SearchClick, label = text "search:" }
-                            ]
+                    else
+                        Input.labelLeft [] <|
+                            row [ centerY ]
+                                [ searchButton
+                                ]
                 }
 
         ddbutton =
@@ -231,8 +245,16 @@ view narrow nblevel model =
                    }
            ,
         -}
+        obs =
+            alignRight :: buttonStyle
+
         buttons =
-            [ Input.button buttonStyle
+            [ if narrow then
+                searchButton
+
+              else
+                none
+            , Input.button obs
                 { onPress = Just SearchDetails
                 , label =
                     text <|
@@ -242,7 +264,7 @@ view narrow nblevel model =
                         else
                             "?"
                 }
-            , Input.button buttonStyle
+            , Input.button obs
                 { onPress = Just Clear
                 , label = text "x"
                 }
@@ -253,9 +275,8 @@ view narrow nblevel model =
     in
     column
         (if showborder then
-            [ Border.color Color.darkBlue
-            , Border.width 3
-            , padding 2
+            [ padding 2
+            , spacing 8
             , width fill
             ]
 
@@ -264,7 +285,7 @@ view narrow nblevel model =
         )
         ((if narrow then
             [ row [ width fill, spacing 3 ] [ tinput, ddbutton ]
-            , row [ spacing 3, alignRight ] buttons
+            , row [ spacing 3, width fill ] buttons
             ]
 
           else

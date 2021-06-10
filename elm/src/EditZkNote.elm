@@ -71,6 +71,7 @@ type NavChoice
     = NcEdit
     | NcView
     | NcSearch
+    | NcRecent
 
 
 type SearchOrRecent
@@ -853,7 +854,7 @@ zknview size recentZkns model =
         ( spwidth, sppad ) =
             case wclass of
                 Narrow ->
-                    ( E.fill, [] )
+                    ( E.fill, [ E.paddingXY 0 5 ] )
 
                 Medium ->
                     ( E.px 400, [ E.padding 5 ] )
@@ -863,52 +864,55 @@ zknview size recentZkns model =
 
         searchOrRecentPanel =
             E.column
-                ([ E.spacing 8
-                 , E.alignTop
-                 , E.alignRight
-                 , E.width spwidth
-                 ]
-                    ++ sppad
-                )
+                [ E.spacing 8
+                , E.alignTop
+                , E.alignRight
+                , E.width spwidth
+                , EBd.width 1
+                ]
                 (Common.navbar 2
                     model.searchOrRecent
                     SearchOrRecentChanged
                     [ ( SearchView, "search" )
                     , ( RecentView, "recent" )
                     ]
-                    :: (case model.searchOrRecent of
+                    :: [ case model.searchOrRecent of
                             SearchView ->
                                 searchPanel
 
                             RecentView ->
                                 recentPanel
-                       )
+                       ]
                 )
 
         searchPanel =
-            EI.button Common.buttonStyle
-                { onPress = Just <| SearchHistoryPress
-                , label = E.el [ E.centerY ] <| E.text "Search History"
-                }
-                :: (E.map SPMsg <|
-                        SP.view True (wclass == Narrow) 0 model.spmodel
-                   )
-                :: (List.map
-                        (showSr model isdirty)
-                    <|
-                        case model.id of
-                            Just id ->
-                                List.filter (\zkl -> zkl.id /= id) model.zknSearchResult.notes
+            E.column (E.spacing 8 :: E.width E.fill :: sppad)
+                (EI.button Common.buttonStyle
+                    { onPress = Just <| SearchHistoryPress
+                    , label = E.el [ E.centerY ] <| E.text "Search History"
+                    }
+                    :: (E.map SPMsg <|
+                            SP.view True (size.width < 400 || wclass /= Narrow) 0 model.spmodel
+                       )
+                    :: (List.map
+                            (showSr model isdirty)
+                        <|
+                            case model.id of
+                                Just id ->
+                                    List.filter (\zkl -> zkl.id /= id) model.zknSearchResult.notes
 
-                            Nothing ->
-                                model.zknSearchResult.notes
-                   )
+                                Nothing ->
+                                    model.zknSearchResult.notes
+                       )
+                )
 
         recentPanel =
-            List.map
-                (showSr model isdirty)
-            <|
-                recentZkns
+            E.column (E.spacing 8 :: sppad)
+                (List.map
+                    (showSr model isdirty)
+                 <|
+                    recentZkns
+                )
 
         showpagelink =
             case pageLink model of
@@ -921,7 +925,11 @@ zknview size recentZkns model =
         headingPanel : String -> List (E.Attribute Msg) -> Element Msg -> Element Msg
         headingPanel name attribs elt =
             E.column ([ E.spacing 12, E.alignTop, EBd.width 1, E.height E.fill ] ++ attribs)
-                [ E.el [ E.centerX, EF.bold ] <| E.text name
+                [ Common.navbar 2
+                    ()
+                    (\_ -> Noop)
+                    [ ( (), name )
+                    ]
                 , elt
                 ]
     in
@@ -963,7 +971,7 @@ zknview size recentZkns model =
                     ]
                     [ headingPanel "edit" [ E.width E.fill ] editview
                     , headingPanel "view" [ E.width E.fill ] mdview
-                    , headingPanel "search" [ E.width spwidth ] searchOrRecentPanel
+                    , searchOrRecentPanel
                     ]
 
             Medium ->
@@ -998,8 +1006,11 @@ zknview size recentZkns model =
 
                             NcSearch ->
                                 mdview
+
+                            NcRecent ->
+                                mdview
                         ]
-                    , headingPanel "search" [ E.width spwidth ] searchOrRecentPanel
+                    , searchOrRecentPanel
                     ]
 
             Narrow ->
@@ -1016,6 +1027,7 @@ zknview size recentZkns model =
                                 "markdown"
                           )
                         , ( NcSearch, "search" )
+                        , ( NcRecent, "recent" )
                         ]
                     , case model.navchoice of
                         NcEdit ->
@@ -1025,7 +1037,10 @@ zknview size recentZkns model =
                             mdview
 
                         NcSearch ->
-                            searchOrRecentPanel
+                            searchPanel
+
+                        NcRecent ->
+                            recentPanel
                     ]
         ]
 
