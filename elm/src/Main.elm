@@ -556,7 +556,9 @@ sendSearch model search =
                     [ sendUIMsg model.location (UI.SearchZkNotes search)
                     , sendUIMsgExp model.location
                         (UI.SaveZkNotePlusLinks searchnote)
-                        -- ignore the reply!
+                        -- ignore the reply!  otherwise if you search while
+                        -- creating a new note, that new note gets the search note
+                        -- id.
                         (\_ -> Noop)
                     ]
                 )
