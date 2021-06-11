@@ -84,6 +84,9 @@ view maxw model loggedin =
     let
         mw =
             min maxw 1000 - 160
+
+        narrow =
+            maxw < 1300
     in
     E.column [ E.width E.fill ]
         [ if loggedin then
@@ -93,10 +96,22 @@ view maxw model loggedin =
 
           else
             E.none
-        , E.row [ E.width E.fill ]
+        , (if narrow then
+            \x -> E.column [ E.width E.fill ] (List.reverse x)
+
+           else
+            E.row [ E.width E.fill ]
+          )
             [ case model.panelNote of
                 Just panel ->
-                    E.el [ E.width <| E.px 400, E.alignTop ]
+                    E.el
+                        [ if narrow then
+                            E.width E.fill
+
+                          else
+                            E.width <| E.px 400
+                        , E.alignTop
+                        ]
                         (case
                             MC.markdownView
                                 (MC.mkRenderer (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged)
@@ -138,10 +153,14 @@ view maxw model loggedin =
                     (model.id
                         |> Maybe.map
                             (\id ->
-                                E.row [ Font.bold ] [ E.text "links" ]
-                                    :: List.map
-                                        (showZkl id)
-                                        model.zklinks
+                                if List.isEmpty model.zklinks then
+                                    []
+
+                                else
+                                    E.row [ Font.bold ] [ E.text "links" ]
+                                        :: List.map
+                                            (showZkl id)
+                                            model.zklinks
                             )
                         |> Maybe.withDefault []
                     )
