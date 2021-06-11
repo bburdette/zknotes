@@ -85,15 +85,43 @@ view maxw model loggedin =
         mw =
             min maxw 1000 - 160
     in
-    E.row [ E.width E.fill ]
-        [ case model.panelNote of
-            Just panel ->
-                E.el [ E.width <| E.px 400, E.alignTop ]
-                    (case
-                        MC.markdownView
-                            (MC.mkRenderer (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged)
-                            panel.content
-                     of
+    E.column [ E.width E.fill ]
+        [ if loggedin then
+            E.row []
+                [ EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "Edit" }
+                ]
+
+          else
+            E.none
+        , E.row [ E.width E.fill ]
+            [ case model.panelNote of
+                Just panel ->
+                    E.el [ E.width <| E.px 400, E.alignTop ]
+                        (case
+                            MC.markdownView
+                                (MC.mkRenderer (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged)
+                                panel.content
+                         of
+                            Ok rendered ->
+                                E.column
+                                    [ E.spacing 30
+                                    , E.padding 80
+                                    , E.width E.fill
+                                    , E.centerX
+                                    ]
+                                    rendered
+
+                            Err errors ->
+                                E.text errors
+                        )
+
+                Nothing ->
+                    E.none
+            , E.column
+                [ E.width (E.fill |> E.maximum 1000), E.centerX, E.padding 10, E.alignTop ]
+                [ E.row [ E.centerX ] [ E.text model.title ]
+                , E.row [ E.width E.fill ]
+                    [ case MC.markdownView (MC.mkRenderer (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged) model.md of
                         Ok rendered ->
                             E.column
                                 [ E.spacing 30
@@ -105,45 +133,19 @@ view maxw model loggedin =
 
                         Err errors ->
                             E.text errors
-                    )
-
-            Nothing ->
-                E.none
-        , E.column
-            [ E.width (E.fill |> E.maximum 1000), E.centerX, E.padding 10, E.alignTop ]
-            [ if loggedin then
-                E.row []
-                    [ EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "Done" }
                     ]
-
-              else
-                E.none
-            , E.row [ E.centerX ] [ E.text model.title ]
-            , E.row [ E.width E.fill ]
-                [ case MC.markdownView (MC.mkRenderer (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged) model.md of
-                    Ok rendered ->
-                        E.column
-                            [ E.spacing 30
-                            , E.padding 80
-                            , E.width E.fill
-                            , E.centerX
-                            ]
-                            rendered
-
-                    Err errors ->
-                        E.text errors
+                , E.column [ E.centerX, E.width (E.minimum 150 E.shrink), E.spacing 8 ]
+                    (model.id
+                        |> Maybe.map
+                            (\id ->
+                                E.row [ Font.bold ] [ E.text "links" ]
+                                    :: List.map
+                                        (showZkl id)
+                                        model.zklinks
+                            )
+                        |> Maybe.withDefault []
+                    )
                 ]
-            , E.column [ E.centerX, E.width (E.minimum 150 E.shrink), E.spacing 8 ]
-                (model.id
-                    |> Maybe.map
-                        (\id ->
-                            E.row [ Font.bold ] [ E.text "links" ]
-                                :: List.map
-                                    (showZkl id)
-                                    model.zklinks
-                        )
-                    |> Maybe.withDefault []
-                )
             ]
         ]
 
