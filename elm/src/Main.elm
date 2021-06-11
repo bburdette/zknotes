@@ -504,10 +504,15 @@ stateLogin state =
 
 sendUIMsg : String -> UI.SendMsg -> Cmd Msg
 sendUIMsg location msg =
+    sendUIMsgExp location msg UserReplyData
+
+
+sendUIMsgExp : String -> UI.SendMsg -> (Result Http.Error UI.ServerResponse -> Msg) -> Cmd Msg
+sendUIMsgExp location msg tomsg =
     Http.post
         { url = location ++ "/user"
         , body = Http.jsonBody (UI.encodeSendMsg msg)
-        , expect = Http.expectJson UserReplyData UI.serverResponseDecoder
+        , expect = Http.expectJson tomsg UI.serverResponseDecoder
         }
 
 
@@ -536,6 +541,7 @@ sendSearch model search =
                         ]
                     }
             in
+            -- if this is the same search as last time, don't save.
             if
                 (List.head model.prevSearches == Just search.tagSearch)
                     || (search.tagSearch == S.SearchTerm [] "")
@@ -548,7 +554,10 @@ sendSearch model search =
                 ( { model | prevSearches = search.tagSearch :: model.prevSearches }
                 , Cmd.batch
                     [ sendUIMsg model.location (UI.SearchZkNotes search)
-                    , sendUIMsg model.location (UI.SaveZkNotePlusLinks searchnote)
+                    , sendUIMsgExp model.location
+                        (UI.SaveZkNotePlusLinks searchnote)
+                        -- ignore the reply!
+                        (\_ -> Noop)
                     ]
                 )
 
