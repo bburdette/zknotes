@@ -1140,7 +1140,9 @@ actualupdate msg model =
                                 EditZkNote emod login ->
                                     let
                                         eznst =
-                                            EditZkNote.onSaved emod szkn
+                                            EditZkNote.onSaved
+                                                emod
+                                                szkn
 
                                         rn =
                                             EditZkNote.toZkListNote eznst
@@ -1166,7 +1168,9 @@ actualupdate msg model =
                                 EditZkNote emod login ->
                                     let
                                         eznst =
-                                            EditZkNote.onSaved emod szkn
+                                            EditZkNote.onSaved
+                                                emod
+                                                szkn
 
                                         rn =
                                             EditZkNote.toZkListNote eznst

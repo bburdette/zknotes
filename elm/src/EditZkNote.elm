@@ -1248,15 +1248,17 @@ onSaved model szn =
                                 szn
                                 pc
                            ]
-                , createdate = model.createdate |> Util.mapNothing szn.changeddate
-                , changeddate = Just szn.changeddate
             }
 
         Nothing ->
             let
                 -- if we already have an ID, keep it.
                 m1 =
-                    { model | id = Just (model.id |> Maybe.withDefault szn.id) }
+                    { model
+                        | id = Just (model.id |> Maybe.withDefault szn.id)
+                        , createdate = model.createdate |> Util.mapNothing szn.changeddate
+                        , changeddate = Just szn.changeddate
+                    }
             in
             { m1 | revert = Just <| sznFromModel m1 }
 
