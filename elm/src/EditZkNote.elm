@@ -158,30 +158,6 @@ elToSzl el =
     }
 
 
-
-{- toEditLink : Int -> Data.ZkLink -> EditLink
-   toEditLink id zkl =
-       let
-           ( oid, direction ) =
-               if zkl.to == id then
-                   -- from other to this.
-                   ( zkl.from, From )
-
-               else
-                   -- from this to other
-                   ( zkl.to, To )
-       in
-       { otherid = oid
-       , direction = direction
-       , user = zkl.user
-       , zknote = zkl.zknote
-       , othername = Just <| zkLinkName zkl id
-       , delete = zkl.delete
-       }
-
--}
-
-
 elToSzkl : Int -> EditLink -> Data.ZkLink
 elToSzkl this el =
     case el.direction of
