@@ -72,7 +72,6 @@ pub fn search_zknotes(
   })?;
 
   if search.list {
-    println!("list!");
     let mut pv = Vec::new();
 
     for rsrec in rec_iter {
@@ -90,7 +89,6 @@ pub fn search_zknotes(
       what: search.what.clone(),
     }))
   } else {
-    println!("notlist!");
     let mut pv = Vec::new();
 
     for rsrec in rec_iter {

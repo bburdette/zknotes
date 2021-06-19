@@ -112,6 +112,7 @@ type alias EditLink =
     , user : Int
     , zknote : Maybe Int
     , othername : Maybe String
+    , sysids : List Int
     }
 
 
@@ -309,12 +310,13 @@ decodeZkLink =
 
 decodeEditLink : JD.Decoder EditLink
 decodeEditLink =
-    JD.map5 EditLink
+    JD.map6 EditLink
         (JD.field "otherid" JD.int)
         (JD.field "direction" decodeDirection)
         (JD.field "user" JD.int)
         (JD.maybe (JD.field "zknote" JD.int))
         (JD.maybe (JD.field "othername" JD.string))
+        (JD.field "sysids" (JD.list JD.int))
 
 
 saveZkNote : ZkNote -> SaveZkNote

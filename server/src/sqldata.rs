@@ -1572,6 +1572,7 @@ pub fn read_zklinks(
   gzl: &GetZkLinks,
 ) -> Result<Vec<EditLink>, Box<dyn Error>> {
   let pubid = note_id(&conn, "system", "public")?;
+  let sysid = user_id(&conn, "system")?;
 
   let usershares = user_shares(&conn, uid)?;
 
@@ -1652,8 +1653,10 @@ pub fn read_zklinks(
       .query_map(params![uid, gzl.zknote, pubid, unid], |row| {
         let fromid = row.get(0)?;
         let toid = row.get(1)?;
+        let otherid = if fromid == gzl.zknote { toid } else { fromid };
+        let sysids = get_sysids(&conn, sysid, otherid)?;
         Ok(EditLink {
-          otherid: if fromid == gzl.zknote { toid } else { fromid },
+          otherid: otherid,
           direction: if fromid == gzl.zknote {
             Direction::To
           } else {
@@ -1666,6 +1669,7 @@ pub fn read_zklinks(
           } else {
             row.get(4)?
           },
+          sysids: sysids,
         })
       })?
       .filter_map(|x| x.ok())
@@ -1699,8 +1703,9 @@ pub fn read_public_zklinks(
       .query_map(params![noteid, pubid, sysid], |row| {
         let fromid = row.get(0)?;
         let toid = row.get(1)?;
+        let otherid = if fromid == noteid { toid } else { fromid };
         Ok(EditLink {
-          otherid: if fromid == noteid { toid } else { fromid },
+          otherid: otherid,
           direction: if fromid == noteid {
             Direction::To
           } else {
@@ -1713,6 +1718,7 @@ pub fn read_public_zklinks(
           } else {
             row.get(4)?
           },
+          sysids: get_sysids(&conn, sysid, otherid)?,
         })
       })?
       .filter_map(|x| x.ok())
