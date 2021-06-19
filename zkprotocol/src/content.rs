@@ -102,6 +102,7 @@ pub struct EditLink {
   pub user: i64,
   pub zknote: Option<i64>,
   pub othername: Option<String>,
+  pub sysids: Vec<i64>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

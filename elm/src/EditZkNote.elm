@@ -1,4 +1,4 @@
-module EditZkNote exposing (Command(..), EditLink, Model, Msg(..), NavChoice(..), SearchOrRecent(..), WClass(..), addComment, commentsRecieved, commonButtonStyle, compareZklinks, dirty, disabledLinkButtonStyle, elToSzkl, elToSzl, fullSave, gotSelectedText, initFull, initNew, isPublic, isSearch, linkButtonStyle, linksWith, mkButtonStyle, noteLink, onCtrlS, onSaved, onZkNote, pageLink, renderMd, replaceOrAdd, saveZkLinkList, showSr, showZkl, sznFromModel, sznToZkn, toEditLink, toPubId, toZkListNote, update, updateSearch, updateSearchResult, view, zkLinkName, zklKey, zknview)
+module EditZkNote exposing (Command(..), EditLink, Model, Msg(..), NavChoice(..), SearchOrRecent(..), WClass(..), addComment, commentsRecieved, commonButtonStyle, compareZklinks, dirty, disabledLinkButtonStyle, elToSzkl, elToSzl, fullSave, gotSelectedText, initFull, initNew, isPublic, isSearch, linkButtonStyle, linksWith, mkButtonStyle, noteLink, onCtrlS, onSaved, onZkNote, pageLink, renderMd, replaceOrAdd, saveZkLinkList, showSr, showZkl, sznFromModel, sznToZkn, toPubId, toZkListNote, update, updateSearch, updateSearchResult, view, zkLinkName, zklKey, zknview)
 
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
@@ -85,6 +85,7 @@ type alias EditLink =
     , user : Int
     , zknote : Maybe Int
     , othername : Maybe String
+    , sysids : List Int
     , delete : Maybe Bool
     }
 
@@ -157,25 +158,28 @@ elToSzl el =
     }
 
 
-toEditLink : Int -> Data.ZkLink -> EditLink
-toEditLink id zkl =
-    let
-        ( oid, direction ) =
-            if zkl.to == id then
-                -- from other to this.
-                ( zkl.from, From )
 
-            else
-                -- from this to other
-                ( zkl.to, To )
-    in
-    { otherid = oid
-    , direction = direction
-    , user = zkl.user
-    , zknote = zkl.zknote
-    , othername = Just <| zkLinkName zkl id
-    , delete = zkl.delete
-    }
+{- toEditLink : Int -> Data.ZkLink -> EditLink
+   toEditLink id zkl =
+       let
+           ( oid, direction ) =
+               if zkl.to == id then
+                   -- from other to this.
+                   ( zkl.from, From )
+
+               else
+                   -- from this to other
+                   ( zkl.to, To )
+       in
+       { otherid = oid
+       , direction = direction
+       , user = zkl.user
+       , zknote = zkl.zknote
+       , othername = Just <| zkLinkName zkl id
+       , delete = zkl.delete
+       }
+
+-}
 
 
 elToSzkl : Int -> EditLink -> Data.ZkLink
@@ -323,8 +327,8 @@ dirty model =
         |> Maybe.withDefault True
 
 
-showZkl : Bool -> Bool -> Maybe EditLink -> Int -> Maybe Int -> EditLink -> Element Msg
-showZkl isDirty editable focusLink user id zkl =
+showZkl : Bool -> Bool -> Maybe EditLink -> Data.LoginData -> Maybe Int -> EditLink -> Element Msg
+showZkl isDirty editable focusLink ld id zkl =
     let
         ( dir, otherid ) =
             case zkl.direction of
@@ -347,17 +351,25 @@ showZkl isDirty editable focusLink user id zkl =
                     )
                 |> Maybe.withDefault False
 
+        sysColor =
+            ZC.systemColor ld zkl.sysids
+
         display =
             [ dir
             , zkl.othername
                 |> Maybe.withDefault ""
                 |> (\s ->
                         E.el
-                            [ E.clipX
-                            , E.height <| E.px 30
-                            , E.width E.fill
-                            , EE.onClick (LinkFocusPress zkl)
-                            ]
+                            ([ E.clipX
+                             , E.height <| E.px 30
+                             , E.width E.fill
+                             , EE.onClick (LinkFocusPress zkl)
+                             ]
+                                ++ (sysColor
+                                        |> Maybe.map (\c -> [ EF.color c ])
+                                        |> Maybe.withDefault []
+                                   )
+                            )
                             (E.text s)
                    )
             ]
@@ -366,7 +378,7 @@ showZkl isDirty editable focusLink user id zkl =
         E.column [ E.spacing 8, E.width E.fill ]
             [ E.row [ E.spacing 8, E.width E.fill ] display
             , E.row [ E.spacing 8 ]
-                [ if user == zkl.user then
+                [ if ld.userid == zkl.user then
                     EI.button (linkButtonStyle ++ [ E.alignLeft ])
                         { onPress = Just (RemoveLink zkl)
                         , label = E.text "X"
@@ -691,7 +703,7 @@ zknview size recentZkns model =
         showLinks =
             E.row [ EF.bold ] [ E.text "links" ]
                 :: List.map
-                    (showZkl isdirty editable model.focusLink model.ld.userid model.id)
+                    (showZkl isdirty editable model.focusLink model.ld model.id)
                     (Dict.values model.zklDict)
 
         editview =
@@ -1093,6 +1105,7 @@ initFull ld searchOrRecent zkl zknote dtlinks spm =
                     , user = dl.user
                     , zknote = dl.zknote
                     , othername = dl.othername
+                    , sysids = dl.sysids
                     , delete = Nothing
                     }
                 )
@@ -1443,6 +1456,7 @@ update msg model =
                     , user = model.ld.userid
                     , zknote = Nothing
                     , othername = Just zkln.title
+                    , sysids = zkln.sysids
                     , delete = Nothing
                     }
             in
@@ -1460,6 +1474,7 @@ update msg model =
                     , user = model.ld.userid
                     , zknote = Nothing
                     , othername = Just zkln.title
+                    , sysids = zkln.sysids
                     , delete = Nothing
                     }
             in
@@ -1534,6 +1549,7 @@ update msg model =
                                 , user = model.ld.userid
                                 , zknote = Nothing
                                 , othername = Just "public"
+                                , sysids = []
                                 , delete = Nothing
                                 }
                         in
