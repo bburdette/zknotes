@@ -4,6 +4,7 @@
 , openssl
 , pkgconfig
 , sqlite
+, lib
 , callPackage }:
 
 # , lib
@@ -18,8 +19,8 @@ rustPlatform.buildRustPackage rec {
   src = fetchFromGitHub {
     owner = "bburdette";
     repo = "zknotes";
-    rev = "3ff285e758776c54958e17783fd179b306e0d26c";
-    sha256 = "031hbdid71l5pz6aavvmh7vjqwyrcfazid9h77xdfj4lfc2j5hiz";
+    rev = "e490934e128cf4a41f087cf7fd8f7a59efe9c01c";
+    sha256 = "1cn89iqvbmcjgzbkqigbpx97skds4w7h2y6ib0jbc31c194baynp";
   };
 
   # preBuild = ''
@@ -37,17 +38,17 @@ rustPlatform.buildRustPackage rec {
 
 
   sourceRoot = "source/server";
-  cargoSha256 = "1w489c3qr0dgq3r8w0f3dzvyzih1qvya256lz5lvghh6kg42k4gv";
+  cargoSha256 = "1krgkkn5550gdyylylljw5zzfmszmcnpcf9k1whg1ylk27bm9q2r";
   # dontMakeSourcesWritable=1;
 
   buildInputs = [openssl sqlite];
 
   nativeBuildInputs = [ pkgconfig ];
 
-  meta = with stdenv.lib; {
+  meta = with lib; {
     description = "zknotes zettelkasten server.";
     homepage = https://github.com/bburdette/zknotes;
-    license = with licenses; [ gpl ];
+    license = licenses.gpl3;
     maintainers = [ ];
     platforms = platforms.all;
   };
