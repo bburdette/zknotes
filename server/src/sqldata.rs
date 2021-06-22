@@ -1314,11 +1314,11 @@ pub fn get_sysids(conn: &Connection, sysid: i64, noteid: i64) -> Result<Vec<i64>
   r
 }
 
-pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNote, Box<dyn Error>> {
+fn read_zknote_unchecked(conn: &Connection, id: i64) -> Result<ZkNote, Box<dyn Error>> {
   let sysid = user_id(&conn, "system")?;
   let sysids = get_sysids(conn, sysid, id)?;
 
-  let mut note = conn.query_row(
+  let note = conn.query_row(
     "select ZN.title, ZN.content, ZN.user, U.name, ZN.pubid, ZN.editable, ZN.createdate, ZN.changeddate
       from zknote ZN, user U where ZN.id = ?1 and U.id = ZN.user",
     params![id],
@@ -1338,6 +1338,12 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
       })
     },
   )?;
+
+  Ok(note)
+}
+
+pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNote, Box<dyn Error>> {
+  let mut note = read_zknote_unchecked(&conn, id)?;
 
   match zknote_access(conn, uid, &note) {
     Ok(zna) => match zna {
@@ -1732,6 +1738,9 @@ pub fn read_zknotecomments(
   uid: i64,
   gznc: &GetZkNoteComments,
 ) -> Result<Vec<ZkNote>, Box<dyn Error>> {
+  // do we have access to the parent note?
+  let _note = read_zknote(&conn, Some(uid), gznc.zknote)?;
+
   let cid = note_id(&conn, "system", "comment")?;
 
   println!("gznc.zknote, cid {}, {}", gznc.zknote, cid);
@@ -1749,7 +1758,7 @@ pub fn read_zknotecomments(
 
   for id in c_iter {
     match id {
-      Ok(id) => match read_zknote(&conn, Some(uid), id) {
+      Ok(id) => match read_zknote_unchecked(&conn, id) {
         Ok(note) => {
           nv.push(note);
           match gznc.limit {
