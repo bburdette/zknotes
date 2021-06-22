@@ -1610,26 +1610,24 @@ update msg model =
                               , delete = Nothing
                               }
                             ]
+                                -- copy links to shares.
+                                ++ (model.zklDict
+                                        |> Dict.values
+                                        |> List.filterMap
+                                            (\l ->
+                                                if List.any ((==) model.ld.shareid) l.sysids then
+                                                    Just
+                                                        { otherid = l.otherid
+                                                        , direction = l.direction
+                                                        , user = model.ld.userid
+                                                        , zknote = Nothing
+                                                        , delete = Nothing
+                                                        }
 
-                        {- -- copy links to shares.
-                           ++ (model.zklDict
-                                   |> Dict.values
-                                   |> List.filterMap
-                                       (\l ->
-                                           if List.any ((==) model.ld.shareid) l.sysids then
-                                               Just
-                                                   { otherid = l.otherid
-                                                   , direction = l.direction
-                                                   , user = model.ld.userid
-                                                   , zknote = Nothing
-                                                   , delete = Nothing
-                                                   }
-
-                                           else
-                                               Nothing
-                                       )
-                              )
-                        -}
+                                                else
+                                                    Nothing
+                                            )
+                                   )
                         }
                     )
 
