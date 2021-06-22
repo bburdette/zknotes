@@ -36,6 +36,7 @@ type Msg
     = OnMarkdownInput String
     | OnCommentInput String
     | AddComment
+    | NewCommentPress
     | OnSchelmeCodeChanged String String
     | OnTitleChanged String
     | OnPubidChanged String
@@ -106,7 +107,7 @@ type alias Model =
     , zklDict : Dict String EditLink
     , focusLink : Maybe EditLink
     , comments : List Data.ZkNote
-    , newcomment : String
+    , newcomment : Maybe String
     , pendingcomment : Maybe Data.SaveZkNote
     , editable : Bool
     , editableValue : Bool
@@ -562,19 +563,22 @@ showSr model isdirty zkln =
         listingrow
 
 
-addComment : Model -> Element Msg
-addComment model =
+addComment : String -> Element Msg
+addComment newcomment =
     E.column
         [ E.width E.fill
         , E.spacing 8
+        , EBk.color TC.lightCharcoal
+        , E.padding 8
         ]
-        [ EI.multiline
+        [ E.el [ E.centerX, EF.bold ] <| E.text "new comment"
+        , EI.multiline
             [ EF.color TC.black
             , E.width E.fill
             , E.alignTop
             ]
             { onChange = OnCommentInput
-            , text = model.newcomment
+            , text = newcomment
             , placeholder = Nothing
             , label = EI.labelHidden "Comment"
             , spellcheck = False
@@ -674,7 +678,15 @@ zknview size recentZkns model =
                             ]
                     )
                     model.comments
-                ++ [ addComment model ]
+                ++ (case model.newcomment of
+                        Just s ->
+                            [ addComment s ]
+
+                        Nothing ->
+                            [ EI.button Common.buttonStyle
+                                { label = E.text "new comment", onPress = Just NewCommentPress }
+                            ]
+                   )
 
         showLinks =
             E.row [ EF.bold ] [ E.text "links" ]
@@ -1105,7 +1117,7 @@ initFull ld searchOrRecent zkl zknote dtlinks spm =
       , title = zknote.title
       , md = zknote.content
       , comments = []
-      , newcomment = ""
+      , newcomment = Nothing
       , pendingcomment = Nothing
       , editable = zknote.editable
       , editableValue = zknote.editableValue
@@ -1147,7 +1159,7 @@ initNew ld zkl spm =
     , pubidtxt = ""
     , title = ""
     , comments = []
-    , newcomment = ""
+    , newcomment = Nothing
     , pendingcomment = Nothing
     , editable = True
     , editableValue = True
@@ -1578,21 +1590,28 @@ update msg model =
             ( { model | pubidtxt = t }, None )
 
         OnCommentInput s ->
-            ( { model | newcomment = s }, None )
+            ( { model | newcomment = Just s }, None )
+
+        NewCommentPress ->
+            let
+                _ =
+                    Debug.log "NewCommentPress" ""
+            in
+            ( { model | newcomment = model.newcomment |> Util.mapNothing "" }, None )
 
         AddComment ->
-            case model.id of
-                Just id ->
+            case ( model.id, model.newcomment ) of
+                ( Just id, Just newcomment ) ->
                     let
                         nc =
                             { id = Nothing
                             , pubid = Nothing
                             , title = "comment"
-                            , content = model.newcomment
+                            , content = newcomment
                             , editable = False
                             }
                     in
-                    ( { model | newcomment = "", pendingcomment = Just nc }
+                    ( { model | newcomment = Nothing, pendingcomment = Just nc }
                     , Save
                         { note =
                             nc
@@ -1631,7 +1650,7 @@ update msg model =
                         }
                     )
 
-                Nothing ->
+                _ ->
                     ( model, None )
 
         OnMarkdownInput newMarkdown ->
