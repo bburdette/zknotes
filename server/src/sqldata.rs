@@ -1331,13 +1331,6 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
   let sysid = user_id(&conn, "system")?;
   let sysids = get_sysids(conn, sysid, id)?;
 
-  println!("here1 {:?}, {:?}", uid, id);
-
-  /*
-     select ZN.title, ZN.content, ZN.user, U.name, U.zknote, ZN.pubid, ZN.editable, ZN.createdate, ZN.changeddate
-       from zknote ZN, user U where ZN.id =  and U.id = ZN.user
-  */
-
   let mut note = conn.query_row(
     "select ZN.title, ZN.content, ZN.user, U.name, U.zknote, ZN.pubid, ZN.editable, ZN.createdate, ZN.changeddate
       from zknote ZN, user U where ZN.id = ?1 and U.id = ZN.user",
@@ -1352,14 +1345,13 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
         usernote: row.get(4)?,
         pubid: row.get(5)?,
         editable: row.get(6)?,                // editable same as editableValue!
-        editableValue: row.get(6)?,
+        editableValue: row.get(6)?,           // <--- same index.
         createdate: row.get(7)?,
         changeddate: row.get(8)?,
         sysids: sysids,
       })
     },
   )?;
-  println!("here2");
 
   match zknote_access(conn, uid, &note) {
     Ok(zna) => match zna {

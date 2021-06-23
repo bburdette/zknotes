@@ -605,7 +605,7 @@ makeNewCommentState model =
                 []
 
             else
-                [ ( { otherid = model.ld.userid
+                [ ( { otherid = model.usernote
                     , direction = Data.To
                     , user = model.ld.userid
                     , zknote = Nothing
@@ -1719,7 +1719,7 @@ update msg model =
                             { id = Nothing
                             , pubid = Nothing
                             , title = "comment"
-                            , content = newcomment.text -- TODO add links
+                            , content = newcomment.text
                             , editable = False
                             }
                     in
@@ -1741,24 +1741,21 @@ update msg model =
                               , delete = Nothing
                               }
                             ]
-                                -- copy links to shares.
-                                ++ (model.zklDict
-                                        |> Dict.values
-                                        |> List.filterMap
-                                            (\l ->
-                                                if List.any ((==) model.ld.shareid) l.sysids then
-                                                    Just
-                                                        { otherid = l.otherid
-                                                        , direction = l.direction
-                                                        , user = model.ld.userid
-                                                        , zknote = Nothing
-                                                        , delete = Nothing
-                                                        }
+                                ++ List.filterMap
+                                    (\( l, b ) ->
+                                        if b then
+                                            Just
+                                                { otherid = l.otherid
+                                                , direction = l.direction
+                                                , user = model.ld.userid
+                                                , zknote = Nothing
+                                                , delete = Nothing
+                                                }
 
-                                                else
-                                                    Nothing
-                                            )
-                                   )
+                                        else
+                                            Nothing
+                                    )
+                                    newcomment.sharelinks
                         }
                     )
 
