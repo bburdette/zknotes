@@ -29,6 +29,7 @@ type alias Login =
 type alias LoginData =
     { userid : Int
     , name : String
+    , zknote : Int
     , publicid : Int
     , shareid : Int
     , searchid : Int
@@ -70,6 +71,7 @@ type alias ZkNote =
     { id : Int
     , user : Int
     , username : String
+    , usernote : Int
     , title : String
     , content : String
     , pubid : Maybe String
@@ -392,6 +394,7 @@ decodeZkNote =
         |> andMap (JD.field "id" JD.int)
         |> andMap (JD.field "user" JD.int)
         |> andMap (JD.field "username" JD.string)
+        |> andMap (JD.field "usernote" JD.int)
         |> andMap (JD.field "title" JD.string)
         |> andMap (JD.field "content" JD.string)
         |> andMap (JD.field "pubid" (JD.maybe JD.string))
@@ -412,9 +415,10 @@ decodeZkNoteEdit =
 
 decodeLoginData : JD.Decoder LoginData
 decodeLoginData =
-    JD.map6 LoginData
+    JD.map7 LoginData
         (JD.field "userid" JD.int)
         (JD.field "name" JD.string)
+        (JD.field "zknote" JD.int)
         (JD.field "publicid" JD.int)
         (JD.field "shareid" JD.int)
         (JD.field "searchid" JD.int)

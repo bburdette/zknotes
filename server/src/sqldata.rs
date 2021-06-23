@@ -18,6 +18,7 @@ use zkprotocol::content::{
 pub struct User {
   pub id: i64,
   pub name: String,
+  pub noteid: i64,
   pub hashwd: String,
   pub salt: String,
   pub email: String,
@@ -25,9 +26,11 @@ pub struct User {
 }
 
 pub fn login_data(conn: &Connection, uid: i64) -> Result<LoginData, Box<dyn Error>> {
+  let user = read_user_by_id(&conn, uid)?;
   Ok(LoginData {
     userid: uid,
-    name: user_name(&conn, uid)?,
+    name: user.name,
+    zknote: user.noteid,
     publicid: note_id(conn, "system", "public")?,
     shareid: note_id(conn, "system", "share")?,
     searchid: note_id(conn, "system", "search")?,
@@ -911,32 +914,41 @@ pub fn save_zklink(
   Ok(conn.last_insert_rowid())
 }
 
-pub fn user_name(conn: &Connection, uid: i64) -> Result<String, Box<dyn Error>> {
+pub fn read_user_by_name(conn: &Connection, name: &str) -> Result<User, Box<dyn Error>> {
   let user = conn.query_row(
-    "select name
-      from user where id = ?1",
-    params![uid],
-    |row| Ok(row.get(0)?),
-  )?;
-
-  Ok(user)
-}
-
-pub fn read_user(dbfile: &Path, name: &str) -> Result<User, Box<dyn Error>> {
-  let conn = connection_open(dbfile)?;
-
-  let user = conn.query_row(
-    "select id, hashwd, salt, email, registration_key
+    "select id, zknote, hashwd, salt, email, registration_key
       from user where name = ?1",
     params![name],
     |row| {
       Ok(User {
         id: row.get(0)?,
         name: name.to_string(),
-        hashwd: row.get(1)?,
-        salt: row.get(2)?,
-        email: row.get(3)?,
-        registration_key: row.get(4)?,
+        noteid: row.get(1)?,
+        hashwd: row.get(2)?,
+        salt: row.get(3)?,
+        email: row.get(4)?,
+        registration_key: row.get(5)?,
+      })
+    },
+  )?;
+
+  Ok(user)
+}
+
+pub fn read_user_by_id(conn: &Connection, id: i64) -> Result<User, Box<dyn Error>> {
+  let user = conn.query_row(
+    "select id, name, zknote, hashwd, salt, email, registration_key
+      from user where id = ?1",
+    params![id],
+    |row| {
+      Ok(User {
+        id: row.get(0)?,
+        name: row.get(1)?,
+        noteid: row.get(2)?,
+        hashwd: row.get(3)?,
+        salt: row.get(4)?,
+        email: row.get(5)?,
+        registration_key: row.get(6)?,
       })
     },
   )?;
@@ -950,7 +962,7 @@ pub fn read_user_by_token(
   token_expiration_ms: Option<i64>,
 ) -> Result<User, Box<dyn Error>> {
   let (user, tokendate) = conn.query_row(
-    "select id, name, hashwd, salt, email, registration_key, token.tokendate
+    "select id, name, zknote, hashwd, salt, email, registration_key, token.tokendate
       from user, token where user.id = token.user and token = ?1",
     params![token.to_string()],
     |row| {
@@ -958,12 +970,13 @@ pub fn read_user_by_token(
         User {
           id: row.get(0)?,
           name: row.get(1)?,
-          hashwd: row.get(2)?,
-          salt: row.get(3)?,
-          email: row.get(4)?,
-          registration_key: row.get(5)?,
+          noteid: row.get(2)?,
+          hashwd: row.get(3)?,
+          salt: row.get(4)?,
+          email: row.get(5)?,
+          registration_key: row.get(6)?,
         },
-        row.get(6)?,
+        row.get(7)?,
       ))
     },
   )?;
@@ -1318,8 +1331,15 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
   let sysid = user_id(&conn, "system")?;
   let sysids = get_sysids(conn, sysid, id)?;
 
+  println!("here1 {:?}, {:?}", uid, id);
+
+  /*
+     select ZN.title, ZN.content, ZN.user, U.name, U.zknote, ZN.pubid, ZN.editable, ZN.createdate, ZN.changeddate
+       from zknote ZN, user U where ZN.id =  and U.id = ZN.user
+  */
+
   let mut note = conn.query_row(
-    "select ZN.title, ZN.content, ZN.user, U.name, ZN.pubid, ZN.editable, ZN.createdate, ZN.changeddate
+    "select ZN.title, ZN.content, ZN.user, U.name, U.zknote, ZN.pubid, ZN.editable, ZN.createdate, ZN.changeddate
       from zknote ZN, user U where ZN.id = ?1 and U.id = ZN.user",
     params![id],
     |row| {
@@ -1329,15 +1349,17 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
         content: row.get(1)?,
         user: row.get(2)?,
         username: row.get(3)?,
-        pubid: row.get(4)?,
-        editable: row.get(5)?,
-        editableValue: row.get(5)?,
-        createdate: row.get(6)?,
-        changeddate: row.get(7)?,
+        usernote: row.get(4)?,
+        pubid: row.get(5)?,
+        editable: row.get(6)?,                // editable same as editableValue!
+        editableValue: row.get(6)?,
+        createdate: row.get(7)?,
+        changeddate: row.get(8)?,
         sysids: sysids,
       })
     },
   )?;
+  println!("here2");
 
   match zknote_access(conn, uid, &note) {
     Ok(zna) => match zna {
@@ -1443,7 +1465,7 @@ pub fn read_zknotepubid(
 ) -> Result<ZkNote, Box<dyn Error>> {
   let publicid = note_id(&conn, "system", "public")?;
   let mut note = conn.query_row(
-    "select A.id, A.title, A.content, A.user, U.name, A.pubid, A.editable, A.createdate, A.changeddate
+    "select A.id, A.title, A.content, A.user, U.name, U.zknote, A.pubid, A.editable, A.createdate, A.changeddate
       from zknote A, user U, zklink L where A.pubid = ?1
       and ((A.id = L.fromid
       and L.toid = ?2) or (A.id = L.toid
@@ -1457,11 +1479,12 @@ pub fn read_zknotepubid(
         content: row.get(2)?,
         user: row.get(3)?,
         username: row.get(4)?,
-        pubid: row.get(5)?,
+        usernote: row.get(5)?,
+        pubid: row.get(6)?,
         editable: false,
-        editableValue: row.get(6)?,
-        createdate: row.get(7)?,
-        changeddate: row.get(8)?,
+        editableValue: row.get(7)?,
+        createdate: row.get(8)?,
+        changeddate: row.get(9)?,
         sysids: Vec::new(),
       })
     },
@@ -1887,7 +1910,7 @@ pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
 
   // Users
   let mut ustmt = conn.prepare(
-    "select id, name, hashwd, salt, email, registration_key
+    "select id, name, zknote, hashwd, salt, email, registration_key
       from user",
   )?;
 
@@ -1895,10 +1918,11 @@ pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
     Ok(User {
       id: row.get(0)?,
       name: row.get(1)?,
-      hashwd: row.get(2)?,
-      salt: row.get(3)?,
-      email: row.get(4)?,
-      registration_key: row.get(5)?,
+      noteid: row.get(2)?,
+      hashwd: row.get(3)?,
+      salt: row.get(4)?,
+      email: row.get(5)?,
+      registration_key: row.get(6)?,
     })
   })?;
 
@@ -1906,8 +1930,9 @@ pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
 
   // Notes
   let mut nstmt = conn.prepare(
-    "select ZN.id, ZN.title, ZN.content, ZN.user, ZN.pubid, ZN.editable, ZN.createdate, ZN.changeddate
-      from zknote ZN",
+    "select ZN.id, ZN.title, ZN.content, ZN.user, U.name, U.zknote, ZN.pubid, ZN.editable, ZN.createdate, ZN.changeddate
+      from zknote ZN, user U
+      where ZN.user == U.id",
   )?;
 
   let n_iter = nstmt.query_map(params![], |row| {
@@ -1917,12 +1942,13 @@ pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
       title: row.get(1)?,
       content: row.get(2)?,
       user: row.get(3)?,
-      username: "".to_string(),
-      pubid: row.get(4)?,
-      editable: row.get(5)?,
-      editableValue: row.get(5)?,
-      createdate: row.get(6)?,
-      changeddate: row.get(7)?,
+      username: row.get(4)?,
+      usernote: row.get(5)?,
+      pubid: row.get(6)?,
+      editable: false,
+      editableValue: row.get(7)?,
+      createdate: row.get(8)?,
+      changeddate: row.get(9)?,
       sysids: sysids,
     })
   })?;

@@ -17,6 +17,7 @@ pub struct Login {
 pub struct LoginData {
   pub userid: i64,
   pub name: String,
+  pub zknote: i64,
   pub publicid: i64,
   pub shareid: i64,
   pub searchid: i64,
@@ -30,6 +31,7 @@ pub struct ZkNote {
   pub content: String,
   pub user: i64,
   pub username: String,
+  pub usernote: i64,
   pub editable: bool,
   pub editableValue: bool,
   pub pubid: Option<String>,

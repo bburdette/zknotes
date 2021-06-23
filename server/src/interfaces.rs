@@ -41,12 +41,13 @@ pub fn user_interface(
   msg: UserMessage,
 ) -> Result<ServerResponse, Box<dyn Error>> {
   info!("got a user message: {}", msg.what);
+  let conn = sqldata::connection_open(config.db.as_path())?;
   if msg.what.as_str() == "register" {
     let msgdata = Option::ok_or(msg.data, "malformed registration data")?;
     let rd: RegistrationData = serde_json::from_value(msgdata)?;
     // do the registration thing.
     // user already exists?
-    match sqldata::read_user(Path::new(&config.db), rd.uid.as_str()) {
+    match sqldata::read_user_by_name(&conn, rd.uid.as_str()) {
       Ok(_) => {
         // err - user exists.
         Ok(ServerResponse {
@@ -100,11 +101,10 @@ pub fn user_interface(
       }
     }
   } else if msg.what == "login" {
-    let conn = sqldata::connection_open(config.db.as_path())?;
     let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
     let login: Login = serde_json::from_value(msgdata.clone())?;
 
-    let userdata = sqldata::read_user(Path::new(&config.db), login.uid.as_str())?;
+    let userdata = sqldata::read_user_by_name(&conn, login.uid.as_str())?;
     match userdata.registration_key {
       Some(_reg_key) => Ok(ServerResponse {
         what: "unregistered user".to_string(),
@@ -129,6 +129,7 @@ pub fn user_interface(
           let token = Uuid::new_v4();
           sqldata::add_token(&conn, userdata.id, token)?;
           session.set("token", token)?;
+          println!("token {:?}", token);
           sqldata::update_user(&conn, &userdata)?;
           println!("logged in, userdata: {:?}", userdata);
 
@@ -140,7 +141,6 @@ pub fn user_interface(
       }
     }
   } else {
-    let conn = sqldata::connection_open(config.db.as_path())?;
     match session.get::<Uuid>("token")? {
       None => Ok(ServerResponse {
         what: "not logged in".to_string(),
@@ -148,10 +148,14 @@ pub fn user_interface(
       }),
       Some(token) => {
         match sqldata::read_user_by_token(&conn, token, Some(config.token_expiration_ms)) {
-          Err(_) => Ok(ServerResponse {
-            what: "invalid user or pwd".to_string(),
-            content: serde_json::Value::Null,
-          }),
+          Err(e) => {
+            println!("rubt error: {:?}", e);
+
+            Ok(ServerResponse {
+              what: "invalid user or pwd".to_string(),
+              content: serde_json::Value::Null,
+            })
+          }
           Ok(userdata) => {
             // finally!  processing messages as logged in user.
             user_interface_loggedin(&config, userdata.id, &msg)

@@ -36,7 +36,9 @@ type Msg
     = OnMarkdownInput String
     | OnCommentInput String
     | AddComment
+    | CancelComment
     | NewCommentPress
+    | CheckCommentLink EditLink Bool
     | OnSchelmeCodeChanged String String
     | OnTitleChanged String
     | OnPubidChanged String
@@ -97,17 +99,24 @@ type WClass
     | Wide
 
 
+type alias NewCommentState =
+    { text : String
+    , sharelinks : List ( EditLink, Bool )
+    }
+
+
 type alias Model =
     { id : Maybe Int
     , ld : Data.LoginData
     , noteUser : Int
     , noteUserName : String
+    , usernote : Int
     , zknSearchResult : Data.ZkListNoteSearchResult
     , focusSr : Maybe Int -- note id in search result.
     , zklDict : Dict String EditLink
     , focusLink : Maybe EditLink
     , comments : List Data.ZkNote
-    , newcomment : Maybe String
+    , newcomment : Maybe NewCommentState
     , pendingcomment : Maybe Data.SaveZkNote
     , editable : Bool
     , editableValue : Bool
@@ -563,8 +572,56 @@ showSr model isdirty zkln =
         listingrow
 
 
-addComment : String -> Element Msg
-addComment newcomment =
+makeNewCommentState : Model -> NewCommentState
+makeNewCommentState model =
+    let
+        sharelinks =
+            model.zklDict
+                |> Dict.values
+                |> List.filterMap
+                    (\l ->
+                        if
+                            List.any ((==) model.ld.shareid) l.sysids
+                                || (l.otherid == model.ld.publicid)
+                        then
+                            Just
+                                ( { otherid = l.otherid
+                                  , direction = l.direction
+                                  , user = model.ld.userid
+                                  , zknote = Nothing
+                                  , delete = Nothing
+                                  , othername = l.othername
+                                  , sysids = l.sysids
+                                  }
+                                , True
+                                )
+
+                        else
+                            Nothing
+                    )
+
+        userlink =
+            if model.ld.userid == model.noteUser then
+                []
+
+            else
+                [ ( { otherid = model.ld.userid
+                    , direction = Data.To
+                    , user = model.ld.userid
+                    , zknote = Nothing
+                    , delete = Nothing
+                    , othername = Just model.noteUserName
+                    , sysids = []
+                    }
+                  , True
+                  )
+                ]
+    in
+    { text = "", sharelinks = userlink ++ sharelinks }
+
+
+addComment : NewCommentState -> Element Msg
+addComment ncs =
     E.column
         [ E.width E.fill
         , E.spacing 8
@@ -578,13 +635,36 @@ addComment newcomment =
             , E.alignTop
             ]
             { onChange = OnCommentInput
-            , text = newcomment
+            , text = ncs.text
             , placeholder = Nothing
             , label = EI.labelHidden "Comment"
             , spellcheck = False
             }
-        , EI.button (E.alignLeft :: Common.buttonStyle)
-            { onPress = Just AddComment, label = E.text "reply" }
+        , if List.isEmpty ncs.sharelinks then
+            E.none
+
+          else
+            E.row [ E.width E.fill, E.spacing 15 ]
+                [ E.el [ E.alignTop ] <| E.text "sharing: "
+                , E.column []
+                    (ncs.sharelinks
+                        |> List.map
+                            (\( l, b ) ->
+                                EI.checkbox []
+                                    { checked = b
+                                    , icon = EI.defaultCheckbox
+                                    , label = EI.labelRight [] (E.text (l.othername |> Maybe.withDefault ""))
+                                    , onChange = CheckCommentLink l
+                                    }
+                            )
+                    )
+                ]
+        , E.row [ E.width E.fill ]
+            [ EI.button (E.alignLeft :: Common.buttonStyle)
+                { onPress = Just AddComment, label = E.text "reply" }
+            , EI.button (E.alignRight :: Common.buttonStyle)
+                { onPress = Just CancelComment, label = E.text "cancel" }
+            ]
         ]
 
 
@@ -1103,6 +1183,7 @@ initFull ld searchOrRecent zkl zknote dtlinks spm =
       , ld = ld
       , noteUser = zknote.user
       , noteUserName = zknote.username
+      , usernote = zknote.usernote
       , zknSearchResult = zkl
       , focusSr = Nothing
       , zklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) links)
@@ -1151,6 +1232,7 @@ initNew ld zkl spm =
     , ld = ld
     , noteUser = ld.userid
     , noteUserName = ld.name
+    , usernote = ld.zknote
     , zknSearchResult = zkl
     , focusSr = Nothing
     , zklDict = Dict.empty
@@ -1219,11 +1301,12 @@ replaceOrAdd items replacement compare mergef =
 -}
 
 
-sznToZkn : Int -> String -> List Int -> Data.SavedZkNote -> Data.SaveZkNote -> Data.ZkNote
-sznToZkn uid uname sysids sdzn szn =
+sznToZkn : Int -> String -> Int -> List Int -> Data.SavedZkNote -> Data.SaveZkNote -> Data.ZkNote
+sznToZkn uid uname unote sysids sdzn szn =
     { id = sdzn.id
     , user = uid
     , username = uname
+    , usernote = unote
     , title = szn.title
     , content = szn.content
     , pubid = Nothing
@@ -1245,6 +1328,7 @@ onSaved model szn =
                         ++ [ sznToZkn
                                 model.ld.userid
                                 model.ld.name
+                                model.ld.zknote
                                 [ model.ld.commentid ]
                                 szn
                                 pc
@@ -1590,14 +1674,42 @@ update msg model =
             ( { model | pubidtxt = t }, None )
 
         OnCommentInput s ->
-            ( { model | newcomment = Just s }, None )
+            let
+                ncs =
+                    model.newcomment
+                        |> Maybe.map (\state -> { state | text = s })
+                        |> Util.mapNothing (makeNewCommentState model)
+            in
+            ( { model | newcomment = ncs }, None )
 
         NewCommentPress ->
-            let
-                _ =
-                    Debug.log "NewCommentPress" ""
-            in
-            ( { model | newcomment = model.newcomment |> Util.mapNothing "" }, None )
+            ( { model | newcomment = model.newcomment |> Util.mapNothing (makeNewCommentState model) }, None )
+
+        CheckCommentLink editlink checked ->
+            ( { model
+                | newcomment =
+                    model.newcomment
+                        |> Maybe.map
+                            (\ncs ->
+                                { ncs
+                                    | sharelinks =
+                                        ncs.sharelinks
+                                            |> List.map
+                                                (\( el, ch ) ->
+                                                    if el == editlink then
+                                                        ( el, checked )
+
+                                                    else
+                                                        ( el, ch )
+                                                )
+                                }
+                            )
+              }
+            , None
+            )
+
+        CancelComment ->
+            ( { model | newcomment = Nothing }, None )
 
         AddComment ->
             case ( model.id, model.newcomment ) of
@@ -1607,7 +1719,7 @@ update msg model =
                             { id = Nothing
                             , pubid = Nothing
                             , title = "comment"
-                            , content = newcomment
+                            , content = newcomment.text -- TODO add links
                             , editable = False
                             }
                     in
