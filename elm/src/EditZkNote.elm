@@ -36,6 +36,9 @@ type Msg
     = OnMarkdownInput String
     | OnCommentInput String
     | AddComment
+    | CancelComment
+    | NewCommentPress
+    | CheckCommentLink EditLink Bool
     | OnSchelmeCodeChanged String String
     | OnTitleChanged String
     | OnPubidChanged String
@@ -96,17 +99,24 @@ type WClass
     | Wide
 
 
+type alias NewCommentState =
+    { text : String
+    , sharelinks : List ( EditLink, Bool )
+    }
+
+
 type alias Model =
     { id : Maybe Int
     , ld : Data.LoginData
     , noteUser : Int
     , noteUserName : String
+    , usernote : Int
     , zknSearchResult : Data.ZkListNoteSearchResult
     , focusSr : Maybe Int -- note id in search result.
     , zklDict : Dict String EditLink
     , focusLink : Maybe EditLink
     , comments : List Data.ZkNote
-    , newcomment : String
+    , newcomment : Maybe NewCommentState
     , pendingcomment : Maybe Data.SaveZkNote
     , editable : Bool
     , editableValue : Bool
@@ -562,25 +572,99 @@ showSr model isdirty zkln =
         listingrow
 
 
-addComment : Model -> Element Msg
-addComment model =
+makeNewCommentState : Model -> NewCommentState
+makeNewCommentState model =
+    let
+        sharelinks =
+            model.zklDict
+                |> Dict.values
+                |> List.filterMap
+                    (\l ->
+                        if
+                            List.any ((==) model.ld.shareid) l.sysids
+                                || (l.otherid == model.ld.publicid)
+                        then
+                            Just
+                                ( { otherid = l.otherid
+                                  , direction = l.direction
+                                  , user = model.ld.userid
+                                  , zknote = Nothing
+                                  , delete = Nothing
+                                  , othername = l.othername
+                                  , sysids = l.sysids
+                                  }
+                                , True
+                                )
+
+                        else
+                            Nothing
+                    )
+
+        userlink =
+            if model.ld.userid == model.noteUser then
+                []
+
+            else
+                [ ( { otherid = model.usernote
+                    , direction = Data.To
+                    , user = model.ld.userid
+                    , zknote = Nothing
+                    , delete = Nothing
+                    , othername = Just model.noteUserName
+                    , sysids = []
+                    }
+                  , True
+                  )
+                ]
+    in
+    { text = "", sharelinks = userlink ++ sharelinks }
+
+
+addComment : NewCommentState -> Element Msg
+addComment ncs =
     E.column
         [ E.width E.fill
         , E.spacing 8
+        , EBk.color TC.lightCharcoal
+        , E.padding 8
         ]
-        [ EI.multiline
+        [ E.el [ E.centerX, EF.bold ] <| E.text "new comment"
+        , EI.multiline
             [ EF.color TC.black
             , E.width E.fill
             , E.alignTop
             ]
             { onChange = OnCommentInput
-            , text = model.newcomment
+            , text = ncs.text
             , placeholder = Nothing
             , label = EI.labelHidden "Comment"
             , spellcheck = False
             }
-        , EI.button (E.alignLeft :: Common.buttonStyle)
-            { onPress = Just AddComment, label = E.text "reply" }
+        , if List.isEmpty ncs.sharelinks then
+            E.none
+
+          else
+            E.row [ E.width E.fill, E.spacing 15 ]
+                [ E.el [ E.alignTop ] <| E.text "sharing: "
+                , E.column []
+                    (ncs.sharelinks
+                        |> List.map
+                            (\( l, b ) ->
+                                EI.checkbox []
+                                    { checked = b
+                                    , icon = EI.defaultCheckbox
+                                    , label = EI.labelRight [] (E.text (l.othername |> Maybe.withDefault ""))
+                                    , onChange = CheckCommentLink l
+                                    }
+                            )
+                    )
+                ]
+        , E.row [ E.width E.fill ]
+            [ EI.button (E.alignLeft :: Common.buttonStyle)
+                { onPress = Just AddComment, label = E.text "reply" }
+            , EI.button (E.alignRight :: Common.buttonStyle)
+                { onPress = Just CancelComment, label = E.text "cancel" }
+            ]
         ]
 
 
@@ -674,7 +758,15 @@ zknview size recentZkns model =
                             ]
                     )
                     model.comments
-                ++ [ addComment model ]
+                ++ (case model.newcomment of
+                        Just s ->
+                            [ addComment s ]
+
+                        Nothing ->
+                            [ EI.button Common.buttonStyle
+                                { label = E.text "new comment", onPress = Just NewCommentPress }
+                            ]
+                   )
 
         showLinks =
             E.row [ EF.bold ] [ E.text "links" ]
@@ -1091,6 +1183,7 @@ initFull ld searchOrRecent zkl zknote dtlinks spm =
       , ld = ld
       , noteUser = zknote.user
       , noteUserName = zknote.username
+      , usernote = zknote.usernote
       , zknSearchResult = zkl
       , focusSr = Nothing
       , zklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) links)
@@ -1105,7 +1198,7 @@ initFull ld searchOrRecent zkl zknote dtlinks spm =
       , title = zknote.title
       , md = zknote.content
       , comments = []
-      , newcomment = ""
+      , newcomment = Nothing
       , pendingcomment = Nothing
       , editable = zknote.editable
       , editableValue = zknote.editableValue
@@ -1139,6 +1232,7 @@ initNew ld zkl spm =
     , ld = ld
     , noteUser = ld.userid
     , noteUserName = ld.name
+    , usernote = ld.zknote
     , zknSearchResult = zkl
     , focusSr = Nothing
     , zklDict = Dict.empty
@@ -1147,7 +1241,7 @@ initNew ld zkl spm =
     , pubidtxt = ""
     , title = ""
     , comments = []
-    , newcomment = ""
+    , newcomment = Nothing
     , pendingcomment = Nothing
     , editable = True
     , editableValue = True
@@ -1207,11 +1301,12 @@ replaceOrAdd items replacement compare mergef =
 -}
 
 
-sznToZkn : Int -> String -> List Int -> Data.SavedZkNote -> Data.SaveZkNote -> Data.ZkNote
-sznToZkn uid uname sysids sdzn szn =
+sznToZkn : Int -> String -> Int -> List Int -> Data.SavedZkNote -> Data.SaveZkNote -> Data.ZkNote
+sznToZkn uid uname unote sysids sdzn szn =
     { id = sdzn.id
     , user = uid
     , username = uname
+    , usernote = unote
     , title = szn.title
     , content = szn.content
     , pubid = Nothing
@@ -1233,6 +1328,7 @@ onSaved model szn =
                         ++ [ sznToZkn
                                 model.ld.userid
                                 model.ld.name
+                                model.ld.zknote
                                 [ model.ld.commentid ]
                                 szn
                                 pc
@@ -1578,21 +1674,56 @@ update msg model =
             ( { model | pubidtxt = t }, None )
 
         OnCommentInput s ->
-            ( { model | newcomment = s }, None )
+            let
+                ncs =
+                    model.newcomment
+                        |> Maybe.map (\state -> { state | text = s })
+                        |> Util.mapNothing (makeNewCommentState model)
+            in
+            ( { model | newcomment = ncs }, None )
+
+        NewCommentPress ->
+            ( { model | newcomment = model.newcomment |> Util.mapNothing (makeNewCommentState model) }, None )
+
+        CheckCommentLink editlink checked ->
+            ( { model
+                | newcomment =
+                    model.newcomment
+                        |> Maybe.map
+                            (\ncs ->
+                                { ncs
+                                    | sharelinks =
+                                        ncs.sharelinks
+                                            |> List.map
+                                                (\( el, ch ) ->
+                                                    if el == editlink then
+                                                        ( el, checked )
+
+                                                    else
+                                                        ( el, ch )
+                                                )
+                                }
+                            )
+              }
+            , None
+            )
+
+        CancelComment ->
+            ( { model | newcomment = Nothing }, None )
 
         AddComment ->
-            case model.id of
-                Just id ->
+            case ( model.id, model.newcomment ) of
+                ( Just id, Just newcomment ) ->
                     let
                         nc =
                             { id = Nothing
                             , pubid = Nothing
                             , title = "comment"
-                            , content = model.newcomment
+                            , content = newcomment.text
                             , editable = False
                             }
                     in
-                    ( { model | newcomment = "", pendingcomment = Just nc }
+                    ( { model | newcomment = Nothing, pendingcomment = Just nc }
                     , Save
                         { note =
                             nc
@@ -1610,28 +1741,25 @@ update msg model =
                               , delete = Nothing
                               }
                             ]
-                                -- copy links to shares.
-                                ++ (model.zklDict
-                                        |> Dict.values
-                                        |> List.filterMap
-                                            (\l ->
-                                                if List.any ((==) model.ld.shareid) l.sysids then
-                                                    Just
-                                                        { otherid = l.otherid
-                                                        , direction = l.direction
-                                                        , user = model.ld.userid
-                                                        , zknote = Nothing
-                                                        , delete = Nothing
-                                                        }
+                                ++ List.filterMap
+                                    (\( l, b ) ->
+                                        if b then
+                                            Just
+                                                { otherid = l.otherid
+                                                , direction = l.direction
+                                                , user = model.ld.userid
+                                                , zknote = Nothing
+                                                , delete = Nothing
+                                                }
 
-                                                else
-                                                    Nothing
-                                            )
-                                   )
+                                        else
+                                            Nothing
+                                    )
+                                    newcomment.sharelinks
                         }
                     )
 
-                Nothing ->
+                _ ->
                     ( model, None )
 
         OnMarkdownInput newMarkdown ->

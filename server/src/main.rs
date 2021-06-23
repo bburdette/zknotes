@@ -98,35 +98,37 @@ fn user(
 
 fn register(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
   info!("registration: uid: {:?}", req.match_info().get("uid"));
-  match (req.match_info().get("uid"), req.match_info().get("key")) {
-    (Some(uid), Some(key)) => {
-      // read user record.  does the reg key match?
-      match sqldata::read_user(data.db.as_path(), uid) {
-        Ok(user) => {
-          if user.registration_key == Some(key.to_string()) {
-            let mut mu = user;
-            mu.registration_key = None;
-            match sqldata::connection_open(data.db.as_path())
-              .and_then(|conn| sqldata::update_user(&conn, &mu))
-            {
-              Ok(_) => HttpResponse::Ok().body(
-                format!(
-                  "<h1>You are registered!<h1> <a href=\"{}\">\
-                 Proceed to the main site</a>",
-                  data.mainsite
-                )
-                .to_string(),
-              ),
-              Err(_e) => HttpResponse::Ok().body("<h1>registration failed</h1>".to_string()),
+  match sqldata::connection_open(data.db.as_path()) {
+    Ok(conn) => match (req.match_info().get("uid"), req.match_info().get("key")) {
+      (Some(uid), Some(key)) => {
+        // read user record.  does the reg key match?
+        match sqldata::read_user_by_name(&conn, uid) {
+          Ok(user) => {
+            if user.registration_key == Some(key.to_string()) {
+              let mut mu = user;
+              mu.registration_key = None;
+              match sqldata::update_user(&conn, &mu) {
+                Ok(_) => HttpResponse::Ok().body(
+                  format!(
+                    "<h1>You are registered!<h1> <a href=\"{}\">\
+                       Proceed to the main site</a>",
+                    data.mainsite
+                  )
+                  .to_string(),
+                ),
+                Err(_e) => HttpResponse::Ok().body("<h1>registration failed</h1>".to_string()),
+              }
+            } else {
+              HttpResponse::Ok().body("<h1>registration failed</h1>".to_string())
             }
-          } else {
-            HttpResponse::Ok().body("<h1>registration failed</h1>".to_string())
           }
+          Err(_e) => HttpResponse::Ok().body("registration key or user doesn't match".to_string()),
         }
-        Err(_e) => HttpResponse::Ok().body("registration key or user doesn't match".to_string()),
       }
-    }
-    _ => HttpResponse::Ok().body("Uid, key not found!".to_string()),
+      _ => HttpResponse::Ok().body("Uid, key not found!".to_string()),
+    },
+
+    Err(_e) => HttpResponse::Ok().body("<h1>registration failed</h1>".to_string()),
   }
 }
 
