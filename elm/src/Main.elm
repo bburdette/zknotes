@@ -1512,7 +1512,9 @@ handleEditZkNoteCmd model login emod ecmd =
                 | state =
                     Wait m.state
                         (\mod _ ->
-                            ( mod, c )
+                            -- stop waiting, issue listing query when a message
+                            -- is received. (presumably delete reply)
+                            ( { mod | state = m.state }, c )
                         )
               }
             , sendUIMsg model.location
