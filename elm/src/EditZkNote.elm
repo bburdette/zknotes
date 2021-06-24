@@ -313,8 +313,8 @@ dirty model =
         |> Maybe.withDefault True
 
 
-showZkl : Bool -> Bool -> Maybe EditLink -> Data.LoginData -> Maybe Int -> EditLink -> Element Msg
-showZkl isDirty editable focusLink ld id zkl =
+showZkl : Bool -> Bool -> Maybe EditLink -> Data.LoginData -> Maybe Int -> Maybe E.Color -> EditLink -> Element Msg
+showZkl isDirty editable focusLink ld id sysColor zkl =
     let
         ( dir, otherid ) =
             case zkl.direction of
@@ -336,9 +336,6 @@ showZkl isDirty editable focusLink ld id zkl =
                             == l.user
                     )
                 |> Maybe.withDefault False
-
-        sysColor =
-            ZC.systemColor ld zkl.sysids
 
         display =
             [ dir
@@ -771,8 +768,35 @@ zknview size recentZkns model =
         showLinks =
             E.row [ EF.bold ] [ E.text "links" ]
                 :: List.map
-                    (showZkl isdirty editable model.focusLink model.ld model.id)
-                    (Dict.values model.zklDict)
+                    (\( l, c ) -> showZkl isdirty editable model.focusLink model.ld model.id c l)
+                    (Dict.values model.zklDict
+                        |> List.map
+                            (\l ->
+                                ( l
+                                , ZC.systemColor model.ld l.sysids
+                                )
+                            )
+                        |> List.sortWith
+                            (\( l, lc ) ( r, rc ) ->
+                                case ( lc, rc ) of
+                                    ( Nothing, Nothing ) ->
+                                        compare r.otherid l.otherid
+
+                                    ( Just _, Nothing ) ->
+                                        GT
+
+                                    ( Nothing, Just _ ) ->
+                                        LT
+
+                                    ( Just lcolor, Just rcolor ) ->
+                                        case Util.compareColor lcolor rcolor of
+                                            EQ ->
+                                                compare r.otherid l.otherid
+
+                                            a ->
+                                                a
+                            )
+                    )
 
         editview =
             let
@@ -1407,7 +1431,6 @@ update msg model =
             )
 
         SavePress ->
-            -- TODO more reliability.  What if the save fails?
             let
                 saveZkn =
                     sznFromModel model

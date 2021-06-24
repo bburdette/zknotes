@@ -69,7 +69,7 @@ type Msg
     | UrlChanged Url
     | WindowSize Util.Size
     | CtrlS
-    | SelectDialogMsg (GD.Msg SS.Msg)
+    | SelectDialogMsg (GD.Msg (SS.Msg Int))
     | Noop
 
 
@@ -84,7 +84,7 @@ type State
     | ShowMessage ShowMessage.Model Data.LoginData
     | PubShowMessage ShowMessage.Model
     | LoginShowMessage ShowMessage.Model Data.LoginData Url
-    | SelectDialog SS.GDModel State
+    | SelectDialog (SS.GDModel Int) State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
 
 
@@ -766,11 +766,11 @@ shDialog model =
         | state =
             SelectDialog
                 (SS.init
-                    { choices = Array.fromList <| List.map S.printTagSearch model.prevSearches
+                    { choices = List.indexedMap (\i ps -> ( i, S.printTagSearch ps )) model.prevSearches
                     , selected = Nothing
                     , search = ""
-                    , buttonStyle = List.map (E.mapAttribute (\_ -> SS.Noop)) Common.buttonStyle
                     }
+                    Common.buttonStyle
                     (E.map (\_ -> ()) (viewState model.size model.state model))
                 )
                 model.state
