@@ -14,13 +14,30 @@ previous one without building.
 
 nix-copy-closure --to root@zknotes.com /nix/store/9v77vwy5zzv38mvh5a93yk02h2y94xq8-zknotes-server-1.0
 
-- then on the server remove the old one (user practica2)
+- then do the following:
 
-nix-env -e zknotes-server
+-----------------------------------------------
 
-- and install the new one by path name.
 
-nix-env -i /nix/store/9v77vwy5zzv38mvh5a93yk02h2y94xq8-zknotes-server-1.0
+bburdette@BB-5520:~/code/zknotes/zknotes/elm$ ssh root@zknotes.com
+Last login: Mon Jun 21 00:08:35 2021 from 76.120.41.224
+[root@nixos:~]# systemctl stop zknotes.service
+
+[root@nixos:~]# su grc
+
+[grc@nixos:/root]$ nix-env -e zknotes-server
+uninstalling 'zknotes-server-1.0'
+
+[grc@nixos:/root]$ nix-env -i /nix/store/bby1sp0din6yx738hhlnb93hzqs6hqnv-zknotes-server-1.0
+installing 'zknotes-server-1.0'
+building '/nix/store/swc1w911nn1hcnir7ixld761irfyyhlm-user-environment.drv'...
+created 5 symlinks in user environment
+
+[grc@nixos:/root]$ exit
+
+[root@nixos:~]# systemctl start zknotes.service
+
+-----------------------------------------------
 
 - and then collect garbage to remove the old package.
 
@@ -28,3 +45,12 @@ nix-collect-garbage
 
 - currently I'm not including any config or static files with the server.  copy up as needed!  
 elm deploy is over in the elm folder, ../elm
+
+FINALLY for the elm, in the zknotes/elm folder:
+
+./build-prod.sh 
+
+then in the .. folder:
+
+./upload-elm-prod.sh
+
