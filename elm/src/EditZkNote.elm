@@ -641,7 +641,7 @@ addComment ncs =
             E.none
 
           else
-            E.row [ E.width E.fill, E.spacing 15 ]
+            E.row [ E.width E.fill, E.spacing 10 ]
                 [ E.el [ E.alignTop ] <| E.text "sharing: "
                 , E.column []
                     (ncs.sharelinks
@@ -926,7 +926,7 @@ zknview size recentZkns model =
             <|
                 [ E.column
                     [ E.centerX
-                    , E.paddingXY 30 15
+                    , E.paddingXY 30 10
                     , E.spacing 8
                     ]
                     [ E.row [ E.width E.fill, E.spacing 8 ]
@@ -973,6 +973,10 @@ zknview size recentZkns model =
                 , E.alignRight
                 , E.width spwidth
                 , EBd.width 1
+                , EBd.color TC.darkGrey
+                , EBd.rounded 10
+                , EBk.color TC.white
+                , E.clip
                 ]
                 (Common.navbar 2
                     model.searchOrRecent
@@ -990,7 +994,8 @@ zknview size recentZkns model =
                 )
 
         searchPanel =
-            E.column (E.spacing 8 :: E.width E.fill :: sppad)
+            E.column
+                (E.spacing 8 :: E.width E.fill :: sppad)
                 (EI.button Common.buttonStyle
                     { onPress = Just <| SearchHistoryPress
                     , label = E.el [ E.centerY ] <| E.text "Search History"
@@ -1028,7 +1033,18 @@ zknview size recentZkns model =
 
         headingPanel : String -> List (E.Attribute Msg) -> Element Msg -> Element Msg
         headingPanel name attribs elt =
-            E.column ([ E.spacing 12, E.alignTop, EBd.width 1, E.height E.fill ] ++ attribs)
+            E.column
+                ([ E.spacing 12
+                 , E.alignTop
+                 , EBd.width 1
+                 , EBd.color TC.darkGrey
+                 , EBd.rounded 10
+                 , E.clip
+                 , E.height E.fill
+                 , EBk.color TC.white
+                 ]
+                    ++ attribs
+                )
                 [ Common.navbar 2
                     ()
                     (\_ -> Noop)
@@ -1038,7 +1054,12 @@ zknview size recentZkns model =
                 ]
     in
     E.column
-        [ E.width E.fill, E.spacing 8, E.padding 8 ]
+        [ E.width E.fill
+        , E.height E.fill
+        , E.spacing 8
+        , E.padding 8
+        , EBk.color TC.lightGray
+        ]
         [ E.row [ E.width E.fill, E.spacing 8 ]
             [ E.row [ EF.bold ] [ E.text model.ld.name ]
             , if mine then
@@ -1072,6 +1093,7 @@ zknview size recentZkns model =
                 E.row
                     [ E.width E.fill
                     , E.alignTop
+                    , E.spacing 8
                     ]
                     [ headingPanel "edit" [ E.width E.fill ] editview
                     , headingPanel "view" [ E.width E.fill ] mdview
@@ -1081,9 +1103,19 @@ zknview size recentZkns model =
             Medium ->
                 E.row
                     [ E.width E.fill
+                    , E.spacing 8
                     ]
                     [ E.column
-                        [ E.spacing 12, E.alignTop, EBd.width 1, E.width E.fill, E.height E.fill ]
+                        [ E.spacing 12
+                        , E.alignTop
+                        , EBd.width 1
+                        , EBd.color TC.darkGrey
+                        , EBd.rounded 10
+                        , E.clip
+                        , E.width E.fill
+                        , E.height E.fill
+                        , EBk.color TC.white
+                        ]
                         [ Common.navbar 2
                             (if model.navchoice == NcSearch then
                                 NcView
