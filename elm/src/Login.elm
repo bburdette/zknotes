@@ -139,30 +139,44 @@ invalidUserOrPwd model =
 
 view : Util.Size -> Model -> Element Msg
 view size model =
-    column [ height fill, width fill, centerX, centerY, Background.color (Common.navbarColor 4) ]
-        [ row [ width fill ]
-            [ Common.navbar 0
-                model.mode
-                SetMode
-                [ ( LoginMode, "log in" ), ( RegistrationMode, "register" ) ]
+    column [ width fill, height (px size.height) ]
+        [ column
+            [ centerX
+            , centerY
+            , Background.color (Common.navbarColor 1)
+            , Border.rounded 10
+            , padding 10
             ]
-        , if model.sent then
-            sentView model
+            [ row [ width fill ]
+                [ Common.navbar 0
+                    model.mode
+                    SetMode
+                    [ ( LoginMode, "log in" ), ( RegistrationMode, "register" ) ]
+                ]
+            , if model.sent then
+                sentView model
 
-          else
-            case model.mode of
-                LoginMode ->
-                    loginView model
+              else
+                case model.mode of
+                    LoginMode ->
+                        loginView model
 
-                RegistrationMode ->
-                    registrationView model
+                    RegistrationMode ->
+                        registrationView model
+            ]
         ]
 
 
 loginView : Model -> Element Msg
 loginView model =
-    column [ spacing 5, width fill, padding 10, Background.color (Common.navbarColor 1) ]
-        [ text <| "welcome to " ++ model.appname ++ "!  log in below:"
+    column
+        [ spacing 8
+        , width fill
+        , padding 10
+        , Background.color (Common.navbarColor 1)
+        ]
+        [ text <| "welcome to " ++ model.appname ++ "!"
+        , text <| "log in below:"
         , Input.text [ width fill ]
             { onChange = IdUpdate
             , text = model.userId
@@ -191,8 +205,8 @@ loginView model =
 registrationView : Model -> Element Msg
 registrationView model =
     column [ Background.color (Common.navbarColor 1), width fill ]
-        [ row [] [ text <| "welcome to " ++ model.appname ++ "!  register your new account below:" ]
-        , text "email: "
+        [ text <| "welcome to " ++ model.appname ++ "!"
+        , text <| "register your new account below:"
         , Input.text []
             { onChange = EmailUpdate
             , text = model.email

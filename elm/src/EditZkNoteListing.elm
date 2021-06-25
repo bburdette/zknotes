@@ -118,7 +118,7 @@ listview ld size model =
                 [ E.row [ EF.bold ] [ E.text ld.name ]
                 , EI.button
                     (E.alignRight :: Common.buttonStyle)
-                    { onPress = Just DonePress, label = E.text "logout" }
+                    { onPress = Just DonePress, label = E.text "log out" }
                 ]
             , E.row [ E.spacing 8 ]
                 [ EI.button Common.buttonStyle { onPress = Just NewPress, label = E.text "new" }
