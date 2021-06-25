@@ -998,7 +998,7 @@ zknview size recentZkns model =
                 (E.spacing 8 :: E.width E.fill :: sppad)
                 (EI.button Common.buttonStyle
                     { onPress = Just <| SearchHistoryPress
-                    , label = E.el [ E.centerY ] <| E.text "Search History"
+                    , label = E.el [ E.centerY ] <| E.text "search history"
                     }
                     :: (E.map SPMsg <|
                             SP.view True (size.width < 400 || wclass /= Narrow) 0 model.spmodel

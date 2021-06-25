@@ -630,7 +630,7 @@ view model =
                     Html.map SelectDialogMsg <| GD.layout (Just { width = min 600 model.size.width, height = min 500 model.size.height }) sdm
 
                 _ ->
-                    E.layout [] <| viewState model.size model.state model
+                    E.layout [ E.width E.fill ] <| viewState model.size model.state model
             ]
         ]
     }

@@ -102,54 +102,74 @@ listview ld size model =
         titlemaxconst =
             85
     in
-    E.column [ E.spacing 8, E.padding 8, E.width (E.maximum maxwidth E.fill), E.centerX ]
-        [ E.row [ E.spacing 8, E.width E.fill ]
-            [ E.row [ EF.bold ] [ E.text ld.name ]
-            , EI.button
-                (E.alignRight :: Common.buttonStyle)
-                { onPress = Just DonePress, label = E.text "logout" }
-            ]
-        , E.row [ E.spacing 8 ]
-            [ EI.button Common.buttonStyle { onPress = Just NewPress, label = E.text "new" }
-            , EI.button Common.buttonStyle { onPress = Just ImportPress, label = E.text "import" }
-            , EI.button Common.buttonStyle { onPress = Just PowerDeletePress, label = E.text "delete..." }
-            ]
-        , EI.button Common.buttonStyle
-            { onPress = Just <| SearchHistoryPress
-            , label = E.el [ E.centerY ] <| E.text "Search History"
-            }
-        , E.map SPMsg <| SP.view False (size.width < maxwidth) 0 model.spmodel
-        , E.table [ E.spacing 5, E.width E.fill, E.centerX ]
-            { data = model.notes.notes
-            , columns =
-                [ { header = E.none
-                  , width =
-                        -- E.fill
-                        -- clipX doesn't work unless max width is here in px, it seems.
-                        -- E.px <| min maxwidth size.width - titlemaxconst
-                        E.px <| min maxwidth size.width - 16
-                  , view =
-                        \n ->
-                            E.row
-                                ([ E.centerY
-                                 , E.clipX
-                                 , E.width E.fill
-                                 ]
-                                    ++ (ZC.systemColor ld n.sysids
-                                            |> Maybe.map (\c -> [ EF.color c ])
-                                            |> Maybe.withDefault []
-                                       )
-                                )
-                                [ E.link
-                                    [ E.height <| E.px 30 ]
-                                    { url = Data.editNoteLink n.id
-                                    , label = E.text n.title
-                                    }
-                                ]
-                  }
-                ]
-            }
+    E.el
+        [ E.width E.fill
+        , EBk.color TC.lightGrey
         ]
+    <|
+        E.column
+            [ E.spacing 8
+            , E.padding 8
+            , E.width (E.maximum maxwidth E.fill)
+            , E.centerX
+            , EBk.color TC.lightGrey
+            ]
+            [ E.row [ E.spacing 8, E.width E.fill ]
+                [ E.row [ EF.bold ] [ E.text ld.name ]
+                , EI.button
+                    (E.alignRight :: Common.buttonStyle)
+                    { onPress = Just DonePress, label = E.text "logout" }
+                ]
+            , E.row [ E.spacing 8 ]
+                [ EI.button Common.buttonStyle { onPress = Just NewPress, label = E.text "new" }
+                , EI.button Common.buttonStyle { onPress = Just ImportPress, label = E.text "import" }
+                , EI.button Common.buttonStyle { onPress = Just PowerDeletePress, label = E.text "delete..." }
+                ]
+            , E.column
+                [ E.padding 8
+                , EBd.rounded 10
+                , EBd.width 1
+                , EBd.color TC.darkGrey
+                , EBk.color TC.white
+                , E.spacing 8
+                ]
+                [ EI.button Common.buttonStyle
+                    { onPress = Just <| SearchHistoryPress
+                    , label = E.el [ E.centerY ] <| E.text "search history"
+                    }
+                , E.map SPMsg <| SP.view False (size.width < maxwidth) 0 model.spmodel
+                , E.table [ E.spacing 5, E.width E.fill, E.centerX ]
+                    { data = model.notes.notes
+                    , columns =
+                        [ { header = E.none
+                          , width =
+                                -- E.fill
+                                -- clipX doesn't work unless max width is here in px, it seems.
+                                -- E.px <| min maxwidth size.width - titlemaxconst
+                                E.px <| min maxwidth size.width - 32
+                          , view =
+                                \n ->
+                                    E.row
+                                        ([ E.centerY
+                                         , E.clipX
+                                         , E.width E.fill
+                                         ]
+                                            ++ (ZC.systemColor ld n.sysids
+                                                    |> Maybe.map (\c -> [ EF.color c ])
+                                                    |> Maybe.withDefault []
+                                               )
+                                        )
+                                        [ E.link
+                                            [ E.height <| E.px 30 ]
+                                            { url = Data.editNoteLink n.id
+                                            , label = E.text n.title
+                                            }
+                                        ]
+                          }
+                        ]
+                    }
+                ]
+            ]
 
 
 update : Msg -> Model -> Data.LoginData -> ( Model, Command )
