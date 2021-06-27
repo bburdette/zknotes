@@ -82,7 +82,7 @@ type State
     | View View.Model
     | EView View.Model State
     | Import Import.Model Data.LoginData
-    | UserSettings UserSettings.Model Data.LoginData
+    | UserSettings UserSettings.Model Data.LoginData State
     | DisplayError DisplayError.Model State
     | ShowMessage ShowMessage.Model Data.LoginData
     | PubShowMessage ShowMessage.Model
@@ -382,7 +382,7 @@ showState state =
         EView _ _ ->
             "EView"
 
-        UserSettings _ _ ->
+        UserSettings _ _ _ ->
             "UserSettings"
 
         Import _ _ ->
@@ -447,7 +447,7 @@ viewState size state model =
         EView em _ ->
             E.map ViewMsg <| View.view size.width em True
 
-        UserSettings em _ ->
+        UserSettings em _ _ ->
             E.map UserSettingsMsg <| UserSettings.view em
 
         DisplayError em _ ->
@@ -495,7 +495,7 @@ stateLogin state =
         EView _ evstate ->
             stateLogin evstate
 
-        UserSettings _ login ->
+        UserSettings _ login _ ->
             Just login
 
         DisplayError _ bestate ->
@@ -903,8 +903,25 @@ actualupdate msg model =
                 Err e ->
                     ( { model | state = DisplayError (DisplayError.initialModel <| JD.errorToString e) model.state }, Cmd.none )
 
-        ( UserSettingsMsg umsg, UserSettings umod _ ) ->
-            ( model, Cmd.none )
+        ( UserSettingsMsg umsg, UserSettings umod login prevstate ) ->
+            let
+                ( numod, c ) =
+                    UserSettings.update umsg umod
+            in
+            case c of
+                UserSettings.Done ->
+                    ( { model | state = prevstate }, Cmd.none )
+
+                UserSettings.LogOut ->
+                    ( { model | state = Login (Login.initialModel Nothing "zknotes" model.seed) }
+                    , sendUIMsg model.location UI.Logout
+                    )
+
+                UserSettings.ChangePassword ->
+                    ( { model | state = UserSettings numod login prevstate }, Cmd.none )
+
+                UserSettings.None ->
+                    ( { model | state = UserSettings numod login prevstate }, Cmd.none )
 
         ( LoginMsg lm, Login ls ) ->
             let
@@ -1332,8 +1349,8 @@ actualupdate msg model =
                     )
 
                 EditZkNoteListing.Done ->
-                    ( { model | state = Login (Login.initialModel Nothing "zknotes" model.seed) }
-                    , sendUIMsg model.location UI.Logout
+                    ( { model | state = UserSettings (UserSettings.init login) login (EditZkNoteListing es login) }
+                    , Cmd.none
                     )
 
                 EditZkNoteListing.Import ->

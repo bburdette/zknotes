@@ -14,25 +14,43 @@ import TangoColors as Color
 type Msg
     = Noop
     | DonePress
+    | ChangePassPress
     | LogOutPress
 
 
 type Command
     = Done
     | LogOut
+    | ChangePassword
     | None
 
 
 type alias Model =
-    { login : Data.Login
+    { login : Data.LoginData
     }
+
+
+init : Data.LoginData -> Model
+init login =
+    { login = login }
 
 
 view : Model -> Element Msg
 view model =
-    E.column [ E.width E.fill, E.height E.fill ]
-        [ EI.button buttonStyle { onPress = Just DonePress, label = E.text "back" }
-        , EI.button buttonStyle { onPress = Just LogOutPress, label = E.text "log out" }
+    E.row [ E.width E.fill, E.height E.fill ]
+        [ E.column [ E.centerX ]
+            [ E.row [ E.width E.fill ]
+                [ EI.button buttonStyle { onPress = Just DonePress, label = E.text "back" }
+                , EI.button (E.alignRight :: buttonStyle) { onPress = Just LogOutPress, label = E.text "log out" }
+                ]
+            , E.row []
+                [ E.text "user: "
+                , E.el [ EF.bold ] <| E.text model.login.name
+                ]
+            , EI.button buttonStyle { onPress = Just ChangePassPress, label = E.text "change password" }
+
+            -- , EI.button buttonStyle { onPress = Just ChangeEmailPress, label = E.text "change email" }
+            ]
         ]
 
 
@@ -44,6 +62,9 @@ update msg model =
 
         LogOutPress ->
             ( model, LogOut )
+
+        ChangePassPress ->
+            ( model, None )
 
         Noop ->
             ( model, None )
