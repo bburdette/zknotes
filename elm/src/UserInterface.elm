@@ -9,6 +9,7 @@ import Search as S
 type SendMsg
     = Register Data.Registration
     | Login Data.Login
+    | Logout
     | GetZkNote Int
     | GetZkNoteEdit Data.GetZkNoteEdit
     | GetZkNoteComments Data.GetZkNoteComments
@@ -29,6 +30,7 @@ type ServerResponse
     | InvalidUserOrPwd
     | NotLoggedIn
     | LoggedIn Data.LoginData
+    | LoggedOut
     | ZkNoteSearchResult Data.ZkNoteSearchResult
     | ZkListNoteSearchResult Data.ZkListNoteSearchResult
     | SavedZkNotePlusLinks Data.SavedZkNote
@@ -64,6 +66,9 @@ showServerResponse sr =
 
         LoggedIn _ ->
             "LoggedIn"
+
+        LoggedOut ->
+            "LoggedOut"
 
         ZkNoteSearchResult _ ->
             "ZkNoteSearchResult"
@@ -118,6 +123,11 @@ encodeSendMsg sm =
             JE.object
                 [ ( "what", JE.string "login" )
                 , ( "data", Data.encodeLogin login )
+                ]
+
+        Logout ->
+            JE.object
+                [ ( "what", JE.string "logout" )
                 ]
 
         GetZkNote id ->
@@ -211,6 +221,9 @@ serverResponseDecoder =
 
                     "logged in" ->
                         JD.map LoggedIn (JD.at [ "content" ] Data.decodeLoginData)
+
+                    "logged out" ->
+                        JD.succeed LoggedOut
 
                     "not logged in" ->
                         JD.succeed NotLoggedIn

@@ -1014,6 +1014,9 @@ actualupdate msg model =
                                     , Cmd.none
                                     )
 
+                        UI.LoggedOut ->
+                            ( model, Cmd.none )
+
                         UI.ZkNoteSearchResult sr ->
                             if sr.what == "prevSearches" then
                                 ( { model
@@ -1312,10 +1315,7 @@ actualupdate msg model =
 
                 EditZkNoteListing.Done ->
                     ( { model | state = Login (Login.initialModel Nothing "zknotes" model.seed) }
-                    , Cmd.batch
-                        [ LS.storeLocalVal { name = "uid", value = "" }
-                        , LS.storeLocalVal { name = "pwd", value = "" }
-                        ]
+                    , sendUIMsg model.location UI.Logout
                     )
 
                 EditZkNoteListing.Import ->

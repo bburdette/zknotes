@@ -140,6 +140,13 @@ pub fn user_interface(
         }
       }
     }
+  } else if msg.what == "logout" {
+    session.remove("token");
+
+    Ok(ServerResponse {
+      what: "logged out".to_string(),
+      content: serde_json::Value::Null,
+    })
   } else {
     match session.get::<Uuid>("token")? {
       None => Ok(ServerResponse {
