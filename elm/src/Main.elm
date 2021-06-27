@@ -1052,6 +1052,10 @@ actualupdate msg model =
                         UI.LoggedOut ->
                             ( model, Cmd.none )
 
+                        UI.ChangedPassword ->
+                            -- TODO display conf dialog on recieving this.
+                            ( model, Cmd.none )
+
                         UI.ZkNoteSearchResult sr ->
                             if sr.what == "prevSearches" then
                                 ( { model
