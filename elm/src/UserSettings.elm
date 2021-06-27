@@ -14,10 +14,12 @@ import TangoColors as Color
 type Msg
     = Noop
     | DonePress
+    | LogOutPress
 
 
 type Command
     = Done
+    | LogOut
     | None
 
 
@@ -29,7 +31,9 @@ type alias Model =
 view : Model -> Element Msg
 view model =
     E.column [ E.width E.fill, E.height E.fill ]
-        [ EI.button buttonStyle { onPress = Just DonePress, label = E.text "back" } ]
+        [ EI.button buttonStyle { onPress = Just DonePress, label = E.text "back" }
+        , EI.button buttonStyle { onPress = Just LogOutPress, label = E.text "log out" }
+        ]
 
 
 update : Msg -> Model -> ( Model, Command )
@@ -37,6 +41,9 @@ update msg model =
     case msg of
         DonePress ->
             ( model, Done )
+
+        LogOutPress ->
+            ( model, LogOut )
 
         Noop ->
             ( model, None )

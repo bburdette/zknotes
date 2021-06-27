@@ -60,6 +60,7 @@ type Msg
     | ViewMsg View.Msg
     | EditZkNoteMsg EditZkNote.Msg
     | EditZkNoteListingMsg EditZkNoteListing.Msg
+    | UserSettingsMsg UserSettings.Msg
     | ImportMsg Import.Msg
     | ShowMessageMsg ShowMessage.Msg
     | UserReplyData (Result Http.Error UI.ServerResponse)
@@ -81,6 +82,7 @@ type State
     | View View.Model
     | EView View.Model State
     | Import Import.Model Data.LoginData
+    | UserSettings UserSettings.Model Data.LoginData
     | DisplayError DisplayError.Model State
     | ShowMessage ShowMessage.Model Data.LoginData
     | PubShowMessage ShowMessage.Model
@@ -311,6 +313,9 @@ showMessage msg =
         EditZkNoteListingMsg _ ->
             "EditZkNoteListingMsg"
 
+        UserSettingsMsg _ ->
+            "UserSettingsMsg"
+
         ImportMsg _ ->
             "ImportMsg"
 
@@ -377,6 +382,9 @@ showState state =
         EView _ _ ->
             "EView"
 
+        UserSettings _ _ ->
+            "UserSettings"
+
         Import _ _ ->
             "Import"
 
@@ -439,6 +447,9 @@ viewState size state model =
         EView em _ ->
             E.map ViewMsg <| View.view size.width em True
 
+        UserSettings em _ ->
+            E.map UserSettingsMsg <| UserSettings.view em
+
         DisplayError em _ ->
             E.map DisplayErrorMsg <| DisplayError.view em
 
@@ -483,6 +494,9 @@ stateLogin state =
 
         EView _ evstate ->
             stateLogin evstate
+
+        UserSettings _ login ->
+            Just login
 
         DisplayError _ bestate ->
             stateLogin bestate
@@ -888,6 +902,9 @@ actualupdate msg model =
 
                 Err e ->
                     ( { model | state = DisplayError (DisplayError.initialModel <| JD.errorToString e) model.state }, Cmd.none )
+
+        ( UserSettingsMsg umsg, UserSettings umod _ ) ->
+            ( model, Cmd.none )
 
         ( LoginMsg lm, Login ls ) ->
             let
