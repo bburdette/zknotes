@@ -680,7 +680,7 @@ view model =
                 ChangePasswordDialog cdm _ ->
                     Html.map ChangePasswordDialogMsg <|
                         GD.layout
-                            (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                            (Just { width = min 600 model.size.width, height = min 200 model.size.height })
                             cdm
 
                 _ ->
@@ -982,7 +982,7 @@ actualupdate msg model =
                 UserSettings.ChangePassword ->
                     ( { model
                         | state =
-                            ChangePasswordDialog (CP.init login [] (UserSettings.view numod |> E.map (always ())))
+                            ChangePasswordDialog (CP.init login Common.buttonStyle (UserSettings.view numod |> E.map (always ())))
                                 (UserSettings numod login prevstate)
                       }
                     , Cmd.none

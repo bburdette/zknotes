@@ -46,19 +46,21 @@ view : List (E.Attribute Msg) -> Maybe Util.Size -> Model -> Element Msg
 view buttonStyle mbsize model =
     E.column
         [ E.width (mbsize |> Maybe.map .width |> Maybe.withDefault 500 |> E.px)
-        , E.height (mbsize |> Maybe.map .height |> Maybe.withDefault 500 |> E.px)
+        , E.height E.shrink
         , E.spacing 10
         ]
-        [ EI.text []
+        [ EI.currentPassword []
             { onChange = OldPwdChanged
             , text = model.oldpwd
             , placeholder = Nothing
+            , show = False
             , label = EI.labelLeft [] (E.text "old password")
             }
-        , EI.text []
+        , EI.newPassword []
             { onChange = NewPwdChanged
             , text = model.newpwd
             , placeholder = Nothing
+            , show = False
             , label = EI.labelLeft [] (E.text "new password")
             }
         , E.row [ E.width E.fill, E.spacing 10 ]
@@ -89,8 +91,5 @@ update msg model =
                 , newpwd = model.newpwd
                 }
 
-        -- model.selected
-        --     |> Maybe.map GD.Ok
-        --     |> Maybe.withDefault GD.Cancel
         Noop ->
             GD.Dialog model
