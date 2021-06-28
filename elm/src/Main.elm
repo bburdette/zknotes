@@ -44,6 +44,7 @@ import Search as S
 import SearchPanel as SP
 import SelectString as SS
 import ShowMessage
+import TangoColors as TC
 import Task exposing (Task)
 import Toop
 import Url exposing (Url)
@@ -665,10 +666,16 @@ view model =
             ]
             [ case model.state of
                 DisplayMessage dm _ ->
-                    Html.map DisplayMessageMsg <| GD.layout (Just { width = min 600 model.size.width, height = min 500 model.size.height }) dm
+                    Html.map DisplayMessageMsg <|
+                        GD.layout
+                            (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                            dm
 
                 SelectDialog sdm _ ->
-                    Html.map SelectDialogMsg <| GD.layout (Just { width = min 600 model.size.width, height = min 500 model.size.height }) sdm
+                    Html.map SelectDialogMsg <|
+                        GD.layout
+                            (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                            sdm
 
                 ChangePasswordDialog cdm _ ->
                     Html.map ChangePasswordDialogMsg <|

@@ -8,7 +8,7 @@ import Element.Border as EBd
 import Element.Events as EE
 import Element.Font as EF
 import Element.Input as EI
-import TangoColors as Color
+import TangoColors as TC
 
 
 type Msg
@@ -37,19 +37,35 @@ init login =
 
 view : Model -> Element Msg
 view model =
-    E.row [ E.width E.fill, E.height E.fill ]
-        [ E.column [ E.centerX ]
+    E.row [ E.width E.fill, E.height E.fill, EBk.color TC.lightGrey ]
+        [ E.column
+            [ E.centerX
+            , E.width (E.maximum 400 E.fill)
+            , E.spacing 8
+            ]
             [ E.row [ E.width E.fill ]
-                [ EI.button buttonStyle { onPress = Just DonePress, label = E.text "back" }
-                , EI.button (E.alignRight :: buttonStyle) { onPress = Just LogOutPress, label = E.text "log out" }
+                [ EI.button buttonStyle { onPress = Just DonePress, label = E.text "done" }
                 ]
-            , E.row []
-                [ E.text "user: "
-                , E.el [ EF.bold ] <| E.text model.login.name
+            , E.column
+                [ E.centerX
+                , E.width (E.maximum 400 E.fill)
+                , EBd.width 1
+                , EBd.color TC.darkGrey
+                , EBd.rounded 10
+                , E.padding 5
+                , EBk.color TC.white
+                , E.spacing 8
                 ]
-            , EI.button buttonStyle { onPress = Just ChangePassPress, label = E.text "change password" }
+                [ E.el [ EF.bold, E.centerX ] <| E.text "user settings"
+                , E.row [ E.width E.fill ]
+                    [ E.text "logged in as user: "
+                    , E.el [ EF.bold ] <| E.text model.login.name
+                    , EI.button (E.alignRight :: buttonStyle) { onPress = Just LogOutPress, label = E.text "log out" }
+                    ]
+                , EI.button (E.centerX :: buttonStyle) { onPress = Just ChangePassPress, label = E.text "change password" }
 
-            -- , EI.button buttonStyle { onPress = Just ChangeEmailPress, label = E.text "change email" }
+                -- , EI.button buttonStyle { onPress = Just ChangeEmailPress, label = E.text "change email" }
+                ]
             ]
         ]
 
