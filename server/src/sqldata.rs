@@ -1354,9 +1354,8 @@ pub fn change_password(
             .as_slice(),
         );
         userdata.hashwd = newhash;
-        // new token here, and token date.
         update_user(&conn, &userdata)?;
-        println!("changed password, userdata: {:?}", userdata);
+        println!("changed password for {}", userdata.name);
 
         Ok(())
       }

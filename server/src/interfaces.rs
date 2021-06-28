@@ -129,9 +129,8 @@ pub fn user_interface(
           let token = Uuid::new_v4();
           sqldata::add_token(&conn, userdata.id, token)?;
           session.set("token", token)?;
-          println!("token {:?}", token);
           sqldata::update_user(&conn, &userdata)?;
-          println!("logged in, userdata: {:?}", userdata);
+          println!("logged in, user: {:?}", userdata.name);
 
           Ok(ServerResponse {
             what: "logged in".to_string(),

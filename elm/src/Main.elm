@@ -368,10 +368,6 @@ showMessage msg =
             "SelectDialogMsg"
 
         ChangePasswordDialogMsg x ->
-            let
-                _ =
-                    Debug.log "cpdm " x
-            in
             "ChangePasswordDialogMsg"
 
 
