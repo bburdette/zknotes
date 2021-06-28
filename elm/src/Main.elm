@@ -1530,11 +1530,7 @@ actualupdate msg model =
             ( model, Cmd.none )
 
         ( x, y ) ->
-            let
-                e =
-                    "invalid message for state: \n" ++ showMessage x ++ "\n" ++ showState y
-            in
-            ( displayMessageDialog model e
+            ( unexpectedMsg model x
             , Cmd.none
             )
 
