@@ -6,6 +6,7 @@ import Browser.Events
 import Browser.Navigation
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
+import ChangePassword as CP
 import Common exposing (buttonStyle)
 import Data
 import Dict exposing (Dict)
@@ -72,6 +73,7 @@ type Msg
     | WindowSize Util.Size
     | CtrlS
     | SelectDialogMsg (GD.Msg (SS.Msg Int))
+    | ChangePasswordDialogMsg (GD.Msg CP.Msg)
     | Noop
 
 
@@ -88,6 +90,7 @@ type State
     | PubShowMessage ShowMessage.Model
     | LoginShowMessage ShowMessage.Model Data.LoginData Url
     | SelectDialog (SS.GDModel Int) State
+    | ChangePasswordDialog CP.GDModel State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
 
 
@@ -363,6 +366,13 @@ showMessage msg =
         SelectDialogMsg _ ->
             "SelectDialogMsg"
 
+        ChangePasswordDialogMsg x ->
+            let
+                _ =
+                    Debug.log "cpdm " x
+            in
+            "ChangePasswordDialogMsg"
+
 
 showState : State -> String
 showState state =
@@ -405,6 +415,9 @@ showState state =
 
         SelectDialog _ _ ->
             "SelectDialog"
+
+        ChangePasswordDialog _ _ ->
+            "ChangePasswordDialog"
 
 
 unexpectedMsg : State -> Msg -> State
@@ -457,6 +470,10 @@ viewState size state model =
             E.map (\_ -> Noop) (viewState size innerState model)
 
         SelectDialog _ _ ->
+            -- render is at the layout level, not here.
+            E.none
+
+        ChangePasswordDialog _ _ ->
             -- render is at the layout level, not here.
             E.none
 
@@ -514,6 +531,9 @@ stateLogin state =
             stateLogin wstate
 
         SelectDialog _ instate ->
+            stateLogin instate
+
+        ChangePasswordDialog _ instate ->
             stateLogin instate
 
 
@@ -643,6 +663,12 @@ view model =
             [ case model.state of
                 SelectDialog sdm _ ->
                     Html.map SelectDialogMsg <| GD.layout (Just { width = min 600 model.size.width, height = min 500 model.size.height }) sdm
+
+                ChangePasswordDialog cdm _ ->
+                    Html.map ChangePasswordDialogMsg <|
+                        GD.layout
+                            (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                            cdm
 
                 _ ->
                     E.layout [ E.width E.fill ] <| viewState model.size model.state model
@@ -848,6 +874,19 @@ actualupdate msg model =
                 GD.Cancel ->
                     ( { model | state = instate }, Cmd.none )
 
+        ( ChangePasswordDialogMsg sdmsg, ChangePasswordDialog sdmod instate ) ->
+            case GD.update sdmsg sdmod of
+                GD.Dialog nmod ->
+                    ( { model | state = ChangePasswordDialog nmod instate }, Cmd.none )
+
+                GD.Ok return ->
+                    ( { model | state = instate }
+                    , sendUIMsg model.location <| UI.ChangePassword return
+                    )
+
+                GD.Cancel ->
+                    ( { model | state = instate }, Cmd.none )
+
         ( SelectedText jv, state ) ->
             case JD.decodeValue JD.string jv of
                 Ok str ->
@@ -918,7 +957,13 @@ actualupdate msg model =
                     )
 
                 UserSettings.ChangePassword ->
-                    ( { model | state = UserSettings numod login prevstate }, Cmd.none )
+                    ( { model
+                        | state =
+                            ChangePasswordDialog (CP.init login [] (UserSettings.view numod |> E.map (always ())))
+                                (UserSettings numod login prevstate)
+                      }
+                    , Cmd.none
+                    )
 
                 UserSettings.None ->
                     ( { model | state = UserSettings numod login prevstate }, Cmd.none )
@@ -1450,8 +1495,23 @@ actualupdate msg model =
                 DisplayError.Okay ->
                     ( { model | state = prevstate }, Cmd.none )
 
-        ( _, _ ) ->
+        ( Noop, _ ) ->
             ( model, Cmd.none )
+
+        ( ChangePasswordDialogMsg GD.Noop, _ ) ->
+            ( model, Cmd.none )
+
+        ( SelectDialogMsg GD.Noop, _ ) ->
+            ( model, Cmd.none )
+
+        ( x, y ) ->
+            let
+                e =
+                    "invalid message for state: \n" ++ showMessage x ++ "\n" ++ showState y
+            in
+            ( { model | state = DisplayError (DisplayError.initialModel e) model.state }
+            , Cmd.none
+            )
 
 
 handleEditZkNoteCmd model login emod ecmd =

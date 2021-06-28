@@ -64,7 +64,7 @@ update msg model =
             ( model, LogOut )
 
         ChangePassPress ->
-            ( model, None )
+            ( model, ChangePassword )
 
         Noop ->
             ( model, None )
