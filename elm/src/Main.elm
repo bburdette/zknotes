@@ -6,10 +6,11 @@ import Browser.Events
 import Browser.Navigation
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
+import ChangePassword as CP
 import Common exposing (buttonStyle)
 import Data
 import Dict exposing (Dict)
-import DisplayError
+import DisplayMessage
 import EditZkNote
 import EditZkNoteListing
 import Element as E exposing (Element)
@@ -43,22 +44,24 @@ import Search as S
 import SearchPanel as SP
 import SelectString as SS
 import ShowMessage
+import TangoColors as TC
 import Task exposing (Task)
 import Toop
 import Url exposing (Url)
 import Url.Builder as UB
 import Url.Parser as UP exposing ((</>))
 import UserInterface as UI
+import UserSettings
 import Util
 import View
 
 
 type Msg
     = LoginMsg Login.Msg
-    | DisplayErrorMsg DisplayError.Msg
     | ViewMsg View.Msg
     | EditZkNoteMsg EditZkNote.Msg
     | EditZkNoteListingMsg EditZkNoteListing.Msg
+    | UserSettingsMsg UserSettings.Msg
     | ImportMsg Import.Msg
     | ShowMessageMsg ShowMessage.Msg
     | UserReplyData (Result Http.Error UI.ServerResponse)
@@ -69,7 +72,9 @@ type Msg
     | UrlChanged Url
     | WindowSize Util.Size
     | CtrlS
+    | DisplayMessageMsg (GD.Msg DisplayMessage.Msg)
     | SelectDialogMsg (GD.Msg (SS.Msg Int))
+    | ChangePasswordDialogMsg (GD.Msg CP.Msg)
     | Noop
 
 
@@ -80,11 +85,13 @@ type State
     | View View.Model
     | EView View.Model State
     | Import Import.Model Data.LoginData
-    | DisplayError DisplayError.Model State
+    | UserSettings UserSettings.Model Data.LoginData State
     | ShowMessage ShowMessage.Model Data.LoginData
     | PubShowMessage ShowMessage.Model
     | LoginShowMessage ShowMessage.Model Data.LoginData Url
     | SelectDialog (SS.GDModel Int) State
+    | ChangePasswordDialog CP.GDModel State
+    | DisplayMessage DisplayMessage.GDModel State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
 
 
@@ -298,8 +305,8 @@ showMessage msg =
         LoginMsg _ ->
             "LoginMsg"
 
-        DisplayErrorMsg _ ->
-            "DisplayErrorMsg"
+        DisplayMessageMsg _ ->
+            "DisplayMessage"
 
         ViewMsg _ ->
             "ViewMsg"
@@ -309,6 +316,9 @@ showMessage msg =
 
         EditZkNoteListingMsg _ ->
             "EditZkNoteListingMsg"
+
+        UserSettingsMsg _ ->
+            "UserSettingsMsg"
 
         ImportMsg _ ->
             "ImportMsg"
@@ -357,6 +367,9 @@ showMessage msg =
         SelectDialogMsg _ ->
             "SelectDialogMsg"
 
+        ChangePasswordDialogMsg x ->
+            "ChangePasswordDialogMsg"
+
 
 showState : State -> String
 showState state =
@@ -376,11 +389,14 @@ showState state =
         EView _ _ ->
             "EView"
 
+        UserSettings _ _ _ ->
+            "UserSettings"
+
         Import _ _ ->
             "Import"
 
-        DisplayError _ _ ->
-            "DisplayError"
+        DisplayMessage _ _ ->
+            "DisplayMessage"
 
         ShowMessage _ _ ->
             "ShowMessage"
@@ -397,15 +413,19 @@ showState state =
         SelectDialog _ _ ->
             "SelectDialog"
 
-
-unexpectedMsg : State -> Msg -> State
-unexpectedMsg state msg =
-    unexpectedMessage state (showMessage msg)
+        ChangePasswordDialog _ _ ->
+            "ChangePasswordDialog"
 
 
-unexpectedMessage : State -> String -> State
-unexpectedMessage state msg =
-    DisplayError (DisplayError.initialModel <| "unexpected message - " ++ msg ++ "; state was " ++ showState state) state
+unexpectedMsg : Model -> Msg -> Model
+unexpectedMsg model msg =
+    unexpectedMessage model (showMessage msg)
+
+
+unexpectedMessage : Model -> String -> Model
+unexpectedMessage model msg =
+    displayMessageDialog model
+        ("unexpected message - " ++ msg ++ "; state was " ++ showState model.state)
 
 
 viewState : Util.Size -> State -> Model -> Element Msg
@@ -438,13 +458,22 @@ viewState size state model =
         EView em _ ->
             E.map ViewMsg <| View.view size.width em True
 
-        DisplayError em _ ->
-            E.map DisplayErrorMsg <| DisplayError.view em
+        UserSettings em _ _ ->
+            E.map UserSettingsMsg <| UserSettings.view em
 
+        DisplayMessage em _ ->
+            -- render is at the layout level, not here.
+            E.none
+
+        -- E.map DisplayMessageMsg <| DisplayMessage.view em
         Wait innerState _ ->
             E.map (\_ -> Noop) (viewState size innerState model)
 
         SelectDialog _ _ ->
+            -- render is at the layout level, not here.
+            E.none
+
+        ChangePasswordDialog _ _ ->
             -- render is at the layout level, not here.
             E.none
 
@@ -483,7 +512,10 @@ stateLogin state =
         EView _ evstate ->
             stateLogin evstate
 
-        DisplayError _ bestate ->
+        UserSettings _ login _ ->
+            Just login
+
+        DisplayMessage _ bestate ->
             stateLogin bestate
 
         ShowMessage _ login ->
@@ -499,6 +531,9 @@ stateLogin state =
             stateLogin wstate
 
         SelectDialog _ instate ->
+            stateLogin instate
+
+        ChangePasswordDialog _ instate ->
             stateLogin instate
 
 
@@ -626,8 +661,23 @@ view model =
             , onKeyDown
             ]
             [ case model.state of
+                DisplayMessage dm _ ->
+                    Html.map DisplayMessageMsg <|
+                        GD.layout
+                            (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                            dm
+
                 SelectDialog sdm _ ->
-                    Html.map SelectDialogMsg <| GD.layout (Just { width = min 600 model.size.width, height = min 500 model.size.height }) sdm
+                    Html.map SelectDialogMsg <|
+                        GD.layout
+                            (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                            sdm
+
+                ChangePasswordDialog cdm _ ->
+                    Html.map ChangePasswordDialogMsg <|
+                        GD.layout
+                            (Just { width = min 600 model.size.width, height = min 200 model.size.height })
+                            cdm
 
                 _ ->
                     E.layout [ E.width E.fill ] <| viewState model.size model.state model
@@ -777,6 +827,19 @@ shDialog model =
     }
 
 
+displayMessageDialog : Model -> String -> Model
+displayMessageDialog model message =
+    { model
+        | state =
+            DisplayMessage
+                (DisplayMessage.init Common.buttonStyle
+                    message
+                    (E.map (\_ -> ()) (viewState model.size model.state model))
+                )
+                model.state
+    }
+
+
 actualupdate : Msg -> Model -> ( Model, Cmd Msg )
 actualupdate msg model =
     case ( msg, model.state ) of
@@ -833,6 +896,19 @@ actualupdate msg model =
                 GD.Cancel ->
                     ( { model | state = instate }, Cmd.none )
 
+        ( ChangePasswordDialogMsg sdmsg, ChangePasswordDialog sdmod instate ) ->
+            case GD.update sdmsg sdmod of
+                GD.Dialog nmod ->
+                    ( { model | state = ChangePasswordDialog nmod instate }, Cmd.none )
+
+                GD.Ok return ->
+                    ( { model | state = instate }
+                    , sendUIMsg model.location <| UI.ChangePassword return
+                    )
+
+                GD.Cancel ->
+                    ( { model | state = instate }, Cmd.none )
+
         ( SelectedText jv, state ) ->
             case JD.decodeValue JD.string jv of
                 Ok str ->
@@ -865,10 +941,7 @@ actualupdate msg model =
                                                             )
 
                                                         _ ->
-                                                            ( { model
-                                                                | state =
-                                                                    unexpectedMsg model.state ms
-                                                              }
+                                                            ( unexpectedMsg model ms
                                                             , Cmd.none
                                                             )
                                                 )
@@ -886,7 +959,33 @@ actualupdate msg model =
                             ( model, Cmd.none )
 
                 Err e ->
-                    ( { model | state = DisplayError (DisplayError.initialModel <| JD.errorToString e) model.state }, Cmd.none )
+                    ( displayMessageDialog model <| JD.errorToString e, Cmd.none )
+
+        ( UserSettingsMsg umsg, UserSettings umod login prevstate ) ->
+            let
+                ( numod, c ) =
+                    UserSettings.update umsg umod
+            in
+            case c of
+                UserSettings.Done ->
+                    ( { model | state = prevstate }, Cmd.none )
+
+                UserSettings.LogOut ->
+                    ( { model | state = Login (Login.initialModel Nothing "zknotes" model.seed) }
+                    , sendUIMsg model.location UI.Logout
+                    )
+
+                UserSettings.ChangePassword ->
+                    ( { model
+                        | state =
+                            ChangePasswordDialog (CP.init login Common.buttonStyle (UserSettings.view numod |> E.map (always ())))
+                                (UserSettings numod login prevstate)
+                      }
+                    , Cmd.none
+                    )
+
+                UserSettings.None ->
+                    ( { model | state = UserSettings numod login prevstate }, Cmd.none )
 
         ( LoginMsg lm, Login ls ) ->
             let
@@ -920,12 +1019,14 @@ actualupdate msg model =
         ( PublicReplyData prd, state ) ->
             case prd of
                 Err e ->
-                    ( { model | state = DisplayError (DisplayError.initialModel <| Util.httpErrorString e) model.state }, Cmd.none )
+                    ( displayMessageDialog model <| Util.httpErrorString e
+                    , Cmd.none
+                    )
 
                 Ok piresponse ->
                     case piresponse of
                         PI.ServerError e ->
-                            ( { model | state = DisplayError (DisplayError.initialModel e) state }, Cmd.none )
+                            ( displayMessageDialog model e, Cmd.none )
 
                         PI.ZkNote fbe ->
                             let
@@ -939,12 +1040,12 @@ actualupdate msg model =
         ( UserReplyData urd, state ) ->
             case urd of
                 Err e ->
-                    ( { model | state = DisplayError (DisplayError.initialModel <| Util.httpErrorString e) model.state }, Cmd.none )
+                    ( displayMessageDialog model <| Util.httpErrorString e, Cmd.none )
 
                 Ok uiresponse ->
                     case uiresponse of
                         UI.ServerError e ->
-                            ( { model | state = DisplayError (DisplayError.initialModel e) state }, Cmd.none )
+                            ( displayMessageDialog model <| e, Cmd.none )
 
                         UI.RegistrationSent ->
                             ( model, Cmd.none )
@@ -1010,12 +1111,17 @@ actualupdate msg model =
                                     ( m, cmd )
 
                                 _ ->
-                                    ( { model | state = unexpectedMessage state "logged in" }
+                                    ( displayMessageDialog model "logged in"
                                     , Cmd.none
                                     )
 
                         UI.LoggedOut ->
                             ( model, Cmd.none )
+
+                        UI.ChangedPassword ->
+                            ( displayMessageDialog model "password changed"
+                            , Cmd.none
+                            )
 
                         UI.ZkNoteSearchResult sr ->
                             if sr.what == "prevSearches" then
@@ -1057,7 +1163,7 @@ actualupdate msg model =
                                     )
 
                                 _ ->
-                                    ( { model | state = unexpectedMessage state (UI.showServerResponse uiresponse) }
+                                    ( unexpectedMessage model (UI.showServerResponse uiresponse)
                                     , Cmd.none
                                     )
 
@@ -1075,7 +1181,7 @@ actualupdate msg model =
                                    )
                                 -}
                                 _ ->
-                                    ( { model | state = unexpectedMessage state (UI.showServerResponse uiresponse) }
+                                    ( unexpectedMessage model (UI.showServerResponse uiresponse)
                                     , Cmd.none
                                     )
 
@@ -1122,7 +1228,7 @@ actualupdate msg model =
                                     )
 
                                 _ ->
-                                    ( { model | state = unexpectedMessage state (UI.showServerResponse uiresponse) }
+                                    ( unexpectedMessage model (UI.showServerResponse uiresponse)
                                     , Cmd.none
                                     )
 
@@ -1134,7 +1240,7 @@ actualupdate msg model =
                                     )
 
                                 _ ->
-                                    ( { model | state = unexpectedMessage state (UI.showServerResponse uiresponse) }
+                                    ( unexpectedMessage model (UI.showServerResponse uiresponse)
                                     , Cmd.none
                                     )
 
@@ -1209,7 +1315,7 @@ actualupdate msg model =
                                     ( { model | state = Login <| Login.userExists lmod }, Cmd.none )
 
                                 _ ->
-                                    ( { model | state = unexpectedMessage state (UI.showServerResponse uiresponse) }
+                                    ( unexpectedMessage model (UI.showServerResponse uiresponse)
                                     , Cmd.none
                                     )
 
@@ -1219,7 +1325,7 @@ actualupdate msg model =
                                     ( { model | state = Login <| Login.unregisteredUser lmod }, Cmd.none )
 
                                 _ ->
-                                    ( { model | state = unexpectedMessage state (UI.showServerResponse uiresponse) }
+                                    ( unexpectedMessage model (UI.showServerResponse uiresponse)
                                     , Cmd.none
                                     )
 
@@ -1237,7 +1343,8 @@ actualupdate msg model =
                                     ( { model | state = Login <| Login.invalidUserOrPwd lmod }, Cmd.none )
 
                                 _ ->
-                                    ( { model | state = unexpectedMessage (Login (Login.initialModel Nothing "zknotes" model.seed)) (UI.showServerResponse uiresponse) }
+                                    ( unexpectedMessage { model | state = Login (Login.initialModel Nothing "zknotes" model.seed) }
+                                        (UI.showServerResponse uiresponse)
                                     , Cmd.none
                                     )
 
@@ -1314,8 +1421,8 @@ actualupdate msg model =
                     )
 
                 EditZkNoteListing.Done ->
-                    ( { model | state = Login (Login.initialModel Nothing "zknotes" model.seed) }
-                    , sendUIMsg model.location UI.Logout
+                    ( { model | state = UserSettings (UserSettings.init login) login (EditZkNoteListing es login) }
+                    , Cmd.none
                     )
 
                 EditZkNoteListing.Import ->
@@ -1402,17 +1509,33 @@ actualupdate msg model =
                 Import.Command cmd ->
                     ( model, Cmd.map ImportMsg cmd )
 
-        ( DisplayErrorMsg bm, DisplayError bs prevstate ) ->
-            let
-                ( bmod, bcmd ) =
-                    DisplayError.update bm bs
-            in
-            case bcmd of
-                DisplayError.Okay ->
+        ( DisplayMessageMsg bm, DisplayMessage bs prevstate ) ->
+            case GD.update bm bs of
+                GD.Dialog nmod ->
+                    ( { model | state = DisplayMessage nmod prevstate }, Cmd.none )
+
+                GD.Ok return ->
                     ( { model | state = prevstate }, Cmd.none )
 
-        ( _, _ ) ->
+                GD.Cancel ->
+                    ( { model | state = prevstate }, Cmd.none )
+
+        ( Noop, _ ) ->
             ( model, Cmd.none )
+
+        ( ChangePasswordDialogMsg GD.Noop, _ ) ->
+            ( model, Cmd.none )
+
+        ( SelectDialogMsg GD.Noop, _ ) ->
+            ( model, Cmd.none )
+
+        ( DisplayMessageMsg GD.Noop, _ ) ->
+            ( model, Cmd.none )
+
+        ( x, y ) ->
+            ( unexpectedMsg model x
+            , Cmd.none
+            )
 
 
 handleEditZkNoteCmd model login emod ecmd =
@@ -1467,12 +1590,12 @@ handleEditZkNoteCmd model login emod ecmd =
                             gotres
 
                         UserReplyData (Ok (UI.ServerError e)) ->
-                            ( { model | state = DisplayError (DisplayError.initialModel e) model.state }
+                            ( displayMessageDialog model e
                             , Cmd.none
                             )
 
                         _ ->
-                            ( { model | state = unexpectedMsg model.state ms }
+                            ( unexpectedMsg model ms
                             , Cmd.none
                             )
             in

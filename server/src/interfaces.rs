@@ -12,8 +12,8 @@ use std::error::Error;
 use std::path::Path;
 use uuid::Uuid;
 use zkprotocol::content::{
-  GetZkNoteComments, GetZkNoteEdit, ImportZkNote, Login, LoginData, RegistrationData, SaveZkNote,
-  SaveZkNotePlusLinks, ZkLinks, ZkNoteEdit,
+  ChangePassword, GetZkNoteComments, GetZkNoteEdit, ImportZkNote, Login, LoginData,
+  RegistrationData, SaveZkNote, SaveZkNotePlusLinks, ZkLinks, ZkNoteEdit,
 };
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 use zkprotocol::search::{TagSearch, ZkNoteSearch};
@@ -129,9 +129,8 @@ pub fn user_interface(
           let token = Uuid::new_v4();
           sqldata::add_token(&conn, userdata.id, token)?;
           session.set("token", token)?;
-          println!("token {:?}", token);
           sqldata::update_user(&conn, &userdata)?;
-          println!("logged in, userdata: {:?}", userdata);
+          println!("logged in, user: {:?}", userdata.name);
 
           Ok(ServerResponse {
             what: "logged in".to_string(),
@@ -179,6 +178,16 @@ fn user_interface_loggedin(
   msg: &UserMessage,
 ) -> Result<ServerResponse, Box<dyn Error>> {
   match msg.what.as_str() {
+    "ChangePassword" => {
+      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      let cp: ChangePassword = serde_json::from_value(msgdata.clone())?;
+      let conn = sqldata::connection_open(config.db.as_path())?;
+      sqldata::change_password(&conn, uid, cp)?;
+      Ok(ServerResponse {
+        what: "changed password".to_string(),
+        content: serde_json::Value::Null,
+      })
+    }
     "getzknote" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let id: i64 = serde_json::from_value(msgdata.clone())?;

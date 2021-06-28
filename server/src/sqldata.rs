@@ -1,6 +1,7 @@
 use crate::util::{is_token_expired, now};
 use barrel::backend::Sqlite;
 use barrel::{types, Migration};
+use crypto_hash::{hex_digest, Algorithm};
 use log::info;
 use rusqlite::{params, Connection};
 use serde_derive::{Deserialize, Serialize};
@@ -10,8 +11,8 @@ use std::path::Path;
 use std::time::Duration;
 use uuid::Uuid;
 use zkprotocol::content::{
-  Direction, EditLink, GetZkLinks, GetZkNoteComments, GetZkNoteEdit, ImportZkNote, LoginData,
-  SaveZkLink, SaveZkNote, SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
+  ChangePassword, Direction, EditLink, GetZkLinks, GetZkNoteComments, GetZkNoteEdit, ImportZkNote,
+  LoginData, SaveZkLink, SaveZkNote, SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
 };
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -1325,6 +1326,41 @@ pub fn get_sysids(conn: &Connection, sysid: i64, noteid: i64) -> Result<Vec<i64>
   );
 
   r
+}
+
+pub fn change_password(
+  conn: &Connection,
+  uid: i64,
+  cp: ChangePassword,
+) -> Result<(), Box<dyn Error>> {
+  let mut userdata = read_user_by_id(&conn, uid)?;
+  match userdata.registration_key {
+    Some(_reg_key) => bail!("invalid user or password"),
+    None => {
+      if hex_digest(
+        Algorithm::SHA256,
+        (cp.oldpwd.clone() + userdata.salt.as_str())
+          .into_bytes()
+          .as_slice(),
+      ) != userdata.hashwd
+      {
+        // bad password, can't change.
+        bail!("invalid password!")
+      } else {
+        let newhash = hex_digest(
+          Algorithm::SHA256,
+          (cp.newpwd.clone() + userdata.salt.as_str())
+            .into_bytes()
+            .as_slice(),
+        );
+        userdata.hashwd = newhash;
+        update_user(&conn, &userdata)?;
+        println!("changed password for {}", userdata.name);
+
+        Ok(())
+      }
+    }
+  }
 }
 
 pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNote, Box<dyn Error>> {

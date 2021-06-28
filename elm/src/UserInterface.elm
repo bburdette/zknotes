@@ -10,6 +10,7 @@ type SendMsg
     = Register Data.Registration
     | Login Data.Login
     | Logout
+    | ChangePassword Data.ChangePassword
     | GetZkNote Int
     | GetZkNoteEdit Data.GetZkNoteEdit
     | GetZkNoteComments Data.GetZkNoteComments
@@ -31,6 +32,7 @@ type ServerResponse
     | NotLoggedIn
     | LoggedIn Data.LoginData
     | LoggedOut
+    | ChangedPassword
     | ZkNoteSearchResult Data.ZkNoteSearchResult
     | ZkListNoteSearchResult Data.ZkListNoteSearchResult
     | SavedZkNotePlusLinks Data.SavedZkNote
@@ -69,6 +71,9 @@ showServerResponse sr =
 
         LoggedOut ->
             "LoggedOut"
+
+        ChangedPassword ->
+            "ChangedPassword"
 
         ZkNoteSearchResult _ ->
             "ZkNoteSearchResult"
@@ -128,6 +133,12 @@ encodeSendMsg sm =
         Logout ->
             JE.object
                 [ ( "what", JE.string "logout" )
+                ]
+
+        ChangePassword chpwd ->
+            JE.object
+                [ ( "what", JE.string "ChangePassword" )
+                , ( "data", Data.encodeChangePassword chpwd )
                 ]
 
         GetZkNote id ->
@@ -230,6 +241,9 @@ serverResponseDecoder =
 
                     "invalid user or pwd" ->
                         JD.succeed InvalidUserOrPwd
+
+                    "changed password" ->
+                        JD.succeed ChangedPassword
 
                     "server error" ->
                         JD.map ServerError (JD.at [ "content" ] JD.string)
