@@ -33,6 +33,15 @@ type alias GDModel =
     GD.Model Model Msg Data.ChangePassword
 
 
+init : Data.LoginData -> List (E.Attribute Msg) -> Element () -> GDModel
+init loginData buttonStyle underLay =
+    { view = view buttonStyle
+    , update = update
+    , model = { loginData = loginData, oldpwd = "", newpwd = "" }
+    , underLay = underLay
+    }
+
+
 view : List (E.Attribute Msg) -> Maybe Util.Size -> Model -> Element Msg
 view buttonStyle mbsize model =
     E.column
@@ -85,12 +94,3 @@ update msg model =
         --     |> Maybe.withDefault GD.Cancel
         Noop ->
             GD.Dialog model
-
-
-init : Data.LoginData -> List (E.Attribute Msg) -> Element () -> GDModel
-init loginData buttonStyle underLay =
-    { view = view buttonStyle
-    , update = update
-    , model = { loginData = loginData, oldpwd = "", newpwd = "" }
-    , underLay = underLay
-    }
