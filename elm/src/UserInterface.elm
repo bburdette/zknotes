@@ -242,6 +242,9 @@ serverResponseDecoder =
                     "invalid user or pwd" ->
                         JD.succeed InvalidUserOrPwd
 
+                    "changed password" ->
+                        JD.succeed ChangedPassword
+
                     "server error" ->
                         JD.map ServerError (JD.at [ "content" ] JD.string)
 

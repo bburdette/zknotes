@@ -76,8 +76,7 @@ update msg model =
 
         OkClick ->
             GD.Ok
-                { uid = model.loginData.name
-                , oldpwd = model.oldpwd
+                { oldpwd = model.oldpwd
                 , newpwd = model.newpwd
                 }
 
