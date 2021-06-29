@@ -14,7 +14,7 @@ use config::Config;
 use log::{error, info};
 use serde_json;
 use std::error::Error;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::str::FromStr;
 use timer;
 use uuid::Uuid;
@@ -217,10 +217,12 @@ fn defcon() -> Config {
   }
 }
 
-fn purge_login_tokens(dbfile: &Path, token_expiration_ms: i64) -> Result<(), Box<dyn Error>> {
-  let conn = sqldata::connection_open(dbfile)?;
+fn purge_tokens(config: &Config) -> Result<(), Box<dyn Error>> {
+  let conn = sqldata::connection_open(config.db.as_path())?;
 
-  sqldata::purge_login_tokens(&conn, token_expiration_ms)?;
+  sqldata::purge_login_tokens(&conn, config.login_token_expiration_ms)?;
+
+  sqldata::purge_email_tokens(&conn, config.email_token_expiration_ms)?;
 
   Ok(())
 }
@@ -296,12 +298,11 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
       let ptconfig = config.clone();
 
       let _guard =
-        timer.schedule_repeating(chrono::Duration::days(1), move || match purge_login_tokens(
-          ptconfig.db.as_path(),
-          ptconfig.login_token_expiration_ms,
-        ) {
-          Err(e) => error!("purge_login_tokens error: {}", e),
-          Ok(_) => (),
+        timer.schedule_repeating(chrono::Duration::days(1), move || {
+          match purge_tokens(&ptconfig) {
+            Err(e) => error!("purge_login_tokens error: {}", e),
+            Ok(_) => (),
+          }
         });
 
       let c = config.clone();

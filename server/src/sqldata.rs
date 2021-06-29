@@ -1059,6 +1059,33 @@ pub fn purge_login_tokens(
   Ok(())
 }
 
+pub fn purge_email_tokens(
+  conn: &Connection,
+  token_expiration_ms: i64,
+) -> Result<(), Box<dyn Error>> {
+  let now = now()?;
+  let expdt = now - token_expiration_ms;
+
+  let count: i64 = conn.query_row(
+    "select count(*) from
+      newemail where tokendate < ?1",
+    params![expdt],
+    |row| Ok(row.get(0)?),
+  )?;
+
+  if count > 0 {
+    info!("removing {} expired newemail records", count);
+
+    conn.execute(
+      "delete from newemail
+        where tokendate < ?1",
+      params![expdt],
+    )?;
+  }
+
+  Ok(())
+}
+
 pub fn update_user(conn: &Connection, user: &User) -> Result<(), Box<dyn Error>> {
   conn.execute(
     "update user set name = ?1, hashwd = ?2, salt = ?3, email = ?4, registration_key = ?5
