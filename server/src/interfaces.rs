@@ -12,7 +12,7 @@ use std::error::Error;
 use std::path::Path;
 use uuid::Uuid;
 use zkprotocol::content::{
-  ChangePassword, GetZkNoteComments, GetZkNoteEdit, ImportZkNote, Login, LoginData,
+  ChangeEmail, ChangePassword, GetZkNoteComments, GetZkNoteEdit, ImportZkNote, Login, LoginData,
   RegistrationData, SaveZkNote, SaveZkNotePlusLinks, ZkLinks, ZkNoteEdit,
 };
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
@@ -185,6 +185,26 @@ fn user_interface_loggedin(
       sqldata::change_password(&conn, uid, cp)?;
       Ok(ServerResponse {
         what: "changed password".to_string(),
+        content: serde_json::Value::Null,
+      })
+    }
+    "ChangeEmail" => {
+      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      let cp: ChangeEmail = serde_json::from_value(msgdata.clone())?;
+      let conn = sqldata::connection_open(config.db.as_path())?;
+      let (name, token) = sqldata::change_email(&conn, uid, cp.clone())?;
+      // send a confirmation email.
+      email::send_newemail_confirmation(
+        config.appname.as_str(),
+        config.domain.as_str(),
+        config.mainsite.as_str(),
+        cp.email.as_str(),
+        name.as_str(),
+        token.to_string().as_str(),
+      )?;
+
+      Ok(ServerResponse {
+        what: "changed email".to_string(),
         content: serde_json::Value::Null,
       })
     }

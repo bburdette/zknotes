@@ -11,8 +11,8 @@ use std::path::Path;
 use std::time::Duration;
 use uuid::Uuid;
 use zkprotocol::content::{
-  ChangePassword, Direction, EditLink, GetZkLinks, GetZkNoteComments, GetZkNoteEdit, ImportZkNote,
-  LoginData, SaveZkLink, SaveZkNote, SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
+  ChangeEmail, ChangePassword, Direction, EditLink, GetZkLinks, GetZkNoteComments, GetZkNoteEdit,
+  ImportZkNote, LoginData, SaveZkLink, SaveZkNote, SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
 };
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -726,69 +726,19 @@ pub fn udpate9(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   let conn = Connection::open(dbfile)?;
   let mut m1 = Migration::new();
 
-  m1.create_table("usertemp", |t| {
-    t.add_column(
-      "id",
-      types::integer()
-        .primary(true)
-        .increments(true)
-        .nullable(false),
-    );
-    t.add_column("name", types::text().nullable(false).unique(true));
-    t.add_column("hashwd", types::text().nullable(false));
-    t.add_column("zknote", types::foreign("zknote", "id").nullable(true));
-    t.add_column("salt", types::text().nullable(false));
+  // add newemail table.  each request for a new email creates an entry.
+  m1.create_table("newemail", |t| {
+    t.add_column("user", types::foreign("user", "id").nullable(false));
     t.add_column("email", types::text().nullable(false));
-    t.add_column("registration_key", types::text().nullable(true));
-    t.add_column("createdate", types::integer().nullable(false));
+    t.add_column("token", types::text().nullable(false));
+    t.add_column("tokendate", types::integer().nullable(false));
+    t.add_index(
+      "newemailunq",
+      types::index(vec!["user", "token"]).unique(true),
+    );
   });
 
   conn.execute_batch(m1.make::<Sqlite>().as_str())?;
-
-  // copy everything from user.
-  conn.execute(
-    "insert into usertemp (id, name, hashwd, zknote, salt, email, registration_key, createdate)
-        select id, name, hashwd, zknote, salt, email, registration_key, createdate from user",
-    params![],
-  )?;
-
-  let mut m2 = Migration::new();
-  m2.drop_table("user");
-
-  // new user table with new columns for email tokens.
-  m2.create_table("user", |t| {
-    t.add_column(
-      "id",
-      types::integer()
-        .primary(true)
-        .increments(true)
-        .nullable(false),
-    );
-    t.add_column("name", types::text().nullable(false).unique(true));
-    t.add_column("hashwd", types::text().nullable(false));
-    t.add_column("zknote", types::foreign("zknote", "id").nullable(true));
-    t.add_column("salt", types::text().nullable(false));
-    t.add_column("email", types::text().nullable(false));
-    t.add_column("registration_key", types::text().nullable(true));
-    t.add_column("createdate", types::integer().nullable(false));
-    t.add_column("emailtoken", types::text().nullable(true));
-    t.add_column("emailtokendate", types::integer().nullable(true));
-  });
-
-  conn.execute_batch(m2.make::<Sqlite>().as_str())?;
-
-  // copy everything from usertemp.
-  conn.execute(
-    "insert into user (id, name, hashwd, zknote, salt, email, registration_key, createdate)
-        select id, name, hashwd, zknote, salt, email, registration_key, createdate from usertemp",
-    params![],
-  )?;
-
-  let mut m3 = Migration::new();
-
-  m3.drop_table("usertemp");
-
-  conn.execute_batch(m3.make::<Sqlite>().as_str())?;
 
   Ok(())
 }
@@ -1123,6 +1073,23 @@ pub fn update_user(conn: &Connection, user: &User) -> Result<(), Box<dyn Error>>
   Ok(())
 }
 
+// email change request.
+pub fn add_newemail(
+  conn: &Connection,
+  user: i64,
+  token: Uuid,
+  email: String,
+) -> Result<(), Box<dyn Error>> {
+  let now = now()?;
+  conn.execute(
+    "insert into newemail (user, email, token, tokendate)
+     values (?1, ?2, ?3, ?4)",
+    params![user, email, token.to_string(), now],
+  )?;
+
+  Ok(())
+}
+
 pub fn note_id(conn: &Connection, name: &str, title: &str) -> Result<i64, Box<dyn Error>> {
   let id: i64 = conn.query_row(
     "select zknote.id from
@@ -1435,6 +1402,35 @@ pub fn change_password(
         println!("changed password for {}", userdata.name);
 
         Ok(())
+      }
+    }
+  }
+}
+
+pub fn change_email(
+  conn: &Connection,
+  uid: i64,
+  cp: ChangeEmail,
+) -> Result<(String, Uuid), Box<dyn Error>> {
+  let userdata = read_user_by_id(&conn, uid)?;
+  match userdata.registration_key {
+    Some(_reg_key) => bail!("invalid user or password"),
+    None => {
+      if hex_digest(
+        Algorithm::SHA256,
+        (cp.pwd.clone() + userdata.salt.as_str())
+          .into_bytes()
+          .as_slice(),
+      ) != userdata.hashwd
+      {
+        // bad password, can't change.
+        bail!("invalid password!")
+      } else {
+        // create a 'newemail' record.
+        let token = Uuid::new_v4();
+        add_newemail(&conn, uid, token, cp.email)?;
+
+        Ok((userdata.name, token))
       }
     }
   }
