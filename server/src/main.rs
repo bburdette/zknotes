@@ -5,7 +5,7 @@ mod search;
 mod sqldata;
 mod sqltest;
 mod util;
-
+use crate::util::now;
 use actix_session::{CookieSession, Session};
 use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Result};
 use chrono;
@@ -147,29 +147,40 @@ fn new_email(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
               Ok(user) => {
                 match sqldata::read_newemail(&conn, user.id, token) {
                   Ok((email, tokendate)) => {
-                    // TODO token expired?
-
-                    // put the email in the user record and update.
-                    let mut mu = user.clone();
-                    mu.email = email;
-                    match sqldata::update_user(&conn, &mu) {
-                      Ok(_) => {
-                        // delete the change email token record.
-                        match sqldata::remove_newemail(&conn, user.id, token) {
-                          Ok(_) => (),
-                          Err(e) => error!("error removing newemail record: {:?}", e),
-                        }
-                        HttpResponse::Ok().body(
-                          format!(
-                            "<h1>Email address changed!<h1> <a href=\"{}\">\
-                                   Proceed to the main site</a>",
-                            data.mainsite
-                          )
-                          .to_string(),
-                        )
-                      }
+                    match now() {
                       Err(_e) => HttpResponse::InternalServerError()
-                        .body("<h1>email change failed</h1>".to_string()),
+                        .body("<h1>'now' failed!</h1>".to_string()),
+
+                      Ok(now) => {
+                        if (now - tokendate) > data.email_token_expiration_ms {
+                          // TODO token expired?
+                          HttpResponse::UnprocessableEntity()
+                            .body("<h1>email change failed - token expired</h1>".to_string())
+                        } else {
+                          // put the email in the user record and update.
+                          let mut mu = user.clone();
+                          mu.email = email;
+                          match sqldata::update_user(&conn, &mu) {
+                            Ok(_) => {
+                              // delete the change email token record.
+                              match sqldata::remove_newemail(&conn, user.id, token) {
+                                Ok(_) => (),
+                                Err(e) => error!("error removing newemail record: {:?}", e),
+                              }
+                              HttpResponse::Ok().body(
+                                format!(
+                                  "<h1>Email address changed!<h1> <a href=\"{}\">\
+                                   Proceed to the main site</a>",
+                                  data.mainsite
+                                )
+                                .to_string(),
+                              )
+                            }
+                            Err(_e) => HttpResponse::InternalServerError()
+                              .body("<h1>email change failed</h1>".to_string()),
+                          }
+                        }
+                      }
                     }
                   }
                   Err(_e) => HttpResponse::InternalServerError()
@@ -201,14 +212,15 @@ fn defcon() -> Config {
     appname: "mahbloag".to_string(),
     domain: "practica.site".to_string(),
     admin_email: "admin@practica.site".to_string(),
-    token_expiration_ms: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
+    login_token_expiration_ms: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
+    email_token_expiration_ms: 1 * 24 * 60 * 60 * 1000, // 1 day in milliseconds
   }
 }
 
-fn purge_tokens(dbfile: &Path, token_expiration_ms: i64) -> Result<(), Box<dyn Error>> {
+fn purge_login_tokens(dbfile: &Path, token_expiration_ms: i64) -> Result<(), Box<dyn Error>> {
   let conn = sqldata::connection_open(dbfile)?;
 
-  sqldata::purge_tokens(&conn, token_expiration_ms)?;
+  sqldata::purge_login_tokens(&conn, token_expiration_ms)?;
 
   Ok(())
 }
@@ -258,7 +270,7 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
       // do that exporting...
       let config = load_config();
 
-      sqldata::dbinit(config.db.as_path(), config.token_expiration_ms)?;
+      sqldata::dbinit(config.db.as_path(), config.login_token_expiration_ms)?;
 
       util::write_string(
         exportfile,
@@ -277,18 +289,19 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
 
       info!("config: {:?}", config);
 
-      sqldata::dbinit(config.db.as_path(), config.token_expiration_ms)?;
+      sqldata::dbinit(config.db.as_path(), config.login_token_expiration_ms)?;
 
       let timer = timer::Timer::new();
 
       let ptconfig = config.clone();
 
       let _guard =
-        timer.schedule_repeating(chrono::Duration::days(1), move || {
-          match purge_tokens(ptconfig.db.as_path(), ptconfig.token_expiration_ms) {
-            Err(e) => error!("purge_tokens error: {}", e),
-            Ok(_) => (),
-          }
+        timer.schedule_repeating(chrono::Duration::days(1), move || match purge_login_tokens(
+          ptconfig.db.as_path(),
+          ptconfig.login_token_expiration_ms,
+        ) {
+          Err(e) => error!("purge_login_tokens error: {}", e),
+          Ok(_) => (),
         });
 
       let c = config.clone();

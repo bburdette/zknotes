@@ -6,7 +6,7 @@ use std::error::Error;
 
 pub fn send_newemail_confirmation(
   appname: &str,
-  domain: &str,
+  _domain: &str,
   mainsite: &str,
   email: &str,
   uid: &str,
@@ -47,7 +47,7 @@ pub fn send_newemail_confirmation(
 
 pub fn send_registration(
   appname: &str,
-  domain: &str,
+  _domain: &str,
   mainsite: &str,
   email: &str,
   uid: &str,
@@ -75,7 +75,7 @@ pub fn send_registration(
     (format!(
       "Click the link to complete registration, {} user '{}'!  \
        {}/register/{}/{}",
-      appname, uid, domain, uid, reg_id
+      appname, uid, mainsite, uid, reg_id
     ))
     .to_string()
     .as_str(),

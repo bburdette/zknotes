@@ -832,7 +832,7 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: i64) -> Result<(), Box<dyn Err
 
   info!("db up to date.");
 
-  purge_tokens(&conn, token_expiration_ms)?;
+  purge_login_tokens(&conn, token_expiration_ms)?;
 
   Ok(())
 }
@@ -1032,7 +1032,10 @@ pub fn add_token(conn: &Connection, user: i64, token: Uuid) -> Result<(), Box<dy
   Ok(())
 }
 
-pub fn purge_tokens(conn: &Connection, token_expiration_ms: i64) -> Result<(), Box<dyn Error>> {
+pub fn purge_login_tokens(
+  conn: &Connection,
+  token_expiration_ms: i64,
+) -> Result<(), Box<dyn Error>> {
   let now = now()?;
   let expdt = now - token_expiration_ms;
 

@@ -27,7 +27,7 @@ pub fn login_data_for_token(
   match session.get("token")? {
     None => Ok(None),
     Some(token) => {
-      match sqldata::read_user_by_token(&conn, token, Some(config.token_expiration_ms)) {
+      match sqldata::read_user_by_token(&conn, token, Some(config.login_token_expiration_ms)) {
         Ok(user) => Ok(Some(sqldata::login_data(&conn, user.id)?)),
         Err(_) => Ok(None),
       }
@@ -153,7 +153,7 @@ pub fn user_interface(
         content: serde_json::Value::Null,
       }),
       Some(token) => {
-        match sqldata::read_user_by_token(&conn, token, Some(config.token_expiration_ms)) {
+        match sqldata::read_user_by_token(&conn, token, Some(config.login_token_expiration_ms)) {
           Err(e) => {
             println!("rubt error: {:?}", e);
 
