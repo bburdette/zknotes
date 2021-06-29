@@ -1168,7 +1168,7 @@ actualupdate msg model =
                             )
 
                         UI.ChangedEmail ->
-                            ( displayMessageDialog model "email changed"
+                            ( displayMessageDialog model "email change confirmation sent!  check your inbox (or spam folder) for an email with title 'change zknotes email', and follow the enclosed link to change to the new address."
                             , Cmd.none
                             )
 

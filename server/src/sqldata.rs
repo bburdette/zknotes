@@ -15,7 +15,7 @@ use zkprotocol::content::{
   ImportZkNote, LoginData, SaveZkLink, SaveZkNote, SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
 };
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Clone, Deserialize, Serialize, Debug)]
 pub struct User {
   pub id: i64,
   pub name: String,
@@ -1048,7 +1048,7 @@ pub fn purge_tokens(conn: &Connection, token_expiration_ms: i64) -> Result<(), B
 
     conn.execute(
       "delete from token
-    where tokendate < ?1",
+        where tokendate < ?1",
       params![expdt],
     )?;
   }
@@ -1085,6 +1085,32 @@ pub fn add_newemail(
     "insert into newemail (user, email, token, tokendate)
      values (?1, ?2, ?3, ?4)",
     params![user, email, token.to_string(), now],
+  )?;
+
+  Ok(())
+}
+
+// email change request.
+pub fn read_newemail(
+  conn: &Connection,
+  user: i64,
+  token: Uuid,
+) -> Result<(String, i64), Box<dyn Error>> {
+  let result = conn.query_row(
+    "select email, tokendate from newemail
+     where user = ?1
+      and token = ?2",
+    params![user, token.to_string()],
+    |row| Ok((row.get(0)?, row.get(1)?)),
+  )?;
+  Ok(result)
+}
+// email change request.
+pub fn remove_newemail(conn: &Connection, user: i64, token: Uuid) -> Result<(), Box<dyn Error>> {
+  conn.execute(
+    "delete from newemail
+     where user = ?1 and token = ?2",
+    params![user, token.to_string()],
   )?;
 
   Ok(())

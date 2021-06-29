@@ -15,7 +15,9 @@ use log::{error, info};
 use serde_json;
 use std::error::Error;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use timer;
+use uuid::Uuid;
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 
 /*
@@ -132,6 +134,63 @@ fn register(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
   }
 }
 
+fn new_email(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
+  info!("new email: uid: {:?}", req.match_info().get("uid"));
+  match sqldata::connection_open(data.db.as_path()) {
+    Ok(conn) => match (req.match_info().get("uid"), req.match_info().get("token")) {
+      (Some(uid), Some(tokenstr)) => {
+        match Uuid::from_str(tokenstr) {
+          Err(_e) => HttpResponse::BadRequest().body("invalid token".to_string()),
+          Ok(token) => {
+            // read user record.  does the reg key match?
+            match sqldata::read_user_by_name(&conn, uid) {
+              Ok(user) => {
+                match sqldata::read_newemail(&conn, user.id, token) {
+                  Ok((email, tokendate)) => {
+                    // TODO token expired?
+
+                    // put the email in the user record and update.
+                    let mut mu = user.clone();
+                    mu.email = email;
+                    match sqldata::update_user(&conn, &mu) {
+                      Ok(_) => {
+                        // delete the change email token record.
+                        match sqldata::remove_newemail(&conn, user.id, token) {
+                          Ok(_) => (),
+                          Err(e) => error!("error removing newemail record: {:?}", e),
+                        }
+                        HttpResponse::Ok().body(
+                          format!(
+                            "<h1>Email address changed!<h1> <a href=\"{}\">\
+                                   Proceed to the main site</a>",
+                            data.mainsite
+                          )
+                          .to_string(),
+                        )
+                      }
+                      Err(_e) => HttpResponse::InternalServerError()
+                        .body("<h1>email change failed</h1>".to_string()),
+                    }
+                  }
+                  Err(_e) => HttpResponse::InternalServerError()
+                    .body("<h1>email change failed</h1>".to_string()),
+                }
+              }
+              Err(_e) => HttpResponse::BadRequest()
+                .body("email change token or user doesn't match".to_string()),
+            }
+          }
+        }
+      }
+      _ => HttpResponse::BadRequest().body("username or token not found!".to_string()),
+    },
+
+    Err(_e) => {
+      HttpResponse::InternalServerError().body("<h1>database connection failed</h1>".to_string())
+    }
+  }
+}
+
 fn defcon() -> Config {
   Config {
     ip: "127.0.0.1".to_string(),
@@ -245,6 +304,7 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
           .service(web::resource("/public").route(web::post().to(public)))
           .service(web::resource("/user").route(web::post().to(user)))
           .service(web::resource(r"/register/{uid}/{key}").route(web::get().to(register)))
+          .service(web::resource(r"/newemail/{uid}/{token}").route(web::get().to(new_email)))
           .service(actix_files::Files::new("/static/", "static/"))
           .service(web::resource("/{tail:.*}").route(web::get().to(mainpage)))
       })
