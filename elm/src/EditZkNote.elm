@@ -1489,6 +1489,10 @@ update msg model =
             ( { model
                 | id = Nothing
                 , title = "Copy of " ++ model.title
+                , noteUser = model.ld.userid
+                , noteUserName = model.ld.name
+                , usernote = model.ld.zknote
+                , editable = True
                 , pubidtxt = "" -- otherwise we get a conflict on save.
                 , zklDict =
                     model.zklDict
