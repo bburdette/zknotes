@@ -132,8 +132,9 @@ mkRenderer restoreSearchMsg maxw cellDict showPanelElt onchanged =
             [ E.spacing 15 ]
     , thematicBreak = E.none
     , text = E.text
-    , strong = \content -> E.row [ EF.bold ] content
-    , emphasis = \content -> E.row [ EF.italic ] content
+    , strong = \content -> E.paragraph [ EF.bold ] content
+    , emphasis = \content -> E.paragraph [ EF.italic ] content
+    , strikethrough = \content -> E.paragraph [ EF.strike ] content
     , codeSpan = code
     , link =
         \{ title, destination } body ->
@@ -148,6 +149,8 @@ mkRenderer restoreSearchMsg maxw cellDict showPanelElt onchanged =
                 , label =
                     E.paragraph
                         [ EF.color (E.rgb255 0 0 255)
+                        , E.htmlAttribute (Html.Attributes.style "overflow-wrap" "break-word")
+                        , E.htmlAttribute (Html.Attributes.style "word-break" "break-word")
                         ]
                         body
                 }
@@ -385,7 +388,11 @@ codeBlock : { body : String, language : Maybe String } -> Element msg
 codeBlock details =
     E.el
         [ EBk.color (E.rgba 0 0 0 0.03)
-        , E.htmlAttribute (Html.Attributes.style "white-space" "pre")
+
+        -- , E.htmlAttribute (Html.Attributes.style "white-space" "pre")
+        -- , E.htmlAttribute (Html.Attributes.style "overflow-wrap" "break-word")
+        -- , E.width <| E.px 400
+        , E.htmlAttribute (Html.Attributes.style "word-break" "break-word")
         , E.padding 20
         , E.width E.fill
         , EF.family
