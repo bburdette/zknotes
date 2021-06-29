@@ -11,11 +11,11 @@ use std::path::Path;
 use std::time::Duration;
 use uuid::Uuid;
 use zkprotocol::content::{
-  ChangePassword, Direction, EditLink, GetZkLinks, GetZkNoteComments, GetZkNoteEdit, ImportZkNote,
-  LoginData, SaveZkLink, SaveZkNote, SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
+  ChangeEmail, ChangePassword, Direction, EditLink, GetZkLinks, GetZkNoteComments, GetZkNoteEdit,
+  ImportZkNote, LoginData, SaveZkLink, SaveZkNote, SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
 };
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Clone, Deserialize, Serialize, Debug)]
 pub struct User {
   pub id: i64,
   pub name: String,
@@ -721,6 +721,28 @@ pub fn udpate8(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   Ok(())
 }
 
+pub fn udpate9(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+  // db connection without foreign key checking.
+  let conn = Connection::open(dbfile)?;
+  let mut m1 = Migration::new();
+
+  // add newemail table.  each request for a new email creates an entry.
+  m1.create_table("newemail", |t| {
+    t.add_column("user", types::foreign("user", "id").nullable(false));
+    t.add_column("email", types::text().nullable(false));
+    t.add_column("token", types::text().nullable(false));
+    t.add_column("tokendate", types::integer().nullable(false));
+    t.add_index(
+      "newemailunq",
+      types::index(vec!["user", "token"]).unique(true),
+    );
+  });
+
+  conn.execute_batch(m1.make::<Sqlite>().as_str())?;
+
+  Ok(())
+}
+
 pub fn get_single_value(conn: &Connection, name: &str) -> Result<Option<String>, Box<dyn Error>> {
   match conn.query_row(
     "select value from singlevalue where name = ?1",
@@ -802,10 +824,15 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: i64) -> Result<(), Box<dyn Err
     udpate8(&dbfile)?;
     set_single_value(&conn, "migration_level", "8")?;
   }
+  if nlevel < 9 {
+    info!("udpate9");
+    udpate9(&dbfile)?;
+    set_single_value(&conn, "migration_level", "9")?;
+  }
 
   info!("db up to date.");
 
-  purge_tokens(&conn, token_expiration_ms)?;
+  purge_login_tokens(&conn, token_expiration_ms)?;
 
   Ok(())
 }
@@ -1005,7 +1032,10 @@ pub fn add_token(conn: &Connection, user: i64, token: Uuid) -> Result<(), Box<dy
   Ok(())
 }
 
-pub fn purge_tokens(conn: &Connection, token_expiration_ms: i64) -> Result<(), Box<dyn Error>> {
+pub fn purge_login_tokens(
+  conn: &Connection,
+  token_expiration_ms: i64,
+) -> Result<(), Box<dyn Error>> {
   let now = now()?;
   let expdt = now - token_expiration_ms;
 
@@ -1021,7 +1051,34 @@ pub fn purge_tokens(conn: &Connection, token_expiration_ms: i64) -> Result<(), B
 
     conn.execute(
       "delete from token
-    where tokendate < ?1",
+        where tokendate < ?1",
+      params![expdt],
+    )?;
+  }
+
+  Ok(())
+}
+
+pub fn purge_email_tokens(
+  conn: &Connection,
+  token_expiration_ms: i64,
+) -> Result<(), Box<dyn Error>> {
+  let now = now()?;
+  let expdt = now - token_expiration_ms;
+
+  let count: i64 = conn.query_row(
+    "select count(*) from
+      newemail where tokendate < ?1",
+    params![expdt],
+    |row| Ok(row.get(0)?),
+  )?;
+
+  if count > 0 {
+    info!("removing {} expired newemail records", count);
+
+    conn.execute(
+      "delete from newemail
+        where tokendate < ?1",
       params![expdt],
     )?;
   }
@@ -1041,6 +1098,49 @@ pub fn update_user(conn: &Connection, user: &User) -> Result<(), Box<dyn Error>>
       user.registration_key,
       user.id,
     ],
+  )?;
+
+  Ok(())
+}
+
+// email change request.
+pub fn add_newemail(
+  conn: &Connection,
+  user: i64,
+  token: Uuid,
+  email: String,
+) -> Result<(), Box<dyn Error>> {
+  let now = now()?;
+  conn.execute(
+    "insert into newemail (user, email, token, tokendate)
+     values (?1, ?2, ?3, ?4)",
+    params![user, email, token.to_string(), now],
+  )?;
+
+  Ok(())
+}
+
+// email change request.
+pub fn read_newemail(
+  conn: &Connection,
+  user: i64,
+  token: Uuid,
+) -> Result<(String, i64), Box<dyn Error>> {
+  let result = conn.query_row(
+    "select email, tokendate from newemail
+     where user = ?1
+      and token = ?2",
+    params![user, token.to_string()],
+    |row| Ok((row.get(0)?, row.get(1)?)),
+  )?;
+  Ok(result)
+}
+// email change request.
+pub fn remove_newemail(conn: &Connection, user: i64, token: Uuid) -> Result<(), Box<dyn Error>> {
+  conn.execute(
+    "delete from newemail
+     where user = ?1 and token = ?2",
+    params![user, token.to_string()],
   )?;
 
   Ok(())
@@ -1358,6 +1458,35 @@ pub fn change_password(
         println!("changed password for {}", userdata.name);
 
         Ok(())
+      }
+    }
+  }
+}
+
+pub fn change_email(
+  conn: &Connection,
+  uid: i64,
+  cp: ChangeEmail,
+) -> Result<(String, Uuid), Box<dyn Error>> {
+  let userdata = read_user_by_id(&conn, uid)?;
+  match userdata.registration_key {
+    Some(_reg_key) => bail!("invalid user or password"),
+    None => {
+      if hex_digest(
+        Algorithm::SHA256,
+        (cp.pwd.clone() + userdata.salt.as_str())
+          .into_bytes()
+          .as_slice(),
+      ) != userdata.hashwd
+      {
+        // bad password, can't change.
+        bail!("invalid password!")
+      } else {
+        // create a 'newemail' record.
+        let token = Uuid::new_v4();
+        add_newemail(&conn, uid, token, cp.email)?;
+
+        Ok((userdata.name, token))
       }
     }
   }

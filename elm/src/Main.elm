@@ -6,6 +6,7 @@ import Browser.Events
 import Browser.Navigation
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
+import ChangeEmail as CE
 import ChangePassword as CP
 import Common exposing (buttonStyle)
 import Data
@@ -75,6 +76,7 @@ type Msg
     | DisplayMessageMsg (GD.Msg DisplayMessage.Msg)
     | SelectDialogMsg (GD.Msg (SS.Msg Int))
     | ChangePasswordDialogMsg (GD.Msg CP.Msg)
+    | ChangeEmailDialogMsg (GD.Msg CE.Msg)
     | Noop
 
 
@@ -91,6 +93,7 @@ type State
     | LoginShowMessage ShowMessage.Model Data.LoginData Url
     | SelectDialog (SS.GDModel Int) State
     | ChangePasswordDialog CP.GDModel State
+    | ChangeEmailDialog CE.GDModel State
     | DisplayMessage DisplayMessage.GDModel State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
 
@@ -370,6 +373,9 @@ showMessage msg =
         ChangePasswordDialogMsg x ->
             "ChangePasswordDialogMsg"
 
+        ChangeEmailDialogMsg x ->
+            "ChangeEmailDialogMsg"
+
 
 showState : State -> String
 showState state =
@@ -415,6 +421,9 @@ showState state =
 
         ChangePasswordDialog _ _ ->
             "ChangePasswordDialog"
+
+        ChangeEmailDialog _ _ ->
+            "ChangeEmailDialog"
 
 
 unexpectedMsg : Model -> Msg -> Model
@@ -477,6 +486,10 @@ viewState size state model =
             -- render is at the layout level, not here.
             E.none
 
+        ChangeEmailDialog _ _ ->
+            -- render is at the layout level, not here.
+            E.none
+
 
 stateSearch : State -> Maybe ( SP.Model, Data.ZkListNoteSearchResult )
 stateSearch state =
@@ -534,6 +547,9 @@ stateLogin state =
             stateLogin instate
 
         ChangePasswordDialog _ instate ->
+            stateLogin instate
+
+        ChangeEmailDialog _ instate ->
             stateLogin instate
 
 
@@ -675,6 +691,12 @@ view model =
 
                 ChangePasswordDialog cdm _ ->
                     Html.map ChangePasswordDialogMsg <|
+                        GD.layout
+                            (Just { width = min 600 model.size.width, height = min 200 model.size.height })
+                            cdm
+
+                ChangeEmailDialog cdm _ ->
+                    Html.map ChangeEmailDialogMsg <|
                         GD.layout
                             (Just { width = min 600 model.size.width, height = min 200 model.size.height })
                             cdm
@@ -909,6 +931,19 @@ actualupdate msg model =
                 GD.Cancel ->
                     ( { model | state = instate }, Cmd.none )
 
+        ( ChangeEmailDialogMsg sdmsg, ChangeEmailDialog sdmod instate ) ->
+            case GD.update sdmsg sdmod of
+                GD.Dialog nmod ->
+                    ( { model | state = ChangeEmailDialog nmod instate }, Cmd.none )
+
+                GD.Ok return ->
+                    ( { model | state = instate }
+                    , sendUIMsg model.location <| UI.ChangeEmail return
+                    )
+
+                GD.Cancel ->
+                    ( { model | state = instate }, Cmd.none )
+
         ( SelectedText jv, state ) ->
             case JD.decodeValue JD.string jv of
                 Ok str ->
@@ -979,6 +1014,15 @@ actualupdate msg model =
                     ( { model
                         | state =
                             ChangePasswordDialog (CP.init login Common.buttonStyle (UserSettings.view numod |> E.map (always ())))
+                                (UserSettings numod login prevstate)
+                      }
+                    , Cmd.none
+                    )
+
+                UserSettings.ChangeEmail ->
+                    ( { model
+                        | state =
+                            ChangeEmailDialog (CE.init login Common.buttonStyle (UserSettings.view numod |> E.map (always ())))
                                 (UserSettings numod login prevstate)
                       }
                     , Cmd.none
@@ -1120,6 +1164,11 @@ actualupdate msg model =
 
                         UI.ChangedPassword ->
                             ( displayMessageDialog model "password changed"
+                            , Cmd.none
+                            )
+
+                        UI.ChangedEmail ->
+                            ( displayMessageDialog model "email change confirmation sent!  check your inbox (or spam folder) for an email with title 'change zknotes email', and follow the enclosed link to change to the new address."
                             , Cmd.none
                             )
 
@@ -1524,6 +1573,9 @@ actualupdate msg model =
             ( model, Cmd.none )
 
         ( ChangePasswordDialogMsg GD.Noop, _ ) ->
+            ( model, Cmd.none )
+
+        ( ChangeEmailDialogMsg GD.Noop, _ ) ->
             ( model, Cmd.none )
 
         ( SelectDialogMsg GD.Noop, _ ) ->

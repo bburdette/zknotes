@@ -1,4 +1,4 @@
-use serde_derive::{Deserialize};
+use serde_derive::Deserialize;
 use std::path::PathBuf;
 
 #[derive(Deserialize, Debug, Clone)]
@@ -11,5 +11,6 @@ pub struct Config {
   pub appname: String,
   pub domain: String,
   pub admin_email: String,
-  pub token_expiration_ms: i64,
+  pub login_token_expiration_ms: i64,
+  pub email_token_expiration_ms: i64,
 }

@@ -11,6 +11,7 @@ type SendMsg
     | Login Data.Login
     | Logout
     | ChangePassword Data.ChangePassword
+    | ChangeEmail Data.ChangeEmail
     | GetZkNote Int
     | GetZkNoteEdit Data.GetZkNoteEdit
     | GetZkNoteComments Data.GetZkNoteComments
@@ -33,6 +34,7 @@ type ServerResponse
     | LoggedIn Data.LoginData
     | LoggedOut
     | ChangedPassword
+    | ChangedEmail
     | ZkNoteSearchResult Data.ZkNoteSearchResult
     | ZkListNoteSearchResult Data.ZkListNoteSearchResult
     | SavedZkNotePlusLinks Data.SavedZkNote
@@ -74,6 +76,9 @@ showServerResponse sr =
 
         ChangedPassword ->
             "ChangedPassword"
+
+        ChangedEmail ->
+            "ChangedEmail"
 
         ZkNoteSearchResult _ ->
             "ZkNoteSearchResult"
@@ -139,6 +144,12 @@ encodeSendMsg sm =
             JE.object
                 [ ( "what", JE.string "ChangePassword" )
                 , ( "data", Data.encodeChangePassword chpwd )
+                ]
+
+        ChangeEmail chpwd ->
+            JE.object
+                [ ( "what", JE.string "ChangeEmail" )
+                , ( "data", Data.encodeChangeEmail chpwd )
                 ]
 
         GetZkNote id ->
@@ -244,6 +255,9 @@ serverResponseDecoder =
 
                     "changed password" ->
                         JD.succeed ChangedPassword
+
+                    "changed email" ->
+                        JD.succeed ChangedEmail
 
                     "server error" ->
                         JD.map ServerError (JD.at [ "content" ] JD.string)

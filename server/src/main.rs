@@ -5,7 +5,7 @@ mod search;
 mod sqldata;
 mod sqltest;
 mod util;
-
+use crate::util::now;
 use actix_session::{CookieSession, Session};
 use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Result};
 use chrono;
@@ -14,8 +14,10 @@ use config::Config;
 use log::{error, info};
 use serde_json;
 use std::error::Error;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
+use std::str::FromStr;
 use timer;
+use uuid::Uuid;
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 
 /*
@@ -132,6 +134,74 @@ fn register(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
   }
 }
 
+fn new_email(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
+  info!("new email: uid: {:?}", req.match_info().get("uid"));
+  match sqldata::connection_open(data.db.as_path()) {
+    Ok(conn) => match (req.match_info().get("uid"), req.match_info().get("token")) {
+      (Some(uid), Some(tokenstr)) => {
+        match Uuid::from_str(tokenstr) {
+          Err(_e) => HttpResponse::BadRequest().body("invalid token".to_string()),
+          Ok(token) => {
+            // read user record.  does the reg key match?
+            match sqldata::read_user_by_name(&conn, uid) {
+              Ok(user) => {
+                match sqldata::read_newemail(&conn, user.id, token) {
+                  Ok((email, tokendate)) => {
+                    match now() {
+                      Err(_e) => HttpResponse::InternalServerError()
+                        .body("<h1>'now' failed!</h1>".to_string()),
+
+                      Ok(now) => {
+                        if (now - tokendate) > data.email_token_expiration_ms {
+                          // TODO token expired?
+                          HttpResponse::UnprocessableEntity()
+                            .body("<h1>email change failed - token expired</h1>".to_string())
+                        } else {
+                          // put the email in the user record and update.
+                          let mut mu = user.clone();
+                          mu.email = email;
+                          match sqldata::update_user(&conn, &mu) {
+                            Ok(_) => {
+                              // delete the change email token record.
+                              match sqldata::remove_newemail(&conn, user.id, token) {
+                                Ok(_) => (),
+                                Err(e) => error!("error removing newemail record: {:?}", e),
+                              }
+                              HttpResponse::Ok().body(
+                                format!(
+                                  "<h1>Email address changed!<h1> <a href=\"{}\">\
+                                   Proceed to the main site</a>",
+                                  data.mainsite
+                                )
+                                .to_string(),
+                              )
+                            }
+                            Err(_e) => HttpResponse::InternalServerError()
+                              .body("<h1>email change failed</h1>".to_string()),
+                          }
+                        }
+                      }
+                    }
+                  }
+                  Err(_e) => HttpResponse::InternalServerError()
+                    .body("<h1>email change failed</h1>".to_string()),
+                }
+              }
+              Err(_e) => HttpResponse::BadRequest()
+                .body("email change token or user doesn't match".to_string()),
+            }
+          }
+        }
+      }
+      _ => HttpResponse::BadRequest().body("username or token not found!".to_string()),
+    },
+
+    Err(_e) => {
+      HttpResponse::InternalServerError().body("<h1>database connection failed</h1>".to_string())
+    }
+  }
+}
+
 fn defcon() -> Config {
   Config {
     ip: "127.0.0.1".to_string(),
@@ -142,14 +212,17 @@ fn defcon() -> Config {
     appname: "mahbloag".to_string(),
     domain: "practica.site".to_string(),
     admin_email: "admin@practica.site".to_string(),
-    token_expiration_ms: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
+    login_token_expiration_ms: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
+    email_token_expiration_ms: 1 * 24 * 60 * 60 * 1000, // 1 day in milliseconds
   }
 }
 
-fn purge_tokens(dbfile: &Path, token_expiration_ms: i64) -> Result<(), Box<dyn Error>> {
-  let conn = sqldata::connection_open(dbfile)?;
+fn purge_tokens(config: &Config) -> Result<(), Box<dyn Error>> {
+  let conn = sqldata::connection_open(config.db.as_path())?;
 
-  sqldata::purge_tokens(&conn, token_expiration_ms)?;
+  sqldata::purge_login_tokens(&conn, config.login_token_expiration_ms)?;
+
+  sqldata::purge_email_tokens(&conn, config.email_token_expiration_ms)?;
 
   Ok(())
 }
@@ -199,7 +272,7 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
       // do that exporting...
       let config = load_config();
 
-      sqldata::dbinit(config.db.as_path(), config.token_expiration_ms)?;
+      sqldata::dbinit(config.db.as_path(), config.login_token_expiration_ms)?;
 
       util::write_string(
         exportfile,
@@ -218,7 +291,7 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
 
       info!("config: {:?}", config);
 
-      sqldata::dbinit(config.db.as_path(), config.token_expiration_ms)?;
+      sqldata::dbinit(config.db.as_path(), config.login_token_expiration_ms)?;
 
       let timer = timer::Timer::new();
 
@@ -226,8 +299,8 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
 
       let _guard =
         timer.schedule_repeating(chrono::Duration::days(1), move || {
-          match purge_tokens(ptconfig.db.as_path(), ptconfig.token_expiration_ms) {
-            Err(e) => error!("purge_tokens error: {}", e),
+          match purge_tokens(&ptconfig) {
+            Err(e) => error!("purge_login_tokens error: {}", e),
             Ok(_) => (),
           }
         });
@@ -245,6 +318,7 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
           .service(web::resource("/public").route(web::post().to(public)))
           .service(web::resource("/user").route(web::post().to(user)))
           .service(web::resource(r"/register/{uid}/{key}").route(web::get().to(register)))
+          .service(web::resource(r"/newemail/{uid}/{token}").route(web::get().to(new_email)))
           .service(actix_files::Files::new("/static/", "static/"))
           .service(web::resource("/{tail:.*}").route(web::get().to(mainpage)))
       })

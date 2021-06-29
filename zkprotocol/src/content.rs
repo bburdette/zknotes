@@ -19,6 +19,12 @@ pub struct ChangePassword {
   pub newpwd: String,
 }
 
+#[derive(Deserialize, Debug, Clone)]
+pub struct ChangeEmail {
+  pub pwd: String,
+  pub email: String,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LoginData {
   pub userid: i64,

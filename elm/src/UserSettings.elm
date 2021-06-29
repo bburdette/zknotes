@@ -15,6 +15,7 @@ type Msg
     = Noop
     | DonePress
     | ChangePassPress
+    | ChangeEmailPress
     | LogOutPress
 
 
@@ -22,6 +23,7 @@ type Command
     = Done
     | LogOut
     | ChangePassword
+    | ChangeEmail
     | None
 
 
@@ -63,8 +65,7 @@ view model =
                     , EI.button (E.alignRight :: buttonStyle) { onPress = Just LogOutPress, label = E.text "log out" }
                     ]
                 , EI.button (E.centerX :: buttonStyle) { onPress = Just ChangePassPress, label = E.text "change password" }
-
-                -- , EI.button buttonStyle { onPress = Just ChangeEmailPress, label = E.text "change email" }
+                , EI.button (E.centerX :: buttonStyle) { onPress = Just ChangeEmailPress, label = E.text "change email" }
                 ]
             ]
         ]
@@ -81,6 +82,9 @@ update msg model =
 
         ChangePassPress ->
             ( model, ChangePassword )
+
+        ChangeEmailPress ->
+            ( model, ChangeEmail )
 
         Noop ->
             ( model, None )
