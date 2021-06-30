@@ -1400,6 +1400,23 @@ actualupdate msg model =
                         UI.SavedImportZkNotes ->
                             ( model, Cmd.none )
 
+                        UI.HomeNoteSet id ->
+                            case model.state of
+                                EditZkNote eznstate login ->
+                                    let
+                                        x =
+                                            EditZkNote.setHomeNote eznstate id
+                                    in
+                                    ( { model
+                                        | state =
+                                            EditZkNote x { login | homenote = Just id }
+                                      }
+                                    , Cmd.none
+                                    )
+
+                                _ ->
+                                    ( model, Cmd.none )
+
         ( ViewMsg em, View es ) ->
             let
                 ( emod, ecmd ) =
@@ -1739,6 +1756,11 @@ handleEditZkNoteCmd model login emod ecmd =
         EditZkNote.GetZkNote id ->
             ( { model | state = EditZkNote emod login }
             , sendUIMsg model.location (UI.GetZkNote id)
+            )
+
+        EditZkNote.SetHomeNote id ->
+            ( { model | state = EditZkNote emod login }
+            , sendUIMsg model.location (UI.SetHomeNote id)
             )
 
 

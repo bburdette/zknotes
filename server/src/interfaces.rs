@@ -325,6 +325,18 @@ fn user_interface_loggedin(
         content: serde_json::to_value(())?,
       })
     }
+    "sethomenote" => {
+      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      let hn: i64 = serde_json::from_value(msgdata.clone())?;
+      let conn = sqldata::connection_open(config.db.as_path())?;
+      let mut user = sqldata::read_user_by_id(&conn, uid)?;
+      user.homenoteid = Some(hn);
+      sqldata::update_user(&conn, &user)?;
+      Ok(ServerResponse {
+        what: "homenoteset".to_string(),
+        content: serde_json::to_value(hn)?,
+      })
+    }
     wat => Err(Box::new(simple_error::SimpleError::new(format!(
       "invalid 'what' code:'{}'",
       wat

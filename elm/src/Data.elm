@@ -42,6 +42,7 @@ type alias LoginData =
     { userid : Int
     , name : String
     , zknote : Int
+    , homenote : Maybe Int
     , publicid : Int
     , shareid : Int
     , searchid : Int
@@ -443,10 +444,11 @@ decodeZkNoteEdit =
 
 decodeLoginData : JD.Decoder LoginData
 decodeLoginData =
-    JD.map7 LoginData
+    JD.map8 LoginData
         (JD.field "userid" JD.int)
         (JD.field "name" JD.string)
         (JD.field "zknote" JD.int)
+        (JD.field "homenote" (JD.maybe JD.int))
         (JD.field "publicid" JD.int)
         (JD.field "shareid" JD.int)
         (JD.field "searchid" JD.int)
