@@ -1081,7 +1081,7 @@ zknview size recentZkns model =
                     (\id ->
                         if Just id == model.id then
                             EI.button Common.disabledButtonStyle
-                                { onPress = Just (SwitchPress id)
+                                { onPress = Nothing
                                 , label = E.text "⌂"
                                 }
 
@@ -1112,7 +1112,7 @@ zknview size recentZkns model =
                 , let
                     disb =
                         EI.button disabledparabuttonstyle
-                            { onPress = Just SetHomeNotePress
+                            { onPress = Nothing
                             , label = E.text "→⌂"
                             }
 
