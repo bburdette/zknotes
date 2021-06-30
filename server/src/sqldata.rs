@@ -20,6 +20,7 @@ pub struct User {
   pub id: i64,
   pub name: String,
   pub noteid: i64,
+  pub homenoteid: Option<i64>,
   pub hashwd: String,
   pub salt: String,
   pub email: String,
@@ -32,6 +33,7 @@ pub fn login_data(conn: &Connection, uid: i64) -> Result<LoginData, Box<dyn Erro
     userid: uid,
     name: user.name,
     zknote: user.noteid,
+    homenote: user.homenoteid,
     publicid: note_id(conn, "system", "public")?,
     shareid: note_id(conn, "system", "share")?,
     searchid: note_id(conn, "system", "search")?,
@@ -743,6 +745,77 @@ pub fn udpate9(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   Ok(())
 }
 
+pub fn udpate10(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+  // db connection without foreign key checking.
+  let conn = Connection::open(dbfile)?;
+  let mut m1 = Migration::new();
+
+  m1.create_table("usertemp", |t| {
+    t.add_column(
+      "id",
+      types::integer()
+        .primary(true)
+        .increments(true)
+        .nullable(false),
+    );
+    t.add_column("name", types::text().nullable(false).unique(true));
+    t.add_column("hashwd", types::text().nullable(false));
+    t.add_column("zknote", types::foreign("zknote", "id").nullable(true));
+    t.add_column("salt", types::text().nullable(false));
+    t.add_column("email", types::text().nullable(false));
+    t.add_column("registration_key", types::text().nullable(true));
+    t.add_column("createdate", types::integer().nullable(false));
+  });
+
+  conn.execute_batch(m1.make::<Sqlite>().as_str())?;
+
+  // copy everything from user.
+  conn.execute(
+    "insert into usertemp (id, name, hashwd, zknote, salt, email, registration_key, createdate)
+        select id, name, hashwd, zknote, salt, email, registration_key, createdate from user",
+    params![],
+  )?;
+
+  let mut m2 = Migration::new();
+  m2.drop_table("user");
+
+  // new user table with homenote
+  m2.create_table("user", |t| {
+    t.add_column(
+      "id",
+      types::integer()
+        .primary(true)
+        .increments(true)
+        .nullable(false),
+    );
+    t.add_column("name", types::text().nullable(false).unique(true));
+    t.add_column("hashwd", types::text().nullable(false));
+    t.add_column("zknote", types::foreign("zknote", "id").nullable(true));
+    t.add_column("homenote", types::foreign("zknote", "id").nullable(true));
+    t.add_column("salt", types::text().nullable(false));
+    t.add_column("email", types::text().nullable(false));
+    t.add_column("registration_key", types::text().nullable(true));
+    t.add_column("createdate", types::integer().nullable(false));
+  });
+
+  conn.execute_batch(m2.make::<Sqlite>().as_str())?;
+
+  // copy everything from usertemp.
+  conn.execute(
+    "insert into user (id, name, hashwd, zknote, salt, email, registration_key, createdate)
+        select id, name, hashwd, zknote, salt, email, registration_key, createdate from usertemp",
+    params![],
+  )?;
+
+  let mut m3 = Migration::new();
+
+  m3.drop_table("usertemp");
+
+  conn.execute_batch(m3.make::<Sqlite>().as_str())?;
+
+  Ok(())
+}
+
 pub fn get_single_value(conn: &Connection, name: &str) -> Result<Option<String>, Box<dyn Error>> {
   match conn.query_row(
     "select value from singlevalue where name = ?1",
@@ -828,6 +901,11 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: i64) -> Result<(), Box<dyn Err
     info!("udpate9");
     udpate9(&dbfile)?;
     set_single_value(&conn, "migration_level", "9")?;
+  }
+  if nlevel < 10 {
+    info!("udpate10");
+    udpate10(&dbfile)?;
+    set_single_value(&conn, "migration_level", "10")?;
   }
 
   info!("db up to date.");
@@ -944,7 +1022,7 @@ pub fn save_zklink(
 
 pub fn read_user_by_name(conn: &Connection, name: &str) -> Result<User, Box<dyn Error>> {
   let user = conn.query_row(
-    "select id, zknote, hashwd, salt, email, registration_key
+    "select id, zknote, homenote, hashwd, salt, email, registration_key
       from user where name = ?1",
     params![name],
     |row| {
@@ -952,10 +1030,11 @@ pub fn read_user_by_name(conn: &Connection, name: &str) -> Result<User, Box<dyn 
         id: row.get(0)?,
         name: name.to_string(),
         noteid: row.get(1)?,
-        hashwd: row.get(2)?,
-        salt: row.get(3)?,
-        email: row.get(4)?,
-        registration_key: row.get(5)?,
+        homenoteid: row.get(2)?,
+        hashwd: row.get(3)?,
+        salt: row.get(4)?,
+        email: row.get(5)?,
+        registration_key: row.get(6)?,
       })
     },
   )?;
@@ -965,7 +1044,7 @@ pub fn read_user_by_name(conn: &Connection, name: &str) -> Result<User, Box<dyn 
 
 pub fn read_user_by_id(conn: &Connection, id: i64) -> Result<User, Box<dyn Error>> {
   let user = conn.query_row(
-    "select id, name, zknote, hashwd, salt, email, registration_key
+    "select id, name, zknote, homenote, hashwd, salt, email, registration_key
       from user where id = ?1",
     params![id],
     |row| {
@@ -973,10 +1052,11 @@ pub fn read_user_by_id(conn: &Connection, id: i64) -> Result<User, Box<dyn Error
         id: row.get(0)?,
         name: row.get(1)?,
         noteid: row.get(2)?,
-        hashwd: row.get(3)?,
-        salt: row.get(4)?,
-        email: row.get(5)?,
-        registration_key: row.get(6)?,
+        homenoteid: row.get(3)?,
+        hashwd: row.get(4)?,
+        salt: row.get(5)?,
+        email: row.get(6)?,
+        registration_key: row.get(7)?,
       })
     },
   )?;
@@ -990,7 +1070,7 @@ pub fn read_user_by_token(
   token_expiration_ms: Option<i64>,
 ) -> Result<User, Box<dyn Error>> {
   let (user, tokendate) = conn.query_row(
-    "select id, name, zknote, hashwd, salt, email, registration_key, token.tokendate
+    "select id, name, zknote, homenote, hashwd, salt, email, registration_key, token.tokendate
       from user, token where user.id = token.user and token = ?1",
     params![token.to_string()],
     |row| {
@@ -999,12 +1079,13 @@ pub fn read_user_by_token(
           id: row.get(0)?,
           name: row.get(1)?,
           noteid: row.get(2)?,
-          hashwd: row.get(3)?,
-          salt: row.get(4)?,
-          email: row.get(5)?,
-          registration_key: row.get(6)?,
+          homenoteid: row.get(3)?,
+          hashwd: row.get(4)?,
+          salt: row.get(5)?,
+          email: row.get(6)?,
+          registration_key: row.get(7)?,
         },
-        row.get(7)?,
+        row.get(8)?,
       ))
     },
   )?;
@@ -1088,14 +1169,15 @@ pub fn purge_email_tokens(
 
 pub fn update_user(conn: &Connection, user: &User) -> Result<(), Box<dyn Error>> {
   conn.execute(
-    "update user set name = ?1, hashwd = ?2, salt = ?3, email = ?4, registration_key = ?5
-           where id = ?6",
+    "update user set name = ?1, hashwd = ?2, salt = ?3, email = ?4, registration_key = ?5, homenote = ?6
+           where id = ?7",
     params![
       user.name,
       user.hashwd,
       user.salt,
       user.email,
       user.registration_key,
+      user.homenoteid,
       user.id,
     ],
   )?;
@@ -2067,7 +2149,7 @@ pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
 
   // Users
   let mut ustmt = conn.prepare(
-    "select id, name, zknote, hashwd, salt, email, registration_key
+    "select id, name, zknote, homenote, hashwd, salt, email, registration_key
       from user",
   )?;
 
@@ -2076,10 +2158,11 @@ pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
       id: row.get(0)?,
       name: row.get(1)?,
       noteid: row.get(2)?,
-      hashwd: row.get(3)?,
-      salt: row.get(4)?,
-      email: row.get(5)?,
-      registration_key: row.get(6)?,
+      homenoteid: row.get(3)?,
+      hashwd: row.get(4)?,
+      salt: row.get(5)?,
+      email: row.get(6)?,
+      registration_key: row.get(7)?,
     })
   })?;
 

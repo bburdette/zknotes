@@ -115,7 +115,16 @@ listview ld size model =
             , EBk.color TC.lightGrey
             ]
             [ E.row [ E.spacing 8, E.width E.fill ]
-                [ E.row [ EF.bold ] [ E.text ld.name ]
+                [ ld.homenote
+                    |> Maybe.map
+                        (\id ->
+                            EI.button Common.buttonStyle
+                                { onPress = Just (SelectPress id)
+                                , label = E.text "⌂"
+                                }
+                        )
+                    |> Maybe.withDefault E.none
+                , E.row [ EF.bold ] [ E.text ld.name ]
                 , EI.button
                     (E.alignRight :: Common.buttonStyle)
                     { onPress = Just DonePress, label = E.text "settings" }

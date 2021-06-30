@@ -30,6 +30,7 @@ pub struct LoginData {
   pub userid: i64,
   pub name: String,
   pub zknote: i64,
+  pub homenote: Option<i64>,
   pub publicid: i64,
   pub shareid: i64,
   pub searchid: i64,

@@ -1225,10 +1225,6 @@ actualupdate msg model =
                                     in
                                     handleEditZkNoteCmd model login emod ecmd
 
-                                {- ( { model | state = EditZkNote  login }
-                                   , Cmd.none
-                                   )
-                                -}
                                 _ ->
                                     ( unexpectedMessage model (UI.showServerResponse uiresponse)
                                     , Cmd.none
@@ -1399,6 +1395,23 @@ actualupdate msg model =
 
                         UI.SavedImportZkNotes ->
                             ( model, Cmd.none )
+
+                        UI.HomeNoteSet id ->
+                            case model.state of
+                                EditZkNote eznstate login ->
+                                    let
+                                        x =
+                                            EditZkNote.setHomeNote eznstate id
+                                    in
+                                    ( { model
+                                        | state =
+                                            EditZkNote x { login | homenote = Just id }
+                                      }
+                                    , Cmd.none
+                                    )
+
+                                _ ->
+                                    ( model, Cmd.none )
 
         ( ViewMsg em, View es ) ->
             let
@@ -1741,6 +1754,11 @@ handleEditZkNoteCmd model login emod ecmd =
             , sendUIMsg model.location (UI.GetZkNote id)
             )
 
+        EditZkNote.SetHomeNote id ->
+            ( { model | state = EditZkNote emod login }
+            , sendUIMsg model.location (UI.SetHomeNote id)
+            )
+
 
 prevSearchQuery =
     \login ->
@@ -1810,18 +1828,23 @@ init flags url key =
                         ( m, c ) =
                             case flags.login of
                                 Just login ->
-                                    let
-                                        ( m2, c2 ) =
-                                            getListing imodel login
-                                    in
-                                    ( m2
-                                    , Cmd.batch
-                                        [ sendUIMsg
-                                            flags.location
-                                            (UI.SearchZkNotes <| prevSearchQuery login)
-                                        , c2
-                                        ]
-                                    )
+                                    case login.homenote of
+                                        Just id ->
+                                            ( imodel, sendUIMsg flags.location (UI.GetZkNoteEdit { zknote = id }) )
+
+                                        Nothing ->
+                                            let
+                                                ( m2, c2 ) =
+                                                    getListing imodel login
+                                            in
+                                            ( m2
+                                            , Cmd.batch
+                                                [ sendUIMsg
+                                                    flags.location
+                                                    (UI.SearchZkNotes <| prevSearchQuery login)
+                                                , c2
+                                                ]
+                                            )
 
                                 Nothing ->
                                     ( { imodel | state = initLogin seed }, Cmd.none )

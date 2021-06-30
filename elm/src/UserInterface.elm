@@ -23,6 +23,7 @@ type SendMsg
     | SearchZkNotes S.ZkNoteSearch
     | SaveImportZkNotes (List Data.ImportZkNote)
     | PowerDelete S.TagSearch
+    | SetHomeNote Int
 
 
 type ServerResponse
@@ -48,6 +49,7 @@ type ServerResponse
     | ZkLinks Data.ZkLinks
     | SavedImportZkNotes
     | PowerDeleteComplete Int
+    | HomeNoteSet Int
 
 
 showServerResponse : ServerResponse -> String
@@ -118,6 +120,9 @@ showServerResponse sr =
 
         PowerDeleteComplete _ ->
             "PowerDeleteComplete"
+
+        HomeNoteSet _ ->
+            "HomeNoteSet"
 
 
 encodeSendMsg : SendMsg -> JE.Value
@@ -217,6 +222,12 @@ encodeSendMsg sm =
                 , ( "data", S.encodeTagSearch s )
                 ]
 
+        SetHomeNote id ->
+            JE.object
+                [ ( "what", JE.string "sethomenote" )
+                , ( "data", JE.int id )
+                ]
+
 
 encodeEmail : String -> JE.Value
 encodeEmail email =
@@ -297,6 +308,9 @@ serverResponseDecoder =
 
                     "powerdeletecomplete" ->
                         JD.map PowerDeleteComplete (JD.field "content" JD.int)
+
+                    "homenoteset" ->
+                        JD.map HomeNoteSet (JD.field "content" JD.int)
 
                     wat ->
                         JD.succeed

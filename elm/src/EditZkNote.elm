@@ -1,4 +1,4 @@
-module EditZkNote exposing (Command(..), EditLink, Model, Msg(..), NavChoice(..), SearchOrRecent(..), WClass(..), addComment, commentsRecieved, commonButtonStyle, compareZklinks, dirty, disabledLinkButtonStyle, elToSzkl, elToSzl, fullSave, gotSelectedText, initFull, initNew, isPublic, isSearch, linkButtonStyle, linksWith, mkButtonStyle, noteLink, onCtrlS, onSaved, onZkNote, pageLink, renderMd, replaceOrAdd, saveZkLinkList, showSr, showZkl, sznFromModel, sznToZkn, toPubId, toZkListNote, update, updateSearch, updateSearchResult, view, zkLinkName, zklKey, zknview)
+module EditZkNote exposing (Command(..), EditLink, Model, Msg(..), NavChoice(..), SearchOrRecent(..), WClass(..), addComment, commentsRecieved, commonButtonStyle, compareZklinks, dirty, disabledLinkButtonStyle, elToSzkl, elToSzl, fullSave, gotSelectedText, initFull, initNew, isPublic, isSearch, linkButtonStyle, linksWith, mkButtonStyle, noteLink, onCtrlS, onSaved, onZkNote, pageLink, renderMd, replaceOrAdd, saveZkLinkList, setHomeNote, showSr, showZkl, sznFromModel, sznToZkn, toPubId, toZkListNote, update, updateSearch, updateSearchResult, view, zkLinkName, zklKey, zknview)
 
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
@@ -39,6 +39,8 @@ type Msg
     | CancelComment
     | NewCommentPress
     | CheckCommentLink EditLink Bool
+    | GoHomeNotePress
+    | SetHomeNotePress
     | OnSchelmeCodeChanged String String
     | OnTitleChanged String
     | OnPubidChanged String
@@ -149,6 +151,7 @@ type Command
     | Search S.ZkNoteSearch
     | SearchHistory
     | GetZkNote Int
+    | SetHomeNote Int
 
 
 onZkNote : Data.ZkNote -> Model -> ( Model, Command )
@@ -156,6 +159,15 @@ onZkNote zkn model =
     ( { model | panelNote = Just zkn }
     , View (sznFromModel model) (Just zkn)
     )
+
+
+setHomeNote : Model -> Int -> Model
+setHomeNote model id =
+    let
+        nld =
+            model.ld
+    in
+    { model | ld = { nld | homenote = Just id } }
 
 
 elToSzl : EditLink -> Data.SaveZkLink
@@ -952,6 +964,9 @@ zknview size recentZkns model =
         parabuttonstyle =
             Common.buttonStyle ++ [ E.paddingXY 10 0 ]
 
+        disabledparabuttonstyle =
+            Common.disabledButtonStyle ++ [ E.paddingXY 10 0 ]
+
         perhapsdirtyparabuttonstyle =
             perhapsdirtybutton ++ [ E.paddingXY 10 0 ]
 
@@ -1061,7 +1076,23 @@ zknview size recentZkns model =
         , EBk.color TC.lightGray
         ]
         [ E.row [ E.width E.fill, E.spacing 8 ]
-            [ E.row [ EF.bold ] [ E.text model.ld.name ]
+            [ model.ld.homenote
+                |> Maybe.map
+                    (\id ->
+                        if Just id == model.id then
+                            EI.button Common.disabledButtonStyle
+                                { onPress = Nothing
+                                , label = E.text "⌂"
+                                }
+
+                        else
+                            EI.button perhapsdirtybutton
+                                { onPress = Just (SwitchPress id)
+                                , label = E.text "⌂"
+                                }
+                    )
+                |> Maybe.withDefault E.none
+            , E.el [ EF.bold ] (E.text model.ld.name)
             , if mine then
                 EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just DeletePress, label = E.text "delete" }
 
@@ -1078,6 +1109,32 @@ zknview size recentZkns model =
                 , EI.button parabuttonstyle { onPress = Just RevertPress, label = E.text "cancel" }
                 , EI.button parabuttonstyle { onPress = Just ViewPress, label = E.text "view" }
                 , EI.button parabuttonstyle { onPress = Just CopyPress, label = E.text "copy" }
+                , let
+                    disb =
+                        EI.button disabledparabuttonstyle
+                            { onPress = Nothing
+                            , label = E.text "→⌂"
+                            }
+
+                    enb =
+                        EI.button parabuttonstyle
+                            { onPress = Just SetHomeNotePress
+                            , label = E.text "→⌂"
+                            }
+                  in
+                  case ( model.ld.homenote, model.id ) of
+                    ( _, Nothing ) ->
+                        disb
+
+                    ( Just x, Just y ) ->
+                        if x == y then
+                            disb
+
+                        else
+                            enb
+
+                    ( Nothing, Just _ ) ->
+                        enb
 
                 -- , EI.button parabuttonstyle { onPress = Just LinksPress, label = E.text"links" }
                 , case isdirty of
@@ -1984,6 +2041,12 @@ update msg model =
               }
             , None
             )
+
+        GoHomeNotePress ->
+            ( model, None )
+
+        SetHomeNotePress ->
+            ( model, model.id |> Maybe.map (\id -> SetHomeNote id) |> Maybe.withDefault None )
 
         Noop ->
             ( model, None )
