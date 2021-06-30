@@ -1169,14 +1169,15 @@ pub fn purge_email_tokens(
 
 pub fn update_user(conn: &Connection, user: &User) -> Result<(), Box<dyn Error>> {
   conn.execute(
-    "update user set name = ?1, hashwd = ?2, salt = ?3, email = ?4, registration_key = ?5
-           where id = ?6",
+    "update user set name = ?1, hashwd = ?2, salt = ?3, email = ?4, registration_key = ?5, homenote = ?6
+           where id = ?7",
     params![
       user.name,
       user.hashwd,
       user.salt,
       user.email,
       user.registration_key,
+      user.homenoteid,
       user.id,
     ],
   )?;

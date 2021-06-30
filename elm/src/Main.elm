@@ -1225,10 +1225,6 @@ actualupdate msg model =
                                     in
                                     handleEditZkNoteCmd model login emod ecmd
 
-                                {- ( { model | state = EditZkNote  login }
-                                   , Cmd.none
-                                   )
-                                -}
                                 _ ->
                                     ( unexpectedMessage model (UI.showServerResponse uiresponse)
                                     , Cmd.none
@@ -1832,18 +1828,23 @@ init flags url key =
                         ( m, c ) =
                             case flags.login of
                                 Just login ->
-                                    let
-                                        ( m2, c2 ) =
-                                            getListing imodel login
-                                    in
-                                    ( m2
-                                    , Cmd.batch
-                                        [ sendUIMsg
-                                            flags.location
-                                            (UI.SearchZkNotes <| prevSearchQuery login)
-                                        , c2
-                                        ]
-                                    )
+                                    case login.homenote of
+                                        Just id ->
+                                            ( imodel, sendUIMsg flags.location (UI.GetZkNoteEdit { zknote = id }) )
+
+                                        Nothing ->
+                                            let
+                                                ( m2, c2 ) =
+                                                    getListing imodel login
+                                            in
+                                            ( m2
+                                            , Cmd.batch
+                                                [ sendUIMsg
+                                                    flags.location
+                                                    (UI.SearchZkNotes <| prevSearchQuery login)
+                                                , c2
+                                                ]
+                                            )
 
                                 Nothing ->
                                     ( { imodel | state = initLogin seed }, Cmd.none )
