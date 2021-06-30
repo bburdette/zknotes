@@ -964,6 +964,9 @@ zknview size recentZkns model =
         parabuttonstyle =
             Common.buttonStyle ++ [ E.paddingXY 10 0 ]
 
+        disabledparabuttonstyle =
+            Common.disabledButtonStyle ++ [ E.paddingXY 10 0 ]
+
         perhapsdirtyparabuttonstyle =
             perhapsdirtybutton ++ [ E.paddingXY 10 0 ]
 
@@ -1076,10 +1079,17 @@ zknview size recentZkns model =
             [ model.ld.homenote
                 |> Maybe.map
                     (\id ->
-                        EI.button perhapsdirtybutton
-                            { onPress = Just (SwitchPress id)
-                            , label = E.text "⌂"
-                            }
+                        if Just id == model.id then
+                            EI.button Common.disabledButtonStyle
+                                { onPress = Just (SwitchPress id)
+                                , label = E.text "⌂"
+                                }
+
+                        else
+                            EI.button perhapsdirtybutton
+                                { onPress = Just (SwitchPress id)
+                                , label = E.text "⌂"
+                                }
                     )
                 |> Maybe.withDefault E.none
             , E.el [ EF.bold ] (E.text model.ld.name)
@@ -1099,10 +1109,32 @@ zknview size recentZkns model =
                 , EI.button parabuttonstyle { onPress = Just RevertPress, label = E.text "cancel" }
                 , EI.button parabuttonstyle { onPress = Just ViewPress, label = E.text "view" }
                 , EI.button parabuttonstyle { onPress = Just CopyPress, label = E.text "copy" }
-                , EI.button parabuttonstyle
-                    { onPress = Just SetHomeNotePress
-                    , label = E.text "→⌂"
-                    }
+                , let
+                    disb =
+                        EI.button disabledparabuttonstyle
+                            { onPress = Just SetHomeNotePress
+                            , label = E.text "→⌂"
+                            }
+
+                    enb =
+                        EI.button parabuttonstyle
+                            { onPress = Just SetHomeNotePress
+                            , label = E.text "→⌂"
+                            }
+                  in
+                  case ( model.ld.homenote, model.id ) of
+                    ( _, Nothing ) ->
+                        disb
+
+                    ( Just x, Just y ) ->
+                        if x == y then
+                            disb
+
+                        else
+                            enb
+
+                    ( Nothing, Just _ ) ->
+                        enb
 
                 -- , EI.button parabuttonstyle { onPress = Just LinksPress, label = E.text"links" }
                 , case isdirty of
