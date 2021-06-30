@@ -779,7 +779,7 @@ pub fn udpate10(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   let mut m2 = Migration::new();
   m2.drop_table("user");
 
-  // new user table with home page
+  // new user table with homenote
   m2.create_table("user", |t| {
     t.add_column(
       "id",
