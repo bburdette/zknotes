@@ -1,4 +1,4 @@
-module TagSearchPanel exposing (Command(..), Model, Msg(..), Search(..), addTagToSearchPrev, addToSearch, addToSearchPanel, getSearch, initModel, selectPrevSearch, toggleHelpButton, update, updateSearchText, view)
+module TagSearchPanel exposing (Command(..), Model, Msg(..), Search(..), addSearchText, addTagToSearchPrev, addToSearch, addToSearchPanel, getSearch, initModel, selectPrevSearch, toggleHelpButton, update, updateSearchText, view)
 
 import Common exposing (buttonStyle)
 import Element exposing (..)
@@ -131,6 +131,27 @@ updateSearchText model txt =
         , search =
             if String.contains "'" txt then
                 TagSearch <| Parser.run tagSearchParser txt
+
+            else
+                TagSearch <| Ok <| Search.SearchTerm [] txt
+    }
+
+
+addSearchText : Model -> String -> Model
+addSearchText model txt =
+    let
+        ntxt =
+            if String.trim model.searchText == "" then
+                txt
+
+            else
+                model.searchText ++ " & " ++ txt
+    in
+    { model
+        | searchText = ntxt
+        , search =
+            if String.contains "'" ntxt then
+                TagSearch <| Parser.run tagSearchParser ntxt
 
             else
                 TagSearch <| Ok <| Search.SearchTerm [] txt

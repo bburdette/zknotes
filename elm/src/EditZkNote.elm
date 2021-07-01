@@ -1511,12 +1511,13 @@ update msg model =
         RestoreSearch s ->
             let
                 spmodel =
-                    SP.setSearchString model.spmodel s
+                    SP.addSearchString model.spmodel s
             in
             ( { model | spmodel = spmodel }
-            , SP.getSearch spmodel
-                |> Maybe.map Search
-                |> Maybe.withDefault None
+              -- , SP.getSearch spmodel
+              --     |> Maybe.map Search
+              --     |> Maybe.withDefault None
+            , None
             )
 
         SavePress ->
