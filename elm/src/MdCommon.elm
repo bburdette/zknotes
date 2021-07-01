@@ -263,7 +263,7 @@ searchView : (String -> a) -> String -> List (Element a) -> Element a
 searchView restoreSearchMsg search renderedChildren =
     E.row [ EBk.color TC.darkGray, E.padding 3, E.spacing 3 ]
         (E.el [ EF.italic ] (E.text "search: ")
-            :: E.text search
+            :: E.paragraph [] [ E.text search ]
             :: EI.button
                 (buttonStyle ++ [ EBk.color TC.darkGray ])
                 { label = E.el [ E.centerY, EF.color TC.blue, EF.bold ] <| E.text ">"

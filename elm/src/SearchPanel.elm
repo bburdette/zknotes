@@ -76,7 +76,7 @@ view showCopy narrow nblevel model =
             [ E.map PPMsg <| PP.view model.paginationModel
             , if showCopy then
                 EI.button (E.alignRight :: buttonStyle)
-                    { label = E.text "< Copy"
+                    { label = E.text "< copy"
                     , onPress = Just CopyClicked
                     }
 
