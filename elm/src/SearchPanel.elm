@@ -1,4 +1,4 @@
-module SearchPanel exposing (Command(..), Model, Msg(..), getSearch, initModel, searchResultUpdated, setSearchString, update, view)
+module SearchPanel exposing (Command(..), Model, Msg(..), addSearchString, getSearch, initModel, searchResultUpdated, setSearchString, update, view)
 
 import Common exposing (buttonStyle)
 import Data
@@ -52,7 +52,18 @@ getSearch model =
 
 setSearchString : Model -> String -> Model
 setSearchString model string =
-    { model | tagSearchModel = TSP.updateSearchText model.tagSearchModel string }
+    { model
+        | tagSearchModel =
+            TSP.updateSearchText model.tagSearchModel string
+    }
+
+
+addSearchString : Model -> String -> Model
+addSearchString model string =
+    { model
+        | tagSearchModel =
+            TSP.addSearchText model.tagSearchModel string
+    }
 
 
 type Msg

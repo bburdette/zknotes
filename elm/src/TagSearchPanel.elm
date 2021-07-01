@@ -1,4 +1,4 @@
-module TagSearchPanel exposing (Command(..), Model, Msg(..), Search(..), addTagToSearchPrev, addToSearch, addToSearchPanel, getSearch, initModel, selectPrevSearch, toggleHelpButton, update, updateSearchText, view)
+module TagSearchPanel exposing (Command(..), Model, Msg(..), Search(..), addSearchText, addTagToSearchPrev, addToSearch, addToSearchPanel, getSearch, initModel, selectPrevSearch, toggleHelpButton, update, updateSearchText, view)
 
 import Common exposing (buttonStyle)
 import Element exposing (..)
@@ -93,6 +93,27 @@ addToSearch searchmods name search =
             TagSearch (Ok (Boolex s And term))
 
 
+addSearch : Search -> Search -> Search
+addSearch ls rs =
+    case ls of
+        NoSearch ->
+            rs
+
+        TagSearch (Err e) ->
+            rs
+
+        TagSearch (Ok sl) ->
+            case rs of
+                NoSearch ->
+                    ls
+
+                TagSearch (Err e) ->
+                    ls
+
+                TagSearch (Ok sr) ->
+                    TagSearch (Ok (Boolex sl And sr))
+
+
 addToSearchPanel : Model -> List SearchMod -> String -> Model
 addToSearchPanel model searchmods name =
     let
@@ -135,6 +156,30 @@ updateSearchText model txt =
             else
                 TagSearch <| Ok <| Search.SearchTerm [] txt
     }
+
+
+addSearchText : Model -> String -> Model
+addSearchText model txt =
+    let
+        addsearch =
+            if String.contains "'" txt then
+                TagSearch <| Parser.run tagSearchParser txt
+
+            else
+                TagSearch <| Ok <| Search.SearchTerm [] txt
+
+        nsearch =
+            addSearch addsearch model.search
+    in
+    case nsearch of
+        TagSearch (Ok ts) ->
+            { model
+                | searchText = Search.printTagSearch ts
+                , search = nsearch
+            }
+
+        _ ->
+            model
 
 
 selectPrevSearch : List String -> Element Msg
