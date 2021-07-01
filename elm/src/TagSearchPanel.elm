@@ -93,6 +93,27 @@ addToSearch searchmods name search =
             TagSearch (Ok (Boolex s And term))
 
 
+addSearch : Search -> Search -> Search
+addSearch ls rs =
+    case ls of
+        NoSearch ->
+            rs
+
+        TagSearch (Err e) ->
+            rs
+
+        TagSearch (Ok sl) ->
+            case rs of
+                NoSearch ->
+                    ls
+
+                TagSearch (Err e) ->
+                    ls
+
+                TagSearch (Ok sr) ->
+                    TagSearch (Ok (Boolex sl And sr))
+
+
 addToSearchPanel : Model -> List SearchMod -> String -> Model
 addToSearchPanel model searchmods name =
     let
@@ -140,22 +161,25 @@ updateSearchText model txt =
 addSearchText : Model -> String -> Model
 addSearchText model txt =
     let
-        ntxt =
-            if String.trim model.searchText == "" then
-                txt
-
-            else
-                model.searchText ++ " & " ++ txt
-    in
-    { model
-        | searchText = ntxt
-        , search =
-            if String.contains "'" ntxt then
-                TagSearch <| Parser.run tagSearchParser ntxt
+        addsearch =
+            if String.contains "'" txt then
+                TagSearch <| Parser.run tagSearchParser txt
 
             else
                 TagSearch <| Ok <| Search.SearchTerm [] txt
-    }
+
+        nsearch =
+            addSearch addsearch model.search
+    in
+    case nsearch of
+        TagSearch (Ok ts) ->
+            { model
+                | searchText = Search.printTagSearch ts
+                , search = nsearch
+            }
+
+        _ ->
+            model
 
 
 selectPrevSearch : List String -> Element Msg
