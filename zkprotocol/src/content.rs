@@ -14,6 +14,11 @@ pub struct Login {
 }
 
 #[derive(Deserialize, Debug)]
+pub struct ResetPassword {
+  pub uid: String,
+}
+
+#[derive(Deserialize, Debug)]
 pub struct ChangePassword {
   pub oldpwd: String,
   pub newpwd: String,

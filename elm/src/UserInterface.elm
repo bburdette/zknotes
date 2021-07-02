@@ -152,7 +152,7 @@ encodeSendMsg sm =
 
         ResetPassword chpwd ->
             JE.object
-                [ ( "what", JE.string "ResetPassword" )
+                [ ( "what", JE.string "resetpassword" )
                 , ( "data", Data.encodeResetPassword chpwd )
                 ]
 
@@ -274,6 +274,9 @@ serverResponseDecoder =
 
                     "invalid user or pwd" ->
                         JD.succeed InvalidUserOrPwd
+
+                    "resetpasswordack" ->
+                        JD.succeed ResetPasswordAck
 
                     "changed password" ->
                         JD.succeed ChangedPassword

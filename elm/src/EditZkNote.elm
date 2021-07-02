@@ -1514,6 +1514,8 @@ update msg model =
                     SP.addSearchString model.spmodel s
             in
             ( { model | spmodel = spmodel }
+              -- DON'T automatically search.  To allow building searches
+              -- from components.
               -- , SP.getSearch spmodel
               --     |> Maybe.map Search
               --     |> Maybe.withDefault None

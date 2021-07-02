@@ -13,7 +13,7 @@ use std::path::Path;
 use uuid::Uuid;
 use zkprotocol::content::{
   ChangeEmail, ChangePassword, GetZkNoteComments, GetZkNoteEdit, ImportZkNote, Login, LoginData,
-  RegistrationData, SaveZkNote, SaveZkNotePlusLinks, ZkLinks, ZkNoteEdit,
+  RegistrationData, ResetPassword, SaveZkNote, SaveZkNotePlusLinks, ZkLinks, ZkNoteEdit,
 };
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 use zkprotocol::search::{TagSearch, ZkNoteSearch};
@@ -146,6 +146,35 @@ pub fn user_interface(
       what: "logged out".to_string(),
       content: serde_json::Value::Null,
     })
+  } else if msg.what == "resetpassword" {
+    let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+    let reset_password: ResetPassword = serde_json::from_value(msgdata.clone())?;
+
+    let userdata = sqldata::read_user_by_name(&conn, reset_password.uid.as_str())?;
+    match userdata.registration_key {
+      Some(_reg_key) => Ok(ServerResponse {
+        what: "unregistered user".to_string(),
+        content: serde_json::Value::Null,
+      }),
+      None => {
+        let reset_key = Uuid::new_v4().to_string();
+
+        // send reset email.
+        email::send_reset(
+          config.appname.as_str(),
+          config.domain.as_str(),
+          config.mainsite.as_str(),
+          userdata.email.as_str(),
+          userdata.name.as_str(),
+          reset_key.as_str(),
+        )?;
+
+        Ok(ServerResponse {
+          what: "resetpasswordack".to_string(),
+          content: serde_json::Value::Null,
+        })
+      }
+    }
   } else {
     match session.get::<Uuid>("token")? {
       None => Ok(ServerResponse {

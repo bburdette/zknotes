@@ -1171,7 +1171,14 @@ actualupdate msg model =
                             ( model, Cmd.none )
 
                         UI.ResetPasswordAck ->
-                            ( displayMessageDialog model "password reset attempted!  if you're a valid user, check your inbox for a reset email."
+                            let
+                                nmod =
+                                    { model
+                                        | state =
+                                            Login <| Login.initialModel Nothing "zknotes" model.seed
+                                    }
+                            in
+                            ( displayMessageDialog nmod "password reset attempted!  if you're a valid user, check your inbox for a reset email."
                             , Cmd.none
                             )
 
