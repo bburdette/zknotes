@@ -26,6 +26,11 @@ type alias Login =
     }
 
 
+type alias ResetPassword =
+    { uid : String
+    }
+
+
 type alias ChangePassword =
     { oldpwd : String
     , newpwd : String
@@ -205,6 +210,13 @@ encodeLogin l =
     JE.object
         [ ( "uid", JE.string l.uid )
         , ( "pwd", JE.string l.pwd )
+        ]
+
+
+encodeResetPassword : ResetPassword -> JE.Value
+encodeResetPassword l =
+    JE.object
+        [ ( "uid", JE.string l.uid )
         ]
 
 

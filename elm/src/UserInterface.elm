@@ -9,6 +9,7 @@ import Search as S
 type SendMsg
     = Register Data.Registration
     | Login Data.Login
+    | ResetPassword Data.ResetPassword
     | Logout
     | ChangePassword Data.ChangePassword
     | ChangeEmail Data.ChangeEmail
@@ -36,6 +37,7 @@ type ServerResponse
     | LoggedOut
     | ChangedPassword
     | ChangedEmail
+    | ResetPasswordAck
     | ZkNoteSearchResult Data.ZkNoteSearchResult
     | ZkListNoteSearchResult Data.ZkListNoteSearchResult
     | SavedZkNotePlusLinks Data.SavedZkNote
@@ -75,6 +77,9 @@ showServerResponse sr =
 
         LoggedOut ->
             "LoggedOut"
+
+        ResetPasswordAck ->
+            "ResetPasswordAck"
 
         ChangedPassword ->
             "ChangedPassword"
@@ -143,6 +148,12 @@ encodeSendMsg sm =
         Logout ->
             JE.object
                 [ ( "what", JE.string "logout" )
+                ]
+
+        ResetPassword chpwd ->
+            JE.object
+                [ ( "what", JE.string "ResetPassword" )
+                , ( "data", Data.encodeResetPassword chpwd )
                 ]
 
         ChangePassword chpwd ->

@@ -1060,6 +1060,14 @@ actualupdate msg model =
                             }
                     )
 
+                Login.Reset ->
+                    ( { model | state = Login lmod }
+                    , sendUIMsg model.location <|
+                        UI.ResetPassword
+                            { uid = lmod.userId
+                            }
+                    )
+
         ( PublicReplyData prd, state ) ->
             case prd of
                 Err e ->
@@ -1161,6 +1169,11 @@ actualupdate msg model =
 
                         UI.LoggedOut ->
                             ( model, Cmd.none )
+
+                        UI.ResetPasswordAck ->
+                            ( displayMessageDialog model "password reset attempted!  if you're a valid user, check your inbox for a reset email."
+                            , Cmd.none
+                            )
 
                         UI.ChangedPassword ->
                             ( displayMessageDialog model "password changed"
