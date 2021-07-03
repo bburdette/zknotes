@@ -1,4 +1,5 @@
 #![allow(non_snake_case)]
+use uuid::Uuid;
 
 #[derive(Deserialize, Debug)]
 pub struct RegistrationData {
@@ -16,6 +17,13 @@ pub struct Login {
 #[derive(Deserialize, Debug)]
 pub struct ResetPassword {
   pub uid: String,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct SetPassword {
+  pub uid: String,
+  pub newpwd: String,
+  pub reset_key: Uuid,
 }
 
 #[derive(Deserialize, Debug)]
