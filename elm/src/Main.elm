@@ -40,6 +40,7 @@ import Markdown.Renderer
 import MdCommon as MC
 import PublicInterface as PI
 import Random exposing (Seed, initialSeed)
+import ResetPassword
 import Schelme.Show exposing (showTerm)
 import Search as S
 import SearchPanel as SP
