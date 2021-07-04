@@ -10,14 +10,15 @@ import Element.Font as Font
 import Element.Input as Input
 import Html exposing (Html)
 import Random exposing (Seed)
-import TangoColors as Color
+import TangoColors as TC
+import UUID exposing (UUID)
 import Util exposing (httpErrorString)
 
 
 type alias Model =
     { userId : String
     , password : String
-    , reset_key : String
+    , reset_key : UUID
     , sent : Bool
     , appname : String
     }
@@ -34,7 +35,7 @@ type Cmd
     | None
 
 
-initialModel : String -> String -> String -> Model
+initialModel : String -> UUID -> String -> Model
 initialModel uid reset_key appname =
     { userId = uid
     , password = ""
@@ -92,7 +93,7 @@ view size model =
                 sentView model
 
               else
-                none
+                resetView model
             ]
         ]
 
@@ -105,16 +106,18 @@ resetView model =
         , padding 10
         , Background.color (Common.navbarColor 1)
         ]
-        [ text <| "forgot your password?"
-        , Input.text [ width fill ]
-            { onChange = always Noop
-            , text = model.userId
+        [ row [ width fill ] [ el [ centerX, Font.bold ] <| text <| "password reset" ]
+        , row [ spacing 8 ] [ text "user id:", text model.userId ]
+        , Input.newPassword [ width fill ]
+            { onChange = PasswordUpdate
+            , text = model.password
             , placeholder = Nothing
-            , label = Input.labelLeft [] <| text "User id:"
+            , show = False
+            , label = Input.labelLeft [] <| text "new password:"
             }
         , Input.button (buttonStyle ++ [ width fill ])
             { onPress = Just OkPressed
-            , label = text "send reset email"
+            , label = text "change to new password"
             }
         ]
 

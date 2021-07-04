@@ -10,6 +10,7 @@ type SendMsg
     = Register Data.Registration
     | Login Data.Login
     | ResetPassword Data.ResetPassword
+    | SetPassword Data.SetPassword
     | Logout
     | ChangePassword Data.ChangePassword
     | ChangeEmail Data.ChangeEmail
@@ -154,6 +155,12 @@ encodeSendMsg sm =
             JE.object
                 [ ( "what", JE.string "resetpassword" )
                 , ( "data", Data.encodeResetPassword chpwd )
+                ]
+
+        SetPassword chpwd ->
+            JE.object
+                [ ( "what", JE.string "setpassword" )
+                , ( "data", Data.encodeSetPassword chpwd )
                 ]
 
         ChangePassword chpwd ->

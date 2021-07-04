@@ -31,6 +31,13 @@ type alias ResetPassword =
     }
 
 
+type alias SetPassword =
+    { uid : String
+    , newpwd : String
+    , reset_key : String
+    }
+
+
 type alias ChangePassword =
     { oldpwd : String
     , newpwd : String
@@ -200,8 +207,8 @@ encodeRegistration : Registration -> JE.Value
 encodeRegistration l =
     JE.object
         [ ( "uid", JE.string l.uid )
-        , ( "pwd", JE.string l.pwd )
-        , ( "email", JE.string l.email )
+        , ( "newpwd", JE.string l.pwd )
+        , ( "reset_key", JE.string l.email )
         ]
 
 
@@ -217,6 +224,15 @@ encodeResetPassword : ResetPassword -> JE.Value
 encodeResetPassword l =
     JE.object
         [ ( "uid", JE.string l.uid )
+        ]
+
+
+encodeSetPassword : SetPassword -> JE.Value
+encodeSetPassword l =
+    JE.object
+        [ ( "uid", JE.string l.uid )
+        , ( "newpwd", JE.string l.newpwd )
+        , ( "reset_key", JE.string l.reset_key )
         ]
 
 
