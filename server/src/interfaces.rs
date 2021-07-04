@@ -13,7 +13,8 @@ use std::path::Path;
 use uuid::Uuid;
 use zkprotocol::content::{
   ChangeEmail, ChangePassword, GetZkNoteComments, GetZkNoteEdit, ImportZkNote, Login, LoginData,
-  RegistrationData, ResetPassword, SaveZkNote, SaveZkNotePlusLinks, ZkLinks, ZkNoteEdit,
+  RegistrationData, ResetPassword, SaveZkNote, SaveZkNotePlusLinks, SetPassword, ZkLinks,
+  ZkNoteEdit,
 };
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 use zkprotocol::search::{TagSearch, ZkNoteSearch};
@@ -150,7 +151,7 @@ pub fn user_interface(
     let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
     let reset_password: ResetPassword = serde_json::from_value(msgdata.clone())?;
 
-    let userdata = sqldata::read_user_by_name(&conn, reset_password.uid.as_str())?;
+    let mut userdata = sqldata::read_user_by_name(&conn, reset_password.uid.as_str())?;
     match userdata.registration_key {
       Some(_reg_key) => Ok(ServerResponse {
         what: "unregistered user".to_string(),
@@ -158,6 +159,10 @@ pub fn user_interface(
       }),
       None => {
         let reset_key = Uuid::new_v4().to_string();
+
+        // update user record.
+        userdata.reset_key = Some(reset_key.clone());
+        sqldata::update_user(&conn, &userdata)?;
 
         // send reset email.
         email::send_reset(
@@ -173,6 +178,49 @@ pub fn user_interface(
           what: "resetpasswordack".to_string(),
           content: serde_json::Value::Null,
         })
+      }
+    }
+  } else if msg.what == "setpassword" {
+    let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+    let set_password: SetPassword = serde_json::from_value(msgdata.clone())?;
+
+    let mut userdata = sqldata::read_user_by_name(&conn, set_password.uid.as_str())?;
+    match userdata.registration_key {
+      Some(_reg_key) => Ok(ServerResponse {
+        what: "unregistered user".to_string(),
+        content: serde_json::Value::Null,
+      }),
+      None => {
+        println!("userdata.reset_key {:?}", userdata.reset_key);
+        println!(
+          "set_password.reset_key.to_string() {}",
+          set_password.reset_key.to_string()
+        );
+
+        if userdata.reset_key == Some(set_password.reset_key.to_string()) {
+          // TODO check for reset_key expiration!
+          // update password.
+          userdata.reset_key = None;
+          userdata.hashwd = hex_digest(
+            Algorithm::SHA256,
+            (set_password.newpwd + userdata.salt.as_str())
+              .into_bytes()
+              .as_slice(),
+          );
+          sqldata::update_user(&conn, &userdata)?;
+
+          // TODO remove tokens to force login.
+
+          Ok(ServerResponse {
+            what: "setpasswordack".to_string(),
+            content: serde_json::Value::Null,
+          })
+        } else {
+          Ok(ServerResponse {
+            what: "password reset failed".to_string(),
+            content: serde_json::Value::Null,
+          })
+        }
       }
     }
   } else {

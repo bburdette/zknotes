@@ -25,6 +25,7 @@ pub struct User {
   pub salt: String,
   pub email: String,
   pub registration_key: Option<String>,
+  pub reset_key: Option<String>,
 }
 
 pub fn login_data(conn: &Connection, uid: i64) -> Result<LoginData, Box<dyn Error>> {
@@ -1100,7 +1101,7 @@ pub fn save_zklink(
 
 pub fn read_user_by_name(conn: &Connection, name: &str) -> Result<User, Box<dyn Error>> {
   let user = conn.query_row(
-    "select id, zknote, homenote, hashwd, salt, email, registration_key
+    "select id, zknote, homenote, hashwd, salt, email, registration_key, reset_key
       from user where name = ?1",
     params![name],
     |row| {
@@ -1113,6 +1114,7 @@ pub fn read_user_by_name(conn: &Connection, name: &str) -> Result<User, Box<dyn 
         salt: row.get(4)?,
         email: row.get(5)?,
         registration_key: row.get(6)?,
+        reset_key: row.get(7)?,
       })
     },
   )?;
@@ -1122,7 +1124,7 @@ pub fn read_user_by_name(conn: &Connection, name: &str) -> Result<User, Box<dyn 
 
 pub fn read_user_by_id(conn: &Connection, id: i64) -> Result<User, Box<dyn Error>> {
   let user = conn.query_row(
-    "select id, name, zknote, homenote, hashwd, salt, email, registration_key
+    "select id, name, zknote, homenote, hashwd, salt, email, registration_key, reset_key
       from user where id = ?1",
     params![id],
     |row| {
@@ -1135,6 +1137,7 @@ pub fn read_user_by_id(conn: &Connection, id: i64) -> Result<User, Box<dyn Error
         salt: row.get(5)?,
         email: row.get(6)?,
         registration_key: row.get(7)?,
+        reset_key: row.get(8)?,
       })
     },
   )?;
@@ -1148,7 +1151,7 @@ pub fn read_user_by_token(
   token_expiration_ms: Option<i64>,
 ) -> Result<User, Box<dyn Error>> {
   let (user, tokendate) = conn.query_row(
-    "select id, name, zknote, homenote, hashwd, salt, email, registration_key, token.tokendate
+    "select id, name, zknote, homenote, hashwd, salt, email, registration_key, reset_key, token.tokendate
       from user, token where user.id = token.user and token = ?1",
     params![token.to_string()],
     |row| {
@@ -1162,8 +1165,9 @@ pub fn read_user_by_token(
           salt: row.get(5)?,
           email: row.get(6)?,
           registration_key: row.get(7)?,
+          reset_key: row.get(8)?,
         },
-        row.get(8)?,
+        row.get(9)?,
       ))
     },
   )?;
@@ -1247,8 +1251,8 @@ pub fn purge_email_tokens(
 
 pub fn update_user(conn: &Connection, user: &User) -> Result<(), Box<dyn Error>> {
   conn.execute(
-    "update user set name = ?1, hashwd = ?2, salt = ?3, email = ?4, registration_key = ?5, homenote = ?6
-           where id = ?7",
+    "update user set name = ?1, hashwd = ?2, salt = ?3, email = ?4, registration_key = ?5, homenote = ?6, reset_key = ?7
+           where id = ?8",
     params![
       user.name,
       user.hashwd,
@@ -1256,6 +1260,7 @@ pub fn update_user(conn: &Connection, user: &User) -> Result<(), Box<dyn Error>>
       user.email,
       user.registration_key,
       user.homenoteid,
+      user.reset_key,
       user.id,
     ],
   )?;
@@ -2227,7 +2232,7 @@ pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
 
   // Users
   let mut ustmt = conn.prepare(
-    "select id, name, zknote, homenote, hashwd, salt, email, registration_key
+    "select id, name, zknote, homenote, hashwd, salt, email, registration_key, reset_key
       from user",
   )?;
 
@@ -2241,6 +2246,7 @@ pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
       salt: row.get(5)?,
       email: row.get(6)?,
       registration_key: row.get(7)?,
+      reset_key: row.get(8)?,
     })
   })?;
 
