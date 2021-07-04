@@ -214,6 +214,7 @@ fn defcon() -> Config {
     admin_email: "admin@practica.site".to_string(),
     login_token_expiration_ms: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
     email_token_expiration_ms: 1 * 24 * 60 * 60 * 1000, // 1 day in milliseconds
+    reset_token_expiration_ms: 1 * 24 * 60 * 60 * 1000, // 1 day in milliseconds
   }
 }
 
