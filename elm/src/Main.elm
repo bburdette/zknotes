@@ -40,6 +40,7 @@ import Markdown.Renderer
 import MdCommon as MC
 import PublicInterface as PI
 import Random exposing (Seed, initialSeed)
+import ResetPassword
 import Schelme.Show exposing (showTerm)
 import Search as S
 import SearchPanel as SP
@@ -48,6 +49,7 @@ import ShowMessage
 import TangoColors as TC
 import Task exposing (Task)
 import Toop
+import UUID exposing (UUID)
 import Url exposing (Url)
 import Url.Builder as UB
 import Url.Parser as UP exposing ((</>))
@@ -77,6 +79,7 @@ type Msg
     | SelectDialogMsg (GD.Msg (SS.Msg Int))
     | ChangePasswordDialogMsg (GD.Msg CP.Msg)
     | ChangeEmailDialogMsg (GD.Msg CE.Msg)
+    | ResetPasswordMsg ResetPassword.Msg
     | Noop
 
 
@@ -94,6 +97,7 @@ type State
     | SelectDialog (SS.GDModel Int) State
     | ChangePasswordDialog CP.GDModel State
     | ChangeEmailDialog CE.GDModel State
+    | ResetPassword ResetPassword.Model
     | DisplayMessage DisplayMessage.GDModel State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
 
@@ -131,6 +135,7 @@ type Route
     = PublicZkNote Int
     | PublicZkPubId String
     | EditZkNoteR Int
+    | ResetPasswordR String UUID
     | Top
 
 
@@ -145,6 +150,9 @@ routeTitle route =
 
         EditZkNoteR id ->
             "zknote " ++ String.fromInt id
+
+        ResetPasswordR _ _ ->
+            "password reset"
 
         Top ->
             "zknotes"
@@ -176,6 +184,11 @@ parseUrl url =
                 UP.s
                     "editnote"
                     </> UP.int
+            , UP.map ResetPasswordR <|
+                UP.s
+                    "reset"
+                    </> UP.string
+                    </> UP.custom "UUID" (UUID.fromString >> Result.toMaybe)
             , UP.map Top <| UP.top
             ]
         )
@@ -193,6 +206,9 @@ routeUrl route =
 
         EditZkNoteR id ->
             UB.absolute [ "editnote", String.fromInt id ] []
+
+        ResetPasswordR user key ->
+            UB.absolute [ "reset", user, UUID.toString key ] []
 
         Top ->
             UB.absolute [] []
@@ -257,6 +273,9 @@ routeState model route =
 
                         Nothing ->
                             Nothing
+
+        ResetPasswordR username key ->
+            Just ( ResetPassword <| ResetPassword.initialModel username key "zknotes", Cmd.none )
 
         Top ->
             if (stateRoute model.state).route == Top then
@@ -370,11 +389,14 @@ showMessage msg =
         SelectDialogMsg _ ->
             "SelectDialogMsg"
 
-        ChangePasswordDialogMsg x ->
+        ChangePasswordDialogMsg _ ->
             "ChangePasswordDialogMsg"
 
-        ChangeEmailDialogMsg x ->
+        ChangeEmailDialogMsg _ ->
             "ChangeEmailDialogMsg"
+
+        ResetPasswordMsg _ ->
+            "ResetPasswordMsg"
 
 
 showState : State -> String
@@ -424,6 +446,9 @@ showState state =
 
         ChangeEmailDialog _ _ ->
             "ChangeEmailDialog"
+
+        ResetPassword _ ->
+            "ResetPassword"
 
 
 unexpectedMsg : Model -> Msg -> Model
@@ -490,6 +515,9 @@ viewState size state model =
             -- render is at the layout level, not here.
             E.none
 
+        ResetPassword st ->
+            E.map ResetPasswordMsg (ResetPassword.view size st)
+
 
 stateSearch : State -> Maybe ( SP.Model, Data.ZkListNoteSearchResult )
 stateSearch state =
@@ -551,6 +579,9 @@ stateLogin state =
 
         ChangeEmailDialog _ instate ->
             stateLogin instate
+
+        ResetPassword _ ->
+            Nothing
 
 
 sendUIMsg : String -> UI.SendMsg -> Cmd Msg
@@ -944,6 +975,21 @@ actualupdate msg model =
                 GD.Cancel ->
                     ( { model | state = instate }, Cmd.none )
 
+        ( ResetPasswordMsg rmsg, ResetPassword rst ) ->
+            let
+                ( nst, cmd ) =
+                    ResetPassword.update rmsg rst
+            in
+            case cmd of
+                ResetPassword.Ok ->
+                    ( { model | state = ResetPassword nst }
+                    , sendUIMsg model.location
+                        (UI.SetPassword { uid = nst.userId, newpwd = nst.password, reset_key = nst.reset_key })
+                    )
+
+                ResetPassword.None ->
+                    ( { model | state = ResetPassword nst }, Cmd.none )
+
         ( SelectedText jv, state ) ->
             case JD.decodeValue JD.string jv of
                 Ok str ->
@@ -1060,6 +1106,14 @@ actualupdate msg model =
                             }
                     )
 
+                Login.Reset ->
+                    ( { model | state = Login lmod }
+                    , sendUIMsg model.location <|
+                        UI.ResetPassword
+                            { uid = lmod.userId
+                            }
+                    )
+
         ( PublicReplyData prd, state ) ->
             case prd of
                 Err e ->
@@ -1161,6 +1215,30 @@ actualupdate msg model =
 
                         UI.LoggedOut ->
                             ( model, Cmd.none )
+
+                        UI.ResetPasswordAck ->
+                            let
+                                nmod =
+                                    { model
+                                        | state =
+                                            Login <| Login.initialModel Nothing "zknotes" model.seed
+                                    }
+                            in
+                            ( displayMessageDialog nmod "password reset attempted!  if you're a valid user, check your inbox for a reset email."
+                            , Cmd.none
+                            )
+
+                        UI.SetPasswordAck ->
+                            let
+                                nmod =
+                                    { model
+                                        | state =
+                                            Login <| Login.initialModel Nothing "zknotes" model.seed
+                                    }
+                            in
+                            ( displayMessageDialog nmod "password reset complete!"
+                            , Cmd.none
+                            )
 
                         UI.ChangedPassword ->
                             ( displayMessageDialog model "password changed"

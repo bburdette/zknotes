@@ -9,6 +9,8 @@ import Search as S
 type SendMsg
     = Register Data.Registration
     | Login Data.Login
+    | ResetPassword Data.ResetPassword
+    | SetPassword Data.SetPassword
     | Logout
     | ChangePassword Data.ChangePassword
     | ChangeEmail Data.ChangeEmail
@@ -36,6 +38,8 @@ type ServerResponse
     | LoggedOut
     | ChangedPassword
     | ChangedEmail
+    | ResetPasswordAck
+    | SetPasswordAck
     | ZkNoteSearchResult Data.ZkNoteSearchResult
     | ZkListNoteSearchResult Data.ZkListNoteSearchResult
     | SavedZkNotePlusLinks Data.SavedZkNote
@@ -75,6 +79,12 @@ showServerResponse sr =
 
         LoggedOut ->
             "LoggedOut"
+
+        ResetPasswordAck ->
+            "ResetPasswordAck"
+
+        SetPasswordAck ->
+            "SetPasswordAck"
 
         ChangedPassword ->
             "ChangedPassword"
@@ -143,6 +153,18 @@ encodeSendMsg sm =
         Logout ->
             JE.object
                 [ ( "what", JE.string "logout" )
+                ]
+
+        ResetPassword chpwd ->
+            JE.object
+                [ ( "what", JE.string "resetpassword" )
+                , ( "data", Data.encodeResetPassword chpwd )
+                ]
+
+        SetPassword chpwd ->
+            JE.object
+                [ ( "what", JE.string "setpassword" )
+                , ( "data", Data.encodeSetPassword chpwd )
                 ]
 
         ChangePassword chpwd ->
@@ -263,6 +285,12 @@ serverResponseDecoder =
 
                     "invalid user or pwd" ->
                         JD.succeed InvalidUserOrPwd
+
+                    "resetpasswordack" ->
+                        JD.succeed ResetPasswordAck
+
+                    "setpasswordack" ->
+                        JD.succeed SetPasswordAck
 
                     "changed password" ->
                         JD.succeed ChangedPassword

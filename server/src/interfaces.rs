@@ -3,6 +3,7 @@ use crate::email;
 use crate::search;
 use crate::sqldata;
 use crate::util;
+use crate::util::is_token_expired;
 use actix_session::Session;
 use crypto_hash::{hex_digest, Algorithm};
 use either::Either::{Left, Right};
@@ -13,7 +14,8 @@ use std::path::Path;
 use uuid::Uuid;
 use zkprotocol::content::{
   ChangeEmail, ChangePassword, GetZkNoteComments, GetZkNoteEdit, ImportZkNote, Login, LoginData,
-  RegistrationData, SaveZkNote, SaveZkNotePlusLinks, ZkLinks, ZkNoteEdit,
+  RegistrationData, ResetPassword, SaveZkNote, SaveZkNotePlusLinks, SetPassword, ZkLinks,
+  ZkNoteEdit,
 };
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 use zkprotocol::search::{TagSearch, ZkNoteSearch};
@@ -146,6 +148,72 @@ pub fn user_interface(
       what: "logged out".to_string(),
       content: serde_json::Value::Null,
     })
+  } else if msg.what == "resetpassword" {
+    let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+    let reset_password: ResetPassword = serde_json::from_value(msgdata.clone())?;
+
+    let userdata = sqldata::read_user_by_name(&conn, reset_password.uid.as_str())?;
+    match userdata.registration_key {
+      Some(_reg_key) => Ok(ServerResponse {
+        what: "unregistered user".to_string(),
+        content: serde_json::Value::Null,
+      }),
+      None => {
+        let reset_key = Uuid::new_v4();
+
+        // make 'newpassword' record.
+        sqldata::add_newpassword(&conn, userdata.id, reset_key.clone())?;
+
+        // send reset email.
+        email::send_reset(
+          config.appname.as_str(),
+          config.domain.as_str(),
+          config.mainsite.as_str(),
+          userdata.email.as_str(),
+          userdata.name.as_str(),
+          reset_key.to_string().as_str(),
+        )?;
+
+        Ok(ServerResponse {
+          what: "resetpasswordack".to_string(),
+          content: serde_json::Value::Null,
+        })
+      }
+    }
+  } else if msg.what == "setpassword" {
+    let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+    let set_password: SetPassword = serde_json::from_value(msgdata.clone())?;
+
+    let mut userdata = sqldata::read_user_by_name(&conn, set_password.uid.as_str())?;
+    match userdata.registration_key {
+      Some(_reg_key) => Ok(ServerResponse {
+        what: "unregistered user".to_string(),
+        content: serde_json::Value::Null,
+      }),
+      None => {
+        let npwd = sqldata::read_newpassword(&conn, userdata.id, set_password.reset_key)?;
+
+        if is_token_expired(config.reset_token_expiration_ms, npwd) {
+          Ok(ServerResponse {
+            what: "password reset failed".to_string(),
+            content: serde_json::Value::Null,
+          })
+        } else {
+          userdata.hashwd = hex_digest(
+            Algorithm::SHA256,
+            (set_password.newpwd + userdata.salt.as_str())
+              .into_bytes()
+              .as_slice(),
+          );
+          sqldata::remove_newpassword(&conn, userdata.id, set_password.reset_key)?;
+          sqldata::update_user(&conn, &userdata)?;
+          Ok(ServerResponse {
+            what: "setpasswordack".to_string(),
+            content: serde_json::Value::Null,
+          })
+        }
+      }
+    }
   } else {
     match session.get::<Uuid>("token")? {
       None => Ok(ServerResponse {

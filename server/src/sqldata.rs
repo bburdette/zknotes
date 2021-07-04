@@ -816,6 +816,27 @@ pub fn udpate10(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   Ok(())
 }
 
+pub fn udpate11(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+  // db connection without foreign key checking.
+  let conn = Connection::open(dbfile)?;
+  let mut m1 = Migration::new();
+
+  // add newpassword table.  each request for a new password creates an entry.
+  m1.create_table("newpassword", |t| {
+    t.add_column("user", types::foreign("user", "id").nullable(false));
+    t.add_column("token", types::text().nullable(false));
+    t.add_column("tokendate", types::integer().nullable(false));
+    t.add_index(
+      "resetpasswordunq",
+      types::index(vec!["user", "token"]).unique(true),
+    );
+  });
+
+  conn.execute_batch(m1.make::<Sqlite>().as_str())?;
+
+  Ok(())
+}
+
 pub fn get_single_value(conn: &Connection, name: &str) -> Result<Option<String>, Box<dyn Error>> {
   match conn.query_row(
     "select value from singlevalue where name = ?1",
@@ -906,6 +927,11 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: i64) -> Result<(), Box<dyn Err
     info!("udpate10");
     udpate10(&dbfile)?;
     set_single_value(&conn, "migration_level", "10")?;
+  }
+  if nlevel < 11 {
+    info!("udpate11");
+    udpate11(&dbfile)?;
+    set_single_value(&conn, "migration_level", "11")?;
   }
 
   info!("db up to date.");
@@ -1167,6 +1193,33 @@ pub fn purge_email_tokens(
   Ok(())
 }
 
+pub fn purge_reset_tokens(
+  conn: &Connection,
+  token_expiration_ms: i64,
+) -> Result<(), Box<dyn Error>> {
+  let now = now()?;
+  let expdt = now - token_expiration_ms;
+
+  let count: i64 = conn.query_row(
+    "select count(*) from
+      newpassword where tokendate < ?1",
+    params![expdt],
+    |row| Ok(row.get(0)?),
+  )?;
+
+  if count > 0 {
+    info!("removing {} expired newpassword records", count);
+
+    conn.execute(
+      "delete from newpassword
+        where tokendate < ?1",
+      params![expdt],
+    )?;
+  }
+
+  Ok(())
+}
+
 pub fn update_user(conn: &Connection, user: &User) -> Result<(), Box<dyn Error>> {
   conn.execute(
     "update user set name = ?1, hashwd = ?2, salt = ?3, email = ?4, registration_key = ?5, homenote = ?6
@@ -1221,6 +1274,41 @@ pub fn read_newemail(
 pub fn remove_newemail(conn: &Connection, user: i64, token: Uuid) -> Result<(), Box<dyn Error>> {
   conn.execute(
     "delete from newemail
+     where user = ?1 and token = ?2",
+    params![user, token.to_string()],
+  )?;
+
+  Ok(())
+}
+
+// password reset request.
+pub fn add_newpassword(conn: &Connection, user: i64, token: Uuid) -> Result<(), Box<dyn Error>> {
+  let now = now()?;
+  conn.execute(
+    "insert into newpassword (user, token, tokendate)
+     values (?1, ?2, ?3)",
+    params![user, token.to_string(), now],
+  )?;
+
+  Ok(())
+}
+
+// password reset request.
+pub fn read_newpassword(conn: &Connection, user: i64, token: Uuid) -> Result<i64, Box<dyn Error>> {
+  let result = conn.query_row(
+    "select tokendate from newpassword
+     where user = ?1
+      and token = ?2",
+    params![user, token.to_string()],
+    |row| Ok(row.get(0)?),
+  )?;
+  Ok(result)
+}
+
+// password reset request.
+pub fn remove_newpassword(conn: &Connection, user: i64, token: Uuid) -> Result<(), Box<dyn Error>> {
+  conn.execute(
+    "delete from newpassword
      where user = ?1 and token = ?2",
     params![user, token.to_string()],
   )?;

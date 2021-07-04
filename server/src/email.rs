@@ -20,7 +20,7 @@ pub fn send_newemail_confirmation(
     )?,
     "change zknotes email".to_string(),
     (format!(
-      "Click the link to change to your new email, {} user '{}'!  \
+      "Click the link to change to your new email, {} user '{}'!\n\
        {}/newemail/{}/{}",
       appname, uid, mainsite, uid, newemail_token
     ))
@@ -32,7 +32,7 @@ pub fn send_newemail_confirmation(
   util::write_string(
     "last-email-change.txt",
     (format!(
-      "Click the link to change to your new email, {} user '{}'!  \
+      "Click the link to change to your new email, {} user '{}'!\n\
        {}/newemail/{}/{}",
       appname, uid, mainsite, uid, newemail_token
     ))
@@ -61,7 +61,7 @@ pub fn send_registration(
     )?,
     "zknotes registration".to_string(),
     (format!(
-      "Click the link to complete registration, {} user '{}'!  \
+      "Click the link to complete registration, {} user '{}'!\n\
        {}/register/{}/{}",
       appname, uid, mainsite, uid, reg_id
     ))
@@ -73,9 +73,50 @@ pub fn send_registration(
   util::write_string(
     "last-email.txt",
     (format!(
-      "Click the link to complete registration, {} user '{}'!  \
+      "Click the link to complete registration, {} user '{}'!\n\
        {}/register/{}/{}",
       appname, uid, mainsite, uid, reg_id
+    ))
+    .to_string()
+    .as_str(),
+  )?;
+
+  let mut mailer = SmtpTransport::new(SmtpClient::new_unencrypted_localhost()?);
+  // Send the email
+  mailer.send(email).map_err(|e| e.into())
+}
+
+pub fn send_reset(
+  appname: &str,
+  _domain: &str,
+  mainsite: &str,
+  email: &str,
+  username: &str,
+  reset_id: &str,
+) -> Result<Response, Box<dyn Error>> {
+  info!("Sending reset email for user: {}", username);
+  let email = SendableEmail::new(
+    Envelope::new(
+      Some(EmailAddress::new("no-reply@zknotes.com".to_string())?),
+      vec![EmailAddress::new(email.to_string())?],
+    )?,
+    "zknotes password reset".to_string(),
+    (format!(
+      "Click the link to complete password reset, {} user '{}'!\n\
+       {}/reset/{}/{}",
+      appname, username, mainsite, username, reset_id
+    ))
+    .to_string()
+    .into_bytes(),
+  );
+
+  // to help with reset for desktop use, or if the server is barred from sending email.
+  util::write_string(
+    "last-email.txt",
+    (format!(
+      "Click the link to complete reset, {} user '{}'!\n\
+       {}/reset/{}/{}",
+      appname, username, mainsite, username, reset_id
     ))
     .to_string()
     .as_str(),

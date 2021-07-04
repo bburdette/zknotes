@@ -3,6 +3,7 @@ module Data exposing (..)
 import Json.Decode as JD
 import Json.Encode as JE
 import Search as S
+import UUID exposing (UUID)
 import Url.Builder as UB
 import Util exposing (andMap)
 
@@ -23,6 +24,18 @@ type alias Registration =
 type alias Login =
     { uid : String
     , pwd : String
+    }
+
+
+type alias ResetPassword =
+    { uid : String
+    }
+
+
+type alias SetPassword =
+    { uid : String
+    , newpwd : String
+    , reset_key : UUID
     }
 
 
@@ -195,8 +208,8 @@ encodeRegistration : Registration -> JE.Value
 encodeRegistration l =
     JE.object
         [ ( "uid", JE.string l.uid )
-        , ( "pwd", JE.string l.pwd )
-        , ( "email", JE.string l.email )
+        , ( "newpwd", JE.string l.pwd )
+        , ( "reset_key", JE.string l.email )
         ]
 
 
@@ -205,6 +218,22 @@ encodeLogin l =
     JE.object
         [ ( "uid", JE.string l.uid )
         , ( "pwd", JE.string l.pwd )
+        ]
+
+
+encodeResetPassword : ResetPassword -> JE.Value
+encodeResetPassword l =
+    JE.object
+        [ ( "uid", JE.string l.uid )
+        ]
+
+
+encodeSetPassword : SetPassword -> JE.Value
+encodeSetPassword l =
+    JE.object
+        [ ( "uid", JE.string l.uid )
+        , ( "newpwd", JE.string l.newpwd )
+        , ( "reset_key", UUID.toValue l.reset_key )
         ]
 
 

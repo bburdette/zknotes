@@ -13,4 +13,5 @@ pub struct Config {
   pub admin_email: String,
   pub login_token_expiration_ms: i64,
   pub email_token_expiration_ms: i64,
+  pub reset_token_expiration_ms: i64,
 }

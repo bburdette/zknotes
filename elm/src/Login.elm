@@ -17,6 +17,7 @@ import Util exposing (httpErrorString)
 type Mode
     = RegistrationMode
     | LoginMode
+    | ResetMode
 
 
 type alias Model =
@@ -40,14 +41,16 @@ type Msg
     | PasswordUpdate String
     | EmailUpdate String
     | SetMode Mode
-    | TryLogin
-    | TryRegister
+    | LoginPressed
+    | RegisterPressed
+    | ResetPressed
     | CancelSent
 
 
 type Cmd
     = Login
     | Register
+    | Reset
     | None
 
 
@@ -88,6 +91,9 @@ makeUrlP model =
         LoginMode ->
             ( "/login", Dict.empty )
 
+        ResetMode ->
+            ( "/reset", Dict.empty )
+
 
 urlToState : List String -> Dict String String -> Model -> Model
 urlToState segments parms model =
@@ -96,6 +102,9 @@ urlToState segments parms model =
             case List.head segments of
                 Just "login" ->
                     LoginMode
+
+                Just "reset" ->
+                    ResetMode
 
                 Just "registration" ->
                     RegistrationMode
@@ -151,7 +160,10 @@ view size model =
                 [ Common.navbar 0
                     model.mode
                     SetMode
-                    [ ( LoginMode, "log in" ), ( RegistrationMode, "register" ) ]
+                    [ ( LoginMode, "log in" )
+                    , ( RegistrationMode, "register" )
+                    , ( ResetMode, "reset" )
+                    ]
                 ]
             , if model.sent then
                 sentView model
@@ -160,6 +172,9 @@ view size model =
                 case model.mode of
                     LoginMode ->
                         loginView model
+
+                    ResetMode ->
+                        resetView model
 
                     RegistrationMode ->
                         registrationView model
@@ -192,12 +207,31 @@ loginView model =
             }
         , text model.responseMessage
         , Input.button (buttonStyle ++ [ width fill ])
-            { onPress = Just TryLogin
+            { onPress = Just LoginPressed
             , label = text "log in"
             }
+        ]
+
+
+resetView : Model -> Element Msg
+resetView model =
+    column
+        [ spacing 8
+        , width fill
+        , padding 10
+        , Background.color (Common.navbarColor 1)
+        ]
+        [ text <| "forgot your password?"
+        , Input.text [ width fill ]
+            { onChange = IdUpdate
+            , text = model.userId
+            , placeholder = Nothing
+            , label = Input.labelLeft [] <| text "User id:"
+            }
+        , text model.responseMessage
         , Input.button (buttonStyle ++ [ width fill ])
-            { onPress = Just (SetMode RegistrationMode)
-            , label = text "reset password"
+            { onPress = Just ResetPressed
+            , label = text "send reset email"
             }
         ]
 
@@ -234,7 +268,7 @@ registrationView model =
             }
         , text model.responseMessage
         , Input.button (buttonStyle ++ [ width fill ])
-            { onPress = Just TryRegister
+            { onPress = Just RegisterPressed
             , label = text "register"
             }
         ]
@@ -250,6 +284,9 @@ sentView model =
 
                 RegistrationMode ->
                     "Registration sent..."
+
+                ResetMode ->
+                    "Reset sent..."
             )
         ]
 
@@ -275,7 +312,7 @@ update msg model =
         CancelSent ->
             ( { model | sent = False }, None )
 
-        TryRegister ->
+        RegisterPressed ->
             let
                 ( newseed, cq, cans ) =
                     Util.captchaQ model.seed
@@ -292,5 +329,8 @@ update msg model =
             else
                 ( newmod, None )
 
-        TryLogin ->
+        LoginPressed ->
             ( { model | sent = True }, Login )
+
+        ResetPressed ->
+            ( { model | sent = True }, Reset )
