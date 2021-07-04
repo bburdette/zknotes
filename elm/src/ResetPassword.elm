@@ -45,40 +45,6 @@ initialModel uid reset_key appname =
     }
 
 
-
-{- makeUrlP : Model -> ( String, Dict String String )
-   makeUrlP model =
-       case model.mode of
-           RegistrationMode ->
-               ( "/registration", Dict.empty )
-
-           LoginMode ->
-               ( "/login", Dict.empty )
-
-           ResetMode ->
-               ( "/reset", Dict.empty )
--}
-{- urlToState : List String -> Dict String String -> Model -> Model
-   urlToState segments parms model =
-       { model
-           | mode =
-               case List.head segments of
-                   Just "login" ->
-                       LoginMode
-
-                   Just "reset" ->
-                       ResetMode
-
-                   Just "registration" ->
-                       RegistrationMode
-
-                   _ ->
-                       model.mode
-       }
-
--}
-
-
 view : Util.Size -> Model -> Element Msg
 view size model =
     column [ width fill, height (px size.height) ]

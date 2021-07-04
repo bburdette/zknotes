@@ -191,11 +191,6 @@ pub fn user_interface(
         content: serde_json::Value::Null,
       }),
       None => {
-        println!(
-          "set_password.reset_key.to_string() {}",
-          set_password.reset_key.to_string()
-        );
-
         let npwd = sqldata::read_newpassword(&conn, userdata.id, set_password.reset_key)?;
 
         if is_token_expired(config.reset_token_expiration_ms, npwd) {

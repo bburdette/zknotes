@@ -984,7 +984,7 @@ actualupdate msg model =
                 ResetPassword.Ok ->
                     ( { model | state = ResetPassword nst }
                     , sendUIMsg model.location
-                        (UI.SetPassword { uid = nst.userId, newpwd = nst.password, reset_key = UUID.toString nst.reset_key })
+                        (UI.SetPassword { uid = nst.userId, newpwd = nst.password, reset_key = nst.reset_key })
                     )
 
                 ResetPassword.None ->

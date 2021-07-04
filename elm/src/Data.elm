@@ -3,6 +3,7 @@ module Data exposing (..)
 import Json.Decode as JD
 import Json.Encode as JE
 import Search as S
+import UUID exposing (UUID)
 import Url.Builder as UB
 import Util exposing (andMap)
 
@@ -34,7 +35,7 @@ type alias ResetPassword =
 type alias SetPassword =
     { uid : String
     , newpwd : String
-    , reset_key : String
+    , reset_key : UUID
     }
 
 
@@ -232,7 +233,7 @@ encodeSetPassword l =
     JE.object
         [ ( "uid", JE.string l.uid )
         , ( "newpwd", JE.string l.newpwd )
-        , ( "reset_key", JE.string l.reset_key )
+        , ( "reset_key", UUID.toValue l.reset_key )
         ]
 
 
