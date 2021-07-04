@@ -1228,6 +1228,18 @@ actualupdate msg model =
                             , Cmd.none
                             )
 
+                        UI.SetPasswordAck ->
+                            let
+                                nmod =
+                                    { model
+                                        | state =
+                                            Login <| Login.initialModel Nothing "zknotes" model.seed
+                                    }
+                            in
+                            ( displayMessageDialog nmod "password reset complete!"
+                            , Cmd.none
+                            )
+
                         UI.ChangedPassword ->
                             ( displayMessageDialog model "password changed"
                             , Cmd.none

@@ -39,6 +39,7 @@ type ServerResponse
     | ChangedPassword
     | ChangedEmail
     | ResetPasswordAck
+    | SetPasswordAck
     | ZkNoteSearchResult Data.ZkNoteSearchResult
     | ZkListNoteSearchResult Data.ZkListNoteSearchResult
     | SavedZkNotePlusLinks Data.SavedZkNote
@@ -81,6 +82,9 @@ showServerResponse sr =
 
         ResetPasswordAck ->
             "ResetPasswordAck"
+
+        SetPasswordAck ->
+            "SetPasswordAck"
 
         ChangedPassword ->
             "ChangedPassword"
@@ -284,6 +288,9 @@ serverResponseDecoder =
 
                     "resetpasswordack" ->
                         JD.succeed ResetPasswordAck
+
+                    "setpasswordack" ->
+                        JD.succeed SetPasswordAck
 
                     "changed password" ->
                         JD.succeed ChangedPassword

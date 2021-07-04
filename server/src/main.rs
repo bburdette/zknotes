@@ -225,6 +225,8 @@ fn purge_tokens(config: &Config) -> Result<(), Box<dyn Error>> {
 
   sqldata::purge_email_tokens(&conn, config.email_token_expiration_ms)?;
 
+  sqldata::purge_reset_tokens(&conn, config.reset_token_expiration_ms)?;
+
   Ok(())
 }
 
