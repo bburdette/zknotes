@@ -238,7 +238,7 @@ resetView model =
 
 registrationView : Model -> Element Msg
 registrationView model =
-    column [ Background.color (Common.navbarColor 1), width fill ]
+    column [ Background.color (Common.navbarColor 1), width fill, spacing 8, padding 8 ]
         [ text <| "welcome to " ++ model.appname ++ "!"
         , text <| "register your new account below:"
         , Input.text []
