@@ -152,6 +152,8 @@ view size model =
         [ column
             [ centerX
             , centerY
+            , width <| maximum 450 fill
+            , height <| maximum 420 fill
             , Background.color (Common.navbarColor 1)
             , Border.rounded 10
             , padding 10
@@ -187,6 +189,7 @@ loginView model =
     column
         [ spacing 8
         , width fill
+        , height fill
         , padding 10
         , Background.color (Common.navbarColor 1)
         ]
@@ -206,7 +209,7 @@ loginView model =
             , show = False
             }
         , text model.responseMessage
-        , Input.button (buttonStyle ++ [ width fill ])
+        , Input.button (buttonStyle ++ [ width fill, alignBottom ])
             { onPress = Just LoginPressed
             , label = text "log in"
             }
@@ -218,6 +221,7 @@ resetView model =
     column
         [ spacing 8
         , width fill
+        , height fill
         , padding 10
         , Background.color (Common.navbarColor 1)
         ]
@@ -229,7 +233,7 @@ resetView model =
             , label = Input.labelLeft [] <| text "User id:"
             }
         , text model.responseMessage
-        , Input.button (buttonStyle ++ [ width fill ])
+        , Input.button (buttonStyle ++ [ width fill, alignBottom ])
             { onPress = Just ResetPressed
             , label = text "send reset email"
             }
@@ -238,7 +242,7 @@ resetView model =
 
 registrationView : Model -> Element Msg
 registrationView model =
-    column [ Background.color (Common.navbarColor 1), width fill, spacing 8, padding 8 ]
+    column [ Background.color (Common.navbarColor 1), width fill, height fill, spacing 8, padding 8 ]
         [ text <| "welcome to " ++ model.appname ++ "!"
         , text <| "register your new account below:"
         , Input.text []
@@ -267,7 +271,7 @@ registrationView model =
             , label = Input.labelLeft [] <| text <| Tuple.first model.captchaQ
             }
         , text model.responseMessage
-        , Input.button (buttonStyle ++ [ width fill ])
+        , Input.button (buttonStyle ++ [ width fill, alignBottom ])
             { onPress = Just RegisterPressed
             , label = text "register"
             }
