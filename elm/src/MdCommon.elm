@@ -16,6 +16,7 @@ import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..))
 import Markdown.Html
 import Markdown.Parser
 import Markdown.Renderer
+import Regex
 import Schelme.Show exposing (showTerm)
 import TangoColors as TC
 
@@ -401,16 +402,20 @@ codeBlock details =
             |> String.lines
             |> List.map
                 (\line ->
-                    let
-                        tline =
-                            String.trimLeft line
+                    E.paragraph []
+                        [ E.text <|
+                            if String.isEmpty line then
+                                "\u{00A0}"
 
-                        splen =
-                            String.length line - String.length tline
-                    in
-                    E.row []
-                        [ E.text (String.left splen line)
-                        , E.paragraph [] [ E.text line ]
+                            else
+                                Regex.replace
+                                    (Regex.fromString "\\s+" |> Maybe.withDefault Regex.never)
+                                    (\match ->
+                                        -- replace regular space with non-breaking space (&nbsp)
+                                        String.replace " " "\u{00A0}" (String.dropLeft 1 match.match)
+                                            ++ String.right 1 match.match
+                                    )
+                                    line
                         ]
                 )
         )
