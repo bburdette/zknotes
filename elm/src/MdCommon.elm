@@ -386,20 +386,31 @@ code snippet =
 
 codeBlock : { body : String, language : Maybe String } -> Element msg
 codeBlock details =
-    E.el
+    E.column
         [ EBk.color (E.rgba 0 0 0 0.03)
-
-        -- , E.htmlAttribute (Html.Attributes.style "white-space" "pre")
-        -- , E.htmlAttribute (Html.Attributes.style "overflow-wrap" "break-word")
-        -- , E.width <| E.px 400
-        , E.htmlAttribute (Html.Attributes.style "word-break" "break-word")
-        , E.padding 20
-        , E.width E.fill
+        , E.padding 5
         , EF.family
             [ EF.external
                 { url = "https://fonts.googleapis.com/css?family=Source+Code+Pro"
                 , name = "Source Code Pro"
                 }
             ]
+        , E.width E.fill
         ]
-        (E.text details.body)
+        (details.body
+            |> String.lines
+            |> List.map
+                (\line ->
+                    let
+                        tline =
+                            String.trimLeft line
+
+                        splen =
+                            String.length line - String.length tline
+                    in
+                    E.row []
+                        [ E.text (String.left splen line)
+                        , E.paragraph [] [ E.text line ]
+                        ]
+                )
+        )
