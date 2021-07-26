@@ -8,7 +8,7 @@ use actix_session::Session;
 use crypto_hash::{hex_digest, Algorithm};
 use either::Either::{Left, Right};
 use log::info;
-use simple_error;
+use simple_error::bail;
 use std::error::Error;
 use std::path::Path;
 use uuid::Uuid;
