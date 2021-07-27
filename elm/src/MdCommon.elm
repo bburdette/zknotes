@@ -11,7 +11,7 @@ import Element.Font as EF
 import Element.Input as EI
 import Element.Region as ER
 import Html exposing (Attribute, Html)
-import Html.Attributes
+import Html.Attributes as HA
 import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..))
 import Markdown.Html
 import Markdown.Parser
@@ -145,13 +145,13 @@ mkRenderer restoreSearchMsg maxw cellDict showPanelElt onchanged =
              else
                 E.link
             )
-                [ E.htmlAttribute (Html.Attributes.style "display" "inline-flex") ]
+                [ E.htmlAttribute (HA.style "display" "inline-flex") ]
                 { url = destination
                 , label =
                     E.paragraph
                         [ EF.color (E.rgb255 0 0 255)
-                        , E.htmlAttribute (Html.Attributes.style "overflow-wrap" "break-word")
-                        , E.htmlAttribute (Html.Attributes.style "word-break" "break-word")
+                        , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
+                        , E.htmlAttribute (HA.style "word-break" "break-word")
                         ]
                         body
                 }
@@ -361,9 +361,9 @@ heading { level, rawText, children } =
         , EF.family [ EF.typeface "Montserrat" ]
         , ER.heading (Block.headingLevelToInt level)
         , E.htmlAttribute
-            (Html.Attributes.attribute "name" (rawTextToId rawText))
+            (HA.attribute "name" (rawTextToId rawText))
         , E.htmlAttribute
-            (Html.Attributes.id (rawTextToId rawText))
+            (HA.id (rawTextToId rawText))
         ]
         children
 
@@ -387,25 +387,12 @@ codeBlock details =
         , E.padding 5
         , EF.family <| [ EF.typeface "mono" ]
         ]
-        (details.body
-            |> String.lines
-            |> List.map
-                (\line ->
-                    E.paragraph []
-                        [ E.text <|
-                            if String.isEmpty line then
-                                "\u{00A0}"
-
-                            else
-                                Regex.replace
-                                    (Regex.fromString "\\s+" |> Maybe.withDefault Regex.never)
-                                    (\match ->
-                                        -- alternating non-breaking spaces with regular spaces
-                                        -- allows paragraph to break the spaces apart when needed
-                                        -- but not compress spaces down to single characters.
-                                        String.replace "  " "\u{00A0} " match.match
-                                    )
-                                    line
-                        ]
-                )
-        )
+        [ E.html <|
+            Html.div
+                [ HA.style "white-space" "pre-wrap"
+                , HA.style "word-break" "break-word"
+                ]
+                [ Html.text <|
+                    details.body
+                ]
+        ]

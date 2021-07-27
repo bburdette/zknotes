@@ -111,6 +111,8 @@ view maxw model loggedin =
                           else
                             E.width <| E.px 400
                         , E.alignTop
+                        , EBk.color TC.darkGrey
+                        , E.padding 10
                         ]
                         (case
                             MC.markdownView
@@ -120,7 +122,6 @@ view maxw model loggedin =
                             Ok rendered ->
                                 E.column
                                     [ E.spacing 30
-                                    , E.padding 80
                                     , E.width E.fill
                                     , E.centerX
                                     ]
@@ -134,13 +135,11 @@ view maxw model loggedin =
                     E.none
             , E.column
                 [ E.width (E.fill |> E.maximum 1000), E.centerX, E.padding 10, E.alignTop ]
-                [ E.row [ E.centerX ] [ E.text model.title ]
-                , E.row [ E.width E.fill ]
+                [ E.row [ E.width E.fill ]
                     [ case MC.markdownView (MC.mkRenderer (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged) model.md of
                         Ok rendered ->
                             E.column
                                 [ E.spacing 30
-                                , E.padding 80
                                 , E.width E.fill
                                 , E.centerX
                                 ]

@@ -938,7 +938,7 @@ zknview size recentZkns model =
             <|
                 [ E.column
                     [ E.centerX
-                    , E.paddingXY 30 10
+                    , E.paddingXY 0 10
                     , E.spacing 8
                     ]
                     [ E.row [ E.width E.fill, E.spacing 8 ]
