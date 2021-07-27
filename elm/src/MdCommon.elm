@@ -1,4 +1,4 @@
-module MdCommon exposing (Panel, blockCells, cellView, code, codeBlock, defCell, heading, markdownView, mdCells, mdPanel, mdPanels, mkRenderer, rawTextToId, showRunState)
+module MdCommon exposing (Panel, blockCells, cellView, defCell, heading, markdownView, mdCells, mdPanel, mdPanels, mkRenderer, rawTextToId, showRunState)
 
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
@@ -136,7 +136,7 @@ mkRenderer restoreSearchMsg maxw cellDict showPanelElt onchanged =
     , strong = \content -> E.paragraph [ EF.bold ] content
     , emphasis = \content -> E.paragraph [ EF.italic ] content
     , strikethrough = \content -> E.paragraph [ EF.strike ] content
-    , codeSpan = code
+    , codeSpan = codeSpan
     , link =
         \{ title, destination } body ->
             (if String.contains ":" destination then
@@ -368,19 +368,14 @@ heading { level, rawText, children } =
         children
 
 
-code : String -> Element msg
-code snippet =
+codeSpan : String -> Element msg
+codeSpan snippet =
     E.el
         [ EBk.color
             (E.rgba 0 0 0 0.04)
         , EBd.rounded 2
         , E.paddingXY 5 3
-        , EF.family
-            [ EF.external
-                { url = "https://fonts.googleapis.com/css?family=Source+Code+Pro"
-                , name = "Source Code Pro"
-                }
-            ]
+        , EF.family <| [ EF.typeface "mono" ]
         ]
         (E.text snippet)
 
@@ -390,13 +385,7 @@ codeBlock details =
     E.column
         [ EBk.color (E.rgba 0 0 0 0.03)
         , E.padding 5
-        , EF.family
-            [ EF.external
-                { url = "https://fonts.googleapis.com/css?family=Source+Code+Pro"
-                , name = "Source Code Pro"
-                }
-            ]
-        , E.width E.fill
+        , EF.family <| [ EF.typeface "mono" ]
         ]
         (details.body
             |> String.lines
@@ -411,9 +400,10 @@ codeBlock details =
                                 Regex.replace
                                     (Regex.fromString "\\s+" |> Maybe.withDefault Regex.never)
                                     (\match ->
-                                        -- replace regular space with non-breaking space (&nbsp)
-                                        String.replace " " "\u{00A0}" (String.dropLeft 1 match.match)
-                                            ++ String.right 1 match.match
+                                        -- alternating non-breaking spaces with regular spaces
+                                        -- allows paragraph to break the spaces apart when needed
+                                        -- but not compress spaces down to single characters.
+                                        String.replace "  " "\u{00A0} " match.match
                                     )
                                     line
                         ]
