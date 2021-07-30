@@ -23,6 +23,7 @@ import MdCommon as MC
 import Schelme.Show exposing (showTerm)
 import Search as S
 import SearchPanel as SP
+import SearchStackPanel as SSP
 import TagSearchPanel as TSP
 import TangoColors as TC
 import Url as U
