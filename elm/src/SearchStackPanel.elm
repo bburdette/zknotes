@@ -83,7 +83,10 @@ type Command
 
 view : Bool -> Bool -> Int -> Model -> Element Msg
 view showCopy narrow nblevel model =
-    E.map SPMsg <| SP.view showCopy narrow nblevel model.spmodel
+    E.column []
+        [ E.text "searrchstack"
+        , E.map SPMsg <| SP.view showCopy narrow nblevel model.spmodel
+        ]
 
 
 update : Msg -> Model -> ( Model, Command )
@@ -102,7 +105,13 @@ update msg model =
                     ( { model | spmodel = nm }, None )
 
                 SP.Search ts ->
-                    ( { model | spmodel = nm }, Search ts )
+                    ( { model | spmodel = nm }
+                    , Search <|
+                        { ts
+                            | tagSearch =
+                                andifySearch model.searchStack ts.tagSearch
+                        }
+                    )
 
                 SP.Copy s ->
                     ( model, Copy s )

@@ -1,5 +1,7 @@
 module EditZkNote exposing (Command(..), EditLink, Model, Msg(..), NavChoice(..), SearchOrRecent(..), WClass(..), addComment, commentsRecieved, commonButtonStyle, compareZklinks, dirty, disabledLinkButtonStyle, elToSzkl, elToSzl, fullSave, gotSelectedText, initFull, initNew, isPublic, isSearch, linkButtonStyle, linksWith, mkButtonStyle, noteLink, onCtrlS, onSaved, onZkNote, pageLink, renderMd, replaceOrAdd, saveZkLinkList, setHomeNote, showSr, showZkl, sznFromModel, sznToZkn, toPubId, toZkListNote, update, updateSearch, updateSearchResult, view, zkLinkName, zklKey, zknview)
 
+-- import TagSearchPanel as TSP
+
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
 import Common
@@ -24,7 +26,6 @@ import Schelme.Show exposing (showTerm)
 import Search as S
 import SearchPanel as SP
 import SearchStackPanel as SSP
-import TagSearchPanel as TSP
 import TangoColors as TC
 import Url as U
 import Url.Builder as UB
@@ -1994,11 +1995,7 @@ update msg model =
             in
             if List.any ((==) model.ld.searchid) zkln.sysids then
                 ( { model
-                    | spmodel =
-                        { spmod
-                            | tagSearchModel =
-                                TSP.updateSearchText spmod.tagSearchModel zkln.title
-                        }
+                    | spmodel = SP.setSearchString model.spmodel zkln.title
                   }
                 , None
                 )
@@ -2006,10 +2003,9 @@ update msg model =
             else
                 ( { model
                     | spmodel =
-                        { spmod
-                            | tagSearchModel =
-                                TSP.addToSearchPanel spmod.tagSearchModel [ S.ExactMatch ] zkln.title
-                        }
+                        SP.addToSearch model.spmodel
+                            [ S.ExactMatch ]
+                            zkln.title
                   }
                 , None
                 )
@@ -2021,10 +2017,7 @@ update msg model =
             in
             ( { model
                 | spmodel =
-                    { spmod
-                        | tagSearchModel =
-                            TSP.updateSearchText spmod.tagSearchModel text
-                    }
+                    SP.setSearchString model.spmodel text
               }
             , None
             )
@@ -2036,12 +2029,9 @@ update msg model =
             in
             ( { model
                 | spmodel =
-                    { spmod
-                        | tagSearchModel =
-                            TSP.addToSearchPanel spmod.tagSearchModel
-                                [ S.ExactMatch, S.Tag ]
-                                title
-                    }
+                    SP.addToSearch model.spmodel
+                        [ S.ExactMatch, S.Tag ]
+                        title
               }
             , None
             )
