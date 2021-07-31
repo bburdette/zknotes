@@ -89,11 +89,11 @@ type Command
 
 view : Bool -> Bool -> Int -> Model -> Element Msg
 view showCopy narrow nblevel model =
-    E.column [ E.width E.fill ] <|
+    E.column [ E.width E.fill, E.spacing 3 ] <|
         List.indexedMap
             (\i ts ->
-                E.row [ E.width E.fill ]
-                    [ E.text <| S.showTagSearch ts
+                E.row [ E.width E.fill, E.centerY ]
+                    [ E.el [ E.width E.fill, E.clipX ] <| E.text <| S.printTagSearch ts
                     , EI.button (buttonStyle ++ [ E.alignRight ])
                         { label = E.text "-"
                         , onPress = Just <| MinusPress i
