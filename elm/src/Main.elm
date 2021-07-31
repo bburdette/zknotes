@@ -1908,7 +1908,14 @@ init flags url key =
                                 Just login ->
                                     case login.homenote of
                                         Just id ->
-                                            ( imodel, sendUIMsg flags.location (UI.GetZkNoteEdit { zknote = id }) )
+                                            ( imodel
+                                            , Cmd.batch
+                                                [ sendUIMsg
+                                                    flags.location
+                                                    (UI.SearchZkNotes <| prevSearchQuery login)
+                                                , sendUIMsg flags.location (UI.GetZkNoteEdit { zknote = id })
+                                                ]
+                                            )
 
                                         Nothing ->
                                             let
