@@ -75,6 +75,7 @@ type Msg
     = TSPMsg TSP.Msg
     | PPMsg PP.Msg
     | CopyClicked
+    | AndClicked
 
 
 type Command
@@ -82,6 +83,7 @@ type Command
     | Save
     | Search S.ZkNoteSearch
     | Copy String
+    | And TagSearch
 
 
 view : Bool -> Bool -> Int -> Model -> Element Msg
@@ -90,6 +92,10 @@ view showCopy narrow nblevel model =
         [ E.map TSPMsg <| TSP.view narrow nblevel model.tagSearchModel
         , E.row [ E.width E.fill ]
             [ E.map PPMsg <| PP.view model.paginationModel
+            , EI.button (E.alignRight :: buttonStyle)
+                { label = E.text "&"
+                , onPress = Just AndClicked
+                }
             , if showCopy then
                 EI.button (E.alignRight :: buttonStyle)
                     { label = E.text "< copy"
@@ -107,6 +113,14 @@ update msg model =
     case msg of
         CopyClicked ->
             ( model, Copy model.tagSearchModel.searchText )
+
+        AndClicked ->
+            case model.tagSearchModel.search of
+                TSP.TagSearch (Ok ts) ->
+                    ( model, And ts )
+
+                _ ->
+                    ( model, None )
 
         TSPMsg m ->
             let

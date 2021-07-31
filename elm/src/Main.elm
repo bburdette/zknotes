@@ -43,7 +43,7 @@ import Random exposing (Seed, initialSeed)
 import ResetPassword
 import Schelme.Show exposing (showTerm)
 import Search as S
-import SearchPanel as SP
+import SearchStackPanel as SP
 import SelectString as SS
 import ShowMessage
 import TangoColors as TC

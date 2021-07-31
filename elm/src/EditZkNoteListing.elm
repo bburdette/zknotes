@@ -11,7 +11,7 @@ import Element.Input as EI
 import Element.Region
 import Import
 import Search as S exposing (TagSearch(..))
-import SearchPanel as SP
+import SearchStackPanel as SP
 import TagSearchPanel as TSP
 import TangoColors as TC
 import Util
@@ -202,7 +202,7 @@ update msg model ld =
             ( model, SearchHistory )
 
         PowerDeletePress ->
-            case TSP.getSearch model.spmodel.tagSearchModel of
+            case SP.getSearch model.spmodel of
                 Nothing ->
                     ( model, None )
 
@@ -211,7 +211,7 @@ update msg model ld =
                         | dialog =
                             Just <|
                                 ( D.init
-                                    ("delete all notes matching this search?\n" ++ S.showTagSearch s)
+                                    ("delete all notes matching this search?\n" ++ S.showTagSearch s.tagSearch)
                                     True
                                     (\size -> E.map (\_ -> ()) (listview ld size model))
                                 , DeleteAll
@@ -228,9 +228,9 @@ update msg model ld =
                             ( { model | dialog = Nothing }, None )
 
                         ( D.Ok, DeleteAll ) ->
-                            case TSP.getSearch model.spmodel.tagSearchModel of
+                            case SP.getSearch model.spmodel of
                                 Just s ->
-                                    ( { model | dialog = Nothing }, PowerDelete s )
+                                    ( { model | dialog = Nothing }, PowerDelete s.tagSearch )
 
                                 Nothing ->
                                     ( { model | dialog = Nothing }, None )

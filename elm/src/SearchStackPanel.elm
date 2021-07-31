@@ -1,4 +1,4 @@
-module SearchStackPanel exposing (Command(..), Model, Msg(..), addSearchString, getSearch, initModel, searchResultUpdated, setSearchString, update, view)
+module SearchStackPanel exposing (Command(..), Model, Msg(..), addSearchString, addToSearch, getSearch, initModel, searchResultUpdated, setSearchString, update, view)
 
 import Common exposing (buttonStyle)
 import Data
@@ -70,8 +70,14 @@ addSearchString model string =
     }
 
 
+addToSearch : Model -> List SearchMod -> String -> Model
+addToSearch model searchmods name =
+    { model | spmodel = SP.addToSearch model.spmodel searchmods name }
+
+
 type Msg
     = SPMsg SP.Msg
+    | MinusPress Int
 
 
 type Command
@@ -83,15 +89,34 @@ type Command
 
 view : Bool -> Bool -> Int -> Model -> Element Msg
 view showCopy narrow nblevel model =
-    E.column []
-        [ E.text "searrchstack"
-        , E.map SPMsg <| SP.view showCopy narrow nblevel model.spmodel
-        ]
+    E.column [ E.width E.fill ] <|
+        List.indexedMap
+            (\i ts ->
+                E.row [ E.width E.fill ]
+                    [ E.text <| S.showTagSearch ts
+                    , EI.button (buttonStyle ++ [ E.alignRight ])
+                        { label = E.text "-"
+                        , onPress = Just <| MinusPress i
+                        }
+                    ]
+            )
+            model.searchStack
+            ++ [ E.map SPMsg <| SP.view showCopy narrow nblevel model.spmodel
+               ]
 
 
 update : Msg -> Model -> ( Model, Command )
 update msg model =
     case msg of
+        MinusPress idx ->
+            ( { model
+                | searchStack =
+                    List.take idx model.searchStack
+                        ++ List.drop (idx + 1) model.searchStack
+              }
+            , None
+            )
+
         SPMsg m ->
             let
                 ( nm, cmd ) =
@@ -115,3 +140,6 @@ update msg model =
 
                 SP.Copy s ->
                     ( model, Copy s )
+
+                SP.And s ->
+                    ( { model | searchStack = model.searchStack ++ [ s ] }, None )

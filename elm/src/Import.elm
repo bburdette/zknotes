@@ -21,7 +21,6 @@ module Import exposing
     , zklKey
     )
 
-import MdCommon exposing (..)
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
 import Common
@@ -42,9 +41,10 @@ import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..), 
 import Markdown.Html
 import Markdown.Parser
 import Markdown.Renderer
+import MdCommon exposing (..)
 import Schelme.Show exposing (showTerm)
 import Search as S
-import SearchPanel as SP
+import SearchStackPanel as SP
 import TangoColors as TC
 import Task
 import Url as U

@@ -1,6 +1,7 @@
 module EditZkNote exposing (Command(..), EditLink, Model, Msg(..), NavChoice(..), SearchOrRecent(..), WClass(..), addComment, commentsRecieved, commonButtonStyle, compareZklinks, dirty, disabledLinkButtonStyle, elToSzkl, elToSzl, fullSave, gotSelectedText, initFull, initNew, isPublic, isSearch, linkButtonStyle, linksWith, mkButtonStyle, noteLink, onCtrlS, onSaved, onZkNote, pageLink, renderMd, replaceOrAdd, saveZkLinkList, setHomeNote, showSr, showZkl, sznFromModel, sznToZkn, toPubId, toZkListNote, update, updateSearch, updateSearchResult, view, zkLinkName, zklKey, zknview)
 
 -- import TagSearchPanel as TSP
+-- import SearchPanel as SP
 
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
@@ -24,8 +25,7 @@ import Markdown.Renderer
 import MdCommon as MC
 import Schelme.Show exposing (showTerm)
 import Search as S
-import SearchPanel as SP
-import SearchStackPanel as SSP
+import SearchStackPanel as SP
 import TangoColors as TC
 import Url as U
 import Url.Builder as UB
