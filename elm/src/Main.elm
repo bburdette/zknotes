@@ -822,7 +822,17 @@ urlupdate msg model =
                                 case routeState model route of
                                     Just ( st, rscmd ) ->
                                         -- swap out the savedRoute, so we don't write over history.
-                                        ( { model | state = st, savedRoute = stateRoute st }, rscmd )
+                                        ( { model
+                                            | state = st
+                                            , savedRoute =
+                                                let
+                                                    nssr =
+                                                        stateRoute st
+                                                in
+                                                { nssr | save = False }
+                                          }
+                                        , rscmd
+                                        )
 
                                     Nothing ->
                                         ( model, Cmd.none )
