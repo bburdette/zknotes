@@ -246,6 +246,10 @@ mkRenderer restoreSearchMsg maxw cellDict showPanelElt onchanged =
                             E.text "error"
                 )
                 |> Markdown.Html.withAttribute "noteid"
+            , Markdown.Html.tag "image" imageView
+                |> Markdown.Html.withAttribute "text"
+                |> Markdown.Html.withAttribute "url"
+                |> Markdown.Html.withOptionalAttribute "uh"
             ]
     , table = E.column [ E.width <| E.fill ]
     , tableHeader = E.column [ E.width <| E.fill, EF.bold, EF.underline, E.spacing 8 ]
@@ -276,7 +280,25 @@ searchView restoreSearchMsg search renderedChildren =
 
 panelView : Int -> List (Element a) -> Element a
 panelView noteid renderedChildren =
-    E.el [ E.padding 5, EBk.color TC.darkGray ] <| E.text ("Side panel note :" ++ String.fromInt noteid)
+    E.el [ E.padding 5, EBk.color TC.darkGray ] <|
+        E.text ("Side panel note :" ++ String.fromInt noteid)
+
+
+imageView : String -> String -> Maybe String -> List (Element a) -> Element a
+imageView text url mbwidth renderedChildren =
+    -- E.el [ E.padding 5, EBk.color TC.darkGray ]
+    --     <| E.text ("Side panel note :" ++ String.fromInt noteid)
+    case
+        mbwidth
+            |> Maybe.andThen (\s -> String.toInt s)
+    of
+        Just w ->
+            E.image [ E.width <| E.px w ]
+                { src = url, description = text }
+
+        Nothing ->
+            E.image [ E.width E.fill ]
+                { src = url, description = text }
 
 
 cellView : CellDict -> List (Element a) -> String -> String -> (String -> String -> a) -> Element a
