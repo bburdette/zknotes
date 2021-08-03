@@ -134,7 +134,7 @@ view maxw model loggedin =
                 Nothing ->
                     E.none
             , E.column
-                [ E.width (E.fill |> E.maximum 1000), E.centerX, E.padding 10, E.alignTop ]
+                [ E.width (E.fill |> E.maximum 1000), E.centerX, E.spacing 8, E.padding 10, E.alignTop ]
                 [ E.row [ E.width E.fill ]
                     [ case MC.markdownView (MC.mkRenderer (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged) model.md of
                         Ok rendered ->

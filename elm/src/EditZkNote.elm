@@ -120,8 +120,8 @@ type alias Model =
     , comments : List Data.ZkNote
     , newcomment : Maybe NewCommentState
     , pendingcomment : Maybe Data.SaveZkNote
-    , editable : Bool
-    , editableValue : Bool
+    , editable : Bool -- is this note editable in the UI?
+    , editableValue : Bool -- is this note editable by other users?
     , pubidtxt : String
     , title : String
     , createdate : Maybe Int
@@ -1356,7 +1356,7 @@ initNew ld zkl spm =
     , comments = []
     , newcomment = Nothing
     , pendingcomment = Nothing
-    , editable = False
+    , editable = True
     , editableValue = False
     , createdate = Nothing
     , changeddate = Nothing
