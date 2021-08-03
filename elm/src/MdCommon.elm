@@ -158,12 +158,8 @@ mkRenderer restoreSearchMsg maxw cellDict showPanelElt onchanged =
     , hardLineBreak = Html.br [] [] |> E.html
     , image =
         \image ->
-            case image.title of
-                Just title ->
-                    E.image [ E.width <| E.maximum maxw E.shrink ] { src = image.src, description = image.alt }
-
-                Nothing ->
-                    E.image [ E.width <| E.maximum maxw E.shrink ] { src = image.src, description = image.alt }
+            E.image [ E.width E.fill ]
+                { src = image.src, description = image.alt }
 
     {- case image.title of
        Just title ->
@@ -249,7 +245,7 @@ mkRenderer restoreSearchMsg maxw cellDict showPanelElt onchanged =
             , Markdown.Html.tag "image" imageView
                 |> Markdown.Html.withAttribute "text"
                 |> Markdown.Html.withAttribute "url"
-                |> Markdown.Html.withOptionalAttribute "uh"
+                |> Markdown.Html.withOptionalAttribute "width"
             ]
     , table = E.column [ E.width <| E.fill ]
     , tableHeader = E.column [ E.width <| E.fill, EF.bold, EF.underline, E.spacing 8 ]
@@ -286,14 +282,12 @@ panelView noteid renderedChildren =
 
 imageView : String -> String -> Maybe String -> List (Element a) -> Element a
 imageView text url mbwidth renderedChildren =
-    -- E.el [ E.padding 5, EBk.color TC.darkGray ]
-    --     <| E.text ("Side panel note :" ++ String.fromInt noteid)
     case
         mbwidth
             |> Maybe.andThen (\s -> String.toInt s)
     of
         Just w ->
-            E.image [ E.width <| E.px w ]
+            E.image [ E.width <| E.maximum w E.fill, E.centerX ]
                 { src = url, description = text }
 
         Nothing ->
