@@ -487,7 +487,7 @@ viewState size state model =
             E.map LoginMsg <| Login.view size lem
 
         EditZkNote em _ ->
-            E.map EditZkNoteMsg <| EditZkNote.view size model.recentNotes em
+            E.map EditZkNoteMsg <| EditZkNote.view model.timezone size model.recentNotes em
 
         EditZkNoteListing em ld ->
             E.map EditZkNoteListingMsg <| EditZkNoteListing.view ld size em
@@ -1875,7 +1875,7 @@ handleEditZkNoteCmd model login emod ecmd =
             )
 
         EditZkNote.View v ->
-            ( { model | state = EView (View.initSzn v.note [] v.panelnote) (EditZkNote emod login) }
+            ( { model | state = EView (View.initSzn v.note v.createdate v.changeddate [] v.panelnote) (EditZkNote emod login) }
             , Cmd.none
             )
 

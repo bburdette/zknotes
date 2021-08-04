@@ -25,6 +25,7 @@ import Search as S
 import SearchPanel as SP
 import TagSearchPanel as TSP
 import TangoColors as TC
+import Time
 import Url as U
 import Url.Builder as UB
 import Url.Parser as UP exposing ((</>))
@@ -47,7 +48,7 @@ type Msg
     | SavePress
     | DonePress
     | RevertPress
-    | DeletePress
+    | DeletePress Time.Zone
     | ViewPress
     | NewPress
     | CopyPress
@@ -143,7 +144,12 @@ type Command
     | Save Data.SaveZkNotePlusLinks
     | SaveExit Data.SaveZkNotePlusLinks
     | Revert
-    | View { note : Data.SaveZkNote, panelnote : Maybe Data.ZkNote }
+    | View
+        { note : Data.SaveZkNote
+        , createdate : Maybe Int
+        , changeddate : Maybe Int
+        , panelnote : Maybe Data.ZkNote
+        }
     | Delete Int
     | Switch Int
     | SaveSwitch Data.SaveZkNotePlusLinks Int
@@ -157,7 +163,12 @@ type Command
 onZkNote : Data.ZkNote -> Model -> ( Model, Command )
 onZkNote zkn model =
     ( { model | panelNote = Just zkn }
-    , View { note = sznFromModel model, panelnote = Just zkn }
+    , View
+        { note = sznFromModel model
+        , createdate = model.createdate
+        , changeddate = model.changeddate
+        , panelnote = Just zkn
+        }
     )
 
 
@@ -434,14 +445,14 @@ pageLink model =
             )
 
 
-view : Util.Size -> List Data.ZkListNote -> Model -> Element Msg
-view size recentZkns model =
+view : Time.Zone -> Util.Size -> List Data.ZkListNote -> Model -> Element Msg
+view zone size recentZkns model =
     case model.dialog of
         Just dialog ->
             D.view size dialog |> E.map DialogMsg
 
         Nothing ->
-            zknview size recentZkns model
+            zknview zone size recentZkns model
 
 
 commonButtonStyle : Bool -> List (E.Attribute msg)
@@ -697,8 +708,8 @@ renderMd cd md mdw =
             E.text errors
 
 
-zknview : Util.Size -> List Data.ZkListNote -> Model -> Element Msg
-zknview size recentZkns model =
+zknview : Time.Zone -> Util.Size -> List Data.ZkListNote -> Model -> Element Msg
+zknview zone size recentZkns model =
     let
         wclass =
             if size.width < 800 then
@@ -776,6 +787,26 @@ zknview size recentZkns model =
                                 { label = E.text "new comment", onPress = Just NewCommentPress }
                             ]
                    )
+
+        dates =
+            case ( model.createdate, model.changeddate ) of
+                ( Just cd, Just chd ) ->
+                    E.row [ E.width E.fill ]
+                        [ E.row []
+                            [ E.text "created: "
+                            , E.text (Util.showTime zone (Time.millisToPosix cd))
+                            ]
+                        , E.row [ E.alignRight ]
+                            [ E.text "saved: "
+                            , E.text (Util.showTime zone (Time.millisToPosix chd))
+                            ]
+                        ]
+
+                _ ->
+                    E.none
+
+        divider =
+            E.row [ E.width E.fill, EBd.widthEach { bottom = 1, left = 0, right = 0, top = 0 } ] []
 
         showLinks =
             E.row [ EF.bold ] [ E.text "links" ]
@@ -922,8 +953,10 @@ zknview size recentZkns model =
                     , spellcheck = False
                     }
                  ]
+                    ++ [ dates, divider ]
                     ++ showComments
                     -- show the links.
+                    ++ [ divider ]
                     ++ showLinks
                 )
 
@@ -1094,7 +1127,7 @@ zknview size recentZkns model =
                 |> Maybe.withDefault E.none
             , E.el [ EF.bold ] (E.text model.ld.name)
             , if mine then
-                EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just DeletePress, label = E.text "delete" }
+                EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just <| DeletePress zone, label = E.text "delete" }
 
               else
                 EI.button (E.alignRight :: Common.disabledButtonStyle) { onPress = Nothing, label = E.text "delete" }
@@ -1568,7 +1601,12 @@ update msg model =
                 Just panel ->
                     if Maybe.map .id model.panelNote == Just panel.noteid then
                         ( model
-                        , View { note = sznFromModel model, panelnote = model.panelNote }
+                        , View
+                            { note = sznFromModel model
+                            , createdate = model.createdate
+                            , changeddate = model.changeddate
+                            , panelnote = model.panelNote
+                            }
                         )
 
                     else
@@ -1578,7 +1616,12 @@ update msg model =
 
                 Nothing ->
                     ( model
-                    , View { note = sznFromModel model, panelnote = Nothing }
+                    , View
+                        { note = sznFromModel model
+                        , createdate = model.createdate
+                        , changeddate = model.changeddate
+                        , panelnote = Nothing
+                        }
                     )
 
         {- LinksPress ->
@@ -1749,13 +1792,13 @@ update msg model =
         RevertPress ->
             ( model, Revert )
 
-        DeletePress ->
+        DeletePress zone ->
             ( { model
                 | dialog =
                     Just <|
                         D.init "delete this note?"
                             True
-                            (\size -> E.map (\_ -> ()) (view size [] model))
+                            (\size -> E.map (\_ -> ()) (view zone size [] model))
               }
             , None
             )

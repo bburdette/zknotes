@@ -205,8 +205,8 @@ initFull zknaa =
     }
 
 
-initSzn : Data.SaveZkNote -> List Data.EditLink -> Maybe Data.ZkNote -> Model
-initSzn zknote links mbpanelnote =
+initSzn : Data.SaveZkNote -> Maybe Int -> Maybe Int -> List Data.EditLink -> Maybe Data.ZkNote -> Model
+initSzn zknote mbcreatedate mbchangeddate links mbpanelnote =
     let
         cells =
             zknote.content
@@ -221,9 +221,6 @@ initSzn zknote links mbpanelnote =
         ( cc, result ) =
             evalCellsFully
                 (mkCc cells)
-
-        ( createdate, changeddate ) =
-            mbpanelnote |> Maybe.map (\n -> ( Just n.createdate, Just n.changeddate )) |> Maybe.withDefault ( Nothing, Nothing )
     in
     { id = zknote.id
     , pubid = zknote.pubid
@@ -232,8 +229,8 @@ initSzn zknote links mbpanelnote =
     , cells = getCd cc
     , panelNote = mbpanelnote
     , zklinks = links
-    , createdate = createdate
-    , changeddate = changeddate
+    , createdate = mbcreatedate
+    , changeddate = mbchangeddate
     }
 
 
