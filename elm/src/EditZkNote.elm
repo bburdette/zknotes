@@ -143,7 +143,7 @@ type Command
     | Save Data.SaveZkNotePlusLinks
     | SaveExit Data.SaveZkNotePlusLinks
     | Revert
-    | View Data.SaveZkNote (Maybe Data.ZkNote)
+    | View { note : Data.SaveZkNote, panelnote : Maybe Data.ZkNote }
     | Delete Int
     | Switch Int
     | SaveSwitch Data.SaveZkNotePlusLinks Int
@@ -157,7 +157,7 @@ type Command
 onZkNote : Data.ZkNote -> Model -> ( Model, Command )
 onZkNote zkn model =
     ( { model | panelNote = Just zkn }
-    , View (sznFromModel model) (Just zkn)
+    , View { note = sznFromModel model, panelnote = Just zkn }
     )
 
 
@@ -1568,9 +1568,7 @@ update msg model =
                 Just panel ->
                     if Maybe.map .id model.panelNote == Just panel.noteid then
                         ( model
-                        , View
-                            (sznFromModel model)
-                            model.panelNote
+                        , View { note = sznFromModel model, panelnote = model.panelNote }
                         )
 
                     else
@@ -1580,9 +1578,7 @@ update msg model =
 
                 Nothing ->
                     ( model
-                    , View
-                        (sznFromModel model)
-                        Nothing
+                    , View { note = sznFromModel model, panelnote = Nothing }
                     )
 
         {- LinksPress ->

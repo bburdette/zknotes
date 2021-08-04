@@ -48,6 +48,7 @@ import SelectString as SS
 import ShowMessage
 import TangoColors as TC
 import Task exposing (Task)
+import Time
 import Toop
 import UUID exposing (UUID)
 import Url exposing (Url)
@@ -80,6 +81,7 @@ type Msg
     | ChangePasswordDialogMsg (GD.Msg CP.Msg)
     | ChangeEmailDialogMsg (GD.Msg CE.Msg)
     | ResetPasswordMsg ResetPassword.Msg
+    | Zone Time.Zone
     | Noop
 
 
@@ -125,10 +127,23 @@ type alias Model =
     , location : String
     , navkey : Browser.Navigation.Key
     , seed : Seed
+    , timezone : Time.Zone
     , savedRoute : SavedRoute
     , prevSearches : List S.TagSearch
     , recentNotes : List Data.ZkListNote
     }
+
+
+type alias PreInitModel =
+    { flags : Flags
+    , url : Url
+    , key : Browser.Navigation.Key
+    }
+
+
+type PiModel
+    = Ready Model
+    | PreInit PreInitModel
 
 
 type Route
@@ -398,6 +413,9 @@ showMessage msg =
         ResetPasswordMsg _ ->
             "ResetPasswordMsg"
 
+        Zone _ ->
+            "Zone"
+
 
 showState : State -> String
 showState state =
@@ -487,10 +505,10 @@ viewState size state model =
             E.map ImportMsg <| Import.view size em
 
         View em ->
-            E.map ViewMsg <| View.view size.width em False
+            E.map ViewMsg <| View.view model.timezone size.width em False
 
         EView em _ ->
-            E.map ViewMsg <| View.view size.width em True
+            E.map ViewMsg <| View.view model.timezone size.width em True
 
         UserSettings em _ _ ->
             E.map UserSettingsMsg <| UserSettings.view em
@@ -688,6 +706,18 @@ addRecentZkListNote recent zkln =
             :: List.filter (\x -> x.id /= zkln.id) recent
 
 
+piview : PiModel -> { title : String, body : List (Html Msg) }
+piview pimodel =
+    case pimodel of
+        Ready model ->
+            view model
+
+        PreInit model ->
+            { title = "zknotes: initializing"
+            , body = []
+            }
+
+
 view : Model -> { title : String, body : List (Html Msg) }
 view model =
     { title =
@@ -769,6 +799,29 @@ onKeyUp msg =
 alwaysPreventDefault : msg -> ( msg, Bool )
 alwaysPreventDefault msg =
     ( msg, True )
+
+
+piupdate : Msg -> PiModel -> ( PiModel, Cmd Msg )
+piupdate msg initmodel =
+    case initmodel of
+        Ready model ->
+            let
+                ( m, c ) =
+                    urlupdate msg model
+            in
+            ( Ready m, c )
+
+        PreInit imod ->
+            case msg of
+                Zone zone ->
+                    let
+                        ( m, c ) =
+                            init imod.flags imod.url imod.key zone
+                    in
+                    ( Ready m, c )
+
+                _ ->
+                    ( initmodel, Cmd.none )
 
 
 {-| urlUpdate: all URL code shall go here! regular code shall not worry about urls!
@@ -1821,8 +1874,10 @@ handleEditZkNoteCmd model login emod ecmd =
                 ]
             )
 
-        EditZkNote.View szn mbpanel ->
-            ( { model | state = EView (View.initSzn szn [] mbpanel) (EditZkNote emod login) }, Cmd.none )
+        EditZkNote.View v ->
+            ( { model | state = EView (View.initSzn v.note [] v.panelnote) (EditZkNote emod login) }
+            , Cmd.none
+            )
 
         EditZkNote.GetSelectedText ids ->
             ( { model | state = EditZkNote emod login }
@@ -1865,8 +1920,19 @@ prevSearchQuery =
         }
 
 
-init : Flags -> Url -> Browser.Navigation.Key -> ( Model, Cmd Msg )
-init flags url key =
+preinit : Flags -> Url -> Browser.Navigation.Key -> ( PiModel, Cmd Msg )
+preinit flags url key =
+    ( PreInit
+        { flags = flags
+        , url = url
+        , key = key
+        }
+    , Task.perform Zone Time.here
+    )
+
+
+init : Flags -> Url -> Browser.Navigation.Key -> Time.Zone -> ( Model, Cmd Msg )
+init flags url key zone =
     let
         seed =
             initialSeed (flags.seed + 7)
@@ -1883,6 +1949,7 @@ init flags url key =
             , location = flags.location
             , navkey = key
             , seed = seed
+            , timezone = zone
             , savedRoute = { route = Top, save = False }
             , prevSearches = []
             , recentNotes = []
@@ -1960,12 +2027,12 @@ initLogin seed =
     Login <| Login.initialModel Nothing "zknotes" seed
 
 
-main : Platform.Program Flags Model Msg
+main : Platform.Program Flags PiModel Msg
 main =
     Browser.application
-        { init = init
-        , view = view
-        , update = urlupdate
+        { init = preinit
+        , view = piview
+        , update = piupdate
         , subscriptions =
             \_ ->
                 Sub.batch

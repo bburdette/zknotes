@@ -20,6 +20,8 @@ import Markdown.Renderer
 import MdCommon as MC
 import Schelme.Show exposing (showTerm)
 import TangoColors as TC
+import Time
+import Util
 
 
 type Msg
@@ -37,6 +39,8 @@ type alias Model =
     , cells : CellDict
     , panelNote : Maybe Data.ZkNote
     , zklinks : List Data.EditLink
+    , createdate : Maybe Int
+    , changeddate : Maybe Int
     }
 
 
@@ -79,8 +83,8 @@ showZkl id zkl =
         ]
 
 
-view : Int -> Model -> Bool -> Element Msg
-view maxw model loggedin =
+view : Time.Zone -> Int -> Model -> Bool -> Element Msg
+view zone maxw model loggedin =
     let
         mw =
             min maxw 1000 - 160
@@ -148,6 +152,12 @@ view maxw model loggedin =
                         Err errors ->
                             E.text errors
                     ]
+                , model.createdate
+                    |> Maybe.map
+                        (\ct ->
+                            E.row [] [ E.text "created: ", E.text (Util.showTime zone (Time.millisToPosix ct)) ]
+                        )
+                    |> Maybe.withDefault E.none
                 , E.column [ E.centerX, E.width (E.minimum 150 E.shrink), E.spacing 8 ]
                     (model.id
                         |> Maybe.map
@@ -190,6 +200,8 @@ initFull zknaa =
     , cells = getCd cc
     , panelNote = zknaa.panelNote
     , zklinks = zknaa.links
+    , createdate = Just zknote.createdate
+    , changeddate = Just zknote.changeddate
     }
 
 
@@ -209,6 +221,9 @@ initSzn zknote links mbpanelnote =
         ( cc, result ) =
             evalCellsFully
                 (mkCc cells)
+
+        ( createdate, changeddate ) =
+            mbpanelnote |> Maybe.map (\n -> ( Just n.createdate, Just n.changeddate )) |> Maybe.withDefault ( Nothing, Nothing )
     in
     { id = zknote.id
     , pubid = zknote.pubid
@@ -217,6 +232,8 @@ initSzn zknote links mbpanelnote =
     , cells = getCd cc
     , panelNote = mbpanelnote
     , zklinks = links
+    , createdate = createdate
+    , changeddate = changeddate
     }
 
 
