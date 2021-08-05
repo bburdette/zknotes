@@ -138,7 +138,7 @@ view zone maxw model loggedin =
                 Nothing ->
                     E.none
             , E.column
-                [ E.width (E.fill |> E.maximum 1000), E.centerX, E.spacing 8, E.padding 10, E.alignTop ]
+                [ E.width (E.fill |> E.maximum 1000), E.centerX, E.spacing 20, E.padding 10, E.alignTop ]
                 [ E.row [ E.width E.fill ]
                     [ case MC.markdownView (MC.mkRenderer (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged) model.md of
                         Ok rendered ->
@@ -155,7 +155,7 @@ view zone maxw model loggedin =
                 , model.changeddate
                     |> Maybe.map
                         (\ct ->
-                            E.row [] [ E.text "last updated: ", E.text (Util.showTime zone (Time.millisToPosix ct)) ]
+                            E.row [ Font.italic ] [ E.text "last updated: ", E.text (Util.showTime zone (Time.millisToPosix ct)) ]
                         )
                     |> Maybe.withDefault E.none
                 , E.column [ E.centerX, E.width (E.minimum 150 E.shrink), E.spacing 8 ]
