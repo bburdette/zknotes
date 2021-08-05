@@ -797,7 +797,7 @@ zknview zone size recentZkns model =
                             , E.text (Util.showTime zone (Time.millisToPosix cd))
                             ]
                         , E.row [ E.alignRight ]
-                            [ E.text "saved: "
+                            [ E.text "updated: "
                             , E.text (Util.showTime zone (Time.millisToPosix chd))
                             ]
                         ]
