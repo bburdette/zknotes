@@ -161,7 +161,7 @@ routeTitle route =
             "zknote " ++ String.fromInt id
 
         PublicZkPubId id ->
-            "zknote " ++ id
+            id ++ " - zknotes"
 
         EditZkNoteR id ->
             "zknote " ++ String.fromInt id
