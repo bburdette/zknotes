@@ -152,10 +152,10 @@ view zone maxw model loggedin =
                         Err errors ->
                             E.text errors
                     ]
-                , model.createdate
+                , model.changeddate
                     |> Maybe.map
                         (\ct ->
-                            E.row [] [ E.text "created: ", E.text (Util.showTime zone (Time.millisToPosix ct)) ]
+                            E.row [] [ E.text "last updated: ", E.text (Util.showTime zone (Time.millisToPosix ct)) ]
                         )
                     |> Maybe.withDefault E.none
                 , E.column [ E.centerX, E.width (E.minimum 150 E.shrink), E.spacing 8 ]
