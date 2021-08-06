@@ -14,6 +14,8 @@ zknotes has some multi-user features.
  - Notes can be designated as read-only or editable.  
  - There's also a comment system.  Notes that link to the 'comment' system note and to another note show up as comments in the web UI.
 
+If you want to read more, there's some [documentation](https://www.zknotes.com/page/what%20is%20zknotes).
+
 ### install notes
 
 If you want to compile and run this on your own machine:
