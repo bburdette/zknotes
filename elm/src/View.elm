@@ -101,10 +101,10 @@ view zone maxw model loggedin =
           else
             E.none
         , (if narrow then
-            \x -> E.column [ E.width E.fill ] (List.reverse x)
+            \x -> E.column [ E.width E.fill ] [ E.column [ E.centerX ] (List.reverse x) ]
 
            else
-            E.row [ E.width E.fill ]
+            \x -> E.row [ E.width E.fill ] [ E.row [ E.centerX, E.spacing 10 ] x ]
           )
             [ case model.panelNote of
                 Just panel ->
@@ -113,7 +113,7 @@ view zone maxw model loggedin =
                             E.width E.fill
 
                           else
-                            E.width <| E.px 400
+                            E.width <| E.px 300
                         , E.alignTop
                         , EBk.color TC.darkGrey
                         , E.padding 10
@@ -155,11 +155,11 @@ view zone maxw model loggedin =
                 , case ( model.createdate, model.changeddate ) of
                     ( Just cd, Just chd ) ->
                         E.row [ E.width E.fill, Font.italic ]
-                            [ E.row []
+                            [ E.paragraph []
                                 [ E.text "created: "
                                 , E.text (Util.showTime zone (Time.millisToPosix cd))
                                 ]
-                            , E.row [ E.alignRight ]
+                            , E.paragraph [ E.alignRight ]
                                 [ E.text "updated: "
                                 , E.text (Util.showTime zone (Time.millisToPosix chd))
                                 ]
