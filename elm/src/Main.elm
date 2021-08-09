@@ -240,7 +240,13 @@ routeState model route =
                             { message = "loading article"
                             }
                             login
-                        , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
+                        , case model.state of
+                            EView _ _ ->
+                                -- if we're in "EView" then do this request to stay in EView.
+                                PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNote id)) PublicReplyData
+
+                            _ ->
+                                sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
                         )
 
                 Nothing ->
@@ -253,9 +259,17 @@ routeState model route =
 
         PublicZkPubId pubid ->
             Just
-                ( PubShowMessage
-                    { message = "loading article"
-                    }
+                ( case stateLogin model.state of
+                    Just login ->
+                        ShowMessage
+                            { message = "loading article"
+                            }
+                            login
+
+                    Nothing ->
+                        PubShowMessage
+                            { message = "loading article"
+                            }
                 , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNotePubId pubid)) PublicReplyData
                 )
 
@@ -271,6 +285,12 @@ routeState model route =
                     Just <|
                         ( EditZkNoteListing st login
                         , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
+                        )
+
+                EView st login ->
+                    Just <|
+                        ( EView st login
+                        , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNote id)) PublicReplyData
                         )
 
                 st ->
@@ -304,6 +324,25 @@ stateRoute : State -> SavedRoute
 stateRoute state =
     case state of
         View vst ->
+            case vst.pubid of
+                Just pubid ->
+                    { route = PublicZkPubId pubid
+                    , save = True
+                    }
+
+                Nothing ->
+                    case vst.id of
+                        Just id ->
+                            { route = PublicZkNote id
+                            , save = True
+                            }
+
+                        Nothing ->
+                            { route = Top
+                            , save = False
+                            }
+
+        EView vst _ ->
             case vst.pubid of
                 Just pubid ->
                     { route = PublicZkPubId pubid
@@ -835,6 +874,9 @@ urlupdate msg model =
             case msg of
                 InternalUrl url ->
                     let
+                        _ =
+                            Debug.log "internalurl" url
+
                         ( state, icmd ) =
                             parseUrl url
                                 |> Maybe.andThen (routeState model)
@@ -864,15 +906,27 @@ urlupdate msg model =
                     ( model, Cmd.none )
 
                 UrlChanged url ->
+                    let
+                        _ =
+                            Debug.log "urlchanged: " url
+                    in
                     -- we get this from forward and back buttons.  if the user changes the url
                     -- in the browser address bar, its a site reload so this isn't called.
                     case parseUrl url of
                         Just route ->
+                            let
+                                _ =
+                                    Debug.log "urlchanged route: " route
+                            in
                             if route == (stateRoute model.state).route then
+                                let
+                                    _ =
+                                        Debug.log "route unchanged" ""
+                                in
                                 ( model, Cmd.none )
 
                             else
-                                case routeState model route of
+                                case Debug.log "rs" <| routeState model route of
                                     Just ( st, rscmd ) ->
                                         -- swap out the savedRoute, so we don't write over history.
                                         ( { model
@@ -1192,7 +1246,12 @@ actualupdate msg model =
                         PI.ZkNote fbe ->
                             let
                                 vstate =
-                                    View (View.initFull fbe)
+                                    case stateLogin state of
+                                        Just _ ->
+                                            EView (View.initFull fbe) state
+
+                                        Nothing ->
+                                            View (View.initFull fbe)
                             in
                             ( { model | state = vstate }
                             , Cmd.none

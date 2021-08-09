@@ -159,7 +159,7 @@ view zone maxw model loggedin =
                                 [ E.text "created: "
                                 , E.text (Util.showTime zone (Time.millisToPosix cd))
                                 ]
-                            , E.paragraph [ E.alignRight ]
+                            , E.paragraph [ Font.alignRight ]
                                 [ E.text "updated: "
                                 , E.text (Util.showTime zone (Time.millisToPosix chd))
                                 ]
