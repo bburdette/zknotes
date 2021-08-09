@@ -690,7 +690,7 @@ addComment ncs =
 
 renderMd : CellDict -> String -> Int -> Element Msg
 renderMd cd md mdw =
-    case MC.markdownView (MC.mkRenderer RestoreSearch mdw cd True OnSchelmeCodeChanged) md of
+    case MC.markdownView (MC.mkRenderer MC.EditView RestoreSearch mdw cd True OnSchelmeCodeChanged) md of
         Ok rendered ->
             E.column
                 [ E.spacing 30

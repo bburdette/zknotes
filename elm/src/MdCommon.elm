@@ -1,4 +1,4 @@
-module MdCommon exposing (Panel, blockCells, cellView, defCell, heading, markdownView, mdCells, mdPanel, mdPanels, mkRenderer, rawTextToId, showRunState)
+module MdCommon exposing (Panel, ViewMode(..), blockCells, blockPanels, cellView, codeBlock, codeSpan, defCell, heading, imageView, markdownView, mdCells, mdPanel, mdPanels, mkRenderer, panelView, rawTextToId, searchView, showRunState)
 
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
@@ -125,8 +125,13 @@ defCell s =
     { code = s, prog = Err "", runstate = RsErr "" }
 
 
-mkRenderer : (String -> a) -> Int -> CellDict -> Bool -> (String -> String -> a) -> Markdown.Renderer.Renderer (Element a)
-mkRenderer restoreSearchMsg maxw cellDict showPanelElt onchanged =
+type ViewMode
+    = PublicView
+    | EditView
+
+
+mkRenderer : ViewMode -> (String -> a) -> Int -> CellDict -> Bool -> (String -> String -> a) -> Markdown.Renderer.Renderer (Element a)
+mkRenderer viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged =
     { heading = heading
     , paragraph =
         E.paragraph
@@ -225,7 +230,7 @@ mkRenderer restoreSearchMsg maxw cellDict showPanelElt onchanged =
                 |> Markdown.Html.withAttribute "schelmecode"
             , Markdown.Html.tag "search"
                 (\search renderedChildren ->
-                    searchView restoreSearchMsg search renderedChildren
+                    searchView viewMode restoreSearchMsg search renderedChildren
                 )
                 |> Markdown.Html.withAttribute "query"
             , Markdown.Html.tag "panel"
@@ -260,16 +265,22 @@ mkRenderer restoreSearchMsg maxw cellDict showPanelElt onchanged =
     }
 
 
-searchView : (String -> a) -> String -> List (Element a) -> Element a
-searchView restoreSearchMsg search renderedChildren =
+searchView : ViewMode -> (String -> a) -> String -> List (Element a) -> Element a
+searchView viewMode restoreSearchMsg search renderedChildren =
     E.row [ EBk.color TC.darkGray, E.padding 3, E.spacing 3 ]
         (E.el [ EF.italic ] (E.text "search: ")
             :: E.paragraph [] [ E.text search ]
-            :: EI.button
-                (buttonStyle ++ [ EBk.color TC.darkGray ])
-                { label = E.el [ E.centerY, EF.color TC.blue, EF.bold ] <| E.text ">"
-                , onPress = Just <| restoreSearchMsg search
-                }
+            :: (case viewMode of
+                    PublicView ->
+                        E.none
+
+                    EditView ->
+                        EI.button
+                            (buttonStyle ++ [ EBk.color TC.darkGray ])
+                            { label = E.el [ E.centerY, EF.color TC.blue, EF.bold ] <| E.text ">"
+                            , onPress = Just <| restoreSearchMsg search
+                            }
+               )
             :: renderedChildren
         )
 

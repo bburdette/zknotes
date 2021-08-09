@@ -120,7 +120,7 @@ view zone maxw model loggedin =
                         ]
                         (case
                             MC.markdownView
-                                (MC.mkRenderer (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged)
+                                (MC.mkRenderer MC.PublicView (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged)
                                 panel.content
                          of
                             Ok rendered ->
@@ -140,7 +140,7 @@ view zone maxw model loggedin =
             , E.column
                 [ E.width (E.fill |> E.maximum 1000), E.centerX, E.spacing 20, E.padding 10, E.alignTop ]
                 [ E.row [ E.width E.fill ]
-                    [ case MC.markdownView (MC.mkRenderer (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged) model.md of
+                    [ case MC.markdownView (MC.mkRenderer MC.PublicView (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged) model.md of
                         Ok rendered ->
                             E.column
                                 [ E.spacing 30
