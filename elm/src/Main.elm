@@ -1646,7 +1646,18 @@ actualupdate msg model =
                     ( { model | state = EView emod state }, Cmd.none )
 
                 View.Done ->
-                    ( { model | state = state }, Cmd.none )
+                    case state of
+                        ShowMessage _ _ ->
+                            case es.id of
+                                Just id ->
+                                    ( { model | state = state }, sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id }) )
+
+                                Nothing ->
+                                    -- uh, initial page I guess.  would expect prev state to be edit if no id.
+                                    initialPage model
+
+                        _ ->
+                            ( { model | state = state }, Cmd.none )
 
                 View.Switch _ ->
                     ( model, Cmd.none )
@@ -1990,6 +2001,39 @@ preinit flags url key =
     )
 
 
+initialPage : Model -> ( Model, Cmd Msg )
+initialPage curmodel =
+    case stateLogin curmodel.state of
+        Just login ->
+            case login.homenote of
+                Just id ->
+                    ( curmodel
+                    , Cmd.batch
+                        [ sendUIMsg
+                            curmodel.location
+                            (UI.SearchZkNotes <| prevSearchQuery login)
+                        , sendUIMsg curmodel.location (UI.GetZkNoteEdit { zknote = id })
+                        ]
+                    )
+
+                Nothing ->
+                    let
+                        ( m2, c2 ) =
+                            getListing curmodel login
+                    in
+                    ( m2
+                    , Cmd.batch
+                        [ sendUIMsg
+                            curmodel.location
+                            (UI.SearchZkNotes <| prevSearchQuery login)
+                        , c2
+                        ]
+                    )
+
+        Nothing ->
+            ( { curmodel | state = initLogin curmodel.seed }, Cmd.none )
+
+
 init : Flags -> Url -> Browser.Navigation.Key -> Time.Zone -> ( Model, Cmd Msg )
 init flags url key zone =
     let
@@ -2040,35 +2084,7 @@ init flags url key zone =
                 |> Maybe.withDefault
                     (let
                         ( m, c ) =
-                            case flags.login of
-                                Just login ->
-                                    case login.homenote of
-                                        Just id ->
-                                            ( imodel
-                                            , Cmd.batch
-                                                [ sendUIMsg
-                                                    flags.location
-                                                    (UI.SearchZkNotes <| prevSearchQuery login)
-                                                , sendUIMsg flags.location (UI.GetZkNoteEdit { zknote = id })
-                                                ]
-                                            )
-
-                                        Nothing ->
-                                            let
-                                                ( m2, c2 ) =
-                                                    getListing imodel login
-                                            in
-                                            ( m2
-                                            , Cmd.batch
-                                                [ sendUIMsg
-                                                    flags.location
-                                                    (UI.SearchZkNotes <| prevSearchQuery login)
-                                                , c2
-                                                ]
-                                            )
-
-                                Nothing ->
-                                    ( { imodel | state = initLogin seed }, Cmd.none )
+                            initialPage imodel
                      in
                      ( m
                      , Cmd.batch
