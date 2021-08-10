@@ -361,7 +361,10 @@ showZkl isDirty editable focusLink ld id sysColor zkl =
                 |> Maybe.withDefault False
 
         display =
-            [ dir
+            [ E.el
+                [ E.height <| E.px 30
+                ]
+                dir
             , zkl.othername
                 |> Maybe.withDefault ""
                 |> (\s ->
@@ -381,7 +384,14 @@ showZkl isDirty editable focusLink ld id sysColor zkl =
             ]
     in
     if focus then
-        E.column [ E.spacing 8, E.width E.fill ]
+        E.column
+            [ E.spacing 8
+            , E.width E.fill
+            , EBd.width 1
+            , E.padding 3
+            , EBd.rounded 3
+            , EBd.color TC.darkGrey
+            ]
             [ E.row [ E.spacing 8, E.width E.fill ] display
             , E.row [ E.spacing 8 ]
                 [ if ld.userid == zkl.user then
@@ -586,7 +596,14 @@ showSr model isdirty zkln =
     in
     if model.focusSr == Just zkln.id then
         -- focus result!  show controlrow.
-        E.column [ E.spacing 8 ] [ listingrow, controlrow ]
+        E.column
+            [ EBd.width 1
+            , E.padding 3
+            , EBd.rounded 3
+            , EBd.color TC.darkGrey
+            , E.width E.fill
+            ]
+            [ listingrow, controlrow ]
 
     else
         listingrow
