@@ -874,9 +874,6 @@ urlupdate msg model =
             case msg of
                 InternalUrl url ->
                     let
-                        _ =
-                            Debug.log "internalurl" url
-
                         ( state, icmd ) =
                             parseUrl url
                                 |> Maybe.andThen (routeState model)
@@ -906,27 +903,15 @@ urlupdate msg model =
                     ( model, Cmd.none )
 
                 UrlChanged url ->
-                    let
-                        _ =
-                            Debug.log "urlchanged: " url
-                    in
                     -- we get this from forward and back buttons.  if the user changes the url
                     -- in the browser address bar, its a site reload so this isn't called.
                     case parseUrl url of
                         Just route ->
-                            let
-                                _ =
-                                    Debug.log "urlchanged route: " route
-                            in
                             if route == (stateRoute model.state).route then
-                                let
-                                    _ =
-                                        Debug.log "route unchanged" ""
-                                in
                                 ( model, Cmd.none )
 
                             else
-                                case Debug.log "rs" <| routeState model route of
+                                case routeState model route of
                                     Just ( st, rscmd ) ->
                                         -- swap out the savedRoute, so we don't write over history.
                                         ( { model
