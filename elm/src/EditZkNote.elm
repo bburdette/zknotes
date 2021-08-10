@@ -846,8 +846,14 @@ zknview zone size recentZkns model =
                 titleed =
                     EI.text
                         (if editable then
-                            [ E.htmlAttribute (Html.Attributes.id "title")
-                            ]
+                            (if isdirty then
+                                [ E.focused [ EBd.glow TC.darkYellow 3 ] ]
+
+                             else
+                                []
+                            )
+                                ++ [ E.htmlAttribute (Html.Attributes.id "title")
+                                   ]
 
                          else
                             [ EF.color TC.darkGrey, E.htmlAttribute (Html.Attributes.id "title") ]
@@ -933,14 +939,21 @@ zknview zone size recentZkns model =
                    else
                     E.none
                  , EI.multiline
-                    [ if editable then
+                    ([ if editable then
                         EF.color TC.black
 
-                      else
+                       else
                         EF.color TC.darkGrey
-                    , E.htmlAttribute (Html.Attributes.id "mdtext")
-                    , E.alignTop
-                    ]
+                     , E.htmlAttribute (Html.Attributes.id "mdtext")
+                     , E.alignTop
+                     ]
+                        ++ (if isdirty then
+                                [ E.focused [ EBd.glow TC.darkYellow 3 ] ]
+
+                            else
+                                []
+                           )
+                    )
                     { onChange =
                         if editable then
                             OnMarkdownInput
@@ -952,6 +965,12 @@ zknview zone size recentZkns model =
                     , label = EI.labelHidden "Markdown input"
                     , spellcheck = False
                     }
+                 , case isdirty of
+                    True ->
+                        EI.button perhapsdirtybutton { onPress = Just SavePress, label = E.text "save" }
+
+                    False ->
+                        E.none
                  ]
                     ++ [ dates, divider ]
                     ++ showComments
