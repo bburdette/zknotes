@@ -70,6 +70,7 @@ type Msg
     | AddToSearchAsTag String
     | SetSearch String
     | BigSearchPress
+    | SettingsPress
     | Noop
 
 
@@ -157,6 +158,7 @@ type Command
     | Search S.ZkNoteSearch
     | SearchHistory
     | BigSearch
+    | Settings
     | GetZkNote Int
     | SetHomeNote Int
 
@@ -1240,6 +1242,9 @@ zknview zone size recentZkns model =
                     )
                 |> Maybe.withDefault E.none
             , E.el [ EF.bold ] (E.text model.ld.name)
+            , EI.button
+                (E.alignRight :: Common.buttonStyle)
+                { onPress = Just SettingsPress, label = E.text "settings" }
             ]
         , case wclass of
             Wide ->
@@ -2153,6 +2158,9 @@ update msg model =
 
         BigSearchPress ->
             ( model, BigSearch )
+
+        SettingsPress ->
+            ( model, Settings )
 
         Noop ->
             ( model, None )
