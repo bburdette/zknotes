@@ -2002,16 +2002,22 @@ initialPage curmodel =
                     )
 
                 Nothing ->
-                    let
-                        ( m2, c2 ) =
-                            getListing curmodel login
-                    in
-                    ( m2
+                    ( { curmodel
+                        | state =
+                            EditZkNote
+                                (EditZkNote.initNew login
+                                    { notes = []
+                                    , offset = 0
+                                    , what = ""
+                                    }
+                                    SP.initModel
+                                )
+                                login
+                      }
                     , Cmd.batch
                         [ sendUIMsg
                             curmodel.location
                             (UI.SearchZkNotes <| prevSearchQuery login)
-                        , c2
                         ]
                     )
 
