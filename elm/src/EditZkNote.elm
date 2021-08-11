@@ -46,7 +46,6 @@ type Msg
     | OnTitleChanged String
     | OnPubidChanged String
     | SavePress
-      -- | DonePress
     | RevertPress
     | DeletePress Time.Zone
     | ViewPress
@@ -910,7 +909,56 @@ zknview zone size recentZkns model =
                 , E.width E.fill
                 , E.paddingXY 5 0
                 ]
-                ([ titleed
+                ([ E.paragraph [ E.padding 10, E.width E.fill, E.spacingXY 3 17 ] <|
+                    List.intersperse (E.text " ")
+                        [ if isdirty then
+                            EI.button parabuttonstyle { onPress = Just RevertPress, label = E.text "revert" }
+
+                          else
+                            E.none
+                        , EI.button parabuttonstyle { onPress = Just CopyPress, label = E.text "copy" }
+                        , let
+                            disb =
+                                EI.button disabledparabuttonstyle
+                                    { onPress = Nothing
+                                    , label = E.text "→⌂"
+                                    }
+
+                            enb =
+                                EI.button parabuttonstyle
+                                    { onPress = Just SetHomeNotePress
+                                    , label = E.text "→⌂"
+                                    }
+                          in
+                          case ( model.ld.homenote, model.id ) of
+                            ( _, Nothing ) ->
+                                disb
+
+                            ( Just x, Just y ) ->
+                                if x == y then
+                                    disb
+
+                                else
+                                    enb
+
+                            ( Nothing, Just _ ) ->
+                                enb
+
+                        -- , EI.button parabuttonstyle { onPress = Just LinksPress, label = E.text"links" }
+                        , case isdirty of
+                            True ->
+                                EI.button perhapsdirtyparabuttonstyle { onPress = Just SavePress, label = E.text "save" }
+
+                            False ->
+                                E.none
+                        , EI.button perhapsdirtyparabuttonstyle { onPress = Just NewPress, label = E.text "new" }
+                        , if mine then
+                            EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just <| DeletePress zone, label = E.text "delete" }
+
+                          else
+                            EI.button (E.alignRight :: Common.disabledButtonStyle) { onPress = Nothing, label = E.text "delete" }
+                        ]
+                 , titleed
                  , if mine then
                     EI.checkbox [ E.width E.shrink ]
                         { onChange =
@@ -1030,6 +1078,10 @@ zknview zone size recentZkns model =
                     ]
                     [ E.row [ E.width E.fill, E.spacing 8 ]
                         [ E.paragraph [ EF.bold ] [ E.text model.title ]
+                        , EI.button Common.buttonStyle
+                            { onPress = Just ViewPress
+                            , label = ZC.fullScreen
+                            }
                         , if search then
                             EI.button (E.alignRight :: Common.buttonStyle)
                                 { label = E.text ">", onPress = Just <| SetSearch model.title }
@@ -1180,56 +1232,7 @@ zknview zone size recentZkns model =
                     )
                 |> Maybe.withDefault E.none
             , E.el [ EF.bold ] (E.text model.ld.name)
-            , if mine then
-                EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just <| DeletePress zone, label = E.text "delete" }
-
-              else
-                EI.button (E.alignRight :: Common.disabledButtonStyle) { onPress = Nothing, label = E.text "delete" }
             ]
-        , E.paragraph
-            [ E.width E.fill, E.spacingXY 3 17 ]
-          <|
-            List.intersperse (E.text " ")
-                [ -- EI.button perhapsdirtyparabuttonstyle { onPress = Just DonePress, label = E.text "done" }
-                  EI.button parabuttonstyle { onPress = Just RevertPress, label = E.text "revert" }
-                , EI.button parabuttonstyle { onPress = Just ViewPress, label = E.text "view" }
-                , EI.button parabuttonstyle { onPress = Just CopyPress, label = E.text "copy" }
-                , let
-                    disb =
-                        EI.button disabledparabuttonstyle
-                            { onPress = Nothing
-                            , label = E.text "→⌂"
-                            }
-
-                    enb =
-                        EI.button parabuttonstyle
-                            { onPress = Just SetHomeNotePress
-                            , label = E.text "→⌂"
-                            }
-                  in
-                  case ( model.ld.homenote, model.id ) of
-                    ( _, Nothing ) ->
-                        disb
-
-                    ( Just x, Just y ) ->
-                        if x == y then
-                            disb
-
-                        else
-                            enb
-
-                    ( Nothing, Just _ ) ->
-                        enb
-
-                -- , EI.button parabuttonstyle { onPress = Just LinksPress, label = E.text"links" }
-                , case isdirty of
-                    True ->
-                        EI.button perhapsdirtyparabuttonstyle { onPress = Just SavePress, label = E.text "save" }
-
-                    False ->
-                        E.none
-                , EI.button perhapsdirtyparabuttonstyle { onPress = Just NewPress, label = E.text "new" }
-                ]
         , case wclass of
             Wide ->
                 E.row
