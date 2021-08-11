@@ -69,6 +69,7 @@ type Msg
     | AddToSearch Data.ZkListNote
     | AddToSearchAsTag String
     | SetSearch String
+    | BigSearchPress
     | Noop
 
 
@@ -155,6 +156,7 @@ type Command
     | GetSelectedText (List String)
     | Search S.ZkNoteSearch
     | SearchHistory
+    | BigSearch
     | GetZkNote Int
     | SetHomeNote Int
 
@@ -1150,10 +1152,16 @@ zknview zone size recentZkns model =
         searchPanel =
             E.column
                 (E.spacing 8 :: E.width E.fill :: sppad)
-                (EI.button Common.buttonStyle
-                    { onPress = Just <| SearchHistoryPress
-                    , label = E.el [ E.centerY ] <| E.text "search history"
-                    }
+                (E.row [ E.width E.fill ]
+                    [ EI.button Common.buttonStyle
+                        { onPress = Just <| SearchHistoryPress
+                        , label = E.el [ E.centerY ] <| E.text "search history"
+                        }
+                    , EI.button (E.alignRight :: Common.buttonStyle)
+                        { onPress = Just <| BigSearchPress
+                        , label = ZC.fullScreen
+                        }
+                    ]
                     :: (E.map SPMsg <|
                             SP.view True (size.width < 400 || wclass /= Narrow) 0 model.spmodel
                        )
@@ -2142,6 +2150,9 @@ update msg model =
 
         SetHomeNotePress ->
             ( model, model.id |> Maybe.map (\id -> SetHomeNote id) |> Maybe.withDefault None )
+
+        BigSearchPress ->
+            ( model, BigSearch )
 
         Noop ->
             ( model, None )

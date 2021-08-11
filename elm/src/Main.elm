@@ -1947,6 +1947,9 @@ handleEditZkNoteCmd model login emod ecmd =
             , Cmd.none
             )
 
+        EditZkNote.BigSearch ->
+            backtolisting
+
         EditZkNote.GetZkNote id ->
             ( { model | state = EditZkNote emod login }
             , sendUIMsg model.location (UI.GetZkNote id)
