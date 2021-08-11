@@ -46,7 +46,7 @@ type Msg
     | OnTitleChanged String
     | OnPubidChanged String
     | SavePress
-    | DonePress
+      -- | DonePress
     | RevertPress
     | DeletePress Time.Zone
     | ViewPress
@@ -334,6 +334,24 @@ dirty model =
                         && (Dict.keys model.zklDict == Dict.keys model.initialZklDict)
             )
         |> Maybe.withDefault True
+
+
+revert : Model -> Model
+revert model =
+    model.revert
+        |> Maybe.map
+            (\r ->
+                { model
+                    | id = r.id
+                    , pubidtxt = r.pubid |> Maybe.withDefault ""
+                    , title = r.title
+                    , md = r.content
+                    , editableValue = r.editable
+                    , zklDict = model.initialZklDict
+                }
+            )
+        |> Maybe.withDefault
+            (initNew model.ld model.zknSearchResult model.spmodel)
 
 
 showZkl : Bool -> Bool -> Maybe EditLink -> Data.LoginData -> Maybe Int -> Maybe E.Color -> EditLink -> Element Msg
@@ -1172,10 +1190,8 @@ zknview zone size recentZkns model =
             [ E.width E.fill, E.spacingXY 3 17 ]
           <|
             List.intersperse (E.text " ")
-                [ EI.button
-                    perhapsdirtyparabuttonstyle
-                    { onPress = Just DonePress, label = E.text "done" }
-                , EI.button parabuttonstyle { onPress = Just RevertPress, label = E.text "cancel" }
+                [ -- EI.button perhapsdirtyparabuttonstyle { onPress = Just DonePress, label = E.text "done" }
+                  EI.button parabuttonstyle { onPress = Just RevertPress, label = E.text "revert" }
                 , EI.button parabuttonstyle { onPress = Just ViewPress, label = E.text "view" }
                 , EI.button parabuttonstyle { onPress = Just CopyPress, label = E.text "copy" }
                 , let
@@ -1604,16 +1620,14 @@ update msg model =
                 (fullSave model)
             )
 
-        DonePress ->
-            ( model
-            , if dirty model then
-                SaveExit
-                    (fullSave model)
-
-              else
-                Revert
-            )
-
+        -- DonePress ->
+        --     ( model
+        --     , if dirty model then
+        --         SaveExit
+        --             (fullSave model)
+        --       else
+        --         Revert
+        --     )
         CopyPress ->
             ( { model
                 | id = Nothing
@@ -1826,7 +1840,7 @@ update msg model =
                         )
 
         RevertPress ->
-            ( model, Revert )
+            ( revert model, None )
 
         DeletePress zone ->
             ( { model

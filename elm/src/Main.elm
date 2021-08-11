@@ -2042,44 +2042,41 @@ init flags url key zone =
             , prevSearches = []
             , recentNotes = []
             }
-
-        ( model, cmd ) =
-            parseUrl url
-                |> Maybe.andThen
-                    (\s ->
-                        case s of
-                            Top ->
-                                Nothing
-
-                            _ ->
-                                Just s
-                    )
-                |> Maybe.andThen
-                    (routeState
-                        imodel
-                    )
-                |> Maybe.map
-                    (\( rs, rcmd ) ->
-                        ( { imodel
-                            | state = rs
-                          }
-                        , rcmd
-                        )
-                    )
-                |> Maybe.withDefault
-                    (let
-                        ( m, c ) =
-                            initialPage imodel
-                     in
-                     ( m
-                     , Cmd.batch
-                        [ c
-                        , Browser.Navigation.replaceUrl key "/"
-                        ]
-                     )
-                    )
     in
-    ( model, cmd )
+    parseUrl url
+        |> Maybe.andThen
+            (\s ->
+                case s of
+                    Top ->
+                        Nothing
+
+                    _ ->
+                        Just s
+            )
+        |> Maybe.andThen
+            (routeState
+                imodel
+            )
+        |> Maybe.map
+            (\( rs, rcmd ) ->
+                ( { imodel
+                    | state = rs
+                  }
+                , rcmd
+                )
+            )
+        |> Maybe.withDefault
+            (let
+                ( m, c ) =
+                    initialPage imodel
+             in
+             ( m
+             , Cmd.batch
+                [ c
+                , Browser.Navigation.replaceUrl key "/"
+                ]
+             )
+            )
 
 
 initLogin : Seed -> State
