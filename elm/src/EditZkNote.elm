@@ -150,6 +150,7 @@ type Command
         , createdate : Maybe Int
         , changeddate : Maybe Int
         , panelnote : Maybe Data.ZkNote
+        , links : List Data.EditLink
         }
     | Delete Int
     | Switch Int
@@ -171,6 +172,7 @@ onZkNote zkn model =
         , createdate = model.createdate
         , changeddate = model.changeddate
         , panelnote = Just zkn
+        , links = model.zklDict |> Dict.values |> List.filterMap elToDel
         }
     )
 
@@ -192,6 +194,23 @@ elToSzl el =
     , zknote = el.zknote
     , delete = el.delete
     }
+
+
+elToDel : EditLink -> Maybe Data.EditLink
+elToDel el =
+    case el.delete of
+        Just True ->
+            Nothing
+
+        _ ->
+            Just
+                { otherid = el.otherid
+                , direction = el.direction
+                , user = el.user
+                , zknote = el.zknote
+                , othername = el.othername
+                , sysids = el.sysids
+                }
 
 
 elToSzkl : Int -> EditLink -> Data.ZkLink
@@ -1636,14 +1655,6 @@ update msg model =
                 (fullSave model)
             )
 
-        -- DonePress ->
-        --     ( model
-        --     , if dirty model then
-        --         SaveExit
-        --             (fullSave model)
-        --       else
-        --         Revert
-        --     )
         CopyPress ->
             ( { model
                 | id = Nothing
@@ -1672,6 +1683,7 @@ update msg model =
                             , createdate = model.createdate
                             , changeddate = model.changeddate
                             , panelnote = model.panelNote
+                            , links = model.zklDict |> Dict.values |> List.filterMap elToDel
                             }
                         )
 
@@ -1687,6 +1699,7 @@ update msg model =
                         , createdate = model.createdate
                         , changeddate = model.changeddate
                         , panelnote = Nothing
+                        , links = model.zklDict |> Dict.values |> List.filterMap elToDel
                         }
                     )
 

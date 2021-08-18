@@ -1934,7 +1934,18 @@ handleEditZkNoteCmd model login emod ecmd =
             )
 
         EditZkNote.View v ->
-            ( { model | state = EView (View.initSzn v.note v.createdate v.changeddate [] v.panelnote) (EditZkNote emod login) }
+            ( { model
+                | state =
+                    EView
+                        (View.initSzn
+                            v.note
+                            v.createdate
+                            v.changeddate
+                            v.links
+                            v.panelnote
+                        )
+                        (EditZkNote emod login)
+              }
             , Cmd.none
             )
 
