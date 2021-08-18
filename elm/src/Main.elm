@@ -1631,13 +1631,19 @@ actualupdate msg model =
                     ( { model | state = EView emod state }, Cmd.none )
 
                 View.Done ->
-                    case es.id of
-                        Just id ->
-                            ( { model | state = state }, sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id }) )
+                    case state of
+                        EditZkNote _ _ ->
+                            -- revert to the edit state.
+                            ( { model | state = state }, Cmd.none )
 
-                        Nothing ->
-                            -- uh, initial page I guess.  would expect prev state to be edit if no id.
-                            initialPage model
+                        _ ->
+                            case es.id of
+                                Just id ->
+                                    ( { model | state = state }, sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id }) )
+
+                                Nothing ->
+                                    -- uh, initial page I guess.  would expect prev state to be edit if no id.
+                                    initialPage model
 
                 View.Switch id ->
                     ( model
