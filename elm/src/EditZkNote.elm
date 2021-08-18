@@ -1769,13 +1769,13 @@ update msg model =
                                 "["
 
                             else
-                                "\n\n["
+                                "\n["
                            )
                         ++ title
                         ++ "]("
                         ++ "/note/"
                         ++ String.fromInt id
-                        ++ ")"
+                        ++ ")  "
               }
             , None
             )
