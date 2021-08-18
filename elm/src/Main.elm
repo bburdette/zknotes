@@ -41,6 +41,7 @@ import MdCommon as MC
 import PublicInterface as PI
 import Random exposing (Seed, initialSeed)
 import ResetPassword
+import Route exposing (Route(..), parseUrl, routeTitle, routeUrl)
 import Schelme.Show exposing (showTerm)
 import Search as S
 import SearchPanel as SP
@@ -146,33 +147,6 @@ type PiModel
     | PreInit PreInitModel
 
 
-type Route
-    = PublicZkNote Int
-    | PublicZkPubId String
-    | EditZkNoteR Int
-    | ResetPasswordR String UUID
-    | Top
-
-
-routeTitle : Route -> String
-routeTitle route =
-    case route of
-        PublicZkNote id ->
-            "zknote " ++ String.fromInt id
-
-        PublicZkPubId id ->
-            id ++ " - zknotes"
-
-        EditZkNoteR id ->
-            "zknote " ++ String.fromInt id
-
-        ResetPasswordR _ _ ->
-            "password reset"
-
-        Top ->
-            "zknotes"
-
-
 urlRequest : Browser.UrlRequest -> Msg
 urlRequest ur =
     case ur of
@@ -181,52 +155,6 @@ urlRequest ur =
 
         Browser.External str ->
             LoadUrl str
-
-
-parseUrl : Url -> Maybe Route
-parseUrl url =
-    UP.parse
-        (UP.oneOf
-            [ UP.map PublicZkNote <|
-                UP.s
-                    "note"
-                    </> UP.int
-            , UP.map (\i -> PublicZkPubId (Maybe.withDefault "" (Url.percentDecode i))) <|
-                UP.s
-                    "page"
-                    </> UP.string
-            , UP.map EditZkNoteR <|
-                UP.s
-                    "editnote"
-                    </> UP.int
-            , UP.map ResetPasswordR <|
-                UP.s
-                    "reset"
-                    </> UP.string
-                    </> UP.custom "UUID" (UUID.fromString >> Result.toMaybe)
-            , UP.map Top <| UP.top
-            ]
-        )
-        url
-
-
-routeUrl : Route -> String
-routeUrl route =
-    case route of
-        PublicZkNote id ->
-            UB.absolute [ "note", String.fromInt id ] []
-
-        PublicZkPubId pubid ->
-            UB.absolute [ "page", pubid ] []
-
-        EditZkNoteR id ->
-            UB.absolute [ "editnote", String.fromInt id ] []
-
-        ResetPasswordR user key ->
-            UB.absolute [ "reset", user, UUID.toString key ] []
-
-        Top ->
-            UB.absolute [] []
 
 
 routeState : Model -> Route -> Maybe ( State, Cmd Msg )
