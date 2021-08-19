@@ -1567,7 +1567,9 @@ actualupdate msg model =
                         _ ->
                             case es.id of
                                 Just id ->
-                                    ( { model | state = state }, sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id }) )
+                                    ( { model | state = state }
+                                    , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
+                                    )
 
                                 Nothing ->
                                     -- uh, initial page I guess.  would expect prev state to be edit if no id.
