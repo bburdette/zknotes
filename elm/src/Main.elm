@@ -41,6 +41,7 @@ import MdCommon as MC
 import PublicInterface as PI
 import Random exposing (Seed, initialSeed)
 import ResetPassword
+import Route exposing (Route(..), parseUrl, routeTitle, routeUrl)
 import Schelme.Show exposing (showTerm)
 import Search as S
 import SearchPanel as SP
@@ -146,33 +147,6 @@ type PiModel
     | PreInit PreInitModel
 
 
-type Route
-    = PublicZkNote Int
-    | PublicZkPubId String
-    | EditZkNoteR Int
-    | ResetPasswordR String UUID
-    | Top
-
-
-routeTitle : Route -> String
-routeTitle route =
-    case route of
-        PublicZkNote id ->
-            "zknote " ++ String.fromInt id
-
-        PublicZkPubId id ->
-            id ++ " - zknotes"
-
-        EditZkNoteR id ->
-            "zknote " ++ String.fromInt id
-
-        ResetPasswordR _ _ ->
-            "password reset"
-
-        Top ->
-            "zknotes"
-
-
 urlRequest : Browser.UrlRequest -> Msg
 urlRequest ur =
     case ur of
@@ -181,52 +155,6 @@ urlRequest ur =
 
         Browser.External str ->
             LoadUrl str
-
-
-parseUrl : Url -> Maybe Route
-parseUrl url =
-    UP.parse
-        (UP.oneOf
-            [ UP.map PublicZkNote <|
-                UP.s
-                    "note"
-                    </> UP.int
-            , UP.map (\i -> PublicZkPubId (Maybe.withDefault "" (Url.percentDecode i))) <|
-                UP.s
-                    "page"
-                    </> UP.string
-            , UP.map EditZkNoteR <|
-                UP.s
-                    "editnote"
-                    </> UP.int
-            , UP.map ResetPasswordR <|
-                UP.s
-                    "reset"
-                    </> UP.string
-                    </> UP.custom "UUID" (UUID.fromString >> Result.toMaybe)
-            , UP.map Top <| UP.top
-            ]
-        )
-        url
-
-
-routeUrl : Route -> String
-routeUrl route =
-    case route of
-        PublicZkNote id ->
-            UB.absolute [ "note", String.fromInt id ] []
-
-        PublicZkPubId pubid ->
-            UB.absolute [ "page", pubid ] []
-
-        EditZkNoteR id ->
-            UB.absolute [ "editnote", String.fromInt id ] []
-
-        ResetPasswordR user key ->
-            UB.absolute [ "reset", user, UUID.toString key ] []
-
-        Top ->
-            UB.absolute [] []
 
 
 routeState : Model -> Route -> Maybe ( State, Cmd Msg )
@@ -1632,20 +1560,26 @@ actualupdate msg model =
 
                 View.Done ->
                     case state of
-                        ShowMessage _ _ ->
+                        EditZkNote _ _ ->
+                            -- revert to the edit state.
+                            ( { model | state = state }, Cmd.none )
+
+                        _ ->
                             case es.id of
                                 Just id ->
-                                    ( { model | state = state }, sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id }) )
+                                    ( { model | state = state }
+                                    , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
+                                    )
 
                                 Nothing ->
                                     -- uh, initial page I guess.  would expect prev state to be edit if no id.
                                     initialPage model
 
-                        _ ->
-                            ( { model | state = state }, Cmd.none )
-
-                View.Switch _ ->
-                    ( model, Cmd.none )
+                View.Switch id ->
+                    ( model
+                      -- , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
+                    , sendPIMsg model.location (PI.GetZkNote id)
+                    )
 
         ( EditZkNoteMsg em, EditZkNote es login ) ->
             let
@@ -1930,7 +1864,18 @@ handleEditZkNoteCmd model login emod ecmd =
             )
 
         EditZkNote.View v ->
-            ( { model | state = EView (View.initSzn v.note v.createdate v.changeddate [] v.panelnote) (EditZkNote emod login) }
+            ( { model
+                | state =
+                    EView
+                        (View.initSzn
+                            v.note
+                            v.createdate
+                            v.changeddate
+                            v.links
+                            v.panelnote
+                        )
+                        (EditZkNote emod login)
+              }
             , Cmd.none
             )
 
@@ -1944,6 +1889,14 @@ handleEditZkNoteCmd model login emod ecmd =
 
         EditZkNote.SearchHistory ->
             ( shDialog model
+            , Cmd.none
+            )
+
+        EditZkNote.BigSearch ->
+            backtolisting
+
+        EditZkNote.Settings ->
+            ( { model | state = UserSettings (UserSettings.init login) login (EditZkNote emod login) }
             , Cmd.none
             )
 
@@ -2002,16 +1955,22 @@ initialPage curmodel =
                     )
 
                 Nothing ->
-                    let
-                        ( m2, c2 ) =
-                            getListing curmodel login
-                    in
-                    ( m2
+                    ( { curmodel
+                        | state =
+                            EditZkNote
+                                (EditZkNote.initNew login
+                                    { notes = []
+                                    , offset = 0
+                                    , what = ""
+                                    }
+                                    SP.initModel
+                                )
+                                login
+                      }
                     , Cmd.batch
                         [ sendUIMsg
                             curmodel.location
                             (UI.SearchZkNotes <| prevSearchQuery login)
-                        , c2
                         ]
                     )
 
@@ -2042,44 +2001,41 @@ init flags url key zone =
             , prevSearches = []
             , recentNotes = []
             }
-
-        ( model, cmd ) =
-            parseUrl url
-                |> Maybe.andThen
-                    (\s ->
-                        case s of
-                            Top ->
-                                Nothing
-
-                            _ ->
-                                Just s
-                    )
-                |> Maybe.andThen
-                    (routeState
-                        imodel
-                    )
-                |> Maybe.map
-                    (\( rs, rcmd ) ->
-                        ( { imodel
-                            | state = rs
-                          }
-                        , rcmd
-                        )
-                    )
-                |> Maybe.withDefault
-                    (let
-                        ( m, c ) =
-                            initialPage imodel
-                     in
-                     ( m
-                     , Cmd.batch
-                        [ c
-                        , Browser.Navigation.replaceUrl key "/"
-                        ]
-                     )
-                    )
     in
-    ( model, cmd )
+    parseUrl url
+        |> Maybe.andThen
+            (\s ->
+                case s of
+                    Top ->
+                        Nothing
+
+                    _ ->
+                        Just s
+            )
+        |> Maybe.andThen
+            (routeState
+                imodel
+            )
+        |> Maybe.map
+            (\( rs, rcmd ) ->
+                ( { imodel
+                    | state = rs
+                  }
+                , rcmd
+                )
+            )
+        |> Maybe.withDefault
+            (let
+                ( m, c ) =
+                    initialPage imodel
+             in
+             ( m
+             , Cmd.batch
+                [ c
+                , Browser.Navigation.replaceUrl key "/"
+                ]
+             )
+            )
 
 
 initLogin : Seed -> State

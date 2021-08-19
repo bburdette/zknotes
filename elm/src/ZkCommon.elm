@@ -73,3 +73,7 @@ otherLinkStyle =
 
 saveLinkStyle =
     [ EF.color TC.darkYellow, EF.underline ]
+
+
+fullScreen =
+    E.row [ EF.size 10 ] [ E.column [] [ E.text "↖", E.text "↙" ], E.column [] [ E.text "↗", E.text "↘" ] ]

@@ -46,7 +46,6 @@ type Msg
     | OnTitleChanged String
     | OnPubidChanged String
     | SavePress
-    | DonePress
     | RevertPress
     | DeletePress Time.Zone
     | ViewPress
@@ -70,6 +69,8 @@ type Msg
     | AddToSearch Data.ZkListNote
     | AddToSearchAsTag String
     | SetSearch String
+    | BigSearchPress
+    | SettingsPress
     | Noop
 
 
@@ -149,6 +150,7 @@ type Command
         , createdate : Maybe Int
         , changeddate : Maybe Int
         , panelnote : Maybe Data.ZkNote
+        , links : List Data.EditLink
         }
     | Delete Int
     | Switch Int
@@ -156,6 +158,8 @@ type Command
     | GetSelectedText (List String)
     | Search S.ZkNoteSearch
     | SearchHistory
+    | BigSearch
+    | Settings
     | GetZkNote Int
     | SetHomeNote Int
 
@@ -168,6 +172,7 @@ onZkNote zkn model =
         , createdate = model.createdate
         , changeddate = model.changeddate
         , panelnote = Just zkn
+        , links = model.zklDict |> Dict.values |> List.filterMap elToDel
         }
     )
 
@@ -189,6 +194,23 @@ elToSzl el =
     , zknote = el.zknote
     , delete = el.delete
     }
+
+
+elToDel : EditLink -> Maybe Data.EditLink
+elToDel el =
+    case el.delete of
+        Just True ->
+            Nothing
+
+        _ ->
+            Just
+                { otherid = el.otherid
+                , direction = el.direction
+                , user = el.user
+                , zknote = el.zknote
+                , othername = el.othername
+                , sysids = el.sysids
+                }
 
 
 elToSzkl : Int -> EditLink -> Data.ZkLink
@@ -334,6 +356,24 @@ dirty model =
                         && (Dict.keys model.zklDict == Dict.keys model.initialZklDict)
             )
         |> Maybe.withDefault True
+
+
+revert : Model -> Model
+revert model =
+    model.revert
+        |> Maybe.map
+            (\r ->
+                { model
+                    | id = r.id
+                    , pubidtxt = r.pubid |> Maybe.withDefault ""
+                    , title = r.title
+                    , md = r.content
+                    , editableValue = r.editable
+                    , zklDict = model.initialZklDict
+                }
+            )
+        |> Maybe.withDefault
+            (initNew model.ld model.zknSearchResult model.spmodel)
 
 
 showZkl : Bool -> Bool -> Maybe EditLink -> Data.LoginData -> Maybe Int -> Maybe E.Color -> EditLink -> Element Msg
@@ -892,7 +932,56 @@ zknview zone size recentZkns model =
                 , E.width E.fill
                 , E.paddingXY 5 0
                 ]
-                ([ titleed
+                ([ E.paragraph [ E.padding 10, E.width E.fill, E.spacingXY 3 17 ] <|
+                    List.intersperse (E.text " ")
+                        [ if isdirty then
+                            EI.button parabuttonstyle { onPress = Just RevertPress, label = E.text "revert" }
+
+                          else
+                            E.none
+                        , EI.button parabuttonstyle { onPress = Just CopyPress, label = E.text "copy" }
+                        , let
+                            disb =
+                                EI.button disabledparabuttonstyle
+                                    { onPress = Nothing
+                                    , label = E.text "→⌂"
+                                    }
+
+                            enb =
+                                EI.button parabuttonstyle
+                                    { onPress = Just SetHomeNotePress
+                                    , label = E.text "→⌂"
+                                    }
+                          in
+                          case ( model.ld.homenote, model.id ) of
+                            ( _, Nothing ) ->
+                                disb
+
+                            ( Just x, Just y ) ->
+                                if x == y then
+                                    disb
+
+                                else
+                                    enb
+
+                            ( Nothing, Just _ ) ->
+                                enb
+
+                        -- , EI.button parabuttonstyle { onPress = Just LinksPress, label = E.text"links" }
+                        , case isdirty of
+                            True ->
+                                EI.button perhapsdirtyparabuttonstyle { onPress = Just SavePress, label = E.text "save" }
+
+                            False ->
+                                E.none
+                        , EI.button perhapsdirtyparabuttonstyle { onPress = Just NewPress, label = E.text "new" }
+                        , if mine then
+                            EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just <| DeletePress zone, label = E.text "delete" }
+
+                          else
+                            EI.button (E.alignRight :: Common.disabledButtonStyle) { onPress = Nothing, label = E.text "delete" }
+                        ]
+                 , titleed
                  , if mine then
                     EI.checkbox [ E.width E.shrink ]
                         { onChange =
@@ -1012,6 +1101,10 @@ zknview zone size recentZkns model =
                     ]
                     [ E.row [ E.width E.fill, E.spacing 8 ]
                         [ E.paragraph [ EF.bold ] [ E.text model.title ]
+                        , EI.button Common.buttonStyle
+                            { onPress = Just ViewPress
+                            , label = ZC.fullScreen
+                            }
                         , if search then
                             EI.button (E.alignRight :: Common.buttonStyle)
                                 { label = E.text ">", onPress = Just <| SetSearch model.title }
@@ -1080,10 +1173,16 @@ zknview zone size recentZkns model =
         searchPanel =
             E.column
                 (E.spacing 8 :: E.width E.fill :: sppad)
-                (EI.button Common.buttonStyle
-                    { onPress = Just <| SearchHistoryPress
-                    , label = E.el [ E.centerY ] <| E.text "search history"
-                    }
+                (E.row [ E.width E.fill ]
+                    [ EI.button Common.buttonStyle
+                        { onPress = Just <| SearchHistoryPress
+                        , label = E.el [ E.centerY ] <| E.text "search history"
+                        }
+                    , EI.button (E.alignRight :: Common.buttonStyle)
+                        { onPress = Just <| BigSearchPress
+                        , label = ZC.fullScreen
+                        }
+                    ]
                     :: (E.map SPMsg <|
                             SP.view True (size.width < 400 || wclass /= Narrow) 0 model.spmodel
                        )
@@ -1162,58 +1261,10 @@ zknview zone size recentZkns model =
                     )
                 |> Maybe.withDefault E.none
             , E.el [ EF.bold ] (E.text model.ld.name)
-            , if mine then
-                EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just <| DeletePress zone, label = E.text "delete" }
-
-              else
-                EI.button (E.alignRight :: Common.disabledButtonStyle) { onPress = Nothing, label = E.text "delete" }
+            , EI.button
+                (E.alignRight :: Common.buttonStyle)
+                { onPress = Just SettingsPress, label = E.text "settings" }
             ]
-        , E.paragraph
-            [ E.width E.fill, E.spacingXY 3 17 ]
-          <|
-            List.intersperse (E.text " ")
-                [ EI.button
-                    perhapsdirtyparabuttonstyle
-                    { onPress = Just DonePress, label = E.text "done" }
-                , EI.button parabuttonstyle { onPress = Just RevertPress, label = E.text "cancel" }
-                , EI.button parabuttonstyle { onPress = Just ViewPress, label = E.text "view" }
-                , EI.button parabuttonstyle { onPress = Just CopyPress, label = E.text "copy" }
-                , let
-                    disb =
-                        EI.button disabledparabuttonstyle
-                            { onPress = Nothing
-                            , label = E.text "→⌂"
-                            }
-
-                    enb =
-                        EI.button parabuttonstyle
-                            { onPress = Just SetHomeNotePress
-                            , label = E.text "→⌂"
-                            }
-                  in
-                  case ( model.ld.homenote, model.id ) of
-                    ( _, Nothing ) ->
-                        disb
-
-                    ( Just x, Just y ) ->
-                        if x == y then
-                            disb
-
-                        else
-                            enb
-
-                    ( Nothing, Just _ ) ->
-                        enb
-
-                -- , EI.button parabuttonstyle { onPress = Just LinksPress, label = E.text"links" }
-                , case isdirty of
-                    True ->
-                        EI.button perhapsdirtyparabuttonstyle { onPress = Just SavePress, label = E.text "save" }
-
-                    False ->
-                        E.none
-                , EI.button perhapsdirtyparabuttonstyle { onPress = Just NewPress, label = E.text "new" }
-                ]
         , case wclass of
             Wide ->
                 E.row
@@ -1604,16 +1655,6 @@ update msg model =
                 (fullSave model)
             )
 
-        DonePress ->
-            ( model
-            , if dirty model then
-                SaveExit
-                    (fullSave model)
-
-              else
-                Revert
-            )
-
         CopyPress ->
             ( { model
                 | id = Nothing
@@ -1642,6 +1683,7 @@ update msg model =
                             , createdate = model.createdate
                             , changeddate = model.changeddate
                             , panelnote = model.panelNote
+                            , links = model.zklDict |> Dict.values |> List.filterMap elToDel
                             }
                         )
 
@@ -1657,6 +1699,7 @@ update msg model =
                         , createdate = model.createdate
                         , changeddate = model.changeddate
                         , panelnote = Nothing
+                        , links = model.zklDict |> Dict.values |> List.filterMap elToDel
                         }
                     )
 
@@ -1826,7 +1869,7 @@ update msg model =
                         )
 
         RevertPress ->
-            ( model, Revert )
+            ( revert model, None )
 
         DeletePress zone ->
             ( { model
@@ -2125,6 +2168,12 @@ update msg model =
 
         SetHomeNotePress ->
             ( model, model.id |> Maybe.map (\id -> SetHomeNote id) |> Maybe.withDefault None )
+
+        BigSearchPress ->
+            ( model, BigSearch )
+
+        SettingsPress ->
+            ( model, Settings )
 
         Noop ->
             ( model, None )
