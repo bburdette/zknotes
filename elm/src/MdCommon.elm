@@ -209,13 +209,18 @@ mkRenderer viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged =
                 )
     , orderedList =
         \startingIndex items ->
-            E.column [ E.spacing 15 ]
+            E.column [ E.spacingXY 10 0 ]
                 (items
                     |> List.indexedMap
                         (\index itemBlocks ->
-                            E.row [ E.spacing 5 ]
+                            E.row []
                                 [ E.row [ E.alignTop ]
-                                    (E.text (String.fromInt (index + startingIndex) ++ " ") :: itemBlocks)
+                                    (E.text
+                                        (String.fromInt (index + startingIndex)
+                                            ++ " "
+                                        )
+                                        :: itemBlocks
+                                    )
                                 ]
                         )
                 )
