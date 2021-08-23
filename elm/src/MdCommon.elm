@@ -184,12 +184,12 @@ mkRenderer viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged =
                 children
     , unorderedList =
         \items ->
-            E.column [ E.spacing 15 ]
+            E.column [ E.paddingXY 10 0 ]
                 (items
                     |> List.map
                         (\(ListItem task children) ->
-                            E.row [ E.spacing 5 ]
-                                [ E.paragraph
+                            E.paragraph []
+                                [ E.row
                                     [ E.alignTop ]
                                     ((case task of
                                         IncompleteTask ->
