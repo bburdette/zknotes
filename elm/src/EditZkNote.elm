@@ -1068,7 +1068,7 @@ zknview zone size recentZkns model =
                             always Noop
                     , text = model.md
                     , placeholder = Nothing
-                    , label = EI.labelHidden "Markdown input"
+                    , label = EI.labelHidden "markdown input"
                     , spellcheck = False
                     }
                  , case isdirty of
@@ -1195,6 +1195,14 @@ zknview zone size recentZkns model =
 
                                 Nothing ->
                                     model.zknSearchResult.notes
+                       )
+                    ++ (if List.length model.zknSearchResult.notes < 15 then
+                            []
+
+                        else
+                            [ E.map SPMsg <|
+                                SP.paginationView True model.spmodel
+                            ]
                        )
                 )
 
