@@ -1,11 +1,11 @@
 module PublicInterface exposing (SendMsg(..), ServerResponse(..), encodeSendMsg, getPublicZkNote, serverResponseDecoder)
 
-import MdCommon as MC
 import Data
 import Http
 import Http.Tasks as HT
 import Json.Decode as JD
 import Json.Encode as JE
+import MdCommon as MC
 import Task exposing (Task)
 import Util
 
@@ -104,4 +104,16 @@ getPublicZkNote : String -> JE.Value -> (Result Http.Error ServerResponse -> msg
 getPublicZkNote location jsonBody tomsg =
     firstTask location jsonBody
         |> Task.andThen (\sr -> secondTask location sr)
+        |> Task.attempt tomsg
+
+
+getErrorIndexNote : String -> Int -> (Result Http.Error ServerResponse -> msg) -> Cmd msg
+getErrorIndexNote location noteid tomsg =
+    HT.post
+        { url = location ++ "/public"
+        , body = Http.jsonBody <| encodeSendMsg (GetZkNote noteid)
+        , resolver =
+            HT.resolveJson
+                serverResponseDecoder
+        }
         |> Task.attempt tomsg

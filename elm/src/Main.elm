@@ -71,6 +71,7 @@ type Msg
     | ShowMessageMsg ShowMessage.Msg
     | UserReplyData (Result Http.Error UI.ServerResponse)
     | PublicReplyData (Result Http.Error PI.ServerResponse)
+    | ErrorIndexNote (Result Http.Error PI.ServerResponse)
     | LoadUrl String
     | InternalUrl Url
     | SelectedText JD.Value
@@ -347,6 +348,9 @@ showMessage msg =
 
         PublicReplyData _ ->
             "PublicReplyData"
+
+        ErrorIndexNote _ ->
+            "ErrorIndexNote"
 
         LoadUrl _ ->
             "LoadUrl"
@@ -1155,12 +1159,12 @@ actualupdate msg model =
                 Ok piresponse ->
                     case piresponse of
                         PI.ServerError e ->
-                            case e of
-                                "can't read zknote; note is private" ->
-                                    -- go to special page for this error.
+                            case Dict.get e model.errorNotes of
+                                Just url ->
+                                    -- go to that url I guess?
                                     ( displayMessageDialog model <| e, Cmd.none )
 
-                                _ ->
+                                Nothing ->
                                     ( displayMessageDialog model <| e, Cmd.none )
 
                         PI.ZkNote fbe ->
@@ -1174,6 +1178,24 @@ actualupdate msg model =
                                             View (View.initFull fbe)
                             in
                             ( { model | state = vstate }
+                            , Cmd.none
+                            )
+
+        ( ErrorIndexNote rsein, state ) ->
+            case rsein of
+                Err e ->
+                    ( displayMessageDialog model <| Util.httpErrorString e
+                    , Cmd.none
+                    )
+
+                Ok resp ->
+                    case resp of
+                        PI.ServerError e ->
+                            -- if there's an error on getting the error index note, just display it.
+                            ( displayMessageDialog model <| e, Cmd.none )
+
+                        PI.ZkNote fbe ->
+                            ( { model | errorNotes = MC.linkDict fbe.zknote.content }
                             , Cmd.none
                             )
 
