@@ -1154,7 +1154,13 @@ actualupdate msg model =
                 Ok piresponse ->
                     case piresponse of
                         PI.ServerError e ->
-                            ( displayMessageDialog model e, Cmd.none )
+                            case e of
+                                "can't read zknote; note is private" ->
+                                    -- go to special page for this error.
+                                    ( displayMessageDialog model <| e, Cmd.none )
+
+                                _ ->
+                                    ( displayMessageDialog model <| e, Cmd.none )
 
                         PI.ZkNote fbe ->
                             let
