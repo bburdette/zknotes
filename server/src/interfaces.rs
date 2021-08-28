@@ -30,11 +30,7 @@ pub fn login_data_for_token(
     None => Ok(None),
     Some(token) => {
       match sqldata::read_user_by_token(&conn, token, Some(config.login_token_expiration_ms)) {
-        Ok(user) => Ok(Some(sqldata::login_data(
-          &conn,
-          user.id,
-          config.error_index_note,
-        )?)),
+        Ok(user) => Ok(Some(sqldata::login_data(&conn, user.id)?)),
         Err(_) => Ok(None),
       }
     }
@@ -130,7 +126,7 @@ pub fn user_interface(
             content: serde_json::Value::Null,
           })
         } else {
-          let ld = sqldata::login_data(&conn, userdata.id, config.error_index_note)?;
+          let ld = sqldata::login_data(&conn, userdata.id)?;
           // new token here, and token date.
           let token = Uuid::new_v4();
           sqldata::add_token(&conn, userdata.id, token)?;

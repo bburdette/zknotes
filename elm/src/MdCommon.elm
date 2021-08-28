@@ -435,9 +435,11 @@ linkDict markdown =
     -- build a dict of description->url
     let
         blah =
-            markdown
-                |> Markdown.Parser.parse
-                |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
+            Debug.log "linkDict blah"
+                (markdown
+                    |> Markdown.Parser.parse
+                    |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
+                )
     in
     case blah of
         Err _ ->
@@ -446,19 +448,26 @@ linkDict markdown =
         Ok blocks ->
             inlineFoldl
                 (\inline links ->
-                    case inline of
-                        Block.Link str mbdesc moarinlines ->
+                    case Debug.log "inline" inline of
+                        Block.Link str mbdesc moreinlines ->
                             case mbdesc of
                                 Just desc ->
                                     ( desc, str )
                                         :: links
 
                                 Nothing ->
-                                    links
+                                    case moreinlines of
+                                        [ Block.Text desc2 ] ->
+                                            ( desc2, str )
+                                                :: links
+
+                                        _ ->
+                                            links
 
                         _ ->
                             links
                 )
                 []
                 blocks
+                |> Debug.log "lnks"
                 |> Dict.fromList

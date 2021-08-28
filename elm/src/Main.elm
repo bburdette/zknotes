@@ -113,6 +113,7 @@ type alias Flags =
     , debugstring : String
     , width : Int
     , height : Int
+    , errorid : Maybe Int
     , login : Maybe Data.LoginData
     }
 
@@ -1159,10 +1160,12 @@ actualupdate msg model =
                 Ok piresponse ->
                     case piresponse of
                         PI.ServerError e ->
-                            case Dict.get e model.errorNotes of
+                            case Dict.get (Debug.log "pise" e) (Debug.log "errornotes" model.errorNotes) of
                                 Just url ->
                                     -- go to that url I guess?
-                                    ( displayMessageDialog model <| e, Cmd.none )
+                                    ( displayMessageDialog model <| e
+                                    , Browser.Navigation.load url
+                                    )
 
                                 Nothing ->
                                     ( displayMessageDialog model <| e, Cmd.none )
@@ -2031,6 +2034,16 @@ init flags url key zone =
             , recentNotes = []
             , errorNotes = Dict.empty
             }
+
+        geterrornote =
+            Debug.log "blah"
+                (flags.errorid
+                    |> Maybe.map
+                        (\id ->
+                            PI.getErrorIndexNote flags.location id ErrorIndexNote
+                        )
+                    |> Maybe.withDefault Cmd.none
+                )
     in
     parseUrl url
         |> Maybe.andThen
@@ -2051,7 +2064,7 @@ init flags url key zone =
                 ( { imodel
                     | state = rs
                   }
-                , rcmd
+                , Cmd.batch [ rcmd, geterrornote ]
                 )
             )
         |> Maybe.withDefault
@@ -2062,6 +2075,7 @@ init flags url key zone =
              ( m
              , Cmd.batch
                 [ c
+                , geterrornote
                 , Browser.Navigation.replaceUrl key "/"
                 ]
              )

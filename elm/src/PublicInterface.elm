@@ -1,4 +1,4 @@
-module PublicInterface exposing (SendMsg(..), ServerResponse(..), encodeSendMsg, getPublicZkNote, serverResponseDecoder)
+module PublicInterface exposing (SendMsg(..), ServerResponse(..), encodeSendMsg, getErrorIndexNote, getPublicZkNote, serverResponseDecoder)
 
 import Data
 import Http

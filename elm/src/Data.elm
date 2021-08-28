@@ -60,7 +60,6 @@ type alias LoginData =
     , shareid : Int
     , searchid : Int
     , commentid : Int
-    , errorid : Maybe Int
     }
 
 
@@ -483,7 +482,6 @@ decodeLoginData =
         |> andMap (JD.field "shareid" JD.int)
         |> andMap (JD.field "searchid" JD.int)
         |> andMap (JD.field "commentid" JD.int)
-        |> andMap (JD.field "errorid" <| JD.maybe JD.int)
 
 
 encodeImportZkNote : ImportZkNote -> JE.Value

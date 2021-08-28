@@ -57,6 +57,7 @@
       }
 
       login = {{logindata}};
+      errorid = {{errorid}};
 
       app = Elm.Main.init({
         node: document.getElementById('elm'),
@@ -66,6 +67,7 @@
                  debugstring : "initial-info", 
                  width : window.innerWidth, 
                  height : window.innerHeight,
+                 errorid : errorid,
                  login : login}});
       // app.ports.storeLocalVal.subscribe(storeVal);
       // app.ports.getLocalVal.subscribe(getVal);
