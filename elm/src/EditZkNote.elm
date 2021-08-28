@@ -849,11 +849,11 @@ zknview zone size recentZkns model =
             case ( model.createdate, model.changeddate ) of
                 ( Just cd, Just chd ) ->
                     E.row [ E.width E.fill ]
-                        [ E.row []
+                        [ E.paragraph []
                             [ E.text "created: "
                             , E.text (Util.showTime zone (Time.millisToPosix cd))
                             ]
-                        , E.row [ E.alignRight ]
+                        , E.paragraph [ EF.alignRight ]
                             [ E.text "updated: "
                             , E.text (Util.showTime zone (Time.millisToPosix chd))
                             ]
