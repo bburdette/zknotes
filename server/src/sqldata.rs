@@ -27,7 +27,7 @@ pub struct User {
   pub registration_key: Option<String>,
 }
 
-pub fn login_data(conn: &Connection, uid: i64) -> Result<LoginData, Box<dyn Error>> {
+pub fn login_data(conn: &Connection, uid: i64, error_note: Option<i64>) -> Result<LoginData, Box<dyn Error>> {
   let user = read_user_by_id(&conn, uid)?;
   Ok(LoginData {
     userid: uid,
@@ -38,6 +38,7 @@ pub fn login_data(conn: &Connection, uid: i64) -> Result<LoginData, Box<dyn Erro
     shareid: note_id(conn, "system", "share")?,
     searchid: note_id(conn, "system", "search")?,
     commentid: note_id(conn, "system", "comment")?,
+    errorid: error_note,
   })
 }
 

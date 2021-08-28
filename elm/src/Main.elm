@@ -132,6 +132,7 @@ type alias Model =
     , savedRoute : SavedRoute
     , prevSearches : List S.TagSearch
     , recentNotes : List Data.ZkListNote
+    , errorNotes : Dict String String
     }
 
 
@@ -2006,6 +2007,7 @@ init flags url key zone =
             , savedRoute = { route = Top, save = False }
             , prevSearches = []
             , recentNotes = []
+            , errorNotes = Dict.empty
             }
     in
     parseUrl url
