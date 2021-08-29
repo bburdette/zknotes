@@ -97,7 +97,7 @@ type State
     | EView View.Model State
     | Import Import.Model Data.LoginData
     | UserSettings UserSettings.Model Data.LoginData State
-    | ShowMessage ShowMessage.Model Data.LoginData
+    | ShowMessage ShowMessage.Model Data.LoginData (Maybe State)
     | PubShowMessage ShowMessage.Model
     | LoginShowMessage ShowMessage.Model Data.LoginData Url
     | SelectDialog (SS.GDModel Int) State
@@ -174,6 +174,7 @@ routeState model route =
                             { message = "loading article"
                             }
                             login
+                            (Just model.state)
                         , case model.state of
                             EView _ _ ->
                                 -- if we're in "EView" then do this request to stay in EView.
@@ -199,6 +200,7 @@ routeState model route =
                             { message = "loading article"
                             }
                             login
+                            (Just model.state)
 
                     Nothing ->
                         PubShowMessage
@@ -231,7 +233,9 @@ routeState model route =
                     case stateLogin st of
                         Just login ->
                             Just <|
-                                ( ShowMessage { message = "loading note..." } login
+                                ( ShowMessage { message = "loading note..." }
+                                    login
+                                    (Just model.state)
                                 , Cmd.batch
                                     [ sendUIMsg
                                         model.location
@@ -426,7 +430,7 @@ showState state =
         MessageNLink _ _ ->
             "MessageNLink"
 
-        ShowMessage _ _ ->
+        ShowMessage _ _ _ ->
             "ShowMessage"
 
         PubShowMessage _ ->
@@ -474,7 +478,7 @@ viewState size state model =
         EditZkNoteListing em ld ->
             E.map EditZkNoteListingMsg <| EditZkNoteListing.view ld size em
 
-        ShowMessage em _ ->
+        ShowMessage em _ _ ->
             E.map ShowMessageMsg <| ShowMessage.view em
 
         PubShowMessage em ->
@@ -566,7 +570,7 @@ stateLogin state =
         MessageNLink _ bestate ->
             stateLogin bestate
 
-        ShowMessage _ login ->
+        ShowMessage _ login _ ->
             Just login
 
         PubShowMessage _ ->
@@ -676,6 +680,7 @@ getListing model login =
                     { message = "loading articles"
                     }
                     login
+                    (Just model.state)
             , seed =
                 case model.state of
                     -- save the seed if we're leaving login state.
@@ -1081,6 +1086,7 @@ actualupdate msg model =
                                                     { message = "waiting for save"
                                                     }
                                                     login
+                                                    (Just model.state)
                                                 )
                                                 (\md ms ->
                                                     case ms of
@@ -1269,6 +1275,7 @@ actualupdate msg model =
                                                     { message = "loading articles"
                                                     }
                                                     login
+                                                    (Just model.state)
                                             , seed =
                                                 case state of
                                                     -- save the seed if we're leaving login state.
@@ -1288,7 +1295,12 @@ actualupdate msg model =
                                 LoginShowMessage _ li url ->
                                     let
                                         lgmod =
-                                            { model | state = ShowMessage { message = "logged in" } login }
+                                            { model
+                                                | state =
+                                                    ShowMessage { message = "logged in" }
+                                                        login
+                                                        Nothing
+                                            }
 
                                         ( m, cmd ) =
                                             parseUrl url
@@ -1387,7 +1399,7 @@ actualupdate msg model =
                                     , Cmd.none
                                     )
 
-                                ShowMessage _ login ->
+                                ShowMessage _ login _ ->
                                     ( { model | state = EditZkNoteListing { notes = sr, spmodel = SP.initModel, dialog = Nothing } login }
                                     , Cmd.none
                                     )
@@ -1775,7 +1787,12 @@ actualupdate msg model =
                     ( { model | state = DisplayMessage nmod prevstate }, Cmd.none )
 
                 GD.Ok return ->
-                    ( { model | state = prevstate }, Cmd.none )
+                    case prevstate of
+                        ShowMessage _ _ (Just ps) ->
+                            ( { model | state = ps }, Cmd.none )
+
+                        _ ->
+                            ( { model | state = prevstate }, Cmd.none )
 
                 GD.Cancel ->
                     ( { model | state = prevstate }, Cmd.none )
@@ -1786,7 +1803,12 @@ actualupdate msg model =
                     ( { model | state = MessageNLink nmod prevstate }, Cmd.none )
 
                 GD.Ok return ->
-                    ( { model | state = Debug.log "return state" prevstate }, Cmd.none )
+                    case prevstate of
+                        ShowMessage _ _ (Just ps) ->
+                            ( { model | state = ps }, Cmd.none )
+
+                        _ ->
+                            ( { model | state = prevstate }, Cmd.none )
 
                 GD.Cancel ->
                     ( { model | state = prevstate }, Cmd.none )
@@ -1883,6 +1905,7 @@ handleEditZkNoteCmd model login emod ecmd =
                             { message = "loading articles"
                             }
                             login
+                            (Just model.state)
                         )
                         onmsg
               }
@@ -1924,7 +1947,9 @@ handleEditZkNoteCmd model login emod ecmd =
         EditZkNote.Switch id ->
             let
                 ( st, cmd ) =
-                    ( ShowMessage { message = "loading note..." } login
+                    ( ShowMessage { message = "loading note..." }
+                        login
+                        (Just model.state)
                     , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
                     )
             in
@@ -1933,7 +1958,9 @@ handleEditZkNoteCmd model login emod ecmd =
         EditZkNote.SaveSwitch s id ->
             let
                 ( st, cmd ) =
-                    ( ShowMessage { message = "loading note..." } login
+                    ( ShowMessage { message = "loading note..." }
+                        login
+                        (Just model.state)
                     , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
                     )
             in
@@ -2073,7 +2100,7 @@ init flags url key zone =
                         PubShowMessage { message = "loading..." }
 
                     Just l ->
-                        ShowMessage { message = "loading..." } l
+                        ShowMessage { message = "loading..." } l Nothing
             , size = { width = flags.width, height = flags.height }
             , location = flags.location
             , navkey = key
