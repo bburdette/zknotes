@@ -38,6 +38,7 @@ import Markdown.Html
 import Markdown.Parser
 import Markdown.Renderer
 import MdCommon as MC
+import MessageNLink
 import PublicInterface as PI
 import Random exposing (Seed, initialSeed)
 import ResetPassword
@@ -79,6 +80,7 @@ type Msg
     | WindowSize Util.Size
     | CtrlS
     | DisplayMessageMsg (GD.Msg DisplayMessage.Msg)
+    | MessageNLinkMsg (GD.Msg MessageNLink.Msg)
     | SelectDialogMsg (GD.Msg (SS.Msg Int))
     | ChangePasswordDialogMsg (GD.Msg CP.Msg)
     | ChangeEmailDialogMsg (GD.Msg CE.Msg)
@@ -103,6 +105,7 @@ type State
     | ChangeEmailDialog CE.GDModel State
     | ResetPassword ResetPassword.Model
     | DisplayMessage DisplayMessage.GDModel State
+    | MessageNLink MessageNLink.GDModel State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
 
 
@@ -315,6 +318,9 @@ showMessage msg =
         DisplayMessageMsg _ ->
             "DisplayMessage"
 
+        MessageNLinkMsg _ ->
+            "MessageNLink"
+
         ViewMsg _ ->
             "ViewMsg"
 
@@ -417,6 +423,9 @@ showState state =
         DisplayMessage _ _ ->
             "DisplayMessage"
 
+        MessageNLink _ _ ->
+            "MessageNLink"
+
         ShowMessage _ _ ->
             "ShowMessage"
 
@@ -490,6 +499,10 @@ viewState size state model =
             -- render is at the layout level, not here.
             E.none
 
+        MessageNLink em _ ->
+            -- render is at the layout level, not here.
+            E.none
+
         -- E.map DisplayMessageMsg <| DisplayMessage.view em
         Wait innerState _ ->
             E.map (\_ -> Noop) (viewState size innerState model)
@@ -548,6 +561,9 @@ stateLogin state =
             Just login
 
         DisplayMessage _ bestate ->
+            stateLogin bestate
+
+        MessageNLink _ bestate ->
             stateLogin bestate
 
         ShowMessage _ login ->
@@ -713,6 +729,12 @@ view model =
             [ case model.state of
                 DisplayMessage dm _ ->
                     Html.map DisplayMessageMsg <|
+                        GD.layout
+                            (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                            dm
+
+                MessageNLink dm _ ->
+                    Html.map MessageNLinkMsg <|
                         GD.layout
                             (Just { width = min 600 model.size.width, height = min 500 model.size.height })
                             dm
@@ -923,6 +945,21 @@ displayMessageDialog model message =
             DisplayMessage
                 (DisplayMessage.init Common.buttonStyle
                     message
+                    (E.map (\_ -> ()) (viewState model.size model.state model))
+                )
+                model.state
+    }
+
+
+displayMessageNLinkDialog : Model -> String -> String -> String -> Model
+displayMessageNLinkDialog model message url text =
+    { model
+        | state =
+            MessageNLink
+                (MessageNLink.init Common.buttonStyle
+                    message
+                    url
+                    text
                     (E.map (\_ -> ()) (viewState model.size model.state model))
                 )
                 model.state
@@ -1163,8 +1200,8 @@ actualupdate msg model =
                             case Dict.get (Debug.log "pise" e) (Debug.log "errornotes" model.errorNotes) of
                                 Just url ->
                                     -- go to that url I guess?
-                                    ( displayMessageDialog model <| e
-                                    , Browser.Navigation.load url
+                                    ( displayMessageNLinkDialog model e url "more info"
+                                    , Cmd.none
                                     )
 
                                 Nothing ->
@@ -1737,6 +1774,17 @@ actualupdate msg model =
             case GD.update bm bs of
                 GD.Dialog nmod ->
                     ( { model | state = DisplayMessage nmod prevstate }, Cmd.none )
+
+                GD.Ok return ->
+                    ( { model | state = prevstate }, Cmd.none )
+
+                GD.Cancel ->
+                    ( { model | state = prevstate }, Cmd.none )
+
+        ( MessageNLinkMsg bm, MessageNLink bs prevstate ) ->
+            case GD.update bm bs of
+                GD.Dialog nmod ->
+                    ( { model | state = MessageNLink nmod prevstate }, Cmd.none )
 
                 GD.Ok return ->
                     ( { model | state = prevstate }, Cmd.none )
