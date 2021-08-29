@@ -38,6 +38,7 @@ import Markdown.Html
 import Markdown.Parser
 import Markdown.Renderer
 import MdCommon as MC
+import MessageNLink
 import PublicInterface as PI
 import Random exposing (Seed, initialSeed)
 import ResetPassword
@@ -71,6 +72,7 @@ type Msg
     | ShowMessageMsg ShowMessage.Msg
     | UserReplyData (Result Http.Error UI.ServerResponse)
     | PublicReplyData (Result Http.Error PI.ServerResponse)
+    | ErrorIndexNote (Result Http.Error PI.ServerResponse)
     | LoadUrl String
     | InternalUrl Url
     | SelectedText JD.Value
@@ -78,6 +80,7 @@ type Msg
     | WindowSize Util.Size
     | CtrlS
     | DisplayMessageMsg (GD.Msg DisplayMessage.Msg)
+    | MessageNLinkMsg (GD.Msg MessageNLink.Msg)
     | SelectDialogMsg (GD.Msg (SS.Msg Int))
     | ChangePasswordDialogMsg (GD.Msg CP.Msg)
     | ChangeEmailDialogMsg (GD.Msg CE.Msg)
@@ -94,7 +97,7 @@ type State
     | EView View.Model State
     | Import Import.Model Data.LoginData
     | UserSettings UserSettings.Model Data.LoginData State
-    | ShowMessage ShowMessage.Model Data.LoginData
+    | ShowMessage ShowMessage.Model Data.LoginData (Maybe State)
     | PubShowMessage ShowMessage.Model
     | LoginShowMessage ShowMessage.Model Data.LoginData Url
     | SelectDialog (SS.GDModel Int) State
@@ -102,6 +105,7 @@ type State
     | ChangeEmailDialog CE.GDModel State
     | ResetPassword ResetPassword.Model
     | DisplayMessage DisplayMessage.GDModel State
+    | MessageNLink MessageNLink.GDModel State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
 
 
@@ -112,6 +116,7 @@ type alias Flags =
     , debugstring : String
     , width : Int
     , height : Int
+    , errorid : Maybe Int
     , login : Maybe Data.LoginData
     }
 
@@ -132,6 +137,7 @@ type alias Model =
     , savedRoute : SavedRoute
     , prevSearches : List S.TagSearch
     , recentNotes : List Data.ZkListNote
+    , errorNotes : Dict String String
     }
 
 
@@ -168,6 +174,7 @@ routeState model route =
                             { message = "loading article"
                             }
                             login
+                            (Just model.state)
                         , case model.state of
                             EView _ _ ->
                                 -- if we're in "EView" then do this request to stay in EView.
@@ -193,6 +200,7 @@ routeState model route =
                             { message = "loading article"
                             }
                             login
+                            (Just model.state)
 
                     Nothing ->
                         PubShowMessage
@@ -225,7 +233,9 @@ routeState model route =
                     case stateLogin st of
                         Just login ->
                             Just <|
-                                ( ShowMessage { message = "loading note..." } login
+                                ( ShowMessage { message = "loading note..." }
+                                    login
+                                    (Just model.state)
                                 , Cmd.batch
                                     [ sendUIMsg
                                         model.location
@@ -312,6 +322,9 @@ showMessage msg =
         DisplayMessageMsg _ ->
             "DisplayMessage"
 
+        MessageNLinkMsg _ ->
+            "MessageNLink"
+
         ViewMsg _ ->
             "ViewMsg"
 
@@ -346,6 +359,9 @@ showMessage msg =
 
         PublicReplyData _ ->
             "PublicReplyData"
+
+        ErrorIndexNote _ ->
+            "ErrorIndexNote"
 
         LoadUrl _ ->
             "LoadUrl"
@@ -411,7 +427,10 @@ showState state =
         DisplayMessage _ _ ->
             "DisplayMessage"
 
-        ShowMessage _ _ ->
+        MessageNLink _ _ ->
+            "MessageNLink"
+
+        ShowMessage _ _ _ ->
             "ShowMessage"
 
         PubShowMessage _ ->
@@ -459,7 +478,7 @@ viewState size state model =
         EditZkNoteListing em ld ->
             E.map EditZkNoteListingMsg <| EditZkNoteListing.view ld size em
 
-        ShowMessage em _ ->
+        ShowMessage em _ _ ->
             E.map ShowMessageMsg <| ShowMessage.view em
 
         PubShowMessage em ->
@@ -481,6 +500,10 @@ viewState size state model =
             E.map UserSettingsMsg <| UserSettings.view em
 
         DisplayMessage em _ ->
+            -- render is at the layout level, not here.
+            E.none
+
+        MessageNLink em _ ->
             -- render is at the layout level, not here.
             E.none
 
@@ -544,7 +567,10 @@ stateLogin state =
         DisplayMessage _ bestate ->
             stateLogin bestate
 
-        ShowMessage _ login ->
+        MessageNLink _ bestate ->
+            stateLogin bestate
+
+        ShowMessage _ login _ ->
             Just login
 
         PubShowMessage _ ->
@@ -654,6 +680,7 @@ getListing model login =
                     { message = "loading articles"
                     }
                     login
+                    (Just model.state)
             , seed =
                 case model.state of
                     -- save the seed if we're leaving login state.
@@ -707,6 +734,12 @@ view model =
             [ case model.state of
                 DisplayMessage dm _ ->
                     Html.map DisplayMessageMsg <|
+                        GD.layout
+                            (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                            dm
+
+                MessageNLink dm _ ->
+                    Html.map MessageNLinkMsg <|
                         GD.layout
                             (Just { width = min 600 model.size.width, height = min 500 model.size.height })
                             dm
@@ -923,6 +956,21 @@ displayMessageDialog model message =
     }
 
 
+displayMessageNLinkDialog : Model -> String -> String -> String -> Model
+displayMessageNLinkDialog model message url text =
+    { model
+        | state =
+            MessageNLink
+                (MessageNLink.init Common.buttonStyle
+                    message
+                    url
+                    text
+                    (E.map (\_ -> ()) (viewState model.size model.state model))
+                )
+                model.state
+    }
+
+
 actualupdate : Msg -> Model -> ( Model, Cmd Msg )
 actualupdate msg model =
     case ( msg, model.state ) of
@@ -1038,6 +1086,7 @@ actualupdate msg model =
                                                     { message = "waiting for save"
                                                     }
                                                     login
+                                                    (Just model.state)
                                                 )
                                                 (\md ms ->
                                                     case ms of
@@ -1154,7 +1203,14 @@ actualupdate msg model =
                 Ok piresponse ->
                     case piresponse of
                         PI.ServerError e ->
-                            ( displayMessageDialog model e, Cmd.none )
+                            case Dict.get e model.errorNotes of
+                                Just url ->
+                                    ( displayMessageNLinkDialog model e url "more info"
+                                    , Cmd.none
+                                    )
+
+                                Nothing ->
+                                    ( displayMessageDialog model <| e, Cmd.none )
 
                         PI.ZkNote fbe ->
                             let
@@ -1167,6 +1223,24 @@ actualupdate msg model =
                                             View (View.initFull fbe)
                             in
                             ( { model | state = vstate }
+                            , Cmd.none
+                            )
+
+        ( ErrorIndexNote rsein, state ) ->
+            case rsein of
+                Err e ->
+                    ( displayMessageDialog model <| Util.httpErrorString e
+                    , Cmd.none
+                    )
+
+                Ok resp ->
+                    case resp of
+                        PI.ServerError e ->
+                            -- if there's an error on getting the error index note, just display it.
+                            ( displayMessageDialog model <| e, Cmd.none )
+
+                        PI.ZkNote fbe ->
+                            ( { model | errorNotes = MC.linkDict fbe.zknote.content }
                             , Cmd.none
                             )
 
@@ -1201,6 +1275,7 @@ actualupdate msg model =
                                                     { message = "loading articles"
                                                     }
                                                     login
+                                                    (Just model.state)
                                             , seed =
                                                 case state of
                                                     -- save the seed if we're leaving login state.
@@ -1220,7 +1295,12 @@ actualupdate msg model =
                                 LoginShowMessage _ li url ->
                                     let
                                         lgmod =
-                                            { model | state = ShowMessage { message = "logged in" } login }
+                                            { model
+                                                | state =
+                                                    ShowMessage { message = "logged in" }
+                                                        login
+                                                        Nothing
+                                            }
 
                                         ( m, cmd ) =
                                             parseUrl url
@@ -1319,7 +1399,7 @@ actualupdate msg model =
                                     , Cmd.none
                                     )
 
-                                ShowMessage _ login ->
+                                ShowMessage _ login _ ->
                                     ( { model | state = EditZkNoteListing { notes = sr, spmodel = SP.initModel, dialog = Nothing } login }
                                     , Cmd.none
                                     )
@@ -1707,10 +1787,34 @@ actualupdate msg model =
                     ( { model | state = DisplayMessage nmod prevstate }, Cmd.none )
 
                 GD.Ok return ->
-                    ( { model | state = prevstate }, Cmd.none )
+                    case prevstate of
+                        ShowMessage _ _ (Just ps) ->
+                            ( { model | state = ps }, Cmd.none )
+
+                        _ ->
+                            ( { model | state = prevstate }, Cmd.none )
 
                 GD.Cancel ->
                     ( { model | state = prevstate }, Cmd.none )
+
+        ( MessageNLinkMsg bm, MessageNLink bs prevstate ) ->
+            case GD.update bm bs of
+                GD.Dialog nmod ->
+                    ( { model | state = MessageNLink nmod prevstate }, Cmd.none )
+
+                GD.Ok return ->
+                    case prevstate of
+                        ShowMessage _ _ (Just ps) ->
+                            ( { model | state = ps }, Cmd.none )
+
+                        _ ->
+                            ( { model | state = prevstate }, Cmd.none )
+
+                GD.Cancel ->
+                    ( { model | state = prevstate }, Cmd.none )
+
+        ( MessageNLinkMsg GD.Noop, _ ) ->
+            ( model, Cmd.none )
 
         ( Noop, _ ) ->
             ( model, Cmd.none )
@@ -1801,6 +1905,7 @@ handleEditZkNoteCmd model login emod ecmd =
                             { message = "loading articles"
                             }
                             login
+                            (Just model.state)
                         )
                         onmsg
               }
@@ -1842,7 +1947,9 @@ handleEditZkNoteCmd model login emod ecmd =
         EditZkNote.Switch id ->
             let
                 ( st, cmd ) =
-                    ( ShowMessage { message = "loading note..." } login
+                    ( ShowMessage { message = "loading note..." }
+                        login
+                        (Just model.state)
                     , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
                     )
             in
@@ -1851,7 +1958,9 @@ handleEditZkNoteCmd model login emod ecmd =
         EditZkNote.SaveSwitch s id ->
             let
                 ( st, cmd ) =
-                    ( ShowMessage { message = "loading note..." } login
+                    ( ShowMessage { message = "loading note..." }
+                        login
+                        (Just model.state)
                     , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
                     )
             in
@@ -1991,7 +2100,7 @@ init flags url key zone =
                         PubShowMessage { message = "loading..." }
 
                     Just l ->
-                        ShowMessage { message = "loading..." } l
+                        ShowMessage { message = "loading..." } l Nothing
             , size = { width = flags.width, height = flags.height }
             , location = flags.location
             , navkey = key
@@ -2000,7 +2109,16 @@ init flags url key zone =
             , savedRoute = { route = Top, save = False }
             , prevSearches = []
             , recentNotes = []
+            , errorNotes = Dict.empty
             }
+
+        geterrornote =
+            flags.errorid
+                |> Maybe.map
+                    (\id ->
+                        PI.getErrorIndexNote flags.location id ErrorIndexNote
+                    )
+                |> Maybe.withDefault Cmd.none
     in
     parseUrl url
         |> Maybe.andThen
@@ -2021,7 +2139,7 @@ init flags url key zone =
                 ( { imodel
                     | state = rs
                   }
-                , rcmd
+                , Cmd.batch [ rcmd, geterrornote ]
                 )
             )
         |> Maybe.withDefault
@@ -2032,6 +2150,7 @@ init flags url key zone =
              ( m
              , Cmd.batch
                 [ c
+                , geterrornote
                 , Browser.Navigation.replaceUrl key "/"
                 ]
              )

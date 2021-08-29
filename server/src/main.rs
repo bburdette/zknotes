@@ -44,12 +44,20 @@ fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -> Http
     _ => serde_json::Value::Null,
   };
 
+  let errorid = match data.error_index_note {
+    Some(eid) => serde_json::to_value(eid).unwrap_or(serde_json::Value::Null),
+    None => serde_json::Value::Null,
+  };
+
   match util::load_string("static/index.html") {
     Ok(s) => {
       // search and replace with logindata!
       HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
-        .body(s.replace("{{logindata}}", logindata.to_string().as_str()))
+        .body(
+          s.replace("{{logindata}}", logindata.to_string().as_str())
+            .replace("{{errorid}}", errorid.to_string().as_str()),
+        )
     }
     Err(e) => {
       println!("err");
@@ -212,6 +220,7 @@ fn defcon() -> Config {
     appname: "mahbloag".to_string(),
     domain: "practica.site".to_string(),
     admin_email: "admin@practica.site".to_string(),
+    error_index_note: None,
     login_token_expiration_ms: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
     email_token_expiration_ms: 1 * 24 * 60 * 60 * 1000, // 1 day in milliseconds
     reset_token_expiration_ms: 1 * 24 * 60 * 60 * 1000, // 1 day in milliseconds

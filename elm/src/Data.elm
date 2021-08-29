@@ -473,15 +473,15 @@ decodeZkNoteEdit =
 
 decodeLoginData : JD.Decoder LoginData
 decodeLoginData =
-    JD.map8 LoginData
-        (JD.field "userid" JD.int)
-        (JD.field "name" JD.string)
-        (JD.field "zknote" JD.int)
-        (JD.field "homenote" (JD.maybe JD.int))
-        (JD.field "publicid" JD.int)
-        (JD.field "shareid" JD.int)
-        (JD.field "searchid" JD.int)
-        (JD.field "commentid" JD.int)
+    JD.succeed LoginData
+        |> andMap (JD.field "userid" JD.int)
+        |> andMap (JD.field "name" JD.string)
+        |> andMap (JD.field "zknote" JD.int)
+        |> andMap (JD.field "homenote" (JD.maybe JD.int))
+        |> andMap (JD.field "publicid" JD.int)
+        |> andMap (JD.field "shareid" JD.int)
+        |> andMap (JD.field "searchid" JD.int)
+        |> andMap (JD.field "commentid" JD.int)
 
 
 encodeImportZkNote : ImportZkNote -> JE.Value

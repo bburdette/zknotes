@@ -1698,7 +1698,11 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
         note.editable = false;
         Ok(note)
       }
-      Access::Private => bail!("can't read zknote; note is private"),
+      Access::Private => Err(Box::new(std::io::Error::new(
+        std::io::ErrorKind::PermissionDenied,
+        "can't read zknote; note is private",
+      ))),
+      // bail!("can't read zknote; note is private"),
     },
     Err(e) => Err(e),
   }
@@ -1831,7 +1835,10 @@ pub fn read_zknotepubid(
         note.editable = false;
         Ok(note)
       }
-      Access::Private => bail!("can't read zknote; note is private"),
+      Access::Private => Err(Box::new(std::io::Error::new(
+        std::io::ErrorKind::PermissionDenied,
+        "can't read zknote; note is private",
+      ))),
     },
     Err(e) => Err(e),
   }

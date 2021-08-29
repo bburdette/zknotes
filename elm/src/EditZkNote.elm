@@ -849,11 +849,11 @@ zknview zone size recentZkns model =
             case ( model.createdate, model.changeddate ) of
                 ( Just cd, Just chd ) ->
                     E.row [ E.width E.fill ]
-                        [ E.row []
+                        [ E.paragraph []
                             [ E.text "created: "
                             , E.text (Util.showTime zone (Time.millisToPosix cd))
                             ]
-                        , E.row [ E.alignRight ]
+                        , E.paragraph [ EF.alignRight ]
                             [ E.text "updated: "
                             , E.text (Util.showTime zone (Time.millisToPosix chd))
                             ]
@@ -1068,7 +1068,7 @@ zknview zone size recentZkns model =
                             always Noop
                     , text = model.md
                     , placeholder = Nothing
-                    , label = EI.labelHidden "Markdown input"
+                    , label = EI.labelHidden "markdown input"
                     , spellcheck = False
                     }
                  , case isdirty of
@@ -1195,6 +1195,14 @@ zknview zone size recentZkns model =
 
                                 Nothing ->
                                     model.zknSearchResult.notes
+                       )
+                    ++ (if List.length model.zknSearchResult.notes < 15 then
+                            []
+
+                        else
+                            [ E.map SPMsg <|
+                                SP.paginationView True model.spmodel
+                            ]
                        )
                 )
 

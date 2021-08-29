@@ -1,4 +1,4 @@
-module SearchPanel exposing (Command(..), Model, Msg(..), addSearchString, getSearch, initModel, searchResultUpdated, setSearchString, update, view)
+module SearchPanel exposing (Command(..), Model, Msg(..), addSearchString, getSearch, initModel, paginationView, searchResultUpdated, setSearchString, update, view)
 
 import Common exposing (buttonStyle)
 import Data
@@ -79,21 +79,26 @@ type Command
     | Copy String
 
 
+paginationView : Bool -> Model -> Element Msg
+paginationView showCopy model =
+    E.row [ E.width E.fill ]
+        [ E.map PPMsg <| PP.view model.paginationModel
+        , if showCopy then
+            EI.button (E.alignRight :: buttonStyle)
+                { label = E.text "< copy"
+                , onPress = Just CopyClicked
+                }
+
+          else
+            E.none
+        ]
+
+
 view : Bool -> Bool -> Int -> Model -> Element Msg
 view showCopy narrow nblevel model =
     column [ E.width E.fill, E.spacing 8 ]
         [ E.map TSPMsg <| TSP.view narrow nblevel model.tagSearchModel
-        , E.row [ E.width E.fill ]
-            [ E.map PPMsg <| PP.view model.paginationModel
-            , if showCopy then
-                EI.button (E.alignRight :: buttonStyle)
-                    { label = E.text "< copy"
-                    , onPress = Just CopyClicked
-                    }
-
-              else
-                E.none
-            ]
+        , paginationView showCopy model
         ]
 
 

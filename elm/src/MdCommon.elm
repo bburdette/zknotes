@@ -1,4 +1,4 @@
-module MdCommon exposing (Panel, ViewMode(..), blockCells, blockPanels, cellView, codeBlock, codeSpan, defCell, heading, imageView, markdownView, mdCells, mdPanel, mdPanels, mkRenderer, panelView, rawTextToId, searchView, showRunState)
+module MdCommon exposing (Panel, ViewMode(..), blockCells, blockPanels, cellView, codeBlock, codeSpan, defCell, heading, imageView, linkDict, markdownView, mdCells, mdPanel, mdPanels, mkRenderer, panelView, rawTextToId, searchView, showRunState)
 
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
@@ -12,7 +12,7 @@ import Element.Input as EI
 import Element.Region as ER
 import Html exposing (Attribute, Html)
 import Html.Attributes as HA
-import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..))
+import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..), inlineFoldl)
 import Markdown.Html
 import Markdown.Parser
 import Markdown.Renderer
@@ -428,3 +428,43 @@ codeBlock details =
                     details.body
                 ]
         ]
+
+
+linkDict : String -> Dict String String
+linkDict markdown =
+    -- build a dict of description->url
+    let
+        parsedmd =
+            markdown
+                |> Markdown.Parser.parse
+                |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
+    in
+    case parsedmd of
+        Err _ ->
+            Dict.empty
+
+        Ok blocks ->
+            inlineFoldl
+                (\inline links ->
+                    case inline of
+                        Block.Link str mbdesc moreinlines ->
+                            case mbdesc of
+                                Just desc ->
+                                    ( desc, str )
+                                        :: links
+
+                                Nothing ->
+                                    case moreinlines of
+                                        [ Block.Text desc2 ] ->
+                                            ( desc2, str )
+                                                :: links
+
+                                        _ ->
+                                            links
+
+                        _ ->
+                            links
+                )
+                []
+                blocks
+                |> Dict.fromList

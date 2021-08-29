@@ -178,6 +178,12 @@ listview ld size model =
                         ]
                     }
                 ]
+            , if List.length model.notes.notes < 15 then
+                E.none
+
+              else
+                E.map SPMsg <|
+                    SP.paginationView True model.spmodel
             ]
 
 
