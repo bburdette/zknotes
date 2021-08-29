@@ -257,7 +257,12 @@ routeState model route =
                 Just ( model.state, Cmd.none )
 
             else
-                Nothing
+                -- home page if any, or login page if not logged in.
+                let
+                    ( m, c ) =
+                        initialPage model
+                in
+                Just ( m.state, c )
 
 
 stateRoute : State -> SavedRoute
