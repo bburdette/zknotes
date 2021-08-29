@@ -98,7 +98,7 @@ type State
     | Import Import.Model Data.LoginData
     | UserSettings UserSettings.Model Data.LoginData State
     | ShowMessage ShowMessage.Model Data.LoginData (Maybe State)
-    | PubShowMessage ShowMessage.Model
+    | PubShowMessage ShowMessage.Model (Maybe State)
     | LoginShowMessage ShowMessage.Model Data.LoginData Url
     | SelectDialog (SS.GDModel Int) State
     | ChangePasswordDialog CP.GDModel State
@@ -189,6 +189,7 @@ routeState model route =
                         ( PubShowMessage
                             { message = "loading article"
                             }
+                            (Just model.state)
                         , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNote id)) PublicReplyData
                         )
 
@@ -206,6 +207,7 @@ routeState model route =
                         PubShowMessage
                             { message = "loading article"
                             }
+                            (Just model.state)
                 , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNotePubId pubid)) PublicReplyData
                 )
 
@@ -433,7 +435,7 @@ showState state =
         ShowMessage _ _ _ ->
             "ShowMessage"
 
-        PubShowMessage _ ->
+        PubShowMessage _ _ ->
             "PubShowMessage"
 
         LoginShowMessage _ _ _ ->
@@ -481,7 +483,7 @@ viewState size state model =
         ShowMessage em _ _ ->
             E.map ShowMessageMsg <| ShowMessage.view em
 
-        PubShowMessage em ->
+        PubShowMessage em _ ->
             E.map ShowMessageMsg <| ShowMessage.view em
 
         LoginShowMessage em _ _ ->
@@ -573,7 +575,7 @@ stateLogin state =
         ShowMessage _ login _ ->
             Just login
 
-        PubShowMessage _ ->
+        PubShowMessage _ _ ->
             Nothing
 
         LoginShowMessage _ _ _ ->
@@ -1624,6 +1626,7 @@ actualupdate msg model =
                             PubShowMessage
                                 { message = "loading article"
                                 }
+                                (Just model.state)
                       }
                     , sendPIMsg model.location
                         (PI.GetZkNote id)
@@ -1791,6 +1794,9 @@ actualupdate msg model =
                         ShowMessage _ _ (Just ps) ->
                             ( { model | state = ps }, Cmd.none )
 
+                        PubShowMessage _ (Just ps) ->
+                            ( { model | state = ps }, Cmd.none )
+
                         _ ->
                             ( { model | state = prevstate }, Cmd.none )
 
@@ -1805,6 +1811,9 @@ actualupdate msg model =
                 GD.Ok return ->
                     case prevstate of
                         ShowMessage _ _ (Just ps) ->
+                            ( { model | state = ps }, Cmd.none )
+
+                        PubShowMessage _ (Just ps) ->
                             ( { model | state = ps }, Cmd.none )
 
                         _ ->
@@ -2097,7 +2106,7 @@ init flags url key zone =
             { state =
                 case flags.login of
                     Nothing ->
-                        PubShowMessage { message = "loading..." }
+                        PubShowMessage { message = "loading..." } Nothing
 
                     Just l ->
                         ShowMessage { message = "loading..." } l Nothing
