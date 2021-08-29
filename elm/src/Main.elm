@@ -1199,7 +1199,6 @@ actualupdate msg model =
                         PI.ServerError e ->
                             case Dict.get (Debug.log "pise" e) (Debug.log "errornotes" model.errorNotes) of
                                 Just url ->
-                                    -- go to that url I guess?
                                     ( displayMessageNLinkDialog model e url "more info"
                                     , Cmd.none
                                     )
@@ -1787,10 +1786,13 @@ actualupdate msg model =
                     ( { model | state = MessageNLink nmod prevstate }, Cmd.none )
 
                 GD.Ok return ->
-                    ( { model | state = prevstate }, Cmd.none )
+                    ( { model | state = Debug.log "return state" prevstate }, Cmd.none )
 
                 GD.Cancel ->
                     ( { model | state = prevstate }, Cmd.none )
+
+        ( MessageNLinkMsg GD.Noop, _ ) ->
+            ( model, Cmd.none )
 
         ( Noop, _ ) ->
             ( model, Cmd.none )
