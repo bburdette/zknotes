@@ -1203,7 +1203,7 @@ actualupdate msg model =
                 Ok piresponse ->
                     case piresponse of
                         PI.ServerError e ->
-                            case Dict.get (Debug.log "pise" e) (Debug.log "errornotes" model.errorNotes) of
+                            case Dict.get e model.errorNotes of
                                 Just url ->
                                     ( displayMessageNLinkDialog model e url "more info"
                                     , Cmd.none
@@ -2113,14 +2113,12 @@ init flags url key zone =
             }
 
         geterrornote =
-            Debug.log "blah"
-                (flags.errorid
-                    |> Maybe.map
-                        (\id ->
-                            PI.getErrorIndexNote flags.location id ErrorIndexNote
-                        )
-                    |> Maybe.withDefault Cmd.none
-                )
+            flags.errorid
+                |> Maybe.map
+                    (\id ->
+                        PI.getErrorIndexNote flags.location id ErrorIndexNote
+                    )
+                |> Maybe.withDefault Cmd.none
     in
     parseUrl url
         |> Maybe.andThen
