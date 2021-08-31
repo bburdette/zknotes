@@ -247,7 +247,11 @@ routeState model route =
                                 )
 
                         Nothing ->
-                            Nothing
+                            Just
+                                ( PubShowMessage { message = "loading note..." }
+                                    (Just model.state)
+                                , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNote id)) PublicReplyData
+                                )
 
         ResetPasswordR username key ->
             Just ( ResetPassword <| ResetPassword.initialModel username key "zknotes", Cmd.none )
