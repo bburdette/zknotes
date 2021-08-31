@@ -163,102 +163,94 @@ urlRequest ur =
             LoadUrl str
 
 
-routeState : Model -> Route -> Maybe ( State, Cmd Msg )
+routeState : Model -> Route -> ( State, Cmd Msg )
 routeState model route =
     case route of
         PublicZkNote id ->
             case stateLogin model.state of
                 Just login ->
-                    Just
-                        ( ShowMessage
-                            { message = "loading article"
-                            }
-                            login
-                            (Just model.state)
-                        , case model.state of
-                            EView _ _ ->
-                                -- if we're in "EView" then do this request to stay in EView.
-                                PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNote id)) PublicReplyData
+                    ( ShowMessage
+                        { message = "loading article"
+                        }
+                        login
+                        (Just model.state)
+                    , case model.state of
+                        EView _ _ ->
+                            -- if we're in "EView" then do this request to stay in EView.
+                            PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNote id)) PublicReplyData
 
-                            _ ->
-                                sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
-                        )
+                        _ ->
+                            sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
+                    )
 
                 Nothing ->
-                    Just
-                        ( PubShowMessage
-                            { message = "loading article"
-                            }
-                            (Just model.state)
-                        , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNote id)) PublicReplyData
-                        )
+                    ( PubShowMessage
+                        { message = "loading article"
+                        }
+                        (Just model.state)
+                    , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNote id)) PublicReplyData
+                    )
 
         PublicZkPubId pubid ->
-            Just
-                ( case stateLogin model.state of
-                    Just login ->
-                        ShowMessage
-                            { message = "loading article"
-                            }
-                            login
-                            (Just model.state)
+            ( case stateLogin model.state of
+                Just login ->
+                    ShowMessage
+                        { message = "loading article"
+                        }
+                        login
+                        (Just model.state)
 
-                    Nothing ->
-                        PubShowMessage
-                            { message = "loading article"
-                            }
-                            (Just model.state)
-                , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNotePubId pubid)) PublicReplyData
-                )
+                Nothing ->
+                    PubShowMessage
+                        { message = "loading article"
+                        }
+                        (Just model.state)
+            , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNotePubId pubid)) PublicReplyData
+            )
 
         EditZkNoteR id ->
             case model.state of
                 EditZkNote st login ->
-                    Just <|
-                        ( EditZkNote st login
-                        , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
-                        )
+                    ( EditZkNote st login
+                    , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
+                    )
 
                 EditZkNoteListing st login ->
-                    Just <|
-                        ( EditZkNoteListing st login
-                        , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
-                        )
+                    ( EditZkNoteListing st login
+                    , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
+                    )
 
                 EView st login ->
-                    Just <|
-                        ( EView st login
-                        , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNote id)) PublicReplyData
-                        )
+                    ( EView st login
+                    , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNote id)) PublicReplyData
+                    )
 
                 st ->
                     case stateLogin st of
                         Just login ->
-                            Just <|
-                                ( ShowMessage { message = "loading note..." }
-                                    login
-                                    (Just model.state)
-                                , Cmd.batch
-                                    [ sendUIMsg
-                                        model.location
-                                        (UI.SearchZkNotes <| prevSearchQuery login)
-                                    , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
-                                    ]
-                                )
+                            ( ShowMessage { message = "loading note..." }
+                                login
+                                (Just model.state)
+                            , Cmd.batch
+                                [ sendUIMsg
+                                    model.location
+                                    (UI.SearchZkNotes <| prevSearchQuery login)
+                                , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
+                                ]
+                            )
 
                         Nothing ->
-                            Just
-                                ( PubShowMessage { message = "loading note..." }
-                                    (Just model.state)
-                                , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNote id)) PublicReplyData
-                                )
+                            ( PubShowMessage { message = "loading note..." }
+                                (Just model.state)
+                            , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNote id)) PublicReplyData
+                            )
 
         ResetPasswordR username key ->
-            Just ( ResetPassword <| ResetPassword.initialModel username key "zknotes", Cmd.none )
+            ( ResetPassword <| ResetPassword.initialModel username key "zknotes", Cmd.none )
 
         Top ->
             if (stateRoute model.state).route == Top then
-                Just ( model.state, Cmd.none )
+                ( model.state, Cmd.none )
 
             else
                 -- home page if any, or login page if not logged in.
@@ -266,7 +258,7 @@ routeState model route =
                     ( m, c ) =
                         initialPage model
                 in
-                Just ( m.state, c )
+                ( m.state, c )
 
 
 stateRoute : State -> SavedRoute
@@ -848,7 +840,7 @@ urlupdate msg model =
                     let
                         ( state, icmd ) =
                             parseUrl url
-                                |> Maybe.andThen (routeState model)
+                                |> Maybe.map (routeState model)
                                 |> Maybe.withDefault ( model.state, Cmd.none )
 
                         bcmd =
@@ -883,23 +875,22 @@ urlupdate msg model =
                                 ( model, Cmd.none )
 
                             else
-                                case routeState model route of
-                                    Just ( st, rscmd ) ->
-                                        -- swap out the savedRoute, so we don't write over history.
-                                        ( { model
-                                            | state = st
-                                            , savedRoute =
-                                                let
-                                                    nssr =
-                                                        stateRoute st
-                                                in
-                                                { nssr | save = False }
-                                          }
-                                        , rscmd
-                                        )
-
-                                    Nothing ->
-                                        ( model, Cmd.none )
+                                let
+                                    ( st, rscmd ) =
+                                        routeState model route
+                                in
+                                -- swap out the savedRoute, so we don't write over history.
+                                ( { model
+                                    | state = st
+                                    , savedRoute =
+                                        let
+                                            nssr =
+                                                stateRoute st
+                                        in
+                                        { nssr | save = False }
+                                  }
+                                , rscmd
+                                )
 
                         Nothing ->
                             -- load foreign site
@@ -1324,7 +1315,7 @@ actualupdate msg model =
                                                             _ ->
                                                                 Just s
                                                     )
-                                                |> Maybe.andThen
+                                                |> Maybe.map
                                                     (routeState
                                                         lgmod
                                                     )
@@ -2148,7 +2139,7 @@ init flags url key zone =
                     _ ->
                         Just s
             )
-        |> Maybe.andThen
+        |> Maybe.map
             (routeState
                 imodel
             )
