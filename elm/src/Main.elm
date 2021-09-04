@@ -1207,12 +1207,12 @@ actualupdate msg model =
                         PI.ServerError e ->
                             case Dict.get e model.errorNotes of
                                 Just url ->
-                                    ( displayMessageNLinkDialog model e url "more info"
+                                    ( displayMessageNLinkDialog { model | state = initLogin model.seed } e url "more info"
                                     , Cmd.none
                                     )
 
                                 Nothing ->
-                                    ( displayMessageDialog model <| e, Cmd.none )
+                                    ( displayMessageDialog { model | state = initLogin model.seed } e, Cmd.none )
 
                         PI.ZkNote fbe ->
                             let
@@ -1288,22 +1288,22 @@ actualupdate msg model =
                                                         model.seed
                                         }
                                         S.defaultSearch
+
+                                lgmod =
+                                    { model
+                                        | state =
+                                            ShowMessage { message = "logged in" }
+                                                login
+                                                Nothing
+                                    }
                             in
                             case state of
                                 Login lm ->
-                                    -- we're logged in!  Get article listing.
-                                    getlisting
+                                    -- we're logged in!
+                                    initialPage lgmod
 
                                 LoginShowMessage _ li url ->
                                     let
-                                        lgmod =
-                                            { model
-                                                | state =
-                                                    ShowMessage { message = "logged in" }
-                                                        login
-                                                        Nothing
-                                            }
-
                                         ( m, cmd ) =
                                             parseUrl url
                                                 |> Maybe.andThen
@@ -1320,8 +1320,7 @@ actualupdate msg model =
                                                         lgmod
                                                     )
                                                 |> Maybe.map (\( st, cm ) -> ( { model | state = st }, cm ))
-                                                |> Maybe.withDefault
-                                                    getlisting
+                                                |> Maybe.withDefault (initialPage lgmod)
                                     in
                                     ( m, cmd )
 
