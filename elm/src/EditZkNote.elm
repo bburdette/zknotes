@@ -1,4 +1,4 @@
-module EditZkNote exposing (Command(..), EditLink, Model, Msg(..), NavChoice(..), SearchOrRecent(..), WClass(..), addComment, commentsRecieved, commonButtonStyle, compareZklinks, dirty, disabledLinkButtonStyle, elToSzkl, elToSzl, fullSave, gotSelectedText, initFull, initNew, isPublic, isSearch, linkButtonStyle, linksWith, mkButtonStyle, noteLink, onCtrlS, onSaved, onZkNote, pageLink, renderMd, replaceOrAdd, saveZkLinkList, setHomeNote, showSr, showZkl, sznFromModel, sznToZkn, toPubId, toZkListNote, update, updateSearch, updateSearchResult, view, zkLinkName, zklKey, zknview)
+module EditZkNote exposing (Command(..), EditLink, Model, Msg(..), NavChoice(..), SearchOrRecent(..), WClass(..), addComment, commentsRecieved, commonButtonStyle, compareZklinks, dirty, disabledLinkButtonStyle, elToSzkl, elToSzl, fullSave, gotSelectedText, initFull, initNew, isPublic, isSearch, linkButtonStyle, linksWith, mkButtonStyle, noteLink, onCtrlS, onEnter, onSaved, onZkNote, pageLink, renderMd, replaceOrAdd, saveZkLinkList, setHomeNote, showSr, showZkl, sznFromModel, sznToZkn, toPubId, toZkListNote, update, updateSearch, updateSearchResult, view, zkLinkName, zklKey, zknview)
 
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
@@ -1633,6 +1633,48 @@ onCtrlS model =
         ( model, None )
 
 
+onEnter : Model -> ( Model, Command )
+onEnter model =
+    handleSPUpdate model (SP.onEnter model.spmodel)
+
+
+handleSPUpdate : Model -> ( SP.Model, SP.Command ) -> ( Model, Command )
+handleSPUpdate model ( nm, cmd ) =
+    let
+        mod =
+            { model | spmodel = nm }
+    in
+    case cmd of
+        SP.None ->
+            ( mod, None )
+
+        SP.Save ->
+            ( mod, None )
+
+        SP.Copy s ->
+            ( { mod
+                | md =
+                    model.md
+                        ++ (if model.md == "" then
+                                "<search query=\""
+
+                            else
+                                "\n\n<search query=\""
+                           )
+                        ++ String.replace "&" "&amp;" s
+                        ++ "\"/>"
+              }
+            , None
+            )
+
+        SP.Search ts ->
+            let
+                zsr =
+                    mod.zknSearchResult
+            in
+            ( { mod | zknSearchResult = { zsr | notes = [] } }, Search ts )
+
+
 update : Msg -> Model -> ( Model, Command )
 update msg model =
     case msg of
@@ -2045,42 +2087,7 @@ update msg model =
             )
 
         SPMsg m ->
-            let
-                ( nm, cm ) =
-                    SP.update m model.spmodel
-
-                mod =
-                    { model | spmodel = nm }
-            in
-            case cm of
-                SP.None ->
-                    ( mod, None )
-
-                SP.Save ->
-                    ( mod, None )
-
-                SP.Copy s ->
-                    ( { mod
-                        | md =
-                            model.md
-                                ++ (if model.md == "" then
-                                        "<search query=\""
-
-                                    else
-                                        "\n\n<search query=\""
-                                   )
-                                ++ String.replace "&" "&amp;" s
-                                ++ "\"/>"
-                      }
-                    , None
-                    )
-
-                SP.Search ts ->
-                    let
-                        zsr =
-                            mod.zknSearchResult
-                    in
-                    ( { mod | zknSearchResult = { zsr | notes = [] } }, Search ts )
+            handleSPUpdate model (SP.update m model.spmodel)
 
         NavChoiceChanged nc ->
             ( { model | navchoice = nc }, None )

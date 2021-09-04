@@ -1,10 +1,10 @@
-module TagSearchPanel exposing (Command(..), Model, Msg(..), Search(..), addSearchText, addTagToSearchPrev, addToSearch, addToSearchPanel, getSearch, initModel, selectPrevSearch, toggleHelpButton, update, updateSearchText, view)
+module TagSearchPanel exposing (Command(..), Model, Msg(..), Search(..), addSearchText, addTagToSearchPrev, addToSearch, addToSearchPanel, getSearch, initModel, onEnter, selectPrevSearch, toggleHelpButton, update, updateSearchText, view)
 
 import Common exposing (buttonStyle)
 import Element exposing (..)
 import Element.Background as Background
 import Element.Border as Border
-import Element.Events exposing (onClick)
+import Element.Events exposing (onClick, onFocus, onLoseFocus)
 import Element.Font as Font
 import Element.Input as Input
 import Parser
@@ -28,6 +28,7 @@ type alias Model =
     , helpPanel : SearchHelpPanel.Model
     , showPrevs : Bool
     , prevSearches : List String
+    , searchFocus : Bool
     }
 
 
@@ -40,11 +41,13 @@ initModel =
     , helpPanel = SearchHelpPanel.init
     , showPrevs = False
     , prevSearches = []
+    , searchFocus = False
     }
 
 
 type Msg
     = SearchText String
+    | STFocus Bool
     | SearchDetails
     | SearchClick
     | ToggleHelp
@@ -250,7 +253,7 @@ view narrow nblevel model =
 
         tinput =
             Input.text
-                tiattribs
+                (onFocus (STFocus True) :: onLoseFocus (STFocus False) :: tiattribs)
                 { onChange = SearchText
                 , text = model.searchText
                 , placeholder = Nothing
@@ -398,6 +401,27 @@ toggleHelpButton showHelp =
         }
 
 
+onEnter : Model -> ( Model, Command )
+onEnter model =
+    if model.searchFocus then
+        doSearchClick model
+
+    else
+        ( model, None )
+
+
+doSearchClick : Model -> ( Model, Command )
+doSearchClick model =
+    ( model
+    , case getSearch model of
+        Just s ->
+            Search s
+
+        Nothing ->
+            None
+    )
+
+
 update : Msg -> Model -> ( Model, Command )
 update msg model =
     case msg of
@@ -405,6 +429,9 @@ update msg model =
             ( updateSearchText model txt
             , None
             )
+
+        STFocus focused ->
+            ( { model | searchFocus = focused }, None )
 
         Clear ->
             ( { model
@@ -435,14 +462,7 @@ update msg model =
             ( { model | showParse = not model.showParse }, None )
 
         SearchClick ->
-            ( model
-            , case getSearch model of
-                Just s ->
-                    Search s
-
-                Nothing ->
-                    None
-            )
+            doSearchClick model
 
         ToggleHelp ->
             ( { model | showHelp = not model.showHelp }, None )

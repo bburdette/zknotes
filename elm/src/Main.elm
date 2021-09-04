@@ -79,6 +79,7 @@ type Msg
     | UrlChanged Url
     | WindowSize Util.Size
     | CtrlS
+    | Enter
     | DisplayMessageMsg (GD.Msg DisplayMessage.Msg)
     | MessageNLinkMsg (GD.Msg MessageNLink.Msg)
     | SelectDialogMsg (GD.Msg (SS.Msg Int))
@@ -386,6 +387,9 @@ showMessage msg =
 
         CtrlS ->
             "CtrlS"
+
+        Enter ->
+            "Enter"
 
         SelectDialogMsg _ ->
             "SelectDialogMsg"
@@ -777,15 +781,15 @@ onKeyDown =
     HE.preventDefaultOn "keydown"
         (JD.map4
             (\key ctrl alt shift ->
-                let
-                    _ =
-                        Debug.log "key" key
-                in
                 case Toop.T4 key ctrl alt shift of
                     Toop.T4 "s" True False False ->
                         -- ctrl-s -> prevent default!
                         -- also, CtrlS message.
                         ( CtrlS, True )
+
+                    Toop.T4 "Enter" False False False ->
+                        -- don't prevent default, issue "Enter" message
+                        ( Enter, False )
 
                     _ ->
                         -- anything else, don't prevent default!
@@ -1417,11 +1421,7 @@ actualupdate msg model =
                         UI.ZkNote zkn ->
                             case state of
                                 EditZkNote ezn login ->
-                                    let
-                                        ( emod, ecmd ) =
-                                            EditZkNote.onZkNote zkn ezn
-                                    in
-                                    handleEditZkNoteCmd model login emod ecmd
+                                    handleEditZkNoteCmd model login (EditZkNote.onZkNote zkn ezn)
 
                                 _ ->
                                     ( unexpectedMessage model (UI.showServerResponse uiresponse)
@@ -1668,59 +1668,19 @@ actualupdate msg model =
                     )
 
         ( EditZkNoteMsg em, EditZkNote es login ) ->
-            let
-                ( emod, ecmd ) =
-                    EditZkNote.update em es
-            in
-            handleEditZkNoteCmd model login emod ecmd
+            handleEditZkNoteCmd model login (EditZkNote.update em es)
 
         ( CtrlS, EditZkNote es login ) ->
-            let
-                ( emod, ecmd ) =
-                    EditZkNote.onCtrlS es
-            in
-            handleEditZkNoteCmd model login emod ecmd
+            handleEditZkNoteCmd model login (EditZkNote.onCtrlS es)
+
+        ( Enter, EditZkNote es login ) ->
+            handleEditZkNoteCmd model login (EditZkNote.onEnter es)
+
+        ( Enter, EditZkNoteListing es login ) ->
+            handleEditZkNoteListing model login (EditZkNoteListing.onEnter es)
 
         ( EditZkNoteListingMsg em, EditZkNoteListing es login ) ->
-            let
-                ( emod, ecmd ) =
-                    EditZkNoteListing.update em es login
-            in
-            case ecmd of
-                EditZkNoteListing.None ->
-                    ( { model | state = EditZkNoteListing emod login }, Cmd.none )
-
-                EditZkNoteListing.New ->
-                    ( { model | state = EditZkNote (EditZkNote.initNew login es.notes emod.spmodel) login }, Cmd.none )
-
-                EditZkNoteListing.Selected id ->
-                    ( { model | state = EditZkNoteListing emod login }
-                    , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
-                    )
-
-                EditZkNoteListing.Done ->
-                    ( { model | state = UserSettings (UserSettings.init login) login (EditZkNoteListing es login) }
-                    , Cmd.none
-                    )
-
-                EditZkNoteListing.Import ->
-                    ( { model | state = Import (Import.init login emod.notes emod.spmodel) login }
-                    , Cmd.none
-                    )
-
-                EditZkNoteListing.Search s ->
-                    sendSearch { model | state = EditZkNoteListing emod login } s
-
-                EditZkNoteListing.PowerDelete s ->
-                    ( { model | state = EditZkNoteListing emod login }
-                    , sendUIMsg model.location
-                        (UI.PowerDelete s)
-                    )
-
-                EditZkNoteListing.SearchHistory ->
-                    ( shDialog model
-                    , Cmd.none
-                    )
+            handleEditZkNoteListing model login (EditZkNoteListing.update em es login)
 
         ( ImportMsg em, Import es login ) ->
             let
@@ -1849,7 +1809,7 @@ actualupdate msg model =
             )
 
 
-handleEditZkNoteCmd model login emod ecmd =
+handleEditZkNoteCmd model login ( emod, ecmd ) =
     let
         backtolisting =
             let
@@ -2029,6 +1989,45 @@ handleEditZkNoteCmd model login emod ecmd =
         EditZkNote.SetHomeNote id ->
             ( { model | state = EditZkNote emod login }
             , sendUIMsg model.location (UI.SetHomeNote id)
+            )
+
+
+handleEditZkNoteListing : Model -> Data.LoginData -> ( EditZkNoteListing.Model, EditZkNoteListing.Command ) -> ( Model, Cmd Msg )
+handleEditZkNoteListing model login ( emod, ecmd ) =
+    case ecmd of
+        EditZkNoteListing.None ->
+            ( { model | state = EditZkNoteListing emod login }, Cmd.none )
+
+        EditZkNoteListing.New ->
+            ( { model | state = EditZkNote (EditZkNote.initNew login emod.notes emod.spmodel) login }, Cmd.none )
+
+        EditZkNoteListing.Selected id ->
+            ( { model | state = EditZkNoteListing emod login }
+            , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
+            )
+
+        EditZkNoteListing.Done ->
+            ( { model | state = UserSettings (UserSettings.init login) login (EditZkNoteListing emod login) }
+            , Cmd.none
+            )
+
+        EditZkNoteListing.Import ->
+            ( { model | state = Import (Import.init login emod.notes emod.spmodel) login }
+            , Cmd.none
+            )
+
+        EditZkNoteListing.Search s ->
+            sendSearch { model | state = EditZkNoteListing emod login } s
+
+        EditZkNoteListing.PowerDelete s ->
+            ( { model | state = EditZkNoteListing emod login }
+            , sendUIMsg model.location
+                (UI.PowerDelete s)
+            )
+
+        EditZkNoteListing.SearchHistory ->
+            ( shDialog model
+            , Cmd.none
             )
 
 

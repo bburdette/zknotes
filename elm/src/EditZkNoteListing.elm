@@ -83,6 +83,11 @@ updateSearch ts model =
     )
 
 
+onEnter : Model -> ( Model, Command )
+onEnter model =
+    handleSPUpdate model (SP.onEnter model.spmodel)
+
+
 view : Data.LoginData -> Util.Size -> Model -> Element Msg
 view ld size model =
     case model.dialog of
@@ -251,22 +256,24 @@ update msg model ld =
                     ( model, None )
 
         SPMsg m ->
-            let
-                ( nm, cm ) =
-                    SP.update m model.spmodel
+            handleSPUpdate model (SP.update m model.spmodel)
 
-                mod =
-                    { model | spmodel = nm }
-            in
-            case cm of
-                SP.None ->
-                    ( mod, None )
 
-                SP.Save ->
-                    ( mod, None )
+handleSPUpdate : Model -> ( SP.Model, SP.Command ) -> ( Model, Command )
+handleSPUpdate model ( nm, cm ) =
+    let
+        mod =
+            { model | spmodel = nm }
+    in
+    case cm of
+        SP.None ->
+            ( mod, None )
 
-                SP.Copy _ ->
-                    ( mod, None )
+        SP.Save ->
+            ( mod, None )
 
-                SP.Search ts ->
-                    ( mod, Search ts )
+        SP.Copy _ ->
+            ( mod, None )
+
+        SP.Search ts ->
+            ( mod, Search ts )

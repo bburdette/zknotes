@@ -1,4 +1,4 @@
-module SearchPanel exposing (Command(..), Model, Msg(..), addSearchString, getSearch, initModel, paginationView, searchResultUpdated, setSearchString, update, view)
+module SearchPanel exposing (Command(..), Model, Msg(..), addSearchString, getSearch, initModel, onEnter, paginationView, searchResultUpdated, setSearchString, update, view)
 
 import Common exposing (buttonStyle)
 import Data
@@ -66,6 +66,11 @@ addSearchString model string =
     }
 
 
+onEnter : Model -> ( Model, Command )
+onEnter model =
+    handleTspUpdate model (TSP.onEnter model.tagSearchModel)
+
+
 type Msg
     = TSPMsg TSP.Msg
     | PPMsg PP.Msg
@@ -102,6 +107,27 @@ view showCopy narrow nblevel model =
         ]
 
 
+handleTspUpdate : Model -> ( TSP.Model, TSP.Command ) -> ( Model, Command )
+handleTspUpdate model ( nm, cmd ) =
+    case cmd of
+        TSP.None ->
+            ( { model | tagSearchModel = nm }, None )
+
+        TSP.Save ->
+            ( { model | tagSearchModel = nm }, None )
+
+        TSP.Search ts ->
+            ( { model | tagSearchModel = nm, paginationModel = PP.initModel }
+            , Search <|
+                { tagSearch = ts
+                , offset = 0
+                , limit = Just model.paginationModel.increment
+                , what = ""
+                , list = True
+                }
+            )
+
+
 update : Msg -> Model -> ( Model, Command )
 update msg model =
     case msg of
@@ -109,27 +135,7 @@ update msg model =
             ( model, Copy model.tagSearchModel.searchText )
 
         TSPMsg m ->
-            let
-                ( nm, cmd ) =
-                    TSP.update m model.tagSearchModel
-            in
-            case cmd of
-                TSP.None ->
-                    ( { model | tagSearchModel = nm }, None )
-
-                TSP.Save ->
-                    ( { model | tagSearchModel = nm }, None )
-
-                TSP.Search ts ->
-                    ( { model | tagSearchModel = nm, paginationModel = PP.initModel }
-                    , Search <|
-                        { tagSearch = ts
-                        , offset = 0
-                        , limit = Just model.paginationModel.increment
-                        , what = ""
-                        , list = True
-                        }
-                    )
+            handleTspUpdate model (TSP.update m model.tagSearchModel)
 
         PPMsg m ->
             let
