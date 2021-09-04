@@ -307,20 +307,6 @@ searchMods =
     listOf searchMod
 
 
-
-{- searchTerm : Parser String
-   searchTerm =
-       succeed identity
-           |. symbol "'"
-           |= (getChompedString <|
-                   succeed ()
-                       |. chompWhile (\c -> c /= '\'')
-              )
-           |. symbol "'"
-
--}
-
-
 searchTerm : Parser String
 searchTerm =
     succeed identity
@@ -331,8 +317,8 @@ searchTerm =
 termHelp : List String -> Parser (Step (List String) String)
 termHelp revChunks =
     oneOf
-        [ succeed (\_ -> Loop ("'" :: revChunks))
-            |= token "\\'"
+        [ succeed (Loop ("'" :: revChunks))
+            |. token "\\'"
         , token "'"
             |> map (\_ -> Done (String.join "" (List.reverse revChunks)))
         , chompWhile isUninteresting
@@ -341,6 +327,7 @@ termHelp revChunks =
                 (\chunk ->
                     case chunk of
                         "" ->
+                            -- prevent infinite loop!
                             Done (String.join "" (List.reverse revChunks))
 
                         _ ->
@@ -352,43 +339,6 @@ termHelp revChunks =
 isUninteresting : Char -> Bool
 isUninteresting char =
     char /= '\\' && char /= '\''
-
-
-
-{- string : Parser String
-   string =
-     succeed identity
-       |. token "\""
-       |= loop [] stringHelp
-
-
-   stringHelp : List String -> Parser (Step (List String) String)
-   stringHelp revChunks =
-     oneOf
-       [ succeed (\chunk -> Loop (chunk :: revChunks))
-           |. token "\\"
-           |= oneOf
-               [ map (\_ -> "\n") (token "n")
-               , map (\_ -> "\t") (token "t")
-               , map (\_ -> "\r") (token "r")
-               , succeed String.fromChar
-                   |. token "u{"
-                   |= unicode
-                   |. token "}"
-               ]
-       , token "\""
-           |> map (\_ -> Done (String.join "" (List.reverse revChunks)))
-       , chompWhile isUninteresting
-           |> getChompedString
-           |> map (\chunk -> Loop (chunk :: revChunks))
-       ]
-
-
-   isUninteresting : Char -> Bool
-   isUninteresting char =
-     char /= '\\' && char /= '"'
-
--}
 
 
 spaces : Parser ()
