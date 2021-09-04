@@ -1,4 +1,4 @@
-module Login exposing (Cmd(..), Mode(..), Model, Msg(..), initialModel, invalidUserOrPwd, loginView, makeUrlP, registrationSent, registrationView, sentView, unregisteredUser, update, urlToState, userExists, view)
+module Login exposing (Cmd(..), Mode(..), Model, Msg(..), initialModel, invalidUserOrPwd, loginView, makeUrlP, registrationSent, registrationView, sentView, unregisteredUser, update, urlToState, userExists, view, onEnter)
 
 import Common exposing (buttonStyle)
 import Dict exposing (Dict)
@@ -293,6 +293,19 @@ sentView model =
                     "Reset sent..."
             )
         ]
+
+
+onEnter : Model -> ( Model, Cmd )
+onEnter model =
+    case model.mode of
+        LoginMode ->
+            update LoginPressed model
+
+        RegistrationMode ->
+            update RegisterPressed model
+
+        ResetMode ->
+            update ResetPressed model
 
 
 update : Msg -> Model -> ( Model, Cmd )

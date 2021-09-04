@@ -1166,42 +1166,11 @@ actualupdate msg model =
                 UserSettings.None ->
                     ( { model | state = UserSettings numod login prevstate }, Cmd.none )
 
+        ( Enter, Login ls ) ->
+            handleLogin model (Login.onEnter ls)
+
         ( LoginMsg lm, Login ls ) ->
-            let
-                ( lmod, lcmd ) =
-                    Login.update lm ls
-            in
-            case lcmd of
-                Login.None ->
-                    ( { model | state = Login lmod }, Cmd.none )
-
-                Login.Register ->
-                    ( { model | state = Login lmod }
-                    , sendUIMsg model.location
-                        (UI.Register
-                            { uid = lmod.userId
-                            , pwd = lmod.password
-                            , email = ls.email
-                            }
-                        )
-                    )
-
-                Login.Login ->
-                    ( { model | state = Login lmod }
-                    , sendUIMsg model.location <|
-                        UI.Login
-                            { uid = lmod.userId
-                            , pwd = lmod.password
-                            }
-                    )
-
-                Login.Reset ->
-                    ( { model | state = Login lmod }
-                    , sendUIMsg model.location <|
-                        UI.ResetPassword
-                            { uid = lmod.userId
-                            }
-                    )
+            handleLogin model (Login.update lm ls)
 
         ( PublicReplyData prd, state ) ->
             case prd of
@@ -2028,6 +1997,41 @@ handleEditZkNoteListing model login ( emod, ecmd ) =
         EditZkNoteListing.SearchHistory ->
             ( shDialog model
             , Cmd.none
+            )
+
+
+handleLogin : Model -> ( Login.Model, Login.Cmd ) -> ( Model, Cmd Msg )
+handleLogin model ( lmod, lcmd ) =
+    case lcmd of
+        Login.None ->
+            ( { model | state = Login lmod }, Cmd.none )
+
+        Login.Register ->
+            ( { model | state = Login lmod }
+            , sendUIMsg model.location
+                (UI.Register
+                    { uid = lmod.userId
+                    , pwd = lmod.password
+                    , email = lmod.email
+                    }
+                )
+            )
+
+        Login.Login ->
+            ( { model | state = Login lmod }
+            , sendUIMsg model.location <|
+                UI.Login
+                    { uid = lmod.userId
+                    , pwd = lmod.password
+                    }
+            )
+
+        Login.Reset ->
+            ( { model | state = Login lmod }
+            , sendUIMsg model.location <|
+                UI.ResetPassword
+                    { uid = lmod.userId
+                    }
             )
 
 
