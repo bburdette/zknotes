@@ -777,6 +777,10 @@ onKeyDown =
     HE.preventDefaultOn "keydown"
         (JD.map4
             (\key ctrl alt shift ->
+                let
+                    _ =
+                        Debug.log "key" key
+                in
                 case Toop.T4 key ctrl alt shift of
                     Toop.T4 "s" True False False ->
                         -- ctrl-s -> prevent default!
