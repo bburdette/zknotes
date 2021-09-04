@@ -80,7 +80,8 @@ addToSearch searchmods name search =
         term =
             SearchTerm
                 searchmods
-                name
+                -- escape single quotes
+                (String.replace "'" "\\'" name)
     in
     case search of
         NoSearch ->
