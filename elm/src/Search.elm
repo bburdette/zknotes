@@ -15,11 +15,13 @@ import Parser
         , chompWhile
         , getChompedString
         , lazy
+        , loop
         , map
         , oneOf
         , run
         , succeed
         , symbol
+        , token
         )
 import TDict exposing (TDict)
 import Util exposing (first, rest)
@@ -305,15 +307,88 @@ searchMods =
     listOf searchMod
 
 
+
+{- searchTerm : Parser String
+   searchTerm =
+       succeed identity
+           |. symbol "'"
+           |= (getChompedString <|
+                   succeed ()
+                       |. chompWhile (\c -> c /= '\'')
+              )
+           |. symbol "'"
+
+-}
+
+
 searchTerm : Parser String
 searchTerm =
     succeed identity
         |. symbol "'"
-        |= (getChompedString <|
-                succeed ()
-                    |. chompWhile (\c -> c /= '\'')
-           )
-        |. symbol "'"
+        |= loop [] termHelp
+
+
+termHelp : List String -> Parser (Step (List String) String)
+termHelp revChunks =
+    oneOf
+        [ succeed (\_ -> Loop ("'" :: revChunks))
+            |= token "\\'"
+        , token "'"
+            |> map (\_ -> Done (String.join "" (List.reverse revChunks)))
+        , chompWhile isUninteresting
+            |> getChompedString
+            |> map
+                (\chunk ->
+                    case chunk of
+                        "" ->
+                            Done (String.join "" (List.reverse revChunks))
+
+                        _ ->
+                            Loop (chunk :: revChunks)
+                )
+        ]
+
+
+isUninteresting : Char -> Bool
+isUninteresting char =
+    char /= '\\' && char /= '\''
+
+
+
+{- string : Parser String
+   string =
+     succeed identity
+       |. token "\""
+       |= loop [] stringHelp
+
+
+   stringHelp : List String -> Parser (Step (List String) String)
+   stringHelp revChunks =
+     oneOf
+       [ succeed (\chunk -> Loop (chunk :: revChunks))
+           |. token "\\"
+           |= oneOf
+               [ map (\_ -> "\n") (token "n")
+               , map (\_ -> "\t") (token "t")
+               , map (\_ -> "\r") (token "r")
+               , succeed String.fromChar
+                   |. token "u{"
+                   |= unicode
+                   |. token "}"
+               ]
+       , token "\""
+           |> map (\_ -> Done (String.join "" (List.reverse revChunks)))
+       , chompWhile isUninteresting
+           |> getChompedString
+           |> map (\chunk -> Loop (chunk :: revChunks))
+       ]
+
+
+   isUninteresting : Char -> Bool
+   isUninteresting char =
+     char /= '\\' && char /= '"'
+
+-}
 
 
 spaces : Parser ()
