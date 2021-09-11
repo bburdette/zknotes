@@ -898,6 +898,13 @@ zknview zone size recentZkns model =
                             )
                     )
 
+        edlabelattr =
+            if editable then
+                []
+
+            else
+                [ EF.color TC.darkGrey ]
+
         editview =
             let
                 titleed =
@@ -923,7 +930,10 @@ zknview zone size recentZkns model =
                                 always Noop
                         , text = model.title
                         , placeholder = Nothing
-                        , label = EI.labelLeft [] (E.text "title")
+                        , label =
+                            EI.labelLeft
+                                edlabelattr
+                                (E.text "title")
                         }
             in
             E.column
@@ -992,19 +1002,18 @@ zknview zone size recentZkns model =
                                 always Noop
                         , icon = EI.defaultCheckbox
                         , checked = model.editableValue
-                        , label = EI.labelLeft [] (E.text "editable")
+                        , label = EI.labelLeft edlabelattr (E.text "editable")
                         }
 
                    else
-                    E.row [ E.spacing 8 ]
+                    E.row [ E.spacing 8, E.width E.fill ]
                         [ EI.checkbox [ E.width E.shrink ]
                             { onChange = always Noop -- can't change editable unless you're the owner.
                             , icon = EI.defaultCheckbox
                             , checked = model.editableValue
-                            , label = EI.labelLeft [] (E.text "editable")
+                            , label = EI.labelLeft edlabelattr (E.text "editable")
                             }
-                        , E.text "creator"
-                        , E.row [ EF.bold ] [ E.text model.noteUserName ]
+                        , E.row [ E.spacing 8, E.alignRight, EF.color TC.darkGrey ] [ E.text "creator", E.el [ EF.bold ] <| E.text model.noteUserName ]
                         ]
                  , E.row [ E.spacing 8, E.width E.fill ]
                     [ EI.checkbox [ E.width E.shrink ]
@@ -1016,7 +1025,7 @@ zknview zone size recentZkns model =
                                 always Noop
                         , icon = EI.defaultCheckbox
                         , checked = public
-                        , label = EI.labelLeft [] (E.text "public")
+                        , label = EI.labelLeft edlabelattr (E.text "public")
                         }
                     , if public then
                         EI.text [ E.width E.fill ]
@@ -1028,7 +1037,7 @@ zknview zone size recentZkns model =
                                     always Noop
                             , text = model.pubidtxt
                             , placeholder = Nothing
-                            , label = EI.labelLeft [] (E.text "article id")
+                            , label = EI.labelLeft edlabelattr (E.text "article id")
                             }
 
                       else
