@@ -167,6 +167,9 @@ urlRequest ur =
 routeState : Model -> Route -> ( State, Cmd Msg )
 routeState model route =
     case route of
+        LoginR ->
+            ( Login (Login.initialModel Nothing "zknotes" model.seed), Cmd.none )
+
         PublicZkNote id ->
             case stateLogin model.state of
                 Just login ->
@@ -246,8 +249,48 @@ routeState model route =
                             , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNote id)) PublicReplyData
                             )
 
+        EditZkNoteNew ->
+            case model.state of
+                EditZkNote st login ->
+                    -- handleEditZkNoteCmd should return state probably, or this function should return model.
+                    let
+                        ( nm, cmd ) =
+                            handleEditZkNoteCmd model login (EditZkNote.gotSelectedText st "")
+                    in
+                    ( nm.state, cmd )
+
+                EditZkNoteListing st login ->
+                    ( EditZkNote (EditZkNote.initNew login st.notes st.spmodel) login, Cmd.none )
+
+                st ->
+                    case stateLogin st of
+                        Just login ->
+                            ( EditZkNote
+                                (EditZkNote.initNew login
+                                    { notes = []
+                                    , offset = 0
+                                    , what = ""
+                                    }
+                                    SP.initModel
+                                )
+                                login
+                            , Cmd.none
+                            )
+
+                        Nothing ->
+                            -- err 'you're not logged in.'
+                            ( (displayMessageDialog { model | state = initLogin model.seed } "can't create a new note; you're not logged in!").state, Cmd.none )
+
         ResetPasswordR username key ->
             ( ResetPassword <| ResetPassword.initialModel username key "zknotes", Cmd.none )
+
+        SettingsR ->
+            case stateLogin model.state of
+                Just login ->
+                    ( UserSettings (UserSettings.init login) login model.state, Cmd.none )
+
+                Nothing ->
+                    ( (displayMessageDialog { model | state = initLogin model.seed } "can't view user settings; you're not logged in!").state, Cmd.none )
 
         Top ->
             if (stateRoute model.state).route == Top then
@@ -307,7 +350,17 @@ stateRoute state =
             { route =
                 st.id
                     |> Maybe.map EditZkNoteR
-                    |> Maybe.withDefault Top
+                    |> Maybe.withDefault EditZkNoteNew
+            , save = True
+            }
+
+        Login _ ->
+            { route = LoginR
+            , save = False
+            }
+
+        UserSettings _ _ _ ->
+            { route = SettingsR
             , save = True
             }
 
@@ -2065,7 +2118,7 @@ preinit flags url key =
 
 initialPage : Model -> ( Model, Cmd Msg )
 initialPage curmodel =
-    case stateLogin curmodel.state of
+    (case stateLogin curmodel.state of
         Just login ->
             case login.homenote of
                 Just id ->
@@ -2100,6 +2153,16 @@ initialPage curmodel =
 
         Nothing ->
             ( { curmodel | state = initLogin curmodel.seed }, Cmd.none )
+    )
+        |> (\( m, c ) ->
+                ( m
+                , Cmd.batch
+                    [ Browser.Navigation.replaceUrl m.navkey
+                        (routeUrl (stateRoute m.state).route)
+                    , c
+                    ]
+                )
+           )
 
 
 init : Flags -> Url -> Browser.Navigation.Key -> Time.Zone -> ( Model, Cmd Msg )

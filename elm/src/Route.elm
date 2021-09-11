@@ -7,16 +7,22 @@ import Url.Parser as UP exposing ((</>))
 
 
 type Route
-    = PublicZkNote Int
+    = LoginR
+    | PublicZkNote Int
     | PublicZkPubId String
     | EditZkNoteR Int
+    | EditZkNoteNew
     | ResetPasswordR String UUID
+    | SettingsR
     | Top
 
 
 routeTitle : Route -> String
 routeTitle route =
     case route of
+        LoginR ->
+            "login"
+
         PublicZkNote id ->
             "zknote " ++ String.fromInt id
 
@@ -26,8 +32,14 @@ routeTitle route =
         EditZkNoteR id ->
             "zknote " ++ String.fromInt id
 
+        EditZkNoteNew ->
+            "new zknote"
+
         ResetPasswordR _ _ ->
             "password reset"
+
+        SettingsR ->
+            "user settings"
 
         Top ->
             "zknotes"
@@ -37,7 +49,10 @@ parseUrl : Url -> Maybe Route
 parseUrl url =
     UP.parse
         (UP.oneOf
-            [ UP.map PublicZkNote <|
+            [ UP.map LoginR <|
+                UP.s
+                    "login"
+            , UP.map PublicZkNote <|
                 UP.s
                     "note"
                     </> UP.int
@@ -49,11 +64,18 @@ parseUrl url =
                 UP.s
                     "editnote"
                     </> UP.int
+            , UP.map EditZkNoteNew <|
+                UP.s
+                    "editnote"
+                    </> UP.s "new"
             , UP.map ResetPasswordR <|
                 UP.s
                     "reset"
                     </> UP.string
                     </> UP.custom "UUID" (UUID.fromString >> Result.toMaybe)
+            , UP.map SettingsR <|
+                UP.s
+                    "settings"
             , UP.map Top <| UP.top
             ]
         )
@@ -63,6 +85,9 @@ parseUrl url =
 routeUrl : Route -> String
 routeUrl route =
     case route of
+        LoginR ->
+            UB.absolute [ "login" ] []
+
         PublicZkNote id ->
             UB.absolute [ "note", String.fromInt id ] []
 
@@ -72,8 +97,14 @@ routeUrl route =
         EditZkNoteR id ->
             UB.absolute [ "editnote", String.fromInt id ] []
 
+        EditZkNoteNew ->
+            UB.absolute [ "editnote", "new" ] []
+
         ResetPasswordR user key ->
             UB.absolute [ "reset", user, UUID.toString key ] []
+
+        SettingsR ->
+            UB.absolute [ "settings" ] []
 
         Top ->
             UB.absolute [] []
