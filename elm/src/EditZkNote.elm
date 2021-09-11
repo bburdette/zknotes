@@ -1497,6 +1497,11 @@ initNew ld zkl spm =
     , dialog = Nothing
     , panelNote = Nothing
     }
+        |> (\m1 ->
+                -- for new EMPTY notes, the 'revert' should be the same as the model, so that you aren't
+                -- prompted to save an empty note.
+                { m1 | revert = Just <| sznFromModel m1 }
+           )
 
 
 replaceOrAdd : List a -> a -> (a -> a -> Bool) -> (a -> a -> a) -> List a
