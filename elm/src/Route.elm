@@ -7,7 +7,8 @@ import Url.Parser as UP exposing ((</>))
 
 
 type Route
-    = PublicZkNote Int
+    = LoginR
+    | PublicZkNote Int
     | PublicZkPubId String
     | EditZkNoteR Int
     | EditZkNoteNew
@@ -18,6 +19,9 @@ type Route
 routeTitle : Route -> String
 routeTitle route =
     case route of
+        LoginR ->
+            "login"
+
         PublicZkNote id ->
             "zknote " ++ String.fromInt id
 
@@ -41,7 +45,10 @@ parseUrl : Url -> Maybe Route
 parseUrl url =
     UP.parse
         (UP.oneOf
-            [ UP.map PublicZkNote <|
+            [ UP.map LoginR <|
+                UP.s
+                    "login"
+            , UP.map PublicZkNote <|
                 UP.s
                     "note"
                     </> UP.int
@@ -70,7 +77,10 @@ parseUrl url =
 
 routeUrl : Route -> String
 routeUrl route =
-    case route of
+    case Debug.log "routeUrl" route of
+        LoginR ->
+            UB.absolute [ "login" ] []
+
         PublicZkNote id ->
             UB.absolute [ "note", String.fromInt id ] []
 

@@ -167,6 +167,9 @@ urlRequest ur =
 routeState : Model -> Route -> ( State, Cmd Msg )
 routeState model route =
     case route of
+        LoginR ->
+            ( Login (Login.initialModel Nothing "zknotes" model.seed), Cmd.none )
+
         PublicZkNote id ->
             case stateLogin model.state of
                 Just login ->
@@ -339,7 +342,12 @@ stateRoute state =
             { route =
                 st.id
                     |> Maybe.map EditZkNoteR
-                    |> Maybe.withDefault Top
+                    |> Maybe.withDefault EditZkNoteNew
+            , save = True
+            }
+
+        Login _ ->
+            { route = LoginR
             , save = True
             }
 
@@ -2097,7 +2105,7 @@ preinit flags url key =
 
 initialPage : Model -> ( Model, Cmd Msg )
 initialPage curmodel =
-    case stateLogin curmodel.state of
+    (case stateLogin curmodel.state of
         Just login ->
             case login.homenote of
                 Just id ->
@@ -2132,6 +2140,16 @@ initialPage curmodel =
 
         Nothing ->
             ( { curmodel | state = initLogin curmodel.seed }, Cmd.none )
+    )
+        |> (\( m, c ) ->
+                ( m
+                , Cmd.batch
+                    [ Browser.Navigation.pushUrl m.navkey
+                        (routeUrl (stateRoute m.state).route)
+                    , c
+                    ]
+                )
+           )
 
 
 init : Flags -> Url -> Browser.Navigation.Key -> Time.Zone -> ( Model, Cmd Msg )
