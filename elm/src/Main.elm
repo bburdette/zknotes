@@ -2144,7 +2144,7 @@ initialPage curmodel =
         |> (\( m, c ) ->
                 ( m
                 , Cmd.batch
-                    [ Browser.Navigation.pushUrl m.navkey
+                    [ Browser.Navigation.replaceUrl m.navkey
                         (routeUrl (stateRoute m.state).route)
                     , c
                     ]
