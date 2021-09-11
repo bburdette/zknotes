@@ -10,6 +10,7 @@ type Route
     = PublicZkNote Int
     | PublicZkPubId String
     | EditZkNoteR Int
+    | EditZkNoteNew
     | ResetPasswordR String UUID
     | Top
 
@@ -25,6 +26,9 @@ routeTitle route =
 
         EditZkNoteR id ->
             "zknote " ++ String.fromInt id
+
+        EditZkNoteNew ->
+            "new zknote"
 
         ResetPasswordR _ _ ->
             "password reset"
@@ -49,6 +53,10 @@ parseUrl url =
                 UP.s
                     "editnote"
                     </> UP.int
+            , UP.map EditZkNoteNew <|
+                UP.s
+                    "editnote"
+                    </> UP.s "new"
             , UP.map ResetPasswordR <|
                 UP.s
                     "reset"
@@ -71,6 +79,9 @@ routeUrl route =
 
         EditZkNoteR id ->
             UB.absolute [ "editnote", String.fromInt id ] []
+
+        EditZkNoteNew ->
+            UB.absolute [ "editnote", "new" ] []
 
         ResetPasswordR user key ->
             UB.absolute [ "reset", user, UUID.toString key ] []

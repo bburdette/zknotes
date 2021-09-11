@@ -246,6 +246,38 @@ routeState model route =
                             , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNote id)) PublicReplyData
                             )
 
+        EditZkNoteNew ->
+            case model.state of
+                EditZkNote st login ->
+                    -- handleEditZkNoteCmd should return state probably, or this function should return model.
+                    let
+                        ( nm, cmd ) =
+                            handleEditZkNoteCmd model login (EditZkNote.gotSelectedText st "")
+                    in
+                    ( nm.state, cmd )
+
+                EditZkNoteListing st login ->
+                    ( EditZkNote (EditZkNote.initNew login st.notes st.spmodel) login, Cmd.none )
+
+                st ->
+                    case stateLogin st of
+                        Just login ->
+                            ( EditZkNote
+                                (EditZkNote.initNew login
+                                    { notes = []
+                                    , offset = 0
+                                    , what = ""
+                                    }
+                                    SP.initModel
+                                )
+                                login
+                            , Cmd.none
+                            )
+
+                        Nothing ->
+                            -- err 'you're not logged in.'
+                            ( (displayMessageDialog { model | state = initLogin model.seed } "can't create a new note; you're not logged in!").state, Cmd.none )
+
         ResetPasswordR username key ->
             ( ResetPassword <| ResetPassword.initialModel username key "zknotes", Cmd.none )
 
