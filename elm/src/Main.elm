@@ -284,6 +284,14 @@ routeState model route =
         ResetPasswordR username key ->
             ( ResetPassword <| ResetPassword.initialModel username key "zknotes", Cmd.none )
 
+        SettingsR ->
+            case stateLogin model.state of
+                Just login ->
+                    ( UserSettings (UserSettings.init login) login model.state, Cmd.none )
+
+                Nothing ->
+                    ( (displayMessageDialog { model | state = initLogin model.seed } "can't view user settings; you're not logged in!").state, Cmd.none )
+
         Top ->
             if (stateRoute model.state).route == Top then
                 ( model.state, Cmd.none )
@@ -348,6 +356,11 @@ stateRoute state =
 
         Login _ ->
             { route = LoginR
+            , save = False
+            }
+
+        UserSettings _ _ _ ->
+            { route = SettingsR
             , save = True
             }
 

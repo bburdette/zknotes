@@ -13,6 +13,7 @@ type Route
     | EditZkNoteR Int
     | EditZkNoteNew
     | ResetPasswordR String UUID
+    | SettingsR
     | Top
 
 
@@ -36,6 +37,9 @@ routeTitle route =
 
         ResetPasswordR _ _ ->
             "password reset"
+
+        SettingsR ->
+            "user settings"
 
         Top ->
             "zknotes"
@@ -69,6 +73,9 @@ parseUrl url =
                     "reset"
                     </> UP.string
                     </> UP.custom "UUID" (UUID.fromString >> Result.toMaybe)
+            , UP.map SettingsR <|
+                UP.s
+                    "settings"
             , UP.map Top <| UP.top
             ]
         )
@@ -95,6 +102,9 @@ routeUrl route =
 
         ResetPasswordR user key ->
             UB.absolute [ "reset", user, UUID.toString key ] []
+
+        SettingsR ->
+            UB.absolute [ "settings" ] []
 
         Top ->
             UB.absolute [] []
