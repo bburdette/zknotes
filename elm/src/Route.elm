@@ -84,7 +84,7 @@ parseUrl url =
 
 routeUrl : Route -> String
 routeUrl route =
-    case Debug.log "routeUrl" route of
+    case route of
         LoginR ->
             UB.absolute [ "login" ] []
 
