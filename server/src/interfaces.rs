@@ -281,7 +281,7 @@ fn user_interface_loggedin(
       let id: i64 = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.db.as_path())?;
       let note = sqldata::read_zknote(&conn, Some(uid), id)?;
-      info!("user getzknote: {} - {}", id, note.title);
+      info!("user#getzknote: {} - {}", id, note.title);
       Ok(ServerResponse {
         what: "zknote".to_string(),
         content: serde_json::to_value(note)?,
@@ -293,7 +293,7 @@ fn user_interface_loggedin(
       let conn = sqldata::connection_open(config.db.as_path())?;
       let note = sqldata::read_zknoteedit(&conn, uid, &gzne)?;
       info!(
-        "user getzknoteedit: {} - {}",
+        "user#getzknoteedit: {} - {}",
         gzne.zknote, note.zknote.title
       );
       Ok(ServerResponse {
@@ -429,7 +429,7 @@ pub fn public_interface(
       let id: i64 = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.db.as_path())?;
       let note = sqldata::read_zknote(&conn, None, id)?;
-      info!("public getzknote: {} - {}", id, note.title);
+      info!("public#getzknote: {} - {}", id, note.title);
       Ok(ServerResponse {
         what: "zknote".to_string(),
         content: serde_json::to_value(ZkNoteEdit {
@@ -443,7 +443,7 @@ pub fn public_interface(
       let pubid: String = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.db.as_path())?;
       let note = sqldata::read_zknotepubid(&conn, None, pubid.as_str())?;
-      info!("public getzknotepubid: {} - {}", pubid, note.title);
+      info!("public#getzknotepubid: {} - {}", pubid, note.title);
       Ok(ServerResponse {
         what: "zknote".to_string(),
         content: serde_json::to_value(ZkNoteEdit {
