@@ -8,7 +8,7 @@ use actix_session::Session;
 use crypto_hash::{hex_digest, Algorithm};
 use either::Either::{Left, Right};
 use log::info;
-use simple_error::bail;
+// use simple_error::bail;
 use std::error::Error;
 use std::path::Path;
 use uuid::Uuid;
@@ -281,6 +281,7 @@ fn user_interface_loggedin(
       let id: i64 = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.db.as_path())?;
       let note = sqldata::read_zknote(&conn, Some(uid), id)?;
+      info!("user getzknote: {} - {}", id, note.title);
       Ok(ServerResponse {
         what: "zknote".to_string(),
         content: serde_json::to_value(note)?,
@@ -291,6 +292,10 @@ fn user_interface_loggedin(
       let gzne: GetZkNoteEdit = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.db.as_path())?;
       let note = sqldata::read_zknoteedit(&conn, uid, &gzne)?;
+      info!(
+        "user getzknoteedit: {} - {}",
+        gzne.zknote, note.zknote.title
+      );
       Ok(ServerResponse {
         what: "zknoteedit".to_string(),
         content: serde_json::to_value(note)?,
@@ -424,40 +429,28 @@ pub fn public_interface(
       let id: i64 = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.db.as_path())?;
       let note = sqldata::read_zknote(&conn, None, id)?;
-      if sqldata::is_zknote_public(&conn, note.id)? {
-        Ok(ServerResponse {
-          what: "zknote".to_string(),
-          content: serde_json::to_value(ZkNoteEdit {
-            links: sqldata::read_public_zklinks(&conn, note.id)?,
-            zknote: note,
-          })?,
-        })
-      } else {
-        Ok(ServerResponse {
-          what: "privatezknote".to_string(),
-          content: serde_json::to_value(note.id)?,
-        })
-      }
+      info!("public getzknote: {} - {}", id, note.title);
+      Ok(ServerResponse {
+        what: "zknote".to_string(),
+        content: serde_json::to_value(ZkNoteEdit {
+          links: sqldata::read_public_zklinks(&conn, note.id)?,
+          zknote: note,
+        })?,
+      })
     }
     "getzknotepubid" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let pubid: String = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.db.as_path())?;
       let note = sqldata::read_zknotepubid(&conn, None, pubid.as_str())?;
-      if sqldata::is_zknote_public(&conn, note.id)? {
-        Ok(ServerResponse {
-          what: "zknote".to_string(),
-          content: serde_json::to_value(ZkNoteEdit {
-            links: sqldata::read_public_zklinks(&conn, note.id)?,
-            zknote: note,
-          })?,
-        })
-      } else {
-        Ok(ServerResponse {
-          what: "privatezknote".to_string(),
-          content: serde_json::to_value(note.id)?,
-        })
-      }
+      info!("public getzknotepubid: {} - {}", pubid, note.title);
+      Ok(ServerResponse {
+        what: "zknote".to_string(),
+        content: serde_json::to_value(ZkNoteEdit {
+          links: sqldata::read_public_zklinks(&conn, note.id)?,
+          zknote: note,
+        })?,
+      })
     }
     wat => Err(Box::new(simple_error::SimpleError::new(format!(
       "invalid 'what' code:'{}'",
