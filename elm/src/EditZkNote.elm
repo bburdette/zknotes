@@ -373,7 +373,7 @@ revert model =
                 }
             )
         |> Maybe.withDefault
-            (initNew model.ld model.zknSearchResult model.spmodel)
+            (initNew model.ld model.zknSearchResult model.spmodel (Dict.values model.initialZklDict))
 
 
 showZkl : Bool -> Bool -> Maybe EditLink -> Data.LoginData -> Maybe Int -> Maybe E.Color -> EditLink -> Element Msg
@@ -653,29 +653,8 @@ makeNewCommentState : Model -> NewCommentState
 makeNewCommentState model =
     let
         sharelinks =
-            model.zklDict
-                |> Dict.values
-                |> List.filterMap
-                    (\l ->
-                        if
-                            List.any ((==) model.ld.shareid) l.sysids
-                                || (l.otherid == model.ld.publicid)
-                        then
-                            Just
-                                ( { otherid = l.otherid
-                                  , direction = l.direction
-                                  , user = model.ld.userid
-                                  , zknote = Nothing
-                                  , delete = Nothing
-                                  , othername = l.othername
-                                  , sysids = l.sysids
-                                  }
-                                , True
-                                )
-
-                        else
-                            Nothing
-                    )
+            shareLinks model
+                |> List.map (\i -> ( i, True ))
 
         userlink =
             if model.ld.userid == model.noteUser then
@@ -695,6 +674,31 @@ makeNewCommentState model =
                 ]
     in
     { text = "", sharelinks = userlink ++ sharelinks }
+
+
+shareLinks : Model -> List EditLink
+shareLinks model =
+    model.zklDict
+        |> Dict.values
+        |> List.filterMap
+            (\l ->
+                if
+                    List.any ((==) model.ld.shareid) l.sysids
+                        || (l.otherid == model.ld.publicid)
+                then
+                    Just
+                        { otherid = l.otherid
+                        , direction = l.direction
+                        , user = model.ld.userid
+                        , zknote = Nothing
+                        , delete = Nothing
+                        , othername = l.othername
+                        , sysids = l.sysids
+                        }
+
+                else
+                    Nothing
+            )
 
 
 addComment : NewCommentState -> Element Msg
@@ -1466,13 +1470,16 @@ initFull ld searchOrRecent zkl zknote dtlinks spm =
     )
 
 
-initNew : Data.LoginData -> Data.ZkListNoteSearchResult -> SP.Model -> Model
-initNew ld zkl spm =
+initNew : Data.LoginData -> Data.ZkListNoteSearchResult -> SP.Model -> List EditLink -> Model
+initNew ld zkl spm links =
     let
         cells =
             ""
                 |> MC.mdCells
                 |> Result.withDefault (CellDict Dict.empty)
+
+        initialZklDict =
+            Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) links)
 
         ( cc, result ) =
             evalCellsFully
@@ -1485,8 +1492,8 @@ initNew ld zkl spm =
     , usernote = ld.zknote
     , zknSearchResult = zkl
     , focusSr = Nothing
-    , zklDict = Dict.empty
-    , initialZklDict = Dict.empty
+    , zklDict = initialZklDict
+    , initialZklDict = initialZklDict
     , focusLink = Nothing
     , pubidtxt = ""
     , title = ""
@@ -1607,7 +1614,7 @@ gotSelectedText : Model -> String -> ( Model, Command )
 gotSelectedText model s =
     let
         nmod =
-            initNew model.ld model.zknSearchResult model.spmodel
+            initNew model.ld model.zknSearchResult model.spmodel (shareLinks model)
     in
     ( { nmod | title = s }
     , if dirty model then
@@ -1819,6 +1826,7 @@ update msg model =
         NewPress ->
             ( model
             , GetSelectedText [ "title", "mdtext" ]
+              -- should result in a gotSelectedText call.
             )
 
         ToLinkPress zkln ->

@@ -260,7 +260,7 @@ routeState model route =
                     ( nm.state, cmd )
 
                 EditZkNoteListing st login ->
-                    ( EditZkNote (EditZkNote.initNew login st.notes st.spmodel) login, Cmd.none )
+                    ( EditZkNote (EditZkNote.initNew login st.notes st.spmodel []) login, Cmd.none )
 
                 st ->
                     case stateLogin st of
@@ -272,6 +272,7 @@ routeState model route =
                                     , what = ""
                                     }
                                     SP.initModel
+                                    []
                                 )
                                 login
                             , Cmd.none
@@ -2021,7 +2022,7 @@ handleEditZkNoteListing model login ( emod, ecmd ) =
             ( { model | state = EditZkNoteListing emod login }, Cmd.none )
 
         EditZkNoteListing.New ->
-            ( { model | state = EditZkNote (EditZkNote.initNew login emod.notes emod.spmodel) login }, Cmd.none )
+            ( { model | state = EditZkNote (EditZkNote.initNew login emod.notes emod.spmodel []) login }, Cmd.none )
 
         EditZkNoteListing.Selected id ->
             ( { model | state = EditZkNoteListing emod login }
@@ -2141,6 +2142,7 @@ initialPage curmodel =
                                     , what = ""
                                     }
                                     SP.initModel
+                                    []
                                 )
                                 login
                       }
