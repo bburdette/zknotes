@@ -348,12 +348,9 @@ stateRoute state =
                             }
 
         EditZkNote st login ->
-            { route =
-                st.id
-                    |> Maybe.map EditZkNoteR
-                    |> Maybe.withDefault EditZkNoteNew
-            , save = True
-            }
+            st.id
+                |> Maybe.map (\id -> { route = EditZkNoteR id, save = True })
+                |> Maybe.withDefault { route = EditZkNoteNew, save = False }
 
         Login _ ->
             { route = LoginR
