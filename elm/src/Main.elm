@@ -79,6 +79,7 @@ type Msg
     | UrlChanged Url
     | WindowSize Util.Size
     | CtrlS
+    | CtrlAlt String Bool
     | Enter
     | DisplayMessageMsg (GD.Msg DisplayMessage.Msg)
     | MessageNLinkMsg (GD.Msg MessageNLink.Msg)
@@ -438,6 +439,16 @@ showMessage msg =
 
         CtrlS ->
             "CtrlS"
+
+        CtrlAlt s shift ->
+            "CtrlAlt"
+                ++ (if shift then
+                        "shift"
+
+                    else
+                        ""
+                   )
+                ++ s
 
         Enter ->
             "Enter"
@@ -841,6 +852,9 @@ onKeyDown =
                     Toop.T4 "Enter" False False False ->
                         -- don't prevent default, issue "Enter" message
                         ( Enter, False )
+
+                    Toop.T4 s True True sh ->
+                        ( CtrlAlt s sh, True )
 
                     _ ->
                         -- anything else, don't prevent default!
@@ -1692,6 +1706,9 @@ actualupdate msg model =
 
         ( CtrlS, EditZkNote es login ) ->
             handleEditZkNoteCmd model login (EditZkNote.onCtrlS es)
+
+        ( CtrlAlt s shift, EditZkNote es login ) ->
+            handleEditZkNoteCmd model login (EditZkNote.onCtrlAlt s shift es)
 
         ( Enter, EditZkNote es login ) ->
             handleEditZkNoteCmd model login (EditZkNote.onEnter es)

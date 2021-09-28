@@ -1,4 +1,4 @@
-module EditZkNote exposing (Command(..), EditLink, Model, Msg(..), NavChoice(..), SearchOrRecent(..), WClass(..), addComment, commentsRecieved, commonButtonStyle, compareZklinks, dirty, disabledLinkButtonStyle, elToSzkl, elToSzl, fullSave, gotSelectedText, initFull, initNew, isPublic, isSearch, linkButtonStyle, linksWith, mkButtonStyle, noteLink, onCtrlS, onEnter, onSaved, onZkNote, pageLink, renderMd, replaceOrAdd, saveZkLinkList, setHomeNote, showSr, showZkl, sznFromModel, sznToZkn, toPubId, toZkListNote, update, updateSearch, updateSearchResult, view, zkLinkName, zklKey, zknview)
+module EditZkNote exposing (Command(..), EditLink, Model, Msg(..), NavChoice(..), SearchOrRecent(..), WClass(..), addComment, commentsRecieved, commonButtonStyle, compareZklinks, dirty, disabledLinkButtonStyle, elToSzkl, elToSzl, fullSave, gotSelectedText, initFull, initNew, isPublic, isSearch, linkButtonStyle, linksWith, mkButtonStyle, noteLink, onCtrlAlt, onCtrlS, onEnter, onSaved, onZkNote, pageLink, renderMd, replaceOrAdd, saveZkLinkList, setHomeNote, showSr, showZkl, sznFromModel, sznToZkn, toPubId, toZkListNote, update, updateSearch, updateSearchResult, view, zkLinkName, zklKey, zknview)
 
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
@@ -1357,7 +1357,7 @@ zknview zone size recentZkns model =
                         , EBk.color TC.white
                         ]
                         [ Common.navbar 2
-                            (if model.navchoice == NcSearch then
+                            (if model.navchoice /= NcView && model.navchoice /= NcEdit then
                                 NcView
 
                              else
@@ -1694,6 +1694,39 @@ onCtrlS model =
 
     else
         ( model, None )
+
+
+onCtrlAlt : String -> Bool -> Model -> ( Model, Command )
+onCtrlAlt s shift model =
+    case s of
+        "e" ->
+            update (NavChoiceChanged NcEdit) model
+
+        "v" ->
+            update (NavChoiceChanged NcView) model
+
+        "s" ->
+            let
+                ( m, c ) =
+                    update (NavChoiceChanged NcSearch) model
+
+                ( m2, c2 ) =
+                    update (SearchOrRecentChanged SearchView) m
+            in
+            ( m2, c2 )
+
+        "r" ->
+            let
+                ( m, c ) =
+                    update (NavChoiceChanged NcRecent) model
+
+                ( m2, c2 ) =
+                    update (SearchOrRecentChanged RecentView) m
+            in
+            ( m2, c2 )
+
+        _ ->
+            ( model, None )
 
 
 onEnter : Model -> ( Model, Command )
