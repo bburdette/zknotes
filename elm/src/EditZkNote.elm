@@ -457,6 +457,15 @@ showZkl isDirty editable focusLink ld id sysColor showflip zkl =
                         { onPress = Nothing
                         , label = E.text "^"
                         }
+                , case zkl.othername of
+                    Just name ->
+                        EI.button (linkButtonStyle ++ [ E.alignLeft ])
+                            { onPress = Just <| AddToSearchAsTag name
+                            , label = E.text ">"
+                            }
+
+                    Nothing ->
+                        E.none
                 , if showflip then
                     EI.button (linkButtonStyle ++ [ E.alignLeft ])
                         { onPress = Just (FlipLink zkl)
