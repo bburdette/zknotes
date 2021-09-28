@@ -503,3 +503,13 @@ encodeImportZkNote izn =
 editNoteLink : Int -> String
 editNoteLink noteid =
     UB.absolute [ "editnote", String.fromInt noteid ] []
+
+
+flipDirection : Direction -> Direction
+flipDirection direction =
+    case direction of
+        To ->
+            From
+
+        From ->
+            To

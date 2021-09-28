@@ -71,6 +71,7 @@ type Msg
     | SetSearch String
     | BigSearchPress
     | SettingsPress
+    | FlipLink EditLink
     | Noop
 
 
@@ -376,8 +377,8 @@ revert model =
             (initNew model.ld model.zknSearchResult model.spmodel (Dict.values model.initialZklDict))
 
 
-showZkl : Bool -> Bool -> Maybe EditLink -> Data.LoginData -> Maybe Int -> Maybe E.Color -> EditLink -> Element Msg
-showZkl isDirty editable focusLink ld id sysColor zkl =
+showZkl : Bool -> Bool -> Maybe EditLink -> Data.LoginData -> Maybe Int -> Maybe E.Color -> Bool -> EditLink -> Element Msg
+showZkl isDirty editable focusLink ld id sysColor showflip zkl =
     let
         ( dir, otherid ) =
             case zkl.direction of
@@ -456,6 +457,14 @@ showZkl isDirty editable focusLink ld id sysColor zkl =
                         { onPress = Nothing
                         , label = E.text "^"
                         }
+                , if showflip then
+                    EI.button (linkButtonStyle ++ [ E.alignLeft ])
+                        { onPress = Just (FlipLink zkl)
+                        , label = E.text "⇄"
+                        }
+
+                  else
+                    E.none
                 , case otherid of
                     Just zknoteid ->
                         E.link
@@ -872,7 +881,31 @@ zknview zone size recentZkns model =
         showLinks =
             E.row [ EF.bold ] [ E.text "links" ]
                 :: List.map
-                    (\( l, c ) -> showZkl isdirty editable model.focusLink model.ld model.id c l)
+                    (\( l, c ) ->
+                        showZkl isdirty
+                            editable
+                            model.focusLink
+                            model.ld
+                            model.id
+                            c
+                            (Dict.get
+                                (zklKey
+                                    { otherid = l.otherid
+                                    , direction =
+                                        case l.direction of
+                                            To ->
+                                                From
+
+                                            From ->
+                                                To
+                                    }
+                                )
+                                model.zklDict
+                                |> Util.isJust
+                                |> not
+                            )
+                            l
+                    )
                     (Dict.values model.zklDict
                         |> List.map
                             (\l ->
@@ -1868,6 +1901,28 @@ update msg model =
         RemoveLink zkln ->
             ( { model
                 | zklDict = Dict.remove (zklKey zkln) model.zklDict
+              }
+            , None
+            )
+
+        FlipLink zkl ->
+            let
+                zklf =
+                    { zkl | direction = Data.flipDirection zkl.direction }
+            in
+            ( { model
+                | zklDict =
+                    model.zklDict
+                        |> Dict.remove (zklKey zkl)
+                        |> Dict.insert
+                            (zklKey zklf)
+                            zklf
+                , focusLink =
+                    if model.focusLink == Just zkl then
+                        Just zklf
+
+                    else
+                        model.focusLink
               }
             , None
             )
