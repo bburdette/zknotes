@@ -2028,6 +2028,11 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
             , sendUIMsg model.location (UI.SetHomeNote id)
             )
 
+        EditZkNote.Cmd cmd ->
+            ( { model | state = EditZkNote emod login }
+            , Cmd.map EditZkNoteMsg cmd
+            )
+
 
 handleEditZkNoteListing : Model -> Data.LoginData -> ( EditZkNoteListing.Model, EditZkNoteListing.Command ) -> ( Model, Cmd Msg )
 handleEditZkNoteListing model login ( emod, ecmd ) =

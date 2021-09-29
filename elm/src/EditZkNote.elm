@@ -1,5 +1,6 @@
 module EditZkNote exposing (Command(..), EditLink, Model, Msg(..), NavChoice(..), SearchOrRecent(..), WClass(..), addComment, commentsRecieved, commonButtonStyle, compareZklinks, dirty, disabledLinkButtonStyle, elToSzkl, elToSzl, fullSave, gotSelectedText, initFull, initNew, isPublic, isSearch, linkButtonStyle, linksWith, mkButtonStyle, noteLink, onCtrlAlt, onCtrlS, onEnter, onSaved, onZkNote, pageLink, renderMd, replaceOrAdd, saveZkLinkList, setHomeNote, showSr, showZkl, sznFromModel, sznToZkn, toPubId, toZkListNote, update, updateSearch, updateSearchResult, view, zkLinkName, zklKey, zknview)
 
+import Browser.Dom as BD
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
 import Common
@@ -25,6 +26,7 @@ import Search as S
 import SearchPanel as SP
 import TagSearchPanel as TSP
 import TangoColors as TC
+import Task
 import Time
 import Url as U
 import Url.Builder as UB
@@ -163,6 +165,7 @@ type Command
     | Settings
     | GetZkNote Int
     | SetHomeNote Int
+    | Cmd (Cmd Msg)
 
 
 onZkNote : Data.ZkNote -> Model -> ( Model, Command )
@@ -1700,7 +1703,11 @@ onCtrlAlt : String -> Bool -> Model -> ( Model, Command )
 onCtrlAlt s shift model =
     case s of
         "e" ->
-            update (NavChoiceChanged NcEdit) model
+            let
+                ( m, c ) =
+                    update (NavChoiceChanged NcEdit) model
+            in
+            ( m, Cmd (BD.focus "mdtext" |> Task.attempt (\_ -> Noop)) )
 
         "v" ->
             update (NavChoiceChanged NcView) model
@@ -1713,7 +1720,7 @@ onCtrlAlt s shift model =
                 ( m2, c2 ) =
                     update (SearchOrRecentChanged SearchView) m
             in
-            ( m2, c2 )
+            ( m2, Cmd (BD.focus "searchtext" |> Task.attempt (\_ -> Noop)) )
 
         "r" ->
             let

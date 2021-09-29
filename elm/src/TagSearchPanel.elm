@@ -7,6 +7,7 @@ import Element.Border as Border
 import Element.Events exposing (onClick, onFocus, onLoseFocus)
 import Element.Font as Font
 import Element.Input as Input
+import Html.Attributes as HA
 import Parser
 import Search exposing (AndOr(..), SearchMod(..), TSText, TagSearch(..), tagSearchParser)
 import SearchHelpPanel
@@ -253,7 +254,7 @@ view narrow nblevel model =
 
         tinput =
             Input.text
-                (onFocus (STFocus True) :: onLoseFocus (STFocus False) :: tiattribs)
+                (htmlAttribute (HA.id "searchtext") :: onFocus (STFocus True) :: onLoseFocus (STFocus False) :: tiattribs)
                 { onChange = SearchText
                 , text = model.searchText
                 , placeholder = Nothing
