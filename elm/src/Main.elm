@@ -60,6 +60,7 @@ import UserInterface as UI
 import UserSettings
 import Util
 import View
+import WindowKeys
 
 
 type Msg
