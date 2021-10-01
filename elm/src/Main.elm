@@ -777,49 +777,39 @@ view model =
             _ ->
                 routeTitle model.savedRoute.route
     , body =
-        [ Html.div
-            [ -- important to prevent ctrl-s on non-input item focus.
-              -- also has to be done in a div enclosing E.layout, rather than using
-              -- E.htmlAttribute to attach it directly.
-              Html.Attributes.tabindex 0
+        [ case model.state of
+            DisplayMessage dm _ ->
+                Html.map DisplayMessageMsg <|
+                    GD.layout
+                        (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                        dm
 
-            -- blocks on ctrl-s, lets others through.
-            -- , onKeyDown
-            ]
-            [ case model.state of
-                DisplayMessage dm _ ->
-                    Html.map DisplayMessageMsg <|
-                        GD.layout
-                            (Just { width = min 600 model.size.width, height = min 500 model.size.height })
-                            dm
+            MessageNLink dm _ ->
+                Html.map MessageNLinkMsg <|
+                    GD.layout
+                        (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                        dm
 
-                MessageNLink dm _ ->
-                    Html.map MessageNLinkMsg <|
-                        GD.layout
-                            (Just { width = min 600 model.size.width, height = min 500 model.size.height })
-                            dm
+            SelectDialog sdm _ ->
+                Html.map SelectDialogMsg <|
+                    GD.layout
+                        (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                        sdm
 
-                SelectDialog sdm _ ->
-                    Html.map SelectDialogMsg <|
-                        GD.layout
-                            (Just { width = min 600 model.size.width, height = min 500 model.size.height })
-                            sdm
+            ChangePasswordDialog cdm _ ->
+                Html.map ChangePasswordDialogMsg <|
+                    GD.layout
+                        (Just { width = min 600 model.size.width, height = min 200 model.size.height })
+                        cdm
 
-                ChangePasswordDialog cdm _ ->
-                    Html.map ChangePasswordDialogMsg <|
-                        GD.layout
-                            (Just { width = min 600 model.size.width, height = min 200 model.size.height })
-                            cdm
+            ChangeEmailDialog cdm _ ->
+                Html.map ChangeEmailDialogMsg <|
+                    GD.layout
+                        (Just { width = min 600 model.size.width, height = min 200 model.size.height })
+                        cdm
 
-                ChangeEmailDialog cdm _ ->
-                    Html.map ChangeEmailDialogMsg <|
-                        GD.layout
-                            (Just { width = min 600 model.size.width, height = min 200 model.size.height })
-                            cdm
-
-                _ ->
-                    E.layout [ E.width E.fill ] <| viewState model.size model.state model
-            ]
+            _ ->
+                E.layout [ E.width E.fill ] <| viewState model.size model.state model
         ]
     }
 
