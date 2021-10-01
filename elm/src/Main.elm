@@ -2230,8 +2230,9 @@ init flags url key zone =
         setkeys =
             skcommand <|
                 WindowKeys.SetWindowKeys
-                    [ { key = "Tab", ctrl = True, alt = True, shift = False, preventDefault = True }
-                    , { key = "s", ctrl = True, alt = False, shift = False, preventDefault = True }
+                    [ { key = "Tab", ctrl = True, alt = True, shift = True, preventDefault = True }
+                    , { key = "s", ctrl = True, alt = True, shift = False, preventDefault = True }
+                    , { key = "e", ctrl = True, alt = True, shift = False, preventDefault = True }
                     ]
     in
     parseUrl url

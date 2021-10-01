@@ -75,6 +75,8 @@
       // app.ports.clearLocalStorage.subscribe(clearStorage);
       app.ports.getSelectedText.subscribe(getSelectedText);
       app.ports.sendKeyCommand.subscribe(sendKeyCommand);
+      window.addEventListener( "keydown", keycheck, false );
+
     </script>
   </body>
 </html>
