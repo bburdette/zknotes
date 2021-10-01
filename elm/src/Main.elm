@@ -1656,10 +1656,6 @@ actualupdate msg model =
         ( EditZkNoteMsg em, EditZkNote es login ) ->
             handleEditZkNoteCmd model login (EditZkNote.update em es)
 
-        -- ( CtrlS, EditZkNote es login ) ->
-        --     handleEditZkNoteCmd model login (EditZkNote.onCtrlS es)
-        -- ( CtrlAlt s shift, EditZkNote es login ) ->
-        --     handleEditZkNoteCmd model login (EditZkNote.onCtrlAlt s shift es)
         ( WkMsg reskey, EditZkNote es login ) ->
             case reskey of
                 Ok key ->

@@ -53,14 +53,14 @@ encodeCmd c =
 
 
 
-{- use send to make a  convenience function,
+{- use send to make a convenience function,
    like so:
          port sendKeyCommand : JE.Value -> Cmd msg
-         wssend =
+         wksend =
              WindowKey.send sendKeyCommand
 
    then you can call (makes a Cmd):
-         wssend <|
+         wksend <|
              (SetWindowKeys
                 [ { key = "Tab", ctrl = True, alt = True, shift = False, preventDefault = True }
                 , { key = "s", ctrl = True, alt = False, shift = False, preventDefault = True }])
