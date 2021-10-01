@@ -8,6 +8,7 @@
       body { font-family: mono, calibri, helvetica, arial, sans-serif; background-color:#EEEEEC; }</style>
     <script type="text/javascript" src="/static/main.js"></script>
     <script type="text/javascript" src="/static/localvals.js"></script>
+    <script type="text/javascript" src="/static/windowkey.js"></script>
   </head>
   <body>
     <div id="elm"></div> 
@@ -73,6 +74,9 @@
       // app.ports.getLocalVal.subscribe(getVal);
       // app.ports.clearLocalStorage.subscribe(clearStorage);
       app.ports.getSelectedText.subscribe(getSelectedText);
+      app.ports.sendKeyCommand.subscribe(sendKeyCommand);
+      window.addEventListener( "keydown", keycheck, false );
+
     </script>
   </body>
 </html>

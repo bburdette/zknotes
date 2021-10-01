@@ -60,6 +60,7 @@ import UserInterface as UI
 import UserSettings
 import Util
 import View
+import WindowKeys
 
 
 type Msg
@@ -78,9 +79,6 @@ type Msg
     | SelectedText JD.Value
     | UrlChanged Url
     | WindowSize Util.Size
-    | CtrlS
-    | CtrlAlt String Bool
-    | Enter
     | DisplayMessageMsg (GD.Msg DisplayMessage.Msg)
     | MessageNLinkMsg (GD.Msg MessageNLink.Msg)
     | SelectDialogMsg (GD.Msg (SS.Msg Int))
@@ -88,6 +86,7 @@ type Msg
     | ChangeEmailDialogMsg (GD.Msg CE.Msg)
     | ResetPasswordMsg ResetPassword.Msg
     | Zone Time.Zone
+    | WkMsg (Result JD.Error WindowKeys.Key)
     | Noop
 
 
@@ -437,21 +436,8 @@ showMessage msg =
         Noop ->
             "Noop"
 
-        CtrlS ->
-            "CtrlS"
-
-        CtrlAlt s shift ->
-            "CtrlAlt"
-                ++ (if shift then
-                        "shift"
-
-                    else
-                        ""
-                   )
-                ++ s
-
-        Enter ->
-            "Enter"
+        WkMsg _ ->
+            "WkMsg"
 
         SelectDialogMsg _ ->
             "SelectDialogMsg"
@@ -791,90 +777,41 @@ view model =
             _ ->
                 routeTitle model.savedRoute.route
     , body =
-        [ Html.div
-            [ -- important to prevent ctrl-s on non-input item focus.
-              -- also has to be done in a div enclosing E.layout, rather than using
-              -- E.htmlAttribute to attach it directly.
-              Html.Attributes.tabindex 0
+        [ case model.state of
+            DisplayMessage dm _ ->
+                Html.map DisplayMessageMsg <|
+                    GD.layout
+                        (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                        dm
 
-            -- blocks on ctrl-s, lets others through.
-            , onKeyDown
-            ]
-            [ case model.state of
-                DisplayMessage dm _ ->
-                    Html.map DisplayMessageMsg <|
-                        GD.layout
-                            (Just { width = min 600 model.size.width, height = min 500 model.size.height })
-                            dm
+            MessageNLink dm _ ->
+                Html.map MessageNLinkMsg <|
+                    GD.layout
+                        (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                        dm
 
-                MessageNLink dm _ ->
-                    Html.map MessageNLinkMsg <|
-                        GD.layout
-                            (Just { width = min 600 model.size.width, height = min 500 model.size.height })
-                            dm
+            SelectDialog sdm _ ->
+                Html.map SelectDialogMsg <|
+                    GD.layout
+                        (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                        sdm
 
-                SelectDialog sdm _ ->
-                    Html.map SelectDialogMsg <|
-                        GD.layout
-                            (Just { width = min 600 model.size.width, height = min 500 model.size.height })
-                            sdm
+            ChangePasswordDialog cdm _ ->
+                Html.map ChangePasswordDialogMsg <|
+                    GD.layout
+                        (Just { width = min 600 model.size.width, height = min 200 model.size.height })
+                        cdm
 
-                ChangePasswordDialog cdm _ ->
-                    Html.map ChangePasswordDialogMsg <|
-                        GD.layout
-                            (Just { width = min 600 model.size.width, height = min 200 model.size.height })
-                            cdm
+            ChangeEmailDialog cdm _ ->
+                Html.map ChangeEmailDialogMsg <|
+                    GD.layout
+                        (Just { width = min 600 model.size.width, height = min 200 model.size.height })
+                        cdm
 
-                ChangeEmailDialog cdm _ ->
-                    Html.map ChangeEmailDialogMsg <|
-                        GD.layout
-                            (Just { width = min 600 model.size.width, height = min 200 model.size.height })
-                            cdm
-
-                _ ->
-                    E.layout [ E.width E.fill ] <| viewState model.size model.state model
-            ]
+            _ ->
+                E.layout [ E.width E.fill ] <| viewState model.size model.state model
         ]
     }
-
-
-onKeyDown : Attribute Msg
-onKeyDown =
-    HE.preventDefaultOn "keydown"
-        (JD.map4
-            (\key ctrl alt shift ->
-                case Toop.T4 key ctrl alt shift of
-                    Toop.T4 "s" True False False ->
-                        -- ctrl-s -> prevent default!
-                        -- also, CtrlS message.
-                        ( CtrlS, True )
-
-                    Toop.T4 "Enter" False False False ->
-                        -- don't prevent default, issue "Enter" message
-                        ( Enter, False )
-
-                    Toop.T4 s True True sh ->
-                        ( CtrlAlt s sh, True )
-
-                    _ ->
-                        -- anything else, don't prevent default!
-                        ( Noop, False )
-            )
-            (JD.field "key" JD.string)
-            (JD.field "ctrlKey" JD.bool)
-            (JD.field "altKey" JD.bool)
-            (JD.field "shiftKey" JD.bool)
-        )
-
-
-onKeyUp : msg -> Attribute msg
-onKeyUp msg =
-    HE.preventDefaultOn "keyup" (JD.map alwaysPreventDefault (JD.succeed msg))
-
-
-alwaysPreventDefault : msg -> ( msg, Bool )
-alwaysPreventDefault msg =
-    ( msg, True )
 
 
 piupdate : Msg -> PiModel -> ( PiModel, Cmd Msg )
@@ -1231,8 +1168,13 @@ actualupdate msg model =
                 UserSettings.None ->
                     ( { model | state = UserSettings numod login prevstate }, Cmd.none )
 
-        ( Enter, Login ls ) ->
-            handleLogin model (Login.onEnter ls)
+        ( WkMsg rkey, Login ls ) ->
+            case rkey of
+                Ok key ->
+                    handleLogin model (Login.onWkKeyPress key ls)
+
+                Err _ ->
+                    ( model, Cmd.none )
 
         ( LoginMsg lm, Login ls ) ->
             handleLogin model (Login.update lm ls)
@@ -1704,17 +1646,23 @@ actualupdate msg model =
         ( EditZkNoteMsg em, EditZkNote es login ) ->
             handleEditZkNoteCmd model login (EditZkNote.update em es)
 
-        ( CtrlS, EditZkNote es login ) ->
-            handleEditZkNoteCmd model login (EditZkNote.onCtrlS es)
+        ( WkMsg reskey, EditZkNote es login ) ->
+            case reskey of
+                Ok key ->
+                    handleEditZkNoteCmd model login (EditZkNote.onWkKeyPress key es)
 
-        ( CtrlAlt s shift, EditZkNote es login ) ->
-            handleEditZkNoteCmd model login (EditZkNote.onCtrlAlt s shift es)
+                Err e ->
+                    ( model, Cmd.none )
 
-        ( Enter, EditZkNote es login ) ->
-            handleEditZkNoteCmd model login (EditZkNote.onEnter es)
+        ( WkMsg reskey, EditZkNoteListing es login ) ->
+            case reskey of
+                Ok key ->
+                    handleEditZkNoteListing model
+                        login
+                        (EditZkNoteListing.onWkKeyPress key es)
 
-        ( Enter, EditZkNoteListing es login ) ->
-            handleEditZkNoteListing model login (EditZkNoteListing.onEnter es)
+                Err e ->
+                    ( model, Cmd.none )
 
         ( EditZkNoteListingMsg em, EditZkNoteListing es login ) ->
             handleEditZkNoteListing model login (EditZkNoteListing.update em es login)
@@ -2218,6 +2166,17 @@ init flags url key zone =
                         PI.getErrorIndexNote flags.location id ErrorIndexNote
                     )
                 |> Maybe.withDefault Cmd.none
+
+        setkeys =
+            skcommand <|
+                WindowKeys.SetWindowKeys
+                    [ { key = "s", ctrl = True, alt = False, shift = False, preventDefault = True }
+                    , { key = "s", ctrl = True, alt = True, shift = False, preventDefault = True }
+                    , { key = "e", ctrl = True, alt = True, shift = False, preventDefault = True }
+                    , { key = "r", ctrl = True, alt = True, shift = False, preventDefault = True }
+                    , { key = "v", ctrl = True, alt = True, shift = False, preventDefault = True }
+                    , { key = "Enter", ctrl = False, alt = False, shift = False, preventDefault = False }
+                    ]
     in
     parseUrl url
         |> Maybe.andThen
@@ -2238,7 +2197,7 @@ init flags url key zone =
                 ( { imodel
                     | state = rs
                   }
-                , Cmd.batch [ rcmd, geterrornote ]
+                , Cmd.batch [ rcmd, geterrornote, setkeys ]
                 )
             )
         |> Maybe.withDefault
@@ -2250,6 +2209,7 @@ init flags url key zone =
              , Cmd.batch
                 [ c
                 , geterrornote
+                , setkeys
                 , Browser.Navigation.replaceUrl key "/"
                 ]
              )
@@ -2272,6 +2232,7 @@ main =
                 Sub.batch
                     [ receiveSelectedText SelectedText
                     , Browser.Events.onResize (\w h -> WindowSize { width = w, height = h })
+                    , keyreceive
                     ]
         , onUrlRequest = urlRequest
         , onUrlChange = UrlChanged
@@ -2282,3 +2243,17 @@ port getSelectedText : List String -> Cmd msg
 
 
 port receiveSelectedText : (JD.Value -> msg) -> Sub msg
+
+
+port receiveKeyMsg : (JD.Value -> msg) -> Sub msg
+
+
+keyreceive =
+    receiveKeyMsg <| WindowKeys.receive WkMsg
+
+
+port sendKeyCommand : JE.Value -> Cmd msg
+
+
+skcommand =
+    WindowKeys.send sendKeyCommand

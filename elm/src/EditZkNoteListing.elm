@@ -14,7 +14,9 @@ import Search as S exposing (TagSearch(..))
 import SearchPanel as SP
 import TagSearchPanel as TSP
 import TangoColors as TC
+import Toop
 import Util
+import WindowKeys as WK
 import ZkCommon as ZC
 
 
@@ -83,9 +85,14 @@ updateSearch ts model =
     )
 
 
-onEnter : Model -> ( Model, Command )
-onEnter model =
-    handleSPUpdate model (SP.onEnter model.spmodel)
+onWkKeyPress : WK.Key -> Model -> ( Model, Command )
+onWkKeyPress key model =
+    case Toop.T4 key.key key.ctrl key.alt key.shift of
+        Toop.T4 "Enter" False False False ->
+            handleSPUpdate model (SP.onEnter model.spmodel)
+
+        _ ->
+            ( model, None )
 
 
 view : Data.LoginData -> Util.Size -> Model -> Element Msg
