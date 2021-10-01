@@ -1,4 +1,4 @@
-module EditZkNote exposing (Command(..), EditLink, Model, Msg(..), NavChoice(..), SearchOrRecent(..), WClass(..), addComment, commentsRecieved, commonButtonStyle, compareZklinks, dirty, disabledLinkButtonStyle, elToSzkl, elToSzl, fullSave, gotSelectedText, initFull, initNew, isPublic, isSearch, linkButtonStyle, linksWith, mkButtonStyle, noteLink, onCtrlAlt, onCtrlS, onEnter, onSaved, onWkKeyPress, onZkNote, pageLink, renderMd, replaceOrAdd, saveZkLinkList, setHomeNote, showSr, showZkl, sznFromModel, sznToZkn, toPubId, toZkListNote, update, updateSearch, updateSearchResult, view, zkLinkName, zklKey, zknview)
+module EditZkNote exposing (Command(..), EditLink, Model, Msg(..), NavChoice(..), SearchOrRecent(..), WClass(..), addComment, commentsRecieved, commonButtonStyle, compareZklinks, dirty, disabledLinkButtonStyle, elToSzkl, elToSzl, fullSave, gotSelectedText, initFull, initNew, isPublic, isSearch, linkButtonStyle, linksWith, mkButtonStyle, noteLink, onSaved, onWkKeyPress, onZkNote, pageLink, renderMd, replaceOrAdd, saveZkLinkList, setHomeNote, showSr, showZkl, sznFromModel, sznToZkn, toPubId, toZkListNote, update, updateSearch, updateSearchResult, view, zkLinkName, zklKey, zknview)
 
 import Browser.Dom as BD
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
@@ -1746,48 +1746,6 @@ onWkKeyPress key model =
 
         _ ->
             ( model, None )
-
-
-onCtrlAlt : String -> Bool -> Model -> ( Model, Command )
-onCtrlAlt s shift model =
-    case s of
-        "e" ->
-            let
-                ( m, c ) =
-                    update (NavChoiceChanged NcEdit) model
-            in
-            ( m, Cmd (BD.focus "mdtext" |> Task.attempt (\_ -> Noop)) )
-
-        "v" ->
-            update (NavChoiceChanged NcView) model
-
-        "s" ->
-            let
-                ( m, c ) =
-                    update (NavChoiceChanged NcSearch) model
-
-                ( m2, c2 ) =
-                    update (SearchOrRecentChanged SearchView) m
-            in
-            ( m2, Cmd (BD.focus "searchtext" |> Task.attempt (\_ -> Noop)) )
-
-        "r" ->
-            let
-                ( m, c ) =
-                    update (NavChoiceChanged NcRecent) model
-
-                ( m2, c2 ) =
-                    update (SearchOrRecentChanged RecentView) m
-            in
-            ( m2, c2 )
-
-        _ ->
-            ( model, None )
-
-
-onEnter : Model -> ( Model, Command )
-onEnter model =
-    handleSPUpdate model (SP.onEnter model.spmodel)
 
 
 handleSPUpdate : Model -> ( SP.Model, SP.Command ) -> ( Model, Command )

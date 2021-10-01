@@ -79,9 +79,6 @@ type Msg
     | SelectedText JD.Value
     | UrlChanged Url
     | WindowSize Util.Size
-    | CtrlS
-    | CtrlAlt String Bool
-    | Enter
     | DisplayMessageMsg (GD.Msg DisplayMessage.Msg)
     | MessageNLinkMsg (GD.Msg MessageNLink.Msg)
     | SelectDialogMsg (GD.Msg (SS.Msg Int))
@@ -438,22 +435,6 @@ showMessage msg =
 
         Noop ->
             "Noop"
-
-        CtrlS ->
-            "CtrlS"
-
-        CtrlAlt s shift ->
-            "CtrlAlt"
-                ++ (if shift then
-                        "shift"
-
-                    else
-                        ""
-                   )
-                ++ s
-
-        Enter ->
-            "Enter"
 
         WkMsg _ ->
             "WkMsg"
@@ -843,47 +824,6 @@ view model =
     }
 
 
-onKeyDown : Attribute Msg
-onKeyDown =
-    HE.preventDefaultOn "keydown"
-        (JD.map4
-            (\key ctrl alt shift ->
-                case Toop.T4 key ctrl alt shift of
-                    Toop.T4 "s" True False False ->
-                        -- ctrl-s -> prevent default!
-                        -- also, CtrlS message.
-                        ( CtrlS, True )
-
-                    Toop.T4 "Enter" False False False ->
-                        -- don't prevent default, issue "Enter" message
-                        ( Enter, False )
-
-                    Toop.T4 s True True sh ->
-                        ( CtrlAlt s sh, True )
-
-                    _ ->
-                        -- anything else, don't prevent default!
-                        ( Noop, False )
-            )
-            (JD.field "key" JD.string)
-            (JD.field "ctrlKey" JD.bool)
-            (JD.field "altKey" JD.bool)
-            (JD.field "shiftKey" JD.bool)
-        )
-
-
-
-{- onKeyUp : msg -> Attribute msg
-   onKeyUp msg =
-       HE.preventDefaultOn "keyup" (JD.map alwaysPreventDefault (JD.succeed msg))
-
-
-   alwaysPreventDefault : msg -> ( msg, Bool )
-   alwaysPreventDefault msg =
-       ( msg, True )
--}
-
-
 piupdate : Msg -> PiModel -> ( PiModel, Cmd Msg )
 piupdate msg initmodel =
     case initmodel of
@@ -1238,8 +1178,13 @@ actualupdate msg model =
                 UserSettings.None ->
                     ( { model | state = UserSettings numod login prevstate }, Cmd.none )
 
-        ( Enter, Login ls ) ->
-            handleLogin model (Login.onEnter ls)
+        ( WkMsg rkey, Login ls ) ->
+            case rkey of
+                Ok key ->
+                    handleLogin model (Login.onWkKeyPress key ls)
+
+                Err _ ->
+                    ( model, Cmd.none )
 
         ( LoginMsg lm, Login ls ) ->
             handleLogin model (Login.update lm ls)
@@ -1731,11 +1676,23 @@ actualupdate msg model =
                     in
                     ( model, Cmd.none )
 
-        ( Enter, EditZkNote es login ) ->
-            handleEditZkNoteCmd model login (EditZkNote.onEnter es)
+        ( WkMsg reskey, EditZkNoteListing es login ) ->
+            case reskey of
+                Ok key ->
+                    let
+                        _ =
+                            Debug.log "key " key
+                    in
+                    handleEditZkNoteListing model
+                        login
+                        (EditZkNoteListing.onWkKeyPress key es)
 
-        ( Enter, EditZkNoteListing es login ) ->
-            handleEditZkNoteListing model login (EditZkNoteListing.onEnter es)
+                Err e ->
+                    let
+                        _ =
+                            Debug.log "key error " e
+                    in
+                    ( model, Cmd.none )
 
         ( EditZkNoteListingMsg em, EditZkNoteListing es login ) ->
             handleEditZkNoteListing model login (EditZkNoteListing.update em es login)
