@@ -61,7 +61,7 @@ encodeCmd c =
 
    then you can call (makes a Cmd):
          wssend <|
-             (SetWindowKeys i
+             (SetWindowKeys
                 [ { key = "Tab", ctrl = True, alt = True, shift = False, preventDefault = True }
                 , { key = "s", ctrl = True, alt = False, shift = False, preventDefault = True }])
 -}

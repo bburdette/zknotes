@@ -38,8 +38,12 @@ function keycheck(e) {
       e.preventDefault();
     }
     console.log("pd:", pd);
+    app.ports.receiveKeyMsg.send({ key : e.key
+                                  , ctrl : e.ctrlKey
+                                  , alt : e.altKey
+                                  , shift : e.shiftKey
+                                  , preventDefault : pd});
     console.log("e", e);
-    // app.ports.receiveKeyMsg.send(
   } catch (error)
   {
     console.log("not found: ", e.key);

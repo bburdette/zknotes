@@ -803,7 +803,7 @@ view model =
               Html.Attributes.tabindex 0
 
             -- blocks on ctrl-s, lets others through.
-            , onKeyDown
+            -- , onKeyDown
             ]
             [ case model.state of
                 DisplayMessage dm _ ->
@@ -872,14 +872,16 @@ onKeyDown =
         )
 
 
-onKeyUp : msg -> Attribute msg
-onKeyUp msg =
-    HE.preventDefaultOn "keyup" (JD.map alwaysPreventDefault (JD.succeed msg))
+
+{- onKeyUp : msg -> Attribute msg
+   onKeyUp msg =
+       HE.preventDefaultOn "keyup" (JD.map alwaysPreventDefault (JD.succeed msg))
 
 
-alwaysPreventDefault : msg -> ( msg, Bool )
-alwaysPreventDefault msg =
-    ( msg, True )
+   alwaysPreventDefault : msg -> ( msg, Bool )
+   alwaysPreventDefault msg =
+       ( msg, True )
+-}
 
 
 piupdate : Msg -> PiModel -> ( PiModel, Cmd Msg )
@@ -1709,14 +1711,25 @@ actualupdate msg model =
         ( EditZkNoteMsg em, EditZkNote es login ) ->
             handleEditZkNoteCmd model login (EditZkNote.update em es)
 
-        ( CtrlS, EditZkNote es login ) ->
-            handleEditZkNoteCmd model login (EditZkNote.onCtrlS es)
+        -- ( CtrlS, EditZkNote es login ) ->
+        --     handleEditZkNoteCmd model login (EditZkNote.onCtrlS es)
+        -- ( CtrlAlt s shift, EditZkNote es login ) ->
+        --     handleEditZkNoteCmd model login (EditZkNote.onCtrlAlt s shift es)
+        ( WkMsg reskey, EditZkNote es login ) ->
+            case reskey of
+                Ok key ->
+                    let
+                        _ =
+                            Debug.log "key " key
+                    in
+                    handleEditZkNoteCmd model login (EditZkNote.onWkKeyPress key es)
 
-        ( CtrlAlt s shift, EditZkNote es login ) ->
-            handleEditZkNoteCmd model login (EditZkNote.onCtrlAlt s shift es)
-
-        ( WkMsg key, EditZkNote es login ) ->
-            ( model, Cmd.none )
+                Err e ->
+                    let
+                        _ =
+                            Debug.log "key error " e
+                    in
+                    ( model, Cmd.none )
 
         ( Enter, EditZkNote es login ) ->
             handleEditZkNoteCmd model login (EditZkNote.onEnter es)
@@ -2230,9 +2243,12 @@ init flags url key zone =
         setkeys =
             skcommand <|
                 WindowKeys.SetWindowKeys
-                    [ { key = "Tab", ctrl = True, alt = True, shift = True, preventDefault = True }
+                    [ { key = "s", ctrl = True, alt = False, shift = False, preventDefault = True }
                     , { key = "s", ctrl = True, alt = True, shift = False, preventDefault = True }
                     , { key = "e", ctrl = True, alt = True, shift = False, preventDefault = True }
+                    , { key = "r", ctrl = True, alt = True, shift = False, preventDefault = True }
+                    , { key = "v", ctrl = True, alt = True, shift = False, preventDefault = True }
+                    , { key = "Enter", ctrl = False, alt = False, shift = False, preventDefault = False }
                     ]
     in
     parseUrl url
@@ -2289,6 +2305,7 @@ main =
                 Sub.batch
                     [ receiveSelectedText SelectedText
                     , Browser.Events.onResize (\w h -> WindowSize { width = w, height = h })
+                    , keyreceive
                     ]
         , onUrlRequest = urlRequest
         , onUrlChange = UrlChanged

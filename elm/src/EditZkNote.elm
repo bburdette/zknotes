@@ -1,4 +1,4 @@
-module EditZkNote exposing (Command(..), EditLink, Model, Msg(..), NavChoice(..), SearchOrRecent(..), WClass(..), addComment, commentsRecieved, commonButtonStyle, compareZklinks, dirty, disabledLinkButtonStyle, elToSzkl, elToSzl, fullSave, gotSelectedText, initFull, initNew, isPublic, isSearch, linkButtonStyle, linksWith, mkButtonStyle, noteLink, onCtrlAlt, onCtrlS, onEnter, onSaved, onZkNote, pageLink, renderMd, replaceOrAdd, saveZkLinkList, setHomeNote, showSr, showZkl, sznFromModel, sznToZkn, toPubId, toZkListNote, update, updateSearch, updateSearchResult, view, zkLinkName, zklKey, zknview)
+module EditZkNote exposing (Command(..), EditLink, Model, Msg(..), NavChoice(..), SearchOrRecent(..), WClass(..), addComment, commentsRecieved, commonButtonStyle, compareZklinks, dirty, disabledLinkButtonStyle, elToSzkl, elToSzl, fullSave, gotSelectedText, initFull, initNew, isPublic, isSearch, linkButtonStyle, linksWith, mkButtonStyle, noteLink, onCtrlAlt, onCtrlS, onEnter, onSaved, onWkKeyPress, onZkNote, pageLink, renderMd, replaceOrAdd, saveZkLinkList, setHomeNote, showSr, showZkl, sznFromModel, sznToZkn, toPubId, toZkListNote, update, updateSearch, updateSearchResult, view, zkLinkName, zklKey, zknview)
 
 import Browser.Dom as BD
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
@@ -28,10 +28,12 @@ import TagSearchPanel as TSP
 import TangoColors as TC
 import Task
 import Time
+import Toop
 import Url as U
 import Url.Builder as UB
 import Url.Parser as UP exposing ((</>))
 import Util
+import WindowKeys as WK
 import ZkCommon as ZC
 
 
@@ -1697,6 +1699,53 @@ onCtrlS model =
 
     else
         ( model, None )
+
+
+onWkKeyPress : WK.Key -> Model -> ( Model, Command )
+onWkKeyPress key model =
+    case Toop.T4 key.key key.ctrl key.alt key.shift of
+        Toop.T4 "e" True True False ->
+            let
+                ( m, c ) =
+                    update (NavChoiceChanged NcEdit) model
+            in
+            ( m, Cmd (BD.focus "mdtext" |> Task.attempt (\_ -> Noop)) )
+
+        Toop.T4 "v" True True False ->
+            update (NavChoiceChanged NcView) model
+
+        Toop.T4 "s" True True False ->
+            let
+                ( m, c ) =
+                    update (NavChoiceChanged NcSearch) model
+
+                ( m2, c2 ) =
+                    update (SearchOrRecentChanged SearchView) m
+            in
+            ( m2, Cmd (BD.focus "searchtext" |> Task.attempt (\_ -> Noop)) )
+
+        Toop.T4 "r" True True False ->
+            let
+                ( m, c ) =
+                    update (NavChoiceChanged NcRecent) model
+
+                ( m2, c2 ) =
+                    update (SearchOrRecentChanged RecentView) m
+            in
+            ( m2, c2 )
+
+        Toop.T4 "s" True False False ->
+            if dirty model then
+                update SavePress model
+
+            else
+                ( model, None )
+
+        Toop.T4 "Enter" False False False ->
+            handleSPUpdate model (SP.onEnter model.spmodel)
+
+        _ ->
+            ( model, None )
 
 
 onCtrlAlt : String -> Bool -> Model -> ( Model, Command )
