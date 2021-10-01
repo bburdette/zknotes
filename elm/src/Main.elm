@@ -89,6 +89,7 @@ type Msg
     | ChangeEmailDialogMsg (GD.Msg CE.Msg)
     | ResetPasswordMsg ResetPassword.Msg
     | Zone Time.Zone
+    | WkMsg (Result JD.Error WindowKeys.Key)
     | Noop
 
 
@@ -453,6 +454,9 @@ showMessage msg =
 
         Enter ->
             "Enter"
+
+        WkMsg _ ->
+            "WkMsg"
 
         SelectDialogMsg _ ->
             "SelectDialogMsg"
@@ -1711,6 +1715,9 @@ actualupdate msg model =
         ( CtrlAlt s shift, EditZkNote es login ) ->
             handleEditZkNoteCmd model login (EditZkNote.onCtrlAlt s shift es)
 
+        ( WkMsg key, EditZkNote es login ) ->
+            ( model, Cmd.none )
+
         ( Enter, EditZkNote es login ) ->
             handleEditZkNoteCmd model login (EditZkNote.onEnter es)
 
@@ -2219,6 +2226,13 @@ init flags url key zone =
                         PI.getErrorIndexNote flags.location id ErrorIndexNote
                     )
                 |> Maybe.withDefault Cmd.none
+
+        setkeys =
+            skcommand <|
+                WindowKeys.SetWindowKeys
+                    [ { key = "Tab", ctrl = True, alt = True, shift = False, preventDefault = True }
+                    , { key = "s", ctrl = True, alt = False, shift = False, preventDefault = True }
+                    ]
     in
     parseUrl url
         |> Maybe.andThen
@@ -2239,7 +2253,7 @@ init flags url key zone =
                 ( { imodel
                     | state = rs
                   }
-                , Cmd.batch [ rcmd, geterrornote ]
+                , Cmd.batch [ rcmd, geterrornote, setkeys ]
                 )
             )
         |> Maybe.withDefault
@@ -2251,6 +2265,7 @@ init flags url key zone =
              , Cmd.batch
                 [ c
                 , geterrornote
+                , setkeys
                 , Browser.Navigation.replaceUrl key "/"
                 ]
              )
@@ -2283,3 +2298,17 @@ port getSelectedText : List String -> Cmd msg
 
 
 port receiveSelectedText : (JD.Value -> msg) -> Sub msg
+
+
+port receiveKeyMsg : (JD.Value -> msg) -> Sub msg
+
+
+keyreceive =
+    receiveKeyMsg <| WindowKeys.receive WkMsg
+
+
+port sendKeyCommand : JE.Value -> Cmd msg
+
+
+skcommand =
+    WindowKeys.send sendKeyCommand
