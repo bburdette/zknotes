@@ -1,4 +1,4 @@
-let windowkeysdebug = true;
+let windowkeysdebug = false;
 
 let windowkeys = {};
 
@@ -11,7 +11,6 @@ function sendKeyCommand( kc ) {
     windowkeys = {};
     for (let i = 0; i < kc.keys.length; i++) {
       k = kc.keys[i];
-      console.log("k", k);
       if (!windowkeys[k.key]) {
         windowkeys[k.key] = {};
       }
@@ -31,29 +30,25 @@ function sendKeyCommand( kc ) {
 
 function keycheck(e) {
   try {
-    // console.log("e", e);
-    // console.log("e.key", e.key, "e.ctrlKey", e.ctrlKey, "e.altKey", e.altKey, "e.shiftKey", e.shiftKey);
     let pd = windowkeys[e.key][e.ctrlKey][e.altKey][e.shiftKey];
     if (pd) {
       e.preventDefault();
     }
-    console.log("pd:", pd);
+    if (windowkeysdebug) {
+      console.log("key found: ", e.key, " preventdefault: ", pd);
+    }
+
     app.ports.receiveKeyMsg.send({ key : e.key
-                                  , ctrl : e.ctrlKey
-                                  , alt : e.altKey
-                                  , shift : e.shiftKey
-                                  , preventDefault : pd});
-    console.log("e", e);
+                                 , ctrl : e.ctrlKey
+                                 , alt : e.altKey
+                                 , shift : e.shiftKey
+                                 , preventDefault : pd});
   } catch (error)
   {
-    console.log("not found: ", e.key);
+    if (windowkeysdebug) {
+      console.log("key not found: ", e.key);
+    }
   }
-
-
-  // if (e.key === "Tab") {
-  //   e.preventDefault();
-  //   app.ports.tabKey.send("Tab");
-  // }
 }
 
 

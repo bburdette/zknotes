@@ -1663,35 +1663,19 @@ actualupdate msg model =
         ( WkMsg reskey, EditZkNote es login ) ->
             case reskey of
                 Ok key ->
-                    let
-                        _ =
-                            Debug.log "key " key
-                    in
                     handleEditZkNoteCmd model login (EditZkNote.onWkKeyPress key es)
 
                 Err e ->
-                    let
-                        _ =
-                            Debug.log "key error " e
-                    in
                     ( model, Cmd.none )
 
         ( WkMsg reskey, EditZkNoteListing es login ) ->
             case reskey of
                 Ok key ->
-                    let
-                        _ =
-                            Debug.log "key " key
-                    in
                     handleEditZkNoteListing model
                         login
                         (EditZkNoteListing.onWkKeyPress key es)
 
                 Err e ->
-                    let
-                        _ =
-                            Debug.log "key error " e
-                    in
                     ( model, Cmd.none )
 
         ( EditZkNoteListingMsg em, EditZkNoteListing es login ) ->
