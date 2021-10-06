@@ -1,11 +1,10 @@
-let windowkeysdebug = false;
-
+// this will contain the keys we're monitoring.
 let windowkeys = {};
 
+// wire up your sendKeyCommand port in elm to this function:
+//    app.ports.sendKeyCommand.subscribe(sendKeyCommand);
 function sendKeyCommand( kc ) {
-  if (windowkeysdebug) {
-    console.log("sendKeyCommand", kc);
-  }
+  // console.log("sendKeyCommand", kc);
 
   if (kc.cmd == "SetWindowKeys") {
     windowkeys = {};
@@ -28,15 +27,15 @@ function sendKeyCommand( kc ) {
   }
 }
 
+// add this line after your elm app init.
+// window.addEventListener( "keydown", keycheck, false );
 function keycheck(e) {
   try {
     let pd = windowkeys[e.key][e.ctrlKey][e.altKey][e.shiftKey];
     if (pd) {
       e.preventDefault();
     }
-    if (windowkeysdebug) {
-      console.log("key found: ", e.key, " preventdefault: ", pd);
-    }
+    // console.log("key found: ", e.key, " preventdefault: ", pd);
 
     app.ports.receiveKeyMsg.send({ key : e.key
                                  , ctrl : e.ctrlKey
@@ -45,11 +44,7 @@ function keycheck(e) {
                                  , preventDefault : pd});
   } catch (error)
   {
-    if (windowkeysdebug) {
-      console.log("key not found: ", e.key);
-    }
+   // console.log("key not found: ", e.key);
   }
 }
-
-
 
