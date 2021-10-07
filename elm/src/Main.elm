@@ -839,6 +839,10 @@ piupdate msg initmodel =
                             { imod | mbzone = Just zone }
 
                         ReceiveLocalVal lv ->
+                            let
+                                default =
+                                    16
+                            in
                             case lv.name of
                                 "fontsize" ->
                                     case lv.value of
@@ -848,10 +852,10 @@ piupdate msg initmodel =
                                                     { imod | mbfontsize = Just i }
 
                                                 Nothing ->
-                                                    { imod | mbfontsize = Just 10 }
+                                                    { imod | mbfontsize = Just default }
 
                                         Nothing ->
-                                            { imod | mbfontsize = Just 10 }
+                                            { imod | mbfontsize = Just default }
 
                                 _ ->
                                     { imod | mbfontsize = Nothing }
