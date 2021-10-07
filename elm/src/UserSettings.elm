@@ -85,7 +85,7 @@ view model =
                     { onChange = round >> SetFontSize
                     , label =
                         EI.labelAbove []
-                            (E.text "Font Size")
+                            (E.text "font size")
                     , min = 2
                     , max = 40
                     , step = Just 1
