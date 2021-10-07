@@ -70,10 +70,13 @@
                  height : window.innerHeight,
                  errorid : errorid,
                  login : login}});
-      // app.ports.storeLocalVal.subscribe(storeVal);
-      // app.ports.getLocalVal.subscribe(getVal);
-      // app.ports.clearLocalStorage.subscribe(clearStorage);
+      // local storage
+      app.ports.storeLocalVal.subscribe(storeVal);
+      app.ports.getLocalVal.subscribe(getVal);
+      app.ports.clearLocalStorage.subscribe(clearStorage);
+      // selected text
       app.ports.getSelectedText.subscribe(getSelectedText);
+      // keydown events
       app.ports.sendKeyCommand.subscribe(sendKeyCommand);
       window.addEventListener( "keydown", keycheck, false );
 
