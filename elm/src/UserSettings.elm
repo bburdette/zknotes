@@ -69,31 +69,31 @@ view model =
                     ]
                 , EI.button (E.centerX :: buttonStyle) { onPress = Just ChangePassPress, label = E.text "change password" }
                 , EI.button (E.centerX :: buttonStyle) { onPress = Just ChangeEmailPress, label = E.text "change email" }
+                , EI.slider
+                    [ E.height (E.px 30)
+                    , E.behindContent
+                        (E.el
+                            [ E.width E.fill
+                            , E.height (E.px 2)
+                            , E.centerY
+                            , EBk.color TC.grey
+                            , EBd.rounded 2
+                            ]
+                            E.none
+                        )
+                    ]
+                    { onChange = round >> SetFontSize
+                    , label =
+                        EI.labelAbove []
+                            (E.text "Font Size")
+                    , min = 2
+                    , max = 40
+                    , step = Just 1
+                    , value = model.fontsize |> toFloat
+                    , thumb =
+                        EI.defaultThumb
+                    }
                 ]
-            , EI.slider
-                [ E.height (E.px 30)
-                , E.behindContent
-                    (E.el
-                        [ E.width E.fill
-                        , E.height (E.px 2)
-                        , E.centerY
-                        , EBk.color TC.grey
-                        , EBd.rounded 2
-                        ]
-                        E.none
-                    )
-                ]
-                { onChange = round >> SetFontSize
-                , label =
-                    EI.labelAbove []
-                        (E.text "Font Size")
-                , min = 2
-                , max = 25
-                , step = Just 1
-                , value = model.fontsize |> toFloat
-                , thumb =
-                    EI.defaultThumb
-                }
             ]
         ]
 
