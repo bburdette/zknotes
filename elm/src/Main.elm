@@ -17,7 +17,7 @@ import EditZkNoteListing
 import Element as E exposing (Element)
 import Element.Background as EBk
 import Element.Border as EBd
-import Element.Font as Font
+import Element.Font as EF
 import Element.Input as EI
 import Element.Region
 import File as F
@@ -140,6 +140,7 @@ type alias Model =
     , prevSearches : List S.TagSearch
     , recentNotes : List Data.ZkListNote
     , errorNotes : Dict String String
+    , fontsize : Int
     }
 
 
@@ -147,6 +148,8 @@ type alias PreInitModel =
     { flags : Flags
     , url : Url
     , key : Browser.Navigation.Key
+    , mbzone : Maybe Time.Zone
+    , mbfontsize : Maybe Int
     }
 
 
@@ -289,7 +292,7 @@ routeState model route =
         SettingsR ->
             case stateLogin model.state of
                 Just login ->
-                    ( UserSettings (UserSettings.init login) login model.state, Cmd.none )
+                    ( UserSettings (UserSettings.init login model.fontsize) login model.state, Cmd.none )
 
                 Nothing ->
                     ( (displayMessageDialog { model | state = initLogin model.seed } "can't view user settings; you're not logged in!").state, Cmd.none )
@@ -813,7 +816,7 @@ view model =
                         cdm
 
             _ ->
-                E.layout [ E.width E.fill ] <| viewState model.size model.state model
+                E.layout [ EF.size model.fontsize, E.width E.fill ] <| viewState model.size model.state model
         ]
     }
 
@@ -829,16 +832,43 @@ piupdate msg initmodel =
             ( Ready m, c )
 
         PreInit imod ->
-            case msg of
-                Zone zone ->
+            let
+                nmod =
+                    case msg of
+                        Zone zone ->
+                            { imod | mbzone = Just zone }
+
+                        ReceiveLocalVal lv ->
+                            case lv.name of
+                                "fontsize" ->
+                                    case lv.value of
+                                        Just v ->
+                                            case String.toInt v of
+                                                Just i ->
+                                                    { imod | mbfontsize = Just i }
+
+                                                Nothing ->
+                                                    { imod | mbfontsize = Just 10 }
+
+                                        Nothing ->
+                                            { imod | mbfontsize = Just 10 }
+
+                                _ ->
+                                    { imod | mbfontsize = Nothing }
+
+                        _ ->
+                            imod
+            in
+            case ( nmod.mbzone, nmod.mbfontsize ) of
+                ( Just zone, Just fontsize ) ->
                     let
                         ( m, c ) =
-                            init imod.flags imod.url imod.key zone
+                            init imod.flags imod.url imod.key zone fontsize
                     in
                     ( Ready m, c )
 
                 _ ->
-                    ( initmodel, Cmd.none )
+                    ( PreInit nmod, Cmd.none )
 
 
 {-| urlUpdate: all URL code shall go here! regular code shall not worry about urls!
@@ -1171,6 +1201,14 @@ actualupdate msg model =
                                 (UserSettings numod login prevstate)
                       }
                     , Cmd.none
+                    )
+
+                UserSettings.ChangeFontSize size ->
+                    ( { model
+                        | state = UserSettings numod login prevstate
+                        , fontsize = size
+                      }
+                    , LS.storeLocalVal { name = "fontsize", value = String.fromInt size }
                     )
 
                 UserSettings.None ->
@@ -1969,7 +2007,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
             backtolisting
 
         EditZkNote.Settings ->
-            ( { model | state = UserSettings (UserSettings.init login) login (EditZkNote emod login) }
+            ( { model | state = UserSettings (UserSettings.init login model.fontsize) login (EditZkNote emod login) }
             , Cmd.none
             )
 
@@ -2004,7 +2042,7 @@ handleEditZkNoteListing model login ( emod, ecmd ) =
             )
 
         EditZkNoteListing.Done ->
-            ( { model | state = UserSettings (UserSettings.init login) login (EditZkNoteListing emod login) }
+            ( { model | state = UserSettings (UserSettings.init login model.fontsize) login (EditZkNoteListing emod login) }
             , Cmd.none
             )
 
@@ -2086,8 +2124,13 @@ preinit flags url key =
         { flags = flags
         , url = url
         , key = key
+        , mbzone = Nothing
+        , mbfontsize = Nothing
         }
-    , Task.perform Zone Time.here
+    , Cmd.batch
+        [ Task.perform Zone Time.here
+        , LS.getLocalVal { for = "", name = "fontsize" }
+        ]
     )
 
 
@@ -2141,8 +2184,8 @@ initialPage curmodel =
            )
 
 
-init : Flags -> Url -> Browser.Navigation.Key -> Time.Zone -> ( Model, Cmd Msg )
-init flags url key zone =
+init : Flags -> Url -> Browser.Navigation.Key -> Time.Zone -> Int -> ( Model, Cmd Msg )
+init flags url key zone fontsize =
     let
         seed =
             initialSeed (flags.seed + 7)
@@ -2164,6 +2207,7 @@ init flags url key zone =
             , prevSearches = []
             , recentNotes = []
             , errorNotes = Dict.empty
+            , fontsize = fontsize
             }
 
         geterrornote =
