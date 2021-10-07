@@ -87,6 +87,7 @@ type Msg
     | ResetPasswordMsg ResetPassword.Msg
     | Zone Time.Zone
     | WkMsg (Result JD.Error WindowKeys.Key)
+    | ReceiveLocalVal { for : String, name : String, value : Maybe String }
     | Noop
 
 
@@ -438,6 +439,9 @@ showMessage msg =
 
         WkMsg _ ->
             "WkMsg"
+
+        ReceiveLocalVal _ ->
+            "ReceiveLocalVal"
 
         SelectDialogMsg _ ->
             "SelectDialogMsg"
@@ -992,6 +996,10 @@ actualupdate msg model =
                     wfn model msg
             in
             ( nmd, cmd )
+
+        ( ReceiveLocalVal lv, _ ) ->
+            -- update the font size
+            ( model, Cmd.none )
 
         ( WindowSize s, _ ) ->
             ( { model | size = s }, Cmd.none )
@@ -2232,6 +2240,7 @@ main =
                     [ receiveSelectedText SelectedText
                     , Browser.Events.onResize (\w h -> WindowSize { width = w, height = h })
                     , keyreceive
+                    , LS.localVal ReceiveLocalVal
                     ]
         , onUrlRequest = urlRequest
         , onUrlChange = UrlChanged
