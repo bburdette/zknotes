@@ -592,6 +592,9 @@ viewState size state model =
 stateSearch : State -> Maybe ( SP.Model, Data.ZkListNoteSearchResult )
 stateSearch state =
     case state of
+        Login _ ->
+            Nothing
+
         EditZkNote emod _ ->
             Just ( emod.spmodel, emod.zknSearchResult )
 
@@ -601,8 +604,50 @@ stateSearch state =
         ShowMessage _ _ (Just st) ->
             stateSearch st
 
-        _ ->
+        ShowMessage _ _ Nothing ->
             Nothing
+
+        PubShowMessage _ (Just st) ->
+            stateSearch st
+
+        PubShowMessage _ Nothing ->
+            Nothing
+
+        View _ ->
+            Nothing
+
+        EView _ st ->
+            stateSearch st
+
+        Import _ _ ->
+            Nothing
+
+        UserSettings _ _ st ->
+            stateSearch st
+
+        LoginShowMessage _ _ _ ->
+            Nothing
+
+        SelectDialog _ st ->
+            stateSearch st
+
+        ChangePasswordDialog _ st ->
+            stateSearch st
+
+        ChangeEmailDialog _ st ->
+            stateSearch st
+
+        ResetPassword _ ->
+            Nothing
+
+        DisplayMessage _ st ->
+            stateSearch st
+
+        MessageNLink _ st ->
+            stateSearch st
+
+        Wait st _ ->
+            stateSearch st
 
 
 stateLogin : State -> Maybe Data.LoginData
