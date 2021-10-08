@@ -598,6 +598,9 @@ stateSearch state =
         EditZkNoteListing emod _ ->
             Just ( emod.spmodel, emod.notes )
 
+        ShowMessage _ _ (Just st) ->
+            stateSearch st
+
         _ ->
             Nothing
 
