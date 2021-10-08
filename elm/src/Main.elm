@@ -1521,6 +1521,7 @@ actualupdate msg model =
                                             case state of
                                                 EditZkNote eznst _ ->
                                                     EditZkNote.copyTabs eznst nst
+                                                        |> EditZkNote.tabsOnLoad
 
                                                 _ ->
                                                     nst
