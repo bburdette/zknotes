@@ -2,7 +2,7 @@
 
 A multiuser zettelkasten implementation in elm and rust, currently storing notes in sqlite.  Its still in the prototype stage.
 
-There are some [docs](https://www.zknotes.com/page/what%20is%20zknotes) hosted in zknotes itself.
+There are some [docs](https://www.zknotes.com/page/what%20is%20zknotes) hosted in zknotes itself, with a few screenshots.
 
 Notes are in markdown, specifically [elm-markdown](https://package.elm-lang.org/packages/dillonkearns/elm-markdown/latest/), which should allow for some interesting extensions later on.  Currently you can use formulas as in [cellme](https://github.com/bburdette/cellme/).
 
@@ -25,7 +25,7 @@ If you want to compile and run this on your own machine:
   git submodule init
   git submodule update
   ```
-- the elm and server directories contain shell.nix files.  If you use nix, just execute nix-shell in those directories and you're ready to build.
+- the elm and server directories contain shell.nix files.  If you use nix, just execute nix-shell in those directories and you're ready to build.  Otherwise install the rust and elm dev tools as you normally would on your OS.
 - build elm with 
   ```
   cd elm
