@@ -135,7 +135,7 @@ mkRenderer viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged =
     { heading = heading
     , paragraph =
         E.paragraph
-            [ E.spacing 15 ]
+            [ E.spacing 8 ]
     , thematicBreak = E.none
     , text = E.text
     , strong = \content -> E.paragraph [ EF.bold ] content
