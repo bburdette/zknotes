@@ -1,12 +1,12 @@
 module TagSearchPanel exposing (Command(..), Model, Msg(..), Search(..), addSearchText, addTagToSearchPrev, addToSearch, addToSearchPanel, getSearch, initModel, onEnter, selectPrevSearch, toggleHelpButton, update, updateSearchText, view)
 
 import Common exposing (buttonStyle)
-import Element exposing (..)
-import Element.Background as Background
-import Element.Border as Border
+import Element as E exposing (..)
+import Element.Background as EBk
+import Element.Border as EBd
 import Element.Events exposing (onClick, onFocus, onLoseFocus)
-import Element.Font as Font
-import Element.Input as Input
+import Element.Font as EF
+import Element.Input as EI
 import Html.Attributes as HA
 import Parser
 import Search exposing (AndOr(..), SearchMod(..), TSText, TagSearch(..), tagSearchParser)
@@ -193,15 +193,15 @@ selectPrevSearch searches =
         [ width fill
         , centerX
         , centerY
-        , Border.color Color.black
-        , Border.width 2
-        , Background.color Color.white
+        , EBd.color Color.black
+        , EBd.width 2
+        , EBk.color Color.white
         ]
         (List.map
             (\s ->
                 row
-                    [ mouseOver [ Background.color Color.lightBlue ]
-                    , mouseDown [ Background.color Color.darkBlue ]
+                    [ mouseOver [ EBk.color Color.lightBlue ]
+                    , mouseDown [ EBk.color Color.darkBlue ]
                     , onClick (PrevSelected s)
                     , width fill
                     ]
@@ -209,6 +209,52 @@ selectPrevSearch searches =
             )
             searches
         )
+
+
+viewSearch : TagSearch -> Element Msg
+viewSearch ts =
+    E.column [ E.width E.fill ] <|
+        viewSearchHelper 0 ts
+
+
+viewSearchHelper : Int -> TagSearch -> List (Element Msg)
+viewSearchHelper indent ts =
+    let
+        indentelt =
+            \idt -> E.row [ E.width (E.px (8 * indent)) ] []
+    in
+    case ts of
+        SearchTerm searchmods term ->
+            [ E.row [ E.width E.fill ] [ indentelt indent, E.text term ] ]
+
+        Not nts ->
+            [ E.row [ E.width E.fill ] [ indentelt indent, E.text "not" ]
+            ]
+                ++ viewSearchHelper (indent + 1) nts
+
+        Boolex ts1 andor ts2 ->
+            [ E.row [ E.width E.fill ]
+                [ indentelt indent
+                , E.text
+                    (case andor of
+                        And ->
+                            "and"
+
+                        Or ->
+                            "or"
+                    )
+                ]
+            ]
+                ++ viewSearchHelper (indent + 1) ts1
+                ++ viewSearchHelper (indent + 1) ts2
+
+
+
+{- = SearchTerm (List SearchMod) String
+   | Not TagSearch
+   | Boolex TagSearch AndOr TagSearch
+
+-}
 
 
 view : Bool -> Int -> Model -> Element Msg
@@ -222,7 +268,7 @@ view narrow nblevel model =
                             []
 
                         Err _ ->
-                            [ Background.color <| rgb255 255 128 128 ]
+                            [ EBk.color <| rgb255 255 128 128 ]
 
                 NoSearch ->
                     []
@@ -247,23 +293,23 @@ view narrow nblevel model =
         searchButton =
             case model.search of
                 TagSearch (Err _) ->
-                    Input.button (sbs ++ [ Background.color Color.grey ]) { onPress = Nothing, label = text "search:" }
+                    EI.button (sbs ++ [ EBk.color Color.grey ]) { onPress = Nothing, label = text "search:" }
 
                 _ ->
-                    Input.button sbs { onPress = Just SearchClick, label = text "search:" }
+                    EI.button sbs { onPress = Just SearchClick, label = text "search:" }
 
         tinput =
-            Input.text
+            EI.text
                 (htmlAttribute (HA.id "searchtext") :: onFocus (STFocus True) :: onLoseFocus (STFocus False) :: tiattribs)
                 { onChange = SearchText
                 , text = model.searchText
                 , placeholder = Nothing
                 , label =
                     if narrow then
-                        Input.labelHidden "search"
+                        EI.labelHidden "search"
 
                     else
-                        Input.labelLeft [] <|
+                        EI.labelLeft [] <|
                             row [ centerY ]
                                 [ searchButton
                                 ]
@@ -275,7 +321,7 @@ view narrow nblevel model =
         {- save and restore search stuff, disabled for now:
 
            was ddbutton:
-           Input.button buttonStyle
+           EI.button buttonStyle
                { onPress = Just TogglePrev
                , label =
                    text <|
@@ -289,7 +335,7 @@ view narrow nblevel model =
            if List.any (\elt -> elt == model.searchText) model.prevSearches then
                none
              else
-               Input.button buttonStyle
+               EI.button buttonStyle
                    { onPress = Just SaveSearch
                    , label = text "save"
                    }
@@ -304,7 +350,7 @@ view narrow nblevel model =
 
               else
                 none
-            , Input.button obs
+            , EI.button obs
                 { onPress = Just SearchDetails
                 , label =
                     text <|
@@ -314,7 +360,7 @@ view narrow nblevel model =
                         else
                             "?"
                 }
-            , Input.button obs
+            , EI.button obs
                 { onPress = Just Clear
                 , label = text "x"
                 }
@@ -333,64 +379,72 @@ view narrow nblevel model =
          else
             [ width fill ]
         )
-        ((if narrow then
-            [ row [ width fill, spacing 3 ] [ tinput, ddbutton ]
-            , row [ spacing 3, width fill ] buttons
-            ]
+        ((case model.search of
+            TagSearch (Ok ts) ->
+                viewSearch ts
 
-          else
-            [ row [ width fill, spacing 3 ]
-                (tinput :: ddbutton :: buttons)
-            ]
+            _ ->
+                E.none
          )
-            ++ (if model.showParse then
-                    case model.search of
-                        TagSearch rts ->
-                            case rts of
-                                Err e ->
-                                    [ column [ width fill ]
-                                        [ row [ spacing 3, width fill ]
-                                            [ text "Syntax error:"
-                                            , paragraph [] [ text (Util.deadEndsToString e) ]
-                                            , el [ alignRight ] <| toggleHelpButton model.showHelp
-                                            ]
-                                        , if model.showHelp then
-                                            Element.map HelpMsg <| SearchHelpPanel.view nblevel model.helpPanel
+            :: ((if narrow then
+                    [ row [ width fill, spacing 3 ] [ tinput, ddbutton ]
+                    , row [ spacing 3, width fill ] buttons
+                    ]
 
-                                          else
-                                            Element.none
-                                        ]
+                 else
+                    [ row [ width fill, spacing 3 ]
+                        (tinput :: ddbutton :: buttons)
+                    ]
+                )
+                    ++ (if model.showParse then
+                            case model.search of
+                                TagSearch rts ->
+                                    case rts of
+                                        Err e ->
+                                            [ column [ width fill ]
+                                                [ row [ spacing 3, width fill ]
+                                                    [ text "Syntax error:"
+                                                    , paragraph [] [ text (Util.deadEndsToString e) ]
+                                                    , el [ alignRight ] <| toggleHelpButton model.showHelp
+                                                    ]
+                                                , if model.showHelp then
+                                                    E.map HelpMsg <| SearchHelpPanel.view nblevel model.helpPanel
+
+                                                  else
+                                                    E.none
+                                                ]
+                                            ]
+
+                                        Ok ts ->
+                                            [ column [ width fill ]
+                                                [ paragraph [ spacing 3, width fill ]
+                                                    [ text "search expression:"
+                                                    , paragraph [] [ text <| Search.printTagSearch ts ]
+                                                    , el [ alignRight ] <| toggleHelpButton model.showHelp
+                                                    ]
+                                                , if model.showHelp then
+                                                    E.map HelpMsg <| SearchHelpPanel.view nblevel model.helpPanel
+
+                                                  else
+                                                    E.none
+                                                ]
+                                            ]
+
+                                NoSearch ->
+                                    [ E.map HelpMsg <|
+                                        SearchHelpPanel.view nblevel model.helpPanel
                                     ]
 
-                                Ok ts ->
-                                    [ column [ width fill ]
-                                        [ paragraph [ spacing 3, width fill ]
-                                            [ text "search expression:"
-                                            , paragraph [] [ text <| Search.printTagSearch ts ]
-                                            , el [ alignRight ] <| toggleHelpButton model.showHelp
-                                            ]
-                                        , if model.showHelp then
-                                            Element.map HelpMsg <| SearchHelpPanel.view nblevel model.helpPanel
-
-                                          else
-                                            Element.none
-                                        ]
-                                    ]
-
-                        NoSearch ->
-                            [ Element.map HelpMsg <|
-                                SearchHelpPanel.view nblevel model.helpPanel
-                            ]
-
-                else
-                    []
+                        else
+                            []
+                       )
                )
         )
 
 
 toggleHelpButton : Bool -> Element Msg
 toggleHelpButton showHelp =
-    Input.button buttonStyle
+    EI.button buttonStyle
         { onPress = Just ToggleHelp
         , label =
             case showHelp of
