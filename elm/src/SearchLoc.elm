@@ -11,20 +11,8 @@ type TSLoc
     | LThis
 
 
-
-{- toTerm : (TSLoc -> TSLoc) -> TSLoc ->(TSLoc -> TSLoc)
-   toTerm tt t =
-     case t of
-       LLeaf -> tt (always LLeaf)
-       LNot TSLoc
-       LBT1 TSLoc
-       LBT2 TSLoc
-
--}
-
-
-getTerm : TagSearch -> TSLoc -> Maybe TagSearch
-getTerm ts tsl =
+getTerm : TSLoc -> TagSearch -> Maybe TagSearch
+getTerm tsl ts =
     case ( ts, tsl ) of
         ( SearchTerm _ _, LLeaf ) ->
             Just ts
@@ -33,48 +21,51 @@ getTerm ts tsl =
             Just ts
 
         ( Not nt, LNot nts ) ->
-            getTerm nt nts
+            getTerm nts nt
 
-        ( Boolex ts1 _ _, LBT1 LThis ) ->
+        ( Boolex _ _ _, LThis ) ->
             Just ts
 
         ( Boolex ts1 _ _, LBT1 bxts ) ->
-            getTerm ts1 bxts
-
-        ( Boolex _ _ ts2, LBT2 LThis ) ->
-            Just ts
+            getTerm bxts ts1
 
         ( Boolex _ _ ts2, LBT2 bxts ) ->
-            getTerm ts2 bxts
+            getTerm bxts ts2
 
         _ ->
             Nothing
 
 
-setTerm : TagSearch -> TSLoc -> TagSearch -> Maybe TagSearch
-setTerm ts tsl rts =
+setTerm : TSLoc -> TagSearch -> TagSearch -> Maybe TagSearch
+setTerm tsl rts ts =
     case ( ts, tsl ) of
         ( SearchTerm _ _, LLeaf ) ->
             Just rts
 
-        ( Not nt, LNot LThis ) ->
+        ( _, LThis ) ->
             Just rts
 
         ( Not nt, LNot nts ) ->
-            setTerm nt nts rts
+            setTerm nts rts ts
                 |> Maybe.map (\t -> Not t)
 
-        ( Boolex ts1 _ _, LBT1 LThis ) ->
-            Just rts
+        ( Boolex ts1 andor ts2, LBT1 bxts ) ->
+            setTerm bxts rts ts1
+                |> Maybe.map
+                    (\t1 ->
+                        Boolex t1
+                            andor
+                            ts2
+                    )
 
-        ( Boolex ts1 _ _, LBT1 bxts ) ->
-            setTerm ts1 bxts rts
-
-        ( Boolex _ _ ts2, LBT2 LThis ) ->
-            Just rts
-
-        ( Boolex _ _ ts2, LBT2 bxts ) ->
-            setTerm ts2 bxts rts
+        ( Boolex ts1 andor ts2, LBT2 bxts ) ->
+            setTerm bxts rts ts2
+                |> Maybe.map
+                    (\t2 ->
+                        Boolex ts1
+                            andor
+                            t2
+                    )
 
         _ ->
             Nothing

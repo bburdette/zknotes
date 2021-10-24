@@ -58,6 +58,7 @@ type Msg
     | PrevSelected String
     | SaveSearch
     | HelpMsg SearchHelpPanel.Msg
+    | ToggleAndOr TSLoc
 
 
 type Command
@@ -230,7 +231,12 @@ viewSearchHelper indent lts ts =
     in
     case ts of
         SearchTerm searchmods term ->
-            [ E.row [ E.width E.fill, E.spacing 8 ] [ indentelt indent, E.text term, E.text <| Debug.toString (toLoc lts LLeaf) ] ]
+            [ E.row [ E.width E.fill, E.spacing 8 ]
+                [ indentelt indent
+                , E.text term
+                , E.text <| Debug.toString (toLoc lts LLeaf)
+                ]
+            ]
 
         Not nts ->
             [ E.row [ E.width E.fill, E.spacing 8 ]
@@ -244,14 +250,18 @@ viewSearchHelper indent lts ts =
         Boolex ts1 andor ts2 ->
             [ E.row [ E.width E.fill, E.spacing 8 ]
                 [ indentelt indent
-                , E.text
-                    (case andor of
-                        And ->
-                            "and"
+                , EI.button buttonStyle
+                    { onPress = Just (ToggleAndOr (toLoc lts LThis))
+                    , label =
+                        text
+                            (case andor of
+                                And ->
+                                    "and"
 
-                        Or ->
-                            "or"
-                    )
+                                Or ->
+                                    "or"
+                            )
+                    }
                 , E.text <| Debug.toString (toLoc lts LThis)
                 ]
             ]
@@ -534,3 +544,40 @@ update msg model =
 
         HelpMsg hmsg ->
             ( { model | helpPanel = SearchHelpPanel.update model.helpPanel hmsg }, None )
+
+        ToggleAndOr tsl ->
+            ( { model
+                | search =
+                    case model.search of
+                        TagSearch (Ok search) ->
+                            search
+                                |> (SL.getTerm tsl >> Debug.log "getterm")
+                                |> Maybe.andThen
+                                    (\term ->
+                                        case term of
+                                            Boolex ts1 andor ts2 ->
+                                                SL.setTerm tsl
+                                                    (Boolex ts1
+                                                        (case andor of
+                                                            And ->
+                                                                Or
+
+                                                            Or ->
+                                                                And
+                                                        )
+                                                        ts2
+                                                    )
+                                                    search
+                                                    |> Debug.log "setterm"
+                                                    |> Maybe.map (TagSearch << Ok)
+
+                                            _ ->
+                                                Nothing
+                                    )
+                                |> Maybe.withDefault model.search
+
+                        _ ->
+                            model.search
+              }
+            , None
+            )
