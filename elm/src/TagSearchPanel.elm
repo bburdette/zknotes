@@ -11,6 +11,7 @@ import Html.Attributes as HA
 import Parser
 import Search exposing (AndOr(..), SearchMod(..), TSText, TagSearch(..), tagSearchParser)
 import SearchHelpPanel
+import SearchLoc as SL exposing (TSLoc(..))
 import TDict exposing (TDict)
 import TangoColors as Color
 import Util exposing (Size)
@@ -214,26 +215,34 @@ selectPrevSearch searches =
 viewSearch : TagSearch -> Element Msg
 viewSearch ts =
     E.column [ E.width E.fill ] <|
-        viewSearchHelper 0 ts
+        viewSearchHelper 0 [] ts
 
 
-viewSearchHelper : Int -> TagSearch -> List (Element Msg)
-viewSearchHelper indent ts =
+viewSearchHelper : Int -> List (TSLoc -> TSLoc) -> TagSearch -> List (Element Msg)
+viewSearchHelper indent lts ts =
     let
         indentelt =
             \idt -> E.row [ E.width (E.px (8 * indent)) ] []
+
+        toLoc : List (TSLoc -> TSLoc) -> TSLoc -> TSLoc
+        toLoc tll tsl =
+            List.foldl (\tlf tl -> tlf tl) tsl tll
     in
     case ts of
         SearchTerm searchmods term ->
-            [ E.row [ E.width E.fill ] [ indentelt indent, E.text term ] ]
+            [ E.row [ E.width E.fill, E.spacing 8 ] [ indentelt indent, E.text term, E.text <| Debug.toString (toLoc lts LLeaf) ] ]
 
         Not nts ->
-            [ E.row [ E.width E.fill ] [ indentelt indent, E.text "not" ]
+            [ E.row [ E.width E.fill, E.spacing 8 ]
+                [ indentelt indent
+                , E.text "not"
+                , E.text <| Debug.toString (toLoc lts LThis)
+                ]
             ]
-                ++ viewSearchHelper (indent + 1) nts
+                ++ viewSearchHelper (indent + 1) (LNot :: lts) nts
 
         Boolex ts1 andor ts2 ->
-            [ E.row [ E.width E.fill ]
+            [ E.row [ E.width E.fill, E.spacing 8 ]
                 [ indentelt indent
                 , E.text
                     (case andor of
@@ -243,10 +252,11 @@ viewSearchHelper indent ts =
                         Or ->
                             "or"
                     )
+                , E.text <| Debug.toString (toLoc lts LThis)
                 ]
             ]
-                ++ viewSearchHelper (indent + 1) ts1
-                ++ viewSearchHelper (indent + 1) ts2
+                ++ viewSearchHelper (indent + 1) (LBT1 :: lts) ts1
+                ++ viewSearchHelper (indent + 1) (LBT2 :: lts) ts2
 
 
 
