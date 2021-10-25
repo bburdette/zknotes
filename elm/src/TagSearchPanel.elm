@@ -4,7 +4,7 @@ import Common exposing (buttonStyle)
 import Element as E exposing (..)
 import Element.Background as EBk
 import Element.Border as EBd
-import Element.Events exposing (onClick, onFocus, onLoseFocus)
+import Element.Events as EE exposing (onClick, onFocus, onLoseFocus)
 import Element.Font as EF
 import Element.Input as EI
 import Html.Attributes as HA
@@ -13,7 +13,7 @@ import Search exposing (AndOr(..), SearchMod(..), TSText, TagSearch(..), tagSear
 import SearchHelpPanel
 import SearchLoc as SL exposing (TSLoc(..))
 import TDict exposing (TDict)
-import TangoColors as Color
+import TangoColors as TC
 import Util exposing (Size)
 
 
@@ -31,6 +31,7 @@ type alias Model =
     , showPrevs : Bool
     , prevSearches : List String
     , searchFocus : Bool
+    , searchTermFocus : Maybe TSLoc
     }
 
 
@@ -44,6 +45,7 @@ initModel =
     , showPrevs = False
     , prevSearches = []
     , searchFocus = False
+    , searchTermFocus = Nothing
     }
 
 
@@ -59,6 +61,7 @@ type Msg
     | SaveSearch
     | HelpMsg SearchHelpPanel.Msg
     | ToggleAndOr TSLoc
+    | ToggleTermFocus TSLoc
 
 
 type Command
@@ -195,15 +198,15 @@ selectPrevSearch searches =
         [ width fill
         , centerX
         , centerY
-        , EBd.color Color.black
+        , EBd.color TC.black
         , EBd.width 2
-        , EBk.color Color.white
+        , EBk.color TC.white
         ]
         (List.map
             (\s ->
                 row
-                    [ mouseOver [ EBk.color Color.lightBlue ]
-                    , mouseDown [ EBk.color Color.darkBlue ]
+                    [ mouseOver [ EBk.color TC.lightBlue ]
+                    , mouseDown [ EBk.color TC.darkBlue ]
                     , onClick (PrevSelected s)
                     , width fill
                     ]
@@ -213,14 +216,14 @@ selectPrevSearch searches =
         )
 
 
-viewSearch : TagSearch -> Element Msg
-viewSearch ts =
+viewSearch : Maybe TSLoc -> TagSearch -> Element Msg
+viewSearch mbfocusloc ts =
     E.column [ E.width E.fill ] <|
-        viewSearchHelper 0 [] ts
+        viewSearchHelper mbfocusloc 0 [] ts
 
 
-viewSearchHelper : Int -> List (TSLoc -> TSLoc) -> TagSearch -> List (Element Msg)
-viewSearchHelper indent lts ts =
+viewSearchHelper : Maybe TSLoc -> Int -> List (TSLoc -> TSLoc) -> TagSearch -> List (Element Msg)
+viewSearchHelper mbfocusloc indent lts ts =
     let
         indentelt =
             \idt -> E.row [ E.width (E.px (8 * indent)) ] []
@@ -228,45 +231,85 @@ viewSearchHelper indent lts ts =
         toLoc : List (TSLoc -> TSLoc) -> TSLoc -> TSLoc
         toLoc tll tsl =
             List.foldl (\tlf tl -> tlf tl) tsl tll
+
+        color =
+            \term ->
+                if Just term == mbfocusloc then
+                    EF.color TC.red
+
+                else
+                    EF.color TC.black
     in
     case ts of
         SearchTerm searchmods term ->
+            let
+                tloc =
+                    toLoc lts LLeaf
+            in
             [ E.row [ E.width E.fill, E.spacing 8 ]
                 [ indentelt indent
-                , E.text term
-                , E.text <| Debug.toString (toLoc lts LLeaf)
+                , E.el
+                    [ onClick <| ToggleTermFocus tloc
+                    , color tloc
+                    ]
+                  <|
+                    E.text term
                 ]
             ]
 
         Not nts ->
+            let
+                tloc =
+                    toLoc lts LThis
+            in
             [ E.row [ E.width E.fill, E.spacing 8 ]
                 [ indentelt indent
-                , E.text "not"
-                , E.text <| Debug.toString (toLoc lts LThis)
+                , E.el
+                    [ onClick <| ToggleTermFocus tloc
+                    , color tloc
+                    ]
+                  <|
+                    E.text "not"
                 ]
             ]
-                ++ viewSearchHelper (indent + 1) (LNot :: lts) nts
+                ++ viewSearchHelper mbfocusloc (indent + 1) (LNot :: lts) nts
 
         Boolex ts1 andor ts2 ->
+            let
+                tloc =
+                    toLoc lts LThis
+            in
             [ E.row [ E.width E.fill, E.spacing 8 ]
                 [ indentelt indent
-                , EI.button buttonStyle
-                    { onPress = Just (ToggleAndOr (toLoc lts LThis))
-                    , label =
-                        text
-                            (case andor of
-                                And ->
-                                    "and"
+                , E.el
+                    [ onClick <| ToggleTermFocus tloc
+                    , color tloc
+                    ]
+                  <|
+                    E.text
+                        (case andor of
+                            And ->
+                                "and"
 
-                                Or ->
-                                    "or"
-                            )
-                    }
-                , E.text <| Debug.toString (toLoc lts LThis)
+                            Or ->
+                                "or"
+                        )
+
+                --         EI.button buttonStyle
+                -- { onPress = Just (ToggleAndOr (toLoc lts LThis))
+                -- , label =
+                --     text
+                --         (case andor of
+                --             And ->
+                --                 "and"
+                --             Or ->
+                --                 "or"
+                --         )
+                -- }
                 ]
             ]
-                ++ viewSearchHelper (indent + 1) (LBT1 :: lts) ts1
-                ++ viewSearchHelper (indent + 1) (LBT2 :: lts) ts2
+                ++ viewSearchHelper mbfocusloc (indent + 1) (LBT1 :: lts) ts1
+                ++ viewSearchHelper mbfocusloc (indent + 1) (LBT2 :: lts) ts2
 
 
 
@@ -313,7 +356,7 @@ view narrow nblevel model =
         searchButton =
             case model.search of
                 TagSearch (Err _) ->
-                    EI.button (sbs ++ [ EBk.color Color.grey ]) { onPress = Nothing, label = text "search:" }
+                    EI.button (sbs ++ [ EBk.color TC.grey ]) { onPress = Nothing, label = text "search:" }
 
                 _ ->
                     EI.button sbs { onPress = Just SearchClick, label = text "search:" }
@@ -401,7 +444,7 @@ view narrow nblevel model =
         )
         ((case model.search of
             TagSearch (Ok ts) ->
-                viewSearch ts
+                viewSearch model.searchTermFocus ts
 
             _ ->
                 E.none
@@ -578,6 +621,18 @@ update msg model =
 
                         _ ->
                             model.search
+              }
+            , None
+            )
+
+        ToggleTermFocus tsl ->
+            ( { model
+                | searchTermFocus =
+                    if model.searchTermFocus == Just tsl then
+                        Nothing
+
+                    else
+                        Just tsl
               }
             , None
             )
