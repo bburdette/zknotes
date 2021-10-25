@@ -283,6 +283,28 @@ viewSearchHelper mbfocusloc indent lts ts =
                             { onPress = Just (ToggleSearchMod tloc mod)
                             , label = text label
                             }
+
+                modindicator =
+                    \mod ->
+                        EI.button
+                            (E.alignRight :: downButtonStyle)
+                            { onPress = Nothing
+                            , label =
+                                text
+                                    (case mod of
+                                        ExactMatch ->
+                                            "e"
+
+                                        Tag ->
+                                            "t"
+
+                                        Note ->
+                                            "n"
+
+                                        User ->
+                                            "u"
+                                    )
+                            }
             in
             [ E.row [ E.width E.fill, E.spacing 8 ]
                 [ indentelt indent
@@ -297,7 +319,7 @@ viewSearchHelper mbfocusloc indent lts ts =
                                 E.text term
                             ]
                         , E.row
-                            [ E.padding 8, E.spacing 8 ]
+                            [ E.padding 8, E.spacing 8, E.centerX ]
                             [ modbutton ExactMatch "e"
                             , modbutton Tag "t"
                             , modbutton Note "n"
@@ -314,7 +336,7 @@ viewSearchHelper mbfocusloc indent lts ts =
                                 , label = text "x"
                                 }
                             ]
-                        , E.row [ E.padding 8, E.spacing 8 ]
+                        , E.row [ E.padding 8, E.spacing 8, E.width E.fill ]
                             [ EI.text
                                 [ E.width E.fill ]
                                 { onChange = SetTermText tloc
@@ -327,12 +349,16 @@ viewSearchHelper mbfocusloc indent lts ts =
                         ]
 
                   else
-                    E.el
-                        [ onClick <| ToggleTermFocus tloc
-                        , color tloc
-                        ]
-                    <|
-                        E.text term
+                    E.row [ E.width E.fill, E.spacing 8 ]
+                        ([ E.el
+                            [ onClick <| ToggleTermFocus tloc
+                            , color tloc
+                            ]
+                           <|
+                            E.text term
+                         ]
+                            ++ List.map modindicator searchmods
+                        )
                 ]
             ]
 
@@ -398,10 +424,10 @@ viewSearchHelper mbfocusloc indent lts ts =
                                         text
                                             (case andor of
                                                 And ->
-                                                    "->or"
+                                                    "or"
 
                                                 Or ->
-                                                    "->and"
+                                                    "and"
                                             )
                                     }
                                 , EI.button
@@ -409,6 +435,11 @@ viewSearchHelper mbfocusloc indent lts ts =
                                     { onPress = Just (NotTerm tloc)
                                     , label =
                                         text "!"
+                                    }
+                                , EI.button
+                                    buttonStyle
+                                    { onPress = Just (DeleteTerm tloc)
+                                    , label = text "x"
                                     }
                                 ]
 
