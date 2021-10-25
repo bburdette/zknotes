@@ -1255,7 +1255,7 @@ zknview zone size recentZkns model =
                         }
                     ]
                     :: (E.map SPMsg <|
-                            SP.view True (size.width < 400 || wclass /= Narrow) 0 model.spmodel
+                            SP.view True (size.width < 500 || wclass /= Narrow) 0 model.spmodel
                        )
                     :: (List.map
                             (showSr model isdirty)
