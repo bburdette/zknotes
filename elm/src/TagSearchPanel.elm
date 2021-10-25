@@ -7,6 +7,7 @@ import Element.Border as EBd
 import Element.Events as EE exposing (onClick, onFocus, onLoseFocus)
 import Element.Font as EF
 import Element.Input as EI
+import Element.Keyed as EK
 import Html.Attributes as HA
 import Parser
 import Search exposing (AndOr(..), SearchMod(..), TSText, TagSearch(..), tagSearchParser)
@@ -519,7 +520,7 @@ view narrow nblevel model =
         showborder =
             model.showParse || narrow
     in
-    column
+    EK.column
         (if showborder then
             [ padding 2
             , spacing 8
@@ -529,7 +530,8 @@ view narrow nblevel model =
          else
             [ width fill ]
         )
-        ((case model.search of
+        (( "viewsearch"
+         , case model.search of
             TagSearch (Ok ts) ->
                 viewSearch model.searchTermFocus ts
 
@@ -537,21 +539,24 @@ view narrow nblevel model =
                 E.none
          )
             :: ((if narrow then
-                    [ row [ width fill, spacing 3 ] [ tinput, ddbutton ]
-                    , row [ spacing 3, width fill ] buttons
+                    [ ( "tinput", row [ width fill, spacing 3 ] [ tinput, ddbutton ] )
+                    , ( "tbuttons", row [ spacing 3, width fill ] buttons )
                     ]
 
                  else
-                    [ row [ width fill, spacing 3 ]
-                        (tinput :: ddbutton :: buttons)
+                    [ ( "tinput"
+                      , row [ width fill, spacing 3 ]
+                            (tinput :: ddbutton :: buttons)
+                      )
                     ]
                 )
-                    ++ (if model.showParse then
+                    ++ ( "searchhelp"
+                       , if model.showParse then
                             case model.search of
                                 TagSearch rts ->
                                     case rts of
                                         Err e ->
-                                            [ column [ width fill ]
+                                            column [ width fill ]
                                                 [ row [ spacing 3, width fill ]
                                                     [ text "Syntax error:"
                                                     , paragraph [] [ text (Util.deadEndsToString e) ]
@@ -563,10 +568,9 @@ view narrow nblevel model =
                                                   else
                                                     E.none
                                                 ]
-                                            ]
 
                                         Ok ts ->
-                                            [ column [ width fill ]
+                                            column [ width fill ]
                                                 [ paragraph [ spacing 3, width fill ]
                                                     [ text "search expression:"
                                                     , paragraph [] [ text <| Search.printTagSearch ts ]
@@ -578,16 +582,15 @@ view narrow nblevel model =
                                                   else
                                                     E.none
                                                 ]
-                                            ]
 
                                 NoSearch ->
-                                    [ E.map HelpMsg <|
+                                    E.map HelpMsg <|
                                         SearchHelpPanel.view nblevel model.helpPanel
-                                    ]
 
-                        else
-                            []
+                         else
+                            E.none
                        )
+                    :: []
                )
         )
 
