@@ -63,6 +63,7 @@ type Msg
     | ToggleAndOr TSLoc
     | ToggleTermFocus TSLoc
     | DeleteTerm TSLoc
+    | ToggleSearchMod TSLoc SearchMod
 
 
 type Command
@@ -123,6 +124,19 @@ addSearch ls rs =
 
                 TagSearch (Ok sr) ->
                     TagSearch (Ok (Boolex sl And sr))
+
+
+setSearch : Search -> Model -> Model
+setSearch s model =
+    case s of
+        TagSearch (Ok ts) ->
+            { model
+                | search = s
+                , searchText = Search.printTagSearch ts
+            }
+
+        _ ->
+            { model | search = s }
 
 
 addToSearchPanel : Model -> List SearchMod -> String -> Model
@@ -250,6 +264,22 @@ viewSearchHelper mbfocusloc indent lts ts =
             let
                 tloc =
                     toLoc lts LLeaf
+
+                downButtonStyle =
+                    buttonStyle ++ [ EBk.color TC.grey ]
+
+                modbutton =
+                    \mod label ->
+                        EI.button
+                            (if List.member mod searchmods then
+                                downButtonStyle
+
+                             else
+                                buttonStyle
+                            )
+                            { onPress = Just (ToggleSearchMod tloc mod)
+                            , label = text label
+                            }
             in
             [ E.row [ E.width E.fill, E.spacing 8 ]
                 [ indentelt indent
@@ -266,6 +296,10 @@ viewSearchHelper mbfocusloc indent lts ts =
                             { onPress = Just (DeleteTerm tloc)
                             , label = text "x"
                             }
+                        , modbutton ExactMatch "e"
+                        , modbutton Tag "t"
+                        , modbutton Note "n"
+                        , modbutton User "u"
                         ]
 
                   else
@@ -630,8 +664,8 @@ update msg model =
             ( { model | helpPanel = SearchHelpPanel.update model.helpPanel hmsg }, None )
 
         ToggleAndOr tsl ->
-            ( { model
-                | search =
+            let
+                ns =
                     case model.search of
                         TagSearch (Ok search) ->
                             search
@@ -662,7 +696,8 @@ update msg model =
 
                         _ ->
                             model.search
-              }
+            in
+            ( setSearch ns model
             , None
             )
 
@@ -679,8 +714,8 @@ update msg model =
             )
 
         DeleteTerm tsl ->
-            ( { model
-                | search =
+            let
+                ns =
                     case model.search of
                         TagSearch (Ok search) ->
                             case SL.removeTerm tsl search of
@@ -695,6 +730,41 @@ update msg model =
 
                         _ ->
                             model.search
-              }
+            in
+            ( setSearch ns model
+            , None
+            )
+
+        ToggleSearchMod tsl mod ->
+            let
+                ns =
+                    case model.search of
+                        TagSearch (Ok search) ->
+                            search
+                                |> SL.getTerm tsl
+                                |> Maybe.andThen
+                                    (\term ->
+                                        case term of
+                                            SearchTerm mods str ->
+                                                let
+                                                    nmods =
+                                                        if List.member mod mods then
+                                                            List.filter (\i -> i /= mod) mods
+
+                                                        else
+                                                            mod :: mods
+                                                in
+                                                SL.setTerm tsl (SearchTerm nmods str) search
+                                                    |> Maybe.map (\s -> TagSearch (Ok s))
+
+                                            _ ->
+                                                Nothing
+                                    )
+                                |> Maybe.withDefault model.search
+
+                        _ ->
+                            model.search
+            in
+            ( setSearch ns model
             , None
             )
