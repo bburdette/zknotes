@@ -62,6 +62,7 @@ type Msg
     | HelpMsg SearchHelpPanel.Msg
     | ToggleAndOr TSLoc
     | ToggleTermFocus TSLoc
+    | DeleteTerm TSLoc
 
 
 type Command
@@ -232,6 +233,10 @@ viewSearchHelper mbfocusloc indent lts ts =
         toLoc tll tsl =
             List.foldl (\tlf tl -> tlf tl) tsl tll
 
+        hasfocus =
+            \term ->
+                Just term == mbfocusloc
+
         color =
             \term ->
                 if Just term == mbfocusloc then
@@ -248,12 +253,28 @@ viewSearchHelper mbfocusloc indent lts ts =
             in
             [ E.row [ E.width E.fill, E.spacing 8 ]
                 [ indentelt indent
-                , E.el
-                    [ onClick <| ToggleTermFocus tloc
-                    , color tloc
-                    ]
-                  <|
-                    E.text term
+                , if hasfocus tloc then
+                    E.row [ EBk.color TC.lightGrey, E.padding 8, E.spacing 8 ]
+                        [ E.el
+                            [ onClick <| ToggleTermFocus tloc
+                            , color tloc
+                            ]
+                          <|
+                            E.text term
+                        , EI.button
+                            buttonStyle
+                            { onPress = Just (DeleteTerm tloc)
+                            , label = text "x"
+                            }
+                        ]
+
+                  else
+                    E.el
+                        [ onClick <| ToggleTermFocus tloc
+                        , color tloc
+                        ]
+                    <|
+                        E.text term
                 ]
             ]
 
@@ -279,36 +300,55 @@ viewSearchHelper mbfocusloc indent lts ts =
                 tloc =
                     toLoc lts LThis
             in
-            [ E.row [ E.width E.fill, E.spacing 8 ]
-                [ indentelt indent
-                , E.el
-                    [ onClick <| ToggleTermFocus tloc
-                    , color tloc
-                    ]
-                  <|
-                    E.text
-                        (case andor of
-                            And ->
-                                "and"
+            viewSearchHelper mbfocusloc (indent + 1) (LBT1 :: lts) ts1
+                ++ [ E.row [ E.width E.fill, E.spacing 8 ]
+                        [ indentelt indent
+                        , if hasfocus tloc then
+                            E.row [ EBk.color TC.lightGrey, E.padding 8, E.spacing 8 ]
+                                [ E.el
+                                    [ onClick <| ToggleTermFocus tloc
+                                    , color tloc
+                                    ]
+                                  <|
+                                    E.text
+                                        (case andor of
+                                            And ->
+                                                "and"
 
-                            Or ->
-                                "or"
-                        )
+                                            Or ->
+                                                "or"
+                                        )
+                                , EI.button
+                                    buttonStyle
+                                    { onPress = Just (ToggleAndOr tloc)
+                                    , label =
+                                        text
+                                            (case andor of
+                                                And ->
+                                                    "->or"
 
-                --         EI.button buttonStyle
-                -- { onPress = Just (ToggleAndOr (toLoc lts LThis))
-                -- , label =
-                --     text
-                --         (case andor of
-                --             And ->
-                --                 "and"
-                --             Or ->
-                --                 "or"
-                --         )
-                -- }
-                ]
-            ]
-                ++ viewSearchHelper mbfocusloc (indent + 1) (LBT1 :: lts) ts1
+                                                Or ->
+                                                    "->and"
+                                            )
+                                    }
+                                ]
+
+                          else
+                            E.el
+                                [ onClick <| ToggleTermFocus tloc
+                                , color tloc
+                                ]
+                            <|
+                                E.text
+                                    (case andor of
+                                        And ->
+                                            "and"
+
+                                        Or ->
+                                            "or"
+                                    )
+                        ]
+                   ]
                 ++ viewSearchHelper mbfocusloc (indent + 1) (LBT2 :: lts) ts2
 
 
@@ -634,6 +674,27 @@ update msg model =
 
                     else
                         Just tsl
+              }
+            , None
+            )
+
+        DeleteTerm tsl ->
+            ( { model
+                | search =
+                    case model.search of
+                        TagSearch (Ok search) ->
+                            case SL.removeTerm tsl search of
+                                SL.Matched ->
+                                    NoSearch
+
+                                SL.Removed s ->
+                                    TagSearch (Ok s)
+
+                                SL.Unmatched ->
+                                    model.search
+
+                        _ ->
+                            model.search
               }
             , None
             )

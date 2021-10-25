@@ -11,6 +11,67 @@ type TSLoc
     | LThis
 
 
+
+{- find term
+   return 'matched'
+-}
+
+
+type RTRes
+    = Matched
+    | Removed TagSearch
+    | Unmatched
+
+
+removeTerm : TSLoc -> TagSearch -> RTRes
+removeTerm tsl ts =
+    case ( ts, tsl ) of
+        ( SearchTerm _ _, LLeaf ) ->
+            Matched
+
+        ( Not nt, LNot LThis ) ->
+            Matched
+
+        ( Not nt, LNot nts ) ->
+            case removeTerm nts nt of
+                Matched ->
+                    Matched
+
+                Removed rts ->
+                    Removed (Not rts)
+
+                Unmatched ->
+                    Unmatched
+
+        ( Boolex _ _ _, LThis ) ->
+            Matched
+
+        ( Boolex ts1 ao ts2, LBT1 bxts ) ->
+            case removeTerm bxts ts1 of
+                Matched ->
+                    Removed ts2
+
+                Removed nt1 ->
+                    Removed <| Boolex nt1 ao ts2
+
+                Unmatched ->
+                    Unmatched
+
+        ( Boolex ts1 ao ts2, LBT2 bxts ) ->
+            case removeTerm bxts ts2 of
+                Matched ->
+                    Removed ts1
+
+                Removed nt2 ->
+                    Removed <| Boolex ts1 ao nt2
+
+                Unmatched ->
+                    Unmatched
+
+        _ ->
+            Unmatched
+
+
 getTerm : TSLoc -> TagSearch -> Maybe TagSearch
 getTerm tsl ts =
     case ( ts, tsl ) of
