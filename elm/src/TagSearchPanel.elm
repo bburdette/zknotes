@@ -777,7 +777,6 @@ update msg model =
                                                         ts2
                                                     )
                                                     search
-                                                    |> Debug.log "setterm"
                                                     |> Maybe.map (TagSearch << Ok)
 
                                             _ ->

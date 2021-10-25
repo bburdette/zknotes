@@ -110,7 +110,7 @@ setTerm tsl rts ts =
             Just rts
 
         ( Not nt, LNot nts ) ->
-            setTerm nts rts ts
+            setTerm nts rts nt
                 |> Maybe.map (\t -> Not t)
 
         ( Boolex ts1 andor ts2, LBT1 bxts ) ->
