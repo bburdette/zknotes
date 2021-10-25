@@ -64,6 +64,7 @@ type Msg
     | ToggleAndOr TSLoc
     | ToggleTermFocus TSLoc
     | DeleteTerm TSLoc
+    | NotTerm TSLoc
     | ToggleSearchMod TSLoc SearchMod
     | SetTermText TSLoc String
 
@@ -256,7 +257,7 @@ viewSearchHelper mbfocusloc indent lts ts =
         color =
             \term ->
                 if Just term == mbfocusloc then
-                    EF.color TC.red
+                    EF.color TC.blue
 
                 else
                     EF.color TC.black
@@ -302,8 +303,13 @@ viewSearchHelper mbfocusloc indent lts ts =
                             , modbutton ExactMatch "e"
                             , modbutton Tag "t"
                             , modbutton Note "n"
-                            , modbutton User
-                                "u"
+                            , modbutton User "u"
+                            , EI.button
+                                buttonStyle
+                                { onPress = Just (NotTerm tloc)
+                                , label =
+                                    text "!"
+                                }
                             ]
                         , EI.text
                             [ E.width E.fill ]
@@ -332,12 +338,27 @@ viewSearchHelper mbfocusloc indent lts ts =
             in
             [ E.row [ E.width E.fill, E.spacing 8 ]
                 [ indentelt indent
-                , E.el
-                    [ onClick <| ToggleTermFocus tloc
-                    , color tloc
-                    ]
-                  <|
-                    E.text "not"
+                , if hasfocus tloc then
+                    E.row [ EBk.color TC.lightGrey, E.padding 8, E.spacing 8 ]
+                        [ E.el
+                            [ onClick <| ToggleTermFocus tloc
+                            , color tloc
+                            ]
+                          <|
+                            E.text "not"
+                        , EI.button
+                            buttonStyle
+                            { onPress = Just (DeleteTerm tloc)
+                            , label = text "x"
+                            }
+                        ]
+
+                  else
+                    E.el
+                        [ onClick <| ToggleTermFocus tloc
+                        ]
+                    <|
+                        E.text "not"
                 ]
             ]
                 ++ viewSearchHelper mbfocusloc (indent + 1) (LNot :: lts) nts
@@ -377,6 +398,12 @@ viewSearchHelper mbfocusloc indent lts ts =
                                                 Or ->
                                                     "->and"
                                             )
+                                    }
+                                , EI.button
+                                    buttonStyle
+                                    { onPress = Just (NotTerm tloc)
+                                    , label =
+                                        text "!"
                                     }
                                 ]
 
@@ -520,6 +547,7 @@ view narrow nblevel model =
         showborder =
             model.showParse || narrow
     in
+    -- keyed column retains focus on search field even if other controls are added dynamically
     EK.column
         (if showborder then
             [ padding 2
@@ -706,6 +734,27 @@ update msg model =
 
                                             _ ->
                                                 Nothing
+                                    )
+                                |> Maybe.withDefault model.search
+
+                        _ ->
+                            model.search
+            in
+            ( setSearch ns model
+            , None
+            )
+
+        NotTerm tsl ->
+            let
+                ns =
+                    case model.search of
+                        TagSearch (Ok search) ->
+                            search
+                                |> SL.getTerm tsl
+                                |> Maybe.andThen
+                                    (\term ->
+                                        SL.setTerm tsl (Not term) search
+                                            |> Maybe.map (TagSearch << Ok)
                                     )
                                 |> Maybe.withDefault model.search
 

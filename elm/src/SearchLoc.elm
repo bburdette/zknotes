@@ -29,6 +29,9 @@ removeTerm tsl ts =
         ( SearchTerm _ _, LLeaf ) ->
             Matched
 
+        ( Not nt, LThis ) ->
+            Removed nt
+
         ( Not nt, LNot LThis ) ->
             Matched
 
