@@ -88,8 +88,8 @@ getSearch model =
             Nothing
 
 
-addToSearch : List SearchMod -> String -> Search -> Search
-addToSearch searchmods name search =
+addToSearch : Maybe TSLoc -> List SearchMod -> String -> Search -> Search
+addToSearch mbtsloc searchmods name search =
     let
         term =
             SearchTerm
@@ -105,7 +105,19 @@ addToSearch searchmods name search =
             TagSearch (Err e)
 
         TagSearch (Ok s) ->
-            TagSearch (Ok (Boolex s And term))
+            case mbtsloc of
+                Just tsloc ->
+                    s
+                        |> SL.getTerm tsloc
+                        |> Maybe.andThen
+                            (\tm ->
+                                SL.setTerm tsloc (Boolex tm And term) s
+                            )
+                        |> Maybe.map (\ts -> TagSearch (Ok ts))
+                        |> Maybe.withDefault search
+
+                Nothing ->
+                    TagSearch (Ok (Boolex s And term))
 
 
 addSearch : Search -> Search -> Search
@@ -146,7 +158,7 @@ addToSearchPanel : Model -> List SearchMod -> String -> Model
 addToSearchPanel model searchmods name =
     let
         s =
-            addToSearch searchmods name model.search
+            addToSearch model.searchTermFocus searchmods name model.search
     in
     case s of
         TagSearch (Ok ts) ->
@@ -748,7 +760,7 @@ update msg model =
                     case model.search of
                         TagSearch (Ok search) ->
                             search
-                                |> (SL.getTerm tsl >> Debug.log "getterm")
+                                |> SL.getTerm tsl
                                 |> Maybe.andThen
                                     (\term ->
                                         case term of
