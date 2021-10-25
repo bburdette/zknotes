@@ -362,11 +362,12 @@ view narrow nblevel model =
                     EI.button sbs { onPress = Just SearchClick, label = text "search:" }
 
         tinput =
-            EI.text
+            EI.multiline
                 (htmlAttribute (HA.id "searchtext") :: onFocus (STFocus True) :: onLoseFocus (STFocus False) :: tiattribs)
                 { onChange = SearchText
                 , text = model.searchText
                 , placeholder = Nothing
+                , spellcheck = False
                 , label =
                     if narrow then
                         EI.labelHidden "search"
