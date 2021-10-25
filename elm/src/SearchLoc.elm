@@ -11,12 +11,6 @@ type TSLoc
     | LThis
 
 
-
-{- find term
-   return 'matched'
--}
-
-
 type RTRes
     = Matched
     | Removed TagSearch
@@ -32,7 +26,7 @@ removeTerm tsl ts =
         ( Not nt, LThis ) ->
             Removed nt
 
-        ( Not nt, LNot LThis ) ->
+        ( Not _, LNot LThis ) ->
             Matched
 
         ( Not nt, LNot nts ) ->

@@ -474,14 +474,6 @@ viewSearchHelper mbfocusloc indent lts ts =
                 ++ viewSearchHelper mbfocusloc (indent + 1) (LBT2 :: lts) ts2
 
 
-
-{- = SearchTerm (List SearchMod) String
-   | Not TagSearch
-   | Boolex TagSearch AndOr TagSearch
-
--}
-
-
 view : Bool -> Int -> Model -> Element Msg
 view narrow nblevel model =
     let
