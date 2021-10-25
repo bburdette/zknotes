@@ -64,6 +64,7 @@ type Msg
     | ToggleTermFocus TSLoc
     | DeleteTerm TSLoc
     | ToggleSearchMod TSLoc SearchMod
+    | SetTermText TSLoc String
 
 
 type Command
@@ -284,22 +285,33 @@ viewSearchHelper mbfocusloc indent lts ts =
             [ E.row [ E.width E.fill, E.spacing 8 ]
                 [ indentelt indent
                 , if hasfocus tloc then
-                    E.row [ EBk.color TC.lightGrey, E.padding 8, E.spacing 8 ]
-                        [ E.el
-                            [ onClick <| ToggleTermFocus tloc
-                            , color tloc
+                    E.column [ E.width E.fill ]
+                        [ E.row [ EBk.color TC.lightGrey, E.padding 8, E.spacing 8 ]
+                            [ E.el
+                                [ onClick <| ToggleTermFocus tloc
+                                , color tloc
+                                ]
+                              <|
+                                E.text term
+                            , EI.button
+                                buttonStyle
+                                { onPress = Just (DeleteTerm tloc)
+                                , label = text "x"
+                                }
+                            , modbutton ExactMatch "e"
+                            , modbutton Tag "t"
+                            , modbutton Note "n"
+                            , modbutton User
+                                "u"
                             ]
-                          <|
-                            E.text term
-                        , EI.button
-                            buttonStyle
-                            { onPress = Just (DeleteTerm tloc)
-                            , label = text "x"
+                        , EI.text
+                            [ E.width E.fill ]
+                            { onChange = SetTermText tloc
+                            , text = term
+                            , placeholder = Nothing
+                            , label =
+                                EI.labelHidden "search term"
                             }
-                        , modbutton ExactMatch "e"
-                        , modbutton Tag "t"
-                        , modbutton Note "n"
-                        , modbutton User "u"
                         ]
 
                   else
@@ -755,6 +767,32 @@ update msg model =
                                                             mod :: mods
                                                 in
                                                 SL.setTerm tsl (SearchTerm nmods str) search
+                                                    |> Maybe.map (\s -> TagSearch (Ok s))
+
+                                            _ ->
+                                                Nothing
+                                    )
+                                |> Maybe.withDefault model.search
+
+                        _ ->
+                            model.search
+            in
+            ( setSearch ns model
+            , None
+            )
+
+        SetTermText tsl nstr ->
+            let
+                ns =
+                    case model.search of
+                        TagSearch (Ok search) ->
+                            search
+                                |> SL.getTerm tsl
+                                |> Maybe.andThen
+                                    (\term ->
+                                        case term of
+                                            SearchTerm mods str ->
+                                                SL.setTerm tsl (SearchTerm mods nstr) search
                                                     |> Maybe.map (\s -> TagSearch (Ok s))
 
                                             _ ->
