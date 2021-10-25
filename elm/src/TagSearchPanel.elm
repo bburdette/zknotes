@@ -287,20 +287,18 @@ viewSearchHelper mbfocusloc indent lts ts =
             [ E.row [ E.width E.fill, E.spacing 8 ]
                 [ indentelt indent
                 , if hasfocus tloc then
-                    E.column [ E.width E.fill ]
-                        [ E.row [ EBk.color TC.lightGrey, E.padding 8, E.spacing 8 ]
+                    E.column [ E.width E.fill, EBk.color TC.lightGrey ]
+                        [ E.row [ E.spacing 8, E.width E.fill ]
                             [ E.el
                                 [ onClick <| ToggleTermFocus tloc
                                 , color tloc
                                 ]
                               <|
                                 E.text term
-                            , EI.button
-                                buttonStyle
-                                { onPress = Just (DeleteTerm tloc)
-                                , label = text "x"
-                                }
-                            , modbutton ExactMatch "e"
+                            ]
+                        , E.row
+                            [ E.padding 8, E.spacing 8 ]
+                            [ modbutton ExactMatch "e"
                             , modbutton Tag "t"
                             , modbutton Note "n"
                             , modbutton User "u"
@@ -310,15 +308,22 @@ viewSearchHelper mbfocusloc indent lts ts =
                                 , label =
                                     text "!"
                                 }
+                            , EI.button
+                                buttonStyle
+                                { onPress = Just (DeleteTerm tloc)
+                                , label = text "x"
+                                }
                             ]
-                        , EI.text
-                            [ E.width E.fill ]
-                            { onChange = SetTermText tloc
-                            , text = term
-                            , placeholder = Nothing
-                            , label =
-                                EI.labelHidden "search term"
-                            }
+                        , E.row [ E.padding 8, E.spacing 8 ]
+                            [ EI.text
+                                [ E.width E.fill ]
+                                { onChange = SetTermText tloc
+                                , text = term
+                                , placeholder = Nothing
+                                , label =
+                                    EI.labelHidden "search term"
+                                }
+                            ]
                         ]
 
                   else
@@ -339,7 +344,7 @@ viewSearchHelper mbfocusloc indent lts ts =
             [ E.row [ E.width E.fill, E.spacing 8 ]
                 [ indentelt indent
                 , if hasfocus tloc then
-                    E.row [ EBk.color TC.lightGrey, E.padding 8, E.spacing 8 ]
+                    E.row [ EBk.color TC.lightGrey, E.paddingXY 0 8, E.spacing 8, E.width E.fill ]
                         [ E.el
                             [ onClick <| ToggleTermFocus tloc
                             , color tloc
@@ -372,7 +377,7 @@ viewSearchHelper mbfocusloc indent lts ts =
                 ++ [ E.row [ E.width E.fill, E.spacing 8 ]
                         [ indentelt indent
                         , if hasfocus tloc then
-                            E.row [ EBk.color TC.lightGrey, E.padding 8, E.spacing 8 ]
+                            E.row [ EBk.color TC.lightGrey, E.paddingXY 0 8, E.spacing 8, E.width E.fill ]
                                 [ E.el
                                     [ onClick <| ToggleTermFocus tloc
                                     , color tloc
