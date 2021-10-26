@@ -416,6 +416,7 @@ viewSearchHelper mbfocusloc indent lts ts =
                             { onPress = Just (DeleteTerm tloc)
                             , label = text "x"
                             }
+                        , E.row [ E.width E.fill, onClick <| ToggleTermFocus tloc ] [ E.text "" ]
                         ]
 
                   else
@@ -482,6 +483,7 @@ viewSearchHelper mbfocusloc indent lts ts =
                                     { onPress = Just (DeleteTerm tloc)
                                     , label = text "x"
                                     }
+                                , E.row [ E.width E.fill, onClick <| ToggleTermFocus tloc ] [ E.text "" ]
                                 ]
 
                           else
