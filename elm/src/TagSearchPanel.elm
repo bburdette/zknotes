@@ -279,7 +279,7 @@ viewSearchHelper mbfocusloc indent lts ts =
         SearchTerm searchmods term ->
             let
                 tloc =
-                    toLoc lts LLeaf
+                    toLoc lts LThis
 
                 downButtonStyle =
                     buttonStyle ++ [ EBk.color TC.grey ]
@@ -407,6 +407,12 @@ viewSearchHelper mbfocusloc indent lts ts =
                             E.text "not"
                         , EI.button
                             buttonStyle
+                            { onPress = Just (AddEmptyTerm tloc)
+                            , label =
+                                text "+"
+                            }
+                        , EI.button
+                            buttonStyle
                             { onPress = Just (DeleteTerm tloc)
                             , label = text "x"
                             }
@@ -464,6 +470,12 @@ viewSearchHelper mbfocusloc indent lts ts =
                                     { onPress = Just (NotTerm tloc)
                                     , label =
                                         text "!"
+                                    }
+                                , EI.button
+                                    buttonStyle
+                                    { onPress = Just (AddEmptyTerm tloc)
+                                    , label =
+                                        text "+"
                                     }
                                 , EI.button
                                     buttonStyle
@@ -919,7 +931,7 @@ update msg model =
         AddEmptyTerm tsl ->
             ( { model
                 | search = addToSearch (Just tsl) [] "" model.search
-                , searchTermFocus = Just <| SL.swapLast tsl (LBT2 LLeaf)
+                , searchTermFocus = Just <| SL.swapLast tsl (LBT2 LThis)
               }
             , None
             )

@@ -7,7 +7,6 @@ type TSLoc
     = LNot TSLoc
     | LBT1 TSLoc
     | LBT2 TSLoc
-    | LLeaf
     | LThis
 
 
@@ -20,9 +19,6 @@ type RTRes
 swapLast : TSLoc -> TSLoc -> TSLoc
 swapLast tsl subst =
     case tsl of
-        LLeaf ->
-            subst
-
         LThis ->
             subst
 
@@ -39,7 +35,7 @@ swapLast tsl subst =
 removeTerm : TSLoc -> TagSearch -> RTRes
 removeTerm tsl ts =
     case ( ts, tsl ) of
-        ( SearchTerm _ _, LLeaf ) ->
+        ( SearchTerm _ _, LThis ) ->
             Matched
 
         ( Not nt, LThis ) ->
@@ -91,17 +87,11 @@ removeTerm tsl ts =
 getTerm : TSLoc -> TagSearch -> Maybe TagSearch
 getTerm tsl ts =
     case ( ts, tsl ) of
-        ( SearchTerm _ _, LLeaf ) ->
-            Just ts
-
-        ( Not nt, LNot LThis ) ->
+        ( _, LThis ) ->
             Just ts
 
         ( Not nt, LNot nts ) ->
             getTerm nts nt
-
-        ( Boolex _ _ _, LThis ) ->
-            Just ts
 
         ( Boolex ts1 _ _, LBT1 bxts ) ->
             getTerm bxts ts1
@@ -116,7 +106,7 @@ getTerm tsl ts =
 setTerm : TSLoc -> TagSearch -> TagSearch -> Maybe TagSearch
 setTerm tsl rts ts =
     case ( ts, tsl ) of
-        ( SearchTerm _ _, LLeaf ) ->
+        ( SearchTerm _ _, LThis ) ->
             Just rts
 
         ( _, LThis ) ->
