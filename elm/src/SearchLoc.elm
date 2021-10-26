@@ -17,6 +17,25 @@ type RTRes
     | Unmatched
 
 
+swapLast : TSLoc -> TSLoc -> TSLoc
+swapLast tsl subst =
+    case tsl of
+        LLeaf ->
+            subst
+
+        LThis ->
+            subst
+
+        LNot l ->
+            LNot (swapLast l subst)
+
+        LBT1 l ->
+            LBT1 (swapLast l subst)
+
+        LBT2 l ->
+            LBT2 (swapLast l subst)
+
+
 removeTerm : TSLoc -> TagSearch -> RTRes
 removeTerm tsl ts =
     case ( ts, tsl ) of

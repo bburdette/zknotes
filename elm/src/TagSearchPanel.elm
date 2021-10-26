@@ -67,6 +67,7 @@ type Msg
     | NotTerm TSLoc
     | ToggleSearchMod TSLoc SearchMod
     | SetTermText TSLoc String
+    | AddEmptyTerm TSLoc
 
 
 type Command
@@ -321,11 +322,17 @@ viewSearchHelper mbfocusloc indent lts ts =
             [ E.row [ E.width E.fill, E.spacing 8 ]
                 [ indentelt indent
                 , if hasfocus tloc then
-                    E.column [ E.width E.fill, EBk.color TC.lightGrey ]
-                        [ E.row [ E.spacing 8, E.width E.fill ]
+                    E.column
+                        [ E.width E.fill
+                        , EBk.color TC.lightGrey
+                        ]
+                        [ E.row
+                            [ onClick <| ToggleTermFocus tloc
+                            , E.spacing 8
+                            , E.width E.fill
+                            ]
                             [ E.el
-                                [ onClick <| ToggleTermFocus tloc
-                                , color tloc
+                                [ color tloc
                                 ]
                               <|
                                 E.text term
@@ -341,6 +348,12 @@ viewSearchHelper mbfocusloc indent lts ts =
                                 { onPress = Just (NotTerm tloc)
                                 , label =
                                     text "!"
+                                }
+                            , EI.button
+                                buttonStyle
+                                { onPress = Just (AddEmptyTerm tloc)
+                                , label =
+                                    text "+"
                                 }
                             , EI.button
                                 buttonStyle
@@ -361,10 +374,13 @@ viewSearchHelper mbfocusloc indent lts ts =
                         ]
 
                   else
-                    E.row [ E.width E.fill, E.spacing 8 ]
+                    E.row
+                        [ onClick <| ToggleTermFocus tloc
+                        , E.width E.fill
+                        , E.spacing 8
+                        ]
                         ([ E.el
-                            [ onClick <| ToggleTermFocus tloc
-                            , color tloc
+                            [ color tloc
                             ]
                            <|
                             E.text term
@@ -397,11 +413,12 @@ viewSearchHelper mbfocusloc indent lts ts =
                         ]
 
                   else
-                    E.el
+                    E.row
                         [ onClick <| ToggleTermFocus tloc
+                        , E.width E.fill
                         ]
-                    <|
-                        E.text "not"
+                        [ E.text "not"
+                        ]
                 ]
             ]
                 ++ viewSearchHelper mbfocusloc (indent + 1) (LNot :: lts) nts
@@ -456,19 +473,20 @@ viewSearchHelper mbfocusloc indent lts ts =
                                 ]
 
                           else
-                            E.el
+                            E.row
                                 [ onClick <| ToggleTermFocus tloc
-                                , color tloc
+                                , E.width E.fill
                                 ]
-                            <|
-                                E.text
-                                    (case andor of
-                                        And ->
-                                            "and"
+                                [ E.el [ color tloc ] <|
+                                    E.text
+                                        (case andor of
+                                            And ->
+                                                "and"
 
-                                        Or ->
-                                            "or"
-                                    )
+                                            Or ->
+                                                "or"
+                                        )
+                                ]
                         ]
                    ]
                 ++ viewSearchHelper mbfocusloc (indent + 1) (LBT2 :: lts) ts2
@@ -895,5 +913,13 @@ update msg model =
                             model.search
             in
             ( setSearch ns model
+            , None
+            )
+
+        AddEmptyTerm tsl ->
+            ( { model
+                | search = addToSearch (Just tsl) [] "" model.search
+                , searchTermFocus = Just <| SL.swapLast tsl (LBT2 LLeaf)
+              }
             , None
             )
