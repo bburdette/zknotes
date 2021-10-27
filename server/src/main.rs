@@ -330,6 +330,7 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
             {
               true
             } else {
+              info!("cors denied: {:?}, {:?}", rv, rh);
               false
             }
           })
