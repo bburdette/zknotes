@@ -1,4 +1,4 @@
-module SearchLoc exposing (..)
+module SearchLoc exposing (RTRes(..), TSLoc(..), getTerm, removeTerm, setTerm, swapLast)
 
 import Search exposing (..)
 
