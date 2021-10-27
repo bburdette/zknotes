@@ -317,18 +317,6 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
           }
         });
 
-      /*
-      pub struct RequestHead {
-          pub uri: Uri,
-          pub method: Method,
-          pub version: Version,
-          pub headers: HeaderMap,
-          pub extensions: RefCell<Extensions>,
-          pub peer_addr: Option<net::SocketAddr>,
-          flags: Flags,
-      }
-       */
-
       let c = config.clone();
       HttpServer::new(move || {
         let d = c.clone();
