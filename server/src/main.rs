@@ -6,6 +6,7 @@ mod sqldata;
 mod sqltest;
 mod util;
 use crate::util::now;
+use actix_cors::Cors;
 use actix_session::{CookieSession, Session};
 use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Result};
 use chrono;
@@ -19,7 +20,6 @@ use std::str::FromStr;
 use timer;
 use uuid::Uuid;
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
-
 /*
 use actix_files::NamedFile;
 
@@ -317,10 +317,41 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
           }
         });
 
+      /*
+      pub struct RequestHead {
+          pub uri: Uri,
+          pub method: Method,
+          pub version: Version,
+          pub headers: HeaderMap,
+          pub extensions: RefCell<Extensions>,
+          pub peer_addr: Option<net::SocketAddr>,
+          flags: Flags,
+      }
+       */
+
       let c = config.clone();
       HttpServer::new(move || {
+        let d = c.clone();
+        let cors = Cors::default()
+          .allowed_origin_fn(move |rv, rh| {
+            if *rv == d.mainsite {
+              true
+            } else if rv == "https://29a.ch"
+              && rh.method == "GET"
+              && rh.uri.to_string().starts_with("/static")
+            {
+              true
+            } else {
+              false
+            }
+          })
+          .allow_any_header()
+          .allow_any_method()
+          .max_age(3600);
+
         App::new()
           .data(c.clone()) // <- create app with shared state
+          .wrap(cors)
           .wrap(middleware::Logger::default())
           .wrap(
             CookieSession::signed(&[0; 32]) // <- create cookie based session middleware
