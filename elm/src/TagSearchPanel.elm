@@ -734,7 +734,7 @@ update : Msg -> Model -> ( Model, Command )
 update msg model =
     case msg of
         SearchText txt ->
-            ( updateSearchText model txt
+            ( updateSearchText model (String.replace "\n" "" txt)
             , None
             )
 
