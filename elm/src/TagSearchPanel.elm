@@ -555,14 +555,7 @@ view narrow nblevel model =
                 , placeholder = Nothing
                 , spellcheck = False
                 , label =
-                    if narrow then
-                        EI.labelHidden "search"
-
-                    else
-                        EI.labelLeft [] <|
-                            row [ centerY ]
-                                [ searchButton
-                                ]
+                    EI.labelHidden "search"
                 }
 
         ddbutton =
@@ -595,11 +588,7 @@ view narrow nblevel model =
             alignRight :: buttonStyle
 
         buttons =
-            [ if narrow then
-                searchButton
-
-              else
-                none
+            [ searchButton
             , EI.button obs
                 { onPress = Just SearchDetails
                 , label =
@@ -628,7 +617,9 @@ view narrow nblevel model =
             ]
 
          else
-            [ width fill ]
+            [ width fill
+            , spacing 8
+            ]
         )
         (( "viewsearch"
          , case model.search of
@@ -638,18 +629,9 @@ view narrow nblevel model =
             _ ->
                 E.none
          )
-            :: ((if narrow then
-                    [ ( "tinput", row [ width fill, spacing 3 ] [ tinput, ddbutton ] )
-                    , ( "tbuttons", row [ spacing 3, width fill ] buttons )
-                    ]
-
-                 else
-                    [ ( "tinput"
-                      , row [ width fill, spacing 3 ]
-                            (tinput :: ddbutton :: buttons)
-                      )
-                    ]
-                )
+            :: ([ ( "tinput", row [ width fill, spacing 3 ] [ tinput ] )
+                , ( "tbuttons", row [ spacing 3, width fill ] buttons )
+                ]
                     ++ ( "searchhelp"
                        , if model.showParse then
                             case model.search of
