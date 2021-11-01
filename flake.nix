@@ -26,7 +26,6 @@
               sqlite
               pkgconfig
               openssl.dev 
-              nix
               ];
           };
           defaultPackage = packages.${pname};
@@ -45,7 +44,6 @@
               sqlite
               pkgconfig
               openssl.dev 
-              nix
               ];
           };
         }
