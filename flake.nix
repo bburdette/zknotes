@@ -1,13 +1,54 @@
 {
   description = "zknotes, a web based zettelkasten";
 
-  inputs.nixpkgs.url = github:NixOS/nixpkgs/21.05;
-
-  outputs = { self, nixpkgs }: {
-
-    packages.x86_64-linux.hello = nixpkgs.legacyPackages.x86_64-linux.hello;
-
-    defaultPackage.x86_64-linux = self.packages.x86_64-linux.hello;
-
+  inputs = {
+    flake-utils.url = "github:numtide/flake-utils";
+    naersk.url = "github:nmattia/naersk";
   };
+
+  outputs = { self, nixpkgs, flake-utils, naersk }:
+    flake-utils.lib.eachDefaultSystem (
+      system: let
+        pkgs = nixpkgs.legacyPackages."${system}";
+        naersk-lib = naersk.lib."${system}";
+      in
+        rec {
+          pname = "zknotes";
+
+          # `nix build`
+          packages.${pname} = naersk-lib.buildPackage {
+            pname = pname;
+            # src = ./.;
+            root = ./.;
+            buildInputs = with pkgs; [
+              cargo
+              rustc
+              sqlite
+              pkgconfig
+              openssl.dev 
+              nix
+              ];
+          };
+          defaultPackage = packages.${pname};
+
+          # `nix run`
+          apps.${pname} = flake-utils.lib.mkApp {
+            drv = packages.${pname};
+          };
+          defaultApp = apps.${pname};
+
+          # `nix develop`
+          devShell = pkgs.mkShell {
+            nativeBuildInputs = with pkgs; [
+              cargo
+              rustc
+              sqlite
+              pkgconfig
+              openssl.dev 
+              nix
+              ];
+          };
+        }
+    );
 }
+
