@@ -7,10 +7,36 @@
   };
 
   outputs = { self, nixpkgs, flake-utils, naersk }:
+    let
+      makeElmPkg = { pkgs, additionalInputs ? [ ], pythonPackages ? (ps: [ ]) }:
+        pkgs.stdenv.mkDerivation {
+          name = "zknotes-elm";
+          src = ./.;
+          buildPhase = pkgs.elmPackages.fetchElmDeps {
+            elmPackages = import ./elm/elm-srcs.nix;
+            elmVersion = "0.19.1";
+            registryDat = ./elm/registry.dat;
+          } + ''
+            cd elm
+           	elm-optimize-level-2 src/Main.elm --output=dist/main.js
+          '';
+          installPhase = ''
+            mkdir $out
+            cp -r dist/* $out
+          '';
+          buildInputs = with pkgs;
+             [
+              elmPackages.elm
+              elmPackages.elm-live
+              elmPackages.elm-optimize-level-2
+            ] ++ additionalInputs;
+        };
+    in
     flake-utils.lib.eachDefaultSystem (
       system: let
         pkgs = nixpkgs.legacyPackages."${system}";
         naersk-lib = naersk.lib."${system}";
+        elm-stuff = makeElmPkg { inherit pkgs; };
       in
         rec {
           pname = "zknotes";
@@ -27,6 +53,10 @@
               pkgconfig
               openssl.dev 
               ];
+            installPhase = ''
+              mkdir $out
+              cp -r ${elm-stuff} $out
+              '';
           };
           defaultPackage = packages.${pname};
 
@@ -44,7 +74,10 @@
               sqlite
               pkgconfig
               openssl.dev 
-              ];
+              elmPackages.elm
+              elmPackages.elm-live
+              elmPackages.elm-optimize-level-2
+            ];
           };
         }
     );
