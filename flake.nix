@@ -34,17 +34,12 @@
     in
     flake-utils.lib.eachDefaultSystem (
       system: let
+        pname = "zknotes";
         pkgs = nixpkgs.legacyPackages."${system}";
         naersk-lib = naersk.lib."${system}";
         elm-stuff = makeElmPkg { inherit pkgs; };
-      in
-        rec {
-          pname = "zknotes";
-
-          # `nix build`
-          packages.${pname} = naersk-lib.buildPackage {
+        rust-stuff = naersk-lib.buildPackage {
             pname = pname;
-            # src = ./.;
             root = ./.;
             buildInputs = with pkgs; [
               cargo
@@ -53,9 +48,21 @@
               pkgconfig
               openssl.dev 
               ];
+          };
+      in
+        rec {
+          inherit pname;
+          # `nix build`
+          packages.${pname} = pkgs.stdenv.mkDerivation {
+            name = pname;
+            src = ./.;
+            # root = ./.;
+            # buildInputs = with pkgs; ;
             installPhase = ''
               mkdir $out
               cp -r ${elm-stuff} $out
+              cp -r ${rust-stuff} $out
+              cp -r $src/server/static $out
               '';
           };
           defaultPackage = packages.${pname};
