@@ -56,13 +56,12 @@
           packages.${pname} = pkgs.stdenv.mkDerivation {
             name = pname;
             src = ./.;
-            # root = ./.;
-            # buildInputs = with pkgs; ;
             installPhase = ''
-              mkdir $out
-              cp -r ${elm-stuff} $out
-              cp -r ${rust-stuff} $out
-              cp -r $src/server/static $out
+              mkdir -p $out/lib/zknotes/static
+              mkdir $out/bin
+              cp -r $src/server/static $out/lib/zknotes
+              cp ${elm-stuff}/main.js $out/lib/zknotes/static
+              cp -r ${rust-stuff}/bin $out
               '';
           };
           defaultPackage = packages.${pname};
