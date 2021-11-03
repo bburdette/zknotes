@@ -24,7 +24,7 @@ use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 /*
 use actix_files::NamedFile;
 
-TODO don't hardcode these paths
+TODO don't hardcode these paths.  Use config.static_path
 fn favicon(_req: &HttpRequest) -> Result<NamedFile> {
   let stpath = Path::new("static/favicon.ico");
   Ok(NamedFile::open(stpath)?)
@@ -272,7 +272,7 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
   let matches = clap::App::new("zknotes server")
     .version("1.0")
     .author("Ben Burdette")
-    .about("Does awesome things")
+    .about("zettelkasten web server")
     .arg(
       Arg::with_name("export")
         .short("e")
@@ -308,9 +308,7 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
 
       if config.static_path == None {
         for (key, value) in env::vars() {
-          println!("{}, {}", key, value);
           if key == "ZKNOTES_STATIC_PATH" {
-            println!("found static path");
             config.static_path = PathBuf::from_str(value.as_str()).ok();
           }
         }
