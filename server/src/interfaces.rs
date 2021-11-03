@@ -132,7 +132,7 @@ pub fn user_interface(
           sqldata::add_token(&conn, userdata.id, token)?;
           session.set("token", token)?;
           sqldata::update_user(&conn, &userdata)?;
-          println!("logged in, user: {:?}", userdata.name);
+          info!("logged in, user: {:?}", userdata.name);
 
           Ok(ServerResponse {
             what: "logged in".to_string(),
@@ -223,7 +223,7 @@ pub fn user_interface(
       Some(token) => {
         match sqldata::read_user_by_token(&conn, token, Some(config.login_token_expiration_ms)) {
           Err(e) => {
-            println!("rubt error: {:?}", e);
+            info!("read_user_by_token error: {:?}", e);
 
             Ok(ServerResponse {
               what: "invalid user or pwd".to_string(),

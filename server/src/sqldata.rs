@@ -1625,7 +1625,7 @@ pub fn change_password(
         );
         userdata.hashwd = newhash;
         update_user(&conn, &userdata)?;
-        println!("changed password for {}", userdata.name);
+        info!("changed password for {}", userdata.name);
 
         Ok(())
       }
@@ -2090,8 +2090,6 @@ pub fn read_zknotecomments(
   gznc: &GetZkNoteComments,
 ) -> Result<Vec<ZkNote>, Box<dyn Error>> {
   let cid = note_id(&conn, "system", "comment")?;
-
-  println!("gznc.zknote, cid {}, {}", gznc.zknote, cid);
 
   // notes with a TO link to our note
   // and a TO link to 'comment'

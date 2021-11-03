@@ -14,6 +14,7 @@ use clap::Arg;
 use config::Config;
 use log::{error, info};
 use serde_json;
+use std::env;
 use std::error::Error;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -23,6 +24,7 @@ use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 /*
 use actix_files::NamedFile;
 
+TODO don't hardcode these paths.  Use config.static_path
 fn favicon(_req: &HttpRequest) -> Result<NamedFile> {
   let stpath = Path::new("static/favicon.ico");
   Ok(NamedFile::open(stpath)?)
@@ -49,20 +51,22 @@ fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -> Http
     None => serde_json::Value::Null,
   };
 
-  match util::load_string("static/index.html") {
-    Ok(s) => {
-      // search and replace with logindata!
-      HttpResponse::Ok()
-        .content_type("text/html; charset=utf-8")
-        .body(
-          s.replace("{{logindata}}", logindata.to_string().as_str())
-            .replace("{{errorid}}", errorid.to_string().as_str()),
-        )
-    }
-    Err(e) => {
-      println!("err");
-      HttpResponse::from_error(actix_web::error::ErrorImATeapot(e))
-    }
+  let mut staticpath = data.static_path.clone().unwrap_or(PathBuf::from("static/"));
+  staticpath.push("index.html");
+  match staticpath.to_str() {
+    Some(path) => match util::load_string(path) {
+      Ok(s) => {
+        // search and replace with logindata!
+        HttpResponse::Ok()
+          .content_type("text/html; charset=utf-8")
+          .body(
+            s.replace("{{logindata}}", logindata.to_string().as_str())
+              .replace("{{errorid}}", errorid.to_string().as_str()),
+          )
+      }
+      Err(e) => HttpResponse::from_error(actix_web::error::ErrorImATeapot(e)),
+    },
+    None => HttpResponse::from_error(actix_web::error::ErrorImATeapot("bad static path")),
   }
 }
 
@@ -224,6 +228,7 @@ fn defcon() -> Config {
     login_token_expiration_ms: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
     email_token_expiration_ms: 1 * 24 * 60 * 60 * 1000, // 1 day in milliseconds
     reset_token_expiration_ms: 1 * 24 * 60 * 60 * 1000, // 1 day in milliseconds
+    static_path: None,
   }
 }
 
@@ -267,7 +272,7 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
   let matches = clap::App::new("zknotes server")
     .version("1.0")
     .author("Ben Burdette")
-    .about("Does awesome things")
+    .about("zettelkasten web server")
     .arg(
       Arg::with_name("export")
         .short("e")
@@ -299,7 +304,15 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
 
       info!("server init!");
 
-      let config = load_config();
+      let mut config = load_config();
+
+      if config.static_path == None {
+        for (key, value) in env::vars() {
+          if key == "ZKNOTES_STATIC_PATH" {
+            config.static_path = PathBuf::from_str(value.as_str()).ok();
+          }
+        }
+      }
 
       info!("config: {:?}", config);
 
@@ -319,6 +332,7 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
 
       let c = config.clone();
       HttpServer::new(move || {
+        let staticpath = c.static_path.clone().unwrap_or(PathBuf::from("static/"));
         let d = c.clone();
         let cors = Cors::default()
           .allowed_origin_fn(move |rv, rh| {
@@ -351,7 +365,7 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
           .service(web::resource("/user").route(web::post().to(user)))
           .service(web::resource(r"/register/{uid}/{key}").route(web::get().to(register)))
           .service(web::resource(r"/newemail/{uid}/{token}").route(web::get().to(new_email)))
-          .service(actix_files::Files::new("/static/", "static/"))
+          .service(actix_files::Files::new("/static/", staticpath))
           .service(web::resource("/{tail:.*}").route(web::get().to(mainpage)))
       })
       .bind(format!("{}:{}", config.ip, config.port))?
