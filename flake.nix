@@ -54,6 +54,7 @@
           inherit pname;
           # `nix build`
           packages.${pname} = pkgs.stdenv.mkDerivation {
+            nativeBuildInputs = [ pkgs.makeWrapper ];
             name = pname;
             src = ./.;
             installPhase = ''
@@ -62,6 +63,8 @@
               cp -r $src/server/static $out/lib/zknotes
               cp ${elm-stuff}/main.js $out/lib/zknotes/static
               cp -r ${rust-stuff}/bin $out
+              mv $out/bin/zknotes-server $out/bin/zknotes-server-actual
+              makeWrapper $out/bin/zknotes-server-actual $out/bin/zknotes-server --set ZKNOTES_STATIC_PATH $out/lib/zknotes/static;
               '';
           };
           defaultPackage = packages.${pname};
