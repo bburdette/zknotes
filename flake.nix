@@ -27,7 +27,6 @@
           buildInputs = with pkgs;
              [
               elmPackages.elm
-              elmPackages.elm-live
               elmPackages.elm-optimize-level-2
             ] ++ additionalInputs;
         };
