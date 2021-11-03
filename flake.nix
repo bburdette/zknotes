@@ -57,14 +57,15 @@
             nativeBuildInputs = [ pkgs.makeWrapper ];
             name = pname;
             src = ./.;
+            # building the 'out' folder
             installPhase = ''
-              mkdir -p $out/lib/zknotes/static
+              mkdir -p $out/share/zknotes/static
               mkdir $out/bin
-              cp -r $src/server/static $out/lib/zknotes
-              cp ${elm-stuff}/main.js $out/lib/zknotes/static
+              cp -r $src/server/static $out/share/zknotes
+              cp ${elm-stuff}/main.js $out/share/zknotes/static
               cp -r ${rust-stuff}/bin $out
               mv $out/bin/zknotes-server $out/bin/.zknotes-server
-              makeWrapper $out/bin/.zknotes-server $out/bin/zknotes-server --set ZKNOTES_STATIC_PATH $out/lib/zknotes/static;
+              makeWrapper $out/bin/.zknotes-server $out/bin/zknotes-server --set ZKNOTES_STATIC_PATH $out/share/zknotes/static;
               '';
           };
           defaultPackage = packages.${pname};
