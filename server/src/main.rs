@@ -24,6 +24,7 @@ use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 /*
 use actix_files::NamedFile;
 
+TODO don't hardcode these paths
 fn favicon(_req: &HttpRequest) -> Result<NamedFile> {
   let stpath = Path::new("static/favicon.ico");
   Ok(NamedFile::open(stpath)?)
@@ -50,20 +51,22 @@ fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -> Http
     None => serde_json::Value::Null,
   };
 
-  match util::load_string("static/index.html") {
-    Ok(s) => {
-      // search and replace with logindata!
-      HttpResponse::Ok()
-        .content_type("text/html; charset=utf-8")
-        .body(
-          s.replace("{{logindata}}", logindata.to_string().as_str())
-            .replace("{{errorid}}", errorid.to_string().as_str()),
-        )
-    }
-    Err(e) => {
-      println!("err");
-      HttpResponse::from_error(actix_web::error::ErrorImATeapot(e))
-    }
+  let mut staticpath = data.static_path.clone().unwrap_or(PathBuf::from("static/"));
+  staticpath.push("index.html");
+  match staticpath.to_str() {
+    Some(path) => match util::load_string(path) {
+      Ok(s) => {
+        // search and replace with logindata!
+        HttpResponse::Ok()
+          .content_type("text/html; charset=utf-8")
+          .body(
+            s.replace("{{logindata}}", logindata.to_string().as_str())
+              .replace("{{errorid}}", errorid.to_string().as_str()),
+          )
+      }
+      Err(e) => HttpResponse::from_error(actix_web::error::ErrorImATeapot(e)),
+    },
+    None => HttpResponse::from_error(actix_web::error::ErrorImATeapot("bad static path")),
   }
 }
 
