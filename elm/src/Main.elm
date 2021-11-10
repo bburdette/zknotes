@@ -2074,6 +2074,14 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
             , sendUIMsg model.location (UI.SetHomeNote id)
             )
 
+        EditZkNote.AddToRecent zkln ->
+            ( { model
+                | state = EditZkNote emod login
+                , recentNotes = addRecentZkListNote model.recentNotes zkln
+              }
+            , Cmd.none
+            )
+
         EditZkNote.Cmd cmd ->
             ( { model | state = EditZkNote emod login }
             , Cmd.map EditZkNoteMsg cmd

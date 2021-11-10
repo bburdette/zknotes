@@ -172,6 +172,7 @@ type Command
     | Settings
     | GetZkNote Int
     | SetHomeNote Int
+    | AddToRecent Data.ZkListNote
     | Cmd (Cmd Msg)
 
 
@@ -1955,7 +1956,7 @@ update msg model =
             ( { model
                 | zklDict = Dict.insert (zklKey nzkl) nzkl model.zklDict
               }
-            , None
+            , AddToRecent zkln
             )
 
         FromLinkPress zkln ->
@@ -1973,7 +1974,7 @@ update msg model =
             ( { model
                 | zklDict = Dict.insert (zklKey nzkl) nzkl model.zklDict
               }
-            , None
+            , AddToRecent zkln
             )
 
         RemoveLink zkln ->
