@@ -27,7 +27,7 @@ If you want to compile and run this on your own machine:
   nix build github:bburdette/zknotes
   ```
 
-- it doesn't come with a config.toml file, so copy the one from here:
+- it doesn't come with a config.toml file, so copy the one from [here](https://www.zknotes.com/note/4755)
 
 - run it with:
   ```
