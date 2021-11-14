@@ -208,8 +208,8 @@ encodeRegistration : Registration -> JE.Value
 encodeRegistration l =
     JE.object
         [ ( "uid", JE.string l.uid )
-        , ( "newpwd", JE.string l.pwd )
-        , ( "reset_key", JE.string l.email )
+        , ( "pwd", JE.string l.pwd )
+        , ( "email", JE.string l.email )
         ]
 
 
