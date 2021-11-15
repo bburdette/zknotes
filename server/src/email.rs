@@ -1,6 +1,9 @@
 use crate::util;
 use lettre::smtp::response::Response;
-use lettre::{EmailAddress, Envelope, SendableEmail, SmtpClient, SmtpTransport, Transport};
+use lettre::{
+  EmailAddress, Envelope, Message, SendableEmail, SmtpClient, SmtpTransport, Transport,
+};
+use lettre_email::EmailBuilder;
 use log::info;
 use std::error::Error;
 
@@ -95,20 +98,35 @@ pub fn send_reset(
   reset_id: &str,
 ) -> Result<Response, Box<dyn Error>> {
   info!("Sending reset email for user: {}", username);
-  let email = SendableEmail::new(
-    Envelope::new(
-      Some(EmailAddress::new("no-reply@zknotes.com".to_string())?),
-      vec![EmailAddress::new(email.to_string())?],
-    )?,
-    "zknotes password reset".to_string(),
-    (format!(
-      "Click the link to complete password reset, {} user '{}'!\n\
+  // let email = SendableEmail::new(
+  //   Envelope::new(
+  //     Some(EmailAddress::new("no-reply@zknotes.com".to_string())?),
+  //     vec![EmailAddress::new(email.to_string())?],
+  //   )?,
+  //   "zknotes password reset".to_string(),
+  //   (format!(
+  //     "Click the link to complete password reset, {} user '{}'!\n\
+  //      {}/reset/{}/{}",
+  //     appname, username, mainsite, username, reset_id
+  //   ))
+  //   .to_string()
+  //   .into_bytes(),
+  // );
+
+  let email = EmailBuilder::new()
+    .from("no-reply@zknotes.com")
+    .reply_to(email)
+    .to("Hei <hei@domain.tld>")
+    .subject("zknotes password reset")
+    .text(
+      (format!(
+        "Click the link to complete password reset, {} user '{}'!\n\
        {}/reset/{}/{}",
-      appname, username, mainsite, username, reset_id
-    ))
-    .to_string()
-    .into_bytes(),
-  );
+        appname, username, mainsite, username, reset_id
+      ))
+      .as_str(),
+    )
+    .build()?;
 
   // to help with reset for desktop use, or if the server is barred from sending email.
   util::write_string(
@@ -122,9 +140,39 @@ pub fn send_reset(
     .as_str(),
   )?;
 
+  // let mut mailer = SmtpTransport::builder_unencrypted_localhost()
+  //   .unwrap()
+  //   .build();
+
   let mut mailer = SmtpTransport::new(SmtpClient::new_unencrypted_localhost()?);
   // Send the email
-  mailer.send(email).map_err(|e| e.into())
+  mailer.send(email.into()).map_err(|e| e.into())
+}
+
+fn test() {
+  let email = EmailBuilder::new()
+    // Addresses can be specified by the tuple (email, alias)
+    .to(("user@example.org", "Firstname Lastname"))
+    // ... or by an address only
+    .from("user@example.com")
+    .subject("Hi, Hello world")
+    .text("Hello world.")
+    .build()
+    .unwrap();
+
+  // Open a local connection on port 25
+  let mut mailer = SmtpTransport::new(SmtpClient::new_unencrypted_localhost().unwrap());
+
+  // Send the email
+  let result = mailer.send(email.into());
+
+  if result.is_ok() {
+    println!("Email sent");
+  } else {
+    println!("Could not send email: {:?}", result);
+  }
+
+  assert!(result.is_ok());
 }
 
 pub fn send_registration_notification(
