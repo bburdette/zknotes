@@ -8,6 +8,7 @@ pub struct Config {
   pub createdirs: bool,
   pub db: PathBuf,
   pub mainsite: String,
+  pub altmainsite: Vec<String>,
   pub appname: String,
   pub domain: String,
   pub admin_email: String,
