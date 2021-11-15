@@ -73,9 +73,13 @@ fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -> Http
 fn public(
   data: web::Data<Config>,
   item: web::Json<PublicMessage>,
-  _req: HttpRequest,
+  req: HttpRequest,
 ) -> HttpResponse {
-  info!("public msg: {:?}", &item);
+  info!(
+    "public msg: {:?} \n connection_info: {:?}",
+    &item,
+    req.connection_info()
+  );
 
   match interfaces::public_interface(&data, item.into_inner()) {
     Ok(sr) => HttpResponse::Ok().json(sr),
@@ -94,9 +98,14 @@ fn user(
   session: Session,
   data: web::Data<Config>,
   item: web::Json<UserMessage>,
-  _req: HttpRequest,
+  req: HttpRequest,
 ) -> HttpResponse {
-  info!("user msg: {}, {:?}", &item.what, &item.data);
+  info!(
+    "user msg: {}, {:?}  \n connection_info: {:?}",
+    &item.what,
+    &item.data,
+    req.connection_info()
+  );
   match interfaces::user_interface(&session, &data, item.into_inner()) {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
