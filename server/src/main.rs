@@ -219,11 +219,12 @@ fn defcon() -> Config {
     ip: "127.0.0.1".to_string(),
     port: 8000,
     createdirs: false,
-    db: PathBuf::from("./mahbloag.db"),
-    mainsite: "https:://mahbloag.practica.site/".to_string(),
-    appname: "mahbloag".to_string(),
-    domain: "practica.site".to_string(),
-    admin_email: "admin@practica.site".to_string(),
+    db: PathBuf::from("./zknotes.db"),
+    mainsite: "http://localhost:8001".to_string(),
+    altmainsite: [].to_vec(),
+    appname: "zknotes".to_string(),
+    domain: "localhost:8001".to_string(),
+    admin_email: "admin@admin.admin".to_string(),
     error_index_note: None,
     login_token_expiration_ms: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
     email_token_expiration_ms: 1 * 24 * 60 * 60 * 1000, // 1 day in milliseconds
@@ -337,6 +338,8 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
         let cors = Cors::default()
           .allowed_origin_fn(move |rv, rh| {
             if *rv == d.mainsite {
+              true
+            } else if d.altmainsite.iter().any(|am| *rv == am) {
               true
             } else if rv == "https://29a.ch"
               && rh.method == "GET"
