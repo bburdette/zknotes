@@ -1847,11 +1847,18 @@ update msg model =
                 , usernote = model.ld.zknote
                 , editable = True
                 , pubidtxt = "" -- otherwise we get a conflict on save.
+                , comments = []
+                , newcomment = Nothing
+                , pendingcomment = Nothing
                 , zklDict =
                     model.zklDict
                         |> Dict.remove (zklKey { otherid = model.ld.publicid, direction = To })
                         |> Dict.remove (zklKey { otherid = model.ld.publicid, direction = From })
                 , initialZklDict = Dict.empty
+                , createdate = Nothing
+                , changeddate = Nothing
+                , revert = Nothing
+                , dialog = Nothing
               }
             , None
             )
