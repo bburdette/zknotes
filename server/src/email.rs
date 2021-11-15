@@ -1,13 +1,13 @@
 use crate::util;
 use lettre::smtp::response::Response;
-use lettre::{EmailAddress, Envelope, SendableEmail, SmtpClient, SmtpTransport, Transport};
+use lettre::{SmtpClient, SmtpTransport, Transport};
 use lettre_email::EmailBuilder;
 use log::info;
 use std::error::Error;
 
 pub fn send_newemail_confirmation(
   appname: &str,
-  _domain: &str,
+  domain: &str,
   mainsite: &str,
   email: &str,
   uid: &str,
@@ -15,9 +15,9 @@ pub fn send_newemail_confirmation(
 ) -> Result<Response, Box<dyn Error>> {
   info!("Sending email change confirmation for user: {}", uid);
   let email = EmailBuilder::new()
-    .from("no-reply@zknotes.com")
+    .from(format!("no-reply@{}", domain).to_string())
     .to(email)
-    .subject("change zknotes email")
+    .subject(format!("change {} email", appname).to_string())
     .text(
       (format!(
         "Click the link to change to your new email, {} user '{}'!\n\
@@ -47,7 +47,7 @@ pub fn send_newemail_confirmation(
 
 pub fn send_registration(
   appname: &str,
-  _domain: &str,
+  domain: &str,
   mainsite: &str,
   email: &str,
   uid: &str,
@@ -55,9 +55,9 @@ pub fn send_registration(
 ) -> Result<Response, Box<dyn Error>> {
   info!("Sending registration email for user: {}", uid);
   let email = EmailBuilder::new()
-    .from("no-reply@zknotes.com")
+    .from(format!("no-reply@{}", domain).to_string())
     .to(email)
-    .subject("zknotes registration")
+    .subject(format!("{} registration", appname).to_string())
     .text(
       (format!(
         "Click the link to complete registration, {} user '{}'!\n\
@@ -87,7 +87,7 @@ pub fn send_registration(
 
 pub fn send_reset(
   appname: &str,
-  _domain: &str,
+  domain: &str,
   mainsite: &str,
   email: &str,
   username: &str,
@@ -96,9 +96,9 @@ pub fn send_reset(
   info!("Sending reset email for user: {}", username);
 
   let email = EmailBuilder::new()
-    .from("no-reply@zknotes.com")
+    .from(format!("no-reply@{}", domain).to_string())
     .to(email)
-    .subject("zknotes password reset")
+    .subject(format!("{} password reset", appname).to_string())
     .text(
       (format!(
         "Click the link to complete password reset, {} user '{}'!\n\
@@ -132,26 +132,23 @@ pub fn send_registration_notification(
   adminemail: &str,
   email: &str,
   uid: &str,
-  reg_id: &str,
+  _reg_id: &str,
 ) -> Result<Response, Box<dyn Error>> {
   info!("sending registration notification to admin!");
-  let email = SendableEmail::new(
-    Envelope::new(
-      Some(EmailAddress::new(
-        format!("no-reply@{}", domain).to_string(),
-      )?),
-      vec![EmailAddress::new(adminemail.to_string())?],
-    )?,
-    format!(
-      "Someones trying to register for {}! {}, {}",
-      appname, uid, email
-    ),
-    format!("uid: {}\nemail:{}\nreg_id: {}", uid, email, reg_id)
-      .to_string()
-      .into_bytes(),
-  );
+  let email = EmailBuilder::new()
+    .from(format!("no-reply@{}", domain).to_string())
+    .to(adminemail)
+    .subject(format!("{} new registration, uid: {}", appname, uid).to_string())
+    .text(
+      (format!(
+        "Someones trying to register for {}! {}, {}",
+        appname, uid, email
+      ))
+      .as_str(),
+    )
+    .build()?;
 
   let mut mailer = SmtpTransport::new(SmtpClient::new_unencrypted_localhost()?);
   // Send the email
-  mailer.send(email).map_err(|e| e.into())
+  mailer.send(email.into()).map_err(|e| e.into())
 }
