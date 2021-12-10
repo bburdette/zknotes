@@ -291,6 +291,14 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
         .help("Export database to json")
         .takes_value(true),
     )
+    .arg(
+      Arg::with_name("config")
+        .short("c")
+        .long("config")
+        .value_name("FILE")
+        .help("write default config file")
+        .takes_value(true),
+    )
     .get_matches();
 
   // are we exporting the DB?
@@ -309,6 +317,19 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
       Ok(())
     }
     None => {
+      // writing a config file?
+      match matches.value_of("config") {
+          Some(filename) =>
+              {util::write_string(
+                filename,
+                serde_json::to_string_pretty(&defcon())?.as_str(),
+              )?;
+              println!(
+                  "default config written to file: {}", filename);
+                      
+              ()}
+          None => (),
+      }
       // normal server ops
       env_logger::init();
 
