@@ -17,7 +17,6 @@ module EditZkNote exposing
     , elToSzkl
     , elToSzl
     , fullSave
-    , gotSelectedText
     , gotTASelection
     , initFull
     , initNew
@@ -26,6 +25,7 @@ module EditZkNote exposing
     , linkButtonStyle
     , linksWith
     , mkButtonStyle
+    , newWithSave
     , noteLink
     , onLinkBackSaved
     , onSaved
@@ -106,6 +106,7 @@ type Msg
     | DeletePress Time.Zone
     | ViewPress
     | NewPress
+    | LinkBackPress
     | CopyPress
     | SearchHistoryPress
     | SwitchPress Int
@@ -217,7 +218,6 @@ type Command
     | Delete Int
     | Switch Int
     | SaveSwitch Data.SaveZkNotePlusLinks Int
-    | GetSelectedText (List String)
     | GetTASelection String
     | Search S.ZkNoteSearch
     | SearchHistory
@@ -239,6 +239,21 @@ onZkNote zkn model =
         , panelnote = Just zkn
         , links = model.zklDict |> Dict.values |> List.filterMap elToDel
         }
+    )
+
+
+newWithSave model =
+    let
+        nmod =
+            initNew model.ld model.zknSearchResult model.spmodel (shareLinks model)
+    in
+    ( nmod
+    , if dirty model then
+        Save
+            (fullSave model)
+
+      else
+        None
     )
 
 
@@ -1094,6 +1109,7 @@ zknview zone size recentZkns model =
 
                             False ->
                                 E.none
+                        , EI.button perhapsdirtyparabuttonstyle { onPress = Just LinkBackPress, label = E.text "linkback" }
                         , EI.button perhapsdirtyparabuttonstyle { onPress = Just NewPress, label = E.text "new" }
                         , if mine then
                             EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just <| DeletePress zone, label = E.text "delete" }
@@ -1667,35 +1683,6 @@ replaceOrAdd items replacement compare mergef =
             [ replacement ]
 
 
-
-{- addListNote : Model -> Int -> Data.SaveZkNote -> Data.SavedZkNote -> Model
-   addListNote model uid szn szkn =
-       let
-           zln =
-               { id = szkn.id
-               , user = uid
-               , title = szn.title
-               , createdate = szkn.changeddate
-               , changeddate = szkn.changeddate
-               }
-       in
-       { model
-           | zknSearchResult =
-               model.zknSearchResult
-                   |> (\zsr ->
-                           { zsr
-                               | notes =
-                                   replaceOrAdd model.zknSearchResult.notes
-                                       zln
-                                       (\a b -> a.id == b.id)
-                                       (\a b -> { b | createdate = a.createdate })
-                           }
-                      )
-       }
-
--}
-
-
 sznToZkn : Int -> String -> Int -> List Int -> Data.SavedZkNote -> Data.SaveZkNote -> Data.ZkNote
 sznToZkn uid uname unote sysids sdzn szn =
     { id = sdzn.id
@@ -1721,9 +1708,6 @@ onSaved oldmodel szn =
                 | revert = Just <| sznFromModel oldmodel
                 , initialZklDict = oldmodel.zklDict
             }
-
-        _ =
-            Debug.log "onSAved" szn
     in
     case model.pendingcomment of
         Just pc ->
@@ -1751,22 +1735,6 @@ onSaved oldmodel szn =
                     }
             in
             { m1 | revert = Just <| sznFromModel m1 }
-
-
-gotSelectedText : Model -> String -> ( Model, Command )
-gotSelectedText model s =
-    let
-        nmod =
-            initNew model.ld model.zknSearchResult model.spmodel (shareLinks model)
-    in
-    ( { nmod | title = s }
-    , if dirty model then
-        Save
-            (fullSave model)
-
-      else
-        None
-    )
 
 
 type TACommand
@@ -1837,55 +1805,6 @@ onLinkBackSaved model tas szn =
     ( nmod
     , fullSave nmod
     )
-
-
-
-{-
-
-      Q: what if the textarea has a selection, but was not the focus before 'new'??
-      A: I don't know.  do it anyway?
-
-      Q: have a dialog with the option of going to new note
-      A: ??
-
-      Q: have a different button for linkback notes
-      A: maybe this is best?  enabled when there's a selection in the textarea?
-        error if nothing selected
-        otherwise its created.
-
-       todo...
-         - if tas.text == ""
-            - save this as normal.
-            - on 'saved', new note with sharelinks, empty title.
-            do save with a closure??
-         - if tas.text != "",
-            - save this.
-            - on 'saved', we have thisid.
-              make a new note with the title.
-              Data.SaveZkNotePlusLinks
-                title == string
-                links == include this note. (thisid)
-                         also share links this note has.
-            - on new note saved, make text link at selection in this text.
-              save again?
-
-   let
-       _ =
-           Debug.log "EditZkNote.gotTASelection" tas
-   in
-   ( model, None )
--}
--- let
---     nmod =
---         initNew model.ld model.zknSearchResult model.spmodel (shareLinks model)
--- in
--- ( { nmod | title = s }
--- , if dirty model then
---     Save
---         (fullSave model)
---   else
---     None
--- )
 
 
 noteLink : String -> Maybe Int
@@ -2126,15 +2045,14 @@ update msg model =
            ( { model | zklDict = Dict.union model.zklDict zklDict }, None )
 
         -}
-        NewPress ->
+        LinkBackPress ->
             ( model
             , GetTASelection "mdtext"
-              -- should result in a gotSelectedText call.
             )
 
-        -- , GetSelectedText [ "title", "mdtext" ]
-        --   -- should result in a gotSelectedText call.
-        -- )
+        NewPress ->
+            newWithSave model
+
         ToLinkPress zkln ->
             let
                 nzkl =

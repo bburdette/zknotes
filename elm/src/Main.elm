@@ -77,7 +77,6 @@ type Msg
     | ErrorIndexNote (Result Http.Error PI.ServerResponse)
     | LoadUrl String
     | InternalUrl Url
-    | SelectedText JD.Value
     | TASelection JD.Value
     | UrlChanged Url
     | WindowSize Util.Size
@@ -261,7 +260,7 @@ routeState model route =
                     -- handleEditZkNoteCmd should return state probably, or this function should return model.
                     let
                         ( nm, cmd ) =
-                            handleEditZkNoteCmd model login (EditZkNote.gotSelectedText st "")
+                            handleEditZkNoteCmd model login (EditZkNote.newWithSave st)
                     in
                     ( nm.state, cmd )
 
@@ -443,9 +442,6 @@ showMessage msg =
 
         InternalUrl _ ->
             "InternalUrl"
-
-        SelectedText _ ->
-            "SelectedText"
 
         TASelection _ ->
             "TASelection"
@@ -1190,10 +1186,6 @@ actualupdate msg model =
                     ( { model | state = ResetPassword nst }, Cmd.none )
 
         ( TASelection jv, state ) ->
-            let
-                _ =
-                    Debug.log "TASelection" jv
-            in
             case JD.decodeValue Data.decodeTASelection jv of
                 Ok tas ->
                     case state of
@@ -1208,59 +1200,6 @@ actualupdate msg model =
                                         (UI.SaveZkNotePlusLinks s)
                                         (TAReplyData tas)
                                     )
-
-                        _ ->
-                            ( model, Cmd.none )
-
-                Err e ->
-                    ( displayMessageDialog model <| JD.errorToString e, Cmd.none )
-
-        ( SelectedText jv, state ) ->
-            case JD.decodeValue JD.string jv of
-                Ok str ->
-                    case state of
-                        EditZkNote emod login ->
-                            let
-                                ( newnote_st, cmd ) =
-                                    EditZkNote.gotSelectedText emod str
-                            in
-                            case cmd of
-                                EditZkNote.Save szkpl ->
-                                    ( { model
-                                        | state =
-                                            Wait
-                                                (ShowMessage
-                                                    { message = "waiting for save"
-                                                    }
-                                                    login
-                                                    (Just model.state)
-                                                )
-                                                (\md ms ->
-                                                    case ms of
-                                                        UserReplyData (Ok (UI.SavedZkNotePlusLinks _)) ->
-                                                            ( { model
-                                                                | state =
-                                                                    EditZkNote
-                                                                        newnote_st
-                                                                        login
-                                                              }
-                                                            , Cmd.none
-                                                            )
-
-                                                        _ ->
-                                                            ( unexpectedMsg model ms
-                                                            , Cmd.none
-                                                            )
-                                                )
-                                      }
-                                    , Cmd.batch
-                                        [ sendUIMsg model.location
-                                            (UI.SaveZkNotePlusLinks szkpl)
-                                        ]
-                                    )
-
-                                _ ->
-                                    ( { model | state = EditZkNote newnote_st login }, Cmd.none )
 
                         _ ->
                             ( model, Cmd.none )
@@ -2127,11 +2066,6 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
             , Cmd.none
             )
 
-        EditZkNote.GetSelectedText ids ->
-            ( { model | state = EditZkNote emod login }
-            , getSelectedText ids
-            )
-
         EditZkNote.GetTASelection id ->
             ( { model | state = EditZkNote emod login }
             , getTASelection id
@@ -2431,8 +2365,7 @@ main =
         , subscriptions =
             \_ ->
                 Sub.batch
-                    [ receiveSelectedText SelectedText
-                    , receiveTASelection TASelection
+                    [ receiveTASelection TASelection
                     , Browser.Events.onResize (\w h -> WindowSize { width = w, height = h })
                     , keyreceive
                     , LS.localVal ReceiveLocalVal
@@ -2440,12 +2373,6 @@ main =
         , onUrlRequest = urlRequest
         , onUrlChange = UrlChanged
         }
-
-
-port getSelectedText : List String -> Cmd msg
-
-
-port receiveSelectedText : (JD.Value -> msg) -> Sub msg
 
 
 port getTASelection : String -> Cmd msg
