@@ -198,6 +198,19 @@ type alias ZkNoteEdit =
     }
 
 
+type alias TASelection =
+    { text : String
+    , offset : Int
+    }
+
+
+decodeTASelection : JD.Decoder TASelection
+decodeTASelection =
+    JD.succeed TASelection
+        |> andMap (JD.field "text" JD.string)
+        |> andMap (JD.field "offset" JD.int)
+
+
 
 ----------------------------------------
 -- Json encoders/decoders
