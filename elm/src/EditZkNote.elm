@@ -17,7 +17,6 @@ module EditZkNote exposing
     , elToSzkl
     , elToSzl
     , fullSave
-    , gotTASelection
     , initFull
     , initNew
     , isPublic
@@ -29,6 +28,7 @@ module EditZkNote exposing
     , noteLink
     , onLinkBackSaved
     , onSaved
+    , onTASelection
     , onWkKeyPress
     , onZkNote
     , pageLink
@@ -242,6 +242,7 @@ onZkNote zkn model =
     )
 
 
+newWithSave : Model -> ( Model, Command )
 newWithSave model =
     let
         nmod =
@@ -1742,8 +1743,8 @@ type TACommand
     | TAError String
 
 
-gotTASelection : Model -> Data.TASelection -> TACommand
-gotTASelection model tas =
+onTASelection : Model -> Data.TASelection -> TACommand
+onTASelection model tas =
     if tas.text == "" then
         TAError "no text selected"
 
@@ -1927,16 +1928,7 @@ update msg model =
             )
 
         SavePress ->
-            -- let
-            --     saveZkn =
-            --         sznFromModel model
-            -- in
-            ( {- { model
-                   | revert = Just saveZkn
-                   , initialZklDict = model.zklDict
-                 }
-              -}
-              model
+            ( model
             , Save
                 (fullSave model)
             )

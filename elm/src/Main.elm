@@ -1190,7 +1190,7 @@ actualupdate msg model =
                 Ok tas ->
                     case state of
                         EditZkNote emod login ->
-                            case EditZkNote.gotTASelection emod tas of
+                            case EditZkNote.onTASelection emod tas of
                                 EditZkNote.TAError e ->
                                     ( displayMessageDialog model e, Cmd.none )
 
@@ -1331,14 +1331,6 @@ actualupdate msg model =
                                                 emod
                                                 tas
                                                 szkn
-
-                                        -- rn =
-                                        --     EditZkNote.toZkListNote eznst
-                                        --         |> Maybe.map
-                                        --             (\zkln ->
-                                        --                 addRecentZkListNote model.recentNotes zkln
-                                        --             )
-                                        --         |> Maybe.withDefault model.recentNotes
                                     in
                                     ( { model | state = EditZkNote eznst login }
                                     , sendUIMsg model.location <| UI.SaveZkNotePlusLinks save
