@@ -1110,7 +1110,12 @@ zknview zone size recentZkns model =
 
                             False ->
                                 E.none
-                        , EI.button perhapsdirtyparabuttonstyle { onPress = Just LinkBackPress, label = E.text "linkback" }
+                        , case model.id of
+                            Just _ ->
+                                EI.button perhapsdirtyparabuttonstyle { onPress = Just LinkBackPress, label = E.text "linkback" }
+
+                            Nothing ->
+                                E.none
                         , EI.button perhapsdirtyparabuttonstyle { onPress = Just NewPress, label = E.text "new" }
                         , if mine then
                             EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just <| DeletePress zone, label = E.text "delete" }
@@ -1746,7 +1751,7 @@ type TACommand
 onTASelection : Model -> Data.TASelection -> TACommand
 onTASelection model tas =
     if tas.text == "" then
-        TAError "no text selected"
+        TAError "No text selected!  To make a linkback note, first highlight some text in the current note."
 
     else
         case model.id of
@@ -1773,7 +1778,7 @@ onTASelection model tas =
                 TASave save
 
             Nothing ->
-                TAError "save this note before creating a new link to it"
+                TAError "new note!  save this note before creating a linkback note to it"
 
 
 onLinkBackSaved : Model -> Data.TASelection -> Data.SavedZkNote -> ( Model, Data.SaveZkNotePlusLinks )
