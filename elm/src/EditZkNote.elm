@@ -1714,7 +1714,17 @@ sznToZkn uid uname unote sysids sdzn szn =
 
 
 onSaved : Model -> Data.SavedZkNote -> Model
-onSaved model szn =
+onSaved oldmodel szn =
+    let
+        model =
+            { oldmodel
+                | revert = Just <| sznFromModel oldmodel
+                , initialZklDict = oldmodel.zklDict
+            }
+
+        _ =
+            Debug.log "onSAved" szn
+    in
     case model.pendingcomment of
         Just pc ->
             { model
@@ -1797,19 +1807,36 @@ gotTASelection model tas =
                 TAError "save this note before creating a new link to it"
 
 
-onLinkBackSaved : Model -> Data.TASelection -> Data.SavedZkNote -> Model
+onLinkBackSaved : Model -> Data.TASelection -> Data.SavedZkNote -> ( Model, Data.SaveZkNotePlusLinks )
 onLinkBackSaved model tas szn =
-    { model
-        | md =
-            String.slice 0 tas.offset model.md
-                ++ "["
-                ++ tas.text
-                ++ "]("
-                ++ "/note/"
-                ++ String.fromInt szn.id
-                ++ ")"
-                ++ String.dropLeft (tas.offset + String.length tas.text) model.md
-    }
+    let
+        linkback =
+            { otherid = szn.id
+            , direction = From
+            , user = model.ld.userid
+            , zknote = Nothing
+            , othername = Just tas.text
+            , sysids = []
+            , delete = Just False
+            }
+
+        nmod =
+            { model
+                | md =
+                    String.slice 0 tas.offset model.md
+                        ++ "["
+                        ++ tas.text
+                        ++ "]("
+                        ++ "/note/"
+                        ++ String.fromInt szn.id
+                        ++ ")"
+                        ++ String.dropLeft (tas.offset + String.length tas.text) model.md
+                , zklDict = Dict.insert (zklKey linkback) linkback model.zklDict
+            }
+    in
+    ( nmod
+    , fullSave nmod
+    )
 
 
 
@@ -1981,14 +2008,16 @@ update msg model =
             )
 
         SavePress ->
-            let
-                saveZkn =
-                    sznFromModel model
-            in
-            ( { model
-                | revert = Just saveZkn
-                , initialZklDict = model.zklDict
-              }
+            -- let
+            --     saveZkn =
+            --         sznFromModel model
+            -- in
+            ( {- { model
+                   | revert = Just saveZkn
+                   , initialZklDict = model.zklDict
+                 }
+              -}
+              model
             , Save
                 (fullSave model)
             )

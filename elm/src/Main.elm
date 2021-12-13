@@ -1387,7 +1387,7 @@ actualupdate msg model =
                             case state of
                                 EditZkNote emod login ->
                                     let
-                                        eznst =
+                                        ( eznst, save ) =
                                             EditZkNote.onLinkBackSaved
                                                 emod
                                                 tas
@@ -1400,11 +1400,9 @@ actualupdate msg model =
                                         --                 addRecentZkListNote model.recentNotes zkln
                                         --             )
                                         --         |> Maybe.withDefault model.recentNotes
-                                        st =
-                                            EditZkNote eznst login
                                     in
-                                    ( { model | state = st }
-                                    , Cmd.none
+                                    ( { model | state = EditZkNote eznst login }
+                                    , sendUIMsg model.location <| UI.SaveZkNotePlusLinks save
                                     )
 
                                 _ ->
