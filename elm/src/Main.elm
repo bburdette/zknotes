@@ -72,6 +72,7 @@ type Msg
     | ImportMsg Import.Msg
     | ShowMessageMsg ShowMessage.Msg
     | UserReplyData (Result Http.Error UI.ServerResponse)
+    | TAReplyData Data.TASelection (Result Http.Error UI.ServerResponse)
     | PublicReplyData (Result Http.Error PI.ServerResponse)
     | ErrorIndexNote (Result Http.Error PI.ServerResponse)
     | LoadUrl String
@@ -405,6 +406,20 @@ showMessage msg =
 
         UserReplyData urd ->
             "UserReplyData: "
+                ++ (Result.map UI.showServerResponse urd
+                        |> Result.mapError Util.httpErrorString
+                        |> (\r ->
+                                case r of
+                                    Ok m ->
+                                        "message: " ++ m
+
+                                    Err e ->
+                                        "error: " ++ e
+                           )
+                   )
+
+        TAReplyData _ urd ->
+            "TAReplyData: "
                 ++ (Result.map UI.showServerResponse urd
                         |> Result.mapError Util.httpErrorString
                         |> (\r ->
@@ -1183,11 +1198,16 @@ actualupdate msg model =
                 Ok tas ->
                     case state of
                         EditZkNote emod login ->
-                            let
-                                ( newnote_st, cmd ) =
-                                    EditZkNote.gotTASelection emod tas
-                            in
-                            ( model, Cmd.none )
+                            case EditZkNote.gotTASelection emod tas of
+                                EditZkNote.TAError e ->
+                                    ( displayMessageDialog model e, Cmd.none )
+
+                                EditZkNote.TASave s ->
+                                    ( model
+                                    , sendUIMsgExp model.location
+                                        (UI.SaveZkNotePlusLinks s)
+                                        (TAReplyData tas)
+                                    )
 
                         _ ->
                             ( model, Cmd.none )
@@ -1352,6 +1372,47 @@ actualupdate msg model =
                             ( { model | errorNotes = MC.linkDict fbe.zknote.content }
                             , Cmd.none
                             )
+
+        ( TAReplyData tas urd, state ) ->
+            case urd of
+                Err e ->
+                    ( displayMessageDialog model <| Util.httpErrorString e, Cmd.none )
+
+                Ok uiresponse ->
+                    case uiresponse of
+                        UI.ServerError e ->
+                            ( displayMessageDialog model <| e, Cmd.none )
+
+                        UI.SavedZkNotePlusLinks szkn ->
+                            case state of
+                                EditZkNote emod login ->
+                                    let
+                                        eznst =
+                                            EditZkNote.onLinkBackSaved
+                                                emod
+                                                tas
+                                                szkn
+
+                                        -- rn =
+                                        --     EditZkNote.toZkListNote eznst
+                                        --         |> Maybe.map
+                                        --             (\zkln ->
+                                        --                 addRecentZkListNote model.recentNotes zkln
+                                        --             )
+                                        --         |> Maybe.withDefault model.recentNotes
+                                        st =
+                                            EditZkNote eznst login
+                                    in
+                                    ( { model | state = st }
+                                    , Cmd.none
+                                    )
+
+                                _ ->
+                                    -- just ignore if we're not editing a new note.
+                                    ( model, Cmd.none )
+
+                        _ ->
+                            ( unexpectedMsg model msg, Cmd.none )
 
         ( UserReplyData urd, state ) ->
             case urd of

@@ -1,4 +1,56 @@
-module EditZkNote exposing (Command(..), EditLink, Model, Msg(..), NavChoice(..), SearchOrRecent(..), WClass(..), addComment, commentsRecieved, commonButtonStyle, compareZklinks, copyTabs, dirty, disabledLinkButtonStyle, elToSzkl, elToSzl, fullSave, gotSelectedText, gotTASelection, initFull, initNew, isPublic, isSearch, linkButtonStyle, linksWith, mkButtonStyle, noteLink, onSaved, onWkKeyPress, onZkNote, pageLink, renderMd, replaceOrAdd, saveZkLinkList, setHomeNote, showSr, showZkl, sznFromModel, sznToZkn, tabsOnLoad, toPubId, toZkListNote, update, updateSearch, updateSearchResult, view, zkLinkName, zklKey, zknview)
+module EditZkNote exposing
+    ( Command(..)
+    , EditLink
+    , Model
+    , Msg(..)
+    , NavChoice(..)
+    , SearchOrRecent(..)
+    , TACommand(..)
+    , WClass(..)
+    , addComment
+    , commentsRecieved
+    , commonButtonStyle
+    , compareZklinks
+    , copyTabs
+    , dirty
+    , disabledLinkButtonStyle
+    , elToSzkl
+    , elToSzl
+    , fullSave
+    , gotSelectedText
+    , gotTASelection
+    , initFull
+    , initNew
+    , isPublic
+    , isSearch
+    , linkButtonStyle
+    , linksWith
+    , mkButtonStyle
+    , noteLink
+    , onLinkBackSaved
+    , onSaved
+    , onWkKeyPress
+    , onZkNote
+    , pageLink
+    , renderMd
+    , replaceOrAdd
+    , saveZkLinkList
+    , setHomeNote
+    , showSr
+    , showZkl
+    , sznFromModel
+    , sznToZkn
+    , tabsOnLoad
+    , toPubId
+    , toZkListNote
+    , update
+    , updateSearch
+    , updateSearchResult
+    , view
+    , zkLinkName
+    , zklKey
+    , zknview
+    )
 
 import Browser.Dom as BD
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
@@ -1707,24 +1759,95 @@ gotSelectedText model s =
     )
 
 
-gotTASelection : Model -> Data.TASelection -> ( Model, Command )
+type TACommand
+    = TASave Data.SaveZkNotePlusLinks
+    | TAError String
+
+
+gotTASelection : Model -> Data.TASelection -> TACommand
 gotTASelection model tas =
-    {-
+    if tas.text == "" then
+        TAError "no text selected"
+
+    else
+        case model.id of
+            Just id ->
+                let
+                    nmod =
+                        initNew model.ld
+                            model.zknSearchResult
+                            model.spmodel
+                            ({ otherid = id
+                             , direction = To
+                             , user = model.ld.userid
+                             , zknote = Nothing
+                             , othername = Nothing
+                             , sysids = []
+                             , delete = Just False
+                             }
+                                :: shareLinks model
+                            )
+
+                    save =
+                        fullSave { nmod | title = tas.text }
+                in
+                TASave save
+
+            Nothing ->
+                TAError "save this note before creating a new link to it"
+
+
+onLinkBackSaved : Model -> Data.TASelection -> Data.SavedZkNote -> Model
+onLinkBackSaved model tas szn =
+    { model
+        | md =
+            String.slice 0 tas.offset model.md
+                ++ "["
+                ++ tas.text
+                ++ "]("
+                ++ "/note/"
+                ++ String.fromInt szn.id
+                ++ ")"
+                ++ String.dropLeft (tas.offset + String.length tas.text) model.md
+    }
+
+
+
+{-
+
+      Q: what if the textarea has a selection, but was not the focus before 'new'??
+      A: I don't know.  do it anyway?
+
+      Q: have a dialog with the option of going to new note
+      A: ??
+
+      Q: have a different button for linkback notes
+      A: maybe this is best?  enabled when there's a selection in the textarea?
+        error if nothing selected
+        otherwise its created.
 
        todo...
-         - make a new note with the title.
-         - write it to the db, get an id back.
-         - make a link to that note using the selection.
+         - if tas.text == ""
+            - save this as normal.
+            - on 'saved', new note with sharelinks, empty title.
+            do save with a closure??
+         - if tas.text != "",
+            - save this.
+            - on 'saved', we have thisid.
+              make a new note with the title.
+              Data.SaveZkNotePlusLinks
+                title == string
+                links == include this note. (thisid)
+                         also share links this note has.
+            - on new note saved, make text link at selection in this text.
+              save again?
 
-    -}
-    let
-        _ =
-            Debug.log "EditZkNote.gotTASelection" tas
-    in
-    ( model, None )
-
-
-
+   let
+       _ =
+           Debug.log "EditZkNote.gotTASelection" tas
+   in
+   ( model, None )
+-}
 -- let
 --     nmod =
 --         initNew model.ld model.zknSearchResult model.spmodel (shareLinks model)

@@ -21,7 +21,6 @@ type SendMsg
     | SaveZkNote Data.SaveZkNote
     | SaveZkLinks Data.ZkLinks
     | SaveZkNotePlusLinks Data.SaveZkNotePlusLinks
-      -- | GetZkLinks Data.GetZkLinks
     | SearchZkNotes S.ZkNoteSearch
     | SaveImportZkNotes (List Data.ImportZkNote)
     | PowerDelete S.TagSearch
