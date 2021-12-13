@@ -77,6 +77,7 @@ type Msg
     | LoadUrl String
     | InternalUrl Url
     | SelectedText JD.Value
+    | TASelection JD.Value
     | UrlChanged Url
     | WindowSize Util.Size
     | DisplayMessageMsg (GD.Msg DisplayMessage.Msg)
@@ -430,6 +431,9 @@ showMessage msg =
 
         SelectedText _ ->
             "SelectedText"
+
+        TASelection _ ->
+            "TASelection"
 
         UrlChanged _ ->
             "UrlChanged"
@@ -1169,6 +1173,27 @@ actualupdate msg model =
 
                 ResetPassword.None ->
                     ( { model | state = ResetPassword nst }, Cmd.none )
+
+        ( TASelection jv, state ) ->
+            let
+                _ =
+                    Debug.log "TASelection" jv
+            in
+            case JD.decodeValue Data.decodeTASelection jv of
+                Ok tas ->
+                    case state of
+                        EditZkNote emod login ->
+                            let
+                                ( newnote_st, cmd ) =
+                                    EditZkNote.gotTASelection emod tas
+                            in
+                            ( model, Cmd.none )
+
+                        _ ->
+                            ( model, Cmd.none )
+
+                Err e ->
+                    ( displayMessageDialog model <| JD.errorToString e, Cmd.none )
 
         ( SelectedText jv, state ) ->
             case JD.decodeValue JD.string jv of
@@ -2048,6 +2073,11 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
             , getSelectedText ids
             )
 
+        EditZkNote.GetTASelection id ->
+            ( { model | state = EditZkNote emod login }
+            , getTASelection id
+            )
+
         EditZkNote.Search s ->
             sendSearch { model | state = EditZkNote emod login } s
 
@@ -2343,6 +2373,7 @@ main =
             \_ ->
                 Sub.batch
                     [ receiveSelectedText SelectedText
+                    , receiveTASelection TASelection
                     , Browser.Events.onResize (\w h -> WindowSize { width = w, height = h })
                     , keyreceive
                     , LS.localVal ReceiveLocalVal
@@ -2356,6 +2387,12 @@ port getSelectedText : List String -> Cmd msg
 
 
 port receiveSelectedText : (JD.Value -> msg) -> Sub msg
+
+
+port getTASelection : String -> Cmd msg
+
+
+port receiveTASelection : (JD.Value -> msg) -> Sub msg
 
 
 port receiveKeyMsg : (JD.Value -> msg) -> Sub msg

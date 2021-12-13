@@ -17,8 +17,23 @@
       function getRegularSelectionText() {
           var text = "";
           if (window.getSelection) {
+              console.log("focusOffset");
+              console.log(window.getSelection().focusOffset);
+              console.log("anchorOffset");
+              console.log(window.getSelection().anchorOffset);
+              console.log("getRangeAt(0)");
+              console.log(window.getSelection().getRangeAt(0));
+              console.log("window.getSelection");
+              console.log(window.getSelection());
+              
               text = window.getSelection().toString();
+              // try getting focusOffset.
+              
           } else if (document.selection && document.selection.type != "Control") {
+              console.log("document.selection");
+              console.log(document.selection());
+              console.log("document.selection.createRange()");
+              console.log(document.selection.createRange());
               text = document.selection.createRange().text;
           }
           return text;
@@ -57,6 +72,26 @@
         app.ports.receiveSelectedText.send(text);
       }
 
+      function getTASelection(id) {
+          console.log("getTASelection");
+          var range = { text: "", offset: null };
+          var activeEl = document.getElementById(id);
+          var activeElTagName = activeEl ? activeEl.tagName.toLowerCase() : null;
+          if (
+            (activeElTagName == "textarea") || (activeElTagName == "input" &&
+            /^(?:text|search|password|tel|url)$/i.test(activeEl.type)) &&
+            (typeof activeEl.selectionStart == "number")
+          ) {
+              console.log("rangin");
+              range.text = activeEl.value.slice(activeEl.selectionStart, activeEl.selectionEnd);
+              range.offset = activeEl.selectionStart;
+              app.ports.receiveTASelection.send(range);
+          }
+          else {
+              app.ports.receiveTASelection.send(null);
+          }
+      }
+
       login = {{logindata}};
       errorid = {{errorid}};
 
@@ -77,6 +112,7 @@
 
       // selected text
       app.ports.getSelectedText.subscribe(getSelectedText);
+      app.ports.getTASelection.subscribe(getTASelection);
       // keydown events
       app.ports.sendKeyCommand.subscribe(sendKeyCommand);
       window.addEventListener( "keydown", keycheck, false );

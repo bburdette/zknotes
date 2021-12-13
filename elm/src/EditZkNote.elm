@@ -1,4 +1,4 @@
-module EditZkNote exposing (Command(..), EditLink, Model, Msg(..), NavChoice(..), SearchOrRecent(..), WClass(..), addComment, commentsRecieved, commonButtonStyle, compareZklinks, copyTabs, dirty, disabledLinkButtonStyle, elToSzkl, elToSzl, fullSave, gotSelectedText, initFull, initNew, isPublic, isSearch, linkButtonStyle, linksWith, mkButtonStyle, noteLink, onSaved, onWkKeyPress, onZkNote, pageLink, renderMd, replaceOrAdd, saveZkLinkList, setHomeNote, showSr, showZkl, sznFromModel, sznToZkn, tabsOnLoad, toPubId, toZkListNote, update, updateSearch, updateSearchResult, view, zkLinkName, zklKey, zknview)
+module EditZkNote exposing (Command(..), EditLink, Model, Msg(..), NavChoice(..), SearchOrRecent(..), WClass(..), addComment, commentsRecieved, commonButtonStyle, compareZklinks, copyTabs, dirty, disabledLinkButtonStyle, elToSzkl, elToSzl, fullSave, gotSelectedText, gotTASelection, initFull, initNew, isPublic, isSearch, linkButtonStyle, linksWith, mkButtonStyle, noteLink, onSaved, onWkKeyPress, onZkNote, pageLink, renderMd, replaceOrAdd, saveZkLinkList, setHomeNote, showSr, showZkl, sznFromModel, sznToZkn, tabsOnLoad, toPubId, toZkListNote, update, updateSearch, updateSearchResult, view, zkLinkName, zklKey, zknview)
 
 import Browser.Dom as BD
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
@@ -166,6 +166,7 @@ type Command
     | Switch Int
     | SaveSwitch Data.SaveZkNotePlusLinks Int
     | GetSelectedText (List String)
+    | GetTASelection String
     | Search S.ZkNoteSearch
     | SearchHistory
     | BigSearch
@@ -1706,6 +1707,37 @@ gotSelectedText model s =
     )
 
 
+gotTASelection : Model -> Data.TASelection -> ( Model, Command )
+gotTASelection model tas =
+    {-
+
+       todo...
+         - make a new note with the title.
+         - write it to the db, get an id back.
+         - make a link to that note using the selection.
+
+    -}
+    let
+        _ =
+            Debug.log "EditZkNote.gotTASelection" tas
+    in
+    ( model, None )
+
+
+
+-- let
+--     nmod =
+--         initNew model.ld model.zknSearchResult model.spmodel (shareLinks model)
+-- in
+-- ( { nmod | title = s }
+-- , if dirty model then
+--     Save
+--         (fullSave model)
+--   else
+--     None
+-- )
+
+
 noteLink : String -> Maybe Int
 noteLink str =
     -- hack allows parsing /note/<N>
@@ -1944,10 +1976,13 @@ update msg model =
         -}
         NewPress ->
             ( model
-            , GetSelectedText [ "title", "mdtext" ]
+            , GetTASelection "mdtext"
               -- should result in a gotSelectedText call.
             )
 
+        -- , GetSelectedText [ "title", "mdtext" ]
+        --   -- should result in a gotSelectedText call.
+        -- )
         ToLinkPress zkln ->
             let
                 nzkl =
