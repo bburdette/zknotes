@@ -1757,23 +1757,31 @@ onTASelection model tas =
         case model.id of
             Just id ->
                 let
-                    nmod =
+                    m1 =
                         initNew model.ld
                             model.zknSearchResult
                             model.spmodel
-                            ({ otherid = id
-                             , direction = To
-                             , user = model.ld.userid
-                             , zknote = Nothing
-                             , othername = Nothing
-                             , sysids = []
-                             , delete = Just False
-                             }
-                                :: shareLinks model
-                            )
+                            []
+
+                    nzkls =
+                        { otherid = id
+                        , direction = To
+                        , user = model.ld.userid
+                        , zknote = Nothing
+                        , othername = Nothing
+                        , sysids = []
+                        , delete = Just False
+                        }
+                            :: shareLinks model
+
+                    m2 =
+                        { m1
+                            | title = tas.text
+                            , zklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) nzkls)
+                        }
 
                     save =
-                        fullSave { nmod | title = tas.text }
+                        fullSave m2
                 in
                 TASave save
 
