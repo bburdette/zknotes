@@ -1,4 +1,56 @@
-module EditZkNote exposing (Command(..), EditLink, Model, Msg(..), NavChoice(..), SearchOrRecent(..), WClass(..), addComment, commentsRecieved, commonButtonStyle, compareZklinks, copyTabs, dirty, disabledLinkButtonStyle, elToSzkl, elToSzl, fullSave, gotSelectedText, initFull, initNew, isPublic, isSearch, linkButtonStyle, linksWith, mkButtonStyle, noteLink, onSaved, onWkKeyPress, onZkNote, pageLink, renderMd, replaceOrAdd, saveZkLinkList, setHomeNote, showSr, showZkl, sznFromModel, sznToZkn, tabsOnLoad, toPubId, toZkListNote, update, updateSearch, updateSearchResult, view, zkLinkName, zklKey, zknview)
+module EditZkNote exposing
+    ( Command(..)
+    , EditLink
+    , Model
+    , Msg(..)
+    , NavChoice(..)
+    , SearchOrRecent(..)
+    , TACommand(..)
+    , WClass(..)
+    , addComment
+    , commentsRecieved
+    , commonButtonStyle
+    , compareZklinks
+    , copyTabs
+    , dirty
+    , disabledLinkButtonStyle
+    , elToSzkl
+    , elToSzl
+    , fullSave
+    , initFull
+    , initNew
+    , isPublic
+    , isSearch
+    , linkButtonStyle
+    , linksWith
+    , mkButtonStyle
+    , newWithSave
+    , noteLink
+    , onLinkBackSaved
+    , onSaved
+    , onTASelection
+    , onWkKeyPress
+    , onZkNote
+    , pageLink
+    , renderMd
+    , replaceOrAdd
+    , saveZkLinkList
+    , setHomeNote
+    , showSr
+    , showZkl
+    , sznFromModel
+    , sznToZkn
+    , tabsOnLoad
+    , toPubId
+    , toZkListNote
+    , update
+    , updateSearch
+    , updateSearchResult
+    , view
+    , zkLinkName
+    , zklKey
+    , zknview
+    )
 
 import Browser.Dom as BD
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
@@ -54,6 +106,7 @@ type Msg
     | DeletePress Time.Zone
     | ViewPress
     | NewPress
+    | LinkBackPress
     | CopyPress
     | SearchHistoryPress
     | SwitchPress Int
@@ -165,7 +218,7 @@ type Command
     | Delete Int
     | Switch Int
     | SaveSwitch Data.SaveZkNotePlusLinks Int
-    | GetSelectedText (List String)
+    | GetTASelection String
     | Search S.ZkNoteSearch
     | SearchHistory
     | BigSearch
@@ -186,6 +239,22 @@ onZkNote zkn model =
         , panelnote = Just zkn
         , links = model.zklDict |> Dict.values |> List.filterMap elToDel
         }
+    )
+
+
+newWithSave : Model -> ( Model, Command )
+newWithSave model =
+    let
+        nmod =
+            initNew model.ld model.zknSearchResult model.spmodel (shareLinks model)
+    in
+    ( nmod
+    , if dirty model then
+        Save
+            (fullSave model)
+
+      else
+        None
     )
 
 
@@ -1041,6 +1110,12 @@ zknview zone size recentZkns model =
 
                             False ->
                                 E.none
+                        , case model.id of
+                            Just _ ->
+                                EI.button perhapsdirtyparabuttonstyle { onPress = Just LinkBackPress, label = E.text "linkback" }
+
+                            Nothing ->
+                                E.none
                         , EI.button perhapsdirtyparabuttonstyle { onPress = Just NewPress, label = E.text "new" }
                         , if mine then
                             EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just <| DeletePress zone, label = E.text "delete" }
@@ -1614,35 +1689,6 @@ replaceOrAdd items replacement compare mergef =
             [ replacement ]
 
 
-
-{- addListNote : Model -> Int -> Data.SaveZkNote -> Data.SavedZkNote -> Model
-   addListNote model uid szn szkn =
-       let
-           zln =
-               { id = szkn.id
-               , user = uid
-               , title = szn.title
-               , createdate = szkn.changeddate
-               , changeddate = szkn.changeddate
-               }
-       in
-       { model
-           | zknSearchResult =
-               model.zknSearchResult
-                   |> (\zsr ->
-                           { zsr
-                               | notes =
-                                   replaceOrAdd model.zknSearchResult.notes
-                                       zln
-                                       (\a b -> a.id == b.id)
-                                       (\a b -> { b | createdate = a.createdate })
-                           }
-                      )
-       }
-
--}
-
-
 sznToZkn : Int -> String -> Int -> List Int -> Data.SavedZkNote -> Data.SaveZkNote -> Data.ZkNote
 sznToZkn uid uname unote sysids sdzn szn =
     { id = sdzn.id
@@ -1661,7 +1707,14 @@ sznToZkn uid uname unote sysids sdzn szn =
 
 
 onSaved : Model -> Data.SavedZkNote -> Model
-onSaved model szn =
+onSaved oldmodel szn =
+    let
+        model =
+            { oldmodel
+                | revert = Just <| sznFromModel oldmodel
+                , initialZklDict = oldmodel.zklDict
+            }
+    in
     case model.pendingcomment of
         Just pc ->
             { model
@@ -1690,19 +1743,81 @@ onSaved model szn =
             { m1 | revert = Just <| sznFromModel m1 }
 
 
-gotSelectedText : Model -> String -> ( Model, Command )
-gotSelectedText model s =
-    let
-        nmod =
-            initNew model.ld model.zknSearchResult model.spmodel (shareLinks model)
-    in
-    ( { nmod | title = s }
-    , if dirty model then
-        Save
-            (fullSave model)
+type TACommand
+    = TASave Data.SaveZkNotePlusLinks
+    | TAError String
 
-      else
-        None
+
+onTASelection : Model -> Data.TASelection -> TACommand
+onTASelection model tas =
+    if tas.text == "" then
+        TAError "No text selected!  To make a linkback note, first highlight some text in the current note."
+
+    else
+        case model.id of
+            Just id ->
+                let
+                    m1 =
+                        initNew model.ld
+                            model.zknSearchResult
+                            model.spmodel
+                            []
+
+                    nzkls =
+                        { otherid = id
+                        , direction = To
+                        , user = model.ld.userid
+                        , zknote = Nothing
+                        , othername = Nothing
+                        , sysids = []
+                        , delete = Just False
+                        }
+                            :: shareLinks model
+
+                    m2 =
+                        { m1
+                            | title = tas.text
+                            , zklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) nzkls)
+                        }
+
+                    save =
+                        fullSave m2
+                in
+                TASave save
+
+            Nothing ->
+                TAError "new note!  save this note before creating a linkback note to it"
+
+
+onLinkBackSaved : Model -> Data.TASelection -> Data.SavedZkNote -> ( Model, Data.SaveZkNotePlusLinks )
+onLinkBackSaved model tas szn =
+    let
+        linkback =
+            { otherid = szn.id
+            , direction = From
+            , user = model.ld.userid
+            , zknote = Nothing
+            , othername = Just tas.text
+            , sysids = []
+            , delete = Just False
+            }
+
+        nmod =
+            { model
+                | md =
+                    String.slice 0 tas.offset model.md
+                        ++ "["
+                        ++ tas.text
+                        ++ "]("
+                        ++ "/note/"
+                        ++ String.fromInt szn.id
+                        ++ ")"
+                        ++ String.dropLeft (tas.offset + String.length tas.text) model.md
+                , zklDict = Dict.insert (zklKey linkback) linkback model.zklDict
+            }
+    in
+    ( nmod
+    , fullSave nmod
     )
 
 
@@ -1826,14 +1941,7 @@ update msg model =
             )
 
         SavePress ->
-            let
-                saveZkn =
-                    sznFromModel model
-            in
-            ( { model
-                | revert = Just saveZkn
-                , initialZklDict = model.zklDict
-              }
+            ( model
             , Save
                 (fullSave model)
             )
@@ -1942,11 +2050,13 @@ update msg model =
            ( { model | zklDict = Dict.union model.zklDict zklDict }, None )
 
         -}
-        NewPress ->
+        LinkBackPress ->
             ( model
-            , GetSelectedText [ "title", "mdtext" ]
-              -- should result in a gotSelectedText call.
+            , GetTASelection "mdtext"
             )
+
+        NewPress ->
+            newWithSave model
 
         ToLinkPress zkln ->
             let
