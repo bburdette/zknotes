@@ -79,6 +79,7 @@
           devShell = pkgs.mkShell {
             nativeBuildInputs = with pkgs; [
               cargo
+              cargo-watch
               rustc
               sqlite
               pkgconfig
