@@ -319,16 +319,12 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
     None => {
       // writing a config file?
       match matches.value_of("config") {
-          Some(filename) =>
-              {util::write_string(
-                filename,
-                serde_json::to_string_pretty(&defcon())?.as_str(),
-              )?;
-              println!(
-                  "default config written to file: {}", filename);
-                      
-              ()}
-          None => (),
+        Some(filename) => {
+          util::write_string(filename, serde_json::to_string_pretty(&defcon())?.as_str())?;
+          println!("default config written to file: {}", filename);
+          ()
+        }
+        None => (),
       }
       // normal server ops
       env_logger::init();
