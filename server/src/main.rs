@@ -229,10 +229,10 @@ fn defcon() -> Config {
     port: 8000,
     createdirs: false,
     db: PathBuf::from("./zknotes.db"),
-    mainsite: "http://localhost:8001".to_string(),
+    mainsite: "http://localhost:8000".to_string(),
     altmainsite: [].to_vec(),
     appname: "zknotes".to_string(),
-    domain: "localhost:8001".to_string(),
+    domain: "localhost:8000".to_string(),
     admin_email: "admin@admin.admin".to_string(),
     error_index_note: None,
     login_token_expiration_ms: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
@@ -254,20 +254,10 @@ fn purge_tokens(config: &Config) -> Result<(), Box<dyn Error>> {
   Ok(())
 }
 
-fn load_config() -> Config {
-  match util::load_string("config.toml") {
-    Err(e) => {
-      error!("error loading config.toml: {:?}", e);
-      defcon()
-    }
-    Ok(config_str) => match toml::from_str(config_str.as_str()) {
-      Ok(c) => c,
-      Err(e) => {
-        error!("error loading config.toml: {:?}", e);
-        defcon()
-      }
-    },
-  }
+fn load_config(filename: &str) -> Result<Config, Box<dyn Error>> {
+  info!("loading config: {}", filename);
+  let c = toml::from_str(util::load_string(filename)?.as_str())?;
+  Ok(c)
 }
 
 fn main() {
@@ -279,6 +269,8 @@ fn main() {
 
 #[actix_web::main]
 async fn err_main() -> Result<(), Box<dyn Error>> {
+  env_logger::init();
+
   let matches = clap::App::new("zknotes server")
     .version("1.0")
     .author("Ben Burdette")
@@ -291,100 +283,124 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
         .help("Export database to json")
         .takes_value(true),
     )
+    .arg(
+      Arg::with_name("config")
+        .short("c")
+        .long("config")
+        .value_name("FILE")
+        .help("specify config file")
+        .takes_value(true),
+    )
+    .arg(
+      Arg::with_name("write_config")
+        .short("w")
+        .long("write_config")
+        .value_name("FILE")
+        .help("write default config file")
+        .takes_value(true),
+    )
     .get_matches();
 
-  // are we exporting the DB?
-  match matches.value_of("export") {
-    Some(exportfile) => {
-      // do that exporting...
-      let config = load_config();
-
-      sqldata::dbinit(config.db.as_path(), config.login_token_expiration_ms)?;
-
-      util::write_string(
-        exportfile,
-        serde_json::to_string_pretty(&sqldata::export_db(config.db.as_path())?)?.as_str(),
-      )?;
-
+  // writing a config file?
+  match matches.value_of("write_config") {
+    Some(filename) => {
+      util::write_string(filename, toml::to_string_pretty(&defcon())?.as_str())?;
+      info!("default config written to file: {}", filename);
       Ok(())
     }
     None => {
-      // normal server ops
-      env_logger::init();
+      // specifying a config file?  otherwise try to load the default.
+      let mut config = match matches.value_of("config") {
+        Some(filename) => load_config(filename)?,
+        None => load_config("config.toml")?,
+      };
+      // are we exporting the DB?
+      match matches.value_of("export") {
+        Some(exportfile) => {
+          // do that exporting...
 
-      info!("server init!");
+          sqldata::dbinit(config.db.as_path(), config.login_token_expiration_ms)?;
 
-      let mut config = load_config();
+          util::write_string(
+            exportfile,
+            serde_json::to_string_pretty(&sqldata::export_db(config.db.as_path())?)?.as_str(),
+          )?;
 
-      if config.static_path == None {
-        for (key, value) in env::vars() {
-          if key == "ZKNOTES_STATIC_PATH" {
-            config.static_path = PathBuf::from_str(value.as_str()).ok();
+          Ok(())
+        }
+        None => {
+          // normal server ops
+          info!("server init!");
+          if config.static_path == None {
+            for (key, value) in env::vars() {
+              if key == "ZKNOTES_STATIC_PATH" {
+                config.static_path = PathBuf::from_str(value.as_str()).ok();
+              }
+            }
           }
+
+          info!("config parameters:\n\n{}", toml::to_string_pretty(&config)?);
+
+          sqldata::dbinit(config.db.as_path(), config.login_token_expiration_ms)?;
+
+          let timer = timer::Timer::new();
+
+          let ptconfig = config.clone();
+
+          let _guard = timer.schedule_repeating(chrono::Duration::days(1), move || {
+            match purge_tokens(&ptconfig) {
+              Err(e) => error!("purge_login_tokens error: {}", e),
+              Ok(_) => (),
+            }
+          });
+
+          let c = config.clone();
+          HttpServer::new(move || {
+            let staticpath = c.static_path.clone().unwrap_or(PathBuf::from("static/"));
+            let d = c.clone();
+            let cors = Cors::default()
+              .allowed_origin_fn(move |rv, rh| {
+                if *rv == d.mainsite {
+                  true
+                } else if d.altmainsite.iter().any(|am| *rv == am) {
+                  true
+                } else if rv == "https://29a.ch"
+                  && rh.method == "GET"
+                  && rh.uri.to_string().starts_with("/static")
+                {
+                  true
+                } else {
+                  info!("cors denied: {:?}, {:?}", rv, rh);
+                  false
+                }
+              })
+              .allow_any_header()
+              .allow_any_method()
+              .max_age(3600);
+
+            App::new()
+              .data(c.clone()) // <- create app with shared state
+              .wrap(cors)
+              .wrap(middleware::Logger::default())
+              .wrap(
+                CookieSession::signed(&[0; 32]) // <- create cookie based session middleware
+                  .secure(false) // allows for dev access
+                  .max_age(10 * 24 * 60 * 60), // 10 days
+              )
+              .service(web::resource("/public").route(web::post().to(public)))
+              .service(web::resource("/user").route(web::post().to(user)))
+              .service(web::resource(r"/register/{uid}/{key}").route(web::get().to(register)))
+              .service(web::resource(r"/newemail/{uid}/{token}").route(web::get().to(new_email)))
+              .service(actix_files::Files::new("/static/", staticpath))
+              .service(web::resource("/{tail:.*}").route(web::get().to(mainpage)))
+          })
+          .bind(format!("{}:{}", config.ip, config.port))?
+          .run()
+          .await?;
+
+          Ok(())
         }
       }
-
-      info!("config: {:?}", config);
-
-      sqldata::dbinit(config.db.as_path(), config.login_token_expiration_ms)?;
-
-      let timer = timer::Timer::new();
-
-      let ptconfig = config.clone();
-
-      let _guard =
-        timer.schedule_repeating(chrono::Duration::days(1), move || {
-          match purge_tokens(&ptconfig) {
-            Err(e) => error!("purge_login_tokens error: {}", e),
-            Ok(_) => (),
-          }
-        });
-
-      let c = config.clone();
-      HttpServer::new(move || {
-        let staticpath = c.static_path.clone().unwrap_or(PathBuf::from("static/"));
-        let d = c.clone();
-        let cors = Cors::default()
-          .allowed_origin_fn(move |rv, rh| {
-            if *rv == d.mainsite {
-              true
-            } else if d.altmainsite.iter().any(|am| *rv == am) {
-              true
-            } else if rv == "https://29a.ch"
-              && rh.method == "GET"
-              && rh.uri.to_string().starts_with("/static")
-            {
-              true
-            } else {
-              info!("cors denied: {:?}, {:?}", rv, rh);
-              false
-            }
-          })
-          .allow_any_header()
-          .allow_any_method()
-          .max_age(3600);
-
-        App::new()
-          .data(c.clone()) // <- create app with shared state
-          .wrap(cors)
-          .wrap(middleware::Logger::default())
-          .wrap(
-            CookieSession::signed(&[0; 32]) // <- create cookie based session middleware
-              .secure(false) // allows for dev access
-              .max_age(10 * 24 * 60 * 60), // 10 days
-          )
-          .service(web::resource("/public").route(web::post().to(public)))
-          .service(web::resource("/user").route(web::post().to(user)))
-          .service(web::resource(r"/register/{uid}/{key}").route(web::get().to(register)))
-          .service(web::resource(r"/newemail/{uid}/{token}").route(web::get().to(new_email)))
-          .service(actix_files::Files::new("/static/", staticpath))
-          .service(web::resource("/{tail:.*}").route(web::get().to(mainpage)))
-      })
-      .bind(format!("{}:{}", config.ip, config.port))?
-      .run()
-      .await?;
-
-      Ok(())
     }
   }
 }

@@ -1,7 +1,7 @@
-use serde_derive::Deserialize;
+use serde_derive::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config {
   pub ip: String,
   pub port: u16,
