@@ -304,13 +304,12 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
   // writing a config file?
   match matches.value_of("write_config") {
     Some(filename) => {
-      // util::write_string(filename, serde_json::to_string_pretty(&defcon())?.as_str())?;
       util::write_string(filename, toml::to_string_pretty(&defcon())?.as_str())?;
-      println!("default config written to file: {}", filename);
+      info!("default config written to file: {}", filename);
       Ok(())
     }
     None => {
-      // specifying a config file?
+      // specifying a config file?  otherwise try to load the default.
       let mut config = match matches.value_of("config") {
         Some(filename) => load_config(filename)?,
         None => load_config("config.toml")?,
@@ -340,7 +339,7 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
             }
           }
 
-          info!("config: {:?}", config);
+          info!("config parameters:\n\n{}", toml::to_string_pretty(&config)?);
 
           sqldata::dbinit(config.db.as_path(), config.login_token_expiration_ms)?;
 
