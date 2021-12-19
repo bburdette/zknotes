@@ -13,23 +13,8 @@
   <body>
     <div id="elm"></div> 
     <script type="text/javascript">
-      // all we'd use in a saner world.  textarea highlighted text is ok here with chrome.
-      function getRegularSelectionText() {
-          var text = "";
-          if (window.getSelection) {
-              text = window.getSelection().toString();
-          } else if (document.selection && document.selection.type != "Control") {
-              text = document.selection.createRange().text;
-          }
-          return text;
-      }
-      // because firefox has a bug we use this to get highlighted text from a textarea.
-      // textarea id required.
-      function getSelectionText(id) {
-          if (id == null) {
-            return getRegularSelectionText();
-          }
-          var text = "";
+      function getTASelection(id) {
+          var range = { text: "", offset: null };
           var activeEl = document.getElementById(id);
           var activeElTagName = activeEl ? activeEl.tagName.toLowerCase() : null;
           if (
@@ -37,24 +22,13 @@
             /^(?:text|search|password|tel|url)$/i.test(activeEl.type)) &&
             (typeof activeEl.selectionStart == "number")
           ) {
-              text = activeEl.value.slice(activeEl.selectionStart, activeEl.selectionEnd);
-          } else if (window.getSelection) {
-              text = window.getSelection().toString();
+              range.text = activeEl.value.slice(activeEl.selectionStart, activeEl.selectionEnd);
+              range.offset = activeEl.selectionStart;
+              app.ports.receiveTASelection.send(range);
           }
-          return text;
-      }
-      function getSelectedText(ids) {
-        var text = getRegularSelectionText();
-        if (text == "") {
-          for ( i in ids) {
-            var id = ids[i];
-            text = getSelectionText(id);
-            if (text != "") {
-              break;
-            }
+          else {
+              app.ports.receiveTASelection.send(null);
           }
-        };
-        app.ports.receiveSelectedText.send(text);
       }
 
       login = {{logindata}};
@@ -76,7 +50,7 @@
       // app.ports.clearLocalStorage.subscribe(clearStorage);
 
       // selected text
-      app.ports.getSelectedText.subscribe(getSelectedText);
+      app.ports.getTASelection.subscribe(getTASelection);
       // keydown events
       app.ports.sendKeyCommand.subscribe(sendKeyCommand);
       window.addEventListener( "keydown", keycheck, false );

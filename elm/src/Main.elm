@@ -72,11 +72,12 @@ type Msg
     | ImportMsg Import.Msg
     | ShowMessageMsg ShowMessage.Msg
     | UserReplyData (Result Http.Error UI.ServerResponse)
+    | TAReplyData Data.TASelection (Result Http.Error UI.ServerResponse)
     | PublicReplyData (Result Http.Error PI.ServerResponse)
     | ErrorIndexNote (Result Http.Error PI.ServerResponse)
     | LoadUrl String
     | InternalUrl Url
-    | SelectedText JD.Value
+    | TASelection JD.Value
     | UrlChanged Url
     | WindowSize Util.Size
     | DisplayMessageMsg (GD.Msg DisplayMessage.Msg)
@@ -259,7 +260,7 @@ routeState model route =
                     -- handleEditZkNoteCmd should return state probably, or this function should return model.
                     let
                         ( nm, cmd ) =
-                            handleEditZkNoteCmd model login (EditZkNote.gotSelectedText st "")
+                            handleEditZkNoteCmd model login (EditZkNote.newWithSave st)
                     in
                     ( nm.state, cmd )
 
@@ -416,6 +417,20 @@ showMessage msg =
                            )
                    )
 
+        TAReplyData _ urd ->
+            "TAReplyData: "
+                ++ (Result.map UI.showServerResponse urd
+                        |> Result.mapError Util.httpErrorString
+                        |> (\r ->
+                                case r of
+                                    Ok m ->
+                                        "message: " ++ m
+
+                                    Err e ->
+                                        "error: " ++ e
+                           )
+                   )
+
         PublicReplyData _ ->
             "PublicReplyData"
 
@@ -428,8 +443,8 @@ showMessage msg =
         InternalUrl _ ->
             "InternalUrl"
 
-        SelectedText _ ->
-            "SelectedText"
+        TASelection _ ->
+            "TASelection"
 
         UrlChanged _ ->
             "UrlChanged"
@@ -1170,52 +1185,21 @@ actualupdate msg model =
                 ResetPassword.None ->
                     ( { model | state = ResetPassword nst }, Cmd.none )
 
-        ( SelectedText jv, state ) ->
-            case JD.decodeValue JD.string jv of
-                Ok str ->
+        ( TASelection jv, state ) ->
+            case JD.decodeValue Data.decodeTASelection jv of
+                Ok tas ->
                     case state of
                         EditZkNote emod login ->
-                            let
-                                ( newnote_st, cmd ) =
-                                    EditZkNote.gotSelectedText emod str
-                            in
-                            case cmd of
-                                EditZkNote.Save szkpl ->
-                                    ( { model
-                                        | state =
-                                            Wait
-                                                (ShowMessage
-                                                    { message = "waiting for save"
-                                                    }
-                                                    login
-                                                    (Just model.state)
-                                                )
-                                                (\md ms ->
-                                                    case ms of
-                                                        UserReplyData (Ok (UI.SavedZkNotePlusLinks _)) ->
-                                                            ( { model
-                                                                | state =
-                                                                    EditZkNote
-                                                                        newnote_st
-                                                                        login
-                                                              }
-                                                            , Cmd.none
-                                                            )
+                            case EditZkNote.onTASelection emod tas of
+                                EditZkNote.TAError e ->
+                                    ( displayMessageDialog model e, Cmd.none )
 
-                                                        _ ->
-                                                            ( unexpectedMsg model ms
-                                                            , Cmd.none
-                                                            )
-                                                )
-                                      }
-                                    , Cmd.batch
-                                        [ sendUIMsg model.location
-                                            (UI.SaveZkNotePlusLinks szkpl)
-                                        ]
+                                EditZkNote.TASave s ->
+                                    ( model
+                                    , sendUIMsgExp model.location
+                                        (UI.SaveZkNotePlusLinks s)
+                                        (TAReplyData tas)
                                     )
-
-                                _ ->
-                                    ( { model | state = EditZkNote newnote_st login }, Cmd.none )
 
                         _ ->
                             ( model, Cmd.none )
@@ -1327,6 +1311,37 @@ actualupdate msg model =
                             ( { model | errorNotes = MC.linkDict fbe.zknote.content }
                             , Cmd.none
                             )
+
+        ( TAReplyData tas urd, state ) ->
+            case urd of
+                Err e ->
+                    ( displayMessageDialog model <| Util.httpErrorString e, Cmd.none )
+
+                Ok uiresponse ->
+                    case uiresponse of
+                        UI.ServerError e ->
+                            ( displayMessageDialog model <| e, Cmd.none )
+
+                        UI.SavedZkNotePlusLinks szkn ->
+                            case state of
+                                EditZkNote emod login ->
+                                    let
+                                        ( eznst, save ) =
+                                            EditZkNote.onLinkBackSaved
+                                                emod
+                                                tas
+                                                szkn
+                                    in
+                                    ( { model | state = EditZkNote eznst login }
+                                    , sendUIMsg model.location <| UI.SaveZkNotePlusLinks save
+                                    )
+
+                                _ ->
+                                    -- just ignore if we're not editing a new note.
+                                    ( model, Cmd.none )
+
+                        _ ->
+                            ( unexpectedMsg model msg, Cmd.none )
 
         ( UserReplyData urd, state ) ->
             case urd of
@@ -2043,9 +2058,9 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
             , Cmd.none
             )
 
-        EditZkNote.GetSelectedText ids ->
+        EditZkNote.GetTASelection id ->
             ( { model | state = EditZkNote emod login }
-            , getSelectedText ids
+            , getTASelection id
             )
 
         EditZkNote.Search s ->
@@ -2342,7 +2357,7 @@ main =
         , subscriptions =
             \_ ->
                 Sub.batch
-                    [ receiveSelectedText SelectedText
+                    [ receiveTASelection TASelection
                     , Browser.Events.onResize (\w h -> WindowSize { width = w, height = h })
                     , keyreceive
                     , LS.localVal ReceiveLocalVal
@@ -2352,10 +2367,10 @@ main =
         }
 
 
-port getSelectedText : List String -> Cmd msg
+port getTASelection : String -> Cmd msg
 
 
-port receiveSelectedText : (JD.Value -> msg) -> Sub msg
+port receiveTASelection : (JD.Value -> msg) -> Sub msg
 
 
 port receiveKeyMsg : (JD.Value -> msg) -> Sub msg
