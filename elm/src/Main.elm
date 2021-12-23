@@ -2303,6 +2303,7 @@ init flags url key zone fontsize =
                     , { key = "r", ctrl = True, alt = True, shift = False, preventDefault = True }
                     , { key = "v", ctrl = True, alt = True, shift = False, preventDefault = True }
                     , { key = "Enter", ctrl = False, alt = False, shift = False, preventDefault = False }
+                    , { key = "l", ctrl = True, alt = True, shift = False, preventDefault = True }
                     ]
     in
     parseUrl url

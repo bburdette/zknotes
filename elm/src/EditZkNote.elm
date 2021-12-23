@@ -1872,6 +1872,9 @@ onWkKeyPress key model =
         Toop.T4 "r" True True False ->
             update (NavChoiceChanged NcRecent) model
 
+        Toop.T4 "l" True True False ->
+            update LinkBackPress model
+
         Toop.T4 "s" True False False ->
             if dirty model then
                 update SavePress model
