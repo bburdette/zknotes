@@ -27,11 +27,11 @@ If you want to compile and run this on your own machine:
   nix build github:bburdette/zknotes
   ```
 
-- it doesn't come with a config.toml file, so copy the one from [here](https://www.zknotes.com/note/4755)
+- Make a config.toml file with `zknotes-server -w myconfig.toml`, then edit as needed.
 
 - run it with:
   ```
-  ./result/bin/zknotes-server
+  ./result/bin/zknotes-server -c myconfig.toml
 
   ```
 
