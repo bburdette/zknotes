@@ -402,7 +402,7 @@ codeSpan : String -> Element msg
 codeSpan snippet =
     E.el
         [ EBk.color
-            (E.rgba 0 0 0 0.04)
+            (E.rgba 0 0 0 0.13)
         , EBd.rounded 2
         , E.paddingXY 5 3
         , EF.family <| [ EF.typeface "mono" ]
@@ -413,7 +413,7 @@ codeSpan snippet =
 codeBlock : { body : String, language : Maybe String } -> Element msg
 codeBlock details =
     E.column
-        [ EBk.color (E.rgba 0 0 0 0.03)
+        [ EBk.color (E.rgba 0 0 0 0.13)
         , E.padding 5
         , EF.family <| [ EF.typeface "mono" ]
         ]
