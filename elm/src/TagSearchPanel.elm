@@ -151,6 +151,12 @@ setSearch s model =
                 , searchText = Search.printTagSearch ts
             }
 
+        NoSearch ->
+            { model
+                | search = s
+                , searchText = ""
+            }
+
         _ ->
             { model | search = s }
 
