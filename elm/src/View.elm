@@ -71,7 +71,7 @@ showZkl id zkl =
 
             Data.From ->
                 E.text "<-"
-        , E.row
+        , E.paragraph
             [ E.clipX
             , E.centerY
             , E.height E.fill
