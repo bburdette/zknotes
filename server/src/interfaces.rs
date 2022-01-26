@@ -9,6 +9,7 @@ use crypto_hash::{hex_digest, Algorithm};
 use either::Either::{Left, Right};
 use log::info;
 // use simple_error::bail;
+use actix_web::HttpRequest;
 use std::error::Error;
 use std::path::Path;
 use uuid::Uuid;
@@ -421,15 +422,20 @@ fn user_interface_loggedin(
 pub fn public_interface(
   config: &Config,
   msg: PublicMessage,
+  req: HttpRequest,
 ) -> Result<ServerResponse, Box<dyn Error>> {
-  info!("process_public_json, what={}", msg.what.as_str());
   match msg.what.as_str() {
     "getzknote" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let id: i64 = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.db.as_path())?;
       let note = sqldata::read_zknote(&conn, None, id)?;
-      info!("public#getzknote: {} - {}", id, note.title);
+      info!(
+        "public#getzknote: {} - {} - {:?}",
+        id,
+        note.title,
+        req.connection_info().realip_remote_addr()
+      );
       Ok(ServerResponse {
         what: "zknote".to_string(),
         content: serde_json::to_value(ZkNoteEdit {
@@ -443,7 +449,12 @@ pub fn public_interface(
       let pubid: String = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.db.as_path())?;
       let note = sqldata::read_zknotepubid(&conn, None, pubid.as_str())?;
-      info!("public#getzknotepubid: {} - {}", pubid, note.title);
+      info!(
+        "public#getzknotepubid: {} - {} - {:?}",
+        pubid,
+        note.title,
+        req.connection_info().realip_remote_addr()
+      );
       Ok(ServerResponse {
         what: "zknote".to_string(),
         content: serde_json::to_value(ZkNoteEdit {

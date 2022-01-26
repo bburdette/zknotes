@@ -76,12 +76,12 @@ fn public(
   req: HttpRequest,
 ) -> HttpResponse {
   info!(
-    "public msg: {:?} \n connection_info: {:?}",
+    "public msg: {:?} connection_info: {:?}",
     &item,
     req.connection_info()
   );
 
-  match interfaces::public_interface(&data, item.into_inner()) {
+  match interfaces::public_interface(&data, item.into_inner(), req) {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'public' err: {:?}", e);
