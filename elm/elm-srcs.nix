@@ -21,8 +21,8 @@
       };
 
       "bburdette/toop" = {
-        sha256 = "091pzp712fwdwqkrikd4yprs5kdfix5q297jz0y9pkpy6pgqfwqw";
-        version = "1.0.1";
+        sha256 = "10i3j97pzc903n0rwkxna6g1pf3lg4zipgrg6r2glygzazaigbs7";
+        version = "1.2.0";
       };
 
       "elm/json" = {

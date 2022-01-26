@@ -83,7 +83,8 @@
               rustc
               sqlite
               pkgconfig
-              openssl.dev 
+              openssl.dev
+              elm2nix
               elmPackages.elm
               elmPackages.elm-analyse
               elmPackages.elm-doc-preview
