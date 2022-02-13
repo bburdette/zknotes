@@ -1,5 +1,5 @@
 use crate::sqldata;
-use crate::sqldata::{get_sysids, note_id, power_delete_zknote, user_id};
+use crate::sqldata::{get_sysids, note_id, power_delete_zknote, user_id, zknote_access_id};
 use either::Either;
 use either::Either::{Left, Right};
 use rusqlite::Connection;
@@ -219,6 +219,118 @@ pub fn build_sql(
   sqlbase.push_str(limclause.as_str());
 
   Ok((sqlbase, baseargs))
+}
+
+pub fn search_zknotes_simple(
+  conn: &Connection,
+  user: i64,
+  search: &ZkNoteSearch,
+) -> Result<Either<ZkListNoteSearchResult, ZkNoteSearchResult>, Box<dyn Error>> {
+  let (sql, args) = build_simple_sql(&conn, user, search.clone())?;
+
+  println!("-----------------------------------------------------");
+  println!("{}", sql);
+
+  let mut pstmt = conn.prepare(sql.as_str())?;
+
+  let sysid = user_id(&conn, "system")?;
+
+  let rec_iter = pstmt.query_map(args.as_slice(), |row| {
+    let id = row.get(0)?;
+    let sysids = get_sysids(conn, sysid, id)?;
+    let access = match zknote_access_id(conn, Some(user), id) {
+      Ok(sqldata::Access::Read) => true,
+      Ok(sqldata::Access::ReadWrite) => true,
+      Ok(sqldata::Access::Private) => false,
+      Err(_) => false,
+    };
+    if access {
+      Ok(Some(ZkListNote {
+        id: id,
+        title: row.get(1)?,
+        user: row.get(2)?,
+        createdate: row.get(3)?,
+        changeddate: row.get(4)?,
+        sysids: sysids,
+      }))
+    } else {
+      Ok(None)
+    }
+  })?;
+
+  if search.list {
+    let mut pv = Vec::new();
+
+    for rsrec in rec_iter {
+      match rsrec {
+        Ok(Some(rec)) => {
+          pv.push(rec);
+        }
+        _ => (),
+      }
+    }
+
+    Ok(Left(ZkListNoteSearchResult {
+      notes: pv,
+      offset: search.offset,
+      what: search.what.clone(),
+    }))
+  } else {
+    let mut pv = Vec::new();
+
+    for rsrec in rec_iter {
+      match rsrec {
+        Ok(Some(rec)) => {
+          pv.push(sqldata::read_zknote(&conn, Some(user), rec.id)?);
+        }
+        _ => (),
+      }
+    }
+
+    Ok(Right(ZkNoteSearchResult {
+      notes: pv,
+      offset: search.offset,
+      what: search.what.clone(),
+    }))
+  }
+}
+
+pub fn build_simple_sql(
+  conn: &Connection,
+  uid: i64,
+  search: ZkNoteSearch,
+) -> Result<(String, Vec<String>), Box<dyn Error>> {
+  let (cls, clsargs) = build_sql_clause(&conn, uid, false, search.tagsearch)?;
+
+  println!("cls:");
+  println!("{}", cls);
+
+  let limclause = match search.limit {
+    Some(lm) => format!(" limit {} offset {}", lm, search.offset),
+    None => "".to_string(), // no limit, no offset either
+                            // None => format!(" offset {}", search.offset),
+  };
+
+  let ordclause = " order by N.id desc ";
+
+  // all notes.
+  let mut sqlbase = format!(
+    "select N.id, N.title, N.user, N.createdate, N.changeddate
+      from zknote N "
+  );
+
+  if cls != "" {
+    sqlbase.push_str(" where ");
+    sqlbase.push_str(cls.as_str());
+  }
+
+  // add order clause to the end.
+  sqlbase.push_str(ordclause);
+
+  // add limit clause to the end.
+  sqlbase.push_str(limclause.as_str());
+
+  Ok((sqlbase, clsargs))
 }
 
 fn build_sql_clause(
