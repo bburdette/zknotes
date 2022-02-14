@@ -228,9 +228,6 @@ pub fn search_zknotes_simple(
 ) -> Result<Either<ZkListNoteSearchResult, ZkNoteSearchResult>, Box<dyn Error>> {
   let (sql, args) = build_simple_sql(&conn, user, search.clone())?;
 
-  println!("-----------------------------------------------------");
-  println!("{}", sql);
-
   let mut pstmt = conn.prepare(sql.as_str())?;
 
   let sysid = user_id(&conn, "system")?;
@@ -301,9 +298,6 @@ pub fn build_simple_sql(
   search: ZkNoteSearch,
 ) -> Result<(String, Vec<String>), Box<dyn Error>> {
   let (cls, clsargs) = build_sql_clause(&conn, uid, false, search.tagsearch)?;
-
-  println!("cls:");
-  println!("{}", cls);
 
   let limclause = match search.limit {
     Some(lm) => format!(" limit {} offset {}", lm, search.offset),
@@ -376,14 +370,12 @@ fn build_sql_clause(
           (
             // clause
             format!(
-              "{} (0 < (select count(zkn.id) from zknote as zkn, zklink
+              "{} (N.id in (select zklink.toid from zknote as zkn, zklink
              where zkn.id = zklink.fromid
-               and zklink.toid = N.id
                and {})
             or
-                0 < (select count(zkn.id) from zknote as zkn, zklink
+                N.id in (select zklink.fromid from zknote as zkn, zklink
              where zkn.id = zklink.toid
-               and zklink.fromid = N.id
                and {}))",
               notstr, clause, clause
             ),
