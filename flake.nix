@@ -93,7 +93,6 @@
               elmPackages.elm-test
               elmPackages.elm-upgrade
               elmPackages.elm-xref
-              # nixos2009.elmPackages.elm-language-server
               elmPackages.elm-language-server
               elmPackages.elm-verify-examples
               elmPackages.elmi-to-json
