@@ -114,6 +114,7 @@ type Msg
     | FromLinkPress Data.ZkListNote
     | PublicPress Bool
     | EditablePress Bool
+    | ShowTitlePress Bool
     | RemoveLink EditLink
     | MdLink EditLink
     | SPMsg SP.Msg
@@ -186,6 +187,7 @@ type alias Model =
     , pendingcomment : Maybe Data.SaveZkNote
     , editable : Bool -- is this note editable in the UI?
     , editableValue : Bool -- is this note editable by other users?
+    , showtitle : Bool
     , pubidtxt : String
     , title : String
     , createdate : Maybe Int
@@ -360,6 +362,7 @@ sznFromModel model =
     , content = model.md
     , pubid = toPubId (isPublic model) model.pubidtxt
     , editable = model.editableValue
+    , showtitle = model.showtitle
     }
 
 
@@ -434,6 +437,7 @@ dirty model =
                         && (r.title == model.title)
                         && (r.content == model.md)
                         && (r.editable == model.editableValue)
+                        && (r.showtitle == model.showtitle)
                         && (Dict.keys model.zklDict == Dict.keys model.initialZklDict)
             )
         |> Maybe.withDefault True
@@ -450,6 +454,7 @@ revert model =
                     , title = r.title
                     , md = r.content
                     , editableValue = r.editable
+                    , showtitle = r.showtitle
                     , zklDict = model.initialZklDict
                 }
             )
@@ -1147,6 +1152,17 @@ zknview zone size recentZkns model =
                             }
                         , E.row [ E.spacing 8, E.alignRight, EF.color TC.darkGrey ] [ E.text "creator", E.el [ EF.bold ] <| E.text model.noteUserName ]
                         ]
+                 , EI.checkbox [ E.width E.shrink ]
+                    { onChange =
+                        if mine && editable then
+                            ShowTitlePress
+
+                        else
+                            always Noop
+                    , icon = EI.defaultCheckbox
+                    , checked = model.showtitle
+                    , label = EI.labelLeft edlabelattr (E.text "show title")
+                    }
                  , E.row [ E.spacing 8, E.width E.fill ]
                     [ EI.checkbox [ E.width E.shrink ]
                         { onChange =
@@ -1609,6 +1625,7 @@ initFull ld zkl zknote dtlinks spm =
       , pendingcomment = Nothing
       , editable = zknote.editable
       , editableValue = zknote.editableValue
+      , showtitle = zknote.showtitle
       , createdate = Just zknote.createdate
       , changeddate = Just zknote.changeddate
       , cells = getCd cc
@@ -1656,6 +1673,7 @@ initNew ld zkl spm links =
     , pendingcomment = Nothing
     , editable = True
     , editableValue = False
+    , showtitle = True
     , createdate = Nothing
     , changeddate = Nothing
     , md = ""
@@ -1700,6 +1718,7 @@ sznToZkn uid uname unote sysids sdzn szn =
     , pubid = Nothing
     , editable = False
     , editableValue = False
+    , showtitle = szn.showtitle
     , createdate = sdzn.changeddate
     , changeddate = sdzn.changeddate
     , sysids = sysids
@@ -2160,6 +2179,10 @@ update msg model =
             -- if we're getting this event, we should be allowed to change the value.
             ( { model | editableValue = not model.editableValue }, None )
 
+        ShowTitlePress _ ->
+            -- if we're getting this event, we should be allowed to change the value.
+            ( { model | showtitle = not model.showtitle }, None )
+
         PublicPress _ ->
             case model.id of
                 Nothing ->
@@ -2284,6 +2307,7 @@ update msg model =
                             , title = "comment"
                             , content = newcomment.text
                             , editable = False
+                            , showtitle = True
                             }
                     in
                     ( { model | newcomment = Nothing, pendingcomment = Just nc }

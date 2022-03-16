@@ -103,6 +103,7 @@ type alias ZkNote =
     , pubid : Maybe String
     , editable : Bool -- whether I'm allowed to edit the note.
     , editableValue : Bool -- whether the user has marked it editable.
+    , showtitle : Bool
     , createdate : Int
     , changeddate : Int
     , sysids : List Int
@@ -115,6 +116,7 @@ type alias SaveZkNote =
     , title : String
     , content : String
     , editable : Bool
+    , showtitle : Bool
     }
 
 
@@ -399,6 +401,7 @@ saveZkNote fzn =
     , title = fzn.title
     , content = fzn.content
     , editable = fzn.editableValue
+    , showtitle = fzn.showtitle
     }
 
 
@@ -471,6 +474,7 @@ decodeZkNote =
         |> andMap (JD.field "pubid" (JD.maybe JD.string))
         |> andMap (JD.field "editable" JD.bool)
         |> andMap (JD.field "editableValue" JD.bool)
+        |> andMap (JD.field "showtitle" JD.bool)
         |> andMap (JD.field "createdate" JD.int)
         |> andMap (JD.field "changeddate" JD.int)
         |> andMap (JD.field "sysids" <| JD.list JD.int)

@@ -35,6 +35,7 @@ type alias Model =
     { id : Maybe Int
     , pubid : Maybe String
     , title : String
+    , showtitle : Bool
     , md : String
     , cells : CellDict
     , panelNote : Maybe Data.ZkNote
@@ -139,7 +140,12 @@ view zone maxw model loggedin =
                     E.none
             , E.column
                 [ E.width (E.fill |> E.maximum 1000), E.centerX, E.spacing 20, E.padding 10, E.alignTop ]
-                [ E.row [ E.width E.fill ]
+                [ if model.showtitle then
+                    E.row [ E.width E.fill ] <| List.singleton <| E.el [ E.centerX, Font.bold, Font.size 20 ] <| E.text model.title
+
+                  else
+                    E.none
+                , E.row [ E.width E.fill ]
                     [ case MC.markdownView (MC.mkRenderer MC.PublicView (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged) model.md of
                         Ok rendered ->
                             E.column
@@ -205,6 +211,7 @@ initFull zknaa =
     { id = Just zknote.id
     , pubid = zknote.pubid
     , title = zknote.title
+    , showtitle = zknote.showtitle
     , md = zknote.content
     , cells = getCd cc
     , panelNote = zknaa.panelNote
@@ -234,6 +241,7 @@ initSzn zknote mbcreatedate mbchangeddate links mbpanelnote =
     { id = zknote.id
     , pubid = zknote.pubid
     , title = zknote.title
+    , showtitle = zknote.showtitle
     , md = zknote.content
     , cells = getCd cc
     , panelNote = mbpanelnote

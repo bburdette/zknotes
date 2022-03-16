@@ -60,6 +60,7 @@ pub struct ZkNote {
   pub usernote: i64,
   pub editable: bool,
   pub editableValue: bool,
+  pub showtitle: bool,
   pub pubid: Option<String>,
   pub createdate: i64,
   pub changeddate: i64,
