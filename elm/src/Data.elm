@@ -425,6 +425,7 @@ encodeSaveZkNote zkn =
             ++ [ ( "title", JE.string zkn.title )
                , ( "content", JE.string zkn.content )
                , ( "editable", JE.bool zkn.editable )
+               , ( "showtitle", JE.bool zkn.showtitle )
                ]
 
 

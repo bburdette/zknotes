@@ -90,6 +90,7 @@ pub struct SaveZkNote {
   pub pubid: Option<String>,
   pub content: String,
   pub editable: bool,
+  pub showtitle: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

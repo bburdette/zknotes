@@ -1598,14 +1598,15 @@ pub fn save_zknote(
     Some(id) => {
       // existing note.  update IF mine.
       match conn.execute(
-        "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4, editable = ?5
-         where id = ?6 and user = ?7",
+        "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4, editable = ?5, showtitle = ?6
+         where id = ?7 and user = ?8",
         params![
           note.title,
           note.content,
           now,
           note.pubid,
           note.editable,
+          note.showtitle,
           note.id,
           uid
         ],
@@ -1619,9 +1620,9 @@ pub fn save_zknote(
             Access::ReadWrite => {
               // update other user's record!  editable flag must be true.
               conn.execute(
-                "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4
-                 where id = ?5 and editable = 1",
-                params![note.title, note.content, now, note.pubid, id],
+                "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4, showtitle = ?5,
+                 where id = ?6 and editable = 1",
+                params![note.title, note.content, now, note.pubid, note.showtitle, id],
               )?;
               Ok(SavedZkNote {
                 id: id,
@@ -1638,14 +1639,15 @@ pub fn save_zknote(
     None => {
       // new note!
       conn.execute(
-        "insert into zknote (title, content, user, pubid, editable, createdate, changeddate)
-         values (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        "insert into zknote (title, content, user, pubid, editable, showtitle, createdate, changeddate)
+         values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
         params![
           note.title,
           note.content,
           uid,
           note.pubid,
           note.editable,
+          note.showtitle,
           now,
           now
         ],
@@ -2251,6 +2253,7 @@ pub fn save_importzknotes(
             pubid: None,
             content: izn.content.clone(),
             editable: false,
+            showtitle: true,
           },
         )?
         .id
@@ -2272,6 +2275,7 @@ pub fn save_importzknotes(
               pubid: None,
               content: "".to_string(),
               editable: false,
+              showtitle: true,
             },
           )?
           .id
@@ -2296,6 +2300,7 @@ pub fn save_importzknotes(
               pubid: None,
               content: "".to_string(),
               editable: false,
+              showtitle: true,
             },
           )?
           .id
