@@ -748,6 +748,7 @@ sendSearch model search =
                         , title = S.printTagSearch search.tagSearch
                         , content = S.encodeTagSearch search.tagSearch |> JE.encode 2
                         , editable = False
+                        , showtitle = True
                         }
                     , links =
                         [ { otherid = ldata.searchid
