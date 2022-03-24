@@ -1,4 +1,18 @@
-module SearchPanel exposing (Command(..), Model, Msg(..), addSearchString, addToSearch, getSearch, initModel, onEnter, paginationView, searchResultUpdated, setSearchString, update, view)
+module SearchPanel exposing
+    ( Command(..)
+    , Model
+    , Msg(..)
+    , addSearchString
+    , addToSearch
+    , getSearch
+    , initModel
+    , onEnter
+    , paginationView
+    , searchResultUpdated
+    , setSearchString
+    , update
+    , view
+    )
 
 import Common exposing (buttonStyle)
 import Data
@@ -93,8 +107,12 @@ type Command
 
 paginationView : Bool -> Model -> Element Msg
 paginationView showCopy model =
-    E.row [ E.width E.fill ]
+    E.row [ E.width E.fill, E.spacing 8 ]
         [ E.map PPMsg <| PP.view model.paginationModel
+        , EI.button (E.alignRight :: buttonStyle)
+            { label = E.text "&"
+            , onPress = Just AndClicked
+            }
         , if showCopy then
             EI.button (E.alignRight :: buttonStyle)
                 { label = E.text "< copy"

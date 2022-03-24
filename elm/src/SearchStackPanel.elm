@@ -1,4 +1,18 @@
-module SearchStackPanel exposing (Command(..), Model, Msg(..), addSearchString, addToSearch, getSearch, initModel, searchResultUpdated, setSearchString, update, view)
+module SearchStackPanel exposing
+    ( Command(..)
+    , Model
+    , Msg(..)
+    , addSearchString
+    , addToSearch
+    , getSearch
+    , initModel
+    , onEnter
+    , paginationView
+    , searchResultUpdated
+    , setSearchString
+    , update
+    , view
+    )
 
 import Common exposing (buttonStyle)
 import Data
@@ -75,6 +89,46 @@ addToSearch model searchmods name =
     { model | spmodel = SP.addToSearch model.spmodel searchmods name }
 
 
+onEnter : Model -> ( Model, Command )
+onEnter model =
+    handleSpUpdate model (SP.onEnter model.spmodel)
+
+
+handleSpUpdate : Model -> ( SP.Model, SP.Command ) -> ( Model, Command )
+handleSpUpdate model ( nm, cmd ) =
+    case cmd of
+        SP.None ->
+            ( { model | spmodel = nm }, None )
+
+        SP.Save ->
+            ( { model | spmodel = nm }, None )
+
+        SP.Search ts ->
+            ( { model | spmodel = nm }
+            , Search <|
+                { ts
+                    | tagSearch =
+                        andifySearch model.searchStack ts.tagSearch
+                }
+            )
+
+        SP.Copy s ->
+            ( model, Copy s )
+
+        SP.And s ->
+            ( { model
+                | searchStack = model.searchStack ++ [ s ]
+                , spmodel = SP.initModel
+              }
+            , None
+            )
+
+
+paginationView : Bool -> Model -> Element Msg
+paginationView showCopy model =
+    E.map SPMsg (SP.paginationView showCopy model.spmodel)
+
+
 type Msg
     = SPMsg SP.Msg
     | MinusPress Int
@@ -118,28 +172,5 @@ update msg model =
             )
 
         SPMsg m ->
-            let
-                ( nm, cmd ) =
-                    SP.update m model.spmodel
-            in
-            case cmd of
-                SP.None ->
-                    ( { model | spmodel = nm }, None )
-
-                SP.Save ->
-                    ( { model | spmodel = nm }, None )
-
-                SP.Search ts ->
-                    ( { model | spmodel = nm }
-                    , Search <|
-                        { ts
-                            | tagSearch =
-                                andifySearch model.searchStack ts.tagSearch
-                        }
-                    )
-
-                SP.Copy s ->
-                    ( model, Copy s )
-
-                SP.And s ->
-                    ( { model | searchStack = model.searchStack ++ [ s ] }, None )
+            handleSpUpdate model <|
+                SP.update m model.spmodel
