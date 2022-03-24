@@ -1,6 +1,8 @@
 # zknotes
 
-A zettelkasten implementation in elm and rust, currently storing notes in sqlite.  Its still in the prototype stage.
+A multiuser zettelkasten implementation in elm and rust, currently storing notes in sqlite.  Its still in the prototype stage.
+
+There are some [docs](https://www.zknotes.com/page/what%20is%20zknotes) hosted in zknotes itself, with a few screenshots.
 
 Notes are in markdown, specifically [elm-markdown](https://package.elm-lang.org/packages/dillonkearns/elm-markdown/latest/), which should allow for some interesting extensions later on.  Currently you can use formulas as in [cellme](https://github.com/bburdette/cellme/).
 
@@ -18,24 +20,25 @@ zknotes has some multi-user features.
 
 If you want to compile and run this on your own machine:
 
-- elm/elm-common is a git submodule, so you'll need to:
+- start by installing the nix package manager on your system, a version with 'flakes' enabled.
+
+- install into a 'result' folder in a local directory:
   ```
-  git submodule init
-  git submodule update
+  nix build github:bburdette/zknotes
   ```
-- the elm and server directories contain shell.nix files.  If you use nix, just execute nix-shell in those directories and you're ready to build.
-- build elm with 
+
+- Make a config.toml file with `zknotes-server -w myconfig.toml`, then edit as needed.
+
+- run it with:
   ```
-  cd elm
-  nix-shell
-  ./watch-build.sh
-  ```
-  or use `./build-prod.sh` if you only want a one-shot build (watch-build uses elm-live).
-- build/run the server with
-  ```
-  cd server
-  nix-shell
-  ./watch-run.sh
+  ./result/bin/zknotes-server -c myconfig.toml
+
   ```
 
 Final note - you're expected to register as a user in order to log in to the website, and this requires an email with a 'magic link' in it.  Chances are the email send won't work when you register (most ISPs prevent this), so look for server/last-email.txt to get your magic link.
+
+### developing.
+
+to install the dev tools needed, clone the zknotes repo locally.  then run `nix develop` in that directory.
+
+there's a watch_run.sh in the server subdirectory, and a watch_build.sh  in the elm directory.  Run those each in a separate terminal and you'll get automatic rebuilds whenever you make changes to code.

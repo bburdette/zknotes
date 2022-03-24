@@ -1,0 +1,12 @@
+ip = '127.0.0.1'
+port = 8010
+createdirs = false
+db = './zknotes.db'
+mainsite = 'http://localhost:8010'
+altmainsite = []
+appname = 'zknotes'
+domain = 'localhost:8010'
+admin_email = 'admin@admin.admin'
+login_token_expiration_ms = 604800000
+email_token_expiration_ms = 86400000
+reset_token_expiration_ms = 86400000

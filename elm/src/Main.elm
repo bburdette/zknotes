@@ -17,7 +17,7 @@ import EditZkNoteListing
 import Element as E exposing (Element)
 import Element.Background as EBk
 import Element.Border as EBd
-import Element.Font as Font
+import Element.Font as EF
 import Element.Input as EI
 import Element.Region
 import File as F
@@ -38,9 +38,11 @@ import Markdown.Html
 import Markdown.Parser
 import Markdown.Renderer
 import MdCommon as MC
+import MessageNLink
 import PublicInterface as PI
 import Random exposing (Seed, initialSeed)
 import ResetPassword
+import Route exposing (Route(..), parseUrl, routeTitle, routeUrl)
 import Schelme.Show exposing (showTerm)
 import Search as S
 import SearchStackPanel as SP
@@ -48,6 +50,7 @@ import SelectString as SS
 import ShowMessage
 import TangoColors as TC
 import Task exposing (Task)
+import Time
 import Toop
 import UUID exposing (UUID)
 import Url exposing (Url)
@@ -57,6 +60,7 @@ import UserInterface as UI
 import UserSettings
 import Util
 import View
+import WindowKeys
 
 
 type Msg
@@ -68,18 +72,23 @@ type Msg
     | ImportMsg Import.Msg
     | ShowMessageMsg ShowMessage.Msg
     | UserReplyData (Result Http.Error UI.ServerResponse)
+    | TAReplyData Data.TASelection (Result Http.Error UI.ServerResponse)
     | PublicReplyData (Result Http.Error PI.ServerResponse)
+    | ErrorIndexNote (Result Http.Error PI.ServerResponse)
     | LoadUrl String
     | InternalUrl Url
-    | SelectedText JD.Value
+    | TASelection JD.Value
     | UrlChanged Url
     | WindowSize Util.Size
-    | CtrlS
     | DisplayMessageMsg (GD.Msg DisplayMessage.Msg)
+    | MessageNLinkMsg (GD.Msg MessageNLink.Msg)
     | SelectDialogMsg (GD.Msg (SS.Msg Int))
     | ChangePasswordDialogMsg (GD.Msg CP.Msg)
     | ChangeEmailDialogMsg (GD.Msg CE.Msg)
     | ResetPasswordMsg ResetPassword.Msg
+    | Zone Time.Zone
+    | WkMsg (Result JD.Error WindowKeys.Key)
+    | ReceiveLocalVal { for : String, name : String, value : Maybe String }
     | Noop
 
 
@@ -91,14 +100,15 @@ type State
     | EView View.Model State
     | Import Import.Model Data.LoginData
     | UserSettings UserSettings.Model Data.LoginData State
-    | ShowMessage ShowMessage.Model Data.LoginData
-    | PubShowMessage ShowMessage.Model
+    | ShowMessage ShowMessage.Model Data.LoginData (Maybe State)
+    | PubShowMessage ShowMessage.Model (Maybe State)
     | LoginShowMessage ShowMessage.Model Data.LoginData Url
     | SelectDialog (SS.GDModel Int) State
     | ChangePasswordDialog CP.GDModel State
     | ChangeEmailDialog CE.GDModel State
     | ResetPassword ResetPassword.Model
     | DisplayMessage DisplayMessage.GDModel State
+    | MessageNLink MessageNLink.GDModel State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
 
 
@@ -109,6 +119,7 @@ type alias Flags =
     , debugstring : String
     , width : Int
     , height : Int
+    , errorid : Maybe Int
     , login : Maybe Data.LoginData
     }
 
@@ -125,37 +136,27 @@ type alias Model =
     , location : String
     , navkey : Browser.Navigation.Key
     , seed : Seed
+    , timezone : Time.Zone
     , savedRoute : SavedRoute
     , prevSearches : List S.TagSearch
     , recentNotes : List Data.ZkListNote
+    , errorNotes : Dict String String
+    , fontsize : Int
     }
 
 
-type Route
-    = PublicZkNote Int
-    | PublicZkPubId String
-    | EditZkNoteR Int
-    | ResetPasswordR String UUID
-    | Top
+type alias PreInitModel =
+    { flags : Flags
+    , url : Url
+    , key : Browser.Navigation.Key
+    , mbzone : Maybe Time.Zone
+    , mbfontsize : Maybe Int
+    }
 
 
-routeTitle : Route -> String
-routeTitle route =
-    case route of
-        PublicZkNote id ->
-            "zknote " ++ String.fromInt id
-
-        PublicZkPubId id ->
-            "zknote " ++ id
-
-        EditZkNoteR id ->
-            "zknote " ++ String.fromInt id
-
-        ResetPasswordR _ _ ->
-            "password reset"
-
-        Top ->
-            "zknotes"
+type PiModel
+    = Ready Model
+    | PreInit PreInitModel
 
 
 urlRequest : Browser.UrlRequest -> Msg
@@ -168,121 +169,146 @@ urlRequest ur =
             LoadUrl str
 
 
-parseUrl : Url -> Maybe Route
-parseUrl url =
-    UP.parse
-        (UP.oneOf
-            [ UP.map PublicZkNote <|
-                UP.s
-                    "note"
-                    </> UP.int
-            , UP.map (\i -> PublicZkPubId (Maybe.withDefault "" (Url.percentDecode i))) <|
-                UP.s
-                    "page"
-                    </> UP.string
-            , UP.map EditZkNoteR <|
-                UP.s
-                    "editnote"
-                    </> UP.int
-            , UP.map ResetPasswordR <|
-                UP.s
-                    "reset"
-                    </> UP.string
-                    </> UP.custom "UUID" (UUID.fromString >> Result.toMaybe)
-            , UP.map Top <| UP.top
-            ]
-        )
-        url
-
-
-routeUrl : Route -> String
-routeUrl route =
-    case route of
-        PublicZkNote id ->
-            UB.absolute [ "note", String.fromInt id ] []
-
-        PublicZkPubId pubid ->
-            UB.absolute [ "page", pubid ] []
-
-        EditZkNoteR id ->
-            UB.absolute [ "editnote", String.fromInt id ] []
-
-        ResetPasswordR user key ->
-            UB.absolute [ "reset", user, UUID.toString key ] []
-
-        Top ->
-            UB.absolute [] []
-
-
-routeState : Model -> Route -> Maybe ( State, Cmd Msg )
+routeState : Model -> Route -> ( State, Cmd Msg )
 routeState model route =
     case route of
+        LoginR ->
+            ( Login (Login.initialModel Nothing "zknotes" model.seed), Cmd.none )
+
         PublicZkNote id ->
             case stateLogin model.state of
                 Just login ->
-                    Just
-                        ( ShowMessage
-                            { message = "loading article"
-                            }
-                            login
-                        , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
-                        )
+                    ( ShowMessage
+                        { message = "loading article"
+                        }
+                        login
+                        (Just model.state)
+                    , case model.state of
+                        EView _ _ ->
+                            -- if we're in "EView" then do this request to stay in EView.
+                            PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNote id)) PublicReplyData
+
+                        _ ->
+                            sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
+                    )
 
                 Nothing ->
-                    Just
-                        ( PubShowMessage
-                            { message = "loading article"
-                            }
-                        , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNote id)) PublicReplyData
-                        )
+                    ( PubShowMessage
+                        { message = "loading article"
+                        }
+                        (Just model.state)
+                    , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNote id)) PublicReplyData
+                    )
 
         PublicZkPubId pubid ->
-            Just
-                ( PubShowMessage
-                    { message = "loading article"
-                    }
-                , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNotePubId pubid)) PublicReplyData
-                )
+            ( case stateLogin model.state of
+                Just login ->
+                    ShowMessage
+                        { message = "loading article"
+                        }
+                        login
+                        (Just model.state)
+
+                Nothing ->
+                    PubShowMessage
+                        { message = "loading article"
+                        }
+                        (Just model.state)
+            , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNotePubId pubid)) PublicReplyData
+            )
 
         EditZkNoteR id ->
             case model.state of
                 EditZkNote st login ->
-                    Just <|
-                        ( EditZkNote st login
-                        , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
-                        )
+                    ( EditZkNote st login
+                    , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
+                    )
 
                 EditZkNoteListing st login ->
-                    Just <|
-                        ( EditZkNoteListing st login
-                        , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
-                        )
+                    ( EditZkNoteListing st login
+                    , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
+                    )
+
+                EView st login ->
+                    ( EView st login
+                    , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNote id)) PublicReplyData
+                    )
 
                 st ->
                     case stateLogin st of
                         Just login ->
-                            Just <|
-                                ( ShowMessage { message = "loading note..." } login
-                                , Cmd.batch
-                                    [ sendUIMsg
-                                        model.location
-                                        (UI.SearchZkNotes <| prevSearchQuery login)
-                                    , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
-                                    ]
-                                )
+                            ( ShowMessage { message = "loading note..." }
+                                login
+                                (Just model.state)
+                            , Cmd.batch
+                                [ sendUIMsg
+                                    model.location
+                                    (UI.SearchZkNotes <| prevSearchQuery login)
+                                , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
+                                ]
+                            )
 
                         Nothing ->
-                            Nothing
+                            ( PubShowMessage { message = "loading note..." }
+                                (Just model.state)
+                            , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNote id)) PublicReplyData
+                            )
+
+        EditZkNoteNew ->
+            case model.state of
+                EditZkNote st login ->
+                    -- handleEditZkNoteCmd should return state probably, or this function should return model.
+                    let
+                        ( nm, cmd ) =
+                            handleEditZkNoteCmd model login (EditZkNote.newWithSave st)
+                    in
+                    ( nm.state, cmd )
+
+                EditZkNoteListing st login ->
+                    ( EditZkNote (EditZkNote.initNew login st.notes st.spmodel []) login, Cmd.none )
+
+                st ->
+                    case stateLogin st of
+                        Just login ->
+                            ( EditZkNote
+                                (EditZkNote.initNew login
+                                    { notes = []
+                                    , offset = 0
+                                    , what = ""
+                                    }
+                                    SP.initModel
+                                    []
+                                )
+                                login
+                            , Cmd.none
+                            )
+
+                        Nothing ->
+                            -- err 'you're not logged in.'
+                            ( (displayMessageDialog { model | state = initLogin model.seed } "can't create a new note; you're not logged in!").state, Cmd.none )
 
         ResetPasswordR username key ->
-            Just ( ResetPassword <| ResetPassword.initialModel username key "zknotes", Cmd.none )
+            ( ResetPassword <| ResetPassword.initialModel username key "zknotes", Cmd.none )
+
+        SettingsR ->
+            case stateLogin model.state of
+                Just login ->
+                    ( UserSettings (UserSettings.init login model.fontsize) login model.state, Cmd.none )
+
+                Nothing ->
+                    ( (displayMessageDialog { model | state = initLogin model.seed } "can't view user settings; you're not logged in!").state, Cmd.none )
 
         Top ->
             if (stateRoute model.state).route == Top then
-                Just ( model.state, Cmd.none )
+                ( model.state, Cmd.none )
 
             else
-                Nothing
+                -- home page if any, or login page if not logged in.
+                let
+                    ( m, c ) =
+                        initialPage model
+                in
+                ( m.state, c )
 
 
 stateRoute : State -> SavedRoute
@@ -307,11 +333,37 @@ stateRoute state =
                             , save = False
                             }
 
+        EView vst _ ->
+            case vst.pubid of
+                Just pubid ->
+                    { route = PublicZkPubId pubid
+                    , save = True
+                    }
+
+                Nothing ->
+                    case vst.id of
+                        Just id ->
+                            { route = PublicZkNote id
+                            , save = True
+                            }
+
+                        Nothing ->
+                            { route = Top
+                            , save = False
+                            }
+
         EditZkNote st login ->
-            { route =
-                st.id
-                    |> Maybe.map EditZkNoteR
-                    |> Maybe.withDefault Top
+            st.id
+                |> Maybe.map (\id -> { route = EditZkNoteR id, save = True })
+                |> Maybe.withDefault { route = EditZkNoteNew, save = False }
+
+        Login _ ->
+            { route = LoginR
+            , save = False
+            }
+
+        UserSettings _ _ _ ->
+            { route = SettingsR
             , save = True
             }
 
@@ -329,6 +381,9 @@ showMessage msg =
 
         DisplayMessageMsg _ ->
             "DisplayMessage"
+
+        MessageNLinkMsg _ ->
+            "MessageNLink"
 
         ViewMsg _ ->
             "ViewMsg"
@@ -362,8 +417,25 @@ showMessage msg =
                            )
                    )
 
+        TAReplyData _ urd ->
+            "TAReplyData: "
+                ++ (Result.map UI.showServerResponse urd
+                        |> Result.mapError Util.httpErrorString
+                        |> (\r ->
+                                case r of
+                                    Ok m ->
+                                        "message: " ++ m
+
+                                    Err e ->
+                                        "error: " ++ e
+                           )
+                   )
+
         PublicReplyData _ ->
             "PublicReplyData"
+
+        ErrorIndexNote _ ->
+            "ErrorIndexNote"
 
         LoadUrl _ ->
             "LoadUrl"
@@ -371,8 +443,8 @@ showMessage msg =
         InternalUrl _ ->
             "InternalUrl"
 
-        SelectedText _ ->
-            "SelectedText"
+        TASelection _ ->
+            "TASelection"
 
         UrlChanged _ ->
             "UrlChanged"
@@ -383,8 +455,11 @@ showMessage msg =
         Noop ->
             "Noop"
 
-        CtrlS ->
-            "CtrlS"
+        WkMsg _ ->
+            "WkMsg"
+
+        ReceiveLocalVal _ ->
+            "ReceiveLocalVal"
 
         SelectDialogMsg _ ->
             "SelectDialogMsg"
@@ -397,6 +472,9 @@ showMessage msg =
 
         ResetPasswordMsg _ ->
             "ResetPasswordMsg"
+
+        Zone _ ->
+            "Zone"
 
 
 showState : State -> String
@@ -426,10 +504,13 @@ showState state =
         DisplayMessage _ _ ->
             "DisplayMessage"
 
-        ShowMessage _ _ ->
+        MessageNLink _ _ ->
+            "MessageNLink"
+
+        ShowMessage _ _ _ ->
             "ShowMessage"
 
-        PubShowMessage _ ->
+        PubShowMessage _ _ ->
             "PubShowMessage"
 
         LoginShowMessage _ _ _ ->
@@ -469,15 +550,15 @@ viewState size state model =
             E.map LoginMsg <| Login.view size lem
 
         EditZkNote em _ ->
-            E.map EditZkNoteMsg <| EditZkNote.view size model.recentNotes em
+            E.map EditZkNoteMsg <| EditZkNote.view model.timezone size model.recentNotes em
 
         EditZkNoteListing em ld ->
             E.map EditZkNoteListingMsg <| EditZkNoteListing.view ld size em
 
-        ShowMessage em _ ->
+        ShowMessage em _ _ ->
             E.map ShowMessageMsg <| ShowMessage.view em
 
-        PubShowMessage em ->
+        PubShowMessage em _ ->
             E.map ShowMessageMsg <| ShowMessage.view em
 
         LoginShowMessage em _ _ ->
@@ -487,15 +568,19 @@ viewState size state model =
             E.map ImportMsg <| Import.view size em
 
         View em ->
-            E.map ViewMsg <| View.view size.width em False
+            E.map ViewMsg <| View.view model.timezone size.width em False
 
         EView em _ ->
-            E.map ViewMsg <| View.view size.width em True
+            E.map ViewMsg <| View.view model.timezone size.width em True
 
         UserSettings em _ _ ->
             E.map UserSettingsMsg <| UserSettings.view em
 
         DisplayMessage em _ ->
+            -- render is at the layout level, not here.
+            E.none
+
+        MessageNLink em _ ->
             -- render is at the layout level, not here.
             E.none
 
@@ -522,14 +607,62 @@ viewState size state model =
 stateSearch : State -> Maybe ( SP.Model, Data.ZkListNoteSearchResult )
 stateSearch state =
     case state of
+        Login _ ->
+            Nothing
+
         EditZkNote emod _ ->
             Just ( emod.spmodel, emod.zknSearchResult )
 
         EditZkNoteListing emod _ ->
             Just ( emod.spmodel, emod.notes )
 
-        _ ->
+        ShowMessage _ _ (Just st) ->
+            stateSearch st
+
+        ShowMessage _ _ Nothing ->
             Nothing
+
+        PubShowMessage _ (Just st) ->
+            stateSearch st
+
+        PubShowMessage _ Nothing ->
+            Nothing
+
+        View _ ->
+            Nothing
+
+        EView _ st ->
+            stateSearch st
+
+        Import _ _ ->
+            Nothing
+
+        UserSettings _ _ st ->
+            stateSearch st
+
+        LoginShowMessage _ _ _ ->
+            Nothing
+
+        SelectDialog _ st ->
+            stateSearch st
+
+        ChangePasswordDialog _ st ->
+            stateSearch st
+
+        ChangeEmailDialog _ st ->
+            stateSearch st
+
+        ResetPassword _ ->
+            Nothing
+
+        DisplayMessage _ st ->
+            stateSearch st
+
+        MessageNLink _ st ->
+            stateSearch st
+
+        Wait st _ ->
+            stateSearch st
 
 
 stateLogin : State -> Maybe Data.LoginData
@@ -559,10 +692,13 @@ stateLogin state =
         DisplayMessage _ bestate ->
             stateLogin bestate
 
-        ShowMessage _ login ->
+        MessageNLink _ bestate ->
+            stateLogin bestate
+
+        ShowMessage _ login _ ->
             Just login
 
-        PubShowMessage _ ->
+        PubShowMessage _ _ ->
             Nothing
 
         LoginShowMessage _ _ _ ->
@@ -612,6 +748,7 @@ sendSearch model search =
                         , title = S.printTagSearch search.tagSearch
                         , content = S.encodeTagSearch search.tagSearch |> JE.encode 2
                         , editable = False
+                        , showtitle = True
                         }
                     , links =
                         [ { otherid = ldata.searchid
@@ -669,6 +806,7 @@ getListing model login =
                     { message = "loading articles"
                     }
                     login
+                    (Just model.state)
             , seed =
                 case model.state of
                     -- save the seed if we're leaving login state.
@@ -688,6 +826,18 @@ addRecentZkListNote recent zkln =
             :: List.filter (\x -> x.id /= zkln.id) recent
 
 
+piview : PiModel -> { title : String, body : List (Html Msg) }
+piview pimodel =
+    case pimodel of
+        Ready model ->
+            view model
+
+        PreInit model ->
+            { title = "zknotes: initializing"
+            , body = []
+            }
+
+
 view : Model -> { title : String, body : List (Html Msg) }
 view model =
     { title =
@@ -698,77 +848,95 @@ view model =
             _ ->
                 routeTitle model.savedRoute.route
     , body =
-        [ Html.div
-            [ -- important to prevent ctrl-s on non-input item focus.
-              -- also has to be done in a div enclosing E.layout, rather than using
-              -- E.htmlAttribute to attach it directly.
-              Html.Attributes.tabindex 0
+        [ case model.state of
+            DisplayMessage dm _ ->
+                Html.map DisplayMessageMsg <|
+                    GD.layout
+                        (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                        dm
 
-            -- blocks on ctrl-s, lets others through.
-            , onKeyDown
-            ]
-            [ case model.state of
-                DisplayMessage dm _ ->
-                    Html.map DisplayMessageMsg <|
-                        GD.layout
-                            (Just { width = min 600 model.size.width, height = min 500 model.size.height })
-                            dm
+            MessageNLink dm _ ->
+                Html.map MessageNLinkMsg <|
+                    GD.layout
+                        (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                        dm
 
-                SelectDialog sdm _ ->
-                    Html.map SelectDialogMsg <|
-                        GD.layout
-                            (Just { width = min 600 model.size.width, height = min 500 model.size.height })
-                            sdm
+            SelectDialog sdm _ ->
+                Html.map SelectDialogMsg <|
+                    GD.layout
+                        (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                        sdm
 
-                ChangePasswordDialog cdm _ ->
-                    Html.map ChangePasswordDialogMsg <|
-                        GD.layout
-                            (Just { width = min 600 model.size.width, height = min 200 model.size.height })
-                            cdm
+            ChangePasswordDialog cdm _ ->
+                Html.map ChangePasswordDialogMsg <|
+                    GD.layout
+                        (Just { width = min 600 model.size.width, height = min 200 model.size.height })
+                        cdm
 
-                ChangeEmailDialog cdm _ ->
-                    Html.map ChangeEmailDialogMsg <|
-                        GD.layout
-                            (Just { width = min 600 model.size.width, height = min 200 model.size.height })
-                            cdm
+            ChangeEmailDialog cdm _ ->
+                Html.map ChangeEmailDialogMsg <|
+                    GD.layout
+                        (Just { width = min 600 model.size.width, height = min 200 model.size.height })
+                        cdm
 
-                _ ->
-                    E.layout [ E.width E.fill ] <| viewState model.size model.state model
-            ]
+            _ ->
+                E.layout [ EF.size model.fontsize, E.width E.fill ] <| viewState model.size model.state model
         ]
     }
 
 
-onKeyDown : Attribute Msg
-onKeyDown =
-    HE.preventDefaultOn "keydown"
-        (JD.map4
-            (\key ctrl alt shift ->
-                case Toop.T4 key ctrl alt shift of
-                    Toop.T4 "s" True False False ->
-                        -- ctrl-s -> prevent default!
-                        -- also, CtrlS message.
-                        ( CtrlS, True )
+piupdate : Msg -> PiModel -> ( PiModel, Cmd Msg )
+piupdate msg initmodel =
+    case initmodel of
+        Ready model ->
+            let
+                ( m, c ) =
+                    urlupdate msg model
+            in
+            ( Ready m, c )
 
-                    _ ->
-                        -- anything else, don't prevent default!
-                        ( Noop, False )
-            )
-            (JD.field "key" JD.string)
-            (JD.field "ctrlKey" JD.bool)
-            (JD.field "altKey" JD.bool)
-            (JD.field "shiftKey" JD.bool)
-        )
+        PreInit imod ->
+            let
+                nmod =
+                    case msg of
+                        Zone zone ->
+                            { imod | mbzone = Just zone }
 
+                        ReceiveLocalVal lv ->
+                            let
+                                default =
+                                    16
+                            in
+                            case lv.name of
+                                "fontsize" ->
+                                    case lv.value of
+                                        Just v ->
+                                            case String.toInt v of
+                                                Just i ->
+                                                    { imod | mbfontsize = Just i }
 
-onKeyUp : msg -> Attribute msg
-onKeyUp msg =
-    HE.preventDefaultOn "keyup" (JD.map alwaysPreventDefault (JD.succeed msg))
+                                                Nothing ->
+                                                    { imod | mbfontsize = Just default }
 
+                                        Nothing ->
+                                            { imod | mbfontsize = Just default }
 
-alwaysPreventDefault : msg -> ( msg, Bool )
-alwaysPreventDefault msg =
-    ( msg, True )
+                                _ ->
+                                    { imod | mbfontsize = Nothing }
+
+                        _ ->
+                            imod
+            in
+            case ( nmod.mbzone, nmod.mbfontsize ) of
+                ( Just zone, Just fontsize ) ->
+                    let
+                        ( m, c ) =
+                            init imod.flags imod.url imod.key zone fontsize
+                    in
+                    ( Ready m, c )
+
+                _ ->
+                    ( PreInit nmod, Cmd.none )
 
 
 {-| urlUpdate: all URL code shall go here! regular code shall not worry about urls!
@@ -784,7 +952,7 @@ urlupdate msg model =
                     let
                         ( state, icmd ) =
                             parseUrl url
-                                |> Maybe.andThen (routeState model)
+                                |> Maybe.map (routeState model)
                                 |> Maybe.withDefault ( model.state, Cmd.none )
 
                         bcmd =
@@ -819,23 +987,22 @@ urlupdate msg model =
                                 ( model, Cmd.none )
 
                             else
-                                case routeState model route of
-                                    Just ( st, rscmd ) ->
-                                        -- swap out the savedRoute, so we don't write over history.
-                                        ( { model
-                                            | state = st
-                                            , savedRoute =
-                                                let
-                                                    nssr =
-                                                        stateRoute st
-                                                in
-                                                { nssr | save = False }
-                                          }
-                                        , rscmd
-                                        )
-
-                                    Nothing ->
-                                        ( model, Cmd.none )
+                                let
+                                    ( st, rscmd ) =
+                                        routeState model route
+                                in
+                                -- swap out the savedRoute, so we don't write over history.
+                                ( { model
+                                    | state = st
+                                    , savedRoute =
+                                        let
+                                            nssr =
+                                                stateRoute st
+                                        in
+                                        { nssr | save = False }
+                                  }
+                                , rscmd
+                                )
 
                         Nothing ->
                             -- load foreign site
@@ -903,6 +1070,21 @@ displayMessageDialog model message =
     }
 
 
+displayMessageNLinkDialog : Model -> String -> String -> String -> Model
+displayMessageNLinkDialog model message url text =
+    { model
+        | state =
+            MessageNLink
+                (MessageNLink.init Common.buttonStyle
+                    message
+                    url
+                    text
+                    (E.map (\_ -> ()) (viewState model.size model.state model))
+                )
+                model.state
+    }
+
+
 actualupdate : Msg -> Model -> ( Model, Cmd Msg )
 actualupdate msg model =
     case ( msg, model.state ) of
@@ -912,6 +1094,10 @@ actualupdate msg model =
                     wfn model msg
             in
             ( nmd, cmd )
+
+        ( ReceiveLocalVal lv, _ ) ->
+            -- update the font size
+            ( model, Cmd.none )
 
         ( WindowSize s, _ ) ->
             ( { model | size = s }, Cmd.none )
@@ -1000,51 +1186,21 @@ actualupdate msg model =
                 ResetPassword.None ->
                     ( { model | state = ResetPassword nst }, Cmd.none )
 
-        ( SelectedText jv, state ) ->
-            case JD.decodeValue JD.string jv of
-                Ok str ->
+        ( TASelection jv, state ) ->
+            case JD.decodeValue Data.decodeTASelection jv of
+                Ok tas ->
                     case state of
                         EditZkNote emod login ->
-                            let
-                                ( newnote_st, cmd ) =
-                                    EditZkNote.gotSelectedText emod str
-                            in
-                            case cmd of
-                                EditZkNote.Save szkpl ->
-                                    ( { model
-                                        | state =
-                                            Wait
-                                                (ShowMessage
-                                                    { message = "waiting for save"
-                                                    }
-                                                    login
-                                                )
-                                                (\md ms ->
-                                                    case ms of
-                                                        UserReplyData (Ok (UI.SavedZkNotePlusLinks _)) ->
-                                                            ( { model
-                                                                | state =
-                                                                    EditZkNote
-                                                                        newnote_st
-                                                                        login
-                                                              }
-                                                            , Cmd.none
-                                                            )
+                            case EditZkNote.onTASelection emod tas of
+                                EditZkNote.TAError e ->
+                                    ( displayMessageDialog model e, Cmd.none )
 
-                                                        _ ->
-                                                            ( unexpectedMsg model ms
-                                                            , Cmd.none
-                                                            )
-                                                )
-                                      }
-                                    , Cmd.batch
-                                        [ sendUIMsg model.location
-                                            (UI.SaveZkNotePlusLinks szkpl)
-                                        ]
+                                EditZkNote.TASave s ->
+                                    ( model
+                                    , sendUIMsgExp model.location
+                                        (UI.SaveZkNotePlusLinks s)
+                                        (TAReplyData tas)
                                     )
-
-                                _ ->
-                                    ( { model | state = EditZkNote newnote_st login }, Cmd.none )
 
                         _ ->
                             ( model, Cmd.none )
@@ -1084,45 +1240,27 @@ actualupdate msg model =
                     , Cmd.none
                     )
 
+                UserSettings.ChangeFontSize size ->
+                    ( { model
+                        | state = UserSettings numod login prevstate
+                        , fontsize = size
+                      }
+                    , LS.storeLocalVal { name = "fontsize", value = String.fromInt size }
+                    )
+
                 UserSettings.None ->
                     ( { model | state = UserSettings numod login prevstate }, Cmd.none )
 
+        ( WkMsg rkey, Login ls ) ->
+            case rkey of
+                Ok key ->
+                    handleLogin model (Login.onWkKeyPress key ls)
+
+                Err _ ->
+                    ( model, Cmd.none )
+
         ( LoginMsg lm, Login ls ) ->
-            let
-                ( lmod, lcmd ) =
-                    Login.update lm ls
-            in
-            case lcmd of
-                Login.None ->
-                    ( { model | state = Login lmod }, Cmd.none )
-
-                Login.Register ->
-                    ( { model | state = Login lmod }
-                    , sendUIMsg model.location
-                        (UI.Register
-                            { uid = lmod.userId
-                            , pwd = lmod.password
-                            , email = ls.email
-                            }
-                        )
-                    )
-
-                Login.Login ->
-                    ( { model | state = Login lmod }
-                    , sendUIMsg model.location <|
-                        UI.Login
-                            { uid = lmod.userId
-                            , pwd = lmod.password
-                            }
-                    )
-
-                Login.Reset ->
-                    ( { model | state = Login lmod }
-                    , sendUIMsg model.location <|
-                        UI.ResetPassword
-                            { uid = lmod.userId
-                            }
-                    )
+            handleLogin model (Login.update lm ls)
 
         ( PublicReplyData prd, state ) ->
             case prd of
@@ -1134,16 +1272,77 @@ actualupdate msg model =
                 Ok piresponse ->
                     case piresponse of
                         PI.ServerError e ->
-                            ( displayMessageDialog model e, Cmd.none )
+                            case Dict.get e model.errorNotes of
+                                Just url ->
+                                    ( displayMessageNLinkDialog { model | state = initLogin model.seed } e url "more info"
+                                    , Cmd.none
+                                    )
+
+                                Nothing ->
+                                    ( displayMessageDialog { model | state = initLogin model.seed } e, Cmd.none )
 
                         PI.ZkNote fbe ->
                             let
                                 vstate =
-                                    View (View.initFull fbe)
+                                    case stateLogin state of
+                                        Just _ ->
+                                            EView (View.initFull fbe) state
+
+                                        Nothing ->
+                                            View (View.initFull fbe)
                             in
                             ( { model | state = vstate }
                             , Cmd.none
                             )
+
+        ( ErrorIndexNote rsein, state ) ->
+            case rsein of
+                Err e ->
+                    ( displayMessageDialog model <| Util.httpErrorString e
+                    , Cmd.none
+                    )
+
+                Ok resp ->
+                    case resp of
+                        PI.ServerError e ->
+                            -- if there's an error on getting the error index note, just display it.
+                            ( displayMessageDialog model <| e, Cmd.none )
+
+                        PI.ZkNote fbe ->
+                            ( { model | errorNotes = MC.linkDict fbe.zknote.content }
+                            , Cmd.none
+                            )
+
+        ( TAReplyData tas urd, state ) ->
+            case urd of
+                Err e ->
+                    ( displayMessageDialog model <| Util.httpErrorString e, Cmd.none )
+
+                Ok uiresponse ->
+                    case uiresponse of
+                        UI.ServerError e ->
+                            ( displayMessageDialog model <| e, Cmd.none )
+
+                        UI.SavedZkNotePlusLinks szkn ->
+                            case state of
+                                EditZkNote emod login ->
+                                    let
+                                        ( eznst, save ) =
+                                            EditZkNote.onLinkBackSaved
+                                                emod
+                                                tas
+                                                szkn
+                                    in
+                                    ( { model | state = EditZkNote eznst login }
+                                    , sendUIMsg model.location <| UI.SaveZkNotePlusLinks save
+                                    )
+
+                                _ ->
+                                    -- just ignore if we're not editing a new note.
+                                    ( model, Cmd.none )
+
+                        _ ->
+                            ( unexpectedMsg model msg, Cmd.none )
 
         ( UserReplyData urd, state ) ->
             case urd of
@@ -1176,6 +1375,7 @@ actualupdate msg model =
                                                     { message = "loading articles"
                                                     }
                                                     login
+                                                    (Just model.state)
                                             , seed =
                                                 case state of
                                                     -- save the seed if we're leaving login state.
@@ -1186,17 +1386,22 @@ actualupdate msg model =
                                                         model.seed
                                         }
                                         S.defaultSearch
+
+                                lgmod =
+                                    { model
+                                        | state =
+                                            ShowMessage { message = "logged in" }
+                                                login
+                                                Nothing
+                                    }
                             in
                             case state of
                                 Login lm ->
-                                    -- we're logged in!  Get article listing.
-                                    getlisting
+                                    -- we're logged in!
+                                    initialPage lgmod
 
                                 LoginShowMessage _ li url ->
                                     let
-                                        lgmod =
-                                            { model | state = ShowMessage { message = "logged in" } login }
-
                                         ( m, cmd ) =
                                             parseUrl url
                                                 |> Maybe.andThen
@@ -1208,13 +1413,12 @@ actualupdate msg model =
                                                             _ ->
                                                                 Just s
                                                     )
-                                                |> Maybe.andThen
+                                                |> Maybe.map
                                                     (routeState
                                                         lgmod
                                                     )
                                                 |> Maybe.map (\( st, cm ) -> ( { model | state = st }, cm ))
-                                                |> Maybe.withDefault
-                                                    getlisting
+                                                |> Maybe.withDefault (initialPage lgmod)
                                     in
                                     ( m, cmd )
 
@@ -1294,7 +1498,7 @@ actualupdate msg model =
                                     , Cmd.none
                                     )
 
-                                ShowMessage _ login ->
+                                ShowMessage _ login _ ->
                                     ( { model | state = EditZkNoteListing { notes = sr, spmodel = SP.initModel, dialog = Nothing } login }
                                     , Cmd.none
                                     )
@@ -1307,11 +1511,7 @@ actualupdate msg model =
                         UI.ZkNote zkn ->
                             case state of
                                 EditZkNote ezn login ->
-                                    let
-                                        ( emod, ecmd ) =
-                                            EditZkNote.onZkNote zkn ezn
-                                    in
-                                    handleEditZkNoteCmd model login emod ecmd
+                                    handleEditZkNoteCmd model login (EditZkNote.onZkNote zkn ezn)
 
                                 _ ->
                                     ( unexpectedMessage model (UI.showServerResponse uiresponse)
@@ -1326,21 +1526,21 @@ actualupdate msg model =
                                             stateSearch state
                                                 |> Maybe.withDefault ( SP.initModel, { notes = [], offset = 0, what = "" } )
 
-                                        sor =
-                                            case state of
-                                                EditZkNote eznst _ ->
-                                                    eznst.searchOrRecent
-
-                                                _ ->
-                                                    EditZkNote.SearchView
-
-                                        ( s, c ) =
+                                        ( nst, c ) =
                                             EditZkNote.initFull login
-                                                sor
                                                 sres
                                                 zne.zknote
                                                 zne.links
                                                 spmod
+
+                                        s =
+                                            case state of
+                                                EditZkNote eznst _ ->
+                                                    EditZkNote.copyTabs eznst nst
+                                                        |> EditZkNote.tabsOnLoad
+
+                                                _ ->
+                                                    nst
                                     in
                                     ( { model
                                         | state =
@@ -1519,6 +1719,7 @@ actualupdate msg model =
                             PubShowMessage
                                 { message = "loading article"
                                 }
+                                (Just model.state)
                       }
                     , sendPIMsg model.location
                         (PI.GetZkNote id)
@@ -1534,65 +1735,51 @@ actualupdate msg model =
                     ( { model | state = EView emod state }, Cmd.none )
 
                 View.Done ->
-                    ( { model | state = state }, Cmd.none )
+                    case state of
+                        EditZkNote _ _ ->
+                            -- revert to the edit state.
+                            ( { model | state = state }, Cmd.none )
 
-                View.Switch _ ->
-                    ( model, Cmd.none )
+                        _ ->
+                            case es.id of
+                                Just id ->
+                                    ( { model | state = state }
+                                    , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
+                                    )
+
+                                Nothing ->
+                                    -- uh, initial page I guess.  would expect prev state to be edit if no id.
+                                    initialPage model
+
+                View.Switch id ->
+                    ( model
+                      -- , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
+                    , sendPIMsg model.location (PI.GetZkNote id)
+                    )
 
         ( EditZkNoteMsg em, EditZkNote es login ) ->
-            let
-                ( emod, ecmd ) =
-                    EditZkNote.update em es
-            in
-            handleEditZkNoteCmd model login emod ecmd
+            handleEditZkNoteCmd model login (EditZkNote.update em es)
 
-        ( CtrlS, EditZkNote es login ) ->
-            let
-                ( emod, ecmd ) =
-                    EditZkNote.onCtrlS es
-            in
-            handleEditZkNoteCmd model login emod ecmd
+        ( WkMsg reskey, EditZkNote es login ) ->
+            case reskey of
+                Ok key ->
+                    handleEditZkNoteCmd model login (EditZkNote.onWkKeyPress key es)
+
+                Err e ->
+                    ( model, Cmd.none )
+
+        ( WkMsg reskey, EditZkNoteListing es login ) ->
+            case reskey of
+                Ok key ->
+                    handleEditZkNoteListing model
+                        login
+                        (EditZkNoteListing.onWkKeyPress key es)
+
+                Err e ->
+                    ( model, Cmd.none )
 
         ( EditZkNoteListingMsg em, EditZkNoteListing es login ) ->
-            let
-                ( emod, ecmd ) =
-                    EditZkNoteListing.update em es login
-            in
-            case ecmd of
-                EditZkNoteListing.None ->
-                    ( { model | state = EditZkNoteListing emod login }, Cmd.none )
-
-                EditZkNoteListing.New ->
-                    ( { model | state = EditZkNote (EditZkNote.initNew login es.notes emod.spmodel) login }, Cmd.none )
-
-                EditZkNoteListing.Selected id ->
-                    ( { model | state = EditZkNoteListing emod login }
-                    , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
-                    )
-
-                EditZkNoteListing.Done ->
-                    ( { model | state = UserSettings (UserSettings.init login) login (EditZkNoteListing es login) }
-                    , Cmd.none
-                    )
-
-                EditZkNoteListing.Import ->
-                    ( { model | state = Import (Import.init login emod.notes emod.spmodel) login }
-                    , Cmd.none
-                    )
-
-                EditZkNoteListing.Search s ->
-                    sendSearch { model | state = EditZkNoteListing emod login } s
-
-                EditZkNoteListing.PowerDelete s ->
-                    ( { model | state = EditZkNoteListing emod login }
-                    , sendUIMsg model.location
-                        (UI.PowerDelete s)
-                    )
-
-                EditZkNoteListing.SearchHistory ->
-                    ( shDialog model
-                    , Cmd.none
-                    )
+            handleEditZkNoteListing model login (EditZkNoteListing.update em es login)
 
         ( ImportMsg em, Import es login ) ->
             let
@@ -1665,10 +1852,40 @@ actualupdate msg model =
                     ( { model | state = DisplayMessage nmod prevstate }, Cmd.none )
 
                 GD.Ok return ->
-                    ( { model | state = prevstate }, Cmd.none )
+                    case prevstate of
+                        ShowMessage _ _ (Just ps) ->
+                            ( { model | state = ps }, Cmd.none )
+
+                        PubShowMessage _ (Just ps) ->
+                            ( { model | state = ps }, Cmd.none )
+
+                        _ ->
+                            ( { model | state = prevstate }, Cmd.none )
 
                 GD.Cancel ->
                     ( { model | state = prevstate }, Cmd.none )
+
+        ( MessageNLinkMsg bm, MessageNLink bs prevstate ) ->
+            case GD.update bm bs of
+                GD.Dialog nmod ->
+                    ( { model | state = MessageNLink nmod prevstate }, Cmd.none )
+
+                GD.Ok return ->
+                    case prevstate of
+                        ShowMessage _ _ (Just ps) ->
+                            ( { model | state = ps }, Cmd.none )
+
+                        PubShowMessage _ (Just ps) ->
+                            ( { model | state = ps }, Cmd.none )
+
+                        _ ->
+                            ( { model | state = prevstate }, Cmd.none )
+
+                GD.Cancel ->
+                    ( { model | state = prevstate }, Cmd.none )
+
+        ( MessageNLinkMsg GD.Noop, _ ) ->
+            ( model, Cmd.none )
 
         ( Noop, _ ) ->
             ( model, Cmd.none )
@@ -1691,7 +1908,7 @@ actualupdate msg model =
             )
 
 
-handleEditZkNoteCmd model login emod ecmd =
+handleEditZkNoteCmd model login ( emod, ecmd ) =
     let
         backtolisting =
             let
@@ -1759,6 +1976,7 @@ handleEditZkNoteCmd model login emod ecmd =
                             { message = "loading articles"
                             }
                             login
+                            (Just model.state)
                         )
                         onmsg
               }
@@ -1800,7 +2018,9 @@ handleEditZkNoteCmd model login emod ecmd =
         EditZkNote.Switch id ->
             let
                 ( st, cmd ) =
-                    ( ShowMessage { message = "loading note..." } login
+                    ( ShowMessage { message = "loading note..." }
+                        login
+                        (Just model.state)
                     , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
                     )
             in
@@ -1809,7 +2029,9 @@ handleEditZkNoteCmd model login emod ecmd =
         EditZkNote.SaveSwitch s id ->
             let
                 ( st, cmd ) =
-                    ( ShowMessage { message = "loading note..." } login
+                    ( ShowMessage { message = "loading note..." }
+                        login
+                        (Just model.state)
                     , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
                     )
             in
@@ -1821,12 +2043,25 @@ handleEditZkNoteCmd model login emod ecmd =
                 ]
             )
 
-        EditZkNote.View szn mbpanel ->
-            ( { model | state = EView (View.initSzn szn [] mbpanel) (EditZkNote emod login) }, Cmd.none )
+        EditZkNote.View v ->
+            ( { model
+                | state =
+                    EView
+                        (View.initSzn
+                            v.note
+                            v.createdate
+                            v.changeddate
+                            v.links
+                            v.panelnote
+                        )
+                        (EditZkNote emod login)
+              }
+            , Cmd.none
+            )
 
-        EditZkNote.GetSelectedText ids ->
+        EditZkNote.GetTASelection id ->
             ( { model | state = EditZkNote emod login }
-            , getSelectedText ids
+            , getTASelection id
             )
 
         EditZkNote.Search s ->
@@ -1834,6 +2069,14 @@ handleEditZkNoteCmd model login emod ecmd =
 
         EditZkNote.SearchHistory ->
             ( shDialog model
+            , Cmd.none
+            )
+
+        EditZkNote.BigSearch ->
+            backtolisting
+
+        EditZkNote.Settings ->
+            ( { model | state = UserSettings (UserSettings.init login model.fontsize) login (EditZkNote emod login) }
             , Cmd.none
             )
 
@@ -1845,6 +2088,93 @@ handleEditZkNoteCmd model login emod ecmd =
         EditZkNote.SetHomeNote id ->
             ( { model | state = EditZkNote emod login }
             , sendUIMsg model.location (UI.SetHomeNote id)
+            )
+
+        EditZkNote.AddToRecent zkln ->
+            ( { model
+                | state = EditZkNote emod login
+                , recentNotes = addRecentZkListNote model.recentNotes zkln
+              }
+            , Cmd.none
+            )
+
+        EditZkNote.Cmd cmd ->
+            ( { model | state = EditZkNote emod login }
+            , Cmd.map EditZkNoteMsg cmd
+            )
+
+
+handleEditZkNoteListing : Model -> Data.LoginData -> ( EditZkNoteListing.Model, EditZkNoteListing.Command ) -> ( Model, Cmd Msg )
+handleEditZkNoteListing model login ( emod, ecmd ) =
+    case ecmd of
+        EditZkNoteListing.None ->
+            ( { model | state = EditZkNoteListing emod login }, Cmd.none )
+
+        EditZkNoteListing.New ->
+            ( { model | state = EditZkNote (EditZkNote.initNew login emod.notes emod.spmodel []) login }, Cmd.none )
+
+        EditZkNoteListing.Selected id ->
+            ( { model | state = EditZkNoteListing emod login }
+            , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
+            )
+
+        EditZkNoteListing.Done ->
+            ( { model | state = UserSettings (UserSettings.init login model.fontsize) login (EditZkNoteListing emod login) }
+            , Cmd.none
+            )
+
+        EditZkNoteListing.Import ->
+            ( { model | state = Import (Import.init login emod.notes emod.spmodel) login }
+            , Cmd.none
+            )
+
+        EditZkNoteListing.Search s ->
+            sendSearch { model | state = EditZkNoteListing emod login } s
+
+        EditZkNoteListing.PowerDelete s ->
+            ( { model | state = EditZkNoteListing emod login }
+            , sendUIMsg model.location
+                (UI.PowerDelete s)
+            )
+
+        EditZkNoteListing.SearchHistory ->
+            ( shDialog model
+            , Cmd.none
+            )
+
+
+handleLogin : Model -> ( Login.Model, Login.Cmd ) -> ( Model, Cmd Msg )
+handleLogin model ( lmod, lcmd ) =
+    case lcmd of
+        Login.None ->
+            ( { model | state = Login lmod }, Cmd.none )
+
+        Login.Register ->
+            ( { model | state = Login lmod }
+            , sendUIMsg model.location
+                (UI.Register
+                    { uid = lmod.userId
+                    , pwd = lmod.password
+                    , email = lmod.email
+                    }
+                )
+            )
+
+        Login.Login ->
+            ( { model | state = Login lmod }
+            , sendUIMsg model.location <|
+                UI.Login
+                    { uid = lmod.userId
+                    , pwd = lmod.password
+                    }
+            )
+
+        Login.Reset ->
+            ( { model | state = Login lmod }
+            , sendUIMsg model.location <|
+                UI.ResetPassword
+                    { uid = lmod.userId
+                    }
             )
 
 
@@ -1865,8 +2195,74 @@ prevSearchQuery =
         }
 
 
-init : Flags -> Url -> Browser.Navigation.Key -> ( Model, Cmd Msg )
-init flags url key =
+preinit : Flags -> Url -> Browser.Navigation.Key -> ( PiModel, Cmd Msg )
+preinit flags url key =
+    ( PreInit
+        { flags = flags
+        , url = url
+        , key = key
+        , mbzone = Nothing
+        , mbfontsize = Nothing
+        }
+    , Cmd.batch
+        [ Task.perform Zone Time.here
+        , LS.getLocalVal { for = "", name = "fontsize" }
+        ]
+    )
+
+
+initialPage : Model -> ( Model, Cmd Msg )
+initialPage curmodel =
+    (case stateLogin curmodel.state of
+        Just login ->
+            case login.homenote of
+                Just id ->
+                    ( curmodel
+                    , Cmd.batch
+                        [ sendUIMsg
+                            curmodel.location
+                            (UI.SearchZkNotes <| prevSearchQuery login)
+                        , sendUIMsg curmodel.location (UI.GetZkNoteEdit { zknote = id })
+                        ]
+                    )
+
+                Nothing ->
+                    ( { curmodel
+                        | state =
+                            EditZkNote
+                                (EditZkNote.initNew login
+                                    { notes = []
+                                    , offset = 0
+                                    , what = ""
+                                    }
+                                    SP.initModel
+                                    []
+                                )
+                                login
+                      }
+                    , Cmd.batch
+                        [ sendUIMsg
+                            curmodel.location
+                            (UI.SearchZkNotes <| prevSearchQuery login)
+                        ]
+                    )
+
+        Nothing ->
+            ( { curmodel | state = initLogin curmodel.seed }, Cmd.none )
+    )
+        |> (\( m, c ) ->
+                ( m
+                , Cmd.batch
+                    [ Browser.Navigation.replaceUrl m.navkey
+                        (routeUrl (stateRoute m.state).route)
+                    , c
+                    ]
+                )
+           )
+
+
+init : Flags -> Url -> Browser.Navigation.Key -> Time.Zone -> Int -> ( Model, Cmd Msg )
+init flags url key zone fontsize =
     let
         seed =
             initialSeed (flags.seed + 7)
@@ -1875,84 +2271,78 @@ init flags url key =
             { state =
                 case flags.login of
                     Nothing ->
-                        PubShowMessage { message = "loading..." }
+                        PubShowMessage { message = "loading..." } Nothing
 
                     Just l ->
-                        ShowMessage { message = "loading..." } l
+                        ShowMessage { message = "loading..." } l Nothing
             , size = { width = flags.width, height = flags.height }
             , location = flags.location
             , navkey = key
             , seed = seed
+            , timezone = zone
             , savedRoute = { route = Top, save = False }
             , prevSearches = []
             , recentNotes = []
+            , errorNotes = Dict.empty
+            , fontsize = fontsize
             }
 
-        ( model, cmd ) =
-            parseUrl url
-                |> Maybe.andThen
-                    (\s ->
-                        case s of
-                            Top ->
-                                Nothing
-
-                            _ ->
-                                Just s
-                    )
-                |> Maybe.andThen
-                    (routeState
-                        imodel
-                    )
+        geterrornote =
+            flags.errorid
                 |> Maybe.map
-                    (\( rs, rcmd ) ->
-                        ( { imodel
-                            | state = rs
-                          }
-                        , rcmd
-                        )
+                    (\id ->
+                        PI.getErrorIndexNote flags.location id ErrorIndexNote
                     )
-                |> Maybe.withDefault
-                    (let
-                        ( m, c ) =
-                            case flags.login of
-                                Just login ->
-                                    case login.homenote of
-                                        Just id ->
-                                            ( imodel
-                                            , Cmd.batch
-                                                [ sendUIMsg
-                                                    flags.location
-                                                    (UI.SearchZkNotes <| prevSearchQuery login)
-                                                , sendUIMsg flags.location (UI.GetZkNoteEdit { zknote = id })
-                                                ]
-                                            )
+                |> Maybe.withDefault Cmd.none
 
-                                        Nothing ->
-                                            let
-                                                ( m2, c2 ) =
-                                                    getListing imodel login
-                                            in
-                                            ( m2
-                                            , Cmd.batch
-                                                [ sendUIMsg
-                                                    flags.location
-                                                    (UI.SearchZkNotes <| prevSearchQuery login)
-                                                , c2
-                                                ]
-                                            )
-
-                                Nothing ->
-                                    ( { imodel | state = initLogin seed }, Cmd.none )
-                     in
-                     ( m
-                     , Cmd.batch
-                        [ c
-                        , Browser.Navigation.replaceUrl key "/"
-                        ]
-                     )
-                    )
+        setkeys =
+            skcommand <|
+                WindowKeys.SetWindowKeys
+                    [ { key = "s", ctrl = True, alt = False, shift = False, preventDefault = True }
+                    , { key = "s", ctrl = True, alt = True, shift = False, preventDefault = True }
+                    , { key = "e", ctrl = True, alt = True, shift = False, preventDefault = True }
+                    , { key = "r", ctrl = True, alt = True, shift = False, preventDefault = True }
+                    , { key = "v", ctrl = True, alt = True, shift = False, preventDefault = True }
+                    , { key = "Enter", ctrl = False, alt = False, shift = False, preventDefault = False }
+                    , { key = "l", ctrl = True, alt = True, shift = False, preventDefault = True }
+                    ]
     in
-    ( model, cmd )
+    parseUrl url
+        |> Maybe.andThen
+            (\s ->
+                case s of
+                    Top ->
+                        Nothing
+
+                    _ ->
+                        Just s
+            )
+        |> Maybe.map
+            (routeState
+                imodel
+            )
+        |> Maybe.map
+            (\( rs, rcmd ) ->
+                ( { imodel
+                    | state = rs
+                  }
+                , Cmd.batch [ rcmd, geterrornote, setkeys ]
+                )
+            )
+        |> Maybe.withDefault
+            (let
+                ( m, c ) =
+                    initialPage imodel
+             in
+             ( m
+             , Cmd.batch
+                [ c
+                , geterrornote
+                , setkeys
+                , Browser.Navigation.replaceUrl key "/"
+                ]
+             )
+            )
 
 
 initLogin : Seed -> State
@@ -1960,24 +2350,40 @@ initLogin seed =
     Login <| Login.initialModel Nothing "zknotes" seed
 
 
-main : Platform.Program Flags Model Msg
+main : Platform.Program Flags PiModel Msg
 main =
     Browser.application
-        { init = init
-        , view = view
-        , update = urlupdate
+        { init = preinit
+        , view = piview
+        , update = piupdate
         , subscriptions =
             \_ ->
                 Sub.batch
-                    [ receiveSelectedText SelectedText
+                    [ receiveTASelection TASelection
                     , Browser.Events.onResize (\w h -> WindowSize { width = w, height = h })
+                    , keyreceive
+                    , LS.localVal ReceiveLocalVal
                     ]
         , onUrlRequest = urlRequest
         , onUrlChange = UrlChanged
         }
 
 
-port getSelectedText : List String -> Cmd msg
+port getTASelection : String -> Cmd msg
 
 
-port receiveSelectedText : (JD.Value -> msg) -> Sub msg
+port receiveTASelection : (JD.Value -> msg) -> Sub msg
+
+
+port receiveKeyMsg : (JD.Value -> msg) -> Sub msg
+
+
+keyreceive =
+    receiveKeyMsg <| WindowKeys.receive WkMsg
+
+
+port sendKeyCommand : JE.Value -> Cmd msg
+
+
+skcommand =
+    WindowKeys.send sendKeyCommand

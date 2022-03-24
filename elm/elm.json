@@ -2,7 +2,7 @@
     "type": "application",
     "source-directories": [
         "src",
-        "elm-common/src/"
+        "elmcommon/src/"
     ],
     "elm-version": "0.19.1",
     "dependencies": {
@@ -10,9 +10,10 @@
             "TSFoster/elm-uuid": "4.1.0",
             "bburdette/cellme": "1.0.0",
             "bburdette/schelme": "3.0.0",
-            "bburdette/toop": "1.0.1",
+            "bburdette/toop": "1.2.0",
             "bburdette/typed-collections": "1.0.2",
-            "dillonkearns/elm-markdown": "6.0.1",
+            "bburdette/windowkeys": "1.0.1",
+            "dillonkearns/elm-markdown": "7.0.0",
             "elm/browser": "1.0.2",
             "elm/core": "1.0.5",
             "elm/file": "1.0.5",
@@ -39,7 +40,9 @@
         }
     },
     "test-dependencies": {
-        "direct": {},
+        "direct": {
+            "elm-explorations/test": "1.2.2"
+        },
         "indirect": {}
     }
 }

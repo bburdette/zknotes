@@ -16,6 +16,7 @@ type Msg
     | DonePress
     | ChangePassPress
     | ChangeEmailPress
+    | SetFontSize Int
     | LogOutPress
 
 
@@ -24,17 +25,19 @@ type Command
     | LogOut
     | ChangePassword
     | ChangeEmail
+    | ChangeFontSize Int
     | None
 
 
 type alias Model =
     { login : Data.LoginData
+    , fontsize : Int
     }
 
 
-init : Data.LoginData -> Model
-init login =
-    { login = login }
+init : Data.LoginData -> Int -> Model
+init login fontsize =
+    { login = login, fontsize = fontsize }
 
 
 view : Model -> Element Msg
@@ -66,6 +69,30 @@ view model =
                     ]
                 , EI.button (E.centerX :: buttonStyle) { onPress = Just ChangePassPress, label = E.text "change password" }
                 , EI.button (E.centerX :: buttonStyle) { onPress = Just ChangeEmailPress, label = E.text "change email" }
+                , EI.slider
+                    [ E.height (E.px 30)
+                    , E.behindContent
+                        (E.el
+                            [ E.width E.fill
+                            , E.height (E.px 2)
+                            , E.centerY
+                            , EBk.color TC.grey
+                            , EBd.rounded 2
+                            ]
+                            E.none
+                        )
+                    ]
+                    { onChange = round >> SetFontSize
+                    , label =
+                        EI.labelAbove []
+                            (E.text "font size")
+                    , min = 2
+                    , max = 40
+                    , step = Just 1
+                    , value = model.fontsize |> toFloat
+                    , thumb =
+                        EI.defaultThumb
+                    }
                 ]
             ]
         ]
@@ -85,6 +112,9 @@ update msg model =
 
         ChangeEmailPress ->
             ( model, ChangeEmail )
+
+        SetFontSize size ->
+            ( { model | fontsize = size }, ChangeFontSize size )
 
         Noop ->
             ( model, None )

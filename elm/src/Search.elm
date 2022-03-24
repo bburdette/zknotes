@@ -15,11 +15,13 @@ import Parser
         , chompWhile
         , getChompedString
         , lazy
+        , loop
         , map
         , oneOf
         , run
         , succeed
         , symbol
+        , token
         )
 import TDict exposing (TDict)
 import Util exposing (first, rest)
@@ -309,11 +311,34 @@ searchTerm : Parser String
 searchTerm =
     succeed identity
         |. symbol "'"
-        |= (getChompedString <|
-                succeed ()
-                    |. chompWhile (\c -> c /= '\'')
-           )
-        |. symbol "'"
+        |= loop [] termHelp
+
+
+termHelp : List String -> Parser (Step (List String) String)
+termHelp revChunks =
+    oneOf
+        [ succeed (Loop ("'" :: revChunks))
+            |. token "\\'"
+        , token "'"
+            |> map (\_ -> Done (String.join "" (List.reverse revChunks)))
+        , chompWhile isUninteresting
+            |> getChompedString
+            |> map
+                (\chunk ->
+                    case chunk of
+                        "" ->
+                            -- prevent infinite loop!
+                            Done (String.join "" (List.reverse revChunks))
+
+                        _ ->
+                            Loop (chunk :: revChunks)
+                )
+        ]
+
+
+isUninteresting : Char -> Bool
+isUninteresting char =
+    char /= '\\' && char /= '\''
 
 
 spaces : Parser ()

@@ -103,6 +103,7 @@ type alias ZkNote =
     , pubid : Maybe String
     , editable : Bool -- whether I'm allowed to edit the note.
     , editableValue : Bool -- whether the user has marked it editable.
+    , showtitle : Bool
     , createdate : Int
     , changeddate : Int
     , sysids : List Int
@@ -115,6 +116,7 @@ type alias SaveZkNote =
     , title : String
     , content : String
     , editable : Bool
+    , showtitle : Bool
     }
 
 
@@ -198,6 +200,19 @@ type alias ZkNoteEdit =
     }
 
 
+type alias TASelection =
+    { text : String
+    , offset : Int
+    }
+
+
+decodeTASelection : JD.Decoder TASelection
+decodeTASelection =
+    JD.succeed TASelection
+        |> andMap (JD.field "text" JD.string)
+        |> andMap (JD.field "offset" JD.int)
+
+
 
 ----------------------------------------
 -- Json encoders/decoders
@@ -208,8 +223,8 @@ encodeRegistration : Registration -> JE.Value
 encodeRegistration l =
     JE.object
         [ ( "uid", JE.string l.uid )
-        , ( "newpwd", JE.string l.pwd )
-        , ( "reset_key", JE.string l.email )
+        , ( "pwd", JE.string l.pwd )
+        , ( "email", JE.string l.email )
         ]
 
 
@@ -386,6 +401,7 @@ saveZkNote fzn =
     , title = fzn.title
     , content = fzn.content
     , editable = fzn.editableValue
+    , showtitle = fzn.showtitle
     }
 
 
@@ -409,6 +425,7 @@ encodeSaveZkNote zkn =
             ++ [ ( "title", JE.string zkn.title )
                , ( "content", JE.string zkn.content )
                , ( "editable", JE.bool zkn.editable )
+               , ( "showtitle", JE.bool zkn.showtitle )
                ]
 
 
@@ -458,6 +475,7 @@ decodeZkNote =
         |> andMap (JD.field "pubid" (JD.maybe JD.string))
         |> andMap (JD.field "editable" JD.bool)
         |> andMap (JD.field "editableValue" JD.bool)
+        |> andMap (JD.field "showtitle" JD.bool)
         |> andMap (JD.field "createdate" JD.int)
         |> andMap (JD.field "changeddate" JD.int)
         |> andMap (JD.field "sysids" <| JD.list JD.int)
@@ -473,15 +491,15 @@ decodeZkNoteEdit =
 
 decodeLoginData : JD.Decoder LoginData
 decodeLoginData =
-    JD.map8 LoginData
-        (JD.field "userid" JD.int)
-        (JD.field "name" JD.string)
-        (JD.field "zknote" JD.int)
-        (JD.field "homenote" (JD.maybe JD.int))
-        (JD.field "publicid" JD.int)
-        (JD.field "shareid" JD.int)
-        (JD.field "searchid" JD.int)
-        (JD.field "commentid" JD.int)
+    JD.succeed LoginData
+        |> andMap (JD.field "userid" JD.int)
+        |> andMap (JD.field "name" JD.string)
+        |> andMap (JD.field "zknote" JD.int)
+        |> andMap (JD.field "homenote" (JD.maybe JD.int))
+        |> andMap (JD.field "publicid" JD.int)
+        |> andMap (JD.field "shareid" JD.int)
+        |> andMap (JD.field "searchid" JD.int)
+        |> andMap (JD.field "commentid" JD.int)
 
 
 encodeImportZkNote : ImportZkNote -> JE.Value
@@ -503,3 +521,13 @@ encodeImportZkNote izn =
 editNoteLink : Int -> String
 editNoteLink noteid =
     UB.absolute [ "editnote", String.fromInt noteid ] []
+
+
+flipDirection : Direction -> Direction
+flipDirection direction =
+    case direction of
+        To ->
+            From
+
+        From ->
+            To

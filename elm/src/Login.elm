@@ -1,4 +1,4 @@
-module Login exposing (Cmd(..), Mode(..), Model, Msg(..), initialModel, invalidUserOrPwd, loginView, makeUrlP, registrationSent, registrationView, sentView, unregisteredUser, update, urlToState, userExists, view)
+module Login exposing (Cmd(..), Mode(..), Model, Msg(..), initialModel, invalidUserOrPwd, loginView, makeUrlP, onWkKeyPress, registrationSent, registrationView, sentView, unregisteredUser, update, urlToState, userExists, view)
 
 import Common exposing (buttonStyle)
 import Dict exposing (Dict)
@@ -11,7 +11,9 @@ import Element.Input as Input
 import Html exposing (Html)
 import Random exposing (Seed)
 import TangoColors as Color
+import Toop
 import Util exposing (httpErrorString)
+import WindowKeys as WK
 
 
 type Mode
@@ -293,6 +295,24 @@ sentView model =
                     "Reset sent..."
             )
         ]
+
+
+onWkKeyPress : WK.Key -> Model -> ( Model, Cmd )
+onWkKeyPress key model =
+    case Toop.T4 key.key key.ctrl key.alt key.shift of
+        Toop.T4 "Enter" False False False ->
+            case model.mode of
+                LoginMode ->
+                    update LoginPressed model
+
+                RegistrationMode ->
+                    update RegisterPressed model
+
+                ResetMode ->
+                    update ResetPressed model
+
+        _ ->
+            ( model, None )
 
 
 update : Msg -> Model -> ( Model, Cmd )

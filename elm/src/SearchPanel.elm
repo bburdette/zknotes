@@ -1,4 +1,4 @@
-module SearchPanel exposing (Command(..), Model, Msg(..), addSearchString, addToSearch, getSearch, initModel, searchResultUpdated, setSearchString, update, view)
+module SearchPanel exposing (Command(..), Model, Msg(..), addSearchString, addToSearch, getSearch, initModel, onEnter, paginationView, searchResultUpdated, setSearchString, update, view)
 
 import Common exposing (buttonStyle)
 import Data
@@ -71,6 +71,11 @@ addToSearch model searchmods name =
     { model | tagSearchModel = TSP.addToSearchPanel model.tagSearchModel searchmods name }
 
 
+onEnter : Model -> ( Model, Command )
+onEnter model =
+    handleTspUpdate model (TSP.onEnter model.tagSearchModel)
+
+
 type Msg
     = TSPMsg TSP.Msg
     | PPMsg PP.Msg
@@ -86,26 +91,65 @@ type Command
     | And TagSearch
 
 
+paginationView : Bool -> Model -> Element Msg
+paginationView showCopy model =
+    E.row [ E.width E.fill ]
+        [ E.map PPMsg <| PP.view model.paginationModel
+        , if showCopy then
+            EI.button (E.alignRight :: buttonStyle)
+                { label = E.text "< copy"
+                , onPress = Just CopyClicked
+                }
+
+          else
+            E.none
+        ]
+
+
+
+-- , E.row [ E.width E.fill ]
+--     [ E.map PPMsg <| PP.view model.paginationModel
+--     , EI.button (E.alignRight :: buttonStyle)
+--         { label = E.text "&"
+--         , onPress = Just AndClicked
+--         }
+--     , if showCopy then
+--         EI.button (E.alignRight :: buttonStyle)
+--             { label = E.text "< copy"
+--             , onPress = Just CopyClicked
+--             }
+--       else
+--         E.none
+--     ]
+
+
 view : Bool -> Bool -> Int -> Model -> Element Msg
 view showCopy narrow nblevel model =
     column [ E.width E.fill, E.spacing 8 ]
         [ E.map TSPMsg <| TSP.view narrow nblevel model.tagSearchModel
-        , E.row [ E.width E.fill ]
-            [ E.map PPMsg <| PP.view model.paginationModel
-            , EI.button (E.alignRight :: buttonStyle)
-                { label = E.text "&"
-                , onPress = Just AndClicked
-                }
-            , if showCopy then
-                EI.button (E.alignRight :: buttonStyle)
-                    { label = E.text "< copy"
-                    , onPress = Just CopyClicked
-                    }
-
-              else
-                E.none
-            ]
+        , paginationView showCopy model
         ]
+
+
+handleTspUpdate : Model -> ( TSP.Model, TSP.Command ) -> ( Model, Command )
+handleTspUpdate model ( nm, cmd ) =
+    case cmd of
+        TSP.None ->
+            ( { model | tagSearchModel = nm }, None )
+
+        TSP.Save ->
+            ( { model | tagSearchModel = nm }, None )
+
+        TSP.Search ts ->
+            ( { model | tagSearchModel = nm, paginationModel = PP.initModel }
+            , Search <|
+                { tagSearch = ts
+                , offset = 0
+                , limit = Just model.paginationModel.increment
+                , what = ""
+                , list = True
+                }
+            )
 
 
 update : Msg -> Model -> ( Model, Command )
@@ -123,27 +167,7 @@ update msg model =
                     ( model, None )
 
         TSPMsg m ->
-            let
-                ( nm, cmd ) =
-                    TSP.update m model.tagSearchModel
-            in
-            case cmd of
-                TSP.None ->
-                    ( { model | tagSearchModel = nm }, None )
-
-                TSP.Save ->
-                    ( { model | tagSearchModel = nm }, None )
-
-                TSP.Search ts ->
-                    ( { model | tagSearchModel = nm, paginationModel = PP.initModel }
-                    , Search <|
-                        { tagSearch = ts
-                        , offset = 0
-                        , limit = Just model.paginationModel.increment
-                        , what = ""
-                        , list = True
-                        }
-                    )
+            handleTspUpdate model (TSP.update m model.tagSearchModel)
 
         PPMsg m ->
             let

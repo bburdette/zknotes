@@ -1,3 +1,0 @@
-[submodule "elm-common"]
-	path = elm/elm-common
-	url = git@github.com:bburdette/elm-common.git

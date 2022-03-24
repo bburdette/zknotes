@@ -20,6 +20,8 @@ import Markdown.Renderer
 import MdCommon as MC
 import Schelme.Show exposing (showTerm)
 import TangoColors as TC
+import Time
+import Util
 
 
 type Msg
@@ -33,10 +35,13 @@ type alias Model =
     { id : Maybe Int
     , pubid : Maybe String
     , title : String
+    , showtitle : Bool
     , md : String
     , cells : CellDict
     , panelNote : Maybe Data.ZkNote
     , zklinks : List Data.EditLink
+    , createdate : Maybe Int
+    , changeddate : Maybe Int
     }
 
 
@@ -67,7 +72,7 @@ showZkl id zkl =
 
             Data.From ->
                 E.text "<-"
-        , E.row
+        , E.paragraph
             [ E.clipX
             , E.centerY
             , E.height E.fill
@@ -79,8 +84,8 @@ showZkl id zkl =
         ]
 
 
-view : Int -> Model -> Bool -> Element Msg
-view maxw model loggedin =
+view : Time.Zone -> Int -> Model -> Bool -> Element Msg
+view zone maxw model loggedin =
     let
         mw =
             min maxw 1000 - 160
@@ -97,10 +102,10 @@ view maxw model loggedin =
           else
             E.none
         , (if narrow then
-            \x -> E.column [ E.width E.fill ] (List.reverse x)
+            \x -> E.column [ E.width E.fill ] [ E.column [ E.centerX ] (List.reverse x) ]
 
            else
-            E.row [ E.width E.fill ]
+            \x -> E.row [ E.width E.fill ] [ E.row [ E.centerX, E.spacing 10 ] x ]
           )
             [ case model.panelNote of
                 Just panel ->
@@ -109,14 +114,14 @@ view maxw model loggedin =
                             E.width E.fill
 
                           else
-                            E.width <| E.px 400
+                            E.width <| E.px 300
                         , E.alignTop
                         , EBk.color TC.darkGrey
                         , E.padding 10
                         ]
                         (case
                             MC.markdownView
-                                (MC.mkRenderer (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged)
+                                (MC.mkRenderer MC.PublicView (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged)
                                 panel.content
                          of
                             Ok rendered ->
@@ -134,9 +139,14 @@ view maxw model loggedin =
                 Nothing ->
                     E.none
             , E.column
-                [ E.width (E.fill |> E.maximum 1000), E.centerX, E.padding 10, E.alignTop ]
-                [ E.row [ E.width E.fill ]
-                    [ case MC.markdownView (MC.mkRenderer (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged) model.md of
+                [ E.width (E.fill |> E.maximum 1000), E.centerX, E.spacing 20, E.padding 10, E.alignTop ]
+                [ if model.showtitle then
+                    E.row [ E.width E.fill ] <| List.singleton <| E.el [ E.centerX, Font.bold, Font.size 20 ] <| E.text model.title
+
+                  else
+                    E.none
+                , E.row [ E.width E.fill ]
+                    [ case MC.markdownView (MC.mkRenderer MC.PublicView (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged) model.md of
                         Ok rendered ->
                             E.column
                                 [ E.spacing 30
@@ -148,6 +158,21 @@ view maxw model loggedin =
                         Err errors ->
                             E.text errors
                     ]
+                , case ( model.createdate, model.changeddate ) of
+                    ( Just cd, Just chd ) ->
+                        E.row [ E.width E.fill, Font.italic ]
+                            [ E.paragraph []
+                                [ E.text "created: "
+                                , E.text (Util.showTime zone (Time.millisToPosix cd))
+                                ]
+                            , E.paragraph [ Font.alignRight ]
+                                [ E.text "updated: "
+                                , E.text (Util.showTime zone (Time.millisToPosix chd))
+                                ]
+                            ]
+
+                    _ ->
+                        E.none
                 , E.column [ E.centerX, E.width (E.minimum 150 E.shrink), E.spacing 8 ]
                     (model.id
                         |> Maybe.map
@@ -186,15 +211,18 @@ initFull zknaa =
     { id = Just zknote.id
     , pubid = zknote.pubid
     , title = zknote.title
+    , showtitle = zknote.showtitle
     , md = zknote.content
     , cells = getCd cc
     , panelNote = zknaa.panelNote
     , zklinks = zknaa.links
+    , createdate = Just zknote.createdate
+    , changeddate = Just zknote.changeddate
     }
 
 
-initSzn : Data.SaveZkNote -> List Data.EditLink -> Maybe Data.ZkNote -> Model
-initSzn zknote links mbpanelnote =
+initSzn : Data.SaveZkNote -> Maybe Int -> Maybe Int -> List Data.EditLink -> Maybe Data.ZkNote -> Model
+initSzn zknote mbcreatedate mbchangeddate links mbpanelnote =
     let
         cells =
             zknote.content
@@ -213,10 +241,13 @@ initSzn zknote links mbpanelnote =
     { id = zknote.id
     , pubid = zknote.pubid
     , title = zknote.title
+    , showtitle = zknote.showtitle
     , md = zknote.content
     , cells = getCd cc
     , panelNote = mbpanelnote
     , zklinks = links
+    , createdate = mbcreatedate
+    , changeddate = mbchangeddate
     }
 
 

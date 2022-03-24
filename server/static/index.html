@@ -8,27 +8,13 @@
       body { font-family: mono, calibri, helvetica, arial, sans-serif; background-color:#EEEEEC; }</style>
     <script type="text/javascript" src="/static/main.js"></script>
     <script type="text/javascript" src="/static/localvals.js"></script>
+    <script type="text/javascript" src="/static/windowkey.js"></script>
   </head>
   <body>
     <div id="elm"></div> 
     <script type="text/javascript">
-      // all we'd use in a saner world.  textarea highlighted text is ok here with chrome.
-      function getRegularSelectionText() {
-          var text = "";
-          if (window.getSelection) {
-              text = window.getSelection().toString();
-          } else if (document.selection && document.selection.type != "Control") {
-              text = document.selection.createRange().text;
-          }
-          return text;
-      }
-      // because firefox has a bug we use this to get highlighted text from a textarea.
-      // textarea id required.
-      function getSelectionText(id) {
-          if (id == null) {
-            return getRegularSelectionText();
-          }
-          var text = "";
+      function getTASelection(id) {
+          var range = { text: "", offset: null };
           var activeEl = document.getElementById(id);
           var activeElTagName = activeEl ? activeEl.tagName.toLowerCase() : null;
           if (
@@ -36,27 +22,17 @@
             /^(?:text|search|password|tel|url)$/i.test(activeEl.type)) &&
             (typeof activeEl.selectionStart == "number")
           ) {
-              text = activeEl.value.slice(activeEl.selectionStart, activeEl.selectionEnd);
-          } else if (window.getSelection) {
-              text = window.getSelection().toString();
+              range.text = activeEl.value.slice(activeEl.selectionStart, activeEl.selectionEnd);
+              range.offset = activeEl.selectionStart;
+              app.ports.receiveTASelection.send(range);
           }
-          return text;
-      }
-      function getSelectedText(ids) {
-        var text = getRegularSelectionText();
-        if (text == "") {
-          for ( i in ids) {
-            var id = ids[i];
-            text = getSelectionText(id);
-            if (text != "") {
-              break;
-            }
+          else {
+              app.ports.receiveTASelection.send(null);
           }
-        };
-        app.ports.receiveSelectedText.send(text);
       }
 
       login = {{logindata}};
+      errorid = {{errorid}};
 
       app = Elm.Main.init({
         node: document.getElementById('elm'),
@@ -66,11 +42,19 @@
                  debugstring : "initial-info", 
                  width : window.innerWidth, 
                  height : window.innerHeight,
+                 errorid : errorid,
                  login : login}});
-      // app.ports.storeLocalVal.subscribe(storeVal);
-      // app.ports.getLocalVal.subscribe(getVal);
+      // local storage
+      app.ports.storeLocalVal.subscribe(storeVal);
+      app.ports.getLocalVal.subscribe(getVal);
       // app.ports.clearLocalStorage.subscribe(clearStorage);
-      app.ports.getSelectedText.subscribe(getSelectedText);
+
+      // selected text
+      app.ports.getTASelection.subscribe(getTASelection);
+      // keydown events
+      app.ports.sendKeyCommand.subscribe(sendKeyCommand);
+      window.addEventListener( "keydown", keycheck, false );
+
     </script>
   </body>
 </html>

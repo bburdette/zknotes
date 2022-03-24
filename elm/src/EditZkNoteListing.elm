@@ -14,7 +14,9 @@ import Search as S exposing (TagSearch(..))
 import SearchStackPanel as SP
 import TagSearchPanel as TSP
 import TangoColors as TC
+import Toop
 import Util
+import WindowKeys as WK
 import ZkCommon as ZC
 
 
@@ -81,6 +83,16 @@ updateSearch ts model =
       }
     , None
     )
+
+
+onWkKeyPress : WK.Key -> Model -> ( Model, Command )
+onWkKeyPress key model =
+    case Toop.T4 key.key key.ctrl key.alt key.shift of
+        Toop.T4 "Enter" False False False ->
+            handleSPUpdate model (SP.onEnter model.spmodel)
+
+        _ ->
+            ( model, None )
 
 
 view : Data.LoginData -> Util.Size -> Model -> Element Msg
@@ -178,6 +190,12 @@ listview ld size model =
                         ]
                     }
                 ]
+            , if List.length model.notes.notes < 15 then
+                E.none
+
+              else
+                E.map SPMsg <|
+                    SP.paginationView True model.spmodel
             ]
 
 
@@ -245,22 +263,24 @@ update msg model ld =
                     ( model, None )
 
         SPMsg m ->
-            let
-                ( nm, cm ) =
-                    SP.update m model.spmodel
+            handleSPUpdate model (SP.update m model.spmodel)
 
-                mod =
-                    { model | spmodel = nm }
-            in
-            case cm of
-                SP.None ->
-                    ( mod, None )
 
-                SP.Save ->
-                    ( mod, None )
+handleSPUpdate : Model -> ( SP.Model, SP.Command ) -> ( Model, Command )
+handleSPUpdate model ( nm, cm ) =
+    let
+        mod =
+            { model | spmodel = nm }
+    in
+    case cm of
+        SP.None ->
+            ( mod, None )
 
-                SP.Copy _ ->
-                    ( mod, None )
+        SP.Save ->
+            ( mod, None )
 
-                SP.Search ts ->
-                    ( mod, Search ts )
+        SP.Copy _ ->
+            ( mod, None )
+
+        SP.Search ts ->
+            ( mod, Search ts )

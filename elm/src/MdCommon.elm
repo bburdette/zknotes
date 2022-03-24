@@ -1,4 +1,4 @@
-module MdCommon exposing (Panel, blockCells, cellView, defCell, heading, markdownView, mdCells, mdPanel, mdPanels, mkRenderer, rawTextToId, showRunState)
+module MdCommon exposing (Panel, ViewMode(..), blockCells, blockPanels, cellView, codeBlock, codeSpan, defCell, heading, imageView, linkDict, markdownView, mdCells, mdPanel, mdPanels, mkRenderer, panelView, rawTextToId, searchView, showRunState)
 
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
@@ -12,7 +12,7 @@ import Element.Input as EI
 import Element.Region as ER
 import Html exposing (Attribute, Html)
 import Html.Attributes as HA
-import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..))
+import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..), inlineFoldl)
 import Markdown.Html
 import Markdown.Parser
 import Markdown.Renderer
@@ -125,12 +125,17 @@ defCell s =
     { code = s, prog = Err "", runstate = RsErr "" }
 
 
-mkRenderer : (String -> a) -> Int -> CellDict -> Bool -> (String -> String -> a) -> Markdown.Renderer.Renderer (Element a)
-mkRenderer restoreSearchMsg maxw cellDict showPanelElt onchanged =
+type ViewMode
+    = PublicView
+    | EditView
+
+
+mkRenderer : ViewMode -> (String -> a) -> Int -> CellDict -> Bool -> (String -> String -> a) -> Markdown.Renderer.Renderer (Element a)
+mkRenderer viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged =
     { heading = heading
     , paragraph =
         E.paragraph
-            [ E.spacing 15 ]
+            [ E.spacing 8 ]
     , thematicBreak = E.none
     , text = E.text
     , strong = \content -> E.paragraph [ EF.bold ] content
@@ -158,12 +163,8 @@ mkRenderer restoreSearchMsg maxw cellDict showPanelElt onchanged =
     , hardLineBreak = Html.br [] [] |> E.html
     , image =
         \image ->
-            case image.title of
-                Just title ->
-                    E.image [ E.width <| E.maximum maxw E.shrink ] { src = image.src, description = image.alt }
-
-                Nothing ->
-                    E.image [ E.width <| E.maximum maxw E.shrink ] { src = image.src, description = image.alt }
+            E.image [ E.width E.fill ]
+                { src = image.src, description = image.alt }
 
     {- case image.title of
        Just title ->
@@ -183,12 +184,12 @@ mkRenderer restoreSearchMsg maxw cellDict showPanelElt onchanged =
                 children
     , unorderedList =
         \items ->
-            E.column [ E.spacing 15 ]
+            E.column [ E.paddingXY 10 0 ]
                 (items
                     |> List.map
                         (\(ListItem task children) ->
-                            E.row [ E.spacing 5 ]
-                                [ E.paragraph
+                            E.paragraph []
+                                [ E.row
                                     [ E.alignTop ]
                                     ((case task of
                                         IncompleteTask ->
@@ -208,14 +209,17 @@ mkRenderer restoreSearchMsg maxw cellDict showPanelElt onchanged =
                 )
     , orderedList =
         \startingIndex items ->
-            E.column [ E.spacing 15 ]
+            E.column [ E.spacingXY 10 0, E.width E.fill ]
                 (items
                     |> List.indexedMap
                         (\index itemBlocks ->
-                            E.row [ E.spacing 5 ]
-                                [ E.row [ E.alignTop ]
-                                    (E.text (String.fromInt (index + startingIndex) ++ " ") :: itemBlocks)
-                                ]
+                            E.row [ E.width E.fill ]
+                                (E.text
+                                    (String.fromInt (index + startingIndex)
+                                        ++ " "
+                                    )
+                                    :: itemBlocks
+                                )
                         )
                 )
     , codeBlock = codeBlock
@@ -229,7 +233,7 @@ mkRenderer restoreSearchMsg maxw cellDict showPanelElt onchanged =
                 |> Markdown.Html.withAttribute "schelmecode"
             , Markdown.Html.tag "search"
                 (\search renderedChildren ->
-                    searchView restoreSearchMsg search renderedChildren
+                    searchView viewMode restoreSearchMsg search renderedChildren
                 )
                 |> Markdown.Html.withAttribute "query"
             , Markdown.Html.tag "panel"
@@ -246,6 +250,10 @@ mkRenderer restoreSearchMsg maxw cellDict showPanelElt onchanged =
                             E.text "error"
                 )
                 |> Markdown.Html.withAttribute "noteid"
+            , Markdown.Html.tag "image" imageView
+                |> Markdown.Html.withAttribute "text"
+                |> Markdown.Html.withAttribute "url"
+                |> Markdown.Html.withOptionalAttribute "width"
             ]
     , table = E.column [ E.width <| E.fill ]
     , tableHeader = E.column [ E.width <| E.fill, EF.bold, EF.underline, E.spacing 8 ]
@@ -260,23 +268,45 @@ mkRenderer restoreSearchMsg maxw cellDict showPanelElt onchanged =
     }
 
 
-searchView : (String -> a) -> String -> List (Element a) -> Element a
-searchView restoreSearchMsg search renderedChildren =
+searchView : ViewMode -> (String -> a) -> String -> List (Element a) -> Element a
+searchView viewMode restoreSearchMsg search renderedChildren =
     E.row [ EBk.color TC.darkGray, E.padding 3, E.spacing 3 ]
         (E.el [ EF.italic ] (E.text "search: ")
             :: E.paragraph [] [ E.text search ]
-            :: EI.button
-                (buttonStyle ++ [ EBk.color TC.darkGray ])
-                { label = E.el [ E.centerY, EF.color TC.blue, EF.bold ] <| E.text ">"
-                , onPress = Just <| restoreSearchMsg search
-                }
+            :: (case viewMode of
+                    PublicView ->
+                        E.none
+
+                    EditView ->
+                        EI.button
+                            (buttonStyle ++ [ EBk.color TC.darkGray ])
+                            { label = E.el [ E.centerY, EF.color TC.blue, EF.bold ] <| E.text ">"
+                            , onPress = Just <| restoreSearchMsg search
+                            }
+               )
             :: renderedChildren
         )
 
 
 panelView : Int -> List (Element a) -> Element a
 panelView noteid renderedChildren =
-    E.el [ E.padding 5, EBk.color TC.darkGray ] <| E.text ("Side panel note :" ++ String.fromInt noteid)
+    E.el [ E.padding 5, EBk.color TC.darkGray ] <|
+        E.text ("Side panel note :" ++ String.fromInt noteid)
+
+
+imageView : String -> String -> Maybe String -> List (Element a) -> Element a
+imageView text url mbwidth renderedChildren =
+    case
+        mbwidth
+            |> Maybe.andThen (\s -> String.toInt s)
+    of
+        Just w ->
+            E.image [ E.width <| E.maximum w E.fill, E.centerX ]
+                { src = url, description = text }
+
+        Nothing ->
+            E.image [ E.width E.fill ]
+                { src = url, description = text }
 
 
 cellView : CellDict -> List (Element a) -> String -> String -> (String -> String -> a) -> Element a
@@ -372,7 +402,7 @@ codeSpan : String -> Element msg
 codeSpan snippet =
     E.el
         [ EBk.color
-            (E.rgba 0 0 0 0.04)
+            (E.rgba 0 0 0 0.13)
         , EBd.rounded 2
         , E.paddingXY 5 3
         , EF.family <| [ EF.typeface "mono" ]
@@ -383,7 +413,7 @@ codeSpan snippet =
 codeBlock : { body : String, language : Maybe String } -> Element msg
 codeBlock details =
     E.column
-        [ EBk.color (E.rgba 0 0 0 0.03)
+        [ EBk.color (E.rgba 0 0 0 0.13)
         , E.padding 5
         , EF.family <| [ EF.typeface "mono" ]
         ]
@@ -396,3 +426,43 @@ codeBlock details =
                     details.body
                 ]
         ]
+
+
+linkDict : String -> Dict String String
+linkDict markdown =
+    -- build a dict of description->url
+    let
+        parsedmd =
+            markdown
+                |> Markdown.Parser.parse
+                |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
+    in
+    case parsedmd of
+        Err _ ->
+            Dict.empty
+
+        Ok blocks ->
+            inlineFoldl
+                (\inline links ->
+                    case inline of
+                        Block.Link str mbdesc moreinlines ->
+                            case mbdesc of
+                                Just desc ->
+                                    ( desc, str )
+                                        :: links
+
+                                Nothing ->
+                                    case moreinlines of
+                                        [ Block.Text desc2 ] ->
+                                            ( desc2, str )
+                                                :: links
+
+                                        _ ->
+                                            links
+
+                        _ ->
+                            links
+                )
+                []
+                blocks
+                |> Dict.fromList
