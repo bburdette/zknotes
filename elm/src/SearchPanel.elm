@@ -130,23 +130,6 @@ paginationView showCopy model =
         ]
 
 
-
--- , E.row [ E.width E.fill ]
---     [ E.map PPMsg <| PP.view model.paginationModel
---     , EI.button (E.alignRight :: buttonStyle)
---         { label = E.text "&"
---         , onPress = Just AndClicked
---         }
---     , if showCopy then
---         EI.button (E.alignRight :: buttonStyle)
---             { label = E.text "< copy"
---             , onPress = Just CopyClicked
---             }
---       else
---         E.none
---     ]
-
-
 view : Bool -> Bool -> Int -> Model -> Element Msg
 view showCopy narrow nblevel model =
     column [ E.width E.fill, E.spacing 8 ]
