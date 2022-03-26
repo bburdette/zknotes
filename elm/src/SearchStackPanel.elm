@@ -76,7 +76,10 @@ setSearch : Model -> List TagSearch -> Model
 setSearch model tsl =
     case List.head (List.reverse tsl) of
         Just s ->
-            { model | spmodel = SP.setSearch model.spmodel s }
+            { model
+                | spmodel = SP.setSearch model.spmodel s
+                , searchStack = List.reverse (List.drop 1 (List.reverse tsl))
+            }
 
         Nothing ->
             { model | spmodel = SP.setSearch model.spmodel (S.SearchTerm [] "") }
