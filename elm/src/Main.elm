@@ -138,7 +138,7 @@ type alias Model =
     , seed : Seed
     , timezone : Time.Zone
     , savedRoute : SavedRoute
-    , prevSearches : List S.TagSearch
+    , prevSearches : List (List S.TagSearch)
     , recentNotes : List Data.ZkListNote
     , errorNotes : Dict String String
     , fontsize : Int
@@ -745,8 +745,8 @@ sendSearch model search =
                     { note =
                         { id = Nothing
                         , pubid = Nothing
-                        , title = S.printTagSearch search.tagSearch
-                        , content = S.encodeTagSearch search.tagSearch |> JE.encode 2
+                        , title = S.printTagSearch (S.getTagSearch search)
+                        , content = S.encodeTsl search.tagSearch |> JE.encode 2
                         , editable = False
                         , showtitle = True
                         }
@@ -763,7 +763,7 @@ sendSearch model search =
             -- if this is the same search as last time, don't save.
             if
                 (List.head model.prevSearches == Just search.tagSearch)
-                    || (search.tagSearch == S.SearchTerm [] "")
+                    || (search.tagSearch == [ S.SearchTerm [] "" ])
             then
                 ( model
                 , sendUIMsg model.location (UI.SearchZkNotes search)
@@ -1046,7 +1046,7 @@ shDialog model =
         | state =
             SelectDialog
                 (SS.init
-                    { choices = List.indexedMap (\i ps -> ( i, S.printTagSearch ps )) model.prevSearches
+                    { choices = List.indexedMap (\i ps -> ( i, S.printTagSearch (S.andifySearches ps) )) model.prevSearches
                     , selected = Nothing
                     , search = ""
                     }
@@ -1470,7 +1470,7 @@ actualupdate msg model =
                                     | prevSearches =
                                         List.filterMap
                                             (\zknote ->
-                                                JD.decodeString S.decodeTagSearch zknote.content
+                                                JD.decodeString S.decodeTsl zknote.content
                                                     |> Result.toMaybe
                                             )
                                             sr.notes
@@ -2178,21 +2178,21 @@ handleLogin model ( lmod, lcmd ) =
             )
 
 
-prevSearchQuery =
-    \login ->
-        let
-            ts : S.TagSearch
-            ts =
-                S.Boolex (S.SearchTerm [ S.ExactMatch, S.Tag ] "search")
-                    S.And
-                    (S.SearchTerm [ S.User ] login.name)
-        in
-        { tagSearch = ts
-        , offset = 0
-        , limit = Just 50
-        , what = "prevSearches"
-        , list = False
-        }
+prevSearchQuery : Data.LoginData -> S.ZkNoteSearch
+prevSearchQuery login =
+    let
+        ts : S.TagSearch
+        ts =
+            S.Boolex (S.SearchTerm [ S.ExactMatch, S.Tag ] "search")
+                S.And
+                (S.SearchTerm [ S.User ] login.name)
+    in
+    { tagSearch = [ ts ]
+    , offset = 0
+    , limit = Just 50
+    , what = "prevSearches"
+    , list = False
+    }
 
 
 preinit : Flags -> Url -> Browser.Navigation.Key -> ( PiModel, Cmd Msg )

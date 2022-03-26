@@ -76,10 +76,10 @@ updateSearchResult zsr model =
     }
 
 
-updateSearch : S.TagSearch -> Model -> ( Model, Command )
+updateSearch : List S.TagSearch -> Model -> ( Model, Command )
 updateSearch ts model =
     ( { model
-        | spmodel = SP.setSearchString model.spmodel (S.printTagSearch ts)
+        | spmodel = SP.setSearch model.spmodel ts
       }
     , None
     )
@@ -229,7 +229,9 @@ update msg model ld =
                         | dialog =
                             Just <|
                                 ( D.init
-                                    ("delete all notes matching this search?\n" ++ S.showTagSearch s.tagSearch)
+                                    ("delete all notes matching this search?\n"
+                                        ++ String.concat (List.map S.showTagSearch s.tagSearch)
+                                    )
                                     True
                                     (\size -> E.map (\_ -> ()) (listview ld size model))
                                 , DeleteAll
@@ -248,7 +250,7 @@ update msg model ld =
                         ( D.Ok, DeleteAll ) ->
                             case SP.getSearch model.spmodel of
                                 Just s ->
-                                    ( { model | dialog = Nothing }, PowerDelete s.tagSearch )
+                                    ( { model | dialog = Nothing }, PowerDelete (S.getTagSearch s) )
 
                                 Nothing ->
                                     ( { model | dialog = Nothing }, None )

@@ -9,6 +9,7 @@ module SearchPanel exposing
     , onEnter
     , paginationView
     , searchResultUpdated
+    , setSearch
     , setSearchString
     , update
     , view
@@ -55,13 +56,18 @@ getSearch model =
     TSP.getSearch model.tagSearchModel
         |> Maybe.map
             (\s ->
-                { tagSearch = s
+                { tagSearch = [ s ]
                 , offset = model.paginationModel.offset
                 , limit = Just model.paginationModel.increment
                 , what = ""
                 , list = True
                 }
             )
+
+
+setSearch : Model -> TagSearch -> Model
+setSearch model ts =
+    { model | tagSearchModel = TSP.setSearch model.tagSearchModel (TSP.TagSearch (Ok ts)) }
 
 
 setSearchString : Model -> String -> Model
@@ -161,7 +167,7 @@ handleTspUpdate model ( nm, cmd ) =
         TSP.Search ts ->
             ( { model | tagSearchModel = nm, paginationModel = PP.initModel }
             , Search <|
-                { tagSearch = ts
+                { tagSearch = [ ts ]
                 , offset = 0
                 , limit = Just model.paginationModel.increment
                 , what = ""
@@ -201,7 +207,7 @@ update msg model =
                         Just ts ->
                             ( { model | paginationModel = nm }
                             , Search
-                                { tagSearch = ts
+                                { tagSearch = [ ts ]
                                 , offset = nm.offset
                                 , limit = Just nm.increment
                                 , what = ""

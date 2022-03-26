@@ -9,6 +9,7 @@ module SearchStackPanel exposing
     , onEnter
     , paginationView
     , searchResultUpdated
+    , setSearch
     , setSearchString
     , update
     , view
@@ -66,8 +67,19 @@ getSearch model =
     SP.getSearch model.spmodel
         |> Maybe.map
             (\s ->
-                { s | tagSearch = andifySearch model.searchStack s.tagSearch }
+                { s | tagSearch = model.searchStack ++ s.tagSearch }
+             -- { s | tagSearch = andifySearch model.searchStack s.tagSearch }
             )
+
+
+setSearch : Model -> List TagSearch -> Model
+setSearch model tsl =
+    case List.head (List.reverse tsl) of
+        Just s ->
+            { model | spmodel = SP.setSearch model.spmodel s }
+
+        Nothing ->
+            { model | spmodel = SP.setSearch model.spmodel (S.SearchTerm [] "") }
 
 
 setSearchString : Model -> String -> Model
@@ -108,7 +120,9 @@ handleSpUpdate model ( nm, cmd ) =
             , Search <|
                 { ts
                     | tagSearch =
-                        andifySearch model.searchStack ts.tagSearch
+                        model.searchStack ++ ts.tagSearch
+
+                    -- andifySearch model.searchStack ts.tagSearch
                 }
             )
 

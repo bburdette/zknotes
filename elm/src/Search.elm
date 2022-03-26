@@ -1,4 +1,42 @@
-module Search exposing (AndOr(..), FieldText(..), SearchMod(..), TSText(..), TagSearch(..), ZkNoteSearch, andor, decodeAndOr, decodeSearchMod, decodeTagSearch, defaultSearch, defaultSearchLimit, encodeAndOr, encodeSearchMod, encodeTagSearch, encodeZkNoteSearch, extractTagSearches, fieldString, fieldText, fields, oplistParser, printAndOr, printSearchMod, printTagSearch, searchMod, searchMods, searchTerm, showAndOr, showSearchMod, showTagSearch, singleTerm, spaces, tagSearchParser)
+module Search exposing
+    ( AndOr(..)
+    , FieldText(..)
+    , SearchMod(..)
+    , TSText(..)
+    , TagSearch(..)
+    , ZkNoteSearch
+    , andifySearches
+    , andor
+    , decodeAndOr
+    , decodeSearchMod
+    , decodeTagSearch
+    , decodeTsl
+    , defaultSearch
+    , defaultSearchLimit
+    , encodeAndOr
+    , encodeSearchMod
+    , encodeTagSearch
+    , encodeTsl
+    , encodeZkNoteSearch
+    , extractTagSearches
+    , fieldString
+    , fieldText
+    , fields
+    , getTagSearch
+    , oplistParser
+    , printAndOr
+    , printSearchMod
+    , printTagSearch
+    , searchMod
+    , searchMods
+    , searchTerm
+    , showAndOr
+    , showSearchMod
+    , showTagSearch
+    , singleTerm
+    , spaces
+    , tagSearchParser
+    )
 
 import Json.Decode as JD
 import Json.Encode as JE
@@ -28,7 +66,7 @@ import Util exposing (first, rest)
 
 
 type alias ZkNoteSearch =
-    { tagSearch : TagSearch
+    { tagSearch : List TagSearch
     , offset : Int
     , limit : Maybe Int
     , what : String
@@ -59,6 +97,21 @@ type TSText
     | Search TagSearch
 
 
+getTagSearch : ZkNoteSearch -> TagSearch
+getTagSearch zkn =
+    andifySearches zkn.tagSearch
+
+
+andifySearches : List TagSearch -> TagSearch
+andifySearches tsl =
+    case tsl of
+        s :: rest ->
+            List.foldr (\sl sr -> Boolex sl And sr) s rest
+
+        [] ->
+            SearchTerm [] ""
+
+
 defaultSearchLimit : Int
 defaultSearchLimit =
     25
@@ -66,7 +119,7 @@ defaultSearchLimit =
 
 defaultSearch : ZkNoteSearch
 defaultSearch =
-    { tagSearch = SearchTerm [] ""
+    { tagSearch = [ SearchTerm [] "" ]
     , offset = 0
     , limit = Just defaultSearchLimit
     , what = ""
@@ -128,6 +181,20 @@ decodeTagSearch =
                 (JD.field "mods" (JD.list decodeSearchMod))
                 (JD.field "term" JD.string)
             )
+        ]
+
+
+encodeTsl : List TagSearch -> JE.Value
+encodeTsl ts =
+    JE.object
+        [ ( "searches", JE.list encodeTagSearch ts ) ]
+
+
+decodeTsl : JD.Decoder (List TagSearch)
+decodeTsl =
+    JD.oneOf
+        [ JD.field "searches" (JD.list decodeTagSearch)
+        , decodeTagSearch |> JD.map List.singleton
         ]
 
 
@@ -199,7 +266,7 @@ decodeAndOr =
 encodeZkNoteSearch : ZkNoteSearch -> JE.Value
 encodeZkNoteSearch zns =
     JE.object <|
-        [ ( "tagsearch", encodeTagSearch zns.tagSearch )
+        [ ( "tagsearch", encodeTagSearch (andifySearches zns.tagSearch) )
         , ( "offset", JE.int zns.offset )
         , ( "what", JE.string zns.what )
         , ( "list", JE.bool zns.list )

@@ -395,10 +395,10 @@ updateSearchResult zsr model =
     }
 
 
-updateSearch : S.TagSearch -> Model -> ( Model, Command )
+updateSearch : List S.TagSearch -> Model -> ( Model, Command )
 updateSearch ts model =
     ( { model
-        | spmodel = SP.setSearchString model.spmodel (S.printTagSearch ts)
+        | spmodel = SP.setSearch model.spmodel ts
       }
     , None
     )

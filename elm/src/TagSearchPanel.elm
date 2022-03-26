@@ -1,4 +1,22 @@
-module TagSearchPanel exposing (Command(..), Model, Msg(..), Search(..), addSearchText, addTagToSearchPrev, addToSearch, addToSearchPanel, getSearch, initModel, onEnter, selectPrevSearch, toggleHelpButton, update, updateSearchText, view)
+module TagSearchPanel exposing
+    ( Command(..)
+    , Model
+    , Msg(..)
+    , Search(..)
+    , addSearchText
+    , addTagToSearchPrev
+    , addToSearch
+    , addToSearchPanel
+    , getSearch
+    , initModel
+    , onEnter
+    , selectPrevSearch
+    , setSearch
+    , toggleHelpButton
+    , update
+    , updateSearchText
+    , view
+    )
 
 import Common exposing (buttonStyle)
 import Element as E exposing (..)
@@ -142,8 +160,8 @@ addSearch ls rs =
                     TagSearch (Ok (Boolex sl And sr))
 
 
-setSearch : Search -> Model -> Model
-setSearch s model =
+setSearch : Model -> Search -> Model
+setSearch model s =
     case s of
         TagSearch (Ok ts) ->
             { model
@@ -799,7 +817,7 @@ update msg model =
                         _ ->
                             model.search
             in
-            ( setSearch ns model
+            ( setSearch model ns
             , None
             )
 
@@ -820,7 +838,7 @@ update msg model =
                         _ ->
                             model.search
             in
-            ( setSearch ns model
+            ( setSearch model ns
             , None
             )
 
@@ -854,7 +872,7 @@ update msg model =
                         _ ->
                             model.search
             in
-            ( setSearch ns model
+            ( setSearch model ns
             , None
             )
 
@@ -888,7 +906,7 @@ update msg model =
                         _ ->
                             model.search
             in
-            ( setSearch ns model
+            ( setSearch model ns
             , None
             )
 
@@ -914,7 +932,7 @@ update msg model =
                         _ ->
                             model.search
             in
-            ( setSearch ns model
+            ( setSearch model ns
             , None
             )
 
