@@ -169,7 +169,7 @@ decodeSearchMod =
 decodeTagSearch : JD.Decoder TagSearch
 decodeTagSearch =
     JD.oneOf
-        [ JD.field "Not" (JD.lazy (\_ -> decodeTagSearch))
+        [ JD.field "Not" (JD.map Not (JD.field "ts" (JD.lazy (\_ -> decodeTagSearch))))
         , JD.field "Boolex"
             (JD.map3 Boolex
                 (JD.field "ts1" (JD.lazy (\_ -> decodeTagSearch)))

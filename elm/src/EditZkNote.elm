@@ -68,6 +68,7 @@ import Element.Input as EI
 import Element.Region as ER
 import Html exposing (Attribute, Html)
 import Html.Attributes
+import Json.Decode as JD
 import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..), inlineFoldl)
 import Markdown.Html
 import Markdown.Parser
@@ -124,7 +125,8 @@ type Msg
     | LinkFocusPress EditLink
     | AddToSearch Data.ZkListNote
     | AddToSearchAsTag String
-    | SetSearch String
+    | SetSearchString String
+    | SetSearch (List S.TagSearch)
     | BigSearchPress
     | SettingsPress
     | FlipLink EditLink
@@ -1263,7 +1265,16 @@ zknview zone size recentZkns model =
                             }
                         , if search then
                             EI.button (E.alignRight :: Common.buttonStyle)
-                                { label = E.text ">", onPress = Just <| SetSearch model.title }
+                                (case
+                                    JD.decodeString S.decodeTsl model.md
+                                        |> Result.toMaybe
+                                 of
+                                    Just s ->
+                                        { label = E.text ">", onPress = Just <| SetSearch s }
+
+                                    Nothing ->
+                                        { label = E.text ">", onPress = Just <| SetSearchString model.title }
+                                )
 
                           else
                             EI.button (E.alignRight :: Common.buttonStyle)
@@ -2461,7 +2472,7 @@ update msg model =
                 , None
                 )
 
-        SetSearch text ->
+        SetSearchString text ->
             let
                 spmod =
                     model.spmodel
@@ -2469,6 +2480,18 @@ update msg model =
             ( { model
                 | spmodel =
                     SP.setSearchString model.spmodel text
+              }
+            , None
+            )
+
+        SetSearch search ->
+            let
+                spmod =
+                    model.spmodel
+            in
+            ( { model
+                | spmodel =
+                    SP.setSearch model.spmodel search
               }
             , None
             )
