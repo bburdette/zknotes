@@ -49,7 +49,7 @@ type alias Model =
     , helpPanel : SearchHelpPanel.Model
     , showPrevs : Bool
     , prevSearches : List String
-    , searchFocus : Bool
+    , searchOnEnter : Bool
     , searchTermFocus : Maybe TSLoc
     }
 
@@ -63,7 +63,7 @@ initModel =
     , helpPanel = SearchHelpPanel.init
     , showPrevs = False
     , prevSearches = []
-    , searchFocus = False
+    , searchOnEnter = False
     , searchTermFocus = Nothing
     }
 
@@ -387,7 +387,10 @@ viewSearchHelper mbfocusloc indent lts ts =
                             ]
                         , E.row [ E.padding 8, E.spacing 8, E.width E.fill ]
                             [ EI.text
-                                [ E.width E.fill ]
+                                [ onFocus (STFocus True)
+                                , onLoseFocus (STFocus False)
+                                , E.width E.fill
+                                ]
                                 { onChange = SetTermText tloc
                                 , text = term
                                 , placeholder = Nothing
@@ -717,7 +720,7 @@ toggleHelpButton showHelp =
 
 onEnter : Model -> ( Model, Command )
 onEnter model =
-    if model.searchFocus then
+    if model.searchOnEnter then
         doSearchClick model
 
     else
@@ -745,7 +748,7 @@ update msg model =
             )
 
         STFocus focused ->
-            ( { model | searchFocus = focused }, None )
+            ( { model | searchOnEnter = focused }, None )
 
         Clear ->
             ( { model
