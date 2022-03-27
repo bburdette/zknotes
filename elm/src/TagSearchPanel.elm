@@ -133,7 +133,8 @@ addToSearch mbtsloc searchmods name search =
                                 SL.setTerm tsloc (Boolex tm And term) s
                             )
                         |> Maybe.map (\ts -> TagSearch (Ok ts))
-                        |> Maybe.withDefault search
+                        |> Maybe.withDefault
+                            (TagSearch (Ok (Boolex s And term)))
 
                 Nothing ->
                     TagSearch (Ok (Boolex s And term))
