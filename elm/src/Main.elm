@@ -1466,14 +1466,35 @@ actualupdate msg model =
 
                         UI.ZkNoteSearchResult sr ->
                             if sr.what == "prevSearches" then
-                                ( { model
-                                    | prevSearches =
+                                let
+                                    pses =
                                         List.filterMap
                                             (\zknote ->
                                                 JD.decodeString S.decodeTsl zknote.content
                                                     |> Result.toMaybe
                                             )
                                             sr.notes
+
+                                    laststack =
+                                        pses
+                                            |> List.head
+                                            |> Maybe.withDefault []
+                                            |> List.reverse
+                                            |> List.drop 1
+                                            |> List.reverse
+                                in
+                                ( { model
+                                    | prevSearches = pses
+                                    , state =
+                                        case model.state of
+                                            EditZkNoteListing znlstate login_ ->
+                                                EditZkNoteListing (EditZkNoteListing.updateSearchStack laststack znlstate) login_
+
+                                            EditZkNote znstate login_ ->
+                                                EditZkNote (EditZkNote.updateSearchStack laststack znstate) login_
+
+                                            _ ->
+                                                model.state
                                   }
                                 , Cmd.none
                                 )
