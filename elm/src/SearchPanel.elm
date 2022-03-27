@@ -1,4 +1,19 @@
-module SearchPanel exposing (Command(..), Model, Msg(..), addSearchString, getSearch, initModel, onEnter, paginationView, searchResultUpdated, setSearchString, update, view)
+module SearchPanel exposing
+    ( Command(..)
+    , Model
+    , Msg(..)
+    , addSearchString
+    , addToSearch
+    , getSearch
+    , initModel
+    , onEnter
+    , paginationView
+    , searchResultUpdated
+    , setSearch
+    , setSearchString
+    , update
+    , view
+    )
 
 import Common exposing (buttonStyle)
 import Data
@@ -41,13 +56,18 @@ getSearch model =
     TSP.getSearch model.tagSearchModel
         |> Maybe.map
             (\s ->
-                { tagSearch = s
+                { tagSearch = [ s ]
                 , offset = model.paginationModel.offset
                 , limit = Just model.paginationModel.increment
                 , what = ""
                 , list = True
                 }
             )
+
+
+setSearch : Model -> TagSearch -> Model
+setSearch model ts =
+    { model | tagSearchModel = TSP.setSearch model.tagSearchModel (TSP.TagSearch (Ok ts)) }
 
 
 setSearchString : Model -> String -> Model
@@ -66,6 +86,11 @@ addSearchString model string =
     }
 
 
+addToSearch : Model -> List SearchMod -> String -> Model
+addToSearch model searchmods name =
+    { model | tagSearchModel = TSP.addToSearchPanel model.tagSearchModel searchmods name }
+
+
 onEnter : Model -> ( Model, Command )
 onEnter model =
     handleTspUpdate model (TSP.onEnter model.tagSearchModel)
@@ -75,6 +100,7 @@ type Msg
     = TSPMsg TSP.Msg
     | PPMsg PP.Msg
     | CopyClicked
+    | AndClicked
 
 
 type Command
@@ -82,12 +108,17 @@ type Command
     | Save
     | Search S.ZkNoteSearch
     | Copy String
+    | And TagSearch
 
 
 paginationView : Bool -> Model -> Element Msg
 paginationView showCopy model =
-    E.row [ E.width E.fill ]
+    E.row [ E.width E.fill, E.spacing 8 ]
         [ E.map PPMsg <| PP.view model.paginationModel
+        , EI.button (E.alignRight :: buttonStyle)
+            { label = E.text "+"
+            , onPress = Just AndClicked
+            }
         , if showCopy then
             EI.button (E.alignRight :: buttonStyle)
                 { label = E.text "< copy"
@@ -119,7 +150,7 @@ handleTspUpdate model ( nm, cmd ) =
         TSP.Search ts ->
             ( { model | tagSearchModel = nm, paginationModel = PP.initModel }
             , Search <|
-                { tagSearch = ts
+                { tagSearch = [ ts ]
                 , offset = 0
                 , limit = Just model.paginationModel.increment
                 , what = ""
@@ -133,6 +164,14 @@ update msg model =
     case msg of
         CopyClicked ->
             ( model, Copy model.tagSearchModel.searchText )
+
+        AndClicked ->
+            case model.tagSearchModel.search of
+                TSP.TagSearch (Ok ts) ->
+                    ( model, And ts )
+
+                _ ->
+                    ( model, None )
 
         TSPMsg m ->
             handleTspUpdate model (TSP.update m model.tagSearchModel)
@@ -151,7 +190,7 @@ update msg model =
                         Just ts ->
                             ( { model | paginationModel = nm }
                             , Search
-                                { tagSearch = ts
+                                { tagSearch = [ ts ]
                                 , offset = nm.offset
                                 , limit = Just nm.increment
                                 , what = ""

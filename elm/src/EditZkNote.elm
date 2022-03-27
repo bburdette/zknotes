@@ -46,6 +46,7 @@ module EditZkNote exposing
     , update
     , updateSearch
     , updateSearchResult
+    , updateSearchStack
     , view
     , zkLinkName
     , zklKey
@@ -68,6 +69,7 @@ import Element.Input as EI
 import Element.Region as ER
 import Html exposing (Attribute, Html)
 import Html.Attributes
+import Json.Decode as JD
 import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..), inlineFoldl)
 import Markdown.Html
 import Markdown.Parser
@@ -75,8 +77,7 @@ import Markdown.Renderer
 import MdCommon as MC
 import Schelme.Show exposing (showTerm)
 import Search as S
-import SearchPanel as SP
-import TagSearchPanel as TSP
+import SearchStackPanel as SP
 import TangoColors as TC
 import Task
 import Time
@@ -125,7 +126,8 @@ type Msg
     | LinkFocusPress EditLink
     | AddToSearch Data.ZkListNote
     | AddToSearchAsTag String
-    | SetSearch String
+    | SetSearchString String
+    | SetSearch (List S.TagSearch)
     | BigSearchPress
     | SettingsPress
     | FlipLink EditLink
@@ -396,13 +398,24 @@ updateSearchResult zsr model =
     }
 
 
-updateSearch : S.TagSearch -> Model -> ( Model, Command )
+updateSearch : List S.TagSearch -> Model -> ( Model, Command )
 updateSearch ts model =
     ( { model
-        | spmodel = SP.setSearchString model.spmodel (S.printTagSearch ts)
+        | spmodel = SP.setSearch model.spmodel ts
       }
     , None
     )
+
+
+updateSearchStack : List S.TagSearch -> Model -> Model
+updateSearchStack tsl model =
+    let
+        spm =
+            model.spmodel
+    in
+    { model
+        | spmodel = { spm | searchStack = tsl }
+    }
 
 
 toPubId : Bool -> String -> Maybe String
@@ -1264,7 +1277,16 @@ zknview zone size recentZkns model =
                             }
                         , if search then
                             EI.button (E.alignRight :: Common.buttonStyle)
-                                { label = E.text ">", onPress = Just <| SetSearch model.title }
+                                (case
+                                    JD.decodeString S.decodeTsl model.md
+                                        |> Result.toMaybe
+                                 of
+                                    Just s ->
+                                        { label = E.text ">", onPress = Just <| SetSearch s }
+
+                                    Nothing ->
+                                        { label = E.text ">", onPress = Just <| SetSearchString model.title }
+                                )
 
                           else
                             EI.button (E.alignRight :: Common.buttonStyle)
@@ -2447,11 +2469,7 @@ update msg model =
             in
             if List.any ((==) model.ld.searchid) zkln.sysids then
                 ( { model
-                    | spmodel =
-                        { spmod
-                            | tagSearchModel =
-                                TSP.updateSearchText spmod.tagSearchModel zkln.title
-                        }
+                    | spmodel = SP.setSearchString model.spmodel zkln.title
                   }
                 , None
                 )
@@ -2459,25 +2477,33 @@ update msg model =
             else
                 ( { model
                     | spmodel =
-                        { spmod
-                            | tagSearchModel =
-                                TSP.addToSearchPanel spmod.tagSearchModel [ S.ExactMatch ] zkln.title
-                        }
+                        SP.addToSearch model.spmodel
+                            [ S.ExactMatch ]
+                            zkln.title
                   }
                 , None
                 )
 
-        SetSearch text ->
+        SetSearchString text ->
             let
                 spmod =
                     model.spmodel
             in
             ( { model
                 | spmodel =
-                    { spmod
-                        | tagSearchModel =
-                            TSP.updateSearchText spmod.tagSearchModel text
-                    }
+                    SP.setSearchString model.spmodel text
+              }
+            , None
+            )
+
+        SetSearch search ->
+            let
+                spmod =
+                    model.spmodel
+            in
+            ( { model
+                | spmodel =
+                    SP.setSearch model.spmodel search
               }
             , None
             )
@@ -2489,12 +2515,9 @@ update msg model =
             in
             ( { model
                 | spmodel =
-                    { spmod
-                        | tagSearchModel =
-                            TSP.addToSearchPanel spmod.tagSearchModel
-                                [ S.ExactMatch, S.Tag ]
-                                title
-                    }
+                    SP.addToSearch model.spmodel
+                        [ S.ExactMatch, S.Tag ]
+                        title
               }
             , None
             )
