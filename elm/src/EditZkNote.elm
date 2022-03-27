@@ -46,6 +46,7 @@ module EditZkNote exposing
     , update
     , updateSearch
     , updateSearchResult
+    , updateSearchStack
     , view
     , zkLinkName
     , zklKey
@@ -404,6 +405,17 @@ updateSearch ts model =
       }
     , None
     )
+
+
+updateSearchStack : List S.TagSearch -> Model -> Model
+updateSearchStack tsl model =
+    let
+        spm =
+            model.spmodel
+    in
+    { model
+        | spmodel = { spm | searchStack = tsl }
+    }
 
 
 toPubId : Bool -> String -> Maybe String

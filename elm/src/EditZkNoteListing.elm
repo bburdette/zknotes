@@ -76,6 +76,17 @@ updateSearchResult zsr model =
     }
 
 
+updateSearchStack : List S.TagSearch -> Model -> Model
+updateSearchStack tsl model =
+    let
+        spm =
+            model.spmodel
+    in
+    { model
+        | spmodel = { spm | searchStack = tsl }
+    }
+
+
 updateSearch : List S.TagSearch -> Model -> ( Model, Command )
 updateSearch ts model =
     ( { model
