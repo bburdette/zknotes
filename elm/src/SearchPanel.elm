@@ -116,7 +116,7 @@ paginationView showCopy model =
     E.row [ E.width E.fill, E.spacing 8 ]
         [ E.map PPMsg <| PP.view model.paginationModel
         , EI.button (E.alignRight :: buttonStyle)
-            { label = E.text "&"
+            { label = E.text "+"
             , onPress = Just AndClicked
             }
         , if showCopy then

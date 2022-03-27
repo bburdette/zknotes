@@ -68,7 +68,6 @@ getSearch model =
         |> Maybe.map
             (\s ->
                 { s | tagSearch = model.searchStack ++ s.tagSearch }
-             -- { s | tagSearch = andifySearch model.searchStack s.tagSearch }
             )
 
 
@@ -124,8 +123,6 @@ handleSpUpdate model ( nm, cmd ) =
                 { ts
                     | tagSearch =
                         model.searchStack ++ ts.tagSearch
-
-                    -- andifySearch model.searchStack ts.tagSearch
                 }
             )
 
