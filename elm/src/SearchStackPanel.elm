@@ -18,8 +18,8 @@ module SearchStackPanel exposing
 import Common exposing (buttonStyle)
 import Data
 import Element as E exposing (..)
-import Element.Background as Background
-import Element.Border as Border
+import Element.Background as EBk
+import Element.Border as EBd
 import Element.Events exposing (onClick)
 import Element.Font as Font
 import Element.Input as EI
@@ -30,7 +30,7 @@ import SearchHelpPanel
 import SearchPanel as SP
 import TDict exposing (TDict)
 import TagSearchPanel as TSP
-import TangoColors as Color
+import TangoColors as TC
 import Util exposing (Size)
 
 
@@ -158,18 +158,25 @@ type Command
 view : Bool -> Bool -> Int -> Model -> Element Msg
 view showCopy narrow nblevel model =
     E.column [ E.width E.fill, E.spacing 3 ] <|
-        List.indexedMap
-            (\i ts ->
-                E.row [ E.width E.fill, E.centerY ]
-                    [ E.el [ E.width E.fill, E.clipX ] <| E.text <| S.printTagSearch ts
-                    , EI.button (buttonStyle ++ [ E.alignRight ])
-                        { label = E.text "-"
-                        , onPress = Just <| MinusPress i
-                        }
-                    ]
-            )
-            model.searchStack
-            ++ [ E.map SPMsg <| SP.view showCopy narrow nblevel model.spmodel
+        (if List.isEmpty model.searchStack then
+            E.none
+
+         else
+            E.column [ E.width E.fill, E.spacing 3, E.padding 3, EBk.color TC.lightGrey ] <|
+                List.indexedMap
+                    (\i ts ->
+                        E.row [ E.width E.fill, E.centerY ]
+                            [ E.el [ E.width E.fill, E.clipX, E.height E.fill ] <| E.text <| S.printTagSearch ts
+                            , EI.button (buttonStyle ++ [ E.alignRight ])
+                                { label =
+                                    E.text "-"
+                                , onPress = Just <| MinusPress i
+                                }
+                            ]
+                    )
+                    model.searchStack
+        )
+            :: [ E.map SPMsg <| SP.view showCopy narrow nblevel model.spmodel
                ]
 
 
