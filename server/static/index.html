@@ -25,11 +25,9 @@
               range.text = activeEl.value.slice(activeEl.selectionStart, activeEl.selectionEnd);
               range.offset = activeEl.selectionStart;
               range.what = request.what;
-              console.log("range", range);
               app.ports.receiveTASelection.send(range);
           }
           else {
-              console.log("null");
               app.ports.receiveTASelection.send(null);
           }
       }
