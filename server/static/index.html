@@ -13,9 +13,9 @@
   <body>
     <div id="elm"></div> 
     <script type="text/javascript">
-      function getTASelection(id) {
+      function getTASelection(request) {
           var range = { text: "", offset: null };
-          var activeEl = document.getElementById(id);
+          var activeEl = document.getElementById(request.id);
           var activeElTagName = activeEl ? activeEl.tagName.toLowerCase() : null;
           if (
             (activeElTagName == "textarea") || (activeElTagName == "input" &&
@@ -24,9 +24,12 @@
           ) {
               range.text = activeEl.value.slice(activeEl.selectionStart, activeEl.selectionEnd);
               range.offset = activeEl.selectionStart;
+              range.what = request.what;
+              console.log("range", range);
               app.ports.receiveTASelection.send(range);
           }
           else {
+              console.log("null");
               app.ports.receiveTASelection.send(null);
           }
       }

@@ -1202,6 +1202,12 @@ actualupdate msg model =
                                         (TAReplyData tas)
                                     )
 
+                                EditZkNote.TAUpdated nemod ->
+                                    ( { model | state = EditZkNote nemod login }, Cmd.none )
+
+                                EditZkNote.TANoop ->
+                                    ( model, Cmd.none )
+
                         _ ->
                             ( model, Cmd.none )
 
@@ -2059,9 +2065,9 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
             , Cmd.none
             )
 
-        EditZkNote.GetTASelection id ->
+        EditZkNote.GetTASelection id what ->
             ( { model | state = EditZkNote emod login }
-            , getTASelection id
+            , getTASelection (JE.object [ ( "id", JE.string id ), ( "what", JE.string what ) ])
             )
 
         EditZkNote.Search s ->
@@ -2369,7 +2375,7 @@ main =
         }
 
 
-port getTASelection : String -> Cmd msg
+port getTASelection : JE.Value -> Cmd msg
 
 
 port receiveTASelection : (JD.Value -> msg) -> Sub msg
