@@ -1787,7 +1787,7 @@ onSaved oldmodel szn =
 type TACommand
     = TASave Data.SaveZkNotePlusLinks
     | TAError String
-    | TAUpdated Model
+    | TAUpdated Model Data.SetSelection
     | TANoop
 
 
@@ -1860,6 +1860,10 @@ onTASelection model tas =
                             String.left tas.offset model.md
                                 ++ linktext
                                 ++ String.dropLeft (tas.offset + String.length tas.text) model.md
+                    }
+                    { id = "mdtext"
+                    , offset = tas.offset + String.length linktext
+                    , length = 0
                     }
 
             Nothing ->

@@ -32,6 +32,20 @@
           }
       }
 
+      function setTASelection(request) {
+          var range = { text: "", offset: null };
+          var activeEl = document.getElementById(request.id);
+          var activeElTagName = activeEl ? activeEl.tagName.toLowerCase() : null;
+          if (
+            (activeElTagName == "textarea") || (activeElTagName == "input" &&
+            /^(?:text|search|password|tel|url)$/i.test(activeEl.type)) &&
+            (typeof activeEl.selectionStart == "number")
+          ) {
+              activeEl.setSelectionRange(request.offset, request.offset + request.length);
+              activeEl.focus();
+          }
+      }
+
       login = {{logindata}};
       errorid = {{errorid}};
 
@@ -52,6 +66,7 @@
 
       // selected text
       app.ports.getTASelection.subscribe(getTASelection);
+      app.ports.setTASelection.subscribe(setTASelection);
       // keydown events
       app.ports.sendKeyCommand.subscribe(sendKeyCommand);
       window.addEventListener( "keydown", keycheck, false );
