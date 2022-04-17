@@ -223,6 +223,7 @@ type Command
     | Switch Int
     | SaveSwitch Data.SaveZkNotePlusLinks Int
     | GetTASelection String String
+    | SetTASelection String Int Int
     | Search S.ZkNoteSearch
     | SearchHistory
     | BigSearch
@@ -1787,7 +1788,7 @@ onSaved oldmodel szn =
 type TACommand
     = TASave Data.SaveZkNotePlusLinks
     | TAError String
-    | TAUpdated Model
+    | TAUpdated Model String Int Int
     | TANoop
 
 
@@ -1861,6 +1862,9 @@ onTASelection model tas =
                                 ++ linktext
                                 ++ String.dropLeft (tas.offset + String.length tas.text) model.md
                     }
+                    "mdtext"
+                    (tas.offset + String.length linktext)
+                    0
 
             Nothing ->
                 TANoop
