@@ -68,6 +68,7 @@ mod tests {
       &SaveZkNote {
         id: None,
         title: "u1 note1".to_string(),
+        showtitle: true,
         pubid: None,
         content: "note1 content".to_string(),
         editable: false,
@@ -81,6 +82,7 @@ mod tests {
       &SaveZkNote {
         id: None,
         title: "u1 note2 - share".to_string(),
+        showtitle: true,
         pubid: None,
         content: "note1-2 content".to_string(),
         editable: false,
@@ -96,6 +98,7 @@ mod tests {
       &SaveZkNote {
         id: None,
         title: "u1 note3 - share".to_string(),
+        showtitle: true,
         pubid: None,
         content: "note1-3 content".to_string(),
         editable: false,
@@ -121,6 +124,7 @@ mod tests {
       &SaveZkNote {
         id: None,
         title: "u1 note4 - share".to_string(),
+        showtitle: true,
         pubid: None,
         content: "note1-4 content".to_string(),
         editable: false,
@@ -135,6 +139,7 @@ mod tests {
       &SaveZkNote {
         id: None,
         title: "u1 note5 - share".to_string(),
+        showtitle: true,
         pubid: None,
         content: "note1-5 content".to_string(),
         editable: false,
@@ -149,6 +154,7 @@ mod tests {
       &SaveZkNote {
         id: Some(szn1_4.id),
         title: "u1 note4 - share".to_string(),
+        showtitle: true,
         pubid: None,
         content: "note1-4 content FROM USER 2".to_string(),
         editable: false,
@@ -162,6 +168,7 @@ mod tests {
       &SaveZkNote {
         id: Some(szn1_5.id),
         title: "u1 note5 - share".to_string(),
+        showtitle: true,
         pubid: None,
         content: "note1-5 content FROM USER 2".to_string(),
         editable: false,
@@ -177,6 +184,7 @@ mod tests {
       &SaveZkNote {
         id: None,
         title: "u2 note1".to_string(),
+        showtitle: true,
         pubid: None,
         content: "note2 content".to_string(),
         editable: false,
@@ -198,6 +206,7 @@ mod tests {
       &SaveZkNote {
         id: None,
         title: "u1 public note1".to_string(),
+        showtitle: true,
         pubid: Some("publicid1".to_string()),
         content: "note1 content".to_string(),
         editable: false,
@@ -215,6 +224,7 @@ mod tests {
       &SaveZkNote {
         id: None,
         title: "u1 public note2".to_string(),
+        showtitle: true,
         pubid: Some("publicid2".to_string()),
         content: "note1 content".to_string(),
         editable: false,
