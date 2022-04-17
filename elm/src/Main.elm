@@ -1202,9 +1202,9 @@ actualupdate msg model =
                                         (TAReplyData tas)
                                     )
 
-                                EditZkNote.TAUpdated nemod id offset length ->
+                                EditZkNote.TAUpdated nemod s ->
                                     ( { model | state = EditZkNote nemod login }
-                                    , setTASelection (JE.object [ ( "id", JE.string id ), ( "offset", JE.int offset ), ( "length", JE.int length ) ])
+                                    , setTASelection (Data.encodeSetSelection s)
                                     )
 
                                 EditZkNote.TANoop ->
@@ -2091,11 +2091,6 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
         EditZkNote.GetTASelection id what ->
             ( { model | state = EditZkNote emod login }
             , getTASelection (JE.object [ ( "id", JE.string id ), ( "what", JE.string what ) ])
-            )
-
-        EditZkNote.SetTASelection id offset length ->
-            ( { model | state = EditZkNote emod login }
-            , setTASelection (JE.object [ ( "id", JE.string id ), ( "offset", JE.int offset ), ( "length", JE.int length ) ])
             )
 
         EditZkNote.Search s ->

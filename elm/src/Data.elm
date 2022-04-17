@@ -9,6 +9,43 @@ import Util exposing (andMap)
 
 
 
+------------------------------------------------------------
+-- getting, setting text selections in text edit areas.
+------------------------------------------------------------
+
+
+type alias SetSelection =
+    { id : String
+    , offset : Int
+    , length : Int
+    }
+
+
+type alias TASelection =
+    { text : String
+    , offset : Int
+    , what : String
+    }
+
+
+encodeSetSelection : SetSelection -> JE.Value
+encodeSetSelection s =
+    JE.object
+        [ ( "id", JE.string s.id )
+        , ( "offset", JE.int s.offset )
+        , ( "length", JE.int s.length )
+        ]
+
+
+decodeTASelection : JD.Decoder TASelection
+decodeTASelection =
+    JD.succeed TASelection
+        |> andMap (JD.field "text" JD.string)
+        |> andMap (JD.field "offset" JD.int)
+        |> andMap (JD.field "what" JD.string)
+
+
+
 ----------------------------------------
 -- types sent to or from the server.
 ----------------------------------------
@@ -198,21 +235,6 @@ type alias ZkNoteEdit =
     , links : List EditLink
     , panelNote : Maybe ZkNote
     }
-
-
-type alias TASelection =
-    { text : String
-    , offset : Int
-    , what : String
-    }
-
-
-decodeTASelection : JD.Decoder TASelection
-decodeTASelection =
-    JD.succeed TASelection
-        |> andMap (JD.field "text" JD.string)
-        |> andMap (JD.field "offset" JD.int)
-        |> andMap (JD.field "what" JD.string)
 
 
 
