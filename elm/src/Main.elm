@@ -2399,6 +2399,9 @@ main =
 port getTASelection : JE.Value -> Cmd msg
 
 
+port setTASelection : JE.Value -> Cmd msg
+
+
 port receiveTASelection : (JD.Value -> msg) -> Sub msg
 
 
