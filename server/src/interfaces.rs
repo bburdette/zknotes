@@ -316,7 +316,8 @@ fn user_interface_loggedin(
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let search: ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.db.as_path())?;
-      let res = search::search_zknotes_simple(&conn, uid, &search)?;
+      // let res = search::search_zknotes_simple(&conn, uid, &search)?;
+      let res = search::search_zknotes(&conn, uid, &search)?;
       match res {
         Left(res) => Ok(ServerResponse {
           what: "zklistnotesearchresult".to_string(),
