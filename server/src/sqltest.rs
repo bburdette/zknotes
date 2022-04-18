@@ -271,26 +271,14 @@ mod tests {
     read_zknotepubid(&conn, None, "publicid2")?;
 
     // TODO test that 'public' is not treated as a share.
-    //
+
     // TODO test notes linked with user BY CREATOR are editable/visible.
 
-    // pub enum TagSearch {
-    //   SearchTerm {
-    //     mods: Vec<SearchMod>,
-    //     term: String,
-    //   },
-    //   Not {
-    //     ts: Box<TagSearch>,
-    //   },
-    //   Boolex {
-    //     ts1: Box<TagSearch>,
-    //     ao: AndOr,
-    //     ts2: Box<TagSearch>,
-    //   },
-    // }
+    // ---------------------------------------------------------------
+    // test searches.
+    // ---------------------------------------------------------------
 
-    // TODO test searches.
-    //   - user A can see documents linked to their user record.
+    // user A can their own public note.
     let u1pubnote2_search = ZkNoteSearch {
       tagsearch: TagSearch::SearchTerm {
         mods: Vec::new(),
@@ -302,7 +290,6 @@ mod tests {
       list: true,
     };
 
-    // u1 can see their own public note.
     match search_zknotes(&conn, uid1, &u1pubnote2_search)? {
       Either::Left(zklr) => {
         if zklr.notes.len() == 1 {
@@ -461,12 +448,11 @@ mod tests {
       Either::Right(zknr) => assert_eq!(2, 4),
     }
 
-    //   - user A can see public documents.
-    //   - user can see documents from share.
-    //   - user can't see documents not shared.
-    //   - tag search works.
-    //   - text search works.
-    //   - note text search works.
+    // TODO test search modifiers.
+    //	 ExactMatch,
+    //	 Tag,
+    //	 Note,
+    //	 User,
     Ok(())
   }
 }
