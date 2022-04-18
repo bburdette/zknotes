@@ -1,6 +1,12 @@
 #[cfg(test)]
 mod tests {
+  use zkprotocol::search::*;
+  //   {
+  //   AndOr, SearchMod, TagSearch, ZkListNoteSearchResult, ZkNoteSearch, ZkNoteSearchResult,
+  // };
+  use crate::search::*;
   use crate::sqldata::*;
+  use either::Either;
   use std::error::Error;
   use std::fs;
   use std::path::Path;
@@ -237,6 +243,54 @@ mod tests {
     // TODO test that 'public' is not treated as a share.
     //
     // TODO test notes linked with user BY CREATOR are editable/visible.
+
+    // pub enum TagSearch {
+    //   SearchTerm {
+    //     mods: Vec<SearchMod>,
+    //     term: String,
+    //   },
+    //   Not {
+    //     ts: Box<TagSearch>,
+    //   },
+    //   Boolex {
+    //     ts1: Box<TagSearch>,
+    //     ao: AndOr,
+    //     ts2: Box<TagSearch>,
+    //   },
+    // }
+
+    // TODO test searches.
+    //   - user A can see documents linked to their user record.
+    let search = ZkNoteSearch {
+      tagsearch: TagSearch::SearchTerm {
+        mods: Vec::new(),
+        term: "u1 public note2".to_string(),
+      },
+      offset: 0,
+      limit: None,
+      what: "test".to_string(),
+      list: true,
+    };
+
+    match search_zknotes(&conn, uid1, &search)? {
+      Either::Left(zklr) => {
+        if zklr.notes.len() == 1 {
+          ()
+        } else {
+          println!("lenth was: {}", zklr.notes.len());
+          assert_eq!(2, 4)
+        }
+      }
+      Either::Right(zknr) => assert_eq!(2, 4),
+    }
+
+    //
+    //   - user A can see public documents.
+    //   - user can see documents from share.
+    //   - user can't see documents not shared.
+    //   - tag search works.
+    //   - text search works.
+    //   - note text search works.
     Ok(())
   }
 }
