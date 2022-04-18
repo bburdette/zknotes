@@ -1040,8 +1040,8 @@ pub fn new_user(
 
   // make a corresponding note,
   conn.execute(
-    "insert into zknote (title, content, user, editable, createdate, changeddate)
-     values (?1, ?2, ?3, 0, ?4, ?5)",
+    "insert into zknote (title, content, user, editable, showtitle, createdate, changeddate)
+     values (?1, ?2, ?3, 0, 1, ?4, ?5)",
     params![name, "", systemid, now, now],
   )?;
 
@@ -1620,7 +1620,7 @@ pub fn save_zknote(
             Access::ReadWrite => {
               // update other user's record!  editable flag must be true.
               conn.execute(
-                "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4, showtitle = ?5,
+                "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4, showtitle = ?5
                  where id = ?6 and editable = 1",
                 params![note.title, note.content, now, note.pubid, note.showtitle, id],
               )?;
