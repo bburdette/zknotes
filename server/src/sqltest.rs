@@ -153,13 +153,43 @@ mod tests {
     )?;
     save_zklink(&conn, szn1_5.id, szn1_3_share.id, uid1, None)?;
 
+    // user 1 note 6 - shared w user link
+    let szn1_6 = save_zknote(
+      &conn,
+      uid1,
+      &SaveZkNote {
+        id: None,
+        title: "u1 note6 - direct share".to_string(),
+        showtitle: true,
+        pubid: None,
+        content: "note1-6 content".to_string(),
+        editable: false,
+      },
+    )?;
+    save_zklink(&conn, szn1_6.id, unid2, uid1, None)?;
+
+    // user 1 note 7 - shared w reversed user link
+    let szn1_7 = save_zknote(
+      &conn,
+      uid1,
+      &SaveZkNote {
+        id: None,
+        title: "u1 note7 - reversed direct share".to_string(),
+        showtitle: true,
+        pubid: None,
+        content: "note1-7 content".to_string(),
+        editable: false,
+      },
+    )?;
+    save_zklink(&conn, unid2, szn1_7.id, uid1, None)?;
+
     // user 2 can save changes to note 4.
     save_zknote(
       &conn,
       uid2,
       &SaveZkNote {
         id: Some(szn1_4.id),
-        title: "u1 note4 - share".to_string(),
+        title: "u1 note4 - rshare".to_string(),
         showtitle: true,
         pubid: None,
         content: "note1-4 content FROM USER 2".to_string(),
@@ -261,7 +291,7 @@ mod tests {
 
     // TODO test searches.
     //   - user A can see documents linked to their user record.
-    let search = ZkNoteSearch {
+    let u1pubnote2_search = ZkNoteSearch {
       tagsearch: TagSearch::SearchTerm {
         mods: Vec::new(),
         term: "u1 public note2".to_string(),
@@ -272,12 +302,111 @@ mod tests {
       list: true,
     };
 
-    match search_zknotes(&conn, uid1, &search)? {
+    // u1 can see their own public note.
+    match search_zknotes(&conn, uid1, &u1pubnote2_search)? {
       Either::Left(zklr) => {
         if zklr.notes.len() == 1 {
           ()
         } else {
           println!("lenth was: {}", zklr.notes.len());
+          assert_eq!(2, 4)
+        }
+      }
+      Either::Right(zknr) => assert_eq!(2, 4),
+    }
+
+    // u2 can see the note too.
+    match search_zknotes(&conn, uid2, &u1pubnote2_search)? {
+      Either::Left(zklr) => {
+        if zklr.notes.len() == 1 {
+          ()
+        } else {
+          println!("lenth was: {}", zklr.notes.len());
+          assert_eq!(2, 4)
+        }
+      }
+      Either::Right(zknr) => assert_eq!(2, 4),
+    }
+
+    let u1note1_search = ZkNoteSearch {
+      tagsearch: TagSearch::SearchTerm {
+        mods: Vec::new(),
+        term: "u1 note1".to_string(),
+      },
+      offset: 0,
+      limit: None,
+      what: "test".to_string(),
+      list: true,
+    };
+
+    // u2 can't see u1's private note..
+    match search_zknotes(&conn, uid2, &u1note1_search)? {
+      Either::Left(zklr) => {
+        if zklr.notes.len() > 0 {
+          // not supposed to see it!
+          assert_eq!(2, 4)
+        } else {
+          ()
+        }
+      }
+      Either::Right(zknr) => assert_eq!(2, 4),
+    }
+
+    // u1 can see their own private note..
+    match search_zknotes(&conn, uid1, &u1note1_search)? {
+      Either::Left(zklr) => {
+        if zklr.notes.len() > 0 {
+          ()
+        } else {
+          // supposed to see it!
+          assert_eq!(2, 4)
+        }
+      }
+      Either::Right(zknr) => assert_eq!(2, 4),
+    }
+
+    let u1note6_search = ZkNoteSearch {
+      tagsearch: TagSearch::SearchTerm {
+        mods: Vec::new(),
+        term: "u1 note6 - direct share".to_string(),
+      },
+      offset: 0,
+      limit: None,
+      what: "test".to_string(),
+      list: true,
+    };
+
+    // u2 can see a note shared directly with them.
+    match search_zknotes(&conn, uid2, &u1note6_search)? {
+      Either::Left(zklr) => {
+        if zklr.notes.len() > 0 {
+          ()
+        } else {
+          // supposed to see it!
+          assert_eq!(2, 4)
+        }
+      }
+      Either::Right(zknr) => assert_eq!(2, 4),
+    }
+
+    let u1note7_search = ZkNoteSearch {
+      tagsearch: TagSearch::SearchTerm {
+        mods: Vec::new(),
+        term: "u1 note7 - reversed direct share".to_string(),
+      },
+      offset: 0,
+      limit: None,
+      what: "test".to_string(),
+      list: true,
+    };
+
+    // u2 can see a note shared directly with them, reversed link.
+    match search_zknotes(&conn, uid2, &u1note7_search)? {
+      Either::Left(zklr) => {
+        if zklr.notes.len() > 0 {
+          ()
+        } else {
+          // not supposed to see it! or are we?
           assert_eq!(2, 4)
         }
       }
