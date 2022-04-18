@@ -406,14 +406,61 @@ mod tests {
         if zklr.notes.len() > 0 {
           ()
         } else {
-          // not supposed to see it! or are we?
+          // not supposed to see it!
           assert_eq!(2, 4)
         }
       }
       Either::Right(zknr) => assert_eq!(2, 4),
     }
 
-    //
+    // u2 can see a note on a share they're a member of.
+    let u1note4_search = ZkNoteSearch {
+      tagsearch: TagSearch::SearchTerm {
+        mods: Vec::new(),
+        term: "u1 note4 - share".to_string(),
+      },
+      offset: 0,
+      limit: None,
+      what: "test".to_string(),
+      list: true,
+    };
+
+    match search_zknotes(&conn, uid2, &u1note4_search)? {
+      Either::Left(zklr) => {
+        if zklr.notes.len() > 0 {
+          ()
+        } else {
+          // not supposed to see it!
+          assert_eq!(2, 4)
+        }
+      }
+      Either::Right(zknr) => assert_eq!(2, 4),
+    }
+
+    // u2 can't see a note on a share they're not a member of.
+    let u1note5_search = ZkNoteSearch {
+      tagsearch: TagSearch::SearchTerm {
+        mods: Vec::new(),
+        term: "u1 note5 - share".to_string(),
+      },
+      offset: 0,
+      limit: None,
+      what: "test".to_string(),
+      list: true,
+    };
+
+    match search_zknotes(&conn, uid2, &u1note5_search)? {
+      Either::Left(zklr) => {
+        if zklr.notes.len() > 0 {
+          // not supposed to see it!
+          assert_eq!(2, 4)
+        } else {
+          ()
+        }
+      }
+      Either::Right(zknr) => assert_eq!(2, 4),
+    }
+
     //   - user A can see public documents.
     //   - user can see documents from share.
     //   - user can't see documents not shared.
