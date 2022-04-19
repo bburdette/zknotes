@@ -453,6 +453,98 @@ mod tests {
     //	 Tag,
     //	 Note,
     //	 User,
+
+    //	 ExactMatch with bad case fails.
+    let u1pubnote2_exact_search = ZkNoteSearch {
+      tagsearch: TagSearch::SearchTerm {
+        mods: vec![SearchMod::ExactMatch],
+        term: "u1 Public note2".to_string(),
+      },
+      offset: 0,
+      limit: None,
+      what: "test".to_string(),
+      list: true,
+    };
+
+    match search_zknotes(&conn, uid1, &u1pubnote2_exact_search)? {
+      Either::Left(zklr) => {
+        if zklr.notes.len() == 1 {
+          assert_eq!(2, 4)
+        } else {
+          ()
+        }
+      }
+      Either::Right(zknr) => assert_eq!(2, 4),
+    }
+
+    // should be 4 notes tagged with et'user' - 3 users and 1 'system'.
+    let u1pubnote2_exact_search = ZkNoteSearch {
+      tagsearch: TagSearch::SearchTerm {
+        mods: vec![SearchMod::ExactMatch, SearchMod::Tag],
+        term: "user".to_string(),
+      },
+      offset: 0,
+      limit: None,
+      what: "test".to_string(),
+      list: true,
+    };
+
+    match search_zknotes(&conn, uid1, &u1pubnote2_exact_search)? {
+      Either::Left(zklr) => {
+        if zklr.notes.len() == 4 {
+          ()
+        } else {
+          assert_eq!(2, 4)
+        }
+      }
+      Either::Right(zknr) => assert_eq!(2, 4),
+    }
+
+    // should be 9 notes for 'user1'
+    let u1pubnote2_exact_search = ZkNoteSearch {
+      tagsearch: TagSearch::SearchTerm {
+        mods: vec![SearchMod::ExactMatch, SearchMod::Tag, SearchMod::User],
+        term: "user1".to_string(),
+      },
+      offset: 0,
+      limit: None,
+      what: "test".to_string(),
+      list: true,
+    };
+
+    match search_zknotes(&conn, uid1, &u1pubnote2_exact_search)? {
+      Either::Left(zklr) => {
+        if zklr.notes.len() == 9 {
+          ()
+        } else {
+          assert_eq!(2, 4)
+        }
+      }
+      Either::Right(zknr) => assert_eq!(2, 4),
+    }
+    // should be 1 notes for 'ote1-4'
+    let u1pubnote2_exact_search = ZkNoteSearch {
+      tagsearch: TagSearch::SearchTerm {
+        mods: vec![SearchMod::Note],
+        term: "ote1-4".to_string(),
+      },
+      offset: 0,
+      limit: None,
+      what: "test".to_string(),
+      list: true,
+    };
+
+    match search_zknotes(&conn, uid1, &u1pubnote2_exact_search)? {
+      Either::Left(zklr) => {
+        if zklr.notes.len() == 1 {
+          ()
+        } else {
+          assert_eq!(2, 4)
+        }
+      }
+      Either::Right(zknr) => assert_eq!(2, 4),
+    }
+    //
     Ok(())
   }
 }
