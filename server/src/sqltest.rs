@@ -393,7 +393,6 @@ mod tests {
         if zklr.notes.len() > 0 {
           ()
         } else {
-          // not supposed to see it!
           assert_eq!(2, 4)
         }
       }
