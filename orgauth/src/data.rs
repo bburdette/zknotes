@@ -1,11 +1,13 @@
 use serde_derive::{Deserialize, Serialize};
 use std::path::PathBuf;
+use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config {
   pub mainsite: String,
   pub appname: String,
   pub domain: String,
+  pub db: PathBuf,
   pub admin_email: String,
   pub error_index_note: Option<i64>,
   pub login_token_expiration_ms: i64,
@@ -58,4 +60,10 @@ pub struct ChangePassword {
 pub struct ChangeEmail {
   pub pwd: String,
   pub email: String,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct WhatMessage {
+  pub what: String,
+  pub data: Option<serde_json::Value>,
 }

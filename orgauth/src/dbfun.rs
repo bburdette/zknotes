@@ -1,16 +1,37 @@
-use crate::config::Config;
-use crate::data;
+use crate::data::Config;
+use crate::data::{ChangeEmail, ChangePassword, User};
 use crate::email;
-use crate::util::is_token_expired;
+use crate::util::{is_token_expired, now};
 use actix_session::Session;
+use actix_web::HttpRequest;
+use barrel::backend::Sqlite;
+use barrel::{types, Migration};
 use crypto_hash::{hex_digest, Algorithm};
 use either::Either::{Left, Right};
 use log::info;
-// use simple_error::bail;
-use actix_web::HttpRequest;
+use rusqlite::{params, Connection};
+use serde_derive::{Deserialize, Serialize};
+use simple_error::bail;
 use std::error::Error;
 use std::path::Path;
+use std::time::Duration;
 use uuid::Uuid;
+
+pub fn connection_open(dbfile: &Path) -> Result<Connection, Box<dyn Error>> {
+  let conn = Connection::open(dbfile)?;
+
+  // conn.busy_timeout(Duration::from_millis(500))?;
+  conn.busy_handler(Some(|count| {
+    info!("busy_handler: {}", count);
+    let d = Duration::from_millis(500);
+    std::thread::sleep(d);
+    true
+  }))?;
+
+  conn.execute("PRAGMA foreign_keys = true;", params![])?;
+
+  Ok(conn)
+}
 
 pub fn new_user(
   dbfile: &Path,
@@ -22,39 +43,16 @@ pub fn new_user(
 ) -> Result<i64, Box<dyn Error>> {
   let conn = connection_open(dbfile)?;
 
-  let usernoteid = note_id(&conn, "system", "user")?;
-  let publicnoteid = note_id(&conn, "system", "public")?;
-  let systemid = user_id(&conn, "system")?;
-
   let now = now()?;
-
-  // make a corresponding note,
-  conn.execute(
-    "insert into zknote (title, content, user, editable, showtitle, createdate, changeddate)
-     values (?1, ?2, ?3, 0, 1, ?4, ?5)",
-    params![name, "", systemid, now, now],
-  )?;
-
-  let zknid = conn.last_insert_rowid();
 
   // make a user record.
   conn.execute(
-    "insert into user (name, zknote, hashwd, salt, email, registration_key, createdate)
-      values (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-    params![name, zknid, hashwd, salt, email, registration_key, now],
+    "insert into user (name, hashwd, salt, email, registration_key, createdate)
+      values (?1, ?2, ?3, ?4, ?5, ?6)",
+    params![name, hashwd, salt, email, registration_key, now],
   )?;
 
   let uid = conn.last_insert_rowid();
-
-  conn.execute(
-    "update zknote set sysdata = ?1
-        where id = ?2",
-    params![systemid, uid.to_string().as_str()],
-  )?;
-
-  // indicate a 'user' record, and 'public'
-  save_zklink(&conn, zknid, usernoteid, systemid, None)?;
-  save_zklink(&conn, zknid, publicnoteid, systemid, None)?;
 
   Ok(uid)
 }
@@ -71,19 +69,17 @@ pub fn user_id(conn: &Connection, name: &str) -> Result<i64, Box<dyn Error>> {
 
 pub fn read_user_by_name(conn: &Connection, name: &str) -> Result<User, Box<dyn Error>> {
   let user = conn.query_row(
-    "select id, zknote, homenote, hashwd, salt, email, registration_key
+    "select id,  hashwd, salt, email, registration_key
       from user where name = ?1",
     params![name],
     |row| {
       Ok(User {
         id: row.get(0)?,
         name: name.to_string(),
-        noteid: row.get(1)?,
-        homenoteid: row.get(2)?,
-        hashwd: row.get(3)?,
-        salt: row.get(4)?,
-        email: row.get(5)?,
-        registration_key: row.get(6)?,
+        hashwd: row.get(1)?,
+        salt: row.get(2)?,
+        email: row.get(3)?,
+        registration_key: row.get(4)?,
       })
     },
   )?;
@@ -93,19 +89,17 @@ pub fn read_user_by_name(conn: &Connection, name: &str) -> Result<User, Box<dyn 
 
 pub fn read_user_by_id(conn: &Connection, id: i64) -> Result<User, Box<dyn Error>> {
   let user = conn.query_row(
-    "select id, name, zknote, homenote, hashwd, salt, email, registration_key
+    "select id, name, hashwd, salt, email, registration_key
       from user where id = ?1",
     params![id],
     |row| {
       Ok(User {
         id: row.get(0)?,
         name: row.get(1)?,
-        noteid: row.get(2)?,
-        homenoteid: row.get(3)?,
-        hashwd: row.get(4)?,
-        salt: row.get(5)?,
-        email: row.get(6)?,
-        registration_key: row.get(7)?,
+        hashwd: row.get(2)?,
+        salt: row.get(3)?,
+        email: row.get(4)?,
+        registration_key: row.get(5)?,
       })
     },
   )?;
@@ -119,7 +113,7 @@ pub fn read_user_by_token(
   token_expiration_ms: Option<i64>,
 ) -> Result<User, Box<dyn Error>> {
   let (user, tokendate) = conn.query_row(
-    "select id, name, zknote, homenote, hashwd, salt, email, registration_key, token.tokendate
+    "select id, name, hashwd, salt, email, registration_key, token.tokendate
       from user, token where user.id = token.user and token = ?1",
     params![token.to_string()],
     |row| {
@@ -127,14 +121,12 @@ pub fn read_user_by_token(
         User {
           id: row.get(0)?,
           name: row.get(1)?,
-          noteid: row.get(2)?,
-          homenoteid: row.get(3)?,
-          hashwd: row.get(4)?,
-          salt: row.get(5)?,
-          email: row.get(6)?,
-          registration_key: row.get(7)?,
+          hashwd: row.get(2)?,
+          salt: row.get(3)?,
+          email: row.get(4)?,
+          registration_key: row.get(5)?,
         },
-        row.get(8)?,
+        row.get(6)?,
       ))
     },
   )?;
@@ -244,28 +236,27 @@ pub fn purge_reset_tokens(
 }
 
 fn purge_tokens(config: &Config) -> Result<(), Box<dyn Error>> {
-  let conn = sqldata::connection_open(config.db.as_path())?;
+  let conn = connection_open(config.db.as_path())?;
 
-  sqldata::purge_login_tokens(&conn, config.login_token_expiration_ms)?;
+  purge_login_tokens(&conn, config.login_token_expiration_ms)?;
 
-  sqldata::purge_email_tokens(&conn, config.email_token_expiration_ms)?;
+  purge_email_tokens(&conn, config.email_token_expiration_ms)?;
 
-  sqldata::purge_reset_tokens(&conn, config.reset_token_expiration_ms)?;
+  purge_reset_tokens(&conn, config.reset_token_expiration_ms)?;
 
   Ok(())
 }
 
 pub fn update_user(conn: &Connection, user: &User) -> Result<(), Box<dyn Error>> {
   conn.execute(
-    "update user set name = ?1, hashwd = ?2, salt = ?3, email = ?4, registration_key = ?5, homenote = ?6
-           where id = ?7",
+    "update user set name = ?1, hashwd = ?2, salt = ?3, email = ?4, registration_key = ?5
+           where id = ?6",
     params![
       user.name,
       user.hashwd,
       user.salt,
       user.email,
       user.registration_key,
-      user.homenoteid,
       user.id,
     ],
   )?;

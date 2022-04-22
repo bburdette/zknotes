@@ -1,38 +1,62 @@
-pub fn login_data_for_token(
-  session: Session,
-  config: &Config,
-) -> Result<Option<LoginData>, Box<dyn Error>> {
-  let conn = sqldata::connection_open(config.db.as_path())?;
+use crate::data::Config;
+use crate::data::{Login, RegistrationData, ResetPassword, SetPassword, WhatMessage};
+use crate::dbfun;
+use crate::email;
+use crate::util;
+use crate::util::is_token_expired;
+use crypto_hash::{hex_digest, Algorithm};
+use either::Either::{Left, Right};
+use log::{error, info};
+// use simple_error::bail;
+use actix_session::{CookieSession, Session};
+use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Result};
+use std::error::Error;
+use std::path::Path;
+use util::now;
+use uuid::Uuid;
+// use zkprotocol::content::{
+//   ChangeEmail, ChangePassword, GetZkNoteComments, GetZkNoteEdit, ImportZkNote, Login, LoginData,
+//   RegistrationData, ResetPassword, SaveZkNote, SaveZkNotePlusLinks, SetPassword, ZkLinks,
+//   ZkNoteEdit,
+// };
+// use zkprotocol::messages::{PublicMessage, WhatMessage, WhatMessage};
+// use zkprotocol::search::{TagSearch, ZkNoteSearch};
 
-  match session.get("token")? {
-    None => Ok(None),
-    Some(token) => {
-      match sqldata::read_user_by_token(&conn, token, Some(config.login_token_expiration_ms)) {
-        Ok(user) => Ok(Some(sqldata::login_data(&conn, user.id)?)),
-        Err(_) => Ok(None),
-      }
-    }
-  }
-}
+// pub fn login_data_for_token(
+//   session: Session,
+//   config: &Config,
+// ) -> Result<Option<LoginData>, Box<dyn Error>> {
+//   let conn = dbfun::connection_open(config.db.as_path())?;
+
+//   match session.get("token")? {
+//     None => Ok(None),
+//     Some(token) => {
+//       match dbfun::read_user_by_token(&conn, token, Some(config.login_token_expiration_ms)) {
+//         Ok(user) => Ok(Some(dbfun::login_data(&conn, user.id)?)),
+//         Err(_) => Ok(None),
+//       }
+//     }
+//   }
+// }
 
 pub fn user_interface(
   session: &Session,
   config: &Config,
-  msg: UserMessage,
-) -> Result<ServerResponse, Box<dyn Error>> {
+  msg: WhatMessage,
+) -> Result<WhatMessage, Box<dyn Error>> {
   info!("got a user message: {}", msg.what);
-  let conn = sqldata::connection_open(config.db.as_path())?;
+  let conn = dbfun::connection_open(config.db.as_path())?;
   if msg.what.as_str() == "register" {
     let msgdata = Option::ok_or(msg.data, "malformed registration data")?;
     let rd: RegistrationData = serde_json::from_value(msgdata)?;
     // do the registration thing.
     // user already exists?
-    match sqldata::read_user_by_name(&conn, rd.uid.as_str()) {
+    match dbfun::read_user_by_name(&conn, rd.uid.as_str()) {
       Ok(_) => {
         // err - user exists.
-        Ok(ServerResponse {
+        Ok(WhatMessage {
           what: "user exists".to_string(),
-          content: serde_json::Value::Null,
+          data: Option::None,
         })
       }
       Err(_) => {
@@ -42,7 +66,7 @@ pub fn user_interface(
         let salt = util::salt_string();
 
         // write a user record.
-        sqldata::new_user(
+        dbfun::new_user(
           Path::new(&config.db),
           rd.uid.clone(),
           hex_digest(
@@ -74,9 +98,9 @@ pub fn user_interface(
           registration_key.as_str(),
         )?;
 
-        Ok(ServerResponse {
+        Ok(WhatMessage {
           what: "registration sent".to_string(),
-          content: serde_json::Value::Null,
+          data: Option::None,
         })
       }
     }
@@ -84,11 +108,11 @@ pub fn user_interface(
     let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
     let login: Login = serde_json::from_value(msgdata.clone())?;
 
-    let userdata = sqldata::read_user_by_name(&conn, login.uid.as_str())?;
+    let userdata = dbfun::read_user_by_name(&conn, login.uid.as_str())?;
     match userdata.registration_key {
-      Some(_reg_key) => Ok(ServerResponse {
+      Some(_reg_key) => Ok(WhatMessage {
         what: "unregistered user".to_string(),
-        content: serde_json::Value::Null,
+        data: Option::None,
       }),
       None => {
         if hex_digest(
@@ -99,22 +123,22 @@ pub fn user_interface(
         ) != userdata.hashwd
         {
           // don't distinguish between bad user id and bad pwd!
-          Ok(ServerResponse {
+          Ok(WhatMessage {
             what: "invalid user or pwd".to_string(),
-            content: serde_json::Value::Null,
+            data: Option::None,
           })
         } else {
-          let ld = sqldata::login_data(&conn, userdata.id)?;
+          let ld = dbfun::login_data(&conn, userdata.id)?;
           // new token here, and token date.
           let token = Uuid::new_v4();
-          sqldata::add_token(&conn, userdata.id, token)?;
+          dbfun::add_token(&conn, userdata.id, token)?;
           session.set("token", token)?;
-          sqldata::update_user(&conn, &userdata)?;
+          dbfun::update_user(&conn, &userdata)?;
           info!("logged in, user: {:?}", userdata.name);
 
-          Ok(ServerResponse {
+          Ok(WhatMessage {
             what: "logged in".to_string(),
-            content: serde_json::to_value(ld)?,
+            data: Option::Some(serde_json::to_value(ld)?),
           })
         }
       }
@@ -122,25 +146,25 @@ pub fn user_interface(
   } else if msg.what == "logout" {
     session.remove("token");
 
-    Ok(ServerResponse {
+    Ok(WhatMessage {
       what: "logged out".to_string(),
-      content: serde_json::Value::Null,
+      data: Option::None,
     })
   } else if msg.what == "resetpassword" {
     let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
     let reset_password: ResetPassword = serde_json::from_value(msgdata.clone())?;
 
-    let userdata = sqldata::read_user_by_name(&conn, reset_password.uid.as_str())?;
+    let userdata = dbfun::read_user_by_name(&conn, reset_password.uid.as_str())?;
     match userdata.registration_key {
-      Some(_reg_key) => Ok(ServerResponse {
+      Some(_reg_key) => Ok(WhatMessage {
         what: "unregistered user".to_string(),
-        content: serde_json::Value::Null,
+        data: Option::None,
       }),
       None => {
         let reset_key = Uuid::new_v4();
 
         // make 'newpassword' record.
-        sqldata::add_newpassword(&conn, userdata.id, reset_key.clone())?;
+        dbfun::add_newpassword(&conn, userdata.id, reset_key.clone())?;
 
         // send reset email.
         email::send_reset(
@@ -152,9 +176,9 @@ pub fn user_interface(
           reset_key.to_string().as_str(),
         )?;
 
-        Ok(ServerResponse {
+        Ok(WhatMessage {
           what: "resetpasswordack".to_string(),
-          content: serde_json::Value::Null,
+          data: Option::None,
         })
       }
     }
@@ -162,19 +186,19 @@ pub fn user_interface(
     let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
     let set_password: SetPassword = serde_json::from_value(msgdata.clone())?;
 
-    let mut userdata = sqldata::read_user_by_name(&conn, set_password.uid.as_str())?;
+    let mut userdata = dbfun::read_user_by_name(&conn, set_password.uid.as_str())?;
     match userdata.registration_key {
-      Some(_reg_key) => Ok(ServerResponse {
+      Some(_reg_key) => Ok(WhatMessage {
         what: "unregistered user".to_string(),
-        content: serde_json::Value::Null,
+        data: Option::None,
       }),
       None => {
-        let npwd = sqldata::read_newpassword(&conn, userdata.id, set_password.reset_key)?;
+        let npwd = dbfun::read_newpassword(&conn, userdata.id, set_password.reset_key)?;
 
         if is_token_expired(config.reset_token_expiration_ms, npwd) {
-          Ok(ServerResponse {
+          Ok(WhatMessage {
             what: "password reset failed".to_string(),
-            content: serde_json::Value::Null,
+            data: Option::None,
           })
         } else {
           userdata.hashwd = hex_digest(
@@ -183,29 +207,29 @@ pub fn user_interface(
               .into_bytes()
               .as_slice(),
           );
-          sqldata::remove_newpassword(&conn, userdata.id, set_password.reset_key)?;
-          sqldata::update_user(&conn, &userdata)?;
-          Ok(ServerResponse {
+          dbfun::remove_newpassword(&conn, userdata.id, set_password.reset_key)?;
+          dbfun::update_user(&conn, &userdata)?;
+          Ok(WhatMessage {
             what: "setpasswordack".to_string(),
-            content: serde_json::Value::Null,
+            data: Option::None,
           })
         }
       }
     }
   } else {
     match session.get::<Uuid>("token")? {
-      None => Ok(ServerResponse {
+      None => Ok(WhatMessage {
         what: "not logged in".to_string(),
-        content: serde_json::Value::Null,
+        data: Option::None,
       }),
       Some(token) => {
-        match sqldata::read_user_by_token(&conn, token, Some(config.login_token_expiration_ms)) {
+        match dbfun::read_user_by_token(&conn, token, Some(config.login_token_expiration_ms)) {
           Err(e) => {
             info!("read_user_by_token error: {:?}", e);
 
-            Ok(ServerResponse {
+            Ok(WhatMessage {
               what: "invalid user or pwd".to_string(),
-              content: serde_json::Value::Null,
+              data: Option::None,
             })
           }
           Ok(userdata) => {
@@ -220,16 +244,16 @@ pub fn user_interface(
 
 fn register(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
   info!("registration: uid: {:?}", req.match_info().get("uid"));
-  match sqldata::connection_open(data.db.as_path()) {
+  match dbfun::connection_open(data.db.as_path()) {
     Ok(conn) => match (req.match_info().get("uid"), req.match_info().get("key")) {
       (Some(uid), Some(key)) => {
         // read user record.  does the reg key match?
-        match sqldata::read_user_by_name(&conn, uid) {
+        match dbfun::read_user_by_name(&conn, uid) {
           Ok(user) => {
             if user.registration_key == Some(key.to_string()) {
               let mut mu = user;
               mu.registration_key = None;
-              match sqldata::update_user(&conn, &mu) {
+              match dbfun::update_user(&conn, &mu) {
                 Ok(_) => HttpResponse::Ok().body(
                   format!(
                     "<h1>You are registered!<h1> <a href=\"{}\">\
@@ -256,16 +280,16 @@ fn register(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
 
 fn new_email(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
   info!("new email: uid: {:?}", req.match_info().get("uid"));
-  match sqldata::connection_open(data.db.as_path()) {
+  match dbfun::connection_open(data.db.as_path()) {
     Ok(conn) => match (req.match_info().get("uid"), req.match_info().get("token")) {
       (Some(uid), Some(tokenstr)) => {
         match Uuid::from_str(tokenstr) {
           Err(_e) => HttpResponse::BadRequest().body("invalid token".to_string()),
           Ok(token) => {
             // read user record.  does the reg key match?
-            match sqldata::read_user_by_name(&conn, uid) {
+            match dbfun::read_user_by_name(&conn, uid) {
               Ok(user) => {
-                match sqldata::read_newemail(&conn, user.id, token) {
+                match dbfun::read_newemail(&conn, user.id, token) {
                   Ok((email, tokendate)) => {
                     match now() {
                       Err(_e) => HttpResponse::InternalServerError()
@@ -280,10 +304,10 @@ fn new_email(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
                           // put the email in the user record and update.
                           let mut mu = user.clone();
                           mu.email = email;
-                          match sqldata::update_user(&conn, &mu) {
+                          match dbfun::update_user(&conn, &mu) {
                             Ok(_) => {
                               // delete the change email token record.
-                              match sqldata::remove_newemail(&conn, user.id, token) {
+                              match dbfun::remove_newemail(&conn, user.id, token) {
                                 Ok(_) => (),
                                 Err(e) => error!("error removing newemail record: {:?}", e),
                               }

@@ -27,6 +27,53 @@ pub struct User {
   pub registration_key: Option<String>,
 }
 
+pub fn new_user(
+  dbfile: &Path,
+  name: String,
+  hashwd: String,
+  salt: String,
+  email: String,
+  registration_key: String,
+) -> Result<i64, Box<dyn Error>> {
+  let conn = connection_open(dbfile)?;
+
+  let usernoteid = note_id(&conn, "system", "user")?;
+  let publicnoteid = note_id(&conn, "system", "public")?;
+  let systemid = user_id(&conn, "system")?;
+
+  let now = now()?;
+
+  // make a corresponding note,
+  conn.execute(
+    "insert into zknote (title, content, user, editable, showtitle, createdate, changeddate)
+     values (?1, ?2, ?3, 0, 1, ?4, ?5)",
+    params![name, "", systemid, now, now],
+  )?;
+
+  let zknid = conn.last_insert_rowid();
+
+  // make a user record.
+  conn.execute(
+    "insert into user (name, zknote, hashwd, salt, email, registration_key, createdate)
+      values (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+    params![name, zknid, hashwd, salt, email, registration_key, now],
+  )?;
+
+  let uid = conn.last_insert_rowid();
+
+  conn.execute(
+    "update zknote set sysdata = ?1
+        where id = ?2",
+    params![systemid, uid.to_string().as_str()],
+  )?;
+
+  // indicate a 'user' record, and 'public'
+  save_zklink(&conn, zknid, usernoteid, systemid, None)?;
+  save_zklink(&conn, zknid, publicnoteid, systemid, None)?;
+
+  Ok(uid)
+}
+
 pub fn login_data(conn: &Connection, uid: i64) -> Result<LoginData, Box<dyn Error>> {
   let user = read_user_by_id(&conn, uid)?;
   Ok(LoginData {
@@ -39,6 +86,23 @@ pub fn login_data(conn: &Connection, uid: i64) -> Result<LoginData, Box<dyn Erro
     searchid: note_id(conn, "system", "search")?,
     commentid: note_id(conn, "system", "comment")?,
   })
+}
+
+pub fn login_data_for_token(
+  session: Session,
+  config: &Config,
+) -> Result<Option<LoginData>, Box<dyn Error>> {
+  let conn = dbfun::connection_open(config.db.as_path())?;
+
+  match session.get("token")? {
+    None => Ok(None),
+    Some(token) => {
+      match dbfun::read_user_by_token(&conn, token, Some(config.login_token_expiration_ms)) {
+        Ok(user) => Ok(Some(dbfun::login_data(&conn, user.id)?)),
+        Err(_) => Ok(None),
+      }
+    }
+  }
 }
 
 pub fn connection_open(dbfile: &Path) -> Result<Connection, Box<dyn Error>> {
@@ -1021,8 +1085,6 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: i64) -> Result<(), Box<dyn Err
 }
 
 // user CRUD
-
-
 
 pub fn save_zklink(
   conn: &Connection,

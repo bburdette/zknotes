@@ -1,7 +1,20 @@
+use crate::util::{is_token_expired, now};
+use barrel::backend::Sqlite;
+use barrel::{types, Migration};
+use crypto_hash::{hex_digest, Algorithm};
+use log::info;
+use rusqlite::{params, Connection};
+use serde_derive::{Deserialize, Serialize};
+use simple_error::bail;
+use std::error::Error;
+use std::path::Path;
+use std::time::Duration;
+use uuid::Uuid;
+
 pub fn udpate1(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   // db connection without foreign key checking.
   let conn = Connection::open(dbfile)?;
-  let mut m1 = Migration::new();
+  let mut m = Migration::new();
 
   // table for storing single values.
   // m.create_table("singlevalue", |t| {
@@ -57,7 +70,7 @@ pub fn udpate1(dbfile: &Path) -> Result<(), Box<dyn Error>> {
     );
   });
 
-  conn.execute_batch(m1.make::<Sqlite>().as_str())?;
+  conn.execute_batch(m.make::<Sqlite>().as_str())?;
 
   Ok(())
 }

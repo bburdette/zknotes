@@ -1650,6 +1650,7 @@ dependencies = [
  "time 0.1.43",
  "timer",
  "toml",
+ "uuid 0.8.2",
 ]
 
 [[package]]
