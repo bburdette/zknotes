@@ -11,7 +11,7 @@ use std::path::Path;
 use std::time::Duration;
 use uuid::Uuid;
 use zkprotocol::content::{
-  ChangeEmail, ChangePassword, Direction, EditLink, GetZkLinks, GetZkNoteComments, GetZkNoteEdit,
+   Direction, EditLink, GetZkLinks, GetZkNoteComments, GetZkNoteEdit,
   ImportZkNote, LoginData, SaveZkLink, SaveZkNote, SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
 };
 

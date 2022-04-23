@@ -12,6 +12,7 @@ use actix_session::{CookieSession, Session};
 use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Result};
 use std::error::Error;
 use std::path::Path;
+use std::str::FromStr;
 use util::now;
 use uuid::Uuid;
 // use zkprotocol::content::{
