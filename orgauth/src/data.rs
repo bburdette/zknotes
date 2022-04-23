@@ -15,6 +15,13 @@ pub struct Config {
   pub reset_token_expiration_ms: i64,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct LoginData {
+  pub userid: i64,
+  pub name: String,
+  pub data: Option<serde_json::Value>,
+}
+
 #[derive(Clone, Deserialize, Serialize, Debug)]
 pub struct User {
   pub id: i64,
