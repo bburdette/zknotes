@@ -1,10 +1,9 @@
 #![allow(non_snake_case)]
-use uuid::Uuid;
+// use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct LoginData {
+pub struct ExtraLoginData {
   pub userid: i64,
-  pub name: String,
   pub zknote: i64,
   pub homenote: Option<i64>,
   pub publicid: i64,

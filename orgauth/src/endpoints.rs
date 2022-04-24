@@ -5,7 +5,7 @@ use crate::email;
 use crate::util;
 use crate::util::is_token_expired;
 use crypto_hash::{hex_digest, Algorithm};
-use either::Either::{Left, Right};
+// use either::Either::{Left, Right};
 use log::{error, info};
 // use simple_error::bail;
 use actix_session::{CookieSession, Session};
@@ -218,32 +218,14 @@ pub fn user_interface(
       }
     }
   } else {
-    match session.get::<Uuid>("token")? {
-      None => Ok(WhatMessage {
-        what: "not logged in".to_string(),
-        data: Option::None,
-      }),
-      Some(token) => {
-        match dbfun::read_user_by_token(&conn, token, Some(config.login_token_expiration_ms)) {
-          Err(e) => {
-            info!("read_user_by_token error: {:?}", e);
-
-            Ok(WhatMessage {
-              what: "invalid user or pwd".to_string(),
-              data: Option::None,
-            })
-          }
-          Ok(userdata) => {
-            // finally!  processing messages as logged in user.
-            user_interface_loggedin(&config, userdata.id, &msg)
-          }
-        }
-      }
-    }
+    Err(Box::new(simple_error::SimpleError::new(format!(
+      "invalid 'what' code:'{}'",
+      msg.what
+    ))))
   }
 }
 
-fn register(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
+pub fn register(data: &Config, req: HttpRequest) -> HttpResponse {
   info!("registration: uid: {:?}", req.match_info().get("uid"));
   match dbfun::connection_open(data.db.as_path()) {
     Ok(conn) => match (req.match_info().get("uid"), req.match_info().get("key")) {
@@ -279,7 +261,7 @@ fn register(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
   }
 }
 
-fn new_email(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
+pub fn new_email(data: &Config, req: HttpRequest) -> HttpResponse {
   info!("new email: uid: {:?}", req.match_info().get("uid"));
   match dbfun::connection_open(data.db.as_path()) {
     Ok(conn) => match (req.match_info().get("uid"), req.match_info().get("token")) {

@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::email;
+// use crate::email;
 use crate::search;
 use crate::sqldata;
 use crate::util;
@@ -14,53 +14,22 @@ use std::error::Error;
 use std::path::Path;
 use uuid::Uuid;
 use zkprotocol::content::{
-  ChangeEmail, ChangePassword, GetZkNoteComments, GetZkNoteEdit, ImportZkNote, Login, LoginData,
-  RegistrationData, ResetPassword, SaveZkNote, SaveZkNotePlusLinks, SetPassword, ZkLinks,
+  GetZkNoteComments, GetZkNoteEdit, ImportZkNote, SaveZkNote, SaveZkNotePlusLinks, ZkLinks,
   ZkNoteEdit,
 };
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 use zkprotocol::search::{TagSearch, ZkNoteSearch};
 
-fn user_interface_loggedin(
+pub fn zk_interface_loggedin(
   config: &Config,
   uid: i64,
   msg: &UserMessage,
 ) -> Result<ServerResponse, Box<dyn Error>> {
   match msg.what.as_str() {
-    "ChangePassword" => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let cp: ChangePassword = serde_json::from_value(msgdata.clone())?;
-      let conn = sqldata::connection_open(config.db.as_path())?;
-      sqldata::change_password(&conn, uid, cp)?;
-      Ok(ServerResponse {
-        what: "changed password".to_string(),
-        content: serde_json::Value::Null,
-      })
-    }
-    "ChangeEmail" => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let cp: ChangeEmail = serde_json::from_value(msgdata.clone())?;
-      let conn = sqldata::connection_open(config.db.as_path())?;
-      let (name, token) = sqldata::change_email(&conn, uid, cp.clone())?;
-      // send a confirmation email.
-      email::send_newemail_confirmation(
-        config.appname.as_str(),
-        config.domain.as_str(),
-        config.mainsite.as_str(),
-        cp.email.as_str(),
-        name.as_str(),
-        token.to_string().as_str(),
-      )?;
-
-      Ok(ServerResponse {
-        what: "changed email".to_string(),
-        content: serde_json::Value::Null,
-      })
-    }
     "getzknote" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let id: i64 = serde_json::from_value(msgdata.clone())?;
-      let conn = sqldata::connection_open(config.db.as_path())?;
+      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       let note = sqldata::read_zknote(&conn, Some(uid), id)?;
       info!("user#getzknote: {} - {}", id, note.title);
       Ok(ServerResponse {
@@ -71,7 +40,7 @@ fn user_interface_loggedin(
     "getzknoteedit" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let gzne: GetZkNoteEdit = serde_json::from_value(msgdata.clone())?;
-      let conn = sqldata::connection_open(config.db.as_path())?;
+      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       let note = sqldata::read_zknoteedit(&conn, uid, &gzne)?;
       info!(
         "user#getzknoteedit: {} - {}",
@@ -85,7 +54,7 @@ fn user_interface_loggedin(
     "getzknotecomments" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let gzne: GetZkNoteComments = serde_json::from_value(msgdata.clone())?;
-      let conn = sqldata::connection_open(config.db.as_path())?;
+      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       let notes = sqldata::read_zknotecomments(&conn, uid, &gzne)?;
       Ok(ServerResponse {
         what: "zknotecomments".to_string(),
@@ -95,7 +64,7 @@ fn user_interface_loggedin(
     "searchzknotes" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let search: ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
-      let conn = sqldata::connection_open(config.db.as_path())?;
+      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       // let res = search::search_zknotes_simple(&conn, uid, &search)?;
       let res = search::search_zknotes(&conn, uid, &search)?;
       match res {
@@ -112,7 +81,7 @@ fn user_interface_loggedin(
     "powerdelete" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let search: TagSearch = serde_json::from_value(msgdata.clone())?;
-      let conn = sqldata::connection_open(config.db.as_path())?;
+      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       let res = search::power_delete_zknotes(&conn, uid, &search)?;
       Ok(ServerResponse {
         what: "powerdeletecomplete".to_string(),
@@ -122,7 +91,7 @@ fn user_interface_loggedin(
     "deletezknote" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let id: i64 = serde_json::from_value(msgdata.clone())?;
-      sqldata::delete_zknote(Path::new(&config.db), uid, id)?;
+      sqldata::delete_zknote(Path::new(&config.orgauth_config.db), uid, id)?;
       Ok(ServerResponse {
         what: "deletedzknote".to_string(),
         content: serde_json::to_value(id)?,
@@ -131,7 +100,7 @@ fn user_interface_loggedin(
     "savezknote" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let sbe: SaveZkNote = serde_json::from_value(msgdata.clone())?;
-      let conn = sqldata::connection_open(config.db.as_path())?;
+      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       let s = sqldata::save_zknote(&conn, uid, &sbe)?;
       Ok(ServerResponse {
         what: "savedzknote".to_string(),
@@ -141,7 +110,7 @@ fn user_interface_loggedin(
     "savezklinks" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let msg: ZkLinks = serde_json::from_value(msgdata.clone())?;
-      let s = sqldata::save_zklinks(&config.db.as_path(), uid, msg.links)?;
+      let s = sqldata::save_zklinks(&config.orgauth_config.db.as_path(), uid, msg.links)?;
       Ok(ServerResponse {
         what: "savedzklinks".to_string(),
         content: serde_json::to_value(s)?,
@@ -150,7 +119,7 @@ fn user_interface_loggedin(
     "savezknotepluslinks" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let sznpl: SaveZkNotePlusLinks = serde_json::from_value(msgdata.clone())?;
-      let conn = sqldata::connection_open(config.db.as_path())?;
+      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       let szkn = sqldata::save_zknote(&conn, uid, &sznpl.note)?;
       let _s = sqldata::save_savezklinks(&conn, uid, szkn.id, sznpl.links)?;
       Ok(ServerResponse {
@@ -162,7 +131,7 @@ fn user_interface_loggedin(
     // "getzklinks" => {
     //   let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
     //   let gzl: GetZkLinks = serde_json::from_value(msgdata.clone())?;
-    //   let conn = sqldata::connection_open(config.db.as_path())?;
+    //   let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
     //   let s = sqldata::read_zklinks(&conn, uid, &gzl)?;
     //   let zklinks = ZkLinks { links: s };
     //   Ok(ServerResponse {
@@ -173,7 +142,7 @@ fn user_interface_loggedin(
     "saveimportzknotes" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let gzl: Vec<ImportZkNote> = serde_json::from_value(msgdata.clone())?;
-      let conn = sqldata::connection_open(config.db.as_path())?;
+      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       sqldata::save_importzknotes(&conn, uid, gzl)?;
       Ok(ServerResponse {
         what: "savedimportzknotes".to_string(),
@@ -183,7 +152,7 @@ fn user_interface_loggedin(
     "sethomenote" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let hn: i64 = serde_json::from_value(msgdata.clone())?;
-      let conn = sqldata::connection_open(config.db.as_path())?;
+      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       let mut user = sqldata::read_user_by_id(&conn, uid)?;
       user.homenoteid = Some(hn);
       sqldata::update_user(&conn, &user)?;
@@ -209,7 +178,7 @@ pub fn public_interface(
     "getzknote" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let id: i64 = serde_json::from_value(msgdata.clone())?;
-      let conn = sqldata::connection_open(config.db.as_path())?;
+      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       let note = sqldata::read_zknote(&conn, None, id)?;
       info!(
         "public#getzknote: {} - {} - {:?}",
@@ -228,7 +197,7 @@ pub fn public_interface(
     "getzknotepubid" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let pubid: String = serde_json::from_value(msgdata.clone())?;
-      let conn = sqldata::connection_open(config.db.as_path())?;
+      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       let note = sqldata::read_zknotepubid(&conn, None, pubid.as_str())?;
       info!(
         "public#getzknotepubid: {} - {} - {:?}",

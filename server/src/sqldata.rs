@@ -3,6 +3,9 @@ use barrel::backend::Sqlite;
 use barrel::{types, Migration};
 use crypto_hash::{hex_digest, Algorithm};
 use log::info;
+use orgauth::dbfun;
+use orgauth::dbfun::user_id;
+use orgauth::migrations;
 use rusqlite::{params, Connection};
 use serde_derive::{Deserialize, Serialize};
 use simple_error::bail;
@@ -11,8 +14,8 @@ use std::path::Path;
 use std::time::Duration;
 use uuid::Uuid;
 use zkprotocol::content::{
-   Direction, EditLink, GetZkLinks, GetZkNoteComments, GetZkNoteEdit,
-  ImportZkNote, LoginData, SaveZkLink, SaveZkNote, SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
+  Direction, EditLink, ExtraLoginData, GetZkLinks, GetZkNoteComments, GetZkNoteEdit, ImportZkNote,
+  SaveZkLink, SaveZkNote, SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
 };
 
 #[derive(Clone, Deserialize, Serialize, Debug)]
@@ -75,7 +78,7 @@ pub fn new_user(
 }
 
 pub fn login_data(conn: &Connection, uid: i64) -> Result<LoginData, Box<dyn Error>> {
-  let user = read_user_by_id(&conn, uid)?;
+  let user = orgauth::dbfun::read_user_by_id(&conn, uid)?;
   Ok(LoginData {
     userid: uid,
     name: user.name,
@@ -88,12 +91,12 @@ pub fn login_data(conn: &Connection, uid: i64) -> Result<LoginData, Box<dyn Erro
   })
 }
 
+// TODO move to interfaces?
 pub fn login_data_for_token(
   session: Session,
   config: &Config,
 ) -> Result<Option<LoginData>, Box<dyn Error>> {
-  let conn = dbfun::connection_open(config.db.as_path())?;
-
+  let conn = connection_open(config.db.as_path())?;
   match session.get("token")? {
     None => Ok(None),
     Some(token) => {
@@ -975,6 +978,90 @@ pub fn udpate12(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   Ok(())
 }
 
+// --------------------------------------------------------------------------------
+// orgauth enters the chat
+// --------------------------------------------------------------------------------
+pub fn udpate13(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+  // db connection without foreign key checking.
+  let conn = Connection::open(dbfile)?;
+
+  migrations::udpate1(dbfile)?;
+
+  // copy from old user tables into orgauth tables.
+  conn.execute(
+    "insert into orgauth_user (id, name, hashwd, salt, email, registration_key, createdate)
+        select id, name, hashwd, salt, email, registration_key, createdate from user",
+    params![],
+  )?;
+
+  conn.execute(
+    "insert into orgauth_token (user, token, tokendate)
+        select user, token, tokendate from token",
+    params![],
+  )?;
+
+  conn.execute(
+    "insert into orgauth_newemail (user, email, token, tokendate)
+        select user, email, token, tokendate from newemail",
+    params![],
+  )?;
+
+  conn.execute(
+    "insert into orgauth_newpassword (user, token, tokendate)
+        select user, token, tokendate fromi newpassword",
+    params![],
+  )?;
+
+  // Hmmm would switch to 'zkuser', but I'll keep the user table so I don't have to rebuild every table with
+  // new foreign keys.
+
+  let mut m1 = Migration::new();
+
+  m1.create_table("usertemp", |t| {
+    t.add_column("id", types::foreign("orgauth_user", "id").nullable(false));
+    t.add_column("zknote", types::foreign("zknote", "id").nullable(true));
+    t.add_column("homenote", types::foreign("zknote", "id").nullable(true));
+  });
+
+  conn.execute_batch(mt.make::<Sqlite>().as_str())?;
+
+  // copy from user.
+  conn.execute(
+    "insert into usertemp (id, zknote, homenote)
+        select id, zknote, homenote from user",
+    params![],
+  )?;
+
+  let mut m2 = Migration::new();
+  m2.drop_table("user");
+
+  // new user table with homenote
+  m2.create_table("user", |t| {
+    t.add_column("id", types::foreign("orgauth_user", "id").nullable(false));
+    t.add_column("zknote", types::foreign("zknote", "id").nullable(true));
+    t.add_column("homenote", types::foreign("zknote", "id").nullable(true));
+  });
+
+  conn.execute_batch(m2.make::<Sqlite>().as_str())?;
+
+  // copy everything from usertemp.
+  conn.execute(
+    "insert into user (id, zknote, homenote)
+        select id, zknote, homenote from usertemp",
+    params![],
+  )?;
+
+  let mut m3 = Migration::new();
+  m3.drop_table("usertemp");
+  m3.drop_table("token");
+  m3.drop_table("newemail");
+  m3.drop_table("newpassword");
+
+  conn.execute_batch(m3.make::<Sqlite>().as_str())?;
+
+  Ok(())
+}
+
 pub fn get_single_value(conn: &Connection, name: &str) -> Result<Option<String>, Box<dyn Error>> {
   match conn.query_row(
     "select value from singlevalue where name = ?1",
@@ -1076,10 +1163,15 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: i64) -> Result<(), Box<dyn Err
     udpate12(&dbfile)?;
     set_single_value(&conn, "migration_level", "12")?;
   }
+  if nlevel < 11 {
+    info!("udpate11");
+    udpate11(&dbfile)?;
+    set_single_value(&conn, "migration_level", "11")?;
+  }
 
   info!("db up to date.");
 
-  purge_login_tokens(&conn, token_expiration_ms)?;
+  orgauth::dbfun::purge_login_tokens(&conn, token_expiration_ms)?;
 
   Ok(())
 }

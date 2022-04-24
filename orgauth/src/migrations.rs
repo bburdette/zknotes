@@ -17,13 +17,13 @@ pub fn udpate1(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   let mut m = Migration::new();
 
   // table for storing single values.
-  // m.create_table("singlevalue", |t| {
+  // m.create_table("orgauth_singlevalue", |t| {
   //   t.add_column("name", types::text().nullable(false).unique(true));
   //   t.add_column("value", types::text().nullable(false));
   // });
 
   // add token table.  multiple tokens per user to support multiple browsers and/or devices.
-  m.create_table("token", |t| {
+  m.create_table("orgauth_token", |t| {
     t.add_column("user", types::foreign("user", "id").nullable(false));
     t.add_column("token", types::text().nullable(false));
     t.add_column("tokendate", types::integer().nullable(false));
@@ -31,7 +31,7 @@ pub fn udpate1(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   });
 
   // add newemail table.  each request for a new email creates an entry.
-  m.create_table("newemail", |t| {
+  m.create_table("orgauth_newemail", |t| {
     t.add_column("user", types::foreign("user", "id").nullable(false));
     t.add_column("email", types::text().nullable(false));
     t.add_column("token", types::text().nullable(false));
@@ -43,7 +43,7 @@ pub fn udpate1(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   });
 
   // new user table with new columns for session tokens.
-  m.create_table("user", |t| {
+  m.create_table("orgauth_user", |t| {
     t.add_column(
       "id",
       types::integer()
@@ -60,7 +60,7 @@ pub fn udpate1(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   });
 
   // add newpassword table.  each request for a new password creates an entry.
-  m.create_table("newpassword", |t| {
+  m.create_table("orgauth_newpassword", |t| {
     t.add_column("user", types::foreign("user", "id").nullable(false));
     t.add_column("token", types::text().nullable(false));
     t.add_column("tokendate", types::integer().nullable(false));

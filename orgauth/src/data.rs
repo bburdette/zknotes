@@ -9,7 +9,6 @@ pub struct Config {
   pub domain: String,
   pub db: PathBuf,
   pub admin_email: String,
-  pub error_index_note: Option<i64>,
   pub login_token_expiration_ms: i64,
   pub email_token_expiration_ms: i64,
   pub reset_token_expiration_ms: i64,

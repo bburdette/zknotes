@@ -1,7 +1,8 @@
 use crate::sqldata;
-use crate::sqldata::{get_sysids, note_id, power_delete_zknote, user_id, zknote_access_id};
+use crate::sqldata::{get_sysids, note_id, power_delete_zknote, zknote_access_id};
 use either::Either;
 use either::Either::{Left, Right};
+use orgauth::dbfun::user_id;
 use rusqlite::Connection;
 use std::convert::TryInto;
 use std::error::Error;
