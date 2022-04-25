@@ -21,13 +21,8 @@ use zkprotocol::content::{
 #[derive(Clone, Deserialize, Serialize, Debug)]
 pub struct User {
   pub id: i64,
-  pub name: String,
   pub noteid: i64,
   pub homenoteid: Option<i64>,
-  pub hashwd: String,
-  pub salt: String,
-  pub email: String,
-  pub registration_key: Option<String>,
 }
 
 pub fn new_user(
@@ -77,25 +72,30 @@ pub fn new_user(
   Ok(uid)
 }
 
-pub fn login_data(conn: &Connection, uid: i64) -> Result<LoginData, Box<dyn Error>> {
-  let user = orgauth::dbfun::read_user_by_id(&conn, uid)?;
-  Ok(LoginData {
+pub fn login_data(conn: &Connection, uid: i64) -> Result<orgauth::data::LoginData, Box<dyn Error>> {
+  let mut oald = orgauth::dbfun::login_data(&conn, uid)?;
+  let oauser = orgauth::dbfun::read_user_by_id(&conn, uid)?;
+  let user = read_user_by_id(&conn, uid)?;
+
+  let eld = ExtraLoginData {
     userid: uid,
-    name: user.name,
     zknote: user.noteid,
     homenote: user.homenoteid,
     publicid: note_id(conn, "system", "public")?,
     shareid: note_id(conn, "system", "share")?,
     searchid: note_id(conn, "system", "search")?,
     commentid: note_id(conn, "system", "comment")?,
-  })
+  };
+
+  oald.data = Some(serde_json::to_value(eld)?);
+  Ok(oald)
 }
 
 // TODO move to interfaces?
 pub fn login_data_for_token(
   session: Session,
   config: &Config,
-) -> Result<Option<LoginData>, Box<dyn Error>> {
+) -> Result<Option<orgauth::data::LoginData>, Box<dyn Error>> {
   let conn = connection_open(config.db.as_path())?;
   match session.get("token")? {
     None => Ok(None),
@@ -1506,6 +1506,23 @@ pub fn get_sysids(conn: &Connection, sysid: i64, noteid: i64) -> Result<Vec<i64>
   );
 
   r
+}
+
+pub fn read_user_by_id(conn: &Connection, id: i64) -> Result<User, Box<dyn Error>> {
+  let user = conn.query_row(
+    "select id, zknote, homenote
+      from user where id = ?1",
+    params![id],
+    |row| {
+      Ok(User {
+        id: row.get(0)?,
+        noteid: row.get(1)?,
+        homenoteid: row.get(2)?,
+      })
+    },
+  )?;
+
+  Ok(user)
 }
 
 pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNote, Box<dyn Error>> {
