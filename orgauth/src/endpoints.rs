@@ -68,7 +68,7 @@ pub fn user_interface(
 
         // write a user record.
         dbfun::new_user(
-          Path::new(&config.db),
+          &conn,
           rd.uid.clone(),
           hex_digest(
             Algorithm::SHA256,

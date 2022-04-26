@@ -20,6 +20,26 @@ use zkprotocol::content::{
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 use zkprotocol::search::{TagSearch, ZkNoteSearch};
 
+pub fn login_data_for_token(
+  session: Session,
+  config: &Config,
+) -> Result<Option<orgauth::data::LoginData>, Box<dyn Error>> {
+  let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+  match session.get("token")? {
+    None => Ok(None),
+    Some(token) => {
+      match orgauth::dbfun::read_user_by_token(
+        &conn,
+        token,
+        Some(config.orgauth_config.login_token_expiration_ms),
+      ) {
+        Ok(user) => Ok(Some(sqldata::login_data(&conn, user.id)?)),
+        Err(_) => Ok(None),
+      }
+    }
+  }
+}
+
 pub fn zk_interface_loggedin(
   config: &Config,
   uid: i64,

@@ -22,26 +22,6 @@ pub fn udpate1(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   //   t.add_column("value", types::text().nullable(false));
   // });
 
-  // add token table.  multiple tokens per user to support multiple browsers and/or devices.
-  m.create_table("orgauth_token", |t| {
-    t.add_column("user", types::foreign("user", "id").nullable(false));
-    t.add_column("token", types::text().nullable(false));
-    t.add_column("tokendate", types::integer().nullable(false));
-    t.add_index("tokenunq", types::index(vec!["user", "token"]).unique(true));
-  });
-
-  // add newemail table.  each request for a new email creates an entry.
-  m.create_table("orgauth_newemail", |t| {
-    t.add_column("user", types::foreign("user", "id").nullable(false));
-    t.add_column("email", types::text().nullable(false));
-    t.add_column("token", types::text().nullable(false));
-    t.add_column("tokendate", types::integer().nullable(false));
-    t.add_index(
-      "newemailunq",
-      types::index(vec!["user", "token"]).unique(true),
-    );
-  });
-
   // new user table with new columns for session tokens.
   m.create_table("orgauth_user", |t| {
     t.add_column(
@@ -59,13 +39,36 @@ pub fn udpate1(dbfile: &Path) -> Result<(), Box<dyn Error>> {
     t.add_column("createdate", types::integer().nullable(false));
   });
 
-  // add newpassword table.  each request for a new password creates an entry.
-  m.create_table("orgauth_newpassword", |t| {
-    t.add_column("user", types::foreign("user", "id").nullable(false));
+  // add token table.  multiple tokens per user to support multiple browsers and/or devices.
+  m.create_table("orgauth_token", |t| {
+    t.add_column("user", types::foreign("orgauth_user", "id").nullable(false));
     t.add_column("token", types::text().nullable(false));
     t.add_column("tokendate", types::integer().nullable(false));
     t.add_index(
-      "resetpasswordunq",
+      "orgauth_tokenunq",
+      types::index(vec!["user", "token"]).unique(true),
+    );
+  });
+
+  // add newemail table.  each request for a new email creates an entry.
+  m.create_table("orgauth_newemail", |t| {
+    t.add_column("user", types::foreign("orgauth_user", "id").nullable(false));
+    t.add_column("email", types::text().nullable(false));
+    t.add_column("token", types::text().nullable(false));
+    t.add_column("tokendate", types::integer().nullable(false));
+    t.add_index(
+      "orgauth_newemailunq",
+      types::index(vec!["user", "token"]).unique(true),
+    );
+  });
+
+  // add newpassword table.  each request for a new password creates an entry.
+  m.create_table("orgauth_newpassword", |t| {
+    t.add_column("user", types::foreign("orgauth_user", "id").nullable(false));
+    t.add_column("token", types::text().nullable(false));
+    t.add_column("tokendate", types::integer().nullable(false));
+    t.add_index(
+      "orgauth_resetpasswordunq",
       types::index(vec!["user", "token"]).unique(true),
     );
   });

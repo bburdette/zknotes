@@ -1,11 +1,13 @@
 ip = '127.0.0.1'
 port = 8010
 createdirs = false
-db = './zknotes.db'
-mainsite = 'http://localhost:8010'
 altmainsite = []
+
+[orgauth_config]
+mainsite = 'http://localhost:8010'
 appname = 'zknotes'
 domain = 'localhost:8010'
+db = './zknotes.db'
 admin_email = 'admin@admin.admin'
 login_token_expiration_ms = 604800000
 email_token_expiration_ms = 86400000

@@ -34,15 +34,13 @@ pub fn connection_open(dbfile: &Path) -> Result<Connection, Box<dyn Error>> {
 }
 
 pub fn new_user(
-  dbfile: &Path,
+  conn: &Connection,
   name: String,
   hashwd: String,
   salt: String,
   email: String,
   registration_key: String,
 ) -> Result<i64, Box<dyn Error>> {
-  let conn = connection_open(dbfile)?;
-
   let now = now()?;
 
   // make a user record.

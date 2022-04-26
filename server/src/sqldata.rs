@@ -26,15 +26,13 @@ pub struct User {
 }
 
 pub fn new_user(
-  dbfile: &Path,
+  conn: &Connection,
   name: String,
   hashwd: String,
   salt: String,
   email: String,
   registration_key: String,
 ) -> Result<i64, Box<dyn Error>> {
-  let conn = connection_open(dbfile)?;
-
   let usernoteid = note_id(&conn, "system", "user")?;
   let publicnoteid = note_id(&conn, "system", "public")?;
   let systemid = user_id(&conn, "system")?;
@@ -50,11 +48,13 @@ pub fn new_user(
 
   let zknid = conn.last_insert_rowid();
 
+  let uid = orgauth::dbfun::new_user(&conn, name, hashwd, salt, email, registration_key)?;
+
   // make a user record.
   conn.execute(
-    "insert into user (name, zknote, hashwd, salt, email, registration_key, createdate)
-      values (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-    params![name, zknid, hashwd, salt, email, registration_key, now],
+    "insert into user (id, zknote)
+      values (?1, ?2)",
+    params![uid, zknid],
   )?;
 
   let uid = conn.last_insert_rowid();
@@ -70,6 +70,16 @@ pub fn new_user(
   save_zklink(&conn, zknid, publicnoteid, systemid, None)?;
 
   Ok(uid)
+}
+
+pub fn update_user(conn: &Connection, user: &User) -> Result<(), Box<dyn Error>> {
+  conn.execute(
+    "update user set zknote = ?1, homenote = ?2
+           where id = ?3",
+    params![user.noteid, user.homenoteid, user.id,],
+  )?;
+
+  Ok(())
 }
 
 pub fn login_data(conn: &Connection, uid: i64) -> Result<orgauth::data::LoginData, Box<dyn Error>> {
@@ -89,23 +99,6 @@ pub fn login_data(conn: &Connection, uid: i64) -> Result<orgauth::data::LoginDat
 
   oald.data = Some(serde_json::to_value(eld)?);
   Ok(oald)
-}
-
-// TODO move to interfaces?
-pub fn login_data_for_token(
-  session: Session,
-  config: &Config,
-) -> Result<Option<orgauth::data::LoginData>, Box<dyn Error>> {
-  let conn = connection_open(config.db.as_path())?;
-  match session.get("token")? {
-    None => Ok(None),
-    Some(token) => {
-      match dbfun::read_user_by_token(&conn, token, Some(config.login_token_expiration_ms)) {
-        Ok(user) => Ok(Some(dbfun::login_data(&conn, user.id)?)),
-        Err(_) => Ok(None),
-      }
-    }
-  }
 }
 
 pub fn connection_open(dbfile: &Path) -> Result<Connection, Box<dyn Error>> {
@@ -1008,7 +1001,7 @@ pub fn udpate13(dbfile: &Path) -> Result<(), Box<dyn Error>> {
 
   conn.execute(
     "insert into orgauth_newpassword (user, token, tokendate)
-        select user, token, tokendate fromi newpassword",
+        select user, token, tokendate from newpassword",
     params![],
   )?;
 
@@ -1023,7 +1016,7 @@ pub fn udpate13(dbfile: &Path) -> Result<(), Box<dyn Error>> {
     t.add_column("homenote", types::foreign("zknote", "id").nullable(true));
   });
 
-  conn.execute_batch(mt.make::<Sqlite>().as_str())?;
+  conn.execute_batch(m1.make::<Sqlite>().as_str())?;
 
   // copy from user.
   conn.execute(
@@ -1163,10 +1156,10 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: i64) -> Result<(), Box<dyn Err
     udpate12(&dbfile)?;
     set_single_value(&conn, "migration_level", "12")?;
   }
-  if nlevel < 11 {
-    info!("udpate11");
-    udpate11(&dbfile)?;
-    set_single_value(&conn, "migration_level", "11")?;
+  if nlevel < 13 {
+    info!("udpate13");
+    udpate13(&dbfile)?;
+    set_single_value(&conn, "migration_level", "13")?;
   }
 
   info!("db up to date.");
@@ -2105,7 +2098,7 @@ pub struct ZkDatabase {
 }
 
 pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
-  let conn = connection_open(dbfile)?;
+  /*  let conn = connection_open(dbfile)?;
   let sysid = user_id(&conn, "system")?;
 
   // Users
@@ -2159,7 +2152,7 @@ pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
 
   // Links
   let mut lstmt = conn.prepare(
-    "select A.fromid, A.toid, A.user, A.linkzknote 
+    "select A.fromid, A.toid, A.user, A.linkzknote
       from zklink A",
   )?;
 
@@ -2181,5 +2174,7 @@ pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
     notes: nv,
     links: lv,
     users: uv,
-  })
+  })*/
+
+  bail!("unimplemented");
 }

@@ -24,7 +24,7 @@ uuid = { version = "0.8", features = ["serde", "v4"] }
 crypto-hash = "0.3.1"
 time = "0.1"
 rand = "0.5.0"
-toml = "0.4.8"
+toml = "0.5.9"
 simple-error = "0.2.1"
 json = "*"
 lettre = "0.9"

@@ -220,8 +220,8 @@ fn defcon() -> Config {
     createdirs: false,
     altmainsite: [].to_vec(),
     static_path: None,
-    orgauth_config: oc,
     error_index_note: None,
+    orgauth_config: oc,
   }
 }
 
@@ -282,6 +282,7 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
   // writing a config file?
   match matches.value_of("write_config") {
     Some(filename) => {
+      println!("defcon {:?}", defcon());
       util::write_string(filename, toml::to_string_pretty(&defcon())?.as_str())?;
       info!("default config written to file: {}", filename);
       Ok(())
