@@ -106,13 +106,13 @@ fn user(
     &item.data,
     req.connection_info()
   );
-  match orgauth::endpoints::user_interface(&session, &data.orgauth_config, item.into_inner()) {
+  match interfaces::user_interface(&session, &data, item.into_inner()) {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'user' err: {:?}", e);
-      let se = ServerResponse {
+      let se = orgauth::data::WhatMessage {
         what: "server error".to_string(),
-        content: serde_json::Value::String(e.to_string()),
+        data: Some(serde_json::Value::String(e.to_string())),
       };
       HttpResponse::Ok().json(se)
     }

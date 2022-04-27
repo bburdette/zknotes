@@ -1052,6 +1052,99 @@ pub fn udpate13(dbfile: &Path) -> Result<(), Box<dyn Error>> {
 
   conn.execute_batch(m3.make::<Sqlite>().as_str())?;
 
+  // --------------------------------------------------------------------------------------
+  // remake zknotes table to point at orgauth_user instead of user.
+
+  conn.execute(
+    "CREATE TABLE IF NOT EXISTS \"zklinktemp\" (
+      \"fromid\" INTEGER REFERENCES zknote(id) NOT NULL,
+      \"toid\" INTEGER REFERENCES zknote(id) NOT NULL,
+      \"user\" INTEGER REFERENCES user(id) NOT NULL,
+      \"linkzknote\" INTEGER REFERENCES zknote(id))",
+    params![],
+  )?;
+
+  conn.execute(
+    "CREATE TABLE IF NOT EXISTS \"zknotetemp\" (
+      \"id\" INTEGER PRIMARY KEY NOT NULL,
+      \"title\" TEXT NOT NULL,
+      \"content\" TEXT NOT NULL,
+      \"sysdata\" TEXT,
+      \"pubid\" TEXT UNIQUE,
+      \"user\" INTEGER REFERENCES user(id) NOT NULL,
+      \"editable\" BOOLEAN NOT NULL,
+      \"showtitle\" BOOLEAN NOT NULL,
+      \"createdate\" INTEGER NOT NULL,
+      \"changeddate\" INTEGER NOT NULL)",
+    params![],
+  )?;
+
+  // copy everything from zknote.
+  conn.execute(
+    "insert into zknotetemp (id, title, content, sysdata, pubid, user, editable, showtitle, createdate, changeddate)
+        select id, title, content, null, pubid, user, editable, showtitle, createdate, changeddate from zknote",
+    params![],
+  )?;
+
+  // copy everything from zklink.
+  conn.execute(
+    "insert into zklinktemp (fromid, toid, user, linkzknote)
+        select fromid, toid, user, linkzknote from zklink",
+    params![],
+  )?;
+
+  // drop tables.
+  conn.execute("drop table zknote", params![])?;
+  conn.execute("drop table zklink", params![])?;
+
+  // new tables referencing orgauth_user.
+  conn.execute(
+    "CREATE TABLE IF NOT EXISTS \"zklink\" (
+      \"fromid\" INTEGER REFERENCES zknote(id) NOT NULL,
+      \"toid\" INTEGER REFERENCES zknote(id) NOT NULL,
+      \"user\" INTEGER REFERENCES orgauth_user(id) NOT NULL,
+      \"linkzknote\" INTEGER REFERENCES zknote(id))",
+    params![],
+  )?;
+
+  conn.execute(
+    "CREATE TABLE IF NOT EXISTS \"zknote\" (
+      \"id\" INTEGER PRIMARY KEY NOT NULL,
+      \"title\" TEXT NOT NULL,
+      \"content\" TEXT NOT NULL,
+      \"sysdata\" TEXT,
+      \"pubid\" TEXT UNIQUE,
+      \"user\" INTEGER REFERENCES orgauth_user(id) NOT NULL,
+      \"editable\" BOOLEAN NOT NULL,
+      \"showtitle\" BOOLEAN NOT NULL,
+      \"createdate\" INTEGER NOT NULL,
+      \"changeddate\" INTEGER NOT NULL)",
+    params![],
+  )?;
+
+  conn.execute(
+    "CREATE UNIQUE INDEX \"zklinkunq\" ON \"zklink\" (\"fromid\", \"toid\", \"user\")",
+    params![],
+  )?;
+
+  // copy everything from zknotetemp.
+  conn.execute(
+    "insert into zknote (id, title, content, sysdata, pubid, user, editable, showtitle, createdate, changeddate)
+        select id, title, content, null, pubid, user, editable, showtitle, createdate, changeddate from zknotetemp",
+    params![],
+  )?;
+
+  // copy everything from zklinktemp.
+  conn.execute(
+    "insert into zklink (fromid, toid, user, linkzknote)
+        select fromid, toid, user, linkzknote from zklinktemp",
+    params![],
+  )?;
+
+  // drop temp tables.
+  conn.execute("drop table zknotetemp", params![])?;
+  conn.execute("drop table zklinktemp", params![])?;
+
   Ok(())
 }
 
@@ -1230,10 +1323,10 @@ pub fn save_zklink(
 pub fn note_id(conn: &Connection, name: &str, title: &str) -> Result<i64, Box<dyn Error>> {
   let id: i64 = conn.query_row(
     "select zknote.id from
-      zknote, user
+      zknote, orgauth_user
       where zknote.title = ?2
-      and user.name = ?1
-      and zknote.user = user.id",
+      and orgauth_user.name = ?1
+      and zknote.user = orgauth_user.id",
     params![name, title],
     |row| Ok(row.get(0)?),
   )?;
@@ -1523,8 +1616,8 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
   let sysids = get_sysids(conn, sysid, id)?;
 
   let mut note = conn.query_row(
-    "select ZN.title, ZN.content, ZN.user, U.name, U.zknote, ZN.pubid, ZN.editable, ZN.showtitle, ZN.createdate, ZN.changeddate
-      from zknote ZN, user U where ZN.id = ?1 and U.id = ZN.user",
+    "select ZN.title, ZN.content, ZN.user, OU.name, U.zknote, ZN.pubid, ZN.editable, ZN.showtitle, ZN.createdate, ZN.changeddate
+      from zknote ZN, orgauth_user OU, user U where ZN.id = ?1 and U.id = ZN.user and OU.id = ZN.user",
     params![id],
     |row| {
       Ok(ZkNote {
@@ -1653,12 +1746,13 @@ pub fn read_zknotepubid(
 ) -> Result<ZkNote, Box<dyn Error>> {
   let publicid = note_id(&conn, "system", "public")?;
   let mut note = conn.query_row(
-    "select A.id, A.title, A.content, A.user, U.name, U.zknote, A.pubid, A.editable, A.showtitle, A.createdate, A.changeddate
-      from zknote A, user U, zklink L where A.pubid = ?1
+    "select A.id, A.title, A.content, A.user, OU.name, U.zknote, A.pubid, A.editable, A.showtitle, A.createdate, A.changeddate
+      from zknote A, user U, orgauth_user OU, zklink L where A.pubid = ?1
       and ((A.id = L.fromid
       and L.toid = ?2) or (A.id = L.toid
       and L.fromid = ?2))
-      and U.id = A.user",
+      and U.id = A.user
+      and OU.id = A.user",
     params![pubid, publicid],
     |row| {
       Ok(ZkNote {

@@ -9,11 +9,11 @@ pub struct ServerResponse {
 #[derive(Deserialize, Serialize, Debug)]
 pub struct UserMessage {
   pub what: String,
-  pub data: Option<serde_json::Value>,
+  pub data: Option<Value>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct PublicMessage {
   pub what: String,
-  pub data: Option<serde_json::Value>,
+  pub data: Option<Value>,
 }

@@ -122,7 +122,7 @@ type alias Flags =
     , width : Int
     , height : Int
     , errorid : Maybe Int
-    , login : Maybe Data.LoginData
+    , login : Maybe JD.Value
     }
 
 
@@ -758,7 +758,7 @@ sendZIMsg location msg =
 sendZIMsgExp : String -> ZI.SendMsg -> (Result Http.Error ZI.ServerResponse -> Msg) -> Cmd Msg
 sendZIMsgExp location msg tomsg =
     Http.post
-        { url = location ++ "/user"
+        { url = location ++ "/private"
         , body = Http.jsonBody (ZI.encodeSendMsg msg)
         , expect = Http.expectJson tomsg ZI.serverResponseDecoder
         }
@@ -2342,8 +2342,15 @@ init flags url key zone fontsize =
                     Nothing ->
                         PubShowMessage { message = "loading..." } Nothing
 
-                    Just l ->
-                        ShowMessage { message = "loading..." } l Nothing
+                    Just v ->
+                        case
+                            JD.decodeValue Data.decodeLoginData v
+                        of
+                            Ok l ->
+                                ShowMessage { message = "loading..." } l Nothing
+
+                            Err e ->
+                                PubShowMessage { message = JD.errorToString e } Nothing
             , size = { width = flags.width, height = flags.height }
             , location = flags.location
             , navkey = key

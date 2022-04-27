@@ -139,7 +139,7 @@ serverResponseDecoder =
                         JD.succeed UserExists
 
                     "logged in" ->
-                        JD.map LoggedIn (JD.at [ "content" ] Data.decodeLoginData)
+                        JD.map LoggedIn (JD.at [ "data" ] Data.decodeLoginData)
 
                     "logged out" ->
                         JD.succeed LoggedOut
@@ -163,7 +163,7 @@ serverResponseDecoder =
                         JD.succeed ChangedEmail
 
                     "server error" ->
-                        JD.map ServerError (JD.at [ "content" ] JD.string)
+                        JD.map ServerError (JD.at [ "data" ] JD.string)
 
                     wat ->
                         JD.succeed

@@ -40,6 +40,33 @@ pub fn login_data_for_token(
   }
 }
 
+// Just like orgauth::endpoints::user_interface, except adds in extra user data.
+pub fn user_interface(
+  session: &Session,
+  config: &Config,
+  msg: orgauth::data::WhatMessage,
+) -> Result<orgauth::data::WhatMessage, Box<dyn Error>> {
+  match orgauth::endpoints::user_interface(&session, &config.orgauth_config, msg) {
+    Ok(sr) => match (sr.what.as_str(), sr.data) {
+      ("logged in", Some(srd)) => {
+        let ld: orgauth::data::LoginData = serde_json::from_value(srd)?;
+        let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+        Ok(orgauth::data::WhatMessage {
+          what: "logged in".to_string(),
+          data: Some(serde_json::to_value(sqldata::login_data(
+            &conn, ld.userid,
+          )?)?),
+        })
+      }
+      (what, data) => Ok(orgauth::data::WhatMessage {
+        what: what.to_string(),
+        data: data,
+      }),
+    },
+    Err(e) => Err(e),
+  }
+}
+
 pub fn zk_interface_loggedin(
   config: &Config,
   uid: i64,
