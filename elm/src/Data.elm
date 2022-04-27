@@ -2,6 +2,7 @@ module Data exposing (..)
 
 import Json.Decode as JD
 import Json.Encode as JE
+import Orgauth.Data
 import Search as S
 import UUID exposing (UUID)
 import Url.Builder as UB
@@ -49,6 +50,20 @@ decodeTASelection =
 ----------------------------------------
 -- types sent to or from the server.
 ----------------------------------------
+
+
+fromOaLd : Orgauth.Data.LoginData -> Result JD.Error LoginData
+fromOaLd oald =
+    JD.decodeValue
+        (JD.succeed (LoginData oald.userid oald.name)
+            |> andMap (JD.field "zknote" JD.int)
+            |> andMap (JD.field "homenote" (JD.maybe JD.int))
+            |> andMap (JD.field "publicid" JD.int)
+            |> andMap (JD.field "shareid" JD.int)
+            |> andMap (JD.field "searchid" JD.int)
+            |> andMap (JD.field "commentid" JD.int)
+        )
+        oald.data
 
 
 type alias LoginData =

@@ -6,8 +6,6 @@ import Browser.Events
 import Browser.Navigation
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
-import ChangeEmail as CE
-import ChangePassword as CP
 import Common exposing (buttonStyle)
 import Data
 import Dict exposing (Dict)
@@ -39,9 +37,13 @@ import Markdown.Parser
 import Markdown.Renderer
 import MdCommon as MC
 import MessageNLink
+import Orgauth.ChangeEmail as CE
+import Orgauth.ChangePassword as CP
+import Orgauth.Data as OD
+import Orgauth.ResetPassword as ResetPassword
+import Orgauth.UserInterface as UI
 import PublicInterface as PI
 import Random exposing (Seed, initialSeed)
-import ResetPassword
 import Route exposing (Route(..), parseUrl, routeTitle, routeUrl)
 import Schelme.Show exposing (showTerm)
 import Search as S
@@ -56,7 +58,6 @@ import UUID exposing (UUID)
 import Url exposing (Url)
 import Url.Builder as UB
 import Url.Parser as UP exposing ((</>))
-import UserInterface as UI
 import UserSettings
 import Util
 import View
@@ -1263,7 +1264,7 @@ actualupdate msg model =
                 UserSettings.ChangePassword ->
                     ( { model
                         | state =
-                            ChangePasswordDialog (CP.init login Common.buttonStyle (UserSettings.view numod |> E.map (always ())))
+                            ChangePasswordDialog (CP.init (OD.toLd login) Common.buttonStyle (UserSettings.view numod |> E.map (always ())))
                                 (UserSettings numod login prevstate)
                       }
                     , Cmd.none
@@ -1272,7 +1273,7 @@ actualupdate msg model =
                 UserSettings.ChangeEmail ->
                     ( { model
                         | state =
-                            ChangeEmailDialog (CE.init login Common.buttonStyle (UserSettings.view numod |> E.map (always ())))
+                            ChangeEmailDialog (CE.init (OD.toLd login) Common.buttonStyle (UserSettings.view numod |> E.map (always ())))
                                 (UserSettings numod login prevstate)
                       }
                     , Cmd.none
@@ -1395,65 +1396,72 @@ actualupdate msg model =
                         UI.RegistrationSent ->
                             ( model, Cmd.none )
 
-                        UI.LoggedIn login ->
-                            let
-                                getlisting =
-                                    sendSearch
-                                        { model
-                                            | state =
-                                                ShowMessage
-                                                    { message = "loading articles"
-                                                    }
-                                                    login
-                                                    (Just model.state)
-                                            , seed =
-                                                case state of
-                                                    -- save the seed if we're leaving login state.
-                                                    Login lmod ->
-                                                        lmod.seed
-
-                                                    _ ->
-                                                        model.seed
-                                        }
-                                        S.defaultSearch
-
-                                lgmod =
-                                    { model
-                                        | state =
-                                            ShowMessage { message = "logged in" }
-                                                login
-                                                Nothing
-                                    }
-                            in
-                            case state of
-                                Login lm ->
-                                    -- we're logged in!
-                                    initialPage lgmod
-
-                                LoginShowMessage _ li url ->
+                        UI.LoggedIn oalogin ->
+                            case Data.fromOaLd oalogin of
+                                Ok login ->
                                     let
-                                        ( m, cmd ) =
-                                            parseUrl url
-                                                |> Maybe.andThen
-                                                    (\s ->
-                                                        case s of
-                                                            Top ->
-                                                                Nothing
+                                        getlisting =
+                                            sendSearch
+                                                { model
+                                                    | state =
+                                                        ShowMessage
+                                                            { message = "loading articles"
+                                                            }
+                                                            login
+                                                            (Just model.state)
+                                                    , seed =
+                                                        case state of
+                                                            -- save the seed if we're leaving login state.
+                                                            Login lmod ->
+                                                                lmod.seed
 
                                                             _ ->
-                                                                Just s
-                                                    )
-                                                |> Maybe.map
-                                                    (routeState
-                                                        lgmod
-                                                    )
-                                                |> Maybe.map (\( st, cm ) -> ( { model | state = st }, cm ))
-                                                |> Maybe.withDefault (initialPage lgmod)
-                                    in
-                                    ( m, cmd )
+                                                                model.seed
+                                                }
+                                                S.defaultSearch
 
-                                _ ->
-                                    ( displayMessageDialog model "logged in"
+                                        lgmod =
+                                            { model
+                                                | state =
+                                                    ShowMessage { message = "logged in" }
+                                                        login
+                                                        Nothing
+                                            }
+                                    in
+                                    case state of
+                                        Login lm ->
+                                            -- we're logged in!
+                                            initialPage lgmod
+
+                                        LoginShowMessage _ li url ->
+                                            let
+                                                ( m, cmd ) =
+                                                    parseUrl url
+                                                        |> Maybe.andThen
+                                                            (\s ->
+                                                                case s of
+                                                                    Top ->
+                                                                        Nothing
+
+                                                                    _ ->
+                                                                        Just s
+                                                            )
+                                                        |> Maybe.map
+                                                            (routeState
+                                                                lgmod
+                                                            )
+                                                        |> Maybe.map (\( st, cm ) -> ( { model | state = st }, cm ))
+                                                        |> Maybe.withDefault (initialPage lgmod)
+                                            in
+                                            ( m, cmd )
+
+                                        _ ->
+                                            ( displayMessageDialog model "logged in"
+                                            , Cmd.none
+                                            )
+
+                                Err e ->
+                                    ( displayMessageDialog model (JD.errorToString e)
                                     , Cmd.none
                                     )
 
