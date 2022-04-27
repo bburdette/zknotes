@@ -1,9 +1,7 @@
-use crate::util::{is_token_expired, now};
+use crate::util::now;
 use barrel::backend::Sqlite;
 use barrel::{types, Migration};
-use crypto_hash::{hex_digest, Algorithm};
 use log::info;
-use orgauth::dbfun;
 use orgauth::dbfun::user_id;
 use orgauth::migrations;
 use rusqlite::{params, Connection};
@@ -12,7 +10,6 @@ use simple_error::bail;
 use std::error::Error;
 use std::path::Path;
 use std::time::Duration;
-use uuid::Uuid;
 use zkprotocol::content::{
   Direction, EditLink, ExtraLoginData, GetZkLinks, GetZkNoteComments, GetZkNoteEdit, ImportZkNote,
   SaveZkLink, SaveZkNote, SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
@@ -84,7 +81,6 @@ pub fn update_user(conn: &Connection, user: &User) -> Result<(), Box<dyn Error>>
 
 pub fn login_data(conn: &Connection, uid: i64) -> Result<orgauth::data::LoginData, Box<dyn Error>> {
   let mut oald = orgauth::dbfun::login_data(&conn, uid)?;
-  let oauser = orgauth::dbfun::read_user_by_id(&conn, uid)?;
   let user = read_user_by_id(&conn, uid)?;
 
   let eld = ExtraLoginData {
@@ -2191,7 +2187,7 @@ pub struct ZkDatabase {
   users: Vec<User>,
 }
 
-pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
+pub fn export_db(_dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
   /*  let conn = connection_open(dbfile)?;
   let sysid = user_id(&conn, "system")?;
 

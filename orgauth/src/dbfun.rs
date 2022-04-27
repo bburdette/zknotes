@@ -1,6 +1,6 @@
 use crate::data::Config;
 use crate::data::{ChangeEmail, ChangePassword, LoginData, User};
-use crate::email;
+// use crate::email;
 use crate::util::{is_token_expired, now};
 // use actix_session::Session;
 // use actix_web::HttpRequest;

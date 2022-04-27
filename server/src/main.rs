@@ -5,7 +5,6 @@ mod search;
 mod sqldata;
 mod sqltest;
 mod util;
-use crate::util::now;
 use actix_cors::Cors;
 use actix_session::{CookieSession, Session};
 use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Result};
@@ -123,7 +122,7 @@ fn private(
   session: Session,
   data: web::Data<Config>,
   item: web::Json<UserMessage>,
-  req: HttpRequest,
+  _req: HttpRequest,
 ) -> HttpResponse {
   match zk_interface_check(&session, &data, item.into_inner()) {
     Ok(sr) => HttpResponse::Ok().json(sr),

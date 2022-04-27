@@ -1,5 +1,4 @@
 #![allow(non_snake_case)]
-// use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ExtraLoginData {

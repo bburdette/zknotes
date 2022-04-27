@@ -4,41 +4,14 @@ use crate::dbfun;
 use crate::email;
 use crate::util;
 use crate::util::is_token_expired;
+use actix_session::Session;
+use actix_web::{HttpRequest, HttpResponse};
 use crypto_hash::{hex_digest, Algorithm};
-// use either::Either::{Left, Right};
 use log::{error, info};
-// use simple_error::bail;
-use actix_session::{CookieSession, Session};
-use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Result};
 use std::error::Error;
-use std::path::Path;
 use std::str::FromStr;
 use util::now;
 use uuid::Uuid;
-// use zkprotocol::content::{
-//   ChangeEmail, ChangePassword, GetZkNoteComments, GetZkNoteEdit, ImportZkNote, Login, LoginData,
-//   RegistrationData, ResetPassword, SaveZkNote, SaveZkNotePlusLinks, SetPassword, ZkLinks,
-//   ZkNoteEdit,
-// };
-// use zkprotocol::messages::{PublicMessage, WhatMessage, WhatMessage};
-// use zkprotocol::search::{TagSearch, ZkNoteSearch};
-
-// pub fn login_data_for_token(
-//   session: Session,
-//   config: &Config,
-// ) -> Result<Option<LoginData>, Box<dyn Error>> {
-//   let conn = dbfun::connection_open(config.db.as_path())?;
-
-//   match session.get("token")? {
-//     None => Ok(None),
-//     Some(token) => {
-//       match dbfun::read_user_by_token(&conn, token, Some(config.login_token_expiration_ms)) {
-//         Ok(user) => Ok(Some(dbfun::login_data(&conn, user.id)?)),
-//         Err(_) => Ok(None),
-//       }
-//     }
-//   }
-// }
 
 pub fn user_interface(
   session: &Session,

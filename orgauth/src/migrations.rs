@@ -1,26 +1,13 @@
-use crate::util::{is_token_expired, now};
 use barrel::backend::Sqlite;
 use barrel::{types, Migration};
-use crypto_hash::{hex_digest, Algorithm};
-use log::info;
-use rusqlite::{params, Connection};
-use serde_derive::{Deserialize, Serialize};
-use simple_error::bail;
+use rusqlite::Connection;
 use std::error::Error;
 use std::path::Path;
-use std::time::Duration;
-use uuid::Uuid;
 
 pub fn udpate1(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   // db connection without foreign key checking.
   let conn = Connection::open(dbfile)?;
   let mut m = Migration::new();
-
-  // table for storing single values.
-  // m.create_table("orgauth_singlevalue", |t| {
-  //   t.add_column("name", types::text().nullable(false).unique(true));
-  //   t.add_column("value", types::text().nullable(false));
-  // });
 
   // new user table with new columns for session tokens.
   m.create_table("orgauth_user", |t| {

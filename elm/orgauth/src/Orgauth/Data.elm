@@ -1,7 +1,5 @@
 module Orgauth.Data exposing (..)
 
--- import Search as S
-
 import Json.Decode as JD
 import Json.Encode as JE
 import UUID exposing (UUID)
@@ -125,7 +123,6 @@ decodeLoginData =
 ------------------------------------------------
 -- utiltiy fn
 ------------------------------------------------
---
 
 
 toLd : { a | userid : Int, name : String } -> LoginData
