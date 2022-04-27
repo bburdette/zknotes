@@ -139,7 +139,7 @@ serverResponseDecoder =
                         JD.succeed UserExists
 
                     "logged in" ->
-                        JD.map LoggedIn (JD.at [ "data" ] Data.decodeLoginData)
+                        JD.map LoggedIn (JD.at [ "data" ] decodeLoginData)
 
                     "logged out" ->
                         JD.succeed LoggedOut
