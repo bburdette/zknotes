@@ -1623,6 +1623,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "orgauth"
+version = "0.1.0"
+dependencies = [
+ "actix-files",
+ "actix-session",
+ "actix-web",
+ "barrel",
+ "base64 0.2.1",
+ "chrono",
+ "clap",
+ "crypto-hash",
+ "either",
+ "env_logger",
+ "futures 0.1.31",
+ "json",
+ "lettre",
+ "lettre_email",
+ "log",
+ "rand 0.5.6",
+ "rusqlite",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "simple-error",
+ "time 0.1.43",
+ "timer",
+ "toml",
+ "uuid 0.8.2",
+]
+
+[[package]]
 name = "parking_lot"
 version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2527,9 +2558,9 @@ dependencies = [
 
 [[package]]
 name = "toml"
-version = "0.4.10"
+version = "0.5.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "758664fc71a3a69038656bee8b6be6477d2a6c315a6b81f7081f591bffa4111f"
+checksum = "8d82e1a7758622a465f8cee077614c73484dac5b836c02ff6a40d5d1010324d7"
 dependencies = [
  "serde",
 ]
@@ -2918,6 +2949,7 @@ dependencies = [
  "lettre",
  "lettre_email",
  "log",
+ "orgauth",
  "rand 0.5.6",
  "rusqlite",
  "serde",

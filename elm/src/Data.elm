@@ -2,6 +2,7 @@ module Data exposing (..)
 
 import Json.Decode as JD
 import Json.Encode as JE
+import Orgauth.Data
 import Search as S
 import UUID exposing (UUID)
 import Url.Builder as UB
@@ -51,41 +52,18 @@ decodeTASelection =
 ----------------------------------------
 
 
-type alias Registration =
-    { uid : String
-    , pwd : String
-    , email : String
-    }
-
-
-type alias Login =
-    { uid : String
-    , pwd : String
-    }
-
-
-type alias ResetPassword =
-    { uid : String
-    }
-
-
-type alias SetPassword =
-    { uid : String
-    , newpwd : String
-    , reset_key : UUID
-    }
-
-
-type alias ChangePassword =
-    { oldpwd : String
-    , newpwd : String
-    }
-
-
-type alias ChangeEmail =
-    { pwd : String
-    , email : String
-    }
+fromOaLd : Orgauth.Data.LoginData -> Result JD.Error LoginData
+fromOaLd oald =
+    JD.decodeValue
+        (JD.succeed (LoginData oald.userid oald.name)
+            |> andMap (JD.field "zknote" JD.int)
+            |> andMap (JD.field "homenote" (JD.maybe JD.int))
+            |> andMap (JD.field "publicid" JD.int)
+            |> andMap (JD.field "shareid" JD.int)
+            |> andMap (JD.field "searchid" JD.int)
+            |> andMap (JD.field "commentid" JD.int)
+        )
+        oald.data
 
 
 type alias LoginData =
@@ -241,55 +219,6 @@ type alias ZkNoteEdit =
 ----------------------------------------
 -- Json encoders/decoders
 ----------------------------------------
-
-
-encodeRegistration : Registration -> JE.Value
-encodeRegistration l =
-    JE.object
-        [ ( "uid", JE.string l.uid )
-        , ( "pwd", JE.string l.pwd )
-        , ( "email", JE.string l.email )
-        ]
-
-
-encodeLogin : Login -> JE.Value
-encodeLogin l =
-    JE.object
-        [ ( "uid", JE.string l.uid )
-        , ( "pwd", JE.string l.pwd )
-        ]
-
-
-encodeResetPassword : ResetPassword -> JE.Value
-encodeResetPassword l =
-    JE.object
-        [ ( "uid", JE.string l.uid )
-        ]
-
-
-encodeSetPassword : SetPassword -> JE.Value
-encodeSetPassword l =
-    JE.object
-        [ ( "uid", JE.string l.uid )
-        , ( "newpwd", JE.string l.newpwd )
-        , ( "reset_key", UUID.toValue l.reset_key )
-        ]
-
-
-encodeChangePassword : ChangePassword -> JE.Value
-encodeChangePassword l =
-    JE.object
-        [ ( "oldpwd", JE.string l.oldpwd )
-        , ( "newpwd", JE.string l.newpwd )
-        ]
-
-
-encodeChangeEmail : ChangeEmail -> JE.Value
-encodeChangeEmail l =
-    JE.object
-        [ ( "pwd", JE.string l.pwd )
-        , ( "email", JE.string l.email )
-        ]
 
 
 encodeGetZkLinks : GetZkLinks -> JE.Value
@@ -518,12 +447,12 @@ decodeLoginData =
     JD.succeed LoginData
         |> andMap (JD.field "userid" JD.int)
         |> andMap (JD.field "name" JD.string)
-        |> andMap (JD.field "zknote" JD.int)
-        |> andMap (JD.field "homenote" (JD.maybe JD.int))
-        |> andMap (JD.field "publicid" JD.int)
-        |> andMap (JD.field "shareid" JD.int)
-        |> andMap (JD.field "searchid" JD.int)
-        |> andMap (JD.field "commentid" JD.int)
+        |> andMap (JD.field "data" (JD.field "zknote" JD.int))
+        |> andMap (JD.field "data" (JD.field "homenote" (JD.maybe JD.int)))
+        |> andMap (JD.field "data" (JD.field "publicid" JD.int))
+        |> andMap (JD.field "data" (JD.field "shareid" JD.int))
+        |> andMap (JD.field "data" (JD.field "searchid" JD.int))
+        |> andMap (JD.field "data" (JD.field "commentid" JD.int))
 
 
 encodeImportZkNote : ImportZkNote -> JE.Value

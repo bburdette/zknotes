@@ -1,11 +1,9 @@
 mod config;
-mod email;
 mod interfaces;
 mod search;
 mod sqldata;
 mod sqltest;
 mod util;
-use crate::util::now;
 use actix_cors::Cors;
 use actix_session::{CookieSession, Session};
 use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Result};
@@ -97,7 +95,7 @@ fn public(
 fn user(
   session: Session,
   data: web::Data<Config>,
-  item: web::Json<UserMessage>,
+  item: web::Json<orgauth::data::WhatMessage>,
   req: HttpRequest,
 ) -> HttpResponse {
   info!(
@@ -110,6 +108,25 @@ fn user(
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'user' err: {:?}", e);
+      let se = orgauth::data::WhatMessage {
+        what: "server error".to_string(),
+        data: Some(serde_json::Value::String(e.to_string())),
+      };
+      HttpResponse::Ok().json(se)
+    }
+  }
+}
+
+fn private(
+  session: Session,
+  data: web::Data<Config>,
+  item: web::Json<UserMessage>,
+  _req: HttpRequest,
+) -> HttpResponse {
+  match zk_interface_check(&session, &data, item.into_inner()) {
+    Ok(sr) => HttpResponse::Ok().json(sr),
+    Err(e) => {
+      error!("'private' err: {:?}", e);
       let se = ServerResponse {
         what: "server error".to_string(),
         content: serde_json::Value::String(e.to_string()),
@@ -119,139 +136,60 @@ fn user(
   }
 }
 
-fn register(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
-  info!("registration: uid: {:?}", req.match_info().get("uid"));
-  match sqldata::connection_open(data.db.as_path()) {
-    Ok(conn) => match (req.match_info().get("uid"), req.match_info().get("key")) {
-      (Some(uid), Some(key)) => {
-        // read user record.  does the reg key match?
-        match sqldata::read_user_by_name(&conn, uid) {
-          Ok(user) => {
-            if user.registration_key == Some(key.to_string()) {
-              let mut mu = user;
-              mu.registration_key = None;
-              match sqldata::update_user(&conn, &mu) {
-                Ok(_) => HttpResponse::Ok().body(
-                  format!(
-                    "<h1>You are registered!<h1> <a href=\"{}\">\
-                       Proceed to the main site</a>",
-                    data.mainsite
-                  )
-                  .to_string(),
-                ),
-                Err(_e) => HttpResponse::Ok().body("<h1>registration failed</h1>".to_string()),
-              }
-            } else {
-              HttpResponse::Ok().body("<h1>registration failed</h1>".to_string())
-            }
-          }
-          Err(_e) => HttpResponse::Ok().body("registration key or user doesn't match".to_string()),
+fn zk_interface_check(
+  session: &Session,
+  config: &Config,
+  msg: UserMessage,
+) -> Result<ServerResponse, Box<dyn Error>> {
+  match session.get::<Uuid>("token")? {
+    None => Ok(ServerResponse {
+      what: "not logged in".to_string(),
+      content: serde_json::Value::Null,
+    }),
+    Some(token) => {
+      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+      match orgauth::dbfun::read_user_by_token(
+        &conn,
+        token,
+        Some(config.orgauth_config.login_token_expiration_ms),
+      ) {
+        Err(e) => {
+          info!("read_user_by_token error: {:?}", e);
+
+          Ok(ServerResponse {
+            what: "invalid user or pwd".to_string(),
+            content: serde_json::Value::Null,
+          })
+        }
+        Ok(userdata) => {
+          // finally!  processing messages as logged in user.
+          interfaces::zk_interface_loggedin(&config, userdata.id, &msg)
         }
       }
-      _ => HttpResponse::Ok().body("Uid, key not found!".to_string()),
-    },
-
-    Err(_e) => HttpResponse::Ok().body("<h1>registration failed</h1>".to_string()),
-  }
-}
-
-fn new_email(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
-  info!("new email: uid: {:?}", req.match_info().get("uid"));
-  match sqldata::connection_open(data.db.as_path()) {
-    Ok(conn) => match (req.match_info().get("uid"), req.match_info().get("token")) {
-      (Some(uid), Some(tokenstr)) => {
-        match Uuid::from_str(tokenstr) {
-          Err(_e) => HttpResponse::BadRequest().body("invalid token".to_string()),
-          Ok(token) => {
-            // read user record.  does the reg key match?
-            match sqldata::read_user_by_name(&conn, uid) {
-              Ok(user) => {
-                match sqldata::read_newemail(&conn, user.id, token) {
-                  Ok((email, tokendate)) => {
-                    match now() {
-                      Err(_e) => HttpResponse::InternalServerError()
-                        .body("<h1>'now' failed!</h1>".to_string()),
-
-                      Ok(now) => {
-                        if (now - tokendate) > data.email_token_expiration_ms {
-                          // TODO token expired?
-                          HttpResponse::UnprocessableEntity()
-                            .body("<h1>email change failed - token expired</h1>".to_string())
-                        } else {
-                          // put the email in the user record and update.
-                          let mut mu = user.clone();
-                          mu.email = email;
-                          match sqldata::update_user(&conn, &mu) {
-                            Ok(_) => {
-                              // delete the change email token record.
-                              match sqldata::remove_newemail(&conn, user.id, token) {
-                                Ok(_) => (),
-                                Err(e) => error!("error removing newemail record: {:?}", e),
-                              }
-                              HttpResponse::Ok().body(
-                                format!(
-                                  "<h1>Email address changed!<h1> <a href=\"{}\">\
-                                   Proceed to the main site</a>",
-                                  data.mainsite
-                                )
-                                .to_string(),
-                              )
-                            }
-                            Err(_e) => HttpResponse::InternalServerError()
-                              .body("<h1>email change failed</h1>".to_string()),
-                          }
-                        }
-                      }
-                    }
-                  }
-                  Err(_e) => HttpResponse::InternalServerError()
-                    .body("<h1>email change failed</h1>".to_string()),
-                }
-              }
-              Err(_e) => HttpResponse::BadRequest()
-                .body("email change token or user doesn't match".to_string()),
-            }
-          }
-        }
-      }
-      _ => HttpResponse::BadRequest().body("username or token not found!".to_string()),
-    },
-
-    Err(_e) => {
-      HttpResponse::InternalServerError().body("<h1>database connection failed</h1>".to_string())
     }
   }
 }
 
 fn defcon() -> Config {
+  let oc = orgauth::data::Config {
+    db: PathBuf::from("./zknotes.db"),
+    mainsite: "http://localhost:8000".to_string(),
+    appname: "zknotes".to_string(),
+    domain: "localhost:8000".to_string(),
+    admin_email: "admin@admin.admin".to_string(),
+    login_token_expiration_ms: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
+    email_token_expiration_ms: 1 * 24 * 60 * 60 * 1000, // 1 day in milliseconds
+    reset_token_expiration_ms: 1 * 24 * 60 * 60 * 1000, // 1 day in milliseconds
+  };
   Config {
     ip: "127.0.0.1".to_string(),
     port: 8000,
     createdirs: false,
-    db: PathBuf::from("./zknotes.db"),
-    mainsite: "http://localhost:8000".to_string(),
     altmainsite: [].to_vec(),
-    appname: "zknotes".to_string(),
-    domain: "localhost:8000".to_string(),
-    admin_email: "admin@admin.admin".to_string(),
-    error_index_note: None,
-    login_token_expiration_ms: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
-    email_token_expiration_ms: 1 * 24 * 60 * 60 * 1000, // 1 day in milliseconds
-    reset_token_expiration_ms: 1 * 24 * 60 * 60 * 1000, // 1 day in milliseconds
     static_path: None,
+    error_index_note: None,
+    orgauth_config: oc,
   }
-}
-
-fn purge_tokens(config: &Config) -> Result<(), Box<dyn Error>> {
-  let conn = sqldata::connection_open(config.db.as_path())?;
-
-  sqldata::purge_login_tokens(&conn, config.login_token_expiration_ms)?;
-
-  sqldata::purge_email_tokens(&conn, config.email_token_expiration_ms)?;
-
-  sqldata::purge_reset_tokens(&conn, config.reset_token_expiration_ms)?;
-
-  Ok(())
 }
 
 fn load_config(filename: &str) -> Result<Config, Box<dyn Error>> {
@@ -265,6 +203,13 @@ fn main() {
     Err(e) => error!("error: {:?}", e),
     Ok(_) => (),
   }
+}
+
+fn register(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
+  orgauth::endpoints::register(&data.orgauth_config, req)
+}
+fn new_email(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
+  orgauth::endpoints::new_email(&data.orgauth_config, req)
 }
 
 #[actix_web::main]
@@ -319,11 +264,15 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
         Some(exportfile) => {
           // do that exporting...
 
-          sqldata::dbinit(config.db.as_path(), config.login_token_expiration_ms)?;
+          sqldata::dbinit(
+            config.orgauth_config.db.as_path(),
+            config.orgauth_config.login_token_expiration_ms,
+          )?;
 
           util::write_string(
             exportfile,
-            serde_json::to_string_pretty(&sqldata::export_db(config.db.as_path())?)?.as_str(),
+            serde_json::to_string_pretty(&sqldata::export_db(config.orgauth_config.db.as_path())?)?
+              .as_str(),
           )?;
 
           Ok(())
@@ -341,14 +290,17 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
 
           info!("config parameters:\n\n{}", toml::to_string_pretty(&config)?);
 
-          sqldata::dbinit(config.db.as_path(), config.login_token_expiration_ms)?;
+          sqldata::dbinit(
+            config.orgauth_config.db.as_path(),
+            config.orgauth_config.login_token_expiration_ms,
+          )?;
 
           let timer = timer::Timer::new();
 
           let ptconfig = config.clone();
 
           let _guard = timer.schedule_repeating(chrono::Duration::days(1), move || {
-            match purge_tokens(&ptconfig) {
+            match orgauth::dbfun::purge_tokens(&ptconfig.orgauth_config) {
               Err(e) => error!("purge_login_tokens error: {}", e),
               Ok(_) => (),
             }
@@ -360,7 +312,7 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
             let d = c.clone();
             let cors = Cors::default()
               .allowed_origin_fn(move |rv, rh| {
-                if *rv == d.mainsite {
+                if *rv == d.orgauth_config.mainsite {
                   true
                 } else if d.altmainsite.iter().any(|am| *rv == am) {
                   true
@@ -388,6 +340,7 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
                   .max_age(10 * 24 * 60 * 60), // 10 days
               )
               .service(web::resource("/public").route(web::post().to(public)))
+              .service(web::resource("/private").route(web::post().to(private)))
               .service(web::resource("/user").route(web::post().to(user)))
               .service(web::resource(r"/register/{uid}/{key}").route(web::get().to(register)))
               .service(web::resource(r"/newemail/{uid}/{token}").route(web::get().to(new_email)))

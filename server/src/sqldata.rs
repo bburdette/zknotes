@@ -1,44 +1,102 @@
-use crate::util::{is_token_expired, now};
+use crate::util::now;
 use barrel::backend::Sqlite;
 use barrel::{types, Migration};
-use crypto_hash::{hex_digest, Algorithm};
 use log::info;
+use orgauth::data::RegistrationData;
+use orgauth::dbfun::user_id;
+use orgauth::migrations;
 use rusqlite::{params, Connection};
 use serde_derive::{Deserialize, Serialize};
 use simple_error::bail;
 use std::error::Error;
 use std::path::Path;
 use std::time::Duration;
-use uuid::Uuid;
 use zkprotocol::content::{
-  ChangeEmail, ChangePassword, Direction, EditLink, GetZkLinks, GetZkNoteComments, GetZkNoteEdit,
-  ImportZkNote, LoginData, SaveZkLink, SaveZkNote, SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
+  Direction, EditLink, ExtraLoginData, GetZkLinks, GetZkNoteComments, GetZkNoteEdit, ImportZkNote,
+  SaveZkLink, SaveZkNote, SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
 };
 
 #[derive(Clone, Deserialize, Serialize, Debug)]
 pub struct User {
   pub id: i64,
-  pub name: String,
   pub noteid: i64,
   pub homenoteid: Option<i64>,
-  pub hashwd: String,
-  pub salt: String,
-  pub email: String,
-  pub registration_key: Option<String>,
 }
 
-pub fn login_data(conn: &Connection, uid: i64) -> Result<LoginData, Box<dyn Error>> {
+pub fn on_new_user(
+  conn: &Connection,
+  rd: &RegistrationData,
+  uid: i64,
+) -> Result<(), Box<dyn Error>> {
+  let usernoteid = note_id(&conn, "system", "user")?;
+  let publicnoteid = note_id(&conn, "system", "public")?;
+  let systemid = user_id(&conn, "system")?;
+
+  let now = now()?;
+
+  // make a corresponding note,
+  conn.execute(
+    "insert into zknote (title, content, user, editable, showtitle, createdate, changeddate)
+     values (?1, ?2, ?3, 0, 1, ?4, ?5)",
+    params![rd.uid, "", systemid, now, now],
+  )?;
+
+  let zknid = conn.last_insert_rowid();
+
+  // make a user record.
+  conn.execute(
+    "insert into user (id, zknote)
+      values (?1, ?2)",
+    params![uid, zknid],
+  )?;
+
+  let uid = conn.last_insert_rowid();
+
+  conn.execute(
+    "update zknote set sysdata = ?1
+        where id = ?2",
+    params![systemid, uid.to_string().as_str()],
+  )?;
+
+  // indicate a 'user' record, and 'public'
+  save_zklink(&conn, zknid, usernoteid, systemid, None)?;
+  save_zklink(&conn, zknid, publicnoteid, systemid, None)?;
+
+  Ok(())
+}
+
+// callback to pass to orgauth
+pub fn extra_login_data_callback(
+  conn: &Connection,
+  uid: i64,
+) -> Result<Option<serde_json::Value>, Box<dyn Error>> {
+  Ok(Some(serde_json::to_value(extra_login_data(&conn, uid)?)?))
+}
+
+pub fn extra_login_data(conn: &Connection, uid: i64) -> Result<ExtraLoginData, Box<dyn Error>> {
   let user = read_user_by_id(&conn, uid)?;
-  Ok(LoginData {
+
+  let eld = ExtraLoginData {
     userid: uid,
-    name: user.name,
     zknote: user.noteid,
     homenote: user.homenoteid,
     publicid: note_id(conn, "system", "public")?,
     shareid: note_id(conn, "system", "share")?,
     searchid: note_id(conn, "system", "search")?,
     commentid: note_id(conn, "system", "comment")?,
-  })
+  };
+
+  Ok(eld)
+}
+
+pub fn update_user(conn: &Connection, user: &User) -> Result<(), Box<dyn Error>> {
+  conn.execute(
+    "update user set zknote = ?1, homenote = ?2
+           where id = ?3",
+    params![user.noteid, user.homenoteid, user.id,],
+  )?;
+
+  Ok(())
 }
 
 pub fn connection_open(dbfile: &Path) -> Result<Connection, Box<dyn Error>> {
@@ -911,6 +969,183 @@ pub fn udpate12(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   Ok(())
 }
 
+// --------------------------------------------------------------------------------
+// orgauth enters the chat
+// --------------------------------------------------------------------------------
+pub fn udpate13(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+  // db connection without foreign key checking.
+  let conn = Connection::open(dbfile)?;
+
+  migrations::udpate1(dbfile)?;
+
+  // copy from old user tables into orgauth tables.
+  conn.execute(
+    "insert into orgauth_user (id, name, hashwd, salt, email, registration_key, createdate)
+        select id, name, hashwd, salt, email, registration_key, createdate from user",
+    params![],
+  )?;
+
+  conn.execute(
+    "insert into orgauth_token (user, token, tokendate)
+        select user, token, tokendate from token",
+    params![],
+  )?;
+
+  conn.execute(
+    "insert into orgauth_newemail (user, email, token, tokendate)
+        select user, email, token, tokendate from newemail",
+    params![],
+  )?;
+
+  conn.execute(
+    "insert into orgauth_newpassword (user, token, tokendate)
+        select user, token, tokendate from newpassword",
+    params![],
+  )?;
+
+  // Hmmm would switch to 'zkuser', but I'll keep the user table so I don't have to rebuild every table with
+  // new foreign keys.
+
+  let mut m1 = Migration::new();
+
+  m1.create_table("usertemp", |t| {
+    t.add_column("id", types::foreign("orgauth_user", "id").nullable(false));
+    t.add_column("zknote", types::foreign("zknote", "id").nullable(true));
+    t.add_column("homenote", types::foreign("zknote", "id").nullable(true));
+  });
+
+  conn.execute_batch(m1.make::<Sqlite>().as_str())?;
+
+  // copy from user.
+  conn.execute(
+    "insert into usertemp (id, zknote, homenote)
+        select id, zknote, homenote from user",
+    params![],
+  )?;
+
+  let mut m2 = Migration::new();
+  m2.drop_table("user");
+
+  // new user table with homenote
+  m2.create_table("user", |t| {
+    t.add_column("id", types::foreign("orgauth_user", "id").nullable(false));
+    t.add_column("zknote", types::foreign("zknote", "id").nullable(true));
+    t.add_column("homenote", types::foreign("zknote", "id").nullable(true));
+  });
+
+  conn.execute_batch(m2.make::<Sqlite>().as_str())?;
+
+  // copy everything from usertemp.
+  conn.execute(
+    "insert into user (id, zknote, homenote)
+        select id, zknote, homenote from usertemp",
+    params![],
+  )?;
+
+  let mut m3 = Migration::new();
+  m3.drop_table("usertemp");
+  m3.drop_table("token");
+  m3.drop_table("newemail");
+  m3.drop_table("newpassword");
+
+  conn.execute_batch(m3.make::<Sqlite>().as_str())?;
+
+  // --------------------------------------------------------------------------------------
+  // remake zknotes table to point at orgauth_user instead of user.
+
+  conn.execute(
+    "CREATE TABLE IF NOT EXISTS \"zklinktemp\" (
+      \"fromid\" INTEGER REFERENCES zknote(id) NOT NULL,
+      \"toid\" INTEGER REFERENCES zknote(id) NOT NULL,
+      \"user\" INTEGER REFERENCES user(id) NOT NULL,
+      \"linkzknote\" INTEGER REFERENCES zknote(id))",
+    params![],
+  )?;
+
+  conn.execute(
+    "CREATE TABLE IF NOT EXISTS \"zknotetemp\" (
+      \"id\" INTEGER PRIMARY KEY NOT NULL,
+      \"title\" TEXT NOT NULL,
+      \"content\" TEXT NOT NULL,
+      \"sysdata\" TEXT,
+      \"pubid\" TEXT UNIQUE,
+      \"user\" INTEGER REFERENCES user(id) NOT NULL,
+      \"editable\" BOOLEAN NOT NULL,
+      \"showtitle\" BOOLEAN NOT NULL,
+      \"createdate\" INTEGER NOT NULL,
+      \"changeddate\" INTEGER NOT NULL)",
+    params![],
+  )?;
+
+  // copy everything from zknote.
+  conn.execute(
+    "insert into zknotetemp (id, title, content, sysdata, pubid, user, editable, showtitle, createdate, changeddate)
+        select id, title, content, null, pubid, user, editable, showtitle, createdate, changeddate from zknote",
+    params![],
+  )?;
+
+  // copy everything from zklink.
+  conn.execute(
+    "insert into zklinktemp (fromid, toid, user, linkzknote)
+        select fromid, toid, user, linkzknote from zklink",
+    params![],
+  )?;
+
+  // drop tables.
+  conn.execute("drop table zknote", params![])?;
+  conn.execute("drop table zklink", params![])?;
+
+  // new tables referencing orgauth_user.
+  conn.execute(
+    "CREATE TABLE IF NOT EXISTS \"zklink\" (
+      \"fromid\" INTEGER REFERENCES zknote(id) NOT NULL,
+      \"toid\" INTEGER REFERENCES zknote(id) NOT NULL,
+      \"user\" INTEGER REFERENCES orgauth_user(id) NOT NULL,
+      \"linkzknote\" INTEGER REFERENCES zknote(id))",
+    params![],
+  )?;
+
+  conn.execute(
+    "CREATE TABLE IF NOT EXISTS \"zknote\" (
+      \"id\" INTEGER PRIMARY KEY NOT NULL,
+      \"title\" TEXT NOT NULL,
+      \"content\" TEXT NOT NULL,
+      \"sysdata\" TEXT,
+      \"pubid\" TEXT UNIQUE,
+      \"user\" INTEGER REFERENCES orgauth_user(id) NOT NULL,
+      \"editable\" BOOLEAN NOT NULL,
+      \"showtitle\" BOOLEAN NOT NULL,
+      \"createdate\" INTEGER NOT NULL,
+      \"changeddate\" INTEGER NOT NULL)",
+    params![],
+  )?;
+
+  conn.execute(
+    "CREATE UNIQUE INDEX \"zklinkunq\" ON \"zklink\" (\"fromid\", \"toid\", \"user\")",
+    params![],
+  )?;
+
+  // copy everything from zknotetemp.
+  conn.execute(
+    "insert into zknote (id, title, content, sysdata, pubid, user, editable, showtitle, createdate, changeddate)
+        select id, title, content, null, pubid, user, editable, showtitle, createdate, changeddate from zknotetemp",
+    params![],
+  )?;
+
+  // copy everything from zklinktemp.
+  conn.execute(
+    "insert into zklink (fromid, toid, user, linkzknote)
+        select fromid, toid, user, linkzknote from zklinktemp",
+    params![],
+  )?;
+
+  // drop temp tables.
+  conn.execute("drop table zknotetemp", params![])?;
+  conn.execute("drop table zklinktemp", params![])?;
+
+  Ok(())
+}
+
 pub fn get_single_value(conn: &Connection, name: &str) -> Result<Option<String>, Box<dyn Error>> {
   match conn.query_row(
     "select value from singlevalue where name = ?1",
@@ -1012,62 +1247,20 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: i64) -> Result<(), Box<dyn Err
     udpate12(&dbfile)?;
     set_single_value(&conn, "migration_level", "12")?;
   }
+  if nlevel < 13 {
+    info!("udpate13");
+    udpate13(&dbfile)?;
+    set_single_value(&conn, "migration_level", "13")?;
+  }
 
   info!("db up to date.");
 
-  purge_login_tokens(&conn, token_expiration_ms)?;
+  orgauth::dbfun::purge_login_tokens(&conn, token_expiration_ms)?;
 
   Ok(())
 }
 
 // user CRUD
-
-pub fn new_user(
-  dbfile: &Path,
-  name: String,
-  hashwd: String,
-  salt: String,
-  email: String,
-  registration_key: String,
-) -> Result<i64, Box<dyn Error>> {
-  let conn = connection_open(dbfile)?;
-
-  let usernoteid = note_id(&conn, "system", "user")?;
-  let publicnoteid = note_id(&conn, "system", "public")?;
-  let systemid = user_id(&conn, "system")?;
-
-  let now = now()?;
-
-  // make a corresponding note,
-  conn.execute(
-    "insert into zknote (title, content, user, editable, showtitle, createdate, changeddate)
-     values (?1, ?2, ?3, 0, 1, ?4, ?5)",
-    params![name, "", systemid, now, now],
-  )?;
-
-  let zknid = conn.last_insert_rowid();
-
-  // make a user record.
-  conn.execute(
-    "insert into user (name, zknote, hashwd, salt, email, registration_key, createdate)
-      values (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-    params![name, zknid, hashwd, salt, email, registration_key, now],
-  )?;
-
-  let uid = conn.last_insert_rowid();
-
-  conn.execute(
-    "update zknote set sysdata = ?1
-        where id = ?2",
-    params![systemid, uid.to_string().as_str()],
-  )?;
-
-  // indicate a 'user' record, and 'public'
-  save_zklink(&conn, zknid, usernoteid, systemid, None)?;
-  save_zklink(&conn, zknid, publicnoteid, systemid, None)?;
-
-  Ok(uid)
-}
 
 pub fn save_zklink(
   conn: &Connection,
@@ -1125,283 +1318,13 @@ pub fn save_zklink(
   Ok(conn.last_insert_rowid())
 }
 
-pub fn read_user_by_name(conn: &Connection, name: &str) -> Result<User, Box<dyn Error>> {
-  let user = conn.query_row(
-    "select id, zknote, homenote, hashwd, salt, email, registration_key
-      from user where name = ?1",
-    params![name],
-    |row| {
-      Ok(User {
-        id: row.get(0)?,
-        name: name.to_string(),
-        noteid: row.get(1)?,
-        homenoteid: row.get(2)?,
-        hashwd: row.get(3)?,
-        salt: row.get(4)?,
-        email: row.get(5)?,
-        registration_key: row.get(6)?,
-      })
-    },
-  )?;
-
-  Ok(user)
-}
-
-pub fn read_user_by_id(conn: &Connection, id: i64) -> Result<User, Box<dyn Error>> {
-  let user = conn.query_row(
-    "select id, name, zknote, homenote, hashwd, salt, email, registration_key
-      from user where id = ?1",
-    params![id],
-    |row| {
-      Ok(User {
-        id: row.get(0)?,
-        name: row.get(1)?,
-        noteid: row.get(2)?,
-        homenoteid: row.get(3)?,
-        hashwd: row.get(4)?,
-        salt: row.get(5)?,
-        email: row.get(6)?,
-        registration_key: row.get(7)?,
-      })
-    },
-  )?;
-
-  Ok(user)
-}
-
-pub fn read_user_by_token(
-  conn: &Connection,
-  token: Uuid,
-  token_expiration_ms: Option<i64>,
-) -> Result<User, Box<dyn Error>> {
-  let (user, tokendate) = conn.query_row(
-    "select id, name, zknote, homenote, hashwd, salt, email, registration_key, token.tokendate
-      from user, token where user.id = token.user and token = ?1",
-    params![token.to_string()],
-    |row| {
-      Ok((
-        User {
-          id: row.get(0)?,
-          name: row.get(1)?,
-          noteid: row.get(2)?,
-          homenoteid: row.get(3)?,
-          hashwd: row.get(4)?,
-          salt: row.get(5)?,
-          email: row.get(6)?,
-          registration_key: row.get(7)?,
-        },
-        row.get(8)?,
-      ))
-    },
-  )?;
-
-  match token_expiration_ms {
-    Some(texp) => {
-      if is_token_expired(texp, tokendate) {
-        bail!("login expired")
-      } else {
-        Ok(user)
-      }
-    }
-    None => Ok(user),
-  }
-}
-
-pub fn add_token(conn: &Connection, user: i64, token: Uuid) -> Result<(), Box<dyn Error>> {
-  let now = now()?;
-  conn.execute(
-    "insert into token (user, token, tokendate)
-     values (?1, ?2, ?3)",
-    params![user, token.to_string(), now],
-  )?;
-
-  Ok(())
-}
-
-pub fn purge_login_tokens(
-  conn: &Connection,
-  token_expiration_ms: i64,
-) -> Result<(), Box<dyn Error>> {
-  let now = now()?;
-  let expdt = now - token_expiration_ms;
-
-  let count: i64 = conn.query_row(
-    "select count(*) from
-      token where tokendate < ?1",
-    params![expdt],
-    |row| Ok(row.get(0)?),
-  )?;
-
-  if count > 0 {
-    info!("removing {} expired token records", count);
-
-    conn.execute(
-      "delete from token
-        where tokendate < ?1",
-      params![expdt],
-    )?;
-  }
-
-  Ok(())
-}
-
-pub fn purge_email_tokens(
-  conn: &Connection,
-  token_expiration_ms: i64,
-) -> Result<(), Box<dyn Error>> {
-  let now = now()?;
-  let expdt = now - token_expiration_ms;
-
-  let count: i64 = conn.query_row(
-    "select count(*) from
-      newemail where tokendate < ?1",
-    params![expdt],
-    |row| Ok(row.get(0)?),
-  )?;
-
-  if count > 0 {
-    info!("removing {} expired newemail records", count);
-
-    conn.execute(
-      "delete from newemail
-        where tokendate < ?1",
-      params![expdt],
-    )?;
-  }
-
-  Ok(())
-}
-
-pub fn purge_reset_tokens(
-  conn: &Connection,
-  token_expiration_ms: i64,
-) -> Result<(), Box<dyn Error>> {
-  let now = now()?;
-  let expdt = now - token_expiration_ms;
-
-  let count: i64 = conn.query_row(
-    "select count(*) from
-      newpassword where tokendate < ?1",
-    params![expdt],
-    |row| Ok(row.get(0)?),
-  )?;
-
-  if count > 0 {
-    info!("removing {} expired newpassword records", count);
-
-    conn.execute(
-      "delete from newpassword
-        where tokendate < ?1",
-      params![expdt],
-    )?;
-  }
-
-  Ok(())
-}
-
-pub fn update_user(conn: &Connection, user: &User) -> Result<(), Box<dyn Error>> {
-  conn.execute(
-    "update user set name = ?1, hashwd = ?2, salt = ?3, email = ?4, registration_key = ?5, homenote = ?6
-           where id = ?7",
-    params![
-      user.name,
-      user.hashwd,
-      user.salt,
-      user.email,
-      user.registration_key,
-      user.homenoteid,
-      user.id,
-    ],
-  )?;
-
-  Ok(())
-}
-
-// email change request.
-pub fn add_newemail(
-  conn: &Connection,
-  user: i64,
-  token: Uuid,
-  email: String,
-) -> Result<(), Box<dyn Error>> {
-  let now = now()?;
-  conn.execute(
-    "insert into newemail (user, email, token, tokendate)
-     values (?1, ?2, ?3, ?4)",
-    params![user, email, token.to_string(), now],
-  )?;
-
-  Ok(())
-}
-
-// email change request.
-pub fn read_newemail(
-  conn: &Connection,
-  user: i64,
-  token: Uuid,
-) -> Result<(String, i64), Box<dyn Error>> {
-  let result = conn.query_row(
-    "select email, tokendate from newemail
-     where user = ?1
-      and token = ?2",
-    params![user, token.to_string()],
-    |row| Ok((row.get(0)?, row.get(1)?)),
-  )?;
-  Ok(result)
-}
-// email change request.
-pub fn remove_newemail(conn: &Connection, user: i64, token: Uuid) -> Result<(), Box<dyn Error>> {
-  conn.execute(
-    "delete from newemail
-     where user = ?1 and token = ?2",
-    params![user, token.to_string()],
-  )?;
-
-  Ok(())
-}
-
-// password reset request.
-pub fn add_newpassword(conn: &Connection, user: i64, token: Uuid) -> Result<(), Box<dyn Error>> {
-  let now = now()?;
-  conn.execute(
-    "insert into newpassword (user, token, tokendate)
-     values (?1, ?2, ?3)",
-    params![user, token.to_string(), now],
-  )?;
-
-  Ok(())
-}
-
-// password reset request.
-pub fn read_newpassword(conn: &Connection, user: i64, token: Uuid) -> Result<i64, Box<dyn Error>> {
-  let result = conn.query_row(
-    "select tokendate from newpassword
-     where user = ?1
-      and token = ?2",
-    params![user, token.to_string()],
-    |row| Ok(row.get(0)?),
-  )?;
-  Ok(result)
-}
-
-// password reset request.
-pub fn remove_newpassword(conn: &Connection, user: i64, token: Uuid) -> Result<(), Box<dyn Error>> {
-  conn.execute(
-    "delete from newpassword
-     where user = ?1 and token = ?2",
-    params![user, token.to_string()],
-  )?;
-
-  Ok(())
-}
-
 pub fn note_id(conn: &Connection, name: &str, title: &str) -> Result<i64, Box<dyn Error>> {
   let id: i64 = conn.query_row(
     "select zknote.id from
-      zknote, user
+      zknote, orgauth_user
       where zknote.title = ?2
-      and user.name = ?1
-      and zknote.user = user.id",
+      and orgauth_user.name = ?1
+      and zknote.user = orgauth_user.id",
     params![name, title],
     |row| Ok(row.get(0)?),
   )?;
@@ -1423,16 +1346,6 @@ pub fn note_id2(conn: &Connection, uid: i64, title: &str) -> Result<Option<i64>,
     },
     Ok(i) => Ok(i),
   }
-}
-
-pub fn user_id(conn: &Connection, name: &str) -> Result<i64, Box<dyn Error>> {
-  let id: i64 = conn.query_row(
-    "select id from user
-      where user.name = ?1",
-    params![name],
-    |row| Ok(row.get(0)?),
-  )?;
-  Ok(id)
 }
 
 pub fn user_note_id(conn: &Connection, uid: i64) -> Result<i64, Box<dyn Error>> {
@@ -1679,68 +1592,21 @@ pub fn get_sysids(conn: &Connection, sysid: i64, noteid: i64) -> Result<Vec<i64>
   r
 }
 
-pub fn change_password(
-  conn: &Connection,
-  uid: i64,
-  cp: ChangePassword,
-) -> Result<(), Box<dyn Error>> {
-  let mut userdata = read_user_by_id(&conn, uid)?;
-  match userdata.registration_key {
-    Some(_reg_key) => bail!("invalid user or password"),
-    None => {
-      if hex_digest(
-        Algorithm::SHA256,
-        (cp.oldpwd.clone() + userdata.salt.as_str())
-          .into_bytes()
-          .as_slice(),
-      ) != userdata.hashwd
-      {
-        // bad password, can't change.
-        bail!("invalid password!")
-      } else {
-        let newhash = hex_digest(
-          Algorithm::SHA256,
-          (cp.newpwd.clone() + userdata.salt.as_str())
-            .into_bytes()
-            .as_slice(),
-        );
-        userdata.hashwd = newhash;
-        update_user(&conn, &userdata)?;
-        info!("changed password for {}", userdata.name);
+pub fn read_user_by_id(conn: &Connection, id: i64) -> Result<User, Box<dyn Error>> {
+  let user = conn.query_row(
+    "select id, zknote, homenote
+      from user where id = ?1",
+    params![id],
+    |row| {
+      Ok(User {
+        id: row.get(0)?,
+        noteid: row.get(1)?,
+        homenoteid: row.get(2)?,
+      })
+    },
+  )?;
 
-        Ok(())
-      }
-    }
-  }
-}
-
-pub fn change_email(
-  conn: &Connection,
-  uid: i64,
-  cp: ChangeEmail,
-) -> Result<(String, Uuid), Box<dyn Error>> {
-  let userdata = read_user_by_id(&conn, uid)?;
-  match userdata.registration_key {
-    Some(_reg_key) => bail!("invalid user or password"),
-    None => {
-      if hex_digest(
-        Algorithm::SHA256,
-        (cp.pwd.clone() + userdata.salt.as_str())
-          .into_bytes()
-          .as_slice(),
-      ) != userdata.hashwd
-      {
-        // bad password, can't change.
-        bail!("invalid password!")
-      } else {
-        // create a 'newemail' record.
-        let token = Uuid::new_v4();
-        add_newemail(&conn, uid, token, cp.email)?;
-
-        Ok((userdata.name, token))
-      }
-    }
-  }
+  Ok(user)
 }
 
 pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNote, Box<dyn Error>> {
@@ -1748,8 +1614,8 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
   let sysids = get_sysids(conn, sysid, id)?;
 
   let mut note = conn.query_row(
-    "select ZN.title, ZN.content, ZN.user, U.name, U.zknote, ZN.pubid, ZN.editable, ZN.showtitle, ZN.createdate, ZN.changeddate
-      from zknote ZN, user U where ZN.id = ?1 and U.id = ZN.user",
+    "select ZN.title, ZN.content, ZN.user, OU.name, U.zknote, ZN.pubid, ZN.editable, ZN.showtitle, ZN.createdate, ZN.changeddate
+      from zknote ZN, orgauth_user OU, user U where ZN.id = ?1 and U.id = ZN.user and OU.id = ZN.user",
     params![id],
     |row| {
       Ok(ZkNote {
@@ -1878,12 +1744,13 @@ pub fn read_zknotepubid(
 ) -> Result<ZkNote, Box<dyn Error>> {
   let publicid = note_id(&conn, "system", "public")?;
   let mut note = conn.query_row(
-    "select A.id, A.title, A.content, A.user, U.name, U.zknote, A.pubid, A.editable, A.showtitle, A.createdate, A.changeddate
-      from zknote A, user U, zklink L where A.pubid = ?1
+    "select A.id, A.title, A.content, A.user, OU.name, U.zknote, A.pubid, A.editable, A.showtitle, A.createdate, A.changeddate
+      from zknote A, user U, orgauth_user OU, zklink L where A.pubid = ?1
       and ((A.id = L.fromid
       and L.toid = ?2) or (A.id = L.toid
       and L.fromid = ?2))
-      and U.id = A.user",
+      and U.id = A.user
+      and OU.id = A.user",
     params![pubid, publicid],
     |row| {
       Ok(ZkNote {
@@ -2322,8 +2189,8 @@ pub struct ZkDatabase {
   users: Vec<User>,
 }
 
-pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
-  let conn = connection_open(dbfile)?;
+pub fn export_db(_dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
+  /*  let conn = connection_open(dbfile)?;
   let sysid = user_id(&conn, "system")?;
 
   // Users
@@ -2377,7 +2244,7 @@ pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
 
   // Links
   let mut lstmt = conn.prepare(
-    "select A.fromid, A.toid, A.user, A.linkzknote 
+    "select A.fromid, A.toid, A.user, A.linkzknote
       from zklink A",
   )?;
 
@@ -2399,5 +2266,7 @@ pub fn export_db(dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
     notes: nv,
     links: lv,
     users: uv,
-  })
+  })*/
+
+  bail!("unimplemented");
 }

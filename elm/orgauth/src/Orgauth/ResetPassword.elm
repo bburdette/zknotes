@@ -1,4 +1,6 @@
-module ResetPassword exposing (Cmd(..), Model, Msg(..), initialModel, resetView, sentView, update, view)
+module Orgauth.ResetPassword exposing (Cmd(..), Model, Msg(..), initialModel, resetView, sentView, update, view)
+
+-- import Html exposing (Html)
 
 import Common exposing (buttonStyle)
 import Dict exposing (Dict)
@@ -8,7 +10,6 @@ import Element.Border as Border
 import Element.Events exposing (onClick)
 import Element.Font as Font
 import Element.Input as Input
-import Html exposing (Html)
 import Random exposing (Seed)
 import TangoColors as TC
 import UUID exposing (UUID)

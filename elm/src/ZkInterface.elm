@@ -1,4 +1,4 @@
-module UserInterface exposing (SendMsg(..), ServerResponse(..), encodeEmail, encodeSendMsg, serverResponseDecoder, showServerResponse)
+module ZkInterface exposing (SendMsg(..), ServerResponse(..), encodeEmail, encodeSendMsg, serverResponseDecoder, showServerResponse)
 
 import Data
 import Json.Decode as JD
@@ -7,14 +7,7 @@ import Search as S
 
 
 type SendMsg
-    = Register Data.Registration
-    | Login Data.Login
-    | ResetPassword Data.ResetPassword
-    | SetPassword Data.SetPassword
-    | Logout
-    | ChangePassword Data.ChangePassword
-    | ChangeEmail Data.ChangeEmail
-    | GetZkNote Int
+    = GetZkNote Int
     | GetZkNoteEdit Data.GetZkNoteEdit
     | GetZkNoteComments Data.GetZkNoteComments
     | DeleteZkNote Int
@@ -28,18 +21,7 @@ type SendMsg
 
 
 type ServerResponse
-    = RegistrationSent
-    | UserExists
-    | UnregisteredUser
-    | InvalidUserOrPwd
-    | NotLoggedIn
-    | LoggedIn Data.LoginData
-    | LoggedOut
-    | ChangedPassword
-    | ChangedEmail
-    | ResetPasswordAck
-    | SetPasswordAck
-    | ZkNoteSearchResult Data.ZkNoteSearchResult
+    = ZkNoteSearchResult Data.ZkNoteSearchResult
     | ZkListNoteSearchResult Data.ZkListNoteSearchResult
     | SavedZkNotePlusLinks Data.SavedZkNote
     | SavedZkNote Data.SavedZkNote
@@ -58,39 +40,6 @@ type ServerResponse
 showServerResponse : ServerResponse -> String
 showServerResponse sr =
     case sr of
-        RegistrationSent ->
-            "RegistrationSent"
-
-        UserExists ->
-            "UserExists"
-
-        UnregisteredUser ->
-            "UnregisteredUser"
-
-        NotLoggedIn ->
-            "NotLoggedIn"
-
-        InvalidUserOrPwd ->
-            "InvalidUserOrPwd"
-
-        LoggedIn _ ->
-            "LoggedIn"
-
-        LoggedOut ->
-            "LoggedOut"
-
-        ResetPasswordAck ->
-            "ResetPasswordAck"
-
-        SetPasswordAck ->
-            "SetPasswordAck"
-
-        ChangedPassword ->
-            "ChangedPassword"
-
-        ChangedEmail ->
-            "ChangedEmail"
-
         ZkNoteSearchResult _ ->
             "ZkNoteSearchResult"
 
@@ -137,47 +86,6 @@ showServerResponse sr =
 encodeSendMsg : SendMsg -> JE.Value
 encodeSendMsg sm =
     case sm of
-        Register registration ->
-            JE.object
-                [ ( "what", JE.string "register" )
-                , ( "data", Data.encodeRegistration registration )
-                ]
-
-        Login login ->
-            JE.object
-                [ ( "what", JE.string "login" )
-                , ( "data", Data.encodeLogin login )
-                ]
-
-        Logout ->
-            JE.object
-                [ ( "what", JE.string "logout" )
-                ]
-
-        ResetPassword chpwd ->
-            JE.object
-                [ ( "what", JE.string "resetpassword" )
-                , ( "data", Data.encodeResetPassword chpwd )
-                ]
-
-        SetPassword chpwd ->
-            JE.object
-                [ ( "what", JE.string "setpassword" )
-                , ( "data", Data.encodeSetPassword chpwd )
-                ]
-
-        ChangePassword chpwd ->
-            JE.object
-                [ ( "what", JE.string "ChangePassword" )
-                , ( "data", Data.encodeChangePassword chpwd )
-                ]
-
-        ChangeEmail chpwd ->
-            JE.object
-                [ ( "what", JE.string "ChangeEmail" )
-                , ( "data", Data.encodeChangeEmail chpwd )
-                ]
-
         GetZkNote id ->
             JE.object
                 [ ( "what", JE.string "getzknote" )
@@ -264,39 +172,6 @@ serverResponseDecoder =
         |> JD.andThen
             (\what ->
                 case what of
-                    "registration sent" ->
-                        JD.succeed RegistrationSent
-
-                    "unregistered user" ->
-                        JD.succeed UnregisteredUser
-
-                    "user exists" ->
-                        JD.succeed UserExists
-
-                    "logged in" ->
-                        JD.map LoggedIn (JD.at [ "content" ] Data.decodeLoginData)
-
-                    "logged out" ->
-                        JD.succeed LoggedOut
-
-                    "not logged in" ->
-                        JD.succeed NotLoggedIn
-
-                    "invalid user or pwd" ->
-                        JD.succeed InvalidUserOrPwd
-
-                    "resetpasswordack" ->
-                        JD.succeed ResetPasswordAck
-
-                    "setpasswordack" ->
-                        JD.succeed SetPasswordAck
-
-                    "changed password" ->
-                        JD.succeed ChangedPassword
-
-                    "changed email" ->
-                        JD.succeed ChangedEmail
-
                     "server error" ->
                         JD.map ServerError (JD.at [ "content" ] JD.string)
 
