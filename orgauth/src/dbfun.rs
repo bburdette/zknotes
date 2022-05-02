@@ -74,6 +74,21 @@ pub fn login_data(conn: &Connection, uid: i64) -> Result<LoginData, Box<dyn Erro
   })
 }
 
+pub fn login_data_cb(
+  conn: &Connection,
+  uid: i64,
+  mut extra_login_data: Box<
+    dyn FnMut(&Connection, i64) -> Result<Option<serde_json::Value>, Box<dyn Error>>,
+  >,
+) -> Result<LoginData, Box<dyn Error>> {
+  let user = read_user_by_id(&conn, uid)?;
+  Ok(LoginData {
+    userid: uid,
+    name: user.name,
+    data: extra_login_data(&conn, uid)?,
+  })
+}
+
 pub fn read_user_by_name(conn: &Connection, name: &str) -> Result<User, Box<dyn Error>> {
   let user = conn.query_row(
     "select id, hashwd, salt, email, registration_key

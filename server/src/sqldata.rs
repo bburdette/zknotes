@@ -65,7 +65,8 @@ pub fn on_new_user(
   Ok(())
 }
 
-pub fn on_logged_in(
+// callback to pass to orgauth
+pub fn extra_login_data_callback(
   conn: &Connection,
   uid: i64,
 ) -> Result<Option<serde_json::Value>, Box<dyn Error>> {
@@ -86,13 +87,6 @@ pub fn extra_login_data(conn: &Connection, uid: i64) -> Result<ExtraLoginData, B
   };
 
   Ok(eld)
-}
-
-pub fn login_data(conn: &Connection, uid: i64) -> Result<orgauth::data::LoginData, Box<dyn Error>> {
-  let mut ld = orgauth::dbfun::login_data(&conn, uid)?;
-  let data = on_logged_in(&conn, ld.userid)?;
-  ld.data = data;
-  Ok(ld)
 }
 
 pub fn update_user(conn: &Connection, user: &User) -> Result<(), Box<dyn Error>> {
