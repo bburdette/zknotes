@@ -13,6 +13,7 @@ use actix_web::HttpRequest;
 use std::error::Error;
 use std::path::Path;
 // use uuid::Uuid;
+use orgauth::endpoints::Callbacks;
 use zkprotocol::content::{
   GetZkNoteComments, GetZkNoteEdit, ImportZkNote, SaveZkNote, SaveZkNotePlusLinks, ZkLinks,
   ZkNoteEdit,
@@ -46,7 +47,10 @@ pub fn user_interface(
   config: &Config,
   msg: orgauth::data::WhatMessage,
 ) -> Result<orgauth::data::WhatMessage, Box<dyn Error>> {
-  match orgauth::endpoints::user_interface(&session, &config.orgauth_config, msg) {
+  let mut cb = Callbacks {
+    on_new_user: Box::new(sqldata::on_new_user),
+  };
+  match orgauth::endpoints::user_interface(&session, &config.orgauth_config, &mut cb, msg) {
     Ok(sr) => match (sr.what.as_str(), sr.data) {
       ("logged in", Some(srd)) => {
         let ld: orgauth::data::LoginData = serde_json::from_value(srd)?;

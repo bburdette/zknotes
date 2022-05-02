@@ -2,6 +2,7 @@ use crate::util::now;
 use barrel::backend::Sqlite;
 use barrel::{types, Migration};
 use log::info;
+use orgauth::data::RegistrationData;
 use orgauth::dbfun::user_id;
 use orgauth::migrations;
 use rusqlite::{params, Connection};
@@ -22,14 +23,11 @@ pub struct User {
   pub homenoteid: Option<i64>,
 }
 
-pub fn new_user(
+pub fn on_new_user(
   conn: &Connection,
-  name: String,
-  hashwd: String,
-  salt: String,
-  email: String,
-  registration_key: String,
-) -> Result<i64, Box<dyn Error>> {
+  rd: &RegistrationData,
+  uid: i64,
+) -> Result<(), Box<dyn Error>> {
   let usernoteid = note_id(&conn, "system", "user")?;
   let publicnoteid = note_id(&conn, "system", "public")?;
   let systemid = user_id(&conn, "system")?;
@@ -40,12 +38,12 @@ pub fn new_user(
   conn.execute(
     "insert into zknote (title, content, user, editable, showtitle, createdate, changeddate)
      values (?1, ?2, ?3, 0, 1, ?4, ?5)",
-    params![name, "", systemid, now, now],
+    params![rd.uid, "", systemid, now, now],
   )?;
 
   let zknid = conn.last_insert_rowid();
 
-  let uid = orgauth::dbfun::new_user(&conn, name, hashwd, salt, email, registration_key)?;
+  // let uid = orgauth::dbfun::new_user(&conn, name, hashwd, salt, email, registration_key)?;
 
   // make a user record.
   conn.execute(
@@ -66,7 +64,7 @@ pub fn new_user(
   save_zklink(&conn, zknid, usernoteid, systemid, None)?;
   save_zklink(&conn, zknid, publicnoteid, systemid, None)?;
 
-  Ok(uid)
+  Ok(())
 }
 
 pub fn update_user(conn: &Connection, user: &User) -> Result<(), Box<dyn Error>> {

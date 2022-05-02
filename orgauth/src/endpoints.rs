@@ -8,14 +8,21 @@ use actix_session::Session;
 use actix_web::{HttpRequest, HttpResponse};
 use crypto_hash::{hex_digest, Algorithm};
 use log::{error, info};
+use rusqlite::Connection;
 use std::error::Error;
 use std::str::FromStr;
 use util::now;
 use uuid::Uuid;
 
+pub struct Callbacks {
+  pub on_new_user:
+    Box<dyn FnMut(&Connection, &RegistrationData, i64) -> Result<(), Box<dyn Error>>>,
+}
+
 pub fn user_interface(
   session: &Session,
   config: &Config,
+  callbacks: &mut Callbacks,
   msg: WhatMessage,
 ) -> Result<WhatMessage, Box<dyn Error>> {
   info!("got a user message: {}", msg.what);
@@ -40,17 +47,19 @@ pub fn user_interface(
         let salt = util::salt_string();
 
         // write a user record.
-        dbfun::new_user(
+        let uid = dbfun::new_user(
           &conn,
           rd.uid.clone(),
           hex_digest(
             Algorithm::SHA256,
-            (rd.pwd + salt.as_str()).into_bytes().as_slice(),
+            (rd.pwd.clone() + salt.as_str()).into_bytes().as_slice(),
           ),
           salt,
           rd.email.clone(),
           registration_key.clone().to_string(),
         )?;
+
+        (callbacks.on_new_user)(&conn, &rd, uid)?;
 
         // send a registration email.
         email::send_registration(
