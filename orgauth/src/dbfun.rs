@@ -1,16 +1,9 @@
 use crate::data::Config;
 use crate::data::{ChangeEmail, ChangePassword, LoginData, User};
-// use crate::email;
 use crate::util::{is_token_expired, now};
-// use actix_session::Session;
-// use actix_web::HttpRequest;
-// use barrel::backend::Sqlite;
-// use barrel::{types, Migration};
 use crypto_hash::{hex_digest, Algorithm};
-// use either::Either::{Left, Right};
 use log::info;
 use rusqlite::{params, Connection};
-// use serde_derive::{Deserialize, Serialize};
 use simple_error::bail;
 use std::error::Error;
 use std::path::Path;

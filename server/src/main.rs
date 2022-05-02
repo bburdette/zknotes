@@ -1,5 +1,4 @@
 mod config;
-// mod email;
 mod interfaces;
 mod search;
 mod sqldata;
@@ -170,37 +169,6 @@ fn zk_interface_check(
     }
   }
 }
-
-/*fn private(
-  session: Session,
-  data: web::Data<Config>,
-  item: web::Json<UserMessage>,
-  req: HttpRequest,
-) -> HttpResponse {
-  match session.get::<Uuid>("token")? {
-    None => Ok(ServerResponse {
-      what: "not logged in".to_string(),
-      content: serde_json::Value::Null,
-    }),
-    Some(token) => {
-      match sqldata::read_user_by_token(&conn, token, Some(config.login_token_expiration_ms)) {
-        Err(e) => {
-          info!("read_user_by_token error: {:?}", e);
-
-          Ok(ServerResponse {
-            what: "invalid user or pwd".to_string(),
-            content: serde_json::Value::Null,
-          })
-        }
-        Ok(userdata) => {
-          // finally!  processing messages as logged in user.
-          zk_interface_loggedin(&config, userdata.id, &msg)
-        }
-      }
-    }
-  }
-}
-*/
 
 fn defcon() -> Config {
   let oc = orgauth::data::Config {
