@@ -49,26 +49,9 @@ pub fn user_interface(
 ) -> Result<orgauth::data::WhatMessage, Box<dyn Error>> {
   let mut cb = Callbacks {
     on_new_user: Box::new(sqldata::on_new_user),
+    on_logged_in: Box::new(sqldata::on_logged_in),
   };
-  match orgauth::endpoints::user_interface(&session, &config.orgauth_config, &mut cb, msg) {
-    Ok(sr) => match (sr.what.as_str(), sr.data) {
-      ("logged in", Some(srd)) => {
-        let ld: orgauth::data::LoginData = serde_json::from_value(srd)?;
-        let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-        Ok(orgauth::data::WhatMessage {
-          what: "logged in".to_string(),
-          data: Some(serde_json::to_value(sqldata::login_data(
-            &conn, ld.userid,
-          )?)?),
-        })
-      }
-      (what, data) => Ok(orgauth::data::WhatMessage {
-        what: what.to_string(),
-        data: data,
-      }),
-    },
-    Err(e) => Err(e),
-  }
+  orgauth::endpoints::user_interface(&session, &config.orgauth_config, &mut cb, msg)
 }
 
 pub fn zk_interface_loggedin(

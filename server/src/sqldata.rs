@@ -43,8 +43,6 @@ pub fn on_new_user(
 
   let zknid = conn.last_insert_rowid();
 
-  // let uid = orgauth::dbfun::new_user(&conn, name, hashwd, salt, email, registration_key)?;
-
   // make a user record.
   conn.execute(
     "insert into user (id, zknote)
@@ -67,18 +65,14 @@ pub fn on_new_user(
   Ok(())
 }
 
-pub fn update_user(conn: &Connection, user: &User) -> Result<(), Box<dyn Error>> {
-  conn.execute(
-    "update user set zknote = ?1, homenote = ?2
-           where id = ?3",
-    params![user.noteid, user.homenoteid, user.id,],
-  )?;
-
-  Ok(())
+pub fn on_logged_in(
+  conn: &Connection,
+  uid: i64,
+) -> Result<Option<serde_json::Value>, Box<dyn Error>> {
+  Ok(Some(serde_json::to_value(extra_login_data(&conn, uid)?)?))
 }
 
-pub fn login_data(conn: &Connection, uid: i64) -> Result<orgauth::data::LoginData, Box<dyn Error>> {
-  let mut oald = orgauth::dbfun::login_data(&conn, uid)?;
+pub fn extra_login_data(conn: &Connection, uid: i64) -> Result<ExtraLoginData, Box<dyn Error>> {
   let user = read_user_by_id(&conn, uid)?;
 
   let eld = ExtraLoginData {
@@ -91,8 +85,24 @@ pub fn login_data(conn: &Connection, uid: i64) -> Result<orgauth::data::LoginDat
     commentid: note_id(conn, "system", "comment")?,
   };
 
-  oald.data = Some(serde_json::to_value(eld)?);
-  Ok(oald)
+  Ok(eld)
+}
+
+pub fn login_data(conn: &Connection, uid: i64) -> Result<orgauth::data::LoginData, Box<dyn Error>> {
+  let mut ld = orgauth::dbfun::login_data(&conn, uid)?;
+  let data = on_logged_in(&conn, ld.userid)?;
+  ld.data = data;
+  Ok(ld)
+}
+
+pub fn update_user(conn: &Connection, user: &User) -> Result<(), Box<dyn Error>> {
+  conn.execute(
+    "update user set zknote = ?1, homenote = ?2
+           where id = ?3",
+    params![user.noteid, user.homenoteid, user.id,],
+  )?;
+
+  Ok(())
 }
 
 pub fn connection_open(dbfile: &Path) -> Result<Connection, Box<dyn Error>> {

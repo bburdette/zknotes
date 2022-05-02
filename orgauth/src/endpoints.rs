@@ -17,6 +17,8 @@ use uuid::Uuid;
 pub struct Callbacks {
   pub on_new_user:
     Box<dyn FnMut(&Connection, &RegistrationData, i64) -> Result<(), Box<dyn Error>>>,
+  pub on_logged_in:
+    Box<dyn FnMut(&Connection, i64) -> Result<Option<serde_json::Value>, Box<dyn Error>>>,
 }
 
 pub fn user_interface(
@@ -111,7 +113,9 @@ pub fn user_interface(
             data: Option::None,
           })
         } else {
-          let ld = dbfun::login_data(&conn, userdata.id)?;
+          let mut ld = dbfun::login_data(&conn, userdata.id)?;
+          let data = (callbacks.on_logged_in)(&conn, ld.userid)?;
+          ld.data = data;
           // new token here, and token date.
           let token = Uuid::new_v4();
           dbfun::add_token(&conn, userdata.id, token)?;
