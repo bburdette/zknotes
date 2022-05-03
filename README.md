@@ -39,6 +39,14 @@ Final note - you're expected to register as a user in order to log in to the web
 
 ### developing.
 
+currently orgauth is used here with submodules.  so you have to:
+
+$ git submodule update
+$ cd orgauth
+$ git submodule update
+
+yes, there is a submodule within a submodule.  hopefully this will change sooner than later.
+
 to install the dev tools needed, clone the zknotes repo locally.  then run `nix develop` in that directory.
 
 there's a watch_run.sh in the server subdirectory, and a watch_build.sh  in the elm directory.  Run those each in a separate terminal and you'll get automatic rebuilds whenever you make changes to code.
