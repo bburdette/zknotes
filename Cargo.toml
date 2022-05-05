@@ -4,5 +4,5 @@
 members = [
     "zkprotocol",
     "server",
-    "orgauth",
+    "orgauth/rustlib",
 ]
