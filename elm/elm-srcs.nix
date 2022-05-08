@@ -80,6 +80,11 @@
         version = "4.1.0";
       };
 
+      "PanagiotisGeorgiadis/elm-datetime" = {
+        sha256 = "10fd2pad1kv8gm8zj2ixspyyxjqlzx50s3di17vl51gp41j05qbw";
+        version = "1.3.0";
+      };
+
       "bburdette/typed-collections" = {
         sha256 = "1j8hkw35dkc9kcdyxz2vqdv500b9pfar55bq20ybznkbm02c6k8w";
         version = "1.0.2";
