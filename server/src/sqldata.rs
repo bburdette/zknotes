@@ -1146,6 +1146,11 @@ pub fn udpate13(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   Ok(())
 }
 
+pub fn udpate14(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+  orgauth::migrations::udpate2(dbfile)?;
+  Ok(())
+}
+
 pub fn get_single_value(conn: &Connection, name: &str) -> Result<Option<String>, Box<dyn Error>> {
   match conn.query_row(
     "select value from singlevalue where name = ?1",
@@ -1251,6 +1256,11 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: i64) -> Result<(), Box<dyn Err
     info!("udpate13");
     udpate13(&dbfile)?;
     set_single_value(&conn, "migration_level", "13")?;
+  }
+  if nlevel < 14 {
+    info!("udpate14");
+    udpate14(&dbfile)?;
+    set_single_value(&conn, "migration_level", "14")?;
   }
 
   info!("db up to date.");
