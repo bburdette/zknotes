@@ -11,6 +11,7 @@ use chrono;
 use clap::Arg;
 use config::Config;
 use log::{error, info};
+use orgauth::endpoints::Callbacks;
 use serde_json;
 use std::env;
 use std::error::Error;
@@ -19,6 +20,7 @@ use std::str::FromStr;
 use timer;
 use uuid::Uuid;
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
+
 /*
 use actix_files::NamedFile;
 
@@ -105,6 +107,40 @@ fn user(
     req.connection_info()
   );
   match interfaces::user_interface(&session, &data, item.into_inner()) {
+    Ok(sr) => HttpResponse::Ok().json(sr),
+    Err(e) => {
+      error!("'user' err: {:?}", e);
+      let se = orgauth::data::WhatMessage {
+        what: "server error".to_string(),
+        data: Some(serde_json::Value::String(e.to_string())),
+      };
+      HttpResponse::Ok().json(se)
+    }
+  }
+}
+
+fn admin(
+  session: Session,
+  data: web::Data<Config>,
+  item: web::Json<orgauth::data::WhatMessage>,
+  req: HttpRequest,
+) -> HttpResponse {
+  info!(
+    "admin msg: {}, {:?}  \n connection_info: {:?}",
+    &item.what,
+    &item.data,
+    req.connection_info()
+  );
+  let mut cb = Callbacks {
+    on_new_user: Box::new(sqldata::on_new_user),
+    extra_login_data: Box::new(sqldata::extra_login_data_callback),
+  };
+  match orgauth::endpoints::admin_interface_check(
+    &session,
+    &data.orgauth_config,
+    &mut cb,
+    item.into_inner(),
+  ) {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'user' err: {:?}", e);
@@ -342,6 +378,7 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
               .service(web::resource("/public").route(web::post().to(public)))
               .service(web::resource("/private").route(web::post().to(private)))
               .service(web::resource("/user").route(web::post().to(user)))
+              .service(web::resource("/admin").route(web::post().to(admin)))
               .service(web::resource(r"/register/{uid}/{key}").route(web::get().to(register)))
               .service(web::resource(r"/newemail/{uid}/{token}").route(web::get().to(new_email)))
               .service(actix_files::Files::new("/static/", staticpath))

@@ -42,6 +42,7 @@ import Orgauth.ChangePassword as CP
 import Orgauth.Data as OD
 import Orgauth.ResetPassword as ResetPassword
 import Orgauth.UserInterface as UI
+import Orgauth.UserListing as UL
 import PublicInterface as PI
 import Random exposing (Seed, initialSeed)
 import Route exposing (Route(..), parseUrl, routeTitle, routeUrl)
@@ -92,6 +93,7 @@ type Msg
     | Zone Time.Zone
     | WkMsg (Result JD.Error WindowKeys.Key)
     | ReceiveLocalVal { for : String, name : String, value : Maybe String }
+    | UserListingMsg UL.Msg
     | Noop
 
 
@@ -110,6 +112,7 @@ type State
     | ChangePasswordDialog CP.GDModel State
     | ChangeEmailDialog CE.GDModel State
     | ResetPassword ResetPassword.Model
+    | UserListing UL.Model Data.LoginData
     | DisplayMessage DisplayMessage.GDModel State
     | MessageNLink MessageNLink.GDModel State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
@@ -493,6 +496,9 @@ showMessage msg =
         Zone _ ->
             "Zone"
 
+        UserListingMsg _ ->
+            "UserListingMsg"
+
 
 showState : State -> String
 showState state =
@@ -547,6 +553,9 @@ showState state =
 
         ResetPassword _ ->
             "ResetPassword"
+
+        UserListing _ _ ->
+            "UserListing"
 
 
 unexpectedMsg : Model -> Msg -> Model
@@ -620,6 +629,9 @@ viewState size state model =
         ResetPassword st ->
             E.map ResetPasswordMsg (ResetPassword.view size st)
 
+        UserListing st login ->
+            E.map UserListingMsg (UL.view Common.buttonStyle st)
+
 
 stateSearch : State -> Maybe ( SP.Model, Data.ZkListNoteSearchResult )
 stateSearch state =
@@ -681,6 +693,9 @@ stateSearch state =
         Wait st _ ->
             stateSearch st
 
+        UserListing _ _ ->
+            Nothing
+
 
 stateLogin : State -> Maybe Data.LoginData
 stateLogin state =
@@ -735,6 +750,9 @@ stateLogin state =
 
         ResetPassword _ ->
             Nothing
+
+        UserListing _ login ->
+            Just login
 
 
 sendUIMsg : String -> UI.SendMsg -> Cmd Msg
@@ -1540,6 +1558,14 @@ actualupdate msg model =
                                         (UI.showServerResponse uiresponse)
                                     , Cmd.none
                                     )
+
+                        UI.Users users ->
+                            case stateLogin model.state of
+                                Just login ->
+                                    ( { model | state = UserListing (UL.init users) login }, Cmd.none )
+
+                                Nothing ->
+                                    ( displayMessageDialog model "not logged in", Cmd.none )
 
         ( ZkReplyData zrd, state ) ->
             case zrd of

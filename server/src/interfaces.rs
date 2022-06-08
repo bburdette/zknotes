@@ -20,6 +20,10 @@ pub fn login_data_for_token(
   config: &Config,
 ) -> Result<Option<orgauth::data::LoginData>, Box<dyn Error>> {
   let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+  let mut cb = Callbacks {
+    on_new_user: Box::new(sqldata::on_new_user),
+    extra_login_data: Box::new(sqldata::extra_login_data_callback),
+  };
   match session.get("token")? {
     None => Ok(None),
     Some(token) => {
@@ -31,7 +35,8 @@ pub fn login_data_for_token(
         Ok(user) => Ok(Some(orgauth::dbfun::login_data_cb(
           &conn,
           user.id,
-          Box::new(sqldata::extra_login_data_callback),
+          &mut cb.extra_login_data,
+          // Box::new(sqldata::extra_login_data_callback),
         )?)),
         Err(_) => Ok(None),
       }
