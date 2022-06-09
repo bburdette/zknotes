@@ -42,8 +42,9 @@ import Orgauth.ChangeEmail as CE
 import Orgauth.ChangePassword as CP
 import Orgauth.Data as OD
 import Orgauth.ResetPassword as ResetPassword
+import Orgauth.UserEdit as UserEdit
 import Orgauth.UserInterface as UI
-import Orgauth.UserListing as UL
+import Orgauth.UserListing as UserListing
 import PublicInterface as PI
 import Random exposing (Seed, initialSeed)
 import Route exposing (Route(..), parseUrl, routeTitle, routeUrl)
@@ -73,6 +74,8 @@ type Msg
     | EditZkNoteMsg EditZkNote.Msg
     | EditZkNoteListingMsg EditZkNoteListing.Msg
     | UserSettingsMsg UserSettings.Msg
+    | UserListingMsg UserListing.Msg
+    | UserEditMsg UserEdit.Msg
     | ImportMsg Import.Msg
     | ShowMessageMsg ShowMessage.Msg
     | UserReplyData (Result Http.Error UI.ServerResponse)
@@ -95,7 +98,6 @@ type Msg
     | Zone Time.Zone
     | WkMsg (Result JD.Error WindowKeys.Key)
     | ReceiveLocalVal { for : String, name : String, value : Maybe String }
-    | UserListingMsg UL.Msg
     | Noop
 
 
@@ -114,7 +116,8 @@ type State
     | ChangePasswordDialog CP.GDModel State
     | ChangeEmailDialog CE.GDModel State
     | ResetPassword ResetPassword.Model
-    | UserListing UL.Model Data.LoginData
+    | UserListing UserListing.Model Data.LoginData
+    | UserEdit UserEdit.Model Data.LoginData
     | DisplayMessage DisplayMessage.GDModel State
     | MessageNLink MessageNLink.GDModel State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
@@ -515,6 +518,9 @@ showMessage msg =
         UserListingMsg _ ->
             "UserListingMsg"
 
+        UserEditMsg _ ->
+            "UserEditMsg"
+
 
 showState : State -> String
 showState state =
@@ -572,6 +578,9 @@ showState state =
 
         UserListing _ _ ->
             "UserListing"
+
+        UserEdit _ _ ->
+            "UserEdit"
 
 
 unexpectedMsg : Model -> Msg -> Model
@@ -646,7 +655,10 @@ viewState size state model =
             E.map ResetPasswordMsg (ResetPassword.view size st)
 
         UserListing st login ->
-            E.map UserListingMsg (UL.view Common.buttonStyle st)
+            E.map UserListingMsg (UserListing.view Common.buttonStyle st)
+
+        UserEdit st login ->
+            E.map UserEditMsg (UserEdit.view Common.buttonStyle st)
 
 
 stateSearch : State -> Maybe ( SP.Model, Data.ZkListNoteSearchResult )
@@ -712,6 +724,9 @@ stateSearch state =
         UserListing _ _ ->
             Nothing
 
+        UserEdit _ _ ->
+            Nothing
+
 
 stateLogin : State -> Maybe Data.LoginData
 stateLogin state =
@@ -768,6 +783,9 @@ stateLogin state =
             Nothing
 
         UserListing _ login ->
+            Just login
+
+        UserEdit _ login ->
             Just login
 
 
@@ -1342,6 +1360,36 @@ actualupdate msg model =
                 UserSettings.None ->
                     ( { model | state = UserSettings numod login prevstate }, Cmd.none )
 
+        ( UserListingMsg umsg, UserListing umod login ) ->
+            let
+                ( numod, c ) =
+                    UserListing.update umsg umod
+            in
+            case c of
+                UserListing.Done ->
+                    initialPage model
+
+                UserListing.NewUser ->
+                    ( { model | state = UserEdit UserEdit.initNew login }, Cmd.none )
+
+                UserListing.EditUser ld ->
+                    ( { model | state = UserEdit (UserEdit.init ld) login }, Cmd.none )
+
+                UserListing.None ->
+                    ( { model | state = UserListing numod login }, Cmd.none )
+
+        ( UserEditMsg umsg, UserEdit umod login ) ->
+            let
+                ( numod, c ) =
+                    UserEdit.update umsg umod
+            in
+            case c of
+                UserEdit.Done ->
+                    initialPage model
+
+                UserEdit.None ->
+                    ( { model | state = UserEdit numod login }, Cmd.none )
+
         ( WkMsg rkey, Login ls ) ->
             case rkey of
                 Ok key ->
@@ -1611,7 +1659,7 @@ actualupdate msg model =
                         AI.Users users ->
                             case stateLogin model.state of
                                 Just login ->
-                                    ( { model | state = UserListing (UL.init users) login }, Cmd.none )
+                                    ( { model | state = UserListing (UserListing.init users) login }, Cmd.none )
 
                                 Nothing ->
                                     ( displayMessageDialog model "not logged in", Cmd.none )
