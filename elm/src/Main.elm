@@ -1385,7 +1385,9 @@ actualupdate msg model =
             in
             case c of
                 UserEdit.Done ->
-                    initialPage model
+                    ( model
+                    , sendAIMsg model.location AI.GetUsers
+                    )
 
                 UserEdit.None ->
                     ( { model | state = UserEdit numod login }, Cmd.none )
