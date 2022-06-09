@@ -51,6 +51,9 @@ fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -> Http
     None => serde_json::Value::Null,
   };
 
+  let adminsettings = serde_json::to_value(orgauth::data::admin_settings(&data.orgauth_config))
+    .unwrap_or(serde_json::Value::Null);
+
   let mut staticpath = data.static_path.clone().unwrap_or(PathBuf::from("static/"));
   staticpath.push("index.html");
   match staticpath.to_str() {
@@ -61,7 +64,8 @@ fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -> Http
           .content_type("text/html; charset=utf-8")
           .body(
             s.replace("{{logindata}}", logindata.to_string().as_str())
-              .replace("{{errorid}}", errorid.to_string().as_str()),
+              .replace("{{errorid}}", errorid.to_string().as_str())
+              .replace("{{adminsettings}}", adminsettings.to_string().as_str()),
           )
       }
       Err(e) => HttpResponse::from_error(actix_web::error::ErrorImATeapot(e)),
@@ -216,6 +220,7 @@ fn defcon() -> Config {
     login_token_expiration_ms: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
     email_token_expiration_ms: 1 * 24 * 60 * 60 * 1000, // 1 day in milliseconds
     reset_token_expiration_ms: 1 * 24 * 60 * 60 * 1000, // 1 day in milliseconds
+    open_registration: true,
   };
   Config {
     ip: "127.0.0.1".to_string(),

@@ -132,6 +132,7 @@ type alias Flags =
     , height : Int
     , errorid : Maybe Int
     , login : Maybe JD.Value
+    , adminsettings : Maybe JD.Value
     }
 
 
@@ -2476,6 +2477,15 @@ init flags url key zone fontsize =
     let
         seed =
             initialSeed (flags.seed + 7)
+
+        adminSettings =
+            flags.adminsettings
+                |> Maybe.andThen
+                    (\v ->
+                        JD.decodeValue OD.decodeAdminSettings v
+                            |> Result.toMaybe
+                    )
+                |> Maybe.withDefault { openRegistration = False }
 
         imodel =
             { state =

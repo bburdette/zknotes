@@ -12,3 +12,4 @@ admin_email = 'admin@admin.admin'
 login_token_expiration_ms = 604800000
 email_token_expiration_ms = 86400000
 reset_token_expiration_ms = 86400000
+open_registration = false
