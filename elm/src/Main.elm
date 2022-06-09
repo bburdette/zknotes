@@ -30,7 +30,6 @@ import Import
 import Json.Decode as JD
 import Json.Encode as JE
 import LocalStorage as LS
-import Login
 import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..))
 import Markdown.Html
 import Markdown.Parser
@@ -41,6 +40,7 @@ import Orgauth.AdminInterface as AI
 import Orgauth.ChangeEmail as CE
 import Orgauth.ChangePassword as CP
 import Orgauth.Data as OD
+import Orgauth.Login as Login
 import Orgauth.ResetPassword as ResetPassword
 import Orgauth.UserEdit as UserEdit
 import Orgauth.UserInterface as UI
@@ -142,6 +142,11 @@ type alias SavedRoute =
     }
 
 
+type alias StylePalette =
+    { defaultSpacing : Int
+    }
+
+
 type alias Model =
     { state : State
     , size : Util.Size
@@ -154,6 +159,8 @@ type alias Model =
     , recentNotes : List Data.ZkListNote
     , errorNotes : Dict String String
     , fontsize : Int
+    , stylePalette : StylePalette
+    , adminSettings : OD.AdminSettings
     }
 
 
@@ -171,6 +178,11 @@ type PiModel
     | PreInit PreInitModel
 
 
+initLoginState : Model -> State
+initLoginState model =
+    Login (Login.initialModel Nothing model.adminSettings "zknotes" model.seed)
+
+
 urlRequest : Browser.UrlRequest -> Msg
 urlRequest ur =
     case ur of
@@ -185,7 +197,7 @@ routeState : Model -> Route -> ( State, Cmd Msg )
 routeState model route =
     case route of
         LoginR ->
-            ( Login (Login.initialModel Nothing "zknotes" model.seed), Cmd.none )
+            ( initLoginState model, Cmd.none )
 
         PublicZkNote id ->
             case stateLogin model.state of
@@ -297,7 +309,7 @@ routeState model route =
 
                         Nothing ->
                             -- err 'you're not logged in.'
-                            ( (displayMessageDialog { model | state = initLogin model.seed } "can't create a new note; you're not logged in!").state, Cmd.none )
+                            ( (displayMessageDialog { model | state = initLoginState model } "can't create a new note; you're not logged in!").state, Cmd.none )
 
         ResetPasswordR username key ->
             ( ResetPassword <| ResetPassword.initialModel username key "zknotes", Cmd.none )
@@ -308,7 +320,7 @@ routeState model route =
                     ( UserSettings (UserSettings.init login model.fontsize) login model.state, Cmd.none )
 
                 Nothing ->
-                    ( (displayMessageDialog { model | state = initLogin model.seed } "can't view user settings; you're not logged in!").state, Cmd.none )
+                    ( (displayMessageDialog { model | state = initLoginState model } "can't view user settings; you're not logged in!").state, Cmd.none )
 
         Top ->
             if (stateRoute model.state).route == Top then
@@ -599,7 +611,7 @@ viewState : Util.Size -> State -> Model -> Element Msg
 viewState size state model =
     case state of
         Login lem ->
-            E.map LoginMsg <| Login.view size lem
+            E.map LoginMsg <| Login.view model.stylePalette size lem
 
         EditZkNote em _ ->
             E.map EditZkNoteMsg <| EditZkNote.view model.timezone size model.recentNotes em
@@ -1328,7 +1340,7 @@ actualupdate msg model =
                     ( { model | state = prevstate }, Cmd.none )
 
                 UserSettings.LogOut ->
-                    ( { model | state = Login (Login.initialModel Nothing "zknotes" model.seed) }
+                    ( { model | state = initLoginState model }
                     , sendUIMsg model.location UI.Logout
                     )
 
@@ -1416,12 +1428,12 @@ actualupdate msg model =
                         PI.ServerError e ->
                             case Dict.get e model.errorNotes of
                                 Just url ->
-                                    ( displayMessageNLinkDialog { model | state = initLogin model.seed } e url "more info"
+                                    ( displayMessageNLinkDialog { model | state = initLoginState model } e url "more info"
                                     , Cmd.none
                                     )
 
                                 Nothing ->
-                                    ( displayMessageDialog { model | state = initLogin model.seed } e, Cmd.none )
+                                    ( displayMessageDialog { model | state = initLoginState model } e, Cmd.none )
 
                         PI.ZkNote fbe ->
                             let
@@ -1575,8 +1587,7 @@ actualupdate msg model =
                             let
                                 nmod =
                                     { model
-                                        | state =
-                                            Login <| Login.initialModel Nothing "zknotes" model.seed
+                                        | state = initLoginState model
                                     }
                             in
                             ( displayMessageDialog nmod "password reset attempted!  if you're a valid user, check your inbox for a reset email."
@@ -1587,8 +1598,7 @@ actualupdate msg model =
                             let
                                 nmod =
                                     { model
-                                        | state =
-                                            Login <| Login.initialModel Nothing "zknotes" model.seed
+                                        | state = initLoginState model
                                     }
                             in
                             ( displayMessageDialog nmod "password reset complete!"
@@ -1631,7 +1641,7 @@ actualupdate msg model =
                                     ( { model | state = Login lmod }, Cmd.none )
 
                                 _ ->
-                                    ( { model | state = Login <| Login.initialModel Nothing "zknotes" model.seed }, Cmd.none )
+                                    ( { model | state = initLoginState model }, Cmd.none )
 
                         UI.InvalidUserOrPwd ->
                             case state of
@@ -1639,7 +1649,7 @@ actualupdate msg model =
                                     ( { model | state = Login <| Login.invalidUserOrPwd lmod }, Cmd.none )
 
                                 _ ->
-                                    ( unexpectedMessage { model | state = Login (Login.initialModel Nothing "zknotes" model.seed) }
+                                    ( unexpectedMessage { model | state = initLoginState model }
                                         (UI.showServerResponse uiresponse)
                                     , Cmd.none
                                     )
@@ -1657,7 +1667,7 @@ actualupdate msg model =
                                     ( { model | state = Login lmod }, Cmd.none )
 
                                 _ ->
-                                    ( { model | state = Login <| Login.initialModel Nothing "zknotes" model.seed }, Cmd.none )
+                                    ( { model | state = initLoginState model }, Cmd.none )
 
                         AI.Users users ->
                             case stateLogin model.state of
@@ -2459,7 +2469,7 @@ initialPage curmodel =
                     )
 
         Nothing ->
-            ( { curmodel | state = initLogin curmodel.seed }, Cmd.none )
+            ( { curmodel | state = initLoginState curmodel }, Cmd.none )
     )
         |> (\( m, c ) ->
                 ( m
@@ -2512,6 +2522,8 @@ init flags url key zone fontsize =
             , recentNotes = []
             , errorNotes = Dict.empty
             , fontsize = fontsize
+            , stylePalette = { defaultSpacing = 10 }
+            , adminSettings = adminSettings
             }
 
         geterrornote =
@@ -2570,11 +2582,6 @@ init flags url key zone fontsize =
                 ]
              )
             )
-
-
-initLogin : Seed -> State
-initLogin seed =
-    Login <| Login.initialModel Nothing "zknotes" seed
 
 
 main : Platform.Program Flags PiModel Msg
