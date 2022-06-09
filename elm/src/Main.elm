@@ -37,6 +37,7 @@ import Markdown.Parser
 import Markdown.Renderer
 import MdCommon as MC
 import MessageNLink
+import Orgauth.AdminInterface as AI
 import Orgauth.ChangeEmail as CE
 import Orgauth.ChangePassword as CP
 import Orgauth.Data as OD
@@ -75,6 +76,7 @@ type Msg
     | ImportMsg Import.Msg
     | ShowMessageMsg ShowMessage.Msg
     | UserReplyData (Result Http.Error UI.ServerResponse)
+    | AdminReplyData (Result Http.Error AI.ServerResponse)
     | ZkReplyData (Result Http.Error ZI.ServerResponse)
     | TAReplyData Data.TASelection (Result Http.Error ZI.ServerResponse)
     | PublicReplyData (Result Http.Error PI.ServerResponse)
@@ -412,6 +414,20 @@ showMessage msg =
         UserReplyData urd ->
             "UserReplyData: "
                 ++ (Result.map UI.showServerResponse urd
+                        |> Result.mapError Util.httpErrorString
+                        |> (\r ->
+                                case r of
+                                    Ok m ->
+                                        "message: " ++ m
+
+                                    Err e ->
+                                        "error: " ++ e
+                           )
+                   )
+
+        AdminReplyData urd ->
+            "AdminReplyData: "
+                ++ (Result.map AI.showServerResponse urd
                         |> Result.mapError Util.httpErrorString
                         |> (\r ->
                                 case r of
@@ -766,6 +782,24 @@ sendUIMsgExp location msg tomsg =
         { url = location ++ "/user"
         , body = Http.jsonBody (UI.encodeSendMsg msg)
         , expect = Http.expectJson tomsg UI.serverResponseDecoder
+        }
+
+
+sendAIMsg : String -> AI.SendMsg -> Cmd Msg
+sendAIMsg location msg =
+    let
+        _ =
+            Debug.log "sendaimsg" msg
+    in
+    sendAIMsgExp location msg AdminReplyData
+
+
+sendAIMsgExp : String -> AI.SendMsg -> (Result Http.Error AI.ServerResponse -> Msg) -> Cmd Msg
+sendAIMsgExp location msg tomsg =
+    Http.post
+        { url = location ++ "/admin"
+        , body = Http.jsonBody (AI.encodeSendMsg msg)
+        , expect = Http.expectJson tomsg AI.serverResponseDecoder
         }
 
 
@@ -1559,13 +1593,31 @@ actualupdate msg model =
                                     , Cmd.none
                                     )
 
-                        UI.Users users ->
+        ( AdminReplyData ard, state ) ->
+            case ard of
+                Err e ->
+                    ( displayMessageDialog model <| Util.httpErrorString e, Cmd.none )
+
+                Ok airesponse ->
+                    case airesponse of
+                        AI.NotLoggedIn ->
+                            case state of
+                                Login lmod ->
+                                    ( { model | state = Login lmod }, Cmd.none )
+
+                                _ ->
+                                    ( { model | state = Login <| Login.initialModel Nothing "zknotes" model.seed }, Cmd.none )
+
+                        AI.Users users ->
                             case stateLogin model.state of
                                 Just login ->
                                     ( { model | state = UserListing (UL.init users) login }, Cmd.none )
 
                                 Nothing ->
                                     ( displayMessageDialog model "not logged in", Cmd.none )
+
+                        AI.ServerError e ->
+                            ( displayMessageDialog model <| e, Cmd.none )
 
         ( ZkReplyData zrd, state ) ->
             case zrd of
@@ -2181,6 +2233,11 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
         EditZkNote.Settings ->
             ( { model | state = UserSettings (UserSettings.init login model.fontsize) login (EditZkNote emod login) }
             , Cmd.none
+            )
+
+        EditZkNote.Admin ->
+            ( model
+            , sendAIMsg model.location AI.GetUsers
             )
 
         EditZkNote.GetZkNote id ->
