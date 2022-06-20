@@ -971,11 +971,11 @@ zknview zone size recentZkns model =
                     E.row [ E.width E.fill ]
                         [ E.paragraph []
                             [ E.text "created: "
-                            , E.text (Util.showTime zone (Time.millisToPosix cd))
+                            , E.text (Util.showDateTime zone (Time.millisToPosix cd))
                             ]
                         , E.paragraph [ EF.alignRight ]
                             [ E.text "updated: "
-                            , E.text (Util.showTime zone (Time.millisToPosix chd))
+                            , E.text (Util.showDateTime zone (Time.millisToPosix chd))
                             ]
                         ]
 
