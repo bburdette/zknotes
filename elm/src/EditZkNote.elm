@@ -1441,14 +1441,15 @@ zknview zone size recentZkns model =
                 |> Maybe.map
                     (\id ->
                         if Just id == model.id then
-                            EI.button Common.disabledButtonStyle
-                                { onPress = Nothing
+                            E.link Common.disabledButtonStyle
+                                { url = Data.editNoteLink id
                                 , label = E.text "⌂"
                                 }
 
                         else
-                            EI.button perhapsdirtybutton
-                                { onPress = Just (SwitchPress id)
+                            E.link
+                                perhapsdirtybutton
+                                { url = Data.editNoteLink id
                                 , label = E.text "⌂"
                                 }
                     )

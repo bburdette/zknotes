@@ -67,6 +67,10 @@ myLinkStyle =
     [ EF.color TC.black, EF.underline ]
 
 
+disabledLinkStyle =
+    [ EF.color TC.darkGrey, EF.underline ]
+
+
 otherLinkStyle =
     [ EF.color TC.darkBlue, EF.underline ]
 
