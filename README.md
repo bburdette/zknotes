@@ -41,10 +41,11 @@ Final note - you're expected to register as a user in order to log in to the web
 
 currently orgauth is used here with submodules.  so you have to:
 
+```
 $ git submodule update
 $ cd orgauth
 $ git submodule update
-
+```
 yes, there is a submodule within a submodule.  hopefully this will change sooner than later.
 
 to install the dev tools needed, clone the zknotes repo locally.  then run `nix develop` in that directory.
