@@ -973,11 +973,11 @@ zknview zone size recentZkns model =
                     E.row [ E.width E.fill ]
                         [ E.paragraph []
                             [ E.text "created: "
-                            , E.text (Util.showTime zone (Time.millisToPosix cd))
+                            , E.text (Util.showDateTime zone (Time.millisToPosix cd))
                             ]
                         , E.paragraph [ EF.alignRight ]
                             [ E.text "updated: "
-                            , E.text (Util.showTime zone (Time.millisToPosix chd))
+                            , E.text (Util.showDateTime zone (Time.millisToPosix chd))
                             ]
                         ]
 
@@ -1443,14 +1443,15 @@ zknview zone size recentZkns model =
                 |> Maybe.map
                     (\id ->
                         if Just id == model.id then
-                            EI.button Common.disabledButtonStyle
-                                { onPress = Nothing
+                            E.link Common.disabledButtonStyle
+                                { url = Data.editNoteLink id
                                 , label = E.text "⌂"
                                 }
 
                         else
-                            EI.button perhapsdirtybutton
-                                { onPress = Just (SwitchPress id)
+                            E.link
+                                perhapsdirtybutton
+                                { url = Data.editNoteLink id
                                 , label = E.text "⌂"
                                 }
                     )

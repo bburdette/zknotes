@@ -7,9 +7,9 @@ edition = "2018"
 [dependencies]
 zkprotocol = { path = "../zkprotocol" }
 orgauth = { path = "../orgauth/rustlib/" }
-base64 = "0.2.1"
+base64 = "0.13.0"
 env_logger = "0.5.13"
-rusqlite = "0.23.0"
+rusqlite = "0.27.0"
 log = "0.4.0"
 actix-web = "3.3.2"
 # actix-rt = "0.2.5"

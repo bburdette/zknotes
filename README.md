@@ -40,7 +40,6 @@ Final note - you're expected to register as a user in order to log in to the web
 ### developing.
 
 currently orgauth is used here with submodules.  so you have to:
-
 ```
 $ git submodule update
 $ cd orgauth

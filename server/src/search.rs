@@ -59,7 +59,7 @@ pub fn search_zknotes(
 
   let sysid = user_id(&conn, "system")?;
 
-  let rec_iter = pstmt.query_map(args.as_slice(), |row| {
+  let rec_iter = pstmt.query_map(rusqlite::params_from_iter(args.iter()), |row| {
     let id = row.get(0)?;
     let sysids = get_sysids(conn, sysid, id)?;
     Ok(ZkListNote {
@@ -233,7 +233,7 @@ pub fn search_zknotes_simple(
 
   let sysid = user_id(&conn, "system")?;
 
-  let rec_iter = pstmt.query_map(args.as_slice(), |row| {
+  let rec_iter = pstmt.query_map(rusqlite::params_from_iter(args.iter()), |row| {
     let id = row.get(0)?;
     let sysids = get_sysids(conn, sysid, id)?;
     let access = match zknote_access_id(conn, Some(user), id) {
