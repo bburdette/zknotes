@@ -1825,10 +1825,6 @@ initLinkBackNote model title =
 onTASelection : Model -> Data.TASelection -> TACommand
 onTASelection model tas =
     if tas.what == "linkback" then
-        -- if tas.text == "" then
-        --     TAError "No text selected!  To make a linkback note, first highlight some text in the current note."
-        -- else
-        --
         case initLinkBackNote model tas.text of
             Ok nmodel ->
                 if tas.text == "" then
@@ -1890,10 +1886,6 @@ onTASelection model tas =
 
 onLinkBackSaved : Model -> Maybe Data.TASelection -> Data.SavedZkNote -> ( Model, Command )
 onLinkBackSaved model mbtas szn =
-    let
-        _ =
-            Debug.log "onLinkBackSaved model mbtas szn" ( mbtas, szn )
-    in
     case mbtas of
         Just tas ->
             if tas.text == "" then

@@ -1227,10 +1227,6 @@ actualupdate msg model =
                                     ( displayMessageDialog model e, Cmd.none )
 
                                 EditZkNote.TASave s ->
-                                    let
-                                        _ =
-                                            Debug.log "EditZkNote.TASave s ->" s
-                                    in
                                     ( model
                                     , sendZIMsgExp model.location
                                         (ZI.SaveZkNotePlusLinks s)
@@ -1383,9 +1379,6 @@ actualupdate msg model =
                                     in
                                     handleEditZkNoteCmd model login ( eznst, cmd )
 
-                                -- ( { model | state = EditZkNote eznst login }
-                                -- , sendZIMsg model.location <| ZI.SaveZkNotePlusLinks save
-                                -- )
                                 _ ->
                                     -- just ignore if we're not editing a new note.
                                     ( model, Cmd.none )
