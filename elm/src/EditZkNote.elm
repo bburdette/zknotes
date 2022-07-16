@@ -1874,36 +1874,46 @@ onTASelection model tas =
         TAError <| "invalid 'what' code: " ++ tas.what
 
 
-onLinkBackSaved : Model -> Data.TASelection -> Data.SavedZkNote -> ( Model, Data.SaveZkNotePlusLinks )
-onLinkBackSaved model tas szn =
-    let
-        linkback =
-            { otherid = szn.id
-            , direction = From
-            , user = model.ld.userid
-            , zknote = Nothing
-            , othername = Just tas.text
-            , sysids = []
-            , delete = Just False
-            }
 
-        nmod =
-            { model
-                | md =
-                    String.slice 0 tas.offset model.md
-                        ++ "["
-                        ++ tas.text
-                        ++ "]("
-                        ++ "/note/"
-                        ++ String.fromInt szn.id
-                        ++ ")"
-                        ++ String.dropLeft (tas.offset + String.length tas.text) model.md
-                , zklDict = Dict.insert (zklKey linkback) linkback model.zklDict
-            }
-    in
-    ( nmod
-    , fullSave nmod
-    )
+-- TODO: allow two outcomes from this ftn: save , or switch (or maybe saveandswitch?)
+
+
+onLinkBackSaved : Model -> Maybe Data.TASelection -> Data.SavedZkNote -> ( Model, Data.SaveZkNotePlusLinks )
+onLinkBackSaved model mbtas szn =
+    case mbtas of
+        Just tas ->
+            let
+                linkback =
+                    { otherid = szn.id
+                    , direction = From
+                    , user = model.ld.userid
+                    , zknote = Nothing
+                    , othername = Just tas.text
+                    , sysids = []
+                    , delete = Just False
+                    }
+
+                nmod =
+                    { model
+                        | md =
+                            String.slice 0 tas.offset model.md
+                                ++ "["
+                                ++ tas.text
+                                ++ "]("
+                                ++ "/note/"
+                                ++ String.fromInt szn.id
+                                ++ ")"
+                                ++ String.dropLeft (tas.offset + String.length tas.text) model.md
+                        , zklDict = Dict.insert (zklKey linkback) linkback model.zklDict
+                    }
+            in
+            ( nmod
+            , fullSave nmod
+            )
+
+        Nothing ->
+            -- probably save-and-switch here.
+            ( model, Noop )
 
 
 noteLink : String -> Maybe Int
