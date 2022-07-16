@@ -1673,7 +1673,7 @@ initNew ld zkl spm links =
                 |> MC.mdCells
                 |> Result.withDefault (CellDict Dict.empty)
 
-        initialZklDict =
+        zklDict =
             Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) links)
 
         ( cc, result ) =
@@ -1687,8 +1687,8 @@ initNew ld zkl spm links =
     , usernote = ld.zknote
     , zknSearchResult = zkl
     , focusSr = Nothing
-    , zklDict = initialZklDict
-    , initialZklDict = initialZklDict
+    , zklDict = zklDict
+    , initialZklDict = Dict.empty
     , focusLink = Nothing
     , pubidtxt = ""
     , title = ""
@@ -1806,7 +1806,7 @@ initLinkBackNote model title =
                          , direction = To
                          , user = model.ld.userid
                          , zknote = Nothing
-                         , othername = Nothing
+                         , othername = Just model.title
                          , sysids = []
                          , delete = Just False
                          }
