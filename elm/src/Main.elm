@@ -1227,6 +1227,10 @@ actualupdate msg model =
                                     ( displayMessageDialog model e, Cmd.none )
 
                                 EditZkNote.TASave s ->
+                                    let
+                                        _ =
+                                            Debug.log "EditZkNote.TASave s ->" s
+                                    in
                                     ( model
                                     , sendZIMsgExp model.location
                                         (ZI.SaveZkNotePlusLinks s)
@@ -1235,7 +1239,12 @@ actualupdate msg model =
 
                                 EditZkNote.TAUpdated nemod s ->
                                     ( { model | state = EditZkNote nemod login }
-                                    , setTASelection (Data.encodeSetSelection s)
+                                    , case s of
+                                        Just sel ->
+                                            setTASelection (Data.encodeSetSelection sel)
+
+                                        Nothing ->
+                                            Cmd.none
                                     )
 
                                 EditZkNote.TANoop ->
@@ -1366,16 +1375,17 @@ actualupdate msg model =
                             case state of
                                 EditZkNote emod login ->
                                     let
-                                        ( eznst, save ) =
+                                        ( eznst, cmd ) =
                                             EditZkNote.onLinkBackSaved
                                                 emod
-                                                tas
+                                                (Just tas)
                                                 szkn
                                     in
-                                    ( { model | state = EditZkNote eznst login }
-                                    , sendZIMsg model.location <| ZI.SaveZkNotePlusLinks save
-                                    )
+                                    handleEditZkNoteCmd model login ( eznst, cmd )
 
+                                -- ( { model | state = EditZkNote eznst login }
+                                -- , sendZIMsg model.location <| ZI.SaveZkNotePlusLinks save
+                                -- )
                                 _ ->
                                     -- just ignore if we're not editing a new note.
                                     ( model, Cmd.none )
@@ -2174,6 +2184,9 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
               }
             , Cmd.none
             )
+
+        EditZkNote.ShowMessage e ->
+            ( displayMessageDialog model e, Cmd.none )
 
         EditZkNote.Cmd cmd ->
             ( { model | state = EditZkNote emod login }
