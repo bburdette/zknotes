@@ -1927,8 +1927,6 @@ onLinkBackSaved model mbtas szn =
                 )
 
         Nothing ->
-            -- no need to save and switch - just switch to the new note.
-            -- if it gets saved the new link will be saved too.
             ( model, None )
 
 
