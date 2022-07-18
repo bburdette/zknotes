@@ -232,6 +232,7 @@ type Command
     | GetZkNote Int
     | SetHomeNote Int
     | AddToRecent Data.ZkListNote
+    | ShowMessage String
     | Cmd (Cmd Msg)
 
 
@@ -1681,7 +1682,7 @@ initNew ld zkl spm links =
                 |> MC.mdCells
                 |> Result.withDefault (CellDict Dict.empty)
 
-        initialZklDict =
+        zklDict =
             Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) links)
 
         ( cc, result ) =
@@ -1695,8 +1696,8 @@ initNew ld zkl spm links =
     , usernote = ld.zknote
     , zknSearchResult = zkl
     , focusSr = Nothing
-    , zklDict = initialZklDict
-    , initialZklDict = initialZklDict
+    , zklDict = zklDict
+    , initialZklDict = Dict.empty
     , focusLink = Nothing
     , pubidtxt = ""
     , title = ""
@@ -1797,50 +1798,57 @@ onSaved oldmodel szn =
 type TACommand
     = TASave Data.SaveZkNotePlusLinks
     | TAError String
-    | TAUpdated Model Data.SetSelection
+    | TAUpdated Model (Maybe Data.SetSelection)
     | TANoop
+
+
+initLinkBackNote : Model -> String -> Result String Model
+initLinkBackNote model title =
+    case model.id of
+        Just id ->
+            let
+                m1 =
+                    initNew model.ld
+                        model.zknSearchResult
+                        model.spmodel
+                        ({ otherid = id
+                         , direction = To
+                         , user = model.ld.userid
+                         , zknote = Nothing
+                         , othername = Just model.title
+                         , sysids = []
+                         , delete = Just False
+                         }
+                            :: shareLinks model
+                        )
+            in
+            Ok
+                { m1
+                    | title = title
+                }
+
+        Nothing ->
+            Err "new note!  save this note before creating a linkback note to it"
 
 
 onTASelection : Model -> Data.TASelection -> TACommand
 onTASelection model tas =
     if tas.what == "linkback" then
-        if tas.text == "" then
-            TAError "No text selected!  To make a linkback note, first highlight some text in the current note."
+        case initLinkBackNote model tas.text of
+            Ok nmodel ->
+                if tas.text == "" then
+                    if dirty model then
+                        -- save current note, then switch.
+                        TASave (fullSave model)
 
-        else
-            case model.id of
-                Just id ->
-                    let
-                        m1 =
-                            initNew model.ld
-                                model.zknSearchResult
-                                model.spmodel
-                                []
+                    else
+                        TAUpdated nmodel Nothing
 
-                        nzkls =
-                            { otherid = id
-                            , direction = To
-                            , user = model.ld.userid
-                            , zknote = Nothing
-                            , othername = Nothing
-                            , sysids = []
-                            , delete = Just False
-                            }
-                                :: shareLinks model
+                else
+                    TASave (fullSave nmodel)
 
-                        m2 =
-                            { m1
-                                | title = tas.text
-                                , zklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) nzkls)
-                            }
-
-                        save =
-                            fullSave m2
-                    in
-                    TASave save
-
-                Nothing ->
-                    TAError "new note!  save this note before creating a linkback note to it"
+            Err e ->
+                TAError e
 
     else if tas.what == "addlink" then
         case model.focusLink of
@@ -1871,10 +1879,12 @@ onTASelection model tas =
                                 ++ linktext
                                 ++ String.dropLeft (tas.offset + String.length tas.text) model.md
                     }
-                    { id = "mdtext"
-                    , offset = tas.offset + String.length linktext
-                    , length = 0
-                    }
+                    (Just
+                        { id = "mdtext"
+                        , offset = tas.offset + String.length linktext
+                        , length = 0
+                        }
+                    )
 
             Nothing ->
                 TANoop
@@ -1883,36 +1893,50 @@ onTASelection model tas =
         TAError <| "invalid 'what' code: " ++ tas.what
 
 
-onLinkBackSaved : Model -> Data.TASelection -> Data.SavedZkNote -> ( Model, Data.SaveZkNotePlusLinks )
-onLinkBackSaved model tas szn =
-    let
-        linkback =
-            { otherid = szn.id
-            , direction = From
-            , user = model.ld.userid
-            , zknote = Nothing
-            , othername = Just tas.text
-            , sysids = []
-            , delete = Just False
-            }
+onLinkBackSaved : Model -> Maybe Data.TASelection -> Data.SavedZkNote -> ( Model, Command )
+onLinkBackSaved model mbtas szn =
+    case mbtas of
+        Just tas ->
+            if tas.text == "" then
+                case initLinkBackNote model "" of
+                    Ok nm ->
+                        ( nm, None )
 
-        nmod =
-            { model
-                | md =
-                    String.slice 0 tas.offset model.md
-                        ++ "["
-                        ++ tas.text
-                        ++ "]("
-                        ++ "/note/"
-                        ++ String.fromInt szn.id
-                        ++ ")"
-                        ++ String.dropLeft (tas.offset + String.length tas.text) model.md
-                , zklDict = Dict.insert (zklKey linkback) linkback model.zklDict
-            }
-    in
-    ( nmod
-    , fullSave nmod
-    )
+                    Err e ->
+                        ( model, ShowMessage e )
+
+            else
+                let
+                    linkback =
+                        { otherid = szn.id
+                        , direction = From
+                        , user = model.ld.userid
+                        , zknote = Nothing
+                        , othername = Just tas.text
+                        , sysids = []
+                        , delete = Just False
+                        }
+
+                    nmod =
+                        { model
+                            | md =
+                                String.slice 0 tas.offset model.md
+                                    ++ "["
+                                    ++ tas.text
+                                    ++ "]("
+                                    ++ "/note/"
+                                    ++ String.fromInt szn.id
+                                    ++ ")"
+                                    ++ String.dropLeft (tas.offset + String.length tas.text) model.md
+                            , zklDict = Dict.insert (zklKey linkback) linkback model.zklDict
+                        }
+                in
+                ( nmod
+                , Save <| fullSave nmod
+                )
+
+        Nothing ->
+            ( model, None )
 
 
 noteLink : String -> Maybe Int
