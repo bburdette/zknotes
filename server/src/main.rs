@@ -198,8 +198,8 @@ fn zk_interface_check(
           info!("read_user_by_token error: {:?}", e);
 
           Ok(ServerResponse {
-            what: "invalid user or pwd".to_string(),
-            content: serde_json::Value::Null,
+            what: "login error".to_string(),
+            content: serde_json::to_value(format!("{:?}", e).as_str())?,
           })
         }
         Ok(userdata) => {

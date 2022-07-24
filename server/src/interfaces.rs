@@ -33,12 +33,18 @@ pub fn login_data_for_token(
         token,
         Some(config.orgauth_config.login_token_expiration_ms),
       ) {
-        Ok(user) => Ok(Some(orgauth::dbfun::login_data_cb(
-          &conn,
-          user.id,
-          &mut cb.extra_login_data,
-          // Box::new(sqldata::extra_login_data_callback),
-        )?)),
+        Ok(user) => {
+          if user.active {
+            Ok(Some(orgauth::dbfun::login_data_cb(
+              &conn,
+              user.id,
+              &mut cb.extra_login_data,
+              // Box::new(sqldata::extra_login_data_callback),
+            )?))
+          } else {
+            Ok(None)
+          }
+        }
         Err(_) => Ok(None),
       }
     }
