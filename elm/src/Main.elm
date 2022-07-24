@@ -1404,7 +1404,7 @@ actualupdate msg model =
 
                 UserEdit.Delete id ->
                     ( model
-                    , sendAIMsg model.location AI.GetUsers
+                    , sendAIMsg model.location <| AI.DeleteUser id
                     )
 
                 UserEdit.None ->

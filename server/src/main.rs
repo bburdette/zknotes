@@ -138,6 +138,7 @@ fn admin(
   let mut cb = Callbacks {
     on_new_user: Box::new(sqldata::on_new_user),
     extra_login_data: Box::new(sqldata::extra_login_data_callback),
+    on_delete_user: Box::new(sqldata::on_delete_user),
   };
   match orgauth::endpoints::admin_interface_check(
     &session,

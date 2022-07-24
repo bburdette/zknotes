@@ -73,6 +73,15 @@ pub fn extra_login_data_callback(
   Ok(Some(serde_json::to_value(extra_login_data(&conn, uid)?)?))
 }
 
+// ok to delete user?
+pub fn on_delete_user(conn: &Connection, uid: i64) -> Result<bool, Box<dyn Error>> {
+  // try deleting all their links and notes.
+  conn.execute("delete from zklink where user = ?1", params!(uid))?;
+  conn.execute("delete from zknote where user = ?1", params!(uid))?;
+  conn.execute("delete from user where id = ?1", params!(uid))?;
+  Ok(true)
+}
+
 pub fn extra_login_data(conn: &Connection, uid: i64) -> Result<ExtraLoginData, Box<dyn Error>> {
   let user = read_user_by_id(&conn, uid)?;
 

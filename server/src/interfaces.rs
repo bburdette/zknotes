@@ -23,6 +23,7 @@ pub fn login_data_for_token(
   let mut cb = Callbacks {
     on_new_user: Box::new(sqldata::on_new_user),
     extra_login_data: Box::new(sqldata::extra_login_data_callback),
+    on_delete_user: Box::new(sqldata::on_delete_user),
   };
   match session.get("token")? {
     None => Ok(None),
@@ -53,6 +54,7 @@ pub fn user_interface(
   let mut cb = Callbacks {
     on_new_user: Box::new(sqldata::on_new_user),
     extra_login_data: Box::new(sqldata::extra_login_data_callback),
+    on_delete_user: Box::new(sqldata::on_delete_user),
   };
   orgauth::endpoints::user_interface(&session, &config.orgauth_config, &mut cb, msg)
 }
