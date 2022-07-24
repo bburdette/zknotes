@@ -1407,6 +1407,11 @@ actualupdate msg model =
                     , sendAIMsg model.location <| AI.DeleteUser id
                     )
 
+                UserEdit.Save ld ->
+                    ( model
+                    , sendAIMsg model.location <| AI.UpdateUser ld
+                    )
+
                 UserEdit.None ->
                     ( { model | state = UserEdit numod login }, Cmd.none )
 
@@ -1686,6 +1691,16 @@ actualupdate msg model =
                             ( displayMessageDialog model "user deleted!"
                             , sendAIMsg model.location AI.GetUsers
                             )
+
+                        AI.UserUpdated ld ->
+                            case model.state of
+                                UserEdit ue login ->
+                                    ( displayMessageDialog { model | state = UserEdit (UserEdit.onUserUpdated ue ld) login } "user updated"
+                                    , Cmd.none
+                                    )
+
+                                _ ->
+                                    ( model, Cmd.none )
 
                         AI.ServerError e ->
                             ( displayMessageDialog model <| e, Cmd.none )
