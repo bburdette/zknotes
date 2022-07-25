@@ -497,12 +497,6 @@ checksum = "dc19a4937b4fbd3fe3379793130e42060d10627a360f2127802b10b87e7baf74"
 
 [[package]]
 name = "base64"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2015e3793554aa5b6007e3a72959e84c1070039e74f13dde08fa64afe1ddd892"
-
-[[package]]
-name = "base64"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "489d6c0ed21b11d038c31b6ceccca973e65d73ba3bd8ecb9a2babf5546164643"
@@ -1695,7 +1689,7 @@ dependencies = [
  "actix-session",
  "actix-web",
  "barrel",
- "base64 0.2.1",
+ "base64 0.13.0",
  "chrono",
  "clap",
  "crypto-hash",
