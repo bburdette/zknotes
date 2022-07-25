@@ -39,7 +39,6 @@ pub fn login_data_for_token(
               &conn,
               user.id,
               &mut cb.extra_login_data,
-              // Box::new(sqldata::extra_login_data_callback),
             )?))
           } else {
             Ok(None)
@@ -172,18 +171,6 @@ pub fn zk_interface_loggedin(
         content: serde_json::to_value(szkn)?,
       })
     }
-    // read_zklinks no longer returns ZkLinks, its EditLinks now.
-    // "getzklinks" => {
-    //   let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-    //   let gzl: GetZkLinks = serde_json::from_value(msgdata.clone())?;
-    //   let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-    //   let s = sqldata::read_zklinks(&conn, uid, &gzl)?;
-    //   let zklinks = ZkLinks { links: s };
-    //   Ok(ServerResponse {
-    //     what: "zklinks".to_string(),
-    //     content: serde_json::to_value(zklinks)?,
-    //   })
-    // }
     "saveimportzknotes" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let gzl: Vec<ImportZkNote> = serde_json::from_value(msgdata.clone())?;

@@ -216,7 +216,7 @@ fn defcon() -> Config {
     db: PathBuf::from("./zknotes.db"),
     mainsite: "http://localhost:8000".to_string(),
     appname: "zknotes".to_string(),
-    domain: "localhost:8000".to_string(),
+    emaildomain: "zknotes.com".to_string(),
     admin_email: "admin@admin.admin".to_string(),
     login_token_expiration_ms: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
     email_token_expiration_ms: 1 * 24 * 60 * 60 * 1000, // 1 day in milliseconds
