@@ -818,10 +818,6 @@ sendUIMsgExp location msg tomsg =
 
 sendAIMsg : String -> AI.SendMsg -> Cmd Msg
 sendAIMsg location msg =
-    let
-        _ =
-            Debug.log "sendaimsg" msg
-    in
     sendAIMsgExp location msg AdminReplyData
 
 
