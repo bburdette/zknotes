@@ -47,6 +47,7 @@
 
       login = {{logindata}};
       errorid = {{errorid}};
+      adminsettings = {{adminsettings}};
 
       app = Elm.Main.init({
         node: document.getElementById('elm'),
@@ -57,7 +58,8 @@
                  width : window.innerWidth, 
                  height : window.innerHeight,
                  errorid : errorid,
-                 login : login}});
+                 login : login,
+                 adminsettings : adminsettings}});
       // local storage
       app.ports.storeLocalVal.subscribe(storeVal);
       app.ports.getLocalVal.subscribe(getVal);

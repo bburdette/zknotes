@@ -20,6 +20,11 @@ pub fn login_data_for_token(
   config: &Config,
 ) -> Result<Option<orgauth::data::LoginData>, Box<dyn Error>> {
   let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+  let mut cb = Callbacks {
+    on_new_user: Box::new(sqldata::on_new_user),
+    extra_login_data: Box::new(sqldata::extra_login_data_callback),
+    on_delete_user: Box::new(sqldata::on_delete_user),
+  };
   match session.get("token")? {
     None => Ok(None),
     Some(token) => {
@@ -28,11 +33,17 @@ pub fn login_data_for_token(
         token,
         Some(config.orgauth_config.login_token_expiration_ms),
       ) {
-        Ok(user) => Ok(Some(orgauth::dbfun::login_data_cb(
-          &conn,
-          user.id,
-          Box::new(sqldata::extra_login_data_callback),
-        )?)),
+        Ok(user) => {
+          if user.active {
+            Ok(Some(orgauth::dbfun::login_data_cb(
+              &conn,
+              user.id,
+              &mut cb.extra_login_data,
+            )?))
+          } else {
+            Ok(None)
+          }
+        }
         Err(_) => Ok(None),
       }
     }
@@ -48,6 +59,7 @@ pub fn user_interface(
   let mut cb = Callbacks {
     on_new_user: Box::new(sqldata::on_new_user),
     extra_login_data: Box::new(sqldata::extra_login_data_callback),
+    on_delete_user: Box::new(sqldata::on_delete_user),
   };
   orgauth::endpoints::user_interface(&session, &config.orgauth_config, &mut cb, msg)
 }
@@ -159,18 +171,6 @@ pub fn zk_interface_loggedin(
         content: serde_json::to_value(szkn)?,
       })
     }
-    // read_zklinks no longer returns ZkLinks, its EditLinks now.
-    // "getzklinks" => {
-    //   let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-    //   let gzl: GetZkLinks = serde_json::from_value(msgdata.clone())?;
-    //   let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-    //   let s = sqldata::read_zklinks(&conn, uid, &gzl)?;
-    //   let zklinks = ZkLinks { links: s };
-    //   Ok(ServerResponse {
-    //     what: "zklinks".to_string(),
-    //     content: serde_json::to_value(zklinks)?,
-    //   })
-    // }
     "saveimportzknotes" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let gzl: Vec<ImportZkNote> = serde_json::from_value(msgdata.clone())?;

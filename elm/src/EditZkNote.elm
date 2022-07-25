@@ -130,6 +130,7 @@ type Msg
     | SetSearch (List S.TagSearch)
     | BigSearchPress
     | SettingsPress
+    | AdminPress
     | FlipLink EditLink
     | Noop
 
@@ -227,6 +228,7 @@ type Command
     | SearchHistory
     | BigSearch
     | Settings
+    | Admin
     | GetZkNote Int
     | SetHomeNote Int
     | AddToRecent Data.ZkListNote
@@ -1456,6 +1458,13 @@ zknview zone size recentZkns model =
                     )
                 |> Maybe.withDefault E.none
             , E.el [ EF.bold ] (E.text model.ld.name)
+            , if model.ld.admin then
+                EI.button
+                    (E.alignRight :: Common.buttonStyle)
+                    { onPress = Just AdminPress, label = E.text "admin" }
+
+              else
+                E.none
             , EI.button
                 (E.alignRight :: Common.buttonStyle)
                 { onPress = Just SettingsPress, label = E.text "settings" }
@@ -2583,6 +2592,9 @@ update msg model =
 
         SettingsPress ->
             ( model, Settings )
+
+        AdminPress ->
+            ( model, Admin )
 
         Noop ->
             ( model, None )

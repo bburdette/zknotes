@@ -73,6 +73,15 @@ pub fn extra_login_data_callback(
   Ok(Some(serde_json::to_value(extra_login_data(&conn, uid)?)?))
 }
 
+// ok to delete user?
+pub fn on_delete_user(conn: &Connection, uid: i64) -> Result<bool, Box<dyn Error>> {
+  // try deleting all their links and notes.
+  conn.execute("delete from zklink where user = ?1", params!(uid))?;
+  conn.execute("delete from zknote where user = ?1", params!(uid))?;
+  conn.execute("delete from user where id = ?1", params!(uid))?;
+  Ok(true)
+}
+
 pub fn extra_login_data(conn: &Connection, uid: i64) -> Result<ExtraLoginData, Box<dyn Error>> {
   let user = read_user_by_id(&conn, uid)?;
 
@@ -1146,6 +1155,11 @@ pub fn udpate13(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   Ok(())
 }
 
+pub fn udpate14(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+  orgauth::migrations::udpate2(dbfile)?;
+  Ok(())
+}
+
 pub fn get_single_value(conn: &Connection, name: &str) -> Result<Option<String>, Box<dyn Error>> {
   match conn.query_row(
     "select value from singlevalue where name = ?1",
@@ -1251,6 +1265,11 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: i64) -> Result<(), Box<dyn Err
     info!("udpate13");
     udpate13(&dbfile)?;
     set_single_value(&conn, "migration_level", "13")?;
+  }
+  if nlevel < 14 {
+    info!("udpate14");
+    udpate14(&dbfile)?;
+    set_single_value(&conn, "migration_level", "14")?;
   }
 
   info!("db up to date.");
