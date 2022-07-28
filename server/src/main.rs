@@ -1,5 +1,6 @@
 mod config;
 mod interfaces;
+mod migrations;
 mod search;
 mod sqldata;
 mod sqltest;
