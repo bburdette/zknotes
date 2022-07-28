@@ -44,6 +44,7 @@ import Orgauth.Login as Login
 import Orgauth.ResetPassword as ResetPassword
 import Orgauth.UserEdit as UserEdit
 import Orgauth.UserInterface as UI
+import Orgauth.UserInvite as UserInvite
 import Orgauth.UserListing as UserListing
 import PublicInterface as PI
 import Random exposing (Seed, initialSeed)
@@ -76,6 +77,7 @@ type Msg
     | UserSettingsMsg UserSettings.Msg
     | UserListingMsg UserListing.Msg
     | UserEditMsg UserEdit.Msg
+    | UserInviteMsg UserInvite.Msg
     | ImportMsg Import.Msg
     | ShowMessageMsg ShowMessage.Msg
     | UserReplyData (Result Http.Error UI.ServerResponse)
@@ -118,6 +120,7 @@ type State
     | ResetPassword ResetPassword.Model
     | UserListing UserListing.Model Data.LoginData
     | UserEdit UserEdit.Model Data.LoginData
+    | UserInvite UserInvite.Model Data.LoginData
     | DisplayMessage DisplayMessage.GDModel State
     | MessageNLink MessageNLink.GDModel State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
@@ -534,6 +537,9 @@ showMessage msg =
         UserEditMsg _ ->
             "UserEditMsg"
 
+        UserInviteMsg _ ->
+            "UserInviteMsg"
+
 
 showState : State -> String
 showState state =
@@ -594,6 +600,9 @@ showState state =
 
         UserEdit _ _ ->
             "UserEdit"
+
+        UserInvite _ _ ->
+            "UserInvite"
 
 
 unexpectedMsg : Model -> Msg -> Model
@@ -673,6 +682,9 @@ viewState size state model =
         UserEdit st login ->
             E.map UserEditMsg (UserEdit.view Common.buttonStyle st)
 
+        UserInvite st login ->
+            E.map UserInviteMsg (UserInvite.view Common.buttonStyle st)
+
 
 stateSearch : State -> Maybe ( SP.Model, Data.ZkListNoteSearchResult )
 stateSearch state =
@@ -740,6 +752,9 @@ stateSearch state =
         UserEdit _ _ ->
             Nothing
 
+        UserInvite _ _ ->
+            Nothing
+
 
 stateLogin : State -> Maybe Data.LoginData
 stateLogin state =
@@ -799,6 +814,9 @@ stateLogin state =
             Just login
 
         UserEdit _ login ->
+            Just login
+
+        UserInvite _ login ->
             Just login
 
 
@@ -1386,6 +1404,9 @@ actualupdate msg model =
                 UserListing.NewUser ->
                     ( { model | state = UserEdit UserEdit.initNew login }, Cmd.none )
 
+                UserListing.InviteUser ->
+                    ( { model | state = UserListing numod login }, sendAIMsg model.location AI.GetInvite )
+
                 UserListing.EditUser ld ->
                     ( { model | state = UserEdit (UserEdit.init ld) login }, Cmd.none )
 
@@ -1415,6 +1436,20 @@ actualupdate msg model =
 
                 UserEdit.None ->
                     ( { model | state = UserEdit numod login }, Cmd.none )
+
+        ( UserInviteMsg umsg, UserInvite umod login ) ->
+            let
+                ( numod, c ) =
+                    UserInvite.update umsg umod
+            in
+            case c of
+                UserInvite.Done ->
+                    ( model
+                    , sendAIMsg model.location AI.GetUsers
+                    )
+
+                UserInvite.None ->
+                    ( { model | state = UserInvite numod login }, Cmd.none )
 
         ( WkMsg rkey, Login ls ) ->
             case rkey of
@@ -1700,6 +1735,18 @@ actualupdate msg model =
 
                                 _ ->
                                     ( model, Cmd.none )
+
+                        AI.UserInvite ui ->
+                            case model.state of
+                                UserListing ul login ->
+                                    ( { model | state = UserInvite (UserInvite.init ui) login }
+                                    , Cmd.none
+                                    )
+
+                                _ ->
+                                    ( displayMessageDialog model "unexpected message: user invite"
+                                    , sendAIMsg model.location AI.GetUsers
+                                    )
 
                         AI.ServerError e ->
                             ( displayMessageDialog model <| e, Cmd.none )
