@@ -965,8 +965,21 @@ pub fn udpate7(dbfile: &Path) -> Result<(), Box<dyn Error>> {
 
 pub fn udpate8(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   let conn = Connection::open(dbfile)?;
-  let pubid = note_id(&conn, "system", "public")?;
-  let sysid = user_id(&conn, "system")?;
+  let pubid: i64 = conn.query_row(
+    "select zknote.id from
+      zknote, user
+      where zknote.title = ?2
+      and user.name = ?1
+      and zknote.user = user.id",
+    params!["system", "public"],
+    |row| Ok(row.get(0)?),
+  )?;
+  let sysid: i64 = conn.query_row(
+    "select id from user
+      where user.name = ?1",
+    params!["system"],
+    |row| Ok(row.get(0)?),
+  )?;
   let now = now()?;
 
   conn.execute(
