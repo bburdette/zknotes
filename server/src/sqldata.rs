@@ -158,8 +158,26 @@ pub fn initialdb() -> Migration {
   });
 
   m.create_table("zkmember", |t| {
-    t.add_column("user", types::foreign("user", "id").nullable(false));
-    t.add_column("zk", types::foreign("zk", "id").nullable(false));
+    t.add_column(
+      "user",
+      types::foreign(
+        "user",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "zk",
+      types::foreign(
+        "zk",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
   });
 
   m.create_table("zknote", |t| {
@@ -173,15 +191,51 @@ pub fn initialdb() -> Migration {
     t.add_column("title", types::text().nullable(false));
     t.add_column("content", types::text().nullable(false));
     t.add_column("public", types::boolean().nullable(false));
-    t.add_column("zk", types::foreign("zk", "id").nullable(false));
+    t.add_column(
+      "zk",
+      types::foreign(
+        "zk",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
     t.add_column("createdate", types::integer().nullable(false));
     t.add_column("changeddate", types::integer().nullable(false));
   });
 
   m.create_table("zklink", |t| {
-    t.add_column("zkleft", types::foreign("zknote", "id").nullable(false));
-    t.add_column("zkright", types::foreign("zknote", "id").nullable(false));
-    t.add_column("linkzk", types::foreign("zknote", "id").nullable(true));
+    t.add_column(
+      "zkleft",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "zkright",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "linkzk",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(true),
+    );
     t.add_index("unq", types::index(vec!["zkleft", "zkright"]).unique(true));
   });
 
@@ -196,10 +250,46 @@ pub fn udpate1() -> Migration {
   m.drop_table("zklink");
 
   m.create_table("zklink", |t| {
-    t.add_column("fromid", types::foreign("zknote", "id").nullable(false));
-    t.add_column("toid", types::foreign("zknote", "id").nullable(false));
-    t.add_column("zk", types::foreign("zknote", "id").nullable(true));
-    t.add_column("linkzknote", types::foreign("zknote", "id").nullable(true));
+    t.add_column(
+      "fromid",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "toid",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "zk",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(true),
+    );
+    t.add_column(
+      "linkzknote",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(true),
+    );
     t.add_index(
       "unq",
       types::index(vec!["fromid", "toid", "zk"]).unique(true),
@@ -223,10 +313,46 @@ pub fn udpate2() -> Migration {
   m.drop_table("zklink");
 
   m.create_table("zklink", |t| {
-    t.add_column("fromid", types::foreign("zknote", "id").nullable(false));
-    t.add_column("toid", types::foreign("zknote", "id").nullable(false));
-    t.add_column("zk", types::foreign("zk", "id").nullable(false));
-    t.add_column("linkzknote", types::foreign("zknote", "id").nullable(true));
+    t.add_column(
+      "fromid",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "toid",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "zk",
+      types::foreign(
+        "zk",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "linkzknote",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(true),
+    );
     t.add_index(
       "unq",
       types::index(vec!["fromid", "toid", "zk"]).unique(true),
@@ -254,7 +380,16 @@ pub fn udpate3(dbfile: &Path) -> Result<(), Box<dyn Error>> {
     t.add_column("content", types::text().nullable(false));
     t.add_column("public", types::boolean().nullable(false));
     t.add_column("pubid", types::text().nullable(true).unique(true));
-    t.add_column("zk", types::foreign("zk", "id").nullable(false));
+    t.add_column(
+      "zk",
+      types::foreign(
+        "zk",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
     t.add_column("createdate", types::integer().nullable(false));
     t.add_column("changeddate", types::integer().nullable(false));
   });
@@ -285,7 +420,16 @@ pub fn udpate3(dbfile: &Path) -> Result<(), Box<dyn Error>> {
     t.add_column("content", types::text().nullable(false));
     t.add_column("public", types::boolean().nullable(false));
     t.add_column("pubid", types::text().nullable(true).unique(true));
-    t.add_column("zk", types::foreign("zk", "id").nullable(false));
+    t.add_column(
+      "zk",
+      types::foreign(
+        "zk",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
     t.add_column("createdate", types::integer().nullable(false));
     t.add_column("changeddate", types::integer().nullable(false));
   });
@@ -326,15 +470,60 @@ pub fn udpate4(dbfile: &Path) -> Result<(), Box<dyn Error>> {
     t.add_column("content", types::text().nullable(false));
     // t.add_column("public", types::boolean().nullable(false));
     t.add_column("pubid", types::text().nullable(true).unique(true));
-    t.add_column("user", types::foreign("user", "id").nullable(false));
+    t.add_column(
+      "user",
+      types::foreign(
+        "user",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
     t.add_column("createdate", types::integer().nullable(false));
     t.add_column("changeddate", types::integer().nullable(false));
   });
   m1.create_table("zklinktemp", |t| {
-    t.add_column("fromid", types::foreign("zknote", "id").nullable(false));
-    t.add_column("toid", types::foreign("zknote", "id").nullable(false));
-    t.add_column("user", types::foreign("user", "id").nullable(false));
-    t.add_column("linkzknote", types::foreign("zknote", "id").nullable(true));
+    t.add_column(
+      "fromid",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "toid",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "user",
+      types::foreign(
+        "user",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "linkzknote",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(true),
+    );
     t.add_index(
       "unqtemp",
       types::index(vec!["fromid", "toid", "user"]).unique(true),
@@ -350,7 +539,16 @@ pub fn udpate4(dbfile: &Path) -> Result<(), Box<dyn Error>> {
     );
     t.add_column("name", types::text().nullable(false).unique(true));
     t.add_column("hashwd", types::text().nullable(false));
-    t.add_column("zknote", types::foreign("zknote", "id").nullable(true));
+    t.add_column(
+      "zknote",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(true),
+    );
     t.add_column("salt", types::text().nullable(false));
     t.add_column("email", types::text().nullable(false));
     t.add_column("registration_key", types::text().nullable(true));
@@ -404,7 +602,16 @@ pub fn udpate4(dbfile: &Path) -> Result<(), Box<dyn Error>> {
     );
     t.add_column("name", types::text().nullable(false).unique(true));
     t.add_column("hashwd", types::text().nullable(false));
-    t.add_column("zknote", types::foreign("zknote", "id").nullable(true));
+    t.add_column(
+      "zknote",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(true),
+    );
     t.add_column("salt", types::text().nullable(false));
     t.add_column("email", types::text().nullable(false));
     t.add_column("registration_key", types::text().nullable(true));
@@ -425,17 +632,62 @@ pub fn udpate4(dbfile: &Path) -> Result<(), Box<dyn Error>> {
     t.add_column("sysdata", types::text().nullable(true));
     // t.add_column("public", types::boolean().nullable(false));
     t.add_column("pubid", types::text().nullable(true).unique(true));
-    t.add_column("user", types::foreign("user", "id").nullable(false));
+    t.add_column(
+      "user",
+      types::foreign(
+        "user",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
     t.add_column("createdate", types::integer().nullable(false));
     t.add_column("changeddate", types::integer().nullable(false));
   });
 
   // new zklink with column 'user' instead of 'zk'.
   m2.create_table("zklink", |t| {
-    t.add_column("fromid", types::foreign("zknote", "id").nullable(false));
-    t.add_column("toid", types::foreign("zknote", "id").nullable(false));
-    t.add_column("user", types::foreign("user", "id").nullable(false));
-    t.add_column("linkzknote", types::foreign("zknote", "id").nullable(true));
+    t.add_column(
+      "fromid",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "toid",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "user",
+      types::foreign(
+        "user",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "linkzknote",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(true),
+    );
     t.add_index(
       "zklinkunq",
       types::index(vec!["fromid", "toid", "user"]).unique(true),
@@ -559,7 +811,16 @@ pub fn udpate5(dbfile: &Path) -> Result<(), Box<dyn Error>> {
     );
     t.add_column("name", types::text().nullable(false).unique(true));
     t.add_column("hashwd", types::text().nullable(false));
-    t.add_column("zknote", types::foreign("zknote", "id").nullable(true));
+    t.add_column(
+      "zknote",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(true),
+    );
     t.add_column("salt", types::text().nullable(false));
     t.add_column("email", types::text().nullable(false));
     t.add_column("registration_key", types::text().nullable(true));
@@ -589,7 +850,16 @@ pub fn udpate5(dbfile: &Path) -> Result<(), Box<dyn Error>> {
     );
     t.add_column("name", types::text().nullable(false).unique(true));
     t.add_column("hashwd", types::text().nullable(false));
-    t.add_column("zknote", types::foreign("zknote", "id").nullable(true));
+    t.add_column(
+      "zknote",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(true),
+    );
     t.add_column("salt", types::text().nullable(false));
     t.add_column("email", types::text().nullable(false));
     t.add_column("registration_key", types::text().nullable(true));
@@ -631,7 +901,16 @@ pub fn udpate6(dbfile: &Path) -> Result<(), Box<dyn Error>> {
     );
     t.add_column("name", types::text().nullable(false).unique(true));
     t.add_column("hashwd", types::text().nullable(false));
-    t.add_column("zknote", types::foreign("zknote", "id").nullable(true));
+    t.add_column(
+      "zknote",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(true),
+    );
     t.add_column("salt", types::text().nullable(false));
     t.add_column("email", types::text().nullable(false));
     t.add_column("registration_key", types::text().nullable(true));
@@ -661,7 +940,16 @@ pub fn udpate6(dbfile: &Path) -> Result<(), Box<dyn Error>> {
     );
     t.add_column("name", types::text().nullable(false).unique(true));
     t.add_column("hashwd", types::text().nullable(false));
-    t.add_column("zknote", types::foreign("zknote", "id").nullable(true));
+    t.add_column(
+      "zknote",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(true),
+    );
     t.add_column("salt", types::text().nullable(false));
     t.add_column("email", types::text().nullable(false));
     t.add_column("registration_key", types::text().nullable(true));
@@ -670,7 +958,16 @@ pub fn udpate6(dbfile: &Path) -> Result<(), Box<dyn Error>> {
 
   // add token table.  multiple tokens per user to support multiple browsers and/or devices.
   m2.create_table("token", |t| {
-    t.add_column("user", types::foreign("user", "id").nullable(false));
+    t.add_column(
+      "user",
+      types::foreign(
+        "user",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
     t.add_column("token", types::text().nullable(false));
     t.add_column("tokendate", types::integer().nullable(false));
     t.add_index("tokenunq", types::index(vec!["user", "token"]).unique(true));
@@ -711,7 +1008,16 @@ pub fn udpate7(dbfile: &Path) -> Result<(), Box<dyn Error>> {
     t.add_column("content", types::text().nullable(false));
     t.add_column("sysdata", types::text().nullable(true));
     t.add_column("pubid", types::text().nullable(true).unique(true));
-    t.add_column("user", types::foreign("user", "id").nullable(false));
+    t.add_column(
+      "user",
+      types::foreign(
+        "user",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
     t.add_column("createdate", types::integer().nullable(false));
     t.add_column("changeddate", types::integer().nullable(false));
   });
@@ -742,7 +1048,16 @@ pub fn udpate7(dbfile: &Path) -> Result<(), Box<dyn Error>> {
     t.add_column("content", types::text().nullable(false));
     t.add_column("sysdata", types::text().nullable(true));
     t.add_column("pubid", types::text().nullable(true).unique(true));
-    t.add_column("user", types::foreign("user", "id").nullable(false));
+    t.add_column(
+      "user",
+      types::foreign(
+        "user",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
     t.add_column("editable", types::boolean());
     t.add_column("createdate", types::integer().nullable(false));
     t.add_column("changeddate", types::integer().nullable(false));
@@ -797,7 +1112,16 @@ pub fn udpate9(dbfile: &Path) -> Result<(), Box<dyn Error>> {
 
   // add newemail table.  each request for a new email creates an entry.
   m1.create_table("newemail", |t| {
-    t.add_column("user", types::foreign("user", "id").nullable(false));
+    t.add_column(
+      "user",
+      types::foreign(
+        "user",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
     t.add_column("email", types::text().nullable(false));
     t.add_column("token", types::text().nullable(false));
     t.add_column("tokendate", types::integer().nullable(false));
@@ -827,7 +1151,16 @@ pub fn udpate10(dbfile: &Path) -> Result<(), Box<dyn Error>> {
     );
     t.add_column("name", types::text().nullable(false).unique(true));
     t.add_column("hashwd", types::text().nullable(false));
-    t.add_column("zknote", types::foreign("zknote", "id").nullable(true));
+    t.add_column(
+      "zknote",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(true),
+    );
     t.add_column("salt", types::text().nullable(false));
     t.add_column("email", types::text().nullable(false));
     t.add_column("registration_key", types::text().nullable(true));
@@ -857,8 +1190,26 @@ pub fn udpate10(dbfile: &Path) -> Result<(), Box<dyn Error>> {
     );
     t.add_column("name", types::text().nullable(false).unique(true));
     t.add_column("hashwd", types::text().nullable(false));
-    t.add_column("zknote", types::foreign("zknote", "id").nullable(true));
-    t.add_column("homenote", types::foreign("zknote", "id").nullable(true));
+    t.add_column(
+      "zknote",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(true),
+    );
+    t.add_column(
+      "homenote",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(true),
+    );
     t.add_column("salt", types::text().nullable(false));
     t.add_column("email", types::text().nullable(false));
     t.add_column("registration_key", types::text().nullable(true));
@@ -890,7 +1241,16 @@ pub fn udpate11(dbfile: &Path) -> Result<(), Box<dyn Error>> {
 
   // add newpassword table.  each request for a new password creates an entry.
   m1.create_table("newpassword", |t| {
-    t.add_column("user", types::foreign("user", "id").nullable(false));
+    t.add_column(
+      "user",
+      types::foreign(
+        "user",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
     t.add_column("token", types::text().nullable(false));
     t.add_column("tokendate", types::integer().nullable(false));
     t.add_index(
@@ -921,7 +1281,16 @@ pub fn udpate12(dbfile: &Path) -> Result<(), Box<dyn Error>> {
     t.add_column("content", types::text().nullable(false));
     t.add_column("sysdata", types::text().nullable(true));
     t.add_column("pubid", types::text().nullable(true).unique(true));
-    t.add_column("user", types::foreign("user", "id").nullable(false));
+    t.add_column(
+      "user",
+      types::foreign(
+        "user",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
     t.add_column("editable", types::boolean());
     t.add_column("createdate", types::integer().nullable(false));
     t.add_column("changeddate", types::integer().nullable(false));
@@ -953,7 +1322,16 @@ pub fn udpate12(dbfile: &Path) -> Result<(), Box<dyn Error>> {
     t.add_column("content", types::text().nullable(false));
     t.add_column("sysdata", types::text().nullable(true));
     t.add_column("pubid", types::text().nullable(true).unique(true));
-    t.add_column("user", types::foreign("user", "id").nullable(false));
+    t.add_column(
+      "user",
+      types::foreign(
+        "user",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
     t.add_column("editable", types::boolean());
     t.add_column("showtitle", types::boolean());
     t.add_column("createdate", types::integer().nullable(false));
@@ -1018,9 +1396,36 @@ pub fn udpate13(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   let mut m1 = Migration::new();
 
   m1.create_table("usertemp", |t| {
-    t.add_column("id", types::foreign("orgauth_user", "id").nullable(false));
-    t.add_column("zknote", types::foreign("zknote", "id").nullable(true));
-    t.add_column("homenote", types::foreign("zknote", "id").nullable(true));
+    t.add_column(
+      "id",
+      types::foreign(
+        "orgauth_user",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "zknote",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(true),
+    );
+    t.add_column(
+      "homenote",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(true),
+    );
   });
 
   conn.execute_batch(m1.make::<Sqlite>().as_str())?;
@@ -1037,9 +1442,36 @@ pub fn udpate13(dbfile: &Path) -> Result<(), Box<dyn Error>> {
 
   // new user table with homenote
   m2.create_table("user", |t| {
-    t.add_column("id", types::foreign("orgauth_user", "id").nullable(false));
-    t.add_column("zknote", types::foreign("zknote", "id").nullable(true));
-    t.add_column("homenote", types::foreign("zknote", "id").nullable(true));
+    t.add_column(
+      "id",
+      types::foreign(
+        "orgauth_user",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "zknote",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(true),
+    );
+    t.add_column(
+      "homenote",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(true),
+    );
   });
 
   conn.execute_batch(m2.make::<Sqlite>().as_str())?;
@@ -1160,6 +1592,11 @@ pub fn udpate14(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   Ok(())
 }
 
+pub fn udpate15(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+  orgauth::migrations::udpate3(dbfile)?;
+  Ok(())
+}
+
 pub fn get_single_value(conn: &Connection, name: &str) -> Result<Option<String>, Box<dyn Error>> {
   match conn.query_row(
     "select value from singlevalue where name = ?1",
@@ -1270,6 +1707,11 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: i64) -> Result<(), Box<dyn Err
     info!("udpate14");
     udpate14(&dbfile)?;
     set_single_value(&conn, "migration_level", "14")?;
+  }
+  if nlevel < 15 {
+    info!("udpate15");
+    udpate15(&dbfile)?;
+    set_single_value(&conn, "migration_level", "15")?;
   }
 
   info!("db up to date.");
