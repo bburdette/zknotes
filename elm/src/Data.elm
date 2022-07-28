@@ -55,7 +55,7 @@ decodeTASelection =
 fromOaLd : Orgauth.Data.LoginData -> Result JD.Error LoginData
 fromOaLd oald =
     JD.decodeValue
-        (JD.succeed (LoginData oald.userid oald.name oald.admin oald.active)
+        (JD.succeed (LoginData oald.userid oald.name oald.email oald.admin oald.active)
             |> andMap (JD.field "zknote" JD.int)
             |> andMap (JD.field "homenote" (JD.maybe JD.int))
             |> andMap (JD.field "publicid" JD.int)
@@ -69,6 +69,7 @@ fromOaLd oald =
 type alias LoginData =
     { userid : Int
     , name : String
+    , email : String
     , admin : Bool
     , active : Bool
     , zknote : Int
@@ -449,6 +450,7 @@ decodeLoginData =
     JD.succeed LoginData
         |> andMap (JD.field "userid" JD.int)
         |> andMap (JD.field "name" JD.string)
+        |> andMap (JD.field "email" JD.string)
         |> andMap (JD.field "admin" JD.bool)
         |> andMap (JD.field "active" JD.bool)
         |> andMap (JD.field "data" (JD.field "zknote" JD.int))
