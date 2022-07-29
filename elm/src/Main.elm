@@ -328,9 +328,9 @@ routeState model route =
                 Nothing ->
                     ( (displayMessageDialog { model | state = initLoginState model } "can't view user settings; you're not logged in!").state, Cmd.none )
 
-        Invite s ->
-            ( Invited (Invited.initialModel s model.adminSettings "zknotes")
-            , Cmd.none
+        Invite token ->
+            ( PubShowMessage { message = "retrieving invite" } Nothing
+            , sendUIMsg model.location (UI.GetInvite token)
             )
 
         Top ->
@@ -1490,6 +1490,19 @@ actualupdate msg model =
                 Err _ ->
                     ( model, Cmd.none )
 
+        ( WkMsg rkey, DisplayMessage dm state ) ->
+            case rkey of
+                Ok key ->
+                    case Toop.T4 key.key key.ctrl key.alt key.shift of
+                        Toop.T4 "Enter" False False False ->
+                            ( { model | state = state }, Cmd.none )
+
+                        _ ->
+                            ( model, Cmd.none )
+
+                Err _ ->
+                    ( model, Cmd.none )
+
         ( LoginMsg lm, Login ls ) ->
             handleLogin model (Login.update lm ls)
 
@@ -1730,6 +1743,11 @@ actualupdate msg model =
                                         (UI.showServerResponse uiresponse)
                                     , Cmd.none
                                     )
+
+                        UI.Invite invite ->
+                            ( { model | state = Invited (Invited.initialModel invite model.adminSettings "zknotes") }
+                            , Cmd.none
+                            )
 
         ( AdminReplyData ard, state ) ->
             case ard of
