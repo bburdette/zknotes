@@ -40,7 +40,7 @@ import Orgauth.AdminInterface as AI
 import Orgauth.ChangeEmail as CE
 import Orgauth.ChangePassword as CP
 import Orgauth.Data as OD
-import Orgauth.Invited as I
+import Orgauth.Invited as Invited
 import Orgauth.Login as Login
 import Orgauth.ResetPassword as ResetPassword
 import Orgauth.UserEdit as UserEdit
@@ -72,6 +72,7 @@ import ZkInterface as ZI
 
 type Msg
     = LoginMsg Login.Msg
+    | InvitedMsg Invited.Msg
     | ViewMsg View.Msg
     | EditZkNoteMsg EditZkNote.Msg
     | EditZkNoteListingMsg EditZkNoteListing.Msg
@@ -106,6 +107,7 @@ type Msg
 
 type State
     = Login Login.Model
+    | Invited Invited.Model
     | EditZkNote EditZkNote.Model Data.LoginData
     | EditZkNoteListing EditZkNoteListing.Model Data.LoginData
     | View View.Model
@@ -327,7 +329,9 @@ routeState model route =
                     ( (displayMessageDialog { model | state = initLoginState model } "can't view user settings; you're not logged in!").state, Cmd.none )
 
         Invite s ->
-            ( (displayMessageDialog { model | state = initLoginState model } "invite").state, Cmd.none )
+            ( Invited (Invited.initialModel s model.adminSettings "zknotes")
+            , Cmd.none
+            )
 
         Top ->
             if (stateRoute model.state).route == Top then
@@ -409,6 +413,9 @@ showMessage msg =
     case msg of
         LoginMsg _ ->
             "LoginMsg"
+
+        InvitedMsg _ ->
+            "InvitedMsg"
 
         DisplayMessageMsg _ ->
             "DisplayMessage"
@@ -551,6 +558,9 @@ showState state =
         Login _ ->
             "Login"
 
+        Invited _ ->
+            "Invited"
+
         EditZkNote _ _ ->
             "EditZkNote"
 
@@ -626,6 +636,9 @@ viewState size state model =
         Login lem ->
             E.map LoginMsg <| Login.view model.stylePalette size lem
 
+        Invited em ->
+            E.map InvitedMsg <| Invited.view model.stylePalette size em
+
         EditZkNote em _ ->
             E.map EditZkNoteMsg <| EditZkNote.view model.timezone size model.recentNotes em
 
@@ -696,6 +709,9 @@ stateSearch state =
         Login _ ->
             Nothing
 
+        Invited _ ->
+            Nothing
+
         EditZkNote emod _ ->
             Just ( emod.spmodel, emod.zknSearchResult )
 
@@ -764,6 +780,9 @@ stateLogin : State -> Maybe Data.LoginData
 stateLogin state =
     case state of
         Login _ ->
+            Nothing
+
+        Invited _ ->
             Nothing
 
         EditZkNote _ login ->
@@ -1466,6 +1485,9 @@ actualupdate msg model =
         ( LoginMsg lm, Login ls ) ->
             handleLogin model (Login.update lm ls)
 
+        ( InvitedMsg lm, Invited ls ) ->
+            handleInvited model (Invited.update lm ls)
+
         ( PublicReplyData prd, state ) ->
             case prd of
                 Err e ->
@@ -1619,9 +1641,8 @@ actualupdate msg model =
                                             ( m, cmd )
 
                                         _ ->
-                                            ( displayMessageDialog model "logged in"
-                                            , Cmd.none
-                                            )
+                                            -- we're logged in!
+                                            initialPage lgmod
 
                                 Err e ->
                                     ( displayMessageDialog model (JD.errorToString e)
@@ -2474,6 +2495,25 @@ handleLogin model ( lmod, lcmd ) =
                 UI.ResetPassword
                     { uid = lmod.userId
                     }
+            )
+
+
+handleInvited : Model -> ( Invited.Model, Invited.Cmd ) -> ( Model, Cmd Msg )
+handleInvited model ( lmod, lcmd ) =
+    case lcmd of
+        Invited.None ->
+            ( { model | state = Invited lmod }, Cmd.none )
+
+        Invited.RSVP ->
+            ( { model | state = Invited lmod }
+            , sendUIMsg model.location
+                (UI.RSVP
+                    { uid = lmod.userId
+                    , pwd = lmod.password
+                    , email = lmod.email
+                    , invite = lmod.invite
+                    }
+                )
             )
 
 
