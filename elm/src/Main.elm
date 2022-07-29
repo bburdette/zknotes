@@ -40,6 +40,7 @@ import Orgauth.AdminInterface as AI
 import Orgauth.ChangeEmail as CE
 import Orgauth.ChangePassword as CP
 import Orgauth.Data as OD
+import Orgauth.Invited as I
 import Orgauth.Login as Login
 import Orgauth.ResetPassword as ResetPassword
 import Orgauth.UserEdit as UserEdit
@@ -324,6 +325,9 @@ routeState model route =
 
                 Nothing ->
                     ( (displayMessageDialog { model | state = initLoginState model } "can't view user settings; you're not logged in!").state, Cmd.none )
+
+        Invite s ->
+            ( (displayMessageDialog { model | state = initLoginState model } "invite").state, Cmd.none )
 
         Top ->
             if (stateRoute model.state).route == Top then
