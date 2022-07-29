@@ -1482,6 +1482,14 @@ actualupdate msg model =
                 Err _ ->
                     ( model, Cmd.none )
 
+        ( WkMsg rkey, Invited ls ) ->
+            case rkey of
+                Ok key ->
+                    handleInvited model (Invited.onWkKeyPress key ls)
+
+                Err _ ->
+                    ( model, Cmd.none )
+
         ( LoginMsg lm, Login ls ) ->
             handleLogin model (Login.update lm ls)
 
