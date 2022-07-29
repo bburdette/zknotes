@@ -1,11 +1,9 @@
 use crate::migrations as zkm;
 use crate::util::now;
 use barrel::backend::Sqlite;
-use barrel::{types, Migration};
 use log::info;
 use orgauth::data::RegistrationData;
 use orgauth::dbfun::user_id;
-use orgauth::migrations;
 use rusqlite::{params, Connection};
 use serde_derive::{Deserialize, Serialize};
 use simple_error::bail;

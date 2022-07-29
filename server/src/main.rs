@@ -222,6 +222,7 @@ fn defcon() -> Config {
     login_token_expiration_ms: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
     email_token_expiration_ms: 1 * 24 * 60 * 60 * 1000, // 1 day in milliseconds
     reset_token_expiration_ms: 1 * 24 * 60 * 60 * 1000, // 1 day in milliseconds
+    invite_token_expiration_ms: 7 * 24 * 60 * 60 * 1000, // 7 day in milliseconds
     open_registration: true,
   };
   Config {
@@ -344,7 +345,7 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
 
           let _guard = timer.schedule_repeating(chrono::Duration::days(1), move || {
             match orgauth::dbfun::purge_tokens(&ptconfig.orgauth_config) {
-              Err(e) => error!("purge_login_tokens error: {}", e),
+              Err(e) => error!("purge_tokens error: {}", e),
               Ok(_) => (),
             }
           });
