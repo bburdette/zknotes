@@ -14,6 +14,7 @@ type Route
     | EditZkNoteNew
     | ResetPasswordR String UUID
     | SettingsR
+    | Invite String
     | Top
 
 
@@ -40,6 +41,9 @@ routeTitle route =
 
         SettingsR ->
             "user settings"
+
+        Invite _ ->
+            "user invite"
 
         Top ->
             "zknotes"
@@ -76,6 +80,10 @@ parseUrl url =
             , UP.map SettingsR <|
                 UP.s
                     "settings"
+            , UP.map Invite <|
+                UP.s
+                    "invite"
+                    </> UP.string
             , UP.map Top <| UP.top
             ]
         )
@@ -105,6 +113,9 @@ routeUrl route =
 
         SettingsR ->
             UB.absolute [ "settings" ] []
+
+        Invite s ->
+            UB.absolute [ "invite", s ] []
 
         Top ->
             UB.absolute [] []

@@ -12,4 +12,5 @@ admin_email = 'bburdette@protonmail.com'
 login_token_expiration_ms = 604800000
 email_token_expiration_ms = 86400000
 reset_token_expiration_ms = 86400000
+invite_token_expiration_ms = 604800000
 open_registration = true

@@ -29,7 +29,7 @@ simple-error = "0.2.1"
 json = "*"
 lettre = "0.9"
 lettre_email = "0.9"
-barrel = { version = "0.6.5", features = ["sqlite3"] }
+barrel = { version = "0.7.0", features = ["sqlite3"] }
 clap = "2.33.2"
 timer = "0.2.0"
 chrono = "0.4.15"
