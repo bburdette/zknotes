@@ -28,20 +28,3 @@ pub fn now() -> Result<i64, Box<dyn Error>> {
   let s: i64 = nowsecs.try_into()?;
   Ok(s * 1000)
 }
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[test]
-  fn test_expiration() {
-    match now() {
-      Ok(now) => {
-        assert_eq!(is_token_expired(100, now), false);
-        assert_eq!(is_token_expired(100, now - 200), true);
-        assert_eq!(is_token_expired(100, now + 200), true);
-      }
-      Err(_) => assert_eq!(2, 4),
-    }
-  }
-}

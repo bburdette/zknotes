@@ -1,18 +1,22 @@
 #[cfg(test)]
 mod tests {
+  use orgauth::data::RegistrationData;
   use zkprotocol::search::*;
   //   {
   //   AndOr, SearchMod, TagSearch, ZkListNoteSearchResult, ZkNoteSearch, ZkNoteSearchResult,
   // };
+  use crate::interfaces::*;
   use crate::search::*;
+  use crate::sqldata;
   use crate::sqldata::*;
   use either::Either;
+  use orgauth::dbfun::new_user;
   use std::error::Error;
   use std::fs;
   use std::path::Path;
   use zkprotocol::content::{
-    Direction, GetZkLinks, GetZkNoteEdit, ImportZkNote, LoginData, SaveZkLink, SaveZkNote,
-    SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
+    Direction, GetZkLinks, GetZkNoteEdit, ImportZkNote, SaveZkLink, SaveZkNote, SavedZkNote,
+    ZkLink, ZkNote, ZkNoteEdit,
   };
 
   // Note this useful idiom: importing names from outer (for mod tests) scope.
@@ -38,35 +42,47 @@ mod tests {
         println!("error removing test.db: {}", e);
       }
     }
+    let mut cb = zknotes_callbacks();
 
     dbinit(dbp, 1000000)?;
 
+    let conn = connection_open(dbp)?;
+
+    println!("1");
+
     let uid1 = new_user(
-      dbp,
-      "user1".to_string(),
-      "".to_string(),
-      "".to_string(),
-      "".to_string(),
-      "".to_string(),
+      &conn,
+      &RegistrationData {
+        uid: "user1".to_string(),
+        pwd: "".to_string(),
+        email: "".to_string(),
+      },
+      None,
+      &mut cb,
     )?;
     let uid2 = new_user(
-      dbp,
-      "user2".to_string(),
-      "".to_string(),
-      "".to_string(),
-      "".to_string(),
-      "".to_string(),
+      &conn,
+      &RegistrationData {
+        uid: "user2".to_string(),
+        pwd: "".to_string(),
+        email: "".to_string(),
+      },
+      None,
+      &mut cb,
     )?;
 
-    let conn = connection_open(dbp)?;
+    println!("2");
 
     let publicid = note_id(&conn, "system", "public")?;
     let shareid = note_id(&conn, "system", "share")?;
     let searchid = note_id(&conn, "system", "search")?;
 
-    let unid1 = user_note_id(&conn, uid1)?;
+    println!("2.5");
 
+    let unid1 = user_note_id(&conn, uid1)?;
     let unid2 = user_note_id(&conn, uid2)?;
+
+    println!("3");
 
     let szn1_1 = save_zknote(
       &conn,
@@ -97,6 +113,8 @@ mod tests {
 
     save_zklink(&conn, szn1_2_share.id, shareid, uid1, None)?;
 
+    println!("4");
+
     // user 1 note 3 - share
     let szn1_3_share = save_zknote(
       &conn,
@@ -113,8 +131,12 @@ mod tests {
 
     save_zklink(&conn, szn1_3_share.id, shareid, uid1, None)?;
 
+    println!("5");
+
     // user1 adds user 2 to user 1 share '2'.
     save_zklink(&conn, unid2, szn1_2_share.id, uid1, None)?;
+
+    println!("6");
 
     // user2 adds user 2 to user1 share '3'.  should fail
     match save_zklink(&conn, unid2, szn1_3_share.id, uid2, None) {
@@ -122,6 +144,8 @@ mod tests {
       // Ok(_) => (),
       Err(_) => (),
     };
+
+    println!("7");
 
     // user 1 note 4 - on share '2'.
     let szn1_4 = save_zknote(
@@ -137,6 +161,8 @@ mod tests {
       },
     )?;
     save_zklink(&conn, szn1_4.id, szn1_2_share.id, uid1, None)?;
+
+    println!("8");
 
     // user 1 note 5 - on share '3'.
     let szn1_5 = save_zknote(
@@ -168,6 +194,8 @@ mod tests {
     )?;
     save_zklink(&conn, szn1_6.id, unid2, uid1, None)?;
 
+    println!("9");
+
     // user 1 note 7 - shared w reversed user link
     let szn1_7 = save_zknote(
       &conn,
@@ -182,6 +210,8 @@ mod tests {
       },
     )?;
     save_zklink(&conn, unid2, szn1_7.id, uid1, None)?;
+
+    println!("10");
 
     // user 2 can save changes to note 4.
     save_zknote(

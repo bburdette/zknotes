@@ -50,18 +50,26 @@ pub fn login_data_for_token(
   }
 }
 
+pub fn zknotes_callbacks() -> Callbacks {
+  Callbacks {
+    on_new_user: Box::new(sqldata::on_new_user),
+    extra_login_data: Box::new(sqldata::extra_login_data_callback),
+    on_delete_user: Box::new(sqldata::on_delete_user),
+  }
+}
+
 // Just like orgauth::endpoints::user_interface, except adds in extra user data.
 pub fn user_interface(
   session: &Session,
   config: &Config,
   msg: orgauth::data::WhatMessage,
 ) -> Result<orgauth::data::WhatMessage, Box<dyn Error>> {
-  let mut cb = Callbacks {
-    on_new_user: Box::new(sqldata::on_new_user),
-    extra_login_data: Box::new(sqldata::extra_login_data_callback),
-    on_delete_user: Box::new(sqldata::on_delete_user),
-  };
-  orgauth::endpoints::user_interface(&session, &config.orgauth_config, &mut cb, msg)
+  orgauth::endpoints::user_interface(
+    &session,
+    &config.orgauth_config,
+    &mut zknotes_callbacks(),
+    msg,
+  )
 }
 
 pub fn zk_interface_loggedin(
