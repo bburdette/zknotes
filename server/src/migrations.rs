@@ -1491,3 +1491,8 @@ pub fn udpate15(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   orgauth::migrations::udpate3(dbfile)?;
   Ok(())
 }
+
+pub fn udpate16(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+  orgauth::migrations::udpate4(dbfile)?;
+  Ok(())
+}
