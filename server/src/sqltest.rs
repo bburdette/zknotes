@@ -1,26 +1,19 @@
 #[cfg(test)]
 mod tests {
-  use orgauth::data::RegistrationData;
-  use zkprotocol::search::*;
-  //   {
-  //   AndOr, SearchMod, TagSearch, ZkListNoteSearchResult, ZkNoteSearch, ZkNoteSearchResult,
-  // };
   use crate::interfaces::*;
   use crate::search::*;
-  use crate::sqldata;
   use crate::sqldata::*;
   use either::Either;
+  use orgauth::data::RegistrationData;
   use orgauth::dbfun::new_user;
   use std::error::Error;
   use std::fs;
   use std::path::Path;
-  use zkprotocol::content::{
-    Direction, GetZkLinks, GetZkNoteEdit, ImportZkNote, SaveZkLink, SaveZkNote, SavedZkNote,
-    ZkLink, ZkNote, ZkNoteEdit,
-  };
+  use zkprotocol::content::SaveZkNote;
+  use zkprotocol::search::*;
 
   // Note this useful idiom: importing names from outer (for mod tests) scope.
-  use super::*;
+  // use super::*;
 
   #[test]
   fn test_sharing() {
@@ -58,7 +51,7 @@ mod tests {
         email: "".to_string(),
       },
       None,
-      &mut cb,
+      &mut cb.on_new_user,
     )?;
     let uid2 = new_user(
       &conn,
@@ -68,23 +61,23 @@ mod tests {
         email: "".to_string(),
       },
       None,
-      &mut cb,
+      &mut cb.on_new_user,
     )?;
 
     println!("2");
 
     let publicid = note_id(&conn, "system", "public")?;
     let shareid = note_id(&conn, "system", "share")?;
-    let searchid = note_id(&conn, "system", "search")?;
+    let _searchid = note_id(&conn, "system", "search")?;
 
     println!("2.5");
 
-    let unid1 = user_note_id(&conn, uid1)?;
+    let _unid1 = user_note_id(&conn, uid1)?;
     let unid2 = user_note_id(&conn, uid2)?;
 
     println!("3");
 
-    let szn1_1 = save_zknote(
+    let _szn1_1 = save_zknote(
       &conn,
       uid1,
       &SaveZkNote {
@@ -140,7 +133,7 @@ mod tests {
 
     // user2 adds user 2 to user1 share '3'.  should fail
     match save_zklink(&conn, unid2, szn1_3_share.id, uid2, None) {
-      Ok(_) => assert_eq!(2, 4),
+      Ok(_) => panic!("test failed"),
       // Ok(_) => (),
       Err(_) => (),
     };
@@ -240,7 +233,7 @@ mod tests {
         editable: false,
       },
     ) {
-      Ok(_) => assert_eq!(2, 4),
+      Ok(_) => panic!("test failed"),
       Err(_e) => (),
     }
 
@@ -266,7 +259,7 @@ mod tests {
     };
 
     // TODO test that pubid read works, since that broke in 'production'
-    let pubzn1 = save_zknote(
+    let _pubzn1 = save_zknote(
       &conn,
       uid1,
       &SaveZkNote {
@@ -325,11 +318,11 @@ mod tests {
         if zklr.notes.len() == 1 {
           ()
         } else {
-          println!("lenth was: {}", zklr.notes.len());
-          assert_eq!(2, 4)
+          println!("length was: {}", zklr.notes.len());
+          panic!("test failed")
         }
       }
-      Either::Right(zknr) => assert_eq!(2, 4),
+      Either::Right(_zknr) => panic!("test failed"),
     }
 
     // u2 can see the note too.
@@ -338,11 +331,11 @@ mod tests {
         if zklr.notes.len() == 1 {
           ()
         } else {
-          println!("lenth was: {}", zklr.notes.len());
-          assert_eq!(2, 4)
+          println!("length was: {}", zklr.notes.len());
+          panic!("test failed")
         }
       }
-      Either::Right(zknr) => assert_eq!(2, 4),
+      Either::Right(_zknr) => panic!("test failed"),
     }
 
     let u1note1_search = ZkNoteSearch {
@@ -361,12 +354,12 @@ mod tests {
       Either::Left(zklr) => {
         if zklr.notes.len() > 0 {
           // not supposed to see it!
-          assert_eq!(2, 4)
+          panic!("test failed")
         } else {
           ()
         }
       }
-      Either::Right(zknr) => assert_eq!(2, 4),
+      Either::Right(_zknr) => panic!("test failed"),
     }
 
     // u1 can see their own private note..
@@ -376,10 +369,10 @@ mod tests {
           ()
         } else {
           // supposed to see it!
-          assert_eq!(2, 4)
+          panic!("test failed")
         }
       }
-      Either::Right(zknr) => assert_eq!(2, 4),
+      Either::Right(_zknr) => panic!("test failed"),
     }
 
     let u1note6_search = ZkNoteSearch {
@@ -400,10 +393,10 @@ mod tests {
           ()
         } else {
           // supposed to see it!
-          assert_eq!(2, 4)
+          panic!("test failed")
         }
       }
-      Either::Right(zknr) => assert_eq!(2, 4),
+      Either::Right(_zknr) => panic!("test failed"),
     }
 
     let u1note7_search = ZkNoteSearch {
@@ -423,10 +416,10 @@ mod tests {
         if zklr.notes.len() > 0 {
           ()
         } else {
-          assert_eq!(2, 4)
+          panic!("test failed")
         }
       }
-      Either::Right(zknr) => assert_eq!(2, 4),
+      Either::Right(_zknr) => panic!("test failed"),
     }
 
     // u2 can see a note on a share they're a member of.
@@ -447,10 +440,10 @@ mod tests {
           ()
         } else {
           // not supposed to see it!
-          assert_eq!(2, 4)
+          panic!("test failed")
         }
       }
-      Either::Right(zknr) => assert_eq!(2, 4),
+      Either::Right(_zknr) => panic!("test failed"),
     }
 
     // u2 can't see a note on a share they're not a member of.
@@ -469,12 +462,12 @@ mod tests {
       Either::Left(zklr) => {
         if zklr.notes.len() > 0 {
           // not supposed to see it!
-          assert_eq!(2, 4)
+          panic!("test failed")
         } else {
           ()
         }
       }
-      Either::Right(zknr) => assert_eq!(2, 4),
+      Either::Right(_zknr) => panic!("test failed"),
     }
 
     // TODO test search modifiers.
@@ -498,12 +491,12 @@ mod tests {
     match search_zknotes(&conn, uid1, &u1pubnote2_exact_search)? {
       Either::Left(zklr) => {
         if zklr.notes.len() == 1 {
-          assert_eq!(2, 4)
+          panic!("test failed")
         } else {
           ()
         }
       }
-      Either::Right(zknr) => assert_eq!(2, 4),
+      Either::Right(_zknr) => panic!("test failed"),
     }
 
     // should be 4 notes tagged with et'user' - 3 users and 1 'system'.
@@ -523,10 +516,10 @@ mod tests {
         if zklr.notes.len() == 4 {
           ()
         } else {
-          assert_eq!(2, 4)
+          panic!("test failed")
         }
       }
-      Either::Right(zknr) => assert_eq!(2, 4),
+      Either::Right(_zknr) => panic!("test failed"),
     }
 
     // should be 9 notes for 'user1'
@@ -546,10 +539,10 @@ mod tests {
         if zklr.notes.len() == 9 {
           ()
         } else {
-          assert_eq!(2, 4)
+          panic!("test failed")
         }
       }
-      Either::Right(zknr) => assert_eq!(2, 4),
+      Either::Right(_zknr) => panic!("test failed"),
     }
     // should be 1 notes for 'ote1-4'
     let u1pubnote2_exact_search = ZkNoteSearch {
@@ -568,10 +561,10 @@ mod tests {
         if zklr.notes.len() == 1 {
           ()
         } else {
-          assert_eq!(2, 4)
+          panic!("test failed")
         }
       }
-      Either::Right(zknr) => assert_eq!(2, 4),
+      Either::Right(_zknr) => panic!("test failed"),
     }
     //
     Ok(())
