@@ -1398,7 +1398,8 @@ actualupdate msg model =
                 UserSettings.ChangeEmail ->
                     ( { model
                         | state =
-                            ChangeEmailDialog (CE.init (OD.toLd login) Common.buttonStyle (UserSettings.view numod |> E.map (always ())))
+                            ChangeEmailDialog
+                                (CE.init (OD.toLd login) Common.buttonStyle (UserSettings.view numod |> E.map (always ())))
                                 (UserSettings numod login prevstate)
                       }
                     , Cmd.none
@@ -1428,7 +1429,9 @@ actualupdate msg model =
                     ( { model | state = UserEdit UserEdit.initNew login }, Cmd.none )
 
                 UserListing.InviteUser ->
-                    ( { model | state = UserListing numod login }, sendAIMsg model.location AI.GetInvite )
+                    ( { model | state = UserListing numod login }
+                    , sendAIMsg model.location (AI.GetInvite { email = Nothing, data = Nothing })
+                    )
 
                 UserListing.EditUser ld ->
                     ( { model | state = UserEdit (UserEdit.init ld) login }, Cmd.none )
