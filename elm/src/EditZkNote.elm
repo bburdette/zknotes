@@ -1,6 +1,5 @@
 module EditZkNote exposing
     ( Command(..)
-    , EditLink
     , Model
     , Msg(..)
     , NavChoice(..)
@@ -49,7 +48,6 @@ module EditZkNote exposing
     , updateSearchStack
     , view
     , zkLinkName
-    , zklKey
     , zknview
     )
 
@@ -57,7 +55,7 @@ import Browser.Dom as BD
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
 import Common
-import Data exposing (Direction(..))
+import Data exposing (Direction(..), EditLink, zklKey)
 import Dialog as D
 import Dict exposing (Dict)
 import Element as E exposing (Element)
@@ -150,17 +148,6 @@ type SearchOrRecent
 type EditOrView
     = EditView
     | ViewView
-
-
-type alias EditLink =
-    { otherid : Int
-    , direction : Direction
-    , user : Int
-    , zknote : Maybe Int
-    , othername : Maybe String
-    , sysids : List Int
-    , delete : Maybe Bool
-    }
 
 
 type WClass
@@ -284,21 +271,14 @@ elToSzl el =
     }
 
 
-elToDel : EditLink -> Maybe Data.EditLink
+elToDel : EditLink -> Maybe EditLink
 elToDel el =
     case el.delete of
         Just True ->
             Nothing
 
         _ ->
-            Just
-                { otherid = el.otherid
-                , direction = el.direction
-                , user = el.user
-                , zknote = el.zknote
-                , othername = el.othername
-                , sysids = el.sysids
-                }
+            Just el
 
 
 elToSzkl : Int -> EditLink -> Data.ZkLink
@@ -1555,19 +1535,6 @@ zknview zone size recentZkns model =
                             recentPanel
                     ]
         ]
-
-
-zklKey : { a | otherid : Int, direction : Direction } -> String
-zklKey zkl =
-    String.fromInt zkl.otherid
-        ++ ":"
-        ++ (case zkl.direction of
-                From ->
-                    "from"
-
-                To ->
-                    "to"
-           )
 
 
 linksWith : List EditLink -> Int -> Bool
