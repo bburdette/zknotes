@@ -1,4 +1,4 @@
-module InviteUser exposing (GDModel, Model, Msg(..), init, update, view)
+module InviteUser exposing (Model, Msg(..), init, update, view)
 
 import Common
 import Data exposing (Direction(..), zklKey)
@@ -10,7 +10,6 @@ import Element.Events as EE
 import Element.Font as EF
 import Element.Input as EI
 import Element.Region
-import GenDialog as GD
 import Orgauth.Data as OD
 import SearchPanel as SP
 import TangoColors as TC
@@ -67,26 +66,23 @@ type Msg
     | Noop
 
 
-type alias GDModel =
-    GD.Model Model Msg OD.GetInvite
+type Command
+    = None
+    | GetInvite OD.GetInvite
+    | Cancel
 
 
-init : SP.Model -> Data.ZkListNoteSearchResult -> List Data.ZkListNote -> List Data.EditLink -> Data.LoginData -> List (E.Attribute Msg) -> Element () -> GDModel
-init spmodel spresult recentZkns links loginData buttonStyle underLay =
-    { view = view buttonStyle recentZkns
-    , update = update
-    , model =
-        { loginData = loginData
-        , email = ""
-        , spmodel = spmodel
-        , zklDict =
-            Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) links)
-        , zknSearchResult = spresult
-        , searchOrRecent = SearchView
-        , focusSr = Nothing
-        , focusLink = Nothing
-        }
-    , underLay = underLay
+init : SP.Model -> Data.ZkListNoteSearchResult -> List Data.ZkListNote -> List Data.EditLink -> Data.LoginData -> List (E.Attribute Msg) -> Model
+init spmodel spresult recentZkns links loginData buttonStyle =
+    { loginData = loginData
+    , email = ""
+    , spmodel = spmodel
+    , zklDict =
+        Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) links)
+    , zknSearchResult = spresult
+    , searchOrRecent = SearchView
+    , focusSr = Nothing
+    , focusLink = Nothing
     }
 
 
@@ -451,53 +447,55 @@ view buttonStyle recentZkns mbsize model =
         ]
 
 
-update : Msg -> Model -> GD.Transition Model OD.GetInvite
+update : Msg -> Model -> ( Model, Command )
 update msg model =
     case msg of
         EmailChanged s ->
-            GD.Dialog { model | email = s }
+            ( { model | email = s }, None )
 
         CancelClick ->
-            GD.Cancel
+            ( model, Cancel )
 
         OkClick ->
-            GD.Ok
+            ( model
+            , GetInvite
                 { email = Just model.email
                 , data = Nothing
                 }
+            )
 
         Noop ->
-            GD.Dialog model
+            ( model, None )
 
         SearchHistoryPress ->
-            GD.Dialog model
+            ( model, None )
 
         AddToSearch zkListNote ->
-            GD.Dialog model
+            ( model, None )
 
         AddToSearchAsTag string ->
-            GD.Dialog model
+            ( model, None )
 
         ToLinkPress zkListNote ->
-            GD.Dialog model
+            ( model, None )
 
         FromLinkPress zkListNote ->
-            GD.Dialog model
+            ( model, None )
 
         SrFocusPress int ->
-            GD.Dialog model
+            ( model, None )
 
         LinkFocusPress editLink ->
-            GD.Dialog model
+            ( model, None )
 
         FlipLink editLink ->
-            GD.Dialog model
+            ( model, None )
 
         RemoveLink editLink ->
-            GD.Dialog model
+            ( model, None )
 
         SPMsg sPMsg ->
-            GD.Dialog model
+            ( model, None )
 
         NavChoiceChanged navChoice ->
-            GD.Dialog model
+            ( model, None )
