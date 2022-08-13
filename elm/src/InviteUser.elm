@@ -1,4 +1,4 @@
-module InviteUser exposing (Command(..), Model, Msg(..), NavChoice(..), SearchOrRecent(..), disabledLinkButtonStyle, init, linkButtonStyle, showSr, showZkl, update, view)
+module InviteUser exposing (Command(..), Model, Msg(..), NavChoice(..), SearchOrRecent(..), disabledLinkButtonStyle, handleSPUpdate, init, linkButtonStyle, showSr, showZkl, update, updateSearchResult, view)
 
 import Common
 import Data exposing (Direction(..), zklKey)
@@ -11,6 +11,7 @@ import Element.Font as EF
 import Element.Input as EI
 import Element.Region
 import Orgauth.Data as OD
+import Search as S
 import SearchStackPanel as SP
 import TangoColors as TC
 import Time exposing (Zone)
@@ -37,7 +38,7 @@ type SearchOrRecent
 
 
 type alias Model =
-    { loginData : Data.LoginData
+    { ld : Data.LoginData
     , email : String
     , spmodel : SP.Model
     , zklDict : Dict String Data.EditLink
@@ -69,12 +70,15 @@ type Msg
 type Command
     = None
     | GetInvite OD.GetInvite
+    | SearchHistory
+    | Search S.ZkNoteSearch
+    | AddToRecent Data.ZkListNote
     | Cancel
 
 
 init : SP.Model -> Data.ZkListNoteSearchResult -> List Data.ZkListNote -> List Data.EditLink -> Data.LoginData -> Model
 init spmodel spresult recentZkns links loginData =
-    { loginData = loginData
+    { ld = loginData
     , email = ""
     , spmodel = spmodel
     , zklDict =
@@ -90,10 +94,10 @@ showSr : Model -> Data.ZkListNote -> Element Msg
 showSr model zkln =
     let
         lnnonme =
-            zkln.user /= model.loginData.userid
+            zkln.user /= model.ld.userid
 
         sysColor =
-            ZC.systemColor model.loginData zkln.sysids
+            ZC.systemColor model.ld zkln.sysids
 
         controlrow =
             E.row [ E.spacing 8, E.width E.fill ]
@@ -291,6 +295,38 @@ showZkl focusLink ld id sysColor showflip zkl =
         E.row [ E.spacing 8, E.width E.fill, E.height <| E.px 30 ] display
 
 
+handleSPUpdate : Model -> ( SP.Model, SP.Command ) -> ( Model, Command )
+handleSPUpdate model ( nm, cmd ) =
+    let
+        mod =
+            { model | spmodel = nm }
+    in
+    case cmd of
+        SP.None ->
+            ( mod, None )
+
+        SP.Save ->
+            ( mod, None )
+
+        SP.Copy s ->
+            ( mod, None )
+
+        SP.Search ts ->
+            let
+                zsr =
+                    mod.zknSearchResult
+            in
+            ( { mod | zknSearchResult = { zsr | notes = [] } }, Search ts )
+
+
+updateSearchResult : Data.ZkListNoteSearchResult -> Model -> Model
+updateSearchResult zsr model =
+    { model
+        | zknSearchResult = zsr
+        , spmodel = SP.searchResultUpdated zsr model.spmodel
+    }
+
+
 view : ZC.StylePalette -> List Data.ZkListNote -> Maybe Util.Size -> Model -> Element Msg
 view stylePalette recentZkns mbsize model =
     let
@@ -307,7 +343,7 @@ view stylePalette recentZkns mbsize model =
                     (\( l, c ) ->
                         showZkl
                             model.focusLink
-                            model.loginData
+                            model.ld
                             Nothing
                             c
                             (Dict.get
@@ -332,7 +368,7 @@ view stylePalette recentZkns mbsize model =
                         |> List.map
                             (\l ->
                                 ( l
-                                , ZC.systemColor model.loginData l.sysids
+                                , ZC.systemColor model.ld l.sysids
                                 )
                             )
                         |> List.sortWith
@@ -431,7 +467,7 @@ view stylePalette recentZkns mbsize model =
           -- , E.height E.shrink
           E.spacing 10
         ]
-        [ E.column []
+        [ E.column [] <|
             [ EI.text []
                 { onChange = EmailChanged
                 , text = model.email
@@ -447,6 +483,7 @@ view stylePalette recentZkns mbsize model =
                     { onPress = Just CancelClick, label = E.text "Cancel" }
                 ]
             ]
+                ++ showLinks
         , searchOrRecentPanel
         ]
 
@@ -472,34 +509,135 @@ update msg model =
             ( model, None )
 
         SearchHistoryPress ->
-            ( model, None )
+            ( model, SearchHistory )
 
-        AddToSearch zkListNote ->
-            ( model, None )
+        AddToSearch zkln ->
+            let
+                spmod =
+                    model.spmodel
+            in
+            if List.any ((==) model.ld.searchid) zkln.sysids then
+                ( { model
+                    | spmodel = SP.setSearchString model.spmodel zkln.title
+                  }
+                , None
+                )
 
-        AddToSearchAsTag string ->
-            ( model, None )
+            else
+                ( { model
+                    | spmodel =
+                        SP.addToSearch model.spmodel
+                            [ S.ExactMatch ]
+                            zkln.title
+                  }
+                , None
+                )
 
-        ToLinkPress zkListNote ->
-            ( model, None )
+        AddToSearchAsTag title ->
+            let
+                spmod =
+                    model.spmodel
+            in
+            ( { model
+                | spmodel =
+                    SP.addToSearch model.spmodel
+                        [ S.ExactMatch, S.Tag ]
+                        title
+              }
+            , None
+            )
 
-        FromLinkPress zkListNote ->
-            ( model, None )
+        ToLinkPress zkln ->
+            let
+                nzkl =
+                    { direction = To
+                    , otherid = zkln.id
+                    , user = model.ld.userid
+                    , zknote = Nothing
+                    , othername = Just zkln.title
+                    , sysids = zkln.sysids
+                    , delete = Nothing
+                    }
+            in
+            ( { model
+                | zklDict = Dict.insert (zklKey nzkl) nzkl model.zklDict
+              }
+            , AddToRecent zkln
+            )
 
-        SrFocusPress int ->
-            ( model, None )
+        FromLinkPress zkln ->
+            let
+                nzkl =
+                    { direction = From
+                    , otherid = zkln.id
+                    , user = model.ld.userid
+                    , zknote = Nothing
+                    , othername = Just zkln.title
+                    , sysids = zkln.sysids
+                    , delete = Nothing
+                    }
+            in
+            ( { model
+                | zklDict = Dict.insert (zklKey nzkl) nzkl model.zklDict
+              }
+            , AddToRecent zkln
+            )
 
-        LinkFocusPress editLink ->
-            ( model, None )
+        SrFocusPress id ->
+            ( { model
+                | focusSr =
+                    if model.focusSr == Just id then
+                        Nothing
 
-        FlipLink editLink ->
-            ( model, None )
+                    else
+                        Just id
+              }
+            , None
+            )
 
-        RemoveLink editLink ->
-            ( model, None )
+        LinkFocusPress link ->
+            ( { model
+                | focusLink =
+                    if model.focusLink == Just link then
+                        Nothing
 
-        SPMsg sPMsg ->
-            ( model, None )
+                    else
+                        Just link
+              }
+            , None
+            )
+
+        FlipLink zkl ->
+            let
+                zklf =
+                    { zkl | direction = Data.flipDirection zkl.direction }
+            in
+            ( { model
+                | zklDict =
+                    model.zklDict
+                        |> Dict.remove (zklKey zkl)
+                        |> Dict.insert
+                            (zklKey zklf)
+                            zklf
+                , focusLink =
+                    if model.focusLink == Just zkl then
+                        Just zklf
+
+                    else
+                        model.focusLink
+              }
+            , None
+            )
+
+        RemoveLink zkln ->
+            ( { model
+                | zklDict = Dict.remove (zklKey zkln) model.zklDict
+              }
+            , None
+            )
+
+        SPMsg m ->
+            handleSPUpdate model (SP.update m model.spmodel)
 
         NavChoiceChanged navChoice ->
             ( model, None )

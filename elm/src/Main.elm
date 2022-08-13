@@ -1917,6 +1917,11 @@ actualupdate msg model =
                                     , Cmd.none
                                     )
 
+                                InviteUser iu login ->
+                                    ( { model | state = InviteUser (InviteUser.updateSearchResult sr iu) login }
+                                    , Cmd.none
+                                    )
+
                                 ShowMessage _ login _ ->
                                     ( { model | state = EditZkNoteListing { notes = sr, spmodel = SP.initModel, dialog = Nothing } login }
                                     , Cmd.none
@@ -2588,7 +2593,16 @@ handleInvited model ( lmod, lcmd ) =
 handleInviteUser : Model -> ( InviteUser.Model, InviteUser.Command ) -> Data.LoginData -> ( Model, Cmd Msg )
 handleInviteUser model ( lmod, lcmd ) login =
     case lcmd of
+        InviteUser.Search s ->
+            sendSearch { model | state = InviteUser lmod login } s
+
+        InviteUser.SearchHistory ->
+            ( { model | state = InviteUser lmod login }, Cmd.none )
+
         InviteUser.None ->
+            ( { model | state = InviteUser lmod login }, Cmd.none )
+
+        InviteUser.AddToRecent _ ->
             ( { model | state = InviteUser lmod login }, Cmd.none )
 
         InviteUser.GetInvite gi ->
