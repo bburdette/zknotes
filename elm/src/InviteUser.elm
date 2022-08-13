@@ -1,4 +1,4 @@
-module InviteUser exposing (Model, Msg(..), init, update, view)
+module InviteUser exposing (Command(..), Model, Msg(..), NavChoice(..), SearchOrRecent(..), disabledLinkButtonStyle, init, linkButtonStyle, showSr, showZkl, update, view)
 
 import Common
 import Data exposing (Direction(..), zklKey)
@@ -11,7 +11,7 @@ import Element.Font as EF
 import Element.Input as EI
 import Element.Region
 import Orgauth.Data as OD
-import SearchPanel as SP
+import SearchStackPanel as SP
 import TangoColors as TC
 import Time exposing (Zone)
 import Util
@@ -72,8 +72,8 @@ type Command
     | Cancel
 
 
-init : SP.Model -> Data.ZkListNoteSearchResult -> List Data.ZkListNote -> List Data.EditLink -> Data.LoginData -> List (E.Attribute Msg) -> Model
-init spmodel spresult recentZkns links loginData buttonStyle =
+init : SP.Model -> Data.ZkListNoteSearchResult -> List Data.ZkListNote -> List Data.EditLink -> Data.LoginData -> Model
+init spmodel spresult recentZkns links loginData =
     { loginData = loginData
     , email = ""
     , spmodel = spmodel
@@ -291,8 +291,8 @@ showZkl focusLink ld id sysColor showflip zkl =
         E.row [ E.spacing 8, E.width E.fill, E.height <| E.px 30 ] display
 
 
-view : List (E.Attribute Msg) -> List Data.ZkListNote -> Maybe Util.Size -> Model -> Element Msg
-view buttonStyle recentZkns mbsize model =
+view : ZC.StylePalette -> List Data.ZkListNote -> Maybe Util.Size -> Model -> Element Msg
+view stylePalette recentZkns mbsize model =
     let
         sppad =
             [ E.paddingXY 0 5 ]
@@ -425,25 +425,29 @@ view buttonStyle recentZkns mbsize model =
                        ]
                 )
     in
-    E.column
-        [ E.width (mbsize |> Maybe.map .width |> Maybe.withDefault 500 |> E.px)
-        , E.height E.shrink
-        , E.spacing 10
+    E.row
+        [ -- E.width (mbsize |> Maybe.map .width |> Maybe.withDefault 500 |> E.px)
+          -- , E.height E.fill
+          -- , E.height E.shrink
+          E.spacing 10
         ]
-        [ EI.text []
-            { onChange = EmailChanged
-            , text = model.email
-            , placeholder = Nothing
-            , label = EI.labelLeft [] (E.text "email")
-            }
-        , searchOrRecentPanel
-        , E.row [ E.width E.fill, E.spacing 10 ]
-            [ EI.button buttonStyle
-                { onPress = Just OkClick, label = E.text "Ok" }
-            , EI.button
-                buttonStyle
-                { onPress = Just CancelClick, label = E.text "Cancel" }
+        [ E.column []
+            [ EI.text []
+                { onChange = EmailChanged
+                , text = model.email
+                , placeholder = Nothing
+                , label = EI.labelLeft [] (E.text "email")
+                }
+            , E.row [ E.width E.fill, E.spacing 10 ]
+                [ EI.button
+                    Common.buttonStyle
+                    { onPress = Just OkClick, label = E.text "Ok" }
+                , EI.button
+                    Common.buttonStyle
+                    { onPress = Just CancelClick, label = E.text "Cancel" }
+                ]
             ]
+        , searchOrRecentPanel
         ]
 
 

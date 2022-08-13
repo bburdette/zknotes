@@ -10,6 +10,11 @@ import TangoColors as TC
 import Util as U
 
 
+type alias StylePalette =
+    { defaultSpacing : Int
+    }
+
+
 searchColor : E.Color
 searchColor =
     TC.darkRed
