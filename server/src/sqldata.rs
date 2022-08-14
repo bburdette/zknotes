@@ -61,6 +61,17 @@ pub fn on_new_user(
   save_zklink(&conn, zknid, usernoteid, systemid, None)?;
   save_zklink(&conn, zknid, publicnoteid, systemid, None)?;
 
+  // TODO: check for accessibility of links from invite creator.
+  // add extra links from 'data'
+  match &rd.data {
+    Some(data) => {
+      let extra_links: Vec<SaveZkLink> = serde_json::from_str(data.as_str())?;
+      println!("extra_links: {:?}", extra_links);
+      save_savezklinks(&conn, uid, zknid, extra_links)?;
+    }
+    None => (),
+  }
+
   Ok(())
 }
 
