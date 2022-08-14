@@ -81,6 +81,10 @@ type alias LoginData =
     }
 
 
+type alias ZkInviteData =
+    List SaveZkLink
+
+
 type alias ZkListNote =
     { id : Int
     , user : Int
@@ -178,6 +182,16 @@ zklKey zkl =
            )
 
 
+elToSzl : EditLink -> SaveZkLink
+elToSzl el =
+    { otherid = el.otherid
+    , direction = el.direction
+    , user = el.user
+    , zknote = el.zknote
+    , delete = el.delete
+    }
+
+
 type alias SaveZkLink =
     { otherid : Int
     , direction : Direction
@@ -236,6 +250,11 @@ type alias ZkNoteEdit =
 ----------------------------------------
 -- Json encoders/decoders
 ----------------------------------------
+
+
+encodeZkInviteData : ZkInviteData -> JE.Value
+encodeZkInviteData zid =
+    JE.list encodeSaveZkLink zid
 
 
 encodeGetZkLinks : GetZkLinks -> JE.Value

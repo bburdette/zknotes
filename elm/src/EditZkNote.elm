@@ -13,8 +13,6 @@ module EditZkNote exposing
     , copyTabs
     , dirty
     , disabledLinkButtonStyle
-    , elToSzkl
-    , elToSzl
     , fullSave
     , initFull
     , initNew
@@ -261,16 +259,6 @@ setHomeNote model id =
     { model | ld = { nld | homenote = Just id } }
 
 
-elToSzl : EditLink -> Data.SaveZkLink
-elToSzl el =
-    { otherid = el.otherid
-    , direction = el.direction
-    , user = el.user
-    , zknote = el.zknote
-    , delete = el.delete
-    }
-
-
 elToDel : EditLink -> Maybe EditLink
 elToDel el =
     case el.delete of
@@ -279,30 +267,6 @@ elToDel el =
 
         _ ->
             Just el
-
-
-elToSzkl : Int -> EditLink -> Data.ZkLink
-elToSzkl this el =
-    case el.direction of
-        From ->
-            { from = this
-            , to = el.otherid
-            , user = el.user
-            , zknote = Nothing
-            , fromname = Nothing
-            , toname = Nothing
-            , delete = Nothing
-            }
-
-        To ->
-            { from = el.otherid
-            , to = this
-            , user = el.user
-            , zknote = Nothing
-            , fromname = Nothing
-            , toname = Nothing
-            , delete = Nothing
-            }
 
 
 toZkListNote : Model -> Maybe Data.ZkListNote
@@ -362,10 +326,10 @@ saveZkLinkList : Model -> List Data.SaveZkLink
 saveZkLinkList model =
     List.map
         (\zkl -> { zkl | delete = Nothing })
-        (List.map elToSzl (Dict.values (Dict.diff model.zklDict model.initialZklDict)))
+        (List.map Data.elToSzl (Dict.values (Dict.diff model.zklDict model.initialZklDict)))
         ++ List.map
             (\zkl -> { zkl | delete = Just True })
-            (List.map elToSzl (Dict.values (Dict.diff model.initialZklDict model.zklDict)))
+            (List.map Data.elToSzl (Dict.values (Dict.diff model.initialZklDict model.zklDict)))
 
 
 commentsRecieved : List Data.ZkNote -> Model -> Model

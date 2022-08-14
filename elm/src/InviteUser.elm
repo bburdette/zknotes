@@ -10,6 +10,7 @@ import Element.Events as EE
 import Element.Font as EF
 import Element.Input as EI
 import Element.Region
+import Json.Encode as JE
 import Orgauth.Data as OD
 import Search as S
 import SearchStackPanel as SP
@@ -500,8 +501,16 @@ update msg model =
         OkClick ->
             ( model
             , GetInvite
-                { email = Just model.email
-                , data = Nothing
+                { email =
+                    if model.email /= "" then
+                        Just model.email
+
+                    else
+                        Nothing
+                , data =
+                    Data.encodeZkInviteData (List.map Data.elToSzl (Dict.values model.zklDict))
+                        |> JE.encode 2
+                        |> Just
                 }
             )
 

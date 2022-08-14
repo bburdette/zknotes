@@ -1830,15 +1830,19 @@ actualupdate msg model =
                                     ( model, Cmd.none )
 
                         AI.UserInvite ui ->
-                            case model.state of
-                                UserListing ul login s ->
+                            let
+                                _ =
+                                    Debug.log "user invite: " ui
+                            in
+                            case stateLogin model.state of
+                                Just login ->
                                     ( { model | state = UserInvite (UserInvite.init ui) login }
                                     , Cmd.none
                                     )
 
-                                _ ->
-                                    ( displayMessageDialog model "unexpected message: user invite"
-                                    , sendAIMsg model.location AI.GetUsers
+                                Nothing ->
+                                    ( displayMessageDialog model "not logged in!"
+                                    , Cmd.none
                                     )
 
                         AI.ServerError e ->
