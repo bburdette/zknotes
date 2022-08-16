@@ -25,6 +25,8 @@ pub struct User {
 pub fn on_new_user(
   conn: &Connection,
   rd: &RegistrationData,
+  data: Option<String>,
+  creator: Option<i64>,
   uid: i64,
 ) -> Result<(), Box<dyn Error>> {
   let usernoteid = note_id(&conn, "system", "user")?;
@@ -49,7 +51,7 @@ pub fn on_new_user(
     params![uid, zknid],
   )?;
 
-  let uid = conn.last_insert_rowid();
+  let nuid = conn.last_insert_rowid();
 
   conn.execute(
     "update zknote set sysdata = ?1
@@ -63,13 +65,13 @@ pub fn on_new_user(
 
   // TODO: check for accessibility of links from invite creator.
   // add extra links from 'data'
-  match &rd.data {
-    Some(data) => {
+  match (&data, creator) {
+    (Some(data), Some(creator)) => {
       let extra_links: Vec<SaveZkLink> = serde_json::from_str(data.as_str())?;
       println!("extra_links: {:?}", extra_links);
-      save_savezklinks(&conn, uid, zknid, extra_links)?;
+      save_savezklinks(&conn, creator, zknid, extra_links)?;
     }
-    None => (),
+    _ => (),
   }
 
   Ok(())
