@@ -81,6 +81,10 @@ type alias LoginData =
     }
 
 
+type alias ZkInviteData =
+    List SaveZkLink
+
+
 type alias ZkListNote =
     { id : Int
     , user : Int
@@ -161,6 +165,30 @@ type alias EditLink =
     , zknote : Maybe Int
     , othername : Maybe String
     , sysids : List Int
+    , delete : Maybe Bool
+    }
+
+
+zklKey : { a | otherid : Int, direction : Direction } -> String
+zklKey zkl =
+    String.fromInt zkl.otherid
+        ++ ":"
+        ++ (case zkl.direction of
+                From ->
+                    "from"
+
+                To ->
+                    "to"
+           )
+
+
+elToSzl : EditLink -> SaveZkLink
+elToSzl el =
+    { otherid = el.otherid
+    , direction = el.direction
+    , user = el.user
+    , zknote = el.zknote
+    , delete = el.delete
     }
 
 
@@ -222,6 +250,11 @@ type alias ZkNoteEdit =
 ----------------------------------------
 -- Json encoders/decoders
 ----------------------------------------
+
+
+encodeZkInviteData : ZkInviteData -> JE.Value
+encodeZkInviteData zid =
+    JE.list encodeSaveZkLink zid
 
 
 encodeGetZkLinks : GetZkLinks -> JE.Value
@@ -341,7 +374,7 @@ decodeZkLink =
 
 decodeEditLink : JD.Decoder EditLink
 decodeEditLink =
-    JD.map6 EditLink
+    JD.map6 (\a b c d e f -> EditLink a b c d e f Nothing)
         (JD.field "otherid" JD.int)
         (JD.field "direction" decodeDirection)
         (JD.field "user" JD.int)

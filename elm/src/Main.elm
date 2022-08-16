@@ -27,6 +27,7 @@ import Html.Events as HE
 import Http
 import Http.Tasks as HT
 import Import
+import InviteUser
 import Json.Decode as JD
 import Json.Encode as JE
 import LocalStorage as LS
@@ -67,12 +68,14 @@ import UserSettings
 import Util
 import View
 import WindowKeys
+import ZkCommon exposing (StylePalette)
 import ZkInterface as ZI
 
 
 type Msg
     = LoginMsg Login.Msg
     | InvitedMsg Invited.Msg
+    | InviteUserMsg InviteUser.Msg
     | ViewMsg View.Msg
     | EditZkNoteMsg EditZkNote.Msg
     | EditZkNoteListingMsg EditZkNoteListing.Msg
@@ -108,6 +111,7 @@ type Msg
 type State
     = Login Login.Model
     | Invited Invited.Model
+    | InviteUser InviteUser.Model Data.LoginData
     | EditZkNote EditZkNote.Model Data.LoginData
     | EditZkNoteListing EditZkNoteListing.Model Data.LoginData
     | View View.Model
@@ -121,7 +125,7 @@ type State
     | ChangePasswordDialog CP.GDModel State
     | ChangeEmailDialog CE.GDModel State
     | ResetPassword ResetPassword.Model
-    | UserListing UserListing.Model Data.LoginData
+    | UserListing UserListing.Model Data.LoginData (Maybe ( SP.Model, Data.ZkListNoteSearchResult ))
     | UserEdit UserEdit.Model Data.LoginData
     | UserInvite UserInvite.Model Data.LoginData
     | DisplayMessage DisplayMessage.GDModel State
@@ -145,11 +149,6 @@ type alias Flags =
 type alias SavedRoute =
     { route : Route
     , save : Bool
-    }
-
-
-type alias StylePalette =
-    { defaultSpacing : Int
     }
 
 
@@ -330,7 +329,7 @@ routeState model route =
 
         Invite token ->
             ( PubShowMessage { message = "retrieving invite" } Nothing
-            , sendUIMsg model.location (UI.GetInvite token)
+            , sendUIMsg model.location (UI.ReadInvite token)
             )
 
         Top ->
@@ -416,6 +415,9 @@ showMessage msg =
 
         InvitedMsg _ ->
             "InvitedMsg"
+
+        InviteUserMsg _ ->
+            "InviteUserMsg"
 
         DisplayMessageMsg _ ->
             "DisplayMessage"
@@ -561,6 +563,9 @@ showState state =
         Invited _ ->
             "Invited"
 
+        InviteUser _ _ ->
+            "InviteUser"
+
         EditZkNote _ _ ->
             "EditZkNote"
 
@@ -609,7 +614,7 @@ showState state =
         ResetPassword _ ->
             "ResetPassword"
 
-        UserListing _ _ ->
+        UserListing _ _ _ ->
             "UserListing"
 
         UserEdit _ _ ->
@@ -638,6 +643,9 @@ viewState size state model =
 
         Invited em ->
             E.map InvitedMsg <| Invited.view model.stylePalette size em
+
+        InviteUser em login ->
+            E.map InviteUserMsg <| InviteUser.view model.stylePalette model.recentNotes (Just size) em
 
         EditZkNote em _ ->
             E.map EditZkNoteMsg <| EditZkNote.view model.timezone size model.recentNotes em
@@ -693,7 +701,7 @@ viewState size state model =
         ResetPassword st ->
             E.map ResetPasswordMsg (ResetPassword.view size st)
 
-        UserListing st login ->
+        UserListing st login _ ->
             E.map UserListingMsg (UserListing.view Common.buttonStyle st)
 
         UserEdit st login ->
@@ -711,6 +719,9 @@ stateSearch state =
 
         Invited _ ->
             Nothing
+
+        InviteUser model _ ->
+            Just ( model.spmodel, model.zknSearchResult )
 
         EditZkNote emod _ ->
             Just ( emod.spmodel, emod.zknSearchResult )
@@ -766,8 +777,8 @@ stateSearch state =
         Wait st _ ->
             stateSearch st
 
-        UserListing _ _ ->
-            Nothing
+        UserListing _ _ s ->
+            s
 
         UserEdit _ _ ->
             Nothing
@@ -784,6 +795,9 @@ stateLogin state =
 
         Invited _ ->
             Nothing
+
+        InviteUser _ login ->
+            Just login
 
         EditZkNote _ login ->
             Just login
@@ -833,7 +847,7 @@ stateLogin state =
         ResetPassword _ ->
             Nothing
 
-        UserListing _ login ->
+        UserListing _ login _ ->
             Just login
 
         UserEdit _ login ->
@@ -1398,7 +1412,8 @@ actualupdate msg model =
                 UserSettings.ChangeEmail ->
                     ( { model
                         | state =
-                            ChangeEmailDialog (CE.init (OD.toLd login) Common.buttonStyle (UserSettings.view numod |> E.map (always ())))
+                            ChangeEmailDialog
+                                (CE.init (OD.toLd login) Common.buttonStyle (UserSettings.view numod |> E.map (always ())))
                                 (UserSettings numod login prevstate)
                       }
                     , Cmd.none
@@ -1415,7 +1430,7 @@ actualupdate msg model =
                 UserSettings.None ->
                     ( { model | state = UserSettings numod login prevstate }, Cmd.none )
 
-        ( UserListingMsg umsg, UserListing umod login ) ->
+        ( UserListingMsg umsg, UserListing umod login s ) ->
             let
                 ( numod, c ) =
                     UserListing.update umsg umod
@@ -1425,16 +1440,36 @@ actualupdate msg model =
                     initialPage model
 
                 UserListing.NewUser ->
-                    ( { model | state = UserEdit UserEdit.initNew login }, Cmd.none )
+                    let
+                        ( sp, sr ) =
+                            s
+                                |> Maybe.withDefault
+                                    ( SP.initModel
+                                    , { notes = []
+                                      , offset = 0
+                                      , what = ""
+                                      }
+                                    )
+                    in
+                    ( { model
+                        | state =
+                            InviteUser
+                                (InviteUser.init sp sr model.recentNotes [] login)
+                                login
+                      }
+                    , Cmd.none
+                    )
 
                 UserListing.InviteUser ->
-                    ( { model | state = UserListing numod login }, sendAIMsg model.location AI.GetInvite )
+                    ( { model | state = UserListing numod login s }
+                    , sendAIMsg model.location (AI.GetInvite { email = Nothing, data = Nothing })
+                    )
 
                 UserListing.EditUser ld ->
                     ( { model | state = UserEdit (UserEdit.init ld) login }, Cmd.none )
 
                 UserListing.None ->
-                    ( { model | state = UserListing numod login }, Cmd.none )
+                    ( { model | state = UserListing numod login s }, Cmd.none )
 
         ( UserEditMsg umsg, UserEdit umod login ) ->
             let
@@ -1508,6 +1543,9 @@ actualupdate msg model =
 
         ( InvitedMsg lm, Invited ls ) ->
             handleInvited model (Invited.update lm ls)
+
+        ( InviteUserMsg lm, InviteUser mod ld ) ->
+            handleInviteUser model (InviteUser.update lm mod) ld
 
         ( PublicReplyData prd, state ) ->
             case prd of
@@ -1767,7 +1805,7 @@ actualupdate msg model =
                         AI.Users users ->
                             case stateLogin model.state of
                                 Just login ->
-                                    ( { model | state = UserListing (UserListing.init users) login }, Cmd.none )
+                                    ( { model | state = UserListing (UserListing.init users) login (stateSearch state) }, Cmd.none )
 
                                 Nothing ->
                                     ( displayMessageDialog model "not logged in", Cmd.none )
@@ -1788,15 +1826,15 @@ actualupdate msg model =
                                     ( model, Cmd.none )
 
                         AI.UserInvite ui ->
-                            case model.state of
-                                UserListing ul login ->
+                            case stateLogin model.state of
+                                Just login ->
                                     ( { model | state = UserInvite (UserInvite.init ui) login }
                                     , Cmd.none
                                     )
 
-                                _ ->
-                                    ( displayMessageDialog model "unexpected message: user invite"
-                                    , sendAIMsg model.location AI.GetUsers
+                                Nothing ->
+                                    ( displayMessageDialog model "not logged in!"
+                                    , Cmd.none
                                     )
 
                         AI.ServerError e ->
@@ -1872,6 +1910,11 @@ actualupdate msg model =
 
                                 Import istate login_ ->
                                     ( { model | state = Import (Import.updateSearchResult sr istate) login_ }
+                                    , Cmd.none
+                                    )
+
+                                InviteUser iu login ->
+                                    ( { model | state = InviteUser (InviteUser.updateSearchResult sr iu) login }
                                     , Cmd.none
                                     )
 
@@ -2541,6 +2584,31 @@ handleInvited model ( lmod, lcmd ) =
                     }
                 )
             )
+
+
+handleInviteUser : Model -> ( InviteUser.Model, InviteUser.Command ) -> Data.LoginData -> ( Model, Cmd Msg )
+handleInviteUser model ( lmod, lcmd ) login =
+    case lcmd of
+        InviteUser.Search s ->
+            sendSearch { model | state = InviteUser lmod login } s
+
+        InviteUser.SearchHistory ->
+            ( { model | state = InviteUser lmod login }, Cmd.none )
+
+        InviteUser.None ->
+            ( { model | state = InviteUser lmod login }, Cmd.none )
+
+        InviteUser.AddToRecent _ ->
+            ( { model | state = InviteUser lmod login }, Cmd.none )
+
+        InviteUser.GetInvite gi ->
+            ( { model | state = InviteUser lmod login }
+            , sendAIMsg model.location (AI.GetInvite gi)
+            )
+
+        InviteUser.Cancel ->
+            -- go to user listing
+            ( { model | state = InviteUser lmod login }, Cmd.none )
 
 
 prevSearchQuery : Data.LoginData -> S.ZkNoteSearch

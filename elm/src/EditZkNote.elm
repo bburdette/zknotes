@@ -1,6 +1,5 @@
 module EditZkNote exposing
     ( Command(..)
-    , EditLink
     , Model
     , Msg(..)
     , NavChoice(..)
@@ -14,8 +13,6 @@ module EditZkNote exposing
     , copyTabs
     , dirty
     , disabledLinkButtonStyle
-    , elToSzkl
-    , elToSzl
     , fullSave
     , initFull
     , initNew
@@ -49,7 +46,6 @@ module EditZkNote exposing
     , updateSearchStack
     , view
     , zkLinkName
-    , zklKey
     , zknview
     )
 
@@ -57,7 +53,7 @@ import Browser.Dom as BD
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
 import Common
-import Data exposing (Direction(..))
+import Data exposing (Direction(..), EditLink, zklKey)
 import Dialog as D
 import Dict exposing (Dict)
 import Element as E exposing (Element)
@@ -150,17 +146,6 @@ type SearchOrRecent
 type EditOrView
     = EditView
     | ViewView
-
-
-type alias EditLink =
-    { otherid : Int
-    , direction : Direction
-    , user : Int
-    , zknote : Maybe Int
-    , othername : Maybe String
-    , sysids : List Int
-    , delete : Maybe Bool
-    }
 
 
 type WClass
@@ -274,55 +259,14 @@ setHomeNote model id =
     { model | ld = { nld | homenote = Just id } }
 
 
-elToSzl : EditLink -> Data.SaveZkLink
-elToSzl el =
-    { otherid = el.otherid
-    , direction = el.direction
-    , user = el.user
-    , zknote = el.zknote
-    , delete = el.delete
-    }
-
-
-elToDel : EditLink -> Maybe Data.EditLink
+elToDel : EditLink -> Maybe EditLink
 elToDel el =
     case el.delete of
         Just True ->
             Nothing
 
         _ ->
-            Just
-                { otherid = el.otherid
-                , direction = el.direction
-                , user = el.user
-                , zknote = el.zknote
-                , othername = el.othername
-                , sysids = el.sysids
-                }
-
-
-elToSzkl : Int -> EditLink -> Data.ZkLink
-elToSzkl this el =
-    case el.direction of
-        From ->
-            { from = this
-            , to = el.otherid
-            , user = el.user
-            , zknote = Nothing
-            , fromname = Nothing
-            , toname = Nothing
-            , delete = Nothing
-            }
-
-        To ->
-            { from = el.otherid
-            , to = this
-            , user = el.user
-            , zknote = Nothing
-            , fromname = Nothing
-            , toname = Nothing
-            , delete = Nothing
-            }
+            Just el
 
 
 toZkListNote : Model -> Maybe Data.ZkListNote
@@ -382,10 +326,10 @@ saveZkLinkList : Model -> List Data.SaveZkLink
 saveZkLinkList model =
     List.map
         (\zkl -> { zkl | delete = Nothing })
-        (List.map elToSzl (Dict.values (Dict.diff model.zklDict model.initialZklDict)))
+        (List.map Data.elToSzl (Dict.values (Dict.diff model.zklDict model.initialZklDict)))
         ++ List.map
             (\zkl -> { zkl | delete = Just True })
-            (List.map elToSzl (Dict.values (Dict.diff model.initialZklDict model.zklDict)))
+            (List.map Data.elToSzl (Dict.values (Dict.diff model.initialZklDict model.zklDict)))
 
 
 commentsRecieved : List Data.ZkNote -> Model -> Model
@@ -1555,19 +1499,6 @@ zknview zone size recentZkns model =
                             recentPanel
                     ]
         ]
-
-
-zklKey : { a | otherid : Int, direction : Direction } -> String
-zklKey zkl =
-    String.fromInt zkl.otherid
-        ++ ":"
-        ++ (case zkl.direction of
-                From ->
-                    "from"
-
-                To ->
-                    "to"
-           )
 
 
 linksWith : List EditLink -> Int -> Bool

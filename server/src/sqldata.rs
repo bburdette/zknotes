@@ -25,6 +25,8 @@ pub struct User {
 pub fn on_new_user(
   conn: &Connection,
   rd: &RegistrationData,
+  data: Option<String>,
+  creator: Option<i64>,
   uid: i64,
 ) -> Result<(), Box<dyn Error>> {
   let usernoteid = note_id(&conn, "system", "user")?;
@@ -49,8 +51,6 @@ pub fn on_new_user(
     params![uid, zknid],
   )?;
 
-  let uid = conn.last_insert_rowid();
-
   conn.execute(
     "update zknote set sysdata = ?1
         where id = ?2",
@@ -60,6 +60,16 @@ pub fn on_new_user(
   // indicate a 'user' record, and 'public'
   save_zklink(&conn, zknid, usernoteid, systemid, None)?;
   save_zklink(&conn, zknid, publicnoteid, systemid, None)?;
+
+  // add extra links from 'data'
+  match (&data, creator) {
+    (Some(data), Some(creator)) => {
+      let extra_links: Vec<SaveZkLink> = serde_json::from_str(data.as_str())?;
+      println!("extra_links: {:?}", extra_links);
+      save_savezklinks(&conn, creator, zknid, extra_links)?;
+    }
+    _ => (),
+  }
 
   Ok(())
 }
@@ -238,6 +248,11 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: i64) -> Result<(), Box<dyn Err
     info!("udpate15");
     zkm::udpate15(&dbfile)?;
     set_single_value(&conn, "migration_level", "15")?;
+  }
+  if nlevel < 16 {
+    info!("udpate16");
+    zkm::udpate16(&dbfile)?;
+    set_single_value(&conn, "migration_level", "16")?;
   }
 
   info!("db up to date.");
