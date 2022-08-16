@@ -1440,7 +1440,6 @@ actualupdate msg model =
                     initialPage model
 
                 UserListing.NewUser ->
-                    -- ( { model | state = UserEdit UserEdit.initNew login }, Cmd.none )
                     let
                         ( sp, sr ) =
                             s
@@ -1462,9 +1461,6 @@ actualupdate msg model =
                     )
 
                 UserListing.InviteUser ->
-                    -- ( { model | state = UserListing numod login }
-                    -- , sendAIMsg model.location (AI.GetInvite { email = Nothing, data = Nothing })
-                    -- )
                     ( { model | state = UserListing numod login s }
                     , sendAIMsg model.location (AI.GetInvite { email = Nothing, data = Nothing })
                     )
@@ -1830,10 +1826,6 @@ actualupdate msg model =
                                     ( model, Cmd.none )
 
                         AI.UserInvite ui ->
-                            let
-                                _ =
-                                    Debug.log "user invite: " ui
-                            in
                             case stateLogin model.state of
                                 Just login ->
                                     ( { model | state = UserInvite (UserInvite.init ui) login }

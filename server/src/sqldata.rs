@@ -61,7 +61,6 @@ pub fn on_new_user(
   save_zklink(&conn, zknid, usernoteid, systemid, None)?;
   save_zklink(&conn, zknid, publicnoteid, systemid, None)?;
 
-  // TODO: check for accessibility of links from invite creator.
   // add extra links from 'data'
   match (&data, creator) {
     (Some(data), Some(creator)) => {
