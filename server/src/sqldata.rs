@@ -51,8 +51,6 @@ pub fn on_new_user(
     params![uid, zknid],
   )?;
 
-  let nuid = conn.last_insert_rowid();
-
   conn.execute(
     "update zknote set sysdata = ?1
         where id = ?2",
