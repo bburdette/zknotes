@@ -463,17 +463,16 @@ view stylePalette recentZkns mbsize model =
                 )
     in
     E.row
-        [ -- E.width (mbsize |> Maybe.map .width |> Maybe.withDefault 500 |> E.px)
-          -- , E.height E.fill
-          -- , E.height E.shrink
-          E.spacing 10
+        [ E.width (mbsize |> Maybe.map .width |> Maybe.withDefault 500 |> E.px)
+        , E.spacing 10
         ]
-        [ E.column [] <|
-            [ EI.text []
+        [ E.column [ E.centerX, E.width <| E.px 600, E.spacing 10, E.alignTop ] <|
+            [ E.el [ E.centerX, EF.bold ] <| E.text "invite new user"
+            , EI.text []
                 { onChange = EmailChanged
                 , text = model.email
                 , placeholder = Nothing
-                , label = EI.labelLeft [] (E.text "email")
+                , label = EI.labelLeft [] (E.text "email (optional)")
                 }
             , E.row [ E.width E.fill, E.spacing 10 ]
                 [ EI.button
