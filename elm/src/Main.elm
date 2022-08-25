@@ -1871,6 +1871,7 @@ actualupdate msg model =
 
                                     laststack =
                                         pses
+                                            |> List.filter (\l -> List.length l > 1)
                                             |> List.head
                                             |> Maybe.withDefault []
                                             |> List.reverse
