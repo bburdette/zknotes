@@ -39,7 +39,9 @@ Final note - you're expected to register as a user in order to log in to the web
 
 ### developing.
 
-currently orgauth is used here with submodules.  so you have to:
+Strictly speaking you only need git, rust, elm, sqlite and openssl to do development (I think).  But you can use nix to install the full array of gadgets I use which will supply lsp support, formatting, automatic recompiling, etc.
+
+currently my orgauth lib is used here with submodules.  so you have to:
 ```
 $ git submodule update
 $ cd orgauth
