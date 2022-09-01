@@ -81,6 +81,8 @@
               cargo
               cargo-watch
               rustc
+              rustfmt
+              rust-analyzer
               sqlite
               pkgconfig
               openssl.dev
