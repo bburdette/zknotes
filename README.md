@@ -16,13 +16,13 @@ zknotes has some multi-user features.
  - Notes can be designated as read-only or editable.  
  - There's also a comment system.  Notes that link to the 'comment' system note and to another note show up as comments in the web UI.
 
-### install notes
+## install notes
 
-If you want to compile and run this on your own machine:
+If you want to compile and run this on your own machine, without bothering with development tools:
 
-- start by installing the nix package manager on your system, a version with 'flakes' enabled.
+- start by installing the [nix package manager](https://nixos.org/download.html) on your system, and [enable flakes](https://nixos.wiki/wiki/Flakes).
 
-- install into a 'result' folder in a local directory:
+- install into a 'result' folder in a local directory (no need to clone this repo!)
   ```
   nix build github:bburdette/zknotes
   ```
@@ -37,7 +37,7 @@ If you want to compile and run this on your own machine:
 
 Final note - you're expected to register as a user in order to log in to the website, and this requires an email with a 'magic link' in it.  Chances are the email send won't work when you register (most ISPs prevent this), so look for server/last-email.txt to get your magic link.
 
-### developing.
+## developing
 
 Strictly speaking you only need git, rust, elm, sqlite and openssl to do development (I think).  But you can use nix to install the full array of gadgets I use which will supply lsp support, formatting, automatic recompiling, etc.
 
