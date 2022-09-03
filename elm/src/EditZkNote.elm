@@ -1775,6 +1775,38 @@ initLinkBackNote model title =
 
 onTASelection : Model -> Data.TASelection -> TACommand
 onTASelection model tas =
+    let
+        addLink title id =
+            let
+                desc =
+                    if tas.text == "" then
+                        title
+
+                    else
+                        tas.text
+
+                linktext =
+                    "["
+                        ++ desc
+                        ++ "]("
+                        ++ "/note/"
+                        ++ String.fromInt id
+                        ++ ")"
+            in
+            TAUpdated
+                { model
+                    | md =
+                        String.left tas.offset model.md
+                            ++ linktext
+                            ++ String.dropLeft (tas.offset + String.length tas.text) model.md
+                }
+                (Just
+                    { id = "mdtext"
+                    , offset = tas.offset + String.length linktext
+                    , length = 0
+                    }
+                )
+    in
     if tas.what == "linkback" then
         case initLinkBackNote model tas.text of
             Ok nmodel ->
@@ -1798,35 +1830,8 @@ onTASelection model tas =
                 let
                     ( title, id ) =
                         ( zkln.othername |> Maybe.withDefault "", zkln.otherid )
-
-                    desc =
-                        if tas.text == "" then
-                            title
-
-                        else
-                            tas.text
-
-                    linktext =
-                        "["
-                            ++ desc
-                            ++ "]("
-                            ++ "/note/"
-                            ++ String.fromInt id
-                            ++ ")"
                 in
-                TAUpdated
-                    { model
-                        | md =
-                            String.left tas.offset model.md
-                                ++ linktext
-                                ++ String.dropLeft (tas.offset + String.length tas.text) model.md
-                    }
-                    (Just
-                        { id = "mdtext"
-                        , offset = tas.offset + String.length linktext
-                        , length = 0
-                        }
-                    )
+                addLink title id
 
             Nothing ->
                 TANoop
@@ -1841,35 +1846,8 @@ onTASelection model tas =
                 let
                     ( title, id ) =
                         ( zkln.title, zkln.id )
-
-                    desc =
-                        if tas.text == "" then
-                            title
-
-                        else
-                            tas.text
-
-                    linktext =
-                        "["
-                            ++ desc
-                            ++ "]("
-                            ++ "/note/"
-                            ++ String.fromInt id
-                            ++ ")"
                 in
-                TAUpdated
-                    { model
-                        | md =
-                            String.left tas.offset model.md
-                                ++ linktext
-                                ++ String.dropLeft (tas.offset + String.length tas.text) model.md
-                    }
-                    (Just
-                        { id = "mdtext"
-                        , offset = tas.offset + String.length linktext
-                        , length = 0
-                        }
-                    )
+                addLink title id
 
             Nothing ->
                 TANoop
