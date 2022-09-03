@@ -113,7 +113,7 @@ type Msg
     | EditablePress Bool
     | ShowTitlePress Bool
     | RemoveLink EditLink
-    | MdLink EditLink
+    | MdLink EditLink String
     | SPMsg SP.Msg
     | NavChoiceChanged NavChoice
     | DialogMsg D.Msg
@@ -493,7 +493,7 @@ showZkl isDirty editable focusLink ld id sysColor showflip zkl =
                         }
                 , if editable then
                     EI.button (linkButtonStyle ++ [ E.alignLeft ])
-                        { onPress = Just (MdLink zkl)
+                        { onPress = Just (MdLink zkl "addlink")
                         , label = E.text "^"
                         }
 
@@ -599,56 +599,67 @@ showSr model isdirty zkln =
         sysColor =
             ZC.systemColor model.ld zkln.sysids
 
+        mbTo =
+            Dict.get (zklKey { direction = To, otherid = zkln.id })
+                model.zklDict
+
+        mbFrom =
+            Dict.get (zklKey { direction = From, otherid = zkln.id })
+                model.zklDict
+
         controlrow =
             E.row [ E.spacing 8, E.width E.fill ]
-                [ (case
-                    Dict.get (zklKey { direction = To, otherid = zkln.id })
-                        model.zklDict
-                   of
-                    Just _ ->
-                        Nothing
-
-                    Nothing ->
-                        Just 1
-                  )
+                [ mbTo
                     |> Maybe.map
-                        (\_ ->
-                            EI.button linkButtonStyle
-                                { onPress = Just <| ToLinkPress zkln
+                        (\zkl ->
+                            EI.button
+                                disabledLinkButtonStyle
+                                { onPress = Just <| RemoveLink zkl
                                 , label = E.el [ E.centerY ] <| E.text "→"
                                 }
                         )
                     |> Maybe.withDefault
-                        (EI.button
-                            disabledLinkButtonStyle
-                            { onPress = Nothing
+                        (EI.button linkButtonStyle
+                            { onPress = Just <| ToLinkPress zkln
                             , label = E.el [ E.centerY ] <| E.text "→"
                             }
                         )
-                , (case
-                    Dict.get (zklKey { direction = From, otherid = zkln.id })
-                        model.zklDict
-                   of
-                    Just _ ->
-                        Nothing
-
-                    Nothing ->
-                        Just 1
-                  )
+                , mbFrom
                     |> Maybe.map
-                        (\_ ->
-                            EI.button linkButtonStyle
-                                { onPress = Just <| FromLinkPress zkln
+                        (\zkl ->
+                            EI.button
+                                disabledLinkButtonStyle
+                                { onPress = Just <| RemoveLink zkl
                                 , label = E.el [ E.centerY ] <| E.text "←"
                                 }
                         )
                     |> Maybe.withDefault
-                        (EI.button
-                            disabledLinkButtonStyle
-                            { onPress = Nothing
+                        (EI.button linkButtonStyle
+                            { onPress = Just <| FromLinkPress zkln
                             , label = E.el [ E.centerY ] <| E.text "←"
                             }
                         )
+                , let
+                    mbzkl =
+                        case ( mbTo, mbFrom ) of
+                            ( Just to, _ ) ->
+                                Just to
+
+                            ( _, Just from ) ->
+                                Just from
+
+                            _ ->
+                                Nothing
+                  in
+                  case mbzkl of
+                    Just zkl ->
+                        EI.button linkButtonStyle
+                            { onPress = Just (MdLink zkl "addsearchlink")
+                            , label = E.text "<"
+                            }
+
+                    Nothing ->
+                        E.none
                 , EI.button linkButtonStyle
                     { onPress = Just (AddToSearch zkln)
                     , label = E.text "^"
@@ -1820,6 +1831,49 @@ onTASelection model tas =
             Nothing ->
                 TANoop
 
+    else if tas.what == "addsearchlink" then
+        case
+            model.focusSr
+                |> Maybe.andThen
+                    (\id -> List.filter (\zkln -> id == zkln.id) model.zknSearchResult.notes |> List.head)
+        of
+            Just zkln ->
+                let
+                    ( title, id ) =
+                        ( zkln.title, zkln.id )
+
+                    desc =
+                        if tas.text == "" then
+                            title
+
+                        else
+                            tas.text
+
+                    linktext =
+                        "["
+                            ++ desc
+                            ++ "]("
+                            ++ "/note/"
+                            ++ String.fromInt id
+                            ++ ")"
+                in
+                TAUpdated
+                    { model
+                        | md =
+                            String.left tas.offset model.md
+                                ++ linktext
+                                ++ String.dropLeft (tas.offset + String.length tas.text) model.md
+                    }
+                    (Just
+                        { id = "mdtext"
+                        , offset = tas.offset + String.length linktext
+                        , length = 0
+                        }
+                    )
+
+            Nothing ->
+                TANoop
+
     else
         TAError <| "invalid 'what' code: " ++ tas.what
 
@@ -2175,9 +2229,9 @@ update msg model =
             , None
             )
 
-        MdLink zkln ->
+        MdLink zkln what ->
             ( model
-            , GetTASelection "mdtext" "addlink"
+            , GetTASelection "mdtext" what
             )
 
         SwitchPress id ->
