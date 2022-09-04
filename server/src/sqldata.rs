@@ -254,6 +254,11 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: i64) -> Result<(), Box<dyn Err
     zkm::udpate16(&dbfile)?;
     set_single_value(&conn, "migration_level", "16")?;
   }
+  if nlevel < 17 {
+    info!("udpate17");
+    zkm::udpate17(&dbfile)?;
+    set_single_value(&conn, "migration_level", "17")?;
+  }
 
   info!("db up to date.");
 
@@ -502,6 +507,29 @@ pub fn are_notes_linked(conn: &Connection, nid1: i64, nid2: i64) -> Result<bool,
 
 // zknote CRUD
 
+pub fn archive_zknote(conn: &Connection, noteid: i64) -> Result<SavedZkNote, Box<dyn Error>> {
+  let now = now()?;
+  let sysid = user_id(&conn, "system")?;
+  let aid = note_id(&conn, "system", "archive")?;
+
+  // copy the note, with user 'system'.
+  conn.execute(
+    "insert into zknote (title, content, user, pubid, editable, showtitle, createdate, changeddate)
+     select title, content, ?1, pubid, editable, showtitle, createdate, changeddate from
+         zknote where id = ?2",
+    params![sysid, noteid,],
+  )?;
+  let archive_note_id = conn.last_insert_rowid();
+
+  // mark the note as an archive note.
+  save_zklink(&conn, archive_note_id, aid, sysid, None)?;
+
+  Ok(SavedZkNote {
+    id: archive_note_id,
+    changeddate: now,
+  })
+}
+
 pub fn save_zknote(
   conn: &Connection,
   uid: i64,
@@ -511,6 +539,7 @@ pub fn save_zknote(
 
   match note.id {
     Some(id) => {
+      archive_zknote(&conn, id)?;
       // existing note.  update IF mine.
       match conn.execute(
         "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4, editable = ?5, showtitle = ?6

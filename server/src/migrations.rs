@@ -1496,3 +1496,47 @@ pub fn udpate16(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   orgauth::migrations::udpate4(dbfile)?;
   Ok(())
 }
+
+pub fn udpate17(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+  // Add archive system note.
+
+  let conn = Connection::open(dbfile)?;
+
+  // get "public" note.
+  let pubid: i64 = conn.query_row(
+    "select zknote.id from
+      zknote, orgauth_user
+      where zknote.title = ?2
+      and orgauth_user.name = ?1
+      and zknote.user = orgauth_user.id",
+    params!["system", "public"],
+    |row| Ok(row.get(0)?),
+  )?;
+
+  // get "system" userid.
+  let sysid: i64 = conn.query_row(
+    "select id from orgauth_user
+      where orgauth_user.name = ?1",
+    params!["system"],
+    |row| Ok(row.get(0)?),
+  )?;
+  let now = now()?;
+
+  // new note.
+  conn.execute(
+    "insert into zknote (title, content, pubid, editable, showtitle, user,  createdate, changeddate)
+      values ('archive', '', null, 0, 0, ?1, ?2, ?3)",
+    params![sysid, now, now],
+  )?;
+
+  let zknid = conn.last_insert_rowid();
+
+  // link system recs to public.
+  conn.execute(
+    "insert into zklink (fromid, toid, user)
+     values (?1, ?2, ?3)",
+    params![zknid, pubid, sysid],
+  )?;
+
+  Ok(())
+}
