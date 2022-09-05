@@ -9,11 +9,11 @@ use orgauth::endpoints::Callbacks;
 use std::error::Error;
 use std::path::Path;
 use zkprotocol::content::{
-  GetZkNoteComments, GetZkNoteEdit, ImportZkNote, SaveZkNote, SaveZkNotePlusLinks, ZkLinks,
-  ZkNoteEdit,
+  GetZkNoteArchives, GetZkNoteComments, GetZkNoteEdit, ImportZkNote, SaveZkNote,
+  SaveZkNotePlusLinks, ZkLinks, ZkNoteEdit,
 };
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
-use zkprotocol::search::{TagSearch, ZkNoteSearch};
+use zkprotocol::search::{TagSearch, ZkListNoteSearchResult, ZkNoteSearch};
 
 pub fn login_data_for_token(
   session: Session,
@@ -111,6 +111,21 @@ pub fn zk_interface_loggedin(
       Ok(ServerResponse {
         what: "zknotecomments".to_string(),
         content: serde_json::to_value(notes)?,
+      })
+    }
+    "getzknotearchives" => {
+      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      let gzne: GetZkNoteArchives = serde_json::from_value(msgdata.clone())?;
+      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+      let notes = sqldata::read_zknotearchives(&conn, uid, &gzne)?;
+      let zlnsr = ZkListNoteSearchResult {
+        notes: notes,
+        offset: gzne.offset,
+        what: "archives".to_string(),
+      };
+      Ok(ServerResponse {
+        what: "zknotearchives".to_string(),
+        content: serde_json::to_value(zlnsr)?,
       })
     }
     "searchzknotes" => {

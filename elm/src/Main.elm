@@ -1,5 +1,6 @@
 port module Main exposing (main)
 
+import ArchiveListing
 import Array
 import Browser
 import Browser.Events
@@ -79,6 +80,7 @@ type Msg
     | ViewMsg View.Msg
     | EditZkNoteMsg EditZkNote.Msg
     | EditZkNoteListingMsg EditZkNoteListing.Msg
+    | ArchiveListingMsg ArchiveListing.Msg
     | UserSettingsMsg UserSettings.Msg
     | UserListingMsg UserListing.Msg
     | UserEditMsg UserEdit.Msg
@@ -114,6 +116,7 @@ type State
     | InviteUser InviteUser.Model Data.LoginData
     | EditZkNote EditZkNote.Model Data.LoginData
     | EditZkNoteListing EditZkNoteListing.Model Data.LoginData
+    | ArchiveListing ArchiveListing.Model Data.LoginData
     | View View.Model
     | EView View.Model State
     | Import Import.Model Data.LoginData
@@ -434,6 +437,9 @@ showMessage msg =
         EditZkNoteListingMsg _ ->
             "EditZkNoteListingMsg"
 
+        ArchiveListingMsg _ ->
+            "ArchiveListingMsg"
+
         UserSettingsMsg _ ->
             "UserSettingsMsg"
 
@@ -572,6 +578,9 @@ showState state =
         EditZkNoteListing _ _ ->
             "EditZkNoteListing"
 
+        ArchiveListing _ _ ->
+            "ArchiveListing"
+
         View _ ->
             "View"
 
@@ -653,6 +662,9 @@ viewState size state model =
         EditZkNoteListing em ld ->
             E.map EditZkNoteListingMsg <| EditZkNoteListing.view ld size em
 
+        ArchiveListing em ld ->
+            E.map ArchiveListingMsg <| ArchiveListing.view ld size em
+
         ShowMessage em _ _ ->
             E.map ShowMessageMsg <| ShowMessage.view em
 
@@ -729,6 +741,9 @@ stateSearch state =
         EditZkNoteListing emod _ ->
             Just ( emod.spmodel, emod.notes )
 
+        ArchiveListing _ _ ->
+            Nothing
+
         ShowMessage _ _ (Just st) ->
             stateSearch st
 
@@ -803,6 +818,9 @@ stateLogin state =
             Just login
 
         EditZkNoteListing _ login ->
+            Just login
+
+        ArchiveListing _ login ->
             Just login
 
         Import _ login ->

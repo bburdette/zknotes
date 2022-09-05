@@ -11,8 +11,9 @@ use std::error::Error;
 use std::path::Path;
 use std::time::Duration;
 use zkprotocol::content::{
-  Direction, EditLink, ExtraLoginData, GetZkLinks, GetZkNoteComments, GetZkNoteEdit, ImportZkNote,
-  SaveZkLink, SaveZkNote, SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
+  Direction, EditLink, ExtraLoginData, GetZkLinks, GetZkNoteArchives, GetZkNoteComments,
+  GetZkNoteEdit, ImportZkNote, SaveZkLink, SaveZkNote, SavedZkNote, ZkLink, ZkListNote, ZkNote,
+  ZkNoteEdit,
 };
 
 #[derive(Clone, Deserialize, Serialize, Debug)]
@@ -687,6 +688,52 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
   }
 }
 
+pub fn read_zklistnote(
+  conn: &Connection,
+  uid: Option<i64>,
+  id: i64,
+) -> Result<ZkListNote, Box<dyn Error>> {
+  let sysid = user_id(&conn, "system")?;
+  let sysids = get_sysids(conn, sysid, id)?;
+
+  let note = conn.query_row(
+    "select ZN.title, ZN.user, ZN.createdate, ZN.changeddate
+      from zknote ZN, orgauth_user OU, user U where ZN.id = ?1 and U.id = ZN.user and OU.id = ZN.user",
+    params![id],
+    |row| {
+      Ok(ZkListNote {
+        id: id,
+        title: row.get(0)?,
+        user: row.get(1)?,
+        createdate: row.get(2)?,
+        changeddate: row.get(3)?,
+        sysids: sysids,
+      })
+    },
+  )?;
+
+  Ok(note)
+
+  // match zknote_access(conn, uid, &note) {
+  //   Ok(zna) => match zna {
+  //     Access::ReadWrite => {
+  //       note.editable = true;
+  //       Ok(note)
+  //     }
+  //     Access::Read => {
+  //       note.editable = false;
+  //       Ok(note)
+  //     }
+  //     Access::Private => Err(Box::new(std::io::Error::new(
+  //       std::io::ErrorKind::PermissionDenied,
+  //       "can't read zknote; note is private",
+  //     ))),
+  //     // bail!("can't read zknote; note is private"),
+  //   },
+  //   Err(e) => Err(e),
+  // }
+}
+
 #[derive(Debug)]
 pub enum Access {
   Private,
@@ -1089,6 +1136,53 @@ pub fn read_zknotecomments(
         Ok(note) => {
           nv.push(note);
           match gznc.limit {
+            Some(l) => {
+              if nv.len() >= l as usize {
+                break;
+              }
+            }
+            None => (),
+          }
+        }
+        Err(_) => (),
+      },
+      Err(_) => (),
+    }
+  }
+
+  Ok(nv)
+}
+
+pub fn read_zknotearchives(
+  conn: &Connection,
+  uid: i64,
+  gzna: &GetZkNoteArchives,
+) -> Result<Vec<ZkListNote>, Box<dyn Error>> {
+  let cid = note_id(&conn, "system", "archive")?;
+
+  // users that can't see a note, can't see the archives either.
+  let note = read_zknote(&conn, Some(uid), gzna.zknote)?;
+
+  // notes with a TO link to our note
+  // and a TO link to 'archive'
+  let mut stmt = conn.prepare(
+    "select N.fromid from  zklink C, zklink N
+      where N.fromid = C.fromid
+      and N.toid = ?1 and C.toid = ?2",
+  )?;
+
+  let c_iter = stmt
+    .query_map(params![gzna.zknote, cid], |row| Ok(row.get(0)?))?
+    .skip(gzna.offset as usize);
+
+  let mut nv = Vec::new();
+
+  for id in c_iter {
+    match id {
+      Ok(id) => match read_zklistnote(&conn, Some(uid), id) {
+        Ok(note) => {
+          nv.push(note);
+          match gzna.limit {
             Some(l) => {
               if nv.len() >= l as usize {
                 break;

@@ -246,7 +246,18 @@ type alias ZkNoteEdit =
     }
 
 
+type alias GetZkNoteArchives =
+    { zknote : Int
+    , offset : Int
+    , limit : Maybe Int
+    }
 
+
+
+-- type alias ZkNoteArchives =
+--     { noteid : Int
+--     , archive_notes : List ZkListNote
+--     }
 ----------------------------------------
 -- Json encoders/decoders
 ----------------------------------------
@@ -504,7 +515,19 @@ encodeImportZkNote izn =
         ]
 
 
+encodeGetZkNoteArchives : GetZkNoteArchives -> JE.Value
+encodeGetZkNoteArchives gzl =
+    JE.object
+        [ ( "zknote", JE.int gzl.zknote )
+        ]
 
+
+
+-- decodeZkNoteArchives : JD.Decoder ZkNoteArchives
+-- decodeZkNoteArchives =
+--     JD.map2 ZkNoteArchives
+--         (JD.field "noteid" JD.int)
+--         (JD.field "archive_notes" (JD.list decodeZkListNote))
 ----------------------------------------
 -- misc functions
 ----------------------------------------

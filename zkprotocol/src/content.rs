@@ -120,6 +120,19 @@ pub struct GetZkNoteEdit {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
+pub struct GetZkNoteArchives {
+  pub zknote: i64,
+  pub offset: i64,
+  pub limit: Option<i64>,
+}
+
+// #[derive(Serialize, Debug, Clone)]
+// pub struct ZkNoteArchives {
+//   pub noteid: i64,
+//   pub archive_notes: Vec<ZkListNote>,
+// }
+
+#[derive(Deserialize, Serialize, Debug)]
 pub struct GetZkNoteComments {
   pub zknote: i64,
   pub offset: i64,
