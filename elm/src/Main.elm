@@ -2506,6 +2506,11 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
         EditZkNote.ShowMessage e ->
             ( displayMessageDialog model e, Cmd.none )
 
+        EditZkNote.ShowArchives x ->
+            ( model
+            , sendZIMsg model.location (ZI.GetZkNoteArchives x)
+            )
+
         EditZkNote.Cmd cmd ->
             ( { model | state = EditZkNote emod login }
             , Cmd.map EditZkNoteMsg cmd
@@ -2548,6 +2553,28 @@ handleEditZkNoteListing model login ( emod, ecmd ) =
         EditZkNoteListing.SearchHistory ->
             ( shDialog model
             , Cmd.none
+            )
+
+
+handleArchiveListing : Model -> Data.LoginData -> ( ArchiveListing.Model, ArchiveListing.Command ) -> ( Model, Cmd Msg )
+handleArchiveListing model login ( emod, ecmd ) =
+    case ecmd of
+        ArchiveListing.None ->
+            ( { model | state = ArchiveListing emod login }, Cmd.none )
+
+        ArchiveListing.Selected id ->
+            ( { model | state = ArchiveListing emod login }
+            , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id })
+            )
+
+        ArchiveListing.Done ->
+            ( { model | state = UserSettings (UserSettings.init login model.fontsize) login (ArchiveListing emod login) }
+            , Cmd.none
+            )
+
+        ArchiveListing.GetArchives msg ->
+            ( model
+            , sendZIMsg model.location <| ZI.GetZkNoteArchives msg
             )
 
 

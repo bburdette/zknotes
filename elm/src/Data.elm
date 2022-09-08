@@ -516,10 +516,19 @@ encodeImportZkNote izn =
 
 
 encodeGetZkNoteArchives : GetZkNoteArchives -> JE.Value
-encodeGetZkNoteArchives gzl =
-    JE.object
-        [ ( "zknote", JE.int gzl.zknote )
+encodeGetZkNoteArchives x =
+    JE.object <|
+        [ ( "zknote", JE.int x.zknote )
+        , ( "offset", JE.int x.offset )
         ]
+            ++ (case x.limit of
+                    Just l ->
+                        [ ( "limit", JE.int l )
+                        ]
+
+                    Nothing ->
+                        []
+               )
 
 
 
