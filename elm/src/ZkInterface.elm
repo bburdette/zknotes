@@ -24,6 +24,7 @@ type SendMsg
 type ServerResponse
     = ZkNoteSearchResult Data.ZkNoteSearchResult
     | ZkListNoteSearchResult Data.ZkListNoteSearchResult
+    | ArchiveList Data.ZkListNoteSearchResult
     | SavedZkNotePlusLinks Data.SavedZkNote
     | SavedZkNote Data.SavedZkNote
     | DeletedZkNote Int
@@ -46,6 +47,9 @@ showServerResponse sr =
 
         ZkListNoteSearchResult _ ->
             "ZkListNoteSearchResult"
+
+        ArchiveList _ ->
+            "ArchiveList"
 
         SavedZkNote _ ->
             "SavedZkNote"
@@ -187,6 +191,9 @@ serverResponseDecoder =
 
                     "zklistnotesearchresult" ->
                         JD.map ZkListNoteSearchResult (JD.at [ "content" ] <| Data.decodeZkListNoteSearchResult)
+
+                    "zknotearchives" ->
+                        JD.map ArchiveList (JD.at [ "content" ] <| Data.decodeZkListNoteSearchResult)
 
                     "savedzknote" ->
                         JD.map SavedZkNote (JD.at [ "content" ] <| Data.decodeSavedZkNote)

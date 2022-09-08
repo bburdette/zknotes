@@ -1947,6 +1947,23 @@ actualupdate msg model =
                                     , Cmd.none
                                     )
 
+                        ZI.ArchiveList sr ->
+                            case state of
+                                EditZkNote znstate login ->
+                                    case znstate.id of
+                                        Just id ->
+                                            ( { model | state = ArchiveListing (ArchiveListing.init id sr.notes) login }
+                                            , Cmd.none
+                                            )
+
+                                        Nothing ->
+                                            ( displayMessageDialog model "no archives for a new note!", Cmd.none )
+
+                                _ ->
+                                    ( unexpectedMessage model (ZI.showServerResponse ziresponse)
+                                    , Cmd.none
+                                    )
+
                         ZI.ZkNote zkn ->
                             case state of
                                 EditZkNote ezn login ->

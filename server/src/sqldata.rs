@@ -525,6 +525,9 @@ pub fn archive_zknote(conn: &Connection, noteid: i64) -> Result<SavedZkNote, Box
   // mark the note as an archive note.
   save_zklink(&conn, archive_note_id, aid, sysid, None)?;
 
+  // link the note to the original note.
+  save_zklink(&conn, archive_note_id, noteid, sysid, None)?;
+
   Ok(SavedZkNote {
     id: archive_note_id,
     changeddate: now,
@@ -1166,7 +1169,7 @@ pub fn read_zknotearchives(
   // notes with a TO link to our note
   // and a TO link to 'archive'
   let mut stmt = conn.prepare(
-    "select N.fromid from  zklink C, zklink N
+    "select N.fromid from zklink C, zklink N
       where N.fromid = C.fromid
       and N.toid = ?1 and C.toid = ?2",
   )?;

@@ -41,6 +41,14 @@ type Command
     | None
 
 
+init : Int -> List Data.ZkListNote -> Model
+init noteid notes =
+    { noteid = noteid
+    , notes = notes
+    , ppmodel = PP.initModel
+    }
+
+
 updateSearchResult : List Data.ZkListNote -> Model -> Model
 updateSearchResult zsr model =
     { model
