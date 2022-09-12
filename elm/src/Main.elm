@@ -463,6 +463,11 @@ stateRoute state =
                 |> Maybe.map (\id -> { route = EditZkNoteR id, save = True })
                 |> Maybe.withDefault { route = EditZkNoteNew, save = False }
 
+        ArchiveListing almod ld ->
+            almod.selected
+                |> Maybe.map (\sid -> { route = ArchiveNoteR almod.noteid sid, save = True })
+                |> Maybe.withDefault { route = ArchiveNoteListingR almod.noteid, save = True }
+
         Login _ ->
             { route = LoginR
             , save = False
