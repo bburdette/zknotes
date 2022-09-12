@@ -10,7 +10,7 @@ use std::error::Error;
 use std::path::Path;
 use zkprotocol::content::{
   GetArchiveZkNote, GetZkNoteArchives, GetZkNoteComments, GetZkNoteEdit, ImportZkNote, SaveZkNote,
-  SaveZkNotePlusLinks, ZkLinks, ZkNoteEdit,
+  SaveZkNotePlusLinks, ZkLinks, ZkNoteArchives, ZkNoteEdit,
 };
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 use zkprotocol::search::{TagSearch, ZkListNoteSearchResult, ZkNoteSearch};
@@ -123,9 +123,13 @@ pub fn zk_interface_loggedin(
         offset: gzne.offset,
         what: "archives".to_string(),
       };
+      let zka = ZkNoteArchives {
+        zknote: gzne.zknote,
+        results: zlnsr,
+      };
       Ok(ServerResponse {
         what: "zknotearchives".to_string(),
-        content: serde_json::to_value(zlnsr)?,
+        content: serde_json::to_value(zka)?,
       })
     }
     "getarchivezknote" => {

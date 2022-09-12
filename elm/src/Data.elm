@@ -253,6 +253,12 @@ type alias GetZkNoteArchives =
     }
 
 
+type alias ZkNoteArchives =
+    { zknote : Int
+    , results : ZkListNoteSearchResult
+    }
+
+
 type alias GetArchiveZkNote =
     { parentnote : Int
     , noteid : Int
@@ -485,6 +491,13 @@ decodeZkNote =
         |> andMap (JD.field "createdate" JD.int)
         |> andMap (JD.field "changeddate" JD.int)
         |> andMap (JD.field "sysids" <| JD.list JD.int)
+
+
+decodeZkNoteArchives : JD.Decoder ZkNoteArchives
+decodeZkNoteArchives =
+    JD.map2 ZkNoteArchives
+        (JD.field "zknote" JD.int)
+        (JD.field "results" decodeZkListNoteSearchResult)
 
 
 decodeZkNoteEdit : JD.Decoder ZkNoteEdit

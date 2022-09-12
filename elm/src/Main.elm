@@ -90,6 +90,7 @@ type Msg
     | UserReplyData (Result Http.Error UI.ServerResponse)
     | AdminReplyData (Result Http.Error AI.ServerResponse)
     | ZkReplyData (Result Http.Error ZI.ServerResponse)
+    | ZkReplyDataSeq (Result Http.Error ZI.ServerResponse -> Maybe (Cmd Msg)) (Result Http.Error ZI.ServerResponse)
     | TAReplyData Data.TASelection (Result Http.Error ZI.ServerResponse)
     | PublicReplyData (Result Http.Error PI.ServerResponse)
     | ErrorIndexNote (Result Http.Error PI.ServerResponse)
@@ -351,6 +352,23 @@ routeState model route =
                             ( model.state, Cmd.none )
 
         ArchiveNoteR id aid ->
+            let
+                getboth =
+                    sendZIMsgExp model.location
+                        (ZI.GetZkNoteArchives
+                            { zknote = id
+                            , offset = 0
+                            , limit = Nothing
+                            }
+                        )
+                        (ZkReplyDataSeq
+                            (\_ ->
+                                Just <|
+                                    sendZIMsg model.location
+                                        (ZI.GetArchiveZkNote { parentnote = id, noteid = aid })
+                            )
+                        )
+            in
             case model.state of
                 ArchiveListing st login ->
                     if st.noteid == id then
@@ -361,13 +379,7 @@ routeState model route =
 
                     else
                         ( ArchiveListing st login
-                        , sendZIMsg model.location
-                            (ZI.GetZkNoteArchives
-                                { zknote = id
-                                , offset = 0
-                                , limit = Nothing
-                                }
-                            )
+                        , getboth
                         )
 
                 st ->
@@ -376,13 +388,7 @@ routeState model route =
                             ( ShowMessage { message = "loading archives..." }
                                 login
                                 (Just model.state)
-                            , sendZIMsg model.location
-                                (ZI.GetZkNoteArchives
-                                    { zknote = id
-                                    , offset = 0
-                                    , limit = Nothing
-                                    }
-                                )
+                            , getboth
                             )
 
                         Nothing ->
@@ -553,6 +559,20 @@ showMessage msg =
 
         ZkReplyData urd ->
             "ZkReplyData: "
+                ++ (Result.map ZI.showServerResponse urd
+                        |> Result.mapError Util.httpErrorString
+                        |> (\r ->
+                                case r of
+                                    Ok m ->
+                                        "message: " ++ m
+
+                                    Err e ->
+                                        "error: " ++ e
+                           )
+                   )
+
+        ZkReplyDataSeq _ urd ->
+            "ZkReplyDataSeq : "
                 ++ (Result.map ZI.showServerResponse urd
                         |> Result.mapError Util.httpErrorString
                         |> (\r ->
@@ -1932,6 +1952,18 @@ actualupdate msg model =
                         AI.ServerError e ->
                             ( displayMessageDialog model <| e, Cmd.none )
 
+        ( ZkReplyDataSeq f zrd, state ) ->
+            let
+                ( nmod, ncmd ) =
+                    actualupdate (ZkReplyData zrd) model
+            in
+            case f zrd of
+                Just cmd ->
+                    ( nmod, Cmd.batch [ ncmd, cmd ] )
+
+                Nothing ->
+                    ( nmod, ncmd )
+
         ( ZkReplyData zrd, state ) ->
             case zrd of
                 Err e ->
@@ -2021,20 +2053,17 @@ actualupdate msg model =
                                     , Cmd.none
                                     )
 
-                        ZI.ArchiveList sr ->
-                            case state of
-                                EditZkNote znstate login ->
-                                    case znstate.id of
-                                        Just id ->
-                                            ( { model | state = ArchiveListing (ArchiveListing.init id sr.notes) login }
-                                            , Cmd.none
-                                            )
+                        ZI.ArchiveList ar ->
+                            case stateLogin state of
+                                Just login ->
+                                    ( { model | state = ArchiveListing (ArchiveListing.init ar.zknote ar.results.notes) login }
+                                    , Cmd.none
+                                    )
 
-                                        Nothing ->
-                                            ( displayMessageDialog model "no archives for a new note!", Cmd.none )
-
-                                _ ->
-                                    ( unexpectedMessage model (ZI.showServerResponse ziresponse)
+                                Nothing ->
+                                    ( displayMessageDialog
+                                        { model | state = initLoginState model }
+                                        "can't access note archives; you're not logged in!"
                                     , Cmd.none
                                     )
 
