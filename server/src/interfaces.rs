@@ -9,7 +9,7 @@ use orgauth::endpoints::Callbacks;
 use std::error::Error;
 use std::path::Path;
 use zkprotocol::content::{
-  GetZkNoteArchives, GetZkNoteComments, GetZkNoteEdit, ImportZkNote, SaveZkNote,
+  GetArchiveZkNote, GetZkNoteArchives, GetZkNoteComments, GetZkNoteEdit, ImportZkNote, SaveZkNote,
   SaveZkNotePlusLinks, ZkLinks, ZkNoteEdit,
 };
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
@@ -126,6 +126,17 @@ pub fn zk_interface_loggedin(
       Ok(ServerResponse {
         what: "zknotearchives".to_string(),
         content: serde_json::to_value(zlnsr)?,
+      })
+    }
+    "getarchivezknote" => {
+      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      let rq: GetArchiveZkNote = serde_json::from_value(msgdata.clone())?;
+      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+      let note = sqldata::read_archivezknote(&conn, uid, &rq)?;
+      info!("user#getarchivezknote: {} - {}", note.id, note.title);
+      Ok(ServerResponse {
+        what: "zknote".to_string(),
+        content: serde_json::to_value(note)?,
       })
     }
     "searchzknotes" => {

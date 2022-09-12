@@ -10,10 +10,11 @@ use simple_error::bail;
 use std::error::Error;
 use std::path::Path;
 use std::time::Duration;
+use uuid::adapter::Simple;
 use zkprotocol::content::{
-  Direction, EditLink, ExtraLoginData, GetZkLinks, GetZkNoteArchives, GetZkNoteComments,
-  GetZkNoteEdit, ImportZkNote, SaveZkLink, SaveZkNote, SavedZkNote, ZkLink, ZkListNote, ZkNote,
-  ZkNoteEdit,
+  Direction, EditLink, ExtraLoginData, GetArchiveZkNote, GetZkLinks, GetZkNoteArchives,
+  GetZkNoteComments, GetZkNoteEdit, ImportZkNote, SaveZkLink, SaveZkNote, SavedZkNote, ZkLink,
+  ZkListNote, ZkNote, ZkNoteEdit,
 };
 
 #[derive(Clone, Deserialize, Serialize, Debug)]
@@ -1201,6 +1202,35 @@ pub fn read_zknotearchives(
   }
 
   Ok(nv)
+}
+
+pub fn read_archivezknote(
+  conn: &Connection,
+  uid: i64,
+  gazn: &GetArchiveZkNote,
+) -> Result<ZkNote, Box<dyn Error>> {
+  let archiveid = note_id(&conn, "system", "archive")?;
+  let sysid = user_id(&conn, "system")?;
+
+  // have access to the parent note?
+  let parentnote = read_zknote(conn, Some(uid), gazn.parentnote)?;
+
+  // archive note should have a TO link to the parent note
+  // and a TO link to 'archive'
+  let i: i64 = match conn.query_row(
+    "select N.fromid from zklink C, zklink N
+      where N.fromid = C.fromid
+      and N.toid = ?1 and C.toid = ?2 and N.fromid = ?3",
+    params![gazn.parentnote, archiveid, gazn.noteid],
+    |row| Ok(row.get(0)?),
+  ) {
+    Ok(v) => Ok(v),
+    Err(rusqlite::Error::QueryReturnedNoRows) => bail!("not an archive note!"),
+    Err(x) => Err(Box::new(x)),
+  }?;
+
+  // now read the archive note AS SYSTEM.
+  read_zknote(conn, Some(sysid), gazn.noteid)
 }
 
 pub fn read_zknoteedit(

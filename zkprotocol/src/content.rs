@@ -126,6 +126,12 @@ pub struct GetZkNoteArchives {
   pub limit: Option<i64>,
 }
 
+#[derive(Deserialize, Serialize, Debug)]
+pub struct GetArchiveZkNote {
+  pub parentnote: i64,
+  pub noteid: i64,
+}
+
 // #[derive(Serialize, Debug, Clone)]
 // pub struct ZkNoteArchives {
 //   pub noteid: i64,

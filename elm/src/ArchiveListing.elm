@@ -106,7 +106,7 @@ listview ld size model =
                         (\id ->
                             E.link
                                 Common.buttonStyle
-                                { url = Data.archiveNoteLink id
+                                { url = Data.archiveNoteLink model.noteid id
                                 , label = E.text "⌂"
                                 }
                         )
@@ -148,7 +148,7 @@ listview ld size model =
                                         )
                                         [ E.link
                                             [ E.height <| E.px 30 ]
-                                            { url = Data.editNoteLink n.id
+                                            { url = Data.archiveNoteLink model.noteid n.id
                                             , label = E.text n.title
                                             }
                                         ]

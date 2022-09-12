@@ -253,6 +253,12 @@ type alias GetZkNoteArchives =
     }
 
 
+type alias GetArchiveZkNote =
+    { parentnote : Int
+    , noteid : Int
+    }
+
+
 
 -- type alias ZkNoteArchives =
 --     { noteid : Int
@@ -531,6 +537,14 @@ encodeGetZkNoteArchives x =
                )
 
 
+encodeGetArchiveZkNote : GetArchiveZkNote -> JE.Value
+encodeGetArchiveZkNote x =
+    JE.object <|
+        [ ( "parentnote", JE.int x.parentnote )
+        , ( "noteid", JE.int x.noteid )
+        ]
+
+
 
 -- decodeZkNoteArchives : JD.Decoder ZkNoteArchives
 -- decodeZkNoteArchives =
@@ -547,10 +561,10 @@ editNoteLink noteid =
     UB.absolute [ "editnote", String.fromInt noteid ] []
 
 
-archiveNoteLink : Int -> String
-archiveNoteLink noteid =
+archiveNoteLink : Int -> Int -> String
+archiveNoteLink parentnoteid noteid =
     -- this what we want?
-    UB.absolute [ "archivenote", String.fromInt noteid ] []
+    UB.absolute [ "archivenote", String.fromInt parentnoteid, String.fromInt noteid ] []
 
 
 flipDirection : Direction -> Direction

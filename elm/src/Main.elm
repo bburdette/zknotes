@@ -356,7 +356,7 @@ routeState model route =
                     if st.noteid == id then
                         ( ArchiveListing st login
                         , sendZIMsg model.location
-                            (ZI.GetZkNote aid)
+                            (ZI.GetArchiveZkNote { parentnote = id, noteid = aid })
                         )
 
                     else
