@@ -31,6 +31,7 @@ type Msg
 type alias Model =
     { noteid : Int
     , notes : List Data.ZkListNote
+    , selected : Maybe Int
     , fullnotes : Dict Int Data.ZkNote
     , ppmodel : PP.Model
     }
@@ -47,6 +48,7 @@ init : Int -> List Data.ZkListNote -> Model
 init noteid notes =
     { noteid = noteid
     , notes = notes
+    , selected = Nothing
     , fullnotes = Dict.empty
     , ppmodel = PP.initModel
     }
@@ -54,7 +56,7 @@ init noteid notes =
 
 onZkNote : Data.ZkNote -> Model -> ( Model, Command )
 onZkNote zkn model =
-    ( { model | fullnotes = Dict.insert zkn.id zkn model.fullnotes }
+    ( { model | fullnotes = Dict.insert zkn.id zkn model.fullnotes, selected = Just zkn.id }
     , None
     )
 
@@ -68,7 +70,13 @@ updateSearchResult zsr model =
 
 view : Data.LoginData -> Util.Size -> Model -> Element Msg
 view ld size model =
-    listview ld size model
+    E.column []
+        [ listview ld size model
+        , model.selected
+            |> Maybe.andThen (\id -> Dict.get id model.fullnotes)
+            |> Maybe.map (\zkn -> E.text zkn.content)
+            |> Maybe.withDefault E.none
+        ]
 
 
 listview : Data.LoginData -> Util.Size -> Model -> Element Msg
