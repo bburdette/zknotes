@@ -141,8 +141,9 @@ listview ld size model =
                 [ ld.homenote
                     |> Maybe.map
                         (\id ->
-                            EI.button Common.buttonStyle
-                                { onPress = Just (SelectPress id)
+                            E.link
+                                Common.buttonStyle
+                                { url = Data.editNoteLink id
                                 , label = E.text "⌂"
                                 }
                         )

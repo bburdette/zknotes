@@ -3,6 +3,7 @@ module ArchiveListing exposing (..)
 import Common
 import Data
 import Dialog as D
+import Dict exposing (Dict(..))
 import Element as E exposing (Element)
 import Element.Background as EBk
 import Element.Border as EBd
@@ -30,6 +31,7 @@ type Msg
 type alias Model =
     { noteid : Int
     , notes : List Data.ZkListNote
+    , fullnotes : Dict Int Data.ZkNote
     , ppmodel : PP.Model
     }
 
@@ -45,8 +47,16 @@ init : Int -> List Data.ZkListNote -> Model
 init noteid notes =
     { noteid = noteid
     , notes = notes
+    , fullnotes = Dict.empty
     , ppmodel = PP.initModel
     }
+
+
+onZkNote : Data.ZkNote -> Model -> ( Model, Command )
+onZkNote zkn model =
+    ( { model | fullnotes = Dict.insert zkn.id zkn model.fullnotes }
+    , None
+    )
 
 
 updateSearchResult : List Data.ZkListNote -> Model -> Model
@@ -86,8 +96,9 @@ listview ld size model =
                 [ ld.homenote
                     |> Maybe.map
                         (\id ->
-                            EI.button Common.buttonStyle
-                                { onPress = Just (SelectPress id)
+                            E.link
+                                Common.buttonStyle
+                                { url = Data.archiveNoteLink id
                                 , label = E.text "⌂"
                                 }
                         )

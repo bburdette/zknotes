@@ -547,6 +547,12 @@ editNoteLink noteid =
     UB.absolute [ "editnote", String.fromInt noteid ] []
 
 
+archiveNoteLink : Int -> String
+archiveNoteLink noteid =
+    -- this what we want?
+    UB.absolute [ "archivenote", String.fromInt noteid ] []
+
+
 flipDirection : Direction -> Direction
 flipDirection direction =
     case direction of

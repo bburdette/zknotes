@@ -12,6 +12,8 @@ type Route
     | PublicZkPubId String
     | EditZkNoteR Int
     | EditZkNoteNew
+    | ArchiveNoteListingR Int
+    | ArchiveNoteR Int Int
     | ResetPasswordR String UUID
     | SettingsR
     | Invite String
@@ -35,6 +37,12 @@ routeTitle route =
 
         EditZkNoteNew ->
             "new zknote"
+
+        ArchiveNoteListingR id ->
+            "archives " ++ String.fromInt id
+
+        ArchiveNoteR id aid ->
+            "archive " ++ String.fromInt id ++ ": " ++ String.fromInt aid
 
         ResetPasswordR _ _ ->
             "password reset"
@@ -64,6 +72,15 @@ parseUrl url =
                 UP.s
                     "page"
                     </> UP.string
+            , UP.map ArchiveNoteListingR <|
+                UP.s
+                    "archivelisting"
+                    </> UP.int
+            , UP.map ArchiveNoteR <|
+                UP.s
+                    "archivenote"
+                    </> UP.int
+                    </> UP.int
             , UP.map EditZkNoteR <|
                 UP.s
                     "editnote"
@@ -107,6 +124,12 @@ routeUrl route =
 
         EditZkNoteNew ->
             UB.absolute [ "editnote", "new" ] []
+
+        ArchiveNoteListingR id ->
+            UB.absolute [ "archivelisting", String.fromInt id ] []
+
+        ArchiveNoteR id aid ->
+            UB.absolute [ "archivenote", String.fromInt id, String.fromInt aid ] []
 
         ResetPasswordR user key ->
             UB.absolute [ "reset", user, UUID.toString key ] []
