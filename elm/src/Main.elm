@@ -732,7 +732,7 @@ viewState size state model =
             E.map EditZkNoteListingMsg <| EditZkNoteListing.view ld size em
 
         ArchiveListing em ld ->
-            E.map ArchiveListingMsg <| ArchiveListing.view ld size em
+            E.map ArchiveListingMsg <| ArchiveListing.view ld model.timezone size em
 
         ShowMessage em _ _ ->
             E.map ShowMessageMsg <| ShowMessage.view em

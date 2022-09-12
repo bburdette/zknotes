@@ -16,6 +16,7 @@ import Search as S exposing (TagSearch(..))
 import SearchStackPanel as SP
 import TagSearchPanel as TSP
 import TangoColors as TC
+import Time
 import Toop
 import Util
 import WindowKeys as WK
@@ -68,10 +69,10 @@ updateSearchResult zsr model =
     }
 
 
-view : Data.LoginData -> Util.Size -> Model -> Element Msg
-view ld size model =
+view : Data.LoginData -> Time.Zone -> Util.Size -> Model -> Element Msg
+view ld zone size model =
     E.column []
-        [ listview ld size model
+        [ listview ld zone size model
         , model.selected
             |> Maybe.andThen (\id -> Dict.get id model.fullnotes)
             |> Maybe.map (\zkn -> E.text zkn.content)
@@ -79,8 +80,8 @@ view ld size model =
         ]
 
 
-listview : Data.LoginData -> Util.Size -> Model -> Element Msg
-listview ld size model =
+listview : Data.LoginData -> Time.Zone -> Util.Size -> Model -> Element Msg
+listview ld zone size model =
     let
         maxwidth =
             700
@@ -149,7 +150,11 @@ listview ld size model =
                                         [ E.link
                                             [ E.height <| E.px 30 ]
                                             { url = Data.archiveNoteLink model.noteid n.id
-                                            , label = E.text n.title
+                                            , label =
+                                                E.row [ E.spacing 10 ]
+                                                    [ E.text (Util.showDateTime zone (Time.millisToPosix n.changeddate))
+                                                    , E.text n.title
+                                                    ]
                                             }
                                         ]
                           }

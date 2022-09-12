@@ -546,11 +546,6 @@ encodeGetArchiveZkNote x =
 
 
 
--- decodeZkNoteArchives : JD.Decoder ZkNoteArchives
--- decodeZkNoteArchives =
---     JD.map2 ZkNoteArchives
---         (JD.field "noteid" JD.int)
---         (JD.field "archive_notes" (JD.list decodeZkListNote))
 ----------------------------------------
 -- misc functions
 ----------------------------------------
@@ -563,7 +558,6 @@ editNoteLink noteid =
 
 archiveNoteLink : Int -> Int -> String
 archiveNoteLink parentnoteid noteid =
-    -- this what we want?
     UB.absolute [ "archivenote", String.fromInt parentnoteid, String.fromInt noteid ] []
 
 
