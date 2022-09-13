@@ -246,6 +246,25 @@ type alias ZkNoteEdit =
     }
 
 
+type alias GetZkNoteArchives =
+    { zknote : Int
+    , offset : Int
+    , limit : Maybe Int
+    }
+
+
+type alias ZkNoteArchives =
+    { zknote : Int
+    , results : ZkListNoteSearchResult
+    }
+
+
+type alias GetArchiveZkNote =
+    { parentnote : Int
+    , noteid : Int
+    }
+
+
 
 ----------------------------------------
 -- Json encoders/decoders
@@ -470,6 +489,13 @@ decodeZkNote =
         |> andMap (JD.field "sysids" <| JD.list JD.int)
 
 
+decodeZkNoteArchives : JD.Decoder ZkNoteArchives
+decodeZkNoteArchives =
+    JD.map2 ZkNoteArchives
+        (JD.field "zknote" JD.int)
+        (JD.field "results" decodeZkListNoteSearchResult)
+
+
 decodeZkNoteEdit : JD.Decoder ZkNoteEdit
 decodeZkNoteEdit =
     JD.map3 ZkNoteEdit
@@ -504,6 +530,30 @@ encodeImportZkNote izn =
         ]
 
 
+encodeGetZkNoteArchives : GetZkNoteArchives -> JE.Value
+encodeGetZkNoteArchives x =
+    JE.object <|
+        [ ( "zknote", JE.int x.zknote )
+        , ( "offset", JE.int x.offset )
+        ]
+            ++ (case x.limit of
+                    Just l ->
+                        [ ( "limit", JE.int l )
+                        ]
+
+                    Nothing ->
+                        []
+               )
+
+
+encodeGetArchiveZkNote : GetArchiveZkNote -> JE.Value
+encodeGetArchiveZkNote x =
+    JE.object <|
+        [ ( "parentnote", JE.int x.parentnote )
+        , ( "noteid", JE.int x.noteid )
+        ]
+
+
 
 ----------------------------------------
 -- misc functions
@@ -513,6 +563,11 @@ encodeImportZkNote izn =
 editNoteLink : Int -> String
 editNoteLink noteid =
     UB.absolute [ "editnote", String.fromInt noteid ] []
+
+
+archiveNoteLink : Int -> Int -> String
+archiveNoteLink parentnoteid noteid =
+    UB.absolute [ "archivenote", String.fromInt parentnoteid, String.fromInt noteid ] []
 
 
 flipDirection : Direction -> Direction

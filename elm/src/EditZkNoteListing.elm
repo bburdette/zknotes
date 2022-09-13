@@ -21,8 +21,7 @@ import ZkCommon as ZC
 
 
 type Msg
-    = SelectPress Int
-    | NewPress
+    = NewPress
     | DonePress
     | ImportPress
     | PowerDeletePress
@@ -44,8 +43,7 @@ type alias Model =
 
 
 type Command
-    = Selected Int
-    | New
+    = New
     | Done
     | Import
     | None
@@ -141,8 +139,9 @@ listview ld size model =
                 [ ld.homenote
                     |> Maybe.map
                         (\id ->
-                            EI.button Common.buttonStyle
-                                { onPress = Just (SelectPress id)
+                            E.link
+                                Common.buttonStyle
+                                { url = Data.editNoteLink id
                                 , label = E.text "⌂"
                                 }
                         )
@@ -213,11 +212,6 @@ listview ld size model =
 update : Msg -> Model -> Data.LoginData -> ( Model, Command )
 update msg model ld =
     case msg of
-        SelectPress id ->
-            ( model
-            , Selected id
-            )
-
         NewPress ->
             ( model, New )
 

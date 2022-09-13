@@ -1,5 +1,6 @@
 port module Main exposing (main)
 
+import ArchiveListing
 import Array
 import Browser
 import Browser.Events
@@ -79,6 +80,7 @@ type Msg
     | ViewMsg View.Msg
     | EditZkNoteMsg EditZkNote.Msg
     | EditZkNoteListingMsg EditZkNoteListing.Msg
+    | ArchiveListingMsg ArchiveListing.Msg
     | UserSettingsMsg UserSettings.Msg
     | UserListingMsg UserListing.Msg
     | UserEditMsg UserEdit.Msg
@@ -88,6 +90,7 @@ type Msg
     | UserReplyData (Result Http.Error UI.ServerResponse)
     | AdminReplyData (Result Http.Error AI.ServerResponse)
     | ZkReplyData (Result Http.Error ZI.ServerResponse)
+    | ZkReplyDataSeq (Result Http.Error ZI.ServerResponse -> Maybe (Cmd Msg)) (Result Http.Error ZI.ServerResponse)
     | TAReplyData Data.TASelection (Result Http.Error ZI.ServerResponse)
     | PublicReplyData (Result Http.Error PI.ServerResponse)
     | ErrorIndexNote (Result Http.Error PI.ServerResponse)
@@ -114,6 +117,7 @@ type State
     | InviteUser InviteUser.Model Data.LoginData
     | EditZkNote EditZkNote.Model Data.LoginData
     | EditZkNoteListing EditZkNoteListing.Model Data.LoginData
+    | ArchiveListing ArchiveListing.Model Data.LoginData
     | View View.Model
     | EView View.Model State
     | Import Import.Model Data.LoginData
@@ -316,6 +320,80 @@ routeState model route =
                             -- err 'you're not logged in.'
                             ( (displayMessageDialog { model | state = initLoginState model } "can't create a new note; you're not logged in!").state, Cmd.none )
 
+        ArchiveNoteListingR id ->
+            case model.state of
+                ArchiveListing st login ->
+                    ( ArchiveListing st login
+                    , sendZIMsg model.location
+                        (ZI.GetZkNoteArchives
+                            { zknote = id
+                            , offset = 0
+                            , limit = Just S.defaultSearchLimit
+                            }
+                        )
+                    )
+
+                st ->
+                    case stateLogin st of
+                        Just login ->
+                            ( ShowMessage { message = "loading archives..." }
+                                login
+                                (Just model.state)
+                            , sendZIMsg model.location
+                                (ZI.GetZkNoteArchives
+                                    { zknote = id
+                                    , offset = 0
+                                    , limit = Just S.defaultSearchLimit
+                                    }
+                                )
+                            )
+
+                        Nothing ->
+                            ( model.state, Cmd.none )
+
+        ArchiveNoteR id aid ->
+            let
+                getboth =
+                    sendZIMsgExp model.location
+                        (ZI.GetZkNoteArchives
+                            { zknote = id
+                            , offset = 0
+                            , limit = Just S.defaultSearchLimit
+                            }
+                        )
+                        (ZkReplyDataSeq
+                            (\_ ->
+                                Just <|
+                                    sendZIMsg model.location
+                                        (ZI.GetArchiveZkNote { parentnote = id, noteid = aid })
+                            )
+                        )
+            in
+            case model.state of
+                ArchiveListing st login ->
+                    if st.noteid == id then
+                        ( ArchiveListing st login
+                        , sendZIMsg model.location
+                            (ZI.GetArchiveZkNote { parentnote = id, noteid = aid })
+                        )
+
+                    else
+                        ( ArchiveListing st login
+                        , getboth
+                        )
+
+                st ->
+                    case stateLogin st of
+                        Just login ->
+                            ( ShowMessage { message = "loading archives..." }
+                                login
+                                (Just model.state)
+                            , getboth
+                            )
+
+                        Nothing ->
+                            ( model.state, Cmd.none )
+
         ResetPasswordR username key ->
             ( ResetPassword <| ResetPassword.initialModel username key "zknotes", Cmd.none )
 
@@ -391,6 +469,11 @@ stateRoute state =
                 |> Maybe.map (\id -> { route = EditZkNoteR id, save = True })
                 |> Maybe.withDefault { route = EditZkNoteNew, save = False }
 
+        ArchiveListing almod ld ->
+            almod.selected
+                |> Maybe.map (\sid -> { route = ArchiveNoteR almod.noteid sid, save = True })
+                |> Maybe.withDefault { route = ArchiveNoteListingR almod.noteid, save = True }
+
         Login _ ->
             { route = LoginR
             , save = False
@@ -434,6 +517,9 @@ showMessage msg =
         EditZkNoteListingMsg _ ->
             "EditZkNoteListingMsg"
 
+        ArchiveListingMsg _ ->
+            "ArchiveListingMsg"
+
         UserSettingsMsg _ ->
             "UserSettingsMsg"
 
@@ -473,6 +559,20 @@ showMessage msg =
 
         ZkReplyData urd ->
             "ZkReplyData: "
+                ++ (Result.map ZI.showServerResponse urd
+                        |> Result.mapError Util.httpErrorString
+                        |> (\r ->
+                                case r of
+                                    Ok m ->
+                                        "message: " ++ m
+
+                                    Err e ->
+                                        "error: " ++ e
+                           )
+                   )
+
+        ZkReplyDataSeq _ urd ->
+            "ZkReplyDataSeq : "
                 ++ (Result.map ZI.showServerResponse urd
                         |> Result.mapError Util.httpErrorString
                         |> (\r ->
@@ -572,6 +672,9 @@ showState state =
         EditZkNoteListing _ _ ->
             "EditZkNoteListing"
 
+        ArchiveListing _ _ ->
+            "ArchiveListing"
+
         View _ ->
             "View"
 
@@ -653,6 +756,9 @@ viewState size state model =
         EditZkNoteListing em ld ->
             E.map EditZkNoteListingMsg <| EditZkNoteListing.view ld size em
 
+        ArchiveListing em ld ->
+            E.map ArchiveListingMsg <| ArchiveListing.view ld model.timezone size em
+
         ShowMessage em _ _ ->
             E.map ShowMessageMsg <| ShowMessage.view em
 
@@ -729,6 +835,9 @@ stateSearch state =
         EditZkNoteListing emod _ ->
             Just ( emod.spmodel, emod.notes )
 
+        ArchiveListing _ _ ->
+            Nothing
+
         ShowMessage _ _ (Just st) ->
             stateSearch st
 
@@ -803,6 +912,9 @@ stateLogin state =
             Just login
 
         EditZkNoteListing _ login ->
+            Just login
+
+        ArchiveListing _ login ->
             Just login
 
         Import _ login ->
@@ -1547,6 +1659,9 @@ actualupdate msg model =
         ( InviteUserMsg lm, InviteUser mod ld ) ->
             handleInviteUser model (InviteUser.update lm mod) ld
 
+        ( ArchiveListingMsg lm, ArchiveListing mod ld ) ->
+            handleArchiveListing model ld (ArchiveListing.update lm mod ld)
+
         ( PublicReplyData prd, state ) ->
             case prd of
                 Err e ->
@@ -1840,6 +1955,18 @@ actualupdate msg model =
                         AI.ServerError e ->
                             ( displayMessageDialog model <| e, Cmd.none )
 
+        ( ZkReplyDataSeq f zrd, state ) ->
+            let
+                ( nmod, ncmd ) =
+                    actualupdate (ZkReplyData zrd) model
+            in
+            case f zrd of
+                Just cmd ->
+                    ( nmod, Cmd.batch [ ncmd, cmd ] )
+
+                Nothing ->
+                    ( nmod, ncmd )
+
         ( ZkReplyData zrd, state ) ->
             case zrd of
                 Err e ->
@@ -1929,10 +2056,34 @@ actualupdate msg model =
                                     , Cmd.none
                                     )
 
+                        ZI.ArchiveList ar ->
+                            case model.state of
+                                ArchiveListing al login ->
+                                    ( { model | state = ArchiveListing (ArchiveListing.updateSearchResult ar.results al) login }
+                                    , Cmd.none
+                                    )
+
+                                _ ->
+                                    case stateLogin state of
+                                        Just login ->
+                                            ( { model | state = ArchiveListing (ArchiveListing.init ar) login }
+                                            , Cmd.none
+                                            )
+
+                                        Nothing ->
+                                            ( displayMessageDialog
+                                                { model | state = initLoginState model }
+                                                "can't access note archives; you're not logged in!"
+                                            , Cmd.none
+                                            )
+
                         ZI.ZkNote zkn ->
                             case state of
                                 EditZkNote ezn login ->
                                     handleEditZkNoteCmd model login (EditZkNote.onZkNote zkn ezn)
+
+                                ArchiveListing st login ->
+                                    handleArchiveListing model login (ArchiveListing.onZkNote zkn st)
 
                                 _ ->
                                     ( unexpectedMessage model (ZI.showServerResponse ziresponse)
@@ -2488,6 +2639,11 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
         EditZkNote.ShowMessage e ->
             ( displayMessageDialog model e, Cmd.none )
 
+        EditZkNote.ShowArchives id ->
+            ( model
+            , sendZIMsg model.location (ZI.GetZkNoteArchives { zknote = id, offset = 0, limit = Just S.defaultSearchLimit })
+            )
+
         EditZkNote.Cmd cmd ->
             ( { model | state = EditZkNote emod login }
             , Cmd.map EditZkNoteMsg cmd
@@ -2502,11 +2658,6 @@ handleEditZkNoteListing model login ( emod, ecmd ) =
 
         EditZkNoteListing.New ->
             ( { model | state = EditZkNote (EditZkNote.initNew login emod.notes emod.spmodel []) login }, Cmd.none )
-
-        EditZkNoteListing.Selected id ->
-            ( { model | state = EditZkNoteListing emod login }
-            , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id })
-            )
 
         EditZkNoteListing.Done ->
             ( { model | state = UserSettings (UserSettings.init login model.fontsize) login (EditZkNoteListing emod login) }
@@ -2530,6 +2681,28 @@ handleEditZkNoteListing model login ( emod, ecmd ) =
         EditZkNoteListing.SearchHistory ->
             ( shDialog model
             , Cmd.none
+            )
+
+
+handleArchiveListing : Model -> Data.LoginData -> ( ArchiveListing.Model, ArchiveListing.Command ) -> ( Model, Cmd Msg )
+handleArchiveListing model login ( emod, ecmd ) =
+    case ecmd of
+        ArchiveListing.None ->
+            ( { model | state = ArchiveListing emod login }, Cmd.none )
+
+        ArchiveListing.Selected id ->
+            ( { model | state = ArchiveListing emod login }
+            , sendZIMsg model.location (ZI.GetZkNote id)
+            )
+
+        ArchiveListing.Done ->
+            ( { model | state = UserSettings (UserSettings.init login model.fontsize) login (ArchiveListing emod login) }
+            , Cmd.none
+            )
+
+        ArchiveListing.GetArchives msg ->
+            ( { model | state = ArchiveListing emod login }
+            , sendZIMsg model.location <| ZI.GetZkNoteArchives msg
             )
 
 

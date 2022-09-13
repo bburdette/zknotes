@@ -128,6 +128,7 @@ type Msg
     | SettingsPress
     | AdminPress
     | FlipLink EditLink
+    | ShowArchivesPress
     | Noop
 
 
@@ -218,6 +219,7 @@ type Command
     | SetHomeNote Int
     | AddToRecent Data.ZkListNote
     | ShowMessage String
+    | ShowArchives Int
     | Cmd (Cmd Msg)
 
 
@@ -1420,6 +1422,10 @@ zknview zone size recentZkns model =
 
               else
                 E.none
+            , EI.button Common.buttonStyle
+                { onPress = Just <| ShowArchivesPress
+                , label = E.el [ E.centerY ] <| E.text "archives"
+                }
             , EI.button
                 (E.alignRight :: Common.buttonStyle)
                 { onPress = Just SettingsPress, label = E.text "settings" }
@@ -2555,6 +2561,14 @@ update msg model =
 
         SettingsPress ->
             ( model, Settings )
+
+        ShowArchivesPress ->
+            case model.id of
+                Just id ->
+                    ( model, ShowArchives id )
+
+                Nothing ->
+                    ( model, None )
 
         AdminPress ->
             ( model, Admin )

@@ -10,6 +10,8 @@ type SendMsg
     = GetZkNote Int
     | GetZkNoteEdit Data.GetZkNoteEdit
     | GetZkNoteComments Data.GetZkNoteComments
+    | GetZkNoteArchives Data.GetZkNoteArchives
+    | GetArchiveZkNote Data.GetArchiveZkNote
     | DeleteZkNote Int
     | SaveZkNote Data.SaveZkNote
     | SaveZkLinks Data.ZkLinks
@@ -23,6 +25,7 @@ type SendMsg
 type ServerResponse
     = ZkNoteSearchResult Data.ZkNoteSearchResult
     | ZkListNoteSearchResult Data.ZkListNoteSearchResult
+    | ArchiveList Data.ZkNoteArchives
     | SavedZkNotePlusLinks Data.SavedZkNote
     | SavedZkNote Data.SavedZkNote
     | DeletedZkNote Int
@@ -45,6 +48,9 @@ showServerResponse sr =
 
         ZkListNoteSearchResult _ ->
             "ZkListNoteSearchResult"
+
+        ArchiveList _ ->
+            "ArchiveList"
 
         SavedZkNote _ ->
             "SavedZkNote"
@@ -102,6 +108,18 @@ encodeSendMsg sm =
             JE.object
                 [ ( "what", JE.string "getzknotecomments" )
                 , ( "data", Data.encodeGetZkNoteComments msg )
+                ]
+
+        GetZkNoteArchives msg ->
+            JE.object
+                [ ( "what", JE.string "getzknotearchives" )
+                , ( "data", Data.encodeGetZkNoteArchives msg )
+                ]
+
+        GetArchiveZkNote msg ->
+            JE.object
+                [ ( "what", JE.string "getarchivezknote" )
+                , ( "data", Data.encodeGetArchiveZkNote msg )
                 ]
 
         DeleteZkNote id ->
@@ -180,6 +198,9 @@ serverResponseDecoder =
 
                     "zklistnotesearchresult" ->
                         JD.map ZkListNoteSearchResult (JD.at [ "content" ] <| Data.decodeZkListNoteSearchResult)
+
+                    "zknotearchives" ->
+                        JD.map ArchiveList (JD.at [ "content" ] <| Data.decodeZkNoteArchives)
 
                     "savedzknote" ->
                         JD.map SavedZkNote (JD.at [ "content" ] <| Data.decodeSavedZkNote)

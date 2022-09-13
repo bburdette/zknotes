@@ -11,8 +11,9 @@ use std::error::Error;
 use std::path::Path;
 use std::time::Duration;
 use zkprotocol::content::{
-  Direction, EditLink, ExtraLoginData, GetZkLinks, GetZkNoteComments, GetZkNoteEdit, ImportZkNote,
-  SaveZkLink, SaveZkNote, SavedZkNote, ZkLink, ZkNote, ZkNoteEdit,
+  Direction, EditLink, ExtraLoginData, GetArchiveZkNote, GetZkLinks, GetZkNoteArchives,
+  GetZkNoteComments, GetZkNoteEdit, ImportZkNote, SaveZkLink, SaveZkNote, SavedZkNote, ZkLink,
+  ZkListNote, ZkNote, ZkNoteEdit,
 };
 
 #[derive(Clone, Deserialize, Serialize, Debug)]
@@ -253,6 +254,11 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: i64) -> Result<(), Box<dyn Err
     info!("udpate16");
     zkm::udpate16(&dbfile)?;
     set_single_value(&conn, "migration_level", "16")?;
+  }
+  if nlevel < 17 {
+    info!("udpate17");
+    zkm::udpate17(&dbfile)?;
+    set_single_value(&conn, "migration_level", "17")?;
   }
 
   info!("db up to date.");
@@ -502,6 +508,32 @@ pub fn are_notes_linked(conn: &Connection, nid1: i64, nid2: i64) -> Result<bool,
 
 // zknote CRUD
 
+pub fn archive_zknote(conn: &Connection, noteid: i64) -> Result<SavedZkNote, Box<dyn Error>> {
+  let now = now()?;
+  let sysid = user_id(&conn, "system")?;
+  let aid = note_id(&conn, "system", "archive")?;
+
+  // copy the note, with user 'system'.
+  conn.execute(
+    "insert into zknote (title, content, user, pubid, editable, showtitle, createdate, changeddate)
+     select title, content, ?1, pubid, editable, showtitle, createdate, changeddate from
+         zknote where id = ?2",
+    params![sysid, noteid,],
+  )?;
+  let archive_note_id = conn.last_insert_rowid();
+
+  // mark the note as an archive note.
+  save_zklink(&conn, archive_note_id, aid, sysid, None)?;
+
+  // link the note to the original note.
+  save_zklink(&conn, archive_note_id, noteid, sysid, None)?;
+
+  Ok(SavedZkNote {
+    id: archive_note_id,
+    changeddate: now,
+  })
+}
+
 pub fn save_zknote(
   conn: &Connection,
   uid: i64,
@@ -511,6 +543,7 @@ pub fn save_zknote(
 
   match note.id {
     Some(id) => {
+      archive_zknote(&conn, id)?;
       // existing note.  update IF mine.
       match conn.execute(
         "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4, editable = ?5, showtitle = ?6
@@ -656,6 +689,43 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
     },
     Err(e) => Err(e),
   }
+}
+
+pub fn read_zklistnote(
+  conn: &Connection,
+  uid: Option<i64>,
+  id: i64,
+) -> Result<ZkListNote, Box<dyn Error>> {
+  let sysid = user_id(&conn, "system")?;
+  let sysids = get_sysids(conn, sysid, id)?;
+
+  // access check
+  let zna = zknote_access_id(conn, uid, id)?;
+  match zna {
+    Access::Private => Err(Box::new(std::io::Error::new(
+      std::io::ErrorKind::PermissionDenied,
+      "can't read zknote; note is private",
+    ))),
+    _ => Ok(()),
+  }?;
+
+  let note = conn.query_row(
+    "select ZN.title, ZN.user, ZN.createdate, ZN.changeddate
+      from zknote ZN, orgauth_user OU, user U where ZN.id = ?1 and U.id = ZN.user and OU.id = ZN.user",
+    params![id],
+    |row| {
+      Ok(ZkListNote {
+        id: id,
+        title: row.get(0)?,
+        user: row.get(1)?,
+        createdate: row.get(2)?,
+        changeddate: row.get(3)?,
+        sysids: sysids,
+      })
+    },
+  )?;
+
+  Ok(note)
 }
 
 #[derive(Debug)]
@@ -1075,6 +1145,83 @@ pub fn read_zknotecomments(
   }
 
   Ok(nv)
+}
+
+pub fn read_zknotearchives(
+  conn: &Connection,
+  uid: i64,
+  gzna: &GetZkNoteArchives,
+) -> Result<Vec<ZkListNote>, Box<dyn Error>> {
+  let cid = note_id(&conn, "system", "archive")?;
+  let sysid = user_id(&conn, "system")?;
+
+  // users that can't see a note, can't see the archives either.
+  read_zknote(&conn, Some(uid), gzna.zknote)?;
+
+  // notes with a TO link to our note
+  // and a TO link to 'archive'
+  let mut stmt = conn.prepare(
+    "select N.fromid from zknote, zklink C, zklink N
+      where N.fromid = C.fromid
+      and zknote.id = N.fromid
+      and N.toid = ?1 and C.toid = ?2
+      order by zknote.changeddate desc",
+  )?;
+
+  let c_iter = stmt
+    .query_map(params![gzna.zknote, cid], |row| Ok(row.get(0)?))?
+    .skip(gzna.offset as usize);
+
+  let mut nv = Vec::new();
+
+  for id in c_iter {
+    match id {
+      Ok(id) => {
+        let note = read_zklistnote(&conn, Some(sysid), id)?;
+        nv.push(note);
+        match gzna.limit {
+          Some(l) => {
+            if nv.len() >= l as usize {
+              break;
+            }
+          }
+          None => (),
+        }
+      }
+      Err(_) => (),
+    }
+  }
+
+  Ok(nv)
+}
+
+pub fn read_archivezknote(
+  conn: &Connection,
+  uid: i64,
+  gazn: &GetArchiveZkNote,
+) -> Result<ZkNote, Box<dyn Error>> {
+  let archiveid = note_id(&conn, "system", "archive")?;
+  let sysid = user_id(&conn, "system")?;
+
+  // have access to the parent note?
+  read_zknote(conn, Some(uid), gazn.parentnote)?;
+
+  // archive note should have a TO link to the parent note
+  // and a TO link to 'archive'
+  let _i: i64 = match conn.query_row(
+    "select N.fromid from zklink C, zklink N
+      where N.fromid = C.fromid
+      and N.toid = ?1 and C.toid = ?2 and N.fromid = ?3",
+    params![gazn.parentnote, archiveid, gazn.noteid],
+    |row| Ok(row.get(0)?),
+  ) {
+    Ok(v) => Ok(v),
+    Err(rusqlite::Error::QueryReturnedNoRows) => bail!("not an archive note!"),
+    Err(x) => Err(Box::new(x)),
+  }?;
+
+  // now read the archive note AS SYSTEM.
+  read_zknote(conn, Some(sysid), gazn.noteid)
 }
 
 pub fn read_zknoteedit(

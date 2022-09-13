@@ -1,5 +1,7 @@
 #![allow(non_snake_case)]
 
+use crate::search::ZkListNoteSearchResult;
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ExtraLoginData {
   pub userid: i64,
@@ -117,6 +119,25 @@ pub struct GetZkLinks {
 #[derive(Deserialize, Serialize, Debug)]
 pub struct GetZkNoteEdit {
   pub zknote: i64,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct GetZkNoteArchives {
+  pub zknote: i64,
+  pub offset: i64,
+  pub limit: Option<i64>,
+}
+
+#[derive(Serialize, Debug)]
+pub struct ZkNoteArchives {
+  pub zknote: i64,
+  pub results: ZkListNoteSearchResult,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct GetArchiveZkNote {
+  pub parentnote: i64,
+  pub noteid: i64,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
