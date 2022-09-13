@@ -10,7 +10,6 @@ use simple_error::bail;
 use std::error::Error;
 use std::path::Path;
 use std::time::Duration;
-use uuid::adapter::Simple;
 use zkprotocol::content::{
   Direction, EditLink, ExtraLoginData, GetArchiveZkNote, GetZkLinks, GetZkNoteArchives,
   GetZkNoteComments, GetZkNoteEdit, ImportZkNote, SaveZkLink, SaveZkNote, SavedZkNote, ZkLink,
@@ -1165,14 +1164,16 @@ pub fn read_zknotearchives(
   let cid = note_id(&conn, "system", "archive")?;
 
   // users that can't see a note, can't see the archives either.
-  let note = read_zknote(&conn, Some(uid), gzna.zknote)?;
+  read_zknote(&conn, Some(uid), gzna.zknote)?;
 
   // notes with a TO link to our note
   // and a TO link to 'archive'
   let mut stmt = conn.prepare(
-    "select N.fromid from zklink C, zklink N
+    "select N.fromid from zknote, zklink C, zklink N
       where N.fromid = C.fromid
-      and N.toid = ?1 and C.toid = ?2",
+      and zknote.id = N.fromid
+      and N.toid = ?1 and C.toid = ?2
+      order by zknote.changeddate desc",
   )?;
 
   let c_iter = stmt
@@ -1213,11 +1214,11 @@ pub fn read_archivezknote(
   let sysid = user_id(&conn, "system")?;
 
   // have access to the parent note?
-  let parentnote = read_zknote(conn, Some(uid), gazn.parentnote)?;
+  read_zknote(conn, Some(uid), gazn.parentnote)?;
 
   // archive note should have a TO link to the parent note
   // and a TO link to 'archive'
-  let i: i64 = match conn.query_row(
+  let _i: i64 = match conn.query_row(
     "select N.fromid from zklink C, zklink N
       where N.fromid = C.fromid
       and N.toid = ?1 and C.toid = ?2 and N.fromid = ?3",
