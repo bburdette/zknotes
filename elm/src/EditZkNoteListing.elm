@@ -21,8 +21,7 @@ import ZkCommon as ZC
 
 
 type Msg
-    = SelectPress Int
-    | NewPress
+    = NewPress
     | DonePress
     | ImportPress
     | PowerDeletePress
@@ -44,8 +43,7 @@ type alias Model =
 
 
 type Command
-    = Selected Int
-    | New
+    = New
     | Done
     | Import
     | None
@@ -214,11 +212,6 @@ listview ld size model =
 update : Msg -> Model -> Data.LoginData -> ( Model, Command )
 update msg model ld =
     case msg of
-        SelectPress id ->
-            ( model
-            , Selected id
-            )
-
         NewPress ->
             ( model, New )
 

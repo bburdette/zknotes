@@ -2659,11 +2659,6 @@ handleEditZkNoteListing model login ( emod, ecmd ) =
         EditZkNoteListing.New ->
             ( { model | state = EditZkNote (EditZkNote.initNew login emod.notes emod.spmodel []) login }, Cmd.none )
 
-        EditZkNoteListing.Selected id ->
-            ( { model | state = EditZkNoteListing emod login }
-            , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id })
-            )
-
         EditZkNoteListing.Done ->
             ( { model | state = UserSettings (UserSettings.init login model.fontsize) login (EditZkNoteListing emod login) }
             , Cmd.none
