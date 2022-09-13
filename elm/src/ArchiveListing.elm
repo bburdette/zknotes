@@ -45,13 +45,13 @@ type Command
     | None
 
 
-init : Int -> List Data.ZkListNote -> Model
-init noteid notes =
-    { noteid = noteid
-    , notes = notes
+init : Data.ZkNoteArchives -> Model
+init zna =
+    { noteid = zna.zknote
+    , notes = zna.results.notes
     , selected = Nothing
     , fullnotes = Dict.empty
-    , ppmodel = PP.initModel
+    , ppmodel = PP.searchResultUpdated zna.results PP.initModel
     }
 
 
@@ -62,16 +62,17 @@ onZkNote zkn model =
     )
 
 
-updateSearchResult : List Data.ZkListNote -> Model -> Model
+updateSearchResult : Data.ZkListNoteSearchResult -> Model -> Model
 updateSearchResult zsr model =
     { model
-        | notes = zsr
+        | notes = zsr.notes
+        , ppmodel = PP.searchResultUpdated zsr model.ppmodel
     }
 
 
 view : Data.LoginData -> Time.Zone -> Util.Size -> Model -> Element Msg
 view ld zone size model =
-    E.column []
+    E.column [ E.centerX ]
         [ listview ld zone size model
         , model.selected
             |> Maybe.andThen (\id -> Dict.get id model.fullnotes)
@@ -107,7 +108,7 @@ listview ld zone size model =
                         (\id ->
                             E.link
                                 Common.buttonStyle
-                                { url = Data.archiveNoteLink model.noteid id
+                                { url = Data.editNoteLink id
                                 , label = E.text "⌂"
                                 }
                         )
@@ -146,6 +147,12 @@ listview ld zone size model =
                                                     |> Maybe.map (\c -> [ EF.color c ])
                                                     |> Maybe.withDefault []
                                                )
+                                            ++ (if Just n.id == model.selected then
+                                                    [ EBk.color TC.lightBlue ]
+
+                                                else
+                                                    []
+                                               )
                                         )
                                         [ E.link
                                             [ E.height <| E.px 30 ]
@@ -183,7 +190,14 @@ update msg model ld =
                 ( nm, cmd ) =
                     PP.update pms model.ppmodel
             in
-            ( model, GetArchives { zknote = model.noteid, offset = nm.offset, limit = Just nm.increment } )
+            ( { model | ppmodel = nm }
+            , case cmd of
+                PP.RangeChanged ->
+                    GetArchives { zknote = model.noteid, offset = nm.offset, limit = Just nm.increment }
+
+                PP.None ->
+                    None
+            )
 
         DonePress ->
             ( model, Done )

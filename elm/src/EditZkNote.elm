@@ -219,7 +219,7 @@ type Command
     | SetHomeNote Int
     | AddToRecent Data.ZkListNote
     | ShowMessage String
-    | ShowArchives Data.GetZkNoteArchives
+    | ShowArchives Int
     | Cmd (Cmd Msg)
 
 
@@ -2565,7 +2565,7 @@ update msg model =
         ShowArchivesPress ->
             case model.id of
                 Just id ->
-                    ( model, ShowArchives { zknote = id, offset = 0, limit = Nothing } )
+                    ( model, ShowArchives id )
 
                 Nothing ->
                     ( model, None )

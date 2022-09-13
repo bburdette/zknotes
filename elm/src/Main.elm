@@ -328,7 +328,7 @@ routeState model route =
                         (ZI.GetZkNoteArchives
                             { zknote = id
                             , offset = 0
-                            , limit = Nothing
+                            , limit = Just S.defaultSearchLimit
                             }
                         )
                     )
@@ -343,7 +343,7 @@ routeState model route =
                                 (ZI.GetZkNoteArchives
                                     { zknote = id
                                     , offset = 0
-                                    , limit = Nothing
+                                    , limit = Just S.defaultSearchLimit
                                     }
                                 )
                             )
@@ -358,7 +358,7 @@ routeState model route =
                         (ZI.GetZkNoteArchives
                             { zknote = id
                             , offset = 0
-                            , limit = Nothing
+                            , limit = Just S.defaultSearchLimit
                             }
                         )
                         (ZkReplyDataSeq
@@ -1659,6 +1659,9 @@ actualupdate msg model =
         ( InviteUserMsg lm, InviteUser mod ld ) ->
             handleInviteUser model (InviteUser.update lm mod) ld
 
+        ( ArchiveListingMsg lm, ArchiveListing mod ld ) ->
+            handleArchiveListing model ld (ArchiveListing.update lm mod ld)
+
         ( PublicReplyData prd, state ) ->
             case prd of
                 Err e ->
@@ -2054,18 +2057,25 @@ actualupdate msg model =
                                     )
 
                         ZI.ArchiveList ar ->
-                            case stateLogin state of
-                                Just login ->
-                                    ( { model | state = ArchiveListing (ArchiveListing.init ar.zknote ar.results.notes) login }
+                            case model.state of
+                                ArchiveListing al login ->
+                                    ( { model | state = ArchiveListing (ArchiveListing.updateSearchResult ar.results al) login }
                                     , Cmd.none
                                     )
 
-                                Nothing ->
-                                    ( displayMessageDialog
-                                        { model | state = initLoginState model }
-                                        "can't access note archives; you're not logged in!"
-                                    , Cmd.none
-                                    )
+                                _ ->
+                                    case stateLogin state of
+                                        Just login ->
+                                            ( { model | state = ArchiveListing (ArchiveListing.init ar) login }
+                                            , Cmd.none
+                                            )
+
+                                        Nothing ->
+                                            ( displayMessageDialog
+                                                { model | state = initLoginState model }
+                                                "can't access note archives; you're not logged in!"
+                                            , Cmd.none
+                                            )
 
                         ZI.ZkNote zkn ->
                             case state of
@@ -2629,9 +2639,9 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
         EditZkNote.ShowMessage e ->
             ( displayMessageDialog model e, Cmd.none )
 
-        EditZkNote.ShowArchives x ->
+        EditZkNote.ShowArchives id ->
             ( model
-            , sendZIMsg model.location (ZI.GetZkNoteArchives x)
+            , sendZIMsg model.location (ZI.GetZkNoteArchives { zknote = id, offset = 0, limit = Just S.defaultSearchLimit })
             )
 
         EditZkNote.Cmd cmd ->
@@ -2696,7 +2706,7 @@ handleArchiveListing model login ( emod, ecmd ) =
             )
 
         ArchiveListing.GetArchives msg ->
-            ( model
+            ( { model | state = ArchiveListing emod login }
             , sendZIMsg model.location <| ZI.GetZkNoteArchives msg
             )
 
