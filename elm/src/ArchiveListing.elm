@@ -72,7 +72,12 @@ updateSearchResult zsr model =
 
 view : Data.LoginData -> Time.Zone -> Util.Size -> Model -> Element Msg
 view ld zone size model =
-    E.column [ E.centerX ]
+    (if size.width > 1400 then
+        E.row [ E.centerX ]
+
+     else
+        E.column [ E.centerX ]
+    )
         [ listview ld zone size model
         , model.selected
             |> Maybe.andThen (\id -> Dict.get id model.fullnotes)
@@ -93,6 +98,7 @@ listview ld zone size model =
     E.el
         [ E.width E.fill
         , EBk.color TC.lightGrey
+        , E.alignTop
         ]
     <|
         E.column
