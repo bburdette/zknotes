@@ -726,25 +726,6 @@ pub fn read_zklistnote(
   )?;
 
   Ok(note)
-
-  // match zknote_access(conn, uid, &note) {
-  //   Ok(zna) => match zna {
-  //     Access::ReadWrite => {
-  //       note.editable = true;
-  //       Ok(note)
-  //     }
-  //     Access::Read => {
-  //       note.editable = false;
-  //       Ok(note)
-  //     }
-  //     Access::Private => Err(Box::new(std::io::Error::new(
-  //       std::io::ErrorKind::PermissionDenied,
-  //       "can't read zknote; note is private",
-  //     ))),
-  //     // bail!("can't read zknote; note is private"),
-  //   },
-  //   Err(e) => Err(e),
-  // }
 }
 
 #[derive(Debug)]
