@@ -140,12 +140,6 @@ pub struct GetArchiveZkNote {
   pub noteid: i64,
 }
 
-// #[derive(Serialize, Debug, Clone)]
-// pub struct ZkNoteArchives {
-//   pub noteid: i64,
-//   pub archive_notes: Vec<ZkListNote>,
-// }
-
 #[derive(Deserialize, Serialize, Debug)]
 pub struct GetZkNoteComments {
   pub zknote: i64,
