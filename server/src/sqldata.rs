@@ -514,9 +514,10 @@ pub fn archive_zknote(conn: &Connection, noteid: i64) -> Result<SavedZkNote, Box
   let aid = note_id(&conn, "system", "archive")?;
 
   // copy the note, with user 'system'.
+  // exclude pubid, to avoid unique constraint problems.
   conn.execute(
-    "insert into zknote (title, content, user, pubid, editable, showtitle, createdate, changeddate)
-     select title, content, ?1, pubid, editable, showtitle, createdate, changeddate from
+    "insert into zknote (title, content, user, editable, showtitle, createdate, changeddate)
+     select title, content, ?1, editable, showtitle, createdate, changeddate from
          zknote where id = ?2",
     params![sysid, noteid,],
   )?;
