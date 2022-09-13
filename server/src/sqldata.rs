@@ -699,6 +699,16 @@ pub fn read_zklistnote(
   let sysid = user_id(&conn, "system")?;
   let sysids = get_sysids(conn, sysid, id)?;
 
+  // access check
+  let zna = zknote_access_id(conn, uid, id)?;
+  match zna {
+    Access::Private => Err(Box::new(std::io::Error::new(
+      std::io::ErrorKind::PermissionDenied,
+      "can't read zknote; note is private",
+    ))),
+    _ => Ok(()),
+  }?;
+
   let note = conn.query_row(
     "select ZN.title, ZN.user, ZN.createdate, ZN.changeddate
       from zknote ZN, orgauth_user OU, user U where ZN.id = ?1 and U.id = ZN.user and OU.id = ZN.user",
@@ -1162,6 +1172,7 @@ pub fn read_zknotearchives(
   gzna: &GetZkNoteArchives,
 ) -> Result<Vec<ZkListNote>, Box<dyn Error>> {
   let cid = note_id(&conn, "system", "archive")?;
+  let sysid = user_id(&conn, "system")?;
 
   // users that can't see a note, can't see the archives either.
   read_zknote(&conn, Some(uid), gzna.zknote)?;
@@ -1184,20 +1195,18 @@ pub fn read_zknotearchives(
 
   for id in c_iter {
     match id {
-      Ok(id) => match read_zklistnote(&conn, Some(uid), id) {
-        Ok(note) => {
-          nv.push(note);
-          match gzna.limit {
-            Some(l) => {
-              if nv.len() >= l as usize {
-                break;
-              }
+      Ok(id) => {
+        let note = read_zklistnote(&conn, Some(sysid), id)?;
+        nv.push(note);
+        match gzna.limit {
+          Some(l) => {
+            if nv.len() >= l as usize {
+              break;
             }
-            None => (),
           }
+          None => (),
         }
-        Err(_) => (),
-      },
+      }
       Err(_) => (),
     }
   }

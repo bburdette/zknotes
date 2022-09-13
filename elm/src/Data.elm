@@ -266,10 +266,6 @@ type alias GetArchiveZkNote =
 
 
 
--- type alias ZkNoteArchives =
---     { noteid : Int
---     , archive_notes : List ZkListNote
---     }
 ----------------------------------------
 -- Json encoders/decoders
 ----------------------------------------
