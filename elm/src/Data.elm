@@ -128,6 +128,7 @@ type alias ZkNote =
     , showtitle : Bool
     , createdate : Int
     , changeddate : Int
+    , deleted : Bool
     , sysids : List Int
     }
 
@@ -139,6 +140,7 @@ type alias SaveZkNote =
     , content : String
     , editable : Bool
     , showtitle : Bool
+    , deleted : Bool
     }
 
 
@@ -410,6 +412,7 @@ saveZkNote fzn =
     , content = fzn.content
     , editable = fzn.editableValue
     , showtitle = fzn.showtitle
+    , deleted = fzn.deleted
     }
 
 
@@ -434,6 +437,7 @@ encodeSaveZkNote zkn =
                , ( "content", JE.string zkn.content )
                , ( "editable", JE.bool zkn.editable )
                , ( "showtitle", JE.bool zkn.showtitle )
+               , ( "deleted", JE.bool zkn.deleted )
                ]
 
 
@@ -486,6 +490,7 @@ decodeZkNote =
         |> andMap (JD.field "showtitle" JD.bool)
         |> andMap (JD.field "createdate" JD.int)
         |> andMap (JD.field "changeddate" JD.int)
+        |> andMap (JD.field "deleted" JD.bool)
         |> andMap (JD.field "sysids" <| JD.list JD.int)
 
 

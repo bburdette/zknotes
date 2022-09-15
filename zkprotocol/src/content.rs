@@ -27,6 +27,7 @@ pub struct ZkNote {
   pub pubid: Option<String>,
   pub createdate: i64,
   pub changeddate: i64,
+  pub deleted: bool,
   pub sysids: Vec<i64>,
 }
 
@@ -54,6 +55,7 @@ pub struct SaveZkNote {
   pub content: String,
   pub editable: bool,
   pub showtitle: bool,
+  pub deleted: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
