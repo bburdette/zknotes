@@ -682,6 +682,11 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
     },
   )?;
 
+  if note.deleted {
+    note.title = "<deleted>".to_string();
+    note.content = "".to_string();
+  }
+
   match zknote_access(conn, uid, &note) {
     Ok(zna) => match zna {
       Access::ReadWrite => {
@@ -879,12 +884,21 @@ pub fn read_zknotepubid(
 }
 
 // delete the note; fails if there are links to it.
-pub fn delete_zknote(dbfile: &Path, uid: i64, noteid: i64) -> Result<(), Box<dyn Error>> {
-  let conn = connection_open(dbfile)?;
+pub fn delete_zknote(conn: &Connection, uid: i64, noteid: i64) -> Result<(), Box<dyn Error>> {
+  match zknote_access_id(&conn, Some(uid), noteid)? {
+    Access::ReadWrite => Ok(()),
+    _ => Err(Box::new(std::io::Error::new(
+      std::io::ErrorKind::PermissionDenied,
+      "can't delete zknote; write permission denied.",
+    ))),
+  }?;
+
+  archive_zknote(&conn, noteid)?;
 
   // only delete when user is the owner.
   conn.execute(
-    "delete from zknote where id = ?1 
+    "update zknote set deleted = 1
+      where id = ?1
       and user = ?2",
     params![noteid, uid],
   )?;
@@ -892,8 +906,8 @@ pub fn delete_zknote(dbfile: &Path, uid: i64, noteid: i64) -> Result<(), Box<dyn
   Ok(())
 }
 
-// delete the note AND any links to it.
-pub fn power_delete_zknote(conn: &Connection, uid: i64, noteid: i64) -> Result<(), Box<dyn Error>> {
+// delete the note AND any links to it.  TODO: delete archives too?
+pub fn real_delete_zknote(conn: &Connection, uid: i64, noteid: i64) -> Result<(), Box<dyn Error>> {
   // only delete when user owns the links.
   conn.execute(
     "delete from zklink where
