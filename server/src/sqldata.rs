@@ -518,8 +518,6 @@ pub fn archive_zknote(conn: &Connection, noteid: i64) -> Result<SavedZkNote, Box
   let sysid = user_id(&conn, "system")?;
   let aid = note_id(&conn, "system", "archive")?;
 
-  println!("here1 {} {} {}", sysid, aid, noteid);
-
   // copy the note, with user 'system'.
   // exclude pubid, to avoid unique constraint problems.
   conn.execute(
@@ -530,14 +528,11 @@ pub fn archive_zknote(conn: &Connection, noteid: i64) -> Result<SavedZkNote, Box
   )?;
   let archive_note_id = conn.last_insert_rowid();
 
-  println!("here2");
   // mark the note as an archive note.
   save_zklink(&conn, archive_note_id, aid, sysid, None)?;
 
-  println!("here3");
   // link the note to the original note.
   save_zklink(&conn, archive_note_id, noteid, sysid, None)?;
-  println!("here4");
 
   Ok(SavedZkNote {
     id: archive_note_id,
