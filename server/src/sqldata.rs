@@ -726,18 +726,22 @@ pub fn read_zklistnote(
   }?;
 
   let note = conn.query_row(
-    "select ZN.title, ZN.user, ZN.createdate, ZN.changeddate
+    "select ZN.title, ZN.user, ZN.createdate, ZN.changeddate, ZN.deleted
       from zknote ZN, orgauth_user OU, user U where ZN.id = ?1 and U.id = ZN.user and OU.id = ZN.user",
     params![id],
     |row| {
-      Ok(ZkListNote {
+      let mut zln = ZkListNote {
         id: id,
         title: row.get(0)?,
         user: row.get(1)?,
         createdate: row.get(2)?,
         changeddate: row.get(3)?,
         sysids: sysids,
-      })
+      };
+      if row.get(4)? {
+        zln.title = "<deleted>".to_string()
+      }
+      Ok(zln)
     },
   )?;
 
@@ -863,6 +867,11 @@ pub fn read_zknotepubid(
   let sysids = get_sysids(conn, sysid, note.id)?;
 
   note.sysids = sysids;
+
+  if note.deleted {
+    note.title = "<deleted>".to_string();
+    note.content = "".to_string();
+  }
 
   match zknote_access(conn, uid, &note) {
     Ok(zna) => match zna {
