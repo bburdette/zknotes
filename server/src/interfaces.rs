@@ -7,7 +7,6 @@ use either::Either::{Left, Right};
 use log::info;
 use orgauth::endpoints::Callbacks;
 use std::error::Error;
-use std::path::Path;
 use zkprotocol::content::{
   GetArchiveZkNote, GetZkNoteArchives, GetZkNoteComments, GetZkNoteEdit, ImportZkNote, SaveZkNote,
   SaveZkNotePlusLinks, ZkLinks, ZkNoteArchives, ZkNoteEdit,
@@ -173,7 +172,8 @@ pub fn zk_interface_loggedin(
     "deletezknote" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let id: i64 = serde_json::from_value(msgdata.clone())?;
-      sqldata::delete_zknote(Path::new(&config.orgauth_config.db), uid, id)?;
+      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+      sqldata::delete_zknote(&conn, uid, id)?;
       Ok(ServerResponse {
         what: "deletedzknote".to_string(),
         content: serde_json::to_value(id)?,

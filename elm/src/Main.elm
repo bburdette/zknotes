@@ -1026,6 +1026,7 @@ sendSearch model search =
                         , content = S.encodeTsl search.tagSearch |> JE.encode 2
                         , editable = False
                         , showtitle = True
+                        , deleted = False
                         }
                     , links =
                         [ { otherid = ldata.searchid

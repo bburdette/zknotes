@@ -1524,7 +1524,7 @@ pub fn udpate17(dbfile: &Path) -> Result<(), Box<dyn Error>> {
 
   // new note.
   conn.execute(
-    "insert into zknote (title, content, pubid, editable, showtitle, user,  createdate, changeddate)
+    "insert into zknote (title, content, pubid, editable, showtitle, user, createdate, changeddate)
       values ('archive', '', null, 0, 0, ?1, ?2, ?3)",
     params![sysid, now, now],
   )?;
@@ -1537,6 +1537,100 @@ pub fn udpate17(dbfile: &Path) -> Result<(), Box<dyn Error>> {
      values (?1, ?2, ?3)",
     params![zknid, pubid, sysid],
   )?;
+
+  Ok(())
+}
+
+pub fn udpate18(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+  // db connection without foreign key checking.
+  let conn = Connection::open(dbfile)?;
+  let mut m1 = Migration::new();
+
+  m1.create_table("zknotetemp", |t| {
+    t.add_column(
+      "id",
+      types::integer()
+        .primary(true)
+        .increments(true)
+        .nullable(false),
+    );
+    t.add_column("title", types::text().nullable(false));
+    t.add_column("content", types::text().nullable(false));
+    t.add_column("sysdata", types::text().nullable(true));
+    t.add_column("pubid", types::text().nullable(true).unique(true));
+    t.add_column(
+      "user",
+      types::foreign(
+        "orgauth_user",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column("editable", types::boolean());
+    t.add_column("showtitle", types::boolean());
+    t.add_column("createdate", types::integer().nullable(false));
+    t.add_column("changeddate", types::integer().nullable(false));
+  });
+
+  conn.execute_batch(m1.make::<Sqlite>().as_str())?;
+
+  // copy everything from zknote.
+  conn.execute(
+    "insert into zknotetemp (id, title, content, sysdata, pubid, user, editable, showtitle, createdate, changeddate)
+        select id, title, content, null, pubid, user, editable, showtitle, createdate, changeddate from zknote",
+    params![],
+  )?;
+
+  let mut m2 = Migration::new();
+
+  m2.drop_table("zknote");
+
+  // new zknote with showtitle column
+  m2.create_table("zknote", |t| {
+    t.add_column(
+      "id",
+      types::integer()
+        .primary(true)
+        .increments(true)
+        .nullable(false),
+    );
+    t.add_column("title", types::text().nullable(false));
+    t.add_column("content", types::text().nullable(false));
+    t.add_column("sysdata", types::text().nullable(true));
+    t.add_column("pubid", types::text().nullable(true).unique(true));
+    t.add_column(
+      "user",
+      types::foreign(
+        "orgauth_user",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column("editable", types::boolean());
+    t.add_column("showtitle", types::boolean());
+    t.add_column("deleted", types::boolean());
+    t.add_column("createdate", types::integer().nullable(false));
+    t.add_column("changeddate", types::integer().nullable(false));
+  });
+
+  conn.execute_batch(m2.make::<Sqlite>().as_str())?;
+
+  // copy everything from zknotetemp.
+  conn.execute(
+    "insert into zknote (id, title, content, sysdata, pubid, user, editable, showtitle, deleted, createdate, changeddate)
+        select id, title, content, null, pubid, user, 0, 1, 0, createdate, changeddate from zknotetemp",
+    params![],
+  )?;
+
+  let mut m3 = Migration::new();
+
+  m3.drop_table("zknotetemp");
+
+  conn.execute_batch(m3.make::<Sqlite>().as_str())?;
 
   Ok(())
 }

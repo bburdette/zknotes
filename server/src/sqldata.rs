@@ -38,8 +38,8 @@ pub fn on_new_user(
 
   // make a corresponding note,
   conn.execute(
-    "insert into zknote (title, content, user, editable, showtitle, createdate, changeddate)
-     values (?1, ?2, ?3, 0, 1, ?4, ?5)",
+    "insert into zknote (title, content, user, editable, showtitle, deleted, createdate, changeddate)
+     values (?1, ?2, ?3, 0, 1, 0, ?4, ?5)",
     params![rd.uid, "", systemid, now, now],
   )?;
 
@@ -259,6 +259,11 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: i64) -> Result<(), Box<dyn Err
     info!("udpate17");
     zkm::udpate17(&dbfile)?;
     set_single_value(&conn, "migration_level", "17")?;
+  }
+  if nlevel < 18 {
+    info!("udpate18");
+    zkm::udpate18(&dbfile)?;
+    set_single_value(&conn, "migration_level", "18")?;
   }
 
   info!("db up to date.");
@@ -516,10 +521,10 @@ pub fn archive_zknote(conn: &Connection, noteid: i64) -> Result<SavedZkNote, Box
   // copy the note, with user 'system'.
   // exclude pubid, to avoid unique constraint problems.
   conn.execute(
-    "insert into zknote (title, content, user, editable, showtitle, createdate, changeddate)
-     select title, content, ?1, editable, showtitle, createdate, changeddate from
+    "insert into zknote (title, content, user, editable, showtitle, deleted, createdate, changeddate)
+     select title, content, ?1, editable, showtitle, deleted, createdate, changeddate from
          zknote where id = ?2",
-    params![sysid, noteid,],
+    params![sysid, noteid],
   )?;
   let archive_note_id = conn.last_insert_rowid();
 
@@ -544,11 +549,13 @@ pub fn save_zknote(
 
   match note.id {
     Some(id) => {
+      println!("pre archive_zknote");
       archive_zknote(&conn, id)?;
       // existing note.  update IF mine.
+      println!("pre update");
       match conn.execute(
-        "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4, editable = ?5, showtitle = ?6
-         where id = ?7 and user = ?8",
+        "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4, editable = ?5, showtitle = ?6, deleted = ?7
+         where id = ?8 and user = ?9",
         params![
           note.title,
           note.content,
@@ -556,6 +563,7 @@ pub fn save_zknote(
           note.pubid,
           note.editable,
           note.showtitle,
+          note.deleted,
           note.id,
           uid
         ],
@@ -569,9 +577,9 @@ pub fn save_zknote(
             Access::ReadWrite => {
               // update other user's record!  editable flag must be true.
               conn.execute(
-                "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4, showtitle = ?5
-                 where id = ?6 and editable = 1",
-                params![note.title, note.content, now, note.pubid, note.showtitle, id],
+                "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4, showtitle = ?5, deleted = ?6,
+                 where id = ?7 and editable = 1",
+                params![note.title, note.content, now, note.pubid, note.showtitle, note.deleted, id],
               )?;
               Ok(SavedZkNote {
                 id: id,
@@ -588,8 +596,8 @@ pub fn save_zknote(
     None => {
       // new note!
       conn.execute(
-        "insert into zknote (title, content, user, pubid, editable, showtitle, createdate, changeddate)
-         values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, createdate, changeddate)
+         values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
         params![
           note.title,
           note.content,
@@ -597,6 +605,7 @@ pub fn save_zknote(
           note.pubid,
           note.editable,
           note.showtitle,
+          note.deleted,
           now,
           now
         ],
@@ -650,7 +659,7 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
   let sysids = get_sysids(conn, sysid, id)?;
 
   let mut note = conn.query_row(
-    "select ZN.title, ZN.content, ZN.user, OU.name, U.zknote, ZN.pubid, ZN.editable, ZN.showtitle, ZN.createdate, ZN.changeddate
+    "select ZN.title, ZN.content, ZN.user, OU.name, U.zknote, ZN.pubid, ZN.editable, ZN.showtitle, ZN.deleted, ZN.createdate, ZN.changeddate
       from zknote ZN, orgauth_user OU, user U where ZN.id = ?1 and U.id = ZN.user and OU.id = ZN.user",
     params![id],
     |row| {
@@ -665,8 +674,9 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
         editable: row.get(6)?,                // editable same as editableValue!
         editableValue: row.get(6)?,           // <--- same index.
         showtitle: row.get(7)?,
-        createdate: row.get(8)?,
-        changeddate: row.get(9)?,
+        deleted: row.get(8)?,
+        createdate: row.get(9)?,
+        changeddate: row.get(10)?,
         sysids: sysids,
       })
     },
@@ -715,14 +725,15 @@ pub fn read_zklistnote(
       from zknote ZN, orgauth_user OU, user U where ZN.id = ?1 and U.id = ZN.user and OU.id = ZN.user",
     params![id],
     |row| {
-      Ok(ZkListNote {
+      let zln = ZkListNote {
         id: id,
         title: row.get(0)?,
         user: row.get(1)?,
         createdate: row.get(2)?,
         changeddate: row.get(3)?,
         sysids: sysids,
-      })
+      };
+      Ok(zln)
     },
   )?;
 
@@ -817,7 +828,7 @@ pub fn read_zknotepubid(
 ) -> Result<ZkNote, Box<dyn Error>> {
   let publicid = note_id(&conn, "system", "public")?;
   let mut note = conn.query_row(
-    "select A.id, A.title, A.content, A.user, OU.name, U.zknote, A.pubid, A.editable, A.showtitle, A.createdate, A.changeddate
+    "select A.id, A.title, A.content, A.user, OU.name, U.zknote, A.pubid, A.editable, A.showtitle, A.deleted, A.createdate, A.changeddate
       from zknote A, user U, orgauth_user OU, zklink L where A.pubid = ?1
       and ((A.id = L.fromid
       and L.toid = ?2) or (A.id = L.toid
@@ -837,8 +848,9 @@ pub fn read_zknotepubid(
         editable: false,
         editableValue: row.get(7)?,
         showtitle: row.get(8)?,
-        createdate: row.get(9)?,
-        changeddate: row.get(10)?,
+        deleted: row.get(9)?,
+        createdate: row.get(10)?,
+        changeddate: row.get(11)?,
         sysids: Vec::new(),
       })
     },
@@ -868,12 +880,21 @@ pub fn read_zknotepubid(
 }
 
 // delete the note; fails if there are links to it.
-pub fn delete_zknote(dbfile: &Path, uid: i64, noteid: i64) -> Result<(), Box<dyn Error>> {
-  let conn = connection_open(dbfile)?;
+pub fn delete_zknote(conn: &Connection, uid: i64, noteid: i64) -> Result<(), Box<dyn Error>> {
+  match zknote_access_id(&conn, Some(uid), noteid)? {
+    Access::ReadWrite => Ok(()),
+    _ => Err(Box::new(std::io::Error::new(
+      std::io::ErrorKind::PermissionDenied,
+      "can't delete zknote; write permission denied.",
+    ))),
+  }?;
+
+  archive_zknote(&conn, noteid)?;
 
   // only delete when user is the owner.
   conn.execute(
-    "delete from zknote where id = ?1 
+    "update zknote set deleted = 1, title = '<deleted>', content = ''
+      where id = ?1
       and user = ?2",
     params![noteid, uid],
   )?;
@@ -881,8 +902,8 @@ pub fn delete_zknote(dbfile: &Path, uid: i64, noteid: i64) -> Result<(), Box<dyn
   Ok(())
 }
 
-// delete the note AND any links to it.
-pub fn power_delete_zknote(conn: &Connection, uid: i64, noteid: i64) -> Result<(), Box<dyn Error>> {
+// delete the note AND any links to it.  TODO: delete archives too?
+pub fn real_delete_zknote(conn: &Connection, uid: i64, noteid: i64) -> Result<(), Box<dyn Error>> {
   // only delete when user owns the links.
   conn.execute(
     "delete from zklink where
@@ -1271,6 +1292,7 @@ pub fn save_importzknotes(
             content: izn.content.clone(),
             editable: false,
             showtitle: true,
+            deleted: false,
           },
         )?
         .id
@@ -1293,6 +1315,7 @@ pub fn save_importzknotes(
               content: "".to_string(),
               editable: false,
               showtitle: true,
+              deleted: false,
             },
           )?
           .id
@@ -1318,6 +1341,7 @@ pub fn save_importzknotes(
               content: "".to_string(),
               editable: false,
               showtitle: true,
+              deleted: false,
             },
           )?
           .id

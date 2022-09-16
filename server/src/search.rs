@@ -1,5 +1,5 @@
 use crate::sqldata;
-use crate::sqldata::{get_sysids, note_id, power_delete_zknote, zknote_access_id};
+use crate::sqldata::{delete_zknote, get_sysids, note_id, zknote_access_id};
 use either::Either;
 use either::Either::{Left, Right};
 use orgauth::dbfun::user_id;
@@ -33,7 +33,7 @@ pub fn power_delete_zknotes(
       let c = znsr.notes.len().try_into()?;
 
       for n in znsr.notes {
-        power_delete_zknote(conn, user, n.id)?;
+        delete_zknote(&conn, user, n.id)?;
       }
       Ok(c)
     }
@@ -41,7 +41,7 @@ pub fn power_delete_zknotes(
       let c = znsr.notes.len().try_into()?;
 
       for n in znsr.notes {
-        power_delete_zknote(conn, user, n.id)?;
+        delete_zknote(&conn, user, n.id)?;
       }
       Ok(c)
     }
@@ -128,10 +128,13 @@ pub fn build_sql(
 
   let ordclause = " order by N.id desc ";
 
+  // TODO: filter deleted notes from search. (?)
+
   // notes that are mine.
   let mut sqlbase = format!(
     "select N.id, N.title, N.user, N.createdate, N.changeddate
-      from zknote N where N.user = ?"
+      from zknote N where N.user = ?
+      and N.deleted = 0"
   );
   let mut baseargs = vec![uid.to_string()];
 
@@ -139,7 +142,8 @@ pub fn build_sql(
   let mut sqlpub = format!(
     "select N.id, N.title, N.user, N.createdate, N.changeddate
       from zknote N, zklink L
-      where (N.user != ? and L.fromid = N.id and L.toid = ?)"
+      where (N.user != ? and L.fromid = N.id and L.toid = ?)
+      and N.deleted = 0"
   );
   let mut pubargs = vec![uid.to_string(), publicid.to_string()];
 
@@ -160,7 +164,8 @@ pub fn build_sql(
           (L.fromid = N.id and L.toid = M.fromid ) or
           (L.toid = N.id and L.fromid = M.fromid )))
       and
-        ((U.fromid = ? and U.toid = M.fromid) or (U.fromid = M.fromid and U.toid = ?)))",
+        ((U.fromid = ? and U.toid = M.fromid) or (U.fromid = M.fromid and U.toid = ?)))
+      and N.deleted = 0",
   );
   let mut shareargs = vec![
     uid.to_string(),
@@ -175,7 +180,8 @@ pub fn build_sql(
       from zknote N, zklink L
       where (
         N.user != ? and
-        ((L.fromid = N.id and L.toid = ?) or (L.toid = N.id and L.fromid = ?)))"
+        ((L.fromid = N.id and L.toid = ?) or (L.toid = N.id and L.fromid = ?)))
+        and N.deleted = 0"
   );
   let mut userargs = vec![
     uid.to_string(),

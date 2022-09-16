@@ -177,6 +177,7 @@ type alias Model =
     , editable : Bool -- is this note editable in the UI?
     , editableValue : Bool -- is this note editable by other users?
     , showtitle : Bool
+    , deleted : Bool
     , pubidtxt : String
     , title : String
     , createdate : Maybe Int
@@ -314,6 +315,7 @@ sznFromModel model =
     , pubid = toPubId (isPublic model) model.pubidtxt
     , editable = model.editableValue
     , showtitle = model.showtitle
+    , deleted = model.deleted
     }
 
 
@@ -877,6 +879,7 @@ zknview zone size recentZkns model =
         editable =
             model.editable
                 && not search
+                && not model.deleted
 
         -- super lame math because images suck in html/elm-ui
         mdw =
@@ -1095,7 +1098,7 @@ zknview zone size recentZkns model =
                             Nothing ->
                                 E.none
                         , EI.button perhapsdirtyparabuttonstyle { onPress = Just NewPress, label = E.text "new" }
-                        , if mine then
+                        , if mine && not model.deleted then
                             EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just <| DeletePress zone, label = E.text "delete" }
 
                           else
@@ -1606,6 +1609,7 @@ initFull ld zkl zknote dtlinks spm =
       , pendingcomment = Nothing
       , editable = zknote.editable
       , editableValue = zknote.editableValue
+      , deleted = zknote.deleted
       , showtitle = zknote.showtitle
       , createdate = Just zknote.createdate
       , changeddate = Just zknote.changeddate
@@ -1654,6 +1658,7 @@ initNew ld zkl spm links =
     , pendingcomment = Nothing
     , editable = True
     , editableValue = False
+    , deleted = False
     , showtitle = True
     , createdate = Nothing
     , changeddate = Nothing
@@ -1702,6 +1707,7 @@ sznToZkn uid uname unote sysids sdzn szn =
     , showtitle = szn.showtitle
     , createdate = sdzn.changeddate
     , changeddate = sdzn.changeddate
+    , deleted = szn.deleted
     , sysids = sysids
     }
 
@@ -2358,6 +2364,7 @@ update msg model =
                             , content = newcomment.text
                             , editable = False
                             , showtitle = True
+                            , deleted = False
                             }
                     in
                     ( { model | newcomment = Nothing, pendingcomment = Just nc }
