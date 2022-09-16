@@ -879,6 +879,7 @@ zknview zone size recentZkns model =
         editable =
             model.editable
                 && not search
+                && not model.deleted
 
         -- super lame math because images suck in html/elm-ui
         mdw =
@@ -1097,7 +1098,7 @@ zknview zone size recentZkns model =
                             Nothing ->
                                 E.none
                         , EI.button perhapsdirtyparabuttonstyle { onPress = Just NewPress, label = E.text "new" }
-                        , if mine then
+                        , if mine && not model.deleted then
                             EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just <| DeletePress zone, label = E.text "delete" }
 
                           else

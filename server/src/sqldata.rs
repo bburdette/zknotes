@@ -682,11 +682,6 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
     },
   )?;
 
-  if note.deleted {
-    note.title = "<deleted>".to_string();
-    note.content = "".to_string();
-  }
-
   match zknote_access(conn, uid, &note) {
     Ok(zna) => match zna {
       Access::ReadWrite => {
@@ -726,11 +721,11 @@ pub fn read_zklistnote(
   }?;
 
   let note = conn.query_row(
-    "select ZN.title, ZN.user, ZN.createdate, ZN.changeddate, ZN.deleted
+    "select ZN.title, ZN.user, ZN.createdate, ZN.changeddate
       from zknote ZN, orgauth_user OU, user U where ZN.id = ?1 and U.id = ZN.user and OU.id = ZN.user",
     params![id],
     |row| {
-      let mut zln = ZkListNote {
+      let zln = ZkListNote {
         id: id,
         title: row.get(0)?,
         user: row.get(1)?,
@@ -738,9 +733,6 @@ pub fn read_zklistnote(
         changeddate: row.get(3)?,
         sysids: sysids,
       };
-      if row.get(4)? {
-        zln.title = "<deleted>".to_string()
-      }
       Ok(zln)
     },
   )?;
@@ -868,11 +860,6 @@ pub fn read_zknotepubid(
 
   note.sysids = sysids;
 
-  if note.deleted {
-    note.title = "<deleted>".to_string();
-    note.content = "".to_string();
-  }
-
   match zknote_access(conn, uid, &note) {
     Ok(zna) => match zna {
       Access::ReadWrite => {
@@ -906,7 +893,7 @@ pub fn delete_zknote(conn: &Connection, uid: i64, noteid: i64) -> Result<(), Box
 
   // only delete when user is the owner.
   conn.execute(
-    "update zknote set deleted = 1
+    "update zknote set deleted = 1, title = '<deleted>', content = ''
       where id = ?1
       and user = ?2",
     params![noteid, uid],
