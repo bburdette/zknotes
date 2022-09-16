@@ -66,7 +66,6 @@ pub fn on_new_user(
   match (&data, creator) {
     (Some(data), Some(creator)) => {
       let extra_links: Vec<SaveZkLink> = serde_json::from_str(data.as_str())?;
-      println!("extra_links: {:?}", extra_links);
       save_savezklinks(&conn, creator, zknid, extra_links)?;
     }
     _ => (),
@@ -479,7 +478,7 @@ pub fn is_zknote_mine(
 ) -> Result<bool, Box<dyn Error>> {
   match conn.query_row(
     "select count(*) from
-      zknote 
+      zknote
       where id = ?1 and user = ?2",
     params![zknoteid, userid],
     |row| {
@@ -549,13 +548,11 @@ pub fn save_zknote(
 
   match note.id {
     Some(id) => {
-      println!("pre archive_zknote");
       archive_zknote(&conn, id)?;
       // existing note.  update IF mine.
-      println!("pre update");
       match conn.execute(
         "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4, editable = ?5, showtitle = ?6, deleted = ?7
-         where id = ?8 and user = ?9",
+         where id = ?8 and user = ?9 and deleted = 0",
         params![
           note.title,
           note.content,
@@ -568,23 +565,27 @@ pub fn save_zknote(
           uid
         ],
       ) {
-        Ok(1) => Ok(SavedZkNote {
+        Ok(1) => {
+          Ok(SavedZkNote {
           id: id,
           changeddate: now,
-        }),
+        })}
         Ok(0) => {
           match zknote_access_id(conn, Some(uid), id)? {
             Access::ReadWrite => {
-              // update other user's record!  editable flag must be true.
-              conn.execute(
-                "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4, showtitle = ?5, deleted = ?6,
-                 where id = ?7 and editable = 1",
-                params![note.title, note.content, now, note.pubid, note.showtitle, note.deleted, id],
-              )?;
-              Ok(SavedZkNote {
-                id: id,
-                changeddate: now,
-              })
+              // update other user's record!  editable flag must be true.  can't modify delete flag.
+              match conn.execute(
+                "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4, showtitle = ?5
+                 where id = ?6 and editable = 1 and deleted = 0",
+                params![note.title, note.content, now, note.pubid, note.showtitle, id],
+              )? {
+                0 => bail!("can't update; note is not writable"),
+                1 => Ok(SavedZkNote {
+                    id: id,
+                    changeddate: now,
+                  }),
+                _ => bail!("unexpected update success!"),
+              }
             }
             _ => bail!("can't update; note is not writable"),
           }
