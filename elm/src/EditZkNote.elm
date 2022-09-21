@@ -897,27 +897,39 @@ zknview zone size recentZkns model =
                 - (60 * 2 + 6)
 
         showComments =
-            E.el [ EF.bold, E.width E.fill ] (E.text "comments")
-                :: List.map
-                    (\zkn ->
-                        E.row [ E.width E.fill, E.spacing 8 ]
-                            [ renderMd model.cells zkn.content mdw
-                            , E.el [ E.alignRight ] <| E.text zkn.username
-                            , E.link
-                                (E.alignRight
-                                    :: (if isdirty then
-                                            ZC.saveLinkStyle
+            (E.el [ EF.bold, E.width E.fill ] (E.text "comments")
+                :: [ E.table [ E.width E.fill, E.spacing 8 ]
+                        { data = model.comments
+                        , columns =
+                            [ { header = E.none
+                              , width = E.fill
+                              , view = \zkn -> renderMd model.cells zkn.content mdw
+                              }
+                            , { header = E.none
+                              , width = E.shrink
+                              , view = \zkn -> E.el [ E.alignRight ] <| E.text zkn.username
+                              }
+                            , { header = E.none
+                              , width = E.shrink
+                              , view =
+                                    \zkn ->
+                                        E.link
+                                            (E.alignRight
+                                                :: (if isdirty then
+                                                        ZC.saveLinkStyle
 
-                                        else
-                                            ZC.myLinkStyle
-                                       )
-                                )
-                                { url = Data.editNoteLink zkn.id
-                                , label = E.text "go"
-                                }
+                                                    else
+                                                        ZC.myLinkStyle
+                                                   )
+                                            )
+                                            { url = Data.editNoteLink zkn.id
+                                            , label = E.text "go"
+                                            }
+                              }
                             ]
-                    )
-                    model.comments
+                        }
+                   ]
+            )
                 ++ (case model.newcomment of
                         Just s ->
                             [ addComment s ]
