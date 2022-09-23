@@ -1336,7 +1336,7 @@ zknview zone size recentZkns model =
                 (E.row [ E.width E.fill ]
                     [ EI.button Common.buttonStyle
                         { onPress = Just <| SearchHistoryPress
-                        , label = E.el [ E.centerY ] <| E.text "search history"
+                        , label = E.el [ E.centerY ] <| E.text "history"
                         }
                     , EI.button (E.alignRight :: Common.buttonStyle)
                         { onPress = Just <| BigSearchPress

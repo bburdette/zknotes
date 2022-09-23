@@ -1638,6 +1638,17 @@ actualupdate msg model =
                 Err _ ->
                     ( model, Cmd.none )
 
+        ( WkMsg rkey, InviteUser mod ld ) ->
+            case rkey of
+                Ok key ->
+                    handleInviteUser model (InviteUser.onWkKeyPress key mod) ld
+
+                Err _ ->
+                    ( model, Cmd.none )
+
+        ( InviteUserMsg lm, InviteUser mod ld ) ->
+            handleInviteUser model (InviteUser.update lm mod) ld
+
         ( WkMsg rkey, DisplayMessage dm state ) ->
             case rkey of
                 Ok key ->
@@ -1656,9 +1667,6 @@ actualupdate msg model =
 
         ( InvitedMsg lm, Invited ls ) ->
             handleInvited model (Invited.update lm ls)
-
-        ( InviteUserMsg lm, InviteUser mod ld ) ->
-            handleInviteUser model (InviteUser.update lm mod) ld
 
         ( ArchiveListingMsg lm, ArchiveListing mod ld ) ->
             handleArchiveListing model ld (ArchiveListing.update lm mod ld)

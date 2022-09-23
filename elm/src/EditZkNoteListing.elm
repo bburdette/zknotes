@@ -166,7 +166,7 @@ listview ld size model =
                 ]
                 [ EI.button Common.buttonStyle
                     { onPress = Just <| SearchHistoryPress
-                    , label = E.el [ E.centerY ] <| E.text "search history"
+                    , label = E.el [ E.centerY ] <| E.text "history"
                     }
                 , E.map SPMsg <| SP.view False (size.width < maxwidth) 0 model.spmodel
                 , E.table [ E.spacing 5, E.width E.fill, E.centerX ]

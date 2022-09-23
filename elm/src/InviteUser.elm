@@ -1,4 +1,4 @@
-module InviteUser exposing (Command(..), Model, Msg(..), NavChoice(..), SearchOrRecent(..), disabledLinkButtonStyle, handleSPUpdate, init, linkButtonStyle, showSr, showZkl, update, updateSearchResult, view)
+module InviteUser exposing (..)
 
 import Common
 import Data exposing (Direction(..), zklKey)
@@ -16,7 +16,9 @@ import Search as S
 import SearchStackPanel as SP
 import TangoColors as TC
 import Time exposing (Zone)
+import Toop
 import Util
+import WindowKeys as WK
 import ZkCommon as ZC
 
 
@@ -91,6 +93,16 @@ init spmodel spresult recentZkns links loginData =
     }
 
 
+onWkKeyPress : WK.Key -> Model -> ( Model, Command )
+onWkKeyPress key model =
+    case Toop.T4 key.key key.ctrl key.alt key.shift of
+        Toop.T4 "Enter" False False False ->
+            handleSPUpdate model (SP.onEnter model.spmodel)
+
+        _ ->
+            ( model, None )
+
+
 showSr : Model -> Data.ZkListNote -> Element Msg
 showSr model zkln =
     let
@@ -100,53 +112,43 @@ showSr model zkln =
         sysColor =
             ZC.systemColor model.ld zkln.sysids
 
+        mbTo =
+            Dict.get (zklKey { direction = To, otherid = zkln.id })
+                model.zklDict
+
+        mbFrom =
+            Dict.get (zklKey { direction = From, otherid = zkln.id })
+                model.zklDict
+
         controlrow =
             E.row [ E.spacing 8, E.width E.fill ]
-                [ (case
-                    Dict.get (zklKey { direction = To, otherid = zkln.id })
-                        model.zklDict
-                   of
-                    Just _ ->
-                        Nothing
-
-                    Nothing ->
-                        Just 1
-                  )
+                [ mbTo
                     |> Maybe.map
-                        (\_ ->
-                            EI.button linkButtonStyle
-                                { onPress = Just <| ToLinkPress zkln
+                        (\zkl ->
+                            EI.button
+                                disabledLinkButtonStyle
+                                { onPress = Just <| RemoveLink zkl
                                 , label = E.el [ E.centerY ] <| E.text "→"
                                 }
                         )
                     |> Maybe.withDefault
-                        (EI.button
-                            disabledLinkButtonStyle
-                            { onPress = Nothing
+                        (EI.button linkButtonStyle
+                            { onPress = Just <| ToLinkPress zkln
                             , label = E.el [ E.centerY ] <| E.text "→"
                             }
                         )
-                , (case
-                    Dict.get (zklKey { direction = From, otherid = zkln.id })
-                        model.zklDict
-                   of
-                    Just _ ->
-                        Nothing
-
-                    Nothing ->
-                        Just 1
-                  )
+                , mbFrom
                     |> Maybe.map
-                        (\_ ->
-                            EI.button linkButtonStyle
-                                { onPress = Just <| FromLinkPress zkln
+                        (\zkl ->
+                            EI.button
+                                disabledLinkButtonStyle
+                                { onPress = Just <| RemoveLink zkl
                                 , label = E.el [ E.centerY ] <| E.text "←"
                                 }
                         )
                     |> Maybe.withDefault
-                        (EI.button
-                            disabledLinkButtonStyle
-                            { onPress = Nothing
+                        (EI.button linkButtonStyle
+                            { onPress = Just <| FromLinkPress zkln
                             , label = E.el [ E.centerY ] <| E.text "←"
                             }
                         )
@@ -400,7 +402,7 @@ view stylePalette recentZkns mbsize model =
                 (E.row [ E.width E.fill ]
                     [ EI.button Common.buttonStyle
                         { onPress = Just <| SearchHistoryPress
-                        , label = E.el [ E.centerY ] <| E.text "search history"
+                        , label = E.el [ E.centerY ] <| E.text "history"
                         }
                     ]
                     :: (E.map SPMsg <|
