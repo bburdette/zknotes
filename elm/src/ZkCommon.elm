@@ -85,4 +85,16 @@ saveLinkStyle =
 
 
 fullScreen =
-    E.row [ EF.size 10 ] [ E.column [] [ E.text "↖", E.text "↙" ], E.column [] [ E.text "↗", E.text "↘" ] ]
+    E.column []
+        [ E.row
+            [ E.inFront
+                (E.row []
+                    [ E.el [] <| E.text "⌞"
+                    , E.el [] <| E.text "⌟"
+                    ]
+                )
+            ]
+            [ E.el [] <| E.text "⌜"
+            , E.el [] <| E.text "⌝"
+            ]
+        ]
