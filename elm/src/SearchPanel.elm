@@ -115,10 +115,6 @@ paginationView : Bool -> Model -> Element Msg
 paginationView showCopy model =
     E.row [ E.width E.fill, E.spacing 8 ]
         [ E.map PPMsg <| PP.view model.paginationModel
-        , EI.button (E.alignRight :: buttonStyle)
-            { label = E.text "+"
-            , onPress = Just AndClicked
-            }
         , if showCopy then
             EI.button (E.alignRight :: buttonStyle)
                 { label = E.text "< copy"
@@ -146,6 +142,14 @@ handleTspUpdate model ( nm, cmd ) =
 
         TSP.Save ->
             ( { model | tagSearchModel = nm }, None )
+
+        TSP.AddToStack ->
+            case model.tagSearchModel.search of
+                TSP.TagSearch (Ok ts) ->
+                    ( model, And ts )
+
+                _ ->
+                    ( model, None )
 
         TSP.Search ts ->
             ( { model | tagSearchModel = nm, paginationModel = PP.initModel }

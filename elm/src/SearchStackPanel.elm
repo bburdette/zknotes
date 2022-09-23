@@ -174,7 +174,8 @@ view showCopy narrow nblevel model =
                             [ E.el [ E.width E.fill, E.clipX, E.height E.fill ] <| E.text <| S.printTagSearch ts
                             , EI.button (buttonStyle ++ [ E.alignRight ])
                                 { label =
-                                    E.text "-"
+                                    E.el [ Font.family [ Font.monospace ] ] <|
+                                        E.text "-"
                                 , onPress = Just <| MinusPress i
                                 }
                             ]

@@ -86,12 +86,14 @@ type Msg
     | ToggleSearchMod TSLoc SearchMod
     | SetTermText TSLoc String
     | AddEmptyTerm TSLoc
+    | AddToStackClicked
 
 
 type Command
     = None
     | Save
     | Search TagSearch
+    | AddToStack
 
 
 getSearch : Model -> Maybe TagSearch
@@ -620,16 +622,19 @@ view narrow nblevel model =
             , EI.button obs
                 { onPress = Just SearchDetails
                 , label =
-                    text <|
-                        if model.showParse then
-                            "-"
+                    E.el [ EF.family [ EF.monospace ] ] <|
+                        text <|
+                            if model.showParse then
+                                "-"
 
-                        else
-                            "?"
+                            else
+                                "?"
                 }
             , EI.button obs
                 { onPress = Just Clear
-                , label = text "x"
+                , label =
+                    E.el [ EF.family [ EF.monospace ] ] <|
+                        text "x"
                 }
             ]
 
@@ -657,7 +662,17 @@ view narrow nblevel model =
             _ ->
                 E.none
          )
-            :: ([ ( "tinput", row [ width fill, spacing 3 ] [ tinput ] )
+            :: ([ ( "tinput"
+                  , row [ width fill, spacing 3 ]
+                        [ tinput
+                        , EI.button (E.alignRight :: buttonStyle)
+                            { label =
+                                E.el [ EF.family [ EF.monospace ] ] <|
+                                    E.text "+"
+                            , onPress = Just AddToStackClicked
+                            }
+                        ]
+                  )
                 , ( "tbuttons", row [ spacing 3, width fill ] buttons )
                 ]
                     ++ ( "searchhelp"
@@ -947,3 +962,6 @@ update msg model =
               }
             , None
             )
+
+        AddToStackClicked ->
+            ( model, AddToStack )
