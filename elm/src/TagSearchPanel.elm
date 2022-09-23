@@ -570,10 +570,10 @@ view narrow nblevel model =
         searchButton =
             case model.search of
                 TagSearch (Err _) ->
-                    EI.button (sbs ++ [ EBk.color TC.grey ]) { onPress = Nothing, label = text "search:" }
+                    EI.button (sbs ++ [ EBk.color TC.grey ]) { onPress = Nothing, label = text "search" }
 
                 _ ->
-                    EI.button sbs { onPress = Just SearchClick, label = text "search:" }
+                    EI.button sbs { onPress = Just SearchClick, label = text "search" }
 
         tinput =
             EI.multiline

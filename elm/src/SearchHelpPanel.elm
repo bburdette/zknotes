@@ -94,26 +94,26 @@ view nblevel hmod =
                         [ showLine "You can write simple queries by typing text into the box.  Items that contain the text in their titles will be shown." ]
 
                 Compound ->
-                    column [ width fill ]
+                    column [ width fill, spacing 10 ]
                         [ showLine "You can match on multiple strings with single quotes. Link the strings together with & or | ('and' or 'or')"
-                        , thingAndDef 2 "'string1' & 'string2' =" "match items that contain both string1 and string2 in their name."
-                        , thingAndDef 2 "'string1' | 'string2' =" "match items that contain either string1 or string2 in their name."
-                        , thingAndDef 2 "!'string1' =" "match items that do not have string1 in their name."
+                        , thingAndDef 2 "'string1' & 'string2'" "match items that contain both string1 and string2 in their name."
+                        , thingAndDef 2 "'string1' | 'string2'" "match items that contain either string1 or string2 in their name."
+                        , thingAndDef 2 "!'string1'" "match items that do not have string1 in their name."
                         ]
 
                 Modifiers ->
-                    column [ width fill ]
+                    column [ width fill, spacing 10 ]
                         [ showLine "the quoted strings can take a number of modifiers:"
-                        , thingAndDef 4 "t'string1' =" "match items that link to items with 'string1' in the name."
-                        , thingAndDef 4 "e'String1' =" "match items whose names are exactly 'String1', no more, no less."
-                        , thingAndDef 4 "n'elements' =" "match items with the string 'elements' in the note body."
-                        , thingAndDef 4 "u'nick' =" "match items owned by user 'nick'."
+                        , thingAndDef 2 "t'string1'" "match items that link to items with 'string1' in the name."
+                        , thingAndDef 2 "e'String1'" "match items whose names are exactly 'String1', no more, no less."
+                        , thingAndDef 2 "n'elements'" "match items with the string 'elements' in the note body."
+                        , thingAndDef 2 "u'nick'" "match items owned by user 'nick'."
                         ]
 
                 FullMonty ->
-                    column [ width fill ]
+                    column [ width fill, spacing 10 ]
                         [ showLine "put all the elements together to make complex queries!  For instance "
-                        , thingAndDef 2 "t'sheet music' & 'tango' & te'G' =" "match items linked to 'sheet music', with 'tango' in the name, and also linking to an item named 'G'"
+                        , thingAndDef 2 "t'sheet music' & 'tango' & te'G'" "match items linked to 'sheet music', with 'tango' in the name, and also linking to an item named 'G'"
                         ]
             ]
         ]
