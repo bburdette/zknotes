@@ -111,26 +111,18 @@ type Command
     | And TagSearch
 
 
-paginationView : Bool -> Model -> Element Msg
-paginationView showCopy model =
+paginationView : Model -> Element Msg
+paginationView model =
     E.row [ E.width E.fill, E.spacing 8 ]
         [ E.map PPMsg <| PP.view model.paginationModel
-        , if showCopy then
-            EI.button (E.alignRight :: buttonStyle)
-                { label = E.text "< copy"
-                , onPress = Just CopyClicked
-                }
-
-          else
-            E.none
         ]
 
 
 view : Bool -> Bool -> Int -> Model -> Element Msg
 view showCopy narrow nblevel model =
     column [ E.width E.fill, E.spacing 8 ]
-        [ E.map TSPMsg <| TSP.view narrow nblevel model.tagSearchModel
-        , paginationView showCopy model
+        [ E.map TSPMsg <| TSP.view showCopy narrow nblevel model.tagSearchModel
+        , paginationView model
         ]
 
 
@@ -142,6 +134,9 @@ handleTspUpdate model ( nm, cmd ) =
 
         TSP.Save ->
             ( { model | tagSearchModel = nm }, None )
+
+        TSP.Copy txt ->
+            ( model, Copy txt )
 
         TSP.AddToStack ->
             case model.tagSearchModel.search of

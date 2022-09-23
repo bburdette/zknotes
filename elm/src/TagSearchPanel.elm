@@ -87,6 +87,7 @@ type Msg
     | SetTermText TSLoc String
     | AddEmptyTerm TSLoc
     | AddToStackClicked
+    | CopyClicked
 
 
 type Command
@@ -94,6 +95,7 @@ type Command
     | Save
     | Search TagSearch
     | AddToStack
+    | Copy String
 
 
 getSearch : Model -> Maybe TagSearch
@@ -536,8 +538,8 @@ viewSearchHelper mbfocusloc indent lts ts =
                 ++ viewSearchHelper mbfocusloc (indent + 1) (LBT2 :: lts) ts2
 
 
-view : Bool -> Int -> Model -> Element Msg
-view narrow nblevel model =
+view : Bool -> Bool -> Int -> Model -> Element Msg
+view showCopy narrow nblevel model =
     let
         inputcolor =
             case model.search of
@@ -619,6 +621,14 @@ view narrow nblevel model =
 
         buttons =
             [ searchButton
+            , if showCopy then
+                EI.button (E.alignRight :: buttonStyle)
+                    { label = E.text "<"
+                    , onPress = Just CopyClicked
+                    }
+
+              else
+                E.none
             , EI.button obs
                 { onPress = Just SearchDetails
                 , label =
@@ -965,3 +975,6 @@ update msg model =
 
         AddToStackClicked ->
             ( model, AddToStack )
+
+        CopyClicked ->
+            ( model, Copy model.searchText )

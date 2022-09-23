@@ -1361,7 +1361,7 @@ zknview zone size recentZkns model =
 
                         else
                             [ E.map SPMsg <|
-                                SP.paginationView True model.spmodel
+                                SP.paginationView model.spmodel
                             ]
                        )
                 )

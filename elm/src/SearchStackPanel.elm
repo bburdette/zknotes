@@ -143,9 +143,9 @@ handleSpUpdate model ( nm, cmd ) =
             )
 
 
-paginationView : Bool -> Model -> Element Msg
-paginationView showCopy model =
-    E.map SPMsg (SP.paginationView showCopy model.spmodel)
+paginationView : Model -> Element Msg
+paginationView model =
+    E.map SPMsg (SP.paginationView model.spmodel)
 
 
 type Msg
