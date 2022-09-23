@@ -334,7 +334,7 @@ view : ZC.StylePalette -> List Data.ZkListNote -> Maybe Util.Size -> Model -> El
 view stylePalette recentZkns mbsize model =
     let
         sppad =
-            [ E.paddingXY 0 5 ]
+            [ E.padding 5 ]
 
         spwidth =
             E.px
