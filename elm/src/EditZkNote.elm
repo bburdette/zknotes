@@ -482,19 +482,21 @@ showZkl isDirty editable focusLink ld id sysColor showflip zkl =
             , EBd.rounded 3
             , EBd.color TC.darkGrey
             , E.inFront
-                (E.el [ E.alignRight, EBk.color TC.white, E.centerY ] <|
-                    case otherid of
+                (E.row [ E.height E.fill, E.alignRight, EBk.color TC.white ]
+                    [ case otherid of
                         Just zknoteid ->
-                            ZC.golink zknoteid
-                                (if isDirty then
-                                    ZC.saveColor
+                            E.el [ E.centerY ] <|
+                                ZC.golink zknoteid
+                                    (if isDirty then
+                                        ZC.saveColor
 
-                                 else
-                                    ZC.myLinkColor
-                                )
+                                     else
+                                        ZC.myLinkColor
+                                    )
 
                         Nothing ->
                             E.none
+                    ]
                 )
             ]
             [ E.row [ E.spacing 8, E.width E.fill ] display
@@ -698,8 +700,8 @@ showSr model isdirty zkln =
             , EBd.color TC.darkGrey
             , E.width E.fill
             , E.inFront
-                (E.el [ E.alignRight, EBk.color TC.white, E.centerY ] <|
-                    if lnnonme then
+                (E.row [ E.height E.fill, E.alignRight, EBk.color TC.white ]
+                    [ if lnnonme then
                         ZC.golink zkln.id
                             (if isdirty then
                                 ZC.saveColor
@@ -708,7 +710,7 @@ showSr model isdirty zkln =
                                 ZC.otherLinkColor
                             )
 
-                    else
+                      else
                         ZC.golink zkln.id
                             (if isdirty then
                                 ZC.saveColor
@@ -716,6 +718,7 @@ showSr model isdirty zkln =
                              else
                                 ZC.myLinkColor
                             )
+                    ]
                 )
             ]
             [ listingrow, controlrow ]

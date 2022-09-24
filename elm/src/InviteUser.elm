@@ -186,8 +186,10 @@ showSr model zkln =
             , EBd.color TC.darkGrey
             , E.width E.fill
             , E.inFront
-                (E.el [ E.alignRight, EBk.color TC.white, E.centerY ] <|
-                    ZC.golink zkln.id ZC.otherLinkColor
+                (E.row [ E.height E.fill, E.alignRight, EBk.color TC.white ]
+                    [ E.el [ E.centerY ] <|
+                        ZC.golink zkln.id ZC.otherLinkColor
+                    ]
                 )
             ]
             [ listingrow, controlrow ]
