@@ -179,14 +179,18 @@ showSr model zkln =
     in
     if model.focusSr == Just zkln.id then
         -- focus result!  show controlrow.
-        E.row
+        E.column
             [ EBd.width 1
             , E.padding 3
             , EBd.rounded 3
             , EBd.color TC.darkGrey
             , E.width E.fill
+            , E.inFront
+                (E.el [ E.alignRight, EBk.color TC.white, E.centerY ] <|
+                    ZC.golink zkln.id ZC.otherLinkColor
+                )
             ]
-            [ E.column [ E.width E.fill ] [ listingrow, controlrow ], ZC.golink zkln.id ZC.otherLinkColor ]
+            [ listingrow, controlrow ]
 
     else
         listingrow

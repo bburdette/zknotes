@@ -474,70 +474,71 @@ showZkl isDirty editable focusLink ld id sysColor showflip zkl =
             ]
     in
     if focus then
-        E.row
+        E.column
             [ E.spacing 8
             , E.width E.fill
             , EBd.width 1
             , E.padding 3
             , EBd.rounded 3
             , EBd.color TC.darkGrey
-            ]
-            [ E.column [ E.width E.fill ]
-                [ E.row [ E.spacing 8, E.width E.fill ] display
-                , E.row [ E.spacing 8 ]
-                    [ if ld.userid == zkl.user then
-                        EI.button (linkButtonStyle ++ [ E.alignLeft ])
-                            { onPress = Just (RemoveLink zkl)
-                            , label = E.text "X"
-                            }
+            , E.inFront
+                (E.el [ E.alignRight, EBk.color TC.white, E.centerY ] <|
+                    case otherid of
+                        Just zknoteid ->
+                            ZC.golink zknoteid
+                                (if isDirty then
+                                    ZC.saveColor
 
-                      else
-                        EI.button (linkButtonStyle ++ [ E.alignLeft, EBk.color TC.darkGray ])
-                            { onPress = Nothing
-                            , label = E.text "X"
-                            }
-                    , if editable then
-                        EI.button (linkButtonStyle ++ [ E.alignLeft ])
-                            { onPress = Just (MdLink zkl "addlink")
-                            , label = E.text "^"
-                            }
-
-                      else
-                        EI.button (disabledLinkButtonStyle ++ [ E.alignLeft ])
-                            { onPress = Nothing
-                            , label = E.text "^"
-                            }
-                    , case zkl.othername of
-                        Just name ->
-                            EI.button (linkButtonStyle ++ [ E.alignLeft ])
-                                { onPress = Just <| AddToSearchAsTag name
-                                , label = E.text ">"
-                                }
+                                 else
+                                    ZC.myLinkColor
+                                )
 
                         Nothing ->
                             E.none
-                    , if showflip then
+                )
+            ]
+            [ E.row [ E.spacing 8, E.width E.fill ] display
+            , E.row [ E.spacing 8 ]
+                [ if ld.userid == zkl.user then
+                    EI.button (linkButtonStyle ++ [ E.alignLeft ])
+                        { onPress = Just (RemoveLink zkl)
+                        , label = E.text "X"
+                        }
+
+                  else
+                    EI.button (linkButtonStyle ++ [ E.alignLeft, EBk.color TC.darkGray ])
+                        { onPress = Nothing
+                        , label = E.text "X"
+                        }
+                , if editable then
+                    EI.button (linkButtonStyle ++ [ E.alignLeft ])
+                        { onPress = Just (MdLink zkl "addlink")
+                        , label = E.text "^"
+                        }
+
+                  else
+                    EI.button (disabledLinkButtonStyle ++ [ E.alignLeft ])
+                        { onPress = Nothing
+                        , label = E.text "^"
+                        }
+                , case zkl.othername of
+                    Just name ->
                         EI.button (linkButtonStyle ++ [ E.alignLeft ])
-                            { onPress = Just (FlipLink zkl)
-                            , label = E.text "⇄"
+                            { onPress = Just <| AddToSearchAsTag name
+                            , label = E.text ">"
                             }
 
-                      else
+                    Nothing ->
                         E.none
-                    ]
-                ]
-            , case otherid of
-                Just zknoteid ->
-                    ZC.golink zknoteid
-                        (if isDirty then
-                            ZC.saveColor
+                , if showflip then
+                    EI.button (linkButtonStyle ++ [ E.alignLeft ])
+                        { onPress = Just (FlipLink zkl)
+                        , label = E.text "⇄"
+                        }
 
-                         else
-                            ZC.myLinkColor
-                        )
-
-                Nothing ->
+                  else
                     E.none
+                ]
             ]
 
     else
@@ -678,7 +679,7 @@ showSr model isdirty zkln =
                 ([ E.width E.fill
                  , EE.onClick (SrFocusPress zkln.id)
                  , E.height <| E.px 30
-                 , E.clipX
+                 , E.clip
                  ]
                     ++ (sysColor
                             |> Maybe.map (\c -> [ EF.color c ])
@@ -690,33 +691,34 @@ showSr model isdirty zkln =
     in
     if model.focusSr == Just zkln.id then
         -- focus result!  show controlrow.
-        E.row
+        E.column
             [ EBd.width 1
             , E.padding 3
             , EBd.rounded 3
             , EBd.color TC.darkGrey
             , E.width E.fill
+            , E.inFront
+                (E.el [ E.alignRight, EBk.color TC.white, E.centerY ] <|
+                    if lnnonme then
+                        ZC.golink zkln.id
+                            (if isdirty then
+                                ZC.saveColor
+
+                             else
+                                ZC.otherLinkColor
+                            )
+
+                    else
+                        ZC.golink zkln.id
+                            (if isdirty then
+                                ZC.saveColor
+
+                             else
+                                ZC.myLinkColor
+                            )
+                )
             ]
-            [ E.column [ E.width E.fill ]
-                [ listingrow, controlrow ]
-            , if lnnonme then
-                ZC.golink zkln.id
-                    (if isdirty then
-                        ZC.saveColor
-
-                     else
-                        ZC.otherLinkColor
-                    )
-
-              else
-                ZC.golink zkln.id
-                    (if isdirty then
-                        ZC.saveColor
-
-                     else
-                        ZC.myLinkColor
-                    )
-            ]
+            [ listingrow, controlrow ]
 
     else
         listingrow
