@@ -192,6 +192,7 @@ type alias Model =
     , editOrView : EditOrView
     , dialog : Maybe D.Model
     , panelNote : Maybe Data.ZkNote
+    , mbReplaceString : Maybe String
     }
 
 
@@ -1629,6 +1630,7 @@ initFull ld zkl zknote dtlinks spm =
       , editOrView = ViewView
       , dialog = Nothing
       , panelNote = Nothing
+      , mbReplaceString = Nothing
       }
     , { zknote = zknote.id, offset = 0, limit = Nothing }
     )
@@ -1679,6 +1681,7 @@ initNew ld zkl spm links =
     , editOrView = EditView
     , dialog = Nothing
     , panelNote = Nothing
+    , mbReplaceString = Nothing
     }
         |> (\m1 ->
                 -- for new EMPTY notes, the 'revert' should be the same as the model, so that you aren't
@@ -1872,6 +1875,26 @@ onTASelection model tas =
             Nothing ->
                 TANoop
 
+    else if tas.what == "replacestring" then
+        case model.mbReplaceString of
+            Just s ->
+                TAUpdated
+                    { model
+                        | md =
+                            String.left tas.offset model.md
+                                ++ s
+                                ++ String.dropLeft (tas.offset + String.length tas.text) model.md
+                    }
+                    (Just
+                        { id = "mdtext"
+                        , offset = tas.offset + String.length s
+                        , length = 0
+                        }
+                    )
+
+            Nothing ->
+                TANoop
+
     else
         TAError <| "invalid 'what' code: " ++ tas.what
 
@@ -2005,18 +2028,18 @@ handleSPUpdate model ( nm, cmd ) =
 
         SP.Copy s ->
             ( { mod
-                | md =
-                    model.md
-                        ++ (if model.md == "" then
-                                "<search query=\""
+                | mbReplaceString =
+                    Just <|
+                        (if model.md == "" then
+                            "<search query=\""
 
-                            else
-                                "\n\n<search query=\""
-                           )
-                        ++ String.replace "&" "&amp;" s
-                        ++ "\"/>"
+                         else
+                            "<search query=\""
+                        )
+                            ++ String.replace "&" "&amp;" s
+                            ++ "\"/>"
               }
-            , None
+            , GetTASelection "mdtext" "replacestring"
             )
 
         SP.Search ts ->
