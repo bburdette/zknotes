@@ -160,19 +160,6 @@ showSr model zkln =
                     { onPress = Just (AddToSearchAsTag zkln.title)
                     , label = E.text "t"
                     }
-                , if lnnonme then
-                    E.link
-                        ZC.otherLinkStyle
-                        { url = Data.editNoteLink zkln.id
-                        , label = E.text zkln.title
-                        }
-
-                  else
-                    E.link
-                        ZC.myLinkStyle
-                        { url = Data.editNoteLink zkln.id
-                        , label = E.text "go"
-                        }
                 ]
 
         listingrow =
@@ -192,14 +179,14 @@ showSr model zkln =
     in
     if model.focusSr == Just zkln.id then
         -- focus result!  show controlrow.
-        E.column
+        E.row
             [ EBd.width 1
             , E.padding 3
             , EBd.rounded 3
             , EBd.color TC.darkGrey
             , E.width E.fill
             ]
-            [ listingrow, controlrow ]
+            [ E.column [ E.width E.fill ] [ listingrow, controlrow ], ZC.golink zkln.id ZC.otherLinkColor ]
 
     else
         listingrow

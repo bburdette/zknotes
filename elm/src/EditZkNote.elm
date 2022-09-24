@@ -474,7 +474,7 @@ showZkl isDirty editable focusLink ld id sysColor showflip zkl =
             ]
     in
     if focus then
-        E.column
+        E.row
             [ E.spacing 8
             , E.width E.fill
             , EBd.width 1
@@ -482,63 +482,62 @@ showZkl isDirty editable focusLink ld id sysColor showflip zkl =
             , EBd.rounded 3
             , EBd.color TC.darkGrey
             ]
-            [ E.row [ E.spacing 8, E.width E.fill ] display
-            , E.row [ E.spacing 8 ]
-                [ if ld.userid == zkl.user then
-                    EI.button (linkButtonStyle ++ [ E.alignLeft ])
-                        { onPress = Just (RemoveLink zkl)
-                        , label = E.text "X"
-                        }
-
-                  else
-                    EI.button (linkButtonStyle ++ [ E.alignLeft, EBk.color TC.darkGray ])
-                        { onPress = Nothing
-                        , label = E.text "X"
-                        }
-                , if editable then
-                    EI.button (linkButtonStyle ++ [ E.alignLeft ])
-                        { onPress = Just (MdLink zkl "addlink")
-                        , label = E.text "^"
-                        }
-
-                  else
-                    EI.button (disabledLinkButtonStyle ++ [ E.alignLeft ])
-                        { onPress = Nothing
-                        , label = E.text "^"
-                        }
-                , case zkl.othername of
-                    Just name ->
+            [ E.column [ E.width E.fill ]
+                [ E.row [ E.spacing 8, E.width E.fill ] display
+                , E.row [ E.spacing 8 ]
+                    [ if ld.userid == zkl.user then
                         EI.button (linkButtonStyle ++ [ E.alignLeft ])
-                            { onPress = Just <| AddToSearchAsTag name
-                            , label = E.text ">"
+                            { onPress = Just (RemoveLink zkl)
+                            , label = E.text "X"
                             }
 
-                    Nothing ->
-                        E.none
-                , if showflip then
-                    EI.button (linkButtonStyle ++ [ E.alignLeft ])
-                        { onPress = Just (FlipLink zkl)
-                        , label = E.text "⇄"
-                        }
-
-                  else
-                    E.none
-                , case otherid of
-                    Just zknoteid ->
-                        E.link
-                            (if isDirty then
-                                ZC.saveLinkStyle
-
-                             else
-                                ZC.myLinkStyle
-                            )
-                            { url = Data.editNoteLink zknoteid
-                            , label = E.text "go"
+                      else
+                        EI.button (linkButtonStyle ++ [ E.alignLeft, EBk.color TC.darkGray ])
+                            { onPress = Nothing
+                            , label = E.text "X"
+                            }
+                    , if editable then
+                        EI.button (linkButtonStyle ++ [ E.alignLeft ])
+                            { onPress = Just (MdLink zkl "addlink")
+                            , label = E.text "^"
                             }
 
-                    Nothing ->
+                      else
+                        EI.button (disabledLinkButtonStyle ++ [ E.alignLeft ])
+                            { onPress = Nothing
+                            , label = E.text "^"
+                            }
+                    , case zkl.othername of
+                        Just name ->
+                            EI.button (linkButtonStyle ++ [ E.alignLeft ])
+                                { onPress = Just <| AddToSearchAsTag name
+                                , label = E.text ">"
+                                }
+
+                        Nothing ->
+                            E.none
+                    , if showflip then
+                        EI.button (linkButtonStyle ++ [ E.alignLeft ])
+                            { onPress = Just (FlipLink zkl)
+                            , label = E.text "⇄"
+                            }
+
+                      else
                         E.none
+                    ]
                 ]
+            , case otherid of
+                Just zknoteid ->
+                    ZC.golink zknoteid
+                        (if isDirty then
+                            ZC.saveColor
+
+                         else
+                            ZC.myLinkColor
+                        )
+
+                Nothing ->
+                    E.none
             ]
 
     else
@@ -672,29 +671,6 @@ showSr model isdirty zkln =
                     { onPress = Just (AddToSearchAsTag zkln.title)
                     , label = E.text "t"
                     }
-                , if lnnonme then
-                    E.link
-                        (if isdirty then
-                            ZC.saveLinkStyle
-
-                         else
-                            ZC.otherLinkStyle
-                        )
-                        { url = Data.editNoteLink zkln.id
-                        , label = E.text zkln.title
-                        }
-
-                  else
-                    E.link
-                        (if isdirty then
-                            ZC.saveLinkStyle
-
-                         else
-                            ZC.myLinkStyle
-                        )
-                        { url = Data.editNoteLink zkln.id
-                        , label = E.text "go"
-                        }
                 ]
 
         listingrow =
@@ -714,14 +690,33 @@ showSr model isdirty zkln =
     in
     if model.focusSr == Just zkln.id then
         -- focus result!  show controlrow.
-        E.column
+        E.row
             [ EBd.width 1
             , E.padding 3
             , EBd.rounded 3
             , EBd.color TC.darkGrey
             , E.width E.fill
             ]
-            [ listingrow, controlrow ]
+            [ E.column [ E.width E.fill ]
+                [ listingrow, controlrow ]
+            , if lnnonme then
+                ZC.golink zkln.id
+                    (if isdirty then
+                        ZC.saveColor
+
+                     else
+                        ZC.otherLinkColor
+                    )
+
+              else
+                ZC.golink zkln.id
+                    (if isdirty then
+                        ZC.saveColor
+
+                     else
+                        ZC.myLinkColor
+                    )
+            ]
 
     else
         listingrow
@@ -913,18 +908,13 @@ zknview zone size recentZkns model =
                               , width = E.shrink
                               , view =
                                     \zkn ->
-                                        E.link
-                                            (E.alignRight
-                                                :: (if isdirty then
-                                                        ZC.saveLinkStyle
+                                        ZC.golink zkn.id
+                                            (if isdirty then
+                                                ZC.saveColor
 
-                                                    else
-                                                        ZC.myLinkStyle
-                                                   )
+                                             else
+                                                ZC.myLinkColor
                                             )
-                                            { url = Data.editNoteLink zkn.id
-                                            , label = E.text "go"
-                                            }
                               }
                             ]
                         }

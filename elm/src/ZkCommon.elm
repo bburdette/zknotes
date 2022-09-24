@@ -15,6 +15,12 @@ type alias StylePalette =
     }
 
 
+
+---------------------------------------------------
+-- system note colors.
+---------------------------------------------------
+
+
 searchColor : E.Color
 searchColor =
     TC.darkRed
@@ -60,12 +66,24 @@ systemColor ld ids =
             sysColor
 
 
-myLinkStylePlain =
-    [ EF.color TC.darkBlue ]
+
+---------------------------------------------------
 
 
-otherLinkStylePlain =
-    [ EF.color TC.lightBlue ]
+saveColor =
+    TC.darkYellow
+
+
+myLinkColor =
+    TC.black
+
+
+disabledLinkColor =
+    TC.darkGrey
+
+
+otherLinkColor =
+    TC.darkBlue
 
 
 myLinkStyle =
@@ -81,7 +99,7 @@ otherLinkStyle =
 
 
 saveLinkStyle =
-    [ EF.color TC.darkYellow, EF.underline ]
+    [ EF.color saveColor, EF.underline ]
 
 
 fullScreen =
@@ -98,3 +116,17 @@ fullScreen =
             , E.el [] <| E.text "⌝"
             ]
         ]
+
+
+golink zknid color =
+    E.link
+        [ EF.color color ]
+        { url = D.editNoteLink zknid
+        , label =
+            E.el
+                [ E.inFront (E.el [ EF.size 50 ] <| E.text "↗")
+                , EF.size 50
+                ]
+            <|
+                E.text "☐"
+        }

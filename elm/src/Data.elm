@@ -23,6 +23,7 @@ type alias SetSelection =
 
 
 type alias TASelection =
+    -- 'Text Area Selection'
     { text : String
     , offset : Int
     , what : String
