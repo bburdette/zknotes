@@ -426,8 +426,8 @@ revert model =
             (initNew model.ld model.zknSearchResult model.spmodel (Dict.values model.initialZklDict))
 
 
-showZkl : Bool -> Bool -> Maybe EditLink -> Data.LoginData -> Maybe Int -> Maybe E.Color -> Bool -> EditLink -> Element Msg
-showZkl isDirty editable focusLink ld id sysColor showflip zkl =
+showZkl : E.Color -> Bool -> Bool -> Maybe EditLink -> Data.LoginData -> Maybe Int -> Maybe E.Color -> Bool -> EditLink -> Element Msg
+showZkl bkcolor isDirty editable focusLink ld id sysColor showflip zkl =
     let
         ( dir, otherid ) =
             case zkl.direction of
@@ -482,7 +482,7 @@ showZkl isDirty editable focusLink ld id sysColor showflip zkl =
             , EBd.rounded 3
             , EBd.color TC.darkGrey
             , E.inFront
-                (E.row [ E.height E.fill, E.alignRight, EBk.color TC.white ]
+                (E.row [ E.height E.fill, E.alignRight, EBk.color bkcolor ]
                     [ case otherid of
                         Just zknoteid ->
                             E.el [ E.centerY ] <|
@@ -596,8 +596,8 @@ disabledLinkButtonStyle =
     Common.disabledButtonStyle
 
 
-showSr : Model -> Bool -> Data.ZkListNote -> Element Msg
-showSr model isdirty zkln =
+showSr : E.Color -> Model -> Bool -> Data.ZkListNote -> Element Msg
+showSr bkcolor model isdirty zkln =
     let
         lnnonme =
             zkln.user /= model.ld.userid
@@ -700,7 +700,7 @@ showSr model isdirty zkln =
             , EBd.color TC.darkGrey
             , E.width E.fill
             , E.inFront
-                (E.row [ E.height E.fill, E.alignRight, EBk.color TC.white ]
+                (E.row [ E.height E.fill, E.alignRight, EBk.color bkcolor ]
                     [ if lnnonme then
                         ZC.golink zkln.id
                             (if isdirty then
@@ -955,11 +955,12 @@ zknview zone size recentZkns model =
         divider =
             E.row [ E.width E.fill, EBd.widthEach { bottom = 1, left = 0, right = 0, top = 0 } ] []
 
-        showLinks =
+        showLinks linkbkc =
             E.row [ EF.bold ] [ E.text "links" ]
                 :: List.map
                     (\( l, c ) ->
-                        showZkl isdirty
+                        showZkl linkbkc
+                            isdirty
                             editable
                             model.focusLink
                             model.ld
@@ -1019,7 +1020,7 @@ zknview zone size recentZkns model =
             else
                 [ EF.color TC.darkGrey ]
 
-        editview =
+        editview linkbkc =
             let
                 titleed =
                     EI.text
@@ -1222,10 +1223,10 @@ zknview zone size recentZkns model =
                     ++ showComments
                     -- show the links.
                     ++ [ divider ]
-                    ++ showLinks
+                    ++ showLinks linkbkc
                 )
 
-        mdview =
+        mdview linkbkc =
             E.column
                 [ E.width E.fill
                 , E.centerX
@@ -1269,7 +1270,7 @@ zknview zone size recentZkns model =
                             []
 
                         else
-                            showComments ++ showLinks
+                            showComments ++ showLinks linkbkc
                        )
 
         parabuttonstyle =
@@ -1318,14 +1319,14 @@ zknview zone size recentZkns model =
                     ]
                     :: [ case model.searchOrRecent of
                             SearchView ->
-                                searchPanel
+                                searchPanel TC.white
 
                             RecentView ->
-                                recentPanel
+                                recentPanel TC.white
                        ]
                 )
 
-        searchPanel =
+        searchPanel bkcolor =
             E.column
                 (E.spacing 8 :: E.width E.fill :: sppad)
                 (E.row [ E.width E.fill ]
@@ -1342,7 +1343,7 @@ zknview zone size recentZkns model =
                             SP.view True (size.width < 500 || wclass /= Narrow) 0 model.spmodel
                        )
                     :: (List.map
-                            (showSr model isdirty)
+                            (showSr bkcolor model isdirty)
                         <|
                             case model.id of
                                 Just id ->
@@ -1361,10 +1362,10 @@ zknview zone size recentZkns model =
                        )
                 )
 
-        recentPanel =
+        recentPanel bkcolor =
             E.column (E.spacing 8 :: sppad)
                 (List.map
-                    (showSr model isdirty)
+                    (showSr bkcolor model isdirty)
                  <|
                     recentZkns
                 )
@@ -1447,8 +1448,8 @@ zknview zone size recentZkns model =
                     , E.alignTop
                     , E.spacing 8
                     ]
-                    [ headingPanel "edit" [ E.width E.fill ] editview
-                    , headingPanel "view" [ E.width E.fill ] mdview
+                    [ headingPanel "edit" [ E.width E.fill ] (editview TC.white)
+                    , headingPanel "view" [ E.width E.fill ] (mdview TC.white)
                     , searchOrRecentPanel
                     ]
 
@@ -1488,10 +1489,10 @@ zknview zone size recentZkns model =
                             ]
                         , case model.editOrView of
                             EditView ->
-                                editview
+                                editview TC.white
 
                             ViewView ->
-                                mdview
+                                mdview TC.white
                         ]
                     , searchOrRecentPanel
                     ]
@@ -1514,16 +1515,16 @@ zknview zone size recentZkns model =
                         ]
                     , case model.navchoice of
                         NcEdit ->
-                            editview
+                            editview TC.lightGray
 
                         NcView ->
-                            mdview
+                            mdview TC.lightGray
 
                         NcSearch ->
-                            searchPanel
+                            searchPanel TC.lightGray
 
                         NcRecent ->
-                            recentPanel
+                            recentPanel TC.lightGray
                     ]
         ]
 
