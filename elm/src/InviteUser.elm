@@ -649,5 +649,15 @@ update msg model =
         SPMsg m ->
             handleSPUpdate model (SP.update m model.spmodel)
 
-        NavChoiceChanged navChoice ->
-            ( model, None )
+        NavChoiceChanged nc ->
+            ( { model
+                | searchOrRecent =
+                    case nc of
+                        NcSearch ->
+                            SearchView
+
+                        NcRecent ->
+                            RecentView
+              }
+            , None
+            )
