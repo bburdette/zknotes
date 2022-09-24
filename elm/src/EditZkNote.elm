@@ -1364,7 +1364,7 @@ zknview zone size recentZkns model =
                 )
 
         recentPanel bkcolor =
-            E.column (E.spacing 8 :: sppad)
+            E.column (E.spacing 8 :: E.width E.fill :: sppad)
                 (List.map
                     (showSr bkcolor model isdirty)
                  <|
