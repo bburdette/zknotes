@@ -51,6 +51,8 @@ mod tests {
         email: "".to_string(),
       },
       None,
+      None,
+      None,
       &mut cb.on_new_user,
     )?;
     let uid2 = new_user(
@@ -60,6 +62,8 @@ mod tests {
         pwd: "".to_string(),
         email: "".to_string(),
       },
+      None,
+      None,
       None,
       &mut cb.on_new_user,
     )?;
@@ -87,6 +91,7 @@ mod tests {
         pubid: None,
         content: "note1 content".to_string(),
         editable: false,
+        deleted: false,
       },
     )?;
 
@@ -101,6 +106,7 @@ mod tests {
         pubid: None,
         content: "note1-2 content".to_string(),
         editable: false,
+        deleted: false,
       },
     )?;
 
@@ -119,6 +125,7 @@ mod tests {
         pubid: None,
         content: "note1-3 content".to_string(),
         editable: false,
+        deleted: false,
       },
     )?;
 
@@ -151,6 +158,7 @@ mod tests {
         pubid: None,
         content: "note1-4 content".to_string(),
         editable: false,
+        deleted: false,
       },
     )?;
     save_zklink(&conn, szn1_4.id, szn1_2_share.id, uid1, None)?;
@@ -168,6 +176,7 @@ mod tests {
         pubid: None,
         content: "note1-5 content".to_string(),
         editable: false,
+        deleted: false,
       },
     )?;
     save_zklink(&conn, szn1_5.id, szn1_3_share.id, uid1, None)?;
@@ -183,6 +192,7 @@ mod tests {
         pubid: None,
         content: "note1-6 content".to_string(),
         editable: false,
+        deleted: false,
       },
     )?;
     save_zklink(&conn, szn1_6.id, unid2, uid1, None)?;
@@ -200,6 +210,7 @@ mod tests {
         pubid: None,
         content: "note1-7 content".to_string(),
         editable: false,
+        deleted: false,
       },
     )?;
     save_zklink(&conn, unid2, szn1_7.id, uid1, None)?;
@@ -217,6 +228,7 @@ mod tests {
         pubid: None,
         content: "note1-4 content FROM USER 2".to_string(),
         editable: false,
+        deleted: false,
       },
     )?;
 
@@ -231,6 +243,7 @@ mod tests {
         pubid: None,
         content: "note1-5 content FROM USER 2".to_string(),
         editable: false,
+        deleted: false,
       },
     ) {
       Ok(_) => panic!("test failed"),
@@ -247,6 +260,7 @@ mod tests {
         pubid: None,
         content: "note2 content".to_string(),
         editable: false,
+        deleted: false,
       },
     )?;
     // Ok to link to share 2, because am a member.
@@ -269,6 +283,7 @@ mod tests {
         pubid: Some("publicid1".to_string()),
         content: "note1 content".to_string(),
         editable: false,
+        deleted: false,
       },
     )?;
     // despite public id, shouldn't be able to read. because doesn't link to 'public'
@@ -287,6 +302,7 @@ mod tests {
         pubid: Some("publicid2".to_string()),
         content: "note1 content".to_string(),
         editable: false,
+        deleted: false,
       },
     )?;
     save_zklink(&conn, pubzn2.id, publicid, uid1, None)?;
@@ -465,6 +481,30 @@ mod tests {
           panic!("test failed")
         } else {
           ()
+        }
+      }
+      Either::Right(_zknr) => panic!("test failed"),
+    }
+
+    // u2 can't see note4 archive note.
+    let u1note4_srearch = ZkNoteSearch {
+      tagsearch: TagSearch::SearchTerm {
+        mods: vec![SearchMod::ExactMatch],
+        term: "u1 note4 - share".to_string(),
+      },
+      offset: 0,
+      limit: None,
+      what: "test".to_string(),
+      list: true,
+    };
+
+    match search_zknotes(&conn, uid2, &u1note4_search)? {
+      Either::Left(zklr) => {
+        if zklr.notes.len() > 0 {
+          ()
+        } else {
+          // not supposed to see it!
+          panic!("test failed")
         }
       }
       Either::Right(_zknr) => panic!("test failed"),
