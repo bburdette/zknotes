@@ -5,7 +5,7 @@ mod tests {
   use crate::sqldata::*;
   use either::Either;
   use orgauth::data::RegistrationData;
-  use orgauth::dbfun::new_user;
+  use orgauth::dbfun::{new_user, user_id};
   use std::error::Error;
   use std::fs;
   use std::path::Path;
@@ -157,7 +157,7 @@ mod tests {
         showtitle: true,
         pubid: None,
         content: "note1-4 content".to_string(),
-        editable: false,
+        editable: true,
         deleted: false,
       },
     )?;
@@ -191,7 +191,7 @@ mod tests {
         showtitle: true,
         pubid: None,
         content: "note1-6 content".to_string(),
-        editable: false,
+        editable: true,
         deleted: false,
       },
     )?;
@@ -218,7 +218,7 @@ mod tests {
     println!("10");
 
     // user 2 can save changes to note 4.
-    save_zknote(
+    match save_zknote(
       &conn,
       uid2,
       &SaveZkNote {
@@ -230,7 +230,15 @@ mod tests {
         editable: false,
         deleted: false,
       },
-    )?;
+    ) {
+      Ok(_) => (),
+      Err(e) => {
+        println!("error {:?}", e);
+        panic!("test failed)")
+      }
+    };
+
+    println!("11");
 
     // user 2 can't save changes to note 5.
     match save_zknote(
@@ -250,6 +258,8 @@ mod tests {
       Err(_e) => (),
     }
 
+    println!("12");
+
     let szn2_1 = save_zknote(
       &conn,
       uid2,
@@ -263,6 +273,9 @@ mod tests {
         deleted: false,
       },
     )?;
+
+    println!("13");
+
     // Ok to link to share 2, because am a member.
     save_zklink(&conn, szn2_1.id, szn1_2_share.id, uid2, None)?;
     // not ok to link to share 3, because not a member.
@@ -271,6 +284,8 @@ mod tests {
       Ok(_) => panic!("wat"),
       Err(_e) => (),
     };
+
+    println!("14");
 
     // TODO test that pubid read works, since that broke in 'production'
     let _pubzn1 = save_zknote(
@@ -286,11 +301,16 @@ mod tests {
         deleted: false,
       },
     )?;
+
+    println!("14");
+
     // despite public id, shouldn't be able to read. because doesn't link to 'public'
     match read_zknotepubid(&conn, None, "publicid1") {
       Ok(_) => panic!("wat"),
       Err(_e) => (),
     };
+
+    println!("15");
 
     let pubzn2 = save_zknote(
       &conn,
@@ -309,9 +329,37 @@ mod tests {
     // should be able to read because links to 'public'.
     read_zknotepubid(&conn, None, "publicid2")?;
 
+    // should be able to save changes to a share note without error.
+    save_zknote(
+      &conn,
+      uid1,
+      &SaveZkNote {
+        id: Some(szn1_2_share.id),
+        title: "u1 note2 - share".to_string(),
+        showtitle: true,
+        pubid: None,
+        content: "note1-2 content changed".to_string(),
+        editable: false,
+        deleted: false,
+      },
+    )?;
+
     // TODO test that 'public' is not treated as a share.
 
-    // TODO test notes linked with user BY CREATOR are editable/visible.
+    // test notes linked with user BY CREATOR are editable.
+    let szn1_6 = save_zknote(
+      &conn,
+      uid2,
+      &SaveZkNote {
+        id: None,
+        title: "u1 note6 - direct share".to_string(),
+        showtitle: true,
+        pubid: None,
+        content: "note1-6 content changed by user2".to_string(),
+        editable: true,
+        deleted: false,
+      },
+    )?;
 
     // ---------------------------------------------------------------
     // test searches.
@@ -442,7 +490,7 @@ mod tests {
     let u1note4_search = ZkNoteSearch {
       tagsearch: TagSearch::SearchTerm {
         mods: Vec::new(),
-        term: "u1 note4 - share".to_string(),
+        term: "u1 note4 - rshare".to_string(),
       },
       offset: 0,
       limit: None,
@@ -455,7 +503,7 @@ mod tests {
         if zklr.notes.len() > 0 {
           ()
         } else {
-          // not supposed to see it!
+          // supposed to see it!
           panic!("test failed")
         }
       }
@@ -487,28 +535,46 @@ mod tests {
     }
 
     // u2 can't see note4 archive note.
-    let u1note4_srearch = ZkNoteSearch {
+    let u1note4_archive_search = ZkNoteSearch {
       tagsearch: TagSearch::SearchTerm {
         mods: vec![SearchMod::ExactMatch],
         term: "u1 note4 - share".to_string(),
       },
       offset: 0,
       limit: None,
-      what: "test".to_string(),
+      what: "u2nran test".to_string(),
       list: true,
     };
 
-    match search_zknotes(&conn, uid2, &u1note4_search)? {
+    match search_zknotes(&conn, uid2, &u1note4_archive_search)? {
+      Either::Left(zklr) => {
+        if zklr.notes.len() > 0 {
+          // not supposed to see it!
+          println!("u1note4_srearch {:?}", zklr);
+          panic!("test failed")
+        } else {
+          ()
+        }
+      }
+      Either::Right(_zknr) => panic!("test failed"),
+    }
+
+    // system user can see the archive note
+    let systemid = user_id(&conn, "system")?;
+    match search_zknotes(&conn, systemid, &u1note4_archive_search)? {
       Either::Left(zklr) => {
         if zklr.notes.len() > 0 {
           ()
         } else {
-          // not supposed to see it!
+          // supposed to see it!
+          println!("u1note4_archive_search w systemid{:?}", zklr);
           panic!("test failed")
         }
       }
       Either::Right(_zknr) => panic!("test failed"),
     }
+
+    // can save changes to a share note, without error.
 
     // TODO test search modifiers.
     //	 ExactMatch,
