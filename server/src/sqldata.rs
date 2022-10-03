@@ -264,6 +264,11 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: i64) -> Result<(), Box<dyn Err
     zkm::udpate18(&dbfile)?;
     set_single_value(&conn, "migration_level", "18")?;
   }
+  if nlevel < 19 {
+    info!("udpate19");
+    zkm::udpate19(&dbfile)?;
+    set_single_value(&conn, "migration_level", "19")?;
+  }
 
   info!("db up to date.");
 
@@ -285,9 +290,11 @@ pub fn save_zklink(
   // can link between notes you don't own, even.
   // but linking from a note you don't own to 'share' or 'public' is not allowed.
   // if one note is a share, then you must be a member of that share to link, or own that share.
+  // or, if the link is owned by 'system' its ok.
 
   let shareid = note_id(&conn, "system", "share")?;
   let publicid = note_id(&conn, "system", "public")?;
+  let systemid = user_id(&conn, "system")?;
   let usernote = user_note_id(&conn, user)?;
 
   let authed = if fromid == shareid || fromid == publicid || fromid == usernote {
@@ -305,10 +312,11 @@ pub fn save_zklink(
     // not allowed!
     is_zknote_mine(&conn, fromid, user)? // unless user owns fromid.
   } else if are_notes_linked(&conn, toid, shareid)? && !are_notes_linked(&conn, usernote, toid)? {
-    // fromid is a share.
+    // toid is a share.
     // user does not link to it.
     // not allowed!
-    is_zknote_mine(&conn, toid, user)? // unless user owns toid.
+    let izm = is_zknote_mine(&conn, toid, user)?; // unless user owns toid.
+    izm || (user == systemid) // OR user is system.  for links from archive notes to share notes.
   } else {
     true
   };
@@ -530,8 +538,8 @@ pub fn archive_zknote(conn: &Connection, noteid: i64) -> Result<SavedZkNote, Box
   // mark the note as an archive note.
   save_zklink(&conn, archive_note_id, aid, sysid, None)?;
 
-  // link the note to the original note.
-  save_zklink(&conn, archive_note_id, noteid, sysid, None)?;
+  // link the note to the original note, AND indicate this is an archive link.
+  save_zklink(&conn, archive_note_id, noteid, sysid, Some(aid))?;
 
   Ok(SavedZkNote {
     id: archive_note_id,
