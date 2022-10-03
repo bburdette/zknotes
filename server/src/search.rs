@@ -117,7 +117,7 @@ pub fn build_sql(
   let (cls, clsargs) = build_sql_clause(&conn, uid, false, search.tagsearch)?;
 
   let publicid = note_id(&conn, "system", "public")?;
-
+  let archiveid = note_id(&conn, "system", "archive")?;
   let shareid = note_id(&conn, "system", "share")?;
 
   let limclause = match search.limit {
@@ -163,6 +163,8 @@ pub fn build_sql(
         (M.toid = ? and (
           (L.fromid = N.id and L.toid = M.fromid ) or
           (L.toid = N.id and L.fromid = M.fromid )))
+      and 
+        L.linkzknote is not ?
       and
         ((U.fromid = ? and U.toid = M.fromid) or (U.fromid = M.fromid and U.toid = ?)))
       and N.deleted = 0",
@@ -170,6 +172,7 @@ pub fn build_sql(
   let mut shareargs = vec![
     uid.to_string(),
     shareid.to_string(),
+    archiveid.to_string(),
     usernoteid.to_string(),
     usernoteid.to_string(),
   ];

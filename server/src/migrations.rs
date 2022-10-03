@@ -1634,3 +1634,31 @@ pub fn udpate18(dbfile: &Path) -> Result<(), Box<dyn Error>> {
 
   Ok(())
 }
+
+pub fn udpate19(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+  // db connection without foreign key checking.
+  let conn = Connection::open(dbfile)?;
+
+  // we don't just call note_id because note_id ftn of the future may be
+  // different!  then migrations would break.  yes this happened.
+  // let archiveid = note_id(&conn, "system", "archive")?;
+  let archiveid: i64 = conn.query_row(
+    "select zknote.id from
+      zknote, orgauth_user
+      where zknote.title = ?2
+      and orgauth_user.name = ?1
+      and zknote.user = orgauth_user.id",
+    params!["system", "archive"],
+    |row| Ok(row.get(0)?),
+  )?;
+  // flag links from archive notes to their targets with archive note id.
+  // so they get skipped in searches.
+  conn.execute(
+    "update zklink set linkzknote = ?1
+      where fromid in (select fromid from zklink where toid = ?1)
+        and toid is not ?1",
+    params![archiveid],
+  )?;
+
+  Ok(())
+}
