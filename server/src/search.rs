@@ -164,7 +164,7 @@ pub fn build_sql(
           (L.fromid = N.id and L.toid = M.fromid ) or
           (L.toid = N.id and L.fromid = M.fromid )))
       and 
-        L.linkzknote != ?
+        L.linkzknote is not ?
       and
         ((U.fromid = ? and U.toid = M.fromid) or (U.fromid = M.fromid and U.toid = ?)))
       and N.deleted = 0",
