@@ -1469,7 +1469,7 @@ actualupdate msg model =
                 Ok tas ->
                     case state of
                         EditZkNote emod login ->
-                            case EditZkNote.onTASelection emod tas of
+                            case EditZkNote.onTASelection emod model.recentNotes tas of
                                 EditZkNote.TAError e ->
                                     ( displayMessageDialog model e, Cmd.none )
 

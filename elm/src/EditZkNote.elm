@@ -70,6 +70,7 @@ import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..), 
 import Markdown.Html
 import Markdown.Parser
 import Markdown.Renderer
+import Maybe.Extra as ME
 import MdCommon as MC
 import Schelme.Show exposing (showTerm)
 import Search as S
@@ -898,43 +899,40 @@ zknview zone size recentZkns model =
                 - (60 * 2 + 6)
 
         showComments =
-            (E.el [ EF.bold, E.width E.fill ] (E.text "comments")
-                :: [ E.table [ E.width E.fill, E.spacing 8 ]
-                        { data = model.comments
-                        , columns =
-                            [ { header = E.none
-                              , width = E.fill
-                              , view = \zkn -> renderMd model.cells zkn.content mdw
-                              }
-                            , { header = E.none
-                              , width = E.shrink
-                              , view = \zkn -> E.el [ E.alignRight ] <| E.text zkn.username
-                              }
-                            , { header = E.none
-                              , width = E.shrink
-                              , view =
-                                    \zkn ->
-                                        ZC.golink zkn.id
-                                            (if isdirty then
-                                                ZC.saveColor
+            [ E.el [ EF.bold, E.width E.fill ] <| E.text "comments"
+            , E.table [ E.width E.fill, E.spacing 8 ]
+                { data = model.comments
+                , columns =
+                    [ { header = E.none
+                      , width = E.fill
+                      , view = \zkn -> renderMd model.cells zkn.content mdw
+                      }
+                    , { header = E.none
+                      , width = E.shrink
+                      , view = \zkn -> E.el [ E.alignRight ] <| E.text zkn.username
+                      }
+                    , { header = E.none
+                      , width = E.shrink
+                      , view =
+                            \zkn ->
+                                ZC.golink zkn.id
+                                    (if isdirty then
+                                        ZC.saveColor
 
-                                             else
-                                                ZC.myLinkColor
-                                            )
-                              }
-                            ]
-                        }
-                   ]
-            )
-                ++ (case model.newcomment of
-                        Just s ->
-                            [ addComment s ]
+                                     else
+                                        ZC.myLinkColor
+                                    )
+                      }
+                    ]
+                }
+            , case model.newcomment of
+                Just s ->
+                    addComment s
 
-                        Nothing ->
-                            [ EI.button Common.buttonStyle
-                                { label = E.text "new comment", onPress = Just NewCommentPress }
-                            ]
-                   )
+                Nothing ->
+                    EI.button Common.buttonStyle
+                        { label = E.text "new comment", onPress = Just NewCommentPress }
+            ]
 
         dates =
             case ( model.createdate, model.changeddate ) of
@@ -1213,12 +1211,11 @@ zknview zone size recentZkns model =
                     , label = EI.labelHidden "markdown input"
                     , spellcheck = False
                     }
-                 , case isdirty of
-                    True ->
-                        EI.button perhapsdirtybutton { onPress = Just SavePress, label = E.text "save" }
+                 , if isdirty then
+                    EI.button perhapsdirtybutton { onPress = Just SavePress, label = E.text "save" }
 
-                    False ->
-                        E.none
+                   else
+                    E.none
                  ]
                     ++ [ dates, divider ]
                     ++ showComments
@@ -1274,14 +1271,17 @@ zknview zone size recentZkns model =
                             showComments ++ showLinks linkbkc
                        )
 
+        pxy =
+            [ E.paddingXY 10 0 ]
+
         parabuttonstyle =
-            Common.buttonStyle ++ [ E.paddingXY 10 0 ]
+            Common.buttonStyle ++ pxy
 
         disabledparabuttonstyle =
-            Common.disabledButtonStyle ++ [ E.paddingXY 10 0 ]
+            Common.disabledButtonStyle ++ pxy
 
         perhapsdirtyparabuttonstyle =
-            perhapsdirtybutton ++ [ E.paddingXY 10 0 ]
+            perhapsdirtybutton ++ pxy
 
         ( spwidth, sppad ) =
             case wclass of
@@ -1796,8 +1796,8 @@ initLinkBackNote model title =
             Err "new note!  save this note before creating a linkback note to it"
 
 
-onTASelection : Model -> Data.TASelection -> TACommand
-onTASelection model tas =
+onTASelection : Model -> List Data.ZkListNote -> Data.TASelection -> TACommand
+onTASelection model recentZkns tas =
     let
         addLink title id =
             let
@@ -1863,7 +1863,15 @@ onTASelection model tas =
         case
             model.focusSr
                 |> Maybe.andThen
-                    (\id -> List.filter (\zkln -> id == zkln.id) model.zknSearchResult.notes |> List.head)
+                    (\id ->
+                        model.zknSearchResult.notes
+                            |> List.filter (\zkln -> id == zkln.id)
+                            |> List.head
+                            |> ME.orElse
+                                (List.filter (\zkln -> id == zkln.id) recentZkns
+                                    |> List.head
+                                )
+                    )
         of
             Just zkln ->
                 let
