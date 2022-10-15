@@ -1435,7 +1435,7 @@ zknview zone size recentZkns model =
 
               else
                 E.none
-            , EI.button Common.buttonStyle
+            , EI.button (E.alignRight :: Common.buttonStyle)
                 { onPress = Just <| ShowArchivesPress
                 , label = E.el [ E.centerY ] <| E.text "archives"
                 }
