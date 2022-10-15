@@ -47,6 +47,7 @@ view model =
             [ E.centerX
             , E.width (E.maximum 400 E.fill)
             , E.spacing 8
+            , E.alignTop
             ]
             [ E.row [ E.width E.fill ]
                 [ EI.button buttonStyle { onPress = Just DonePress, label = E.text "done" }
