@@ -1240,6 +1240,10 @@ pub fn read_archivezknote(
   let archiveid = note_id(&conn, "system", "archive")?;
   let sysid = user_id(&conn, "system")?;
 
+  if gazn.parentnote == archiveid {
+    bail!("query not allowed!");
+  }
+
   // have access to the parent note?
   read_zknote(conn, Some(uid), gazn.parentnote)?;
 
