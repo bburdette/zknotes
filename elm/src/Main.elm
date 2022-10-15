@@ -1762,7 +1762,12 @@ actualupdate msg model =
                             ( displayMessageDialog model <| e, Cmd.none )
 
                         UI.RegistrationSent ->
-                            ( model, Cmd.none )
+                            case model.state of
+                                Login lgst ->
+                                    ( { model | state = Login (Login.registrationSent lgst) }, Cmd.none )
+
+                                _ ->
+                                    ( model, Cmd.none )
 
                         UI.LoggedIn oalogin ->
                             case Data.fromOaLd oalogin of
@@ -1899,6 +1904,34 @@ actualupdate msg model =
                             case state of
                                 Login lmod ->
                                     ( { model | state = Login <| Login.invalidUserOrPwd lmod }, Cmd.none )
+
+                                _ ->
+                                    ( unexpectedMessage { model | state = initLoginState model }
+                                        (UI.showServerResponse uiresponse)
+                                    , Cmd.none
+                                    )
+
+                        UI.BlankUserName ->
+                            case state of
+                                Invited lmod ->
+                                    ( { model | state = Invited <| Invited.blankUserName lmod }, Cmd.none )
+
+                                Login lmod ->
+                                    ( { model | state = Login <| Login.blankUserName lmod }, Cmd.none )
+
+                                _ ->
+                                    ( unexpectedMessage { model | state = initLoginState model }
+                                        (UI.showServerResponse uiresponse)
+                                    , Cmd.none
+                                    )
+
+                        UI.BlankPassword ->
+                            case state of
+                                Invited lmod ->
+                                    ( { model | state = Invited <| Invited.blankPassword lmod }, Cmd.none )
+
+                                Login lmod ->
+                                    ( { model | state = Login <| Login.blankPassword lmod }, Cmd.none )
 
                                 _ ->
                                     ( unexpectedMessage { model | state = initLoginState model }
