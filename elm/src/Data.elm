@@ -2,7 +2,7 @@ module Data exposing (..)
 
 import Json.Decode as JD
 import Json.Encode as JE
-import Orgauth.Data exposing (UserId, decodeUserId, encodeUserId, getUserIdVal, makeUserId)
+import Orgauth.Data exposing (UserId, decodeUserId, encodeUserId)
 import Search as S
 import UUID exposing (UUID)
 import Url.Builder as UB
@@ -366,7 +366,7 @@ encodeZkLink zklink =
     JE.object <|
         [ ( "from", JE.int zklink.from )
         , ( "to", JE.int zklink.to )
-        , ( "user", JE.int (getUserIdVal zklink.user) )
+        , ( "user", encodeUserId zklink.user )
         ]
             ++ (zklink.delete
                     |> Maybe.map (\b -> [ ( "delete", JE.bool b ) ])
@@ -513,7 +513,7 @@ decodeZkNoteEdit =
 decodeLoginData : JD.Decoder LoginData
 decodeLoginData =
     JD.succeed LoginData
-        |> andMap (JD.field "userid" (JD.map makeUserId JD.int))
+        |> andMap (JD.field "userid" decodeUserId)
         |> andMap (JD.field "name" JD.string)
         |> andMap (JD.field "email" JD.string)
         |> andMap (JD.field "admin" JD.bool)
