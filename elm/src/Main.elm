@@ -1599,6 +1599,24 @@ actualupdate msg model =
                 UserEdit.None ->
                     ( { model | state = UserEdit numod login }, Cmd.none )
 
+        ( ShowUrlMsg umsg, ShowUrl umod login ) ->
+            let
+                ( numod, c ) =
+                    ShowUrl.update umsg umod
+            in
+            case c of
+                ShowUrl.Done ->
+                    if login.admin then
+                        ( model
+                        , sendAIMsg model.location AI.GetUsers
+                        )
+
+                    else
+                        initialPage model
+
+                ShowUrl.None ->
+                    ( { model | state = ShowUrl numod login }, Cmd.none )
+
         ( WkMsg rkey, Login ls ) ->
             case rkey of
                 Ok key ->
