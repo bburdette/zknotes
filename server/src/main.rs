@@ -224,6 +224,7 @@ fn defcon() -> Config {
     reset_token_expiration_ms: 1 * 24 * 60 * 60 * 1000, // 1 day in milliseconds
     invite_token_expiration_ms: 7 * 24 * 60 * 60 * 1000, // 7 day in milliseconds
     open_registration: true,
+    non_admin_invite: true,
   };
   Config {
     ip: "127.0.0.1".to_string(),

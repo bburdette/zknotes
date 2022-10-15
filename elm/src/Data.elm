@@ -2,7 +2,7 @@ module Data exposing (..)
 
 import Json.Decode as JD
 import Json.Encode as JE
-import Orgauth.Data
+import Orgauth.Data exposing (UserId, decodeUserId, encodeUserId)
 import Search as S
 import UUID exposing (UUID)
 import Url.Builder as UB
@@ -68,7 +68,7 @@ fromOaLd oald =
 
 
 type alias LoginData =
-    { userid : Int
+    { userid : UserId
     , name : String
     , email : String
     , admin : Bool
@@ -88,7 +88,7 @@ type alias ZkInviteData =
 
 type alias ZkListNote =
     { id : Int
-    , user : Int
+    , user : UserId
     , title : String
     , createdate : Int
     , changeddate : Int
@@ -118,7 +118,7 @@ type alias SavedZkNote =
 
 type alias ZkNote =
     { id : Int
-    , user : Int
+    , user : UserId
     , username : String
     , usernote : Int
     , title : String
@@ -148,7 +148,7 @@ type alias SaveZkNote =
 type alias ZkLink =
     { from : Int
     , to : Int
-    , user : Int
+    , user : UserId
     , zknote : Maybe Int
     , fromname : Maybe String
     , toname : Maybe String
@@ -164,7 +164,7 @@ type Direction
 type alias EditLink =
     { otherid : Int
     , direction : Direction
-    , user : Int
+    , user : UserId
     , zknote : Maybe Int
     , othername : Maybe String
     , sysids : List Int
@@ -198,7 +198,7 @@ elToSzl el =
 type alias SaveZkLink =
     { otherid : Int
     , direction : Direction
-    , user : Int
+    , user : UserId
     , zknote : Maybe Int
     , delete : Maybe Bool
     }
@@ -347,7 +347,7 @@ encodeSaveZkLink : SaveZkLink -> JE.Value
 encodeSaveZkLink s =
     [ Just ( "otherid", JE.int s.otherid )
     , Just ( "direction", encodeDirection s.direction )
-    , Just ( "user", JE.int s.user )
+    , Just ( "user", encodeUserId s.user )
     , s.zknote |> Maybe.map (\n -> ( "zknote", JE.int n ))
     , s.delete |> Maybe.map (\n -> ( "delete", JE.bool n ))
     ]
@@ -366,7 +366,7 @@ encodeZkLink zklink =
     JE.object <|
         [ ( "from", JE.int zklink.from )
         , ( "to", JE.int zklink.to )
-        , ( "user", JE.int zklink.user )
+        , ( "user", encodeUserId zklink.user )
         ]
             ++ (zklink.delete
                     |> Maybe.map (\b -> [ ( "delete", JE.bool b ) ])
@@ -387,7 +387,7 @@ decodeZkLink =
     JD.map7 ZkLink
         (JD.field "from" JD.int)
         (JD.field "to" JD.int)
-        (JD.field "user" JD.int)
+        (JD.field "user" decodeUserId)
         (JD.maybe (JD.field "linkzknote" JD.int))
         (JD.maybe (JD.field "fromname" JD.string))
         (JD.maybe (JD.field "toname" JD.string))
@@ -399,7 +399,7 @@ decodeEditLink =
     JD.map6 (\a b c d e f -> EditLink a b c d e f Nothing)
         (JD.field "otherid" JD.int)
         (JD.field "direction" decodeDirection)
-        (JD.field "user" JD.int)
+        (JD.field "user" decodeUserId)
         (JD.maybe (JD.field "zknote" JD.int))
         (JD.maybe (JD.field "othername" JD.string))
         (JD.field "sysids" (JD.list JD.int))
@@ -446,7 +446,7 @@ decodeZkListNote : JD.Decoder ZkListNote
 decodeZkListNote =
     JD.map6 ZkListNote
         (JD.field "id" JD.int)
-        (JD.field "user" JD.int)
+        (JD.field "user" decodeUserId)
         (JD.field "title" JD.string)
         (JD.field "createdate" JD.int)
         (JD.field "changeddate" JD.int)
@@ -480,7 +480,7 @@ decodeZkNote : JD.Decoder ZkNote
 decodeZkNote =
     JD.succeed ZkNote
         |> andMap (JD.field "id" JD.int)
-        |> andMap (JD.field "user" JD.int)
+        |> andMap (JD.field "user" decodeUserId)
         |> andMap (JD.field "username" JD.string)
         |> andMap (JD.field "usernote" JD.int)
         |> andMap (JD.field "title" JD.string)
@@ -513,7 +513,7 @@ decodeZkNoteEdit =
 decodeLoginData : JD.Decoder LoginData
 decodeLoginData =
     JD.succeed LoginData
-        |> andMap (JD.field "userid" JD.int)
+        |> andMap (JD.field "userid" decodeUserId)
         |> andMap (JD.field "name" JD.string)
         |> andMap (JD.field "email" JD.string)
         |> andMap (JD.field "admin" JD.bool)

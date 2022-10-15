@@ -72,6 +72,7 @@ import Markdown.Parser
 import Markdown.Renderer
 import Maybe.Extra as ME
 import MdCommon as MC
+import Orgauth.Data exposing (UserId)
 import Schelme.Show exposing (showTerm)
 import Search as S
 import SearchStackPanel as SP
@@ -165,7 +166,7 @@ type alias NewCommentState =
 type alias Model =
     { id : Maybe Int
     , ld : Data.LoginData
-    , noteUser : Int
+    , noteUser : UserId
     , noteUserName : String
     , usernote : Int
     , zknSearchResult : Data.ZkListNoteSearchResult
@@ -1704,7 +1705,7 @@ replaceOrAdd items replacement compare mergef =
             [ replacement ]
 
 
-sznToZkn : Int -> String -> Int -> List Int -> Data.SavedZkNote -> Data.SaveZkNote -> Data.ZkNote
+sznToZkn : UserId -> String -> Int -> List Int -> Data.SavedZkNote -> Data.SaveZkNote -> Data.ZkNote
 sznToZkn uid uname unote sysids sdzn szn =
     { id = sdzn.id
     , user = uid

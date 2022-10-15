@@ -1,12 +1,9 @@
 port module Main exposing (main)
 
 import ArchiveListing
-import Array
 import Browser
 import Browser.Events
 import Browser.Navigation
-import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
-import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
 import Common exposing (buttonStyle)
 import Data
 import Dict exposing (Dict)
@@ -14,16 +11,11 @@ import DisplayMessage
 import EditZkNote
 import EditZkNoteListing
 import Element as E exposing (Element)
-import Element.Background as EBk
-import Element.Border as EBd
 import Element.Font as EF
-import Element.Input as EI
-import Element.Region
 import File as F
 import File.Select as FS
 import GenDialog as GD
 import Html exposing (Attribute, Html)
-import Html.Attributes
 import Html.Events as HE
 import Http
 import Http.Tasks as HT
@@ -32,10 +24,6 @@ import InviteUser
 import Json.Decode as JD
 import Json.Encode as JE
 import LocalStorage as LS
-import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..))
-import Markdown.Html
-import Markdown.Parser
-import Markdown.Renderer
 import MdCommon as MC
 import MessageNLink
 import Orgauth.AdminInterface as AI
@@ -45,26 +33,22 @@ import Orgauth.Data as OD
 import Orgauth.Invited as Invited
 import Orgauth.Login as Login
 import Orgauth.ResetPassword as ResetPassword
+import Orgauth.ShowUrl as ShowUrl
 import Orgauth.UserEdit as UserEdit
 import Orgauth.UserInterface as UI
-import Orgauth.UserInvite as UserInvite
 import Orgauth.UserListing as UserListing
 import PublicInterface as PI
 import Random exposing (Seed, initialSeed)
 import Route exposing (Route(..), parseUrl, routeTitle, routeUrl)
-import Schelme.Show exposing (showTerm)
 import Search as S
 import SearchStackPanel as SP
 import SelectString as SS
 import ShowMessage
-import TangoColors as TC
 import Task exposing (Task)
 import Time
 import Toop
 import UUID exposing (UUID)
 import Url exposing (Url)
-import Url.Builder as UB
-import Url.Parser as UP exposing ((</>))
 import UserSettings
 import Util
 import View
@@ -84,7 +68,6 @@ type Msg
     | UserSettingsMsg UserSettings.Msg
     | UserListingMsg UserListing.Msg
     | UserEditMsg UserEdit.Msg
-    | UserInviteMsg UserInvite.Msg
     | ImportMsg Import.Msg
     | ShowMessageMsg ShowMessage.Msg
     | UserReplyData (Result Http.Error UI.ServerResponse)
@@ -105,6 +88,7 @@ type Msg
     | ChangePasswordDialogMsg (GD.Msg CP.Msg)
     | ChangeEmailDialogMsg (GD.Msg CE.Msg)
     | ResetPasswordMsg ResetPassword.Msg
+    | ShowUrlMsg ShowUrl.Msg
     | Zone Time.Zone
     | WkMsg (Result JD.Error WindowKeys.Key)
     | ReceiveLocalVal { for : String, name : String, value : Maybe String }
@@ -131,7 +115,7 @@ type State
     | ResetPassword ResetPassword.Model
     | UserListing UserListing.Model Data.LoginData (Maybe ( SP.Model, Data.ZkListNoteSearchResult ))
     | UserEdit UserEdit.Model Data.LoginData
-    | UserInvite UserInvite.Model Data.LoginData
+    | ShowUrl ShowUrl.Model Data.LoginData
     | DisplayMessage DisplayMessage.GDModel State
     | MessageNLink MessageNLink.GDModel State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
@@ -650,8 +634,8 @@ showMessage msg =
         UserEditMsg _ ->
             "UserEditMsg"
 
-        UserInviteMsg _ ->
-            "UserInviteMsg"
+        ShowUrlMsg _ ->
+            "ShowUrlMsg"
 
 
 showState : State -> String
@@ -723,8 +707,8 @@ showState state =
         UserEdit _ _ ->
             "UserEdit"
 
-        UserInvite _ _ ->
-            "UserInvite"
+        ShowUrl _ _ ->
+            "ShowUrl"
 
 
 unexpectedMsg : Model -> Msg -> Model
@@ -813,8 +797,10 @@ viewState size state model =
         UserEdit st login ->
             E.map UserEditMsg (UserEdit.view Common.buttonStyle st)
 
-        UserInvite st login ->
-            E.map UserInviteMsg (UserInvite.view Common.buttonStyle st)
+        ShowUrl st login ->
+            E.map
+                ShowUrlMsg
+                (ShowUrl.view Common.buttonStyle st)
 
 
 stateSearch : State -> Maybe ( SP.Model, Data.ZkListNoteSearchResult )
@@ -892,7 +878,7 @@ stateSearch state =
         UserEdit _ _ ->
             Nothing
 
-        UserInvite _ _ ->
+        ShowUrl _ _ ->
             Nothing
 
 
@@ -965,7 +951,7 @@ stateLogin state =
         UserEdit _ login ->
             Just login
 
-        UserInvite _ login ->
+        ShowUrl _ login ->
             Just login
 
 
@@ -1605,22 +1591,13 @@ actualupdate msg model =
                     , sendAIMsg model.location <| AI.UpdateUser ld
                     )
 
-                UserEdit.None ->
-                    ( { model | state = UserEdit numod login }, Cmd.none )
-
-        ( UserInviteMsg umsg, UserInvite umod login ) ->
-            let
-                ( numod, c ) =
-                    UserInvite.update umsg umod
-            in
-            case c of
-                UserInvite.Done ->
+                UserEdit.ResetPwd id ->
                     ( model
-                    , sendAIMsg model.location AI.GetUsers
+                    , sendAIMsg model.location <| AI.GetPwdReset id
                     )
 
-                UserInvite.None ->
-                    ( { model | state = UserInvite numod login }, Cmd.none )
+                UserEdit.None ->
+                    ( { model | state = UserEdit numod login }, Cmd.none )
 
         ( WkMsg rkey, Login ls ) ->
             case rkey of
@@ -1985,7 +1962,12 @@ actualupdate msg model =
                         AI.UserInvite ui ->
                             case stateLogin model.state of
                                 Just login ->
-                                    ( { model | state = UserInvite (UserInvite.init ui) login }
+                                    ( { model
+                                        | state =
+                                            ShowUrl
+                                                (ShowUrl.init ui.url "Send this url to the invited user!" "invite url")
+                                                login
+                                      }
                                     , Cmd.none
                                     )
 
@@ -1993,6 +1975,21 @@ actualupdate msg model =
                                     ( displayMessageDialog model "not logged in!"
                                     , Cmd.none
                                     )
+
+                        AI.PwdReset pr ->
+                            case state of
+                                UserEdit uem login ->
+                                    ( { model
+                                        | state =
+                                            ShowUrl
+                                                (ShowUrl.init pr.url "Send this url to the user for password reset!" "reset url")
+                                                login
+                                      }
+                                    , Cmd.none
+                                    )
+
+                                _ ->
+                                    ( model, Cmd.none )
 
                         AI.ServerError e ->
                             ( displayMessageDialog model <| e, Cmd.none )
@@ -2923,7 +2920,7 @@ init flags url key zone fontsize =
                         JD.decodeValue OD.decodeAdminSettings v
                             |> Result.toMaybe
                     )
-                |> Maybe.withDefault { openRegistration = False }
+                |> Maybe.withDefault { openRegistration = False, nonAdminInvite = False }
 
         imodel =
             { state =
