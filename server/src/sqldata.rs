@@ -1183,8 +1183,14 @@ pub fn read_zknotearchives(
   uid: i64,
   gzna: &GetZkNoteArchives,
 ) -> Result<Vec<ZkListNote>, Box<dyn Error>> {
-  let cid = note_id(&conn, "system", "archive")?;
+  let aid = note_id(&conn, "system", "archive")?;
   let sysid = user_id(&conn, "system")?;
+
+  // if this is the archive note itself, return empty array.
+  // otherwise we can see all the archives for everyone's notes!
+  if gzna.zknote == aid {
+    return Ok(Vec::new());
+  }
 
   // users that can't see a note, can't see the archives either.
   read_zknote(&conn, Some(uid), gzna.zknote)?;
@@ -1200,7 +1206,7 @@ pub fn read_zknotearchives(
   )?;
 
   let c_iter = stmt
-    .query_map(params![gzna.zknote, cid], |row| Ok(row.get(0)?))?
+    .query_map(params![gzna.zknote, aid], |row| Ok(row.get(0)?))?
     .skip(gzna.offset as usize);
 
   let mut nv = Vec::new();
