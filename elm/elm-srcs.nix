@@ -60,6 +60,11 @@
         version = "1.2.0";
       };
 
+      "elm-community/maybe-extra" = {
+        sha256 = "185jy9jxx3bqf0xl3rmdxfqqmxzcr084llf32glr6hgl5agshywk";
+        version = "5.3.0";
+      };
+
       "elm/json" = {
         sha256 = "0kjwrz195z84kwywaxhhlnpl3p251qlbm5iz6byd6jky2crmyqyh";
         version = "1.1.3";
