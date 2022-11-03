@@ -254,6 +254,10 @@ mkRenderer viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged =
                 |> Markdown.Html.withAttribute "text"
                 |> Markdown.Html.withAttribute "url"
                 |> Markdown.Html.withOptionalAttribute "width"
+            , Markdown.Html.tag "video" videoView
+                |> Markdown.Html.withAttribute "src"
+                |> Markdown.Html.withOptionalAttribute "width"
+                |> Markdown.Html.withOptionalAttribute "height"
             ]
     , table = E.column [ E.width <| E.fill ]
     , tableHeader = E.column [ E.width <| E.fill, EF.bold, EF.underline, E.spacing 8 ]
@@ -307,6 +311,26 @@ imageView text url mbwidth renderedChildren =
         Nothing ->
             E.image [ E.width E.fill ]
                 { src = url, description = text }
+
+
+videoView : String -> Maybe String -> Maybe String -> List (Element a) -> Element a
+videoView url mbwidth mbheight renderedChildren =
+    let
+        attribs =
+            List.filterMap identity
+                [ mbwidth
+                    |> Maybe.map (\s -> HA.style "width" s)
+                , mbheight
+                    |> Maybe.map (\s -> HA.style "height" s)
+                ]
+    in
+    E.html <|
+        Html.video
+            attribs
+            [ Html.source
+                [ HA.attribute "src" url ]
+                [ Html.text "video element" ]
+            ]
 
 
 cellView : CellDict -> List (Element a) -> String -> String -> (String -> String -> a) -> Element a
