@@ -16,6 +16,7 @@ import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..), 
 import Markdown.Html
 import Markdown.Parser
 import Markdown.Renderer
+import Maybe.Extra as ME
 import Regex
 import Schelme.Show exposing (showTerm)
 import TangoColors as TC
@@ -254,7 +255,7 @@ mkRenderer viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged =
                 |> Markdown.Html.withAttribute "text"
                 |> Markdown.Html.withAttribute "url"
                 |> Markdown.Html.withOptionalAttribute "width"
-            , Markdown.Html.tag "video" videoView
+            , Markdown.Html.tag "video" (videoView maxw)
                 |> Markdown.Html.withAttribute "src"
                 |> Markdown.Html.withOptionalAttribute "width"
                 |> Markdown.Html.withOptionalAttribute "height"
@@ -313,15 +314,19 @@ imageView text url mbwidth renderedChildren =
                 { src = url, description = text }
 
 
-videoView : String -> Maybe String -> Maybe String -> List (Element a) -> Element a
-videoView url mbwidth mbheight renderedChildren =
+videoView : Int -> String -> Maybe String -> Maybe String -> List (Element a) -> Element a
+videoView maxw url mbwidth mbheight renderedChildren =
     let
         attribs =
             List.filterMap identity
                 [ mbwidth
-                    |> Maybe.map (\s -> HA.style "width" s)
+                    |> Maybe.andThen (\s -> String.toInt s)
+                    |> Maybe.map (\i -> HA.width (min i maxw))
+                    |> ME.orElse (Just <| HA.width maxw)
                 , mbheight
-                    |> Maybe.map (\s -> HA.style "height" s)
+                    |> Maybe.andThen (\s -> String.toInt s)
+                    |> Maybe.map (\i -> HA.height i)
+                , Just <| HA.controls True
                 ]
     in
     E.html <|
