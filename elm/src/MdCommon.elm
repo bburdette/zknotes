@@ -16,6 +16,7 @@ import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..), 
 import Markdown.Html
 import Markdown.Parser
 import Markdown.Renderer
+import Maybe.Extra as ME
 import Regex
 import Schelme.Show exposing (showTerm)
 import TangoColors as TC
@@ -254,6 +255,11 @@ mkRenderer viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged =
                 |> Markdown.Html.withAttribute "text"
                 |> Markdown.Html.withAttribute "url"
                 |> Markdown.Html.withOptionalAttribute "width"
+            , Markdown.Html.tag "video" (videoView maxw)
+                |> Markdown.Html.withAttribute "src"
+                |> Markdown.Html.withOptionalAttribute "text"
+                |> Markdown.Html.withOptionalAttribute "width"
+                |> Markdown.Html.withOptionalAttribute "height"
             ]
     , table = E.column [ E.width <| E.fill ]
     , tableHeader = E.column [ E.width <| E.fill, EF.bold, EF.underline, E.spacing 8 ]
@@ -307,6 +313,34 @@ imageView text url mbwidth renderedChildren =
         Nothing ->
             E.image [ E.width E.fill ]
                 { src = url, description = text }
+
+
+videoView : Int -> String -> Maybe String -> Maybe String -> Maybe String -> List (Element a) -> Element a
+videoView maxw url mbtext mbwidth mbheight renderedChildren =
+    let
+        attribs =
+            List.filterMap identity
+                [ mbwidth
+                    |> Maybe.andThen (\s -> String.toInt s)
+                    |> Maybe.map (\i -> HA.width (min i maxw))
+                    |> ME.orElse (Just <| HA.width maxw)
+                , mbheight
+                    |> Maybe.andThen (\s -> String.toInt s)
+                    |> Maybe.map (\i -> HA.height i)
+                , Just <| HA.controls True
+                ]
+    in
+    E.el [] <|
+        E.html <|
+            Html.video
+                attribs
+                [ Html.source
+                    [ HA.attribute "src" url ]
+                    [ mbtext
+                        |> Maybe.map (\s -> Html.text s)
+                        |> Maybe.withDefault (Html.text "video")
+                    ]
+                ]
 
 
 cellView : CellDict -> List (Element a) -> String -> String -> (String -> String -> a) -> Element a
