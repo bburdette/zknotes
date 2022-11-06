@@ -257,6 +257,7 @@ mkRenderer viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged =
                 |> Markdown.Html.withOptionalAttribute "width"
             , Markdown.Html.tag "video" (videoView maxw)
                 |> Markdown.Html.withAttribute "src"
+                |> Markdown.Html.withOptionalAttribute "text"
                 |> Markdown.Html.withOptionalAttribute "width"
                 |> Markdown.Html.withOptionalAttribute "height"
             ]
@@ -314,8 +315,8 @@ imageView text url mbwidth renderedChildren =
                 { src = url, description = text }
 
 
-videoView : Int -> String -> Maybe String -> Maybe String -> List (Element a) -> Element a
-videoView maxw url mbwidth mbheight renderedChildren =
+videoView : Int -> String -> Maybe String -> Maybe String -> Maybe String -> List (Element a) -> Element a
+videoView maxw url mbtext mbwidth mbheight renderedChildren =
     let
         attribs =
             List.filterMap identity
@@ -329,13 +330,17 @@ videoView maxw url mbwidth mbheight renderedChildren =
                 , Just <| HA.controls True
                 ]
     in
-    E.html <|
-        Html.video
-            attribs
-            [ Html.source
-                [ HA.attribute "src" url ]
-                [ Html.text "video element" ]
-            ]
+    E.el [] <|
+        E.html <|
+            Html.video
+                attribs
+                [ Html.source
+                    [ HA.attribute "src" url ]
+                    [ mbtext
+                        |> Maybe.map (\s -> Html.text s)
+                        |> Maybe.withDefault (Html.text "video")
+                    ]
+                ]
 
 
 cellView : CellDict -> List (Element a) -> String -> String -> (String -> String -> a) -> Element a
