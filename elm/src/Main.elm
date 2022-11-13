@@ -188,6 +188,27 @@ urlRequest ur =
 
 routeState : Model -> Route -> ( State, Cmd Msg )
 routeState model route =
+    let
+        ( st, cmds ) =
+            routeStateInternal model route
+    in
+    case stateLogin st of
+        Just login ->
+            ( st
+            , Cmd.batch
+                [ cmds
+                , sendZIMsg
+                    model.location
+                    (ZI.SearchZkNotes <| prevSearchQuery login)
+                ]
+            )
+
+        Nothing ->
+            ( st, cmds )
+
+
+routeStateInternal : Model -> Route -> ( State, Cmd Msg )
+routeStateInternal model route =
     case route of
         LoginR ->
             ( initLoginState model, Cmd.none )
@@ -257,12 +278,7 @@ routeState model route =
                             ( ShowMessage { message = "loading note..." }
                                 login
                                 (Just model.state)
-                            , Cmd.batch
-                                [ sendZIMsg
-                                    model.location
-                                    (ZI.SearchZkNotes <| prevSearchQuery login)
-                                , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id })
-                                ]
+                            , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id })
                             )
 
                         Nothing ->
@@ -2904,11 +2920,9 @@ initialPage curmodel =
                                 )
                                 login
                       }
-                    , Cmd.batch
-                        [ sendZIMsg
-                            curmodel.location
-                            (ZI.SearchZkNotes <| prevSearchQuery login)
-                        ]
+                    , sendZIMsg
+                        curmodel.location
+                        (ZI.SearchZkNotes <| prevSearchQuery login)
                     )
 
         Nothing ->
