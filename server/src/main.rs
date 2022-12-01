@@ -225,10 +225,11 @@ async fn save_file_too(
             },
           )?;
 
-          let note = sqldata::read_zknote(&conn, Some(userdata.id), sn.id)?;
+          let note =
+            sqldata::read_zknoteedit(&conn, userdata.id, &zc::GetZkNoteEdit { zknote: sn.id })?;
           // info!("user#zknote: {} - {}", id, note.title);
           Ok(ServerResponse {
-            what: "zknote".to_string(),
+            what: "zknoteedit".to_string(),
             content: serde_json::to_value(note)?,
           })
 
