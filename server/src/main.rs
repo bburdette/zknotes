@@ -6,21 +6,28 @@ mod sqldata;
 mod sqltest;
 mod util;
 use actix_cors::Cors;
+use actix_multipart::Multipart;
 use actix_session::{CookieSession, Session};
 use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Result};
 use chrono;
 use clap::Arg;
 use config::Config;
+// use futures_util::stream::StreamExt;
+use futures_util::TryStreamExt;
 use log::{error, info};
 use orgauth::endpoints::Callbacks;
 use serde_json;
 use std::env;
 use std::error::Error;
+use std::io::Write;
 use std::path::PathBuf;
 use std::str::FromStr;
 use timer;
 use uuid::Uuid;
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
+
+// use futures_util::stream::try_stream::TryStreamExt;
+// use tokio::stream::StreamExt;
 
 /*
 use actix_files::NamedFile;
@@ -157,6 +164,31 @@ fn admin(
       HttpResponse::Ok().json(se)
     }
   }
+}
+
+async fn save_file(mut payload: Multipart) -> Result<HttpResponse, Box<dyn Error>> {
+  // iterate over multipart stream
+  while let Some(mut field) = payload.try_next().await? {
+    // A multipart/form-data stream has to contain `content_disposition`
+    let content_disposition = field.content_disposition();
+
+    let filename = content_disposition.get_filename().unwrap_or("meh");
+    // content_disposition
+    // .get_filename()
+    // .map_or_else(|| Uuid::new_v4().to_string(), sanitize_filename::sanitize);
+    let filepath = format!("./tmp/{filename}");
+
+    // File::create is blocking operation, use threadpool
+    let mut f = web::block(|| std::fs::File::create(filepath)).await?;
+
+    // Field in turn is stream of *Bytes* object
+    while let Some(chunk) = field.try_next().await? {
+      // filesystem operations are blocking, we have to use threadpool
+      f = web::block(move || f.write_all(&chunk).map(|_| f)).await?;
+    }
+  }
+
+  Ok(HttpResponse::Ok().into())
 }
 
 fn private(
