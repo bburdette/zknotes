@@ -92,7 +92,7 @@ type Msg
     | Zone Time.Zone
     | WkMsg (Result JD.Error WindowKeys.Key)
     | ReceiveLocalVal { for : String, name : String, value : Maybe String }
-    | OnFileSelected F.File
+    | OnFileSelected F.File (List F.File)
     | FileUploaded (Result Http.Error ZI.ServerResponse)
     | Noop
 
@@ -655,7 +655,7 @@ showMessage msg =
         ShowUrlMsg _ ->
             "ShowUrlMsg"
 
-        OnFileSelected _ ->
+        OnFileSelected _ _ ->
             "OnFileSelected"
 
         FileUploaded _ ->
@@ -2516,13 +2516,17 @@ actualupdate msg model =
         ( DisplayMessageMsg GD.Noop, _ ) ->
             ( model, Cmd.none )
 
-        ( OnFileSelected file, _ ) ->
+        ( OnFileSelected file files, _ ) ->
             ( model
             , Http.request
                 { method = "POST"
                 , headers = []
                 , url = model.location ++ "/upload"
-                , body = Http.fileBody file
+                , body =
+                    file
+                        :: files
+                        |> List.map (\f -> Http.filePart (F.name f) f)
+                        |> Http.multipartBody
                 , expect = Http.expectJson FileUploaded ZI.serverResponseDecoder
                 , timeout = Nothing
                 , tracker = Nothing
@@ -2800,7 +2804,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
 
         EditZkNote.FileUpload ->
             ( model
-            , FS.file [] OnFileSelected
+            , FS.files [] OnFileSelected
             )
 
         EditZkNote.Cmd cmd ->
