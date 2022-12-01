@@ -105,6 +105,7 @@ type Msg
     | DeletePress Time.Zone
     | ViewPress
     | NewPress
+    | UploadPress
     | LinkBackPress
     | CopyPress
     | SearchHistoryPress
@@ -224,6 +225,7 @@ type Command
     | AddToRecent Data.ZkListNote
     | ShowMessage String
     | ShowArchives Int
+    | FileUpload
     | Cmd (Cmd Msg)
 
 
@@ -1106,6 +1108,7 @@ zknview zone size recentZkns model =
                             Nothing ->
                                 E.none
                         , EI.button perhapsdirtyparabuttonstyle { onPress = Just NewPress, label = E.text "new" }
+                        , EI.button perhapsdirtyparabuttonstyle { onPress = Just UploadPress, label = E.text "upload" }
                         , if mine && not model.deleted then
                             EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just <| DeletePress zone, label = E.text "delete" }
 
@@ -2193,6 +2196,11 @@ update msg model =
 
         NewPress ->
             newWithSave model
+
+        UploadPress ->
+            ( model
+            , FileUpload
+            )
 
         ToLinkPress zkln ->
             let

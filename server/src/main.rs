@@ -16,15 +16,16 @@ use futures_util::TryStreamExt as _;
 use log::{error, info};
 use orgauth::endpoints::Callbacks;
 use serde_json;
+use sha256;
 use std::env;
 use std::error::Error;
 use std::io::Write;
+use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 use timer;
 use uuid::Uuid;
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
-
 // use futures_util::stream::try_stream::TryStreamExt;
 // use tokio::stream::StreamExt;
 
@@ -166,29 +167,90 @@ fn admin(
 }
 
 // async fn save_file(session: Session, mut payload: Multipart, req: HttpRequest) -> HttpResponse {
-async fn save_file(mut payload: Multipart) -> HttpResponse {
+async fn receive_file(
+  session: Session,
+  config: web::Data<Config>,
+  mut payload: Multipart,
+) -> HttpResponse {
   println!("save_faile");
-  match save_file_too(payload).await {
-    Ok(_) => HttpResponse::Ok().json(()),
+  match save_file_too(session, config, payload).await {
+    Ok(r) => HttpResponse::Ok().json(r),
     Err(e) => HttpResponse::BadRequest().json(()),
   }
 }
 
-async fn save_file_too(mut payload: Multipart) -> Result<(), Box<dyn Error>> {
+async fn save_file_too(
+  session: Session,
+  config: web::Data<Config>,
+  mut payload: Multipart,
+) -> Result<ServerResponse, Box<dyn Error>> {
+  println!("prelogin");
+  match session.get::<Uuid>("token")? {
+    None => Ok(ServerResponse {
+      what: "not logged in".to_string(),
+      content: serde_json::Value::Null,
+    }),
+    Some(token) => {
+      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+      match orgauth::dbfun::read_user_by_token(
+        &conn,
+        token,
+        Some(config.orgauth_config.login_token_expiration_ms),
+      ) {
+        Err(e) => {
+          info!("read_user_by_token error: {:?}", e);
+
+          Ok(ServerResponse {
+            what: "login error".to_string(),
+            content: serde_json::to_value(format!("{:?}", e).as_str())?,
+          })
+        }
+        Ok(userdata) => {
+          println!("aqui");
+          // Ok save the file.
+          let fp = save_file(payload).await?;
+          let fh = sha256::try_digest(Path::new(&fp));
+          println!("file hash: {:?}", fh);
+          // finally!  processing messages as logged in user.
+          Ok(ServerResponse {
+            what: "file saved".to_string(),
+            content: serde_json::to_value(())?,
+          })
+        }
+      }
+    }
+  }
+}
+
+// TODO:
+// user auth.
+// save file.
+// hash file.
+
+async fn save_file(mut payload: Multipart) -> Result<String, Box<dyn Error>> {
   // iterate over multipart stream
+
+  println!("sf 0");
+
+  // ONLY SAVING THE FIRST FILE
   while let Some(mut field) = payload.try_next().await? {
+    println!("sf 1");
     // A multipart/form-data stream has to contain `content_disposition`
     let content_disposition = field
       .content_disposition()
       .ok_or(simple_error::SimpleError::new("bad"))?;
+    println!("sf 2");
 
-    let filename = content_disposition.get_filename().unwrap_or("meh");
+    let filename = content_disposition
+      .get_filename()
+      .unwrap_or("filename not found");
     println!("filename {}", filename);
-    // content_disposition
-    // .get_filename()
-    // .map_or_else(|| Uuid::new_v4().to_string(), sanitize_filename::sanitize);
-    let filepath = format!("./tmp/{filename}");
 
+    let wkfilename = Uuid::new_v4().to_string();
+    let filepath = format!("./tmp/{wkfilename}");
+    let rf = filepath.clone();
+
+    println!("sf 3");
     // File::create is blocking operation, use threadpool
     let mut f = web::block(|| std::fs::File::create(filepath)).await?;
 
@@ -197,9 +259,13 @@ async fn save_file_too(mut payload: Multipart) -> Result<(), Box<dyn Error>> {
       // filesystem operations are blocking, we have to use threadpool
       f = web::block(move || f.write_all(&chunk).map(|_| f)).await?;
     }
+    println!("sf 4");
+
+    // stop on the first file.
+    return Ok(rf);
   }
 
-  Ok(())
+  simple_error::bail!("no file saved")
 }
 
 fn private(
@@ -427,7 +493,7 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
                   .secure(false) // allows for dev access
                   .max_age(10 * 24 * 60 * 60), // 10 days
               )
-              .service(web::resource("/upload").route(web::post().to(save_file)))
+              .service(web::resource("/upload").route(web::post().to(receive_file)))
               .service(web::resource("/public").route(web::post().to(public)))
               .service(web::resource("/private").route(web::post().to(private)))
               .service(web::resource("/user").route(web::post().to(user)))

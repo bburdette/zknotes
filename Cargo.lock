@@ -786,7 +786,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a77162240fd97248d19a564a565eb563a3f592b386e4136fb300909e67dddca"
 dependencies = [
  "commoncrypto",
- "hex",
+ "hex 0.3.2",
  "openssl",
  "winapi 0.3.9",
 ]
@@ -1248,6 +1248,12 @@ name = "hex"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "805026a5d0141ffc30abb3be3173848ad46a1b1664fe632428479619a3644d77"
+
+[[package]]
+name = "hex"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "hkdf"
@@ -2319,6 +2325,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "sha256"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e334db67871c14c18fc066ad14af13f9fdf5f9a91c61af432d1e3a39c8c6a141"
+dependencies = [
+ "hex 0.4.3",
+ "sha2",
+]
+
+[[package]]
 name = "signal-hook-registry"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3059,6 +3075,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
+ "sha256",
  "simple-error",
  "time 0.1.44",
  "timer",
