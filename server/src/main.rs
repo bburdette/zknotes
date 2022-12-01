@@ -25,6 +25,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use timer;
 use uuid::Uuid;
+use zkprotocol::content as zc;
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 // use futures_util::stream::try_stream::TryStreamExt;
 // use tokio::stream::StreamExt;
@@ -184,7 +185,6 @@ async fn save_file_too(
   config: web::Data<Config>,
   mut payload: Multipart,
 ) -> Result<ServerResponse, Box<dyn Error>> {
-  println!("prelogin");
   match session.get::<Uuid>("token")? {
     None => Ok(ServerResponse {
       what: "not logged in".to_string(),
@@ -206,16 +206,37 @@ async fn save_file_too(
           })
         }
         Ok(userdata) => {
-          println!("aqui");
           // Ok save the file.
           let fp = save_file(payload).await?;
-          let fh = sha256::try_digest(Path::new(&fp));
-          println!("file hash: {:?}", fh);
-          // finally!  processing messages as logged in user.
+          let fh = sha256::try_digest(Path::new(&fp))?;
+
+          // now make a new note.
+          let sn = sqldata::save_zknote(
+            &conn,
+            userdata.id,
+            &zc::SaveZkNote {
+              id: None,
+              title: fh,
+              pubid: None,
+              content: "".to_string(),
+              editable: false,
+              showtitle: false,
+              deleted: false,
+            },
+          )?;
+
+          let note = sqldata::read_zknote(&conn, Some(userdata.id), sn.id)?;
+          // info!("user#zknote: {} - {}", id, note.title);
           Ok(ServerResponse {
-            what: "file saved".to_string(),
-            content: serde_json::to_value(())?,
+            what: "zknote".to_string(),
+            content: serde_json::to_value(note)?,
           })
+
+          // finally!  processing messages as logged in user.
+          // Ok(ServerResponse {
+          //   what: "file saved".to_string(),
+          //   content: serde_json::to_value(())?,
+          // })
         }
       }
     }
@@ -230,27 +251,21 @@ async fn save_file_too(
 async fn save_file(mut payload: Multipart) -> Result<String, Box<dyn Error>> {
   // iterate over multipart stream
 
-  println!("sf 0");
-
   // ONLY SAVING THE FIRST FILE
   while let Some(mut field) = payload.try_next().await? {
-    println!("sf 1");
     // A multipart/form-data stream has to contain `content_disposition`
     let content_disposition = field
       .content_disposition()
       .ok_or(simple_error::SimpleError::new("bad"))?;
-    println!("sf 2");
 
     let filename = content_disposition
       .get_filename()
       .unwrap_or("filename not found");
-    println!("filename {}", filename);
 
     let wkfilename = Uuid::new_v4().to_string();
     let filepath = format!("./tmp/{wkfilename}");
     let rf = filepath.clone();
 
-    println!("sf 3");
     // File::create is blocking operation, use threadpool
     let mut f = web::block(|| std::fs::File::create(filepath)).await?;
 
@@ -259,7 +274,6 @@ async fn save_file(mut payload: Multipart) -> Result<String, Box<dyn Error>> {
       // filesystem operations are blocking, we have to use threadpool
       f = web::block(move || f.write_all(&chunk).map(|_| f)).await?;
     }
-    println!("sf 4");
 
     // stop on the first file.
     return Ok(rf);
