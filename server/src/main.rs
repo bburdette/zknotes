@@ -12,8 +12,7 @@ use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Res
 use chrono;
 use clap::Arg;
 use config::Config;
-// use futures_util::stream::StreamExt;
-use futures_util::TryStreamExt;
+use futures_util::TryStreamExt as _;
 use log::{error, info};
 use orgauth::endpoints::Callbacks;
 use serde_json;
@@ -166,13 +165,25 @@ fn admin(
   }
 }
 
-async fn save_file(mut payload: Multipart) -> Result<HttpResponse, Box<dyn Error>> {
+// async fn save_file(session: Session, mut payload: Multipart, req: HttpRequest) -> HttpResponse {
+async fn save_file(mut payload: Multipart) -> HttpResponse {
+  println!("save_faile");
+  match save_file_too(payload).await {
+    Ok(_) => HttpResponse::Ok().json(()),
+    Err(e) => HttpResponse::BadRequest().json(()),
+  }
+}
+
+async fn save_file_too(mut payload: Multipart) -> Result<(), Box<dyn Error>> {
   // iterate over multipart stream
   while let Some(mut field) = payload.try_next().await? {
     // A multipart/form-data stream has to contain `content_disposition`
-    let content_disposition = field.content_disposition();
+    let content_disposition = field
+      .content_disposition()
+      .ok_or(simple_error::SimpleError::new("bad"))?;
 
     let filename = content_disposition.get_filename().unwrap_or("meh");
+    println!("filename {}", filename);
     // content_disposition
     // .get_filename()
     // .map_or_else(|| Uuid::new_v4().to_string(), sanitize_filename::sanitize);
@@ -188,7 +199,7 @@ async fn save_file(mut payload: Multipart) -> Result<HttpResponse, Box<dyn Error
     }
   }
 
-  Ok(HttpResponse::Ok().into())
+  Ok(())
 }
 
 fn private(
@@ -416,6 +427,7 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
                   .secure(false) // allows for dev access
                   .max_age(10 * 24 * 60 * 60), // 10 days
               )
+              .service(web::resource("/upload").route(web::post().to(save_file)))
               .service(web::resource("/public").route(web::post().to(public)))
               .service(web::resource("/private").route(web::post().to(private)))
               .service(web::resource("/user").route(web::post().to(user)))
