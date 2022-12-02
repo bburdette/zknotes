@@ -6,6 +6,7 @@ mod sqldata;
 mod sqltest;
 mod util;
 use actix_cors::Cors;
+use actix_files::NamedFile;
 use actix_multipart::Multipart;
 use actix_session::{CookieSession, Session};
 use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Result};
@@ -27,6 +28,8 @@ use timer;
 use uuid::Uuid;
 use zkprotocol::content as zc;
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
+
+use either::Either;
 // use futures_util::stream::try_stream::TryStreamExt;
 // use tokio::stream::StreamExt;
 
@@ -167,6 +170,82 @@ fn admin(
   }
 }
 
+fn session_user(
+  session: Session,
+  config: web::Data<Config>,
+) -> Result<Either<orgauth::data::User, ServerResponse>, Box<dyn Error>> {
+  match session.get::<Uuid>("token")? {
+    None => Ok(Either::Right(ServerResponse {
+      what: "not logged in".to_string(),
+      content: serde_json::Value::Null,
+    })),
+    Some(token) => {
+      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+      match orgauth::dbfun::read_user_by_token(
+        &conn,
+        token,
+        Some(config.orgauth_config.login_token_expiration_ms),
+      ) {
+        Err(e) => {
+          info!("read_user_by_token error: {:?}", e);
+
+          Ok(Either::Right(ServerResponse {
+            what: "login error".to_string(),
+            content: serde_json::to_value(format!("{:?}", e).as_str())?,
+          }))
+        }
+        Ok(userdata) => Ok(Either::Left(userdata)),
+      }
+    }
+  }
+}
+
+// async fn save_file(session: Session, mut payload: Multipart, req: HttpRequest) -> HttpResponse {
+async fn files(session: Session, config: web::Data<Config>, req: HttpRequest) -> HttpResponse {
+  let user = match session_user(session, config) {
+    Ok(Either::Left(user)) => user,
+    Ok(Either::Right(sr)) => return HttpResponse::Ok().json(sr),
+    Err(e) => return HttpResponse::BadRequest().json(()),
+  };
+
+  match req.match_info().get("hash") {
+    Some(file) => {
+      // TODO verify only chars 0-9 in the string.
+
+      let pstr = format!("files/{}", file);
+      let stpath = Path::new(pstr.as_str());
+
+      match NamedFile::open(stpath) {
+        Ok(f) => f
+          .into_response(&req)
+          .unwrap_or(HttpResponse::NotFound().json(())),
+        Err(e) => HttpResponse::NotFound().json(()),
+      }
+
+      // Ok(NamedFile::open(stpath)?)
+
+      // match NamedFile::open(path) {
+      //     Ok(mut named_file) => {
+      //         if let Some(ref mime_override) = self.mime_override {
+      //             let new_disposition =
+      //                 mime_override(&named_file.content_type.type_());
+      //             named_file.content_disposition.disposition = new_disposition;
+      //         }
+      //         named_file.flags = self.file_flags;
+
+      //         let (req, _) = req.into_parts();
+      //         Either::Left(ok(match named_file.into_response(&req) {
+      //             Ok(item) => ServiceResponse::new(req, item),
+      //             Err(e) => ServiceResponse::from_err(e, req),
+      //         }))
+      //     }
+      //     Err(e) => self.handle_err(e, req),
+      // }
+    }
+    None => (HttpResponse::NotFound().json(())),
+  }
+}
+
 // async fn save_file(session: Session, mut payload: Multipart, req: HttpRequest) -> HttpResponse {
 async fn receive_file(
   session: Session,
@@ -208,7 +287,13 @@ async fn save_file_too(
         Ok(userdata) => {
           // Ok save the file.
           let fp = save_file(payload).await?;
+
+          // compute hash.
           let fh = sha256::try_digest(Path::new(&fp))?;
+
+          // move into hashed-files dir.
+
+          std::fs::rename(Path::new(&fp), Path::new(&format!("files/{}", fh)));
 
           // now make a new note.
           let sn = sqldata::save_zknote(
@@ -513,6 +598,7 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
               .service(web::resource("/private").route(web::post().to(private)))
               .service(web::resource("/user").route(web::post().to(user)))
               .service(web::resource("/admin").route(web::post().to(admin)))
+              .service(web::resource(r"/files/{hash}").route(web::get().to(files)))
               .service(web::resource(r"/register/{uid}/{key}").route(web::get().to(register)))
               .service(web::resource(r"/newemail/{uid}/{token}").route(web::get().to(new_email)))
               .service(actix_files::Files::new("/static/", staticpath))
