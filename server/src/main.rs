@@ -16,15 +16,18 @@ use config::Config;
 use futures_util::TryStreamExt as _;
 use log::{error, info};
 use orgauth::endpoints::Callbacks;
+use rusqlite::{params, Connection};
 use serde_json;
 use sha256;
 use std::env;
 use std::error::Error;
+use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 use timer;
+use util::now;
 use uuid::Uuid;
 use zkprotocol::content as zc;
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
@@ -171,6 +174,7 @@ fn admin(
 }
 
 fn session_user(
+  conn: &Connection,
   session: Session,
   config: web::Data<Config>,
 ) -> Result<Either<orgauth::data::User, ServerResponse>, Box<dyn Error>> {
@@ -180,7 +184,6 @@ fn session_user(
       content: serde_json::Value::Null,
     })),
     Some(token) => {
-      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       match orgauth::dbfun::read_user_by_token(
         &conn,
         token,
@@ -202,7 +205,12 @@ fn session_user(
 
 // async fn save_file(session: Session, mut payload: Multipart, req: HttpRequest) -> HttpResponse {
 async fn files(session: Session, config: web::Data<Config>, req: HttpRequest) -> HttpResponse {
-  let user = match session_user(session, config) {
+  let conn = match sqldata::connection_open(config.orgauth_config.db.as_path()) {
+    Ok(c) => c,
+    Err(e) => return HttpResponse::InternalServerError().json(()),
+  };
+
+  let user = match session_user(&conn, session, config) {
     Ok(Either::Left(user)) => user,
     Ok(Either::Right(sr)) => return HttpResponse::Ok().json(sr),
     Err(e) => return HttpResponse::BadRequest().json(()),
@@ -212,35 +220,22 @@ async fn files(session: Session, config: web::Data<Config>, req: HttpRequest) ->
     Some(file) => {
       // TODO verify only chars 0-9 in the string.
 
-      let pstr = format!("files/{}", file);
-      let stpath = Path::new(pstr.as_str());
+      match sqldata::file_access(&conn, Some(user.id), file.to_string()) {
+        Ok(Some(name)) => {
+          let pstr = format!("files/{}", file);
+          let stpath = Path::new(pstr.as_str());
 
-      match NamedFile::open(stpath) {
-        Ok(f) => f
-          .into_response(&req)
-          .unwrap_or(HttpResponse::NotFound().json(())),
-        Err(e) => HttpResponse::NotFound().json(()),
+          // Self::from_file(File::open(&path)?, path)
+          match File::open(stpath).and_then(|f| NamedFile::from_file(f, Path::new(name.as_str()))) {
+            Ok(f) => f
+              .into_response(&req)
+              .unwrap_or(HttpResponse::NotFound().json(())),
+            Err(e) => HttpResponse::NotFound().json(()),
+          }
+        }
+        Ok(None) => HttpResponse::Unauthorized().json(()),
+        Err(_) => (HttpResponse::NotFound().json(())),
       }
-
-      // Ok(NamedFile::open(stpath)?)
-
-      // match NamedFile::open(path) {
-      //     Ok(mut named_file) => {
-      //         if let Some(ref mime_override) = self.mime_override {
-      //             let new_disposition =
-      //                 mime_override(&named_file.content_type.type_());
-      //             named_file.content_disposition.disposition = new_disposition;
-      //         }
-      //         named_file.flags = self.file_flags;
-
-      //         let (req, _) = req.into_parts();
-      //         Either::Left(ok(match named_file.into_response(&req) {
-      //             Ok(item) => ServiceResponse::new(req, item),
-      //             Err(e) => ServiceResponse::from_err(e, req),
-      //         }))
-      //     }
-      //     Err(e) => self.handle_err(e, req),
-      // }
     }
     None => (HttpResponse::NotFound().json(())),
   }
@@ -252,7 +247,6 @@ async fn receive_file(
   config: web::Data<Config>,
   mut payload: Multipart,
 ) -> HttpResponse {
-  println!("save_faile");
   match save_file_too(session, config, payload).await {
     Ok(r) => HttpResponse::Ok().json(r),
     Err(e) => HttpResponse::BadRequest().json(()),
@@ -264,69 +258,56 @@ async fn save_file_too(
   config: web::Data<Config>,
   mut payload: Multipart,
 ) -> Result<ServerResponse, Box<dyn Error>> {
-  match session.get::<Uuid>("token")? {
-    None => Ok(ServerResponse {
-      what: "not logged in".to_string(),
-      content: serde_json::Value::Null,
-    }),
-    Some(token) => {
-      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-      match orgauth::dbfun::read_user_by_token(
-        &conn,
-        token,
-        Some(config.orgauth_config.login_token_expiration_ms),
-      ) {
-        Err(e) => {
-          info!("read_user_by_token error: {:?}", e);
+  let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+  let userdata = match session_user(&conn, session, config)? {
+    Either::Left(ud) => ud,
+    Either::Right(sr) => return Ok(sr),
+  };
 
-          Ok(ServerResponse {
-            what: "login error".to_string(),
-            content: serde_json::to_value(format!("{:?}", e).as_str())?,
-          })
-        }
-        Ok(userdata) => {
-          // Ok save the file.
-          let fp = save_file(payload).await?;
+  // Ok save the file.
+  let (name, fp) = save_file(payload).await?;
 
-          // compute hash.
-          let fh = sha256::try_digest(Path::new(&fp))?;
+  // compute hash.
+  let fh = sha256::try_digest(Path::new(&fp))?;
 
-          // move into hashed-files dir.
+  // move into hashed-files dir.
+  std::fs::rename(Path::new(&fp), Path::new(&format!("files/{}", fh)))?;
+  let now = now()?;
 
-          std::fs::rename(Path::new(&fp), Path::new(&format!("files/{}", fh)));
+  // new file entry.
+  conn.execute(
+    "insert into file (hash, createdate)
+         values (?1, ?2)",
+    params![fh, now],
+  )?;
 
-          // now make a new note.
-          let sn = sqldata::save_zknote(
-            &conn,
-            userdata.id,
-            &zc::SaveZkNote {
-              id: None,
-              title: fh,
-              pubid: None,
-              content: "".to_string(),
-              editable: false,
-              showtitle: false,
-              deleted: false,
-            },
-          )?;
+  let fid = conn.last_insert_rowid();
 
-          let note =
-            sqldata::read_zknoteedit(&conn, userdata.id, &zc::GetZkNoteEdit { zknote: sn.id })?;
-          // info!("user#zknote: {} - {}", id, note.title);
-          Ok(ServerResponse {
-            what: "zknoteedit".to_string(),
-            content: serde_json::to_value(note)?,
-          })
+  // now make a new note.
+  let sn = sqldata::save_zknote(
+    &conn,
+    userdata.id,
+    &zc::SaveZkNote {
+      id: None,
+      title: name,
+      pubid: None,
+      content: fh.to_string(),
+      editable: false,
+      showtitle: false,
+      deleted: false,
+    },
+  )?;
 
-          // finally!  processing messages as logged in user.
-          // Ok(ServerResponse {
-          //   what: "file saved".to_string(),
-          //   content: serde_json::to_value(())?,
-          // })
-        }
-      }
-    }
-  }
+  // set the file id in that note.
+  sqldata::set_zknote_file(&conn, sn.id, fid)?;
+
+  // return zknoteedit.
+  let note = sqldata::read_zknoteedit(&conn, userdata.id, &zc::GetZkNoteEdit { zknote: sn.id })?;
+  // info!("user#zknote: {} - {}", id, note.title);
+  Ok(ServerResponse {
+    what: "zknoteedit".to_string(),
+    content: serde_json::to_value(note)?,
+  })
 }
 
 // TODO:
@@ -334,7 +315,7 @@ async fn save_file_too(
 // save file.
 // hash file.
 
-async fn save_file(mut payload: Multipart) -> Result<String, Box<dyn Error>> {
+async fn save_file(mut payload: Multipart) -> Result<(String, String), Box<dyn Error>> {
   // iterate over multipart stream
 
   // ONLY SAVING THE FIRST FILE
@@ -362,7 +343,7 @@ async fn save_file(mut payload: Multipart) -> Result<String, Box<dyn Error>> {
     }
 
     // stop on the first file.
-    return Ok(rf);
+    return Ok((filename.to_string(), rf));
   }
 
   simple_error::bail!("no file saved")

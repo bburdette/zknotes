@@ -1,6 +1,7 @@
 use crate::migrations as zkm;
 use crate::util::now;
 use barrel::backend::Sqlite;
+use either::Either;
 use log::info;
 use orgauth::data::RegistrationData;
 use orgauth::dbfun::user_id;
@@ -557,6 +558,15 @@ pub fn archive_zknote(conn: &Connection, noteid: i64) -> Result<SavedZkNote, Box
   })
 }
 
+pub fn set_zknote_file(conn: &Connection, noteid: i64, fileid: i64) -> Result<(), Box<dyn Error>> {
+  conn.execute(
+    "update zknote set file = ?1
+         where id = ?2",
+    params![fileid, noteid],
+  )?;
+  Ok(())
+}
+
 pub fn save_zknote(
   conn: &Connection,
   uid: i64,
@@ -759,7 +769,7 @@ pub fn read_zklistnote(
   Ok(note)
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Access {
   Private,
   Read,
@@ -838,6 +848,34 @@ pub fn zknote_access_id(
       }
     }
   }
+}
+
+pub fn file_access(
+  conn: &Connection,
+  uid: Option<i64>,
+  hash: String,
+) -> Result<Option<String>, Box<dyn Error>> {
+  let mut pstmt = conn.prepare(
+    " select zknote.id, zknote.title from zknote, file
+        where zknote.file = file.id
+        and file.hash = ?1
+    ",
+  )?;
+
+  let rec_iter = pstmt.query_map(params![hash], |row| Ok((row.get(0)?, row.get(1)?)))?;
+
+  for rsid in rec_iter {
+    match rsid {
+      Ok((id, title)) => {
+        if zknote_access_id(&conn, uid, id)? != Access::Private {
+          return Ok(Some(title));
+        }
+      }
+      Err(_) => (),
+    }
+  }
+
+  Ok(None)
 }
 
 pub fn read_zknotepubid(
