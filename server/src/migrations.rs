@@ -1723,7 +1723,7 @@ pub fn udpate21(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   // copy everything from zknote.
   conn.execute(
     "insert into zknotetemp (id, title, content, sysdata, pubid, user, editable, showtitle, deleted, createdate, changeddate)
-        select id, title, content, null, pubid, user, editable, showtitle, createdate, deleted, changeddate from zknote",
+        select id, title, content, sysdata, pubid, user, editable, showtitle, deleted, createdate, changeddate from zknote",
     params![],
   )?;
 
@@ -1776,7 +1776,7 @@ pub fn udpate21(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   // copy everything from zknotetemp.
   conn.execute(
     "insert into zknote (id, title, content, sysdata, pubid, user, editable, showtitle, deleted, createdate, changeddate)
-        select id, title, content, null, pubid, user, 0, 1, deleted, createdate, changeddate from zknotetemp",
+        select id, title, content, sysdata, pubid, user, editable, showtitle, deleted, createdate, changeddate from zknotetemp",
     params![],
   )?;
 
