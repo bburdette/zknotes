@@ -317,19 +317,43 @@ async fn save_file_too(
 
   // compute hash.
   let fh = sha256::try_digest(Path::new(&fp))?;
+  let fhp = format!("files/{}", fh);
+  let hashpath = Path::new(&fhp);
 
-  // move into hashed-files dir.
-  std::fs::rename(Path::new(&fp), Path::new(&format!("files/{}", fh)))?;
-  let now = now()?;
+  // file exists?
+  if hashpath.exists() {
+    // new file already exists.
+    std::fs::remove_file(Path::new(&fp));
+  } else {
+    // move into hashed-files dir.
+    std::fs::rename(Path::new(&fp), hashpath)?;
+  }
 
-  // new file entry.
-  conn.execute(
-    "insert into file (hash, createdate)
-         values (?1, ?2)",
-    params![fh, now],
-  )?;
+  // table entry exists?
+  let mut oid: Option<i64> =
+    match conn.query_row("select id from file where hash = ?1", params![fh], |row| {
+      Ok(row.get(0)?)
+    }) {
+      Ok(v) => Ok(Some(v)),
+      Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+      Err(x) => Err(Box::new(x)),
+    }?;
 
-  let fid = conn.last_insert_rowid();
+  // use existing id, or create new
+  let fid = match oid {
+    Some(id) => id,
+    None => {
+      let now = now()?;
+
+      // add table entry
+      conn.execute(
+        "insert into file (hash, createdate)
+                 values (?1, ?2)",
+        params![fh, now],
+      )?;
+      conn.last_insert_rowid()
+    }
+  };
 
   // now make a new note.
   let sn = sqldata::save_zknote(
