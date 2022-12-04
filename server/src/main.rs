@@ -207,13 +207,13 @@ fn session_user(
 async fn files(session: Session, config: web::Data<Config>, req: HttpRequest) -> HttpResponse {
   let conn = match sqldata::connection_open(config.orgauth_config.db.as_path()) {
     Ok(c) => c,
-    Err(e) => return HttpResponse::InternalServerError().json(()),
+    Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
   };
 
   let user = match session_user(&conn, session, config) {
     Ok(Either::Left(user)) => user,
     Ok(Either::Right(sr)) => return HttpResponse::Ok().json(sr),
-    Err(e) => return HttpResponse::BadRequest().json(()),
+    Err(e) => return HttpResponse::BadRequest().body(format!("{:?}", e)),
   };
 
   match req.match_info().get("hash") {
@@ -230,14 +230,14 @@ async fn files(session: Session, config: web::Data<Config>, req: HttpRequest) ->
             Ok(f) => f
               .into_response(&req)
               .unwrap_or(HttpResponse::NotFound().json(())),
-            Err(e) => HttpResponse::NotFound().json(()),
+            Err(e) => HttpResponse::NotFound().body(format!("{:?}", e)),
           }
         }
         Ok(None) => HttpResponse::Unauthorized().json(()),
-        Err(_) => (HttpResponse::NotFound().json(())),
+        Err(e) => HttpResponse::NotFound().body(format!("{:?}", e)),
       }
     }
-    None => (HttpResponse::NotFound().json(())),
+    None => (HttpResponse::BadRequest().body("file hash required: /files/<hash>")),
   }
 }
 
@@ -251,8 +251,7 @@ async fn file(session: Session, config: web::Data<Config>, req: HttpRequest) -> 
   let suser = match session_user(&conn, session, config) {
     Ok(Either::Left(user)) => Some(user),
     Ok(Either::Right(sr)) => None,
-    // return HttpResponse::Ok().json(sr),
-    Err(e) => return HttpResponse::BadRequest().json(()),
+    Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
   };
 
   let uid = suser.map(|user| user.id);
@@ -283,10 +282,10 @@ async fn file(session: Session, config: web::Data<Config>, req: HttpRequest) -> 
         Ok(f) => f
           .into_response(&req)
           .unwrap_or(HttpResponse::NotFound().json(())),
-        Err(e) => HttpResponse::NotFound().json(()),
+        Err(e) => HttpResponse::NotFound().body(format!("{:?}", e)),
       }
     }
-    None => (HttpResponse::BadRequest().json(())),
+    None => (HttpResponse::BadRequest().body("file id required: /files/<id>")),
   }
 }
 
@@ -298,7 +297,7 @@ async fn receive_file(
 ) -> HttpResponse {
   match save_file_too(session, config, payload).await {
     Ok(r) => HttpResponse::Ok().json(r),
-    Err(e) => HttpResponse::BadRequest().json(()),
+    Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
   }
 }
 
@@ -466,6 +465,8 @@ fn defcon() -> Config {
     createdirs: false,
     altmainsite: [].to_vec(),
     static_path: None,
+    file_tmp_path: Path::new("./temp").to_path_buf(),
+    file_path: Path::new("./files").to_path_buf(),
     error_index_note: None,
     orgauth_config: oc,
   }
@@ -538,6 +539,20 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
         Some(filename) => load_config(filename)?,
         None => load_config("config.toml")?,
       };
+
+      // verify/create file directories.
+
+      // TODO upgrade when stable
+      // if !std::fs::try_exists(config.file_tmp_path)? {
+      if !std::path::Path::exists(&config.file_tmp_path) {
+        std::fs::create_dir_all(&config.file_tmp_path)?
+      }
+      // TODO upgrade when stable
+      // if !std::fs::try_exists(config.file_path)? {
+      if !std::path::Path::exists(&config.file_path) {
+        std::fs::create_dir_all(&config.file_path)?
+      }
+
       // are we exporting the DB?
       match matches.value_of("export") {
         Some(exportfile) => {
@@ -623,7 +638,7 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
               .service(web::resource("/private").route(web::post().to(private)))
               .service(web::resource("/user").route(web::post().to(user)))
               .service(web::resource("/admin").route(web::post().to(admin)))
-              .service(web::resource(r"/files/{hash}").route(web::get().to(files)))
+              // .service(web::resource(r"/files/{hash}").route(web::get().to(files)))
               .service(web::resource(r"/file/{id}").route(web::get().to(file)))
               .service(web::resource(r"/register/{uid}/{key}").route(web::get().to(register)))
               .service(web::resource(r"/newemail/{uid}/{token}").route(web::get().to(new_email)))
