@@ -36,7 +36,6 @@ module EditZkNote exposing
     , showSr
     , showZkl
     , sznFromModel
-    , sznToZkn
     , tabsOnLoad
     , toPubId
     , toZkListNote
@@ -181,6 +180,7 @@ type alias Model =
     , editableValue : Bool -- is this note editable by other users?
     , showtitle : Bool
     , deleted : Bool
+    , isFile : Bool
     , pubidtxt : String
     , title : String
     , createdate : Maybe Int
@@ -285,6 +285,7 @@ toZkListNote model =
                 { id = id
                 , user = model.noteUser
                 , title = model.title
+                , isFile = model.isFile
                 , createdate = createdate
                 , changeddate = changeddate
                 , sysids =
@@ -885,6 +886,7 @@ zknview zone size recentZkns model =
             model.editable
                 && not search
                 && not model.deleted
+                && not model.isFile
 
         -- super lame math because images suck in html/elm-ui
         mdw =
@@ -1050,7 +1052,14 @@ zknview zone size recentZkns model =
                         , label =
                             EI.labelLeft
                                 edlabelattr
-                                (E.text "title")
+                                (E.text
+                                    (if model.isFile then
+                                        "filename"
+
+                                     else
+                                        "title"
+                                    )
+                                )
                         }
             in
             E.column
@@ -1220,8 +1229,9 @@ zknview zone size recentZkns model =
 
                    else
                     E.none
+                 , dates
+                 , divider
                  ]
-                    ++ [ dates, divider ]
                     ++ showComments
                     -- show the links.
                     ++ [ divider ]
@@ -1623,6 +1633,7 @@ initFull ld zkl zknote dtlinks spm =
       , editable = zknote.editable
       , editableValue = zknote.editableValue
       , deleted = zknote.deleted
+      , isFile = zknote.isFile
       , showtitle = zknote.showtitle
       , createdate = Just zknote.createdate
       , changeddate = Just zknote.changeddate
@@ -1673,6 +1684,7 @@ initNew ld zkl spm links =
     , editable = True
     , editableValue = False
     , deleted = False
+    , isFile = False
     , showtitle = True
     , createdate = Nothing
     , changeddate = Nothing
@@ -1723,6 +1735,7 @@ sznToZkn uid uname unote sysids sdzn szn =
     , createdate = sdzn.changeddate
     , changeddate = sdzn.changeddate
     , deleted = szn.deleted
+    , isFile = False
     , sysids = sysids
     }
 

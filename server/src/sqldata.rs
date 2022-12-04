@@ -1,7 +1,6 @@
 use crate::migrations as zkm;
 use crate::util::now;
 use barrel::backend::Sqlite;
-use either::Either;
 use log::info;
 use orgauth::data::RegistrationData;
 use orgauth::dbfun::user_id;
@@ -688,7 +687,7 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
   let sysids = get_sysids(conn, sysid, id)?;
 
   let mut note = conn.query_row(
-    "select ZN.title, ZN.content, ZN.user, OU.name, U.zknote, ZN.pubid, ZN.editable, ZN.showtitle, ZN.deleted, ZN.createdate, ZN.changeddate
+    "select ZN.title, ZN.content, ZN.user, OU.name, U.zknote, ZN.pubid, ZN.editable, ZN.showtitle, ZN.deleted, ZN.file, ZN.createdate, ZN.changeddate
       from zknote ZN, orgauth_user OU, user U where ZN.id = ?1 and U.id = ZN.user and OU.id = ZN.user",
     params![id],
     |row| {
@@ -704,8 +703,13 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
         editableValue: row.get(6)?,           // <--- same index.
         showtitle: row.get(7)?,
         deleted: row.get(8)?,
-        createdate: row.get(9)?,
-        changeddate: row.get(10)?,
+        is_file: { let wat : Option<i64> = row.get(9)?;
+          match wat {
+          Some(_) => true,
+          None => false,
+        }},
+        createdate: row.get(10)?,
+        changeddate: row.get(11)?,
         sysids: sysids,
       })
     },
@@ -750,16 +754,19 @@ pub fn read_zklistnote(
   }?;
 
   let note = conn.query_row(
-    "select ZN.title, ZN.user, ZN.createdate, ZN.changeddate
+    "select ZN.title, ZN.file, ZN.user, ZN.createdate, ZN.changeddate
       from zknote ZN, orgauth_user OU, user U where ZN.id = ?1 and U.id = ZN.user and OU.id = ZN.user",
     params![id],
     |row| {
+      let wat : Option<i64> = row.get(1)?;
+      println!("wat: {:?}", wat);
       let zln = ZkListNote {
         id: id,
         title: row.get(0)?,
-        user: row.get(1)?,
-        createdate: row.get(2)?,
-        changeddate: row.get(3)?,
+        is_file: wat.is_some(),
+        user: row.get(2)?,
+        createdate: row.get(3)?,
+        changeddate: row.get(4)?,
         sysids: sysids,
       };
       Ok(zln)
@@ -905,7 +912,7 @@ pub fn read_zknotepubid(
 ) -> Result<ZkNote, Box<dyn Error>> {
   let publicid = note_id(&conn, "system", "public")?;
   let mut note = conn.query_row(
-    "select A.id, A.title, A.content, A.user, OU.name, U.zknote, A.pubid, A.editable, A.showtitle, A.deleted, A.createdate, A.changeddate
+    "select A.id, A.title, A.content, A.user, OU.name, U.zknote, A.pubid, A.editable, A.showtitle, A.deleted, A.file, A.createdate, A.changeddate
       from zknote A, user U, orgauth_user OU, zklink L where A.pubid = ?1
       and ((A.id = L.fromid
       and L.toid = ?2) or (A.id = L.toid
@@ -926,8 +933,13 @@ pub fn read_zknotepubid(
         editableValue: row.get(7)?,
         showtitle: row.get(8)?,
         deleted: row.get(9)?,
-        createdate: row.get(10)?,
-        changeddate: row.get(11)?,
+        is_file: { let wat : Option<i64> = row.get(10)?;
+          match wat {
+          Some(_) => true,
+          None => false,
+        }},
+        createdate: row.get(11)?,
+        changeddate: row.get(12)?,
         sysids: Vec::new(),
       })
     },

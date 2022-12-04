@@ -245,12 +245,12 @@ async fn files(session: Session, config: web::Data<Config>, req: HttpRequest) ->
 async fn file(session: Session, config: web::Data<Config>, req: HttpRequest) -> HttpResponse {
   let conn = match sqldata::connection_open(config.orgauth_config.db.as_path()) {
     Ok(c) => c,
-    Err(e) => return HttpResponse::InternalServerError().json(()),
+    Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
   };
 
   let suser = match session_user(&conn, session, config) {
     Ok(Either::Left(user)) => Some(user),
-    Ok(Either::Right(sr)) => None,
+    Ok(Either::Right(_sr)) => None,
     Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
   };
 
@@ -339,7 +339,7 @@ async fn save_file_too(
       id: None,
       title: name,
       pubid: None,
-      content: fh.to_string(),
+      content: "".to_string(),
       editable: false,
       showtitle: false,
       deleted: false,
