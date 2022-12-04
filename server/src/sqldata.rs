@@ -878,6 +878,26 @@ pub fn file_access(
   Ok(None)
 }
 
+pub fn read_zknote_filehash(
+  conn: &Connection,
+  uid: Option<i64>,
+  noteid: &i64,
+) -> Result<Option<String>, Box<dyn Error>> {
+  if zknote_access_id(&conn, uid, *noteid)? != Access::Private {
+    let hash = conn.query_row(
+      "select F.hash from zknote N, file F
+      where N.id = ?1
+      and N.file = F.id",
+      params![noteid],
+      |row| Ok(row.get(0)?),
+    )?;
+
+    Ok(Some(hash))
+  } else {
+    Ok(None)
+  }
+}
+
 pub fn read_zknotepubid(
   conn: &Connection,
   uid: Option<i64>,

@@ -242,6 +242,55 @@ async fn files(session: Session, config: web::Data<Config>, req: HttpRequest) ->
 }
 
 // async fn save_file(session: Session, mut payload: Multipart, req: HttpRequest) -> HttpResponse {
+async fn file(session: Session, config: web::Data<Config>, req: HttpRequest) -> HttpResponse {
+  let conn = match sqldata::connection_open(config.orgauth_config.db.as_path()) {
+    Ok(c) => c,
+    Err(e) => return HttpResponse::InternalServerError().json(()),
+  };
+
+  let suser = match session_user(&conn, session, config) {
+    Ok(Either::Left(user)) => Some(user),
+    Ok(Either::Right(sr)) => None,
+    // return HttpResponse::Ok().json(sr),
+    Err(e) => return HttpResponse::BadRequest().json(()),
+  };
+
+  let uid = suser.map(|user| user.id);
+
+  match req
+    .match_info()
+    .get("id")
+    .and_then(|s| s.parse::<i64>().ok())
+  {
+    Some(noteid) => {
+      let hash = match sqldata::read_zknote_filehash(&conn, uid, &noteid) {
+        Ok(Some(hash)) => hash,
+        Ok(None) => return HttpResponse::NotFound().body("not found"),
+        Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
+      };
+
+      let zkln = match sqldata::read_zklistnote(&conn, uid, noteid) {
+        Ok(zkln) => zkln,
+        Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
+      };
+
+      let pstr = format!("files/{}", hash);
+      let stpath = Path::new(pstr.as_str());
+
+      // Self::from_file(File::open(&path)?, path)
+      match File::open(stpath).and_then(|f| NamedFile::from_file(f, Path::new(zkln.title.as_str())))
+      {
+        Ok(f) => f
+          .into_response(&req)
+          .unwrap_or(HttpResponse::NotFound().json(())),
+        Err(e) => HttpResponse::NotFound().json(()),
+      }
+    }
+    None => (HttpResponse::BadRequest().json(())),
+  }
+}
+
+// async fn save_file(session: Session, mut payload: Multipart, req: HttpRequest) -> HttpResponse {
 async fn receive_file(
   session: Session,
   config: web::Data<Config>,
@@ -309,11 +358,6 @@ async fn save_file_too(
     content: serde_json::to_value(note)?,
   })
 }
-
-// TODO:
-// user auth.
-// save file.
-// hash file.
 
 async fn save_file(mut payload: Multipart) -> Result<(String, String), Box<dyn Error>> {
   // iterate over multipart stream
@@ -580,6 +624,7 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
               .service(web::resource("/user").route(web::post().to(user)))
               .service(web::resource("/admin").route(web::post().to(admin)))
               .service(web::resource(r"/files/{hash}").route(web::get().to(files)))
+              .service(web::resource(r"/file/{id}").route(web::get().to(file)))
               .service(web::resource(r"/register/{uid}/{key}").route(web::get().to(register)))
               .service(web::resource(r"/newemail/{uid}/{token}").route(web::get().to(new_email)))
               .service(actix_files::Files::new("/static/", staticpath))
