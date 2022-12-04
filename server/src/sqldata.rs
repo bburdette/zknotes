@@ -8,7 +8,7 @@ use rusqlite::{params, Connection};
 use serde_derive::{Deserialize, Serialize};
 use simple_error::bail;
 use std::error::Error;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 use zkprotocol::content::{
   Direction, EditLink, ExtraLoginData, GetArchiveZkNote, GetZkLinks, GetZkNoteArchives,
@@ -968,8 +968,12 @@ pub fn read_zknotepubid(
   }
 }
 
-// delete the note; fails if there are links to it.
-pub fn delete_zknote(conn: &Connection, uid: i64, noteid: i64) -> Result<(), Box<dyn Error>> {
+pub fn delete_zknote(
+  conn: &Connection,
+  file_path: PathBuf,
+  uid: i64,
+  noteid: i64,
+) -> Result<(), Box<dyn Error>> {
   match zknote_access_id(&conn, Some(uid), noteid)? {
     Access::ReadWrite => Ok(()),
     _ => Err(Box::new(std::io::Error::new(
@@ -980,13 +984,47 @@ pub fn delete_zknote(conn: &Connection, uid: i64, noteid: i64) -> Result<(), Box
 
   archive_zknote(&conn, noteid)?;
 
+  // get file info, if any.
+  let filerec: Option<(i64, String)> = match conn.query_row(
+    "select F.id, F.hash from zknote N, file F
+    where N.id = ?1
+    and N.file = F.id",
+    params![noteid],
+    |row| Ok((row.get(0)?, row.get(1)?)),
+  ) {
+    Ok(fr) => Some(fr),
+    Err(QueryReturnedNoRows) => None,
+    Err(e) => Err(e)?,
+  };
+
   // only delete when user is the owner.
   conn.execute(
-    "update zknote set deleted = 1, title = '<deleted>', content = ''
+    "update zknote set deleted = 1, title = '<deleted>', content = '', file = null
       where id = ?1
       and user = ?2",
     params![noteid, uid],
   )?;
+
+  // is this file referred to by any other notes?
+  match filerec {
+    Some((fileid, hash)) => {
+      let usecount: i32 = conn.query_row(
+        "select count(*) from zknote N
+        where N.file = ?1",
+        params![fileid],
+        |row| Ok(row.get(0)?),
+      )?;
+      if usecount == 0 {
+        let mut rpath = file_path.clone();
+        rpath.push(Path::new(&hash));
+
+        std::fs::remove_file(rpath.as_path())?;
+
+        conn.execute("delete from file where id = ?1", params![fileid])?;
+      }
+    }
+    None => (),
+  }
 
   Ok(())
 }

@@ -6,6 +6,7 @@ use orgauth::dbfun::user_id;
 use rusqlite::Connection;
 use std::convert::TryInto;
 use std::error::Error;
+use std::path::{Path, PathBuf};
 use zkprotocol::content::ZkListNote;
 use zkprotocol::search::{
   AndOr, SearchMod, TagSearch, ZkListNoteSearchResult, ZkNoteSearch, ZkNoteSearchResult,
@@ -13,6 +14,7 @@ use zkprotocol::search::{
 
 pub fn power_delete_zknotes(
   conn: &Connection,
+  file_path: PathBuf,
   user: i64,
   search: &TagSearch,
 ) -> Result<i64, Box<dyn Error>> {
@@ -33,7 +35,7 @@ pub fn power_delete_zknotes(
       let c = znsr.notes.len().try_into()?;
 
       for n in znsr.notes {
-        delete_zknote(&conn, user, n.id)?;
+        delete_zknote(&conn, file_path.clone(), user, n.id)?;
       }
       Ok(c)
     }
@@ -41,7 +43,7 @@ pub fn power_delete_zknotes(
       let c = znsr.notes.len().try_into()?;
 
       for n in znsr.notes {
-        delete_zknote(&conn, user, n.id)?;
+        delete_zknote(&conn, file_path.clone(), user, n.id)?;
       }
       Ok(c)
     }

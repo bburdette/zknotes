@@ -163,7 +163,7 @@ pub fn zk_interface_loggedin(
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let search: TagSearch = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-      let res = search::power_delete_zknotes(&conn, uid, &search)?;
+      let res = search::power_delete_zknotes(&conn, config.file_path.clone(), uid, &search)?;
       Ok(ServerResponse {
         what: "powerdeletecomplete".to_string(),
         content: serde_json::to_value(res)?,
@@ -173,7 +173,7 @@ pub fn zk_interface_loggedin(
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let id: i64 = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-      sqldata::delete_zknote(&conn, uid, id)?;
+      sqldata::delete_zknote(&conn, config.file_path.clone(), uid, id)?;
       Ok(ServerResponse {
         what: "deletedzknote".to_string(),
         content: serde_json::to_value(id)?,
