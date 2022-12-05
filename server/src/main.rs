@@ -646,7 +646,8 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
                   true
                 } else if rv == "https://29a.ch"
                   && rh.method == "GET"
-                  && rh.uri.to_string().starts_with("/static")
+                  && (rh.uri.to_string().starts_with("/static/")
+                    || (rh.uri.to_string().starts_with("/file/")))
                 {
                   true
                 } else {
