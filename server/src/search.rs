@@ -6,6 +6,7 @@ use orgauth::dbfun::user_id;
 use rusqlite::Connection;
 use std::convert::TryInto;
 use std::error::Error;
+use std::path::{Path, PathBuf};
 use zkprotocol::content::ZkListNote;
 use zkprotocol::search::{
   AndOr, SearchMod, TagSearch, ZkListNoteSearchResult, ZkNoteSearch, ZkNoteSearchResult,
@@ -13,6 +14,7 @@ use zkprotocol::search::{
 
 pub fn power_delete_zknotes(
   conn: &Connection,
+  file_path: PathBuf,
   user: i64,
   search: &TagSearch,
 ) -> Result<i64, Box<dyn Error>> {
@@ -33,7 +35,7 @@ pub fn power_delete_zknotes(
       let c = znsr.notes.len().try_into()?;
 
       for n in znsr.notes {
-        delete_zknote(&conn, user, n.id)?;
+        delete_zknote(&conn, file_path.clone(), user, n.id)?;
       }
       Ok(c)
     }
@@ -41,7 +43,7 @@ pub fn power_delete_zknotes(
       let c = znsr.notes.len().try_into()?;
 
       for n in znsr.notes {
-        delete_zknote(&conn, user, n.id)?;
+        delete_zknote(&conn, file_path.clone(), user, n.id)?;
       }
       Ok(c)
     }
@@ -65,9 +67,16 @@ pub fn search_zknotes(
     Ok(ZkListNote {
       id: id,
       title: row.get(1)?,
-      user: row.get(2)?,
-      createdate: row.get(3)?,
-      changeddate: row.get(4)?,
+      is_file: {
+        let wat: Option<i64> = row.get(2)?;
+        match wat {
+          Some(_) => true,
+          None => false,
+        }
+      },
+      user: row.get(3)?,
+      createdate: row.get(4)?,
+      changeddate: row.get(5)?,
       sysids: sysids,
     })
   })?;
@@ -132,7 +141,7 @@ pub fn build_sql(
 
   // notes that are mine.
   let mut sqlbase = format!(
-    "select N.id, N.title, N.user, N.createdate, N.changeddate
+    "select N.id, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N where N.user = ?
       and N.deleted = 0"
   );
@@ -140,7 +149,7 @@ pub fn build_sql(
 
   // notes that are public, and not mine.
   let mut sqlpub = format!(
-    "select N.id, N.title, N.user, N.createdate, N.changeddate
+    "select N.id, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N, zklink L
       where (N.user != ? and L.fromid = N.id and L.toid = ?)
       and N.deleted = 0"
@@ -157,7 +166,7 @@ pub fn build_sql(
   // clause 3 is M.from (the share)
   // is that share linked to usernoteid?
   let mut sqlshare = format!(
-    "select N.id, N.title, N.user, N.createdate, N.changeddate
+    "select N.id, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N, zklink L, zklink M, zklink U
       where (N.user != ? and
         (M.toid = ? and (
@@ -179,7 +188,7 @@ pub fn build_sql(
 
   // notes that are tagged with my usernoteid, and not mine.
   let mut sqluser = format!(
-    "select N.id, N.title, N.user, N.createdate, N.changeddate
+    "select N.id, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N, zklink L
       where (
         N.user != ? and
@@ -256,8 +265,15 @@ pub fn search_zknotes_simple(
         id: id,
         title: row.get(1)?,
         user: row.get(2)?,
-        createdate: row.get(3)?,
-        changeddate: row.get(4)?,
+        is_file: {
+          let wat: Option<i64> = row.get(3)?;
+          match wat {
+            Some(_) => true,
+            None => false,
+          }
+        },
+        createdate: row.get(4)?,
+        changeddate: row.get(5)?,
         sysids: sysids,
       }))
     } else {
@@ -319,7 +335,7 @@ pub fn build_simple_sql(
 
   // all notes.
   let mut sqlbase = format!(
-    "select N.id, N.title, N.user, N.createdate, N.changeddate
+    "select N.id, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N "
   );
 

@@ -92,6 +92,8 @@ type Msg
     | Zone Time.Zone
     | WkMsg (Result JD.Error WindowKeys.Key)
     | ReceiveLocalVal { for : String, name : String, value : Maybe String }
+    | OnFileSelected F.File (List F.File)
+    | FileUploaded (Result Http.Error ZI.ServerResponse)
     | Noop
 
 
@@ -652,6 +654,12 @@ showMessage msg =
 
         ShowUrlMsg _ ->
             "ShowUrlMsg"
+
+        OnFileSelected _ _ ->
+            "OnFileSelected"
+
+        FileUploaded _ ->
+            "FileUploaded"
 
 
 showState : State -> String
@@ -2197,6 +2205,7 @@ actualupdate msg model =
                                                 { id = zne.zknote.id
                                                 , user = zne.zknote.user
                                                 , title = zne.zknote.title
+                                                , isFile = zne.zknote.isFile
                                                 , createdate = zne.zknote.createdate
                                                 , changeddate = zne.zknote.changeddate
                                                 , sysids = zne.zknote.sysids
@@ -2508,6 +2517,84 @@ actualupdate msg model =
         ( DisplayMessageMsg GD.Noop, _ ) ->
             ( model, Cmd.none )
 
+        ( OnFileSelected file files, _ ) ->
+            ( model
+            , Http.request
+                { method = "POST"
+                , headers = []
+                , url = model.location ++ "/upload"
+                , body =
+                    file
+                        :: files
+                        |> List.map (\f -> Http.filePart (F.name f) f)
+                        |> Http.multipartBody
+                , expect = Http.expectJson FileUploaded ZI.serverResponseDecoder
+                , timeout = Nothing
+                , tracker = Nothing
+                }
+            )
+
+        ( FileUploaded zrd, state ) ->
+            case zrd of
+                Err e ->
+                    ( displayMessageDialog model <| Util.httpErrorString e, Cmd.none )
+
+                Ok ziresponse ->
+                    case ziresponse of
+                        ZI.ServerError e ->
+                            ( displayMessageDialog model <| e, Cmd.none )
+
+                        ZI.ZkNoteEdit zne ->
+                            case stateLogin state of
+                                Just login ->
+                                    let
+                                        ( spmod, sres ) =
+                                            stateSearch state
+                                                |> Maybe.withDefault ( SP.initModel, { notes = [], offset = 0, what = "" } )
+
+                                        ( nst, c ) =
+                                            EditZkNote.initFull login
+                                                sres
+                                                zne.zknote
+                                                zne.links
+                                                spmod
+
+                                        s =
+                                            case state of
+                                                EditZkNote eznst _ ->
+                                                    EditZkNote.copyTabs eznst nst
+                                                        |> EditZkNote.tabsOnLoad
+
+                                                _ ->
+                                                    nst
+                                    in
+                                    ( { model
+                                        | state =
+                                            EditZkNote
+                                                s
+                                                login
+                                        , recentNotes =
+                                            addRecentZkListNote model.recentNotes
+                                                { id = zne.zknote.id
+                                                , user = zne.zknote.user
+                                                , title = zne.zknote.title
+                                                , isFile = zne.zknote.isFile
+                                                , createdate = zne.zknote.createdate
+                                                , changeddate = zne.zknote.changeddate
+                                                , sysids = zne.zknote.sysids
+                                                }
+                                      }
+                                    , sendZIMsg model.location <| ZI.GetZkNoteComments c
+                                    )
+
+                                _ ->
+                                    ( unexpectedMessage model (ZI.showServerResponse ziresponse)
+                                    , Cmd.none
+                                    )
+
+                        _ ->
+                            ( displayMessageDialog model (ZI.showServerResponse ziresponse), Cmd.none )
+
         ( x, y ) ->
             ( unexpectedMsg model x
             , Cmd.none
@@ -2715,6 +2802,11 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
         EditZkNote.ShowArchives id ->
             ( model
             , sendZIMsg model.location (ZI.GetZkNoteArchives { zknote = id, offset = 0, limit = Just S.defaultSearchLimit })
+            )
+
+        EditZkNote.FileUpload ->
+            ( model
+            , FS.files [] OnFileSelected
             )
 
         EditZkNote.Cmd cmd ->

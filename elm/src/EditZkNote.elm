@@ -36,7 +36,6 @@ module EditZkNote exposing
     , showSr
     , showZkl
     , sznFromModel
-    , sznToZkn
     , tabsOnLoad
     , toPubId
     , toZkListNote
@@ -105,6 +104,7 @@ type Msg
     | DeletePress Time.Zone
     | ViewPress
     | NewPress
+    | UploadPress
     | LinkBackPress
     | CopyPress
     | SearchHistoryPress
@@ -180,6 +180,7 @@ type alias Model =
     , editableValue : Bool -- is this note editable by other users?
     , showtitle : Bool
     , deleted : Bool
+    , isFile : Bool
     , pubidtxt : String
     , title : String
     , createdate : Maybe Int
@@ -224,6 +225,7 @@ type Command
     | AddToRecent Data.ZkListNote
     | ShowMessage String
     | ShowArchives Int
+    | FileUpload
     | Cmd (Cmd Msg)
 
 
@@ -283,6 +285,7 @@ toZkListNote model =
                 { id = id
                 , user = model.noteUser
                 , title = model.title
+                , isFile = model.isFile
                 , createdate = createdate
                 , changeddate = changeddate
                 , sysids =
@@ -555,7 +558,10 @@ pageLink model =
     model.id
         |> Maybe.andThen
             (\id ->
-                if isPublic model then
+                if model.isFile then
+                    Just <| UB.absolute [ "file", String.fromInt id ] []
+
+                else if isPublic model then
                     if model.pubidtxt /= "" then
                         Just <| UB.absolute [ "page", model.pubidtxt ] []
 
@@ -883,6 +889,7 @@ zknview zone size recentZkns model =
             model.editable
                 && not search
                 && not model.deleted
+                && not model.isFile
 
         -- super lame math because images suck in html/elm-ui
         mdw =
@@ -1048,7 +1055,14 @@ zknview zone size recentZkns model =
                         , label =
                             EI.labelLeft
                                 edlabelattr
-                                (E.text "title")
+                                (E.text
+                                    (if model.isFile then
+                                        "filename"
+
+                                     else
+                                        "title"
+                                    )
+                                )
                         }
             in
             E.column
@@ -1106,6 +1120,7 @@ zknview zone size recentZkns model =
                             Nothing ->
                                 E.none
                         , EI.button perhapsdirtyparabuttonstyle { onPress = Just NewPress, label = E.text "new" }
+                        , EI.button perhapsdirtyparabuttonstyle { onPress = Just UploadPress, label = E.text "upload" }
                         , if mine && not model.deleted then
                             EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just <| DeletePress zone, label = E.text "delete" }
 
@@ -1217,8 +1232,9 @@ zknview zone size recentZkns model =
 
                    else
                     E.none
+                 , dates
+                 , divider
                  ]
-                    ++ [ dates, divider ]
                     ++ showComments
                     -- show the links.
                     ++ [ divider ]
@@ -1620,6 +1636,7 @@ initFull ld zkl zknote dtlinks spm =
       , editable = zknote.editable
       , editableValue = zknote.editableValue
       , deleted = zknote.deleted
+      , isFile = zknote.isFile
       , showtitle = zknote.showtitle
       , createdate = Just zknote.createdate
       , changeddate = Just zknote.changeddate
@@ -1670,6 +1687,7 @@ initNew ld zkl spm links =
     , editable = True
     , editableValue = False
     , deleted = False
+    , isFile = False
     , showtitle = True
     , createdate = Nothing
     , changeddate = Nothing
@@ -1720,6 +1738,7 @@ sznToZkn uid uname unote sysids sdzn szn =
     , createdate = sdzn.changeddate
     , changeddate = sdzn.changeddate
     , deleted = szn.deleted
+    , isFile = False
     , sysids = sysids
     }
 
@@ -2193,6 +2212,11 @@ update msg model =
 
         NewPress ->
             newWithSave model
+
+        UploadPress ->
+            ( model
+            , FileUpload
+            )
 
         ToLinkPress zkln ->
             let

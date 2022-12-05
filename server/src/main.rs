@@ -6,21 +6,33 @@ mod sqldata;
 mod sqltest;
 mod util;
 use actix_cors::Cors;
+use actix_files::NamedFile;
+use actix_multipart::Multipart;
 use actix_session::{CookieSession, Session};
 use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Result};
 use chrono;
 use clap::Arg;
 use config::Config;
+use futures_util::TryStreamExt as _;
 use log::{error, info};
 use orgauth::endpoints::Callbacks;
+use rusqlite::{params, Connection};
 use serde_json;
+use sha256;
 use std::env;
 use std::error::Error;
+use std::fs::File;
+use std::io::Write;
+use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 use timer;
+use util::now;
 use uuid::Uuid;
+use zkprotocol::content as zc;
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
+
+use either::Either;
 
 /*
 use actix_files::NamedFile;
@@ -159,6 +171,249 @@ fn admin(
   }
 }
 
+fn session_user(
+  conn: &Connection,
+  session: Session,
+  config: web::Data<Config>,
+) -> Result<Either<orgauth::data::User, ServerResponse>, Box<dyn Error>> {
+  match session.get::<Uuid>("token")? {
+    None => Ok(Either::Right(ServerResponse {
+      what: "not logged in".to_string(),
+      content: serde_json::Value::Null,
+    })),
+    Some(token) => {
+      match orgauth::dbfun::read_user_by_token(
+        &conn,
+        token,
+        Some(config.orgauth_config.login_token_expiration_ms),
+      ) {
+        Err(e) => {
+          info!("read_user_by_token error: {:?}", e);
+
+          Ok(Either::Right(ServerResponse {
+            what: "login error".to_string(),
+            content: serde_json::to_value(format!("{:?}", e).as_str())?,
+          }))
+        }
+        Ok(userdata) => Ok(Either::Left(userdata)),
+      }
+    }
+  }
+}
+
+async fn files(session: Session, config: web::Data<Config>, req: HttpRequest) -> HttpResponse {
+  let conn = match sqldata::connection_open(config.orgauth_config.db.as_path()) {
+    Ok(c) => c,
+    Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
+  };
+
+  let user = match session_user(&conn, session, config) {
+    Ok(Either::Left(user)) => user,
+    Ok(Either::Right(sr)) => return HttpResponse::Ok().json(sr),
+    Err(e) => return HttpResponse::BadRequest().body(format!("{:?}", e)),
+  };
+
+  match req.match_info().get("hash") {
+    Some(file) => {
+      // TODO verify only chars 0-9 in the string.
+
+      match sqldata::file_access(&conn, Some(user.id), file.to_string()) {
+        Ok(Some(name)) => {
+          let pstr = format!("files/{}", file);
+          let stpath = Path::new(pstr.as_str());
+
+          // Self::from_file(File::open(&path)?, path)
+          match File::open(stpath).and_then(|f| NamedFile::from_file(f, Path::new(name.as_str()))) {
+            Ok(f) => f
+              .into_response(&req)
+              .unwrap_or(HttpResponse::NotFound().json(())),
+            Err(e) => HttpResponse::NotFound().body(format!("{:?}", e)),
+          }
+        }
+        Ok(None) => HttpResponse::Unauthorized().json(()),
+        Err(e) => HttpResponse::NotFound().body(format!("{:?}", e)),
+      }
+    }
+    None => (HttpResponse::BadRequest().body("file hash required: /files/<hash>")),
+  }
+}
+
+async fn file(session: Session, config: web::Data<Config>, req: HttpRequest) -> HttpResponse {
+  let conn = match sqldata::connection_open(config.orgauth_config.db.as_path()) {
+    Ok(c) => c,
+    Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
+  };
+
+  let suser = match session_user(&conn, session, config) {
+    Ok(Either::Left(user)) => Some(user),
+    Ok(Either::Right(_sr)) => None,
+    Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
+  };
+
+  let uid = suser.map(|user| user.id);
+
+  match req
+    .match_info()
+    .get("id")
+    .and_then(|s| s.parse::<i64>().ok())
+  {
+    Some(noteid) => {
+      let hash = match sqldata::read_zknote_filehash(&conn, uid, &noteid) {
+        Ok(Some(hash)) => hash,
+        Ok(None) => return HttpResponse::NotFound().body("not found"),
+        Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
+      };
+
+      let zkln = match sqldata::read_zklistnote(&conn, uid, noteid) {
+        Ok(zkln) => zkln,
+        Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
+      };
+
+      let pstr = format!("files/{}", hash);
+      let stpath = Path::new(pstr.as_str());
+
+      // Self::from_file(File::open(&path)?, path)
+      match File::open(stpath).and_then(|f| NamedFile::from_file(f, Path::new(zkln.title.as_str())))
+      {
+        Ok(f) => f
+          .into_response(&req)
+          .unwrap_or(HttpResponse::NotFound().json(())),
+        Err(e) => HttpResponse::NotFound().body(format!("{:?}", e)),
+      }
+    }
+    None => (HttpResponse::BadRequest().body("file id required: /files/<id>")),
+  }
+}
+
+async fn receive_file(
+  session: Session,
+  config: web::Data<Config>,
+  mut payload: Multipart,
+) -> HttpResponse {
+  match save_file_too(session, config, payload).await {
+    Ok(r) => HttpResponse::Ok().json(r),
+    Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
+  }
+}
+
+async fn save_file_too(
+  session: Session,
+  config: web::Data<Config>,
+  mut payload: Multipart,
+) -> Result<ServerResponse, Box<dyn Error>> {
+  let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+  let userdata = match session_user(&conn, session, config)? {
+    Either::Left(ud) => ud,
+    Either::Right(sr) => return Ok(sr),
+  };
+
+  // Ok save the file.
+  let (name, fp) = save_file(payload).await?;
+
+  // compute hash.
+  let fh = sha256::try_digest(Path::new(&fp))?;
+  let fhp = format!("files/{}", fh);
+  let hashpath = Path::new(&fhp);
+
+  // file exists?
+  if hashpath.exists() {
+    // new file already exists.
+    std::fs::remove_file(Path::new(&fp));
+  } else {
+    // move into hashed-files dir.
+    std::fs::rename(Path::new(&fp), hashpath)?;
+  }
+
+  // table entry exists?
+  let mut oid: Option<i64> =
+    match conn.query_row("select id from file where hash = ?1", params![fh], |row| {
+      Ok(row.get(0)?)
+    }) {
+      Ok(v) => Ok(Some(v)),
+      Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+      Err(x) => Err(Box::new(x)),
+    }?;
+
+  // use existing id, or create new
+  let fid = match oid {
+    Some(id) => id,
+    None => {
+      let now = now()?;
+
+      // add table entry
+      conn.execute(
+        "insert into file (hash, createdate)
+                 values (?1, ?2)",
+        params![fh, now],
+      )?;
+      conn.last_insert_rowid()
+    }
+  };
+
+  // now make a new note.
+  let sn = sqldata::save_zknote(
+    &conn,
+    userdata.id,
+    &zc::SaveZkNote {
+      id: None,
+      title: name,
+      pubid: None,
+      content: "".to_string(),
+      editable: false,
+      showtitle: false,
+      deleted: false,
+    },
+  )?;
+
+  // set the file id in that note.
+  sqldata::set_zknote_file(&conn, sn.id, fid)?;
+
+  // return zknoteedit.
+  let note = sqldata::read_zknoteedit(&conn, userdata.id, &zc::GetZkNoteEdit { zknote: sn.id })?;
+  info!(
+    "user#filer_uploaded-zknote: {} - {}",
+    note.zknote.id, note.zknote.title
+  );
+  Ok(ServerResponse {
+    what: "zknoteedit".to_string(),
+    content: serde_json::to_value(note)?,
+  })
+}
+
+async fn save_file(mut payload: Multipart) -> Result<(String, String), Box<dyn Error>> {
+  // iterate over multipart stream
+
+  // ONLY SAVING THE FIRST FILE
+  while let Some(mut field) = payload.try_next().await? {
+    // A multipart/form-data stream has to contain `content_disposition`
+    let content_disposition = field
+      .content_disposition()
+      .ok_or(simple_error::SimpleError::new("bad"))?;
+
+    let filename = content_disposition
+      .get_filename()
+      .unwrap_or("filename not found");
+
+    let wkfilename = Uuid::new_v4().to_string();
+    let filepath = format!("./tmp/{wkfilename}");
+    let rf = filepath.clone();
+
+    // File::create is blocking operation, use threadpool
+    let mut f = web::block(|| std::fs::File::create(filepath)).await?;
+
+    // Field in turn is stream of *Bytes* object
+    while let Some(chunk) = field.try_next().await? {
+      // filesystem operations are blocking, we have to use threadpool
+      f = web::block(move || f.write_all(&chunk).map(|_| f)).await?;
+    }
+
+    // stop on the first file.
+    return Ok((filename.to_string(), rf));
+  }
+
+  simple_error::bail!("no file saved")
+}
+
 fn private(
   session: Session,
   data: web::Data<Config>,
@@ -232,6 +487,8 @@ fn defcon() -> Config {
     createdirs: false,
     altmainsite: [].to_vec(),
     static_path: None,
+    file_tmp_path: Path::new("./temp").to_path_buf(),
+    file_path: Path::new("./files").to_path_buf(),
     error_index_note: None,
     orgauth_config: oc,
   }
@@ -304,6 +561,20 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
         Some(filename) => load_config(filename)?,
         None => load_config("config.toml")?,
       };
+
+      // verify/create file directories.
+
+      // TODO upgrade when stable
+      // if !std::fs::try_exists(config.file_tmp_path)? {
+      if !std::path::Path::exists(&config.file_tmp_path) {
+        std::fs::create_dir_all(&config.file_tmp_path)?
+      }
+      // TODO upgrade when stable
+      // if !std::fs::try_exists(config.file_path)? {
+      if !std::path::Path::exists(&config.file_path) {
+        std::fs::create_dir_all(&config.file_path)?
+      }
+
       // are we exporting the DB?
       match matches.value_of("export") {
         Some(exportfile) => {
@@ -384,10 +655,13 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
                   .secure(false) // allows for dev access
                   .max_age(10 * 24 * 60 * 60), // 10 days
               )
+              .service(web::resource("/upload").route(web::post().to(receive_file)))
               .service(web::resource("/public").route(web::post().to(public)))
               .service(web::resource("/private").route(web::post().to(private)))
               .service(web::resource("/user").route(web::post().to(user)))
               .service(web::resource("/admin").route(web::post().to(admin)))
+              // .service(web::resource(r"/files/{hash}").route(web::get().to(files)))
+              .service(web::resource(r"/file/{id}").route(web::get().to(file)))
               .service(web::resource(r"/register/{uid}/{key}").route(web::get().to(register)))
               .service(web::resource(r"/newemail/{uid}/{token}").route(web::get().to(new_email)))
               .service(actix_files::Files::new("/static/", staticpath))

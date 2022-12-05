@@ -8,7 +8,7 @@ use rusqlite::{params, Connection};
 use serde_derive::{Deserialize, Serialize};
 use simple_error::bail;
 use std::error::Error;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 use zkprotocol::content::{
   Direction, EditLink, ExtraLoginData, GetArchiveZkNote, GetZkLinks, GetZkNoteArchives,
@@ -273,6 +273,11 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: i64) -> Result<(), Box<dyn Err
     info!("udpate20");
     zkm::udpate20(&dbfile)?;
     set_single_value(&conn, "migration_level", "20")?;
+  }
+  if nlevel < 21 {
+    info!("udpate21");
+    zkm::udpate21(&dbfile)?;
+    set_single_value(&conn, "migration_level", "21")?;
   }
 
   info!("db up to date.");
@@ -552,6 +557,15 @@ pub fn archive_zknote(conn: &Connection, noteid: i64) -> Result<SavedZkNote, Box
   })
 }
 
+pub fn set_zknote_file(conn: &Connection, noteid: i64, fileid: i64) -> Result<(), Box<dyn Error>> {
+  conn.execute(
+    "update zknote set file = ?1
+         where id = ?2",
+    params![fileid, noteid],
+  )?;
+  Ok(())
+}
+
 pub fn save_zknote(
   conn: &Connection,
   uid: i64,
@@ -673,7 +687,7 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
   let sysids = get_sysids(conn, sysid, id)?;
 
   let mut note = conn.query_row(
-    "select ZN.title, ZN.content, ZN.user, OU.name, U.zknote, ZN.pubid, ZN.editable, ZN.showtitle, ZN.deleted, ZN.createdate, ZN.changeddate
+    "select ZN.title, ZN.content, ZN.user, OU.name, U.zknote, ZN.pubid, ZN.editable, ZN.showtitle, ZN.deleted, ZN.file, ZN.createdate, ZN.changeddate
       from zknote ZN, orgauth_user OU, user U where ZN.id = ?1 and U.id = ZN.user and OU.id = ZN.user",
     params![id],
     |row| {
@@ -689,8 +703,13 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
         editableValue: row.get(6)?,           // <--- same index.
         showtitle: row.get(7)?,
         deleted: row.get(8)?,
-        createdate: row.get(9)?,
-        changeddate: row.get(10)?,
+        is_file: { let wat : Option<i64> = row.get(9)?;
+          match wat {
+          Some(_) => true,
+          None => false,
+        }},
+        createdate: row.get(10)?,
+        changeddate: row.get(11)?,
         sysids: sysids,
       })
     },
@@ -735,16 +754,19 @@ pub fn read_zklistnote(
   }?;
 
   let note = conn.query_row(
-    "select ZN.title, ZN.user, ZN.createdate, ZN.changeddate
+    "select ZN.title, ZN.file, ZN.user, ZN.createdate, ZN.changeddate
       from zknote ZN, orgauth_user OU, user U where ZN.id = ?1 and U.id = ZN.user and OU.id = ZN.user",
     params![id],
     |row| {
+      let wat : Option<i64> = row.get(1)?;
+      println!("wat: {:?}", wat);
       let zln = ZkListNote {
         id: id,
         title: row.get(0)?,
-        user: row.get(1)?,
-        createdate: row.get(2)?,
-        changeddate: row.get(3)?,
+        is_file: wat.is_some(),
+        user: row.get(2)?,
+        createdate: row.get(3)?,
+        changeddate: row.get(4)?,
         sysids: sysids,
       };
       Ok(zln)
@@ -754,7 +776,7 @@ pub fn read_zklistnote(
   Ok(note)
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Access {
   Private,
   Read,
@@ -835,6 +857,54 @@ pub fn zknote_access_id(
   }
 }
 
+pub fn file_access(
+  conn: &Connection,
+  uid: Option<i64>,
+  hash: String,
+) -> Result<Option<String>, Box<dyn Error>> {
+  let mut pstmt = conn.prepare(
+    " select zknote.id, zknote.title from zknote, file
+        where zknote.file = file.id
+        and file.hash = ?1
+    ",
+  )?;
+
+  let rec_iter = pstmt.query_map(params![hash], |row| Ok((row.get(0)?, row.get(1)?)))?;
+
+  for rsid in rec_iter {
+    match rsid {
+      Ok((id, title)) => {
+        if zknote_access_id(&conn, uid, id)? != Access::Private {
+          return Ok(Some(title));
+        }
+      }
+      Err(_) => (),
+    }
+  }
+
+  Ok(None)
+}
+
+pub fn read_zknote_filehash(
+  conn: &Connection,
+  uid: Option<i64>,
+  noteid: &i64,
+) -> Result<Option<String>, Box<dyn Error>> {
+  if zknote_access_id(&conn, uid, *noteid)? != Access::Private {
+    let hash = conn.query_row(
+      "select F.hash from zknote N, file F
+      where N.id = ?1
+      and N.file = F.id",
+      params![noteid],
+      |row| Ok(row.get(0)?),
+    )?;
+
+    Ok(Some(hash))
+  } else {
+    Ok(None)
+  }
+}
+
 pub fn read_zknotepubid(
   conn: &Connection,
   uid: Option<i64>,
@@ -842,7 +912,7 @@ pub fn read_zknotepubid(
 ) -> Result<ZkNote, Box<dyn Error>> {
   let publicid = note_id(&conn, "system", "public")?;
   let mut note = conn.query_row(
-    "select A.id, A.title, A.content, A.user, OU.name, U.zknote, A.pubid, A.editable, A.showtitle, A.deleted, A.createdate, A.changeddate
+    "select A.id, A.title, A.content, A.user, OU.name, U.zknote, A.pubid, A.editable, A.showtitle, A.deleted, A.file, A.createdate, A.changeddate
       from zknote A, user U, orgauth_user OU, zklink L where A.pubid = ?1
       and ((A.id = L.fromid
       and L.toid = ?2) or (A.id = L.toid
@@ -863,8 +933,13 @@ pub fn read_zknotepubid(
         editableValue: row.get(7)?,
         showtitle: row.get(8)?,
         deleted: row.get(9)?,
-        createdate: row.get(10)?,
-        changeddate: row.get(11)?,
+        is_file: { let wat : Option<i64> = row.get(10)?;
+          match wat {
+          Some(_) => true,
+          None => false,
+        }},
+        createdate: row.get(11)?,
+        changeddate: row.get(12)?,
         sysids: Vec::new(),
       })
     },
@@ -893,8 +968,12 @@ pub fn read_zknotepubid(
   }
 }
 
-// delete the note; fails if there are links to it.
-pub fn delete_zknote(conn: &Connection, uid: i64, noteid: i64) -> Result<(), Box<dyn Error>> {
+pub fn delete_zknote(
+  conn: &Connection,
+  file_path: PathBuf,
+  uid: i64,
+  noteid: i64,
+) -> Result<(), Box<dyn Error>> {
   match zknote_access_id(&conn, Some(uid), noteid)? {
     Access::ReadWrite => Ok(()),
     _ => Err(Box::new(std::io::Error::new(
@@ -905,13 +984,47 @@ pub fn delete_zknote(conn: &Connection, uid: i64, noteid: i64) -> Result<(), Box
 
   archive_zknote(&conn, noteid)?;
 
+  // get file info, if any.
+  let filerec: Option<(i64, String)> = match conn.query_row(
+    "select F.id, F.hash from zknote N, file F
+    where N.id = ?1
+    and N.file = F.id",
+    params![noteid],
+    |row| Ok((row.get(0)?, row.get(1)?)),
+  ) {
+    Ok(fr) => Some(fr),
+    Err(QueryReturnedNoRows) => None,
+    Err(e) => Err(e)?,
+  };
+
   // only delete when user is the owner.
   conn.execute(
-    "update zknote set deleted = 1, title = '<deleted>', content = ''
+    "update zknote set deleted = 1, title = '<deleted>', content = '', file = null
       where id = ?1
       and user = ?2",
     params![noteid, uid],
   )?;
+
+  // is this file referred to by any other notes?
+  match filerec {
+    Some((fileid, hash)) => {
+      let usecount: i32 = conn.query_row(
+        "select count(*) from zknote N
+        where N.file = ?1",
+        params![fileid],
+        |row| Ok(row.get(0)?),
+      )?;
+      if usecount == 0 {
+        let mut rpath = file_path.clone();
+        rpath.push(Path::new(&hash));
+
+        std::fs::remove_file(rpath.as_path())?;
+
+        conn.execute("delete from file where id = ?1", params![fileid])?;
+      }
+    }
+    None => (),
+  }
 
   Ok(())
 }

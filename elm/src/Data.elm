@@ -90,6 +90,7 @@ type alias ZkListNote =
     { id : Int
     , user : UserId
     , title : String
+    , isFile : Bool
     , createdate : Int
     , changeddate : Int
     , sysids : List Int
@@ -130,6 +131,7 @@ type alias ZkNote =
     , createdate : Int
     , changeddate : Int
     , deleted : Bool
+    , isFile : Bool
     , sysids : List Int
     }
 
@@ -444,13 +446,14 @@ encodeSaveZkNote zkn =
 
 decodeZkListNote : JD.Decoder ZkListNote
 decodeZkListNote =
-    JD.map6 ZkListNote
-        (JD.field "id" JD.int)
-        (JD.field "user" decodeUserId)
-        (JD.field "title" JD.string)
-        (JD.field "createdate" JD.int)
-        (JD.field "changeddate" JD.int)
-        (JD.field "sysids" (JD.list JD.int))
+    JD.succeed ZkListNote
+        |> andMap (JD.field "id" JD.int)
+        |> andMap (JD.field "user" decodeUserId)
+        |> andMap (JD.field "title" JD.string)
+        |> andMap (JD.field "is_file" JD.bool)
+        |> andMap (JD.field "createdate" JD.int)
+        |> andMap (JD.field "changeddate" JD.int)
+        |> andMap (JD.field "sysids" (JD.list JD.int))
 
 
 decodeZkListNoteSearchResult : JD.Decoder ZkListNoteSearchResult
@@ -492,6 +495,7 @@ decodeZkNote =
         |> andMap (JD.field "createdate" JD.int)
         |> andMap (JD.field "changeddate" JD.int)
         |> andMap (JD.field "deleted" JD.bool)
+        |> andMap (JD.field "is_file" JD.bool)
         |> andMap (JD.field "sysids" <| JD.list JD.int)
 
 

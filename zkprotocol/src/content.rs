@@ -28,6 +28,7 @@ pub struct ZkNote {
   pub createdate: i64,
   pub changeddate: i64,
   pub deleted: bool,
+  pub is_file: bool,
   pub sysids: Vec<i64>,
 }
 
@@ -35,6 +36,7 @@ pub struct ZkNote {
 pub struct ZkListNote {
   pub id: i64,
   pub title: String,
+  pub is_file: bool,
   pub user: i64,
   pub createdate: i64,
   pub changeddate: i64,
