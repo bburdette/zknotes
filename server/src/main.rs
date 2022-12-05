@@ -19,6 +19,7 @@ use orgauth::endpoints::Callbacks;
 use rusqlite::{params, Connection};
 use serde_json;
 use sha256;
+use simple_error::simple_error;
 use std::env;
 use std::error::Error;
 use std::fs::File;
@@ -174,7 +175,7 @@ fn admin(
 fn session_user(
   conn: &Connection,
   session: Session,
-  config: web::Data<Config>,
+  config: &web::Data<Config>,
 ) -> Result<Either<orgauth::data::User, ServerResponse>, Box<dyn Error>> {
   match session.get::<Uuid>("token")? {
     None => Ok(Either::Right(ServerResponse {
@@ -207,7 +208,7 @@ async fn files(session: Session, config: web::Data<Config>, req: HttpRequest) ->
     Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
   };
 
-  let user = match session_user(&conn, session, config) {
+  let user = match session_user(&conn, session, &config) {
     Ok(Either::Left(user)) => user,
     Ok(Either::Right(sr)) => return HttpResponse::Ok().json(sr),
     Err(e) => return HttpResponse::BadRequest().body(format!("{:?}", e)),
@@ -244,7 +245,7 @@ async fn file(session: Session, config: web::Data<Config>, req: HttpRequest) -> 
     Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
   };
 
-  let suser = match session_user(&conn, session, config) {
+  let suser = match session_user(&conn, session, &config) {
     Ok(Either::Left(user)) => Some(user),
     Ok(Either::Right(_sr)) => None,
     Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
@@ -302,13 +303,14 @@ async fn save_file_too(
   mut payload: Multipart,
 ) -> Result<ServerResponse, Box<dyn Error>> {
   let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-  let userdata = match session_user(&conn, session, config)? {
+  let userdata = match session_user(&conn, session, &config)? {
     Either::Left(ud) => ud,
     Either::Right(sr) => return Ok(sr),
   };
 
   // Ok save the file.
-  let (name, fp) = save_file(payload).await?;
+  let tp = config.file_tmp_path.clone();
+  let (name, fp) = save_file(&tp, payload).await?;
 
   // compute hash.
   let fh = sha256::try_digest(Path::new(&fp))?;
@@ -380,7 +382,10 @@ async fn save_file_too(
   })
 }
 
-async fn save_file(mut payload: Multipart) -> Result<(String, String), Box<dyn Error>> {
+async fn save_file(
+  to_dir: &Path,
+  mut payload: Multipart,
+) -> Result<(String, String), Box<dyn Error>> {
   // iterate over multipart stream
 
   // ONLY SAVING THE FIRST FILE
@@ -395,7 +400,10 @@ async fn save_file(mut payload: Multipart) -> Result<(String, String), Box<dyn E
       .unwrap_or("filename not found");
 
     let wkfilename = Uuid::new_v4().to_string();
-    let filepath = format!("./tmp/{wkfilename}");
+
+    let mut filepath = to_dir.to_path_buf();
+    filepath.push(wkfilename);
+
     let rf = filepath.clone();
 
     // File::create is blocking operation, use threadpool
@@ -408,7 +416,11 @@ async fn save_file(mut payload: Multipart) -> Result<(String, String), Box<dyn E
     }
 
     // stop on the first file.
-    return Ok((filename.to_string(), rf));
+    let ps = rf
+      .into_os_string()
+      .into_string()
+      .map_err(|osstr| simple_error!("couldn't convert filename to string"));
+    return Ok((filename.to_string(), ps?));
   }
 
   simple_error::bail!("no file saved")
