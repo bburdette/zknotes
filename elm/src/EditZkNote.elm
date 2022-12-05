@@ -558,7 +558,10 @@ pageLink model =
     model.id
         |> Maybe.andThen
             (\id ->
-                if isPublic model then
+                if model.isFile then
+                    Just <| UB.absolute [ "file", String.fromInt id ] []
+
+                else if isPublic model then
                     if model.pubidtxt /= "" then
                         Just <| UB.absolute [ "page", model.pubidtxt ] []
 
