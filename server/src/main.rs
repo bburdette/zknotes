@@ -33,8 +33,6 @@ use zkprotocol::content as zc;
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 
 use either::Either;
-// use futures_util::stream::try_stream::TryStreamExt;
-// use tokio::stream::StreamExt;
 
 /*
 use actix_files::NamedFile;
@@ -203,7 +201,6 @@ fn session_user(
   }
 }
 
-// async fn save_file(session: Session, mut payload: Multipart, req: HttpRequest) -> HttpResponse {
 async fn files(session: Session, config: web::Data<Config>, req: HttpRequest) -> HttpResponse {
   let conn = match sqldata::connection_open(config.orgauth_config.db.as_path()) {
     Ok(c) => c,
@@ -241,7 +238,6 @@ async fn files(session: Session, config: web::Data<Config>, req: HttpRequest) ->
   }
 }
 
-// async fn save_file(session: Session, mut payload: Multipart, req: HttpRequest) -> HttpResponse {
 async fn file(session: Session, config: web::Data<Config>, req: HttpRequest) -> HttpResponse {
   let conn = match sqldata::connection_open(config.orgauth_config.db.as_path()) {
     Ok(c) => c,
@@ -289,7 +285,6 @@ async fn file(session: Session, config: web::Data<Config>, req: HttpRequest) -> 
   }
 }
 
-// async fn save_file(session: Session, mut payload: Multipart, req: HttpRequest) -> HttpResponse {
 async fn receive_file(
   session: Session,
   config: web::Data<Config>,
@@ -375,7 +370,10 @@ async fn save_file_too(
 
   // return zknoteedit.
   let note = sqldata::read_zknoteedit(&conn, userdata.id, &zc::GetZkNoteEdit { zknote: sn.id })?;
-  // info!("user#zknote: {} - {}", id, note.title);
+  info!(
+    "user#filer_uploaded-zknote: {} - {}",
+    note.zknote.id, note.zknote.title
+  );
   Ok(ServerResponse {
     what: "zknoteedit".to_string(),
     content: serde_json::to_value(note)?,
