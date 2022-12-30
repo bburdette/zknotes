@@ -291,7 +291,7 @@ async fn receive_file(
   config: web::Data<Config>,
   mut payload: Multipart,
 ) -> HttpResponse {
-  match save_file_too(session, config, payload).await {
+  match save_file_too(session, config, &mut payload).await {
     Ok(r) => HttpResponse::Ok().json(r),
     Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
   }
@@ -300,7 +300,7 @@ async fn receive_file(
 async fn save_file_too(
   session: Session,
   config: web::Data<Config>,
-  mut payload: Multipart,
+  mut payload: &mut Multipart,
 ) -> Result<ServerResponse, Box<dyn Error>> {
   let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
   let userdata = match session_user(&conn, session, &config)? {
@@ -384,7 +384,7 @@ async fn save_file_too(
 
 async fn save_file(
   to_dir: &Path,
-  mut payload: Multipart,
+  mut payload: &mut Multipart,
 ) -> Result<(String, String), Box<dyn Error>> {
   // iterate over multipart stream
 
