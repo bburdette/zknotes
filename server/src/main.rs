@@ -320,14 +320,14 @@ async fn save_file_too(
   // file exists?
   if hashpath.exists() {
     // new file already exists.
-    std::fs::remove_file(Path::new(&fp));
+    std::fs::remove_file(Path::new(&fp))?;
   } else {
     // move into hashed-files dir.
     std::fs::rename(Path::new(&fp), hashpath)?;
   }
 
   // table entry exists?
-  let mut oid: Option<i64> =
+  let oid: Option<i64> =
     match conn.query_row("select id from file where hash = ?1", params![fh], |row| {
       Ok(row.get(0)?)
     }) {
@@ -419,7 +419,7 @@ async fn save_file(
     let ps = rf
       .into_os_string()
       .into_string()
-      .map_err(|osstr| simple_error!("couldn't convert filename to string"));
+      .map_err(|osstr| simple_error!("couldn't convert filename to string {:?}", osstr));
     return Ok((filename.to_string(), ps?));
   }
 

@@ -993,7 +993,7 @@ pub fn delete_zknote(
     |row| Ok((row.get(0)?, row.get(1)?)),
   ) {
     Ok(fr) => Some(fr),
-    Err(QueryReturnedNoRows) => None,
+    Err(rusqlite::Error::QueryReturnedNoRows) => None,
     Err(e) => Err(e)?,
   };
 
