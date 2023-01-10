@@ -4,7 +4,7 @@ import ArchiveListing
 import Browser
 import Browser.Events
 import Browser.Navigation
-import Common exposing (buttonStyle)
+import Common
 import Data
 import Dict exposing (Dict)
 import DisplayMessage
@@ -15,10 +15,8 @@ import Element.Font as EF
 import File as F
 import File.Select as FS
 import GenDialog as GD
-import Html exposing (Attribute, Html)
-import Html.Events as HE
+import Html exposing (Html)
 import Http
-import Http.Tasks as HT
 import Import
 import InviteUser
 import Json.Decode as JD
@@ -44,10 +42,10 @@ import Search as S
 import SearchStackPanel as SP
 import SelectString as SS
 import ShowMessage
-import Task exposing (Task)
+import Task
 import Time
 import Toop
-import UUID exposing (UUID)
+import UUID
 import Url exposing (Url)
 import UserSettings
 import Util
@@ -165,7 +163,7 @@ type alias TRequests =
 
 
 type TRequest
-    = FileUpload { filename : String, progress : Maybe Http.Progress }
+    = FileUpload { filenames : List String, progress : Maybe Http.Progress }
 
 
 type alias PreInitModel =
@@ -2534,22 +2532,23 @@ actualupdate msg model =
                 tr =
                     model.trackedRequests
 
+                nrid =
+                    String.fromInt (model.trackedRequests.requestCount + 1)
+
+                nrq =
+                    (file :: files)
+                        |> List.map F.name
+                        |> (\names ->
+                                FileUpload { filenames = names, progress = Nothing }
+                           )
+
                 ntr =
                     { tr
                         | requestCount = tr.requestCount + fc
                         , requests =
-                            (file :: files)
-                                |> List.indexedMap
-                                    (\i f ->
-                                        ( String.fromInt <| i + tr.requestCount
-                                        , FileUpload { filename = F.name f, progress = Nothing }
-                                        )
-                                    )
-                                |> List.foldr
-                                    (\( str, trq ) accum ->
-                                        Dict.insert str trq accum
-                                    )
-                                    tr.requests
+                            Dict.insert nrid
+                                nrq
+                                tr.requests
                     }
             in
             ( model
@@ -2564,7 +2563,7 @@ actualupdate msg model =
                         |> Http.multipartBody
                 , expect = Http.expectJson FileUploaded ZI.serverResponseDecoder
                 , timeout = Nothing
-                , tracker = Nothing
+                , tracker = Just nrid
                 }
             )
 

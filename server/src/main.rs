@@ -290,13 +290,13 @@ async fn receive_files(
   config: web::Data<Config>,
   mut payload: Multipart,
 ) -> HttpResponse {
-  match save_file_too(session, config, payload).await {
+  match make_file_notes(session, config, payload).await {
     Ok(r) => HttpResponse::Ok().json(r),
     Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
   }
 }
 
-async fn save_file_too(
+async fn make_file_notes(
   session: Session,
   config: web::Data<Config>,
   mut payload: Multipart,
@@ -307,13 +307,13 @@ async fn save_file_too(
     Either::Right(sr) => return Ok(sr),
   };
 
-  // Ok save the file.
+  // Save the files to our temp path.
   let tp = config.file_tmp_path.clone();
-  let savedFiles = save_files(&tp, payload).await?;
+  let saved_files = save_files(&tp, payload).await?;
 
   let mut zklns = Vec::new();
 
-  for (name, fp) in savedFiles {
+  for (name, fp) in saved_files {
     // compute hash.
     let fh = sha256::try_digest(Path::new(&fp))?;
     let fhp = format!("files/{}", fh);
@@ -368,6 +368,7 @@ async fn save_file_too(
         deleted: false,
       },
     )?;
+
     // set the file id in that note.
     sqldata::set_zknote_file(&conn, sn.id, fid)?;
 
@@ -420,7 +421,6 @@ async fn save_files(
       f = web::block(move || f.write_all(&chunk).map(|_| f)).await?;
     }
 
-    // stop on the first file.
     let ps = rf
       .into_os_string()
       .into_string()
