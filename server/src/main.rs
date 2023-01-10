@@ -13,6 +13,7 @@ use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Res
 use chrono;
 use clap::Arg;
 use config::Config;
+use either::Either;
 use futures_util::TryStreamExt as _;
 use log::{error, info};
 use orgauth::endpoints::Callbacks;
@@ -32,8 +33,6 @@ use util::now;
 use uuid::Uuid;
 use zkprotocol::content as zc;
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
-
-use either::Either;
 
 /*
 use actix_files::NamedFile;
@@ -286,7 +285,7 @@ async fn file(session: Session, config: web::Data<Config>, req: HttpRequest) -> 
   }
 }
 
-async fn receive_file(
+async fn receive_files(
   session: Session,
   config: web::Data<Config>,
   mut payload: Multipart,
@@ -310,85 +309,91 @@ async fn save_file_too(
 
   // Ok save the file.
   let tp = config.file_tmp_path.clone();
-  let (name, fp) = save_file(&tp, payload).await?;
+  let savedFiles = save_files(&tp, payload).await?;
 
-  // compute hash.
-  let fh = sha256::try_digest(Path::new(&fp))?;
-  let fhp = format!("files/{}", fh);
-  let hashpath = Path::new(&fhp);
+  let mut zklns = Vec::new();
 
-  // file exists?
-  if hashpath.exists() {
-    // new file already exists.
-    std::fs::remove_file(Path::new(&fp));
-  } else {
-    // move into hashed-files dir.
-    std::fs::rename(Path::new(&fp), hashpath)?;
-  }
+  for (name, fp) in savedFiles {
+    // compute hash.
+    let fh = sha256::try_digest(Path::new(&fp))?;
+    let fhp = format!("files/{}", fh);
+    let hashpath = Path::new(&fhp);
 
-  // table entry exists?
-  let mut oid: Option<i64> =
-    match conn.query_row("select id from file where hash = ?1", params![fh], |row| {
-      Ok(row.get(0)?)
-    }) {
-      Ok(v) => Ok(Some(v)),
-      Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-      Err(x) => Err(Box::new(x)),
-    }?;
-
-  // use existing id, or create new
-  let fid = match oid {
-    Some(id) => id,
-    None => {
-      let now = now()?;
-
-      // add table entry
-      conn.execute(
-        "insert into file (hash, createdate)
-                 values (?1, ?2)",
-        params![fh, now],
-      )?;
-      conn.last_insert_rowid()
+    // file exists?
+    if hashpath.exists() {
+      // new file already exists.
+      std::fs::remove_file(Path::new(&fp));
+    } else {
+      // move into hashed-files dir.
+      std::fs::rename(Path::new(&fp), hashpath)?;
     }
-  };
 
-  // now make a new note.
-  let sn = sqldata::save_zknote(
-    &conn,
-    userdata.id,
-    &zc::SaveZkNote {
-      id: None,
-      title: name,
-      pubid: None,
-      content: "".to_string(),
-      editable: false,
-      showtitle: false,
-      deleted: false,
-    },
-  )?;
+    // table entry exists?
+    let mut oid: Option<i64> =
+      match conn.query_row("select id from file where hash = ?1", params![fh], |row| {
+        Ok(row.get(0)?)
+      }) {
+        Ok(v) => Ok(Some(v)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(x) => Err(Box::new(x)),
+      }?;
 
-  // set the file id in that note.
-  sqldata::set_zknote_file(&conn, sn.id, fid)?;
+    // use existing id, or create new
+    let fid = match oid {
+      Some(id) => id,
+      None => {
+        let now = now()?;
 
-  // return zknoteedit.
-  let note = sqldata::read_zknoteedit(&conn, userdata.id, &zc::GetZkNoteEdit { zknote: sn.id })?;
-  info!(
-    "user#filer_uploaded-zknote: {} - {}",
-    note.zknote.id, note.zknote.title
-  );
+        // add table entry
+        conn.execute(
+          "insert into file (hash, createdate)
+                 values (?1, ?2)",
+          params![fh, now],
+        )?;
+        conn.last_insert_rowid()
+      }
+    };
+
+    // now make a new note.
+    let sn = sqldata::save_zknote(
+      &conn,
+      userdata.id,
+      &zc::SaveZkNote {
+        id: None,
+        title: name,
+        pubid: None,
+        content: "".to_string(),
+        editable: false,
+        showtitle: false,
+        deleted: false,
+      },
+    )?;
+    // set the file id in that note.
+    sqldata::set_zknote_file(&conn, sn.id, fid)?;
+
+    // return zknoteedit.
+    let listnote = sqldata::read_zklistnote(&conn, Some(userdata.id), sn.id)?;
+    info!(
+      "user#filer_uploaded-zknote: {} - {}",
+      listnote.id, listnote.title
+    );
+
+    zklns.push(listnote);
+  }
   Ok(ServerResponse {
-    what: "zknoteedit".to_string(),
-    content: serde_json::to_value(note)?,
+    what: "savedfiles".to_string(),
+    content: serde_json::to_value(zklns)?,
   })
 }
 
-async fn save_file(
+async fn save_files(
   to_dir: &Path,
   mut payload: Multipart,
-) -> Result<(String, String), Box<dyn Error>> {
+) -> Result<Vec<(String, String)>, Box<dyn Error>> {
   // iterate over multipart stream
 
-  // ONLY SAVING THE FIRST FILE
+  let mut rv = Vec::new();
+
   while let Some(mut field) = payload.try_next().await? {
     // A multipart/form-data stream has to contain `content_disposition`
     let content_disposition = field
@@ -420,10 +425,13 @@ async fn save_file(
       .into_os_string()
       .into_string()
       .map_err(|osstr| simple_error!("couldn't convert filename to string"));
-    return Ok((filename.to_string(), ps?));
+
+    rv.push((filename.to_string(), ps?));
   }
 
-  simple_error::bail!("no file saved")
+  Ok(rv)
+
+  // simple_error::bail!("no file saved")
 }
 
 fn private(
@@ -667,7 +675,7 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
                   .secure(false) // allows for dev access
                   .max_age(10 * 24 * 60 * 60), // 10 days
               )
-              .service(web::resource("/upload").route(web::post().to(receive_file)))
+              .service(web::resource("/upload").route(web::post().to(receive_files)))
               .service(web::resource("/public").route(web::post().to(public)))
               .service(web::resource("/private").route(web::post().to(private)))
               .service(web::resource("/user").route(web::post().to(user)))
