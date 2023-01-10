@@ -156,7 +156,16 @@ type alias Model =
     , fontsize : Int
     , stylePalette : StylePalette
     , adminSettings : OD.AdminSettings
+    , trackedRequests : TRequests
     }
+
+
+type alias TRequests =
+    { requestCount : Int, requests : Dict String TRequest }
+
+
+type TRequest
+    = FileUpload { filename : String, progress : Maybe Http.Progress }
 
 
 type alias PreInitModel =
@@ -2518,6 +2527,31 @@ actualupdate msg model =
             ( model, Cmd.none )
 
         ( OnFileSelected file files, _ ) ->
+            let
+                fc =
+                    1 + List.length files
+
+                tr =
+                    model.trackedRequests
+
+                ntr =
+                    { tr
+                        | requestCount = tr.requestCount + fc
+                        , requests =
+                            (file :: files)
+                                |> List.indexedMap
+                                    (\i f ->
+                                        ( String.fromInt <| i + tr.requestCount
+                                        , FileUpload { filename = F.name f, progress = Nothing }
+                                        )
+                                    )
+                                |> List.foldr
+                                    (\( str, trq ) accum ->
+                                        Dict.insert str trq accum
+                                    )
+                                    tr.requests
+                    }
+            in
             ( model
             , Http.request
                 { method = "POST"
@@ -3073,6 +3107,7 @@ init flags url key zone fontsize =
             , fontsize = fontsize
             , stylePalette = { defaultSpacing = 10 }
             , adminSettings = adminSettings
+            , trackedRequests = { requestCount = 0, requests = Dict.empty }
             }
 
         geterrornote =
