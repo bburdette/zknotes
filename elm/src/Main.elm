@@ -92,6 +92,7 @@ type Msg
     | ReceiveLocalVal { for : String, name : String, value : Maybe String }
     | OnFileSelected F.File (List F.File)
     | FileUploaded (Result Http.Error ZI.ServerResponse)
+    | RequestProgress String Http.Progress
     | Noop
 
 
@@ -667,6 +668,9 @@ showMessage msg =
 
         FileUploaded _ ->
             "FileUploaded"
+
+        RequestProgress _ _ ->
+            "RequestProgress"
 
 
 showState : State -> String
@@ -2552,19 +2556,21 @@ actualupdate msg model =
                     }
             in
             ( model
-            , Http.request
-                { method = "POST"
-                , headers = []
-                , url = model.location ++ "/upload"
-                , body =
-                    file
-                        :: files
-                        |> List.map (\f -> Http.filePart (F.name f) f)
-                        |> Http.multipartBody
-                , expect = Http.expectJson FileUploaded ZI.serverResponseDecoder
-                , timeout = Nothing
-                , tracker = Just nrid
-                }
+            , Cmd.batch
+                [ Http.request
+                    { method = "POST"
+                    , headers = []
+                    , url = model.location ++ "/upload"
+                    , body =
+                        file
+                            :: files
+                            |> List.map (\f -> Http.filePart (F.name f) f)
+                            |> Http.multipartBody
+                    , expect = Http.expectJson FileUploaded ZI.serverResponseDecoder
+                    , timeout = Nothing
+                    , tracker = Just nrid
+                    }
+                ]
             )
 
         ( FileUploaded zrd, state ) ->
@@ -2627,6 +2633,23 @@ actualupdate msg model =
 
                         _ ->
                             ( displayMessageDialog model (ZI.showServerResponse ziresponse), Cmd.none )
+
+        ( RequestProgress a b, _ ) ->
+            let
+                tr =
+                    model.trackedRequests
+            in
+            case Dict.get a tr.requests of
+                Just (FileUpload trq) ->
+                    ( { model
+                        | trackedRequests =
+                            { tr | requests = Dict.insert a (FileUpload { trq | progress = Just b }) tr.requests }
+                      }
+                    , Cmd.none
+                    )
+
+                Nothing ->
+                    ( model, Cmd.none )
 
         ( x, y ) ->
             ( unexpectedMsg model x
@@ -3174,13 +3197,26 @@ main =
         , view = piview
         , update = piupdate
         , subscriptions =
-            \_ ->
-                Sub.batch
+            \model ->
+                let
+                    tracks : List (Sub Msg)
+                    tracks =
+                        case model of
+                            Ready rmd ->
+                                rmd.trackedRequests.requests
+                                    |> Dict.keys
+                                    |> List.map (\k -> Http.track k (RequestProgress k))
+
+                            PreInit _ ->
+                                []
+                in
+                Sub.batch <|
                     [ receiveTASelection TASelection
                     , Browser.Events.onResize (\w h -> WindowSize { width = w, height = h })
                     , keyreceive
                     , LS.localVal ReceiveLocalVal
                     ]
+                        ++ tracks
         , onUrlRequest = urlRequest
         , onUrlChange = UrlChanged
         }
