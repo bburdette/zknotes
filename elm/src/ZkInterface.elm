@@ -38,6 +38,7 @@ type ServerResponse
     | SavedImportZkNotes
     | PowerDeleteComplete Int
     | HomeNoteSet Int
+    | FilesUploaded (List Data.ZkListNote)
 
 
 showServerResponse : ServerResponse -> String
@@ -87,6 +88,9 @@ showServerResponse sr =
 
         HomeNoteSet _ ->
             "HomeNoteSet"
+
+        FilesUploaded _ ->
+            "FilesUploaded"
 
 
 encodeSendMsg : SendMsg -> JE.Value
@@ -234,6 +238,9 @@ serverResponseDecoder =
 
                     "homenoteset" ->
                         JD.map HomeNoteSet (JD.field "content" JD.int)
+
+                    "savedfiles" ->
+                        JD.map FilesUploaded (JD.field "content" <| JD.list Data.decodeZkListNote)
 
                     wat ->
                         JD.succeed

@@ -14,6 +14,7 @@ import Element as E exposing (Element)
 import Element.Font as EF
 import File as F
 import File.Select as FS
+import FilesDialog
 import GenDialog as GD
 import Html exposing (Html)
 import Http
@@ -92,6 +93,7 @@ type Msg
     | ReceiveLocalVal { for : String, name : String, value : Maybe String }
     | OnFileSelected F.File (List F.File)
     | FileUploaded (Result Http.Error ZI.ServerResponse)
+    | FilesDialogMsg (GD.Msg FilesDialog.Msg)
     | RequestProgress String Http.Progress
     | Noop
 
@@ -119,6 +121,7 @@ type State
     | ShowUrl ShowUrl.Model Data.LoginData
     | DisplayMessage DisplayMessage.GDModel State
     | MessageNLink MessageNLink.GDModel State
+    | FilesDialog FilesDialog.GDModel State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
 
 
@@ -669,6 +672,9 @@ showMessage msg =
         FileUploaded _ ->
             "FileUploaded"
 
+        FilesDialogMsg _ ->
+            "FilesDialogMsg"
+
         RequestProgress _ _ ->
             "RequestProgress"
 
@@ -744,6 +750,9 @@ showState state =
 
         ShowUrl _ _ ->
             "ShowUrl"
+
+        FilesDialog _ _ ->
+            "FilesDialog"
 
 
 unexpectedMsg : Model -> Msg -> Model
@@ -837,6 +846,10 @@ viewState size state model =
                 ShowUrlMsg
                 (ShowUrl.view Common.buttonStyle st)
 
+        FilesDialog _ _ ->
+            -- render is at the layout level, not here.
+            E.none
+
 
 stateSearch : State -> Maybe ( SP.Model, Data.ZkListNoteSearchResult )
 stateSearch state =
@@ -916,6 +929,9 @@ stateSearch state =
         ShowUrl _ _ ->
             Nothing
 
+        FilesDialog _ st ->
+            stateSearch st
+
 
 stateLogin : State -> Maybe Data.LoginData
 stateLogin state =
@@ -988,6 +1004,9 @@ stateLogin state =
 
         ShowUrl _ login ->
             Just login
+
+        FilesDialog _ instate ->
+            stateLogin instate
 
 
 sendUIMsg : String -> UI.SendMsg -> Cmd Msg
@@ -1177,6 +1196,12 @@ view model =
                     GD.layout
                         (Just { width = min 600 model.size.width, height = min 200 model.size.height })
                         cdm
+
+            FilesDialog dm _ ->
+                Html.map FilesDialogMsg <|
+                    GD.layout
+                        (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                        dm
 
             _ ->
                 E.layout [ EF.size model.fontsize, E.width E.fill ] <| viewState model.size model.state model
@@ -2327,6 +2352,19 @@ actualupdate msg model =
                                 _ ->
                                     ( model, Cmd.none )
 
+                        ZI.FilesUploaded files ->
+                            ( { model
+                                | state =
+                                    FilesDialog
+                                        (FilesDialog.init files
+                                            Common.buttonStyle
+                                            (E.map (\_ -> ()) (viewState model.size model.state model))
+                                        )
+                                        model.state
+                              }
+                            , Cmd.none
+                            )
+
         ( ViewMsg em, View es ) ->
             let
                 ( emod, ecmd ) =
@@ -2631,6 +2669,19 @@ actualupdate msg model =
                                     , Cmd.none
                                     )
 
+                        ZI.FilesUploaded files ->
+                            ( { model
+                                | state =
+                                    FilesDialog
+                                        (FilesDialog.init files
+                                            Common.buttonStyle
+                                            (E.map (\_ -> ()) (viewState model.size model.state model))
+                                        )
+                                        model.state
+                              }
+                            , Cmd.none
+                            )
+
                         _ ->
                             ( displayMessageDialog model (ZI.showServerResponse ziresponse), Cmd.none )
 
@@ -2650,6 +2701,20 @@ actualupdate msg model =
 
                 Nothing ->
                     ( model, Cmd.none )
+
+        ( FilesDialogMsg bm, FilesDialog bs prevstate ) ->
+            case GD.update bm bs of
+                GD.Dialog nmod ->
+                    ( { model | state = FilesDialog nmod prevstate }, Cmd.none )
+
+                GD.Ok return ->
+                    ( { model | state = prevstate }, Cmd.none )
+
+                GD.Cancel ->
+                    ( { model | state = prevstate }, Cmd.none )
+
+        ( FilesDialogMsg bm, _ ) ->
+            ( model, Cmd.none )
 
         ( x, y ) ->
             ( unexpectedMsg model x
