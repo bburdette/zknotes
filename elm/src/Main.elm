@@ -47,6 +47,7 @@ import Task
 import Time
 import Toop
 import UUID
+import UploadsDialog exposing (TRequest(..), TRequests)
 import Url exposing (Url)
 import UserSettings
 import Util
@@ -95,6 +96,7 @@ type Msg
     | FileUploaded (Result Http.Error ZI.ServerResponse)
     | FilesDialogMsg (GD.Msg FilesDialog.Msg)
     | RequestProgress String Http.Progress
+    | RequestsDialogMsg (GD.Msg UploadsDialog.Msg)
     | Noop
 
 
@@ -122,6 +124,7 @@ type State
     | DisplayMessage DisplayMessage.GDModel State
     | MessageNLink MessageNLink.GDModel State
     | FilesDialog FilesDialog.GDModel State
+    | RequestsDialog UploadsDialog.GDModel State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
 
 
@@ -160,14 +163,6 @@ type alias Model =
     , adminSettings : OD.AdminSettings
     , trackedRequests : TRequests
     }
-
-
-type alias TRequests =
-    { requestCount : Int, requests : Dict String TRequest }
-
-
-type TRequest
-    = FileUpload { filenames : List String, progress : Maybe Http.Progress }
 
 
 type alias PreInitModel =
@@ -675,6 +670,9 @@ showMessage msg =
         FilesDialogMsg _ ->
             "FilesDialogMsg"
 
+        RequestsDialogMsg _ ->
+            "RequestsDialogMsg"
+
         RequestProgress _ _ ->
             "RequestProgress"
 
@@ -754,6 +752,9 @@ showState state =
         FilesDialog _ _ ->
             "FilesDialog"
 
+        RequestsDialog _ _ ->
+            "RequestsDialog"
+
 
 unexpectedMsg : Model -> Msg -> Model
 unexpectedMsg model msg =
@@ -779,7 +780,7 @@ viewState size state model =
             E.map InviteUserMsg <| InviteUser.view model.stylePalette model.recentNotes (Just size) em
 
         EditZkNote em _ ->
-            E.map EditZkNoteMsg <| EditZkNote.view model.timezone size model.recentNotes em
+            E.map EditZkNoteMsg <| EditZkNote.view model.timezone size model.recentNotes model.trackedRequests em
 
         EditZkNoteListing em ld ->
             E.map EditZkNoteListingMsg <| EditZkNoteListing.view ld size em
@@ -847,6 +848,10 @@ viewState size state model =
                 (ShowUrl.view Common.buttonStyle st)
 
         FilesDialog _ _ ->
+            -- render is at the layout level, not here.
+            E.none
+
+        RequestsDialog _ _ ->
             -- render is at the layout level, not here.
             E.none
 
@@ -932,6 +937,9 @@ stateSearch state =
         FilesDialog _ st ->
             stateSearch st
 
+        RequestsDialog _ st ->
+            stateSearch st
+
 
 stateLogin : State -> Maybe Data.LoginData
 stateLogin state =
@@ -1006,6 +1014,9 @@ stateLogin state =
             Just login
 
         FilesDialog _ instate ->
+            stateLogin instate
+
+        RequestsDialog _ instate ->
             stateLogin instate
 
 
@@ -1199,6 +1210,12 @@ view model =
 
             FilesDialog dm _ ->
                 Html.map FilesDialogMsg <|
+                    GD.layout
+                        (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                        dm
+
+            RequestsDialog dm _ ->
+                Html.map RequestsDialogMsg <|
                     GD.layout
                         (Just { width = min 600 model.size.width, height = min 500 model.size.height })
                         dm
@@ -2593,7 +2610,7 @@ actualupdate msg model =
                                 tr.requests
                     }
             in
-            ( model
+            ( { model | trackedRequests = ntr }
             , Cmd.batch
                 [ Http.request
                     { method = "POST"
@@ -2714,6 +2731,20 @@ actualupdate msg model =
                     ( { model | state = prevstate }, Cmd.none )
 
         ( FilesDialogMsg bm, _ ) ->
+            ( model, Cmd.none )
+
+        ( RequestsDialogMsg bm, RequestsDialog bs prevstate ) ->
+            case GD.update bm bs of
+                GD.Dialog nmod ->
+                    ( { model | state = RequestsDialog nmod prevstate }, Cmd.none )
+
+                GD.Ok return ->
+                    ( { model | state = prevstate }, Cmd.none )
+
+                GD.Cancel ->
+                    ( { model | state = prevstate }, Cmd.none )
+
+        ( RequestsDialogMsg bm, _ ) ->
             ( model, Cmd.none )
 
         ( x, y ) ->
@@ -2928,6 +2959,20 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
         EditZkNote.FileUpload ->
             ( model
             , FS.files [] OnFileSelected
+            )
+
+        EditZkNote.Requests ->
+            ( { model
+                | state =
+                    RequestsDialog
+                        (UploadsDialog.init
+                            model.trackedRequests
+                            Common.buttonStyle
+                            (E.map (\_ -> ()) (viewState model.size model.state model))
+                        )
+                        model.state
+              }
+            , Cmd.none
             )
 
         EditZkNote.Cmd cmd ->
