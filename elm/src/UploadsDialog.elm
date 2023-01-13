@@ -53,6 +53,22 @@ init trqs buttonStyle underLay =
     }
 
 
+renderProgress : Http.Progress -> Element Msg
+renderProgress p =
+    case p of
+        Http.Sending ps ->
+            Http.fractionSent ps
+                |> String.fromFloat
+                |> (\s -> s ++ " sent")
+                |> E.text
+
+        Http.Receiving pr ->
+            Http.fractionReceived pr
+                |> String.fromFloat
+                |> (\s -> s ++ " received")
+                |> E.text
+
+
 view : List (E.Attribute Msg) -> Maybe Util.Size -> TRequests -> Element Msg
 view buttonStyle mbsize trqs =
     E.column
@@ -68,10 +84,17 @@ view buttonStyle mbsize trqs =
                     (\tr ->
                         case tr of
                             FileUpload fu ->
-                                fu.filenames
-                                    |> List.map (\fn -> E.paragraph [] [ E.text fn ])
+                                E.row [ E.width E.fill ]
+                                    [ E.column [ E.width E.fill ]
+                                        (fu.filenames
+                                            |> List.map (\fn -> E.paragraph [] [ E.text fn ])
+                                        )
+                                    , fu.progress
+                                        |> Maybe.map renderProgress
+                                        |> Maybe.withDefault E.none
+                                    ]
                     )
-                |> List.concat
+             -- |> List.concat
             )
         , E.row [ E.width E.fill, E.spacing 10 ]
             [ EI.button buttonStyle
