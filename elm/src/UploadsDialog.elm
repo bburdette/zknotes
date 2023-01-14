@@ -73,11 +73,11 @@ view : List (E.Attribute Msg) -> Maybe Util.Size -> TRequests -> Element Msg
 view buttonStyle mbsize trqs =
     E.column
         [ E.width (mbsize |> Maybe.map .width |> Maybe.withDefault 500 |> E.px)
-        , E.height E.shrink
+        , E.height E.fill
         , E.spacing 15
         ]
         [ E.el [ E.centerX, EF.bold ] <| E.text "Files Uploaded"
-        , E.column [ E.width E.fill, E.height E.fill ]
+        , E.column [ E.width E.fill, E.height E.fill, E.scrollbarY ]
             (trqs.requests
                 |> Dict.values
                 |> List.map
@@ -94,7 +94,6 @@ view buttonStyle mbsize trqs =
                                         |> Maybe.withDefault E.none
                                     ]
                     )
-             -- |> List.concat
             )
         , E.row [ E.width E.fill, E.spacing 10 ]
             [ EI.button buttonStyle
