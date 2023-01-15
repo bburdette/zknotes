@@ -72,6 +72,7 @@ import Markdown.Renderer
 import Maybe.Extra as ME
 import MdCommon as MC
 import Orgauth.Data exposing (UserId)
+import RequestsDialog exposing (TRequests)
 import Schelme.Show exposing (showTerm)
 import Search as S
 import SearchStackPanel as SP
@@ -79,7 +80,6 @@ import TangoColors as TC
 import Task
 import Time
 import Toop
-import UploadsDialog exposing (TRequests)
 import Url as U
 import Url.Builder as UB
 import Url.Parser as UP exposing ((</>))

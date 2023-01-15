@@ -1,4 +1,4 @@
-module UploadsDialog exposing (..)
+module RequestsDialog exposing (..)
 
 import Data
 import Dict exposing (Dict)

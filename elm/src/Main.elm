@@ -38,6 +38,7 @@ import Orgauth.UserInterface as UI
 import Orgauth.UserListing as UserListing
 import PublicInterface as PI
 import Random exposing (Seed, initialSeed)
+import RequestsDialog exposing (TRequest(..), TRequests)
 import Route exposing (Route(..), parseUrl, routeTitle, routeUrl)
 import Search as S
 import SearchStackPanel as SP
@@ -47,7 +48,6 @@ import Task
 import Time
 import Toop
 import UUID
-import UploadsDialog exposing (TRequest(..), TRequests)
 import Url exposing (Url)
 import UserSettings
 import Util
@@ -96,7 +96,7 @@ type Msg
     | FileUploaded (Result Http.Error ZI.ServerResponse)
     | FilesDialogMsg (GD.Msg FilesDialog.Msg)
     | RequestProgress String Http.Progress
-    | RequestsDialogMsg (GD.Msg UploadsDialog.Msg)
+    | RequestsDialogMsg (GD.Msg RequestsDialog.Msg)
     | Noop
 
 
@@ -124,7 +124,7 @@ type State
     | DisplayMessage DisplayMessage.GDModel State
     | MessageNLink MessageNLink.GDModel State
     | FilesDialog FilesDialog.GDModel State
-    | RequestsDialog UploadsDialog.GDModel State
+    | RequestsDialog RequestsDialog.GDModel State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
 
 
@@ -2965,7 +2965,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
             ( { model
                 | state =
                     RequestsDialog
-                        (UploadsDialog.init
+                        (RequestsDialog.init
                             model.trackedRequests
                             Common.buttonStyle
                             (E.map (\_ -> ()) (viewState model.size model.state model))
