@@ -76,7 +76,7 @@ view buttonStyle mbsize trqs =
         , E.height E.fill
         , E.spacing 15
         ]
-        [ E.el [ E.centerX, EF.bold ] <| E.text "Files Uploaded"
+        [ E.el [ E.centerX, EF.bold ] <| E.text "http requests"
         , E.column [ E.width E.fill, E.height E.fill, E.scrollbarY ]
             (trqs.requests
                 |> Dict.values
@@ -84,14 +84,17 @@ view buttonStyle mbsize trqs =
                     (\tr ->
                         case tr of
                             FileUpload fu ->
-                                E.row [ E.width E.fill ]
-                                    [ E.column [ E.width E.fill ]
-                                        (fu.filenames
-                                            |> List.map (\fn -> E.paragraph [] [ E.text fn ])
-                                        )
-                                    , fu.progress
-                                        |> Maybe.map renderProgress
-                                        |> Maybe.withDefault E.none
+                                E.column [ E.width E.fill, EBk.color TC.lightGrey, EBd.rounded 10, E.padding 10 ]
+                                    [ E.el [ E.centerX, EF.bold ] <| E.text "Files Uploaded"
+                                    , E.row [ E.width E.fill ]
+                                        [ E.column [ E.width E.fill, E.height <| E.maximum 200 E.fill, E.scrollbarY ]
+                                            (fu.filenames
+                                                |> List.map (\fn -> E.paragraph [] [ E.text fn ])
+                                            )
+                                        , fu.progress
+                                            |> Maybe.map renderProgress
+                                            |> Maybe.withDefault E.none
+                                        ]
                                     ]
                     )
             )
