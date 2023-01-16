@@ -1,5 +1,6 @@
 module RequestsDialog exposing (..)
 
+import Common
 import Data
 import Dict exposing (Dict)
 import Element as E exposing (Element)
@@ -33,6 +34,8 @@ type TRequest
 type Msg
     = OkClick
     | CancelClick
+    | TagClick String
+    | ClearClick String
     | Noop
 
 
@@ -42,10 +45,6 @@ type alias GDModel =
 
 init : TRequests -> List (E.Attribute Msg) -> Element () -> GDModel
 init trqs buttonStyle underLay =
-    let
-        _ =
-            Debug.log "uplaods idalog init " trqs
-    in
     { view = view buttonStyle
     , update = update
     , model = trqs
@@ -79,12 +78,12 @@ view buttonStyle mbsize trqs =
         [ E.el [ E.centerX, EF.bold ] <| E.text "http requests"
         , E.column [ E.width E.fill, E.height E.fill, E.scrollbarY ]
             (trqs.requests
-                |> Dict.values
+                |> Dict.toList
                 |> List.map
-                    (\tr ->
+                    (\( s, tr ) ->
                         case tr of
                             FileUpload fu ->
-                                E.column [ E.width E.fill, EBk.color TC.lightGrey, EBd.rounded 10, E.padding 10 ]
+                                E.column [ E.width E.fill, EBk.color (Common.navbarColor 2), EBd.rounded 10, E.padding 10 ]
                                     [ E.el [ E.centerX, EF.bold ] <| E.text "Files Uploaded"
                                     , E.row [ E.width E.fill ]
                                         [ E.column [ E.width E.fill, E.height <| E.maximum 200 E.fill, E.scrollbarY ]
@@ -94,6 +93,12 @@ view buttonStyle mbsize trqs =
                                         , fu.progress
                                             |> Maybe.map renderProgress
                                             |> Maybe.withDefault E.none
+                                        ]
+                                    , E.row [ E.width E.fill ]
+                                        [ EI.button buttonStyle
+                                            { onPress = Just (TagClick s), label = E.text "tags" }
+                                        , EI.button (E.alignRight :: buttonStyle)
+                                            { onPress = Just (ClearClick s), label = E.text "clear" }
                                         ]
                                     ]
                     )
@@ -117,6 +122,12 @@ update msg model =
         OkClick ->
             GD.Ok
                 ()
+
+        TagClick s ->
+            GD.Dialog model
+
+        ClearClick s ->
+            GD.Dialog model
 
         Noop ->
             GD.Dialog model
