@@ -47,7 +47,6 @@ import ShowMessage
 import Task
 import Time
 import Toop
-import UUID
 import Url exposing (Url)
 import UserSettings
 import Util
@@ -472,12 +471,12 @@ stateRoute state =
                             , save = False
                             }
 
-        EditZkNote st login ->
+        EditZkNote st _ ->
             st.id
                 |> Maybe.map (\id -> { route = EditZkNoteR id, save = True })
                 |> Maybe.withDefault { route = EditZkNoteNew, save = False }
 
-        ArchiveListing almod ld ->
+        ArchiveListing almod _ ->
             almod.selected
                 |> Maybe.map (\sid -> { route = ArchiveNoteR almod.noteid sid, save = True })
                 |> Maybe.withDefault { route = ArchiveNoteListingR almod.noteid, save = True }
@@ -776,7 +775,7 @@ viewState size state model =
         Invited em ->
             E.map InvitedMsg <| Invited.view model.stylePalette size em
 
-        InviteUser em login ->
+        InviteUser em _ ->
             E.map InviteUserMsg <| InviteUser.view model.stylePalette model.recentNotes (Just size) em
 
         EditZkNote em _ ->
@@ -809,11 +808,11 @@ viewState size state model =
         UserSettings em _ _ ->
             E.map UserSettingsMsg <| UserSettings.view em
 
-        DisplayMessage em _ ->
+        DisplayMessage _ _ ->
             -- render is at the layout level, not here.
             E.none
 
-        MessageNLink em _ ->
+        MessageNLink _ _ ->
             -- render is at the layout level, not here.
             E.none
 
@@ -836,13 +835,13 @@ viewState size state model =
         ResetPassword st ->
             E.map ResetPasswordMsg (ResetPassword.view size st)
 
-        UserListing st login _ ->
+        UserListing st _ _ ->
             E.map UserListingMsg (UserListing.view Common.buttonStyle st)
 
-        UserEdit st login ->
+        UserEdit st _ ->
             E.map UserEditMsg (UserEdit.view Common.buttonStyle st)
 
-        ShowUrl st login ->
+        ShowUrl st _ ->
             E.map
                 ShowUrlMsg
                 (ShowUrl.view Common.buttonStyle st)
@@ -1126,28 +1125,6 @@ sendPIMsg location msg =
         }
 
 
-getListing : Model -> Data.LoginData -> ( Model, Cmd Msg )
-getListing model login =
-    sendSearch
-        { model
-            | state =
-                ShowMessage
-                    { message = "loading articles"
-                    }
-                    login
-                    (Just model.state)
-            , seed =
-                case model.state of
-                    -- save the seed if we're leaving login state.
-                    Login lmod ->
-                        lmod.seed
-
-                    _ ->
-                        model.seed
-        }
-        S.defaultSearch
-
-
 addRecentZkListNote : List Data.ZkListNote -> Data.ZkListNote -> List Data.ZkListNote
 addRecentZkListNote recent zkln =
     List.take 50 <|
@@ -1161,7 +1138,7 @@ piview pimodel =
         Ready model ->
             view model
 
-        PreInit model ->
+        PreInit _ ->
             { title = "zknotes: initializing"
             , body = []
             }
@@ -1298,7 +1275,7 @@ urlupdate msg model =
 
                         bcmd =
                             case model.state of
-                                EditZkNote s ld ->
+                                EditZkNote s _ ->
                                     if EditZkNote.dirty s then
                                         Cmd.batch
                                             [ icmd
@@ -1314,7 +1291,7 @@ urlupdate msg model =
                     in
                     ( { model | state = state }, bcmd )
 
-                LoadUrl urlstr ->
+                LoadUrl _ ->
                     -- load foreign site
                     -- ( model, Browser.Navigation.load urlstr )
                     ( model, Cmd.none )
@@ -1429,14 +1406,14 @@ displayMessageNLinkDialog model message url text =
 actualupdate : Msg -> Model -> ( Model, Cmd Msg )
 actualupdate msg model =
     case ( msg, model.state ) of
-        ( _, Wait wst wfn ) ->
+        ( _, Wait _ wfn ) ->
             let
                 ( nmd, cmd ) =
                     wfn model msg
             in
             ( nmd, cmd )
 
-        ( ReceiveLocalVal lv, _ ) ->
+        ( ReceiveLocalVal _, _ ) ->
             -- update the font size
             ( model, Cmd.none )
 
@@ -1721,7 +1698,7 @@ actualupdate msg model =
         ( InviteUserMsg lm, InviteUser mod ld ) ->
             handleInviteUser model (InviteUser.update lm mod) ld
 
-        ( WkMsg rkey, DisplayMessage dm state ) ->
+        ( WkMsg rkey, DisplayMessage _ state ) ->
             case rkey of
                 Ok key ->
                     case Toop.T4 key.key key.ctrl key.alt key.shift of
@@ -1776,7 +1753,7 @@ actualupdate msg model =
                             , Cmd.none
                             )
 
-        ( ErrorIndexNote rsein, state ) ->
+        ( ErrorIndexNote rsein, _ ) ->
             case rsein of
                 Err e ->
                     ( displayMessageDialog model <| Util.httpErrorString e
@@ -1845,26 +1822,6 @@ actualupdate msg model =
                             case Data.fromOaLd oalogin of
                                 Ok login ->
                                     let
-                                        getlisting =
-                                            sendSearch
-                                                { model
-                                                    | state =
-                                                        ShowMessage
-                                                            { message = "loading articles"
-                                                            }
-                                                            login
-                                                            (Just model.state)
-                                                    , seed =
-                                                        case state of
-                                                            -- save the seed if we're leaving login state.
-                                                            Login lmod ->
-                                                                lmod.seed
-
-                                                            _ ->
-                                                                model.seed
-                                                }
-                                                S.defaultSearch
-
                                         lgmod =
                                             { model
                                                 | state =
@@ -1874,11 +1831,11 @@ actualupdate msg model =
                                             }
                                     in
                                     case state of
-                                        Login lm ->
+                                        Login _ ->
                                             -- we're logged in!
                                             initialPage lgmod
 
-                                        LoginShowMessage _ li url ->
+                                        LoginShowMessage _ _ url ->
                                             let
                                                 ( m, cmd ) =
                                                     parseUrl url
@@ -2039,7 +1996,7 @@ actualupdate msg model =
                                 Nothing ->
                                     ( displayMessageDialog model "not logged in", Cmd.none )
 
-                        AI.UserDeleted id ->
+                        AI.UserDeleted _ ->
                             ( displayMessageDialog model "user deleted!"
                             , sendAIMsg model.location AI.GetUsers
                             )
@@ -2073,7 +2030,7 @@ actualupdate msg model =
 
                         AI.PwdReset pr ->
                             case state of
-                                UserEdit uem login ->
+                                UserEdit _ login ->
                                     ( { model
                                         | state =
                                             ShowUrl
@@ -2089,7 +2046,7 @@ actualupdate msg model =
                         AI.ServerError e ->
                             ( displayMessageDialog model <| e, Cmd.none )
 
-        ( ZkReplyDataSeq f zrd, state ) ->
+        ( ZkReplyDataSeq f zrd, _ ) ->
             let
                 ( nmod, ncmd ) =
                     actualupdate (ZkReplyData zrd) model
@@ -2340,13 +2297,13 @@ actualupdate msg model =
                                     -- just ignore if we're not editing a new note.
                                     ( model, Cmd.none )
 
-                        ZI.DeletedZkNote beid ->
+                        ZI.DeletedZkNote _ ->
                             ( model, Cmd.none )
 
                         ZI.SavedZkLinks ->
                             ( model, Cmd.none )
 
-                        ZI.ZkLinks zkl ->
+                        ZI.ZkLinks _ ->
                             ( model, Cmd.none )
 
                         ZI.SavedImportZkNotes ->
@@ -2447,7 +2404,7 @@ actualupdate msg model =
                     handleEditZkNoteCmd model login (EditZkNote.onWkKeyPress key es)
 
                 Err e ->
-                    ( model, Cmd.none )
+                    ( displayMessageDialog model ("error decoding windowkeys message: " ++ JD.errorToString e), Cmd.none )
 
         ( WkMsg reskey, EditZkNoteListing es login ) ->
             case reskey of
@@ -2457,7 +2414,7 @@ actualupdate msg model =
                         (EditZkNoteListing.onWkKeyPress key es)
 
                 Err e ->
-                    ( model, Cmd.none )
+                    ( displayMessageDialog model ("error decoding windowkeys message: " ++ JD.errorToString e), Cmd.none )
 
         ( EditZkNoteListingMsg em, EditZkNoteListing es login ) ->
             handleEditZkNoteListing model login (EditZkNoteListing.update em es login)
@@ -2730,7 +2687,7 @@ actualupdate msg model =
                 GD.Cancel ->
                     ( { model | state = prevstate }, Cmd.none )
 
-        ( FilesDialogMsg bm, _ ) ->
+        ( FilesDialogMsg _, _ ) ->
             ( model, Cmd.none )
 
         ( RequestsDialogMsg bm, RequestsDialog bs prevstate ) ->
@@ -2744,15 +2701,16 @@ actualupdate msg model =
                 GD.Cancel ->
                     ( { model | state = prevstate }, Cmd.none )
 
-        ( RequestsDialogMsg bm, _ ) ->
+        ( RequestsDialogMsg _, _ ) ->
             ( model, Cmd.none )
 
-        ( x, y ) ->
+        ( x, _ ) ->
             ( unexpectedMsg model x
             , Cmd.none
             )
 
 
+handleEditZkNoteCmd : Model -> Data.LoginData -> ( EditZkNote.Model, EditZkNote.Command ) -> ( Model, Cmd Msg )
 handleEditZkNoteCmd model login ( emod, ecmd ) =
     let
         backtolisting =
@@ -2799,9 +2757,9 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                             ( nm, Cmd.none )
 
                 onmsg : Model -> Msg -> ( Model, Cmd Msg )
-                onmsg st ms =
+                onmsg _ ms =
                     case ms of
-                        ZkReplyData (Ok (ZI.SavedZkNotePlusLinks szn)) ->
+                        ZkReplyData (Ok (ZI.SavedZkNotePlusLinks _)) ->
                             gotres
 
                         ZkReplyData (Ok (ZI.ServerError e)) ->
@@ -3344,6 +3302,7 @@ port receiveTASelection : (JD.Value -> msg) -> Sub msg
 port receiveKeyMsg : (JD.Value -> msg) -> Sub msg
 
 
+keyreceive : Sub Msg
 keyreceive =
     receiveKeyMsg <| WindowKeys.receive WkMsg
 
@@ -3351,5 +3310,6 @@ keyreceive =
 port sendKeyCommand : JE.Value -> Cmd msg
 
 
+skcommand : WindowKeys.WindowKeyCmd -> Cmd Msg
 skcommand =
     WindowKeys.send sendKeyCommand
