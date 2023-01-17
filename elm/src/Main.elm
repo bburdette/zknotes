@@ -2160,6 +2160,11 @@ actualupdate msg model =
                                     , Cmd.none
                                     )
 
+                                TagFiles iu login ps ->
+                                    ( { model | state = TagFiles (TagAThing.updateSearchResult sr iu) login ps }
+                                    , Cmd.none
+                                    )
+
                                 ShowMessage _ login _ ->
                                     ( { model | state = EditZkNoteListing { notes = sr, spmodel = SP.initModel, dialog = Nothing } login }
                                     , Cmd.none
