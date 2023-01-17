@@ -1195,7 +1195,8 @@ view model =
                 Html.map RequestsDialogMsg <|
                     GD.layout
                         (Just { width = min 600 model.size.width, height = min 500 model.size.height })
-                        dm
+                        -- use the live-updated model
+                        { dm | model = model.trackedRequests }
 
             _ ->
                 E.layout [ EF.size model.fontsize, E.width E.fill ] <| viewState model.size model.state model
@@ -2599,7 +2600,8 @@ actualupdate msg model =
                 , state =
                     RequestsDialog
                         (RequestsDialog.init
-                            model.trackedRequests
+                            -- dummy state we won't use
+                            { requestCount = 0, requests = Dict.empty }
                             Common.buttonStyle
                             (E.map (\_ -> ()) (viewState model.size model.state model))
                         )

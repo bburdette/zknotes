@@ -6,16 +6,11 @@ import Dict exposing (Dict)
 import Element as E exposing (Element)
 import Element.Background as EBk
 import Element.Border as EBd
-import Element.Events as EE
 import Element.Font as EF
 import Element.Input as EI
-import Element.Region
-import File
 import GenDialog as GD
 import Http
 import Orgauth.Data as Data
-import TangoColors as TC
-import Time exposing (Zone)
 import Util
 
 
