@@ -1691,48 +1691,44 @@ actualupdate msg model =
                 ShowUrl.None ->
                     ( { model | state = ShowUrl numod login }, Cmd.none )
 
-        ( WkMsg rkey, Login ls ) ->
-            case rkey of
-                Ok key ->
-                    handleLogin model (Login.onWkKeyPress key ls)
+        ( WkMsg (Ok key), Login ls ) ->
+            handleLogin model (Login.onWkKeyPress key ls)
 
-                Err _ ->
+        ( WkMsg (Ok key), Invited ls ) ->
+            handleInvited model (Invited.onWkKeyPress key ls)
+
+        ( WkMsg (Ok key), InviteUser mod ld ) ->
+            handleInviteUser model (InviteUser.onWkKeyPress key mod) ld
+
+        ( WkMsg (Ok key), TagFiles mod ld ps ) ->
+            handleTagFiles model (TagAThing.onWkKeyPress key mod) ld ps
+
+        ( WkMsg (Ok key), DisplayMessage _ state ) ->
+            case Toop.T4 key.key key.ctrl key.alt key.shift of
+                Toop.T4 "Enter" False False False ->
+                    ( { model | state = state }, Cmd.none )
+
+                _ ->
                     ( model, Cmd.none )
 
-        ( WkMsg rkey, Invited ls ) ->
-            case rkey of
-                Ok key ->
-                    handleInvited model (Invited.onWkKeyPress key ls)
+        ( WkMsg (Ok key), EditZkNote es login ) ->
+            handleEditZkNoteCmd model login (EditZkNote.onWkKeyPress key es)
 
-                Err _ ->
-                    ( model, Cmd.none )
+        ( WkMsg (Ok key), EditZkNoteListing es login ) ->
+            handleEditZkNoteListing model
+                login
+                (EditZkNoteListing.onWkKeyPress key es)
 
-        ( WkMsg rkey, InviteUser mod ld ) ->
-            case rkey of
-                Ok key ->
-                    handleInviteUser model (InviteUser.onWkKeyPress key mod) ld
-
-                Err _ ->
-                    ( model, Cmd.none )
+        ( WkMsg (Err e), _ ) ->
+            ( displayMessageDialog model <| "error decoding windowskey message: " ++ JD.errorToString e
+            , Cmd.none
+            )
 
         ( InviteUserMsg lm, InviteUser mod ld ) ->
             handleInviteUser model (InviteUser.update lm mod) ld
 
         ( TagFilesMsg lm, TagFiles mod ld st ) ->
             handleTagFiles model (TagAThing.update lm mod) ld st
-
-        ( WkMsg rkey, DisplayMessage _ state ) ->
-            case rkey of
-                Ok key ->
-                    case Toop.T4 key.key key.ctrl key.alt key.shift of
-                        Toop.T4 "Enter" False False False ->
-                            ( { model | state = state }, Cmd.none )
-
-                        _ ->
-                            ( model, Cmd.none )
-
-                Err _ ->
-                    ( model, Cmd.none )
 
         ( LoginMsg lm, Login ls ) ->
             handleLogin model (Login.update lm ls)
@@ -2452,24 +2448,6 @@ actualupdate msg model =
 
         ( EditZkNoteMsg em, EditZkNote es login ) ->
             handleEditZkNoteCmd model login (EditZkNote.update em es)
-
-        ( WkMsg reskey, EditZkNote es login ) ->
-            case reskey of
-                Ok key ->
-                    handleEditZkNoteCmd model login (EditZkNote.onWkKeyPress key es)
-
-                Err e ->
-                    ( displayMessageDialog model ("error decoding windowkeys message: " ++ JD.errorToString e), Cmd.none )
-
-        ( WkMsg reskey, EditZkNoteListing es login ) ->
-            case reskey of
-                Ok key ->
-                    handleEditZkNoteListing model
-                        login
-                        (EditZkNoteListing.onWkKeyPress key es)
-
-                Err e ->
-                    ( displayMessageDialog model ("error decoding windowkeys message: " ++ JD.errorToString e), Cmd.none )
 
         ( EditZkNoteListingMsg em, EditZkNoteListing es login ) ->
             handleEditZkNoteListing model login (EditZkNoteListing.update em es login)
