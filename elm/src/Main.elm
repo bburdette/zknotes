@@ -14,7 +14,6 @@ import Element as E exposing (Element)
 import Element.Font as EF
 import File as F
 import File.Select as FS
-import FilesDialog
 import GenDialog as GD
 import Html exposing (Html)
 import Http
@@ -95,7 +94,6 @@ type Msg
     | ReceiveLocalVal { for : String, name : String, value : Maybe String }
     | OnFileSelected F.File (List F.File)
     | FileUploaded String (Result Http.Error ZI.ServerResponse)
-    | FilesDialogMsg (GD.Msg FilesDialog.Msg)
     | RequestProgress String Http.Progress
     | RequestsDialogMsg (GD.Msg RequestsDialog.Msg)
     | TagFilesMsg (TagAThing.Msg TagFiles.Msg)
@@ -125,7 +123,6 @@ type State
     | ShowUrl ShowUrl.Model Data.LoginData
     | DisplayMessage DisplayMessage.GDModel State
     | MessageNLink MessageNLink.GDModel State
-    | FilesDialog FilesDialog.GDModel State
     | RequestsDialog RequestsDialog.GDModel State
     | TagFiles (TagAThing.Model TagFiles.Model TagFiles.Msg TagFiles.Command) Data.LoginData State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
@@ -670,9 +667,6 @@ showMessage msg =
         FileUploaded _ _ ->
             "FileUploaded"
 
-        FilesDialogMsg _ ->
-            "FilesDialogMsg"
-
         RequestsDialogMsg _ ->
             "RequestsDialogMsg"
 
@@ -754,9 +748,6 @@ showState state =
 
         ShowUrl _ _ ->
             "ShowUrl"
-
-        FilesDialog _ _ ->
-            "FilesDialog"
 
         RequestsDialog _ _ ->
             "RequestsDialog"
@@ -856,10 +847,6 @@ viewState size state model =
                 ShowUrlMsg
                 (ShowUrl.view Common.buttonStyle st)
 
-        FilesDialog _ _ ->
-            -- render is at the layout level, not here.
-            E.none
-
         RequestsDialog _ _ ->
             -- render is at the layout level, not here.
             E.none
@@ -946,9 +933,6 @@ stateSearch state =
         ShowUrl _ _ ->
             Nothing
 
-        FilesDialog _ st ->
-            stateSearch st
-
         RequestsDialog _ st ->
             stateSearch st
 
@@ -1027,9 +1011,6 @@ stateLogin state =
 
         ShowUrl _ login ->
             Just login
-
-        FilesDialog _ instate ->
-            stateLogin instate
 
         RequestsDialog _ instate ->
             stateLogin instate
@@ -1203,12 +1184,6 @@ view model =
                     GD.layout
                         (Just { width = min 600 model.size.width, height = min 200 model.size.height })
                         cdm
-
-            FilesDialog dm _ ->
-                Html.map FilesDialogMsg <|
-                    GD.layout
-                        (Just { width = min 600 model.size.width, height = min 500 model.size.height })
-                        dm
 
             RequestsDialog dm _ ->
                 Html.map RequestsDialogMsg <|
@@ -2733,20 +2708,6 @@ actualupdate msg model =
 
                 Nothing ->
                     ( model, Cmd.none )
-
-        ( FilesDialogMsg bm, FilesDialog bs prevstate ) ->
-            case GD.update bm bs of
-                GD.Dialog nmod ->
-                    ( { model | state = FilesDialog nmod prevstate }, Cmd.none )
-
-                GD.Ok return ->
-                    ( { model | state = prevstate }, Cmd.none )
-
-                GD.Cancel ->
-                    ( { model | state = prevstate }, Cmd.none )
-
-        ( FilesDialogMsg _, _ ) ->
-            ( model, Cmd.none )
 
         ( RequestsDialogMsg bm, RequestsDialog bs prevstate ) ->
             -- TODO address this hack!
