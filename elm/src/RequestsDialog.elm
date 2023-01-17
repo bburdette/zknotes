@@ -34,8 +34,13 @@ type Msg
     | Noop
 
 
+type Command
+    = Tag (List Data.ZkListNote)
+    | Close
+
+
 type alias GDModel =
-    GD.Model TRequests Msg ()
+    GD.Model TRequests Msg Command
 
 
 init : TRequests -> List (E.Attribute Msg) -> Element () -> GDModel
@@ -108,21 +113,30 @@ view buttonStyle mbsize trqs =
         ]
 
 
-update : Msg -> TRequests -> GD.Transition TRequests ()
+update : Msg -> TRequests -> GD.Transition TRequests Command
 update msg model =
     case msg of
         CancelClick ->
             GD.Cancel
 
         OkClick ->
-            GD.Ok
-                ()
+            GD.Ok Close
 
         TagClick s ->
-            GD.Dialog model
+            case Dict.get s model.requests of
+                Just (FileUpload fu) ->
+                    case fu.files of
+                        Just f ->
+                            GD.Ok (Tag f)
+
+                        Nothing ->
+                            GD.Dialog model
+
+                Nothing ->
+                    GD.Dialog model
 
         ClearClick s ->
-            GD.Dialog model
+            GD.Dialog { model | requests = Dict.remove s model.requests }
 
         Noop ->
             GD.Dialog model

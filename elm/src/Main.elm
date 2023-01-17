@@ -44,6 +44,8 @@ import Search as S
 import SearchStackPanel as SP
 import SelectString as SS
 import ShowMessage
+import TagAThing
+import TagFiles
 import Task
 import Time
 import Toop
@@ -96,6 +98,7 @@ type Msg
     | FilesDialogMsg (GD.Msg FilesDialog.Msg)
     | RequestProgress String Http.Progress
     | RequestsDialogMsg (GD.Msg RequestsDialog.Msg)
+    | TagFilesMsg (TagAThing.Msg TagFiles.Msg)
     | Noop
 
 
@@ -124,6 +127,7 @@ type State
     | MessageNLink MessageNLink.GDModel State
     | FilesDialog FilesDialog.GDModel State
     | RequestsDialog RequestsDialog.GDModel State
+    | TagFiles (TagAThing.Model TagFiles.Model TagFiles.Msg TagFiles.Command) Data.LoginData State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
 
 
@@ -675,6 +679,9 @@ showMessage msg =
         RequestProgress _ _ ->
             "RequestProgress"
 
+        TagFilesMsg _ ->
+            "TagFilesMsg"
+
 
 showState : State -> String
 showState state =
@@ -753,6 +760,9 @@ showState state =
 
         RequestsDialog _ _ ->
             "RequestsDialog"
+
+        TagFiles _ _ _ ->
+            "TagFiles"
 
 
 unexpectedMsg : Model -> Msg -> Model
@@ -854,6 +864,9 @@ viewState size state model =
             -- render is at the layout level, not here.
             E.none
 
+        TagFiles tfmod _ _ ->
+            E.map TagFilesMsg <| TagAThing.view model.stylePalette model.recentNotes (Just size) tfmod
+
 
 stateSearch : State -> Maybe ( SP.Model, Data.ZkListNoteSearchResult )
 stateSearch state =
@@ -939,6 +952,9 @@ stateSearch state =
         RequestsDialog _ st ->
             stateSearch st
 
+        TagFiles model _ _ ->
+            Just ( model.spmodel, model.zknSearchResult )
+
 
 stateLogin : State -> Maybe Data.LoginData
 stateLogin state =
@@ -1017,6 +1033,9 @@ stateLogin state =
 
         RequestsDialog _ instate ->
             stateLogin instate
+
+        TagFiles _ login _ ->
+            Just login
 
 
 sendUIMsg : String -> UI.SendMsg -> Cmd Msg
@@ -1698,6 +1717,9 @@ actualupdate msg model =
 
         ( InviteUserMsg lm, InviteUser mod ld ) ->
             handleInviteUser model (InviteUser.update lm mod) ld
+
+        ( TagFilesMsg lm, TagFiles mod ld st ) ->
+            handleTagFiles model (TagAThing.update lm mod) ld st
 
         ( WkMsg rkey, DisplayMessage _ state ) ->
             case rkey of
@@ -2709,17 +2731,6 @@ actualupdate msg model =
                             , Cmd.none
                             )
 
-                        -- ( { model
-                        --     | state =
-                        --         FilesDialog
-                        --             (FilesDialog.init files
-                        --                 Common.buttonStyle
-                        --                 (E.map (\_ -> ()) (viewState model.size model.state model))
-                        --             )
-                        --             model.state
-                        --   }
-                        -- , Cmd.none
-                        -- )
                         _ ->
                             ( displayMessageDialog model (ZI.showServerResponse ziresponse), Cmd.none )
 
@@ -2755,12 +2766,42 @@ actualupdate msg model =
             ( model, Cmd.none )
 
         ( RequestsDialogMsg bm, RequestsDialog bs prevstate ) ->
-            case GD.update bm bs of
+            -- TODO address this hack!
+            case GD.update bm { bs | model = model.trackedRequests } of
                 GD.Dialog nmod ->
                     ( { model | state = RequestsDialog nmod prevstate }, Cmd.none )
 
                 GD.Ok return ->
-                    ( { model | state = prevstate }, Cmd.none )
+                    case return of
+                        RequestsDialog.Close ->
+                            ( { model | state = prevstate }, Cmd.none )
+
+                        RequestsDialog.Tag s ->
+                            case ( stateLogin prevstate, stateSearch prevstate ) of
+                                ( Just login, Just ( spm, sr ) ) ->
+                                    let
+                                        _ =
+                                            Debug.log "here" s
+                                    in
+                                    ( { model
+                                        | state =
+                                            TagFiles
+                                                (TagAThing.init
+                                                    (TagFiles.initThing s)
+                                                    spm
+                                                    sr
+                                                    model.recentNotes
+                                                    []
+                                                    login
+                                                )
+                                                login
+                                                prevstate
+                                      }
+                                    , Cmd.none
+                                    )
+
+                                _ ->
+                                    ( { model | state = prevstate }, Cmd.none )
 
                 GD.Cancel ->
                     ( { model | state = prevstate }, Cmd.none )
@@ -3136,6 +3177,42 @@ handleInviteUser model ( lmod, lcmd ) login =
         InviteUser.Cancel ->
             -- go to user listing
             ( { model | state = InviteUser lmod login }, Cmd.none )
+
+
+handleTagFiles :
+    Model
+    -> ( TagAThing.Model TagFiles.Model TagFiles.Msg TagFiles.Command, TagAThing.Command TagFiles.Command )
+    -> Data.LoginData
+    -> State
+    -> ( Model, Cmd Msg )
+handleTagFiles model ( lmod, lcmd ) login st =
+    let
+        updstate =
+            TagFiles lmod login st
+    in
+    case lcmd of
+        TagAThing.Search s ->
+            sendSearch { model | state = updstate } s
+
+        TagAThing.SearchHistory ->
+            ( { model | state = updstate }, Cmd.none )
+
+        TagAThing.None ->
+            ( { model | state = updstate }, Cmd.none )
+
+        TagAThing.AddToRecent _ ->
+            ( { model | state = updstate }, Cmd.none )
+
+        TagAThing.ThingCommand tc ->
+            case tc of
+                TagFiles.Ok ->
+                    ( { model | state = updstate }, Cmd.none )
+
+                TagFiles.Cancel ->
+                    ( { model | state = updstate }, Cmd.none )
+
+                TagFiles.None ->
+                    ( { model | state = updstate }, Cmd.none )
 
 
 prevSearchQuery : Data.LoginData -> S.ZkNoteSearch
