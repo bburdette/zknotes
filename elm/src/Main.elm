@@ -92,7 +92,7 @@ type Msg
     | WkMsg (Result JD.Error WindowKeys.Key)
     | ReceiveLocalVal { for : String, name : String, value : Maybe String }
     | OnFileSelected F.File (List F.File)
-    | FileUploaded (Result Http.Error ZI.ServerResponse)
+    | FileUploaded String (Result Http.Error ZI.ServerResponse)
     | FilesDialogMsg (GD.Msg FilesDialog.Msg)
     | RequestProgress String Http.Progress
     | RequestsDialogMsg (GD.Msg RequestsDialog.Msg)
@@ -663,7 +663,7 @@ showMessage msg =
         OnFileSelected _ _ ->
             "OnFileSelected"
 
-        FileUploaded _ ->
+        FileUploaded _ _ ->
             "FileUploaded"
 
         FilesDialogMsg _ ->
@@ -2327,18 +2327,45 @@ actualupdate msg model =
                                     ( model, Cmd.none )
 
                         ZI.FilesUploaded files ->
-                            ( { model
-                                | state =
-                                    FilesDialog
-                                        (FilesDialog.init files
-                                            Common.buttonStyle
-                                            (E.map (\_ -> ()) (viewState model.size model.state model))
-                                        )
-                                        model.state
-                              }
+                            ( unexpectedMessage model (ZI.showServerResponse ziresponse)
                             , Cmd.none
                             )
 
+        -- ( { model
+        --     | trackedRequests =
+        --         case Dict.get what model.trackedRequests.requests of
+        --             Just (FileUpload fu) ->
+        --                 let
+        --                     trqs =
+        --                         model.trackedRequests
+        --                 in
+        --                 { trqs
+        --                     | requests =
+        --                         Dict.insert files.what
+        --                             (FileUpload
+        --                                 { fu
+        --                                     | files =
+        --                                         Just files.files
+        --                                 }
+        --                             )
+        --                             trqs.requests
+        --                 }
+        --             _ ->
+        --                 model.trackedRequests
+        --   }
+        -- , Cmd.none
+        -- )
+        -- ( { model
+        --     | state =
+        --         FilesDialog
+        --             (FilesDialog.init files
+        --                 Common.buttonStyle
+        --                 (E.map (\_ -> ()) (viewState model.size model.state model))
+        --             )
+        --             model.state
+        --   }
+        -- , Cmd.none
+        -- )
         ( ViewMsg em, View es ) ->
             let
                 ( emod, ecmd ) =
@@ -2555,7 +2582,7 @@ actualupdate msg model =
                     (file :: files)
                         |> List.map F.name
                         |> (\names ->
-                                FileUpload { filenames = names, progress = Nothing }
+                                FileUpload { filenames = names, progress = Nothing, files = Nothing }
                            )
 
                 ntr =
@@ -2567,7 +2594,17 @@ actualupdate msg model =
                                 tr.requests
                     }
             in
-            ( { model | trackedRequests = ntr }
+            ( { model
+                | trackedRequests = ntr
+                , state =
+                    RequestsDialog
+                        (RequestsDialog.init
+                            model.trackedRequests
+                            Common.buttonStyle
+                            (E.map (\_ -> ()) (viewState model.size model.state model))
+                        )
+                        model.state
+              }
             , Cmd.batch
                 [ Http.request
                     { method = "POST"
@@ -2578,14 +2615,14 @@ actualupdate msg model =
                             :: files
                             |> List.map (\f -> Http.filePart (F.name f) f)
                             |> Http.multipartBody
-                    , expect = Http.expectJson FileUploaded ZI.serverResponseDecoder
+                    , expect = Http.expectJson (FileUploaded nrid) ZI.serverResponseDecoder
                     , timeout = Nothing
                     , tracker = Just nrid
                     }
                 ]
             )
 
-        ( FileUploaded zrd, state ) ->
+        ( FileUploaded what zrd, state ) ->
             case zrd of
                 Err e ->
                     ( displayMessageDialog model <| Util.httpErrorString e, Cmd.none )
@@ -2645,17 +2682,42 @@ actualupdate msg model =
 
                         ZI.FilesUploaded files ->
                             ( { model
-                                | state =
-                                    FilesDialog
-                                        (FilesDialog.init files
-                                            Common.buttonStyle
-                                            (E.map (\_ -> ()) (viewState model.size model.state model))
-                                        )
-                                        model.state
+                                | trackedRequests =
+                                    case Dict.get what model.trackedRequests.requests of
+                                        Just (FileUpload fu) ->
+                                            let
+                                                trqs =
+                                                    model.trackedRequests
+                                            in
+                                            { trqs
+                                                | requests =
+                                                    Dict.insert what
+                                                        (FileUpload
+                                                            { fu
+                                                                | files =
+                                                                    Just files
+                                                            }
+                                                        )
+                                                        trqs.requests
+                                            }
+
+                                        _ ->
+                                            model.trackedRequests
                               }
                             , Cmd.none
                             )
 
+                        -- ( { model
+                        --     | state =
+                        --         FilesDialog
+                        --             (FilesDialog.init files
+                        --                 Common.buttonStyle
+                        --                 (E.map (\_ -> ()) (viewState model.size model.state model))
+                        --             )
+                        --             model.state
+                        --   }
+                        -- , Cmd.none
+                        -- )
                         _ ->
                             ( displayMessageDialog model (ZI.showServerResponse ziresponse), Cmd.none )
 

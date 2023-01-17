@@ -4,6 +4,7 @@ import Data
 import Json.Decode as JD
 import Json.Encode as JE
 import Search as S
+import Util
 
 
 type SendMsg
@@ -39,6 +40,16 @@ type ServerResponse
     | PowerDeleteComplete Int
     | HomeNoteSet Int
     | FilesUploaded (List Data.ZkListNote)
+
+
+
+-- type alias UploadedFiles =
+--     { what : String, files : List Data.ZkListNote }
+-- decodeUploadedFiles : JD.Decoder UploadedFiles
+-- decodeUploadedFiles =
+--     JD.succeed UploadedFiles
+--         |> Util.andMap (JD.field "what" JD.string)
+--         |> Util.andMap (JD.field "files" (JD.list Data.decodeZkListNote))
 
 
 showServerResponse : ServerResponse -> String

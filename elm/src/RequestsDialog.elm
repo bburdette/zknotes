@@ -24,11 +24,11 @@ type alias TRequests =
 
 
 type TRequest
-    = FileUpload { filenames : List String, progress : Maybe Http.Progress }
-
-
-
--- type alias Model = {}
+    = FileUpload
+        { filenames : List String
+        , progress : Maybe Http.Progress
+        , files : Maybe (List Data.ZkListNote)
+        }
 
 
 type Msg
