@@ -33,12 +33,11 @@ type alias GDModel =
 
 init : List Data.ZkListNote -> List (E.Attribute Msg) -> Element () -> GDModel
 init files buttonStyle underLay =
-    Debug.log "filesdialog.init "
-        { view = view buttonStyle
-        , update = update
-        , model = { files = files }
-        , underLay = underLay
-        }
+    { view = view buttonStyle
+    , update = update
+    , model = { files = files }
+    , underLay = underLay
+    }
 
 
 view : List (E.Attribute Msg) -> Maybe Util.Size -> Model -> Element Msg
