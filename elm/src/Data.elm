@@ -174,6 +174,30 @@ type alias EditLink =
     }
 
 
+toZkLink : Int -> UserId -> EditLink -> ZkLink
+toZkLink noteid user el =
+    { from =
+        case el.direction of
+            From ->
+                el.otherid
+
+            To ->
+                noteid
+    , to =
+        case el.direction of
+            From ->
+                noteid
+
+            To ->
+                el.otherid
+    , user = user
+    , zknote = Nothing
+    , fromname = Nothing
+    , toname = Nothing
+    , delete = Nothing
+    }
+
+
 zklKey : { a | otherid : Int, direction : Direction } -> String
 zklKey zkl =
     String.fromInt zkl.otherid

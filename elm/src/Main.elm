@@ -2723,10 +2723,6 @@ actualupdate msg model =
                         RequestsDialog.Tag s ->
                             case ( stateLogin prevstate, stateSearch prevstate ) of
                                 ( Just login, Just ( spm, sr ) ) ->
-                                    let
-                                        _ =
-                                            Debug.log "here" s
-                                    in
                                     ( { model
                                         | state =
                                             TagFiles
@@ -3150,10 +3146,30 @@ handleTagFiles model ( lmod, lcmd ) login st =
         TagAThing.ThingCommand tc ->
             case tc of
                 TagFiles.Ok ->
-                    ( { model | state = updstate }, Cmd.none )
+                    let
+                        zklns =
+                            lmod.thing.model.files
+
+                        zkls =
+                            Dict.values lmod.zklDict
+
+                        zklinks : List Data.ZkLink
+                        zklinks =
+                            zklns
+                                |> List.foldl
+                                    (\zkln links ->
+                                        List.map (\el -> Data.toZkLink zkln.id login.userid el) zkls
+                                            ++ links
+                                    )
+                                    []
+                    in
+                    ( { model | state = st }
+                    , sendZIMsg model.location
+                        (ZI.SaveZkLinks { links = zklinks })
+                    )
 
                 TagFiles.Cancel ->
-                    ( { model | state = updstate }, Cmd.none )
+                    ( { model | state = st }, Cmd.none )
 
                 TagFiles.None ->
                     ( { model | state = updstate }, Cmd.none )
