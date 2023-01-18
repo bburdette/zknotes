@@ -1587,7 +1587,7 @@ actualupdate msg model =
                 UserListing.Done ->
                     initialPage model
 
-                UserListing.NewUser ->
+                UserListing.InviteUser ->
                     let
                         ( sp, sr ) =
                             s
@@ -1614,11 +1614,6 @@ actualupdate msg model =
                                 (UserListing numod login s)
                       }
                     , Cmd.none
-                    )
-
-                UserListing.InviteUser ->
-                    ( { model | state = UserListing numod login s }
-                    , sendAIMsg model.location (AI.GetInvite { email = Nothing, data = Nothing })
                     )
 
                 UserListing.EditUser ld ->
