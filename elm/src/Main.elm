@@ -18,7 +18,7 @@ import GenDialog as GD
 import Html exposing (Html)
 import Http
 import Import
-import InviteUserPanel
+import InviteUser
 import Json.Decode as JD
 import Json.Encode as JE
 import LocalStorage as LS
@@ -96,7 +96,7 @@ type Msg
     | RequestProgress String Http.Progress
     | RequestsDialogMsg (GD.Msg RequestsDialog.Msg)
     | TagFilesMsg (TagAThing.Msg TagFiles.Msg)
-    | InviteUserPanelMsg (TagAThing.Msg InviteUserPanel.Msg)
+    | InviteUserMsg (TagAThing.Msg InviteUser.Msg)
     | Noop
 
 
@@ -124,7 +124,7 @@ type State
     | MessageNLink MessageNLink.GDModel State
     | RequestsDialog RequestsDialog.GDModel State
     | TagFiles (TagAThing.Model TagFiles.Model TagFiles.Msg TagFiles.Command) Data.LoginData State
-    | InviteUserPanel (TagAThing.Model InviteUserPanel.Model InviteUserPanel.Msg InviteUserPanel.Command) Data.LoginData State
+    | InviteUser (TagAThing.Model InviteUser.Model InviteUser.Msg InviteUser.Command) Data.LoginData State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
 
 
@@ -673,8 +673,8 @@ showMessage msg =
         TagFilesMsg _ ->
             "TagFilesMsg"
 
-        InviteUserPanelMsg _ ->
-            "InviteUserPanelMsg"
+        InviteUserMsg _ ->
+            "InviteUserMsg"
 
 
 showState : State -> String
@@ -752,8 +752,8 @@ showState state =
         TagFiles _ _ _ ->
             "TagFiles"
 
-        InviteUserPanel _ _ _ ->
-            "InviteUserPanel"
+        InviteUser _ _ _ ->
+            "InviteUser"
 
 
 unexpectedMsg : Model -> Msg -> Model
@@ -851,8 +851,8 @@ viewState size state model =
         TagFiles tfmod _ _ ->
             E.map TagFilesMsg <| TagAThing.view model.stylePalette model.recentNotes (Just size) tfmod
 
-        InviteUserPanel tfmod _ _ ->
-            E.map InviteUserPanelMsg <| TagAThing.view model.stylePalette model.recentNotes (Just size) tfmod
+        InviteUser tfmod _ _ ->
+            E.map InviteUserMsg <| TagAThing.view model.stylePalette model.recentNotes (Just size) tfmod
 
 
 stateSearch : State -> Maybe ( SP.Model, Data.ZkListNoteSearchResult )
@@ -936,7 +936,7 @@ stateSearch state =
         TagFiles model _ _ ->
             Just ( model.spmodel, model.zknSearchResult )
 
-        InviteUserPanel model _ _ ->
+        InviteUser model _ _ ->
             Just ( model.spmodel, model.zknSearchResult )
 
 
@@ -1015,7 +1015,7 @@ stateLogin state =
         TagFiles _ login _ ->
             Just login
 
-        InviteUserPanel _ login _ ->
+        InviteUser _ login _ ->
             Just login
 
 
@@ -1601,9 +1601,9 @@ actualupdate msg model =
                     in
                     ( { model
                         | state =
-                            InviteUserPanel
+                            InviteUser
                                 (TagAThing.init
-                                    (InviteUserPanel.initThing "")
+                                    (InviteUser.initThing "")
                                     sp
                                     sr
                                     model.recentNotes
@@ -1683,8 +1683,8 @@ actualupdate msg model =
         ( WkMsg (Ok key), TagFiles mod ld ps ) ->
             handleTagFiles model (TagAThing.onWkKeyPress key mod) ld ps
 
-        ( WkMsg (Ok key), InviteUserPanel mod ld ps ) ->
-            handleInviteUserPanel model (TagAThing.onWkKeyPress key mod) ld ps
+        ( WkMsg (Ok key), InviteUser mod ld ps ) ->
+            handleInviteUser model (TagAThing.onWkKeyPress key mod) ld ps
 
         ( WkMsg (Ok key), DisplayMessage _ state ) ->
             case Toop.T4 key.key key.ctrl key.alt key.shift of
@@ -1710,8 +1710,8 @@ actualupdate msg model =
         ( TagFilesMsg lm, TagFiles mod ld st ) ->
             handleTagFiles model (TagAThing.update lm mod) ld st
 
-        ( InviteUserPanelMsg lm, InviteUserPanel mod ld st ) ->
-            handleInviteUserPanel model (TagAThing.update lm mod) ld st
+        ( InviteUserMsg lm, InviteUser mod ld st ) ->
+            handleInviteUser model (TagAThing.update lm mod) ld st
 
         ( LoginMsg lm, Login ls ) ->
             handleLogin model (Login.update lm ls)
@@ -2139,8 +2139,8 @@ actualupdate msg model =
                                     , Cmd.none
                                     )
 
-                                InviteUserPanel iu login ps ->
-                                    ( { model | state = InviteUserPanel (TagAThing.updateSearchResult sr iu) login ps }
+                                InviteUser iu login ps ->
+                                    ( { model | state = InviteUser (TagAThing.updateSearchResult sr iu) login ps }
                                     , Cmd.none
                                     )
 
@@ -3163,16 +3163,16 @@ handleTagFiles model ( lmod, lcmd ) login st =
                     ( { model | state = updstate }, Cmd.none )
 
 
-handleInviteUserPanel :
+handleInviteUser :
     Model
-    -> ( TagAThing.Model InviteUserPanel.Model InviteUserPanel.Msg InviteUserPanel.Command, TagAThing.Command InviteUserPanel.Command )
+    -> ( TagAThing.Model InviteUser.Model InviteUser.Msg InviteUser.Command, TagAThing.Command InviteUser.Command )
     -> Data.LoginData
     -> State
     -> ( Model, Cmd Msg )
-handleInviteUserPanel model ( lmod, lcmd ) login st =
+handleInviteUser model ( lmod, lcmd ) login st =
     let
         updstate =
-            InviteUserPanel lmod login st
+            InviteUser lmod login st
     in
     case lcmd of
         TagAThing.Search s ->
@@ -3189,7 +3189,7 @@ handleInviteUserPanel model ( lmod, lcmd ) login st =
 
         TagAThing.ThingCommand tc ->
             case tc of
-                InviteUserPanel.Ok ->
+                InviteUser.Ok ->
                     ( { model | state = updstate }
                     , sendAIMsg model.location
                         (AI.GetInvite
@@ -3207,10 +3207,10 @@ handleInviteUserPanel model ( lmod, lcmd ) login st =
                         )
                     )
 
-                InviteUserPanel.Cancel ->
+                InviteUser.Cancel ->
                     ( { model | state = st }, Cmd.none )
 
-                InviteUserPanel.None ->
+                InviteUser.None ->
                     ( { model | state = updstate }, Cmd.none )
 
 
