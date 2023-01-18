@@ -290,7 +290,7 @@ async fn receive_files(
   config: web::Data<Config>,
   mut payload: Multipart,
 ) -> HttpResponse {
-  match make_file_notes(session, config, payload).await {
+  match make_file_notes(session, config, &mut payload).await {
     Ok(r) => HttpResponse::Ok().json(r),
     Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
   }
@@ -299,7 +299,7 @@ async fn receive_files(
 async fn make_file_notes(
   session: Session,
   config: web::Data<Config>,
-  mut payload: Multipart,
+  mut payload: &mut Multipart,
 ) -> Result<ServerResponse, Box<dyn Error>> {
   let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
   let userdata = match session_user(&conn, session, &config)? {
@@ -389,7 +389,7 @@ async fn make_file_notes(
 
 async fn save_files(
   to_dir: &Path,
-  mut payload: Multipart,
+  mut payload: &mut Multipart,
 ) -> Result<Vec<(String, String)>, Box<dyn Error>> {
   // iterate over multipart stream
 
@@ -654,7 +654,8 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
                   true
                 } else if rv == "https://29a.ch"
                   && rh.method == "GET"
-                  && rh.uri.to_string().starts_with("/static")
+                  && (rh.uri.to_string().starts_with("/static/")
+                    || (rh.uri.to_string().starts_with("/file/")))
                 {
                   true
                 } else {

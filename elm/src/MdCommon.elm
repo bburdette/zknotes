@@ -439,7 +439,7 @@ codeSpan snippet =
             (E.rgba 0 0 0 0.13)
         , EBd.rounded 2
         , E.paddingXY 5 3
-        , EF.family <| [ EF.typeface "mono" ]
+        , EF.family [ EF.monospace ]
         ]
         (E.text snippet)
 
@@ -449,7 +449,7 @@ codeBlock details =
     E.column
         [ EBk.color (E.rgba 0 0 0 0.13)
         , E.padding 5
-        , EF.family <| [ EF.typeface "mono" ]
+        , EF.family [ EF.monospace ]
         ]
         [ E.html <|
             Html.div

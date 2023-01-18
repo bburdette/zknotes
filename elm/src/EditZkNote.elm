@@ -892,7 +892,6 @@ zknview zone size recentZkns trqs model =
             model.editable
                 && not search
                 && not model.deleted
-                && not model.isFile
 
         -- super lame math because images suck in html/elm-ui
         mdw =
