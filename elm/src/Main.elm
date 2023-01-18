@@ -18,7 +18,6 @@ import GenDialog as GD
 import Html exposing (Html)
 import Http
 import Import
-import InviteUser
 import InviteUserPanel
 import Json.Decode as JD
 import Json.Encode as JE
@@ -61,7 +60,6 @@ import ZkInterface as ZI
 type Msg
     = LoginMsg Login.Msg
     | InvitedMsg Invited.Msg
-    | InviteUserMsg InviteUser.Msg
     | ViewMsg View.Msg
     | EditZkNoteMsg EditZkNote.Msg
     | EditZkNoteListingMsg EditZkNoteListing.Msg
@@ -105,7 +103,6 @@ type Msg
 type State
     = Login Login.Model
     | Invited Invited.Model
-    | InviteUser InviteUser.Model Data.LoginData
     | EditZkNote EditZkNote.Model Data.LoginData
     | EditZkNoteListing EditZkNoteListing.Model Data.LoginData
     | ArchiveListing ArchiveListing.Model Data.LoginData
@@ -510,9 +507,6 @@ showMessage msg =
         InvitedMsg _ ->
             "InvitedMsg"
 
-        InviteUserMsg _ ->
-            "InviteUserMsg"
-
         DisplayMessageMsg _ ->
             "DisplayMessage"
 
@@ -692,9 +686,6 @@ showState state =
         Invited _ ->
             "Invited"
 
-        InviteUser _ _ ->
-            "InviteUser"
-
         EditZkNote _ _ ->
             "EditZkNote"
 
@@ -785,9 +776,6 @@ viewState size state model =
         Invited em ->
             E.map InvitedMsg <| Invited.view model.stylePalette size em
 
-        InviteUser em _ ->
-            E.map InviteUserMsg <| InviteUser.view model.stylePalette model.recentNotes (Just size) em
-
         EditZkNote em _ ->
             E.map EditZkNoteMsg <| EditZkNote.view model.timezone size model.recentNotes model.trackedRequests em
 
@@ -876,9 +864,6 @@ stateSearch state =
         Invited _ ->
             Nothing
 
-        InviteUser model _ ->
-            Just ( model.spmodel, model.zknSearchResult )
-
         EditZkNote emod _ ->
             Just ( emod.spmodel, emod.zknSearchResult )
 
@@ -963,9 +948,6 @@ stateLogin state =
 
         Invited _ ->
             Nothing
-
-        InviteUser _ login ->
-            Just login
 
         EditZkNote _ login ->
             Just login
@@ -1698,9 +1680,6 @@ actualupdate msg model =
         ( WkMsg (Ok key), Invited ls ) ->
             handleInvited model (Invited.onWkKeyPress key ls)
 
-        ( WkMsg (Ok key), InviteUser mod ld ) ->
-            handleInviteUser model (InviteUser.onWkKeyPress key mod) ld
-
         ( WkMsg (Ok key), TagFiles mod ld ps ) ->
             handleTagFiles model (TagAThing.onWkKeyPress key mod) ld ps
 
@@ -1727,9 +1706,6 @@ actualupdate msg model =
             ( displayMessageDialog model <| "error decoding windowskey message: " ++ JD.errorToString e
             , Cmd.none
             )
-
-        ( InviteUserMsg lm, InviteUser mod ld ) ->
-            handleInviteUser model (InviteUser.update lm mod) ld
 
         ( TagFilesMsg lm, TagFiles mod ld st ) ->
             handleTagFiles model (TagAThing.update lm mod) ld st
@@ -2155,11 +2131,6 @@ actualupdate msg model =
 
                                 Import istate login_ ->
                                     ( { model | state = Import (Import.updateSearchResult sr istate) login_ }
-                                    , Cmd.none
-                                    )
-
-                                InviteUser iu login ->
-                                    ( { model | state = InviteUser (InviteUser.updateSearchResult sr iu) login }
                                     , Cmd.none
                                     )
 
@@ -3134,31 +3105,6 @@ handleInvited model ( lmod, lcmd ) =
                     }
                 )
             )
-
-
-handleInviteUser : Model -> ( InviteUser.Model, InviteUser.Command ) -> Data.LoginData -> ( Model, Cmd Msg )
-handleInviteUser model ( lmod, lcmd ) login =
-    case lcmd of
-        InviteUser.Search s ->
-            sendSearch { model | state = InviteUser lmod login } s
-
-        InviteUser.SearchHistory ->
-            ( { model | state = InviteUser lmod login }, Cmd.none )
-
-        InviteUser.None ->
-            ( { model | state = InviteUser lmod login }, Cmd.none )
-
-        InviteUser.AddToRecent _ ->
-            ( { model | state = InviteUser lmod login }, Cmd.none )
-
-        InviteUser.GetInvite gi ->
-            ( { model | state = InviteUser lmod login }
-            , sendAIMsg model.location (AI.GetInvite gi)
-            )
-
-        InviteUser.Cancel ->
-            -- go to user listing
-            ( { model | state = InviteUser lmod login }, Cmd.none )
 
 
 handleTagFiles :
