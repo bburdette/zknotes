@@ -19,6 +19,7 @@ import Html exposing (Html)
 import Http
 import Import
 import InviteUser
+import InviteUserPanel
 import Json.Decode as JD
 import Json.Encode as JE
 import LocalStorage as LS
@@ -97,6 +98,7 @@ type Msg
     | RequestProgress String Http.Progress
     | RequestsDialogMsg (GD.Msg RequestsDialog.Msg)
     | TagFilesMsg (TagAThing.Msg TagFiles.Msg)
+    | InviteUserPanelMsg (TagAThing.Msg InviteUserPanel.Msg)
     | Noop
 
 
@@ -125,6 +127,7 @@ type State
     | MessageNLink MessageNLink.GDModel State
     | RequestsDialog RequestsDialog.GDModel State
     | TagFiles (TagAThing.Model TagFiles.Model TagFiles.Msg TagFiles.Command) Data.LoginData State
+    | InviteUserPanel (TagAThing.Model InviteUserPanel.Model InviteUserPanel.Msg InviteUserPanel.Command) Data.LoginData State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
 
 
@@ -676,6 +679,9 @@ showMessage msg =
         TagFilesMsg _ ->
             "TagFilesMsg"
 
+        InviteUserPanelMsg _ ->
+            "InviteUserPanelMsg"
+
 
 showState : State -> String
 showState state =
@@ -754,6 +760,9 @@ showState state =
 
         TagFiles _ _ _ ->
             "TagFiles"
+
+        InviteUserPanel _ _ _ ->
+            "InviteUserPanel"
 
 
 unexpectedMsg : Model -> Msg -> Model
@@ -854,6 +863,9 @@ viewState size state model =
         TagFiles tfmod _ _ ->
             E.map TagFilesMsg <| TagAThing.view model.stylePalette model.recentNotes (Just size) tfmod
 
+        InviteUserPanel tfmod _ _ ->
+            E.map InviteUserPanelMsg <| TagAThing.view model.stylePalette model.recentNotes (Just size) tfmod
+
 
 stateSearch : State -> Maybe ( SP.Model, Data.ZkListNoteSearchResult )
 stateSearch state =
@@ -939,6 +951,9 @@ stateSearch state =
         TagFiles model _ _ ->
             Just ( model.spmodel, model.zknSearchResult )
 
+        InviteUserPanel model _ _ ->
+            Just ( model.spmodel, model.zknSearchResult )
+
 
 stateLogin : State -> Maybe Data.LoginData
 stateLogin state =
@@ -1016,6 +1031,9 @@ stateLogin state =
             stateLogin instate
 
         TagFiles _ login _ ->
+            Just login
+
+        InviteUserPanel _ login _ ->
             Just login
 
 
@@ -1601,9 +1619,17 @@ actualupdate msg model =
                     in
                     ( { model
                         | state =
-                            InviteUser
-                                (InviteUser.init sp sr model.recentNotes [] login)
+                            InviteUserPanel
+                                (TagAThing.init
+                                    (InviteUserPanel.initThing "")
+                                    sp
+                                    sr
+                                    model.recentNotes
+                                    []
+                                    login
+                                )
                                 login
+                                (UserListing numod login s)
                       }
                     , Cmd.none
                     )
@@ -1678,6 +1704,9 @@ actualupdate msg model =
         ( WkMsg (Ok key), TagFiles mod ld ps ) ->
             handleTagFiles model (TagAThing.onWkKeyPress key mod) ld ps
 
+        ( WkMsg (Ok key), InviteUserPanel mod ld ps ) ->
+            handleInviteUserPanel model (TagAThing.onWkKeyPress key mod) ld ps
+
         ( WkMsg (Ok key), DisplayMessage _ state ) ->
             case Toop.T4 key.key key.ctrl key.alt key.shift of
                 Toop.T4 "Enter" False False False ->
@@ -1704,6 +1733,9 @@ actualupdate msg model =
 
         ( TagFilesMsg lm, TagFiles mod ld st ) ->
             handleTagFiles model (TagAThing.update lm mod) ld st
+
+        ( InviteUserPanelMsg lm, InviteUserPanel mod ld st ) ->
+            handleInviteUserPanel model (TagAThing.update lm mod) ld st
 
         ( LoginMsg lm, Login ls ) ->
             handleLogin model (Login.update lm ls)
@@ -2133,6 +2165,11 @@ actualupdate msg model =
 
                                 TagFiles iu login ps ->
                                     ( { model | state = TagFiles (TagAThing.updateSearchResult sr iu) login ps }
+                                    , Cmd.none
+                                    )
+
+                                InviteUserPanel iu login ps ->
+                                    ( { model | state = InviteUserPanel (TagAThing.updateSearchResult sr iu) login ps }
                                     , Cmd.none
                                     )
 
@@ -3177,6 +3214,57 @@ handleTagFiles model ( lmod, lcmd ) login st =
                     ( { model | state = st }, Cmd.none )
 
                 TagFiles.None ->
+                    ( { model | state = updstate }, Cmd.none )
+
+
+handleInviteUserPanel :
+    Model
+    -> ( TagAThing.Model InviteUserPanel.Model InviteUserPanel.Msg InviteUserPanel.Command, TagAThing.Command InviteUserPanel.Command )
+    -> Data.LoginData
+    -> State
+    -> ( Model, Cmd Msg )
+handleInviteUserPanel model ( lmod, lcmd ) login st =
+    let
+        updstate =
+            InviteUserPanel lmod login st
+    in
+    case lcmd of
+        TagAThing.Search s ->
+            sendSearch { model | state = updstate } s
+
+        TagAThing.SearchHistory ->
+            ( { model | state = updstate }, Cmd.none )
+
+        TagAThing.None ->
+            ( { model | state = updstate }, Cmd.none )
+
+        TagAThing.AddToRecent _ ->
+            ( { model | state = updstate }, Cmd.none )
+
+        TagAThing.ThingCommand tc ->
+            case tc of
+                InviteUserPanel.Ok ->
+                    ( { model | state = updstate }
+                    , sendAIMsg model.location
+                        (AI.GetInvite
+                            { email =
+                                if lmod.thing.model.email /= "" then
+                                    Just lmod.thing.model.email
+
+                                else
+                                    Nothing
+                            , data =
+                                Data.encodeZkInviteData (List.map Data.elToSzl (Dict.values lmod.zklDict))
+                                    |> JE.encode 2
+                                    |> Just
+                            }
+                        )
+                    )
+
+                InviteUserPanel.Cancel ->
+                    ( { model | state = st }, Cmd.none )
+
+                InviteUserPanel.None ->
                     ( { model | state = updstate }, Cmd.none )
 
 
