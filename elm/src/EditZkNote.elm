@@ -72,6 +72,7 @@ import Markdown.Renderer
 import Maybe.Extra as ME
 import MdCommon as MC
 import Orgauth.Data exposing (UserId)
+import RequestsDialog exposing (TRequests)
 import Schelme.Show exposing (showTerm)
 import Search as S
 import SearchStackPanel as SP
@@ -129,6 +130,7 @@ type Msg
     | BigSearchPress
     | SettingsPress
     | AdminPress
+    | RequestsPress
     | FlipLink EditLink
     | ShowArchivesPress
     | Noop
@@ -220,6 +222,7 @@ type Command
     | BigSearch
     | Settings
     | Admin
+    | Requests
     | GetZkNote Int
     | SetHomeNote Int
     | AddToRecent Data.ZkListNote
@@ -573,14 +576,14 @@ pageLink model =
             )
 
 
-view : Time.Zone -> Util.Size -> List Data.ZkListNote -> Model -> Element Msg
-view zone size recentZkns model =
+view : Time.Zone -> Util.Size -> List Data.ZkListNote -> TRequests -> Model -> Element Msg
+view zone size recentZkns trqs model =
     case model.dialog of
         Just dialog ->
             D.view size dialog |> E.map DialogMsg
 
         Nothing ->
-            zknview zone size recentZkns model
+            zknview zone size recentZkns trqs model
 
 
 commonButtonStyle : Bool -> List (E.Attribute msg)
@@ -856,8 +859,8 @@ renderMd cd md mdw =
             E.text errors
 
 
-zknview : Time.Zone -> Util.Size -> List Data.ZkListNote -> Model -> Element Msg
-zknview zone size recentZkns model =
+zknview : Time.Zone -> Util.Size -> List Data.ZkListNote -> TRequests -> Model -> Element Msg
+zknview zone size recentZkns trqs model =
     let
         wclass =
             if size.width < 800 then
@@ -1443,6 +1446,13 @@ zknview zone size recentZkns model =
                     )
                 |> Maybe.withDefault E.none
             , E.el [ EF.bold ] (E.text model.ld.name)
+            , if trqs.requests /= Dict.empty then
+                EI.button
+                    (E.alignRight :: Common.buttonStyle ++ [ EBk.color TC.darkGreen ])
+                    { onPress = Just RequestsPress, label = E.text "uploads" }
+
+              else
+                E.none
             , if model.ld.admin then
                 EI.button
                     (E.alignRight :: Common.buttonStyle)
@@ -2345,7 +2355,15 @@ update msg model =
                     Just <|
                         D.init "delete this note?"
                             True
-                            (\size -> E.map (\_ -> ()) (view zone size [] model))
+                            (\size ->
+                                E.map (\_ -> ())
+                                    (view zone
+                                        size
+                                        []
+                                        (TRequests 0 Dict.empty)
+                                        model
+                                    )
+                            )
               }
             , None
             )
@@ -2642,6 +2660,9 @@ update msg model =
 
         AdminPress ->
             ( model, Admin )
+
+        RequestsPress ->
+            ( model, Requests )
 
         Noop ->
             ( model, None )

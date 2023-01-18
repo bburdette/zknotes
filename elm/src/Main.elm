@@ -4,7 +4,7 @@ import ArchiveListing
 import Browser
 import Browser.Events
 import Browser.Navigation
-import Common exposing (buttonStyle)
+import Common
 import Data
 import Dict exposing (Dict)
 import DisplayMessage
@@ -15,10 +15,8 @@ import Element.Font as EF
 import File as F
 import File.Select as FS
 import GenDialog as GD
-import Html exposing (Attribute, Html)
-import Html.Events as HE
+import Html exposing (Html)
 import Http
-import Http.Tasks as HT
 import Import
 import InviteUser
 import Json.Decode as JD
@@ -39,15 +37,17 @@ import Orgauth.UserInterface as UI
 import Orgauth.UserListing as UserListing
 import PublicInterface as PI
 import Random exposing (Seed, initialSeed)
+import RequestsDialog exposing (TRequest(..), TRequests)
 import Route exposing (Route(..), parseUrl, routeTitle, routeUrl)
 import Search as S
 import SearchStackPanel as SP
 import SelectString as SS
 import ShowMessage
-import Task exposing (Task)
+import TagAThing
+import TagFiles
+import Task
 import Time
 import Toop
-import UUID exposing (UUID)
 import Url exposing (Url)
 import UserSettings
 import Util
@@ -60,7 +60,6 @@ import ZkInterface as ZI
 type Msg
     = LoginMsg Login.Msg
     | InvitedMsg Invited.Msg
-    | InviteUserMsg InviteUser.Msg
     | ViewMsg View.Msg
     | EditZkNoteMsg EditZkNote.Msg
     | EditZkNoteListingMsg EditZkNoteListing.Msg
@@ -93,14 +92,17 @@ type Msg
     | WkMsg (Result JD.Error WindowKeys.Key)
     | ReceiveLocalVal { for : String, name : String, value : Maybe String }
     | OnFileSelected F.File (List F.File)
-    | FileUploaded (Result Http.Error ZI.ServerResponse)
+    | FileUploaded String (Result Http.Error ZI.ServerResponse)
+    | RequestProgress String Http.Progress
+    | RequestsDialogMsg (GD.Msg RequestsDialog.Msg)
+    | TagFilesMsg (TagAThing.Msg TagFiles.Msg)
+    | InviteUserMsg (TagAThing.Msg InviteUser.Msg)
     | Noop
 
 
 type State
     = Login Login.Model
     | Invited Invited.Model
-    | InviteUser InviteUser.Model Data.LoginData
     | EditZkNote EditZkNote.Model Data.LoginData
     | EditZkNoteListing EditZkNoteListing.Model Data.LoginData
     | ArchiveListing ArchiveListing.Model Data.LoginData
@@ -120,6 +122,9 @@ type State
     | ShowUrl ShowUrl.Model Data.LoginData
     | DisplayMessage DisplayMessage.GDModel State
     | MessageNLink MessageNLink.GDModel State
+    | RequestsDialog RequestsDialog.GDModel State
+    | TagFiles (TagAThing.Model TagFiles.Model TagFiles.Msg TagFiles.Command) Data.LoginData State
+    | InviteUser (TagAThing.Model InviteUser.Model InviteUser.Msg InviteUser.Command) Data.LoginData State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
 
 
@@ -156,6 +161,7 @@ type alias Model =
     , fontsize : Int
     , stylePalette : StylePalette
     , adminSettings : OD.AdminSettings
+    , trackedRequests : TRequests
     }
 
 
@@ -466,12 +472,12 @@ stateRoute state =
                             , save = False
                             }
 
-        EditZkNote st login ->
+        EditZkNote st _ ->
             st.id
                 |> Maybe.map (\id -> { route = EditZkNoteR id, save = True })
                 |> Maybe.withDefault { route = EditZkNoteNew, save = False }
 
-        ArchiveListing almod ld ->
+        ArchiveListing almod _ ->
             almod.selected
                 |> Maybe.map (\sid -> { route = ArchiveNoteR almod.noteid sid, save = True })
                 |> Maybe.withDefault { route = ArchiveNoteListingR almod.noteid, save = True }
@@ -500,9 +506,6 @@ showMessage msg =
 
         InvitedMsg _ ->
             "InvitedMsg"
-
-        InviteUserMsg _ ->
-            "InviteUserMsg"
 
         DisplayMessageMsg _ ->
             "DisplayMessage"
@@ -658,8 +661,20 @@ showMessage msg =
         OnFileSelected _ _ ->
             "OnFileSelected"
 
-        FileUploaded _ ->
+        FileUploaded _ _ ->
             "FileUploaded"
+
+        RequestsDialogMsg _ ->
+            "RequestsDialogMsg"
+
+        RequestProgress _ _ ->
+            "RequestProgress"
+
+        TagFilesMsg _ ->
+            "TagFilesMsg"
+
+        InviteUserMsg _ ->
+            "InviteUserMsg"
 
 
 showState : State -> String
@@ -670,9 +685,6 @@ showState state =
 
         Invited _ ->
             "Invited"
-
-        InviteUser _ _ ->
-            "InviteUser"
 
         EditZkNote _ _ ->
             "EditZkNote"
@@ -734,6 +746,15 @@ showState state =
         ShowUrl _ _ ->
             "ShowUrl"
 
+        RequestsDialog _ _ ->
+            "RequestsDialog"
+
+        TagFiles _ _ _ ->
+            "TagFiles"
+
+        InviteUser _ _ _ ->
+            "InviteUser"
+
 
 unexpectedMsg : Model -> Msg -> Model
 unexpectedMsg model msg =
@@ -755,11 +776,8 @@ viewState size state model =
         Invited em ->
             E.map InvitedMsg <| Invited.view model.stylePalette size em
 
-        InviteUser em login ->
-            E.map InviteUserMsg <| InviteUser.view model.stylePalette model.recentNotes (Just size) em
-
         EditZkNote em _ ->
-            E.map EditZkNoteMsg <| EditZkNote.view model.timezone size model.recentNotes em
+            E.map EditZkNoteMsg <| EditZkNote.view model.timezone size model.recentNotes model.trackedRequests em
 
         EditZkNoteListing em ld ->
             E.map EditZkNoteListingMsg <| EditZkNoteListing.view ld size em
@@ -788,11 +806,11 @@ viewState size state model =
         UserSettings em _ _ ->
             E.map UserSettingsMsg <| UserSettings.view em
 
-        DisplayMessage em _ ->
+        DisplayMessage _ _ ->
             -- render is at the layout level, not here.
             E.none
 
-        MessageNLink em _ ->
+        MessageNLink _ _ ->
             -- render is at the layout level, not here.
             E.none
 
@@ -815,16 +833,26 @@ viewState size state model =
         ResetPassword st ->
             E.map ResetPasswordMsg (ResetPassword.view size st)
 
-        UserListing st login _ ->
+        UserListing st _ _ ->
             E.map UserListingMsg (UserListing.view Common.buttonStyle st)
 
-        UserEdit st login ->
+        UserEdit st _ ->
             E.map UserEditMsg (UserEdit.view Common.buttonStyle st)
 
-        ShowUrl st login ->
+        ShowUrl st _ ->
             E.map
                 ShowUrlMsg
                 (ShowUrl.view Common.buttonStyle st)
+
+        RequestsDialog _ _ ->
+            -- render is at the layout level, not here.
+            E.none
+
+        TagFiles tfmod _ _ ->
+            E.map TagFilesMsg <| TagAThing.view model.stylePalette model.recentNotes (Just size) tfmod
+
+        InviteUser tfmod _ _ ->
+            E.map InviteUserMsg <| TagAThing.view model.stylePalette model.recentNotes (Just size) tfmod
 
 
 stateSearch : State -> Maybe ( SP.Model, Data.ZkListNoteSearchResult )
@@ -835,9 +863,6 @@ stateSearch state =
 
         Invited _ ->
             Nothing
-
-        InviteUser model _ ->
-            Just ( model.spmodel, model.zknSearchResult )
 
         EditZkNote emod _ ->
             Just ( emod.spmodel, emod.zknSearchResult )
@@ -905,6 +930,15 @@ stateSearch state =
         ShowUrl _ _ ->
             Nothing
 
+        RequestsDialog _ st ->
+            stateSearch st
+
+        TagFiles model _ _ ->
+            Just ( model.spmodel, model.zknSearchResult )
+
+        InviteUser model _ _ ->
+            Just ( model.spmodel, model.zknSearchResult )
+
 
 stateLogin : State -> Maybe Data.LoginData
 stateLogin state =
@@ -914,9 +948,6 @@ stateLogin state =
 
         Invited _ ->
             Nothing
-
-        InviteUser _ login ->
-            Just login
 
         EditZkNote _ login ->
             Just login
@@ -976,6 +1007,15 @@ stateLogin state =
             Just login
 
         ShowUrl _ login ->
+            Just login
+
+        RequestsDialog _ instate ->
+            stateLogin instate
+
+        TagFiles _ login _ ->
+            Just login
+
+        InviteUser _ login _ ->
             Just login
 
 
@@ -1085,28 +1125,6 @@ sendPIMsg location msg =
         }
 
 
-getListing : Model -> Data.LoginData -> ( Model, Cmd Msg )
-getListing model login =
-    sendSearch
-        { model
-            | state =
-                ShowMessage
-                    { message = "loading articles"
-                    }
-                    login
-                    (Just model.state)
-            , seed =
-                case model.state of
-                    -- save the seed if we're leaving login state.
-                    Login lmod ->
-                        lmod.seed
-
-                    _ ->
-                        model.seed
-        }
-        S.defaultSearch
-
-
 addRecentZkListNote : List Data.ZkListNote -> Data.ZkListNote -> List Data.ZkListNote
 addRecentZkListNote recent zkln =
     List.take 50 <|
@@ -1120,7 +1138,7 @@ piview pimodel =
         Ready model ->
             view model
 
-        PreInit model ->
+        PreInit _ ->
             { title = "zknotes: initializing"
             , body = []
             }
@@ -1166,6 +1184,13 @@ view model =
                     GD.layout
                         (Just { width = min 600 model.size.width, height = min 200 model.size.height })
                         cdm
+
+            RequestsDialog dm _ ->
+                Html.map RequestsDialogMsg <|
+                    GD.layout
+                        (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                        -- use the live-updated model
+                        { dm | model = model.trackedRequests }
 
             _ ->
                 E.layout [ EF.size model.fontsize, E.width E.fill ] <| viewState model.size model.state model
@@ -1245,7 +1270,7 @@ urlupdate msg model =
 
                         bcmd =
                             case model.state of
-                                EditZkNote s ld ->
+                                EditZkNote s _ ->
                                     if EditZkNote.dirty s then
                                         Cmd.batch
                                             [ icmd
@@ -1261,7 +1286,7 @@ urlupdate msg model =
                     in
                     ( { model | state = state }, bcmd )
 
-                LoadUrl urlstr ->
+                LoadUrl _ ->
                     -- load foreign site
                     -- ( model, Browser.Navigation.load urlstr )
                     ( model, Cmd.none )
@@ -1376,14 +1401,14 @@ displayMessageNLinkDialog model message url text =
 actualupdate : Msg -> Model -> ( Model, Cmd Msg )
 actualupdate msg model =
     case ( msg, model.state ) of
-        ( _, Wait wst wfn ) ->
+        ( _, Wait _ wfn ) ->
             let
                 ( nmd, cmd ) =
                     wfn model msg
             in
             ( nmd, cmd )
 
-        ( ReceiveLocalVal lv, _ ) ->
+        ( ReceiveLocalVal _, _ ) ->
             -- update the font size
             ( model, Cmd.none )
 
@@ -1577,8 +1602,16 @@ actualupdate msg model =
                     ( { model
                         | state =
                             InviteUser
-                                (InviteUser.init sp sr model.recentNotes [] login)
+                                (TagAThing.init
+                                    (InviteUser.initThing "")
+                                    sp
+                                    sr
+                                    model.recentNotes
+                                    []
+                                    login
+                                )
                                 login
+                                (UserListing numod login s)
                       }
                     , Cmd.none
                     )
@@ -1641,45 +1674,44 @@ actualupdate msg model =
                 ShowUrl.None ->
                     ( { model | state = ShowUrl numod login }, Cmd.none )
 
-        ( WkMsg rkey, Login ls ) ->
-            case rkey of
-                Ok key ->
-                    handleLogin model (Login.onWkKeyPress key ls)
+        ( WkMsg (Ok key), Login ls ) ->
+            handleLogin model (Login.onWkKeyPress key ls)
 
-                Err _ ->
+        ( WkMsg (Ok key), Invited ls ) ->
+            handleInvited model (Invited.onWkKeyPress key ls)
+
+        ( WkMsg (Ok key), TagFiles mod ld ps ) ->
+            handleTagFiles model (TagAThing.onWkKeyPress key mod) ld ps
+
+        ( WkMsg (Ok key), InviteUser mod ld ps ) ->
+            handleInviteUser model (TagAThing.onWkKeyPress key mod) ld ps
+
+        ( WkMsg (Ok key), DisplayMessage _ state ) ->
+            case Toop.T4 key.key key.ctrl key.alt key.shift of
+                Toop.T4 "Enter" False False False ->
+                    ( { model | state = state }, Cmd.none )
+
+                _ ->
                     ( model, Cmd.none )
 
-        ( WkMsg rkey, Invited ls ) ->
-            case rkey of
-                Ok key ->
-                    handleInvited model (Invited.onWkKeyPress key ls)
+        ( WkMsg (Ok key), EditZkNote es login ) ->
+            handleEditZkNoteCmd model login (EditZkNote.onWkKeyPress key es)
 
-                Err _ ->
-                    ( model, Cmd.none )
+        ( WkMsg (Ok key), EditZkNoteListing es login ) ->
+            handleEditZkNoteListing model
+                login
+                (EditZkNoteListing.onWkKeyPress key es)
 
-        ( WkMsg rkey, InviteUser mod ld ) ->
-            case rkey of
-                Ok key ->
-                    handleInviteUser model (InviteUser.onWkKeyPress key mod) ld
+        ( WkMsg (Err e), _ ) ->
+            ( displayMessageDialog model <| "error decoding windowskey message: " ++ JD.errorToString e
+            , Cmd.none
+            )
 
-                Err _ ->
-                    ( model, Cmd.none )
+        ( TagFilesMsg lm, TagFiles mod ld st ) ->
+            handleTagFiles model (TagAThing.update lm mod) ld st
 
-        ( InviteUserMsg lm, InviteUser mod ld ) ->
-            handleInviteUser model (InviteUser.update lm mod) ld
-
-        ( WkMsg rkey, DisplayMessage dm state ) ->
-            case rkey of
-                Ok key ->
-                    case Toop.T4 key.key key.ctrl key.alt key.shift of
-                        Toop.T4 "Enter" False False False ->
-                            ( { model | state = state }, Cmd.none )
-
-                        _ ->
-                            ( model, Cmd.none )
-
-                Err _ ->
-                    ( model, Cmd.none )
+        ( InviteUserMsg lm, InviteUser mod ld st ) ->
+            handleInviteUser model (TagAThing.update lm mod) ld st
 
         ( LoginMsg lm, Login ls ) ->
             handleLogin model (Login.update lm ls)
@@ -1723,7 +1755,7 @@ actualupdate msg model =
                             , Cmd.none
                             )
 
-        ( ErrorIndexNote rsein, state ) ->
+        ( ErrorIndexNote rsein, _ ) ->
             case rsein of
                 Err e ->
                     ( displayMessageDialog model <| Util.httpErrorString e
@@ -1792,26 +1824,6 @@ actualupdate msg model =
                             case Data.fromOaLd oalogin of
                                 Ok login ->
                                     let
-                                        getlisting =
-                                            sendSearch
-                                                { model
-                                                    | state =
-                                                        ShowMessage
-                                                            { message = "loading articles"
-                                                            }
-                                                            login
-                                                            (Just model.state)
-                                                    , seed =
-                                                        case state of
-                                                            -- save the seed if we're leaving login state.
-                                                            Login lmod ->
-                                                                lmod.seed
-
-                                                            _ ->
-                                                                model.seed
-                                                }
-                                                S.defaultSearch
-
                                         lgmod =
                                             { model
                                                 | state =
@@ -1821,11 +1833,11 @@ actualupdate msg model =
                                             }
                                     in
                                     case state of
-                                        Login lm ->
+                                        Login _ ->
                                             -- we're logged in!
                                             initialPage lgmod
 
-                                        LoginShowMessage _ li url ->
+                                        LoginShowMessage _ _ url ->
                                             let
                                                 ( m, cmd ) =
                                                     parseUrl url
@@ -1986,7 +1998,7 @@ actualupdate msg model =
                                 Nothing ->
                                     ( displayMessageDialog model "not logged in", Cmd.none )
 
-                        AI.UserDeleted id ->
+                        AI.UserDeleted _ ->
                             ( displayMessageDialog model "user deleted!"
                             , sendAIMsg model.location AI.GetUsers
                             )
@@ -2020,7 +2032,7 @@ actualupdate msg model =
 
                         AI.PwdReset pr ->
                             case state of
-                                UserEdit uem login ->
+                                UserEdit _ login ->
                                     ( { model
                                         | state =
                                             ShowUrl
@@ -2036,7 +2048,7 @@ actualupdate msg model =
                         AI.ServerError e ->
                             ( displayMessageDialog model <| e, Cmd.none )
 
-        ( ZkReplyDataSeq f zrd, state ) ->
+        ( ZkReplyDataSeq f zrd, _ ) ->
             let
                 ( nmod, ncmd ) =
                     actualupdate (ZkReplyData zrd) model
@@ -2122,8 +2134,13 @@ actualupdate msg model =
                                     , Cmd.none
                                     )
 
-                                InviteUser iu login ->
-                                    ( { model | state = InviteUser (InviteUser.updateSearchResult sr iu) login }
+                                TagFiles iu login ps ->
+                                    ( { model | state = TagFiles (TagAThing.updateSearchResult sr iu) login ps }
+                                    , Cmd.none
+                                    )
+
+                                InviteUser iu login ps ->
+                                    ( { model | state = InviteUser (TagAThing.updateSearchResult sr iu) login ps }
                                     , Cmd.none
                                     )
 
@@ -2287,13 +2304,13 @@ actualupdate msg model =
                                     -- just ignore if we're not editing a new note.
                                     ( model, Cmd.none )
 
-                        ZI.DeletedZkNote beid ->
+                        ZI.DeletedZkNote _ ->
                             ( model, Cmd.none )
 
                         ZI.SavedZkLinks ->
                             ( model, Cmd.none )
 
-                        ZI.ZkLinks zkl ->
+                        ZI.ZkLinks _ ->
                             ( model, Cmd.none )
 
                         ZI.SavedImportZkNotes ->
@@ -2315,6 +2332,11 @@ actualupdate msg model =
 
                                 _ ->
                                     ( model, Cmd.none )
+
+                        ZI.FilesUploaded files ->
+                            ( unexpectedMessage model (ZI.showServerResponse ziresponse)
+                            , Cmd.none
+                            )
 
         ( ViewMsg em, View es ) ->
             let
@@ -2374,24 +2396,6 @@ actualupdate msg model =
 
         ( EditZkNoteMsg em, EditZkNote es login ) ->
             handleEditZkNoteCmd model login (EditZkNote.update em es)
-
-        ( WkMsg reskey, EditZkNote es login ) ->
-            case reskey of
-                Ok key ->
-                    handleEditZkNoteCmd model login (EditZkNote.onWkKeyPress key es)
-
-                Err e ->
-                    ( model, Cmd.none )
-
-        ( WkMsg reskey, EditZkNoteListing es login ) ->
-            case reskey of
-                Ok key ->
-                    handleEditZkNoteListing model
-                        login
-                        (EditZkNoteListing.onWkKeyPress key es)
-
-                Err e ->
-                    ( model, Cmd.none )
 
         ( EditZkNoteListingMsg em, EditZkNoteListing es login ) ->
             handleEditZkNoteListing model login (EditZkNoteListing.update em es login)
@@ -2518,23 +2522,62 @@ actualupdate msg model =
             ( model, Cmd.none )
 
         ( OnFileSelected file files, _ ) ->
-            ( model
-            , Http.request
-                { method = "POST"
-                , headers = []
-                , url = model.location ++ "/upload"
-                , body =
-                    file
-                        :: files
-                        |> List.map (\f -> Http.filePart (F.name f) f)
-                        |> Http.multipartBody
-                , expect = Http.expectJson FileUploaded ZI.serverResponseDecoder
-                , timeout = Nothing
-                , tracker = Nothing
-                }
+            let
+                fc =
+                    1 + List.length files
+
+                tr =
+                    model.trackedRequests
+
+                nrid =
+                    String.fromInt (model.trackedRequests.requestCount + 1)
+
+                nrq =
+                    (file :: files)
+                        |> List.map F.name
+                        |> (\names ->
+                                FileUpload { filenames = names, progress = Nothing, files = Nothing }
+                           )
+
+                ntr =
+                    { tr
+                        | requestCount = tr.requestCount + fc
+                        , requests =
+                            Dict.insert nrid
+                                nrq
+                                tr.requests
+                    }
+            in
+            ( { model
+                | trackedRequests = ntr
+                , state =
+                    RequestsDialog
+                        (RequestsDialog.init
+                            -- dummy state we won't use
+                            { requestCount = 0, requests = Dict.empty }
+                            Common.buttonStyle
+                            (E.map (\_ -> ()) (viewState model.size model.state model))
+                        )
+                        model.state
+              }
+            , Cmd.batch
+                [ Http.request
+                    { method = "POST"
+                    , headers = []
+                    , url = model.location ++ "/upload"
+                    , body =
+                        file
+                            :: files
+                            |> List.map (\f -> Http.filePart (F.name f) f)
+                            |> Http.multipartBody
+                    , expect = Http.expectJson (FileUploaded nrid) ZI.serverResponseDecoder
+                    , timeout = Nothing
+                    , tracker = Just nrid
+                    }
+                ]
             )
 
-        ( FileUploaded zrd, state ) ->
+        ( FileUploaded what zrd, state ) ->
             case zrd of
                 Err e ->
                     ( displayMessageDialog model <| Util.httpErrorString e, Cmd.none )
@@ -2592,15 +2635,105 @@ actualupdate msg model =
                                     , Cmd.none
                                     )
 
+                        ZI.FilesUploaded files ->
+                            ( { model
+                                | trackedRequests =
+                                    case Dict.get what model.trackedRequests.requests of
+                                        Just (FileUpload fu) ->
+                                            let
+                                                trqs =
+                                                    model.trackedRequests
+                                            in
+                                            { trqs
+                                                | requests =
+                                                    Dict.insert what
+                                                        (FileUpload
+                                                            { fu
+                                                                | files =
+                                                                    Just files
+                                                            }
+                                                        )
+                                                        trqs.requests
+                                            }
+
+                                        _ ->
+                                            model.trackedRequests
+                              }
+                            , Cmd.none
+                            )
+
                         _ ->
                             ( displayMessageDialog model (ZI.showServerResponse ziresponse), Cmd.none )
 
-        ( x, y ) ->
+        ( RequestProgress a b, _ ) ->
+            let
+                tr =
+                    model.trackedRequests
+            in
+            case Dict.get a tr.requests of
+                Just (FileUpload trq) ->
+                    ( { model
+                        | trackedRequests =
+                            { tr | requests = Dict.insert a (FileUpload { trq | progress = Just b }) tr.requests }
+                      }
+                    , Cmd.none
+                    )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        ( RequestsDialogMsg bm, RequestsDialog bs prevstate ) ->
+            -- TODO address this hack!
+            case GD.update bm { bs | model = model.trackedRequests } of
+                GD.Dialog nmod ->
+                    ( { model
+                        | state = RequestsDialog nmod prevstate
+                        , trackedRequests = nmod.model
+                      }
+                    , Cmd.none
+                    )
+
+                GD.Ok return ->
+                    case return of
+                        RequestsDialog.Close ->
+                            ( { model | state = prevstate }, Cmd.none )
+
+                        RequestsDialog.Tag s ->
+                            case ( stateLogin prevstate, stateSearch prevstate ) of
+                                ( Just login, Just ( spm, sr ) ) ->
+                                    ( { model
+                                        | state =
+                                            TagFiles
+                                                (TagAThing.init
+                                                    (TagFiles.initThing s)
+                                                    spm
+                                                    sr
+                                                    model.recentNotes
+                                                    []
+                                                    login
+                                                )
+                                                login
+                                                prevstate
+                                      }
+                                    , Cmd.none
+                                    )
+
+                                _ ->
+                                    ( { model | state = prevstate }, Cmd.none )
+
+                GD.Cancel ->
+                    ( { model | state = prevstate }, Cmd.none )
+
+        ( RequestsDialogMsg _, _ ) ->
+            ( model, Cmd.none )
+
+        ( x, _ ) ->
             ( unexpectedMsg model x
             , Cmd.none
             )
 
 
+handleEditZkNoteCmd : Model -> Data.LoginData -> ( EditZkNote.Model, EditZkNote.Command ) -> ( Model, Cmd Msg )
 handleEditZkNoteCmd model login ( emod, ecmd ) =
     let
         backtolisting =
@@ -2647,9 +2780,9 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                             ( nm, Cmd.none )
 
                 onmsg : Model -> Msg -> ( Model, Cmd Msg )
-                onmsg st ms =
+                onmsg _ ms =
                     case ms of
-                        ZkReplyData (Ok (ZI.SavedZkNotePlusLinks szn)) ->
+                        ZkReplyData (Ok (ZI.SavedZkNotePlusLinks _)) ->
                             gotres
 
                         ZkReplyData (Ok (ZI.ServerError e)) ->
@@ -2809,6 +2942,20 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
             , FS.files [] OnFileSelected
             )
 
+        EditZkNote.Requests ->
+            ( { model
+                | state =
+                    RequestsDialog
+                        (RequestsDialog.init
+                            model.trackedRequests
+                            Common.buttonStyle
+                            (E.map (\_ -> ()) (viewState model.size model.state model))
+                        )
+                        model.state
+              }
+            , Cmd.none
+            )
+
         EditZkNote.Cmd cmd ->
             ( { model | state = EditZkNote emod login }
             , Cmd.map EditZkNoteMsg cmd
@@ -2925,29 +3072,111 @@ handleInvited model ( lmod, lcmd ) =
             )
 
 
-handleInviteUser : Model -> ( InviteUser.Model, InviteUser.Command ) -> Data.LoginData -> ( Model, Cmd Msg )
-handleInviteUser model ( lmod, lcmd ) login =
+handleTagFiles :
+    Model
+    -> ( TagAThing.Model TagFiles.Model TagFiles.Msg TagFiles.Command, TagAThing.Command TagFiles.Command )
+    -> Data.LoginData
+    -> State
+    -> ( Model, Cmd Msg )
+handleTagFiles model ( lmod, lcmd ) login st =
+    let
+        updstate =
+            TagFiles lmod login st
+    in
     case lcmd of
-        InviteUser.Search s ->
-            sendSearch { model | state = InviteUser lmod login } s
+        TagAThing.Search s ->
+            sendSearch { model | state = updstate } s
 
-        InviteUser.SearchHistory ->
-            ( { model | state = InviteUser lmod login }, Cmd.none )
+        TagAThing.SearchHistory ->
+            ( { model | state = updstate }, Cmd.none )
 
-        InviteUser.None ->
-            ( { model | state = InviteUser lmod login }, Cmd.none )
+        TagAThing.None ->
+            ( { model | state = updstate }, Cmd.none )
 
-        InviteUser.AddToRecent _ ->
-            ( { model | state = InviteUser lmod login }, Cmd.none )
+        TagAThing.AddToRecent _ ->
+            ( { model | state = updstate }, Cmd.none )
 
-        InviteUser.GetInvite gi ->
-            ( { model | state = InviteUser lmod login }
-            , sendAIMsg model.location (AI.GetInvite gi)
-            )
+        TagAThing.ThingCommand tc ->
+            case tc of
+                TagFiles.Ok ->
+                    let
+                        zklns =
+                            lmod.thing.model.files
 
-        InviteUser.Cancel ->
-            -- go to user listing
-            ( { model | state = InviteUser lmod login }, Cmd.none )
+                        zkls =
+                            Dict.values lmod.zklDict
+
+                        zklinks : List Data.ZkLink
+                        zklinks =
+                            zklns
+                                |> List.foldl
+                                    (\zkln links ->
+                                        List.map (\el -> Data.toZkLink zkln.id login.userid el) zkls
+                                            ++ links
+                                    )
+                                    []
+                    in
+                    ( { model | state = st }
+                    , sendZIMsg model.location
+                        (ZI.SaveZkLinks { links = zklinks })
+                    )
+
+                TagFiles.Cancel ->
+                    ( { model | state = st }, Cmd.none )
+
+                TagFiles.None ->
+                    ( { model | state = updstate }, Cmd.none )
+
+
+handleInviteUser :
+    Model
+    -> ( TagAThing.Model InviteUser.Model InviteUser.Msg InviteUser.Command, TagAThing.Command InviteUser.Command )
+    -> Data.LoginData
+    -> State
+    -> ( Model, Cmd Msg )
+handleInviteUser model ( lmod, lcmd ) login st =
+    let
+        updstate =
+            InviteUser lmod login st
+    in
+    case lcmd of
+        TagAThing.Search s ->
+            sendSearch { model | state = updstate } s
+
+        TagAThing.SearchHistory ->
+            ( { model | state = updstate }, Cmd.none )
+
+        TagAThing.None ->
+            ( { model | state = updstate }, Cmd.none )
+
+        TagAThing.AddToRecent _ ->
+            ( { model | state = updstate }, Cmd.none )
+
+        TagAThing.ThingCommand tc ->
+            case tc of
+                InviteUser.Ok ->
+                    ( { model | state = updstate }
+                    , sendAIMsg model.location
+                        (AI.GetInvite
+                            { email =
+                                if lmod.thing.model.email /= "" then
+                                    Just lmod.thing.model.email
+
+                                else
+                                    Nothing
+                            , data =
+                                Data.encodeZkInviteData (List.map Data.elToSzl (Dict.values lmod.zklDict))
+                                    |> JE.encode 2
+                                    |> Just
+                            }
+                        )
+                    )
+
+                InviteUser.Cancel ->
+                    ( { model | state = st }, Cmd.none )
+
+                InviteUser.None ->
+                    ( { model | state = updstate }, Cmd.none )
 
 
 prevSearchQuery : Data.LoginData -> S.ZkNoteSearch
@@ -3073,6 +3302,7 @@ init flags url key zone fontsize =
             , fontsize = fontsize
             , stylePalette = { defaultSpacing = 10 }
             , adminSettings = adminSettings
+            , trackedRequests = { requestCount = 0, requests = Dict.empty }
             }
 
         geterrornote =
@@ -3140,13 +3370,26 @@ main =
         , view = piview
         , update = piupdate
         , subscriptions =
-            \_ ->
-                Sub.batch
+            \model ->
+                let
+                    tracks : List (Sub Msg)
+                    tracks =
+                        case model of
+                            Ready rmd ->
+                                rmd.trackedRequests.requests
+                                    |> Dict.keys
+                                    |> List.map (\k -> Http.track k (RequestProgress k))
+
+                            PreInit _ ->
+                                []
+                in
+                Sub.batch <|
                     [ receiveTASelection TASelection
                     , Browser.Events.onResize (\w h -> WindowSize { width = w, height = h })
                     , keyreceive
                     , LS.localVal ReceiveLocalVal
                     ]
+                        ++ tracks
         , onUrlRequest = urlRequest
         , onUrlChange = UrlChanged
         }
@@ -3164,6 +3407,7 @@ port receiveTASelection : (JD.Value -> msg) -> Sub msg
 port receiveKeyMsg : (JD.Value -> msg) -> Sub msg
 
 
+keyreceive : Sub Msg
 keyreceive =
     receiveKeyMsg <| WindowKeys.receive WkMsg
 
@@ -3171,5 +3415,6 @@ keyreceive =
 port sendKeyCommand : JE.Value -> Cmd msg
 
 
+skcommand : WindowKeys.WindowKeyCmd -> Cmd Msg
 skcommand =
     WindowKeys.send sendKeyCommand

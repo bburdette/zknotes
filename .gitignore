@@ -13,3 +13,4 @@ server/indra/
 server/*.db*
 server/config.toml
 target/
+files/

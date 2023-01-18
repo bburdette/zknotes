@@ -4,6 +4,7 @@ import Data
 import Json.Decode as JD
 import Json.Encode as JE
 import Search as S
+import Util
 
 
 type SendMsg
@@ -38,6 +39,7 @@ type ServerResponse
     | SavedImportZkNotes
     | PowerDeleteComplete Int
     | HomeNoteSet Int
+    | FilesUploaded (List Data.ZkListNote)
 
 
 showServerResponse : ServerResponse -> String
@@ -87,6 +89,9 @@ showServerResponse sr =
 
         HomeNoteSet _ ->
             "HomeNoteSet"
+
+        FilesUploaded _ ->
+            "FilesUploaded"
 
 
 encodeSendMsg : SendMsg -> JE.Value
@@ -146,11 +151,6 @@ encodeSendMsg sm =
                 , ( "data", Data.encodeZkLinks zklinks )
                 ]
 
-        -- GetZkLinks gzl ->
-        --     JE.object
-        --         [ ( "what", JE.string "getzklinks" )
-        --         , ( "data", Data.encodeGetZkLinks gzl )
-        --         ]
         SearchZkNotes s ->
             JE.object
                 [ ( "what", JE.string "searchzknotes" )
@@ -234,6 +234,9 @@ serverResponseDecoder =
 
                     "homenoteset" ->
                         JD.map HomeNoteSet (JD.field "content" JD.int)
+
+                    "savedfiles" ->
+                        JD.map FilesUploaded (JD.field "content" <| JD.list Data.decodeZkListNote)
 
                     wat ->
                         JD.succeed
