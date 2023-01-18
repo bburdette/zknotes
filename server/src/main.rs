@@ -430,8 +430,6 @@ async fn save_files(
   }
 
   Ok(rv)
-
-  // simple_error::bail!("no file saved")
 }
 
 fn private(

@@ -42,16 +42,6 @@ type ServerResponse
     | FilesUploaded (List Data.ZkListNote)
 
 
-
--- type alias UploadedFiles =
---     { what : String, files : List Data.ZkListNote }
--- decodeUploadedFiles : JD.Decoder UploadedFiles
--- decodeUploadedFiles =
---     JD.succeed UploadedFiles
---         |> Util.andMap (JD.field "what" JD.string)
---         |> Util.andMap (JD.field "files" (JD.list Data.decodeZkListNote))
-
-
 showServerResponse : ServerResponse -> String
 showServerResponse sr =
     case sr of
@@ -161,11 +151,6 @@ encodeSendMsg sm =
                 , ( "data", Data.encodeZkLinks zklinks )
                 ]
 
-        -- GetZkLinks gzl ->
-        --     JE.object
-        --         [ ( "what", JE.string "getzklinks" )
-        --         , ( "data", Data.encodeGetZkLinks gzl )
-        --         ]
         SearchZkNotes s ->
             JE.object
                 [ ( "what", JE.string "searchzknotes" )

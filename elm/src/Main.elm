@@ -2338,41 +2338,6 @@ actualupdate msg model =
                             , Cmd.none
                             )
 
-        -- ( { model
-        --     | trackedRequests =
-        --         case Dict.get what model.trackedRequests.requests of
-        --             Just (FileUpload fu) ->
-        --                 let
-        --                     trqs =
-        --                         model.trackedRequests
-        --                 in
-        --                 { trqs
-        --                     | requests =
-        --                         Dict.insert files.what
-        --                             (FileUpload
-        --                                 { fu
-        --                                     | files =
-        --                                         Just files.files
-        --                                 }
-        --                             )
-        --                             trqs.requests
-        --                 }
-        --             _ ->
-        --                 model.trackedRequests
-        --   }
-        -- , Cmd.none
-        -- )
-        -- ( { model
-        --     | state =
-        --         FilesDialog
-        --             (FilesDialog.init files
-        --                 Common.buttonStyle
-        --                 (E.map (\_ -> ()) (viewState model.size model.state model))
-        --             )
-        --             model.state
-        --   }
-        -- , Cmd.none
-        -- )
         ( ViewMsg em, View es ) ->
             let
                 ( emod, ecmd ) =
