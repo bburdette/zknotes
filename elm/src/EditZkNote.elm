@@ -1449,7 +1449,7 @@ zknview zone size recentZkns trqs model =
             , E.el [ EF.bold ] (E.text model.ld.name)
             , if trqs.requests /= Dict.empty then
                 EI.button
-                    (E.alignRight :: Common.buttonStyle ++ [ EBk.color TC.green ])
+                    (E.alignRight :: Common.buttonStyle ++ [ EBk.color TC.darkGreen ])
                     { onPress = Just RequestsPress, label = E.text "uploads" }
 
               else

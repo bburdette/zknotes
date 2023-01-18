@@ -11,6 +11,7 @@ import Element.Input as EI
 import GenDialog as GD
 import Http
 import Orgauth.Data as Data
+import TangoColors as TC
 import Util
 
 
@@ -76,17 +77,38 @@ view buttonStyle mbsize trqs =
         , E.spacing 15
         ]
         [ E.el [ E.centerX, EF.bold ] <| E.text "http requests"
-        , E.column [ E.width E.fill, E.height E.fill, E.scrollbarY ]
+        , E.column [ E.width E.fill, E.height E.fill, E.scrollbarY, E.spacing 8 ]
             (trqs.requests
                 |> Dict.toList
+                |> List.reverse
                 |> List.map
                     (\( s, tr ) ->
                         case tr of
                             FileUpload fu ->
-                                E.column [ E.width E.fill, EBk.color (Common.navbarColor 2), EBd.rounded 10, E.padding 10 ]
-                                    [ E.el [ E.centerX, EF.bold ] <| E.text "Files Uploaded"
+                                let
+                                    complete =
+                                        Util.isJust fu.files
+                                in
+                                E.column
+                                    [ E.width E.fill
+                                    , EBk.color (Common.navbarColor 2)
+                                    , EBd.rounded 10
+                                    , E.padding 10
+                                    , E.spacing 8
+                                    ]
+                                    [ if complete then
+                                        E.el [ E.centerX, EF.bold ] <| E.text "file upload complete"
+
+                                      else
+                                        E.el [ E.centerX, EF.bold ] <| E.text "uploading..."
                                     , E.row [ E.width E.fill ]
-                                        [ E.column [ E.width E.fill, E.height <| E.maximum 200 E.fill, E.scrollbarY ]
+                                        [ E.column
+                                            [ EBd.width 3
+                                            , EBd.color TC.darkGrey
+                                            , E.width E.fill
+                                            , E.height <| E.maximum 200 E.fill
+                                            , E.scrollbarY
+                                            ]
                                             (fu.filenames
                                                 |> List.map (\fn -> E.paragraph [] [ E.text fn ])
                                             )
@@ -94,21 +116,23 @@ view buttonStyle mbsize trqs =
                                             |> Maybe.map renderProgress
                                             |> Maybe.withDefault E.none
                                         ]
-                                    , E.row [ E.width E.fill ]
-                                        [ EI.button buttonStyle
-                                            { onPress = Just (TagClick s), label = E.text "tags" }
-                                        , EI.button (E.alignRight :: buttonStyle)
-                                            { onPress = Just (ClearClick s), label = E.text "clear" }
-                                        ]
+                                    , if complete then
+                                        E.row [ E.width E.fill ]
+                                            [ EI.button buttonStyle
+                                                { onPress = Just (TagClick s), label = E.text "add tags" }
+                                            , EI.button (E.alignRight :: buttonStyle)
+                                                { onPress = Just (ClearClick s), label = E.text "clear" }
+                                            ]
+
+                                      else
+                                        E.none
                                     ]
                     )
             )
         , E.row [ E.width E.fill, E.spacing 10 ]
-            [ EI.button buttonStyle
-                { onPress = Just OkClick, label = E.text "Ok" }
-            , EI.button
-                (E.alignRight :: buttonStyle)
-                { onPress = Just CancelClick, label = E.text "Cancel" }
+            [ EI.button
+                (E.centerX :: buttonStyle)
+                { onPress = Just CancelClick, label = E.text "close" }
             ]
         ]
 

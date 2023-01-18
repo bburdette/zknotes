@@ -2713,7 +2713,12 @@ actualupdate msg model =
             -- TODO address this hack!
             case GD.update bm { bs | model = model.trackedRequests } of
                 GD.Dialog nmod ->
-                    ( { model | state = RequestsDialog nmod prevstate }, Cmd.none )
+                    ( { model
+                        | state = RequestsDialog nmod prevstate
+                        , trackedRequests = nmod.model
+                      }
+                    , Cmd.none
+                    )
 
                 GD.Ok return ->
                     case return of

@@ -9,6 +9,7 @@ import Element.Events as EE
 import Element.Font as EF
 import Element.Input as EI
 import TagAThing exposing (Thing)
+import TangoColors as TC
 
 
 type Msg
@@ -29,9 +30,9 @@ type alias Model =
 
 view : Model -> Element Msg
 view model =
-    E.column [ E.width E.fill, E.height E.fill ]
-        [ E.el [ EF.bold ] <| E.text "tag notes"
-        , E.column [ E.width E.fill, E.height <| E.maximum 200 E.fill, E.scrollbarY ]
+    E.column [ E.width E.fill, E.height E.fill, EBk.color TC.white, EBd.rounded 10, E.spacing 8, E.padding 10 ]
+        [ E.el [ E.centerX, EF.bold ] <| E.text "notes"
+        , E.column [ E.width E.fill, E.height <| E.maximum 200 E.fill, E.scrollbarY, E.centerX ]
             (model.files
                 |> List.map (\fn -> E.paragraph [] [ E.text fn.title ])
             )
@@ -40,7 +41,7 @@ view model =
                 Common.buttonStyle
                 { onPress = Just OkClick, label = E.text "Ok" }
             , EI.button
-                Common.buttonStyle
+                (E.alignRight :: Common.buttonStyle)
                 { onPress = Just CancelClick, label = E.text "Cancel" }
             ]
         ]

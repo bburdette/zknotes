@@ -345,60 +345,62 @@ view stylePalette recentZkns mbsize model =
                 400
 
         showLinks =
-            E.row [ EF.bold ] [ E.text "links" ]
-                :: List.map
-                    (\( l, c ) ->
-                        showZkl
-                            model.focusLink
-                            model.ld
-                            Nothing
-                            c
-                            (Dict.get
-                                (zklKey
-                                    { otherid = l.otherid
-                                    , direction =
-                                        case l.direction of
-                                            To ->
-                                                From
+            E.column [ E.height E.fill, EBk.color TC.white, EBd.rounded 10, E.padding 10, E.width E.fill ]
+                (E.row [ EF.bold, E.width E.fill, E.centerX ] [ E.text "add links" ]
+                    :: List.map
+                        (\( l, c ) ->
+                            showZkl
+                                model.focusLink
+                                model.ld
+                                Nothing
+                                c
+                                (Dict.get
+                                    (zklKey
+                                        { otherid = l.otherid
+                                        , direction =
+                                            case l.direction of
+                                                To ->
+                                                    From
 
-                                            From ->
-                                                To
-                                    }
+                                                From ->
+                                                    To
+                                        }
+                                    )
+                                    model.zklDict
+                                    |> Util.isJust
+                                    |> not
                                 )
-                                model.zklDict
-                                |> Util.isJust
-                                |> not
-                            )
-                            l
-                    )
-                    (Dict.values model.zklDict
-                        |> List.map
-                            (\l ->
-                                ( l
-                                , ZC.systemColor model.ld l.sysids
+                                l
+                        )
+                        (Dict.values model.zklDict
+                            |> List.map
+                                (\l ->
+                                    ( l
+                                    , ZC.systemColor model.ld l.sysids
+                                    )
                                 )
-                            )
-                        |> List.sortWith
-                            (\( l, lc ) ( r, rc ) ->
-                                case ( lc, rc ) of
-                                    ( Nothing, Nothing ) ->
-                                        compare r.otherid l.otherid
+                            |> List.sortWith
+                                (\( l, lc ) ( r, rc ) ->
+                                    case ( lc, rc ) of
+                                        ( Nothing, Nothing ) ->
+                                            compare r.otherid l.otherid
 
-                                    ( Just _, Nothing ) ->
-                                        GT
+                                        ( Just _, Nothing ) ->
+                                            GT
 
-                                    ( Nothing, Just _ ) ->
-                                        LT
+                                        ( Nothing, Just _ ) ->
+                                            LT
 
-                                    ( Just lcolor, Just rcolor ) ->
-                                        case Util.compareColor lcolor rcolor of
-                                            EQ ->
-                                                compare r.otherid l.otherid
+                                        ( Just lcolor, Just rcolor ) ->
+                                            case Util.compareColor lcolor rcolor of
+                                                EQ ->
+                                                    compare r.otherid l.otherid
 
-                                            a ->
-                                                a
-                            )
-                    )
+                                                a ->
+                                                    a
+                                )
+                        )
+                )
 
         searchPanel =
             E.column
@@ -472,10 +474,10 @@ view stylePalette recentZkns mbsize model =
         [ E.width (mbsize |> Maybe.map .width |> Maybe.withDefault 500 |> E.px)
         , E.spacing 10
         ]
-        [ E.column [ E.centerX, E.width <| E.px 600, E.spacing 10, E.alignTop, E.height E.fill ] <|
+        [ E.row [ E.centerX, E.width <| E.maximum 1000 E.fill, E.spacing 10, E.alignTop, E.height E.fill ] <|
             [ E.map ThingMsg <| model.thing.view model.thing.model
+            , showLinks
             ]
-                ++ showLinks
         , searchOrRecentPanel
         ]
 
