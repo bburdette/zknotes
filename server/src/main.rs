@@ -185,7 +185,7 @@ fn session_user(
       match orgauth::dbfun::read_user_by_token(
         &conn,
         token,
-        Some(config.orgauth_config.login_token_expiration_ms),
+        config.orgauth_config.login_token_expiration_ms,
       ) {
         Err(e) => {
           info!("read_user_by_token error: {:?}", e);
@@ -234,7 +234,7 @@ async fn files(session: Session, config: web::Data<Config>, req: HttpRequest) ->
         Err(e) => HttpResponse::NotFound().body(format!("{:?}", e)),
       }
     }
-    None => (HttpResponse::BadRequest().body("file hash required: /files/<hash>")),
+    None => HttpResponse::BadRequest().body("file hash required: /files/<hash>"),
   }
 }
 
@@ -281,7 +281,7 @@ async fn file(session: Session, config: web::Data<Config>, req: HttpRequest) -> 
         Err(e) => HttpResponse::NotFound().body(format!("{:?}", e)),
       }
     }
-    None => (HttpResponse::BadRequest().body("file id required: /files/<id>")),
+    None => HttpResponse::BadRequest().body("file id required: /files/<id>"),
   }
 }
 
@@ -466,7 +466,7 @@ fn zk_interface_check(
       match orgauth::dbfun::read_user_by_token(
         &conn,
         token,
-        Some(config.orgauth_config.login_token_expiration_ms),
+        config.orgauth_config.login_token_expiration_ms,
       ) {
         Err(e) => {
           info!("read_user_by_token error: {:?}", e);
@@ -492,10 +492,11 @@ fn defcon() -> Config {
     appname: "zknotes".to_string(),
     emaildomain: "zknotes.com".to_string(),
     admin_email: "admin@admin.admin".to_string(),
-    login_token_expiration_ms: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
-    email_token_expiration_ms: 1 * 24 * 60 * 60 * 1000, // 1 day in milliseconds
-    reset_token_expiration_ms: 1 * 24 * 60 * 60 * 1000, // 1 day in milliseconds
-    invite_token_expiration_ms: 7 * 24 * 60 * 60 * 1000, // 7 day in milliseconds
+    regen_login_tokens: false,
+    login_token_expiration_ms: Some(7 * 24 * 60 * 60 * 1000), // 7 days in milliseconds
+    email_token_expiration_ms: 1 * 24 * 60 * 60 * 1000,       // 1 day in milliseconds
+    reset_token_expiration_ms: 1 * 24 * 60 * 60 * 1000,       // 1 day in milliseconds
+    invite_token_expiration_ms: 7 * 24 * 60 * 60 * 1000,      // 7 day in milliseconds
     open_registration: true,
     non_admin_invite: true,
   };
