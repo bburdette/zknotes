@@ -1121,8 +1121,11 @@ zknview zone size recentZkns trqs model =
 
                             Nothing ->
                                 E.none
+                        , EI.button parabuttonstyle
+                            { onPress = Just <| ShowArchivesPress
+                            , label = E.el [ E.centerY ] <| E.text "archives"
+                            }
                         , EI.button perhapsdirtyparabuttonstyle { onPress = Just NewPress, label = E.text "new" }
-                        , EI.button perhapsdirtyparabuttonstyle { onPress = Just UploadPress, label = E.text "upload" }
                         , if mine && not model.deleted then
                             EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just <| DeletePress zone, label = E.text "delete" }
 
@@ -1453,6 +1456,10 @@ zknview zone size recentZkns trqs model =
 
               else
                 E.none
+            , EI.button (E.alignRight :: Common.buttonStyle)
+                { onPress = Just UploadPress
+                , label = E.text "upload"
+                }
             , if model.ld.admin then
                 EI.button
                     (E.alignRight :: Common.buttonStyle)
@@ -1460,10 +1467,6 @@ zknview zone size recentZkns trqs model =
 
               else
                 E.none
-            , EI.button (E.alignRight :: Common.buttonStyle)
-                { onPress = Just <| ShowArchivesPress
-                , label = E.el [ E.centerY ] <| E.text "archives"
-                }
             , EI.button
                 (E.alignRight :: Common.buttonStyle)
                 { onPress = Just SettingsPress, label = E.text "settings" }
