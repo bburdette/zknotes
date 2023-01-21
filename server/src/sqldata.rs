@@ -154,7 +154,7 @@ pub fn set_single_value(conn: &Connection, name: &str, value: &str) -> Result<()
   Ok(())
 }
 
-pub fn dbinit(dbfile: &Path, token_expiration_ms: i64) -> Result<(), Box<dyn Error>> {
+pub fn dbinit(dbfile: &Path, token_expiration_ms: Option<i64>) -> Result<(), Box<dyn Error>> {
   let exists = dbfile.exists();
 
   let conn = connection_open(dbfile)?;
@@ -279,10 +279,17 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: i64) -> Result<(), Box<dyn Err
     zkm::udpate21(&dbfile)?;
     set_single_value(&conn, "migration_level", "21")?;
   }
+  if nlevel < 22 {
+    info!("udpate22");
+    zkm::udpate22(&dbfile)?;
+    set_single_value(&conn, "migration_level", "22")?;
+  }
 
   info!("db up to date.");
 
-  orgauth::dbfun::purge_login_tokens(&conn, token_expiration_ms)?;
+  if let Some(expms) = token_expiration_ms {
+    orgauth::dbfun::purge_login_tokens(&conn, expms)?;
+  }
 
   Ok(())
 }

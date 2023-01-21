@@ -27,10 +27,12 @@ pub fn login_data_for_token(
   match session.get("token")? {
     None => Ok(None),
     Some(token) => {
-      match orgauth::dbfun::read_user_by_token(
+      match orgauth::dbfun::read_user_with_token_regen(
         &conn,
+        &session,
         token,
-        Some(config.orgauth_config.login_token_expiration_ms),
+        config.orgauth_config.regen_login_tokens,
+        config.orgauth_config.login_token_expiration_ms,
       ) {
         Ok(user) => {
           if user.active {
