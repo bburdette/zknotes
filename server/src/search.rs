@@ -135,7 +135,7 @@ pub fn build_sql(
                             // None => format!(" offset {}", search.offset),
   };
 
-  let ordclause = " order by N.id desc ";
+  let ordclause = " order by N.changeddate desc ";
 
   // TODO: filter deleted notes from search. (?)
 
@@ -331,7 +331,7 @@ pub fn build_simple_sql(
                             // None => format!(" offset {}", search.offset),
   };
 
-  let ordclause = " order by N.id desc ";
+  let ordclause = " order by N.changeddate desc ";
 
   // all notes.
   let mut sqlbase = format!(
