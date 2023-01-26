@@ -155,6 +155,7 @@ type alias Model =
     , seed : Seed
     , timezone : Time.Zone
     , savedRoute : SavedRoute
+    , initialRoute : Route
     , prevSearches : List (List S.TagSearch)
     , recentNotes : List Data.ZkListNote
     , errorNotes : Dict String String
@@ -420,47 +421,46 @@ routeStateInternal model route =
 
         Top ->
             -- if we'rre already at Top state, leave it alone.
-            if (stateRoute model.state).route == Top then
-                ( model.state, Cmd.none )
-
-            else
-                -- home page if any, or login page if not logged in.
-                -- let
-                --     ( m, c ) =
-                --         initialPage model route
-                -- in
-                -- ( m.state, c )
-                case stateLogin model.state of
-                    Just login ->
-                        case login.homenote of
-                            Just id ->
-                                ( model.state
-                                , Cmd.batch
-                                    [ sendZIMsg
-                                        model.location
-                                        (ZI.SearchZkNotes <| prevSearchQuery login)
-                                    , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id })
-                                    ]
-                                )
-
-                            Nothing ->
-                                ( EditZkNote
-                                    (EditZkNote.initNew login
-                                        { notes = []
-                                        , offset = 0
-                                        , what = ""
-                                        }
-                                        SP.initModel
-                                        []
-                                    )
-                                    login
-                                , sendZIMsg
+            -- if (stateRoute model.state).route == Top then
+            --     ( model.state, Cmd.none )
+            -- else
+            -- home page if any, or login page if not logged in.
+            -- let
+            --     ( m, c ) =
+            --         initialPage model route
+            -- in
+            -- ( m.state, c )
+            case stateLogin model.state of
+                Just login ->
+                    case login.homenote of
+                        Just id ->
+                            ( model.state
+                            , Cmd.batch
+                                [ sendZIMsg
                                     model.location
                                     (ZI.SearchZkNotes <| prevSearchQuery login)
-                                )
+                                , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id })
+                                ]
+                            )
 
-                    Nothing ->
-                        ( initLoginState model route, Cmd.none )
+                        Nothing ->
+                            ( EditZkNote
+                                (EditZkNote.initNew login
+                                    { notes = []
+                                    , offset = 0
+                                    , what = ""
+                                    }
+                                    SP.initModel
+                                    []
+                                )
+                                login
+                            , sendZIMsg
+                                model.location
+                                (ZI.SearchZkNotes <| prevSearchQuery login)
+                            )
+
+                Nothing ->
+                    ( initLoginState model route, Cmd.none )
 
 
 stateRoute : State -> SavedRoute
@@ -1617,7 +1617,7 @@ actualupdate msg model =
             in
             case c of
                 UserListing.Done ->
-                    initialPage model Top
+                    initToRoute model Top
 
                 UserListing.InviteUser ->
                     let
@@ -1696,7 +1696,7 @@ actualupdate msg model =
                         )
 
                     else
-                        initialPage model Top
+                        initToRoute model Top
 
                 ShowUrl.None ->
                     ( { model | state = ShowUrl numod login }, Cmd.none )
@@ -1759,14 +1759,24 @@ actualupdate msg model =
                 Ok piresponse ->
                     case piresponse of
                         PI.ServerError e ->
+                            -- assuming a not-logged-in error.  but maybe not?
+                            let
+                                prevstate =
+                                    case stateLogin state of
+                                        Just login ->
+                                            state
+
+                                        Nothing ->
+                                            initLoginState model model.initialRoute
+                            in
                             case Dict.get e model.errorNotes of
                                 Just url ->
-                                    ( displayMessageNLinkDialog { model | state = initLoginState model Top } e url "more info"
+                                    ( displayMessageNLinkDialog { model | state = prevstate } e url "more info"
                                     , Cmd.none
                                     )
 
                                 Nothing ->
-                                    ( displayMessageDialog { model | state = initLoginState model Top } e, Cmd.none )
+                                    ( displayMessageDialog { model | state = prevstate } e, Cmd.none )
 
                         PI.ZkNote fbe ->
                             let
@@ -1860,9 +1870,13 @@ actualupdate msg model =
                                             }
                                     in
                                     case state of
-                                        Login _ url ->
+                                        Login _ route ->
+                                            let
+                                                _ =
+                                                    Debug.log "meh" route
+                                            in
                                             -- we're logged in!
-                                            initialPage lgmod url
+                                            initToRoute lgmod route
 
                                         LoginShowMessage _ _ url ->
                                             let
@@ -1886,13 +1900,13 @@ actualupdate msg model =
                                                                 lgmod
                                                             )
                                                         |> Maybe.map (\( st, cm ) -> ( { model | state = st }, cm ))
-                                                        |> Maybe.withDefault (initialPage lgmod (mbroute |> Maybe.withDefault Top))
+                                                        |> Maybe.withDefault (initToRoute lgmod (mbroute |> Maybe.withDefault Top))
                                             in
                                             ( m, cmd )
 
                                         _ ->
                                             -- we're logged in!
-                                            initialPage lgmod Top
+                                            initToRoute lgmod Top
 
                                 Err e ->
                                     ( displayMessageDialog model (JD.errorToString e)
@@ -2418,7 +2432,7 @@ actualupdate msg model =
                                 Nothing ->
                                     -- uh, initial page I guess.  would expect prev state to be edit if no id.
                                     -- initialPage model ((stateRoute state).route) |> Maybe.withDefault Top)
-                                    initialPage model (stateRoute state).route
+                                    initToRoute model (stateRoute state).route
 
                 View.Switch id ->
                     ( model
@@ -3244,11 +3258,11 @@ preinit flags url key =
     )
 
 
-initialPage : Model -> Route -> ( Model, Cmd Msg )
-initialPage model initialroute =
+initToRoute : Model -> Route -> ( Model, Cmd Msg )
+initToRoute model route =
     let
         ( initialstate, c ) =
-            routeState model initialroute
+            routeState model route
     in
     ( { model | state = initialstate }
     , Cmd.batch
@@ -3274,6 +3288,12 @@ init flags url key zone fontsize =
                     )
                 |> Maybe.withDefault { openRegistration = False, nonAdminInvite = False }
 
+        initialroute =
+            Debug.log "route " <|
+                (parseUrl url
+                    |> Maybe.withDefault Top
+                )
+
         imodel =
             { state =
                 case flags.login of
@@ -3295,6 +3315,7 @@ init flags url key zone fontsize =
             , seed = seed
             , timezone = zone
             , savedRoute = { route = Top, save = False }
+            , initialRoute = initialroute
             , prevSearches = []
             , recentNotes = []
             , errorNotes = Dict.empty
@@ -3324,43 +3345,52 @@ init flags url key zone fontsize =
                     , { key = "l", ctrl = True, alt = True, shift = False, preventDefault = True }
                     ]
 
-        mbroute =
-            parseUrl url
+        ( m, c ) =
+            initToRoute imodel imodel.initialRoute
     in
-    mbroute
-        |> Maybe.andThen
-            (\s ->
-                case s of
-                    Top ->
-                        Nothing
+    ( m
+    , Cmd.batch
+        [ c
+        , geterrornote
+        , setkeys
+        ]
+    )
 
-                    _ ->
-                        Just s
-            )
-        |> Maybe.map
-            (routeState imodel)
-        |> Maybe.map
-            (\( rs, rcmd ) ->
-                ( { imodel
-                    | state = rs
-                  }
-                , Cmd.batch [ rcmd, geterrornote, setkeys ]
-                )
-            )
-        |> Maybe.withDefault
-            (let
-                ( m, c ) =
-                    initialPage imodel (mbroute |> Maybe.withDefault Top)
-             in
-             ( m
-             , Cmd.batch
-                [ c
-                , geterrornote
-                , setkeys
-                , Browser.Navigation.replaceUrl key "/"
-                ]
-             )
-            )
+
+
+-- mbroute
+--     |> Maybe.andThen
+--         (\s ->
+--             case s of
+--                 Top ->
+--                     Nothing
+--                 _ ->
+--                     Just s
+--         )
+--     |> Maybe.map
+--         (routeState imodel)
+--     |> Maybe.map
+--         (\( rs, rcmd ) ->
+--             ( { imodel
+--                 | state = rs
+--               }
+--             , Cmd.batch [ rcmd, geterrornote, setkeys ]
+--             )
+--         )
+--     |> Maybe.withDefault
+--         (let
+--             ( m, c ) =
+--                 initialPage imodel (mbroute |> Maybe.withDefault Top)
+--          in
+--          ( m
+--          , Cmd.batch
+--             [ c
+--             , geterrornote
+--             , setkeys
+--             , Browser.Navigation.replaceUrl key "/"
+--             ]
+--          )
+--         )
 
 
 main : Platform.Program Flags PiModel Msg
