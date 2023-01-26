@@ -101,7 +101,7 @@ type Msg
 
 
 type State
-    = Login Login.Model
+    = Login Login.Model Route
     | Invited Invited.Model
     | EditZkNote EditZkNote.Model Data.LoginData
     | EditZkNoteListing EditZkNoteListing.Model Data.LoginData
@@ -179,9 +179,9 @@ type PiModel
     | PreInit PreInitModel
 
 
-initLoginState : Model -> State
-initLoginState model =
-    Login (Login.initialModel Nothing model.adminSettings "zknotes" model.seed)
+initLoginState : Model -> Route -> State
+initLoginState model initroute =
+    Login (Login.initialModel Nothing model.adminSettings "zknotes" model.seed) initroute
 
 
 urlRequest : Browser.UrlRequest -> Msg
@@ -219,7 +219,7 @@ routeStateInternal : Model -> Route -> ( State, Cmd Msg )
 routeStateInternal model route =
     case route of
         LoginR ->
-            ( initLoginState model, Cmd.none )
+            ( initLoginState model route, Cmd.none )
 
         PublicZkNote id ->
             case stateLogin model.state of
@@ -326,7 +326,7 @@ routeStateInternal model route =
 
                         Nothing ->
                             -- err 'you're not logged in.'
-                            ( (displayMessageDialog { model | state = initLoginState model } "can't create a new note; you're not logged in!").state, Cmd.none )
+                            ( (displayMessageDialog { model | state = initLoginState model route } "can't create a new note; you're not logged in!").state, Cmd.none )
 
         ArchiveNoteListingR id ->
             case model.state of
@@ -411,7 +411,7 @@ routeStateInternal model route =
                     ( UserSettings (UserSettings.init login model.fontsize) login model.state, Cmd.none )
 
                 Nothing ->
-                    ( (displayMessageDialog { model | state = initLoginState model } "can't view user settings; you're not logged in!").state, Cmd.none )
+                    ( (displayMessageDialog { model | state = initLoginState model route } "can't view user settings; you're not logged in!").state, Cmd.none )
 
         Invite token ->
             ( PubShowMessage { message = "retrieving invite" } Nothing
@@ -419,16 +419,48 @@ routeStateInternal model route =
             )
 
         Top ->
+            -- if we'rre already at Top state, leave it alone.
             if (stateRoute model.state).route == Top then
                 ( model.state, Cmd.none )
 
             else
                 -- home page if any, or login page if not logged in.
-                let
-                    ( m, c ) =
-                        initialPage model
-                in
-                ( m.state, c )
+                -- let
+                --     ( m, c ) =
+                --         initialPage model route
+                -- in
+                -- ( m.state, c )
+                case stateLogin model.state of
+                    Just login ->
+                        case login.homenote of
+                            Just id ->
+                                ( model.state
+                                , Cmd.batch
+                                    [ sendZIMsg
+                                        model.location
+                                        (ZI.SearchZkNotes <| prevSearchQuery login)
+                                    , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id })
+                                    ]
+                                )
+
+                            Nothing ->
+                                ( EditZkNote
+                                    (EditZkNote.initNew login
+                                        { notes = []
+                                        , offset = 0
+                                        , what = ""
+                                        }
+                                        SP.initModel
+                                        []
+                                    )
+                                    login
+                                , sendZIMsg
+                                    model.location
+                                    (ZI.SearchZkNotes <| prevSearchQuery login)
+                                )
+
+                    Nothing ->
+                        ( initLoginState model route, Cmd.none )
 
 
 stateRoute : State -> SavedRoute
@@ -482,7 +514,7 @@ stateRoute state =
                 |> Maybe.map (\sid -> { route = ArchiveNoteR almod.noteid sid, save = True })
                 |> Maybe.withDefault { route = ArchiveNoteListingR almod.noteid, save = True }
 
-        Login _ ->
+        Login _ _ ->
             { route = LoginR
             , save = False
             }
@@ -680,7 +712,7 @@ showMessage msg =
 showState : State -> String
 showState state =
     case state of
-        Login _ ->
+        Login _ _ ->
             "Login"
 
         Invited _ ->
@@ -770,7 +802,7 @@ unexpectedMessage model msg =
 viewState : Util.Size -> State -> Model -> Element Msg
 viewState size state model =
     case state of
-        Login lem ->
+        Login lem _ ->
             E.map LoginMsg <| Login.view model.stylePalette size lem
 
         Invited em ->
@@ -858,7 +890,7 @@ viewState size state model =
 stateSearch : State -> Maybe ( SP.Model, Data.ZkListNoteSearchResult )
 stateSearch state =
     case state of
-        Login _ ->
+        Login _ _ ->
             Nothing
 
         Invited _ ->
@@ -943,7 +975,7 @@ stateSearch state =
 stateLogin : State -> Maybe Data.LoginData
 stateLogin state =
     case state of
-        Login _ ->
+        Login _ _ ->
             Nothing
 
         Invited _ ->
@@ -1544,7 +1576,7 @@ actualupdate msg model =
                     ( { model | state = prevstate }, Cmd.none )
 
                 UserSettings.LogOut ->
-                    ( { model | state = initLoginState model }
+                    ( { model | state = initLoginState model Top }
                     , sendUIMsg model.location UI.Logout
                     )
 
@@ -1585,7 +1617,7 @@ actualupdate msg model =
             in
             case c of
                 UserListing.Done ->
-                    initialPage model
+                    initialPage model Top
 
                 UserListing.InviteUser ->
                     let
@@ -1664,13 +1696,13 @@ actualupdate msg model =
                         )
 
                     else
-                        initialPage model
+                        initialPage model Top
 
                 ShowUrl.None ->
                     ( { model | state = ShowUrl numod login }, Cmd.none )
 
-        ( WkMsg (Ok key), Login ls ) ->
-            handleLogin model (Login.onWkKeyPress key ls)
+        ( WkMsg (Ok key), Login ls url ) ->
+            handleLogin model url (Login.onWkKeyPress key ls)
 
         ( WkMsg (Ok key), Invited ls ) ->
             handleInvited model (Invited.onWkKeyPress key ls)
@@ -1708,8 +1740,8 @@ actualupdate msg model =
         ( InviteUserMsg lm, InviteUser mod ld st ) ->
             handleInviteUser model (TagAThing.update lm mod) ld st
 
-        ( LoginMsg lm, Login ls ) ->
-            handleLogin model (Login.update lm ls)
+        ( LoginMsg lm, Login ls route ) ->
+            handleLogin model route (Login.update lm ls)
 
         ( InvitedMsg lm, Invited ls ) ->
             handleInvited model (Invited.update lm ls)
@@ -1729,12 +1761,12 @@ actualupdate msg model =
                         PI.ServerError e ->
                             case Dict.get e model.errorNotes of
                                 Just url ->
-                                    ( displayMessageNLinkDialog { model | state = initLoginState model } e url "more info"
+                                    ( displayMessageNLinkDialog { model | state = initLoginState model Top } e url "more info"
                                     , Cmd.none
                                     )
 
                                 Nothing ->
-                                    ( displayMessageDialog { model | state = initLoginState model } e, Cmd.none )
+                                    ( displayMessageDialog { model | state = initLoginState model Top } e, Cmd.none )
 
                         PI.ZkNote fbe ->
                             let
@@ -1809,8 +1841,8 @@ actualupdate msg model =
 
                         UI.RegistrationSent ->
                             case model.state of
-                                Login lgst ->
-                                    ( { model | state = Login (Login.registrationSent lgst) }, Cmd.none )
+                                Login lgst url ->
+                                    ( { model | state = Login (Login.registrationSent lgst) url }, Cmd.none )
 
                                 _ ->
                                     ( model, Cmd.none )
@@ -1828,14 +1860,18 @@ actualupdate msg model =
                                             }
                                     in
                                     case state of
-                                        Login _ ->
+                                        Login _ url ->
                                             -- we're logged in!
-                                            initialPage lgmod
+                                            initialPage lgmod url
 
                                         LoginShowMessage _ _ url ->
                                             let
                                                 ( m, cmd ) =
-                                                    parseUrl url
+                                                    let
+                                                        mbroute =
+                                                            parseUrl url
+                                                    in
+                                                    mbroute
                                                         |> Maybe.andThen
                                                             (\s ->
                                                                 case s of
@@ -1850,13 +1886,13 @@ actualupdate msg model =
                                                                 lgmod
                                                             )
                                                         |> Maybe.map (\( st, cm ) -> ( { model | state = st }, cm ))
-                                                        |> Maybe.withDefault (initialPage lgmod)
+                                                        |> Maybe.withDefault (initialPage lgmod (mbroute |> Maybe.withDefault Top))
                                             in
                                             ( m, cmd )
 
                                         _ ->
                                             -- we're logged in!
-                                            initialPage lgmod
+                                            initialPage lgmod Top
 
                                 Err e ->
                                     ( displayMessageDialog model (JD.errorToString e)
@@ -1870,7 +1906,7 @@ actualupdate msg model =
                             let
                                 nmod =
                                     { model
-                                        | state = initLoginState model
+                                        | state = initLoginState model Top
                                     }
                             in
                             ( displayMessageDialog nmod "password reset attempted!  if you're a valid user, check your inbox for a reset email."
@@ -1881,7 +1917,7 @@ actualupdate msg model =
                             let
                                 nmod =
                                     { model
-                                        | state = initLoginState model
+                                        | state = initLoginState model Top
                                     }
                             in
                             ( displayMessageDialog nmod "password reset complete!"
@@ -1900,8 +1936,8 @@ actualupdate msg model =
 
                         UI.UserExists ->
                             case state of
-                                Login lmod ->
-                                    ( { model | state = Login <| Login.userExists lmod }, Cmd.none )
+                                Login lmod route ->
+                                    ( { model | state = Login (Login.userExists lmod) route }, Cmd.none )
 
                                 _ ->
                                     ( unexpectedMessage model (UI.showServerResponse uiresponse)
@@ -1910,8 +1946,8 @@ actualupdate msg model =
 
                         UI.UnregisteredUser ->
                             case state of
-                                Login lmod ->
-                                    ( { model | state = Login <| Login.unregisteredUser lmod }, Cmd.none )
+                                Login lmod route ->
+                                    ( { model | state = Login (Login.unregisteredUser lmod) route }, Cmd.none )
 
                                 _ ->
                                     ( unexpectedMessage model (UI.showServerResponse uiresponse)
@@ -1920,19 +1956,19 @@ actualupdate msg model =
 
                         UI.NotLoggedIn ->
                             case state of
-                                Login lmod ->
-                                    ( { model | state = Login lmod }, Cmd.none )
+                                Login lmod route ->
+                                    ( { model | state = Login lmod route }, Cmd.none )
 
                                 _ ->
-                                    ( { model | state = initLoginState model }, Cmd.none )
+                                    ( { model | state = initLoginState model Top }, Cmd.none )
 
                         UI.InvalidUserOrPwd ->
                             case state of
-                                Login lmod ->
-                                    ( { model | state = Login <| Login.invalidUserOrPwd lmod }, Cmd.none )
+                                Login lmod route ->
+                                    ( { model | state = Login (Login.invalidUserOrPwd lmod) route }, Cmd.none )
 
                                 _ ->
-                                    ( unexpectedMessage { model | state = initLoginState model }
+                                    ( unexpectedMessage { model | state = initLoginState model Top }
                                         (UI.showServerResponse uiresponse)
                                     , Cmd.none
                                     )
@@ -1942,11 +1978,11 @@ actualupdate msg model =
                                 Invited lmod ->
                                     ( { model | state = Invited <| Invited.blankUserName lmod }, Cmd.none )
 
-                                Login lmod ->
-                                    ( { model | state = Login <| Login.blankUserName lmod }, Cmd.none )
+                                Login lmod route ->
+                                    ( { model | state = Login (Login.blankUserName lmod) route }, Cmd.none )
 
                                 _ ->
-                                    ( unexpectedMessage { model | state = initLoginState model }
+                                    ( unexpectedMessage { model | state = initLoginState model Top }
                                         (UI.showServerResponse uiresponse)
                                     , Cmd.none
                                     )
@@ -1956,11 +1992,11 @@ actualupdate msg model =
                                 Invited lmod ->
                                     ( { model | state = Invited <| Invited.blankPassword lmod }, Cmd.none )
 
-                                Login lmod ->
-                                    ( { model | state = Login <| Login.blankPassword lmod }, Cmd.none )
+                                Login lmod route ->
+                                    ( { model | state = Login (Login.blankPassword lmod) route }, Cmd.none )
 
                                 _ ->
-                                    ( unexpectedMessage { model | state = initLoginState model }
+                                    ( unexpectedMessage { model | state = initLoginState model Top }
                                         (UI.showServerResponse uiresponse)
                                     , Cmd.none
                                     )
@@ -1979,11 +2015,11 @@ actualupdate msg model =
                     case airesponse of
                         AI.NotLoggedIn ->
                             case state of
-                                Login lmod ->
-                                    ( { model | state = Login lmod }, Cmd.none )
+                                Login lmod route ->
+                                    ( { model | state = Login lmod route }, Cmd.none )
 
                                 _ ->
-                                    ( { model | state = initLoginState model }, Cmd.none )
+                                    ( { model | state = initLoginState model Top }, Cmd.none )
 
                         AI.Users users ->
                             case stateLogin model.state of
@@ -2165,7 +2201,7 @@ actualupdate msg model =
 
                                         Nothing ->
                                             ( displayMessageDialog
-                                                { model | state = initLoginState model }
+                                                { model | state = initLoginState model Top }
                                                 "can't access note archives; you're not logged in!"
                                             , Cmd.none
                                             )
@@ -2381,7 +2417,8 @@ actualupdate msg model =
 
                                 Nothing ->
                                     -- uh, initial page I guess.  would expect prev state to be edit if no id.
-                                    initialPage model
+                                    -- initialPage model ((stateRoute state).route) |> Maybe.withDefault Top)
+                                    initialPage model (stateRoute state).route
 
                 View.Switch id ->
                     ( model
@@ -3013,14 +3050,14 @@ handleArchiveListing model login ( emod, ecmd ) =
             )
 
 
-handleLogin : Model -> ( Login.Model, Login.Cmd ) -> ( Model, Cmd Msg )
-handleLogin model ( lmod, lcmd ) =
+handleLogin : Model -> Route -> ( Login.Model, Login.Cmd ) -> ( Model, Cmd Msg )
+handleLogin model route ( lmod, lcmd ) =
     case lcmd of
         Login.None ->
-            ( { model | state = Login lmod }, Cmd.none )
+            ( { model | state = Login lmod route }, Cmd.none )
 
         Login.Register ->
-            ( { model | state = Login lmod }
+            ( { model | state = Login lmod route }
             , sendUIMsg model.location
                 (UI.Register
                     { uid = lmod.userId
@@ -3031,7 +3068,7 @@ handleLogin model ( lmod, lcmd ) =
             )
 
         Login.Login ->
-            ( { model | state = Login lmod }
+            ( { model | state = Login lmod route }
             , sendUIMsg model.location <|
                 UI.Login
                     { uid = lmod.userId
@@ -3040,7 +3077,7 @@ handleLogin model ( lmod, lcmd ) =
             )
 
         Login.Reset ->
-            ( { model | state = Login lmod }
+            ( { model | state = Login lmod route }
             , sendUIMsg model.location <|
                 UI.ResetPassword
                     { uid = lmod.userId
@@ -3207,52 +3244,19 @@ preinit flags url key =
     )
 
 
-initialPage : Model -> ( Model, Cmd Msg )
-initialPage curmodel =
-    (case stateLogin curmodel.state of
-        Just login ->
-            case login.homenote of
-                Just id ->
-                    ( curmodel
-                    , Cmd.batch
-                        [ sendZIMsg
-                            curmodel.location
-                            (ZI.SearchZkNotes <| prevSearchQuery login)
-                        , sendZIMsg curmodel.location (ZI.GetZkNoteEdit { zknote = id })
-                        ]
-                    )
-
-                Nothing ->
-                    ( { curmodel
-                        | state =
-                            EditZkNote
-                                (EditZkNote.initNew login
-                                    { notes = []
-                                    , offset = 0
-                                    , what = ""
-                                    }
-                                    SP.initModel
-                                    []
-                                )
-                                login
-                      }
-                    , sendZIMsg
-                        curmodel.location
-                        (ZI.SearchZkNotes <| prevSearchQuery login)
-                    )
-
-        Nothing ->
-            ( { curmodel | state = initLoginState curmodel }, Cmd.none )
+initialPage : Model -> Route -> ( Model, Cmd Msg )
+initialPage model initialroute =
+    let
+        ( initialstate, c ) =
+            routeState model initialroute
+    in
+    ( { model | state = initialstate }
+    , Cmd.batch
+        [ Browser.Navigation.replaceUrl model.navkey
+            (routeUrl (stateRoute model.state).route)
+        , c
+        ]
     )
-        |> (\( m, c ) ->
-                ( m
-                , Cmd.batch
-                    [ Browser.Navigation.replaceUrl m.navkey
-                        (routeUrl (stateRoute m.state).route)
-                    , c
-                    ]
-                )
-           )
 
 
 init : Flags -> Url -> Browser.Navigation.Key -> Time.Zone -> Int -> ( Model, Cmd Msg )
@@ -3319,8 +3323,11 @@ init flags url key zone fontsize =
                     , { key = "Enter", ctrl = False, alt = False, shift = False, preventDefault = False }
                     , { key = "l", ctrl = True, alt = True, shift = False, preventDefault = True }
                     ]
+
+        mbroute =
+            parseUrl url
     in
-    parseUrl url
+    mbroute
         |> Maybe.andThen
             (\s ->
                 case s of
@@ -3331,9 +3338,7 @@ init flags url key zone fontsize =
                         Just s
             )
         |> Maybe.map
-            (routeState
-                imodel
-            )
+            (routeState imodel)
         |> Maybe.map
             (\( rs, rcmd ) ->
                 ( { imodel
@@ -3345,7 +3350,7 @@ init flags url key zone fontsize =
         |> Maybe.withDefault
             (let
                 ( m, c ) =
-                    initialPage imodel
+                    initialPage imodel (mbroute |> Maybe.withDefault Top)
              in
              ( m
              , Cmd.batch
