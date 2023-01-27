@@ -430,10 +430,6 @@ routeStateInternal model route =
             --         initialPage model route
             -- in
             -- ( m.state, c )
-            let
-                _ =
-                    Debug.log "meh" "Top"
-            in
             case stateLogin model.state of
                 Just login ->
                     case login.homenote of
@@ -1301,7 +1297,7 @@ urlupdate msg model =
                     let
                         ( state, icmd ) =
                             parseUrl url
-                                |> Maybe.map (Debug.log "rs1" <| routeState model)
+                                |> Maybe.map (routeState model)
                                 |> Maybe.withDefault ( model.state, Cmd.none )
 
                         bcmd =
@@ -1338,7 +1334,7 @@ urlupdate msg model =
                             else
                                 let
                                     ( st, rscmd ) =
-                                        Debug.log "rs2" <| routeState model route
+                                        routeState model route
                                 in
                                 -- swap out the savedRoute, so we don't write over history.
                                 ( { model
@@ -1874,18 +1870,11 @@ actualupdate msg model =
                                     in
                                     case state of
                                         Login _ route ->
-                                            let
-                                                _ =
-                                                    Debug.log "meh" route
-                                            in
                                             -- we're logged in!
                                             initToRoute lgmod lgmod.initialRoute
 
                                         LoginShowMessage _ _ url ->
                                             let
-                                                _ =
-                                                    Debug.log "LoginShowMessage _ _ url " url
-
                                                 ( m, cmd ) =
                                                     let
                                                         mbroute =
@@ -1912,8 +1901,7 @@ actualupdate msg model =
 
                                         _ ->
                                             -- we're logged in!
-                                            Debug.log "itr1" <|
-                                                initToRoute lgmod Top
+                                            initToRoute lgmod Top
 
                                 Err e ->
                                     ( displayMessageDialog model (JD.errorToString e)
@@ -3269,12 +3257,11 @@ initToRoute : Model -> Route -> ( Model, Cmd Msg )
 initToRoute model route =
     let
         ( initialstate, c ) =
-            Debug.log "rs3" <| routeState model route
+            routeState model route
     in
     ( { model | state = initialstate }
     , Cmd.batch
         [ Browser.Navigation.replaceUrl model.navkey
-            -- (routeUrl (stateRoute model.state).route)
             (routeUrl (stateRoute initialstate).route)
         , c
         ]
@@ -3297,10 +3284,8 @@ init flags url key zone fontsize =
                 |> Maybe.withDefault { openRegistration = False, nonAdminInvite = False }
 
         initialroute =
-            Debug.log "route " <|
-                (parseUrl url
-                    |> Maybe.withDefault Top
-                )
+            parseUrl url
+                |> Maybe.withDefault Top
 
         imodel =
             { state =
