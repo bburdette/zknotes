@@ -420,16 +420,6 @@ routeStateInternal model route =
             )
 
         Top ->
-            -- if we'rre already at Top state, leave it alone.
-            -- if (stateRoute model.state).route == Top then
-            --     ( model.state, Cmd.none )
-            -- else
-            -- home page if any, or login page if not logged in.
-            -- let
-            --     ( m, c ) =
-            --         initialPage model route
-            -- in
-            -- ( m.state, c )
             case stateLogin model.state of
                 Just login ->
                     case login.homenote of
@@ -3348,42 +3338,6 @@ init flags url key zone fontsize =
         , setkeys
         ]
     )
-
-
-
--- mbroute
---     |> Maybe.andThen
---         (\s ->
---             case s of
---                 Top ->
---                     Nothing
---                 _ ->
---                     Just s
---         )
---     |> Maybe.map
---         (Debug.log "rs1" <| routeState imodel)
---     |> Maybe.map
---         (\( rs, rcmd ) ->
---             ( { imodel
---                 | state = rs
---               }
---             , Cmd.batch [ rcmd, geterrornote, setkeys ]
---             )
---         )
---     |> Maybe.withDefault
---         (let
---             ( m, c ) =
---                 initialPage imodel (mbroute |> Maybe.withDefault Top)
---          in
---          ( m
---          , Cmd.batch
---             [ c
---             , geterrornote
---             , setkeys
---             , Browser.Navigation.replaceUrl key "/"
---             ]
---          )
---         )
 
 
 main : Platform.Program Flags PiModel Msg
