@@ -1759,7 +1759,6 @@ actualupdate msg model =
                 Ok piresponse ->
                     case piresponse of
                         PI.ServerError e ->
-                            -- assuming a not-logged-in error.  but maybe not?
                             let
                                 prevstate =
                                     case stateLogin state of
@@ -1876,7 +1875,7 @@ actualupdate msg model =
                                                     Debug.log "meh" route
                                             in
                                             -- we're logged in!
-                                            initToRoute lgmod route
+                                            initToRoute lgmod lgmod.initialRoute
 
                                         LoginShowMessage _ _ url ->
                                             let
