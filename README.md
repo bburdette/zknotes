@@ -24,7 +24,7 @@ If you want to compile and run this on your own machine, without bothering with 
 
 - install into a 'result' folder in a local directory (no need to clone this repo!)
   ```
-  nix build github:bburdette/zknotes
+  nix build "git+http://github.com/bburdette/zknotes?submodules=1"
   ```
 
 - Make a config.toml file with `zknotes-server -w myconfig.toml`, then edit as needed.
