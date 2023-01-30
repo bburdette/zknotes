@@ -20,7 +20,7 @@ use orgauth::endpoints::Callbacks;
 use rusqlite::{params, Connection};
 use serde_json;
 use sha256;
-use simple_error::simple_error;
+use simple_error::{bail, simple_error};
 use std::env;
 use std::error::Error;
 use std::fs::File;
@@ -565,135 +565,150 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
         .help("write default config file")
         .takes_value(true),
     )
+    .arg(
+      Arg::with_name("promote_to_admin")
+        .short("p")
+        .long("promote_to_admin")
+        .value_name("user id")
+        .help("grant admin privileges to user")
+        .takes_value(true),
+    )
     .get_matches();
 
   // writing a config file?
-  match matches.value_of("write_config") {
-    Some(filename) => {
-      util::write_string(filename, toml::to_string_pretty(&defcon())?.as_str())?;
-      info!("default config written to file: {}", filename);
-      Ok(())
-    }
-    None => {
-      // specifying a config file?  otherwise try to load the default.
-      let mut config = match matches.value_of("config") {
-        Some(filename) => load_config(filename)?,
-        None => load_config("config.toml")?,
-      };
+  if let Some(filename) = matches.value_of("write_config") {
+    util::write_string(filename, toml::to_string_pretty(&defcon())?.as_str())?;
+    info!("default config written to file: {}", filename);
+    return Ok(());
+  }
 
-      // verify/create file directories.
+  // specifying a config file?  otherwise try to load the default.
+  let mut config = match matches.value_of("config") {
+    Some(filename) => load_config(filename)?,
+    None => load_config("config.toml")?,
+  };
 
-      // TODO upgrade when stable
-      // if !std::fs::try_exists(config.file_tmp_path)? {
-      if !std::path::Path::exists(&config.file_tmp_path) {
-        std::fs::create_dir_all(&config.file_tmp_path)?
-      }
-      // TODO upgrade when stable
-      // if !std::fs::try_exists(config.file_path)? {
-      if !std::path::Path::exists(&config.file_path) {
-        std::fs::create_dir_all(&config.file_path)?
-      }
+  // verify/create file directories.
 
-      // are we exporting the DB?
-      match matches.value_of("export") {
-        Some(exportfile) => {
-          // do that exporting...
+  // TODO upgrade when stable
+  // if !std::fs::try_exists(config.file_tmp_path)? {
+  if !std::path::Path::exists(&config.file_tmp_path) {
+    std::fs::create_dir_all(&config.file_tmp_path)?
+  }
+  // TODO upgrade when stable
+  // if !std::fs::try_exists(config.file_path)? {
+  if !std::path::Path::exists(&config.file_path) {
+    std::fs::create_dir_all(&config.file_path)?
+  }
 
-          sqldata::dbinit(
-            config.orgauth_config.db.as_path(),
-            config.orgauth_config.login_token_expiration_ms,
-          )?;
+  // are we exporting the DB?
+  if let Some(exportfile) = matches.value_of("export") {
+    // do that exporting...
 
-          util::write_string(
-            exportfile,
-            serde_json::to_string_pretty(&sqldata::export_db(config.orgauth_config.db.as_path())?)?
-              .as_str(),
-          )?;
+    sqldata::dbinit(
+      config.orgauth_config.db.as_path(),
+      config.orgauth_config.login_token_expiration_ms,
+    )?;
 
-          Ok(())
-        }
-        None => {
-          // normal server ops
-          info!("server init!");
-          if config.static_path == None {
-            for (key, value) in env::vars() {
-              if key == "ZKNOTES_STATIC_PATH" {
-                config.static_path = PathBuf::from_str(value.as_str()).ok();
-              }
-            }
-          }
+    util::write_string(
+      exportfile,
+      serde_json::to_string_pretty(&sqldata::export_db(config.orgauth_config.db.as_path())?)?
+        .as_str(),
+    )?;
 
-          info!("config parameters:\n\n{}", toml::to_string_pretty(&config)?);
+    return Ok(());
+  }
 
-          sqldata::dbinit(
-            config.orgauth_config.db.as_path(),
-            config.orgauth_config.login_token_expiration_ms,
-          )?;
-
-          let timer = timer::Timer::new();
-
-          let ptconfig = config.clone();
-
-          let _guard = timer.schedule_repeating(chrono::Duration::days(1), move || {
-            match orgauth::dbfun::purge_tokens(&ptconfig.orgauth_config) {
-              Err(e) => error!("purge_tokens error: {}", e),
-              Ok(_) => (),
-            }
-          });
-
-          let c = config.clone();
-          HttpServer::new(move || {
-            let staticpath = c.static_path.clone().unwrap_or(PathBuf::from("static/"));
-            let d = c.clone();
-            let cors = Cors::default()
-              .allowed_origin_fn(move |rv, rh| {
-                if *rv == d.orgauth_config.mainsite {
-                  true
-                } else if d.altmainsite.iter().any(|am| *rv == am) {
-                  true
-                } else if rv == "https://29a.ch"
-                  && rh.method == "GET"
-                  && (rh.uri.to_string().starts_with("/static/")
-                    || (rh.uri.to_string().starts_with("/file/")))
-                {
-                  true
-                } else {
-                  info!("cors denied: {:?}, {:?}", rv, rh);
-                  false
-                }
-              })
-              .allow_any_header()
-              .allow_any_method()
-              .max_age(3600);
-
-            App::new()
-              .data(c.clone()) // <- create app with shared state
-              .wrap(cors)
-              .wrap(middleware::Logger::default())
-              .wrap(
-                CookieSession::signed(&[0; 32]) // <- create cookie based session middleware
-                  .secure(false) // allows for dev access
-                  .max_age(10 * 24 * 60 * 60), // 10 days
-              )
-              .service(web::resource("/upload").route(web::post().to(receive_files)))
-              .service(web::resource("/public").route(web::post().to(public)))
-              .service(web::resource("/private").route(web::post().to(private)))
-              .service(web::resource("/user").route(web::post().to(user)))
-              .service(web::resource("/admin").route(web::post().to(admin)))
-              // .service(web::resource(r"/files/{hash}").route(web::get().to(files)))
-              .service(web::resource(r"/file/{id}").route(web::get().to(file)))
-              .service(web::resource(r"/register/{uid}/{key}").route(web::get().to(register)))
-              .service(web::resource(r"/newemail/{uid}/{token}").route(web::get().to(new_email)))
-              .service(actix_files::Files::new("/static/", staticpath))
-              .service(web::resource("/{tail:.*}").route(web::get().to(mainpage)))
-          })
-          .bind(format!("{}:{}", config.ip, config.port))?
-          .run()
-          .await?;
-
-          Ok(())
-        }
+  // normal server ops
+  info!("server init!");
+  if config.static_path == None {
+    for (key, value) in env::vars() {
+      if key == "ZKNOTES_STATIC_PATH" {
+        config.static_path = PathBuf::from_str(value.as_str()).ok();
       }
     }
   }
+
+  info!("config parameters:\n\n{}", toml::to_string_pretty(&config)?);
+
+  sqldata::dbinit(
+    config.orgauth_config.db.as_path(),
+    config.orgauth_config.login_token_expiration_ms,
+  )?;
+
+  // promoting a user to admin?
+  if let Some(uid) = matches.value_of("promote_to_admin") {
+    let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+    let mut user = orgauth::dbfun::read_user_by_name(&conn, uid)?;
+    user.admin = true;
+    orgauth::dbfun::update_user(&conn, &user)?;
+
+    println!("promoted user {} to admin", uid);
+    return Ok(());
+  }
+
+  let timer = timer::Timer::new();
+
+  let ptconfig = config.clone();
+
+  let _guard =
+    timer.schedule_repeating(
+      chrono::Duration::days(1),
+      move || match orgauth::dbfun::purge_tokens(&ptconfig.orgauth_config) {
+        Err(e) => error!("purge_tokens error: {}", e),
+        Ok(_) => (),
+      },
+    );
+
+  let c = config.clone();
+  HttpServer::new(move || {
+    let staticpath = c.static_path.clone().unwrap_or(PathBuf::from("static/"));
+    let d = c.clone();
+    let cors = Cors::default()
+      .allowed_origin_fn(move |rv, rh| {
+        if *rv == d.orgauth_config.mainsite {
+          true
+        } else if d.altmainsite.iter().any(|am| *rv == am) {
+          true
+        } else if rv == "https://29a.ch"
+          && rh.method == "GET"
+          && (rh.uri.to_string().starts_with("/static/")
+            || (rh.uri.to_string().starts_with("/file/")))
+        {
+          true
+        } else {
+          info!("cors denied: {:?}, {:?}", rv, rh);
+          false
+        }
+      })
+      .allow_any_header()
+      .allow_any_method()
+      .max_age(3600);
+
+    App::new()
+      .data(c.clone()) // <- create app with shared state
+      .wrap(cors)
+      .wrap(middleware::Logger::default())
+      .wrap(
+        CookieSession::signed(&[0; 32]) // <- create cookie based session middleware
+          .secure(false) // allows for dev access
+          .max_age(10 * 24 * 60 * 60), // 10 days
+      )
+      .service(web::resource("/upload").route(web::post().to(receive_files)))
+      .service(web::resource("/public").route(web::post().to(public)))
+      .service(web::resource("/private").route(web::post().to(private)))
+      .service(web::resource("/user").route(web::post().to(user)))
+      .service(web::resource("/admin").route(web::post().to(admin)))
+      // .service(web::resource(r"/files/{hash}").route(web::get().to(files)))
+      .service(web::resource(r"/file/{id}").route(web::get().to(file)))
+      .service(web::resource(r"/register/{uid}/{key}").route(web::get().to(register)))
+      .service(web::resource(r"/newemail/{uid}/{token}").route(web::get().to(new_email)))
+      .service(actix_files::Files::new("/static/", staticpath))
+      .service(web::resource("/{tail:.*}").route(web::get().to(mainpage)))
+  })
+  .bind(format!("{}:{}", config.ip, config.port))?
+  .run()
+  .await?;
+
+  Ok(())
 }
