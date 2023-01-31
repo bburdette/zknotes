@@ -6,7 +6,7 @@ use orgauth::dbfun::user_id;
 use rusqlite::Connection;
 use std::convert::TryInto;
 use std::error::Error;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use zkprotocol::content::ZkListNote;
 use zkprotocol::search::{
   AndOr, SearchMod, TagSearch, ZkListNoteSearchResult, ZkNoteSearch, ZkNoteSearchResult,

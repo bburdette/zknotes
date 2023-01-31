@@ -3276,6 +3276,14 @@ init flags url key zone fontsize =
         initialroute =
             parseUrl url
                 |> Maybe.withDefault Top
+                |> (\r ->
+                        -- Don't go back to login once we've logged in!  Ha.
+                        if r == LoginR then
+                            Top
+
+                        else
+                            r
+                   )
 
         imodel =
             { state =

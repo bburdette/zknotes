@@ -20,11 +20,11 @@ use orgauth::endpoints::Callbacks;
 use rusqlite::{params, Connection};
 use serde_json;
 use sha256;
-use simple_error::{bail, simple_error};
+use simple_error::simple_error;
 use std::env;
 use std::error::Error;
 use std::fs::File;
-use std::io::Write;
+use std::io::{stdin, Write};
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -299,7 +299,7 @@ async fn receive_files(
 async fn make_file_notes(
   session: Session,
   config: web::Data<Config>,
-  mut payload: &mut Multipart,
+  payload: &mut Multipart,
 ) -> Result<ServerResponse, Box<dyn Error>> {
   let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
   let userdata = match session_user(&conn, session, &config)? {
@@ -322,14 +322,14 @@ async fn make_file_notes(
     // file exists?
     if hashpath.exists() {
       // new file already exists.
-      std::fs::remove_file(Path::new(&fp));
+      std::fs::remove_file(Path::new(&fp))?;
     } else {
       // move into hashed-files dir.
       std::fs::rename(Path::new(&fp), hashpath)?;
     }
 
     // table entry exists?
-    let mut oid: Option<i64> =
+    let oid: Option<i64> =
       match conn.query_row("select id from file where hash = ?1", params![fh], |row| {
         Ok(row.get(0)?)
       }) {
@@ -389,7 +389,7 @@ async fn make_file_notes(
 
 async fn save_files(
   to_dir: &Path,
-  mut payload: &mut Multipart,
+  payload: &mut Multipart,
 ) -> Result<Vec<(String, String)>, Box<dyn Error>> {
   // iterate over multipart stream
 
@@ -424,7 +424,7 @@ async fn save_files(
     let ps = rf
       .into_os_string()
       .into_string()
-      .map_err(|osstr| simple_error!("couldn't convert filename to string"));
+      .map_err(|osstr| simple_error!("couldn't convert filename to string: {:?}", osstr));
 
     rv.push((filename.to_string(), ps?));
   }
@@ -569,8 +569,16 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
       Arg::with_name("promote_to_admin")
         .short("p")
         .long("promote_to_admin")
-        .value_name("user id")
+        .value_name("user name")
         .help("grant admin privileges to user")
+        .takes_value(true),
+    )
+    .arg(
+      Arg::with_name("create_admin_user")
+        .short("a")
+        .long("create_admin_user")
+        .value_name("user name")
+        .help("create new admin user")
         .takes_value(true),
     )
     .get_matches();
@@ -644,6 +652,43 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
     orgauth::dbfun::update_user(&conn, &user)?;
 
     println!("promoted user {} to admin", uid);
+    return Ok(());
+  }
+
+  // creating an admin user?
+  if let Some(username) = matches.value_of("create_admin_user") {
+    // prompt for password.
+    println!("Enter password for admin user '{}':", username);
+    let mut pwd = String::new();
+    stdin().read_line(&mut pwd)?;
+    let mut cb = Callbacks {
+      on_new_user: Box::new(sqldata::on_new_user),
+      extra_login_data: Box::new(sqldata::extra_login_data_callback),
+      on_delete_user: Box::new(sqldata::on_delete_user),
+    };
+
+    let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+    // make new registration i
+    let rd = orgauth::data::RegistrationData {
+      uid: username.to_string(),
+      pwd: pwd.trim().to_string(),
+      email: "".to_string(),
+    };
+
+    println!("rd: {:?}", rd);
+
+    orgauth::dbfun::new_user(
+      &conn,
+      &rd,
+      None,
+      None,
+      true,
+      None,
+      // &mut Box::new(sqldata::on_new_user),
+      &mut cb.on_new_user,
+    )?;
+
+    println!("admin user created: {}", username);
     return Ok(());
   }
 
