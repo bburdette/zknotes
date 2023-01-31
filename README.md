@@ -29,12 +29,20 @@ If you want to compile and run this on your own machine, without bothering with 
 
 - Make a config.toml file with `zknotes-server -w myconfig.toml`, then edit as needed.
 
-- run it with:
+## first login
+
+To create the first zknotes admin account, use the -a option, like so:
+
+`../target/debug/zknotes-server -c myconfig.tomll -a the-admin`
+
+By default zknotes uses 'invite links' for new users.  To onboard a new user, an admin gets an invite link from the admin panel, and sends that to the new user via email, signal, slack, etc.  Whoever uses the invite link can set their username and password to get an account.
+
+## run zknotes
+
+After finishing the above setup, run it with:
   ```
   ./result/bin/zknotes-server -c myconfig.toml
   ```
-
-Final note - you're expected to register as a user in order to log in to the website, and this requires an email with a 'magic link' in it.  Chances are the email send won't work when you register (most ISPs prevent this), so look for server/last-email.txt to get your magic link.
 
 ## developing
 
