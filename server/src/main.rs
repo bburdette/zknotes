@@ -186,6 +186,7 @@ fn session_user(
         &conn,
         token,
         config.orgauth_config.login_token_expiration_ms,
+        config.orgauth_config.regen_login_tokens,
       ) {
         Err(e) => {
           info!("read_user_by_token error: {:?}", e);
@@ -467,6 +468,7 @@ fn zk_interface_check(
         &conn,
         token,
         config.orgauth_config.login_token_expiration_ms,
+        config.orgauth_config.regen_login_tokens,
       ) {
         Err(e) => {
           info!("read_user_by_token error: {:?}", e);
