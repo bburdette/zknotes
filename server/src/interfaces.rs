@@ -29,7 +29,8 @@ pub fn login_data_for_token(
   match session.get("token")? {
     None => Ok(None),
     Some(token) => {
-      loop {
+      // TODO: check error code rather than blindly looping.
+      for u in 1..10 {
         match orgauth::dbfun::read_user_with_token_pageload(
           &mut conn,
           &session,
@@ -57,6 +58,7 @@ pub fn login_data_for_token(
           }
         }
       }
+      Ok(None)
     }
   }
 }
