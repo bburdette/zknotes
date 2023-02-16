@@ -50,11 +50,7 @@ pub fn login_data_for_token(
             }
           }
           Err(e) => {
-            // match e {
-            //     rusqlite::Error::
-            //   }
             error!("login_data_errror {:?}, token: {:?}", e, token);
-            // Ok(None)
           }
         }
       }

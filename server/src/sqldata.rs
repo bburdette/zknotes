@@ -120,13 +120,13 @@ pub fn update_user(conn: &Connection, user: &User) -> Result<(), Box<dyn Error>>
 pub fn connection_open(dbfile: &Path) -> Result<Connection, Box<dyn Error>> {
   let conn = Connection::open(dbfile)?;
 
-  conn.busy_timeout(Duration::from_millis(500))?;
-  // conn.busy_handler(Some(|count| {
-  //   info!("busy_handler: {}", count);
-  //   let d = Duration::from_millis(500);
-  //   std::thread::sleep(d);
-  //   true
-  // }))?;
+  // conn.busy_timeout(Duration::from_millis(500))?;
+  conn.busy_handler(Some(|count| {
+    info!("busy_handler: {}", count);
+    let d = Duration::from_millis(500);
+    std::thread::sleep(d);
+    true
+  }))?;
 
   conn.execute("PRAGMA foreign_keys = true;", params![])?;
 
