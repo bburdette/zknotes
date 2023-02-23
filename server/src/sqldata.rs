@@ -869,34 +869,6 @@ pub fn zknote_access_id(
   }
 }
 
-pub fn file_access(
-  conn: &Connection,
-  uid: Option<i64>,
-  hash: String,
-) -> Result<Option<String>, Box<dyn Error>> {
-  let mut pstmt = conn.prepare(
-    " select zknote.id, zknote.title from zknote, file
-        where zknote.file = file.id
-        and file.hash = ?1
-    ",
-  )?;
-
-  let rec_iter = pstmt.query_map(params![hash], |row| Ok((row.get(0)?, row.get(1)?)))?;
-
-  for rsid in rec_iter {
-    match rsid {
-      Ok((id, title)) => {
-        if zknote_access_id(&conn, uid, id)? != Access::Private {
-          return Ok(Some(title));
-        }
-      }
-      Err(_) => (),
-    }
-  }
-
-  Ok(None)
-}
-
 pub fn read_zknote_filehash(
   conn: &Connection,
   uid: Option<i64>,
@@ -1037,26 +1009,6 @@ pub fn delete_zknote(
     }
     None => (),
   }
-
-  Ok(())
-}
-
-// delete the note AND any links to it.  TODO: delete archives too?
-pub fn real_delete_zknote(conn: &Connection, uid: i64, noteid: i64) -> Result<(), Box<dyn Error>> {
-  // only delete when user owns the links.
-  conn.execute(
-    "delete from zklink where
-      user = ?2
-      and (fromid = ?1 or toid = ?1)",
-    params![noteid, uid],
-  )?;
-
-  // only delete when user is in the zk
-  conn.execute(
-    "delete from zknote where id = ?1
-      and user = ?2",
-    params![noteid, uid],
-  )?;
 
   Ok(())
 }
