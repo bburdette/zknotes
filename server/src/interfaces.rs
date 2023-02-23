@@ -4,9 +4,10 @@ use crate::sqldata;
 use actix_session::Session;
 use actix_web::HttpRequest;
 use either::Either::{Left, Right};
-use log::info;
+use log::{error, info};
 use orgauth::endpoints::Callbacks;
 use std::error::Error;
+use std::time::Duration;
 use zkprotocol::content::{
   GetArchiveZkNote, GetZkNoteArchives, GetZkNoteComments, GetZkNoteEdit, ImportZkNote, SaveZkNote,
   SaveZkNotePlusLinks, ZkLinks, ZkNoteArchives, ZkNoteEdit,
@@ -18,7 +19,8 @@ pub fn login_data_for_token(
   session: Session,
   config: &Config,
 ) -> Result<Option<orgauth::data::LoginData>, Box<dyn Error>> {
-  let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+  let mut conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+  conn.busy_timeout(Duration::from_millis(500))?;
   let mut cb = Callbacks {
     on_new_user: Box::new(sqldata::on_new_user),
     extra_login_data: Box::new(sqldata::extra_login_data_callback),
@@ -27,26 +29,32 @@ pub fn login_data_for_token(
   match session.get("token")? {
     None => Ok(None),
     Some(token) => {
-      match orgauth::dbfun::read_user_with_token_regen(
-        &conn,
-        &session,
-        token,
-        config.orgauth_config.regen_login_tokens,
-        config.orgauth_config.login_token_expiration_ms,
-      ) {
-        Ok(user) => {
-          if user.active {
-            Ok(Some(orgauth::dbfun::login_data_cb(
-              &conn,
-              user.id,
-              &mut cb.extra_login_data,
-            )?))
-          } else {
-            Ok(None)
+      // TODO: check error code rather than blindly looping.
+      for _u in 1..10 {
+        match orgauth::dbfun::read_user_with_token_pageload(
+          &mut conn,
+          &session,
+          token,
+          config.orgauth_config.regen_login_tokens,
+          config.orgauth_config.login_token_expiration_ms,
+        ) {
+          Ok(user) => {
+            if user.active {
+              return Ok(Some(orgauth::dbfun::login_data_cb(
+                &conn,
+                user.id,
+                &mut cb.extra_login_data,
+              )?));
+            } else {
+              return Ok(None);
+            }
+          }
+          Err(e) => {
+            error!("login_data_errror {:?}, token: {:?}", e, token);
           }
         }
-        Err(_) => Ok(None),
       }
+      Ok(None)
     }
   }
 }

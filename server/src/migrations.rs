@@ -1793,3 +1793,8 @@ pub fn udpate22(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   orgauth::migrations::udpate6(dbfile)?;
   Ok(())
 }
+
+pub fn udpate23(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+  orgauth::migrations::udpate7(dbfile)?;
+  Ok(())
+}

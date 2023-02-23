@@ -182,13 +182,14 @@ fn session_user(
       content: serde_json::Value::Null,
     })),
     Some(token) => {
-      match orgauth::dbfun::read_user_by_token(
+      match orgauth::dbfun::read_user_by_token_api(
         &conn,
         token,
         config.orgauth_config.login_token_expiration_ms,
+        config.orgauth_config.regen_login_tokens,
       ) {
         Err(e) => {
-          info!("read_user_by_token error: {:?}", e);
+          info!("read_user_by_token_api error: {:?}", e);
 
           Ok(Either::Right(ServerResponse {
             what: "login error".to_string(),
@@ -198,43 +199,6 @@ fn session_user(
         Ok(userdata) => Ok(Either::Left(userdata)),
       }
     }
-  }
-}
-
-async fn files(session: Session, config: web::Data<Config>, req: HttpRequest) -> HttpResponse {
-  let conn = match sqldata::connection_open(config.orgauth_config.db.as_path()) {
-    Ok(c) => c,
-    Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
-  };
-
-  let user = match session_user(&conn, session, &config) {
-    Ok(Either::Left(user)) => user,
-    Ok(Either::Right(sr)) => return HttpResponse::Ok().json(sr),
-    Err(e) => return HttpResponse::BadRequest().body(format!("{:?}", e)),
-  };
-
-  match req.match_info().get("hash") {
-    Some(file) => {
-      // TODO verify only chars 0-9 in the string.
-
-      match sqldata::file_access(&conn, Some(user.id), file.to_string()) {
-        Ok(Some(name)) => {
-          let pstr = format!("files/{}", file);
-          let stpath = Path::new(pstr.as_str());
-
-          // Self::from_file(File::open(&path)?, path)
-          match File::open(stpath).and_then(|f| NamedFile::from_file(f, Path::new(name.as_str()))) {
-            Ok(f) => f
-              .into_response(&req)
-              .unwrap_or(HttpResponse::NotFound().json(())),
-            Err(e) => HttpResponse::NotFound().body(format!("{:?}", e)),
-          }
-        }
-        Ok(None) => HttpResponse::Unauthorized().json(()),
-        Err(e) => HttpResponse::NotFound().body(format!("{:?}", e)),
-      }
-    }
-    None => HttpResponse::BadRequest().body("file hash required: /files/<hash>"),
   }
 }
 
@@ -463,13 +427,14 @@ fn zk_interface_check(
     }),
     Some(token) => {
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-      match orgauth::dbfun::read_user_by_token(
+      match orgauth::dbfun::read_user_by_token_api(
         &conn,
         token,
         config.orgauth_config.login_token_expiration_ms,
+        config.orgauth_config.regen_login_tokens,
       ) {
         Err(e) => {
-          info!("read_user_by_token error: {:?}", e);
+          info!("read_user_by_token_api error2: {:?}, {:?}", token, e);
 
           Ok(ServerResponse {
             what: "login error".to_string(),
