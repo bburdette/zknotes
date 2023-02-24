@@ -3,7 +3,6 @@ use barrel::backend::Sqlite;
 use barrel::{types, Migration};
 use orgauth::migrations;
 use rusqlite::{params, Connection};
-use std::error::Error;
 use std::path::Path;
 
 pub fn initialdb() -> Migration {
@@ -244,7 +243,7 @@ pub fn udpate2() -> Migration {
   m
 }
 
-pub fn udpate3(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+pub fn udpate3(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   // db connection without foreign key checking.
   let conn = Connection::open(dbfile)?;
   let mut m1 = Migration::new();
@@ -334,7 +333,7 @@ pub fn udpate3(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   Ok(())
 }
 
-pub fn udpate4(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+pub fn udpate4(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   // db connection without foreign key checking.
   let conn = Connection::open(dbfile)?;
   let mut m1 = Migration::new();
@@ -678,7 +677,7 @@ pub fn udpate4(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   Ok(())
 }
 
-pub fn udpate5(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+pub fn udpate5(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   // db connection without foreign key checking.
   let conn = Connection::open(dbfile)?;
   let mut m1 = Migration::new();
@@ -768,7 +767,7 @@ pub fn udpate5(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   Ok(())
 }
 
-pub fn udpate6(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+pub fn udpate6(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   // db connection without foreign key checking.
   let conn = Connection::open(dbfile)?;
   let mut m1 = Migration::new();
@@ -873,7 +872,7 @@ pub fn udpate6(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   Ok(())
 }
 
-pub fn udpate7(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+pub fn udpate7(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   // db connection without foreign key checking.
   let conn = Connection::open(dbfile)?;
   let mut m1 = Migration::new();
@@ -963,7 +962,7 @@ pub fn udpate7(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   Ok(())
 }
 
-pub fn udpate8(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+pub fn udpate8(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   let conn = Connection::open(dbfile)?;
   let pubid: i64 = conn.query_row(
     "select zknote.id from
@@ -1000,7 +999,7 @@ pub fn udpate8(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   Ok(())
 }
 
-pub fn udpate9(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+pub fn udpate9(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   // db connection without foreign key checking.
   let conn = Connection::open(dbfile)?;
   let mut m1 = Migration::new();
@@ -1031,7 +1030,7 @@ pub fn udpate9(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   Ok(())
 }
 
-pub fn udpate10(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+pub fn udpate10(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   // db connection without foreign key checking.
   let conn = Connection::open(dbfile)?;
   let mut m1 = Migration::new();
@@ -1129,7 +1128,7 @@ pub fn udpate10(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   Ok(())
 }
 
-pub fn udpate11(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+pub fn udpate11(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   // db connection without foreign key checking.
   let conn = Connection::open(dbfile)?;
   let mut m1 = Migration::new();
@@ -1159,7 +1158,7 @@ pub fn udpate11(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   Ok(())
 }
 
-pub fn udpate12(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+pub fn udpate12(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   // db connection without foreign key checking.
   let conn = Connection::open(dbfile)?;
   let mut m1 = Migration::new();
@@ -1254,7 +1253,7 @@ pub fn udpate12(dbfile: &Path) -> Result<(), Box<dyn Error>> {
 // --------------------------------------------------------------------------------
 // orgauth enters the chat
 // --------------------------------------------------------------------------------
-pub fn udpate13(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+pub fn udpate13(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   // db connection without foreign key checking.
   let conn = Connection::open(dbfile)?;
 
@@ -1482,22 +1481,22 @@ pub fn udpate13(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   Ok(())
 }
 
-pub fn udpate14(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+pub fn udpate14(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   orgauth::migrations::udpate2(dbfile)?;
   Ok(())
 }
 
-pub fn udpate15(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+pub fn udpate15(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   orgauth::migrations::udpate3(dbfile)?;
   Ok(())
 }
 
-pub fn udpate16(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+pub fn udpate16(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   orgauth::migrations::udpate4(dbfile)?;
   Ok(())
 }
 
-pub fn udpate17(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+pub fn udpate17(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   // Add archive system note.
 
   let conn = Connection::open(dbfile)?;
@@ -1541,7 +1540,7 @@ pub fn udpate17(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   Ok(())
 }
 
-pub fn udpate18(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+pub fn udpate18(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   // db connection without foreign key checking.
   let conn = Connection::open(dbfile)?;
   let mut m1 = Migration::new();
@@ -1635,7 +1634,7 @@ pub fn udpate18(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   Ok(())
 }
 
-pub fn udpate19(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+pub fn udpate19(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   // db connection without foreign key checking.
   let conn = Connection::open(dbfile)?;
 
@@ -1663,12 +1662,12 @@ pub fn udpate19(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   Ok(())
 }
 
-pub fn udpate20(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+pub fn udpate20(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   orgauth::migrations::udpate5(dbfile)?;
   Ok(())
 }
 
-pub fn udpate21(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+pub fn udpate21(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   let conn = Connection::open(dbfile)?;
 
   let mut m = Migration::new();
@@ -1789,12 +1788,12 @@ pub fn udpate21(dbfile: &Path) -> Result<(), Box<dyn Error>> {
   Ok(())
 }
 
-pub fn udpate22(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+pub fn udpate22(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   orgauth::migrations::udpate6(dbfile)?;
   Ok(())
 }
 
-pub fn udpate23(dbfile: &Path) -> Result<(), Box<dyn Error>> {
+pub fn udpate23(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   orgauth::migrations::udpate7(dbfile)?;
   Ok(())
 }

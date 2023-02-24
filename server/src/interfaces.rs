@@ -5,6 +5,7 @@ use actix_session::Session;
 use actix_web::HttpRequest;
 use either::Either::{Left, Right};
 use log::{error, info};
+use orgauth;
 use orgauth::endpoints::Callbacks;
 use std::error::Error;
 use std::time::Duration;
@@ -29,8 +30,7 @@ pub fn login_data_for_token(
   match session.get("token")? {
     None => Ok(None),
     Some(token) => {
-      // TODO: check error code rather than blindly looping.
-      for _u in 1..10 {
+      loop {
         match orgauth::dbfun::read_user_with_token_pageload(
           &mut conn,
           &session,
@@ -49,12 +49,29 @@ pub fn login_data_for_token(
               return Ok(None);
             }
           }
+          Err(orgauth::error::Error::Rusqlite(rusqlite::Error::SqliteFailure(fe, mbstring))) => {
+            error!("SqliteFailure: {:?}, {:?}", fe, mbstring);
+            match fe.code {
+              rusqlite::ErrorCode::DatabaseBusy => {
+                error!("database busy sleeping 10");
+                std::thread::sleep_ms(10);
+                ()
+              }
+              rusqlite::ErrorCode::DatabaseLocked => {
+                error!("database locked sleeping 10");
+                std::thread::sleep_ms(10);
+                ()
+              }
+              _ => return Err(rusqlite::Error::SqliteFailure(fe, mbstring).into()),
+            }
+          }
           Err(e) => {
             error!("login_data_errror {:?}, token: {:?}", e, token);
+            return Err(e.into());
+            // error!("login_data_errror {:?}, token: {:?}", e, token);
           }
         }
       }
-      Ok(None)
     }
   }
 }
@@ -73,12 +90,12 @@ pub fn user_interface(
   config: &Config,
   msg: orgauth::data::WhatMessage,
 ) -> Result<orgauth::data::WhatMessage, Box<dyn Error>> {
-  orgauth::endpoints::user_interface(
+  Ok(orgauth::endpoints::user_interface(
     &session,
     &config.orgauth_config,
     &mut zknotes_callbacks(),
     msg,
-  )
+  )?)
 }
 
 pub fn zk_interface_loggedin(

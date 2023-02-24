@@ -1,13 +1,12 @@
 use crate::migrations as zkm;
-use crate::util::now;
 use barrel::backend::Sqlite;
 use log::info;
 use orgauth::data::RegistrationData;
 use orgauth::dbfun::user_id;
+use orgauth::util::now;
 use rusqlite::{params, Connection};
 use serde_derive::{Deserialize, Serialize};
 use simple_error::bail;
-use std::error::Error;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use zkprotocol::content::{
@@ -29,7 +28,7 @@ pub fn on_new_user(
   data: Option<String>,
   creator: Option<i64>,
   uid: i64,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), orgauth::error::Error> {
   let usernoteid = note_id(&conn, "system", "user")?;
   let publicnoteid = note_id(&conn, "system", "public")?;
   let systemid = user_id(&conn, "system")?;
@@ -78,12 +77,12 @@ pub fn on_new_user(
 pub fn extra_login_data_callback(
   conn: &Connection,
   uid: i64,
-) -> Result<Option<serde_json::Value>, Box<dyn Error>> {
+) -> Result<Option<serde_json::Value>, orgauth::error::Error> {
   Ok(Some(serde_json::to_value(extra_login_data(&conn, uid)?)?))
 }
 
 // ok to delete user?
-pub fn on_delete_user(conn: &Connection, uid: i64) -> Result<bool, Box<dyn Error>> {
+pub fn on_delete_user(conn: &Connection, uid: i64) -> Result<bool, orgauth::error::Error> {
   // try deleting all their links and notes.
   conn.execute("delete from zklink where user = ?1", params!(uid))?;
   conn.execute("delete from zknote where user = ?1", params!(uid))?;
@@ -91,7 +90,10 @@ pub fn on_delete_user(conn: &Connection, uid: i64) -> Result<bool, Box<dyn Error
   Ok(true)
 }
 
-pub fn extra_login_data(conn: &Connection, uid: i64) -> Result<ExtraLoginData, Box<dyn Error>> {
+pub fn extra_login_data(
+  conn: &Connection,
+  uid: i64,
+) -> Result<ExtraLoginData, orgauth::error::Error> {
   let user = read_user_by_id(&conn, uid)?;
 
   let eld = ExtraLoginData {
@@ -107,7 +109,7 @@ pub fn extra_login_data(conn: &Connection, uid: i64) -> Result<ExtraLoginData, B
   Ok(eld)
 }
 
-pub fn update_user(conn: &Connection, user: &User) -> Result<(), Box<dyn Error>> {
+pub fn update_user(conn: &Connection, user: &User) -> Result<(), orgauth::error::Error> {
   conn.execute(
     "update user set zknote = ?1, homenote = ?2
            where id = ?3",
@@ -117,7 +119,7 @@ pub fn update_user(conn: &Connection, user: &User) -> Result<(), Box<dyn Error>>
   Ok(())
 }
 
-pub fn connection_open(dbfile: &Path) -> Result<Connection, Box<dyn Error>> {
+pub fn connection_open(dbfile: &Path) -> Result<Connection, orgauth::error::Error> {
   let conn = Connection::open(dbfile)?;
 
   // conn.busy_timeout(Duration::from_millis(500))?;
@@ -133,7 +135,10 @@ pub fn connection_open(dbfile: &Path) -> Result<Connection, Box<dyn Error>> {
   Ok(conn)
 }
 
-pub fn get_single_value(conn: &Connection, name: &str) -> Result<Option<String>, Box<dyn Error>> {
+pub fn get_single_value(
+  conn: &Connection,
+  name: &str,
+) -> Result<Option<String>, orgauth::error::Error> {
   match conn.query_row(
     "select value from singlevalue where name = ?1",
     params![name],
@@ -141,11 +146,15 @@ pub fn get_single_value(conn: &Connection, name: &str) -> Result<Option<String>,
   ) {
     Ok(v) => Ok(Some(v)),
     Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-    Err(x) => Err(Box::new(x)),
+    Err(x) => Err(x.into()),
   }
 }
 
-pub fn set_single_value(conn: &Connection, name: &str, value: &str) -> Result<(), Box<dyn Error>> {
+pub fn set_single_value(
+  conn: &Connection,
+  name: &str,
+  value: &str,
+) -> Result<(), orgauth::error::Error> {
   conn.execute(
     "insert into singlevalue (name, value) values (?1, ?2)
         on conflict (name) do update set value = ?2 where name = ?1",
@@ -154,7 +163,10 @@ pub fn set_single_value(conn: &Connection, name: &str, value: &str) -> Result<()
   Ok(())
 }
 
-pub fn dbinit(dbfile: &Path, token_expiration_ms: Option<i64>) -> Result<(), Box<dyn Error>> {
+pub fn dbinit(
+  dbfile: &Path,
+  token_expiration_ms: Option<i64>,
+) -> Result<(), orgauth::error::Error> {
   let exists = dbfile.exists();
 
   let conn = connection_open(dbfile)?;
@@ -168,7 +180,10 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: Option<i64>) -> Result<(), Box
     Err(_) => 0,
     Ok(None) => 0,
     Ok(Some(level)) => {
-      let l = level.parse::<i32>()?;
+      let l = match level.parse::<i32>() {
+        Ok(l) => l,
+        Err(e) => return Err(format!("{}", e).into()),
+      };
       l
     }
   };
@@ -307,7 +322,7 @@ pub fn save_zklink(
   toid: i64,
   user: i64,
   linkzknote: Option<i64>,
-) -> Result<i64, Box<dyn Error>> {
+) -> Result<i64, orgauth::error::Error> {
   // ok to link to notes you don't own.
   // can link between notes you don't own, even.
   // but linking from a note you don't own to 'share' or 'public' is not allowed.
@@ -344,10 +359,10 @@ pub fn save_zklink(
   };
 
   // yeesh.  doing this to exit with ? instead of having a big if-then to the end.
-  let orwat: Result<(), Box<dyn Error>> = if authed {
+  let orwat: Result<(), orgauth::error::Error> = if authed {
     Ok(())
   } else {
-    bail!("link not allowed")
+    Err("link not allowed".into())
   };
   let _wat = orwat?;
 
@@ -360,7 +375,7 @@ pub fn save_zklink(
   Ok(conn.last_insert_rowid())
 }
 
-pub fn note_id(conn: &Connection, name: &str, title: &str) -> Result<i64, Box<dyn Error>> {
+pub fn note_id(conn: &Connection, name: &str, title: &str) -> Result<i64, orgauth::error::Error> {
   let id: i64 = conn.query_row(
     "select zknote.id from
       zknote, orgauth_user
@@ -373,7 +388,11 @@ pub fn note_id(conn: &Connection, name: &str, title: &str) -> Result<i64, Box<dy
   Ok(id)
 }
 
-pub fn note_id2(conn: &Connection, uid: i64, title: &str) -> Result<Option<i64>, Box<dyn Error>> {
+pub fn note_id2(
+  conn: &Connection,
+  uid: i64,
+  title: &str,
+) -> Result<Option<i64>, orgauth::error::Error> {
   match conn.query_row(
     "select zknote.id from
       zknote
@@ -384,13 +403,13 @@ pub fn note_id2(conn: &Connection, uid: i64, title: &str) -> Result<Option<i64>,
   ) {
     Err(e) => match e {
       rusqlite::Error::QueryReturnedNoRows => Ok(None),
-      _ => Err(Box::new(e)),
+      _ => Err(e.into()),
     },
     Ok(i) => Ok(i),
   }
 }
 
-pub fn user_note_id(conn: &Connection, uid: i64) -> Result<i64, Box<dyn Error>> {
+pub fn user_note_id(conn: &Connection, uid: i64) -> Result<i64, orgauth::error::Error> {
   let id: i64 = conn.query_row(
     "select zknote from user
       where user.id = ?1",
@@ -400,7 +419,7 @@ pub fn user_note_id(conn: &Connection, uid: i64) -> Result<i64, Box<dyn Error>> 
   Ok(id)
 }
 
-pub fn user_shares(conn: &Connection, uid: i64) -> Result<Vec<i64>, Box<dyn Error>> {
+pub fn user_shares(conn: &Connection, uid: i64) -> Result<Vec<i64>, orgauth::error::Error> {
   let shareid = note_id(&conn, "system", "share")?;
   let usernoteid = user_note_id(&conn, uid)?;
 
@@ -430,7 +449,7 @@ pub fn is_zknote_usershared(
   conn: &Connection,
   zknoteid: i64,
   uid: i64,
-) -> Result<bool, Box<dyn Error>> {
+) -> Result<bool, orgauth::error::Error> {
   let usernoteid: i64 = user_note_id(&conn, uid)?;
 
   let ret = are_notes_linked(&conn, zknoteid, usernoteid)?;
@@ -442,14 +461,14 @@ pub fn is_zknote_shared(
   conn: &Connection,
   zknoteid: i64,
   uid: i64,
-) -> Result<bool, Box<dyn Error>> {
+) -> Result<bool, orgauth::error::Error> {
   let shareid: i64 = note_id(conn, "system", "share")?;
   let publicid: i64 = note_id(conn, "system", "public")?;
   let usernoteid: i64 = user_note_id(&conn, uid)?;
 
   // does note link to a note that links to share?
   // and does that note link to usernoteid?
-  let ret = match conn.query_row(
+  let ret: Result<bool, orgauth::error::Error> = match conn.query_row(
     "select count(*)
       from zklink L,
         (select U.toid id
@@ -476,13 +495,13 @@ pub fn is_zknote_shared(
   ) {
     Ok(count) => Ok(count > 0),
     Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
-    Err(x) => Err(Box::new(x)),
+    Err(x) => Err(x.into()),
   };
 
   Ok(ret?)
 }
 
-pub fn is_zknote_public(conn: &Connection, zknoteid: i64) -> Result<bool, Box<dyn Error>> {
+pub fn is_zknote_public(conn: &Connection, zknoteid: i64) -> Result<bool, orgauth::error::Error> {
   let pubid: i64 = note_id(conn, "system", "public")?;
   match conn.query_row(
     "select count(*) from
@@ -497,7 +516,7 @@ pub fn is_zknote_public(conn: &Connection, zknoteid: i64) -> Result<bool, Box<dy
   ) {
     Ok(count) => Ok(count > 0),
     Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
-    Err(x) => Err(Box::new(x)),
+    Err(x) => Err(x.into()),
   }
 }
 
@@ -505,7 +524,7 @@ pub fn is_zknote_mine(
   conn: &Connection,
   zknoteid: i64,
   userid: i64,
-) -> Result<bool, Box<dyn Error>> {
+) -> Result<bool, orgauth::error::Error> {
   match conn.query_row(
     "select count(*) from
       zknote
@@ -518,11 +537,15 @@ pub fn is_zknote_mine(
   ) {
     Ok(count) => Ok(count > 0),
     Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
-    Err(x) => Err(Box::new(x)),
+    Err(x) => Err(x.into()),
   }
 }
 
-pub fn are_notes_linked(conn: &Connection, nid1: i64, nid2: i64) -> Result<bool, Box<dyn Error>> {
+pub fn are_notes_linked(
+  conn: &Connection,
+  nid1: i64,
+  nid2: i64,
+) -> Result<bool, orgauth::error::Error> {
   match conn.query_row(
     "select count(*) from
       zklink
@@ -536,13 +559,16 @@ pub fn are_notes_linked(conn: &Connection, nid1: i64, nid2: i64) -> Result<bool,
   ) {
     Ok(count) => Ok(count > 0),
     Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
-    Err(x) => Err(Box::new(x)),
+    Err(x) => Err(x.into()),
   }
 }
 
 // zknote CRUD
 
-pub fn archive_zknote(conn: &Connection, noteid: i64) -> Result<SavedZkNote, Box<dyn Error>> {
+pub fn archive_zknote(
+  conn: &Connection,
+  noteid: i64,
+) -> Result<SavedZkNote, orgauth::error::Error> {
   let now = now()?;
   let sysid = user_id(&conn, "system")?;
   let aid = note_id(&conn, "system", "archive")?;
@@ -569,7 +595,11 @@ pub fn archive_zknote(conn: &Connection, noteid: i64) -> Result<SavedZkNote, Box
   })
 }
 
-pub fn set_zknote_file(conn: &Connection, noteid: i64, fileid: i64) -> Result<(), Box<dyn Error>> {
+pub fn set_zknote_file(
+  conn: &Connection,
+  noteid: i64,
+  fileid: i64,
+) -> Result<(), orgauth::error::Error> {
   conn.execute(
     "update zknote set file = ?1
          where id = ?2",
@@ -582,7 +612,7 @@ pub fn save_zknote(
   conn: &Connection,
   uid: i64,
   note: &SaveZkNote,
-) -> Result<SavedZkNote, Box<dyn Error>> {
+) -> Result<SavedZkNote, orgauth::error::Error> {
   let now = now()?;
 
   match note.id {
@@ -677,7 +707,7 @@ pub fn get_sysids(conn: &Connection, sysid: i64, noteid: i64) -> Result<Vec<i64>
   r
 }
 
-pub fn read_user_by_id(conn: &Connection, id: i64) -> Result<User, Box<dyn Error>> {
+pub fn read_user_by_id(conn: &Connection, id: i64) -> Result<User, orgauth::error::Error> {
   let user = conn.query_row(
     "select id, zknote, homenote
       from user where id = ?1",
@@ -694,7 +724,11 @@ pub fn read_user_by_id(conn: &Connection, id: i64) -> Result<User, Box<dyn Error
   Ok(user)
 }
 
-pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNote, Box<dyn Error>> {
+pub fn read_zknote(
+  conn: &Connection,
+  uid: Option<i64>,
+  id: i64,
+) -> Result<ZkNote, orgauth::error::Error> {
   let sysid = user_id(&conn, "system")?;
   let sysids = get_sysids(conn, sysid, id)?;
 
@@ -737,11 +771,11 @@ pub fn read_zknote(conn: &Connection, uid: Option<i64>, id: i64) -> Result<ZkNot
         note.editable = false;
         Ok(note)
       }
-      Access::Private => Err(Box::new(std::io::Error::new(
-        std::io::ErrorKind::PermissionDenied,
-        "can't read zknote; note is private",
-      ))),
-      // bail!("can't read zknote; note is private"),
+      Access::Private => Err("can't read zknote; note is private".into()),
+      // Access::Private => Err(Box::new(std::io::Error::new(
+      //   std::io::ErrorKind::PermissionDenied,
+      //   "can't read zknote; note is private",
+      // ))),
     },
     Err(e) => Err(e),
   }
@@ -751,17 +785,18 @@ pub fn read_zklistnote(
   conn: &Connection,
   uid: Option<i64>,
   id: i64,
-) -> Result<ZkListNote, Box<dyn Error>> {
+) -> Result<ZkListNote, orgauth::error::Error> {
   let sysid = user_id(&conn, "system")?;
   let sysids = get_sysids(conn, sysid, id)?;
 
   // access check
   let zna = zknote_access_id(conn, uid, id)?;
   match zna {
-    Access::Private => Err(Box::new(std::io::Error::new(
-      std::io::ErrorKind::PermissionDenied,
-      "can't read zknote; note is private",
-    ))),
+    // Access::Private => Err(Box::new(std::io::Error::new(
+    //   std::io::ErrorKind::PermissionDenied,
+    //   "can't read zknote; note is private",
+    // ))),
+    Access::Private => Err::<_, orgauth::error::Error>("can't read zknote; note is private".into()),
     _ => Ok(()),
   }?;
 
@@ -799,7 +834,7 @@ pub fn zknote_access(
   conn: &Connection,
   uid: Option<i64>,
   note: &ZkNote,
-) -> Result<Access, Box<dyn Error>> {
+) -> Result<Access, orgauth::error::Error> {
   match uid {
     Some(uid) => {
       if uid == note.user {
@@ -840,7 +875,7 @@ pub fn zknote_access_id(
   conn: &Connection,
   uid: Option<i64>,
   noteid: i64,
-) -> Result<Access, Box<dyn Error>> {
+) -> Result<Access, orgauth::error::Error> {
   match uid {
     Some(uid) => {
       if is_zknote_mine(&conn, noteid, uid)? {
@@ -873,7 +908,7 @@ pub fn read_zknote_filehash(
   conn: &Connection,
   uid: Option<i64>,
   noteid: &i64,
-) -> Result<Option<String>, Box<dyn Error>> {
+) -> Result<Option<String>, orgauth::error::Error> {
   if zknote_access_id(&conn, uid, *noteid)? != Access::Private {
     let hash = conn.query_row(
       "select F.hash from zknote N, file F
@@ -893,7 +928,7 @@ pub fn read_zknotepubid(
   conn: &Connection,
   uid: Option<i64>,
   pubid: &str,
-) -> Result<ZkNote, Box<dyn Error>> {
+) -> Result<ZkNote, orgauth::error::Error> {
   let publicid = note_id(&conn, "system", "public")?;
   let mut note = conn.query_row(
     "select A.id, A.title, A.content, A.user, OU.name, U.zknote, A.pubid, A.editable, A.showtitle, A.deleted, A.file, A.createdate, A.changeddate
@@ -943,10 +978,11 @@ pub fn read_zknotepubid(
         note.editable = false;
         Ok(note)
       }
-      Access::Private => Err(Box::new(std::io::Error::new(
-        std::io::ErrorKind::PermissionDenied,
-        "can't read zknote; note is private",
-      ))),
+      // Access::Private => Err(Box::new(std::io::Error::new(
+      //   std::io::ErrorKind::PermissionDenied,
+      //   "can't read zknote; note is private",
+      // ))),
+      Access::Private => Err("can't read zknote; note is private".into()),
     },
     Err(e) => Err(e),
   }
@@ -957,13 +993,10 @@ pub fn delete_zknote(
   file_path: PathBuf,
   uid: i64,
   noteid: i64,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), orgauth::error::Error> {
   match zknote_access_id(&conn, Some(uid), noteid)? {
-    Access::ReadWrite => Ok(()),
-    _ => Err(Box::new(std::io::Error::new(
-      std::io::ErrorKind::PermissionDenied,
-      "can't delete zknote; write permission denied.",
-    ))),
+    Access::ReadWrite => Ok::<(), orgauth::error::Error>(()),
+    _ => Err("can't delete zknote; write permission denied.".into()),
   }?;
 
   archive_zknote(&conn, noteid)?;
@@ -1013,7 +1046,11 @@ pub fn delete_zknote(
   Ok(())
 }
 
-pub fn save_zklinks(dbfile: &Path, uid: i64, zklinks: Vec<ZkLink>) -> Result<(), Box<dyn Error>> {
+pub fn save_zklinks(
+  dbfile: &Path,
+  uid: i64,
+  zklinks: Vec<ZkLink>,
+) -> Result<(), orgauth::error::Error> {
   let conn = connection_open(dbfile)?;
 
   for zklink in zklinks.iter() {
@@ -1037,7 +1074,7 @@ pub fn save_savezklinks(
   uid: i64,
   zknid: i64,
   zklinks: Vec<SaveZkLink>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), orgauth::error::Error> {
   for link in zklinks.iter() {
     let (from, to) = match link.direction {
       Direction::From => (link.otherid, zknid),
@@ -1062,7 +1099,7 @@ pub fn read_zklinks(
   conn: &Connection,
   uid: i64,
   gzl: &GetZkLinks,
-) -> Result<Vec<EditLink>, Box<dyn Error>> {
+) -> Result<Vec<EditLink>, orgauth::error::Error> {
   let pubid = note_id(&conn, "system", "public")?;
   let sysid = user_id(&conn, "system")?;
 
@@ -1173,7 +1210,7 @@ pub fn read_zklinks(
 pub fn read_public_zklinks(
   conn: &Connection,
   noteid: i64,
-) -> Result<Vec<EditLink>, Box<dyn Error>> {
+) -> Result<Vec<EditLink>, orgauth::error::Error> {
   let pubid = note_id(&conn, "system", "public")?;
   let sysid = user_id(&conn, "system")?;
 
@@ -1223,7 +1260,7 @@ pub fn read_zknotecomments(
   conn: &Connection,
   uid: i64,
   gznc: &GetZkNoteComments,
-) -> Result<Vec<ZkNote>, Box<dyn Error>> {
+) -> Result<Vec<ZkNote>, orgauth::error::Error> {
   let cid = note_id(&conn, "system", "comment")?;
 
   // notes with a TO link to our note
@@ -1264,7 +1301,7 @@ pub fn read_zknotearchives(
   conn: &Connection,
   uid: i64,
   gzna: &GetZkNoteArchives,
-) -> Result<Vec<ZkListNote>, Box<dyn Error>> {
+) -> Result<Vec<ZkListNote>, orgauth::error::Error> {
   let aid = note_id(&conn, "system", "archive")?;
   let sysid = user_id(&conn, "system")?;
 
@@ -1318,7 +1355,7 @@ pub fn read_archivezknote(
   conn: &Connection,
   uid: i64,
   gazn: &GetArchiveZkNote,
-) -> Result<ZkNote, Box<dyn Error>> {
+) -> Result<ZkNote, orgauth::error::Error> {
   let archiveid = note_id(&conn, "system", "archive")?;
   let sysid = user_id(&conn, "system")?;
 
@@ -1338,9 +1375,9 @@ pub fn read_archivezknote(
     params![gazn.parentnote, archiveid, gazn.noteid],
     |row| Ok(row.get(0)?),
   ) {
-    Ok(v) => Ok(v),
-    Err(rusqlite::Error::QueryReturnedNoRows) => bail!("not an archive note!"),
-    Err(x) => Err(Box::new(x)),
+    Ok(v) => Ok::<i64, orgauth::error::Error>(v),
+    Err(rusqlite::Error::QueryReturnedNoRows) => Err("not an archive note!".into()),
+    Err(x) => Err(x.into()),
   }?;
 
   // now read the archive note AS SYSTEM.
@@ -1351,7 +1388,7 @@ pub fn read_zknoteedit(
   conn: &Connection,
   uid: i64,
   gzl: &GetZkNoteEdit,
-) -> Result<ZkNoteEdit, Box<dyn Error>> {
+) -> Result<ZkNoteEdit, orgauth::error::Error> {
   // should do an ownership check for us
   let zknote = read_zknote(conn, Some(uid), gzl.zknote)?;
 
@@ -1367,7 +1404,7 @@ pub fn save_importzknotes(
   conn: &Connection,
   uid: i64,
   izns: Vec<ImportZkNote>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), orgauth::error::Error> {
   for izn in izns.iter() {
     // create the note if it doesn't exist.
     let nid = match note_id2(&conn, uid, izn.title.as_str())? {
@@ -1464,7 +1501,7 @@ pub struct ZkDatabase {
   users: Vec<User>,
 }
 
-pub fn export_db(_dbfile: &Path) -> Result<ZkDatabase, Box<dyn Error>> {
+pub fn export_db(_dbfile: &Path) -> Result<ZkDatabase, orgauth::error::Error> {
   /*  let conn = connection_open(dbfile)?;
   let sysid = user_id(&conn, "system")?;
 
