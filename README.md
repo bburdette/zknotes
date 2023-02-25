@@ -1,6 +1,6 @@
 # zknotes
 
-A multiuser zettelkasten implementation in elm and rust, currently storing notes in sqlite.  Its still in the prototype stage.
+A multiuser zettelkasten implementation in elm and rust, currently storing notes in sqlite.
 
 There are some [docs](https://www.zknotes.com/page/what%20is%20zknotes) hosted in zknotes itself, with a few screenshots.
 
