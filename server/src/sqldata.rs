@@ -806,7 +806,6 @@ pub fn read_zklistnote(
     params![id],
     |row| {
       let wat : Option<i64> = row.get(1)?;
-      println!("wat: {:?}", wat);
       let zln = ZkListNote {
         id: id,
         title: row.get(0)?,
