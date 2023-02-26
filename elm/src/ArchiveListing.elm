@@ -12,6 +12,7 @@ import Element.Input as EI
 import Element.Region
 import Import
 import PaginationPanel as PP
+import Route as R
 import Search as S exposing (TagSearch(..))
 import SearchStackPanel as SP
 import TagSearchPanel as TSP
@@ -81,7 +82,7 @@ view ld zone size model =
         [ listview ld zone size model
         , model.selected
             |> Maybe.andThen (\id -> Dict.get id model.fullnotes)
-            |> Maybe.map (\zkn -> E.text zkn.content)
+            |> Maybe.map (\zkn -> E.column [ E.width (E.maximum 700 E.fill), E.scrollbarX ] <| [ E.text zkn.content ])
             |> Maybe.withDefault E.none
         ]
 
@@ -132,7 +133,18 @@ listview ld zone size model =
                 , EBk.color TC.white
                 , E.spacing 8
                 ]
-                [ E.map PPMsg <| PP.view model.ppmodel
+                [ E.row [ E.width E.fill ]
+                    [ E.link
+                        Common.linkStyle
+                        { url = R.routeUrl <| R.EditZkNoteR model.noteid
+                        , label = E.text "back"
+                        }
+                    , E.el [ E.centerX ] <|
+                        E.map
+                            PPMsg
+                        <|
+                            PP.view model.ppmodel
+                    ]
                 , E.table [ E.spacing 5, E.width E.fill, E.centerX ]
                     { data = model.notes
                     , columns =
