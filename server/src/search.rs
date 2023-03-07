@@ -365,6 +365,7 @@ fn build_sql_clause(
       let mut tag = false;
       let mut desc = false;
       let mut user = false;
+      let mut file = false;
 
       for m in mods {
         match m {
@@ -372,6 +373,7 @@ fn build_sql_clause(
           SearchMod::Tag => tag = true,
           SearchMod::Note => desc = true,
           SearchMod::User => user = true,
+          SearchMod::File => file = true,
         }
       }
       let field = if desc { "content" } else { "title" };
@@ -385,10 +387,12 @@ fn build_sql_clause(
         (format!("N.user {}= ?", notstr), vec![format!("{}", user)])
       } else {
         if tag {
+          let fileclause = if file { "and zkn.file is not null" } else { "" };
+
           let clause = if exact {
-            format!("zkn.{} = ?", field)
+            format!("zkn.{} = ? {}", field, fileclause)
           } else {
-            format!("zkn.{}  like ?", field)
+            format!("zkn.{}  like ? {}", field, fileclause)
           };
 
           let notstr = if not { "not" } else { "" };
@@ -416,6 +420,8 @@ fn build_sql_clause(
             },
           )
         } else {
+          let fileclause = if file { "and N.file is not null" } else { "" };
+
           let notstr = match (not, exact) {
             (true, false) => "not",
             (false, false) => "",
@@ -426,9 +432,9 @@ fn build_sql_clause(
           (
             // clause
             if exact {
-              format!("N.{} {}= ?", field, notstr)
+              format!("N.{} {}= ? {}", field, notstr, fileclause)
             } else {
-              format!("N.{} {} like ?", field, notstr)
+              format!("N.{} {} like ? {}", field, notstr, fileclause)
             },
             // args
             if exact {
