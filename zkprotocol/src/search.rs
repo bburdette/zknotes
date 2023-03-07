@@ -31,6 +31,7 @@ pub enum SearchMod {
   Tag,
   Note,
   User,
+  File,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

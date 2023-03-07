@@ -79,6 +79,7 @@ type SearchMod
     | Tag
     | Note
     | User
+    | File
 
 
 type TagSearch
@@ -142,6 +143,9 @@ encodeSearchMod smod =
         User ->
             JE.string "User"
 
+        File ->
+            JE.string "File"
+
 
 decodeSearchMod : JD.Decoder SearchMod
 decodeSearchMod =
@@ -160,6 +164,9 @@ decodeSearchMod =
 
                     "User" ->
                         JD.succeed User
+
+                    "File" ->
+                        JD.succeed File
 
                     wat ->
                         JD.fail <| "invalid search mod: " ++ wat
@@ -292,6 +299,9 @@ showSearchMod mod =
         User ->
             "User"
 
+        File ->
+            "File"
+
 
 showAndOr : AndOr -> String
 showAndOr ao =
@@ -331,6 +341,9 @@ printSearchMod mod =
         User ->
             "u"
 
+        File ->
+            "u"
+
 
 printAndOr : AndOr -> String
 printAndOr ao =
@@ -366,6 +379,8 @@ searchMod =
             |. symbol "n"
         , succeed User
             |. symbol "u"
+        , succeed File
+            |. symbol "f"
         ]
 
 
