@@ -342,7 +342,7 @@ printSearchMod mod =
             "u"
 
         File ->
-            "u"
+            "f"
 
 
 printAndOr : AndOr -> String
