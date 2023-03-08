@@ -260,6 +260,7 @@ async fn receive_files(
   }
 }
 
+// TODO: move out of main.rs
 async fn make_file_notes(
   session: Session,
   config: web::Data<Config>,
@@ -279,17 +280,19 @@ async fn make_file_notes(
 
   for (name, fp) in saved_files {
     // compute hash.
-    let fh = sha256::try_digest(Path::new(&fp))?;
+    let fpath = Path::new(&fp);
+    let fh = sha256::try_digest(fpath)?;
+    let size = std::fs::metadata(fpath)?.len();
     let fhp = format!("files/{}", fh);
     let hashpath = Path::new(&fhp);
 
     // file exists?
     if hashpath.exists() {
       // new file already exists.
-      std::fs::remove_file(Path::new(&fp))?;
+      std::fs::remove_file(fpath)?;
     } else {
       // move into hashed-files dir.
-      std::fs::rename(Path::new(&fp), hashpath)?;
+      std::fs::rename(fpath, hashpath)?;
     }
 
     // table entry exists?
@@ -310,9 +313,9 @@ async fn make_file_notes(
 
         // add table entry
         conn.execute(
-          "insert into file (hash, createdate)
-                 values (?1, ?2)",
-          params![fh, now],
+          "insert into file (hash, createdate, size)
+                 values (?1, ?2, ?3)",
+          params![fh, now, size],
         )?;
         conn.last_insert_rowid()
       }
