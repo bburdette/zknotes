@@ -3,6 +3,7 @@ use barrel::backend::Sqlite;
 use barrel::{types, Migration};
 use orgauth::migrations;
 use rusqlite::{params, Connection};
+use std::fs::Metadata;
 use std::path::Path;
 
 pub fn initialdb() -> Migration {
@@ -1795,5 +1796,82 @@ pub fn udpate22(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 
 pub fn udpate23(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   orgauth::migrations::udpate7(dbfile)?;
+  Ok(())
+}
+
+pub fn udpate24(dbfile: &Path) -> Result<(), orgauth::error::Error> {
+  let conn = Connection::open(dbfile)?;
+
+  let mut m1 = Migration::new();
+
+  m1.create_table("filetemp", |t| {
+    t.add_column(
+      "id",
+      types::integer()
+        .primary(true)
+        .increments(true)
+        .nullable(false),
+    );
+    t.add_column("hash", types::text().nullable(false).unique(true));
+    t.add_column("createdate", types::integer().nullable(false));
+  });
+
+  conn.execute_batch(m1.make::<Sqlite>().as_str())?;
+
+  conn.execute(
+    "insert into filetemp (hash, createdate)
+      select hash, createdate from file",
+    params![],
+  )?;
+
+  let mut m2 = Migration::new();
+
+  m2.drop_table("file");
+
+  m2.create_table("file", |t| {
+    t.add_column(
+      "id",
+      types::integer()
+        .primary(true)
+        .increments(true)
+        .nullable(false),
+    );
+    t.add_column("hash", types::text().nullable(false).unique(true));
+    t.add_column("createdate", types::integer().nullable(false));
+    t.add_column("size", types::integer().nullable(false));
+  });
+
+  conn.execute_batch(m2.make::<Sqlite>().as_str())?;
+
+  let mut pstmt = conn.prepare("select hash, createdate from filetemp")?;
+  let r: Vec<(String, i64)> = pstmt
+    .query_map(params![], |row| {
+      let s: String = row.get(0)?;
+      let i: i64 = row.get(1)?;
+      Ok((s, i))
+    })?
+    .filter_map(|x| x.ok())
+    .collect();
+
+  for (hash, createdate) in r {
+    // get file size.
+
+    println!("attempting file {}", hash);
+
+    let pstr = format!("files/{}", hash);
+    let stpath = Path::new(pstr.as_str());
+    let md = std::fs::metadata(stpath)?;
+
+    let size = md.len();
+    println!("file size {} - {}", hash, size);
+
+    conn.execute(
+      "insert  into file (hash, createdate, size)
+      values (?1, ?2, ?3)",
+      params![hash, createdate, size],
+    )?;
+    println!("insert complete");
+  }
+
   Ok(())
 }
