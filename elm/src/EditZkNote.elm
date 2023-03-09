@@ -71,6 +71,7 @@ import Markdown.Parser
 import Markdown.Renderer
 import Maybe.Extra as ME
 import MdCommon as MC
+import MdText as MT
 import Orgauth.Data exposing (UserId)
 import RequestsDialog exposing (TRequests)
 import Schelme.Show exposing (showTerm)
