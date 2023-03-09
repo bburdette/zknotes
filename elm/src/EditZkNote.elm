@@ -138,6 +138,7 @@ type Msg
 
 type NavChoice
     = NcEdit
+    | NcList
     | NcView
     | NcSearch
     | NcRecent
@@ -150,6 +151,7 @@ type SearchOrRecent
 
 type EditOrView
     = EditView
+    | ListView
     | ViewView
 
 
@@ -1029,6 +1031,9 @@ zknview zone size recentZkns trqs model =
             else
                 [ EF.color TC.darkGrey ]
 
+        listview =
+            editview
+
         editview linkbkc =
             let
                 titleed =
@@ -1480,6 +1485,7 @@ zknview zone size recentZkns trqs model =
                     ]
                     [ headingPanel "edit" [ E.width E.fill ] (editview TC.white)
                     , headingPanel "view" [ E.width E.fill ] (mdview TC.white)
+                    , headingPanel "list" [ E.width E.fill ] (listview TC.white)
                     , searchOrRecentPanel
                     ]
 
@@ -1504,6 +1510,9 @@ zknview zone size recentZkns trqs model =
                                 EditView ->
                                     NcEdit
 
+                                ListView ->
+                                    NcList
+
                                 ViewView ->
                                     NcView
                             )
@@ -1516,10 +1525,14 @@ zknview zone size recentZkns trqs model =
                                 else
                                     "markdown"
                               )
+                            , ( NcList, "list" )
                             ]
                         , case model.editOrView of
                             EditView ->
                                 editview TC.white
+
+                            ListView ->
+                                listview TC.white
 
                             ViewView ->
                                 mdview TC.white
@@ -1540,12 +1553,16 @@ zknview zone size recentZkns trqs model =
                             else
                                 "markdown"
                           )
+                        , ( NcList, "list" )
                         , ( NcSearch, "search" )
                         , ( NcRecent, "recent" )
                         ]
                     , case model.navchoice of
                         NcEdit ->
                             editview TC.lightGray
+
+                        NcList ->
+                            listview TC.lightGray
 
                         NcView ->
                             mdview TC.lightGray
@@ -1592,6 +1609,9 @@ tabsOnLoad model =
             case model.editOrView of
                 EditView ->
                     NcEdit
+
+                ListView ->
+                    NcList
 
                 ViewView ->
                     NcView
@@ -2547,6 +2567,9 @@ update msg model =
                     case nc of
                         NcEdit ->
                             EditView
+
+                        NcList ->
+                            ListView
 
                         NcView ->
                             ViewView
