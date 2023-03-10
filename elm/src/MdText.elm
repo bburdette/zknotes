@@ -39,7 +39,7 @@ stringRenderer =
                     "###### "
                         ++ String.concat children
             )
-                |> (\s -> String.append s "\n\n")
+                ++ "\n\n"
     , paragraph =
         \strs ->
             String.concat strs
@@ -69,8 +69,7 @@ stringRenderer =
         \link content ->
             String.concat
                 [ "["
-                , -- link.title |> Maybe.withDefault "",
-                  String.concat content
+                , String.concat content
                 , "]("
                 , link.destination
                 , ")"
@@ -79,8 +78,7 @@ stringRenderer =
         \imageInfo ->
             String.concat
                 [ "!["
-                , -- link.title |> Maybe.withDefault "",
-                  imageInfo.alt
+                , imageInfo.alt
                 , "]("
                 , imageInfo.src
                 , ")"
@@ -111,11 +109,11 @@ stringRenderer =
     , codeBlock =
         \{ body, language } ->
             String.concat
-                [ "````"
+                [ "```"
                 , language |> Maybe.withDefault ""
                 , "\n"
                 , body
-                , "```\n`"
+                , "```\n\n"
                 ]
     , thematicBreak = "--------------------\n"
 
