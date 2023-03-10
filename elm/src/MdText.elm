@@ -1,51 +1,50 @@
-module MdText exposing (stringRenderer)
+module MdText exposing (renderMdText, stringRenderer)
 
 import Markdown.Block as Block exposing (Block, Inline, ListItem, Task)
 import Markdown.Html
+import Markdown.Parser
 import Markdown.Renderer exposing (Renderer)
 
 
-{-| This renders `Html` in an attempt to be as close as possible to
-the HTML output in <https://github.github.com/gfm/>.
--}
+renderMdText : String -> Result String String
+renderMdText md =
+    md
+        |> Markdown.Parser.parse
+        |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
+        |> Result.andThen (Markdown.Renderer.render stringRenderer)
+        |> Result.map String.concat
+
+
 stringRenderer : Renderer String
 stringRenderer =
     { heading =
-        -- \{ level, rawText, children } ->
-        --     case level of
-        --         Block.H1 ->
-        --             "# " ++ String.concat children
-        --         Block.H2 ->
-        --             "## " ++ String.concat children
-        --         Block.H3 ->
-        --             "### " ++ String.concat children
-        --         Block.H4 ->
-        --             "#### " ++ String.concat children
-        --         Block.H5 ->
-        --             "##### " ++ String.concat children
-        --         Block.H6 ->
-        --             "###### " ++ String.concat children
-        \hinfo ->
-            case hinfo.level of
+        \{ level, rawText, children } ->
+            (case level of
                 Block.H1 ->
-                    "# " ++ String.concat hinfo.children
+                    "# " ++ String.concat children
 
                 Block.H2 ->
-                    "## " ++ String.concat hinfo.children
+                    "## " ++ String.concat children
 
                 Block.H3 ->
-                    "### " ++ String.concat hinfo.children
+                    "### " ++ String.concat children
 
                 Block.H4 ->
-                    "#### " ++ String.concat hinfo.children
+                    "#### " ++ String.concat children
 
                 Block.H5 ->
-                    "##### " ++ String.concat hinfo.children
+                    "##### " ++ String.concat children
 
                 Block.H6 ->
-                    "###### " ++ String.concat hinfo.children
-    , paragraph = String.concat
-    , hardLineBreak = "\n\n"
+                    "###### "
+                        ++ String.concat children
+            )
+                |> (\s -> String.append s "\n\n")
+    , paragraph =
+        \strs ->
+            String.concat strs
+                ++ "\n\n"
+    , hardLineBreak = "  \n"
     , blockQuote =
         \strs ->
             strs
@@ -59,9 +58,6 @@ stringRenderer =
         \s ->
             String.concat
                 ("*" :: s ++ [ "*" ])
-
-    -- |> (\l -> l ++ "*")
-    -- |> (++) "*"
     , strikethrough =
         \s ->
             String.concat
@@ -100,10 +96,10 @@ stringRenderer =
                                 "- " ++ String.concat childs ++ "\n"
 
                             Block.ListItem Block.IncompleteTask childs ->
-                                "- " ++ String.concat childs ++ "\n"
+                                "- [ ]" ++ String.concat childs ++ "\n"
 
                             Block.ListItem Block.CompletedTask childs ->
-                                "- " ++ String.concat childs ++ "\n"
+                                "- [x]" ++ String.concat childs ++ "\n"
                     )
                 |> String.concat
     , orderedList =
@@ -121,7 +117,9 @@ stringRenderer =
                 , body
                 , "```\n`"
                 ]
-    , thematicBreak = "\n"
+    , thematicBreak = "--------------------\n"
+
+    -- tables not currently parsed by elm-markdown.
     , table = String.concat
     , tableHeader = String.concat
     , tableBody = String.concat
@@ -131,61 +129,3 @@ stringRenderer =
     , tableCell =
         \maybeAlignment strs -> String.concat strs
     }
-
-
-
--- type alias Renderer String =
---     { heading : { level : Block.HeadingLevel, rawText : String, children : List String } -> String
---     , paragraph : List String -> String
---     , blockQuote : List String -> String
---     , html : Markdown.Html.Renderer (List String -> String)
---     , text : String -> String
---     , codeSpan : String -> String
---     , strong : List String -> String
---     , emphasis : List String -> String
---     , strikethrough : List String -> String
---     , hardLineBreak : String
---     , link : { title : Maybe String, destination : String } -> List String -> String
---     , image : { alt : String, src : String, title : Maybe String } -> String
---     , unorderedList : List (ListItem String) -> String
---     , orderedList : Int -> List (List String) -> String
---     , codeBlock : { body : String, language : Maybe String } -> String
---     , thematicBreak : String
---     , table : List String -> String
---     , tableHeader : List String -> String
---     , tableBody : List String -> String
---     , tableRow : List String -> String
---     , tableCell : Maybe Block.Alignment -> List String -> String
---     , tableHeaderCell : Maybe Block.Alignment -> List String -> String
---     }
-{-
-   -- { blockQuote : List String -> String
-     -- , codeBlock : { body : String, language : Maybe String } -> String
-     -- , codeSpan : String -> String
-     -- , emphasis : List String -> String
-     -- , hardLineBreak : String
-     -- , heading :
-     --       { children : List String, level : Block.HeadingLevel, rawText : String
-     --       }
-     --       -> String
-     -- , html : Markdown.Html.Renderer (List String -> String)
-     -- , image : { alt : String, src : String, title : Maybe String } -> String
-     -- , link :
-     --       { destination : String, title : Maybe String }
-     --       -> List String
-     --       -> String
-     , orderedList : Int -> List String -> String
-     , paragraph : List String -> String
-     , strikethrough : List String -> String
-     , strong : List String -> String
-     , table : List String -> String
-     , tableBody : List String -> String
-     , tableCell : Maybe Block.Alignment -> List String -> String
-     , tableHeader : List String -> String
-     , tableHeaderCell : Maybe Block.Alignment -> List String -> String
-     , tableRow : List String -> String
-     , text : String -> String
-     , thematicBreak : String
-     , unorderedList : List (ListItem String) -> String
-     }
--}

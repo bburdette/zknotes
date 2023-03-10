@@ -62,8 +62,8 @@ import Element.Events as EE
 import Element.Font as EF
 import Element.Input as EI
 import Element.Region as ER
-import Html exposing (Attribute, Html)
-import Html.Attributes
+import Html exposing (Html)
+import Html.Attributes as HA
 import Json.Decode as JD
 import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..), inlineFoldl)
 import Markdown.Html
@@ -1033,7 +1033,37 @@ zknview zone size recentZkns trqs model =
                 [ EF.color TC.darkGrey ]
 
         listview =
-            editview
+            E.column
+                [ E.width E.fill
+                , E.centerX
+                , E.alignTop
+                , E.spacing 8
+                , E.paddingXY 5 0
+                ]
+            <|
+                [ E.column
+                    [ E.centerX
+                    , E.paddingXY 0 10
+                    , E.spacing 8
+                    ]
+                    [ E.row [ E.width E.fill, E.spacing 8 ]
+                        [ E.paragraph [ EF.bold ] [ E.text model.title ]
+                        ]
+                    , case MT.renderMdText model.md of
+                        Err e ->
+                            E.text e
+
+                        Ok s ->
+                            E.html <|
+                                Html.div
+                                    [ HA.style "white-space" "pre-wrap"
+                                    , HA.style "word-break" "break-word"
+                                    ]
+                                    [ Html.text <|
+                                        s
+                                    ]
+                    ]
+                ]
 
         editview linkbkc =
             let
@@ -1046,11 +1076,11 @@ zknview zone size recentZkns trqs model =
                              else
                                 []
                             )
-                                ++ [ E.htmlAttribute (Html.Attributes.id "title")
+                                ++ [ E.htmlAttribute (HA.id "title")
                                    ]
 
                          else
-                            [ EF.color TC.darkGrey, E.htmlAttribute (Html.Attributes.id "title") ]
+                            [ EF.color TC.darkGrey, E.htmlAttribute (HA.id "title") ]
                         )
                         { onChange =
                             if editable then
@@ -1217,7 +1247,7 @@ zknview zone size recentZkns trqs model =
 
                        else
                         EF.color TC.darkGrey
-                     , E.htmlAttribute (Html.Attributes.id "mdtext")
+                     , E.htmlAttribute (HA.id "mdtext")
                      , E.alignTop
                      ]
                         ++ (if isdirty then
@@ -1486,7 +1516,7 @@ zknview zone size recentZkns trqs model =
                     ]
                     [ headingPanel "edit" [ E.width E.fill ] (editview TC.white)
                     , headingPanel "view" [ E.width E.fill ] (mdview TC.white)
-                    , headingPanel "list" [ E.width E.fill ] (listview TC.white)
+                    , headingPanel "list" [ E.width E.fill ] listview
                     , searchOrRecentPanel
                     ]
 
@@ -1533,7 +1563,7 @@ zknview zone size recentZkns trqs model =
                                 editview TC.white
 
                             ListView ->
-                                listview TC.white
+                                listview
 
                             ViewView ->
                                 mdview TC.white
@@ -1563,7 +1593,7 @@ zknview zone size recentZkns trqs model =
                             editview TC.lightGray
 
                         NcList ->
-                            listview TC.lightGray
+                            listview
 
                         NcView ->
                             mdview TC.lightGray
