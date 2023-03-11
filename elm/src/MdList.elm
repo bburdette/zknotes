@@ -1,5 +1,8 @@
 module MdList exposing (mdblockview)
 
+import Array exposing (Array)
+import Common exposing (buttonStyle)
+import DnDList
 import Element as E exposing (Element)
 import Element.Background as EBk
 import Element.Border as EBd
@@ -9,6 +12,166 @@ import Element.Input as EI
 import Element.Region as ER
 import Markdown.Block as Block exposing (Block(..), Html(..), Inline(..), ListItem(..), Task(..), inlineFoldl)
 import Markdown.Html
+
+
+type alias Model =
+    { blocks : Array EditBlock
+    , focusBlock : Maybe Int
+    , nextBlockId : Int
+    , cleanBlocks : Array EditBlock
+    , blockDnd : DnDList.Model
+    }
+
+
+type alias EditBlock =
+    { editid : Int
+    , block : Block
+    }
+
+
+type Msg
+    = AddBlockPress
+    | BlockDndMsg DnDList.Msg
+    | BlockClicked Int
+    | DeleteBlock Int
+
+
+
+-- | BlockViewMsg BlockView.Msg
+
+
+blockDndConfig : DnDList.Config EditBlock
+blockDndConfig =
+    { beforeUpdate = \_ _ list -> list
+    , movement = DnDList.Free
+    , listen = DnDList.OnDrag
+    , operation = DnDList.Swap
+    }
+
+
+blockDndSystem : DnDList.System EditBlock Msg
+blockDndSystem =
+    DnDList.create blockDndConfig BlockDndMsg
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    blockDndSystem.subscriptions model.blockDnd
+        ++ (Array.indexedMap
+                (\i -> viewBlockDnd model.blockDnd i model.focusBlock)
+                model.blocks
+                |> Array.toList
+           )
+
+
+viewBlockDnd : DnDList.Model -> Int -> Maybe Int -> EditBlock -> Element Msg
+viewBlockDnd ddlmodel i focusid s =
+    let
+        ddw =
+            case
+                blockDndSystem.info ddlmodel
+                    |> Maybe.map .dragIndex
+            of
+                Just ix ->
+                    if ix == i then
+                        Ghost
+
+                    else
+                        Drop
+
+                Nothing ->
+                    Drag
+    in
+    viewBlock ddw i focusid s
+
+
+type DragDropWhat
+    = Drag
+    | Drop
+    | Ghost
+
+
+viewBlock : DragDropWhat -> Int -> Maybe Int -> EditBlock -> Element Msg
+viewBlock ddw i focusid s =
+    let
+        itemId : String
+        itemId =
+            "id-" ++ String.fromInt i
+
+        focus =
+            focusid == Just s.editid
+    in
+    E.row
+        ([ E.width E.fill
+         , E.spacing 8
+         , E.htmlAttribute (Html.Attributes.id itemId)
+         , E.padding 10
+         , EBd.rounded 5
+         , EE.onMouseDown (BlockClicked s.editid)
+         ]
+            ++ (case ddw of
+                    Drag ->
+                        [ EBk.color <|
+                            if focus then
+                                TC.darkBlue
+
+                            else
+                                TC.blue
+                        ]
+
+                    Drop ->
+                        EBk.color TC.yellow
+                            :: List.map E.htmlAttribute (blockDndSystem.dropEvents i itemId)
+
+                    Ghost ->
+                        [ E.alpha 0.5, EBk.color TC.green ]
+               )
+        )
+        [ E.column
+            ([ E.width <| E.px 30
+             , EBk.color TC.brown
+             , E.height E.fill
+             ]
+                ++ List.map E.htmlAttribute (blockDndSystem.dragEvents i itemId)
+            )
+            []
+        , E.column
+            [ E.width E.fill
+            , E.spacing 8
+            ]
+            [ viewBlockItem s.editid s.item
+
+            -- , if focus then
+            --     blockMenu
+            --   else
+            --     E.none
+            ]
+        , EI.button (E.alignTop :: E.alignRight :: buttonStyle)
+            { onPress = Just (DeleteBlock s.editid)
+            , label = E.text "x"
+            }
+        ]
+
+
+ghostView : Model -> E.Element Msg
+ghostView model =
+    let
+        dnd =
+            model.blockDnd
+
+        maybeDragItem : Maybe EditBlock
+        maybeDragItem =
+            blockDndSystem.info dnd
+                |> Maybe.andThen (\{ dragIndex } -> Array.get dragIndex model.blocks)
+    in
+    case maybeDragItem of
+        Just item ->
+            E.el
+                (List.map E.htmlAttribute (blockDndSystem.ghostStyles dnd))
+                (viewBlock Ghost 0 (Just item.editid) item)
+
+        Nothing ->
+            E.none
 
 
 mdblockview parsedMd =
