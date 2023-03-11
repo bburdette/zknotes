@@ -65,12 +65,13 @@ import Element.Region as ER
 import Html exposing (Html)
 import Html.Attributes as HA
 import Json.Decode as JD
-import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..), inlineFoldl)
+import Markdown.Block as Block exposing (Block(..), Html(..), Inline, ListItem(..), Task(..), inlineFoldl)
 import Markdown.Html
 import Markdown.Parser
 import Markdown.Renderer
 import Maybe.Extra as ME
 import MdCommon as MC
+import MdList as ML
 import MdText as MT
 import Orgauth.Data exposing (UserId)
 import RequestsDialog exposing (TRequests)
@@ -1032,6 +1033,9 @@ zknview zone size recentZkns trqs model =
             else
                 [ EF.color TC.darkGrey ]
 
+        parsedMd =
+            Markdown.Parser.parse model.md
+
         listview =
             E.column
                 [ E.width E.fill
@@ -1046,23 +1050,25 @@ zknview zone size recentZkns trqs model =
                     , E.paddingXY 0 10
                     , E.spacing 8
                     ]
-                    [ E.row [ E.width E.fill, E.spacing 8 ]
+                    (E.row [ E.width E.fill, E.spacing 8 ]
                         [ E.paragraph [ EF.bold ] [ E.text model.title ]
                         ]
-                    , case MT.renderMdText model.md of
-                        Err e ->
-                            E.text e
+                        :: ML.mdblockview parsedMd
+                        ++ [ case MT.renderMdText model.md of
+                                Err e ->
+                                    E.text e
 
-                        Ok s ->
-                            E.html <|
-                                Html.div
-                                    [ HA.style "white-space" "pre-wrap"
-                                    , HA.style "word-break" "break-word"
-                                    ]
-                                    [ Html.text <|
-                                        s
-                                    ]
-                    ]
+                                Ok s ->
+                                    E.html <|
+                                        Html.div
+                                            [ HA.style "white-space" "pre-wrap"
+                                            , HA.style "word-break" "break-word"
+                                            ]
+                                            [ Html.text <|
+                                                s
+                                            ]
+                           ]
+                    )
                 ]
 
         editview linkbkc =
