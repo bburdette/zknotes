@@ -7,7 +7,7 @@ import Element.Events as EE
 import Element.Font as EF
 import Element.Input as EI
 import Element.Region as ER
-import Markdown.Block as Block exposing (Block(..), Html(..), Inline, ListItem(..), Task(..), inlineFoldl)
+import Markdown.Block as Block exposing (Block(..), Html(..), Inline(..), ListItem(..), Task(..), inlineFoldl)
 import Markdown.Html
 
 
@@ -22,61 +22,7 @@ mdblockview parsedMd =
                     (\b ->
                         case b of
                             HtmlBlock htmlb ->
-                                E.column []
-                                    [ E.text "HtmlBlock"
-                                    , case htmlb of
-                                        HtmlElement string listHtmlAttribute listChildren ->
-                                            E.el
-                                                [ E.paddingEach
-                                                    { top = 0, right = 0, bottom = 0, left = 10 }
-                                                ]
-                                            <|
-                                                E.text <|
-                                                    "HtmlElement "
-                                                        ++ string
-
-                                        HtmlComment string ->
-                                            E.el
-                                                [ E.paddingEach
-                                                    { top = 0, right = 0, bottom = 0, left = 10 }
-                                                ]
-                                            <|
-                                                E.text <|
-                                                    "HtmlComment "
-                                                        ++ string
-
-                                        ProcessingInstruction string ->
-                                            E.el
-                                                [ E.paddingEach
-                                                    { top = 0, right = 0, bottom = 0, left = 10 }
-                                                ]
-                                            <|
-                                                E.text <|
-                                                    "ProcessingInstruction "
-                                                        ++ string
-
-                                        HtmlDeclaration string1 string2 ->
-                                            E.el
-                                                [ E.paddingEach
-                                                    { top = 0, right = 0, bottom = 0, left = 10 }
-                                                ]
-                                            <|
-                                                E.text <|
-                                                    "HtmlDeclaration "
-                                                        ++ string1
-                                                        ++ " "
-                                                        ++ string2
-
-                                        Cdata string ->
-                                            E.el
-                                                [ E.paddingEach
-                                                    { top = 0, right = 0, bottom = 0, left = 10 }
-                                                ]
-                                            <|
-                                                E.text <|
-                                                    "Cdata "
-                                                        ++ string
-                                    ]
+                                viewhtml htmlb
 
                             UnorderedList listSpacing blockListItems ->
                                 E.text "UnorderedList"
@@ -88,13 +34,23 @@ mdblockview parsedMd =
                                 E.text "BlockQuote"
 
                             Heading headingLevel inlines ->
-                                E.text "Heading"
+                                E.column []
+                                    [ E.text "Heading"
+                                    , E.column [] (List.map viewinline inlines)
+                                    ]
 
                             Paragraph inlines ->
-                                E.text "Paragraph"
+                                E.column []
+                                    [ E.text "Paragraph"
+                                    , E.column [] (List.map viewinline inlines)
+                                    ]
 
                             Table headings inlines ->
-                                E.text "Table"
+                                E.column []
+                                    [ E.text "Table"
+
+                                    -- , E.column [] (List.map viewinline inlines)
+                                    ]
 
                             CodeBlock bodyLanguage ->
                                 E.text "CodeBlock"
@@ -104,13 +60,107 @@ mdblockview parsedMd =
                     )
 
 
+lpad =
+    E.paddingEach
+        { top = 0, right = 0, bottom = 0, left = 10 }
 
--- = HtmlInline (Html Block)
--- | Link String (Maybe String) (List Inline)
--- | Image String (Maybe String) (List Inline)
--- | Emphasis (List Inline)
--- | Strong (List Inline)
--- | Strikethrough (List Inline)
--- | CodeSpan String
--- | Text String
--- | HardLineBreak
+
+viewhtml htmlb =
+    E.column []
+        [ E.text "HtmlBlock"
+        , case htmlb of
+            HtmlElement string listHtmlAttribute listChildren ->
+                E.el
+                    [ lpad ]
+                <|
+                    E.text <|
+                        "HtmlElement "
+                            ++ string
+
+            HtmlComment string ->
+                E.el
+                    [ lpad ]
+                <|
+                    E.text <|
+                        "HtmlComment "
+                            ++ string
+
+            ProcessingInstruction string ->
+                E.el
+                    [ lpad ]
+                <|
+                    E.text <|
+                        "ProcessingInstruction "
+                            ++ string
+
+            HtmlDeclaration string1 string2 ->
+                E.el
+                    [ lpad ]
+                <|
+                    E.text <|
+                        "HtmlDeclaration "
+                            ++ string1
+                            ++ " "
+                            ++ string2
+
+            Cdata string ->
+                E.el
+                    [ lpad ]
+                <|
+                    E.text <|
+                        "Cdata "
+                            ++ string
+        ]
+
+
+viewinline inline =
+    case inline of
+        HtmlInline html ->
+            E.row [ lpad ]
+                [ E.text <| "HtmlInline "
+                , viewhtml html
+                ]
+
+        Link string maybeString inlines ->
+            E.row [ lpad ]
+                (E.text
+                    "Link "
+                    :: List.map viewinline inlines
+                )
+
+        Image string maybeString inlines ->
+            E.row [ lpad ]
+                (E.text
+                    "Image "
+                    :: List.map viewinline inlines
+                )
+
+        Emphasis inlines ->
+            E.row [ lpad ]
+                (E.text
+                    "Emphasis "
+                    :: List.map viewinline inlines
+                )
+
+        Strong inlines ->
+            E.row [ lpad ]
+                (E.text
+                    "Strong "
+                    :: List.map viewinline inlines
+                )
+
+        Strikethrough inlines ->
+            E.row [ lpad ]
+                (E.text
+                    "Strikethrough "
+                    :: List.map viewinline inlines
+                )
+
+        CodeSpan string ->
+            E.text <| "CodeSpan " ++ string
+
+        Text string ->
+            E.text <| "Text " ++ string
+
+        HardLineBreak ->
+            E.text <| "HardLineBreak "
