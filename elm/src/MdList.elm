@@ -10,8 +10,10 @@ import Element.Events as EE
 import Element.Font as EF
 import Element.Input as EI
 import Element.Region as ER
+import Html.Attributes as HA
 import Markdown.Block as Block exposing (Block(..), Html(..), Inline(..), ListItem(..), Task(..), inlineFoldl)
 import Markdown.Html
+import TangoColors as TC
 
 
 type alias Model =
@@ -29,15 +31,15 @@ type alias EditBlock =
     }
 
 
+
+-- | BlockViewMsg BlockView.Msg
+
+
 type Msg
     = AddBlockPress
     | BlockDndMsg DnDList.Msg
     | BlockClicked Int
     | DeleteBlock Int
-
-
-
--- | BlockViewMsg BlockView.Msg
 
 
 blockDndConfig : DnDList.Config EditBlock
@@ -57,11 +59,14 @@ blockDndSystem =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     blockDndSystem.subscriptions model.blockDnd
-        ++ (Array.indexedMap
-                (\i -> viewBlockDnd model.blockDnd i model.focusBlock)
-                model.blocks
-                |> Array.toList
-           )
+
+
+
+-- ++ (Array.indexedMap
+--         (\i -> viewBlockDnd model.blockDnd i model.focusBlock)
+--         model.blocks
+--         |> Array.toList
+--    )
 
 
 viewBlockDnd : DnDList.Model -> Int -> Maybe Int -> EditBlock -> Element Msg
@@ -104,7 +109,7 @@ viewBlock ddw i focusid s =
     E.row
         ([ E.width E.fill
          , E.spacing 8
-         , E.htmlAttribute (Html.Attributes.id itemId)
+         , E.htmlAttribute (HA.id itemId)
          , E.padding 10
          , EBd.rounded 5
          , EE.onMouseDown (BlockClicked s.editid)
@@ -139,7 +144,7 @@ viewBlock ddw i focusid s =
             [ E.width E.fill
             , E.spacing 8
             ]
-            [ viewBlockItem s.editid s.item
+            [ viewIBlock s.editid s.block
 
             -- , if focus then
             --     blockMenu
@@ -150,6 +155,26 @@ viewBlock ddw i focusid s =
             { onPress = Just (DeleteBlock s.editid)
             , label = E.text "x"
             }
+        ]
+
+
+makeScrollId : Int -> String
+makeScrollId i =
+    "id-" ++ String.fromInt i
+
+
+viewIBlock : Int -> Block -> Element Msg
+viewIBlock editid b =
+    E.row
+        [ E.width E.fill
+        , EBd.width 1
+        , EBd.rounded 5
+        , E.padding 8
+        , E.spacing 8
+        , E.htmlAttribute (HA.id (makeScrollId editid))
+        ]
+    <|
+        [ viewMdBlock b
         ]
 
 
@@ -174,6 +199,46 @@ ghostView model =
             E.none
 
 
+viewMdBlock b =
+    case b of
+        HtmlBlock htmlb ->
+            viewhtml htmlb
+
+        UnorderedList listSpacing blockListItems ->
+            E.text "UnorderedList"
+
+        OrderedList listSpacing offset listListBlocks ->
+            E.text "OrderedList"
+
+        BlockQuote blocks ->
+            E.text "BlockQuote"
+
+        Heading headingLevel inlines ->
+            E.column []
+                [ E.text "Heading"
+                , E.column [] (List.map viewinline inlines)
+                ]
+
+        Paragraph inlines ->
+            E.column []
+                [ E.text "Paragraph"
+                , E.column [] (List.map viewinline inlines)
+                ]
+
+        Table headings inlines ->
+            E.column []
+                [ E.text "Table"
+
+                -- , E.column [] (List.map viewinline inlines)
+                ]
+
+        CodeBlock bodyLanguage ->
+            E.text "CodeBlock"
+
+        ThematicBreak ->
+            E.text "ThematicBreak"
+
+
 mdblockview parsedMd =
     case parsedMd of
         Err e ->
@@ -182,45 +247,7 @@ mdblockview parsedMd =
         Ok bs ->
             bs
                 |> List.map
-                    (\b ->
-                        case b of
-                            HtmlBlock htmlb ->
-                                viewhtml htmlb
-
-                            UnorderedList listSpacing blockListItems ->
-                                E.text "UnorderedList"
-
-                            OrderedList listSpacing offset listListBlocks ->
-                                E.text "OrderedList"
-
-                            BlockQuote blocks ->
-                                E.text "BlockQuote"
-
-                            Heading headingLevel inlines ->
-                                E.column []
-                                    [ E.text "Heading"
-                                    , E.column [] (List.map viewinline inlines)
-                                    ]
-
-                            Paragraph inlines ->
-                                E.column []
-                                    [ E.text "Paragraph"
-                                    , E.column [] (List.map viewinline inlines)
-                                    ]
-
-                            Table headings inlines ->
-                                E.column []
-                                    [ E.text "Table"
-
-                                    -- , E.column [] (List.map viewinline inlines)
-                                    ]
-
-                            CodeBlock bodyLanguage ->
-                                E.text "CodeBlock"
-
-                            ThematicBreak ->
-                                E.text "ThematicBreak"
-                    )
+                    viewMdBlock
 
 
 lpad =
