@@ -1,4 +1,4 @@
-module MdList exposing (mdblockview)
+module MdList exposing (..)
 
 import Array exposing (Array)
 import Common exposing (buttonStyle)
@@ -42,6 +42,22 @@ type Msg
     | DeleteBlock Int
 
 
+init : List Block -> Model
+init blocks =
+    let
+        ba =
+            blocks
+                |> List.indexedMap (\i b -> { editid = i, block = b })
+                |> Array.fromList
+    in
+    { blocks = ba
+    , focusBlock = Nothing
+    , nextBlockId = Array.length ba
+    , cleanBlocks = ba
+    , blockDnd = blockDndSystem.model
+    }
+
+
 blockDndConfig : DnDList.Config EditBlock
 blockDndConfig =
     { beforeUpdate = \_ _ list -> list
@@ -67,6 +83,34 @@ subscriptions model =
 --         model.blocks
 --         |> Array.toList
 --    )
+
+
+view : Model -> Element Msg
+view model =
+    -- let
+    --     maxwidth =
+    --         700
+    --     maxheight =
+    --         nd.size.height - 75
+    -- in
+    E.column
+        [ E.alignTop
+        , E.spacing 8
+        , E.padding 8
+
+        -- , E.width (E.maximum maxwidth E.fill)
+        -- , E.height (E.maximum maxheight E.fill)
+        , E.centerX
+
+        -- , E.scrollbarY
+        , E.htmlAttribute (HA.id "steplist")
+        ]
+    <|
+        (Array.indexedMap
+            (\i -> viewBlockDnd model.blockDnd i model.focusBlock)
+            model.blocks
+            |> Array.toList
+        )
 
 
 viewBlockDnd : DnDList.Model -> Int -> Maybe Int -> EditBlock -> Element Msg

@@ -65,7 +65,7 @@ import Element.Region as ER
 import Html exposing (Html)
 import Html.Attributes as HA
 import Json.Decode as JD
-import Markdown.Block as Block exposing (Block(..), Html(..), Inline, ListItem(..), Task(..), inlineFoldl)
+import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..), inlineFoldl)
 import Markdown.Html
 import Markdown.Parser
 import Markdown.Renderer
@@ -135,6 +135,7 @@ type Msg
     | RequestsPress
     | FlipLink EditLink
     | ShowArchivesPress
+    | MLMsg ML.Msg
     | Noop
 
 
@@ -202,6 +203,7 @@ type alias Model =
     , dialog : Maybe D.Model
     , panelNote : Maybe Data.ZkNote
     , mbReplaceString : Maybe String
+    , mlModel : ML.Model
     }
 
 
@@ -1033,10 +1035,7 @@ zknview zone size recentZkns trqs model =
             else
                 [ EF.color TC.darkGrey ]
 
-        parsedMd =
-            Markdown.Parser.parse model.md
-
-        listview =
+        blocksToStringView =
             E.column
                 [ E.width E.fill
                 , E.centerX
@@ -1050,26 +1049,27 @@ zknview zone size recentZkns trqs model =
                     , E.paddingXY 0 10
                     , E.spacing 8
                     ]
-                    (E.row [ E.width E.fill, E.spacing 8 ]
+                    [ E.row [ E.width E.fill, E.spacing 8 ]
                         [ E.paragraph [ EF.bold ] [ E.text model.title ]
                         ]
-                        :: ML.mdblockview parsedMd
-                        ++ [ case MT.renderMdText model.md of
-                                Err e ->
-                                    E.text e
+                    , case MT.renderMdText model.md of
+                        Err e ->
+                            E.text e
 
-                                Ok s ->
-                                    E.html <|
-                                        Html.div
-                                            [ HA.style "white-space" "pre-wrap"
-                                            , HA.style "word-break" "break-word"
-                                            ]
-                                            [ Html.text <|
-                                                s
-                                            ]
-                           ]
-                    )
+                        Ok s ->
+                            E.html <|
+                                Html.div
+                                    [ HA.style "white-space" "pre-wrap"
+                                    , HA.style "word-break" "break-word"
+                                    ]
+                                    [ Html.text <|
+                                        s
+                                    ]
+                    ]
                 ]
+
+        listview =
+            E.map MLMsg <| ML.view model.mlModel
 
         editview linkbkc =
             let
@@ -1680,6 +1680,10 @@ initFull ld zkl zknote dtlinks spm =
                     }
                 )
                 dtlinks
+
+        blocks =
+            Markdown.Parser.parse zknote.content
+                |> Result.withDefault []
     in
     ( { id = Just zknote.id
       , ld = ld
@@ -1718,6 +1722,7 @@ initFull ld zkl zknote dtlinks spm =
       , dialog = Nothing
       , panelNote = Nothing
       , mbReplaceString = Nothing
+      , mlModel = ML.init blocks
       }
     , { zknote = zknote.id, offset = 0, limit = Nothing }
     )
@@ -1770,6 +1775,7 @@ initNew ld zkl spm links =
     , dialog = Nothing
     , panelNote = Nothing
     , mbReplaceString = Nothing
+    , mlModel = ML.init []
     }
         |> (\m1 ->
                 -- for new EMPTY notes, the 'revert' should be the same as the model, so that you aren't
@@ -2726,6 +2732,9 @@ update msg model =
 
         RequestsPress ->
             ( model, Requests )
+
+        MLMsg _ ->
+            ( model, None )
 
         Noop ->
             ( model, None )
