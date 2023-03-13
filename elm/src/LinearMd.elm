@@ -8,6 +8,7 @@ import Element.Font as EF
 import Element.Input as EI
 import Element.Region as ER
 import Markdown.Block as MB
+import TangoColors as TC
 
 
 type MdElement
@@ -47,95 +48,100 @@ type MdElement
 
 viewMdElement : MdElement -> Element msg
 viewMdElement b =
-    case b of
-        HtmlBlock hblock ->
-            viewhtml hblock
+    E.el [ EF.color TC.white ] <|
+        case b of
+            HtmlBlock hblock ->
+                viewhtml hblock
 
-        UnorderedListStart listSpacing ->
-            E.text <| "UnorderedListStart"
+            UnorderedListStart listSpacing ->
+                E.text <| "UnorderedListStart"
 
-        UnorderedListItem task blocks ->
-            E.text "UnorderedListItem"
+            UnorderedListItem task blocks ->
+                E.text "UnorderedListItem"
 
-        UnorderedListEnd ->
-            E.text "UnorderedListEnd"
+            UnorderedListEnd ->
+                E.text "UnorderedListEnd"
 
-        OrderedListStart listSpacing offset ->
-            E.text "OrderedListStart"
+            OrderedListStart listSpacing offset ->
+                E.text "OrderedListStart"
 
-        OrderedListItem blocks ->
-            E.text "OrderedListItem"
+            OrderedListItem blocks ->
+                E.text "OrderedListItem"
 
-        OrderedListEnd ->
-            E.text "OrderedListEnd"
+            OrderedListEnd ->
+                E.text "OrderedListEnd"
 
-        BlockQuoteStart ->
-            E.text "BlockQuoteStart"
+            BlockQuoteStart ->
+                E.text "BlockQuoteStart"
 
-        BlockQuoteEnd ->
-            E.text "BlockQuoteEnd"
+            BlockQuoteEnd ->
+                E.text "BlockQuoteEnd"
 
-        HeadingStart headingLevel ->
-            E.text "HeadingStart"
+            HeadingStart headingLevel ->
+                E.text "HeadingStart"
 
-        HeadingEnd ->
-            E.text "HeadingEnd"
+            HeadingEnd ->
+                E.text "HeadingEnd"
 
-        ParagraphStart ->
-            E.text "ParagraphStart"
+            ParagraphStart ->
+                E.text "ParagraphStart"
 
-        ParagraphEnd ->
-            E.text "ParagraphEnd"
+            ParagraphEnd ->
+                E.text "ParagraphEnd"
 
-        Table headings items ->
-            E.text "Table"
+            Table headings items ->
+                E.text "Table"
 
-        -- Leaf Blocks Without Inlines -> E.text "--"
-        CodeBlock code ->
-            E.text "CodeBlock"
+            -- Leaf Blocks Without Inlines -> E.text "--"
+            CodeBlock code ->
+                E.text "CodeBlock"
 
-        ThematicBreak ->
-            E.text "ThematicBreak"
+            ThematicBreak ->
+                E.text "ThematicBreak"
 
-        -- Inlines
-        HtmlInline hblock ->
-            viewhtml hblock
+            -- Inlines
+            HtmlInline hblock ->
+                viewhtml hblock
 
-        Link url maybeTitle inlines ->
-            E.text "Link"
+            Link url maybeTitle inlines ->
+                E.column []
+                    [ E.text "Link"
+                    , E.text <| "url " ++ url
+                    , E.text <| "title " ++ Maybe.withDefault "" maybeTitle
+                    ]
 
-        Image url maybeTitle inlines ->
-            E.text "Image"
+            Image url maybeTitle inlines ->
+                E.text "Image"
 
-        EmphasisBegin ->
-            E.text "EmphasisBegin"
+            EmphasisBegin ->
+                E.text "EmphasisBegin"
 
-        EmphasisEnd ->
-            E.text "EmphasisEnd"
+            EmphasisEnd ->
+                E.text "EmphasisEnd"
 
-        StrongBegin ->
-            E.text "StrongBegin"
+            StrongBegin ->
+                E.text "StrongBegin"
 
-        StrongEnd ->
-            E.text "StrongEnd"
+            StrongEnd ->
+                E.text "StrongEnd"
 
-        StrikethroughBegin ->
-            E.text "StrikethroughBegin"
+            StrikethroughBegin ->
+                E.text "StrikethroughBegin"
 
-        StrikethroughEnd ->
-            E.text "StrikethroughEnd"
+            StrikethroughEnd ->
+                E.text "StrikethroughEnd"
 
-        CodeSpan string ->
-            E.text "CodeSpan"
+            CodeSpan string ->
+                E.text "CodeSpan"
 
-        Text string ->
-            E.column []
-                [ E.text <| "Text"
-                , E.text string
-                ]
+            Text string ->
+                E.column []
+                    [ E.text <| "Text"
+                    , E.text string
+                    ]
 
-        HardLineBreak ->
-            E.text "HardLineBreak"
+            HardLineBreak ->
+                E.text "HardLineBreak"
 
 
 lpad : E.Attribute msg
