@@ -31,10 +31,6 @@ type alias EditBlock =
     }
 
 
-
--- | BlockViewMsg BlockView.Msg
-
-
 type Msg
     = AddBlockPress
     | BlockDndMsg DnDList.Msg
@@ -243,6 +239,7 @@ ghostView model =
             E.none
 
 
+viewMdBlock : Block -> Element Msg
 viewMdBlock b =
     case b of
         HtmlBlock htmlb ->
@@ -283,6 +280,7 @@ viewMdBlock b =
             E.text "ThematicBreak"
 
 
+mdblockview : Result error (List Block) -> List (Element Msg)
 mdblockview parsedMd =
     case parsedMd of
         Err e ->
@@ -294,11 +292,13 @@ mdblockview parsedMd =
                     viewMdBlock
 
 
+lpad : E.Attribute Msg
 lpad =
     E.paddingEach
         { top = 0, right = 0, bottom = 0, left = 10 }
 
 
+viewhtml : Html Block -> Element Msg
 viewhtml htmlb =
     E.column []
         [ E.text "HtmlBlock"
@@ -347,6 +347,7 @@ viewhtml htmlb =
         ]
 
 
+viewinline : Inline -> Element Msg
 viewinline inline =
     case inline of
         HtmlInline html ->
