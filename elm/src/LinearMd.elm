@@ -1,5 +1,12 @@
-module LinearMd exposing (..)
+module LinearMd exposing (MdElement(..), lpad, mbToMe, miToMe, viewMdElement, viewhtml)
 
+import Element as E exposing (Element)
+import Element.Background as EBk
+import Element.Border as EBd
+import Element.Events as EE
+import Element.Font as EF
+import Element.Input as EI
+import Element.Region as ER
 import Markdown.Block as MB
 
 
@@ -36,6 +43,154 @@ type MdElement
     | CodeSpan String
     | Text String
     | HardLineBreak
+
+
+viewMdElement : MdElement -> Element msg
+viewMdElement b =
+    case b of
+        HtmlBlock hblock ->
+            viewhtml hblock
+
+        UnorderedListStart listSpacing ->
+            E.text <| "UnorderedListStart"
+
+        UnorderedListItem task blocks ->
+            E.text "UnorderedListItem"
+
+        UnorderedListEnd ->
+            E.text "UnorderedListEnd"
+
+        OrderedListStart listSpacing offset ->
+            E.text "OrderedListStart"
+
+        OrderedListItem blocks ->
+            E.text "OrderedListItem"
+
+        OrderedListEnd ->
+            E.text "OrderedListEnd"
+
+        BlockQuoteStart ->
+            E.text "BlockQuoteStart"
+
+        BlockQuoteEnd ->
+            E.text "BlockQuoteEnd"
+
+        HeadingStart headingLevel ->
+            E.text "HeadingStart"
+
+        HeadingEnd ->
+            E.text "HeadingEnd"
+
+        ParagraphStart ->
+            E.text "ParagraphStart"
+
+        ParagraphEnd ->
+            E.text "ParagraphEnd"
+
+        Table headings items ->
+            E.text "Table"
+
+        -- Leaf Blocks Without Inlines -> E.text "--"
+        CodeBlock code ->
+            E.text "CodeBlock"
+
+        ThematicBreak ->
+            E.text "ThematicBreak"
+
+        -- Inlines
+        HtmlInline hblock ->
+            viewhtml hblock
+
+        Link url maybeTitle inlines ->
+            E.text "Link"
+
+        Image url maybeTitle inlines ->
+            E.text "Image"
+
+        EmphasisBegin ->
+            E.text "EmphasisBegin"
+
+        EmphasisEnd ->
+            E.text "EmphasisEnd"
+
+        StrongBegin ->
+            E.text "StrongBegin"
+
+        StrongEnd ->
+            E.text "StrongEnd"
+
+        StrikethroughBegin ->
+            E.text "StrikethroughBegin"
+
+        StrikethroughEnd ->
+            E.text "StrikethroughEnd"
+
+        CodeSpan string ->
+            E.text "CodeSpan"
+
+        Text string ->
+            E.column []
+                [ E.text <| "Text"
+                , E.text string
+                ]
+
+        HardLineBreak ->
+            E.text "HardLineBreak"
+
+
+lpad : E.Attribute msg
+lpad =
+    E.paddingEach
+        { top = 0, right = 0, bottom = 0, left = 10 }
+
+
+viewhtml : MB.Html MB.Block -> Element msg
+viewhtml htmlb =
+    E.column []
+        [ E.text "HtmlBlock"
+        , case htmlb of
+            MB.HtmlElement string listHtmlAttribute listChildren ->
+                E.el
+                    [ lpad ]
+                <|
+                    E.text <|
+                        "HtmlElement "
+                            ++ string
+
+            MB.HtmlComment string ->
+                E.el
+                    [ lpad ]
+                <|
+                    E.text <|
+                        "HtmlComment "
+                            ++ string
+
+            MB.ProcessingInstruction string ->
+                E.el
+                    [ lpad ]
+                <|
+                    E.text <|
+                        "ProcessingInstruction "
+                            ++ string
+
+            MB.HtmlDeclaration string1 string2 ->
+                E.el
+                    [ lpad ]
+                <|
+                    E.text <|
+                        "HtmlDeclaration "
+                            ++ string1
+                            ++ " "
+                            ++ string2
+
+            MB.Cdata string ->
+                E.el
+                    [ lpad ]
+                <|
+                    E.text <|
+                        "Cdata "
+                            ++ string
+        ]
 
 
 mbToMe : MB.Block -> List MdElement

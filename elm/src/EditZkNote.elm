@@ -48,6 +48,8 @@ module EditZkNote exposing
     , zknview
     )
 
+-- import MdList as ML
+
 import Browser.Dom as BD
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
@@ -65,14 +67,12 @@ import Element.Region as ER
 import Html exposing (Html)
 import Html.Attributes as HA
 import Json.Decode as JD
-import LinearMd
 import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..), inlineFoldl)
 import Markdown.Html
 import Markdown.Parser
 import Markdown.Renderer
 import Maybe.Extra as ME
 import MdCommon as MC
-import MdList as ML
 import MdText as MT
 import Orgauth.Data exposing (UserId)
 import RequestsDialog exposing (TRequests)
@@ -87,6 +87,7 @@ import Url as U
 import Url.Builder as UB
 import Url.Parser as UP exposing ((</>))
 import Util
+import ViewLinearMd as ML
 import WindowKeys as WK
 import ZkCommon as ZC
 
