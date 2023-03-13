@@ -65,6 +65,7 @@ import Element.Region as ER
 import Html exposing (Html)
 import Html.Attributes as HA
 import Json.Decode as JD
+import LinearMd
 import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..), inlineFoldl)
 import Markdown.Html
 import Markdown.Parser
