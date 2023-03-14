@@ -3355,17 +3355,30 @@ main =
         , view = piview
         , update = piupdate
         , subscriptions =
-            \model ->
+            \pimodel ->
                 let
                     tracks : List (Sub Msg)
                     tracks =
-                        case model of
+                        case pimodel of
                             Ready rmd ->
                                 rmd.trackedRequests.requests
                                     |> Dict.keys
                                     |> List.map (\k -> Http.track k (RequestProgress k))
 
                             PreInit _ ->
+                                []
+
+                    esub =
+                        case pimodel of
+                            Ready model ->
+                                case model.state of
+                                    EditZkNote state _ ->
+                                        [ Sub.map EditZkNoteMsg <| EditZkNote.subscriptions state ]
+
+                                    _ ->
+                                        []
+
+                            _ ->
                                 []
                 in
                 Sub.batch <|
@@ -3375,6 +3388,7 @@ main =
                     , LS.localVal ReceiveLocalVal
                     ]
                         ++ tracks
+                        ++ esub
         , onUrlRequest = urlRequest
         , onUrlChange = UrlChanged
         }

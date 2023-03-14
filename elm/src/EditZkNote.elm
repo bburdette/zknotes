@@ -35,6 +35,7 @@ module EditZkNote exposing
     , setHomeNote
     , showSr
     , showZkl
+    , subscriptions
     , sznFromModel
     , tabsOnLoad
     , toPubId
@@ -236,6 +237,11 @@ type Command
     | ShowArchives Int
     | FileUpload
     | Cmd (Cmd Msg)
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    Sub.map VLMMsg <| VLM.subscriptions model.mlModel
 
 
 onZkNote : Data.ZkNote -> Model -> ( Model, Command )
@@ -2733,7 +2739,11 @@ update msg model =
         RequestsPress ->
             ( model, Requests )
 
-        VLMMsg _ ->
+        VLMMsg vmsg ->
+            let
+                wat =
+                    VLM.update model.mlModel vmsg
+            in
             ( model, None )
 
         Noop ->
