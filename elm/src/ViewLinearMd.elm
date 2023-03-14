@@ -1,10 +1,8 @@
 module ViewLinearMd exposing (..)
 
-import LinearMd exposing (MdElement(..), lpad, mbToMe, miToMe, viewMdElement, viewhtml)
 import Array exposing (Array)
 import Common exposing (buttonStyle)
 import DnDList
-import Markdown.Block as MB
 import Element as E exposing (Element)
 import Element.Background as EBk
 import Element.Border as EBd
@@ -13,9 +11,11 @@ import Element.Font as EF
 import Element.Input as EI
 import Element.Region as ER
 import Html.Attributes as HA
--- import Markdown.MdElement as MdElement exposing (MdElement(..), Html(..), Inline(..), ListItem(..), Task(..), inlineFoldl)
+import LinearMd exposing (MdElement(..), lpad, mbToMe, miToMe, viewMdElement, viewhtml)
+import Markdown.Block as MB
 import Markdown.Html
 import TangoColors as TC
+
 
 type alias Model =
     { blocks : Array EditMdElement
@@ -39,12 +39,18 @@ type Msg
     | DeleteMdElement Int
 
 
+type DragDropWhat
+    = Drag
+    | Drop
+    | Ghost
+
+
 init : List MB.Block -> Model
 init blocks =
     let
         ba =
             blocks
-                |> List.map mbToMe 
+                |> List.map mbToMe
                 |> List.concat
                 |> List.indexedMap (\i b -> { editid = i, block = b })
                 |> Array.fromList
@@ -131,12 +137,6 @@ viewMdElementDnd ddlmodel i focusid s =
                     Drag
     in
     viewMdElement ddw i focusid s
-
-
-type DragDropWhat
-    = Drag
-    | Drop
-    | Ghost
 
 
 viewMdElement : DragDropWhat -> Int -> Maybe Int -> EditMdElement -> Element Msg
@@ -243,3 +243,31 @@ ghostView model =
 
 
 
+-- type Command
+--     = None
+--     | BlockDndCmd (Cmd Msg)
+
+
+update : Model -> Msg -> ( Model, Cmd Msg )
+update model msg =
+    case msg of
+        AddMdElementPress ->
+            ( model, Cmd.none )
+
+        MdElementDndMsg dndmsg ->
+            let
+                ( blockDnD, blocks ) =
+                    blockDndSystem.update dndmsg model.blockDnd (Array.toList model.blocks)
+            in
+            ( { model
+                | blockDnd = blockDnD
+                , blocks = Array.fromList blocks
+              }
+            , blockDndSystem.commands blockDnD
+            )
+
+        MdElementClicked int ->
+            ( model, Cmd.none )
+
+        DeleteMdElement int ->
+            ( model, Cmd.none )

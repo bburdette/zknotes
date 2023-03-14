@@ -2741,10 +2741,12 @@ update msg model =
 
         VLMMsg vmsg ->
             let
-                wat =
+                ( mlModel, cmd ) =
                     VLM.update model.mlModel vmsg
             in
-            ( model, None )
+            ( { model | mlModel = mlModel }
+            , Cmd (Cmd.map VLMMsg cmd)
+            )
 
         Noop ->
             ( model, None )
