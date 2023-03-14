@@ -1215,9 +1215,31 @@ view model =
                         { dm | model = model.trackedRequests }
 
             _ ->
-                E.layout [ EF.size model.fontsize, E.width E.fill ] <| viewState model.size model.state model
+                E.layout
+                    ((case ghostState model.state of
+                        Just elt ->
+                            [ E.inFront elt ]
+
+                        Nothing ->
+                            []
+                     )
+                        ++ [ EF.size model.fontsize, E.width E.fill ]
+                    )
+                <|
+                    viewState model.size model.state model
         ]
     }
+
+
+ghostState : State -> Maybe (E.Element Msg)
+ghostState state =
+    case state of
+        EditZkNote m l ->
+            Maybe.map (E.map EditZkNoteMsg) <|
+                EditZkNote.ghostView m
+
+        _ ->
+            Nothing
 
 
 piupdate : Msg -> PiModel -> ( PiModel, Cmd Msg )

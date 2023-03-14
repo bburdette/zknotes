@@ -14,6 +14,7 @@ module EditZkNote exposing
     , dirty
     , disabledLinkButtonStyle
     , fullSave
+    , ghostView
     , initFull
     , initNew
     , isPublic
@@ -242,6 +243,13 @@ type Command
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.map VLMMsg <| VLM.subscriptions model.mlModel
+
+
+ghostView : Model -> Maybe (E.Element Msg)
+ghostView model =
+    VLM.ghostView model.mlModel
+        |> Maybe.map
+            (E.map VLMMsg)
 
 
 onZkNote : Data.ZkNote -> Model -> ( Model, Command )

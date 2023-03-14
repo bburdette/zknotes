@@ -172,7 +172,8 @@ viewMdElement ddw i focusid s =
                             :: List.map E.htmlAttribute (blockDndSystem.dropEvents i itemId)
 
                     Ghost ->
-                        [ E.alpha 0.5, EBk.color TC.green ]
+                        Debug.log "ghost mode"
+                            [ E.alpha 0.5, EBk.color TC.red ]
                )
         )
         [ E.column
@@ -221,7 +222,7 @@ viewIMdElement editid b =
         ]
 
 
-ghostView : Model -> E.Element Msg
+ghostView : Model -> Maybe (E.Element Msg)
 ghostView model =
     let
         dnd =
@@ -232,14 +233,13 @@ ghostView model =
             blockDndSystem.info dnd
                 |> Maybe.andThen (\{ dragIndex } -> Array.get dragIndex model.blocks)
     in
-    case maybeDragItem of
-        Just item ->
-            E.el
-                (List.map E.htmlAttribute (blockDndSystem.ghostStyles dnd))
-                (viewMdElement Ghost 0 (Just item.editid) item)
-
-        Nothing ->
-            E.none
+    maybeDragItem
+        |> Maybe.map
+            (\item ->
+                E.el
+                    (List.map E.htmlAttribute (blockDndSystem.ghostStyles dnd))
+                    (viewMdElement Ghost 0 (Just item.editid) item)
+            )
 
 
 
