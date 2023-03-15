@@ -55,6 +55,13 @@ type alias State =
 
 mdfProc : MdElement -> State -> State
 mdfProc elt state =
+    case state.result of 
+        Err _ -> state
+        Ok mbs -> 
+            case state.mdf mbs elt of
+                Err e -> {state | result - Err e}
+                Ok nmbs ->  
+        
     case List.head state.mdbstack of
         Just mdf ->
             case mdf of
@@ -83,93 +90,198 @@ toBlocks elements =
 -- state can
 
 
+
+
+
 type Mdf
-    = Mdf (List MB.Block -> MdElement -> Result String ( Mdf, List MB.Block ))
-    | Mdfb (List MB.Block -> Mdf) (List MB.Block -> MdElement -> Result String ( Mdf, List MB.Block ))
-    | Mdfi (List MB.Inline -> Mdf) (List MB.Inline -> MdElement -> Result String ( Mdf, List MB.Inline ))
+    = Mdfb (MdElement -> Result String ( Mdf, List MB.Block ))
+    | Mdfi (MdElement -> Result String ( Mdf, List MB.Inline ))
     | Mdfe
 
 
-type Mdb
-    = Mdbf (List MB.Block -> Mdf)
-    | Mdif (List MB.Inline -> Mdf)
+-- type Mdb
+--     = Mdbf (List MB.Block -> ( Mdf, List MB.Block ))
+--     | Mdif (List MB.Inline -> ( Mdf, List MB.Block ))
 
 
-unorderedListItem : MB.ListSpacing -> List (MB.ListItem MB.Block) -> List MB.Block -> MdElement -> Result String ( Mdf, List MB.Block )
-unorderedListItem listSpacing items mbs mde =
+unorderedListItem : MB.ListSpacing -> List (MB.ListItem MB.Block) ->  MdElement -> Result String ( Mdf, List MB.Block )
+unorderedListItem listSpacing items  mde =
     case mde of
         UnorderedListItem task blocks ->
-            Ok ( Mdf (unorderedListItem listSpacing (MB.ListItem task blocks :: items)), mbs )
+            Ok ( Mdf (unorderedListItem listSpacing (MB.ListItem task blocks :: items)), [] )
 
         UnorderedListEnd ->
-            Ok ( Mdf toBlock, MB.UnorderedList listSpacing (List.reverse items) :: mbs )
+            Ok ( Mdf toBlock, [MB.UnorderedList listSpacing (List.reverse items)] )
 
         _ ->
             Err "unexpected item"
 
 
-orderedListItem : MB.ListSpacing -> Int -> List (List MB.Block) -> List MB.Block -> MdElement -> Result String ( Mdf, List MB.Block )
+orderedListItem : MB.ListSpacing -> Int -> List (List MB.Block)  -> MdElement -> Result String ( Mdf, List MB.Block )
 orderedListItem listSpacing offset items mbs mde =
     case mde of
         OrderedListItem blocks ->
-            Ok ( Mdf (orderedListItem listSpacing offset (blocks :: items)), mbs )
+            Ok ( Mdf (orderedListItem listSpacing offset (blocks :: items)), [] )
 
         OrderedListEnd ->
-            Ok ( Mdf toBlock, MB.OrderedList listSpacing offset items :: mbs )
+            Ok ( Mdf toBlock, [MB.OrderedList listSpacing offset items ])
 
         _ ->
             Err "unexpected item"
 
 -- blockQuote : List MB.Block -> 
 
+accumInlinesToB : MdElement -> (List MB.Inline -> MB.Inline) -> List MB.Inline -> MdElement -> Result String (Mdf, List MB.Block)
+accumInlinesToB endelt endcontainer accum elt =
+    if elt == endelt then 
+        Ok (Mdfe, endcontainer accum)
+    else
+         
+    
+accumInlines : MdElement -> (List MB.Inline -> MB.Inline) -> List MB.Inline -> MdElement -> Result String (Mdf, List MB.Inline)
+accumInlines endelt endcontainer accum elt =
+    case toInline elt of 
+        Mdfb -> 
+            Err "bad accum"
+        Mdfi fn -> 
+            
 
-toBlock : List MB.Block -> MdElement -> Result String ( Mdf, List MB.Block )
-toBlock mbs mde =
+    
+andThenInline : (MdElement -> Result String ( Mdf, List MB.Inline )) 
+    -> (MdElement -> Result String ( Mdf, List MB.Inline )) 
+    -> MdElement -> Result String ( Mdf, List MB.Inline )
+andThenInline fn1 fn2 elt =
+    case fn2 elt of 
+        (Mdfi newf -> 
+             
+    
+
+toBlock :  MdElement -> Result String ( Mdf, List MB.Block )
+toBlock  mde =
    case mde of
        HtmlBlock hblock ->
-           Ok ( Mdf toBlock, MB.HtmlBlock hblock :: mbs )
+           Ok ( Mdf toBlock, [MB.HtmlBlock hblock] )
        UnorderedListStart listSpacing  -> -- (List (ListItem Block))
-           Ok ( Mdf unorderedListItem listSpacing [], mbs )
+           Ok ( Mdf unorderedListItem listSpacing [], [] )
        UnorderedListItem _ _ ->
-         Err "unexpected item"
+         Err "unexpected UnorderedListItem"
        UnorderedListEnd ->
-         Err "unexpected item"
+         Err "unexpected UnorderedListEnd"
        OrderedListStart listSpacing offset  -> -- (List (List Block))
-           Ok ( Mdf orderedListItem listSpacing offset [], mbs )
+           Ok ( Mdf orderedListItem listSpacing offset [], [] )
        OrderedListItem _ ->
-         Err "unexpected item"
+         Err "unexpected OrderedListItem"
        OrderedListEnd ->
-         Err "unexpected item"
+         Err "unexpected OrderedListEnd"
        BlockQuoteStart ->  -- list blocks
-            Ok ( Mdfb MB.BlockQuote toBlock, mbs)
+            Ok ( Mdfb MB.BlockQuote toBlock, [])
        BlockQuoteEnd -> 
             Ok (Mdfe, mbs)
        -- Leaf Blocks With Inlines
        HeadingStart headingLevel -> 
             Ok (Mdfi MB.Heading )
-       HeadingEnd
-       ParagraphStart
-       ParagraphEnd
+       HeadingEnd -> 
+       ParagraphStart -> 
+            Ok (Mdfi MB.Paragraph )
+       ParagraphEnd -> 
+            Err "unexpected ParagraphEnd"
        Table heading data -> 
              Ok (Mdf toBlock [MB.Table heading data ])
        -- Leaf Blocks Without Inlines
        CodeBlock code 
             -> Ok (Mdf toBlock [MB.CodeBlock code ])
-       ThematicBreak ->  Ok (Mdf toBlock [MB.ThematicBreak ])
+       ThematicBreak -> Ok (Mdf toBlock [MB.ThematicBreak ])
        -- Inlines
        HtmlInline hblock ->
-            -> Ok (Mdf toBlock [MB.HtmlInline hblock ])
+            Err "unexpected HtmlInline; expected block"
        Link url maybeTitle inlines ->
+            Err "unexpected Link; expected block"
        Image  url maybeTitle inlines ->
-       EmphasisBegin
-       EmphasisEnd
-       StrongBegin
-       StrongEnd
-       StrikethroughBegin
-       StrikethroughEnd
-       CodeSpan String
-       Text String
-       HardLineBreak
+            Err "unexpected Image; expected block"
+       EmphasisBegin ->
+            Err "unexpected EmphasisBegin; expected block"
+       EmphasisEnd ->
+            Err "unexpected EmphasisEnd; expected block"
+       StrongBegin ->
+            Err "unexpected StrongBegin; expected block"
+       StrongEnd ->
+            Err "unexpected StrongEnd; expected block"
+       StrikethroughBegin ->
+            Err "unexpected StrikethroughBegin; expected block"
+       StrikethroughEnd ->
+            Err "unexpected StrikethroughEnd; expected block"
+       CodeSpan String ->
+            Err "unexpected CodeSpan; expected block"
+       Text String ->
+            Err "unexpected Text; expected block"
+       HardLineBreak ->
+            Err "unexpected HardLineBreak; expected block"
+
+toInline : MdElement -> Result String (Mdf, List MB.Inline)
+toInline mde = 
+   case mde of
+       HtmlBlock hblock ->
+            Err "unexpectd HtmlBlock"
+       UnorderedListStart listSpacing  -> -- (List (ListItem Block))
+            Err "unexpectd UnorderedListStart"
+       UnorderedListItem _ _ ->
+         Err "unexpected UnorderedListItem"
+       UnorderedListEnd ->
+         Err "unexpected UnorderedListEnd"
+       OrderedListStart listSpacing offset  -> -- (List (List Block))
+            Err "unexpectd OrderedListStart"
+       OrderedListItem _ ->
+         Err "unexpected OrderedListItem"
+       OrderedListEnd ->
+         Err "unexpected OrderedListEnd"
+       BlockQuoteStart ->  -- list blocks
+            Err "unexpectd BlockQuoteStart"
+       BlockQuoteEnd -> 
+            Err "unexpectd BlockQuoteEnd"
+       -- Leaf Blocks With Inlines
+       HeadingStart headingLevel -> 
+            Err "unexpectd HeadingStart"
+       HeadingEnd -> 
+            Err "unexpected HeadingEnd"
+       ParagraphStart -> 
+            Err "unexpectd ParagraphStart"
+       ParagraphEnd -> 
+            Err "unexpected ParagraphEnd"
+       Table heading data -> 
+            Err "unexpectd Table"
+       -- Leaf Blocks Without Inlines
+       CodeBlock code 
+            Err "unexpectd CodeBlock"
+       ThematicBreak -> 
+            Err "unexpectd ThematicBreak"
+       -- Inlines
+       HtmlInline hblock ->
+            Err "unexpectd HtmlInline"
+       Link url maybeTitle inlines -> 
+         Ok (Mdfe, [MB.Link url maybeTitle inlines])
+       Image  url maybeTitle inlines ->
+         Ok (Mdfe, [MB.Image url maybeTitle inlines])
+       EmphasisBegin -> 
+        Ok (Mdfi (accumInlines EmphasisEnd MB.Emphasis [] ))
+       EmphasisEnd -> Err "unexpected EmphasisEnd"
+            
+       StrongBegin ->
+        Ok (Mdfi (accumInlines StrongEnd MB.Emphasis [] ))
+            
+       StrongEnd ->Err "unexpected StrongEnd"
+            
+       StrikethroughBegin ->
+        Ok (Mdfi (accumInlines StrikethroughEnd MB.Emphasis [] ))
+            
+       StrikethroughEnd ->Err "unexpected StrikethroughEnd"
+            
+       CodeSpan string -> 
+            
+            Ok(Mdfe, [MB.CodeSpan string])
+       Text string ->
+            Ok(Mdfe, [MB.CodeSpan string])
+       HardLineBreak ->
+            Ok(Mdfe, [MB.HardLineBreak])
 
 
 
