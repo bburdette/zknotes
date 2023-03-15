@@ -85,7 +85,9 @@ toBlocks elements =
 
 type Mdf
     = Mdf (List MB.Block -> MdElement -> Result String ( Mdf, List MB.Block ))
-    | Mdfb Mdb (List MB.Block -> MdElement -> Result String ( Mdf, List MB.Block ))
+    | Mdfb (List MB.Block -> Mdf) (List MB.Block -> MdElement -> Result String ( Mdf, List MB.Block ))
+    | Mdfi (List MB.Inline -> Mdf) (List MB.Inline -> MdElement -> Result String ( Mdf, List MB.Inline ))
+    | Mdfe
 
 
 type Mdb
@@ -118,57 +120,57 @@ orderedListItem listSpacing offset items mbs mde =
         _ ->
             Err "unexpected item"
 
+-- blockQuote : List MB.Block -> 
+
 
 toBlock : List MB.Block -> MdElement -> Result String ( Mdf, List MB.Block )
 toBlock mbs mde =
-    Err ""
+   case mde of
+       HtmlBlock hblock ->
+           Ok ( Mdf toBlock, MB.HtmlBlock hblock :: mbs )
+       UnorderedListStart listSpacing  -> -- (List (ListItem Block))
+           Ok ( Mdf unorderedListItem listSpacing [], mbs )
+       UnorderedListItem _ _ ->
+         Err "unexpected item"
+       UnorderedListEnd ->
+         Err "unexpected item"
+       OrderedListStart listSpacing offset  -> -- (List (List Block))
+           Ok ( Mdf orderedListItem listSpacing offset [], mbs )
+       OrderedListItem _ ->
+         Err "unexpected item"
+       OrderedListEnd ->
+         Err "unexpected item"
+       BlockQuoteStart ->  -- list blocks
+            Ok ( Mdfb MB.BlockQuote toBlock, mbs)
+       BlockQuoteEnd -> 
+            Ok (Mdfe, mbs)
+       -- Leaf Blocks With Inlines
+       HeadingStart headingLevel -> 
+            Ok (Mdfi MB.Heading )
+       HeadingEnd
+       ParagraphStart
+       ParagraphEnd
+       Table heading data -> 
+             Ok (Mdf toBlock [MB.Table heading data ])
+       -- Leaf Blocks Without Inlines
+       CodeBlock code 
+            -> Ok (Mdf toBlock [MB.CodeBlock code ])
+       ThematicBreak ->  Ok (Mdf toBlock [MB.ThematicBreak ])
+       -- Inlines
+       HtmlInline hblock ->
+            -> Ok (Mdf toBlock [MB.HtmlInline hblock ])
+       Link url maybeTitle inlines ->
+       Image  url maybeTitle inlines ->
+       EmphasisBegin
+       EmphasisEnd
+       StrongBegin
+       StrongEnd
+       StrikethroughBegin
+       StrikethroughEnd
+       CodeSpan String
+       Text String
+       HardLineBreak
 
-
-
-{-
-
-   toBlock : List MB.Block -> MdElement -> Result String ( Mdf, List MB.Block )
-   toBlock mbs mde =
-       case mde of
-           HtmlBlock hblock ->
-               Ok ( Mdf toBlock, MB.HtmlBlock hblock :: mbs )
-           UnorderedListStart listSpacing  -> -- (List (ListItem Block))
-               Ok ( Mdf unorderedListItem listSpacing [], mbs )
-           UnorderedListItem _ _ ->
-             Err "unexpected item"
-           UnorderedListEnd ->
-             Err "unexpected item"
-           OrderedListStart listSpacing offset  -> -- (List (List Block))
-               Ok ( Mdf orderedListItem listSpacing offset [], mbs )
-           OrderedListItem _ ->
-             Err "unexpected item"
-           OrderedListEnd ->
-             Err "unexpected item"
-           BlockQuoteStart -- list blocks
-           BlockQuoteEnd
-           -- Leaf Blocks With Inlines
-           HeadingStart MB.HeadingLevel
-           HeadingEnd
-           ParagraphStart
-           ParagraphEnd
-           Table (List { label : List MB.Inline, alignment : Maybe MB.Alignment }) (List (List (List MB.Inline)))
-           -- Leaf Blocks Without Inlines
-           CodeBlock { body : String, language : Maybe String }
-           ThematicBreak
-           -- Inlines
-           HtmlInline (MB.Html MB.Block)
-           Link String (Maybe String) (List MB.Inline)
-           Image String (Maybe String) (List MB.Inline)
-           EmphasisBegin
-           EmphasisEnd
-           StrongBegin
-           StrongEnd
-           StrikethroughBegin
-           StrikethroughEnd
-           CodeSpan String
-           Text String
-           HardLineBreak
--}
 
 
 viewMdElement : MdElement -> Element msg
