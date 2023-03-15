@@ -46,6 +46,131 @@ type MdElement
     | HardLineBreak
 
 
+type alias State =
+    { mdbstack : List Mdb
+    , mdf : Mdf
+    , result : Result String (List MB.Block)
+    }
+
+
+mdfProc : MdElement -> State -> State
+mdfProc elt state =
+    case List.head state.mdbstack of
+        Just mdf ->
+            case mdf of
+                Mdbf fn ->
+                    state
+
+                Mdif fn ->
+                    state
+
+        Nothing ->
+            state
+
+
+toBlocks : List MdElement -> Result String (List MB.Block)
+toBlocks elements =
+    List.foldl
+        mdfProc
+        { mdbstack = [], mdf = Mdf toBlock, result = Ok [] }
+        elements
+        |> .result
+
+
+
+-- stack 'o states.
+-- state is a function.
+-- state can
+
+
+type Mdf
+    = Mdf (List MB.Block -> MdElement -> Result String ( Mdf, List MB.Block ))
+    | Mdfb Mdb (List MB.Block -> MdElement -> Result String ( Mdf, List MB.Block ))
+
+
+type Mdb
+    = Mdbf (List MB.Block -> Mdf)
+    | Mdif (List MB.Inline -> Mdf)
+
+
+unorderedListItem : MB.ListSpacing -> List (MB.ListItem MB.Block) -> List MB.Block -> MdElement -> Result String ( Mdf, List MB.Block )
+unorderedListItem listSpacing items mbs mde =
+    case mde of
+        UnorderedListItem task blocks ->
+            Ok ( Mdf (unorderedListItem listSpacing (MB.ListItem task blocks :: items)), mbs )
+
+        UnorderedListEnd ->
+            Ok ( Mdf toBlock, MB.UnorderedList listSpacing (List.reverse items) :: mbs )
+
+        _ ->
+            Err "unexpected item"
+
+
+orderedListItem : MB.ListSpacing -> Int -> List (List MB.Block) -> List MB.Block -> MdElement -> Result String ( Mdf, List MB.Block )
+orderedListItem listSpacing offset items mbs mde =
+    case mde of
+        OrderedListItem blocks ->
+            Ok ( Mdf (orderedListItem listSpacing offset (blocks :: items)), mbs )
+
+        OrderedListEnd ->
+            Ok ( Mdf toBlock, MB.OrderedList listSpacing offset items :: mbs )
+
+        _ ->
+            Err "unexpected item"
+
+
+toBlock : List MB.Block -> MdElement -> Result String ( Mdf, List MB.Block )
+toBlock mbs mde =
+    Err ""
+
+
+
+{-
+
+   toBlock : List MB.Block -> MdElement -> Result String ( Mdf, List MB.Block )
+   toBlock mbs mde =
+       case mde of
+           HtmlBlock hblock ->
+               Ok ( Mdf toBlock, MB.HtmlBlock hblock :: mbs )
+           UnorderedListStart listSpacing  -> -- (List (ListItem Block))
+               Ok ( Mdf unorderedListItem listSpacing [], mbs )
+           UnorderedListItem _ _ ->
+             Err "unexpected item"
+           UnorderedListEnd ->
+             Err "unexpected item"
+           OrderedListStart listSpacing offset  -> -- (List (List Block))
+               Ok ( Mdf orderedListItem listSpacing offset [], mbs )
+           OrderedListItem _ ->
+             Err "unexpected item"
+           OrderedListEnd ->
+             Err "unexpected item"
+           BlockQuoteStart -- list blocks
+           BlockQuoteEnd
+           -- Leaf Blocks With Inlines
+           HeadingStart MB.HeadingLevel
+           HeadingEnd
+           ParagraphStart
+           ParagraphEnd
+           Table (List { label : List MB.Inline, alignment : Maybe MB.Alignment }) (List (List (List MB.Inline)))
+           -- Leaf Blocks Without Inlines
+           CodeBlock { body : String, language : Maybe String }
+           ThematicBreak
+           -- Inlines
+           HtmlInline (MB.Html MB.Block)
+           Link String (Maybe String) (List MB.Inline)
+           Image String (Maybe String) (List MB.Inline)
+           EmphasisBegin
+           EmphasisEnd
+           StrongBegin
+           StrongEnd
+           StrikethroughBegin
+           StrikethroughEnd
+           CodeSpan String
+           Text String
+           HardLineBreak
+-}
+
+
 viewMdElement : MdElement -> Element msg
 viewMdElement b =
     E.el [ EF.color TC.white ] <|
