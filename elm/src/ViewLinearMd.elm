@@ -11,9 +11,11 @@ import Element.Font as EF
 import Element.Input as EI
 import Element.Region as ER
 import Html.Attributes as HA
-import LinearMd exposing (MdElement(..), lpad, mbToMe, miToMe, viewMdElement, viewhtml)
+import LinearMd exposing (MdElement(..), lpad, mbToMe, miToMe, toBlocks, viewMdElement, viewhtml)
 import Markdown.Block as MB
 import Markdown.Html
+import Markdown.Renderer as MR
+import MdText as MT
 import TangoColors as TC
 
 
@@ -23,6 +25,7 @@ type alias Model =
     , nextMdElementId : Int
     , cleanMdElements : Array EditMdElement
     , blockDnd : DnDList.Model
+    , built : Maybe String
     }
 
 
@@ -37,6 +40,7 @@ type Msg
     | MdElementDndMsg DnDList.Msg
     | MdElementClicked Int
     | DeleteMdElement Int
+    | BuildPress
 
 
 type DragDropWhat
@@ -60,6 +64,7 @@ init blocks =
     , nextMdElementId = Array.length ba
     , cleanMdElements = ba
     , blockDnd = blockDndSystem.model
+    , built = Nothing
     }
 
 
@@ -111,11 +116,13 @@ view model =
         , E.htmlAttribute (HA.id "steplist")
         ]
     <|
-        (Array.indexedMap
-            (\i -> viewMdElementDnd model.blockDnd i model.focusMdElement)
-            model.blocks
-            |> Array.toList
-        )
+        EI.button Common.buttonStyle { onPress = Just BuildPress, label = E.text "build" }
+            :: E.text (Maybe.withDefault "" model.built)
+            :: (Array.indexedMap
+                    (\i -> viewMdElementDnd model.blockDnd i model.focusMdElement)
+                    model.blocks
+                    |> Array.toList
+               )
 
 
 viewMdElementDnd : DnDList.Model -> Int -> Maybe Int -> EditMdElement -> Element Msg
@@ -251,6 +258,32 @@ ghostView model =
 update : Model -> Msg -> ( Model, Cmd Msg )
 update model msg =
     case msg of
+        BuildPress ->
+            let
+                st =
+                    model.blocks
+                        |> Array.toList
+                        |> List.map .block
+                        |> LinearMd.toBlocks
+                        |> Result.andThen
+                            (\blocks ->
+                                MR.render MT.stringRenderer blocks
+                                    |> Result.map String.concat
+                            )
+            in
+            ( { model
+                | built =
+                    Just <|
+                        case st of
+                            Ok s ->
+                                s
+
+                            Err s ->
+                                s
+              }
+            , Cmd.none
+            )
+
         AddMdElementPress ->
             ( model, Cmd.none )
 

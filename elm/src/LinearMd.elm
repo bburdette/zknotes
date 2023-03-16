@@ -1,4 +1,4 @@
-module LinearMd exposing (MdElement(..), lpad, mbToMe, miToMe, viewMdElement, viewhtml)
+module LinearMd exposing (..)
 
 import Element as E exposing (Element)
 import Element.Background as EBk
@@ -57,7 +57,7 @@ toBlocks elements =
             Err e
 
         Ok _ ->
-            Ok st.blocks
+            Ok (List.reverse st.blocks)
 
 
 
@@ -74,6 +74,10 @@ type alias State =
 
 mdfProc : MdElement -> State -> State
 mdfProc elt state =
+    -- let
+    --     _ =
+    --         Debug.log "mdfProc elt, blocks" ( elt, state.blocks )
+    -- in
     case state.result of
         Err _ ->
             state
@@ -84,7 +88,7 @@ mdfProc elt state =
                     { state | result = Err e }
 
                 Ok (Mdeb block) ->
-                    { state | blocks = block :: state.blocks }
+                    { state | blocks = block :: state.blocks, result = Ok toMB }
 
                 Ok (Mdei inline) ->
                     { state | result = Err "unexpected inline" }
@@ -140,10 +144,10 @@ accumInlines endelt endcontainer accum mdfn elt =
                 Err e
 
             Ok (Mdeb blocks) ->
-                Err "expected inlines not blocks"
+                Err "accumInlines - expected inlines not blocks"
 
             Ok (Mdei inline) ->
-                Ok (Mdf <| accumInlines endelt endcontainer (inline :: accum) toMB)
+                Ok (Mdf <| accumInlines endelt endcontainer (inline :: accum) mdfn)
 
             Ok (Mdf fn) ->
                 Ok (Mdf <| accumInlines endelt endcontainer accum fn)
@@ -152,18 +156,27 @@ accumInlines endelt endcontainer accum mdfn elt =
 accumInlinesToBlock : MdElement -> (List MB.Inline -> MB.Block) -> List MB.Inline -> Mdfn -> MdElement -> Result String Mdf
 accumInlinesToBlock endelt endcontainer accum mdfn elt =
     if elt == endelt then
+        -- Ok (Mdeb (Debug.log "return" (endcontainer (List.reverse accum))))
         Ok (Mdeb (endcontainer (List.reverse accum)))
 
     else
+        -- let
+        --     _ =
+        --         Debug.log "mdfn elt, endelt" ( elt, endelt )
+        -- in
         case mdfn elt of
             Err e ->
                 Err e
 
-            Ok (Mdeb blocks) ->
-                Err "expected inlines not blocks"
+            Ok (Mdeb block) ->
+                -- let
+                --     _ =
+                --         Debug.log "blocjk" block
+                -- in
+                Err "accumInlinesToBlock - expected inlines not blocks"
 
             Ok (Mdei inline) ->
-                Ok (Mdf <| accumInlinesToBlock endelt endcontainer (inline :: accum) toMB)
+                Ok (Mdf <| accumInlinesToBlock endelt endcontainer (inline :: accum) mdfn)
 
             Ok (Mdf fn) ->
                 Ok (Mdf <| accumInlinesToBlock endelt endcontainer accum fn)
@@ -277,7 +290,7 @@ toMB mde =
             Ok (Mdei (MB.CodeSpan string))
 
         Text string ->
-            Ok (Mdei (MB.CodeSpan string))
+            Ok (Mdei (MB.Text string))
 
         HardLineBreak ->
             Ok (Mdei MB.HardLineBreak)
