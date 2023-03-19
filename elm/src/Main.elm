@@ -1215,9 +1215,31 @@ view model =
                         { dm | model = model.trackedRequests }
 
             _ ->
-                E.layout [ EF.size model.fontsize, E.width E.fill ] <| viewState model.size model.state model
+                E.layout
+                    ((case ghostState model.state of
+                        Just elt ->
+                            [ E.inFront elt ]
+
+                        Nothing ->
+                            []
+                     )
+                        ++ [ EF.size model.fontsize, E.width E.fill ]
+                    )
+                <|
+                    viewState model.size model.state model
         ]
     }
+
+
+ghostState : State -> Maybe (E.Element Msg)
+ghostState state =
+    case state of
+        EditZkNote m l ->
+            Maybe.map (E.map EditZkNoteMsg) <|
+                EditZkNote.ghostView m
+
+        _ ->
+            Nothing
 
 
 piupdate : Msg -> PiModel -> ( PiModel, Cmd Msg )
@@ -3355,17 +3377,30 @@ main =
         , view = piview
         , update = piupdate
         , subscriptions =
-            \model ->
+            \pimodel ->
                 let
                     tracks : List (Sub Msg)
                     tracks =
-                        case model of
+                        case pimodel of
                             Ready rmd ->
                                 rmd.trackedRequests.requests
                                     |> Dict.keys
                                     |> List.map (\k -> Http.track k (RequestProgress k))
 
                             PreInit _ ->
+                                []
+
+                    esub =
+                        case pimodel of
+                            Ready model ->
+                                case model.state of
+                                    EditZkNote state _ ->
+                                        [ Sub.map EditZkNoteMsg <| EditZkNote.subscriptions state ]
+
+                                    _ ->
+                                        []
+
+                            _ ->
                                 []
                 in
                 Sub.batch <|
@@ -3375,6 +3410,7 @@ main =
                     , LS.localVal ReceiveLocalVal
                     ]
                         ++ tracks
+                        ++ esub
         , onUrlRequest = urlRequest
         , onUrlChange = UrlChanged
         }
