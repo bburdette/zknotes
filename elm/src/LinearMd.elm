@@ -60,12 +60,6 @@ toBlocks elements =
             Ok (List.reverse st.blocks)
 
 
-
--- stack 'o states.
--- state is a function.
--- state can
-
-
 type alias State =
     { blocks : List MB.Block
     , result : Result String Mdfn
