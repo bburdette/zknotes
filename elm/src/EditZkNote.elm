@@ -41,8 +41,9 @@ module EditZkNote exposing
     , toZkListNote
     , update
     , updateSearch
-    , updateSearchResult
-    , updateSearchStack
+    ,  updateSearchResult
+       -- , updateSearchStack
+
     , view
     , zkLinkName
     , zknview
@@ -75,6 +76,7 @@ import Orgauth.Data exposing (UserId)
 import RequestsDialog exposing (TRequests)
 import Schelme.Show exposing (showTerm)
 import Search as S
+import SearchRecent as SR
 import SearchStackPanel as SP
 import TangoColors as TC
 import Task
@@ -143,11 +145,6 @@ type NavChoice
     | NcRecent
 
 
-type SearchOrRecent
-    = SearchView
-    | RecentView
-
-
 type EditOrView
     = EditView
     | ViewView
@@ -171,8 +168,9 @@ type alias Model =
     , noteUser : UserId
     , noteUserName : String
     , usernote : Int
-    , zknSearchResult : Data.ZkListNoteSearchResult
-    , focusSr : Maybe Int -- note id in search result.
+
+    -- , zknSearchResult : Data.ZkListNoteSearchResult
+    -- , focusSr : Maybe Int -- note id in search result.
     , zklDict : Dict String EditLink
     , focusLink : Maybe EditLink
     , comments : List Data.ZkNote
@@ -189,11 +187,13 @@ type alias Model =
     , changeddate : Maybe Int
     , md : String
     , cells : CellDict
-    , revert : Maybe Data.SaveZkNote
-    , initialZklDict : Dict String EditLink
-    , spmodel : SP.Model
+
+    -- , revert : Maybe Data.SaveZkNote
+    -- , initialZklDict : Dict String EditLink
+    -- , spmodel : SP.Model
     , navchoice : NavChoice
-    , searchOrRecent : SearchOrRecent
+
+    -- , searchOrRecent : SearchOrRecent
     , editOrView : EditOrView
     , dialog : Maybe D.Model
     , panelNote : Maybe Data.ZkNote
@@ -367,15 +367,16 @@ updateSearch ts model =
     )
 
 
-updateSearchStack : List S.TagSearch -> Model -> Model
-updateSearchStack tsl model =
-    let
-        spm =
-            model.spmodel
-    in
-    { model
-        | spmodel = { spm | searchStack = tsl }
-    }
+
+-- updateSearchStack : List S.TagSearch -> Model -> Model
+-- updateSearchStack tsl model =
+--     let
+--         spm =
+--             model.spmodel
+--     in
+--     { model
+--         | spmodel = { spm | searchStack = tsl }
+--     }
 
 
 toPubId : Bool -> String -> Maybe String
