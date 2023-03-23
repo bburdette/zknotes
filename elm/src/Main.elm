@@ -147,6 +147,14 @@ type alias SavedRoute =
     }
 
 
+type alias CacheNote =
+    { revert : Maybe Data.SaveZkNote -- should be zknote??
+    , initialZklDict : Dict String Data.EditLink
+    , editState : Maybe EditZkNote.Model
+    , lastRefresh : Time.Posix
+    }
+
+
 type alias Model =
     { state : State
     , size : Util.Size
@@ -163,6 +171,7 @@ type alias Model =
     , stylePalette : StylePalette
     , adminSettings : OD.AdminSettings
     , trackedRequests : TRequests
+    , cachedNotes : Dict Int CacheNote
     }
 
 
@@ -3314,6 +3323,7 @@ init flags url key zone fontsize =
             , stylePalette = { defaultSpacing = 10 }
             , adminSettings = adminSettings
             , trackedRequests = { requestCount = 0, requests = Dict.empty }
+            , cachedNotes = Dict.empty
             }
 
         geterrornote =
