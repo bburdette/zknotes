@@ -1,5 +1,6 @@
 module Data exposing (..)
 
+import Dict exposing (Dict)
 import Json.Decode as JD
 import Json.Encode as JE
 import Orgauth.Data exposing (UserId, decodeUserId, encodeUserId)
@@ -171,6 +172,12 @@ type alias EditLink =
     , othername : Maybe String
     , sysids : List Int
     , delete : Maybe Bool
+    }
+
+
+type alias CacheNote =
+    { initialZkNote : ZkNote
+    , initialZklDict : Dict String EditLink
     }
 
 

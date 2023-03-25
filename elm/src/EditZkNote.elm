@@ -2,8 +2,9 @@ module EditZkNote exposing
     ( Command(..)
     , Model
     , Msg(..)
-    , NavChoice(..)
-    , SearchOrRecent(..)
+    ,  NavChoice(..)
+       -- , SearchOrRecent(..)
+
     , TACommand(..)
     , WClass(..)
     , addComment
@@ -39,9 +40,9 @@ module EditZkNote exposing
     , tabsOnLoad
     , toPubId
     , toZkListNote
-    , update
-    , updateSearch
-    ,  updateSearchResult
+    ,  update
+       -- ,  updateSearch
+       -- ,  updateSearchResult
        -- , updateSearchStack
 
     , view
@@ -76,7 +77,7 @@ import Orgauth.Data exposing (UserId)
 import RequestsDialog exposing (TRequests)
 import Schelme.Show exposing (showTerm)
 import Search as S
-import SearchRecent as SR
+-- import SearchRecent as SR
 import SearchStackPanel as SP
 import TangoColors as TC
 import Task
@@ -150,6 +151,11 @@ type EditOrView
     | ViewView
 
 
+type SearchOrRecent
+    = SearchView
+    | RecentView
+
+
 type WClass
     = Narrow
     | Medium
@@ -192,12 +198,17 @@ type alias Model =
     -- , initialZklDict : Dict String EditLink
     -- , spmodel : SP.Model
     , navchoice : NavChoice
-
-    -- , searchOrRecent : SearchOrRecent
+    , searchOrRecent : SearchOrRecent
     , editOrView : EditOrView
     , dialog : Maybe D.Model
     , panelNote : Maybe Data.ZkNote
     , mbReplaceString : Maybe String
+    }
+
+
+type alias CM =
+    { model : Model
+    , cacheNote : Data.CacheNote
     }
 
 
@@ -327,6 +338,32 @@ sznFromModel model =
     , deleted = model.deleted
     }
 
+znFromModel : Model -> Data.ZkNote
+znFromModel model =
+    { id = model.id
+    , title = model.title
+    , content = model.md
+    , pubid = toPubId (isPublic model) model.pubidtxt
+    , editable = model.editableValue
+    , showtitle = model.showtitle
+    , deleted = model.deleted
+    }
+{ id : Int
+    , user : UserId
+    , username : String
+    , usernote : Int
+    , title : String
+    , content : String
+    , pubid : Maybe String
+    , editable : Bool -- whether I'm allowed to edit the note.
+    , editableValue : Bool -- whether the user has marked it editable.
+    , showtitle : Bool
+    , createdate : Int
+    , changeddate : Int
+    , deleted : Bool
+    , isFile : Bool
+    , sysids : List Int
+    }
 
 fullSave : Model -> Data.SaveZkNotePlusLinks
 fullSave model =
@@ -335,14 +372,14 @@ fullSave model =
     }
 
 
-saveZkLinkList : Model -> List Data.SaveZkLink
-saveZkLinkList model =
+saveZkLinkList : CM -> List Data.SaveZkLink
+saveZkLinkList { model, cacheNote } =
     List.map
         (\zkl -> { zkl | delete = Nothing })
-        (List.map Data.elToSzl (Dict.values (Dict.diff model.zklDict model.initialZklDict)))
+        (List.map Data.elToSzl (Dict.values (Dict.diff model.zklDict cacheNote.initialZklDict)))
         ++ List.map
             (\zkl -> { zkl | delete = Just True })
-            (List.map Data.elToSzl (Dict.values (Dict.diff model.initialZklDict model.zklDict)))
+            (List.map Data.elToSzl (Dict.values (Dict.diff cacheNote.initialZklDict model.zklDict)))
 
 
 commentsRecieved : List Data.ZkNote -> Model -> Model
@@ -350,24 +387,20 @@ commentsRecieved comments model =
     { model | comments = comments }
 
 
-updateSearchResult : Data.ZkListNoteSearchResult -> Model -> Model
-updateSearchResult zsr model =
-    { model
-        | zknSearchResult = zsr
-        , spmodel = SP.searchResultUpdated zsr model.spmodel
-    }
 
-
-updateSearch : List S.TagSearch -> Model -> ( Model, Command )
-updateSearch ts model =
-    ( { model
-        | spmodel = SP.setSearch model.spmodel ts
-      }
-    , None
-    )
-
-
-
+-- updateSearchResult : Data.ZkListNoteSearchResult -> Model -> Model
+-- updateSearchResult zsr model =
+--     { model
+--         | zknSearchResult = zsr
+--         , spmodel = SP.searchResultUpdated zsr model.spmodel
+--     }
+-- updateSearch : List S.TagSearch -> Model -> ( Model, Command )
+-- updateSearch ts model =
+--     ( { model
+--         | spmodel = SP.setSearch model.spmodel ts
+--       }
+--     , None
+--     )
 -- updateSearchStack : List S.TagSearch -> Model -> Model
 -- updateSearchStack tsl model =
 --     let
@@ -400,9 +433,9 @@ zkLinkName zklink noteid =
         "link error"
 
 
-dirty : Model -> Bool
-dirty model =
-    model.revert
+dirty : CM -> Bool
+dirty { model, cacheNote } =
+    model.initialZkNote
         |> Maybe.map
             (\r ->
                 not <|
@@ -419,7 +452,7 @@ dirty model =
 
 revert : Model -> Model
 revert model =
-    model.revert
+    model.initialZkNote
         |> Maybe.map
             (\r ->
                 { model
@@ -1633,12 +1666,13 @@ initFull ld zkl zknote dtlinks spm =
       , zknSearchResult = zkl
       , focusSr = Nothing
       , zklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) links)
-      , initialZklDict =
-            Dict.fromList
-                (List.map
-                    (\zl -> ( zklKey zl, zl ))
-                    links
-                )
+
+      -- , initialZklDict =
+      --       Dict.fromList
+      --           (List.map
+      --               (\zl -> ( zklKey zl, zl ))
+      --               links
+      --           )
       , focusLink = Nothing
       , pubidtxt = zknote.pubid |> Maybe.withDefault ""
       , title = zknote.title
@@ -1654,7 +1688,8 @@ initFull ld zkl zknote dtlinks spm =
       , createdate = Just zknote.createdate
       , changeddate = Just zknote.changeddate
       , cells = getCd cc
-      , revert = Just (Data.saveZkNote zknote)
+
+      -- , revert = Just (Data.saveZkNote zknote)
       , spmodel = SP.searchResultUpdated zkl spm
       , navchoice = NcView
       , searchOrRecent = SearchView
@@ -1690,7 +1725,8 @@ initNew ld zkl spm links =
     , zknSearchResult = zkl
     , focusSr = Nothing
     , zklDict = zklDict
-    , initialZklDict = Dict.empty
+
+    -- , initialZklDict = Dict.empty
     , focusLink = Nothing
     , pubidtxt = ""
     , title = ""
@@ -1706,7 +1742,8 @@ initNew ld zkl spm links =
     , changeddate = Nothing
     , md = ""
     , cells = getCd cc
-    , revert = Nothing
+
+    -- , revert = Nothing
     , spmodel = SP.searchResultUpdated zkl spm
     , navchoice = NcEdit
     , searchOrRecent = SearchView
@@ -1756,13 +1793,13 @@ sznToZkn uid uname unote sysids sdzn szn =
     }
 
 
-onSaved : Model -> Data.SavedZkNote -> Model
-onSaved oldmodel szn =
+onSaved : CM -> Data.SavedZkNote -> CM
+onSaved { model, cacheNote } szn =
     let
-        model =
-            { oldmodel
-                | revert = Just <| sznFromModel oldmodel
-                , initialZklDict = oldmodel.zklDict
+        newCacheNote =
+            { cacheNote
+                | initialZkNote = Just <| sznFromModel model
+                , initialZklDict = model.zklDict
             }
     in
     case model.pendingcomment of
@@ -1790,7 +1827,13 @@ onSaved oldmodel szn =
                         , changeddate = Just szn.changeddate
                     }
             in
-            { m1 | revert = Just <| sznFromModel m1 }
+            { model = m1
+            , cacheNote = { newCacheNote | initialZkNote = sznFromModel m1 }
+            }
+
+
+
+-- { m1 | initialZkNote = Just <| sznFromModel m1 }
 
 
 type TACommand
@@ -2133,7 +2176,7 @@ update msg model =
                 , initialZklDict = Dict.empty
                 , createdate = Nothing
                 , changeddate = Nothing
-                , revert = Nothing
+                , initialZkNote = Nothing
                 , dialog = Nothing
               }
             , None

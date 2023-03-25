@@ -147,14 +147,6 @@ type alias SavedRoute =
     }
 
 
-type alias CacheNote =
-    { revert : Maybe Data.SaveZkNote -- should be zknote??
-    , initialZklDict : Dict String Data.EditLink
-    , editState : Maybe EditZkNote.Model
-    , lastRefresh : Time.Posix
-    }
-
-
 type alias Model =
     { state : State
     , size : Util.Size
@@ -171,7 +163,7 @@ type alias Model =
     , stylePalette : StylePalette
     , adminSettings : OD.AdminSettings
     , trackedRequests : TRequests
-    , cachedNotes : Dict Int CacheNote
+    , cachedNotes : Dict Int Data.CacheNote
     }
 
 
