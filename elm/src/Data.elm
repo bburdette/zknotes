@@ -265,6 +265,13 @@ type alias GetZkNoteComments =
 
 type alias GetZkNoteEdit =
     { zknote : Int
+    , what : String
+    }
+
+
+type alias ZkNoteEditWhat =
+    { what : String
+    , zne : ZkNoteEdit
     }
 
 
@@ -322,6 +329,7 @@ encodeGetZkNoteEdit : GetZkNoteEdit -> JE.Value
 encodeGetZkNoteEdit gzl =
     JE.object
         [ ( "zknote", JE.int gzl.zknote )
+        , ( "what", JE.string gzl.what )
         ]
 
 
@@ -541,6 +549,13 @@ decodeZkNoteEdit =
     JD.map2 ZkNoteEdit
         (JD.field "zknote" decodeZkNote)
         (JD.field "links" (JD.list decodeEditLink))
+
+
+decodeZkNoteEditWhat : JD.Decoder ZkNoteEditWhat
+decodeZkNoteEditWhat =
+    JD.map2 ZkNoteEditWhat
+        (JD.field "what" JD.string)
+        (JD.field "zne" decodeZkNoteEdit)
 
 
 decodeLoginData : JD.Decoder LoginData

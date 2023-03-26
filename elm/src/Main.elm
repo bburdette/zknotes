@@ -237,7 +237,7 @@ routeStateInternal model route =
                             PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNote id)) PublicReplyData
 
                         _ ->
-                            sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id })
+                            sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id, what = "" })
                     )
 
                 Nothing ->
@@ -269,12 +269,12 @@ routeStateInternal model route =
             case model.state of
                 EditZkNote st login ->
                     ( EditZkNote st login
-                    , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id })
+                    , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id, what = "" })
                     )
 
                 EditZkNoteListing st login ->
                     ( EditZkNoteListing st login
-                    , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id })
+                    , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id, what = "" })
                     )
 
                 EView st login ->
@@ -288,7 +288,7 @@ routeStateInternal model route =
                             ( ShowMessage { message = "loading note..." }
                                 login
                                 (Just model.state)
-                            , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id })
+                            , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id, what = "" })
                             )
 
                         Nothing ->
@@ -430,7 +430,7 @@ routeStateInternal model route =
                                 [ sendZIMsg
                                     model.location
                                     (ZI.SearchZkNotes <| prevSearchQuery login)
-                                , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id })
+                                , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id, what = "" })
                                 ]
                             )
 
@@ -2219,7 +2219,7 @@ actualupdate msg model =
                                     , Cmd.none
                                     )
 
-                        ZI.ZkNoteEdit zne ->
+                        ZI.ZkNoteEditWhat znew ->
                             case stateLogin state of
                                 Just login ->
                                     let
@@ -2230,8 +2230,8 @@ actualupdate msg model =
                                         ( nst, c ) =
                                             EditZkNote.initFull login
                                                 sres
-                                                zne.zknote
-                                                zne.links
+                                                znew.zne.zknote
+                                                znew.zne.links
                                                 spmod
 
                                         s =
@@ -2249,14 +2249,18 @@ actualupdate msg model =
                                                 s
                                                 login
                                         , recentNotes =
+                                            let
+                                                zknote =
+                                                    znew.zne.zknote
+                                            in
                                             addRecentZkListNote model.recentNotes
-                                                { id = zne.zknote.id
-                                                , user = zne.zknote.user
-                                                , title = zne.zknote.title
-                                                , isFile = zne.zknote.isFile
-                                                , createdate = zne.zknote.createdate
-                                                , changeddate = zne.zknote.changeddate
-                                                , sysids = zne.zknote.sysids
+                                                { id = zknote.id
+                                                , user = zknote.user
+                                                , title = zknote.title
+                                                , isFile = zknote.isFile
+                                                , createdate = zknote.createdate
+                                                , changeddate = zknote.changeddate
+                                                , sysids = zknote.sysids
                                                 }
                                       }
                                     , sendZIMsg model.location <| ZI.GetZkNoteComments c
@@ -2412,7 +2416,7 @@ actualupdate msg model =
                             case es.id of
                                 Just id ->
                                     ( { model | state = state }
-                                    , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id })
+                                    , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id, what = "" })
                                     )
 
                                 Nothing ->
@@ -2619,7 +2623,7 @@ actualupdate msg model =
                         ZI.ServerError e ->
                             ( displayMessageDialog model <| e, Cmd.none )
 
-                        ZI.ZkNoteEdit zne ->
+                        ZI.ZkNoteEditWhat znew ->
                             case stateLogin state of
                                 Just login ->
                                     let
@@ -2630,8 +2634,8 @@ actualupdate msg model =
                                         ( nst, c ) =
                                             EditZkNote.initFull login
                                                 sres
-                                                zne.zknote
-                                                zne.links
+                                                znew.zne.zknote
+                                                znew.zne.links
                                                 spmod
 
                                         s =
@@ -2649,14 +2653,18 @@ actualupdate msg model =
                                                 s
                                                 login
                                         , recentNotes =
+                                            let
+                                                zknote =
+                                                    znew.zne.zknote
+                                            in
                                             addRecentZkListNote model.recentNotes
-                                                { id = zne.zknote.id
-                                                , user = zne.zknote.user
-                                                , title = zne.zknote.title
-                                                , isFile = zne.zknote.isFile
-                                                , createdate = zne.zknote.createdate
-                                                , changeddate = zne.zknote.changeddate
-                                                , sysids = zne.zknote.sysids
+                                                { id = zknote.id
+                                                , user = zknote.user
+                                                , title = zknote.title
+                                                , isFile = zknote.isFile
+                                                , createdate = zknote.createdate
+                                                , changeddate = zknote.changeddate
+                                                , sysids = zknote.sysids
                                                 }
                                       }
                                     , sendZIMsg model.location <| ZI.GetZkNoteComments c
@@ -2879,7 +2887,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     ( ShowMessage { message = "loading note..." }
                         login
                         (Just model.state)
-                    , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id })
+                    , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id, what = "" })
                     )
             in
             ( { model | state = st }, cmd )
@@ -2890,7 +2898,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     ( ShowMessage { message = "loading note..." }
                         login
                         (Just model.state)
-                    , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id })
+                    , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id, what = "" })
                     )
             in
             ( { model | state = st }

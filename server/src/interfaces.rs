@@ -11,7 +11,7 @@ use std::error::Error;
 use std::time::Duration;
 use zkprotocol::content::{
   GetArchiveZkNote, GetZkNoteArchives, GetZkNoteComments, GetZkNoteEdit, ImportZkNote, SaveZkNote,
-  SaveZkNotePlusLinks, ZkLinks, ZkNoteArchives, ZkNoteEdit,
+  SaveZkNotePlusLinks, ZkLinks, ZkNoteArchives, ZkNoteEdit, ZkNoteEditWhat,
 };
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 use zkprotocol::search::{TagSearch, ZkListNoteSearchResult, ZkNoteSearch};
@@ -102,9 +102,15 @@ pub fn zk_interface_loggedin(
         "user#getzknoteedit: {} - {}",
         gzne.zknote, note.zknote.title
       );
+
+      let znew = ZkNoteEditWhat {
+        what: gzne.what,
+        zne: note,
+      };
+
       Ok(ServerResponse {
         what: "zknoteedit".to_string(),
-        content: serde_json::to_value(note)?,
+        content: serde_json::to_value(znew)?,
       })
     }
     "getzknotecomments" => {
