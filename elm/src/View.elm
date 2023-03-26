@@ -193,7 +193,7 @@ view zone maxw model loggedin =
         ]
 
 
-initFull : Data.ZkNoteEdit -> Model
+initFull : Data.PubZkNote -> Model
 initFull zknaa =
     let
         zknote =

@@ -17,7 +17,7 @@ type SendMsg
 
 type ServerResponse
     = ServerError String
-    | ZkNote Data.ZkNoteEdit
+    | ZkNote Data.PubZkNote
 
 
 encodeSendMsg : SendMsg -> JE.Value
@@ -42,7 +42,18 @@ serverResponseDecoder =
         (\what ->
             case what of
                 "zknote" ->
-                    JD.map ZkNote (JD.at [ "content" ] <| Data.decodeZkNoteEdit)
+                    JD.map ZkNote
+                        (JD.at [ "content" ] <|
+                            JD.map
+                                (\zne ->
+                                    -- PubZkNote
+                                    { zknote = zne.zknote
+                                    , links = zne.links
+                                    , panelNote = Nothing
+                                    }
+                                )
+                                Data.decodeZkNoteEdit
+                        )
 
                 "server error" ->
                     JD.map ServerError (JD.at [ "content" ] JD.string)
