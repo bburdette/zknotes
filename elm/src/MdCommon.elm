@@ -12,13 +12,14 @@ import Element.Input as EI
 import Element.Region as ER
 import Html exposing (Attribute, Html)
 import Html.Attributes as HA
-import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..), inlineFoldl)
+import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..), foldl, inlineFoldl)
 import Markdown.Html
 import Markdown.Parser
 import Markdown.Renderer
 import Maybe.Extra as ME
 import Regex
 import Schelme.Show exposing (showTerm)
+import Set exposing (Set(..))
 import TangoColors as TC
 
 
@@ -260,6 +261,8 @@ mkRenderer viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged =
                 |> Markdown.Html.withOptionalAttribute "text"
                 |> Markdown.Html.withOptionalAttribute "width"
                 |> Markdown.Html.withOptionalAttribute "height"
+            , Markdown.Html.tag "note" noteView
+                |> Markdown.Html.withAttribute "id"
             ]
     , table = E.column [ E.width <| E.fill ]
     , tableHeader = E.column [ E.width <| E.fill, EF.bold, EF.underline, E.spacing 8 ]
@@ -313,6 +316,11 @@ imageView text url mbwidth renderedChildren =
         Nothing ->
             E.image [ E.width E.fill ]
                 { src = url, description = text }
+
+
+noteView : String -> List (Element a) -> Element a
+noteView id _ =
+    E.text <| id
 
 
 videoView : Int -> String -> Maybe String -> Maybe String -> Maybe String -> List (Element a) -> Element a
@@ -500,3 +508,79 @@ linkDict markdown =
                 []
                 blocks
                 |> Dict.fromList
+
+
+noteIds : String -> Set Int
+noteIds markdown =
+    -- build a dict of description->url
+    let
+        parsedmd =
+            markdown
+                |> Markdown.Parser.parse
+                |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
+    in
+    case parsedmd of
+        Err _ ->
+            Set.empty
+
+        Ok blocks ->
+            foldl
+                (\block ids ->
+                    case block of
+                        Block.HtmlBlock (Block.HtmlElement tag attr childs) ->
+                            case
+                                ( tag
+                                , List.foldl
+                                    (\i mbv ->
+                                        if i.name == "id" then
+                                            String.toInt i.value
+
+                                        else
+                                            Nothing
+                                    )
+                                    Nothing
+                                    attr
+                                )
+                            of
+                                ( "tag", Just id ) ->
+                                    Set.insert id ids
+
+                                _ ->
+                                    ids
+
+                        _ ->
+                            ids
+                )
+                Set.empty
+                blocks
+                |> (\bids ->
+                        inlineFoldl
+                            (\inline ids ->
+                                case inline of
+                                    Block.HtmlInline (Block.HtmlElement tag attr childs) ->
+                                        case
+                                            ( tag
+                                            , List.foldl
+                                                (\i mbv ->
+                                                    if i.name == "id" then
+                                                        String.toInt i.value
+
+                                                    else
+                                                        Nothing
+                                                )
+                                                Nothing
+                                                attr
+                                            )
+                                        of
+                                            ( "tag", Just id ) ->
+                                                Set.insert id ids
+
+                                            _ ->
+                                                ids
+
+                                    _ ->
+                                        ids
+                            )
+                            bids
+                            blocks
+                   )

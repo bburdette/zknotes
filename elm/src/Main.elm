@@ -163,6 +163,7 @@ type alias Model =
     , stylePalette : StylePalette
     , adminSettings : OD.AdminSettings
     , trackedRequests : TRequests
+    , noteCache : Dict Int Data.ZkNoteEdit
     }
 
 
@@ -3314,6 +3315,7 @@ init flags url key zone fontsize =
             , stylePalette = { defaultSpacing = 10 }
             , adminSettings = adminSettings
             , trackedRequests = { requestCount = 0, requests = Dict.empty }
+            , noteCache = Dict.empty
             }
 
         geterrornote =
