@@ -1,8 +1,9 @@
-module MdCommon exposing (Panel, ViewMode(..), blockCells, blockPanels, cellView, codeBlock, codeSpan, defCell, heading, imageView, linkDict, markdownView, mdCells, mdPanel, mdPanels, mkRenderer, panelView, rawTextToId, searchView, showRunState)
+module MdCommon exposing (Panel, ViewMode(..), blockCells, blockPanels, cellView, codeBlock, codeSpan, defCell, heading, imageView, linkDict, markdownView, mdCells, mdPanel, mdPanels, mkRenderer, noteIds, panelView, rawTextToId, searchView, showRunState)
 
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
 import Common exposing (buttonStyle)
+import Data
 import Dict exposing (Dict)
 import Element as E exposing (Element)
 import Element.Background as EBk
@@ -132,8 +133,8 @@ type ViewMode
     | EditView
 
 
-mkRenderer : ViewMode -> (String -> a) -> Int -> CellDict -> Bool -> (String -> String -> a) -> Markdown.Renderer.Renderer (Element a)
-mkRenderer viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged =
+mkRenderer : ViewMode -> (String -> a) -> Int -> CellDict -> Bool -> (String -> String -> a) -> Dict Int Data.ZkNoteEdit -> Markdown.Renderer.Renderer (Element a)
+mkRenderer viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged noteCache =
     { heading = heading
     , paragraph =
         E.paragraph
@@ -261,7 +262,7 @@ mkRenderer viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged =
                 |> Markdown.Html.withOptionalAttribute "text"
                 |> Markdown.Html.withOptionalAttribute "width"
                 |> Markdown.Html.withOptionalAttribute "height"
-            , Markdown.Html.tag "note" noteView
+            , Markdown.Html.tag "note" (noteView noteCache)
                 |> Markdown.Html.withAttribute "id"
             ]
     , table = E.column [ E.width <| E.fill ]
@@ -318,9 +319,17 @@ imageView text url mbwidth renderedChildren =
                 { src = url, description = text }
 
 
-noteView : String -> List (Element a) -> Element a
-noteView id _ =
-    E.text <| id
+noteView : Dict Int Data.ZkNoteEdit -> String -> List (Element a) -> Element a
+noteView noteCache id _ =
+    case
+        String.toInt id
+            |> Maybe.andThen (\iid -> Dict.get iid noteCache)
+    of
+        Just zne ->
+            E.text zne.zknote.title
+
+        Nothing ->
+            E.text <| id
 
 
 videoView : Int -> String -> Maybe String -> Maybe String -> Maybe String -> List (Element a) -> Element a
@@ -542,7 +551,7 @@ noteIds markdown =
                                     attr
                                 )
                             of
-                                ( "tag", Just id ) ->
+                                ( "note", Just id ) ->
                                     Set.insert id ids
 
                                 _ ->
@@ -572,7 +581,7 @@ noteIds markdown =
                                                 attr
                                             )
                                         of
-                                            ( "tag", Just id ) ->
+                                            ( "note", Just id ) ->
                                                 Set.insert id ids
 
                                             _ ->

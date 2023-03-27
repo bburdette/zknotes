@@ -42,6 +42,7 @@ import Route exposing (Route(..), parseUrl, routeTitle, routeUrl)
 import Search as S
 import SearchStackPanel as SP
 import SelectString as SS
+import Set
 import ShowMessage
 import TagAThing
 import TagFiles
@@ -800,7 +801,7 @@ viewState size state model =
             E.map InvitedMsg <| Invited.view model.stylePalette size em
 
         EditZkNote em _ ->
-            E.map EditZkNoteMsg <| EditZkNote.view model.timezone size model.recentNotes model.trackedRequests em
+            E.map EditZkNoteMsg <| EditZkNote.view model.timezone size model.recentNotes model.trackedRequests model.noteCache em
 
         EditZkNoteListing em ld ->
             E.map EditZkNoteListingMsg <| EditZkNoteListing.view ld size em
@@ -821,10 +822,10 @@ viewState size state model =
             E.map ImportMsg <| Import.view size em
 
         View em ->
-            E.map ViewMsg <| View.view model.timezone size.width em False
+            E.map ViewMsg <| View.view model.timezone size.width model.noteCache em False
 
         EView em _ ->
-            E.map ViewMsg <| View.view model.timezone size.width em True
+            E.map ViewMsg <| View.view model.timezone size.width model.noteCache em True
 
         UserSettings em _ _ ->
             E.map UserSettingsMsg <| UserSettings.view em
@@ -2220,56 +2221,62 @@ actualupdate msg model =
                                     )
 
                         ZI.ZkNoteEditWhat znew ->
-                            case stateLogin state of
-                                Just login ->
-                                    let
-                                        ( spmod, sres ) =
-                                            stateSearch state
-                                                |> Maybe.withDefault ( SP.initModel, { notes = [], offset = 0, what = "" } )
+                            if znew.what == "cache" then
+                                ( { model | noteCache = Dict.insert znew.zne.zknote.id znew.zne model.noteCache }
+                                , Cmd.none
+                                )
 
-                                        ( nst, c ) =
-                                            EditZkNote.initFull login
-                                                sres
-                                                znew.zne.zknote
-                                                znew.zne.links
-                                                spmod
+                            else
+                                case stateLogin state of
+                                    Just login ->
+                                        let
+                                            ( spmod, sres ) =
+                                                stateSearch state
+                                                    |> Maybe.withDefault ( SP.initModel, { notes = [], offset = 0, what = "" } )
 
-                                        s =
-                                            case state of
-                                                EditZkNote eznst _ ->
-                                                    EditZkNote.copyTabs eznst nst
-                                                        |> EditZkNote.tabsOnLoad
-
-                                                _ ->
-                                                    nst
-                                    in
-                                    ( { model
-                                        | state =
-                                            EditZkNote
-                                                s
-                                                login
-                                        , recentNotes =
-                                            let
-                                                zknote =
+                                            ( nst, c ) =
+                                                EditZkNote.initFull login
+                                                    sres
                                                     znew.zne.zknote
-                                            in
-                                            addRecentZkListNote model.recentNotes
-                                                { id = zknote.id
-                                                , user = zknote.user
-                                                , title = zknote.title
-                                                , isFile = zknote.isFile
-                                                , createdate = zknote.createdate
-                                                , changeddate = zknote.changeddate
-                                                , sysids = zknote.sysids
-                                                }
-                                      }
-                                    , sendZIMsg model.location <| ZI.GetZkNoteComments c
-                                    )
+                                                    znew.zne.links
+                                                    spmod
 
-                                _ ->
-                                    ( unexpectedMessage model (ZI.showServerResponse ziresponse)
-                                    , Cmd.none
-                                    )
+                                            s =
+                                                case state of
+                                                    EditZkNote eznst _ ->
+                                                        EditZkNote.copyTabs eznst nst
+                                                            |> EditZkNote.tabsOnLoad
+
+                                                    _ ->
+                                                        nst
+                                        in
+                                        ( { model
+                                            | state =
+                                                EditZkNote
+                                                    s
+                                                    login
+                                            , recentNotes =
+                                                let
+                                                    zknote =
+                                                        znew.zne.zknote
+                                                in
+                                                addRecentZkListNote model.recentNotes
+                                                    { id = zknote.id
+                                                    , user = zknote.user
+                                                    , title = zknote.title
+                                                    , isFile = zknote.isFile
+                                                    , createdate = zknote.createdate
+                                                    , changeddate = zknote.changeddate
+                                                    , sysids = zknote.sysids
+                                                    }
+                                          }
+                                        , sendZIMsg model.location <| ZI.GetZkNoteComments c
+                                        )
+
+                                    _ ->
+                                        ( unexpectedMessage model (ZI.showServerResponse ziresponse)
+                                        , Cmd.none
+                                        )
 
                         ZI.ZkNoteComments zc ->
                             case state of
@@ -2624,56 +2631,63 @@ actualupdate msg model =
                             ( displayMessageDialog model <| e, Cmd.none )
 
                         ZI.ZkNoteEditWhat znew ->
-                            case stateLogin state of
-                                Just login ->
-                                    let
-                                        ( spmod, sres ) =
-                                            stateSearch state
-                                                |> Maybe.withDefault ( SP.initModel, { notes = [], offset = 0, what = "" } )
+                            -- TODO same as other ZkNoteEditWhat handler.  DRY
+                            if znew.what == "cache" then
+                                ( { model | noteCache = Dict.insert znew.zne.zknote.id znew.zne model.noteCache }
+                                , Cmd.none
+                                )
 
-                                        ( nst, c ) =
-                                            EditZkNote.initFull login
-                                                sres
-                                                znew.zne.zknote
-                                                znew.zne.links
-                                                spmod
+                            else
+                                case stateLogin state of
+                                    Just login ->
+                                        let
+                                            ( spmod, sres ) =
+                                                stateSearch state
+                                                    |> Maybe.withDefault ( SP.initModel, { notes = [], offset = 0, what = "" } )
 
-                                        s =
-                                            case state of
-                                                EditZkNote eznst _ ->
-                                                    EditZkNote.copyTabs eznst nst
-                                                        |> EditZkNote.tabsOnLoad
-
-                                                _ ->
-                                                    nst
-                                    in
-                                    ( { model
-                                        | state =
-                                            EditZkNote
-                                                s
-                                                login
-                                        , recentNotes =
-                                            let
-                                                zknote =
+                                            ( nst, c ) =
+                                                EditZkNote.initFull login
+                                                    sres
                                                     znew.zne.zknote
-                                            in
-                                            addRecentZkListNote model.recentNotes
-                                                { id = zknote.id
-                                                , user = zknote.user
-                                                , title = zknote.title
-                                                , isFile = zknote.isFile
-                                                , createdate = zknote.createdate
-                                                , changeddate = zknote.changeddate
-                                                , sysids = zknote.sysids
-                                                }
-                                      }
-                                    , sendZIMsg model.location <| ZI.GetZkNoteComments c
-                                    )
+                                                    znew.zne.links
+                                                    spmod
 
-                                _ ->
-                                    ( unexpectedMessage model (ZI.showServerResponse ziresponse)
-                                    , Cmd.none
-                                    )
+                                            s =
+                                                case state of
+                                                    EditZkNote eznst _ ->
+                                                        EditZkNote.copyTabs eznst nst
+                                                            |> EditZkNote.tabsOnLoad
+
+                                                    _ ->
+                                                        nst
+                                        in
+                                        ( { model
+                                            | state =
+                                                EditZkNote
+                                                    s
+                                                    login
+                                            , recentNotes =
+                                                let
+                                                    zknote =
+                                                        znew.zne.zknote
+                                                in
+                                                addRecentZkListNote model.recentNotes
+                                                    { id = zknote.id
+                                                    , user = zknote.user
+                                                    , title = zknote.title
+                                                    , isFile = zknote.isFile
+                                                    , createdate = zknote.createdate
+                                                    , changeddate = zknote.changeddate
+                                                    , sysids = zknote.sysids
+                                                    }
+                                          }
+                                        , sendZIMsg model.location <| ZI.GetZkNoteComments c
+                                        )
+
+                                    _ ->
+                                        ( unexpectedMessage model (ZI.showServerResponse ziresponse)
+                                        , Cmd.none
+                                        )
 
                         ZI.FilesUploaded files ->
                             ( { model
@@ -2776,6 +2790,9 @@ actualupdate msg model =
 handleEditZkNoteCmd : Model -> Data.LoginData -> ( EditZkNote.Model, EditZkNote.Command ) -> ( Model, Cmd Msg )
 handleEditZkNoteCmd model login ( emod, ecmd ) =
     let
+        _ =
+            Debug.log "handleEditZkNoteCmd" ""
+
         backtolisting =
             let
                 nm =
@@ -2795,211 +2812,230 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
 
                 Nothing ->
                     ( nm, Cmd.none )
-    in
-    case ecmd of
-        EditZkNote.SaveExit snpl ->
-            let
-                gotres =
+
+        nids =
+            Debug.log "noteids" (MC.noteIds emod.md)
+                |> Set.filter
+                    (\id ->
+                        Dict.member id model.noteCache
+                            |> not
+                    )
+
+        ngets =
+            List.map (\id -> sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id, what = "cache" })) (Set.toList nids)
+
+        ( rm, rcmd ) =
+            case ecmd of
+                EditZkNote.SaveExit snpl ->
                     let
-                        nm =
-                            { model
-                                | state =
-                                    EditZkNoteListing
-                                        { notes = emod.zknSearchResult
-                                        , spmodel = emod.spmodel
-                                        , dialog = Nothing
-                                        }
-                                        login
-                            }
+                        gotres =
+                            let
+                                nm =
+                                    { model
+                                        | state =
+                                            EditZkNoteListing
+                                                { notes = emod.zknSearchResult
+                                                , spmodel = emod.spmodel
+                                                , dialog = Nothing
+                                                }
+                                                login
+                                    }
+                            in
+                            case SP.getSearch emod.spmodel of
+                                Just s ->
+                                    sendSearch nm s
+
+                                Nothing ->
+                                    ( nm, Cmd.none )
+
+                        onmsg : Model -> Msg -> ( Model, Cmd Msg )
+                        onmsg _ ms =
+                            case ms of
+                                ZkReplyData (Ok (ZI.SavedZkNotePlusLinks _)) ->
+                                    gotres
+
+                                ZkReplyData (Ok (ZI.ServerError e)) ->
+                                    ( displayMessageDialog model e
+                                    , Cmd.none
+                                    )
+
+                                _ ->
+                                    ( unexpectedMsg model ms
+                                    , Cmd.none
+                                    )
                     in
-                    case SP.getSearch emod.spmodel of
-                        Just s ->
-                            sendSearch nm s
+                    ( { model
+                        | state =
+                            Wait
+                                (ShowMessage
+                                    { message = "loading articles"
+                                    }
+                                    login
+                                    (Just model.state)
+                                )
+                                onmsg
+                      }
+                    , sendZIMsg model.location
+                        (ZI.SaveZkNotePlusLinks snpl)
+                    )
 
-                        Nothing ->
-                            ( nm, Cmd.none )
+                EditZkNote.Save snpl ->
+                    ( { model | state = EditZkNote emod login }
+                    , sendZIMsg model.location
+                        (ZI.SaveZkNotePlusLinks snpl)
+                    )
 
-                onmsg : Model -> Msg -> ( Model, Cmd Msg )
-                onmsg _ ms =
-                    case ms of
-                        ZkReplyData (Ok (ZI.SavedZkNotePlusLinks _)) ->
-                            gotres
+                EditZkNote.None ->
+                    ( { model | state = EditZkNote emod login }, Cmd.none )
 
-                        ZkReplyData (Ok (ZI.ServerError e)) ->
-                            ( displayMessageDialog model e
-                            , Cmd.none
+                EditZkNote.Revert ->
+                    backtolisting
+
+                EditZkNote.Delete id ->
+                    -- issue delete and go back to listing.
+                    let
+                        ( m, c ) =
+                            backtolisting
+                    in
+                    ( { m
+                        | state =
+                            Wait m.state
+                                (\mod _ ->
+                                    -- stop waiting, issue listing query when a message
+                                    -- is received. (presumably delete reply)
+                                    ( { mod | state = m.state }, c )
+                                )
+                      }
+                    , sendZIMsg model.location
+                        (ZI.DeleteZkNote id)
+                    )
+
+                EditZkNote.Switch id ->
+                    let
+                        ( st, cmd ) =
+                            ( ShowMessage { message = "loading note..." }
+                                login
+                                (Just model.state)
+                            , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id, what = "" })
                             )
+                    in
+                    ( { model | state = st }, cmd )
+
+                EditZkNote.SaveSwitch s id ->
+                    let
+                        ( st, cmd ) =
+                            ( ShowMessage { message = "loading note..." }
+                                login
+                                (Just model.state)
+                            , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id, what = "" })
+                            )
+                    in
+                    ( { model | state = st }
+                    , Cmd.batch
+                        [ cmd
+                        , sendZIMsg model.location
+                            (ZI.SaveZkNotePlusLinks s)
+                        ]
+                    )
+
+                EditZkNote.View v ->
+                    ( { model
+                        | state =
+                            EView
+                                (View.initSzn
+                                    v.note
+                                    v.createdate
+                                    v.changeddate
+                                    v.links
+                                    v.panelnote
+                                )
+                                (EditZkNote emod login)
+                      }
+                    , Cmd.none
+                    )
+
+                EditZkNote.GetTASelection id what ->
+                    ( { model | state = EditZkNote emod login }
+                    , getTASelection (JE.object [ ( "id", JE.string id ), ( "what", JE.string what ) ])
+                    )
+
+                EditZkNote.Search s ->
+                    sendSearch { model | state = EditZkNote emod login } s
+
+                EditZkNote.SearchHistory ->
+                    ( shDialog model
+                    , Cmd.none
+                    )
+
+                EditZkNote.BigSearch ->
+                    backtolisting
+
+                EditZkNote.Settings ->
+                    ( { model | state = UserSettings (UserSettings.init login model.fontsize) login (EditZkNote emod login) }
+                    , Cmd.none
+                    )
+
+                EditZkNote.Admin ->
+                    ( model
+                    , sendAIMsg model.location AI.GetUsers
+                    )
+
+                EditZkNote.GetZkNoteWhat id what ->
+                    ( { model | state = EditZkNote emod login }
+                    , case what of
+                        "panel" ->
+                            sendZIMsg model.location (ZI.GetZkNote id)
 
                         _ ->
-                            ( unexpectedMsg model ms
-                            , Cmd.none
-                            )
-            in
-            ( { model
-                | state =
-                    Wait
-                        (ShowMessage
-                            { message = "loading articles"
-                            }
-                            login
-                            (Just model.state)
-                        )
-                        onmsg
-              }
-            , sendZIMsg model.location
-                (ZI.SaveZkNotePlusLinks snpl)
-            )
-
-        EditZkNote.Save snpl ->
-            ( { model | state = EditZkNote emod login }
-            , sendZIMsg model.location
-                (ZI.SaveZkNotePlusLinks snpl)
-            )
-
-        EditZkNote.None ->
-            ( { model | state = EditZkNote emod login }, Cmd.none )
-
-        EditZkNote.Revert ->
-            backtolisting
-
-        EditZkNote.Delete id ->
-            -- issue delete and go back to listing.
-            let
-                ( m, c ) =
-                    backtolisting
-            in
-            ( { m
-                | state =
-                    Wait m.state
-                        (\mod _ ->
-                            -- stop waiting, issue listing query when a message
-                            -- is received. (presumably delete reply)
-                            ( { mod | state = m.state }, c )
-                        )
-              }
-            , sendZIMsg model.location
-                (ZI.DeleteZkNote id)
-            )
-
-        EditZkNote.Switch id ->
-            let
-                ( st, cmd ) =
-                    ( ShowMessage { message = "loading note..." }
-                        login
-                        (Just model.state)
-                    , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id, what = "" })
+                            sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id, what = what })
                     )
-            in
-            ( { model | state = st }, cmd )
 
-        EditZkNote.SaveSwitch s id ->
-            let
-                ( st, cmd ) =
-                    ( ShowMessage { message = "loading note..." }
-                        login
-                        (Just model.state)
-                    , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id, what = "" })
+                EditZkNote.SetHomeNote id ->
+                    ( { model | state = EditZkNote emod login }
+                    , sendZIMsg model.location (ZI.SetHomeNote id)
                     )
-            in
-            ( { model | state = st }
-            , Cmd.batch
-                [ cmd
-                , sendZIMsg model.location
-                    (ZI.SaveZkNotePlusLinks s)
-                ]
-            )
 
-        EditZkNote.View v ->
-            ( { model
-                | state =
-                    EView
-                        (View.initSzn
-                            v.note
-                            v.createdate
-                            v.changeddate
-                            v.links
-                            v.panelnote
-                        )
-                        (EditZkNote emod login)
-              }
-            , Cmd.none
-            )
+                EditZkNote.AddToRecent zkln ->
+                    ( { model
+                        | state = EditZkNote emod login
+                        , recentNotes = addRecentZkListNote model.recentNotes zkln
+                      }
+                    , Cmd.none
+                    )
 
-        EditZkNote.GetTASelection id what ->
-            ( { model | state = EditZkNote emod login }
-            , getTASelection (JE.object [ ( "id", JE.string id ), ( "what", JE.string what ) ])
-            )
+                EditZkNote.ShowMessage e ->
+                    ( displayMessageDialog model e, Cmd.none )
 
-        EditZkNote.Search s ->
-            sendSearch { model | state = EditZkNote emod login } s
+                EditZkNote.ShowArchives id ->
+                    ( model
+                    , sendZIMsg model.location (ZI.GetZkNoteArchives { zknote = id, offset = 0, limit = Just S.defaultSearchLimit })
+                    )
 
-        EditZkNote.SearchHistory ->
-            ( shDialog model
-            , Cmd.none
-            )
+                EditZkNote.FileUpload ->
+                    ( model
+                    , FS.files [] OnFileSelected
+                    )
 
-        EditZkNote.BigSearch ->
-            backtolisting
+                EditZkNote.Requests ->
+                    ( { model
+                        | state =
+                            RequestsDialog
+                                (RequestsDialog.init
+                                    model.trackedRequests
+                                    Common.buttonStyle
+                                    (E.map (\_ -> ()) (viewState model.size model.state model))
+                                )
+                                model.state
+                      }
+                    , Cmd.none
+                    )
 
-        EditZkNote.Settings ->
-            ( { model | state = UserSettings (UserSettings.init login model.fontsize) login (EditZkNote emod login) }
-            , Cmd.none
-            )
-
-        EditZkNote.Admin ->
-            ( model
-            , sendAIMsg model.location AI.GetUsers
-            )
-
-        EditZkNote.GetZkNote id ->
-            ( { model | state = EditZkNote emod login }
-            , sendZIMsg model.location (ZI.GetZkNote id)
-            )
-
-        EditZkNote.SetHomeNote id ->
-            ( { model | state = EditZkNote emod login }
-            , sendZIMsg model.location (ZI.SetHomeNote id)
-            )
-
-        EditZkNote.AddToRecent zkln ->
-            ( { model
-                | state = EditZkNote emod login
-                , recentNotes = addRecentZkListNote model.recentNotes zkln
-              }
-            , Cmd.none
-            )
-
-        EditZkNote.ShowMessage e ->
-            ( displayMessageDialog model e, Cmd.none )
-
-        EditZkNote.ShowArchives id ->
-            ( model
-            , sendZIMsg model.location (ZI.GetZkNoteArchives { zknote = id, offset = 0, limit = Just S.defaultSearchLimit })
-            )
-
-        EditZkNote.FileUpload ->
-            ( model
-            , FS.files [] OnFileSelected
-            )
-
-        EditZkNote.Requests ->
-            ( { model
-                | state =
-                    RequestsDialog
-                        (RequestsDialog.init
-                            model.trackedRequests
-                            Common.buttonStyle
-                            (E.map (\_ -> ()) (viewState model.size model.state model))
-                        )
-                        model.state
-              }
-            , Cmd.none
-            )
-
-        EditZkNote.Cmd cmd ->
-            ( { model | state = EditZkNote emod login }
-            , Cmd.map EditZkNoteMsg cmd
-            )
+                EditZkNote.Cmd cmd ->
+                    ( { model | state = EditZkNote emod login }
+                    , Cmd.map EditZkNoteMsg cmd
+                    )
+    in
+    ( rm, Cmd.batch (rcmd :: ngets) )
 
 
 handleEditZkNoteListing : Model -> Data.LoginData -> ( EditZkNoteListing.Model, EditZkNoteListing.Command ) -> ( Model, Cmd Msg )
