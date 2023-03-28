@@ -319,6 +319,63 @@ imageView text url mbwidth renderedChildren =
                 { src = url, description = text }
 
 
+audioView url text =
+    E.html (Html.audio [ HA.controls True, HA.src url ] [ Html.text "text" ])
+
+
+
+-- <audio
+--     controls
+--     src="/media/cc0-audio/t-rex-roar.mp3">
+--         <a href="/media/cc0-audio/t-rex-roar.mp3">
+--             Download audio
+--         </a>
+-- </audio>
+
+
+noteFile : String -> Data.ZkNote -> Element a
+noteFile filename zknote =
+    let
+        suffix =
+            String.split "." filename
+                |> List.drop 1
+                |> List.reverse
+                |> List.head
+
+        fileurl =
+            "https://zknotes.com/file/" ++ String.fromInt zknote.id
+    in
+    case suffix of
+        Nothing ->
+            E.text filename
+
+        Just s ->
+            case String.toLower s of
+                "mp3" ->
+                    audioView fileurl filename
+
+                "m4a" ->
+                    audioView fileurl filename
+
+                "opus" ->
+                    audioView fileurl filename
+
+                "mp4" ->
+                    videoView 200 fileurl (Just zknote.title) Nothing Nothing []
+
+                "webm" ->
+                    videoView 200 fileurl (Just zknote.title) Nothing Nothing []
+
+                "jpg" ->
+                    imageView zknote.title fileurl Nothing []
+
+                "gif" ->
+                    imageView zknote.title fileurl Nothing []
+
+                _ ->
+                    E.text filename
+
+
 noteView : Dict Int Data.ZkNoteEdit -> String -> List (Element a) -> Element a
 noteView noteCache id _ =
     case
@@ -326,10 +383,29 @@ noteView noteCache id _ =
             |> Maybe.andThen (\iid -> Dict.get iid noteCache)
     of
         Just zne ->
-            E.text zne.zknote.title
+            -- E.text zne.zknote.title
+            if zne.zknote.isFile then
+                noteFile zne.zknote.title zne.zknote
+
+            else
+                E.column []
+                    [ E.link
+                        [ E.htmlAttribute (HA.style "display" "inline-flex") ]
+                        -- TODO are we in edit mode?
+                        { url = "/note/" ++ id
+                        , label =
+                            E.paragraph
+                                [ EF.color (E.rgb255 0 0 255)
+                                , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
+                                , E.htmlAttribute (HA.style "word-break" "break-word")
+                                ]
+                                [ E.text zne.zknote.title ]
+                        }
+                    , E.column [] (List.map (.othername >> Maybe.withDefault "" >> E.text) zne.links)
+                    ]
 
         Nothing ->
-            E.text <| id
+            E.text <| "note " ++ id
 
 
 videoView : Int -> String -> Maybe String -> Maybe String -> Maybe String -> List (Element a) -> Element a
