@@ -133,6 +133,30 @@ type ViewMode
     | EditView
 
 
+link : Maybe String -> String -> List (Element a) -> Element a
+link title destination body =
+    let
+        _ =
+            Debug.log "tdb" ( title, destination, body )
+    in
+    (if String.contains ":" destination then
+        E.newTabLink
+
+     else
+        E.link
+    )
+        [ E.htmlAttribute (HA.style "display" "inline-flex") ]
+        { url = destination
+        , label =
+            E.paragraph
+                [ EF.color (E.rgb255 0 0 255)
+                , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
+                , E.htmlAttribute (HA.style "word-break" "break-word")
+                ]
+                body
+        }
+
+
 mkRenderer : ViewMode -> (String -> a) -> Int -> CellDict -> Bool -> (String -> String -> a) -> Dict Int Data.ZkNoteEdit -> Markdown.Renderer.Renderer (Element a)
 mkRenderer viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged noteCache =
     { heading = heading
@@ -146,36 +170,12 @@ mkRenderer viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged noteCa
     , strikethrough = \content -> E.paragraph [ EF.strike ] content
     , codeSpan = codeSpan
     , link =
-        \{ title, destination } body ->
-            (if String.contains ":" destination then
-                E.newTabLink
-
-             else
-                E.link
-            )
-                [ E.htmlAttribute (HA.style "display" "inline-flex") ]
-                { url = destination
-                , label =
-                    E.paragraph
-                        [ EF.color (E.rgb255 0 0 255)
-                        , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
-                        , E.htmlAttribute (HA.style "word-break" "break-word")
-                        ]
-                        body
-                }
+        \{ title, destination } body -> link title destination body
     , hardLineBreak = Html.br [] [] |> E.html
     , image =
         \image ->
             E.image [ E.width E.fill ]
                 { src = image.src, description = image.alt }
-
-    {- case image.title of
-       Just title ->
-           E.image [ E.width E.fill ] { src = image.src, description = image.alt }
-
-       Nothing ->
-           E.image [ E.width E.fill ] { src = image.src, description = image.alt }
-    -}
     , blockQuote =
         \children ->
             E.column
@@ -319,18 +319,23 @@ imageView text url mbwidth renderedChildren =
                 { src = url, description = text }
 
 
-audioView url text =
-    E.html (Html.audio [ HA.controls True, HA.src url ] [ Html.text "text" ])
+htmlAudioView : String -> String -> Element a
+htmlAudioView url text =
+    E.html (Html.audio [ HA.controls True, HA.src url ] [ Html.text text ])
 
 
+audioView : Data.ZkNote -> Element a
+audioView zkn =
+    E.column []
+        [ link (Just zkn.title) ("/note/" ++ String.fromInt zkn.id) [ E.text zkn.title ]
+        , htmlAudioView ("/file/" ++ String.fromInt zkn.id) zkn.title
 
--- <audio
---     controls
---     src="/media/cc0-audio/t-rex-roar.mp3">
---         <a href="/media/cc0-audio/t-rex-roar.mp3">
---             Download audio
---         </a>
--- </audio>
+        -- TODO pass in url instead of hardcoded
+        , link
+            (Just "timestretch")
+            ("https://29a.ch/timestretch/#a=https://www.zknotes.com/file/" ++ String.fromInt zkn.id)
+            [ E.text "timestretch" ]
+        ]
 
 
 noteFile : String -> Data.ZkNote -> Element a
@@ -343,7 +348,7 @@ noteFile filename zknote =
                 |> List.head
 
         fileurl =
-            "https://zknotes.com/file/" ++ String.fromInt zknote.id
+            "/file/" ++ String.fromInt zknote.id
     in
     case suffix of
         Nothing ->
@@ -352,13 +357,13 @@ noteFile filename zknote =
         Just s ->
             case String.toLower s of
                 "mp3" ->
-                    audioView fileurl filename
+                    audioView zknote
 
                 "m4a" ->
-                    audioView fileurl filename
+                    audioView zknote
 
                 "opus" ->
-                    audioView fileurl filename
+                    audioView zknote
 
                 "mp4" ->
                     videoView 200 fileurl (Just zknote.title) Nothing Nothing []
@@ -383,7 +388,6 @@ noteView noteCache id _ =
             |> Maybe.andThen (\iid -> Dict.get iid noteCache)
     of
         Just zne ->
-            -- E.text zne.zknote.title
             if zne.zknote.isFile then
                 noteFile zne.zknote.title zne.zknote
 
@@ -391,7 +395,6 @@ noteView noteCache id _ =
                 E.column []
                     [ E.link
                         [ E.htmlAttribute (HA.style "display" "inline-flex") ]
-                        -- TODO are we in edit mode?
                         { url = "/note/" ++ id
                         , label =
                             E.paragraph
