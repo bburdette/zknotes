@@ -135,10 +135,6 @@ type ViewMode
 
 link : Maybe String -> String -> List (Element a) -> Element a
 link title destination body =
-    let
-        _ =
-            Debug.log "tdb" ( title, destination, body )
-    in
     (if String.contains ":" destination then
         E.newTabLink
 
@@ -326,15 +322,17 @@ htmlAudioView url text =
 
 audioView : Data.ZkNote -> Element a
 audioView zkn =
-    E.column []
+    E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
         [ link (Just zkn.title) ("/note/" ++ String.fromInt zkn.id) [ E.text zkn.title ]
-        , htmlAudioView ("/file/" ++ String.fromInt zkn.id) zkn.title
+        , E.row [ E.spacing 20 ]
+            [ htmlAudioView ("/file/" ++ String.fromInt zkn.id) zkn.title
 
-        -- TODO pass in url instead of hardcoded
-        , link
-            (Just "timestretch")
-            ("https://29a.ch/timestretch/#a=https://www.zknotes.com/file/" ++ String.fromInt zkn.id)
-            [ E.text "timestretch" ]
+            -- TODO pass in url instead of hardcoded
+            , link
+                (Just "ts↗")
+                ("https://29a.ch/timestretch/#a=https://www.zknotes.com/file/" ++ String.fromInt zkn.id)
+                [ E.text "ts↗" ]
+            ]
         ]
 
 
