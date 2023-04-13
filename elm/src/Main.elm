@@ -2749,16 +2749,22 @@ actualupdate msg model =
 
 makeNoteCacheGets : String -> Model -> List (Cmd Msg)
 makeNoteCacheGets md model =
-    let
-        nids =
-            Debug.log "noteids" (MC.noteIds md)
-                |> Set.filter
-                    (\id ->
-                        Dict.member id model.noteCache
-                            |> not
-                    )
-    in
-    List.map (\id -> sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id, what = "cache" })) (Set.toList nids)
+    -- TODO remove notes from the cache that aren't used in the current note.  Or something.
+    MC.noteIds md
+        |> Set.toList
+        |> List.map
+            (\id ->
+                case Dict.get id model.noteCache of
+                    Just zkn ->
+                        sendZIMsg
+                            model.location
+                            (ZI.GetZneIfChanged { zknote = id, what = "cache", changeddate = zkn.zknote.changeddate })
+
+                    Nothing ->
+                        sendZIMsg
+                            model.location
+                            (ZI.GetZkNoteEdit { zknote = id, what = "cache" })
+            )
 
 
 handleEditZkNoteCmd : Model -> Data.LoginData -> ( EditZkNote.Model, EditZkNote.Command ) -> ( Model, Cmd Msg )

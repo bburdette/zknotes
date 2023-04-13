@@ -114,11 +114,11 @@ pub fn zk_interface_loggedin(
         content: serde_json::to_value(znew)?,
       })
     }
-    "getzneifupdated" => {
+    "getzneifchanged" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let gzic: GetZneIfChanged = serde_json::from_value(msgdata.clone())?;
       info!(
-        "user#getzneifupdated: {} - {}",
+        "user#getzneifchanged: {} - {}",
         gzic.zknote, gzic.changeddate
       );
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
@@ -127,7 +127,10 @@ pub fn zk_interface_loggedin(
       match ozkne {
         Some(zkne) => Ok(ServerResponse {
           what: "zknoteedit".to_string(),
-          content: serde_json::to_value(zkne)?,
+          content: serde_json::to_value(ZkNoteEditWhat {
+            what: gzic.what,
+            zne: zkne,
+          })?,
         }),
         None => Ok(ServerResponse {
           what: "noop".to_string(),

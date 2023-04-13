@@ -269,6 +269,13 @@ type alias GetZkNoteEdit =
     }
 
 
+type alias GetZneIfChanged =
+    { zknote : Int
+    , changeddate : Int
+    , what : String
+    }
+
+
 type alias ZkNoteEditWhat =
     { what : String
     , zne : ZkNoteEdit
@@ -330,6 +337,15 @@ encodeGetZkNoteEdit gzl =
     JE.object
         [ ( "zknote", JE.int gzl.zknote )
         , ( "what", JE.string gzl.what )
+        ]
+
+
+encodeGetZneIfChanged : GetZneIfChanged -> JE.Value
+encodeGetZneIfChanged x =
+    JE.object
+        [ ( "zknote", JE.int x.zknote )
+        , ( "changeddate", JE.int x.changeddate )
+        , ( "what", JE.string x.what )
         ]
 
 

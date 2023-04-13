@@ -10,6 +10,7 @@ import Util
 type SendMsg
     = GetZkNote Int
     | GetZkNoteEdit Data.GetZkNoteEdit
+    | GetZneIfChanged Data.GetZneIfChanged
     | GetZkNoteComments Data.GetZkNoteComments
     | GetZkNoteArchives Data.GetZkNoteArchives
     | GetArchiveZkNote Data.GetArchiveZkNote
@@ -113,6 +114,12 @@ encodeSendMsg sm =
                 , ( "data", Data.encodeGetZkNoteEdit zkne )
                 ]
 
+        GetZneIfChanged x ->
+            JE.object
+                [ ( "what", JE.string "getzneifchanged" )
+                , ( "data", Data.encodeGetZneIfChanged x )
+                ]
+
         GetZkNoteComments msg ->
             JE.object
                 [ ( "what", JE.string "getzknotecomments" )
@@ -137,10 +144,10 @@ encodeSendMsg sm =
                 , ( "data", JE.int id )
                 ]
 
-        SaveZkNote sbe ->
+        SaveZkNote x ->
             JE.object
                 [ ( "what", JE.string "savezknote" )
-                , ( "data", Data.encodeSaveZkNote sbe )
+                , ( "data", Data.encodeSaveZkNote x )
                 ]
 
         SaveZkNotePlusLinks s ->
