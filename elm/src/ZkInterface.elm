@@ -40,6 +40,7 @@ type ServerResponse
     | PowerDeleteComplete Int
     | HomeNoteSet Int
     | FilesUploaded (List Data.ZkListNote)
+    | Noop
 
 
 showServerResponse : ServerResponse -> String
@@ -92,6 +93,9 @@ showServerResponse sr =
 
         FilesUploaded _ ->
             "FilesUploaded"
+
+        Noop ->
+            "Noop"
 
 
 encodeSendMsg : SendMsg -> JE.Value
@@ -237,6 +241,9 @@ serverResponseDecoder =
 
                     "savedfiles" ->
                         JD.map FilesUploaded (JD.field "content" <| JD.list Data.decodeZkListNote)
+
+                    "noop" ->
+                        JD.succeed Noop
 
                     wat ->
                         JD.succeed

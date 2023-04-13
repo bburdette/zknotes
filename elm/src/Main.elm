@@ -2392,6 +2392,10 @@ actualupdate msg model =
                             , Cmd.none
                             )
 
+                        ZI.Noop ->
+                            -- just ignore these.
+                            ( model, Cmd.none )
+
         ( ViewMsg em, View es ) ->
             let
                 ( emod, ecmd ) =

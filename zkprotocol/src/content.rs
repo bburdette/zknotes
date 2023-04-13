@@ -126,6 +126,14 @@ pub struct GetZkNoteEdit {
   pub what: String,
 }
 
+#[derive(Deserialize, Debug, Clone)]
+pub struct GetZneIfChanged {
+  pub zknote: i64,
+  pub changeddate: i64,
+  pub linkchangeddate: Option<i64>,
+  pub what: String,
+}
+
 #[derive(Deserialize, Serialize, Debug)]
 pub struct GetZkNoteArchives {
   pub zknote: i64,

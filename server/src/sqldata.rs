@@ -11,8 +11,8 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use zkprotocol::content::{
   Direction, EditLink, ExtraLoginData, GetArchiveZkNote, GetZkLinks, GetZkNoteArchives,
-  GetZkNoteComments, GetZkNoteEdit, ImportZkNote, SaveZkLink, SaveZkNote, SavedZkNote, ZkLink,
-  ZkListNote, ZkNote, ZkNoteEdit,
+  GetZkNoteComments, GetZkNoteEdit, GetZneIfChanged, ImportZkNote, SaveZkLink, SaveZkNote,
+  SavedZkNote, ZkLink, ZkListNote, ZkNote, ZkNoteEdit,
 };
 
 #[derive(Clone, Deserialize, Serialize, Debug)]
@@ -1402,6 +1402,33 @@ pub fn read_zknoteedit(
     zknote: zknote,
     links: zklinks,
   })
+}
+
+pub fn read_zneifchanged(
+  conn: &Connection,
+  uid: i64,
+  gzic: &GetZneIfChanged,
+) -> Result<Option<ZkNoteEdit>, orgauth::error::Error> {
+  let changeddate: i64 = conn.query_row(
+    "select changeddate from zknote N
+      where N.id = ?1",
+    params![gzic.zknote],
+    |row| Ok(row.get(0)?),
+  )?;
+
+  if changeddate > gzic.changeddate {
+    return read_zknoteedit(
+      conn,
+      uid,
+      &GetZkNoteEdit {
+        zknote: gzic.zknote,
+        what: gzic.what.clone(),
+      },
+    )
+    .map(Some);
+  } else {
+    Ok(None)
+  }
 }
 
 pub fn save_importzknotes(
