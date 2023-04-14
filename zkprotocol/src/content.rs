@@ -130,7 +130,6 @@ pub struct GetZkNoteEdit {
 pub struct GetZneIfChanged {
   pub zknote: i64,
   pub changeddate: i64,
-  pub linkchangeddate: Option<i64>,
   pub what: String,
 }
 

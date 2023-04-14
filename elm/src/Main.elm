@@ -17,6 +17,7 @@ import File.Select as FS
 import GenDialog as GD
 import Html exposing (Html)
 import Http
+import HttpEvil as HE
 import Import
 import InviteUser
 import Json.Decode as JD
@@ -72,9 +73,9 @@ type Msg
     | ShowMessageMsg ShowMessage.Msg
     | UserReplyData (Result Http.Error UI.ServerResponse)
     | AdminReplyData (Result Http.Error AI.ServerResponse)
-    | ZkReplyData (Result Http.Error ZI.ServerResponse)
-    | ZkReplyDataSeq (Result Http.Error ZI.ServerResponse -> Maybe (Cmd Msg)) (Result Http.Error ZI.ServerResponse)
-    | TAReplyData Data.TASelection (Result Http.Error ZI.ServerResponse)
+    | ZkReplyData (Result Http.Error ( Time.Posix, ZI.ServerResponse ))
+    | ZkReplyDataSeq (Result Http.Error ( Time.Posix, ZI.ServerResponse ) -> Maybe (Cmd Msg)) (Result Http.Error ( Time.Posix, ZI.ServerResponse ))
+    | TAReplyData Data.TASelection (Result Http.Error ( Time.Posix, ZI.ServerResponse ))
     | PublicReplyData (Result Http.Error PI.ServerResponse)
     | ErrorIndexNote (Result Http.Error PI.ServerResponse)
     | LoadUrl String
@@ -93,7 +94,8 @@ type Msg
     | WkMsg (Result JD.Error WindowKeys.Key)
     | ReceiveLocalVal { for : String, name : String, value : Maybe String }
     | OnFileSelected F.File (List F.File)
-    | FileUploaded String (Result Http.Error ZI.ServerResponse)
+    | FileUploadedButGetTime String (Result Http.Error ZI.ServerResponse)
+    | FileUploaded String (Result Http.Error ( Time.Posix, ZI.ServerResponse ))
     | RequestProgress String Http.Progress
     | RequestsDialogMsg (GD.Msg RequestsDialog.Msg)
     | TagFilesMsg (TagAThing.Msg TagFiles.Msg)
@@ -588,44 +590,32 @@ showMessage msg =
 
         ZkReplyData urd ->
             "ZkReplyData: "
-                ++ (Result.map ZI.showServerResponse urd
-                        |> Result.mapError Util.httpErrorString
-                        |> (\r ->
-                                case r of
-                                    Ok m ->
-                                        "message: " ++ m
+                ++ (case urd of
+                        Ok ( _, m ) ->
+                            "message: " ++ ZI.showServerResponse m
 
-                                    Err e ->
-                                        "error: " ++ e
-                           )
+                        Err e ->
+                            "error: " ++ Util.httpErrorString e
                    )
 
         ZkReplyDataSeq _ urd ->
             "ZkReplyDataSeq : "
-                ++ (Result.map ZI.showServerResponse urd
-                        |> Result.mapError Util.httpErrorString
-                        |> (\r ->
-                                case r of
-                                    Ok m ->
-                                        "message: " ++ m
+                ++ (case urd of
+                        Ok ( _, m ) ->
+                            "message: " ++ ZI.showServerResponse m
 
-                                    Err e ->
-                                        "error: " ++ e
-                           )
+                        Err e ->
+                            "error: " ++ Util.httpErrorString e
                    )
 
         TAReplyData _ urd ->
             "TAReplyData: "
-                ++ (Result.map ZI.showServerResponse urd
-                        |> Result.mapError Util.httpErrorString
-                        |> (\r ->
-                                case r of
-                                    Ok m ->
-                                        "message: " ++ m
+                ++ (case urd of
+                        Ok ( _, m ) ->
+                            "message: " ++ ZI.showServerResponse m
 
-                                    Err e ->
-                                        "error: " ++ e
-                           )
+                        Err e ->
+                            "error: " ++ Util.httpErrorString e
                    )
 
         PublicReplyData _ ->
@@ -684,6 +674,9 @@ showMessage msg =
 
         OnFileSelected _ _ ->
             "OnFileSelected"
+
+        FileUploadedButGetTime _ _ ->
+            "FileUploadedButGetTime"
 
         FileUploaded _ _ ->
             "FileUploaded"
@@ -1076,13 +1069,15 @@ sendZIMsg location msg =
     sendZIMsgExp location msg ZkReplyData
 
 
-sendZIMsgExp : String -> ZI.SendMsg -> (Result Http.Error ZI.ServerResponse -> Msg) -> Cmd Msg
+sendZIMsgExp : String -> ZI.SendMsg -> (Result Http.Error ( Time.Posix, ZI.ServerResponse ) -> Msg) -> Cmd Msg
 sendZIMsgExp location msg tomsg =
-    Http.post
+    HE.postJsonTask
         { url = location ++ "/private"
         , body = Http.jsonBody (ZI.encodeSendMsg msg)
-        , expect = Http.expectJson tomsg ZI.serverResponseDecoder
+        , decoder = ZI.serverResponseDecoder
         }
+        |> Task.andThen (\x -> Task.map (\posix -> ( posix, x )) Time.now)
+        |> Task.attempt tomsg
 
 
 {-| send search AND save search in db as a zknote
@@ -1422,8 +1417,8 @@ displayMessageNLinkDialog model message url text =
     }
 
 
-onZkNoteEditWhat : Model -> Data.ZkNoteEditWhat -> ( Model, Cmd Msg )
-onZkNoteEditWhat model znew =
+onZkNoteEditWhat : Model -> Time.Posix -> Data.ZkNoteEditWhat -> ( Model, Cmd Msg )
+onZkNoteEditWhat model pt znew =
     let
         state =
             model.state
@@ -1873,7 +1868,7 @@ actualupdate msg model =
                 Err e ->
                     ( displayMessageDialog model <| Util.httpErrorString e, Cmd.none )
 
-                Ok uiresponse ->
+                Ok ( _, uiresponse ) ->
                     case uiresponse of
                         ZI.ServerError e ->
                             ( displayMessageDialog model <| e, Cmd.none )
@@ -2164,7 +2159,7 @@ actualupdate msg model =
                 Err e ->
                     ( displayMessageDialog model <| Util.httpErrorString e, Cmd.none )
 
-                Ok ziresponse ->
+                Ok ( pt, ziresponse ) ->
                     case ziresponse of
                         ZI.ServerError e ->
                             ( displayMessageDialog model <| e, Cmd.none )
@@ -2288,7 +2283,7 @@ actualupdate msg model =
                                     )
 
                         ZI.ZkNoteEditWhat znew ->
-                            onZkNoteEditWhat model znew
+                            onZkNoteEditWhat model pt znew
 
                         ZI.ZkNoteComments zc ->
                             case state of
@@ -2619,21 +2614,25 @@ actualupdate msg model =
                         )
                         model.state
               }
-            , Cmd.batch
-                [ Http.request
-                    { method = "POST"
-                    , headers = []
-                    , url = model.location ++ "/upload"
-                    , body =
-                        file
-                            :: files
-                            |> List.map (\f -> Http.filePart (F.name f) f)
-                            |> Http.multipartBody
-                    , expect = Http.expectJson (FileUploaded nrid) ZI.serverResponseDecoder
-                    , timeout = Nothing
-                    , tracker = Just nrid
-                    }
-                ]
+            , Http.request
+                { method = "POST"
+                , headers = []
+                , url = model.location ++ "/upload"
+                , body =
+                    file
+                        :: files
+                        |> List.map (\f -> Http.filePart (F.name f) f)
+                        |> Http.multipartBody
+                , expect = Http.expectJson (FileUploadedButGetTime nrid) ZI.serverResponseDecoder
+                , timeout = Nothing
+                , tracker = Just nrid
+                }
+            )
+
+        ( FileUploadedButGetTime what zrd, state ) ->
+            ( { model | state = state }
+            , Time.now
+                |> Task.perform (\pt -> FileUploaded what (Result.map (\zi -> ( pt, zi )) zrd))
             )
 
         ( FileUploaded what zrd, state ) ->
@@ -2641,13 +2640,13 @@ actualupdate msg model =
                 Err e ->
                     ( displayMessageDialog model <| Util.httpErrorString e, Cmd.none )
 
-                Ok ziresponse ->
+                Ok ( pt, ziresponse ) ->
                     case ziresponse of
                         ZI.ServerError e ->
                             ( displayMessageDialog model <| e, Cmd.none )
 
                         ZI.ZkNoteEditWhat znew ->
-                            onZkNoteEditWhat model znew
+                            onZkNoteEditWhat model pt znew
 
                         ZI.FilesUploaded files ->
                             ( { model
@@ -2823,10 +2822,10 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                         onmsg : Model -> Msg -> ( Model, Cmd Msg )
                         onmsg _ ms =
                             case ms of
-                                ZkReplyData (Ok (ZI.SavedZkNotePlusLinks _)) ->
+                                ZkReplyData (Ok ( _, ZI.SavedZkNotePlusLinks _ )) ->
                                     gotres
 
-                                ZkReplyData (Ok (ZI.ServerError e)) ->
+                                ZkReplyData (Ok ( _, ZI.ServerError e )) ->
                                     ( displayMessageDialog model e
                                     , Cmd.none
                                     )
