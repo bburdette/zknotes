@@ -17,7 +17,7 @@ import File.Select as FS
 import GenDialog as GD
 import Html exposing (Html)
 import Http
-import HttpEvil as HE
+import HttpJsonTask as HE
 import Import
 import InviteUser
 import Json.Decode as JD
