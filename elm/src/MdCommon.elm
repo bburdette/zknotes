@@ -370,10 +370,16 @@ noteFile filename zknote =
                 "webm" ->
                     videoView 200 fileurl (Just zknote.title) Nothing Nothing []
 
+                "mkv" ->
+                    videoView 200 fileurl (Just zknote.title) Nothing Nothing []
+
                 "jpg" ->
                     imageView zknote.title fileurl Nothing []
 
                 "gif" ->
+                    imageView zknote.title fileurl Nothing []
+
+                "png" ->
                     imageView zknote.title fileurl Nothing []
 
                 _ ->
