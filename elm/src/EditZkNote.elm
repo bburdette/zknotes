@@ -1835,20 +1835,17 @@ onTASelection model recentZkns tas =
     let
         addLink title id =
             let
-                desc =
+                linktext =
                     if tas.text == "" then
-                        title
+                        "<note id=\"" ++ String.fromInt id ++ "\"/>"
 
                     else
-                        tas.text
-
-                linktext =
-                    "["
-                        ++ desc
-                        ++ "]("
-                        ++ "/note/"
-                        ++ String.fromInt id
-                        ++ ")"
+                        "["
+                            ++ tas.text
+                            ++ "]("
+                            ++ "/note/"
+                            ++ String.fromInt id
+                            ++ ")"
             in
             TAUpdated
                 { model

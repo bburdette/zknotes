@@ -1426,9 +1426,6 @@ displayMessageNLinkDialog model message url text =
 onZkNoteEditWhat : Model -> Time.Posix -> Data.ZkNoteEditWhat -> ( Model, Cmd Msg )
 onZkNoteEditWhat model pt znew =
     let
-        _ =
-            Debug.log "onZkNoteEditWhat" ""
-
         state =
             model.state
     in
@@ -1604,7 +1601,7 @@ actualupdate msg model =
                 Ok tas ->
                     case state of
                         EditZkNote emod login ->
-                            case EditZkNote.onTASelection emod model.recentNotes tas of
+                            case  EditZkNote.onTASelection emod model.recentNotes tas of
                                 EditZkNote.TAError e ->
                                     ( displayMessageDialog model e, Cmd.none )
 
@@ -1617,12 +1614,16 @@ actualupdate msg model =
 
                                 EditZkNote.TAUpdated nemod s ->
                                     ( { model | state = EditZkNote nemod login }
-                                    , case s of
-                                        Just sel ->
-                                            setTASelection (Data.encodeSetSelection sel)
+                                    , Cmd.batch
+                                        ((case s of
+                                            Just sel ->
+                                                setTASelection (Data.encodeSetSelection sel)
 
-                                        Nothing ->
-                                            Cmd.none
+                                            Nothing ->
+                                                Cmd.none
+                                         )
+                                            :: makeNewNoteCacheGets nemod.md model
+                                        )
                                     )
 
                                 EditZkNote.TANoop ->
@@ -2762,7 +2763,6 @@ actualupdate msg model =
 
 makeNoteCacheGets : String -> Model -> List (Cmd Msg)
 makeNoteCacheGets md model =
-    -- TODO remove notes from the cache that aren't used in the current note.  Or something.
     MC.noteIds md
         |> Set.toList
         |> List.map
@@ -2780,12 +2780,32 @@ makeNoteCacheGets md model =
             )
 
 
+
+-- only retreive not-found notes.
+
+
+makeNewNoteCacheGets : String -> Model -> List (Cmd Msg)
+makeNewNoteCacheGets md model =
+        (MC.noteIds md
+            |> Set.toList
+            |> List.filterMap
+                (\id ->
+                    case NC.getNote id model.noteCache of
+                        Just zkn ->
+                            Nothing
+
+                        Nothing ->
+                            Just <|
+                                sendZIMsg
+                                    model.location
+                                    (ZI.GetZkNoteEdit { zknote = id, what = "cache" })
+                )
+        )
+
+
 handleEditZkNoteCmd : Model -> Data.LoginData -> ( EditZkNote.Model, EditZkNote.Command ) -> ( Model, Cmd Msg )
 handleEditZkNoteCmd model login ( emod, ecmd ) =
     let
-        _ =
-            Debug.log "handleEditZkNoteCmd" ""
-
         backtolisting =
             let
                 nm =
@@ -2807,7 +2827,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     ( nm, Cmd.none )
 
         ngets =
-            makeNoteCacheGets emod.md model
+            makeNewNoteCacheGets emod.md model
 
         ( rm, rcmd ) =
             case ecmd of
@@ -2865,7 +2885,12 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     )
 
                 EditZkNote.Save snpl ->
-                    ( { model | state = EditZkNote emod login }
+                    ( { model
+                        | state = EditZkNote emod login
+
+                        -- reset keeps on save, to get rid of unused notes.
+                        , noteCache = NC.setKeeps (MC.noteIds emod.md) model.noteCache
+                      }
                     , sendZIMsg model.location
                         (ZI.SaveZkNotePlusLinks snpl)
                     )

@@ -44,7 +44,9 @@ addNote pt zne nc =
 
             Nothing ->
                 Dict.insert ms (Set.insert id Set.empty) nc.byReceipt
-    , keep = nc.keep
+
+    -- add new notes to keeps!  assuming they belong in the current note.
+    , keep = Set.insert id nc.keep
     , max = nc.max
     }
 
@@ -59,10 +61,6 @@ removeNote : Int -> NoteCache -> NoteCache
 removeNote id nc =
     case Dict.get id nc.byId of
         Just ze ->
-            let
-                _ =
-                    Debug.log "removing note " id
-            in
             { byId = Dict.remove id nc.byId
             , byReceipt =
                 case Dict.get ze.receivetime nc.byReceipt of
@@ -90,9 +88,6 @@ removeNote id nc =
 purgeNotes : NoteCache -> NoteCache
 purgeNotes nc =
     let
-        _ =
-            Debug.log "purgeNotes" ""
-
         ncount =
             Dict.size nc.byId
 

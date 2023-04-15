@@ -391,21 +391,19 @@ noteView noteCache id _ =
                 noteFile zne.zknote.title zne.zknote
 
             else
-                E.column []
-                    [ E.link
-                        [ E.htmlAttribute (HA.style "display" "inline-flex") ]
-                        { url = "/note/" ++ id
-                        , label =
-                            E.paragraph
-                                [ EF.color (E.rgb255 0 0 255)
-                                , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
-                                , E.htmlAttribute (HA.style "word-break" "break-word")
-                                ]
-                                [ E.text zne.zknote.title ]
-                        }
-                    , E.column [] (List.map (.othername >> Maybe.withDefault "" >> E.text) zne.links)
-                    ]
+                E.link
+                    [ E.htmlAttribute (HA.style "display" "inline-flex") ]
+                    { url = "/note/" ++ id
+                    , label =
+                        E.paragraph
+                            [ EF.color (E.rgb255 0 0 255)
+                            , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
+                            , E.htmlAttribute (HA.style "word-break" "break-word")
+                            ]
+                            [ E.text zne.zknote.title ]
+                    }
 
+        -- , E.column [] (List.map (.othername >> Maybe.withDefault "" >> E.text) zne.links)
         Nothing ->
             E.text <| "note " ++ id
 
