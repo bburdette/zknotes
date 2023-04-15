@@ -1601,7 +1601,7 @@ actualupdate msg model =
                 Ok tas ->
                     case state of
                         EditZkNote emod login ->
-                            case  EditZkNote.onTASelection emod model.recentNotes tas of
+                            case EditZkNote.onTASelection emod model.recentNotes tas of
                                 EditZkNote.TAError e ->
                                     ( displayMessageDialog model e, Cmd.none )
 
@@ -1799,7 +1799,7 @@ actualupdate msg model =
                 (EditZkNoteListing.onWkKeyPress key es)
 
         ( WkMsg (Err e), _ ) ->
-            ( displayMessageDialog model <| "error decoding windowskey message: " ++ JD.errorToString e
+            ( displayMessageDialog model <| "error decoding windowkeys message: " ++ JD.errorToString e
             , Cmd.none
             )
 
@@ -2786,21 +2786,20 @@ makeNoteCacheGets md model =
 
 makeNewNoteCacheGets : String -> Model -> List (Cmd Msg)
 makeNewNoteCacheGets md model =
-        (MC.noteIds md
-            |> Set.toList
-            |> List.filterMap
-                (\id ->
-                    case NC.getNote id model.noteCache of
-                        Just zkn ->
-                            Nothing
+    MC.noteIds md
+        |> Set.toList
+        |> List.filterMap
+            (\id ->
+                case NC.getNote id model.noteCache of
+                    Just zkn ->
+                        Nothing
 
-                        Nothing ->
-                            Just <|
-                                sendZIMsg
-                                    model.location
-                                    (ZI.GetZkNoteEdit { zknote = id, what = "cache" })
-                )
-        )
+                    Nothing ->
+                        Just <|
+                            sendZIMsg
+                                model.location
+                                (ZI.GetZkNoteEdit { zknote = id, what = "cache" })
+            )
 
 
 handleEditZkNoteCmd : Model -> Data.LoginData -> ( EditZkNote.Model, EditZkNote.Command ) -> ( Model, Cmd Msg )
