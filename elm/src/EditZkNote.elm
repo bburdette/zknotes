@@ -71,6 +71,7 @@ import Markdown.Parser
 import Markdown.Renderer
 import Maybe.Extra as ME
 import MdCommon as MC
+import NoteCache as NC exposing (NoteCache)
 import Orgauth.Data exposing (UserId)
 import RequestsDialog exposing (TRequests)
 import Schelme.Show exposing (showTerm)
@@ -223,7 +224,8 @@ type Command
     | Settings
     | Admin
     | Requests
-    | GetZkNote Int
+    | GetZkNoteWhat Int String
+      -- | GetZkNotesWhat (List Int) String
     | SetHomeNote Int
     | AddToRecent Data.ZkListNote
     | ShowMessage String
@@ -576,14 +578,14 @@ pageLink model =
             )
 
 
-view : Time.Zone -> Util.Size -> List Data.ZkListNote -> TRequests -> Model -> Element Msg
-view zone size recentZkns trqs model =
+view : Time.Zone -> Util.Size -> List Data.ZkListNote -> TRequests -> NoteCache -> Model -> Element Msg
+view zone size recentZkns trqs noteCache model =
     case model.dialog of
         Just dialog ->
             D.view size dialog |> E.map DialogMsg
 
         Nothing ->
-            zknview zone size recentZkns trqs model
+            zknview zone size recentZkns trqs noteCache model
 
 
 commonButtonStyle : Bool -> List (E.Attribute msg)
@@ -839,9 +841,9 @@ addComment ncs =
         ]
 
 
-renderMd : CellDict -> String -> Int -> Element Msg
-renderMd cd md mdw =
-    case MC.markdownView (MC.mkRenderer MC.EditView RestoreSearch mdw cd True OnSchelmeCodeChanged) md of
+renderMd : CellDict -> NoteCache -> String -> Int -> Element Msg
+renderMd cd noteCache md mdw =
+    case MC.markdownView (MC.mkRenderer MC.EditView RestoreSearch mdw cd True OnSchelmeCodeChanged noteCache) md of
         Ok rendered ->
             E.column
                 [ E.spacing 30
@@ -859,8 +861,8 @@ renderMd cd md mdw =
             E.text errors
 
 
-zknview : Time.Zone -> Util.Size -> List Data.ZkListNote -> TRequests -> Model -> Element Msg
-zknview zone size recentZkns trqs model =
+zknview : Time.Zone -> Util.Size -> List Data.ZkListNote -> TRequests -> NoteCache -> Model -> Element Msg
+zknview zone size recentZkns trqs noteCache model =
     let
         wclass =
             if size.width < 800 then
@@ -915,7 +917,7 @@ zknview zone size recentZkns trqs model =
                 , columns =
                     [ { header = E.none
                       , width = E.fill
-                      , view = \zkn -> renderMd model.cells zkn.content mdw
+                      , view = \zkn -> renderMd model.cells noteCache zkn.content mdw
                       }
                     , { header = E.none
                       , width = E.shrink
@@ -1283,7 +1285,7 @@ zknview zone size recentZkns trqs model =
                             EI.button (E.alignRight :: Common.buttonStyle)
                                 { label = E.text ">", onPress = Just <| AddToSearchAsTag model.title }
                         ]
-                    , renderMd model.cells model.md mdw
+                    , renderMd model.cells noteCache model.md mdw
                     ]
                 ]
                     ++ (if wclass == Wide then
@@ -1833,20 +1835,17 @@ onTASelection model recentZkns tas =
     let
         addLink title id =
             let
-                desc =
+                linktext =
                     if tas.text == "" then
-                        title
+                        "<note id=\"" ++ String.fromInt id ++ "\"/>"
 
                     else
-                        tas.text
-
-                linktext =
-                    "["
-                        ++ desc
-                        ++ "]("
-                        ++ "/note/"
-                        ++ String.fromInt id
-                        ++ ")"
+                        "["
+                            ++ tas.text
+                            ++ "]("
+                            ++ "/note/"
+                            ++ String.fromInt id
+                            ++ ")"
             in
             TAUpdated
                 { model
@@ -2154,7 +2153,7 @@ update msg model =
 
                     else
                         ( model
-                        , GetZkNote panel.noteid
+                        , GetZkNoteWhat panel.noteid "panel"
                         )
 
                 Nothing ->
@@ -2364,6 +2363,7 @@ update msg model =
                                         size
                                         []
                                         (TRequests 0 Dict.empty)
+                                        (NC.empty 0)
                                         model
                                     )
                             )
