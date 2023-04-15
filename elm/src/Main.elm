@@ -25,6 +25,7 @@ import Json.Encode as JE
 import LocalStorage as LS
 import MdCommon as MC
 import MessageNLink
+import NoteCache as NC exposing (NoteCache)
 import Orgauth.AdminInterface as AI
 import Orgauth.ChangeEmail as CE
 import Orgauth.ChangePassword as CP
@@ -150,6 +151,11 @@ type alias SavedRoute =
     }
 
 
+maxCacheNotes : Int
+maxCacheNotes =
+    100
+
+
 type alias Model =
     { state : State
     , size : Util.Size
@@ -166,7 +172,7 @@ type alias Model =
     , stylePalette : StylePalette
     , adminSettings : OD.AdminSettings
     , trackedRequests : TRequests
-    , noteCache : Dict Int Data.ZkNoteEdit
+    , noteCache : NoteCache
     }
 
 
@@ -1420,11 +1426,18 @@ displayMessageNLinkDialog model message url text =
 onZkNoteEditWhat : Model -> Time.Posix -> Data.ZkNoteEditWhat -> ( Model, Cmd Msg )
 onZkNoteEditWhat model pt znew =
     let
+        _ =
+            Debug.log "onZkNoteEditWhat" ""
+
         state =
             model.state
     in
     if znew.what == "cache" then
-        ( { model | noteCache = Dict.insert znew.zne.zknote.id znew.zne model.noteCache }
+        ( { model
+            | noteCache =
+                NC.addNote pt znew.zne model.noteCache
+                    |> NC.purgeNotes
+          }
         , Cmd.none
         )
 
@@ -1474,6 +1487,7 @@ onZkNoteEditWhat model pt znew =
                             , changeddate = zknote.changeddate
                             , sysids = zknote.sysids
                             }
+                    , noteCache = NC.setKeeps (MC.noteIds nst.md) model.noteCache
                   }
                 , Cmd.batch ((sendZIMsg model.location <| ZI.GetZkNoteComments c) :: ngets)
                 )
@@ -2753,7 +2767,7 @@ makeNoteCacheGets md model =
         |> Set.toList
         |> List.map
             (\id ->
-                case Dict.get id model.noteCache of
+                case NC.getNote id model.noteCache of
                     Just zkn ->
                         sendZIMsg
                             model.location
@@ -3330,7 +3344,7 @@ init flags url key zone fontsize =
             , stylePalette = { defaultSpacing = 10 }
             , adminSettings = adminSettings
             , trackedRequests = { requestCount = 0, requests = Dict.empty }
-            , noteCache = Dict.empty
+            , noteCache = NC.empty maxCacheNotes
             }
 
         geterrornote =

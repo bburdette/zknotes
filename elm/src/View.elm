@@ -18,6 +18,7 @@ import Markdown.Html
 import Markdown.Parser
 import Markdown.Renderer
 import MdCommon as MC
+import NoteCache as NC exposing (NoteCache)
 import Schelme.Show exposing (showTerm)
 import TangoColors as TC
 import Time
@@ -84,7 +85,7 @@ showZkl id zkl =
         ]
 
 
-view : Time.Zone -> Int -> Dict Int Data.ZkNoteEdit -> Model -> Bool -> Element Msg
+view : Time.Zone -> Int -> NoteCache -> Model -> Bool -> Element Msg
 view zone maxw noteCache model loggedin =
     let
         mw =

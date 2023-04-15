@@ -18,6 +18,7 @@ import Markdown.Html
 import Markdown.Parser
 import Markdown.Renderer
 import Maybe.Extra as ME
+import NoteCache as NC exposing (NoteCache)
 import Regex
 import Schelme.Show exposing (showTerm)
 import Set exposing (Set(..))
@@ -153,7 +154,7 @@ link title destination body =
         }
 
 
-mkRenderer : ViewMode -> (String -> a) -> Int -> CellDict -> Bool -> (String -> String -> a) -> Dict Int Data.ZkNoteEdit -> Markdown.Renderer.Renderer (Element a)
+mkRenderer : ViewMode -> (String -> a) -> Int -> CellDict -> Bool -> (String -> String -> a) -> NoteCache -> Markdown.Renderer.Renderer (Element a)
 mkRenderer viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged noteCache =
     { heading = heading
     , paragraph =
@@ -379,11 +380,11 @@ noteFile filename zknote =
                     E.text filename
 
 
-noteView : Dict Int Data.ZkNoteEdit -> String -> List (Element a) -> Element a
+noteView : NoteCache -> String -> List (Element a) -> Element a
 noteView noteCache id _ =
     case
         String.toInt id
-            |> Maybe.andThen (\iid -> Dict.get iid noteCache)
+            |> Maybe.andThen (\iid -> NC.getNote iid noteCache)
     of
         Just zne ->
             if zne.zknote.isFile then

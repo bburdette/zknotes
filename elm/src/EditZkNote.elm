@@ -71,6 +71,7 @@ import Markdown.Parser
 import Markdown.Renderer
 import Maybe.Extra as ME
 import MdCommon as MC
+import NoteCache as NC exposing (NoteCache)
 import Orgauth.Data exposing (UserId)
 import RequestsDialog exposing (TRequests)
 import Schelme.Show exposing (showTerm)
@@ -577,7 +578,7 @@ pageLink model =
             )
 
 
-view : Time.Zone -> Util.Size -> List Data.ZkListNote -> TRequests -> Dict Int Data.ZkNoteEdit -> Model -> Element Msg
+view : Time.Zone -> Util.Size -> List Data.ZkListNote -> TRequests -> NoteCache -> Model -> Element Msg
 view zone size recentZkns trqs noteCache model =
     case model.dialog of
         Just dialog ->
@@ -840,7 +841,7 @@ addComment ncs =
         ]
 
 
-renderMd : CellDict -> Dict Int Data.ZkNoteEdit -> String -> Int -> Element Msg
+renderMd : CellDict -> NoteCache -> String -> Int -> Element Msg
 renderMd cd noteCache md mdw =
     case MC.markdownView (MC.mkRenderer MC.EditView RestoreSearch mdw cd True OnSchelmeCodeChanged noteCache) md of
         Ok rendered ->
@@ -860,7 +861,7 @@ renderMd cd noteCache md mdw =
             E.text errors
 
 
-zknview : Time.Zone -> Util.Size -> List Data.ZkListNote -> TRequests -> Dict Int Data.ZkNoteEdit -> Model -> Element Msg
+zknview : Time.Zone -> Util.Size -> List Data.ZkListNote -> TRequests -> NoteCache -> Model -> Element Msg
 zknview zone size recentZkns trqs noteCache model =
     let
         wclass =
@@ -2365,7 +2366,7 @@ update msg model =
                                         size
                                         []
                                         (TRequests 0 Dict.empty)
-                                        Dict.empty
+                                        (NC.empty 0)
                                         model
                                     )
                             )
