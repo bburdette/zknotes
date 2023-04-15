@@ -225,7 +225,6 @@ type Command
     | Admin
     | Requests
     | GetZkNoteWhat Int String
-      -- | GetZkNotesWhat (List Int) String
     | SetHomeNote Int
     | AddToRecent Data.ZkListNote
     | ShowMessage String
