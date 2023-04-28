@@ -100,6 +100,7 @@ type Msg
     | FileUploaded String (Result Http.Error ( Time.Posix, ZI.ServerResponse ))
     | RequestProgress String Http.Progress
     | RequestsDialogMsg (GD.Msg RequestsDialog.Msg)
+    | YeetDialogMsg (GD.Msg YeetDialog.Msg)
     | TagFilesMsg (TagAThing.Msg TagFiles.Msg)
     | InviteUserMsg (TagAThing.Msg InviteUser.Msg)
     | Noop
@@ -131,6 +132,7 @@ type State
     | TagFiles (TagAThing.Model TagFiles.Model TagFiles.Msg TagFiles.Command) Data.LoginData State
     | InviteUser (TagAThing.Model InviteUser.Model InviteUser.Msg InviteUser.Command) Data.LoginData State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
+    | YeetDialog YeetDialog.GDModel State
 
 
 type alias Flags =
@@ -691,6 +693,9 @@ showMessage msg =
         RequestsDialogMsg _ ->
             "RequestsDialogMsg"
 
+        YeetDialogMsg _ ->
+            "YeetDialogMsg"
+
         RequestProgress _ _ ->
             "RequestProgress"
 
@@ -772,6 +777,9 @@ showState state =
 
         RequestsDialog _ _ ->
             "RequestsDialog"
+
+        YeetDialog _ _ ->
+            "YeetDialog"
 
         TagFiles _ _ _ ->
             "TagFiles"
@@ -872,6 +880,10 @@ viewState size state model =
             -- render is at the layout level, not here.
             E.none
 
+        YeetDialog _ _ ->
+            -- render is at the layout level, not here.
+            E.none
+
         TagFiles tfmod _ _ ->
             E.map TagFilesMsg <| TagAThing.view model.stylePalette model.recentNotes (Just size) tfmod
 
@@ -957,6 +969,9 @@ stateSearch state =
         RequestsDialog _ st ->
             stateSearch st
 
+        YeetDialog _ st ->
+            stateSearch st
+
         TagFiles model _ _ ->
             Just ( model.spmodel, model.zknSearchResult )
 
@@ -1034,6 +1049,9 @@ stateLogin state =
             Just login
 
         RequestsDialog _ instate ->
+            stateLogin instate
+
+        YeetDialog _ instate ->
             stateLogin instate
 
         TagFiles _ login _ ->
@@ -1217,6 +1235,13 @@ view model =
                         (Just { width = min 600 model.size.width, height = min 500 model.size.height })
                         -- use the live-updated model
                         { dm | model = model.trackedRequests }
+
+            YeetDialog dm _ ->
+                Html.map YeetDialogMsg <|
+                    GD.layout
+                        (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                        -- use the live-updated model
+                        dm
 
             _ ->
                 E.layout [ EF.size model.fontsize, E.width E.fill ] <| viewState model.size model.state model
@@ -2711,6 +2736,19 @@ actualupdate msg model =
                 Nothing ->
                     ( model, Cmd.none )
 
+        ( YeetDialogMsg ym, YeetDialog ymod pstate ) ->
+            -- case YeetDialog.update ym ymod of
+            case GD.update ym ymod of
+                GD.Dialog nmodel ->
+                    ( { model | state = YeetDialog nmodel pstate }, Cmd.none )
+
+                GD.Ok return ->
+                    ( model, Cmd.none )
+
+                GD.Cancel ->
+                    ( { model | state = pstate }, Cmd.none )
+        ( YeetDialogMsg ym, _ ) -> ( model, Cmd.none)
+
         ( RequestsDialogMsg bm, RequestsDialog bs prevstate ) ->
             -- TODO address this hack!
             case GD.update bm { bs | model = model.trackedRequests } of
@@ -3024,6 +3062,20 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                 EditZkNote.FileUpload ->
                     ( model
                     , FS.files [] OnFileSelected
+                    )
+
+                EditZkNote.Yeet ->
+                    ( { model
+                        | state =
+                            YeetDialog
+                                (YeetDialog.init ""
+                                    False
+                                    Common.buttonStyle
+                                    (E.map (\_ -> ()) (viewState model.size model.state model))
+                                )
+                                model.state
+                      }
+                    , Cmd.none
                     )
 
                 EditZkNote.Requests ->

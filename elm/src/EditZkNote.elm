@@ -231,6 +231,7 @@ type Command
     | ShowMessage String
     | ShowArchives Int
     | FileUpload
+    | Yeet
     | Cmd (Cmd Msg)
 
 
@@ -1465,6 +1466,10 @@ zknview zone size recentZkns trqs noteCache model =
               else
                 E.none
             , EI.button (E.alignRight :: Common.buttonStyle)
+                { onPress = Just YeetPress
+                , label = E.text "yeet"
+                }
+            , EI.button (E.alignRight :: Common.buttonStyle)
                 { onPress = Just UploadPress
                 , label = E.text "upload"
                 }
@@ -2244,7 +2249,7 @@ update msg model =
 
         YeetPress ->
             ( model
-            , GetTASelection "mdtext" "linkback"
+            , Yeet
             )
 
         NewPress ->
