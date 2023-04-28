@@ -56,6 +56,7 @@ import UserSettings
 import Util
 import View
 import WindowKeys
+import YeetDialog
 import ZkCommon exposing (StylePalette)
 import ZkInterface as ZI
 
