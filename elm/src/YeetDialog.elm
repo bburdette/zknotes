@@ -17,7 +17,6 @@ import Util
 
 type alias Model =
     { url : String
-    , linkback : Bool
     }
 
 
@@ -25,9 +24,6 @@ type Msg
     = OkClick
     | CancelClick
     | OnUrlChanged String
-    | OnLinkbackChanged Bool
-      -- | TagClick String
-      -- | ClearClick String
     | Noop
 
 
@@ -40,13 +36,12 @@ type alias GDModel =
     GD.Model Model Msg Command
 
 
-init : String -> Bool -> List (E.Attribute Msg) -> Element () -> GDModel
-init url linkback buttonStyle underLay =
+init : String -> List (E.Attribute Msg) -> Element () -> GDModel
+init url buttonStyle underLay =
     { view = view buttonStyle
     , update = update
     , model =
         { url = url
-        , linkback = linkback
         }
     , underLay = underLay
     }
@@ -71,13 +66,6 @@ view buttonStyle mbsize model =
                         "url"
                     )
             }
-        , EI.checkbox
-            []
-            { checked = model.linkback
-            , icon = EI.defaultCheckbox
-            , label = EI.labelLeft [] (E.text "linkback")
-            , onChange = OnLinkbackChanged
-            }
         , E.row [ E.width E.fill, E.spacing 10 ]
             [ EI.button
                 (E.centerX :: buttonStyle)
@@ -100,9 +88,6 @@ update msg model =
 
         OnUrlChanged s ->
             GD.Dialog { model | url = s }
-
-        OnLinkbackChanged b ->
-            GD.Dialog { model | linkback = b }
 
         Noop ->
             GD.Dialog model

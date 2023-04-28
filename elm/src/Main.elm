@@ -2747,7 +2747,9 @@ actualupdate msg model =
 
                 GD.Cancel ->
                     ( { model | state = pstate }, Cmd.none )
-        ( YeetDialogMsg ym, _ ) -> ( model, Cmd.none)
+
+        ( YeetDialogMsg ym, _ ) ->
+            ( model, Cmd.none )
 
         ( RequestsDialogMsg bm, RequestsDialog bs prevstate ) ->
             -- TODO address this hack!
@@ -3069,7 +3071,6 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                         | state =
                             YeetDialog
                                 (YeetDialog.init ""
-                                    False
                                     Common.buttonStyle
                                     (E.map (\_ -> ()) (viewState model.size model.state model))
                                 )
