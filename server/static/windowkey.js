@@ -35,16 +35,19 @@ function keycheck(e) {
     if (pd) {
       e.preventDefault();
     }
-    // console.log("key found: ", e.key, " preventdefault: ", pd);
+    // if pd undefined, null, etc, then don't report key press.
+    if (pd == true || pd == false) {
+      // console.log("key found: ", e.key, " preventdefault: ", pd);
+      app.ports.receiveKeyMsg.send({ key : e.key
+                                   , ctrl : e.ctrlKey
+                                   , alt : e.altKey
+                                   , shift : e.shiftKey
+                                   , preventDefault : pd});
+    }
 
-    app.ports.receiveKeyMsg.send({ key : e.key
-                                 , ctrl : e.ctrlKey
-                                 , alt : e.altKey
-                                 , shift : e.shiftKey
-                                 , preventDefault : pd});
+
   } catch (error)
   {
    // console.log("key not found: ", e.key);
   }
 }
-

@@ -10,8 +10,9 @@ use orgauth::endpoints::Callbacks;
 use std::error::Error;
 use std::time::Duration;
 use zkprotocol::content::{
-  GetArchiveZkNote, GetZkNoteArchives, GetZkNoteComments, GetZkNoteEdit, ImportZkNote, SaveZkNote,
-  SaveZkNotePlusLinks, ZkLinks, ZkNoteArchives, ZkNoteEdit,
+  GetArchiveZkNote, GetZkNoteArchives, GetZkNoteComments, GetZkNoteEdit, GetZneIfChanged,
+  ImportZkNote, SaveZkNote, SaveZkNotePlusLinks, ZkLinks, ZkNoteArchives, ZkNoteEdit,
+  ZkNoteEditWhat,
 };
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 use zkprotocol::search::{TagSearch, ZkListNoteSearchResult, ZkNoteSearch};
@@ -102,10 +103,40 @@ pub fn zk_interface_loggedin(
         "user#getzknoteedit: {} - {}",
         gzne.zknote, note.zknote.title
       );
+
+      let znew = ZkNoteEditWhat {
+        what: gzne.what,
+        zne: note,
+      };
+
       Ok(ServerResponse {
         what: "zknoteedit".to_string(),
-        content: serde_json::to_value(note)?,
+        content: serde_json::to_value(znew)?,
       })
+    }
+    "getzneifchanged" => {
+      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      let gzic: GetZneIfChanged = serde_json::from_value(msgdata.clone())?;
+      info!(
+        "user#getzneifchanged: {} - {}",
+        gzic.zknote, gzic.changeddate
+      );
+      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+      let ozkne = sqldata::read_zneifchanged(&conn, uid, &gzic)?;
+
+      match ozkne {
+        Some(zkne) => Ok(ServerResponse {
+          what: "zknoteedit".to_string(),
+          content: serde_json::to_value(ZkNoteEditWhat {
+            what: gzic.what,
+            zne: zkne,
+          })?,
+        }),
+        None => Ok(ServerResponse {
+          what: "noop".to_string(),
+          content: serde_json::Value::Null,
+        }),
+      }
     }
     "getzknotecomments" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;

@@ -18,6 +18,7 @@ import Markdown.Html
 import Markdown.Parser
 import Markdown.Renderer
 import MdCommon as MC
+import NoteCache as NC exposing (NoteCache)
 import Schelme.Show exposing (showTerm)
 import TangoColors as TC
 import Time
@@ -84,8 +85,8 @@ showZkl id zkl =
         ]
 
 
-view : Time.Zone -> Int -> Model -> Bool -> Element Msg
-view zone maxw model loggedin =
+view : Time.Zone -> Int -> NoteCache -> Model -> Bool -> Element Msg
+view zone maxw noteCache model loggedin =
     let
         mw =
             min maxw 1000 - 160
@@ -121,7 +122,7 @@ view zone maxw model loggedin =
                         ]
                         (case
                             MC.markdownView
-                                (MC.mkRenderer MC.PublicView (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged)
+                                (MC.mkRenderer MC.PublicView (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged noteCache)
                                 panel.content
                          of
                             Ok rendered ->
@@ -146,7 +147,7 @@ view zone maxw model loggedin =
                   else
                     E.none
                 , E.row [ E.width E.fill ]
-                    [ case MC.markdownView (MC.mkRenderer MC.PublicView (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged) model.md of
+                    [ case MC.markdownView (MC.mkRenderer MC.PublicView (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged noteCache) model.md of
                         Ok rendered ->
                             E.column
                                 [ E.spacing 30
@@ -193,7 +194,7 @@ view zone maxw model loggedin =
         ]
 
 
-initFull : Data.ZkNoteEdit -> Model
+initFull : Data.PubZkNote -> Model
 initFull zknaa =
     let
         zknote =

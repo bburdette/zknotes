@@ -10,6 +10,7 @@ import Util
 type SendMsg
     = GetZkNote Int
     | GetZkNoteEdit Data.GetZkNoteEdit
+    | GetZneIfChanged Data.GetZneIfChanged
     | GetZkNoteComments Data.GetZkNoteComments
     | GetZkNoteArchives Data.GetZkNoteArchives
     | GetArchiveZkNote Data.GetArchiveZkNote
@@ -31,7 +32,7 @@ type ServerResponse
     | SavedZkNote Data.SavedZkNote
     | DeletedZkNote Int
     | ZkNote Data.ZkNote
-    | ZkNoteEdit Data.ZkNoteEdit
+    | ZkNoteEditWhat Data.ZkNoteEditWhat
     | ZkNoteComments (List Data.ZkNote)
     | ServerError String
     | SavedZkLinks
@@ -40,6 +41,7 @@ type ServerResponse
     | PowerDeleteComplete Int
     | HomeNoteSet Int
     | FilesUploaded (List Data.ZkListNote)
+    | Noop
 
 
 showServerResponse : ServerResponse -> String
@@ -63,7 +65,7 @@ showServerResponse sr =
         ZkNote _ ->
             "ZkNote"
 
-        ZkNoteEdit _ ->
+        ZkNoteEditWhat _ ->
             "ZkNoteEdit"
 
         ZkNoteComments _ ->
@@ -93,6 +95,9 @@ showServerResponse sr =
         FilesUploaded _ ->
             "FilesUploaded"
 
+        Noop ->
+            "Noop"
+
 
 encodeSendMsg : SendMsg -> JE.Value
 encodeSendMsg sm =
@@ -107,6 +112,12 @@ encodeSendMsg sm =
             JE.object
                 [ ( "what", JE.string "getzknoteedit" )
                 , ( "data", Data.encodeGetZkNoteEdit zkne )
+                ]
+
+        GetZneIfChanged x ->
+            JE.object
+                [ ( "what", JE.string "getzneifchanged" )
+                , ( "data", Data.encodeGetZneIfChanged x )
                 ]
 
         GetZkNoteComments msg ->
@@ -133,10 +144,10 @@ encodeSendMsg sm =
                 , ( "data", JE.int id )
                 ]
 
-        SaveZkNote sbe ->
+        SaveZkNote x ->
             JE.object
                 [ ( "what", JE.string "savezknote" )
-                , ( "data", Data.encodeSaveZkNote sbe )
+                , ( "data", Data.encodeSaveZkNote x )
                 ]
 
         SaveZkNotePlusLinks s ->
@@ -215,7 +226,7 @@ serverResponseDecoder =
                         JD.map ZkNote (JD.at [ "content" ] <| Data.decodeZkNote)
 
                     "zknoteedit" ->
-                        JD.map ZkNoteEdit (JD.at [ "content" ] <| Data.decodeZkNoteEdit)
+                        JD.map ZkNoteEditWhat (JD.at [ "content" ] <| Data.decodeZkNoteEditWhat)
 
                     "zknotecomments" ->
                         JD.map ZkNoteComments (JD.at [ "content" ] <| JD.list Data.decodeZkNote)
@@ -237,6 +248,9 @@ serverResponseDecoder =
 
                     "savedfiles" ->
                         JD.map FilesUploaded (JD.field "content" <| JD.list Data.decodeZkListNote)
+
+                    "noop" ->
+                        JD.succeed Noop
 
                     wat ->
                         JD.succeed

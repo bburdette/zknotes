@@ -1,8 +1,9 @@
-module MdCommon exposing (Panel, ViewMode(..), blockCells, blockPanels, cellView, codeBlock, codeSpan, defCell, heading, imageView, linkDict, markdownView, mdCells, mdPanel, mdPanels, mkRenderer, panelView, rawTextToId, searchView, showRunState)
+module MdCommon exposing (Panel, ViewMode(..), blockCells, blockPanels, cellView, codeBlock, codeSpan, defCell, heading, imageView, linkDict, markdownView, mdCells, mdPanel, mdPanels, mkRenderer, noteIds, panelView, rawTextToId, searchView, showRunState)
 
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
 import Common exposing (buttonStyle)
+import Data
 import Dict exposing (Dict)
 import Element as E exposing (Element)
 import Element.Background as EBk
@@ -12,13 +13,15 @@ import Element.Input as EI
 import Element.Region as ER
 import Html exposing (Attribute, Html)
 import Html.Attributes as HA
-import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..), inlineFoldl)
+import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..), foldl, inlineFoldl)
 import Markdown.Html
 import Markdown.Parser
 import Markdown.Renderer
 import Maybe.Extra as ME
+import NoteCache as NC exposing (NoteCache)
 import Regex
 import Schelme.Show exposing (showTerm)
+import Set exposing (Set(..))
 import TangoColors as TC
 
 
@@ -131,8 +134,28 @@ type ViewMode
     | EditView
 
 
-mkRenderer : ViewMode -> (String -> a) -> Int -> CellDict -> Bool -> (String -> String -> a) -> Markdown.Renderer.Renderer (Element a)
-mkRenderer viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged =
+link : Maybe String -> String -> List (Element a) -> Element a
+link title destination body =
+    (if String.contains ":" destination then
+        E.newTabLink
+
+     else
+        E.link
+    )
+        [ E.htmlAttribute (HA.style "display" "inline-flex") ]
+        { url = destination
+        , label =
+            E.paragraph
+                [ EF.color (E.rgb255 0 0 255)
+                , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
+                , E.htmlAttribute (HA.style "word-break" "break-word")
+                ]
+                body
+        }
+
+
+mkRenderer : ViewMode -> (String -> a) -> Int -> CellDict -> Bool -> (String -> String -> a) -> NoteCache -> Markdown.Renderer.Renderer (Element a)
+mkRenderer viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged noteCache =
     { heading = heading
     , paragraph =
         E.paragraph
@@ -144,36 +167,12 @@ mkRenderer viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged =
     , strikethrough = \content -> E.paragraph [ EF.strike ] content
     , codeSpan = codeSpan
     , link =
-        \{ title, destination } body ->
-            (if String.contains ":" destination then
-                E.newTabLink
-
-             else
-                E.link
-            )
-                [ E.htmlAttribute (HA.style "display" "inline-flex") ]
-                { url = destination
-                , label =
-                    E.paragraph
-                        [ EF.color (E.rgb255 0 0 255)
-                        , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
-                        , E.htmlAttribute (HA.style "word-break" "break-word")
-                        ]
-                        body
-                }
+        \{ title, destination } body -> link title destination body
     , hardLineBreak = Html.br [] [] |> E.html
     , image =
         \image ->
             E.image [ E.width E.fill ]
                 { src = image.src, description = image.alt }
-
-    {- case image.title of
-       Just title ->
-           E.image [ E.width E.fill ] { src = image.src, description = image.alt }
-
-       Nothing ->
-           E.image [ E.width E.fill ] { src = image.src, description = image.alt }
-    -}
     , blockQuote =
         \children ->
             E.column
@@ -260,6 +259,8 @@ mkRenderer viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged =
                 |> Markdown.Html.withOptionalAttribute "text"
                 |> Markdown.Html.withOptionalAttribute "width"
                 |> Markdown.Html.withOptionalAttribute "height"
+            , Markdown.Html.tag "note" (noteView noteCache)
+                |> Markdown.Html.withAttribute "id"
             ]
     , table = E.column [ E.width <| E.fill ]
     , tableHeader = E.column [ E.width <| E.fill, EF.bold, EF.underline, E.spacing 8 ]
@@ -313,6 +314,104 @@ imageView text url mbwidth renderedChildren =
         Nothing ->
             E.image [ E.width E.fill ]
                 { src = url, description = text }
+
+
+htmlAudioView : String -> String -> Element a
+htmlAudioView url text =
+    E.html (Html.audio [ HA.controls True, HA.src url ] [ Html.text text ])
+
+
+audioView : Data.ZkNote -> Element a
+audioView zkn =
+    E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
+        [ link (Just zkn.title) ("/note/" ++ String.fromInt zkn.id) [ E.text zkn.title ]
+        , E.row [ E.spacing 20 ]
+            [ htmlAudioView ("/file/" ++ String.fromInt zkn.id) zkn.title
+
+            -- TODO pass in url instead of hardcoded
+            , link
+                (Just "ts↗")
+                ("https://29a.ch/timestretch/#a=https://www.zknotes.com/file/" ++ String.fromInt zkn.id)
+                [ E.text "ts↗" ]
+            ]
+        ]
+
+
+noteFile : String -> Data.ZkNote -> Element a
+noteFile filename zknote =
+    let
+        suffix =
+            String.split "." filename
+                |> List.drop 1
+                |> List.reverse
+                |> List.head
+
+        fileurl =
+            "/file/" ++ String.fromInt zknote.id
+    in
+    case suffix of
+        Nothing ->
+            E.text filename
+
+        Just s ->
+            case String.toLower s of
+                "mp3" ->
+                    audioView zknote
+
+                "m4a" ->
+                    audioView zknote
+
+                "opus" ->
+                    audioView zknote
+
+                "mp4" ->
+                    videoView 200 fileurl (Just zknote.title) Nothing Nothing []
+
+                "webm" ->
+                    videoView 200 fileurl (Just zknote.title) Nothing Nothing []
+
+                "mkv" ->
+                    videoView 200 fileurl (Just zknote.title) Nothing Nothing []
+
+                "jpg" ->
+                    imageView zknote.title fileurl Nothing []
+
+                "gif" ->
+                    imageView zknote.title fileurl Nothing []
+
+                "png" ->
+                    imageView zknote.title fileurl Nothing []
+
+                _ ->
+                    E.text filename
+
+
+noteView : NoteCache -> String -> List (Element a) -> Element a
+noteView noteCache id _ =
+    case
+        String.toInt id
+            |> Maybe.andThen (\iid -> NC.getNote iid noteCache)
+    of
+        Just zne ->
+            if zne.zknote.isFile then
+                noteFile zne.zknote.title zne.zknote
+
+            else
+                E.link
+                    [ E.htmlAttribute (HA.style "display" "inline-flex") ]
+                    { url = "/note/" ++ id
+                    , label =
+                        E.paragraph
+                            [ EF.color (E.rgb255 0 0 255)
+                            , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
+                            , E.htmlAttribute (HA.style "word-break" "break-word")
+                            ]
+                            [ E.text zne.zknote.title ]
+                    }
+
+        -- , E.column [] (List.map (.othername >> Maybe.withDefault "" >> E.text) zne.links)
+        Nothing ->
+            E.text <| "note " ++ id
 
 
 videoView : Int -> String -> Maybe String -> Maybe String -> Maybe String -> List (Element a) -> Element a
@@ -500,3 +599,79 @@ linkDict markdown =
                 []
                 blocks
                 |> Dict.fromList
+
+
+noteIds : String -> Set Int
+noteIds markdown =
+    -- build a dict of description->url
+    let
+        parsedmd =
+            markdown
+                |> Markdown.Parser.parse
+                |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
+    in
+    case parsedmd of
+        Err _ ->
+            Set.empty
+
+        Ok blocks ->
+            foldl
+                (\block ids ->
+                    case block of
+                        Block.HtmlBlock (Block.HtmlElement tag attr childs) ->
+                            case
+                                ( tag
+                                , List.foldl
+                                    (\i mbv ->
+                                        if i.name == "id" then
+                                            String.toInt i.value
+
+                                        else
+                                            Nothing
+                                    )
+                                    Nothing
+                                    attr
+                                )
+                            of
+                                ( "note", Just id ) ->
+                                    Set.insert id ids
+
+                                _ ->
+                                    ids
+
+                        _ ->
+                            ids
+                )
+                Set.empty
+                blocks
+                |> (\bids ->
+                        inlineFoldl
+                            (\inline ids ->
+                                case inline of
+                                    Block.HtmlInline (Block.HtmlElement tag attr childs) ->
+                                        case
+                                            ( tag
+                                            , List.foldl
+                                                (\i mbv ->
+                                                    if i.name == "id" then
+                                                        String.toInt i.value
+
+                                                    else
+                                                        Nothing
+                                                )
+                                                Nothing
+                                                attr
+                                            )
+                                        of
+                                            ( "note", Just id ) ->
+                                                Set.insert id ids
+
+                                            _ ->
+                                                ids
+
+                                    _ ->
+                                        ids
+                            )
+                            bids
+                            blocks
+                   )

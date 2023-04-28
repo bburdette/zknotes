@@ -12,6 +12,7 @@
             "TSFoster/elm-uuid": "4.1.0",
             "annaghi/dnd-list": "6.0.1",
             "bburdette/cellme": "1.0.0",
+            "bburdette/httpjsontask": "1.0.0",
             "bburdette/schelme": "3.0.0",
             "bburdette/toop": "1.2.0",
             "bburdette/typed-collections": "1.0.2",

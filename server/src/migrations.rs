@@ -1819,8 +1819,8 @@ pub fn udpate24(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   conn.execute_batch(m1.make::<Sqlite>().as_str())?;
 
   conn.execute(
-    "insert into filetemp (hash, createdate)
-      select hash, createdate from file",
+    "insert into filetemp (id, hash, createdate)
+      select id, hash, createdate from file",
     params![],
   )?;
 
@@ -1843,17 +1843,18 @@ pub fn udpate24(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 
   conn.execute_batch(m2.make::<Sqlite>().as_str())?;
 
-  let mut pstmt = conn.prepare("select hash, createdate from filetemp")?;
-  let r: Vec<(String, i64)> = pstmt
+  let mut pstmt = conn.prepare("select id, hash, createdate from filetemp")?;
+  let r: Vec<(i64, String, i64)> = pstmt
     .query_map(params![], |row| {
-      let s: String = row.get(0)?;
-      let i: i64 = row.get(1)?;
-      Ok((s, i))
+      let id: i64 = row.get(0)?;
+      let s: String = row.get(1)?;
+      let i: i64 = row.get(2)?;
+      Ok((id, s, i))
     })?
     .filter_map(|x| x.ok())
     .collect();
 
-  for (hash, createdate) in r {
+  for (id, hash, createdate) in r {
     // get file size.
 
     println!("attempting file {}", hash);
@@ -1866,9 +1867,9 @@ pub fn udpate24(dbfile: &Path) -> Result<(), orgauth::error::Error> {
     println!("file size {} - {}", hash, size);
 
     conn.execute(
-      "insert  into file (hash, createdate, size)
-      values (?1, ?2, ?3)",
-      params![hash, createdate, size],
+      "insert  into file (id, hash, createdate, size)
+      values (?1, ?2, ?3, ?4)",
+      params![id, hash, createdate, size],
     )?;
     println!("insert complete");
   }
