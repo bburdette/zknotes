@@ -1882,53 +1882,25 @@ pub fn udpate25(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 
   let mut m1 = Migration::new();
 
-  m1.create_table("filetemp", |t| {
+  // files yeeted with youtube-dl.
+  m1.create_table("yeetfile", |t| {
+    t.add_column("yeetkey", types::text().nullable(false));
+    t.add_column("audio", types::boolean().nullable(false));
+    t.add_column("filename", types::integer().nullable(false));
     t.add_column(
-      "id",
-      types::integer()
-        .primary(true)
-        .increments(true)
-        .nullable(false),
+      "fileid",
+      types::foreign(
+        "file",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
     );
-    t.add_column("hash", types::text().nullable(false).unique(true));
-    t.add_column("createdate", types::integer().nullable(false));
-    t.add_column("size", types::integer().nullable(false));
+    t.add_index("unq", types::index(vec!["yeetkey", "audio"]).unique(true));
   });
 
   conn.execute_batch(m1.make::<Sqlite>().as_str())?;
-
-  conn.execute(
-    "insert into filetemp (id, hash, createdate, size)
-      select id, hash, createdate, size from file",
-    params![],
-  )?;
-
-  let mut m2 = Migration::new();
-
-  m2.drop_table("file");
-
-  m2.create_table("file", |t| {
-    t.add_column(
-      "id",
-      types::integer()
-        .primary(true)
-        .increments(true)
-        .nullable(false),
-    );
-    t.add_column("hash", types::text().nullable(false).unique(true));
-    t.add_column("createdate", types::integer().nullable(false));
-    t.add_column("size", types::integer().nullable(false));
-    t.add_column("yeetkey", types::text().nullable(true));
-    t.add_index("yeetkey-idx", types::index(vec!["yeetkey"]).unique(true));
-  });
-
-  conn.execute_batch(m2.make::<Sqlite>().as_str())?;
-
-  conn.execute(
-    "insert into file (id, hash, createdate, size)
-      select id, hash, createdate, size from filetemp",
-    params![],
-  )?;
 
   Ok(())
 }

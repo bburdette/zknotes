@@ -316,6 +316,7 @@ type alias GetArchiveZkNote =
 
 type alias Yeet =
     { url : String
+    , audio : Bool
     }
 
 
@@ -633,6 +634,7 @@ encodeYeet : Yeet -> JE.Value
 encodeYeet x =
     JE.object <|
         [ ( "url", JE.string x.url )
+        , ( "audio", JE.bool x.audio )
         ]
 
 

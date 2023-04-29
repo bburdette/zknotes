@@ -98,7 +98,7 @@ pub fn zk_interface_loggedin(
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let gzne: GetZkNoteEdit = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-      let note = sqldata::read_zknoteedit(&conn, uid, &gzne)?;
+      let note = sqldata::read_zknoteedit(&conn, uid, gzne.zknote)?;
       info!(
         "user#getzknoteedit: {} - {}",
         gzne.zknote, note.zknote.title
@@ -271,12 +271,14 @@ pub fn zk_interface_loggedin(
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let yt: Yeet = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-      let mut user = sqldata::read_user_by_id(&conn, uid)?;
+
+      let yr = sqldata::yeet(&conn, uid, config.file_tmp_path.as_path(), yt)?;
+
       // user.homenoteid = Some(hn);
       // sqldata::update_user(&conn, &user)?;
       Ok(ServerResponse {
-        what: "yeetnote".to_string(),
-        content: serde_json::to_value(())?,
+        what: "zknoteedit".to_string(),
+        content: serde_json::to_value(yr)?,
       })
     }
     wat => Err(Box::new(simple_error::SimpleError::new(format!(

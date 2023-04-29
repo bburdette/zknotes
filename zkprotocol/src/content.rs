@@ -174,4 +174,5 @@ pub struct ZkNoteEditWhat {
 #[derive(Deserialize, Debug)]
 pub struct Yeet {
   pub url: String,
+  pub audio: bool,
 }
