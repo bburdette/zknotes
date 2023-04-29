@@ -314,6 +314,11 @@ type alias GetArchiveZkNote =
     }
 
 
+type alias Yeet =
+    { url : String
+    }
+
+
 
 ----------------------------------------
 -- Json encoders/decoders
@@ -621,6 +626,13 @@ encodeGetArchiveZkNote x =
     JE.object <|
         [ ( "parentnote", JE.int x.parentnote )
         , ( "noteid", JE.int x.noteid )
+        ]
+
+
+encodeYeet : Yeet -> JE.Value
+encodeYeet x =
+    JE.object <|
+        [ ( "url", JE.string x.url )
         ]
 
 

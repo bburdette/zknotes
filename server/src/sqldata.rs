@@ -12,7 +12,7 @@ use std::time::Duration;
 use zkprotocol::content::{
   Direction, EditLink, ExtraLoginData, GetArchiveZkNote, GetZkLinks, GetZkNoteArchives,
   GetZkNoteComments, GetZkNoteEdit, GetZneIfChanged, ImportZkNote, SaveZkLink, SaveZkNote,
-  SavedZkNote, ZkLink, ZkListNote, ZkNote, ZkNoteEdit,
+  SavedZkNote, Yeet, ZkLink, ZkListNote, ZkNote, ZkNoteEdit,
 };
 
 #[derive(Clone, Deserialize, Serialize, Debug)]
@@ -308,6 +308,11 @@ pub fn dbinit(
     info!("udpate24");
     zkm::udpate24(&dbfile)?;
     set_single_value(&conn, "migration_level", "24")?;
+  }
+  if nlevel < 25 {
+    info!("udpate25");
+    zkm::udpate25(&dbfile)?;
+    set_single_value(&conn, "migration_level", "25")?;
   }
 
   info!("db up to date.");
@@ -1523,6 +1528,113 @@ pub fn save_importzknotes(
   }
 
   Ok(())
+}
+
+fn yeet(conn: &Connection, uid: i64, yeet: Yeet) -> Result<ZkNoteEditWhat, orgauth::error::Error> {
+  // info!(
+  //   "yeet: remote ip: {:?}, request:{:?}",
+  //   req.connection_info(),
+  //   req
+  // );
+
+  // parse 'site'
+  let uri: Uri = match yeet.url.parse() {
+    Ok(uri) => uri,
+    Err(e) => return HttpResponse::InternalServerError().body(format!("yeet err {:?}", e)),
+  };
+
+  // get 'v' parameter.
+  let query = match uri.path_and_query() {
+    Some(paq) => {
+      println!("paq: {:?}", paq);
+      match paq.query() {
+        Some(query) => query,
+        None => {
+          return HttpResponse::InternalServerError()
+            .body(format!("query string not present in url"))
+        }
+      }
+    }
+    None => {
+      return HttpResponse::InternalServerError().body(format!("query string not present in url"))
+    }
+  };
+
+  // with 'v' paramter, scan for existing files.
+  let hv = match web::Query::<HasV>::from_query(query) {
+    Ok(hv) => hv,
+    Err(e) => {
+      return HttpResponse::InternalServerError().body(format!("query parse error {:?}", e))
+    }
+  };
+
+  // if file exists, serve file directly.
+  match fileresp(hv.v.clone()) {
+    Some(r) => return r,
+    None => (),
+  }
+
+  let mut child = Command::new("sh")
+    .arg("youtube-dl")
+    .arg("-x")
+    .arg(info.site.clone())
+    .spawn()
+    .expect("youtube-dl failed to execute");
+  match child.wait() {
+    Ok(exit_code) => {
+      if exit_code.success() {
+        match fileresp(hv.v.clone()) {
+          Some(r) => r,
+          None => HttpResponse::Ok().body(format!("yeeted! {:?}", child.stdout)),
+        }
+      } else {
+        HttpResponse::InternalServerError().body(format!("yeet err {:?}", exit_code))
+      }
+    }
+    Err(e) => HttpResponse::InternalServerError().body(format!("yeet err {:?}", e)),
+  }
+}
+
+// givin a youtube id like "bczQzZnGsFs", find the file and return an http response containing it.
+fn fileresp(v: String) -> Option<HttpResponse> {
+  let file: Option<Result<PathBuf, glob::GlobError>> = match glob::glob(format!("*{}*", v).as_str())
+  {
+    Ok(mut paths) => paths.next(),
+    Err(e) => return Some(HttpResponse::InternalServerError().body(format!("glob error {:?}", e))),
+  };
+
+  match file {
+    Some(Ok(path)) => {
+      // File content may come from a database as a blob data
+      let mut f = File::open(path.clone()).unwrap();
+      let mut buffer = Vec::new();
+
+      // read the whole file
+      match f.read_to_end(&mut buffer) {
+        Ok(_) => (),
+        Err(e) => {
+          return Some(HttpResponse::InternalServerError().body(format!("yeet err {:?}", e)))
+        }
+      };
+
+      // TODO return filename and not "yeet.ogg" or whatever.
+      Some(
+        HttpResponse::Ok()
+          .content_type("application/octet-stream")
+          .header("accept-ranges", "bytes")
+          .header(
+            "content-disposition",
+            format!(
+              "attachment; filename=\"{:?}\"",
+              path.file_name().and_then(|x| x.to_str()).unwrap_or("")
+            )
+            .as_str(),
+          )
+          .body(buffer),
+      )
+    }
+    _ => None,
+  }
 }
 
 #[derive(Serialize, Deserialize, Debug)]

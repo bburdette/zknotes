@@ -28,7 +28,7 @@ type Msg
 
 
 type Command
-    = Ok
+    = Ok Model
     | Cancel
 
 
@@ -40,9 +40,7 @@ init : String -> List (E.Attribute Msg) -> Element () -> GDModel
 init url buttonStyle underLay =
     { view = view buttonStyle
     , update = update
-    , model =
-        { url = url
-        }
+    , model = { url = url }
     , underLay = underLay
     }
 
@@ -59,12 +57,7 @@ view buttonStyle mbsize model =
             { onChange = OnUrlChanged
             , text = model.url
             , placeholder = Nothing
-            , label =
-                EI.labelLeft
-                    []
-                    (E.text
-                        "url"
-                    )
+            , label = EI.labelLeft [] (E.text "url")
             }
         , E.row [ E.width E.fill, E.spacing 10 ]
             [ EI.button
@@ -84,7 +77,7 @@ update msg model =
             GD.Cancel
 
         OkClick ->
-            GD.Ok Ok
+            GD.Ok (Ok model)
 
         OnUrlChanged s ->
             GD.Dialog { model | url = s }

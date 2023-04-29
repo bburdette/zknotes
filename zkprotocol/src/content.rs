@@ -170,3 +170,8 @@ pub struct ZkNoteEditWhat {
   pub what: String,
   pub zne: ZkNoteEdit,
 }
+
+#[derive(Deserialize, Debug)]
+pub struct Yeet {
+  pub url: String,
+}

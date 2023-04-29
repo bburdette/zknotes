@@ -1876,3 +1876,59 @@ pub fn udpate24(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 
   Ok(())
 }
+
+pub fn udpate25(dbfile: &Path) -> Result<(), orgauth::error::Error> {
+  let conn = Connection::open(dbfile)?;
+
+  let mut m1 = Migration::new();
+
+  m1.create_table("filetemp", |t| {
+    t.add_column(
+      "id",
+      types::integer()
+        .primary(true)
+        .increments(true)
+        .nullable(false),
+    );
+    t.add_column("hash", types::text().nullable(false).unique(true));
+    t.add_column("createdate", types::integer().nullable(false));
+    t.add_column("size", types::integer().nullable(false));
+  });
+
+  conn.execute_batch(m1.make::<Sqlite>().as_str())?;
+
+  conn.execute(
+    "insert into filetemp (id, hash, createdate, size)
+      select id, hash, createdate, size from file",
+    params![],
+  )?;
+
+  let mut m2 = Migration::new();
+
+  m2.drop_table("file");
+
+  m2.create_table("file", |t| {
+    t.add_column(
+      "id",
+      types::integer()
+        .primary(true)
+        .increments(true)
+        .nullable(false),
+    );
+    t.add_column("hash", types::text().nullable(false).unique(true));
+    t.add_column("createdate", types::integer().nullable(false));
+    t.add_column("size", types::integer().nullable(false));
+    t.add_column("yeetkey", types::text().nullable(true));
+    t.add_index("yeetkey-idx", types::index(vec!["yeetkey"]).unique(true));
+  });
+
+  conn.execute_batch(m2.make::<Sqlite>().as_str())?;
+
+  conn.execute(
+    "insert into file (id, hash, createdate, size)
+      select id, hash, createdate, size from filetemp",
+    params![],
+  )?;
+
+  Ok(())
+}
