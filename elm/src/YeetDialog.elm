@@ -28,9 +28,6 @@ type Msg
 
 
 
--- type Command
---     = Yeet Data.Yeet
-
 
 type alias GDModel =
     GD.Model Model Msg Data.Yeet

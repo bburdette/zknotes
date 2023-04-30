@@ -1626,27 +1626,9 @@ pub fn yeet(
     Err(x) => return Err(x.into()),
   };
 
-  // file does not exist.
-  // let mut child = Command::new("sh")
-  //   .arg("youtube-dl")
-  //   .arg("-x") // TODO: audio switch.
-  //   // .arg(format!("-o {}/%(title)s-%(id)s.%(ext)s", savedir.display()))
-  //   .arg(yeet.url.clone())
-  //   .spawn()
-  //   .expect("youtube-dl failed to execute");
-
-  println!("yeeturl: {}", yeet.url);
-
-  // verbatim from yeettube server.
-  // let mut child = Command::new("sh")
-  //   .arg("youtube-dl")
-  //   .arg("-x")
-  //   .arg(yeet.url.clone())
-  //   .spawn()
-  //   .expect("youtube-dl failed to execute");
-
   let mut child = Command::new("youtube-dl")
     .arg("-x")
+    .arg(format!("-o{}/%(title)s-%(id)s.%(ext)s", savedir.display()))
     .arg(yeet.url.clone())
     .spawn()
     .expect("youtube-dl failed to execute");
@@ -1655,7 +1637,7 @@ pub fn yeet(
     Ok(exit_code) => {
       if exit_code.success() {
         // find the yeeted file by 'v'.
-        let file: PathBuf = match glob::glob(format!("*{}*", hv.v).as_str()) {
+        let file: PathBuf = match glob::glob(format!("{}/*{}*", savedir.display(), hv.v).as_str()) {
           Ok(mut paths) => match paths.next() {
             Some(rpb) => match rpb {
               Ok(pb) => pb,
