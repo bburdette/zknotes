@@ -1627,13 +1627,30 @@ pub fn yeet(
   };
 
   // file does not exist.
-  let mut child = Command::new("sh")
-    .arg("youtube-dl")
-    .arg("-x") // TODO: audio switch.
-    .arg(format!("-o {}%(title)s-%(id)s.%(ext)s", savedir.display()))
+  // let mut child = Command::new("sh")
+  //   .arg("youtube-dl")
+  //   .arg("-x") // TODO: audio switch.
+  //   // .arg(format!("-o {}/%(title)s-%(id)s.%(ext)s", savedir.display()))
+  //   .arg(yeet.url.clone())
+  //   .spawn()
+  //   .expect("youtube-dl failed to execute");
+
+  println!("yeeturl: {}", yeet.url);
+
+  // verbatim from yeettube server.
+  // let mut child = Command::new("sh")
+  //   .arg("youtube-dl")
+  //   .arg("-x")
+  //   .arg(yeet.url.clone())
+  //   .spawn()
+  //   .expect("youtube-dl failed to execute");
+
+  let mut child = Command::new("youtube-dl")
+    .arg("-x")
     .arg(yeet.url.clone())
     .spawn()
     .expect("youtube-dl failed to execute");
+
   match child.wait() {
     Ok(exit_code) => {
       if exit_code.success() {

@@ -27,13 +27,13 @@ type Msg
     | Noop
 
 
-type Command
-    = Ok Model
-    | Cancel
+
+-- type Command
+--     = Yeet Data.Yeet
 
 
 type alias GDModel =
-    GD.Model Model Msg Command
+    GD.Model Model Msg Data.Yeet
 
 
 init : String -> List (E.Attribute Msg) -> Element () -> GDModel
@@ -70,14 +70,14 @@ view buttonStyle mbsize model =
         ]
 
 
-update : Msg -> Model -> GD.Transition Model Command
+update : Msg -> Model -> GD.Transition Model Data.Yeet
 update msg model =
     case msg of
         CancelClick ->
             GD.Cancel
 
         OkClick ->
-            GD.Ok (Ok model)
+            GD.Ok { url = model.url, audio = True }
 
         OnUrlChanged s ->
             GD.Dialog { model | url = s }

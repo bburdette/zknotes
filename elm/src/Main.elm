@@ -2742,8 +2742,12 @@ actualupdate msg model =
                 GD.Dialog nmodel ->
                     ( { model | state = YeetDialog nmodel pstate }, Cmd.none )
 
-                GD.Ok return ->
-                    ( model, Cmd.none )
+                GD.Ok yeet ->
+                    ( {model | state = pstate}
+                    , sendZIMsg
+                        model.location
+                        (ZI.Yeet yeet)
+                    )
 
                 GD.Cancel ->
                     ( { model | state = pstate }, Cmd.none )
