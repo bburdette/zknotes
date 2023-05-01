@@ -47,7 +47,7 @@ view buttonStyle mbsize model =
         , E.height E.fill
         , E.spacing 15
         ]
-        [ E.el [ E.centerX, EF.bold ] <| E.text "http requests"
+        [ E.el [ E.centerX, EF.bold ] <| E.text "yeet audio"
         , EI.text [ E.width E.fill ]
             { onChange = OnUrlChanged
             , text = model.url

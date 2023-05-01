@@ -2826,7 +2826,7 @@ actualupdate msg model =
                                     Common.buttonStyle
                                     (E.map (\_ -> ()) (viewState model.size model.state model))
                                 )
-                                model.state
+                                pstate
                       }
                     , sendZIMsgExp model.location (ZI.Yeet yeet) (YeetReplyData nrid)
                     )
