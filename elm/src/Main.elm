@@ -103,6 +103,7 @@ type Msg
     | YeetDialogMsg (GD.Msg YeetDialog.Msg)
     | TagFilesMsg (TagAThing.Msg TagFiles.Msg)
     | InviteUserMsg (TagAThing.Msg InviteUser.Msg)
+    | YeetReplyData String (Result Http.Error ZI.ServerResponse)
     | Noop
 
 
@@ -695,6 +696,9 @@ showMessage msg =
 
         YeetDialogMsg _ ->
             "YeetDialogMsg"
+
+        YeetReplyData _ _ ->
+            "YeetReplyData"
 
         RequestProgress _ _ ->
             "RequestProgress"
@@ -2719,6 +2723,51 @@ actualupdate msg model =
                         _ ->
                             ( displayMessageDialog model (ZI.showServerResponse ziresponse), Cmd.none )
 
+        ( YeetReplyData what zrd, state ) ->
+            case zrd of
+                Err e ->
+                    ( displayMessageDialog model <| Util.httpErrorString e, Cmd.none )
+
+                Ok ziresponse ->
+                    case ziresponse of
+                        ZI.ServerError e ->
+                            ( displayMessageDialog model <| e, Cmd.none )
+
+                        ZI.ZkNoteEditWhat znew ->
+                            -- onZkNoteEditWhat model
+                            --     pt
+                            --     znew
+                            ( { model
+                                | trackedRequests =
+                                    case Dict.get what model.trackedRequests.requests of
+                                        Just (Yeet fu) ->
+                                            let
+                                                trqs =
+                                                    model.trackedRequests
+                                            in
+                                            { trqs
+                                                | requests =
+                                                    Dict.insert what
+                                                        (Yeet
+                                                            { fu
+                                                                | files =
+                                                                    Just files
+                                                            }
+                                                        )
+                                                        trqs.requests
+                                            }
+
+                                        _ ->
+                                            model.trackedRequests
+                              }
+                            , Cmd.none
+                            )
+
+                        _ ->
+                            ( unexpectedMsg model
+                            , Cmd.none
+                            )
+
         ( RequestProgress a b, _ ) ->
             let
                 tr =
@@ -2733,6 +2782,14 @@ actualupdate msg model =
                     , Cmd.none
                     )
 
+                Just (Yeet trq) ->
+                    ( { model
+                        | trackedRequests =
+                            { tr | requests = Dict.insert a (Yeet { trq | progress = Just b }) tr.requests }
+                      }
+                    , Cmd.none
+                    )
+
                 Nothing ->
                     ( model, Cmd.none )
 
@@ -2743,12 +2800,69 @@ actualupdate msg model =
                     ( { model | state = YeetDialog nmodel pstate }, Cmd.none )
 
                 GD.Ok yeet ->
-                    ( {model | state = pstate}
-                    , sendZIMsg
-                        model.location
-                        (ZI.Yeet yeet)
+                    -- ( { model | state = pstate }
+                    -- , sendZIMsg
+                    --     model.location
+                    --     (ZI.Yeet yeet)
+                    -- )
+                    let
+                        tr =
+                            model.trackedRequests
+
+                        nrid =
+                            String.fromInt (model.trackedRequests.requestCount + 1)
+
+                        nrq =
+                            Yeet
+                                { url = yeet.url
+                                , progress = Nothing
+                                , file = Nothing
+                                }
+
+                        ntr =
+                            { tr
+                                | requestCount = tr.requestCount + 1
+                                , requests =
+                                    Dict.insert nrid
+                                        nrq
+                                        tr.requests
+                            }
+                    in
+                    ( { model
+                        | trackedRequests = ntr
+                        , state =
+                            RequestsDialog
+                                (RequestsDialog.init
+                                    -- dummy state we won't use
+                                    { requestCount = 0, requests = Dict.empty }
+                                    Common.buttonStyle
+                                    (E.map (\_ -> ()) (viewState model.size model.state model))
+                                )
+                                model.state
+                      }
+                    , Http.request
+                        { method = "POST"
+                        , headers = []
+                        , url = model.location ++ "/private"
+                        , body = Http.jsonBody (ZI.encodeSendMsg (ZI.Yeet yeet))
+                        , expect = Http.expectJson YeetReplyData ZI.serverResponseDecoder
+                        , timeout = Nothing
+                        , tracker = Just nrid
+                        }
                     )
 
+                -- sendZIMsg : String -> ZI.SendMsg -> Cmd Msg
+                -- sendZIMsg location msg =
+                --     sendZIMsgExp location msg ZkReplyData
+                -- sendZIMsgExp : String -> ZI.SendMsg -> (Result Http.Error ( Time.Posix, ZI.ServerResponse ) -> Msg) -> Cmd Msg
+                -- sendZIMsgExp location msg tomsg =
+                --     HE.postJsonTask
+                --         { url = location ++ "/private"
+                --         , body = Http.jsonBody (ZI.encodeSendMsg msg)
+                --         , decoder = ZI.serverResponseDecoder
+                --         }
+                --         |> Task.andThen (\x -> Task.map (\posix -> ( posix, x )) Time.now)
+                --         |> Task.attempt tomsg
                 GD.Cancel ->
                     ( { model | state = pstate }, Cmd.none )
 
