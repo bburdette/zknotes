@@ -103,7 +103,7 @@ type Msg
     | YeetDialogMsg (GD.Msg YeetDialog.Msg)
     | TagFilesMsg (TagAThing.Msg TagFiles.Msg)
     | InviteUserMsg (TagAThing.Msg InviteUser.Msg)
-    | YeetReplyData String (Result Http.Error ZI.ServerResponse)
+    | YeetReplyData String (Result Http.Error ( Time.Posix, ZI.ServerResponse ))
     | Noop
 
 
@@ -2723,23 +2723,20 @@ actualupdate msg model =
                         _ ->
                             ( displayMessageDialog model (ZI.showServerResponse ziresponse), Cmd.none )
 
-        ( YeetReplyData what zrd, state ) ->
+        ( YeetReplyData nrid zrd, state ) ->
             case zrd of
                 Err e ->
                     ( displayMessageDialog model <| Util.httpErrorString e, Cmd.none )
 
-                Ok ziresponse ->
+                Ok ( pt, ziresponse ) ->
                     case ziresponse of
                         ZI.ServerError e ->
                             ( displayMessageDialog model <| e, Cmd.none )
 
                         ZI.ZkNoteEditWhat znew ->
-                            -- onZkNoteEditWhat model
-                            --     pt
-                            --     znew
                             ( { model
                                 | trackedRequests =
-                                    case Dict.get what model.trackedRequests.requests of
+                                    case Dict.get nrid model.trackedRequests.requests of
                                         Just (Yeet fu) ->
                                             let
                                                 trqs =
@@ -2747,11 +2744,11 @@ actualupdate msg model =
                                             in
                                             { trqs
                                                 | requests =
-                                                    Dict.insert what
+                                                    Dict.insert nrid
                                                         (Yeet
                                                             { fu
-                                                                | files =
-                                                                    Just files
+                                                                | file =
+                                                                    Just znew.zne
                                                             }
                                                         )
                                                         trqs.requests
@@ -2764,7 +2761,7 @@ actualupdate msg model =
                             )
 
                         _ ->
-                            ( unexpectedMsg model
+                            ( unexpectedMsg model msg
                             , Cmd.none
                             )
 
@@ -2782,11 +2779,9 @@ actualupdate msg model =
                     , Cmd.none
                     )
 
-                Just (Yeet trq) ->
-                    ( { model
-                        | trackedRequests =
-                            { tr | requests = Dict.insert a (Yeet { trq | progress = Just b }) tr.requests }
-                      }
+                Just (Yeet _) ->
+                    -- not expecting progress updates for Yeet.
+                    ( model
                     , Cmd.none
                     )
 
@@ -2794,17 +2789,11 @@ actualupdate msg model =
                     ( model, Cmd.none )
 
         ( YeetDialogMsg ym, YeetDialog ymod pstate ) ->
-            -- case YeetDialog.update ym ymod of
             case GD.update ym ymod of
                 GD.Dialog nmodel ->
                     ( { model | state = YeetDialog nmodel pstate }, Cmd.none )
 
                 GD.Ok yeet ->
-                    -- ( { model | state = pstate }
-                    -- , sendZIMsg
-                    --     model.location
-                    --     (ZI.Yeet yeet)
-                    -- )
                     let
                         tr =
                             model.trackedRequests
@@ -2815,7 +2804,6 @@ actualupdate msg model =
                         nrq =
                             Yeet
                                 { url = yeet.url
-                                , progress = Nothing
                                 , file = Nothing
                                 }
 
@@ -2840,29 +2828,9 @@ actualupdate msg model =
                                 )
                                 model.state
                       }
-                    , Http.request
-                        { method = "POST"
-                        , headers = []
-                        , url = model.location ++ "/private"
-                        , body = Http.jsonBody (ZI.encodeSendMsg (ZI.Yeet yeet))
-                        , expect = Http.expectJson YeetReplyData ZI.serverResponseDecoder
-                        , timeout = Nothing
-                        , tracker = Just nrid
-                        }
+                    , sendZIMsgExp model.location (ZI.Yeet yeet) (YeetReplyData nrid)
                     )
 
-                -- sendZIMsg : String -> ZI.SendMsg -> Cmd Msg
-                -- sendZIMsg location msg =
-                --     sendZIMsgExp location msg ZkReplyData
-                -- sendZIMsgExp : String -> ZI.SendMsg -> (Result Http.Error ( Time.Posix, ZI.ServerResponse ) -> Msg) -> Cmd Msg
-                -- sendZIMsgExp location msg tomsg =
-                --     HE.postJsonTask
-                --         { url = location ++ "/private"
-                --         , body = Http.jsonBody (ZI.encodeSendMsg msg)
-                --         , decoder = ZI.serverResponseDecoder
-                --         }
-                --         |> Task.andThen (\x -> Task.map (\posix -> ( posix, x )) Time.now)
-                --         |> Task.attempt tomsg
                 GD.Cancel ->
                     ( { model | state = pstate }, Cmd.none )
 

@@ -27,8 +27,7 @@ type TRequest
         }
     | Yeet
         { url : String
-        , progress : Maybe Http.Progress
-        , file : Maybe Data.ZkListNote
+        , file : Maybe Data.ZkNoteEdit
         }
 
 
@@ -159,10 +158,8 @@ view buttonStyle mbsize trqs =
                                             , E.scrollbarY
                                             ]
                                             [ E.paragraph [] [ E.text yt.url ] ]
-                                        , yt.progress
-                                            |> Maybe.map renderProgress
-                                            |> Maybe.withDefault E.none
-                                        ]
+                                        , if complete then E.text "complete"
+                                        else E.text "pending"                                        ]
                                     , if complete then
                                         E.row [ E.width E.fill ]
                                             [ EI.button buttonStyle
@@ -206,7 +203,7 @@ update msg model =
                 Just (Yeet yt) ->
                     case yt.file of
                         Just f ->
-                            GD.Ok (Tag [ f ])
+                            GD.Ok (Tag [ Data.toZkListNote f.zknote ])
 
                         Nothing ->
                             GD.Dialog model
