@@ -27,8 +27,6 @@ type Msg
     | Noop
 
 
-
-
 type alias GDModel =
     GD.Model Model Msg Data.Yeet
 

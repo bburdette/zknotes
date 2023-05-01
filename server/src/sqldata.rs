@@ -15,8 +15,8 @@ use std::process::Command;
 use std::time::Duration;
 use zkprotocol::content::{
   Direction, EditLink, ExtraLoginData, GetArchiveZkNote, GetZkLinks, GetZkNoteArchives,
-  GetZkNoteComments, GetZkNoteEdit, GetZneIfChanged, ImportZkNote, SaveZkLink, SaveZkNote,
-  SavedZkNote, Yeet, ZkLink, ZkListNote, ZkNote, ZkNoteEdit, ZkNoteEditWhat,
+  GetZkNoteComments, GetZneIfChanged, ImportZkNote, SaveZkLink, SaveZkNote, SavedZkNote, Yeet,
+  ZkLink, ZkListNote, ZkNote, ZkNoteEdit, ZkNoteEditWhat,
 };
 
 #[derive(Clone, Deserialize, Serialize, Debug)]
@@ -1652,17 +1652,21 @@ pub fn yeet(
           },
           Err(e) => return Err(orgauth::error::Error::String(format!("glob error {:?}", e))),
         };
-        let noteid = make_file_note(
-          &conn,
-          uid,
-          file
-            .as_path()
-            .file_name()
-            .and_then(|x| x.to_str())
-            .unwrap_or("meh.txt")
-            .to_string(),
-          file.as_path(),
+        let filename = file
+          .as_path()
+          .file_name()
+          .and_then(|x| x.to_str())
+          .unwrap_or("meh.txt")
+          .to_string();
+        let (noteid, fid) = make_file_note(&conn, uid, &filename, file.as_path())?;
+
+        // yeetfile table entry.
+        conn.execute(
+          "insert into yeetfile (yeetkey, audio, filename, fileid)
+                   values (?1, ?2, ?3, ?4)",
+          params![hv.v, true, filename, fid],
         )?;
+
         // return zknoteedit.
         let zne = read_zknoteedit(&conn, uid, noteid)?;
 
@@ -1689,12 +1693,12 @@ pub fn yeet(
   }
 }
 
-fn make_file_note(
+pub fn make_file_note(
   conn: &Connection,
   uid: i64,
-  name: String,
+  name: &String,
   fpath: &Path,
-) -> Result<i64, orgauth::error::Error> {
+) -> Result<(i64, i64), orgauth::error::Error> {
   // compute hash.
   // let fpath = Path::new(&filepath);
   let fh = sha256::try_digest(fpath)?;
@@ -1743,7 +1747,7 @@ fn make_file_note(
     uid,
     &SaveZkNote {
       id: None,
-      title: name,
+      title: name.to_string(),
       pubid: None,
       content: "".to_string(),
       editable: false,
@@ -1755,53 +1759,8 @@ fn make_file_note(
   // set the file id in that note.
   set_zknote_file(&conn, sn.id, fid)?;
 
-  Ok(sn.id)
+  Ok((sn.id, fid))
 }
-
-// // givin a youtube id like "bczQzZnGsFs", find the file and return an http response containing it.
-// fn fileresp(savedir: Path, v: String) -> Result {
-//   // is there a file with this yeetkey already?
-//   let conn = Connection::open(dbfile)?;
-
-//   let file: Option<Result<PathBuf, glob::GlobError>> = match glob::glob(format!("*{}*", v).as_str())
-//   {
-//     Ok(mut paths) => paths.next(),
-//     Err(e) => return Some(HttpResponse::InternalServerError().body(format!("glob error {:?}", e))),
-//   };
-
-//   match file {
-//     Some(Ok(path)) => {
-//       // File content may come from a database as a blob data
-//       let mut f = File::open(path.clone()).unwrap();
-//       let mut buffer = Vec::new();
-
-//       // read the whole file
-//       match f.read_to_end(&mut buffer) {
-//         Ok(_) => (),
-//         Err(e) => {
-//           return Some(HttpResponse::InternalServerError().body(format!("yeet err {:?}", e)))
-//         }
-//       };
-
-//       // TODO return filename and not "yeet.ogg" or whatever.
-//       Some(
-//         HttpResponse::Ok()
-//           .content_type("application/octet-stream")
-//           .header("accept-ranges", "bytes")
-//           .header(
-//             "content-disposition",
-//             format!(
-//               "attachment; filename=\"{:?}\"",
-//               path.file_name().and_then(|x| x.to_str()).unwrap_or("")
-//             )
-//             .as_str(),
-//           )
-//           .body(buffer),
-//       )
-//     }
-//     _ => None,
-//   }
-// }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ZkDatabase {
