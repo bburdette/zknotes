@@ -1891,8 +1891,8 @@ pub fn udpate25(dbfile: &Path) -> Result<(), orgauth::error::Error> {
       types::foreign(
         "file",
         "id",
-        types::ReferentialAction::Restrict,
-        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Cascade,
+        types::ReferentialAction::Cascade,
       )
       .nullable(false),
     );
