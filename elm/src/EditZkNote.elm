@@ -1124,12 +1124,6 @@ zknview zone size recentZkns trqs noteCache model =
 
                             Nothing ->
                                 E.none
-                        , case model.id of
-                            Just _ ->
-                                EI.button perhapsdirtyparabuttonstyle { onPress = Just YeetPress, label = E.text "yeet" }
-
-                            Nothing ->
-                                E.none
                         , EI.button parabuttonstyle
                             { onPress = Just <| ShowArchivesPress
                             , label = E.el [ E.centerY ] <| E.text "archives"
@@ -1888,21 +1882,6 @@ onTASelection model recentZkns tas =
 
             Err e ->
                 TAError e
-
-    else if tas.what == "yeet" then
-        TANoop
-        -- case initLinkBackNote model tas.text of
-        --     Ok nmodel ->
-        --         if tas.text == "" then
-        --             if dirty model then
-        --                 -- save current note, then switch.
-        --                 TASave (fullSave model)
-        --             else
-        --                 TAUpdated nmodel Nothing
-        --         else
-        --             TASave (fullSave nmodel)
-        --     Err e ->
-        --         TAError e
 
     else if tas.what == "addlink" then
         case model.focusLink of

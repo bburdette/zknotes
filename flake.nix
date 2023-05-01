@@ -76,8 +76,6 @@
           };
           defaultApp = apps.${pname};
 
-          meh = builtins.break 5;
-
           # `nix develop`
           devShell = pkgs.mkShell {
             nativeBuildInputs = with pkgs; [
