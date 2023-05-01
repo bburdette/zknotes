@@ -271,11 +271,9 @@ pub fn zk_interface_loggedin(
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let yt: Yeet = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-
       let yr = sqldata::yeet(&conn, uid, config.file_tmp_path.as_path(), yt)?;
+      info!("user#yeet: url:{:?}", yr.url);
 
-      // user.homenoteid = Some(hn);
-      // sqldata::update_user(&conn, &user)?;
       Ok(ServerResponse {
         what: "zknoteedit".to_string(),
         content: serde_json::to_value(yr)?,
