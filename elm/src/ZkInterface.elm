@@ -22,6 +22,7 @@ type SendMsg
     | SaveImportZkNotes (List Data.ImportZkNote)
     | PowerDelete S.TagSearch
     | SetHomeNote Int
+    | Yeet Data.Yeet
 
 
 type ServerResponse
@@ -184,6 +185,12 @@ encodeSendMsg sm =
             JE.object
                 [ ( "what", JE.string "sethomenote" )
                 , ( "data", JE.int id )
+                ]
+
+        Yeet yt ->
+            JE.object
+                [ ( "what", JE.string "yeet" )
+                , ( "data", Data.encodeYeet yt )
                 ]
 
 

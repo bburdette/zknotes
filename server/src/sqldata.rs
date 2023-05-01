@@ -1,5 +1,8 @@
 use crate::migrations as zkm;
+use actix_web::http::Uri;
+use actix_web::web;
 use barrel::backend::Sqlite;
+use glob;
 use log::info;
 use orgauth::data::RegistrationData;
 use orgauth::dbfun::user_id;
@@ -8,11 +11,12 @@ use rusqlite::{params, Connection};
 use serde_derive::{Deserialize, Serialize};
 use simple_error::bail;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::time::Duration;
 use zkprotocol::content::{
   Direction, EditLink, ExtraLoginData, GetArchiveZkNote, GetZkLinks, GetZkNoteArchives,
-  GetZkNoteComments, GetZkNoteEdit, GetZneIfChanged, ImportZkNote, SaveZkLink, SaveZkNote,
-  SavedZkNote, ZkLink, ZkListNote, ZkNote, ZkNoteEdit,
+  GetZkNoteComments, GetZneIfChanged, ImportZkNote, SaveZkLink, SaveZkNote, SavedZkNote, Yeet,
+  ZkLink, ZkListNote, ZkNote, ZkNoteEdit, ZkNoteEditWhat,
 };
 
 #[derive(Clone, Deserialize, Serialize, Debug)]
@@ -308,6 +312,11 @@ pub fn dbinit(
     info!("udpate24");
     zkm::udpate24(&dbfile)?;
     set_single_value(&conn, "migration_level", "24")?;
+  }
+  if nlevel < 25 {
+    info!("udpate25");
+    zkm::udpate25(&dbfile)?;
+    set_single_value(&conn, "migration_level", "25")?;
   }
 
   info!("db up to date.");
@@ -1391,10 +1400,10 @@ pub fn read_archivezknote(
 pub fn read_zknoteedit(
   conn: &Connection,
   uid: i64,
-  gzl: &GetZkNoteEdit,
+  zknoteid: i64,
 ) -> Result<ZkNoteEdit, orgauth::error::Error> {
   // should do an ownership check for us
-  let zknote = read_zknote(conn, Some(uid), gzl.zknote)?;
+  let zknote = read_zknote(conn, Some(uid), zknoteid)?;
 
   let zklinks = read_zklinks(conn, uid, &GetZkLinks { zknote: zknote.id })?;
 
@@ -1417,15 +1426,7 @@ pub fn read_zneifchanged(
   )?;
 
   if changeddate > gzic.changeddate {
-    return read_zknoteedit(
-      conn,
-      uid,
-      &GetZkNoteEdit {
-        zknote: gzic.zknote,
-        what: gzic.what.clone(),
-      },
-    )
-    .map(Some);
+    return read_zknoteedit(conn, uid, gzic.zknote).map(Some);
   } else {
     Ok(None)
   }
@@ -1523,6 +1524,236 @@ pub fn save_importzknotes(
   }
 
   Ok(())
+}
+
+#[derive(Debug, Deserialize)]
+pub struct HasV {
+  v: String,
+}
+
+pub fn yeet(
+  conn: &Connection,
+  uid: i64,
+  savedir: &Path,
+  yeet: Yeet,
+) -> Result<ZkNoteEditWhat, orgauth::error::Error> {
+  // parse 'url'
+  let uri: Uri = match yeet.url.parse() {
+    Ok(uri) => uri,
+    Err(e) => return Err(orgauth::error::Error::String(format!("yeet err {:?}", e))),
+  };
+
+  // get 'v' parameter.
+  let query = match uri.path_and_query() {
+    Some(paq) => {
+      println!("paq: {:?}", paq);
+      match paq.query() {
+        Some(query) => query,
+        None => {
+          return Err(orgauth::error::Error::String(
+            "query string not present in url".to_string(),
+          ))
+        }
+      }
+    }
+    None => {
+      return Err(orgauth::error::Error::String(format!(
+        "query string not present in url"
+      )))
+    }
+  };
+
+  // with 'v' paramter, scan for existing files.
+  let hv = match web::Query::<HasV>::from_query(query) {
+    Ok(hv) => hv,
+    Err(e) => {
+      return Err(orgauth::error::Error::String(format!(
+        "query parse error {:?}",
+        e
+      )))
+    }
+  };
+
+  // if there's already a file, return a new zknote that points at it.
+  match conn.query_row(
+    "select fileid, filename from yeetfile where 
+      yeetkey = ?1 and audio = ?2",
+    params![hv.v, yeet.audio],
+    |row| Ok((row.get(0)?, row.get(1)?)),
+  ) {
+    Ok((fileid, filename)) => {
+      // now make a new note.
+      let sn = save_zknote(
+        &conn,
+        uid,
+        &SaveZkNote {
+          id: None,
+          title: filename,
+          pubid: None,
+          content: "".to_string(),
+          editable: false,
+          showtitle: false,
+          deleted: false,
+        },
+      )?;
+
+      // set the file id in that note.
+      set_zknote_file(&conn, sn.id, fileid)?;
+
+      // return zknoteedit.
+      let note = read_zknoteedit(&conn, uid, sn.id)?;
+
+      let znew = ZkNoteEditWhat {
+        what: "yeet".to_string(),
+        zne: note,
+      };
+
+      info!(
+        "user#yeet-copy-zknote: {} - {}",
+        znew.zne.zknote.id.clone(),
+        znew.zne.zknote.title.clone()
+      );
+
+      return Ok(znew);
+    }
+    Err(rusqlite::Error::QueryReturnedNoRows) => (),
+    Err(x) => return Err(x.into()),
+  };
+
+  let mut child = Command::new("yt-dlp")
+    .arg("-x")
+    .arg(format!("-o{}/%(title)s-%(id)s.%(ext)s", savedir.display()))
+    .arg(yeet.url.clone())
+    .spawn()
+    .expect("youtube-dl failed to execute");
+
+  match child.wait() {
+    Ok(exit_code) => {
+      if exit_code.success() {
+        // find the yeeted file by 'v'.
+        let file: PathBuf = match glob::glob(format!("{}/*{}*", savedir.display(), hv.v).as_str()) {
+          Ok(mut paths) => match paths.next() {
+            Some(rpb) => match rpb {
+              Ok(pb) => pb,
+              Err(e) => return Err(orgauth::error::Error::String(format!("glob error {:?}", e))),
+            },
+            None => {
+              return Err(orgauth::error::Error::String(format!(
+                "yeet file not found {:?}",
+                hv.v
+              )))
+            }
+          },
+          Err(e) => return Err(orgauth::error::Error::String(format!("glob error {:?}", e))),
+        };
+        let filename = file
+          .as_path()
+          .file_name()
+          .and_then(|x| x.to_str())
+          .unwrap_or("meh.txt")
+          .to_string();
+        let (noteid, fid) = make_file_note(&conn, uid, &filename, file.as_path())?;
+
+        // yeetfile table entry.
+        conn.execute(
+          "insert into yeetfile (yeetkey, audio, filename, fileid)
+                   values (?1, ?2, ?3, ?4)",
+          params![hv.v, true, filename, fid],
+        )?;
+
+        // return zknoteedit.
+        let zne = read_zknoteedit(&conn, uid, noteid)?;
+
+        let znew = ZkNoteEditWhat {
+          what: "yeet".to_string(),
+          zne: zne,
+        };
+
+        info!(
+          "user#yeet-new-zknote: {} - {}",
+          znew.zne.zknote.id.clone(),
+          znew.zne.zknote.title.clone()
+        );
+
+        return Ok(znew);
+      } else {
+        Err(orgauth::error::Error::String(format!(
+          "yeet err {:?}",
+          exit_code
+        )))
+      }
+    }
+    Err(e) => Err(orgauth::error::Error::String(format!("yeet err {:?}", e))),
+  }
+}
+
+pub fn make_file_note(
+  conn: &Connection,
+  uid: i64,
+  name: &String,
+  fpath: &Path,
+) -> Result<(i64, i64), orgauth::error::Error> {
+  // compute hash.
+  // let fpath = Path::new(&filepath);
+  let fh = sha256::try_digest(fpath)?;
+  let size = std::fs::metadata(fpath)?.len();
+  let fhp = format!("files/{}", fh);
+  let hashpath = Path::new(&fhp);
+
+  // file exists?
+  if hashpath.exists() {
+    // new file already exists.
+    std::fs::remove_file(fpath)?;
+  } else {
+    // move into hashed-files dir.
+    std::fs::rename(fpath, hashpath)?;
+  }
+
+  // table entry exists?
+  let oid: Option<i64> =
+    match conn.query_row("select id from file where hash = ?1", params![fh], |row| {
+      Ok(row.get(0)?)
+    }) {
+      Ok(v) => Ok(Some(v)),
+      Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+      Err(x) => Err(x),
+    }?;
+
+  // use existing id, or create new
+  let fid = match oid {
+    Some(id) => id,
+    None => {
+      let now = now()?;
+
+      // add table entry
+      conn.execute(
+        "insert into file (hash, createdate, size)
+                 values (?1, ?2, ?3)",
+        params![fh, now, size],
+      )?;
+      conn.last_insert_rowid()
+    }
+  };
+
+  // now make a new note.
+  let sn = save_zknote(
+    &conn,
+    uid,
+    &SaveZkNote {
+      id: None,
+      title: name.to_string(),
+      pubid: None,
+      content: "".to_string(),
+      editable: false,
+      showtitle: false,
+      deleted: false,
+    },
+  )?;
+
+  // set the file id in that note.
+  set_zknote_file(&conn, sn.id, fid)?;
+
+  Ok((sn.id, fid))
 }
 
 #[derive(Serialize, Deserialize, Debug)]

@@ -53,20 +53,6 @@ decodeTASelection =
 ----------------------------------------
 
 
-fromOaLd : Orgauth.Data.LoginData -> Result JD.Error LoginData
-fromOaLd oald =
-    JD.decodeValue
-        (JD.succeed (LoginData oald.userid oald.name oald.email oald.admin oald.active)
-            |> andMap (JD.field "zknote" JD.int)
-            |> andMap (JD.field "homenote" (JD.maybe JD.int))
-            |> andMap (JD.field "publicid" JD.int)
-            |> andMap (JD.field "shareid" JD.int)
-            |> andMap (JD.field "searchid" JD.int)
-            |> andMap (JD.field "commentid" JD.int)
-        )
-        oald.data
-
-
 type alias LoginData =
     { userid : UserId
     , name : String
@@ -174,53 +160,6 @@ type alias EditLink =
     }
 
 
-toZkLink : Int -> UserId -> EditLink -> ZkLink
-toZkLink noteid user el =
-    { from =
-        case el.direction of
-            From ->
-                el.otherid
-
-            To ->
-                noteid
-    , to =
-        case el.direction of
-            From ->
-                noteid
-
-            To ->
-                el.otherid
-    , user = user
-    , zknote = Nothing
-    , fromname = Nothing
-    , toname = Nothing
-    , delete = Nothing
-    }
-
-
-zklKey : { a | otherid : Int, direction : Direction } -> String
-zklKey zkl =
-    String.fromInt zkl.otherid
-        ++ ":"
-        ++ (case zkl.direction of
-                From ->
-                    "from"
-
-                To ->
-                    "to"
-           )
-
-
-elToSzl : EditLink -> SaveZkLink
-elToSzl el =
-    { otherid = el.otherid
-    , direction = el.direction
-    , user = el.user
-    , zknote = el.zknote
-    , delete = el.delete
-    }
-
-
 type alias SaveZkLink =
     { otherid : Int
     , direction : Direction
@@ -311,6 +250,91 @@ type alias ZkNoteArchives =
 type alias GetArchiveZkNote =
     { parentnote : Int
     , noteid : Int
+    }
+
+
+type alias Yeet =
+    { url : String
+    , audio : Bool
+    }
+
+
+
+----------------------------------------
+-- utility fns.
+----------------------------------------
+
+
+fromOaLd : Orgauth.Data.LoginData -> Result JD.Error LoginData
+fromOaLd oald =
+    JD.decodeValue
+        (JD.succeed (LoginData oald.userid oald.name oald.email oald.admin oald.active)
+            |> andMap (JD.field "zknote" JD.int)
+            |> andMap (JD.field "homenote" (JD.maybe JD.int))
+            |> andMap (JD.field "publicid" JD.int)
+            |> andMap (JD.field "shareid" JD.int)
+            |> andMap (JD.field "searchid" JD.int)
+            |> andMap (JD.field "commentid" JD.int)
+        )
+        oald.data
+
+
+toZkLink : Int -> UserId -> EditLink -> ZkLink
+toZkLink noteid user el =
+    { from =
+        case el.direction of
+            From ->
+                el.otherid
+
+            To ->
+                noteid
+    , to =
+        case el.direction of
+            From ->
+                noteid
+
+            To ->
+                el.otherid
+    , user = user
+    , zknote = Nothing
+    , fromname = Nothing
+    , toname = Nothing
+    , delete = Nothing
+    }
+
+
+zklKey : { a | otherid : Int, direction : Direction } -> String
+zklKey zkl =
+    String.fromInt zkl.otherid
+        ++ ":"
+        ++ (case zkl.direction of
+                From ->
+                    "from"
+
+                To ->
+                    "to"
+           )
+
+
+elToSzl : EditLink -> SaveZkLink
+elToSzl el =
+    { otherid = el.otherid
+    , direction = el.direction
+    , user = el.user
+    , zknote = el.zknote
+    , delete = el.delete
+    }
+
+
+toZkListNote : ZkNote -> ZkListNote
+toZkListNote zkn =
+    { id = zkn.id
+    , user = zkn.user
+    , title = zkn.title
+    , isFile = zkn.isFile
+    , createdate = zkn.createdate
+    , changeddate = zkn.changeddate
+    , sysids = zkn.sysids
     }
 
 
@@ -621,6 +645,14 @@ encodeGetArchiveZkNote x =
     JE.object <|
         [ ( "parentnote", JE.int x.parentnote )
         , ( "noteid", JE.int x.noteid )
+        ]
+
+
+encodeYeet : Yeet -> JE.Value
+encodeYeet x =
+    JE.object <|
+        [ ( "url", JE.string x.url )
+        , ( "audio", JE.bool x.audio )
         ]
 
 
