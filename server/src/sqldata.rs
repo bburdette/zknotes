@@ -1537,12 +1537,6 @@ pub fn yeet(
   savedir: &Path,
   yeet: Yeet,
 ) -> Result<ZkNoteEditWhat, orgauth::error::Error> {
-  // info!(
-  //   "yeet: remote ip: {:?}, request:{:?}",
-  //   req.connection_info(),
-  //   req
-  // );
-
   // parse 'url'
   let uri: Uri = match yeet.url.parse() {
     Ok(uri) => uri,
