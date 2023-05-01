@@ -1620,7 +1620,7 @@ pub fn yeet(
     Err(x) => return Err(x.into()),
   };
 
-  let mut child = Command::new("youtube-dl")
+  let mut child = Command::new("yt-dlp")
     .arg("-x")
     .arg(format!("-o{}/%(title)s-%(id)s.%(ext)s", savedir.display()))
     .arg(yeet.url.clone())
