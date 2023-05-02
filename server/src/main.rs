@@ -262,7 +262,6 @@ async fn make_file_notes(
   session: Session,
   config: web::Data<Config>,
   payload: &mut Multipart,
-  // ) -> Result<ServerResponse, Box<dyn Error>> {
 ) -> Result<ServerResponse, Box<dyn Error>> {
   let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
   let userdata = match session_user(&conn, session, &config)? {
@@ -279,6 +278,7 @@ async fn make_file_notes(
   for (name, fp) in saved_files {
     // compute hash.
     let fpath = Path::new(&fp);
+
     let (noteid, _fid) = sqldata::make_file_note(&conn, userdata.id, &name, fpath)?;
 
     // return zknoteedit.

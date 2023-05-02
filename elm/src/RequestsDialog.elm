@@ -25,10 +25,6 @@ type TRequest
         , progress : Maybe Http.Progress
         , files : Maybe (List Data.ZkListNote)
         }
-    | Yeet
-        { url : String
-        , file : Maybe Data.ZkNoteEdit
-        }
 
 
 type Msg
@@ -131,46 +127,6 @@ view buttonStyle mbsize trqs =
                                       else
                                         E.none
                                     ]
-
-                            Yeet yt ->
-                                let
-                                    complete =
-                                        Util.isJust yt.file
-                                in
-                                E.column
-                                    [ E.width E.fill
-                                    , EBk.color (Common.navbarColor 2)
-                                    , EBd.rounded 10
-                                    , E.padding 10
-                                    , E.spacing 8
-                                    ]
-                                    [ if complete then
-                                        E.el [ E.centerX, EF.bold ] <| E.text "yeet complete"
-
-                                      else
-                                        E.el [ E.centerX, EF.bold ] <| E.text "yeeting..."
-                                    , E.row [ E.width E.fill ]
-                                        [ E.column
-                                            [ EBd.width 3
-                                            , EBd.color TC.darkGrey
-                                            , E.width E.fill
-                                            , E.height <| E.maximum 200 E.fill
-                                            , E.scrollbarY
-                                            ]
-                                            [ E.paragraph [] [ E.text yt.url ] ]
-                                        , if complete then E.text "complete"
-                                        else E.text "pending"                                        ]
-                                    , if complete then
-                                        E.row [ E.width E.fill ]
-                                            [ EI.button buttonStyle
-                                                { onPress = Just (TagClick s), label = E.text "add tags" }
-                                            , EI.button (E.alignRight :: buttonStyle)
-                                                { onPress = Just (ClearClick s), label = E.text "clear" }
-                                            ]
-
-                                      else
-                                        E.none
-                                    ]
                     )
             )
         , E.row [ E.width E.fill, E.spacing 10 ]
@@ -196,14 +152,6 @@ update msg model =
                     case fu.files of
                         Just f ->
                             GD.Ok (Tag f)
-
-                        Nothing ->
-                            GD.Dialog model
-
-                Just (Yeet yt) ->
-                    case yt.file of
-                        Just f ->
-                            GD.Ok (Tag [ Data.toZkListNote f.zknote ])
 
                         Nothing ->
                             GD.Dialog model

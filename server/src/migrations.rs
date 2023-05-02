@@ -1903,3 +1903,16 @@ pub fn udpate25(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 
   Ok(())
 }
+
+pub fn udpate26(dbfile: &Path) -> Result<(), orgauth::error::Error> {
+  let conn = Connection::open(dbfile)?;
+
+  let mut m1 = Migration::new();
+
+  // files yeeted with youtube-dl.
+  m1.drop_table("yeetfile");
+
+  conn.execute_batch(m1.make::<Sqlite>().as_str())?;
+
+  Ok(())
+}

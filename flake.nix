@@ -53,7 +53,7 @@
           inherit pname;
           # `nix build`
           packages.${pname} = pkgs.stdenv.mkDerivation {
-            nativeBuildInputs = [ pkgs.makeWrapper pkgs.yt-dlp ];
+            nativeBuildInputs = [ pkgs.makeWrapper ];
             name = pname;
             src = ./.;
             # building the 'out' folder
@@ -64,8 +64,7 @@
               cp ${elm-stuff}/main.js $out/share/zknotes/static
               cp -r ${rust-stuff}/bin $out
               mv $out/bin/zknotes-server $out/bin/.zknotes-server
-              makeWrapper $out/bin/.zknotes-server $out/bin/zknotes-server --set ZKNOTES_STATIC_PATH $out/share/zknotes/static \
-                --prefix PATH : ${nixpkgs.lib.makeBinPath [ pkgs.yt-dlp ]};
+              makeWrapper $out/bin/.zknotes-server $out/bin/zknotes-server --set ZKNOTES_STATIC_PATH $out/share/zknotes/static;
               '';
           };
           defaultPackage = packages.${pname};
@@ -87,7 +86,6 @@
               sqlite
               pkgconfig
               openssl.dev
-              yt-dlp
               elm2nix
               elmPackages.elm
               elmPackages.elm-analyse

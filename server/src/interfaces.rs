@@ -11,7 +11,7 @@ use std::error::Error;
 use std::time::Duration;
 use zkprotocol::content::{
   GetArchiveZkNote, GetZkNoteArchives, GetZkNoteComments, GetZkNoteEdit, GetZneIfChanged,
-  ImportZkNote, SaveZkNote, SaveZkNotePlusLinks, Yeet, ZkLinks, ZkNoteArchives, ZkNoteEdit,
+  ImportZkNote, SaveZkNote, SaveZkNotePlusLinks, ZkLinks, ZkNoteArchives, ZkNoteEdit,
   ZkNoteEditWhat,
 };
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
@@ -265,19 +265,6 @@ pub fn zk_interface_loggedin(
       Ok(ServerResponse {
         what: "homenoteset".to_string(),
         content: serde_json::to_value(hn)?,
-      })
-    }
-    "yeet" => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let yt: Yeet = serde_json::from_value(msgdata.clone())?;
-      info!("user#yeet: url:{:?}", yt.url);
-
-      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-      let yr = sqldata::yeet(&conn, uid, config.file_tmp_path.as_path(), yt)?;
-
-      Ok(ServerResponse {
-        what: "zknoteedit".to_string(),
-        content: serde_json::to_value(yr)?,
       })
     }
     wat => Err(Box::new(simple_error::SimpleError::new(format!(

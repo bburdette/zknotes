@@ -253,15 +253,9 @@ type alias GetArchiveZkNote =
     }
 
 
-type alias Yeet =
-    { url : String
-    , audio : Bool
-    }
-
-
 
 ----------------------------------------
--- utility fns.
+-- Utility ftns
 ----------------------------------------
 
 
@@ -323,18 +317,6 @@ elToSzl el =
     , user = el.user
     , zknote = el.zknote
     , delete = el.delete
-    }
-
-
-toZkListNote : ZkNote -> ZkListNote
-toZkListNote zkn =
-    { id = zkn.id
-    , user = zkn.user
-    , title = zkn.title
-    , isFile = zkn.isFile
-    , createdate = zkn.createdate
-    , changeddate = zkn.changeddate
-    , sysids = zkn.sysids
     }
 
 
@@ -645,14 +627,6 @@ encodeGetArchiveZkNote x =
     JE.object <|
         [ ( "parentnote", JE.int x.parentnote )
         , ( "noteid", JE.int x.noteid )
-        ]
-
-
-encodeYeet : Yeet -> JE.Value
-encodeYeet x =
-    JE.object <|
-        [ ( "url", JE.string x.url )
-        , ( "audio", JE.bool x.audio )
         ]
 
 
