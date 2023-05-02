@@ -98,7 +98,7 @@ pub fn zk_interface_loggedin(
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let gzne: GetZkNoteEdit = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-      let note = sqldata::read_zknoteedit(&conn, uid, &gzne)?;
+      let note = sqldata::read_zknoteedit(&conn, uid, gzne.zknote)?;
       info!(
         "user#getzknoteedit: {} - {}",
         gzne.zknote, note.zknote.title
