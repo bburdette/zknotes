@@ -3,6 +3,7 @@ use barrel::backend::Sqlite;
 use barrel::{types, Migration};
 use orgauth::migrations;
 use rusqlite::{params, Connection};
+use std::fs::Metadata;
 use std::path::Path;
 
 pub fn initialdb() -> Migration {
@@ -1872,34 +1873,6 @@ pub fn udpate24(dbfile: &Path) -> Result<(), orgauth::error::Error> {
     )?;
     println!("insert complete");
   }
-
-  Ok(())
-}
-
-pub fn udpate25(dbfile: &Path) -> Result<(), orgauth::error::Error> {
-  let conn = Connection::open(dbfile)?;
-
-  let mut m1 = Migration::new();
-
-  // files yeeted with youtube-dl.
-  m1.create_table("yeetfile", |t| {
-    t.add_column("yeetkey", types::text().nullable(false));
-    t.add_column("audio", types::boolean().nullable(false));
-    t.add_column("filename", types::integer().nullable(false));
-    t.add_column(
-      "fileid",
-      types::foreign(
-        "file",
-        "id",
-        types::ReferentialAction::Cascade,
-        types::ReferentialAction::Cascade,
-      )
-      .nullable(false),
-    );
-    t.add_index("unq", types::index(vec!["yeetkey", "audio"]).unique(true));
-  });
-
-  conn.execute_batch(m1.make::<Sqlite>().as_str())?;
 
   Ok(())
 }

@@ -17,8 +17,9 @@ use futures_util::TryStreamExt as _;
 use log::{error, info};
 use orgauth::endpoints::Callbacks;
 use orgauth::util;
-use rusqlite::Connection;
+use rusqlite::{params, Connection};
 use serde_json;
+use sha256;
 use simple_error::simple_error;
 use std::env;
 use std::error::Error;
@@ -28,7 +29,9 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 use timer;
+use util::now;
 use uuid::Uuid;
+use zkprotocol::content as zc;
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 
 /*
@@ -262,7 +265,6 @@ async fn make_file_notes(
   session: Session,
   config: web::Data<Config>,
   payload: &mut Multipart,
-  // ) -> Result<ServerResponse, Box<dyn Error>> {
 ) -> Result<ServerResponse, Box<dyn Error>> {
   let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
   let userdata = match session_user(&conn, session, &config)? {
@@ -279,10 +281,66 @@ async fn make_file_notes(
   for (name, fp) in saved_files {
     // compute hash.
     let fpath = Path::new(&fp);
-    let (noteid, _fid) = sqldata::make_file_note(&conn, userdata.id, &name, fpath)?;
+    let fh = sha256::try_digest(fpath)?;
+    let size = std::fs::metadata(fpath)?.len();
+    let fhp = format!("files/{}", fh);
+    let hashpath = Path::new(&fhp);
+
+    // file exists?
+    if hashpath.exists() {
+      // new file already exists.
+      std::fs::remove_file(fpath)?;
+    } else {
+      // move into hashed-files dir.
+      std::fs::rename(fpath, hashpath)?;
+    }
+
+    // table entry exists?
+    let oid: Option<i64> =
+      match conn.query_row("select id from file where hash = ?1", params![fh], |row| {
+        Ok(row.get(0)?)
+      }) {
+        Ok(v) => Ok(Some(v)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(x) => Err(Box::new(x)),
+      }?;
+
+    // use existing id, or create new
+    let fid = match oid {
+      Some(id) => id,
+      None => {
+        let now = now()?;
+
+        // add table entry
+        conn.execute(
+          "insert into file (hash, createdate, size)
+                 values (?1, ?2, ?3)",
+          params![fh, now, size],
+        )?;
+        conn.last_insert_rowid()
+      }
+    };
+
+    // now make a new note.
+    let sn = sqldata::save_zknote(
+      &conn,
+      userdata.id,
+      &zc::SaveZkNote {
+        id: None,
+        title: name,
+        pubid: None,
+        content: "".to_string(),
+        editable: false,
+        showtitle: false,
+        deleted: false,
+      },
+    )?;
+
+    // set the file id in that note.
+    sqldata::set_zknote_file(&conn, sn.id, fid)?;
 
     // return zknoteedit.
-    let listnote = sqldata::read_zklistnote(&conn, Some(userdata.id), noteid)?;
+    let listnote = sqldata::read_zklistnote(&conn, Some(userdata.id), sn.id)?;
     info!(
       "user#filer_uploaded-zknote: {} - {}",
       listnote.id, listnote.title
