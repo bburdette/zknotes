@@ -365,13 +365,13 @@ noteFile filename zknote =
                     audioView zknote
 
                 "mp4" ->
-                    videoView 200 fileurl (Just zknote.title) Nothing Nothing []
+                    videoView 500 fileurl (Just zknote.title) Nothing Nothing []
 
                 "webm" ->
-                    videoView 200 fileurl (Just zknote.title) Nothing Nothing []
+                    videoView 500 fileurl (Just zknote.title) Nothing Nothing []
 
                 "mkv" ->
-                    videoView 200 fileurl (Just zknote.title) Nothing Nothing []
+                    videoView 500 fileurl (Just zknote.title) Nothing Nothing []
 
                 "jpg" ->
                     imageView zknote.title fileurl Nothing []
