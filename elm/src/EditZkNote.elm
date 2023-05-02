@@ -281,6 +281,28 @@ elToDel el =
             Just el
 
 
+getSysids : Model -> List Int
+getSysids model =
+    List.filterMap
+        (\el ->
+            if
+                List.any ((==) el.otherid)
+                    [ model.ld.publicid
+                    , model.ld.shareid
+                    , model.ld.searchid
+                    , model.ld.commentid
+                    ]
+                    && el.direction
+                    == To
+            then
+                Just el.otherid
+
+            else
+                Nothing
+        )
+        (Dict.values model.zklDict)
+
+
 toZkListNote : Model -> Maybe Data.ZkListNote
 toZkListNote model =
     case ( model.id, model.createdate, model.changeddate ) of
@@ -292,25 +314,38 @@ toZkListNote model =
                 , isFile = model.isFile
                 , createdate = createdate
                 , changeddate = changeddate
-                , sysids =
-                    List.filterMap
-                        (\el ->
-                            if
-                                List.any ((==) el.otherid)
-                                    [ model.ld.publicid
-                                    , model.ld.shareid
-                                    , model.ld.searchid
-                                    , model.ld.commentid
-                                    ]
-                                    && el.direction
-                                    == To
-                            then
-                                Just el.otherid
+                , sysids = getSysids model
+                }
 
-                            else
-                                Nothing
-                        )
-                        (Dict.values model.zklDict)
+        _ ->
+            Nothing
+
+
+toZkNote : Model -> Maybe Data.ZkNote
+toZkNote model =
+    case ( model.id, model.createdate, model.changeddate ) of
+        ( Just id, Just createdate, Just changeddate ) ->
+            Just
+                { id = id
+                , user = model.noteUser
+                , username = model.noteUserName
+                , usernote = model.usernote
+                , title = model.title
+                , content = model.md
+                , pubid =
+                    if model.pubidtxt /= "" then
+                        Just model.pubidtxt
+
+                    else
+                        Nothing
+                , editable = model.editable
+                , editableValue = model.editableValue
+                , showtitle = model.showtitle
+                , createdate = createdate
+                , changeddate = changeddate
+                , deleted = model.deleted
+                , isFile = model.isFile
+                , sysids = getSysids model
                 }
 
         _ ->
@@ -1256,7 +1291,7 @@ zknview zone size recentZkns trqs noteCache model =
                 , E.paddingXY 5 0
                 ]
             <|
-                [ E.column
+                E.column
                     [ E.centerX
                     , E.paddingXY 0 10
                     , E.spacing 8
@@ -1284,10 +1319,15 @@ zknview zone size recentZkns trqs noteCache model =
                             EI.button (E.alignRight :: Common.buttonStyle)
                                 { label = E.text ">", onPress = Just <| AddToSearchAsTag model.title }
                         ]
+                    , case ( model.isFile, toZkNote model ) of
+                        ( True, Just zkn ) ->
+                            MC.noteFile model.title zkn
+
+                        _ ->
+                            E.none
                     , renderMd model.cells noteCache model.md mdw
                     ]
-                ]
-                    ++ (if wclass == Wide then
+                    :: (if wclass == Wide then
                             []
 
                         else
