@@ -51,9 +51,15 @@ fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -> Http
   info!("remote ip: {:?}, request:{:?}", req.connection_info(), req);
 
   // logged in?
-  let logindata = match interfaces::login_data_for_token(session, &data) {
-    Ok(Some(logindata)) => serde_json::to_value(logindata).unwrap_or(serde_json::Value::Null),
-    _ => serde_json::Value::Null,
+  let (logindata, sysids) = match interfaces::login_data_for_token(session, &data) {
+    Ok((optld, sysids)) => (
+      match optld {
+        Some(logindata) => serde_json::to_value(logindata).unwrap_or(serde_json::Value::Null),
+        _ => serde_json::Value::Null,
+      },
+      serde_json::to_value(sysids).unwrap_or(serde_json::Value::Null),
+    ),
+    _ => (serde_json::Value::Null, serde_json::Value::Null),
   };
 
   let errorid = match data.error_index_note {
@@ -74,6 +80,7 @@ fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -> Http
           .content_type("text/html; charset=utf-8")
           .body(
             s.replace("{{logindata}}", logindata.to_string().as_str())
+              .replace("{{sysids}}", sysids.to_string().as_str())
               .replace("{{errorid}}", errorid.to_string().as_str())
               .replace("{{adminsettings}}", adminsettings.to_string().as_str()),
           )

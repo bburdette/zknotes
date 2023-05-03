@@ -11,8 +11,8 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use zkprotocol::content::{
   Direction, EditLink, ExtraLoginData, GetArchiveZkNote, GetZkLinks, GetZkNoteArchives,
-  GetZkNoteComments, GetZneIfChanged, ImportZkNote, SaveZkLink, SaveZkNote, SavedZkNote, ZkLink,
-  ZkListNote, ZkNote, ZkNoteEdit,
+  GetZkNoteComments, GetZneIfChanged, ImportZkNote, SaveZkLink, SaveZkNote, SavedZkNote, Sysids,
+  ZkLink, ZkListNote, ZkNote, ZkNoteEdit,
 };
 
 #[derive(Clone, Deserialize, Serialize, Debug)]
@@ -100,13 +100,18 @@ pub fn extra_login_data(
     userid: uid,
     zknote: user.noteid,
     homenote: user.homenoteid,
+  };
+
+  Ok(eld)
+}
+
+pub fn read_sysids(conn: &Connection) -> Result<Sysids, orgauth::error::Error> {
+  Ok(Sysids {
     publicid: note_id(conn, "system", "public")?,
     shareid: note_id(conn, "system", "share")?,
     searchid: note_id(conn, "system", "search")?,
     commentid: note_id(conn, "system", "comment")?,
-  };
-
-  Ok(eld)
+  })
 }
 
 pub fn update_user(conn: &Connection, user: &User) -> Result<(), orgauth::error::Error> {

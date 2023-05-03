@@ -53,7 +53,7 @@ import Time
 import Toop
 import Url exposing (Url)
 import UserSettings
-import Util
+import Util exposing (andMap)
 import View
 import WindowKeys
 import ZkCommon exposing (StylePalette)
@@ -132,6 +132,21 @@ type State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
 
 
+decodeSFlags : JD.Decoder Flags
+decodeSFlags =
+    JD.succeed Flags
+        |> andMap (JD.field "seed" JD.int)
+        |> andMap (JD.field "location" JD.string)
+        |> andMap (JD.field "useragent" JD.string)
+        |> andMap (JD.field "debugstring" JD.string)
+        |> andMap (JD.field "width" JD.int)
+        |> andMap (JD.field "height" JD.int)
+        |> andMap (JD.field "errorid" (JD.maybe JD.int))
+        |> andMap (JD.field "login" (JD.maybe Data.decodeLoginData))
+        |> andMap (JD.field "sysids" Data.decodeSysids)
+        |> andMap (JD.field "adminsettings" OD.decodeAdminSettings)
+
+
 type alias Flags =
     { seed : Int
     , location : String
@@ -140,8 +155,9 @@ type alias Flags =
     , width : Int
     , height : Int
     , errorid : Maybe Int
-    , login : Maybe JD.Value
-    , adminsettings : Maybe JD.Value
+    , login : Maybe Data.LoginData
+    , sysids : Data.Sysids
+    , adminsettings : OD.AdminSettings
     }
 
 
@@ -170,6 +186,7 @@ type alias Model =
     , errorNotes : Dict String String
     , fontsize : Int
     , stylePalette : StylePalette
+    , sysids : Data.Sysids
     , adminSettings : OD.AdminSettings
     , trackedRequests : TRequests
     , noteCache : NoteCache
@@ -188,6 +205,7 @@ type alias PreInitModel =
 type PiModel
     = Ready Model
     | PreInit PreInitModel
+    | InitError String
 
 
 initLoginState : Model -> Route -> State
@@ -317,13 +335,14 @@ routeStateInternal model route =
                     ( nm.state, cmd )
 
                 EditZkNoteListing st login ->
-                    ( EditZkNote (EditZkNote.initNew login st.notes st.spmodel []) login, Cmd.none )
+                    ( EditZkNote (EditZkNote.initNew model.sysids login st.notes st.spmodel []) login, Cmd.none )
 
                 st ->
                     case stateLogin st of
                         Just login ->
                             ( EditZkNote
-                                (EditZkNote.initNew login
+                                (EditZkNote.initNew model.sysids
+                                    login
                                     { notes = []
                                     , offset = 0
                                     , what = ""
@@ -445,7 +464,8 @@ routeStateInternal model route =
 
                         Nothing ->
                             ( EditZkNote
-                                (EditZkNote.initNew login
+                                (EditZkNote.initNew model.sysids
+                                    login
                                     { notes = []
                                     , offset = 0
                                     , what = ""
@@ -803,10 +823,10 @@ viewState size state model =
             E.map EditZkNoteMsg <| EditZkNote.view model.timezone size model.recentNotes model.trackedRequests model.noteCache em
 
         EditZkNoteListing em ld ->
-            E.map EditZkNoteListingMsg <| EditZkNoteListing.view ld size em
+            E.map EditZkNoteListingMsg <| EditZkNoteListing.view model.sysids ld size em
 
         ArchiveListing em ld ->
-            E.map ArchiveListingMsg <| ArchiveListing.view ld model.timezone size em
+            E.map ArchiveListingMsg <| ArchiveListing.view model.sysids ld model.timezone size em
 
         ShowMessage em _ _ ->
             E.map ShowMessageMsg <| ShowMessage.view em
@@ -1104,7 +1124,7 @@ sendSearch model search =
                         , deleted = False
                         }
                     , links =
-                        [ { otherid = ldata.searchid
+                        [ { otherid = model.sysids.searchid
                           , direction = Data.To
                           , user = ldata.userid
                           , zknote = Nothing
@@ -1166,6 +1186,11 @@ piview pimodel =
         PreInit _ ->
             { title = "zknotes: initializing"
             , body = []
+            }
+
+        InitError e ->
+            { title = "zknotes: init error!"
+            , body = [ E.layout [ E.width E.fill ] (E.column [] [ E.text "zknotes init error! ", E.text e ]) ]
             }
 
 
@@ -1275,6 +1300,9 @@ piupdate msg initmodel =
 
                 _ ->
                     ( PreInit nmod, Cmd.none )
+
+        InitError e ->
+            ( InitError e, Cmd.none )
 
 
 {-| urlUpdate: all URL code shall go here! regular code shall not worry about urls!
@@ -1447,7 +1475,8 @@ onZkNoteEditWhat model pt znew =
                             |> Maybe.withDefault ( SP.initModel, { notes = [], offset = 0, what = "" } )
 
                     ( nst, c ) =
-                        EditZkNote.initFull login
+                        EditZkNote.initFull model.sysids
+                            login
                             sres
                             znew.zne.zknote
                             znew.zne.links
@@ -1710,6 +1739,7 @@ actualupdate msg model =
                                     model.recentNotes
                                     []
                                     login
+                                    model.sysids
                                 )
                                 login
                                 (UserListing numod login s)
@@ -1851,10 +1881,15 @@ actualupdate msg model =
                                 vstate =
                                     case stateLogin state of
                                         Just _ ->
-                                            EView (View.initFull fbe) state
+                                            EView
+                                                (View.initFull
+                                                    model.sysids
+                                                    fbe
+                                                )
+                                                state
 
                                         Nothing ->
-                                            View (View.initFull fbe)
+                                            View (View.initFull model.sysids fbe)
                             in
                             ( { model | state = vstate }
                             , Cmd.none
@@ -2182,7 +2217,7 @@ actualupdate msg model =
                         ZI.PowerDeleteComplete count ->
                             case model.state of
                                 EditZkNoteListing mod li ->
-                                    ( { model | state = EditZkNoteListing (EditZkNoteListing.onPowerDeleteComplete count li mod) li }, Cmd.none )
+                                    ( { model | state = EditZkNoteListing (EditZkNoteListing.onPowerDeleteComplete count model.sysids li mod) li }, Cmd.none )
 
                                 _ ->
                                     ( model, Cmd.none )
@@ -2467,7 +2502,7 @@ actualupdate msg model =
             handleEditZkNoteCmd model login (EditZkNote.update em es)
 
         ( EditZkNoteListingMsg em, EditZkNoteListing es login ) ->
-            handleEditZkNoteListing model login (EditZkNoteListing.update em es login)
+            handleEditZkNoteListing model login (EditZkNoteListing.update em es model.sysids login)
 
         ( ImportMsg em, Import es login ) ->
             let
@@ -2739,6 +2774,7 @@ actualupdate msg model =
                                                     model.recentNotes
                                                     []
                                                     login
+                                                    model.sysids
                                                 )
                                                 login
                                                 prevstate
@@ -2951,7 +2987,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     ( { model
                         | state =
                             EView
-                                (View.initSzn
+                                (View.initSzn model.sysids
                                     v.note
                                     v.createdate
                                     v.changeddate
@@ -3054,7 +3090,7 @@ handleEditZkNoteListing model login ( emod, ecmd ) =
             ( { model | state = EditZkNoteListing emod login }, Cmd.none )
 
         EditZkNoteListing.New ->
-            ( { model | state = EditZkNote (EditZkNote.initNew login emod.notes emod.spmodel []) login }, Cmd.none )
+            ( { model | state = EditZkNote (EditZkNote.initNew model.sysids login emod.notes emod.spmodel []) login }, Cmd.none )
 
         EditZkNoteListing.Done ->
             ( { model | state = UserSettings (UserSettings.init login model.fontsize) login (EditZkNoteListing emod login) }
@@ -3281,15 +3317,20 @@ prevSearchQuery login =
     }
 
 
-preinit : Flags -> Url -> Browser.Navigation.Key -> ( PiModel, Cmd Msg )
-preinit flags url key =
-    ( PreInit
-        { flags = flags
-        , url = url
-        , key = key
-        , mbzone = Nothing
-        , mbfontsize = Nothing
-        }
+preinit : JD.Value -> Url -> Browser.Navigation.Key -> ( PiModel, Cmd Msg )
+preinit jsflags url key =
+    ( case JD.decodeValue decodeSFlags jsflags of
+        Ok flags ->
+            PreInit
+                { flags = flags
+                , url = url
+                , key = key
+                , mbzone = Nothing
+                , mbfontsize = Nothing
+                }
+
+        Err e ->
+            InitError (JD.errorToString e)
     , Cmd.batch
         [ Task.perform Zone Time.here
         , LS.getLocalVal { for = "", name = "fontsize" }
@@ -3318,15 +3359,6 @@ init flags url key zone fontsize =
         seed =
             initialSeed (flags.seed + 7)
 
-        adminSettings =
-            flags.adminsettings
-                |> Maybe.andThen
-                    (\v ->
-                        JD.decodeValue OD.decodeAdminSettings v
-                            |> Result.toMaybe
-                    )
-                |> Maybe.withDefault { openRegistration = False, nonAdminInvite = False }
-
         initialroute =
             parseUrl url
                 |> Maybe.withDefault Top
@@ -3345,15 +3377,8 @@ init flags url key zone fontsize =
                     Nothing ->
                         PubShowMessage { message = "loading..." } Nothing
 
-                    Just v ->
-                        case
-                            JD.decodeValue Data.decodeLoginData v
-                        of
-                            Ok l ->
-                                ShowMessage { message = "loading..." } l Nothing
-
-                            Err e ->
-                                PubShowMessage { message = JD.errorToString e } Nothing
+                    Just l ->
+                        ShowMessage { message = "loading..." } l Nothing
             , size = { width = flags.width, height = flags.height }
             , location = flags.location
             , navkey = key
@@ -3366,7 +3391,8 @@ init flags url key zone fontsize =
             , errorNotes = Dict.empty
             , fontsize = fontsize
             , stylePalette = { defaultSpacing = 10 }
-            , adminSettings = adminSettings
+            , sysids = flags.sysids
+            , adminSettings = flags.adminsettings
             , trackedRequests = { requestCount = 0, requests = Dict.empty }
             , noteCache = NC.empty maxCacheNotes
             }
@@ -3403,7 +3429,7 @@ init flags url key zone fontsize =
     )
 
 
-main : Platform.Program Flags PiModel Msg
+main : Platform.Program JD.Value PiModel Msg
 main =
     Browser.application
         { init = preinit
@@ -3421,6 +3447,9 @@ main =
                                     |> List.map (\k -> Http.track k (RequestProgress k))
 
                             PreInit _ ->
+                                []
+
+                            InitError _ ->
                                 []
                 in
                 Sub.batch <|

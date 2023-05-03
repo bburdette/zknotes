@@ -34,6 +34,7 @@ type Msg
 
 type alias Model =
     { id : Maybe Int
+    , sysids : Data.Sysids
     , pubid : Maybe String
     , title : String
     , showtitle : Bool
@@ -122,7 +123,7 @@ view zone maxw noteCache model loggedin =
                         ]
                         (case
                             MC.markdownView
-                                (MC.mkRenderer MC.PublicView (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged noteCache)
+                                (MC.mkRenderer model.sysids MC.PublicView (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged noteCache)
                                 panel.content
                          of
                             Ok rendered ->
@@ -147,7 +148,7 @@ view zone maxw noteCache model loggedin =
                   else
                     E.none
                 , E.row [ E.width E.fill ]
-                    [ case MC.markdownView (MC.mkRenderer MC.PublicView (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged noteCache) model.md of
+                    [ case MC.markdownView (MC.mkRenderer model.sysids MC.PublicView (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged noteCache) model.md of
                         Ok rendered ->
                             E.column
                                 [ E.spacing 30
@@ -194,8 +195,8 @@ view zone maxw noteCache model loggedin =
         ]
 
 
-initFull : Data.PubZkNote -> Model
-initFull zknaa =
+initFull : Data.Sysids -> Data.PubZkNote -> Model
+initFull sysids zknaa =
     let
         zknote =
             zknaa.zknote
@@ -210,6 +211,7 @@ initFull zknaa =
                 (mkCc cells)
     in
     { id = Just zknote.id
+    , sysids = sysids
     , pubid = zknote.pubid
     , title = zknote.title
     , showtitle = zknote.showtitle
@@ -222,8 +224,8 @@ initFull zknaa =
     }
 
 
-initSzn : Data.SaveZkNote -> Maybe Int -> Maybe Int -> List Data.EditLink -> Maybe Data.ZkNote -> Model
-initSzn zknote mbcreatedate mbchangeddate links mbpanelnote =
+initSzn : Data.Sysids -> Data.SaveZkNote -> Maybe Int -> Maybe Int -> List Data.EditLink -> Maybe Data.ZkNote -> Model
+initSzn sysids zknote mbcreatedate mbchangeddate links mbpanelnote =
     let
         cells =
             zknote.content
@@ -240,6 +242,7 @@ initSzn zknote mbcreatedate mbchangeddate links mbpanelnote =
                 (mkCc cells)
     in
     { id = zknote.id
+    , sysids = sysids
     , pubid = zknote.pubid
     , title = zknote.title
     , showtitle = zknote.showtitle

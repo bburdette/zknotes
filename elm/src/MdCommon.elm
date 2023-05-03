@@ -11,19 +11,19 @@ import Element.Border as EBd
 import Element.Font as EF
 import Element.Input as EI
 import Element.Region as ER
-import Html exposing (Attribute, Html)
+import Html
 import Html.Attributes as HA
-import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..), foldl, inlineFoldl)
+import Markdown.Block as Block exposing (Block, ListItem(..), Task(..), foldl, inlineFoldl)
 import Markdown.Html
 import Markdown.Parser
 import Markdown.Renderer
 import Maybe.Extra as ME
 import NoteCache as NC exposing (NoteCache)
-import Regex
 import Schelme.Show exposing (showTerm)
 import Set exposing (Set(..))
 import TangoColors as TC
-
+import Util
+import ZkCommon
 
 markdownView : Markdown.Renderer.Renderer (Element a) -> String -> Result String (List (Element a))
 markdownView renderer markdown =
@@ -154,8 +154,8 @@ link title destination body =
         }
 
 
-mkRenderer : ViewMode -> (String -> a) -> Int -> CellDict -> Bool -> (String -> String -> a) -> NoteCache -> Markdown.Renderer.Renderer (Element a)
-mkRenderer viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged noteCache =
+mkRenderer : Data.Sysids -> ViewMode -> (String -> a) -> Int -> CellDict -> Bool -> (String -> String -> a) -> NoteCache -> Markdown.Renderer.Renderer (Element a)
+mkRenderer si viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged noteCache =
     { heading = heading
     , paragraph =
         E.paragraph
@@ -259,7 +259,7 @@ mkRenderer viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged noteCa
                 |> Markdown.Html.withOptionalAttribute "text"
                 |> Markdown.Html.withOptionalAttribute "width"
                 |> Markdown.Html.withOptionalAttribute "height"
-            , Markdown.Html.tag "note" (noteView noteCache)
+            , Markdown.Html.tag "note" (noteView si noteCache)
                 |> Markdown.Html.withAttribute "id"
             ]
     , table = E.column [ E.width <| E.fill ]
@@ -321,24 +321,29 @@ htmlAudioView url text =
     E.html (Html.audio [ HA.controls True, HA.src url ] [ Html.text text ])
 
 
-audioView : Data.ZkNote -> Element a
-audioView zkn =
+audioView : Data.Sysids -> Data.ZkNote -> Element a
+audioView si zkn =
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
         [ link (Just zkn.title) ("/note/" ++ String.fromInt zkn.id) [ E.text zkn.title ]
         , E.row [ E.spacing 20 ]
             [ htmlAudioView ("/file/" ++ String.fromInt zkn.id) zkn.title
 
             -- TODO pass in url instead of hardcoded
-            , link
-                (Just "ts↗")
-                ("https://29a.ch/timestretch/#a=https://www.zknotes.com/file/" ++ String.fromInt zkn.id)
-                [ E.text "ts↗" ]
+            , if List.filter (\i -> i == si.publicid) zkn.sysids /= [] then
+                link
+                    (Just "ts↗")
+                    ("https://29a.ch/timestretch/#a=https://www.zknotes.com/file/" ++ String.fromInt zkn.id)
+                    [ E.text "ts↗" ]
+
+              else
+                E.el [ Util.addToolTip E.below (ZkCommon.stringToolTip "disabled for private notes") ]
+                    (E.el [ EF.color TC.darkGrey ] <| E.text "ts↗")
             ]
         ]
 
 
-noteFile : String -> Data.ZkNote -> Element a
-noteFile filename zknote =
+noteFile : Data.Sysids -> String -> Data.ZkNote -> Element a
+noteFile si filename zknote =
     let
         suffix =
             String.split "." filename
@@ -356,13 +361,13 @@ noteFile filename zknote =
         Just s ->
             case String.toLower s of
                 "mp3" ->
-                    audioView zknote
+                    audioView si zknote
 
                 "m4a" ->
-                    audioView zknote
+                    audioView si zknote
 
                 "opus" ->
-                    audioView zknote
+                    audioView si zknote
 
                 "mp4" ->
                     videoView 500 fileurl (Just zknote.title) Nothing Nothing []
@@ -386,15 +391,15 @@ noteFile filename zknote =
                     E.text filename
 
 
-noteView : NoteCache -> String -> List (Element a) -> Element a
-noteView noteCache id _ =
+noteView : Data.Sysids -> NoteCache -> String -> List (Element a) -> Element a
+noteView si noteCache id _ =
     case
         String.toInt id
             |> Maybe.andThen (\iid -> NC.getNote iid noteCache)
     of
         Just zne ->
             if zne.zknote.isFile then
-                noteFile zne.zknote.title zne.zknote
+                noteFile si zne.zknote.title zne.zknote
 
             else
                 E.link

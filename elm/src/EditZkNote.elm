@@ -168,6 +168,7 @@ type alias NewCommentState =
 
 type alias Model =
     { id : Maybe Int
+    , si : Data.Sysids
     , ld : Data.LoginData
     , noteUser : UserId
     , noteUserName : String
@@ -250,7 +251,7 @@ newWithSave : Model -> ( Model, Command )
 newWithSave model =
     let
         nmod =
-            initNew model.ld model.zknSearchResult model.spmodel (shareLinks model)
+            initNew model.si model.ld model.zknSearchResult model.spmodel (shareLinks model)
     in
     ( nmod
     , if dirty model then
@@ -287,10 +288,10 @@ getSysids model =
         (\el ->
             if
                 List.any ((==) el.otherid)
-                    [ model.ld.publicid
-                    , model.ld.shareid
-                    , model.ld.searchid
-                    , model.ld.commentid
+                    [ model.si.publicid
+                    , model.si.shareid
+                    , model.si.searchid
+                    , model.si.commentid
                     ]
                     && el.direction
                     == To
@@ -468,7 +469,7 @@ revert model =
                 }
             )
         |> Maybe.withDefault
-            (initNew model.ld model.zknSearchResult model.spmodel (Dict.values model.initialZklDict))
+            (initNew model.si model.ld model.zknSearchResult model.spmodel (Dict.values model.initialZklDict))
 
 
 showZkl : E.Color -> Bool -> Bool -> Maybe EditLink -> Data.LoginData -> Maybe Int -> Maybe E.Color -> Bool -> EditLink -> Element Msg
@@ -651,7 +652,7 @@ showSr bkcolor model isdirty zkln =
             zkln.user /= model.ld.userid
 
         sysColor =
-            ZC.systemColor model.ld zkln.sysids
+            ZC.systemColor model.si zkln.sysids
 
         mbTo =
             Dict.get (zklKey { direction = To, otherid = zkln.id })
@@ -809,8 +810,8 @@ shareLinks model =
         |> List.filterMap
             (\l ->
                 if
-                    List.any ((==) model.ld.shareid) l.sysids
-                        || (l.otherid == model.ld.publicid)
+                    List.any ((==) model.si.shareid) l.sysids
+                        || (l.otherid == model.si.publicid)
                 then
                     Just
                         { otherid = l.otherid
@@ -875,9 +876,9 @@ addComment ncs =
         ]
 
 
-renderMd : CellDict -> NoteCache -> String -> Int -> Element Msg
-renderMd cd noteCache md mdw =
-    case MC.markdownView (MC.mkRenderer MC.EditView RestoreSearch mdw cd True OnSchelmeCodeChanged noteCache) md of
+renderMd : Data.Sysids -> CellDict -> NoteCache -> String -> Int -> Element Msg
+renderMd si cd noteCache md mdw =
+    case MC.markdownView (MC.mkRenderer si MC.EditView RestoreSearch mdw cd True OnSchelmeCodeChanged noteCache) md of
         Ok rendered ->
             E.column
                 [ E.spacing 30
@@ -951,7 +952,7 @@ zknview zone size recentZkns trqs noteCache model =
                 , columns =
                     [ { header = E.none
                       , width = E.fill
-                      , view = \zkn -> renderMd model.cells noteCache zkn.content mdw
+                      , view = \zkn -> renderMd model.si model.cells noteCache zkn.content mdw
                       }
                     , { header = E.none
                       , width = E.shrink
@@ -1033,7 +1034,7 @@ zknview zone size recentZkns trqs noteCache model =
                         |> List.map
                             (\l ->
                                 ( l
-                                , ZC.systemColor model.ld l.sysids
+                                , ZC.systemColor model.si l.sysids
                                 )
                             )
                         |> List.sortWith
@@ -1321,11 +1322,11 @@ zknview zone size recentZkns trqs noteCache model =
                         ]
                     , case ( model.isFile, toZkNote model ) of
                         ( True, Just zkn ) ->
-                            MC.noteFile model.title zkn
+                            MC.noteFile model.si model.title zkn
 
                         _ ->
                             E.none
-                    , renderMd model.cells noteCache model.md mdw
+                    , renderMd model.si model.cells noteCache model.md mdw
                     ]
                     :: (if wclass == Wide then
                             []
@@ -1607,12 +1608,12 @@ linksWith links linkid =
 
 isPublic : Model -> Bool
 isPublic model =
-    linksWith (Dict.values model.zklDict) model.ld.publicid
+    linksWith (Dict.values model.zklDict) model.si.publicid
 
 
 isSearch : Model -> Bool
 isSearch model =
-    linksWith (Dict.values model.zklDict) model.ld.searchid
+    linksWith (Dict.values model.zklDict) model.si.searchid
 
 
 copyTabs : Model -> Model -> Model
@@ -1639,8 +1640,8 @@ tabsOnLoad model =
     }
 
 
-initFull : Data.LoginData -> Data.ZkListNoteSearchResult -> Data.ZkNote -> List Data.EditLink -> SP.Model -> ( Model, Data.GetZkNoteComments )
-initFull ld zkl zknote dtlinks spm =
+initFull : Data.Sysids -> Data.LoginData -> Data.ZkListNoteSearchResult -> Data.ZkNote -> List Data.EditLink -> SP.Model -> ( Model, Data.GetZkNoteComments )
+initFull si ld zkl zknote dtlinks spm =
     let
         cells =
             zknote.content
@@ -1666,6 +1667,7 @@ initFull ld zkl zknote dtlinks spm =
                 dtlinks
     in
     ( { id = Just zknote.id
+      , si = si
       , ld = ld
       , noteUser = zknote.user
       , noteUserName = zknote.username
@@ -1707,8 +1709,8 @@ initFull ld zkl zknote dtlinks spm =
     )
 
 
-initNew : Data.LoginData -> Data.ZkListNoteSearchResult -> SP.Model -> List EditLink -> Model
-initNew ld zkl spm links =
+initNew : Data.Sysids -> Data.LoginData -> Data.ZkListNoteSearchResult -> SP.Model -> List EditLink -> Model
+initNew si ld zkl spm links =
     let
         cells =
             ""
@@ -1723,6 +1725,7 @@ initNew ld zkl spm links =
                 (mkCc cells)
     in
     { id = Nothing
+    , si = si
     , ld = ld
     , noteUser = ld.userid
     , noteUserName = ld.name
@@ -1814,7 +1817,7 @@ onSaved oldmodel szn =
                                 model.ld.userid
                                 model.ld.name
                                 model.ld.zknote
-                                [ model.ld.commentid ]
+                                [ model.si.commentid ]
                                 szn
                                 pc
                            ]
@@ -1846,7 +1849,8 @@ initLinkBackNote model title =
         Just id ->
             let
                 m1 =
-                    initNew model.ld
+                    initNew model.si
+                        model.ld
                         model.zknSearchResult
                         model.spmodel
                         ({ otherid = id
@@ -2165,8 +2169,8 @@ update msg model =
                 , pendingcomment = Nothing
                 , zklDict =
                     model.zklDict
-                        |> Dict.remove (zklKey { otherid = model.ld.publicid, direction = To })
-                        |> Dict.remove (zklKey { otherid = model.ld.publicid, direction = From })
+                        |> Dict.remove (zklKey { otherid = model.si.publicid, direction = To })
+                        |> Dict.remove (zklKey { otherid = model.si.publicid, direction = From })
                 , initialZklDict = Dict.empty
                 , createdate = Nothing
                 , changeddate = Nothing
@@ -2363,8 +2367,8 @@ update msg model =
                         ( { model
                             | zklDict =
                                 model.zklDict
-                                    |> Dict.remove (zklKey { direction = From, otherid = model.ld.publicid })
-                                    |> Dict.remove (zklKey { direction = To, otherid = model.ld.publicid })
+                                    |> Dict.remove (zklKey { direction = From, otherid = model.si.publicid })
+                                    |> Dict.remove (zklKey { direction = To, otherid = model.si.publicid })
                           }
                         , None
                         )
@@ -2373,7 +2377,7 @@ update msg model =
                         let
                             nzkl =
                                 { direction = To
-                                , otherid = model.ld.publicid
+                                , otherid = model.si.publicid
                                 , user = model.ld.userid
                                 , zknote = Nothing
                                 , othername = Just "public"
@@ -2495,7 +2499,7 @@ update msg model =
                         { note =
                             nc
                         , links =
-                            [ { otherid = model.ld.commentid
+                            [ { otherid = model.si.commentid
                               , direction = To
                               , user = model.ld.userid
                               , zknote = Nothing
@@ -2625,7 +2629,7 @@ update msg model =
                 spmod =
                     model.spmodel
             in
-            if List.any ((==) model.ld.searchid) zkln.sysids then
+            if List.any ((==) model.si.searchid) zkln.sysids then
                 ( { model
                     | spmodel = SP.setSearchString model.spmodel zkln.title
                   }

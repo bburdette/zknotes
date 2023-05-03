@@ -61,7 +61,11 @@ type alias LoginData =
     , active : Bool
     , zknote : Int
     , homenote : Maybe Int
-    , publicid : Int
+    }
+
+
+type alias Sysids =
+    { publicid : Int
     , shareid : Int
     , searchid : Int
     , commentid : Int
@@ -265,12 +269,17 @@ fromOaLd oald =
         (JD.succeed (LoginData oald.userid oald.name oald.email oald.admin oald.active)
             |> andMap (JD.field "zknote" JD.int)
             |> andMap (JD.field "homenote" (JD.maybe JD.int))
-            |> andMap (JD.field "publicid" JD.int)
-            |> andMap (JD.field "shareid" JD.int)
-            |> andMap (JD.field "searchid" JD.int)
-            |> andMap (JD.field "commentid" JD.int)
         )
         oald.data
+
+
+decodeSysids : JD.Decoder Sysids
+decodeSysids =
+    JD.succeed Sysids
+        |> andMap (JD.field "publicid" JD.int)
+        |> andMap (JD.field "shareid" JD.int)
+        |> andMap (JD.field "searchid" JD.int)
+        |> andMap (JD.field "commentid" JD.int)
 
 
 toZkLink : Int -> UserId -> EditLink -> ZkLink
@@ -590,10 +599,6 @@ decodeLoginData =
         |> andMap (JD.field "active" JD.bool)
         |> andMap (JD.field "data" (JD.field "zknote" JD.int))
         |> andMap (JD.field "data" (JD.field "homenote" (JD.maybe JD.int)))
-        |> andMap (JD.field "data" (JD.field "publicid" JD.int))
-        |> andMap (JD.field "data" (JD.field "shareid" JD.int))
-        |> andMap (JD.field "data" (JD.field "searchid" JD.int))
-        |> andMap (JD.field "data" (JD.field "commentid" JD.int))
 
 
 encodeImportZkNote : ImportZkNote -> JE.Value

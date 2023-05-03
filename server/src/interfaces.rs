@@ -11,7 +11,7 @@ use std::error::Error;
 use std::time::Duration;
 use zkprotocol::content::{
   GetArchiveZkNote, GetZkNoteArchives, GetZkNoteComments, GetZkNoteEdit, GetZneIfChanged,
-  ImportZkNote, SaveZkNote, SaveZkNotePlusLinks, ZkLinks, ZkNoteArchives, ZkNoteEdit,
+  ImportZkNote, SaveZkNote, SaveZkNotePlusLinks, Sysids, ZkLinks, ZkNoteArchives, ZkNoteEdit,
   ZkNoteEditWhat,
 };
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
@@ -20,16 +20,19 @@ use zkprotocol::search::{TagSearch, ZkListNoteSearchResult, ZkNoteSearch};
 pub fn login_data_for_token(
   session: Session,
   config: &Config,
-) -> Result<Option<orgauth::data::LoginData>, Box<dyn Error>> {
+) -> Result<(Option<orgauth::data::LoginData>, Sysids), Box<dyn Error>> {
   let mut conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
   conn.busy_timeout(Duration::from_millis(500))?;
+
+  let sysids = sqldata::read_sysids(&conn)?;
+
   let mut cb = Callbacks {
     on_new_user: Box::new(sqldata::on_new_user),
     extra_login_data: Box::new(sqldata::extra_login_data_callback),
     on_delete_user: Box::new(sqldata::on_delete_user),
   };
-  match session.get("token")? {
-    None => Ok(None),
+  let ldopt = match session.get("token")? {
+    None => None,
     Some(token) => {
       match orgauth::dbfun::read_user_with_token_pageload(
         &mut conn,
@@ -40,19 +43,20 @@ pub fn login_data_for_token(
       ) {
         Ok(user) => {
           if user.active {
-            return Ok(Some(orgauth::dbfun::login_data_cb(
+            Some(orgauth::dbfun::login_data_cb(
               &conn,
               user.id,
               &mut cb.extra_login_data,
-            )?));
+            )?)
           } else {
-            Ok(None)
+            None
           }
         }
-        Err(e) => Err(e.into()),
+        Err(_e) => None, // Err(e.into()),
       }
     }
-  }
+  };
+  Ok((ldopt, sysids))
 }
 
 pub fn zknotes_callbacks() -> Callbacks {
