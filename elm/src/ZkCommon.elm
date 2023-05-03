@@ -130,3 +130,16 @@ golink zknid color =
             <|
                 E.text "☐"
         }
+
+stringToolTip : String -> E.Element msg
+stringToolTip  str =
+    E.el
+        [ EBk.color (E.rgb 0.2 0.2 0.2)
+        , EF.color (E.rgb 1 1 1)
+        , E.padding 4
+        , EBd.rounded 5
+        , EF.size 14
+        , EBd.shadow
+            { offset = ( 0, 3 ), blur = 6, size = 0, color = E.rgba 0 0 0 0.32 }
+        ]
+        (E.text str)

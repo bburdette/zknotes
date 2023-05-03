@@ -22,7 +22,8 @@ import NoteCache as NC exposing (NoteCache)
 import Schelme.Show exposing (showTerm)
 import Set exposing (Set(..))
 import TangoColors as TC
-
+import Util
+import ZkCommon
 
 markdownView : Markdown.Renderer.Renderer (Element a) -> String -> Result String (List (Element a))
 markdownView renderer markdown =
@@ -335,7 +336,8 @@ audioView si zkn =
                     [ E.text "ts↗" ]
 
               else
-                E.text "ts↗ disabled for private notes"
+                E.el [ Util.addToolTip E.below (ZkCommon.stringToolTip "disabled for private notes") ]
+                    (E.el [ EF.color TC.darkGrey ] <| E.text "ts↗")
             ]
         ]
 
