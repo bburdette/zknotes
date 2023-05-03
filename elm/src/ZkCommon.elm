@@ -134,7 +134,7 @@ golink zknid color =
 stringToolTip : String -> E.Element msg
 stringToolTip  str =
     E.el
-        [ EBk.color (E.rgb 0.2 0.2 0.2)
+        [ EBk.color (E.rgb 0.6 0.6 0.6)
         , EF.color (E.rgb 1 1 1)
         , E.padding 4
         , EBd.rounded 5
