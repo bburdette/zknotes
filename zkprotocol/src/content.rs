@@ -7,6 +7,10 @@ pub struct ExtraLoginData {
   pub userid: i64,
   pub zknote: i64,
   pub homenote: Option<i64>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Sysids {
   pub publicid: i64,
   pub shareid: i64,
   pub searchid: i64,

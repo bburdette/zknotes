@@ -46,6 +46,7 @@
       }
 
       login = {{logindata}};
+      sysids = {{sysids}};
       errorid = {{errorid}};
       adminsettings = {{adminsettings}};
 
@@ -59,6 +60,7 @@
                  height : window.innerHeight,
                  errorid : errorid,
                  login : login,
+                 sysids : sysids,
                  adminsettings : adminsettings}});
       // local storage
       app.ports.storeLocalVal.subscribe(storeVal);

@@ -41,7 +41,7 @@ shareColor =
     TC.darkBrown
 
 
-systemColor : D.LoginData -> List Int -> Maybe E.Color
+systemColor : D.Sysids -> List Int -> Maybe E.Color
 systemColor ld ids =
     let
         sysColor : Int -> Maybe E.Color
