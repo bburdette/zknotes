@@ -132,23 +132,9 @@ type State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
 
 
-type alias Flags =
-    { seed : Int
-    , location : String
-    , useragent : String
-    , debugstring : String
-    , width : Int
-    , height : Int
-    , errorid : Maybe Int
-    , login : Maybe JD.Value
-    , sysids : Maybe JD.Value
-    , adminsettings : Maybe JD.Value
-    }
-
-
-decodeSFlags : JD.Decoder SFlags
+decodeSFlags : JD.Decoder Flags
 decodeSFlags =
-    JD.succeed SFlags
+    JD.succeed Flags
         |> andMap (JD.field "seed" JD.int)
         |> andMap (JD.field "location" JD.string)
         |> andMap (JD.field "useragent" JD.string)
@@ -161,7 +147,7 @@ decodeSFlags =
         |> andMap (JD.field "adminsettings" OD.decodeAdminSettings)
 
 
-type alias SFlags =
+type alias Flags =
     { seed : Int
     , location : String
     , useragent : String
@@ -208,7 +194,7 @@ type alias Model =
 
 
 type alias PreInitModel =
-    { flags : SFlags
+    { flags : Flags
     , url : Url
     , key : Browser.Navigation.Key
     , mbzone : Maybe Time.Zone
@@ -3367,20 +3353,12 @@ initToRoute model route =
     )
 
 
-init : SFlags -> Url -> Browser.Navigation.Key -> Time.Zone -> Int -> ( Model, Cmd Msg )
+init : Flags -> Url -> Browser.Navigation.Key -> Time.Zone -> Int -> ( Model, Cmd Msg )
 init flags url key zone fontsize =
     let
         seed =
             initialSeed (flags.seed + 7)
 
-        -- adminSettings =
-        --     flags.adminsettings
-        --         |> Maybe.andThen
-        --             (\v ->
-        --                 JD.decodeValue OD.decodeAdminSettings v
-        --                     |> Result.toMaybe
-        --             )
-        --         |> Maybe.withDefault { openRegistration = False, nonAdminInvite = False }
         initialroute =
             parseUrl url
                 |> Maybe.withDefault Top
