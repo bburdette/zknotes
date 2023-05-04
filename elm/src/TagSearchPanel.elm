@@ -224,7 +224,22 @@ updateSearchText model txt =
                 TagSearch <| Parser.run tagSearchParser txt
 
             else
-                TagSearch <| Ok <| Search.SearchTerm [] txt
+                TagSearch
+                    (Ok
+                        (txt
+                            |> String.split " "
+                            |> List.map (Search.SearchTerm [])
+                            |> (\terms ->
+                                    case terms of
+                                        first :: rest ->
+                                            List.foldr (\t s -> Search.Boolex t Search.And s) first rest
+
+                                        [] ->
+                                            Search.SearchTerm [] ""
+                               )
+                        )
+                    )
+
     }
 
 
