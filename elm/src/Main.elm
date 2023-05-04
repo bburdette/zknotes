@@ -132,8 +132,8 @@ type State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
 
 
-decodeSFlags : JD.Decoder Flags
-decodeSFlags =
+decodeFlags : JD.Decoder Flags
+decodeFlags =
     JD.succeed Flags
         |> andMap (JD.field "seed" JD.int)
         |> andMap (JD.field "location" JD.string)
@@ -3319,7 +3319,7 @@ prevSearchQuery login =
 
 preinit : JD.Value -> Url -> Browser.Navigation.Key -> ( PiModel, Cmd Msg )
 preinit jsflags url key =
-    ( case JD.decodeValue decodeSFlags jsflags of
+    ( case JD.decodeValue decodeFlags jsflags of
         Ok flags ->
             PreInit
                 { flags = flags
