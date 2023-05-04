@@ -828,6 +828,45 @@ shareLinks model =
             )
 
 
+
+-- shareReport : Model -> List String
+-- shareReport model =
+--     let sids =     model.zklDict
+--         |> Dict.values
+--             |> Data.shareIds
+--     in
+
+
+noteIds : Model -> List Int
+noteIds model =
+    let
+        blah =
+            model.md
+                |> Markdown.Parser.parse
+                |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
+    in
+    case ( blah, model.id ) of
+        ( Err _, _ ) ->
+            []
+
+        ( Ok blocks, Nothing ) ->
+            []
+
+        ( Ok blocks, Just id ) ->
+            inlineFoldl
+                (\inline links ->
+                    case inline of
+                        Block.Link str mbstr moarinlines ->
+                            noteLink str :: links
+
+                        _ ->
+                            links
+                )
+                []
+                blocks
+                |> List.filterMap identity
+
+
 addComment : NewCommentState -> Element Msg
 addComment ncs =
     E.column

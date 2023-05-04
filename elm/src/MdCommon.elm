@@ -1,4 +1,5 @@
 module MdCommon exposing (Panel, ViewMode(..), blockCells, blockPanels, cellView, codeBlock, codeSpan, defCell, heading, imageView, linkDict, markdownView, mdCells, mdPanel, mdPanels, mkRenderer, noteFile, noteIds, panelView, rawTextToId, searchView, showRunState)
+import Url as U
 
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
@@ -22,8 +23,10 @@ import NoteCache as NC exposing (NoteCache)
 import Schelme.Show exposing (showTerm)
 import Set exposing (Set(..))
 import TangoColors as TC
+import Url.Parser as UP exposing ((</>))
 import Util
 import ZkCommon
+
 
 markdownView : Markdown.Renderer.Renderer (Element a) -> String -> Result String (List (Element a))
 markdownView renderer markdown =
@@ -318,7 +321,7 @@ imageView text url mbwidth renderedChildren =
 
 htmlAudioView : String -> String -> Element a
 htmlAudioView url text =
-    E.html (Html.audio [ HA.controls True, HA.src url ] [ Html.text text ])
+    E.html (Html.audio [ HA.style "width" "500px", HA.controls True, HA.src url ] [ Html.text text ])
 
 
 audioView : Data.Sysids -> Data.ZkNote -> Element a
@@ -680,3 +683,39 @@ noteIds markdown =
                             bids
                             blocks
                    )
+
+
+noteLink : String -> Maybe Int
+noteLink str =
+    -- hack allows parsing /note/<N>
+    -- other urls will be invalid which is fine.
+    U.fromString ("http://wat" ++ str)
+        |> Maybe.andThen
+            (UP.parse (UP.s "note" </> UP.int))
+
+
+noteLinkIds : String -> List Int
+noteLinkIds md =
+    let
+        blah =
+            md
+                |> Markdown.Parser.parse
+                |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
+    in
+    case ( blah ) of
+        ( Err _ ) ->
+            []
+
+        ( Ok blocks ) ->
+            inlineFoldl
+                (\inline links ->
+                    case inline of
+                        Block.Link str mbstr moarinlines ->
+                            noteLink str :: links
+
+                        _ ->
+                            links
+                )
+                []
+                blocks
+                |> List.filterMap identity

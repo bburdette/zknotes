@@ -4,6 +4,7 @@ import Json.Decode as JD
 import Json.Encode as JE
 import Orgauth.Data exposing (UserId, decodeUserId, encodeUserId)
 import Search as S
+import Set exposing (Set)
 import UUID exposing (UUID)
 import Url.Builder as UB
 import Util exposing (andMap)
@@ -327,6 +328,27 @@ elToSzl el =
     , zknote = el.zknote
     , delete = el.delete
     }
+
+
+shareIds : Sysids -> List EditLink -> Set Int
+shareIds si els =
+    els
+        |> List.filterMap
+            (\l ->
+                if
+                    (List.any ((==) si.shareid) l.sysids
+                        || (l.otherid == si.publicid)
+                    )
+                        && l.direction
+                        == To
+                then
+                    Just
+                        l.otherid
+
+                else
+                    Nothing
+            )
+        |> Set.fromList
 
 
 
