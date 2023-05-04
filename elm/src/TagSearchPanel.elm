@@ -668,23 +668,27 @@ view showCopy narrow nblevel model =
             , spacing 8
             ]
         )
-        (( "viewsearch"
-         , case model.search of
-            TagSearch (Ok ts) ->
-                viewSearch model.searchTermFocus ts
-
-            _ ->
-                E.none
+        (( "addbutton"
+         , row [ width fill ]
+            [ EI.button (height (px 19) :: E.centerX :: buttonStyle)
+                { label =
+                    E.el [ EF.family [ EF.monospace ] ] <|
+                        E.text "^"
+                , onPress = Just AddToStackClicked
+                }
+            ]
          )
+            :: ( "viewsearch"
+               , case model.search of
+                    TagSearch (Ok ts) ->
+                        viewSearch model.searchTermFocus ts
+
+                    _ ->
+                        E.none
+               )
             :: ([ ( "tinput"
                   , row [ width fill, spacing 3 ]
                         [ tinput
-                        , EI.button (E.alignRight :: buttonStyle)
-                            { label =
-                                E.el [ EF.family [ EF.monospace ] ] <|
-                                    E.text "+"
-                            , onPress = Just AddToStackClicked
-                            }
                         ]
                   )
                 , ( "tbuttons", row [ spacing 3, width fill ] buttons )
