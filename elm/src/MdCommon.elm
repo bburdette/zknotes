@@ -25,6 +25,7 @@ import TangoColors as TC
 import Util
 import ZkCommon
 
+
 markdownView : Markdown.Renderer.Renderer (Element a) -> String -> Result String (List (Element a))
 markdownView renderer markdown =
     markdown
@@ -321,8 +322,8 @@ htmlAudioView url text =
     E.html (Html.audio [ HA.controls True, HA.src url ] [ Html.text text ])
 
 
-audioView : Data.Sysids -> Data.ZkNote -> Element a
-audioView si zkn =
+audioNoteView : Data.Sysids -> Data.ZkNote -> Element a
+audioNoteView si zkn =
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
         [ link (Just zkn.title) ("/note/" ++ String.fromInt zkn.id) [ E.text zkn.title ]
         , E.row [ E.spacing 20 ]
@@ -339,6 +340,30 @@ audioView si zkn =
                 E.el [ Util.addToolTip E.below (ZkCommon.stringToolTip "disabled for private notes") ]
                     (E.el [ EF.color TC.darkGrey ] <| E.text "ts↗")
             ]
+        ]
+
+
+videoNoteView : Data.ZkNote -> Element a
+videoNoteView zknote =
+    let
+        fileurl =
+            "/file/" ++ String.fromInt zknote.id
+    in
+    E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
+        [ link (Just zknote.title) ("/note/" ++ String.fromInt zknote.id) [ E.text zknote.title ]
+        , videoView 500 fileurl (Just zknote.title) Nothing Nothing []
+        ]
+
+
+imageNoteView : Data.ZkNote -> Element a
+imageNoteView zknote =
+    let
+        fileurl =
+            "/file/" ++ String.fromInt zknote.id
+    in
+    E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
+        [ link (Just zknote.title) ("/note/" ++ String.fromInt zknote.id) [ E.text zknote.title ]
+        , imageView zknote.title fileurl Nothing []
         ]
 
 
@@ -361,31 +386,31 @@ noteFile si filename zknote =
         Just s ->
             case String.toLower s of
                 "mp3" ->
-                    audioView si zknote
+                    audioNoteView si zknote
 
                 "m4a" ->
-                    audioView si zknote
+                    audioNoteView si zknote
 
                 "opus" ->
-                    audioView si zknote
+                    audioNoteView si zknote
 
                 "mp4" ->
-                    videoView 500 fileurl (Just zknote.title) Nothing Nothing []
+                    videoNoteView zknote
 
                 "webm" ->
-                    videoView 500 fileurl (Just zknote.title) Nothing Nothing []
+                    videoNoteView zknote
 
                 "mkv" ->
-                    videoView 500 fileurl (Just zknote.title) Nothing Nothing []
+                    videoNoteView zknote
 
                 "jpg" ->
-                    imageView zknote.title fileurl Nothing []
+                    imageNoteView zknote
 
                 "gif" ->
-                    imageView zknote.title fileurl Nothing []
+                    imageNoteView zknote
 
                 "png" ->
-                    imageView zknote.title fileurl Nothing []
+                    imageNoteView zknote
 
                 _ ->
                     E.text filename
