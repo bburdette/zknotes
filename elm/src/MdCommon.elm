@@ -413,7 +413,7 @@ noteFile si filename zknote =
                     imageNoteView zknote
 
                 _ ->
-                    E.text filename
+                    link (Just zknote.title) ("/note/" ++ String.fromInt zknote.id) [ E.text zknote.title ]
 
 
 noteView : Data.Sysids -> NoteCache -> String -> List (Element a) -> Element a
