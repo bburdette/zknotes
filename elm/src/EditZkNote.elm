@@ -1537,7 +1537,9 @@ zknview zone size recentZkns trqs noteCache model =
                     ]
                     [ headingPanel "edit" [ E.width E.fill ] (editview TC.white)
                     , headingPanel "view" [ E.width E.fill ] (mdview TC.white)
-                    , headingPanel "list" [ E.width E.fill ] listview
+
+                    -- , headingPanel "list" [ E.width E.fill ] listview
+                    , headingPanel "list" [ E.width E.fill ] blocksToStringView
                     , searchOrRecentPanel
                     ]
 
