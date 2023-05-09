@@ -101,7 +101,12 @@
               elmPackages.elm-optimize-level-2
               cargo-tauri
               tauri-mobile
-            ];
+              libsoup
+              cairo
+              atk
+              # gdk-pixbuf
+              webkitgtk
+                         ];
           };
         }
     );

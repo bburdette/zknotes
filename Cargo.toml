@@ -5,4 +5,5 @@ members = [
     "zkprotocol",
     "server",
     "orgauth/rustlib",
+    "tauri/src-tauri",
 ]
