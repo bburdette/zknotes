@@ -105,8 +105,7 @@
               cairo
               atk
               # gdk-pixbuf
-              webkitgtk
-                         ];
+              webkitgtk ];
           };
         }
     );
