@@ -99,6 +99,8 @@
               elmPackages.elm-verify-examples
               elmPackages.elmi-to-json
               elmPackages.elm-optimize-level-2
+              cargo-tauri
+              tauri-mobile
             ];
           };
         }
