@@ -3,7 +3,8 @@
     "beforeBuildCommand": "frontend-build.sh",
     "beforeDevCommand": "frontend.sh",
     "devPath": "localhost:8010",
-    "distDir": "../../server/static"
+    "distDir": "blah",
+    "withGlobalTauri": true
   },
   "package": {
     "productName": "zknotes",
