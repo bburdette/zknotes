@@ -101,15 +101,17 @@
               elmPackages.elm-optimize-level-2
               cargo-tauri
               tauri-mobile
+              # extra stuff for tauri
               libsoup
               cairo
               atk
-              # gdk-pixbuf
               webkitgtk
               gst_all_1.gstreamer
               gst_all_1.gst-plugins-base
               gst_all_1.gst-plugins-good
               gst_all_1.gst-plugins-bad
+              # for tauti-mobile (?)
+              lldb
               ];
           };
         }
