@@ -6,4 +6,5 @@ members = [
     "server",
     "orgauth/rustlib",
     "tauri/src-tauri",
+    "meh2"
 ]

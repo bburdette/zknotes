@@ -1,0 +1,5 @@
+[app]
+name = "meh2"
+stylized-name = "Meh2"
+domain = "example.com"
+template-pack = "bevy"

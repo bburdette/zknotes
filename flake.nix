@@ -112,6 +112,7 @@
               gst_all_1.gst-plugins-bad
               # for tauti-mobile (?)
               lldb
+              alsa-lib
               ];
           };
         }
