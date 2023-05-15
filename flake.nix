@@ -114,6 +114,8 @@
               lldb
               vscode-extensions.vadimcn.vscode-lldb
               alsa-lib
+              # they suggest using the jbr (jetbrains runtime?) from android-studio, but that is not accessible.
+              jetbrains.jdk
               ];
           };
         }
