@@ -69,10 +69,10 @@
         # x86_64-linux-android
 
         mobileTargets = mkToolchain (with toolchain; [
-          # cargo
+          cargo
           # clippy
           # rust-src
-          # rustc
+          rustc
           # target.rust-std
           target1.rust-std
           target2.rust-std
@@ -114,9 +114,9 @@
           # `nix develop`
           devShell = pkgs.mkShell {
             nativeBuildInputs = with pkgs; [
-              cargo
+              # cargo
               cargo-watch
-              rustc
+              # rustc
               rustfmt
               rust-analyzer
               sqlite
