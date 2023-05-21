@@ -4,9 +4,14 @@
   inputs = {
     flake-utils.url = "github:numtide/flake-utils";
     naersk.url = "github:nmattia/naersk";
+    fenix = {
+      url = "github:nix-community/fenix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
   };
 
-  outputs = { self, nixpkgs, flake-utils, naersk }:
+  outputs = { self, nixpkgs, flake-utils, naersk, fenix }:
     let
       makeElmPkg = { pkgs, additionalInputs ? [ ], pythonPackages ? (ps: [ ]) }:
         pkgs.stdenv.mkDerivation {
@@ -32,7 +37,8 @@
         };
     in
     flake-utils.lib.eachDefaultSystem (
-      system: let
+      system: 
+      let
         pname = "zknotes";
         pkgs = nixpkgs.legacyPackages."${system}";
         naersk-lib = naersk.lib."${system}";
@@ -48,6 +54,36 @@
               openssl.dev 
               ];
           };
+
+        # fenix stuff for adding other compile targets
+        mkToolchain = fenix.packages.${system}.combine;
+        toolchain = fenix.packages.${system}.stable;
+        target1 = fenix.packages.${system}.targets."aarch64-linux-android".stable;
+        target2 = fenix.packages.${system}.targets."armv7-linux-androideabi".stable;
+        target3 = fenix.packages.${system}.targets."i686-linux-android".stable;
+        target4 = fenix.packages.${system}.targets."x86_64-linux-android".stable;
+
+        # aarch64-linux-android
+        # armv7-linux-androideabi
+        # i686-linux-android
+        # x86_64-linux-android
+
+        mobileTargets = mkToolchain (with toolchain; [
+          # cargo
+          # clippy
+          # rust-src
+          # rustc
+          # target.rust-std
+          target1.rust-std
+          target2.rust-std
+          target3.rust-std
+          target4.rust-std
+
+          # Always use nightly rustfmt because most of its options are unstable
+          # fenix.packages.${system}.latest.rustfmt
+        ]);
+
+
       in
         rec {
           inherit pname;
@@ -114,6 +150,7 @@
               lldb
               vscode-extensions.vadimcn.vscode-lldb
               alsa-lib
+              mobileTargets 
               # they suggest using the jbr (jetbrains runtime?) from android-studio, but that is not accessible.
               jetbrains.jdk
               ];
