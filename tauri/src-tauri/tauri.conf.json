@@ -1,9 +1,9 @@
 {
   "build": {
-    "beforeBuildCommand": "frontend-build.sh",
-    "beforeDevCommand": "frontend.sh",
-    "devPath": "localhost:8010",
-    "distDir": "blah",
+    "beforeBuildCommand": null,
+    "beforeDevCommand": null,
+    "devPath": "http://10.0.0.85:8010",
+    "distDir": "../../server/static/",
     "withGlobalTauri": true
   },
   "package": {
@@ -29,7 +29,7 @@
         "icons/icon.icns",
         "icons/icon.ico"
       ],
-      "identifier": "com.tauri.dev",
+      "identifier": "zknotes.com",
       "longDescription": "",
       "macOS": {
         "entitlements": null,

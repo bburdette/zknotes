@@ -41,6 +41,8 @@
       let
         pname = "zknotes";
         pkgs = nixpkgs.legacyPackages."${system}";
+        # aarch64-linux-android-pkgs = nixpkgs.legacyPackages."aarch64-linux-android";
+        # aarch64-linux-android-pkgs = nixpkgs.legacyPackages."aarch64-linux";
         naersk-lib = naersk.lib."${system}";
         elm-stuff = makeElmPkg { inherit pkgs; };
         rust-stuff = naersk-lib.buildPackage {
@@ -62,11 +64,6 @@
         target2 = fenix.packages.${system}.targets."armv7-linux-androideabi".stable;
         target3 = fenix.packages.${system}.targets."i686-linux-android".stable;
         target4 = fenix.packages.${system}.targets."x86_64-linux-android".stable;
-
-        # aarch64-linux-android
-        # armv7-linux-androideabi
-        # i686-linux-android
-        # x86_64-linux-android
 
         mobileTargets = mkToolchain (with toolchain; [
           cargo
@@ -120,8 +117,10 @@
               rustfmt
               rust-analyzer
               sqlite
-              pkgconfig
               openssl.dev
+              # aarch64-linux-android-pkgs.sqlite
+              # aarch64-linux-android-pkgs.openssl.dev
+              pkgconfig
               elm2nix
               elmPackages.elm
               elmPackages.elm-analyse
@@ -148,7 +147,7 @@
               gst_all_1.gst-plugins-bad
               # for tauti-mobile (?)
               lldb
-              vscode-extensions.vadimcn.vscode-lldb
+              # vscode-extensions.vadimcn.vscode-lldb   #  added this but still not found by tauri mobile template init.
               alsa-lib
               mobileTargets 
               # they suggest using the jbr (jetbrains runtime?) from android-studio, but that is not accessible.

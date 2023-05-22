@@ -14,5 +14,7 @@ server/*.db*
 server/config.toml
 target/
 files/
+
+# tauri-mobile
 .cargo/
 /gen
