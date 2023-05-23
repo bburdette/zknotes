@@ -1,0 +1,20 @@
+ip = '0.0.0.0'
+port = 8010
+createdirs = false
+altmainsite = []
+file_tmp_path = "./temp"
+file_path = "./files"
+
+[orgauth_config]
+mainsite = 'http://10.0.0.85:8010'
+appname = 'zknotes'
+emaildomain = 'zknotes.com'
+db = './zknotes.db'
+admin_email = 'bburdette@protonmail.com'
+regen_login_tokens = true
+# login_token_expiration_ms = 604800000
+email_token_expiration_ms = 86400000
+reset_token_expiration_ms = 86400000
+invite_token_expiration_ms = 604800000
+open_registration = true
+non_admin_invite = true
