@@ -134,9 +134,8 @@
               elmPackages.elm-verify-examples
               elmPackages.elmi-to-json
               elmPackages.elm-optimize-level-2
-              cargo-tauri
-              tauri-mobile
               # extra stuff for tauri
+              cargo-tauri
               libsoup
               cairo
               atk
@@ -146,7 +145,9 @@
               gst_all_1.gst-plugins-good
               gst_all_1.gst-plugins-bad
               # for tauti-mobile (?)
+              tauri-mobile
               lldb
+              nodejs
               # vscode-extensions.vadimcn.vscode-lldb   #  added this but still not found by tauri mobile template init.
               alsa-lib
               mobileTargets 

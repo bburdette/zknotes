@@ -3,7 +3,7 @@
     "beforeBuildCommand": null,
     "beforeDevCommand": null,
     "devPath": "http://10.0.0.85:8010",
-    "distDir": "../../server/static/",
+    "distDir": "../../server",
     "withGlobalTauri": true
   },
   "package": {
