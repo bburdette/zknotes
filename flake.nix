@@ -8,7 +8,6 @@
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-
   };
 
   outputs = { self, nixpkgs, flake-utils, naersk, fenix }:
@@ -35,6 +34,7 @@
               elmPackages.elm-optimize-level-2
             ] ++ additionalInputs;
         };
+      mytauri = { pkgs }: pkgs.callPackage ./my-tauri.nix {};
     in
     flake-utils.lib.eachDefaultSystem (
       system: 
@@ -56,6 +56,8 @@
               openssl.dev 
               ];
           };
+
+        my-tauri = mytauri { inherit pkgs; };
 
         # fenix stuff for adding other compile targets
         mkToolchain = fenix.packages.${system}.combine;
@@ -135,7 +137,8 @@
               elmPackages.elmi-to-json
               elmPackages.elm-optimize-level-2
               # extra stuff for tauri
-              cargo-tauri
+              my-tauri
+              # cargo-tauri
               libsoup
               cairo
               atk
