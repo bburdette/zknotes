@@ -151,6 +151,7 @@
               tauri-mobile
               lldb
               nodejs
+              rustup # `cargo tauri android init` wants this, even though targets already installed.
               # vscode-extensions.vadimcn.vscode-lldb   #  added this but still not found by tauri mobile template init.
               alsa-lib
               mobileTargets 
