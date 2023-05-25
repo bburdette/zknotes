@@ -114,10 +114,10 @@
           devShell = pkgs.mkShell {
             nativeBuildInputs = with pkgs; [
               # cargo
-              cargo-watch
               # rustc
-              rustfmt
-              rust-analyzer
+              # cargo-watch
+              # rustfmt
+              # rust-analyzer
               sqlite
               openssl.dev
               # aarch64-linux-android-pkgs.sqlite
@@ -154,7 +154,7 @@
               rustup # `cargo tauri android init` wants this, even though targets already installed.
               # vscode-extensions.vadimcn.vscode-lldb   #  added this but still not found by tauri mobile template init.
               alsa-lib
-              mobileTargets 
+              # mobileTargets
               # they suggest using the jbr (jetbrains runtime?) from android-studio, but that is not accessible.
               jetbrains.jdk
               ];
