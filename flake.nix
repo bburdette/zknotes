@@ -40,7 +40,10 @@
       system: 
       let
         pname = "zknotes";
-        pkgs = nixpkgs.legacyPackages."${system}";
+        # pkgs = nixpkgs.legacyPackages."${system}" // { config.android_sdk.accept_license = true; };
+        pkgs = import nixpkgs { config.android_sdk.accept_license = true;
+          config.allowUnfree = true;
+          system = "${system}"; };
         # aarch64-linux-android-pkgs = nixpkgs.legacyPackages."aarch64-linux-android";
         # aarch64-linux-android-pkgs = nixpkgs.legacyPackages."aarch64-linux";
         naersk-lib = naersk.lib."${system}";
@@ -66,6 +69,9 @@
         target2 = fenix.packages.${system}.targets."armv7-linux-androideabi".stable;
         target3 = fenix.packages.${system}.targets."i686-linux-android".stable;
         target4 = fenix.packages.${system}.targets."x86_64-linux-android".stable;
+
+        sc = pkgs.stdenv.cc;
+        sc2 = builtins.readFile "${pkgs.stdenv.cc}/nix-support/dynamic-linker";
 
         mobileTargets = mkToolchain (with toolchain; [
           cargo
@@ -110,9 +116,46 @@
           };
           defaultApp = apps.${pname};
 
-          # `nix develop`
+          # meh = pkgs.androidenv.androidPkgs_9_0 // { android_sdk.accept_license = true; };
+          # androidComposition = pkgs.androidenv.androidPkgs_9_0 // { includeNDK = true; };
+          androidComposition = pkgs.androidenv.composeAndroidPackages { includeNDK = true; 
+            extraLicenses = [
+              "android-googletv-license"
+              "android-sdk-arm-dbt-license"
+              "android-sdk-license"
+              "android-sdk-preview-license"
+              "google-gdk-license"
+              "intel-android-extra-license"
+              "intel-android-sysimage-license"
+              "mips-android-sysimage-license"            ];
+            };
+     # platforms;android-33 Android SDK Platform 33
+     # build-tools;30.0.3 Android SDK Build-Tools 30.0.3
+              # `nix develop`
           devShell = pkgs.mkShell {
+            # NIX_LD_LIBRARY_PATH = pkgs.lib.strings.makeLibraryPath [
+            #   pkgs.stdenv.cc.cc
+            #   ];
+            # NIX_LD = pkgs.lib.strings.fileContents "${sc}/nix-support/dynamic-linker";
+
+            # NIX_LD = builtins.readFile "${xpkgs.stdenv.cc}/nix-support/dynamic-linker";
+            # NIX_LD = sc2;
+
+            # ANDROID_HOME = "${pkgs.androidsdk}";
+
+            ANDROID_HOME = "${androidComposition.androidsdk}";
+            # NDK_HOME = "${androidComposition.ndk-bundle}";
+            NDK_HOME = "${androidComposition.ndk-bundle}/libexec/android-sdk/ndk/${builtins.head (pkgs.lib.lists.reverseList (builtins.split "-" "${androidComposition.ndk-bundle}"))}";
+
+            # 25.2.9519653	Installed
+            # /nix/store/j5hsaa3fbrz3n7kqc4zz785398qbrm2m-ndk-25.1.8937393/libexec/android-sdk/ndk/25.1.8937393
             nativeBuildInputs = with pkgs; [
+              # androidenv.androidPkgs_9_0.androidsdk
+              # androidenv.androidPkgs_9_0.ndk-bundle
+              androidComposition.androidsdk
+              androidComposition.ndk-bundle
+
+              # androidComposition.ndk-bundle
               # cargo
               # rustc
               # cargo-watch
@@ -148,6 +191,8 @@
               gst_all_1.gst-plugins-good
               gst_all_1.gst-plugins-bad
               # for tauti-mobile (?)
+              librsvg
+              webkitgtk_4_1
               tauri-mobile
               lldb
               nodejs
