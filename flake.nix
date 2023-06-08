@@ -37,11 +37,12 @@
       mytauri = { pkgs }: pkgs.callPackage ./my-tauri.nix {};
     in
     flake-utils.lib.eachDefaultSystem (
-      system: 
+      system:
       let
         pname = "zknotes";
         # pkgs = nixpkgs.legacyPackages."${system}" // { config.android_sdk.accept_license = true; };
-        pkgs = import nixpkgs { config.android_sdk.accept_license = true;
+        pkgs = import nixpkgs {
+          config.android_sdk.accept_license = true;
           config.allowUnfree = true;
           system = "${system}"; };
         # aarch64-linux-android-pkgs = nixpkgs.legacyPackages."aarch64-linux-android";
@@ -56,7 +57,7 @@
               rustc
               sqlite
               pkgconfig
-              openssl.dev 
+              openssl.dev
               ];
           };
 
@@ -69,9 +70,6 @@
         target2 = fenix.packages.${system}.targets."armv7-linux-androideabi".stable;
         target3 = fenix.packages.${system}.targets."i686-linux-android".stable;
         target4 = fenix.packages.${system}.targets."x86_64-linux-android".stable;
-
-        sc = pkgs.stdenv.cc;
-        sc2 = builtins.readFile "${pkgs.stdenv.cc}/nix-support/dynamic-linker";
 
         mobileTargets = mkToolchain (with toolchain; [
           cargo
@@ -118,7 +116,12 @@
 
           # meh = pkgs.androidenv.androidPkgs_9_0 // { android_sdk.accept_license = true; };
           # androidComposition = pkgs.androidenv.androidPkgs_9_0 // { includeNDK = true; };
-          androidComposition = pkgs.androidenv.composeAndroidPackages { includeNDK = true; 
+
+          androidEnv = pkgs.androidenv.override { licenseAccepted = true; };
+          androidComposition = androidEnv.composeAndroidPackages {
+            includeNDK = true;
+            platformToolsVersion = "33.0.3";
+            buildToolsVersions = [ "30.0.3" ];
             extraLicenses = [
               "android-googletv-license"
               "android-sdk-arm-dbt-license"
@@ -128,7 +131,7 @@
               "intel-android-extra-license"
               "intel-android-sysimage-license"
               "mips-android-sysimage-license"            ];
-            };
+          };
      # platforms;android-33 Android SDK Platform 33
      # build-tools;30.0.3 Android SDK Build-Tools 30.0.3
               # `nix develop`
@@ -143,9 +146,29 @@
 
             # ANDROID_HOME = "${pkgs.androidsdk}";
 
-            ANDROID_HOME = "${androidComposition.androidsdk}";
+            ANDROID_HOME = "${androidComposition.androidsdk}/libexec/android-sdk";
             # NDK_HOME = "${androidComposition.ndk-bundle}";
-            NDK_HOME = "${androidComposition.ndk-bundle}/libexec/android-sdk/ndk/${builtins.head (pkgs.lib.lists.reverseList (builtins.split "-" "${androidComposition.ndk-bundle}"))}";
+# Observed package id 'build-tools;33.0.1' in inconsistent location '/nix/store/mq9g7ppqc1hk0i3mzkh3bkibf1q276dq-androidsdk/libexec/android-sdk/build-tools/33.0.1'
+#                                                         (Expected '/nix/store/mq9g7ppqc1hk0i3mzkh3bkibf1q276dq-androidsdk/build-tools/33.0.1')
+# Observed package id 'ndk;25.1.8937393' in inconsistent location '/nix/store/mq9g7ppqc1hk0i3mzkh3bkibf1q276dq-androidsdk/libexec/android-sdk/ndk-bundle'
+#                                                       (Expected '/nix/store/mq9g7ppqc1hk0i3mzkh3bkibf1q276dq-androidsdk/libexec/android-sdk/ndk/25.1.8937393')
+# Observed package id 'ndk;25.1.8937393' in inconsistent location '/nix/store/mq9g7ppqc1hk0i3mzkh3bkibf1q276dq-androidsdk/libexec/android-sdk/ndk-bundle'
+#                                                       (Expected '/nix/store/mq9g7ppqc1hk0i3mzkh3bkibf1q276dq-androidsdk/libexec/android-sdk/ndk/25.1.8937393')
+            # /nix/store/mq9g7ppqc1hk0i3mzkh3bkibf1q276dq-androidsdk/libexec/android-sdk/ndk/25.1.8937393
+            # tauri mobile expects a source.properties file, so setting this to
+            # the dir that contains it.
+            # NDK_HOME = "${androidComposition.ndk-bundle}/libexec/android-sdk/ndk/${builtins.head (pkgs.lib.lists.reverseList (builtins.split "-" "${androidComposition.ndk-bundle}"))}";
+           # /nix/store/mq9g7ppqc1hk0i3mzkh3bkibf1q276dq-androidsdk/libexec/android-sdk/ndk/25.1.8937393
+            # NDK_HOME = "${androidComposition.androidsdk}/libexec/android-sdk/ndk/${builtins.head (pkgs.lib.lists.reverseList (builtins.split "-" "${androidComposition.ndk-bundle}"))}";
+            # NDK_HOME = "${androidComposition.androidsdk}/libexec/android-sdk/ndk-bundle";
+            # libexec/android-sdk/ndk/25.1.8937393
+
+
+            # /nix/store/mq9g7ppqc1hk0i3mzkh3bkibf1q276dq-androidsdk/libexec/android-sdk/ndk/25.1.8937393
+            NDK_HOME = "${androidComposition.androidsdk}/libexec/android-sdk/ndk/${builtins.head (pkgs.lib.lists.reverseList (builtins.split "-" "${androidComposition.ndk-bundle}"))}";
+
+            # NDK_HOME = "${androidComposition.androidsdk}/libexec/android-sdk/ndk-bundle";
+
 
             # 25.2.9519653	Installed
             # /nix/store/j5hsaa3fbrz3n7kqc4zz785398qbrm2m-ndk-25.1.8937393/libexec/android-sdk/ndk/25.1.8937393
