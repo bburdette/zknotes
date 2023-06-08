@@ -73,11 +73,11 @@
     },
     "nixpkgs_2": {
       "locked": {
-        "lastModified": 1683353485,
-        "narHash": "sha256-Skp5El3egmoXPiINWjnoW0ktVfB7PR/xc4F4bhD+BJY=",
+        "lastModified": 1684151413,
+        "narHash": "sha256-Kqi8ki6PTo5aefiTu5tq7kkh3Hw5Z3WFH7utLQ+IoI8=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "caf436a52b25164b71e0d48b671127ac2e2a5b75",
+        "rev": "363465f8f9d3b335f9ddb86a895023974d678a9d",
         "type": "github"
       },
       "original": {
@@ -85,12 +85,29 @@
         "type": "indirect"
       }
     },
+    "oldnixpkgs": {
+      "locked": {
+        "lastModified": 1672406788,
+        "narHash": "sha256-Z5E7uknYD0H4g0YBJoouJ2ejnwRK0BXPI3LBUBNHbmk=",
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "eb32539c9618d6314e82c69a508467fa44d28126",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "eb32539c9618d6314e82c69a508467fa44d28126",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "fenix": "fenix",
         "flake-utils": "flake-utils",
         "naersk": "naersk",
-        "nixpkgs": "nixpkgs_2"
+        "nixpkgs": "nixpkgs_2",
+        "oldnixpkgs": "oldnixpkgs"
       }
     },
     "rust-analyzer-src": {

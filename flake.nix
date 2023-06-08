@@ -8,9 +8,11 @@
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # this revision has 33.0.2
+    oldnixpkgs.url = "github:nixos/nixpkgs/eb32539c9618d6314e82c69a508467fa44d28126";
   };
 
-  outputs = { self, nixpkgs, flake-utils, naersk, fenix }:
+  outputs = { self, nixpkgs, flake-utils, naersk, fenix, oldnixpkgs }:
     let
       makeElmPkg = { pkgs, additionalInputs ? [ ], pythonPackages ? (ps: [ ]) }:
         pkgs.stdenv.mkDerivation {
@@ -42,6 +44,10 @@
         pname = "zknotes";
         # pkgs = nixpkgs.legacyPackages."${system}" // { config.android_sdk.accept_license = true; };
         pkgs = import nixpkgs {
+          config.android_sdk.accept_license = true;
+          config.allowUnfree = true;
+          system = "${system}"; };
+        onpkgs = import oldnixpkgs {
           config.android_sdk.accept_license = true;
           config.allowUnfree = true;
           system = "${system}"; };
@@ -117,10 +123,10 @@
           # meh = pkgs.androidenv.androidPkgs_9_0 // { android_sdk.accept_license = true; };
           # androidComposition = pkgs.androidenv.androidPkgs_9_0 // { includeNDK = true; };
 
-          androidEnv = pkgs.androidenv.override { licenseAccepted = true; };
+          androidEnv = onpkgs.pkgs.androidenv.override { licenseAccepted = true; };
           androidComposition = androidEnv.composeAndroidPackages {
             includeNDK = true;
-            platformToolsVersion = "33.0.3";
+            platformToolsVersion = "33.0.2";
             buildToolsVersions = [ "30.0.3" ];
             extraLicenses = [
               "android-googletv-license"
