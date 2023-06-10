@@ -148,9 +148,10 @@
             #   ];
             # NIX_LD = pkgs.lib.strings.fileContents "${sc}/nix-support/dynamic-linker";
 
-            # NIX_LD = builtins.readFile "${xpkgs.stdenv.cc}/nix-support/dynamic-linker";
+            # NIX_LD = builtins.readFile "${pkgs.stdenv.cc}/nix-support/dynamic-linker";
             # NIX_LD = sc2;
 
+            NIX_LD= "${pkgs.stdenv.cc.libc}/lib/ld-linux-x86-64.so.2";
             # ANDROID_HOME = "${pkgs.androidsdk}";
 
             ANDROID_HOME = "${androidComposition.androidsdk}/libexec/android-sdk";
