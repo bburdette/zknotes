@@ -9,10 +9,10 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     # this revision has 33.0.2
-    oldnixpkgs.url = "github:nixos/nixpkgs/eb32539c9618d6314e82c69a508467fa44d28126";
+    # oldnixpkgs.url = "github:nixos/nixpkgs/eb32539c9618d6314e82c69a508467fa44d28126";
   };
 
-  outputs = { self, nixpkgs, flake-utils, naersk, fenix, oldnixpkgs }:
+  outputs = { self, nixpkgs, flake-utils, naersk, fenix }:
     let
       makeElmPkg = { pkgs, additionalInputs ? [ ], pythonPackages ? (ps: [ ]) }:
         pkgs.stdenv.mkDerivation {
@@ -47,10 +47,10 @@
           config.android_sdk.accept_license = true;
           config.allowUnfree = true;
           system = "${system}"; };
-        onpkgs = import oldnixpkgs {
-          config.android_sdk.accept_license = true;
-          config.allowUnfree = true;
-          system = "${system}"; };
+        # onpkgs = import oldnixpkgs {
+        #   config.android_sdk.accept_license = true;
+        #   config.allowUnfree = true;
+        #   system = "${system}"; };
         # aarch64-linux-android-pkgs = nixpkgs.legacyPackages."aarch64-linux-android";
         # aarch64-linux-android-pkgs = nixpkgs.legacyPackages."aarch64-linux";
         naersk-lib = naersk.lib."${system}";
@@ -123,11 +123,12 @@
           # meh = pkgs.androidenv.androidPkgs_9_0 // { android_sdk.accept_license = true; };
           # androidComposition = pkgs.androidenv.androidPkgs_9_0 // { includeNDK = true; };
 
-          androidEnv = onpkgs.pkgs.androidenv.override { licenseAccepted = true; };
+          androidEnv = pkgs.androidenv.override { licenseAccepted = true; };
           androidComposition = androidEnv.composeAndroidPackages {
             includeNDK = true;
-            platformToolsVersion = "33.0.2";
+            platformToolsVersion = "33.0.3";
             buildToolsVersions = [ "30.0.3" ];
+            platformVersions  = ["33"];
             extraLicenses = [
               "android-googletv-license"
               "android-sdk-arm-dbt-license"
@@ -174,7 +175,6 @@
             NDK_HOME = "${androidComposition.androidsdk}/libexec/android-sdk/ndk/${builtins.head (pkgs.lib.lists.reverseList (builtins.split "-" "${androidComposition.ndk-bundle}"))}";
 
             # NDK_HOME = "${androidComposition.androidsdk}/libexec/android-sdk/ndk-bundle";
-
 
             # 25.2.9519653	Installed
             # /nix/store/j5hsaa3fbrz3n7kqc4zz785398qbrm2m-ndk-25.1.8937393/libexec/android-sdk/ndk/25.1.8937393
