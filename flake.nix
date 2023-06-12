@@ -37,6 +37,7 @@
             ] ++ additionalInputs;
         };
       mytauri = { pkgs }: pkgs.callPackage ./my-tauri.nix {};
+      mytaurimobile = { pkgs }: pkgs.callPackage ./my-tauri-mobile.nix {};
     in
     flake-utils.lib.eachDefaultSystem (
       system:
@@ -68,6 +69,7 @@
           };
 
         my-tauri = mytauri { inherit pkgs; };
+        my-tauri-mobile = mytaurimobile { inherit pkgs; };
 
         # fenix stuff for adding other compile targets
         mkToolchain = fenix.packages.${system}.combine;
@@ -223,7 +225,8 @@
               # for tauti-mobile (?)
               librsvg
               webkitgtk_4_1
-              tauri-mobile
+              # tauri-mobile
+              my-tauri-mobile
               lldb
               nodejs
               rustup # `cargo tauri android init` wants this, even though targets already installed.
