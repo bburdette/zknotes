@@ -17,17 +17,17 @@ in
 rustPlatform.buildRustPackage {
   inherit pname version;
   src = fetchFromGitHub {
-    owner = "tauri-apps";
+    owner = "bburdette";
     repo = pname;
-    rev = "6239dce5da2c9fa6da1354b357aae6df976d1719";
-    sha256 = "sha256-iTm0QF+ntGggmayg/1yqHDauKTreb8nuCci5As25GeM=";
+    rev = "f011d5e53898f36ea64ed2e5ca56035b951a899c";
+    sha256 = "sha256-DdOHos7LOMobjzPcwC8F36QeoDfo5ejmfmofAjMEC/k=";
   };
 
   # Manually specify the sourceRoot since this crate depends on other crates in the workspace. Relevant info at
   # https://discourse.nixos.org/t/difficulty-using-buildrustpackage-with-a-src-containing-multiple-cargo-workspaces/10202
   # sourceRoot = "source/tooling/cli";
 
-  cargoHash = "sha256-zF6dkyuTMNAKJVjm6WXNom1+dG9TWZIobxQWc/rabgQ=";
+  cargoHash = "sha256-mIya7CLhYdWS+K/vLylm1x+1bkYRGtxdY3t1iwjU6oU=";
 
   preBuild = ''
     export HOME=$(mktemp -d)
