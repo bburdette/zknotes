@@ -1,10 +1,9 @@
 {
   "build": {
-    "beforeBuildCommand": null,
-    "beforeDevCommand": null,
+    "beforeBuildCommand": "",
+    "beforeDevCommand": "",
     "devPath": "http://10.0.0.85:8010",
-    "distDir": "http://10.0.0.85:8010",
-    "withGlobalTauri": true
+    "distDir": "../../server/static"
   },
   "package": {
     "productName": "zknotes",
@@ -26,7 +25,7 @@
         "icons/icon.icns",
         "icons/icon.ico"
       ],
-      "identifier": "zknotes.com",
+      "identifier": "com.zknotes.bburdette",
       "longDescription": "",
       "macOS": {
         "entitlements": null,
