@@ -23,6 +23,7 @@ use simple_error::simple_error;
 use std::env;
 use std::error::Error;
 use std::fs::File;
+use std::io::Read;
 use std::io::{stdin, Write};
 use std::path::Path;
 use std::path::PathBuf;
@@ -30,7 +31,6 @@ use std::str::FromStr;
 use timer;
 use uuid::Uuid;
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
-
 /*
 use actix_files::NamedFile;
 
@@ -45,6 +45,38 @@ fn sitemap(_req: &HttpRequest) -> Result<NamedFile> {
   Ok(NamedFile::open(stpath)?)
 }
 */
+// TODO don't hardcode these paths.  Use config.static_path
+// fn favicon(session: Session, data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
+//   let stpath = Path::new("static/favicon.ico");
+//   match NamedFile::open(stpath) {
+//     Ok(f) => f.into_response(&req),
+//     Err(e) => HttpResponse::from_error(actix_web::error::ErrorImATeapot(e)),
+//   }
+// }
+
+fn favicon(session: Session, data: web::Data<Config>, _req: HttpRequest) -> HttpResponse {
+  returnfile(
+    "static/favicon.ico", // format!(
+                          //   "{}/favicon.ico",
+                          //   data.static_path.map(|p| p.as_os_str()).unwrap_or("")
+                          // )
+                          // .as_str(),
+  )
+}
+
+fn returnfile(name: &str) -> HttpResponse {
+  let stpath = Path::new(name);
+  match NamedFile::open(stpath) {
+    Ok(f) => {
+      let mut buffer = Vec::new();
+      match f.file().read_to_end(&mut buffer) {
+        Ok(_) => HttpResponse::Ok().body(buffer),
+        Err(e) => HttpResponse::BadRequest().body(e.to_string()),
+      }
+    }
+    Err(e) => HttpResponse::BadRequest().body(e.to_string()),
+  }
+}
 
 // simple index handler
 fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
@@ -649,7 +681,7 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
 
     App::new()
       .data(c.clone()) // <- create app with shared state
-      .wrap(cors)
+      // .wrap(cors)
       .wrap(middleware::Logger::default())
       .wrap(
         CookieSession::signed(&[0; 32]) // <- create cookie based session middleware
@@ -665,6 +697,7 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
       .service(web::resource(r"/file/{id}").route(web::get().to(file)))
       .service(web::resource(r"/register/{uid}/{key}").route(web::get().to(register)))
       .service(web::resource(r"/newemail/{uid}/{token}").route(web::get().to(new_email)))
+      .service(web::resource(r"/favicon.ico").route(web::get().to(favicon)))
       .service(actix_files::Files::new("/static/", staticpath))
       .service(web::resource("/{tail:.*}").route(web::get().to(mainpage)))
   })

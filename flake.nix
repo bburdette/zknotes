@@ -190,9 +190,9 @@
               # androidComposition.ndk-bundle
               # cargo
               # rustc
-              # cargo-watch
-              # rustfmt
-              # rust-analyzer
+              cargo-watch
+              rustfmt
+              rust-analyzer
               sqlite
               openssl.dev
               # aarch64-linux-android-pkgs.sqlite

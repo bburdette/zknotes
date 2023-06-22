@@ -1,12 +1,14 @@
 ip = '0.0.0.0'
 port = 8010
 createdirs = false
+# altmainsite = ["https://tauri.localhost"]
 altmainsite = []
 file_tmp_path = "./temp"
 file_path = "./files"
 
 [orgauth_config]
 mainsite = 'http://10.0.0.85:8010'
+# mainsite = 'https://tauri.localhost'
 appname = 'zknotes'
 emaildomain = 'zknotes.com'
 db = './zknotes.db'
