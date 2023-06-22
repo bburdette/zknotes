@@ -687,7 +687,7 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
       .max_age(3600);
 
     App::new()
-      .data(c.clone()) // <- create app with shared state
+      .app_data(web::Data::new(c.clone())) // <- create app with shared state
       // .wrap(cors)
       // .wrap(middleware::Logger::default())
       .wrap(TracingLogger::default())
