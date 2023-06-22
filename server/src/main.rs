@@ -7,8 +7,14 @@ mod sqltest;
 use actix_cors::Cors;
 use actix_files::NamedFile;
 use actix_multipart::Multipart;
-use actix_session::{CookieSession, Session};
-use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Result};
+// use actix_session::{CookieSession, Session};
+use actix_session::{
+  config::PersistentSession, storage::CookieSessionStore, Session, SessionMiddleware,
+};
+use actix_web::{
+  cookie::{self, Key},
+  web, App, HttpRequest, HttpResponse, HttpServer, Result,
+};
 use chrono;
 use clap::Arg;
 use config::Config;
@@ -31,6 +37,9 @@ use std::str::FromStr;
 use timer;
 use uuid::Uuid;
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
+
+use tracing_actix_web::TracingLogger;
+
 /*
 use actix_files::NamedFile;
 
@@ -54,7 +63,7 @@ fn sitemap(_req: &HttpRequest) -> Result<NamedFile> {
 //   }
 // }
 
-fn favicon(session: Session, data: web::Data<Config>, _req: HttpRequest) -> HttpResponse {
+async fn favicon() -> HttpResponse {
   returnfile(
     "static/favicon.ico", // format!(
                           //   "{}/favicon.ico",
@@ -79,7 +88,7 @@ fn returnfile(name: &str) -> HttpResponse {
 }
 
 // simple index handler
-fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
+async fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
   info!("remote ip: {:?}, request:{:?}", req.connection_info(), req);
 
   // logged in?
@@ -123,7 +132,7 @@ fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -> Http
   }
 }
 
-fn public(
+async fn public(
   data: web::Data<Config>,
   item: web::Json<PublicMessage>,
   req: HttpRequest,
@@ -147,7 +156,7 @@ fn public(
   }
 }
 
-fn user(
+async fn user(
   session: Session,
   data: web::Data<Config>,
   item: web::Json<orgauth::data::WhatMessage>,
@@ -172,7 +181,7 @@ fn user(
   }
 }
 
-fn admin(
+async fn admin(
   session: Session,
   data: web::Data<Config>,
   item: web::Json<orgauth::data::WhatMessage>,
@@ -275,9 +284,8 @@ async fn file(session: Session, config: web::Data<Config>, req: HttpRequest) -> 
       // Self::from_file(File::open(&path)?, path)
       match File::open(stpath).and_then(|f| NamedFile::from_file(f, Path::new(zkln.title.as_str())))
       {
-        Ok(f) => f
-          .into_response(&req)
-          .unwrap_or(HttpResponse::NotFound().json(())),
+        Ok(f) => f.into_response(&req),
+        // .unwrap_or(HttpResponse::NotFound().json(())),
         Err(e) => HttpResponse::NotFound().body(format!("{:?}", e)),
       }
     }
@@ -345,9 +353,8 @@ async fn save_files(
 
   while let Some(mut field) = payload.try_next().await? {
     // A multipart/form-data stream has to contain `content_disposition`
-    let content_disposition = field
-      .content_disposition()
-      .ok_or(simple_error::SimpleError::new("bad"))?;
+    let content_disposition = field.content_disposition().clone();
+    // .ok_or(simple_error::SimpleError::new("bad"))?;
 
     let filename = content_disposition
       .get_filename()
@@ -361,12 +368,12 @@ async fn save_files(
     let rf = filepath.clone();
 
     // File::create is blocking operation, use threadpool
-    let mut f = web::block(|| std::fs::File::create(filepath)).await?;
+    let mut f = web::block(|| std::fs::File::create(filepath)).await??;
 
     // Field in turn is stream of *Bytes* object
     while let Some(chunk) = field.try_next().await? {
       // filesystem operations are blocking, we have to use threadpool
-      f = web::block(move || f.write_all(&chunk).map(|_| f)).await?;
+      f = web::block(move || f.write_all(&chunk).map(|_| f)).await??;
     }
 
     let ps = rf
@@ -380,7 +387,7 @@ async fn save_files(
   Ok(rv)
 }
 
-fn private(
+async fn private(
   session: Session,
   data: web::Data<Config>,
   item: web::Json<UserMessage>,
@@ -475,10 +482,10 @@ fn main() {
   }
 }
 
-fn register(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
+async fn register(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
   orgauth::endpoints::register(&data.orgauth_config, req)
 }
-fn new_email(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
+async fn new_email(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
   orgauth::endpoints::new_email(&data.orgauth_config, req)
 }
 
@@ -682,12 +689,22 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
     App::new()
       .data(c.clone()) // <- create app with shared state
       // .wrap(cors)
-      .wrap(middleware::Logger::default())
+      // .wrap(middleware::Logger::default())
+      .wrap(TracingLogger::default())
       .wrap(
-        CookieSession::signed(&[0; 32]) // <- create cookie based session middleware
-          .secure(false) // allows for dev access
-          .max_age(10 * 24 * 60 * 60), // 10 days
+        SessionMiddleware::builder(CookieSessionStore::default(), Key::from(&[0; 64]))
+          .cookie_secure(false)
+          // customize session and cookie expiration
+          .session_lifecycle(
+            PersistentSession::default().session_ttl(cookie::time::Duration::hours(2)),
+          )
+          .build(),
       )
+      // .wrap(
+      //   CookieSession::signed(&[0; 32]) // <- create cookie based session middleware
+      //     .secure(false) // allows for dev access
+      //     .max_age(10 * 24 * 60 * 60), // 10 days
+      // )
       .service(web::resource("/upload").route(web::post().to(receive_files)))
       .service(web::resource("/public").route(web::post().to(public)))
       .service(web::resource("/private").route(web::post().to(private)))
