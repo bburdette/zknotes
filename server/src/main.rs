@@ -64,13 +64,7 @@ fn sitemap(_req: &HttpRequest) -> Result<NamedFile> {
 // }
 
 async fn favicon() -> HttpResponse {
-  returnfile(
-    "static/favicon.ico", // format!(
-                          //   "{}/favicon.ico",
-                          //   data.static_path.map(|p| p.as_os_str()).unwrap_or("")
-                          // )
-                          // .as_str(),
-  )
+  returnfile("static/favicon.ico")
 }
 
 fn returnfile(name: &str) -> HttpResponse {
@@ -281,11 +275,9 @@ async fn file(session: Session, config: web::Data<Config>, req: HttpRequest) -> 
       let pstr = format!("files/{}", hash);
       let stpath = Path::new(pstr.as_str());
 
-      // Self::from_file(File::open(&path)?, path)
       match File::open(stpath).and_then(|f| NamedFile::from_file(f, Path::new(zkln.title.as_str())))
       {
         Ok(f) => f.into_response(&req),
-        // .unwrap_or(HttpResponse::NotFound().json(())),
         Err(e) => HttpResponse::NotFound().body(format!("{:?}", e)),
       }
     }
@@ -633,16 +625,7 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
 
     println!("rd: {:?}", rd);
 
-    orgauth::dbfun::new_user(
-      &conn,
-      &rd,
-      None,
-      None,
-      true,
-      None,
-      // &mut Box::new(sqldata::on_new_user),
-      &mut cb.on_new_user,
-    )?;
+    orgauth::dbfun::new_user(&conn, &rd, None, None, true, None, &mut cb.on_new_user)?;
 
     println!("admin user created: {}", username);
     return Ok(());
@@ -688,29 +671,22 @@ async fn err_main() -> Result<(), Box<dyn Error>> {
 
     App::new()
       .app_data(web::Data::new(c.clone())) // <- create app with shared state
-      // .wrap(cors)
-      // .wrap(middleware::Logger::default())
+      .wrap(cors)
       .wrap(TracingLogger::default())
       .wrap(
         SessionMiddleware::builder(CookieSessionStore::default(), Key::from(&[0; 64]))
           .cookie_secure(false)
           // customize session and cookie expiration
           .session_lifecycle(
-            PersistentSession::default().session_ttl(cookie::time::Duration::hours(2)),
+            PersistentSession::default().session_ttl(cookie::time::Duration::weeks(52)),
           )
           .build(),
       )
-      // .wrap(
-      //   CookieSession::signed(&[0; 32]) // <- create cookie based session middleware
-      //     .secure(false) // allows for dev access
-      //     .max_age(10 * 24 * 60 * 60), // 10 days
-      // )
       .service(web::resource("/upload").route(web::post().to(receive_files)))
       .service(web::resource("/public").route(web::post().to(public)))
       .service(web::resource("/private").route(web::post().to(private)))
       .service(web::resource("/user").route(web::post().to(user)))
       .service(web::resource("/admin").route(web::post().to(admin)))
-      // .service(web::resource(r"/files/{hash}").route(web::get().to(files)))
       .service(web::resource(r"/file/{id}").route(web::get().to(file)))
       .service(web::resource(r"/register/{uid}/{key}").route(web::get().to(register)))
       .service(web::resource(r"/newemail/{uid}/{token}").route(web::get().to(new_email)))
