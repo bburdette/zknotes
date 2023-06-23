@@ -2,7 +2,7 @@ ip = '0.0.0.0'
 port = 8010
 createdirs = false
 # altmainsite = ["https://tauri.localhost"]
-altmainsite = []
+altmainsite = ["https://tauri.localhost"]
 file_tmp_path = "./temp"
 file_path = "./files"
 

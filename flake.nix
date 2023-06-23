@@ -8,8 +8,6 @@
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    # this revision has 33.0.2
-    # oldnixpkgs.url = "github:nixos/nixpkgs/eb32539c9618d6314e82c69a508467fa44d28126";
   };
 
   outputs = { self, nixpkgs, flake-utils, naersk, fenix }:
@@ -43,17 +41,11 @@
       system:
       let
         pname = "zknotes";
-        # pkgs = nixpkgs.legacyPackages."${system}" // { config.android_sdk.accept_license = true; };
+        # pkgs = nixpkgs.legacyPackages."${system}"
         pkgs = import nixpkgs {
           config.android_sdk.accept_license = true;
           config.allowUnfree = true;
           system = "${system}"; };
-        # onpkgs = import oldnixpkgs {
-        #   config.android_sdk.accept_license = true;
-        #   config.allowUnfree = true;
-        #   system = "${system}"; };
-        # aarch64-linux-android-pkgs = nixpkgs.legacyPackages."aarch64-linux-android";
-        # aarch64-linux-android-pkgs = nixpkgs.legacyPackages."aarch64-linux";
         naersk-lib = naersk.lib."${system}";
         elm-stuff = makeElmPkg { inherit pkgs; };
         rust-stuff = naersk-lib.buildPackage {
@@ -81,17 +73,11 @@
 
         mobileTargets = mkToolchain (with toolchain; [
           cargo
-          # clippy
-          # rust-src
           rustc
-          # target.rust-std
           target1.rust-std
           target2.rust-std
           target3.rust-std
           target4.rust-std
-
-          # Always use nightly rustfmt because most of its options are unstable
-          # fenix.packages.${system}.latest.rustfmt
         ]);
 
 
@@ -141,53 +127,16 @@
               "intel-android-sysimage-license"
               "mips-android-sysimage-license"            ];
           };
-     # platforms;android-33 Android SDK Platform 33
-     # build-tools;30.0.3 Android SDK Build-Tools 30.0.3
-              # `nix develop`
+          # `nix develop`
           devShell = pkgs.mkShell {
-            # NIX_LD_LIBRARY_PATH = pkgs.lib.strings.makeLibraryPath [
-            #   pkgs.stdenv.cc.cc
-            #   ];
-            # NIX_LD = pkgs.lib.strings.fileContents "${sc}/nix-support/dynamic-linker";
-
-            # NIX_LD = builtins.readFile "${pkgs.stdenv.cc}/nix-support/dynamic-linker";
-            # NIX_LD = sc2;
 
             NIX_LD= "${pkgs.stdenv.cc.libc}/lib/ld-linux-x86-64.so.2";
-            # ANDROID_HOME = "${pkgs.androidsdk}";
-
             ANDROID_HOME = "${androidComposition.androidsdk}/libexec/android-sdk";
-            # NDK_HOME = "${androidComposition.ndk-bundle}";
-# Observed package id 'build-tools;33.0.1' in inconsistent location '/nix/store/mq9g7ppqc1hk0i3mzkh3bkibf1q276dq-androidsdk/libexec/android-sdk/build-tools/33.0.1'
-#                                                         (Expected '/nix/store/mq9g7ppqc1hk0i3mzkh3bkibf1q276dq-androidsdk/build-tools/33.0.1')
-# Observed package id 'ndk;25.1.8937393' in inconsistent location '/nix/store/mq9g7ppqc1hk0i3mzkh3bkibf1q276dq-androidsdk/libexec/android-sdk/ndk-bundle'
-#                                                       (Expected '/nix/store/mq9g7ppqc1hk0i3mzkh3bkibf1q276dq-androidsdk/libexec/android-sdk/ndk/25.1.8937393')
-# Observed package id 'ndk;25.1.8937393' in inconsistent location '/nix/store/mq9g7ppqc1hk0i3mzkh3bkibf1q276dq-androidsdk/libexec/android-sdk/ndk-bundle'
-#                                                       (Expected '/nix/store/mq9g7ppqc1hk0i3mzkh3bkibf1q276dq-androidsdk/libexec/android-sdk/ndk/25.1.8937393')
-            # /nix/store/mq9g7ppqc1hk0i3mzkh3bkibf1q276dq-androidsdk/libexec/android-sdk/ndk/25.1.8937393
-            # tauri mobile expects a source.properties file, so setting this to
-            # the dir that contains it.
-            # NDK_HOME = "${androidComposition.ndk-bundle}/libexec/android-sdk/ndk/${builtins.head (pkgs.lib.lists.reverseList (builtins.split "-" "${androidComposition.ndk-bundle}"))}";
-           # /nix/store/mq9g7ppqc1hk0i3mzkh3bkibf1q276dq-androidsdk/libexec/android-sdk/ndk/25.1.8937393
-            # NDK_HOME = "${androidComposition.androidsdk}/libexec/android-sdk/ndk/${builtins.head (pkgs.lib.lists.reverseList (builtins.split "-" "${androidComposition.ndk-bundle}"))}";
-            # NDK_HOME = "${androidComposition.androidsdk}/libexec/android-sdk/ndk-bundle";
-            # libexec/android-sdk/ndk/25.1.8937393
-
-
-            # /nix/store/mq9g7ppqc1hk0i3mzkh3bkibf1q276dq-androidsdk/libexec/android-sdk/ndk/25.1.8937393
             NDK_HOME = "${androidComposition.androidsdk}/libexec/android-sdk/ndk/${builtins.head (pkgs.lib.lists.reverseList (builtins.split "-" "${androidComposition.ndk-bundle}"))}";
 
-            # NDK_HOME = "${androidComposition.androidsdk}/libexec/android-sdk/ndk-bundle";
-
-            # 25.2.9519653	Installed
-            # /nix/store/j5hsaa3fbrz3n7kqc4zz785398qbrm2m-ndk-25.1.8937393/libexec/android-sdk/ndk/25.1.8937393
             nativeBuildInputs = with pkgs; [
-              # androidenv.androidPkgs_9_0.androidsdk
-              # androidenv.androidPkgs_9_0.ndk-bundle
               androidComposition.androidsdk
               androidComposition.ndk-bundle
-
-              # androidComposition.ndk-bundle
               # cargo
               # rustc
               cargo-watch
@@ -222,7 +171,7 @@
               gst_all_1.gst-plugins-base
               gst_all_1.gst-plugins-good
               gst_all_1.gst-plugins-bad
-              # for tauti-mobile (?)
+              # for tauti-mobile
               librsvg
               webkitgtk_4_1
               # tauri-mobile
@@ -230,7 +179,7 @@
               lldb
               nodejs
               rustup # `cargo tauri android init` wants this, even though targets already installed.
-              # vscode-extensions.vadimcn.vscode-lldb   #  added this but still not found by tauri mobile template init.
+                     # should be fixed though, https://github.com/tauri-apps/tauri/issues/7044
               alsa-lib
               # mobileTargets
               # they suggest using the jbr (jetbrains runtime?) from android-studio, but that is not accessible.
