@@ -44,40 +44,18 @@ use tracing_actix_web::TracingLogger;
 use actix_files::NamedFile;
 
 TODO don't hardcode these paths.  Use config.static_path
-fn favicon(_req: &HttpRequest) -> Result<NamedFile> {
-  let stpath = Path::new("static/favicon.ico");
-  Ok(NamedFile::open(stpath)?)
-}
-
 fn sitemap(_req: &HttpRequest) -> Result<NamedFile> {
   let stpath = Path::new("static/sitemap.txt");
   Ok(NamedFile::open(stpath)?)
 }
 */
-// TODO don't hardcode these paths.  Use config.static_path
-// fn favicon(session: Session, data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
-//   let stpath = Path::new("static/favicon.ico");
-//   match NamedFile::open(stpath) {
-//     Ok(f) => f.into_response(&req),
-//     Err(e) => HttpResponse::from_error(actix_web::error::ErrorImATeapot(e)),
-//   }
-// }
 
-async fn favicon() -> HttpResponse {
-  returnfile("static/favicon.ico")
-}
-
-fn returnfile(name: &str) -> HttpResponse {
-  let stpath = Path::new(name);
-  match NamedFile::open(stpath) {
-    Ok(f) => {
-      let mut buffer = Vec::new();
-      match f.file().read_to_end(&mut buffer) {
-        Ok(_) => HttpResponse::Ok().body(buffer),
-        Err(e) => HttpResponse::BadRequest().body(e.to_string()),
-      }
-    }
-    Err(e) => HttpResponse::BadRequest().body(e.to_string()),
+async fn favicon(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
+  let mut staticpath = data.static_path.clone().unwrap_or(PathBuf::from("static/"));
+  let icopath = staticpath.join("favicon.ico");
+  match NamedFile::open(&icopath) {
+    Ok(f) => f.into_response(&req),
+    Err(e) => HttpResponse::from_error(actix_web::error::ErrorInternalServerError(e)),
   }
 }
 
