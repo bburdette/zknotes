@@ -178,10 +178,10 @@
               my-tauri-mobile
               lldb
               nodejs
-              rustup # `cargo tauri android init` wants this, even though targets already installed.
+              # rustup # `cargo tauri android init` wants this, even though targets already installed.
                      # should be fixed though, https://github.com/tauri-apps/tauri/issues/7044
               alsa-lib
-              # mobileTargets
+              mobileTargets
               # they suggest using the jbr (jetbrains runtime?) from android-studio, but that is not accessible.
               jetbrains.jdk
               ];

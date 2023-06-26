@@ -1,5 +1,5 @@
 [package]
-name = "app"
+name = "zknotes-app"
 version = "0.1.0"
 description = "A Tauri App"
 authors = ["you"]
@@ -23,6 +23,10 @@ serde = { version = "1.0", features = ["derive"] }
 # tauri = { version = "2.0.0-alpha.9", features = [] }
 # tauri = { git = "https://github.com/tauri-apps/tauri", rev = "2d2fd6abe291ddf645fa2fdecc08111d2c0e258e", features = [] }
 tauri = { git = "https://github.com/tauri-apps/tauri", rev = "38d0bed8ebb6c5872fc54903051d146d386b721e", features = [] }
+
+# zknotes deps
+zknotes-server-lib = { path = "../../server-lib" }
+log = "0.4.0"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem and the built-in dev server is disabled.

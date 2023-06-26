@@ -401,16 +401,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c7d0618f0e0b7e8ff11427422b64564d5fb0be1940354bfe2e0529b18a9d9b8"
 
 [[package]]
-name = "app"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "tauri",
- "tauri-build 2.0.0-alpha.6 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "askama_escape"
 version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5042,7 +5032,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "zknotes-app"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build 2.0.0-alpha.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "zknotes-server-lib",
+]
+
+[[package]]
 name = "zknotes-server"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "zknotes-server-lib",
+]
+
+[[package]]
+name = "zknotes-server-lib"
 version = "0.1.0"
 dependencies = [
  "actix-cors",
