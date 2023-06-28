@@ -528,7 +528,8 @@ pub async fn err_main() -> Result<(), Box<dyn Error>> {
   // specifying a config file?  otherwise try to load the default.
   let mut config = match matches.value_of("config") {
     Some(filename) => load_config(filename)?,
-    None => load_config("config.toml")?,
+    // None => load_config("config.toml")?,
+    None => defcon(),
   };
 
   // verify/create file directories.

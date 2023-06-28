@@ -50,6 +50,12 @@
       errorid = {{errorid}};
       adminsettings = {{adminsettings}};
 
+      const { invoke } = window.__TAURI__.tauri
+
+      // `invoke` returns a Promise
+      invoke('greet', { name: 'World' })
+      .then((response) => console.log(response))
+
       app = Elm.Main.init({
         node: document.getElementById('elm'),
         flags: { seed : Math.floor(Math.random()*0x0FFFFFFF), 
