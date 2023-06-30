@@ -4,47 +4,16 @@
     <meta charset="UTF-8">
     <title>Main</title>
     <meta name="viewport" content="width=device-width">
-    <style>html,head,body { padding:0; margin:0; } 
+    <style>html,head,body { padding:0; margin:0; }
       body { font-family: mono, calibri, helvetica, arial, sans-serif; background-color:#EEEEEC; }</style>
     <script type="text/javascript" src="/static/main.js"></script>
     <script type="text/javascript" src="/static/localvals.js"></script>
     <script type="text/javascript" src="/static/windowkey.js"></script>
+    <script type="text/javascript" src="/static/taselection.js"></script>
   </head>
   <body>
-    <div id="elm"></div> 
+    <div id="elm"></div>
     <script type="text/javascript">
-      function getTASelection(request) {
-          var range = { text: "", offset: null };
-          var activeEl = document.getElementById(request.id);
-          var activeElTagName = activeEl ? activeEl.tagName.toLowerCase() : null;
-          if (
-            (activeElTagName == "textarea") || (activeElTagName == "input" &&
-            /^(?:text|search|password|tel|url)$/i.test(activeEl.type)) &&
-            (typeof activeEl.selectionStart == "number")
-          ) {
-              range.text = activeEl.value.slice(activeEl.selectionStart, activeEl.selectionEnd);
-              range.offset = activeEl.selectionStart;
-              range.what = request.what;
-              app.ports.receiveTASelection.send(range);
-          }
-          else {
-              app.ports.receiveTASelection.send(null);
-          }
-      }
-
-      function setTASelection(request) {
-          var activeEl = document.getElementById(request.id);
-          var activeElTagName = activeEl ? activeEl.tagName.toLowerCase() : null;
-          if (
-            (activeElTagName == "textarea") || (activeElTagName == "input" &&
-            /^(?:text|search|password|tel|url)$/i.test(activeEl.type)) &&
-            (typeof activeEl.selectionStart == "number")
-          ) {
-              activeEl.setSelectionRange(request.offset, request.offset + request.length);
-              activeEl.focus();
-          }
-      }
-
       login = {{logindata}};
       sysids = {{sysids}};
       errorid = {{errorid}};
@@ -52,25 +21,35 @@
 
       const { invoke } = window.__TAURI__.tauri
 
+      function sendZIValueTauri(request) {
+        console.log("sendZIValueTauri", request);
+        invoke('zimsg', { msg: request })
+        .then((response) => {
+          console.log("response!"); 
+          app.ports.receiveTauriResponse.send(response) });
+      }
+
       // `invoke` returns a Promise
       invoke('greet', { name: 'World' })
       .then((response) => console.log(response))
 
       app = Elm.Main.init({
         node: document.getElementById('elm'),
-        flags: { seed : Math.floor(Math.random()*0x0FFFFFFF), 
-                 location : document.location.origin || "", 
-                 useragent : navigator.userAgent, 
-                 debugstring : "initial-info", 
-                 width : window.innerWidth, 
+        flags: { seed : Math.floor(Math.random()*0x0FFFFFFF),
+                 location : document.location.origin || "",
+                 useragent : navigator.userAgent,
+                 debugstring : "initial-info",
+                 width : window.innerWidth,
                  height : window.innerHeight,
                  errorid : errorid,
                  login : login,
                  sysids : sysids,
-                 adminsettings : adminsettings}});
+                 adminsettings : adminsettings,
+                 tauri : true}});
       // local storage
       app.ports.storeLocalVal.subscribe(storeVal);
       app.ports.getLocalVal.subscribe(getVal);
+      app.ports.sendZIValueTauri.subscribe(sendZIValueTauri);
       // app.ports.clearLocalStorage.subscribe(clearStorage);
 
       // selected text

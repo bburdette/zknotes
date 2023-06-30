@@ -1,7 +1,7 @@
 //
 
 mod config;
-mod interfaces;
+pub mod interfaces;
 mod migrations;
 mod search;
 mod sqldata;
@@ -38,7 +38,8 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use timer;
 use uuid::Uuid;
-use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
+pub use zkprotocol;
+pub use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 
 use tracing_actix_web::TracingLogger;
 // pub fn add(left: usize, right: usize) -> usize {
@@ -427,7 +428,7 @@ fn zk_interface_check(
   }
 }
 
-fn defcon() -> Config {
+pub fn defcon() -> Config {
   let oc = orgauth::data::Config {
     db: PathBuf::from("./zknotes.db"),
     mainsite: "http://localhost:8000".to_string(),
