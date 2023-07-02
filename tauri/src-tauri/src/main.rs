@@ -8,6 +8,7 @@ use std::thread;
 use tauri::State;
 use zknotes_server_lib::err_main;
 use zknotes_server_lib::orgauth::data::WhatMessage;
+use zknotes_server_lib::orgauth::endpoints::{Callbacks, Tokener, UuidTokener};
 use zknotes_server_lib::zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 
 struct ZkState {
@@ -97,7 +98,9 @@ fn uimsg(state: State<ZkState>, msg: WhatMessage) -> WhatMessage {
 
   let c = zknotes_server_lib::defcon();
 
-  match zknotes_server_lib::interfaces::user_interface(&state.config, msg) {
+  let mut ut = UuidTokener { uuid: None };
+
+  let sr = match zknotes_server_lib::interfaces::user_interface(&mut ut, &c, msg) {
     Ok(sr) => {
       println!("sr: {}", sr.what);
       // serde_json::to_value(&sr).unwrap());
@@ -107,7 +110,11 @@ fn uimsg(state: State<ZkState>, msg: WhatMessage) -> WhatMessage {
       what: "erro".to_string(),
       data: Some(Value::String("erro".to_string())),
     },
-  }
+  };
+
+  println!("ut {:?}", ut.uuid);
+
+  sr
 }
 
 // #[tauri::command]

@@ -454,7 +454,7 @@ routeStateInternal model route =
 
         Invite token ->
             ( PubShowMessage { message = "retrieving invite" } Nothing
-            , sendUIMsg model.location (UI.ReadInvite token)
+            , sendUIMsg model.tauri model.location (UI.ReadInvite token)
             )
 
         Top ->
@@ -1083,18 +1083,19 @@ stateLogin state =
             Just login
 
 
-sendUIMsg : String -> UI.SendMsg -> Cmd Msg
-sendUIMsg location msg =
-    sendUIMsgExp location msg UserReplyData
+sendUIMsg : Bool -> String -> UI.SendMsg -> Cmd Msg
+sendUIMsg tauri location msg =
+    -- if tauri then
+    sendUIValueTauri (UI.encodeSendMsg msg)
 
 
-sendUIMsgExp : String -> UI.SendMsg -> (Result Http.Error UI.ServerResponse -> Msg) -> Cmd Msg
-sendUIMsgExp location msg tomsg =
-    Http.post
-        { url = location ++ "/user"
-        , body = Http.jsonBody (UI.encodeSendMsg msg)
-        , expect = Http.expectJson tomsg UI.serverResponseDecoder
-        }
+
+-- else
+--     Http.post
+--         { url = location ++ "/user"
+--         , body = Http.jsonBody (UI.encodeSendMsg msg)
+--         , expect = Http.expectJson UserReplyData UI.serverResponseDecoder
+--         }
 
 
 sendAIMsg : String -> AI.SendMsg -> Cmd Msg
@@ -1695,7 +1696,7 @@ actualupdate msg model =
 
                 GD.Ok return ->
                     ( { model | state = instate }
-                    , sendUIMsg model.location <| UI.ChangePassword return
+                    , sendUIMsg model.tauri model.location <| UI.ChangePassword return
                     )
 
                 GD.Cancel ->
@@ -1708,7 +1709,7 @@ actualupdate msg model =
 
                 GD.Ok return ->
                     ( { model | state = instate }
-                    , sendUIMsg model.location <| UI.ChangeEmail return
+                    , sendUIMsg model.tauri model.location <| UI.ChangeEmail return
                     )
 
                 GD.Cancel ->
@@ -1722,7 +1723,8 @@ actualupdate msg model =
             case cmd of
                 ResetPassword.Ok ->
                     ( { model | state = ResetPassword nst }
-                    , sendUIMsg model.location
+                    , sendUIMsg model.tauri
+                        model.location
                         (UI.SetPassword { uid = nst.userId, newpwd = nst.password, reset_key = nst.reset_key })
                     )
 
@@ -1779,7 +1781,7 @@ actualupdate msg model =
 
                 UserSettings.LogOut ->
                     ( { model | state = initLoginState model Top }
-                    , sendUIMsg model.location UI.Logout
+                    , sendUIMsg model.tauri model.location UI.Logout
                     )
 
                 UserSettings.ChangePassword ->
@@ -3258,7 +3260,8 @@ handleLogin model route ( lmod, lcmd ) =
 
         Login.Register ->
             ( { model | state = Login lmod route }
-            , sendUIMsg model.location
+            , sendUIMsg model.tauri
+                model.location
                 (UI.Register
                     { uid = lmod.userId
                     , pwd = lmod.password
@@ -3269,7 +3272,7 @@ handleLogin model route ( lmod, lcmd ) =
 
         Login.Login ->
             ( { model | state = Login lmod route }
-            , sendUIMsg model.location <|
+            , sendUIMsg model.tauri model.location <|
                 UI.Login
                     { uid = lmod.userId
                     , pwd = lmod.password
@@ -3278,7 +3281,7 @@ handleLogin model route ( lmod, lcmd ) =
 
         Login.Reset ->
             ( { model | state = Login lmod route }
-            , sendUIMsg model.location <|
+            , sendUIMsg model.tauri model.location <|
                 UI.ResetPassword
                     { uid = lmod.userId
                     }
@@ -3293,7 +3296,8 @@ handleInvited model ( lmod, lcmd ) =
 
         Invited.RSVP ->
             ( { model | state = Invited lmod }
-            , sendUIMsg model.location
+            , sendUIMsg model.tauri
+                model.location
                 (UI.RSVP
                     { uid = lmod.userId
                     , pwd = lmod.password

@@ -24,7 +24,7 @@ use either::Either;
 use futures_util::TryStreamExt as _;
 use log::{error, info};
 pub use orgauth;
-use orgauth::endpoints::Callbacks;
+use orgauth::endpoints::{ActixTokener, Callbacks, Tokener};
 use orgauth::util;
 use rusqlite::Connection;
 use serde_json;
@@ -162,7 +162,11 @@ async fn user(
     &item.data,
     req.connection_info()
   );
-  match interfaces::user_interface(&session, &data, item.into_inner()) {
+  match interfaces::user_interface(
+    &mut ActixTokener { session: &session },
+    &data,
+    item.into_inner(),
+  ) {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'user' err: {:?}", e);
@@ -193,7 +197,7 @@ async fn admin(
     on_delete_user: Box::new(sqldata::on_delete_user),
   };
   match orgauth::endpoints::admin_interface_check(
-    &session,
+    &mut ActixTokener { session: &session },
     &data.orgauth_config,
     &mut cb,
     item.into_inner(),

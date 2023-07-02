@@ -6,7 +6,7 @@ use actix_web::HttpRequest;
 use either::Either::{Left, Right};
 use log::info;
 use orgauth;
-use orgauth::endpoints::Callbacks;
+use orgauth::endpoints::{Callbacks, Tokener};
 use std::error::Error;
 use std::time::Duration;
 use zkprotocol::content::{
@@ -69,12 +69,12 @@ pub fn zknotes_callbacks() -> Callbacks {
 
 // Just like orgauth::endpoints::user_interface, except adds in extra user data.
 pub fn user_interface(
-  session: &Session,
+  tokener: &mut dyn Tokener,
   config: &Config,
   msg: orgauth::data::WhatMessage,
 ) -> Result<orgauth::data::WhatMessage, Box<dyn Error>> {
   Ok(orgauth::endpoints::user_interface(
-    &session,
+    tokener,
     &config.orgauth_config,
     &mut zknotes_callbacks(),
     msg,
