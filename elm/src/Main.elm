@@ -79,7 +79,10 @@ type Msg
     | TAReplyData Data.TASelection (Result Http.Error ( Time.Posix, ZI.ServerResponse ))
     | PublicReplyData (Result Http.Error PI.ServerResponse)
     | ErrorIndexNote (Result Http.Error PI.ServerResponse)
-    | TauriReceiveZkReplyData JD.Value
+    | TauriZkReplyData JD.Value
+    | TauriUserReplyData JD.Value
+    | TauriAdminReplyData JD.Value
+    | TauriPublicReplyData JD.Value
     | LoadUrl String
     | InternalUrl Url
     | TASelection JD.Value
@@ -680,8 +683,17 @@ showMessage msg =
         ReceiveLocalVal _ ->
             "ReceiveLocalVal"
 
-        TauriReceiveZkReplyData _ ->
+        TauriZkReplyData _ ->
             "TauriReceiveZkReplyData"
+
+        TauriUserReplyData _ ->
+            "TauriUserReplyData"
+
+        TauriAdminReplyData _ ->
+            "TauriAdminReplyData"
+
+        TauriPublicReplyData _ ->
+            "TauriPublicReplyData"
 
         SelectDialogMsg _ ->
             "SelectDialogMsg"
@@ -1191,13 +1203,17 @@ sendSearch model search =
             )
 
 
-sendPIMsg : String -> PI.SendMsg -> Cmd Msg
-sendPIMsg location msg =
-    Http.post
-        { url = location ++ "/public"
-        , body = Http.jsonBody (PI.encodeSendMsg msg)
-        , expect = Http.expectJson PublicReplyData PI.serverResponseDecoder
-        }
+sendPIMsg : Bool -> String -> PI.SendMsg -> Cmd Msg
+sendPIMsg tauri location msg =
+    if tauri then
+        sendPIValueTauri <| PI.encodeSendMsg msg
+
+    else
+        Http.post
+            { url = location ++ "/public"
+            , body = Http.jsonBody (PI.encodeSendMsg msg)
+            , expect = Http.expectJson PublicReplyData PI.serverResponseDecoder
+            }
 
 
 addRecentZkListNote : List Data.ZkListNote -> Data.ZkListNote -> List Data.ZkListNote
@@ -1569,7 +1585,7 @@ actualupdate msg model =
             -- update the font size
             ( model, Cmd.none )
 
-        ( TauriReceiveZkReplyData jd, _ ) ->
+        ( TauriZkReplyData jd, _ ) ->
             let
                 _ =
                     Debug.log "TauriReceiveZkReplyData" ""
@@ -1579,7 +1595,51 @@ actualupdate msg model =
                     actualupdate (ZkReplyData (Ok ( Time.millisToPosix 0, d ))) model
 
                 Err e ->
-                    ( model, Cmd.none )
+                    ( displayMessageDialog model <| JD.errorToString e
+                    , Cmd.none
+                    )
+
+        ( TauriUserReplyData jd, _ ) ->
+            let
+                _ =
+                    Debug.log "TauriUserReplyData" ""
+            in
+            case JD.decodeValue UI.serverResponseDecoder jd of
+                Ok d ->
+                    actualupdate (UserReplyData (Ok d)) model
+
+                Err e ->
+                    ( displayMessageDialog model <| JD.errorToString e
+                    , Cmd.none
+                    )
+
+        ( TauriAdminReplyData jd, _ ) ->
+            let
+                _ =
+                    Debug.log "TauriAdminReplyData" ""
+            in
+            case JD.decodeValue AI.serverResponseDecoder jd of
+                Ok d ->
+                    actualupdate (AdminReplyData (Ok d)) model
+
+                Err e ->
+                    ( displayMessageDialog model <| JD.errorToString e
+                    , Cmd.none
+                    )
+
+        ( TauriPublicReplyData jd, _ ) ->
+            let
+                _ =
+                    Debug.log "TauriPublicReplyData" ""
+            in
+            case JD.decodeValue PI.serverResponseDecoder jd of
+                Ok d ->
+                    actualupdate (PublicReplyData (Ok d)) model
+
+                Err e ->
+                    ( displayMessageDialog model <| JD.errorToString e
+                    , Cmd.none
+                    )
 
         ( WindowSize s, _ ) ->
             ( { model | size = s }, Cmd.none )
@@ -2505,7 +2565,8 @@ actualupdate msg model =
                                 }
                                 (Just model.state)
                       }
-                    , sendPIMsg model.location
+                    , sendPIMsg model.tauri
+                        model.location
                         (PI.GetZkNote id)
                     )
 
@@ -2539,7 +2600,7 @@ actualupdate msg model =
                 View.Switch id ->
                     ( model
                       -- , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
-                    , sendPIMsg model.location (PI.GetZkNote id)
+                    , sendPIMsg model.tauri model.location (PI.GetZkNote id)
                     )
 
         ( EditZkNoteMsg em, EditZkNote es login ) ->
@@ -3509,7 +3570,10 @@ main =
                     , Browser.Events.onResize (\w h -> WindowSize { width = w, height = h })
                     , keyreceive
                     , LS.localVal ReceiveLocalVal
-                    , receiveTauriResponse TauriReceiveZkReplyData
+                    , receiveZITauriResponse TauriZkReplyData
+                    , receiveAITauriResponse TauriAdminReplyData
+                    , receiveUITauriResponse TauriUserReplyData
+                    , receivePITauriResponse TauriPublicReplyData
                     ]
                         ++ tracks
         , onUrlRequest = urlRequest
@@ -3532,7 +3596,25 @@ port receiveKeyMsg : (JD.Value -> msg) -> Sub msg
 port sendZIValueTauri : JD.Value -> Cmd msg
 
 
-port receiveTauriResponse : (JD.Value -> msg) -> Sub msg
+port receiveZITauriResponse : (JD.Value -> msg) -> Sub msg
+
+
+port sendAIValueTauri : JD.Value -> Cmd msg
+
+
+port receiveAITauriResponse : (JD.Value -> msg) -> Sub msg
+
+
+port sendUIValueTauri : JD.Value -> Cmd msg
+
+
+port receiveUITauriResponse : (JD.Value -> msg) -> Sub msg
+
+
+port sendPIValueTauri : JD.Value -> Cmd msg
+
+
+port receivePITauriResponse : (JD.Value -> msg) -> Sub msg
 
 
 keyreceive : Sub Msg

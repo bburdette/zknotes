@@ -282,7 +282,7 @@ pub fn zk_interface_loggedin(
 pub fn public_interface(
   config: &Config,
   msg: PublicMessage,
-  req: HttpRequest,
+  ip: Option<&str>,
 ) -> Result<ServerResponse, Box<dyn Error>> {
   match msg.what.as_str() {
     "getzknote" => {
@@ -290,12 +290,7 @@ pub fn public_interface(
       let id: i64 = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       let note = sqldata::read_zknote(&conn, None, id)?;
-      info!(
-        "public#getzknote: {} - {} - {:?}",
-        id,
-        note.title,
-        req.connection_info().realip_remote_addr()
-      );
+      info!("public#getzknote: {} - {} - {:?}", id, note.title, ip);
       Ok(ServerResponse {
         what: "zknote".to_string(),
         content: serde_json::to_value(ZkNoteEdit {
@@ -311,9 +306,7 @@ pub fn public_interface(
       let note = sqldata::read_zknotepubid(&conn, None, pubid.as_str())?;
       info!(
         "public#getzknotepubid: {} - {} - {:?}",
-        pubid,
-        note.title,
-        req.connection_info().realip_remote_addr()
+        pubid, note.title, ip,
       );
       Ok(ServerResponse {
         what: "zknote".to_string(),

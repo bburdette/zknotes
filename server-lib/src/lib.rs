@@ -1,6 +1,6 @@
 //
 
-mod config;
+pub mod config;
 pub mod interfaces;
 mod migrations;
 mod search;
@@ -23,6 +23,7 @@ use config::Config;
 use either::Either;
 use futures_util::TryStreamExt as _;
 use log::{error, info};
+pub use orgauth;
 use orgauth::endpoints::Callbacks;
 use orgauth::util;
 use rusqlite::Connection;
@@ -132,7 +133,11 @@ async fn public(
     req.connection_info()
   );
 
-  match interfaces::public_interface(&data, item.into_inner(), req) {
+  match interfaces::public_interface(
+    &data,
+    item.into_inner(),
+    req.connection_info().realip_remote_addr(),
+  ) {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'public' err: {:?}", e);
