@@ -19,13 +19,13 @@ struct ZkState {
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 fn main() {
   // spawn the web server in a separate thread.
-  let handler = thread::spawn(|| {
-    println!("meh here");
-    match err_main() {
-      Err(e) => error!("error: {:?}", e),
-      Ok(_) => (),
-    }
-  });
+  // let handler = thread::spawn(|| {
+  //   println!("meh here");
+  //   match err_main() {
+  //     Err(e) => error!("error: {:?}", e),
+  //     Ok(_) => (),
+  //   }
+  // });
 
   // #[cfg(desktop)]
   // app_lib::run();
@@ -46,15 +46,13 @@ fn greet(name: &str) -> String {
 }
 
 #[tauri::command]
-fn zimsg(msg: UserMessage) -> ServerResponse {
+fn zimsg(state: State<ZkState>, msg: UserMessage) -> ServerResponse {
   // gonna need config obj, uid.
   // uid could be passed from elm maybe.
 
   println!("zimsg");
 
-  let c = zknotes_server_lib::defcon();
-
-  match zknotes_server_lib::interfaces::zk_interface_loggedin(&c, 2, &msg) {
+  match zknotes_server_lib::interfaces::zk_interface_loggedin(&&state.config, 2, &msg) {
     Ok(sr) => {
       println!("sr: {}", sr.what);
       // serde_json::to_value(&sr).unwrap());
@@ -73,8 +71,6 @@ fn pimsg(state: State<ZkState>, msg: PublicMessage) -> ServerResponse {
   // uid could be passed from elm maybe.
 
   println!("pimsg");
-
-  let c = zknotes_server_lib::defcon();
 
   match zknotes_server_lib::interfaces::public_interface(&state.config, msg, None) {
     Ok(sr) => {
@@ -96,11 +92,9 @@ fn uimsg(state: State<ZkState>, msg: WhatMessage) -> WhatMessage {
 
   println!("uimsg");
 
-  let c = zknotes_server_lib::defcon();
-
   let mut ut = UuidTokener { uuid: None };
 
-  let sr = match zknotes_server_lib::interfaces::user_interface(&mut ut, &c, msg) {
+  let sr = match zknotes_server_lib::interfaces::user_interface(&mut ut, &state.config, msg) {
     Ok(sr) => {
       println!("sr: {}", sr.what);
       // serde_json::to_value(&sr).unwrap());

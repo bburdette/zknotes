@@ -14,11 +14,15 @@
   <body>
     <div id="elm"></div>
     <script type="text/javascript">
-      login = {{logindata}};
-      sysids = {{sysids}};
-      errorid = {{errorid}};
-      adminsettings = {{adminsettings}};
-
+      // login = {{logindata}};
+      // sysids = {{sysids}};
+      // errorid = {{errorid}};
+      // adminsettings = {{adminsettings}};
+      login = {"active":true,"admin":true,"data":{"homenote":2623,"userid":2,"zknote":309},"email":"bburdette@protonmail.com","name":"ben","userid":2};
+      sysids = {"commentid":2770,"publicid":304,"searchid":306,"shareid":305};
+      errorid = null;
+      adminsettings = {"non_admin_invite":true,"open_registration":true};
+      
       const { invoke } = window.__TAURI__.tauri
 
       function sendZIValueTauri(request) {
@@ -44,7 +48,7 @@
       }
       function sendUIValueTauri(request) {
         console.log("sendUIValueTauri", request);
-        invoke('zimsg', { msg: request })
+        invoke('uimsg', { msg: request })
         .then((response) => {
           console.log("response!");
           app.ports.receiveUITauriResponse.send(response) });

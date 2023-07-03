@@ -1085,6 +1085,10 @@ stateLogin state =
 
 sendUIMsg : Bool -> String -> UI.SendMsg -> Cmd Msg
 sendUIMsg tauri location msg =
+    let
+        _ =
+            Debug.log "sendUIMsg tauri:" tauri
+    in
     -- if tauri then
     sendUIValueTauri (UI.encodeSendMsg msg)
 
@@ -1116,19 +1120,19 @@ sendZIMsg : Bool -> String -> ZI.SendMsg -> Cmd Msg
 sendZIMsg tauri location msg =
     let
         _ =
-            Debug.log "sendZIMsg tauri:" tauri
+            Debug.log "zzzz sendZIMsg tauri:" tauri
     in
     if tauri then
         let
             _ =
-                Debug.log "sendZIMsg" msg
+                Debug.log "zzzz sendZIMsg" msg
         in
         sendZIMsgTauri msg
 
     else
         let
             _ =
-                Debug.log "sendZIMsgExp" msg
+                Debug.log "zzzz sendZIMsgExp" msg
         in
         sendZIMsgExp location msg ZkReplyData
 
