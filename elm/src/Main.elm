@@ -1089,17 +1089,15 @@ sendUIMsg tauri location msg =
         _ =
             Debug.log "sendUIMsg tauri:" tauri
     in
-    -- if tauri then
-    sendUIValueTauri (UI.encodeSendMsg msg)
+    if tauri then
+        sendUIValueTauri (UI.encodeSendMsg msg)
 
-
-
--- else
---     Http.post
---         { url = location ++ "/user"
---         , body = Http.jsonBody (UI.encodeSendMsg msg)
---         , expect = Http.expectJson UserReplyData UI.serverResponseDecoder
---         }
+    else
+        Http.post
+            { url = location ++ "/user"
+            , body = Http.jsonBody (UI.encodeSendMsg msg)
+            , expect = Http.expectJson UserReplyData UI.serverResponseDecoder
+            }
 
 
 sendAIMsg : String -> AI.SendMsg -> Cmd Msg
