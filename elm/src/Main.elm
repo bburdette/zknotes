@@ -1123,7 +1123,7 @@ sendZIMsg tauri location msg =
     if tauri then
         let
             _ =
-                Debug.log "zzzz sendZIMsg" msg
+                Debug.log "zzzz sendZIMsgTauri" msg
         in
         sendZIMsgTauri msg
 

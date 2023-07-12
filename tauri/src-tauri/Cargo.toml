@@ -15,14 +15,15 @@ name = "app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2.0.0-alpha.5", features = [] }
+tauri-build = { version = "2.0.0-alpha.6", features = [] }
 
 [dependencies]
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 # tauri = { version = "2.0.0-alpha.9", features = [] }
 # tauri = { git = "https://github.com/tauri-apps/tauri", rev = "2d2fd6abe291ddf645fa2fdecc08111d2c0e258e", features = [] }
-tauri = { git = "https://github.com/tauri-apps/tauri", rev = "38d0bed8ebb6c5872fc54903051d146d386b721e", features = [] }
+# tauri = { git = "https://github.com/tauri-apps/tauri", rev = "38d0bed8ebb6c5872fc54903051d146d386b721e", features = [] }
+tauri = { git = "https://github.com/tauri-apps/tauri", rev = "tauri-v2.0.0-alpha.10", features = [] }
 
 # zknotes deps
 zknotes-server-lib = { path = "../../server-lib" }
