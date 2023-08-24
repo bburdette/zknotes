@@ -49,6 +49,7 @@ module EditZkNote exposing
     )
 
 import Browser.Dom as BD
+import Browser.Events as BE
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
 import Common
@@ -134,6 +135,8 @@ type Msg
     | RequestsPress
     | FlipLink EditLink
     | ShowArchivesPress
+    | OnEditFocus Bool
+    | EditKey String
     | Noop
 
 
@@ -200,6 +203,7 @@ type alias Model =
     , dialog : Maybe D.Model
     , panelNote : Maybe Data.ZkNote
     , mbReplaceString : Maybe String
+    , editKeys : Bool
     }
 
 
@@ -888,7 +892,10 @@ renderMd si cd noteCache md mdw =
                 , E.alignTop
                 , EBd.width 2
                 , EBd.color TC.darkGrey
-                , EBk.color TC.lightGrey
+                , EBk.color TC.lightGreen
+                , EE.onFocus (OnEditFocus True)
+                , EE.onLoseFocus (OnEditFocus False)
+                , E.htmlAttribute (Html.Attributes.attribute "tabindex" "0")
                 ]
                 rendered
 
@@ -1704,6 +1711,7 @@ initFull si ld zkl zknote dtlinks spm =
       , dialog = Nothing
       , panelNote = Nothing
       , mbReplaceString = Nothing
+      , editKeys = False
       }
     , { zknote = zknote.id, offset = 0, limit = Nothing }
     )
@@ -1757,6 +1765,7 @@ initNew si ld zkl spm links =
     , dialog = Nothing
     , panelNote = Nothing
     , mbReplaceString = Nothing
+    , editKeys = False
     }
         |> (\m1 ->
                 -- for new EMPTY notes, the 'revert' should be the same as the model, so that you aren't
@@ -2710,5 +2719,324 @@ update msg model =
         RequestsPress ->
             ( model, Requests )
 
+        OnEditFocus on ->
+            let
+                _ =
+                    Debug.log "oneditfocus" on
+            in
+            ( { model | editKeys = on }, None )
+
+        EditKey s ->
+            let
+                _ =
+                    Debug.log "editkey" s
+            in
+            ( { model | md = mdKeyPress (toKeyPress s) model.md }, None )
+
         Noop ->
             ( model, None )
+
+
+type KeyPress
+    = ArrowLeft
+    | ArrowRight
+    | ArrowUp
+    | ArrowDown
+    | Backspace
+    | Alt
+    | Control
+    | OS
+    | Shift
+    | Enter
+    | Tab
+    | End
+    | Home
+    | PageUp
+    | PageDown
+    | Escape
+    | F1
+    | F2
+    | F3
+    | F4
+    | F5
+    | F6
+    | F7
+    | F8
+    | F9
+    | F10
+    | F11
+    | F12
+    | DeleteKp
+    | Other String
+
+
+toKeyPress : String -> KeyPress
+toKeyPress s =
+    case s of
+        "ArrowLeft" ->
+            ArrowLeft
+
+        "ArrowRight" ->
+            ArrowRight
+
+        "ArrowUp" ->
+            ArrowUp
+
+        "ArrowDown" ->
+            ArrowDown
+
+        "Backspace" ->
+            Backspace
+
+        "Alt" ->
+            Alt
+
+        "Control" ->
+            Control
+
+        "OS" ->
+            OS
+
+        "Shift" ->
+            Shift
+
+        "Enter" ->
+            Enter
+
+        "Tab" ->
+            Tab
+
+        "End" ->
+            End
+
+        "Home" ->
+            Home
+
+        "PageUp" ->
+            PageUp
+
+        "PageDown" ->
+            PageDown
+
+        "Escape" ->
+            Escape
+
+        "F1" ->
+            F1
+
+        "F2" ->
+            F2
+
+        "F3" ->
+            F3
+
+        "F4" ->
+            F4
+
+        "F5" ->
+            F5
+
+        "F6" ->
+            F6
+
+        "F7" ->
+            F7
+
+        "F8" ->
+            F8
+
+        "F9" ->
+            F9
+
+        "F10" ->
+            F10
+
+        "F11" ->
+            F11
+
+        "F12" ->
+            F12
+
+        "Delete" ->
+            DeleteKp
+
+        x ->
+            Other x
+
+
+mdKeyPress : KeyPress -> String -> String
+mdKeyPress kp md =
+    case kp of
+        ArrowLeft ->
+            String.split "<cursor/>" md
+                -- |> Debug.log "lcursor"
+                |> moveRight
+                -- |> Debug.log "aftermovlief"
+                |> List.filter ((/=) "")
+                -- |> Debug.log "afterfileter"
+                |> String.join "<cursor/>"
+
+        ArrowRight ->
+            String.split "<cursor/>" md
+                |> moveLeft
+                |> List.filter ((/=) "")
+                |> String.join "<cursor/>"
+
+        ArrowUp ->
+            md
+
+        ArrowDown ->
+            md
+
+        Backspace ->
+            let
+                ems =
+                    String.split "<cursor/>" md
+                        |> List.reverse
+            in
+            case ems of
+                fst :: rst ->
+                    fst
+                        :: List.map (String.dropRight 1) rst
+                        |> List.reverse
+                        |> List.filter ((/=) "")
+                        |> String.join "<cursor/>"
+
+                [] ->
+                    ""
+
+        Alt ->
+            md
+
+        Control ->
+            md
+
+        OS ->
+            md
+
+        Shift ->
+            md
+
+        Enter ->
+            md
+
+        Tab ->
+            md
+
+        End ->
+            md
+
+        Home ->
+            md
+
+        PageUp ->
+            md
+
+        PageDown ->
+            md
+
+        Escape ->
+            md
+
+        F1 ->
+            md
+
+        F2 ->
+            md
+
+        F3 ->
+            md
+
+        F4 ->
+            md
+
+        F5 ->
+            md
+
+        F6 ->
+            md
+
+        F7 ->
+            md
+
+        F8 ->
+            md
+
+        F9 ->
+            md
+
+        F10 ->
+            md
+
+        F11 ->
+            md
+
+        F12 ->
+            md
+
+        DeleteKp ->
+            let
+                ems =
+                    String.split "<cursor/>" md
+            in
+            case ems of
+                fst :: rst ->
+                    fst
+                        :: List.map (String.dropLeft 1) rst
+                        |> List.filter ((/=) "")
+                        |> String.join "<cursor/>"
+
+                [] ->
+                    ""
+
+        Other s ->
+            String.replace "<cursor/>" (s ++ "<cursor/>") md
+
+
+moveLeft : List String -> List String
+moveLeft strings =
+    case strings of
+        first :: rest ->
+            let
+                firsts =
+                    List.map (String.left 1) rest
+
+                rests =
+                    List.map (String.dropLeft 1) rest
+            in
+            case firsts of
+                fst :: rsts ->
+                    String.append first fst
+                        :: List.map2 (\f r -> String.append r f) rsts rests
+                        ++ List.drop (List.length rsts) rests
+
+                [] ->
+                    []
+
+        [] ->
+            []
+
+
+
+-- moveRight : List String -> List String
+-- moveRight strings =
+--     case strings of
+--         first :: rest ->
+--             let firsts = List.map (String.right 1) rest
+--                 rests = List.map (String.dropRight 1) rest in
+--             case firsts of
+--                 (fst::rsts) -> (String.append first fst) ::
+--                     (List.map2 (\f r -> String.append r f)) rsts rests
+--                     ++ (List.drop (List.length rsts) rests)
+--                 [] -> []
+--         [] -> []
+
+
+moveRight : List String -> List String
+moveRight strings =
+    strings
+        |> List.map String.reverse
+        |> List.reverse
+        |> moveLeft
+        |> List.map String.reverse
+        |> List.reverse

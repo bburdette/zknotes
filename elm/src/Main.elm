@@ -48,6 +48,7 @@ import Set
 import ShowMessage
 import TagAThing
 import TagFiles
+import TangoColors as TC
 import Task
 import Time
 import Toop
@@ -1243,7 +1244,25 @@ view model =
                         { dm | model = model.trackedRequests }
 
             _ ->
-                E.layout [ EF.size model.fontsize, E.width E.fill ] <| viewState model.size model.state model
+                E.layoutWith
+                    { options =
+                        [ E.focusStyle
+                            { borderColor = Just TC.orange
+                            , backgroundColor =
+                                Nothing
+                            , shadow =
+                                Just
+                                    { color = TC.orange
+                                    , offset = ( 0, 0 )
+                                    , blur = 0
+                                    , size = 3
+                                    }
+                            }
+                        ]
+                    }
+                    [ EF.size model.fontsize, E.width E.fill ]
+                <|
+                    viewState model.size model.state model
         ]
     }
 
@@ -3451,6 +3470,29 @@ main =
 
                             InitError _ ->
                                 []
+
+                    editKeys =
+                        case model of
+                            Ready rmd ->
+                                case rmd.state of
+                                    EditZkNote ezkn ld ->
+                                        -- if ezkn.editKeys then
+                                        [ Browser.Events.onKeyDown
+                                            (JD.succeed (EditZkNote.EditKey >> EditZkNoteMsg)
+                                                |> andMap (JD.field "key" JD.string)
+                                            )
+                                        ]
+
+                                    -- else
+                                    --     []
+                                    _ ->
+                                        []
+
+                            PreInit _ ->
+                                []
+
+                            InitError _ ->
+                                []
                 in
                 Sub.batch <|
                     [ receiveTASelection TASelection
@@ -3459,6 +3501,7 @@ main =
                     , LS.localVal ReceiveLocalVal
                     ]
                         ++ tracks
+                        ++ editKeys
         , onUrlRequest = urlRequest
         , onUrlChange = UrlChanged
         }

@@ -262,6 +262,7 @@ mkRenderer si viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged not
                 |> Markdown.Html.withOptionalAttribute "height"
             , Markdown.Html.tag "note" (noteView si noteCache)
                 |> Markdown.Html.withAttribute "id"
+            , Markdown.Html.tag "cursor" cursorView
             ]
     , table = E.column [ E.width <| E.fill ]
     , tableHeader = E.column [ E.width <| E.fill, EF.bold, EF.underline, E.spacing 8 ]
@@ -414,6 +415,11 @@ noteFile si filename zknote =
 
                 _ ->
                     link (Just zknote.title) ("/note/" ++ String.fromInt zknote.id) [ E.text zknote.title ]
+
+
+cursorView : List (Element a) -> Element a
+cursorView _ =
+    E.el [ EF.color TC.red ] (E.text "|")
 
 
 noteView : Data.Sysids -> NoteCache -> String -> List (Element a) -> Element a
