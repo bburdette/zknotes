@@ -2866,6 +2866,10 @@ toKeyPress s =
 
 mdKeyPress : KeyPress -> String -> String
 mdKeyPress kp md =
+    let
+        _ =
+            Debug.log "mdKeyPress" kp
+    in
     case kp of
         ArrowLeft ->
             String.split "<cursor/>" md
@@ -2918,7 +2922,7 @@ mdKeyPress kp md =
             md
 
         Enter ->
-            md
+            String.replace "<cursor/>" "\n<cursor/>" md
 
         Tab ->
             md
