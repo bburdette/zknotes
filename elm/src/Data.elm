@@ -30,6 +30,11 @@ type alias TASelection =
     }
 
 
+type alias TAError =
+    { what : String
+    }
+
+
 encodeSetSelection : SetSelection -> JE.Value
 encodeSetSelection s =
     JE.object
@@ -44,6 +49,12 @@ decodeTASelection =
     JD.succeed TASelection
         |> andMap (JD.field "text" JD.string)
         |> andMap (JD.field "offset" JD.int)
+        |> andMap (JD.field "what" JD.string)
+
+
+decodeTAError : JD.Decoder TAError
+decodeTAError =
+    JD.succeed TAError
         |> andMap (JD.field "what" JD.string)
 
 

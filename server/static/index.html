@@ -28,7 +28,8 @@
               app.ports.receiveTASelection.send(range);
           }
           else {
-              app.ports.receiveTASelection.send(null);
+              var error = { what: request.what };
+              app.ports.receiveTAError.send(error);
           }
       }
 
