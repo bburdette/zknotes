@@ -1195,6 +1195,24 @@ piview pimodel =
             }
 
 
+layoutOptions =
+    { options =
+        [ E.focusStyle
+            { borderColor = Just TC.orange
+            , backgroundColor =
+                Nothing
+            , shadow =
+                Just
+                    { color = TC.orange
+                    , offset = ( 0, 0 )
+                    , blur = 0
+                    , size = 3
+                    }
+            }
+        ]
+    }
+
+
 view : Model -> { title : String, body : List (Html Msg) }
 view model =
     { title =
@@ -1208,58 +1226,43 @@ view model =
         [ case model.state of
             DisplayMessage dm _ ->
                 Html.map DisplayMessageMsg <|
-                    GD.layout
+                    GD.layoutWith layoutOptions
                         (Just { width = min 600 model.size.width, height = min 500 model.size.height })
                         dm
 
             MessageNLink dm _ ->
                 Html.map MessageNLinkMsg <|
-                    GD.layout
+                    GD.layoutWith layoutOptions
                         (Just { width = min 600 model.size.width, height = min 500 model.size.height })
                         dm
 
             SelectDialog sdm _ ->
                 Html.map SelectDialogMsg <|
-                    GD.layout
+                    GD.layoutWith layoutOptions
                         (Just { width = min 600 model.size.width, height = min 500 model.size.height })
                         sdm
 
             ChangePasswordDialog cdm _ ->
                 Html.map ChangePasswordDialogMsg <|
-                    GD.layout
+                    GD.layoutWith layoutOptions
                         (Just { width = min 600 model.size.width, height = min 200 model.size.height })
                         cdm
 
             ChangeEmailDialog cdm _ ->
                 Html.map ChangeEmailDialogMsg <|
-                    GD.layout
+                    GD.layoutWith layoutOptions
                         (Just { width = min 600 model.size.width, height = min 200 model.size.height })
                         cdm
 
             RequestsDialog dm _ ->
                 Html.map RequestsDialogMsg <|
-                    GD.layout
+                    GD.layoutWith layoutOptions
                         (Just { width = min 600 model.size.width, height = min 500 model.size.height })
                         -- use the live-updated model
                         { dm | model = model.trackedRequests }
 
             _ ->
-                E.layoutWith
-                    { options =
-                        [ E.focusStyle
-                            { borderColor = Just TC.orange
-                            , backgroundColor =
-                                Nothing
-                            , shadow =
-                                Just
-                                    { color = TC.orange
-                                    , offset = ( 0, 0 )
-                                    , blur = 0
-                                    , size = 3
-                                    }
-                            }
-                        ]
-                    }
+                E.layoutWith layoutOptions
                     [ EF.size model.fontsize, E.width E.fill ]
                 <|
                     viewState model.size model.state model
