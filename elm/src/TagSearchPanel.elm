@@ -239,7 +239,6 @@ updateSearchText model txt =
                                )
                         )
                     )
-
     }
 
 

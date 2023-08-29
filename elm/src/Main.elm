@@ -1887,7 +1887,9 @@ actualupdate msg model =
 
                                         Nothing ->
                                             View (View.initFull model.sysids fbe)
-                                ngets = Debug.log "makeNoteCacheGets" <| makeNoteCacheGets fbe.zknote.content model
+
+                                ngets =
+                                    makeNoteCacheGets fbe.zknote.content model
                             in
                             ( { model | state = vstate }
                             , Cmd.batch ngets

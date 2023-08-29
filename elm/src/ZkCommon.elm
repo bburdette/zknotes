@@ -131,8 +131,9 @@ golink zknid color =
                 E.text "☐"
         }
 
+
 stringToolTip : String -> E.Element msg
-stringToolTip  str =
+stringToolTip str =
     E.el
         [ EBk.color (E.rgb 0.6 0.6 0.6)
         , EF.color (E.rgb 1 1 1)
