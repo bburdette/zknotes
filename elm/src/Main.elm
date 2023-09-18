@@ -264,7 +264,7 @@ routeStateInternal model route =
                             PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNote id)) PublicReplyData
 
                         _ ->
-                            sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id, what = "" })
+                            sendZIMsg model.location (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
                 Nothing ->
@@ -296,12 +296,12 @@ routeStateInternal model route =
             case model.state of
                 EditZkNote st login ->
                     ( EditZkNote st login
-                    , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id, what = "" })
+                    , sendZIMsg model.location (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
                 EditZkNoteListing st login ->
                     ( EditZkNoteListing st login
-                    , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id, what = "" })
+                    , sendZIMsg model.location (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
                 EView st login ->
@@ -315,7 +315,7 @@ routeStateInternal model route =
                             ( ShowMessage { message = "loading note..." }
                                 login
                                 (Just model.state)
-                            , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id, what = "" })
+                            , sendZIMsg model.location (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
                             )
 
                         Nothing ->
@@ -458,7 +458,7 @@ routeStateInternal model route =
                                 [ sendZIMsg
                                     model.location
                                     (ZI.SearchZkNotes <| prevSearchQuery login)
-                                , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id, what = "" })
+                                , sendZIMsg model.location (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
                                 ]
                             )
 
@@ -1451,7 +1451,7 @@ displayMessageNLinkDialog model message url text =
     }
 
 
-onZkNoteEditWhat : Model -> Time.Posix -> Data.ZkNoteEditWhat -> ( Model, Cmd Msg )
+onZkNoteEditWhat : Model -> Time.Posix -> Data.ZkNoteAndLinksWhat -> ( Model, Cmd Msg )
 onZkNoteEditWhat model pt znew =
     let
         state =
@@ -2484,7 +2484,7 @@ actualupdate msg model =
                             case es.id of
                                 Just id ->
                                     ( { model | state = state }
-                                    , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id, what = "" })
+                                    , sendZIMsg model.location (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
                                     )
 
                                 Nothing ->
@@ -2807,12 +2807,12 @@ makeNoteCacheGets md model =
                     Just zkn ->
                         sendZIMsg
                             model.location
-                            (ZI.GetZneIfChanged { zknote = id, what = "cache", changeddate = zkn.zknote.changeddate })
+                            (ZI.GetZnlIfChanged { zknote = id, what = "cache", changeddate = zkn.zknote.changeddate })
 
                     Nothing ->
                         sendZIMsg
                             model.location
-                            (ZI.GetZkNoteEdit { zknote = id, what = "cache" })
+                            (ZI.GetZkNoteAndLinks { zknote = id, what = "cache" })
             )
 
 
@@ -2834,7 +2834,7 @@ makeNewNoteCacheGets md model =
                         Just <|
                             sendZIMsg
                                 model.location
-                                (ZI.GetZkNoteEdit { zknote = id, what = "cache" })
+                                (ZI.GetZkNoteAndLinks { zknote = id, what = "cache" })
             )
 
 
@@ -2961,7 +2961,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                             ( ShowMessage { message = "loading note..." }
                                 login
                                 (Just model.state)
-                            , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id, what = "" })
+                            , sendZIMsg model.location (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
                             )
                     in
                     ( { model | state = st }, cmd )
@@ -2972,7 +2972,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                             ( ShowMessage { message = "loading note..." }
                                 login
                                 (Just model.state)
-                            , sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id, what = "" })
+                            , sendZIMsg model.location (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
                             )
                     in
                     ( { model | state = st }
@@ -3032,7 +3032,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                             sendZIMsg model.location (ZI.GetZkNote id)
 
                         _ ->
-                            sendZIMsg model.location (ZI.GetZkNoteEdit { zknote = id, what = what })
+                            sendZIMsg model.location (ZI.GetZkNoteAndLinks { zknote = id, what = what })
                     )
 
                 EditZkNote.SetHomeNote id ->

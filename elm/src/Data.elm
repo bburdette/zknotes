@@ -206,26 +206,26 @@ type alias GetZkNoteComments =
     }
 
 
-type alias GetZkNoteEdit =
+type alias GetZkNoteAndLinks =
     { zknote : Int
     , what : String
     }
 
 
-type alias GetZneIfChanged =
+type alias GetZnlIfChanged =
     { zknote : Int
     , changeddate : Int
     , what : String
     }
 
 
-type alias ZkNoteEditWhat =
+type alias ZkNoteAndLinksWhat =
     { what : String
-    , zne : ZkNoteEdit
+    , zne : ZkNoteAndLinks
     }
 
 
-type alias ZkNoteEdit =
+type alias ZkNoteAndLinks =
     { zknote : ZkNote
     , links : List EditLink
     }
@@ -347,7 +347,7 @@ encodeGetZkLinks gzl =
         ]
 
 
-encodeGetZkNoteEdit : GetZkNoteEdit -> JE.Value
+encodeGetZkNoteEdit : GetZkNoteAndLinks -> JE.Value
 encodeGetZkNoteEdit gzl =
     JE.object
         [ ( "zknote", JE.int gzl.zknote )
@@ -355,7 +355,7 @@ encodeGetZkNoteEdit gzl =
         ]
 
 
-encodeGetZneIfChanged : GetZneIfChanged -> JE.Value
+encodeGetZneIfChanged : GetZnlIfChanged -> JE.Value
 encodeGetZneIfChanged x =
     JE.object
         [ ( "zknote", JE.int x.zknote )
@@ -575,16 +575,16 @@ decodeZkNoteArchives =
         (JD.field "results" decodeZkListNoteSearchResult)
 
 
-decodeZkNoteEdit : JD.Decoder ZkNoteEdit
+decodeZkNoteEdit : JD.Decoder ZkNoteAndLinks
 decodeZkNoteEdit =
-    JD.map2 ZkNoteEdit
+    JD.map2 ZkNoteAndLinks
         (JD.field "zknote" decodeZkNote)
         (JD.field "links" (JD.list decodeEditLink))
 
 
-decodeZkNoteEditWhat : JD.Decoder ZkNoteEditWhat
+decodeZkNoteEditWhat : JD.Decoder ZkNoteAndLinksWhat
 decodeZkNoteEditWhat =
-    JD.map2 ZkNoteEditWhat
+    JD.map2 ZkNoteAndLinksWhat
         (JD.field "what" JD.string)
         (JD.field "zne" decodeZkNoteEdit)
 
