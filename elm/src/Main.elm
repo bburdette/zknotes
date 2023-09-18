@@ -82,6 +82,7 @@ type Msg
     | LoadUrl String
     | InternalUrl Url
     | TASelection JD.Value
+    | TAError JD.Value
     | UrlChanged Url
     | WindowSize Util.Size
     | DisplayMessageMsg (GD.Msg DisplayMessage.Msg)
@@ -658,6 +659,9 @@ showMessage msg =
 
         TASelection _ ->
             "TASelection"
+
+        TAError _ ->
+            "TAError"
 
         UrlChanged _ ->
             "UrlChanged"
@@ -1630,33 +1634,26 @@ actualupdate msg model =
                 Ok tas ->
                     case state of
                         EditZkNote emod login ->
-                            case EditZkNote.onTASelection emod model.recentNotes tas of
-                                EditZkNote.TAError e ->
-                                    ( displayMessageDialog model e, Cmd.none )
+                            handleTASelection model emod login tas
 
-                                EditZkNote.TASave s ->
-                                    ( model
-                                    , sendZIMsgExp model.location
-                                        (ZI.SaveZkNotePlusLinks s)
-                                        (TAReplyData tas)
-                                    )
+                        _ ->
+                            ( model, Cmd.none )
 
-                                EditZkNote.TAUpdated nemod s ->
-                                    ( { model | state = EditZkNote nemod login }
-                                    , Cmd.batch
-                                        ((case s of
-                                            Just sel ->
-                                                setTASelection (Data.encodeSetSelection sel)
+                Err e ->
+                    ( displayMessageDialog model <| JD.errorToString e, Cmd.none )
 
-                                            Nothing ->
-                                                Cmd.none
-                                         )
-                                            :: makeNewNoteCacheGets nemod.md model
-                                        )
-                                    )
-
-                                EditZkNote.TANoop ->
-                                    ( model, Cmd.none )
+        ( TAError jv, state ) ->
+            case JD.decodeValue Data.decodeTAError jv of
+                Ok tae ->
+                    case state of
+                        EditZkNote emod login ->
+                            handleTASelection model
+                                emod
+                                login
+                                { text = ""
+                                , offset = 0
+                                , what = tae.what
+                                }
 
                         _ ->
                             ( model, Cmd.none )
@@ -1890,9 +1887,12 @@ actualupdate msg model =
 
                                         Nothing ->
                                             View (View.initFull model.sysids fbe)
+
+                                ngets =
+                                    makeNoteCacheGets fbe.zknote.content model
                             in
                             ( { model | state = vstate }
-                            , Cmd.none
+                            , Cmd.batch ngets
                             )
 
         ( ErrorIndexNote rsein, _ ) ->
@@ -2797,6 +2797,37 @@ actualupdate msg model =
             )
 
 
+handleTASelection : Model -> EditZkNote.Model -> Data.LoginData -> Data.TASelection -> ( Model, Cmd Msg )
+handleTASelection model emod login tas =
+    case EditZkNote.onTASelection emod model.recentNotes tas of
+        EditZkNote.TAError e ->
+            ( displayMessageDialog model e, Cmd.none )
+
+        EditZkNote.TASave s ->
+            ( model
+            , sendZIMsgExp model.location
+                (ZI.SaveZkNotePlusLinks s)
+                (TAReplyData tas)
+            )
+
+        EditZkNote.TAUpdated nemod s ->
+            ( { model | state = EditZkNote nemod login }
+            , Cmd.batch
+                ((case s of
+                    Just sel ->
+                        setTASelection (Data.encodeSetSelection sel)
+
+                    Nothing ->
+                        Cmd.none
+                 )
+                    :: makeNewNoteCacheGets nemod.md model
+                )
+            )
+
+        EditZkNote.TANoop ->
+            ( model, Cmd.none )
+
+
 makeNoteCacheGets : String -> Model -> List (Cmd Msg)
 makeNoteCacheGets md model =
     MC.noteIds md
@@ -3454,6 +3485,7 @@ main =
                 in
                 Sub.batch <|
                     [ receiveTASelection TASelection
+                    , receiveTAError TAError
                     , Browser.Events.onResize (\w h -> WindowSize { width = w, height = h })
                     , keyreceive
                     , LS.localVal ReceiveLocalVal
@@ -3471,6 +3503,9 @@ port setTASelection : JE.Value -> Cmd msg
 
 
 port receiveTASelection : (JD.Value -> msg) -> Sub msg
+
+
+port receiveTAError : (JD.Value -> msg) -> Sub msg
 
 
 port receiveKeyMsg : (JD.Value -> msg) -> Sub msg
