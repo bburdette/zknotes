@@ -242,14 +242,6 @@ type alias ZkNoteAndLinks =
     }
 
 
-
--- type alias PubZkNote =
---     { zknote : ZkNote
---     , links : List EditLink
---     -- , panelNote : Maybe ZkNote
---     }
-
-
 type alias GetZkNoteArchives =
     { zknote : Int
     , offset : Int

@@ -262,7 +262,6 @@ routeStateInternal model route =
                     , case model.state of
                         EView _ _ ->
                             -- if we're in "EView" then do this request to stay in EView.
-                            -- PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNoteAndLinksWhat id)) PublicReplyData
                             sendPIMsg model.location (PI.GetZkNoteAndLinks { zknote = id, what = "" })
 
                         _ ->
@@ -274,7 +273,6 @@ routeStateInternal model route =
                         { message = "loading article"
                         }
                         (Just model.state)
-                      -- , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNoteAndLinksWhat id)) PublicReplyData
                     , sendPIMsg model.location (PI.GetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
@@ -292,7 +290,6 @@ routeStateInternal model route =
                         { message = "loading article"
                         }
                         (Just model.state)
-              -- , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNotePubId pubid)) PublicReplyData
             , sendPIMsg model.location (PI.GetZkNotePubId pubid)
             )
 
@@ -310,7 +307,6 @@ routeStateInternal model route =
 
                 EView st login ->
                     ( EView st login
-                      -- , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNoteAndLinks id "")) PublicReplyData
                     , sendPIMsg model.location (PI.GetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
@@ -326,7 +322,6 @@ routeStateInternal model route =
                         Nothing ->
                             ( PubShowMessage { message = "loading note..." }
                                 (Just model.state)
-                              -- , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNoteAndLinks id "")) PublicReplyData
                             , sendPIMsg model.location (PI.GetZkNoteAndLinks { zknote = id, what = "" })
                             )
 

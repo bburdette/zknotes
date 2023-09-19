@@ -51,16 +51,7 @@ serverResponseDecoder =
             case what of
                 "zknote" ->
                     JD.map ZkNoteAndLinks
-                        (JD.at [ "content" ] <|
-                            -- JD.map
-                            --     (\zne ->
-                            --         -- PubZkNote
-                            --         { zknote = zne.zknote
-                            --         , links = zne.links
-                            --         }
-                            --     )
-                            Data.decodeZkNoteEditWhat
-                        )
+                        (JD.at [ "content" ] <| Data.decodeZkNoteEditWhat)
 
                 "server error" ->
                     JD.map ServerError (JD.at [ "content" ] JD.string)
@@ -75,52 +66,6 @@ serverResponseDecoder =
         (JD.at [ "what" ]
             JD.string
         )
-
-
-
--- firstTask : String -> JE.Value -> Task Http.Error ServerResponse
--- firstTask location jsonBody =
---     HT.post
---         { url = location ++ "/public"
---         , body = Http.jsonBody jsonBody
---         , resolver = HT.resolveJson serverResponseDecoder
---         }
--- secondTask : String -> ServerResponse -> Task Http.Error ServerResponse
--- secondTask location sr =
---     case sr of
---         ZkNoteAndLinks zknoteedit ->
---             zknoteedit.zknote.content
---                 |> MC.mdPanel
---                 |> Maybe.map
---                     (\panel ->
---                         HT.post
---                             { url = location ++ "/public"
---                             , body = Http.jsonBody <| encodeSendMsg (GetZkNoteAndLinksWhat panel.noteid)
---                             , resolver =
---                                 HT.resolveJson
---                                     (serverResponseDecoder
---                                         |> JD.andThen
---                                             (\sr2 ->
---                                                 case sr2 of
---                                                     ZkNoteAndLinks panelnoteedit ->
---                                                         JD.succeed (ZkNoteAndLinks { zknoteedit | panelNote = Just panelnoteedit.zknote })
---                                                     _ ->
---                                                         JD.succeed sr2
---                                             )
---                                     )
---                             }
---                     )
---                 |> Maybe.withDefault
---                     (Task.succeed <|
---                         ZkNoteAndLinks zknoteedit
---                     )
---         _ ->
---             Task.succeed sr
--- getPublicZkNote : String -> JE.Value -> (Result Http.Error ServerResponse -> msg) -> Cmd msg
--- getPublicZkNote location jsonBody tomsg =
---     firstTask location jsonBody
---         |> Task.andThen (\sr -> secondTask location sr)
---         |> Task.attempt tomsg
 
 
 getErrorIndexNote : String -> Int -> (Result Http.Error ServerResponse -> msg) -> Cmd msg

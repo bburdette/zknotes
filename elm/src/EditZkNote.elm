@@ -27,7 +27,6 @@ module EditZkNote exposing
     , onSaved
     , onTASelection
     , onWkKeyPress
-      -- , onZkNote
     , pageLink
     , renderMd
     , replaceOrAdd
@@ -232,20 +231,6 @@ type Command
     | ShowArchives Int
     | FileUpload
     | Cmd (Cmd Msg)
-
-
-
--- onZkNote : Data.ZkNote -> Model -> ( Model, Command )
--- onZkNote zkn model =
---     ( { model | panelNote = Just zkn }
---     , View
---         { note = sznFromModel model
---         , createdate = model.createdate
---         , changeddate = model.changeddate
---         , panelnote = Just zkn
---         , links = model.zklDict |> Dict.values |> List.filterMap elToDel
---         }
---     )
 
 
 newWithSave : Model -> ( Model, Command )
