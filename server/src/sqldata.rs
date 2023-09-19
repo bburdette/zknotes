@@ -12,7 +12,7 @@ use std::time::Duration;
 use zkprotocol::content::{
   Direction, EditLink, ExtraLoginData, GetArchiveZkNote, GetZkLinks, GetZkNoteArchives,
   GetZkNoteComments, GetZneIfChanged, ImportZkNote, SaveZkLink, SaveZkNote, SavedZkNote, Sysids,
-  ZkLink, ZkListNote, ZkNote, ZkNoteEdit,
+  ZkLink, ZkListNote, ZkNote, ZkNoteAndLinks,
 };
 
 #[derive(Clone, Deserialize, Serialize, Debug)]
@@ -1407,7 +1407,7 @@ pub fn read_zknoteedit(
   conn: &Connection,
   uid: Option<i64>,
   zknoteid: i64,
-) -> Result<ZkNoteEdit, orgauth::error::Error> {
+) -> Result<ZkNoteAndLinks, orgauth::error::Error> {
   // should do an ownership check for us
   let zknote = read_zknote(conn, uid, zknoteid)?;
 
@@ -1417,7 +1417,7 @@ pub fn read_zknoteedit(
     None => read_public_zklinks(conn, zknote.id)?,
   };
 
-  Ok(ZkNoteEdit {
+  Ok(ZkNoteAndLinks {
     zknote: zknote,
     links: zklinks,
   })
@@ -1427,7 +1427,7 @@ pub fn read_zneifchanged(
   conn: &Connection,
   uid: Option<i64>,
   gzic: &GetZneIfChanged,
-) -> Result<Option<ZkNoteEdit>, orgauth::error::Error> {
+) -> Result<Option<ZkNoteAndLinks>, orgauth::error::Error> {
   let changeddate: i64 = conn.query_row(
     "select changeddate from zknote N
       where N.id = ?1",
