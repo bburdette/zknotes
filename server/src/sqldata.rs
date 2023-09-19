@@ -1405,13 +1405,17 @@ pub fn read_archivezknote(
 
 pub fn read_zknoteedit(
   conn: &Connection,
-  uid: i64,
+  uid: Option<i64>,
   zknoteid: i64,
 ) -> Result<ZkNoteEdit, orgauth::error::Error> {
   // should do an ownership check for us
-  let zknote = read_zknote(conn, Some(uid), zknoteid)?;
+  let zknote = read_zknote(conn, uid, zknoteid)?;
 
-  let zklinks = read_zklinks(conn, uid, &GetZkLinks { zknote: zknote.id })?;
+  let zklinks = match uid {
+    Some(uid) => read_zklinks(conn, uid, &GetZkLinks { zknote: zknote.id })?,
+
+    None => read_public_zklinks(conn, zknote.id)?,
+  };
 
   Ok(ZkNoteEdit {
     zknote: zknote,
@@ -1421,7 +1425,7 @@ pub fn read_zknoteedit(
 
 pub fn read_zneifchanged(
   conn: &Connection,
-  uid: i64,
+  uid: Option<i64>,
   gzic: &GetZneIfChanged,
 ) -> Result<Option<ZkNoteEdit>, orgauth::error::Error> {
   let changeddate: i64 = conn.query_row(

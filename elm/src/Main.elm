@@ -1917,6 +1917,9 @@ actualupdate msg model =
                                 , Cmd.batch ngets
                                 )
 
+                        PI.Noop ->
+                            ( model, Cmd.none )
+
         ( ErrorIndexNote rsein, _ ) ->
             case rsein of
                 Err e ->
@@ -1934,6 +1937,9 @@ actualupdate msg model =
                             ( { model | errorNotes = MC.linkDict fbe.zne.zknote.content }
                             , Cmd.none
                             )
+
+                        PI.Noop ->
+                            ( model, Cmd.none )
 
         ( TAReplyData tas urd, state ) ->
             case urd of

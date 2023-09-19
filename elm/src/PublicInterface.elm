@@ -19,6 +19,7 @@ type SendMsg
 type ServerResponse
     = ServerError String
     | ZkNoteAndLinks Data.ZkNoteAndLinksWhat
+    | Noop
 
 
 encodeSendMsg : SendMsg -> JE.Value
@@ -63,6 +64,9 @@ serverResponseDecoder =
 
                 "server error" ->
                     JD.map ServerError (JD.at [ "content" ] JD.string)
+
+                "noop" ->
+                    JD.succeed Noop
 
                 wat ->
                     JD.succeed

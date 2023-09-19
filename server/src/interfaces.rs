@@ -102,7 +102,7 @@ pub fn zk_interface_loggedin(
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let gzne: GetZkNoteEdit = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-      let note = sqldata::read_zknoteedit(&conn, uid, gzne.zknote)?;
+      let note = sqldata::read_zknoteedit(&conn, Some(uid), gzne.zknote)?;
       info!(
         "user#getzknoteedit: {} - {}",
         gzne.zknote, note.zknote.title
@@ -126,7 +126,7 @@ pub fn zk_interface_loggedin(
         gzic.zknote, gzic.changeddate
       );
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-      let ozkne = sqldata::read_zneifchanged(&conn, uid, &gzic)?;
+      let ozkne = sqldata::read_zneifchanged(&conn, Some(uid), &gzic)?;
 
       match ozkne {
         Some(zkne) => Ok(ServerResponse {
@@ -306,6 +306,30 @@ pub fn public_interface(
           },
         })?,
       })
+    }
+    "getzneifchanged" => {
+      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      let gzic: GetZneIfChanged = serde_json::from_value(msgdata.clone())?;
+      info!(
+        "user#getzneifchanged: {} - {}",
+        gzic.zknote, gzic.changeddate
+      );
+      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+      let ozkne = sqldata::read_zneifchanged(&conn, None, &gzic)?;
+
+      match ozkne {
+        Some(zkne) => Ok(ServerResponse {
+          what: "zknoteedit".to_string(),
+          content: serde_json::to_value(ZkNoteEditWhat {
+            what: gzic.what,
+            zne: zkne,
+          })?,
+        }),
+        None => Ok(ServerResponse {
+          what: "noop".to_string(),
+          content: serde_json::Value::Null,
+        }),
+      }
     }
     "getzknotepubid" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
