@@ -232,7 +232,7 @@ type alias GetZnlIfChanged =
 
 type alias ZkNoteAndLinksWhat =
     { what : String
-    , zne : ZkNoteAndLinks
+    , znl : ZkNoteAndLinks
     }
 
 
@@ -590,7 +590,7 @@ decodeZkNoteEditWhat : JD.Decoder ZkNoteAndLinksWhat
 decodeZkNoteEditWhat =
     JD.map2 ZkNoteAndLinksWhat
         (JD.field "what" JD.string)
-        (JD.field "zne" decodeZkNoteEdit)
+        (JD.field "znl" decodeZkNoteEdit)
 
 
 decodeLoginData : JD.Decoder LoginData

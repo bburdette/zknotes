@@ -10,7 +10,7 @@ use orgauth::endpoints::Callbacks;
 use std::error::Error;
 use std::time::Duration;
 use zkprotocol::content::{
-  GetArchiveZkNote, GetZkNoteAndLinks, GetZkNoteArchives, GetZkNoteComments, GetZneIfChanged,
+  GetArchiveZkNote, GetZkNoteAndLinks, GetZkNoteArchives, GetZkNoteComments, GetZnlIfChanged,
   ImportZkNote, SaveZkNote, SaveZkNotePlusLinks, Sysids, ZkLinks, ZkNoteAndLinks,
   ZkNoteAndLinksWhat, ZkNoteArchives,
 };
@@ -110,7 +110,7 @@ pub fn zk_interface_loggedin(
 
       let znew = ZkNoteAndLinksWhat {
         what: gzne.what,
-        zne: note,
+        znl: note,
       };
 
       Ok(ServerResponse {
@@ -120,7 +120,7 @@ pub fn zk_interface_loggedin(
     }
     "getzneifchanged" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let gzic: GetZneIfChanged = serde_json::from_value(msgdata.clone())?;
+      let gzic: GetZnlIfChanged = serde_json::from_value(msgdata.clone())?;
       info!(
         "user#getzneifchanged: {} - {}",
         gzic.zknote, gzic.changeddate
@@ -133,7 +133,7 @@ pub fn zk_interface_loggedin(
           what: "zknoteedit".to_string(),
           content: serde_json::to_value(ZkNoteAndLinksWhat {
             what: gzic.what,
-            zne: zkne,
+            znl: zkne,
           })?,
         }),
         None => Ok(ServerResponse {
@@ -300,7 +300,7 @@ pub fn public_interface(
         what: "zknote".to_string(),
         content: serde_json::to_value(ZkNoteAndLinksWhat {
           what: gzne.what,
-          zne: ZkNoteAndLinks {
+          znl: ZkNoteAndLinks {
             links: sqldata::read_public_zklinks(&conn, note.id)?,
             zknote: note,
           },
@@ -309,7 +309,7 @@ pub fn public_interface(
     }
     "getzneifchanged" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let gzic: GetZneIfChanged = serde_json::from_value(msgdata.clone())?;
+      let gzic: GetZnlIfChanged = serde_json::from_value(msgdata.clone())?;
       info!(
         "user#getzneifchanged: {} - {}",
         gzic.zknote, gzic.changeddate
@@ -322,7 +322,7 @@ pub fn public_interface(
           what: "zknoteedit".to_string(),
           content: serde_json::to_value(ZkNoteAndLinksWhat {
             what: gzic.what,
-            zne: zkne,
+            znl: zkne,
           })?,
         }),
         None => Ok(ServerResponse {
@@ -346,7 +346,7 @@ pub fn public_interface(
         what: "zknote".to_string(),
         content: serde_json::to_value(ZkNoteAndLinksWhat {
           what: "".to_string(),
-          zne: ZkNoteAndLinks {
+          znl: ZkNoteAndLinks {
             links: sqldata::read_public_zklinks(&conn, note.id)?,
             zknote: note,
           },

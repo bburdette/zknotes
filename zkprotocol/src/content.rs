@@ -131,7 +131,7 @@ pub struct GetZkNoteAndLinks {
 }
 
 #[derive(Deserialize, Debug, Clone)]
-pub struct GetZneIfChanged {
+pub struct GetZnlIfChanged {
   pub zknote: i64,
   pub changeddate: i64,
   pub what: String,
@@ -172,5 +172,5 @@ pub struct ZkNoteAndLinks {
 #[derive(Serialize, Debug)]
 pub struct ZkNoteAndLinksWhat {
   pub what: String,
-  pub zne: ZkNoteAndLinks,
+  pub znl: ZkNoteAndLinks,
 }

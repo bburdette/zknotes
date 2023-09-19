@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use zkprotocol::content::{
   Direction, EditLink, ExtraLoginData, GetArchiveZkNote, GetZkLinks, GetZkNoteArchives,
-  GetZkNoteComments, GetZneIfChanged, ImportZkNote, SaveZkLink, SaveZkNote, SavedZkNote, Sysids,
+  GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkLink, SaveZkNote, SavedZkNote, Sysids,
   ZkLink, ZkListNote, ZkNote, ZkNoteAndLinks,
 };
 
@@ -1426,7 +1426,7 @@ pub fn read_zknoteedit(
 pub fn read_zneifchanged(
   conn: &Connection,
   uid: Option<i64>,
-  gzic: &GetZneIfChanged,
+  gzic: &GetZnlIfChanged,
 ) -> Result<Option<ZkNoteAndLinks>, orgauth::error::Error> {
   let changeddate: i64 = conn.query_row(
     "select changeddate from zknote N

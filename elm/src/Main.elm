@@ -1471,7 +1471,7 @@ onZkNoteEditWhat model pt znew =
     if znew.what == "cache" then
         ( { model
             | noteCache =
-                NC.addNote pt znew.zne model.noteCache
+                NC.addNote pt znew.znl model.noteCache
                     |> NC.purgeNotes
           }
         , Cmd.none
@@ -1489,8 +1489,8 @@ onZkNoteEditWhat model pt znew =
                         EditZkNote.initFull model.sysids
                             login
                             sres
-                            znew.zne.zknote
-                            znew.zne.links
+                            znew.znl.zknote
+                            znew.znl.links
                             spmod
 
                     ngets =
@@ -1513,7 +1513,7 @@ onZkNoteEditWhat model pt znew =
                     , recentNotes =
                         let
                             zknote =
-                                znew.zne.zknote
+                                znew.znl.zknote
                         in
                         addRecentZkListNote model.recentNotes
                             { id = zknote.id
@@ -1884,7 +1884,7 @@ actualupdate msg model =
                             if fbe.what == "cache" then
                                 ( { model
                                     | noteCache =
-                                        NC.addNote pt fbe.zne model.noteCache
+                                        NC.addNote pt fbe.znl model.noteCache
                                             |> NC.purgeNotes
                                   }
                                 , Cmd.none
@@ -1898,15 +1898,15 @@ actualupdate msg model =
                                                 EView
                                                     (View.initFull
                                                         model.sysids
-                                                        fbe.zne
+                                                        fbe.znl
                                                     )
                                                     state
 
                                             Nothing ->
-                                                View (View.initFull model.sysids fbe.zne)
+                                                View (View.initFull model.sysids fbe.znl)
 
                                     ngets =
-                                        makePubNoteCacheGets fbe.zne.zknote.content model
+                                        makePubNoteCacheGets fbe.znl.zknote.content model
                                 in
                                 ( { model | state = vstate }
                                 , Cmd.batch ngets
@@ -1929,7 +1929,7 @@ actualupdate msg model =
                             ( displayMessageDialog model <| e, Cmd.none )
 
                         PI.ZkNoteAndLinks fbe ->
-                            ( { model | errorNotes = MC.linkDict fbe.zne.zknote.content }
+                            ( { model | errorNotes = MC.linkDict fbe.znl.zknote.content }
                             , Cmd.none
                             )
 
