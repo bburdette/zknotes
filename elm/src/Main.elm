@@ -77,7 +77,7 @@ type Msg
     | ZkReplyData (Result Http.Error ( Time.Posix, ZI.ServerResponse ))
     | ZkReplyDataSeq (Result Http.Error ( Time.Posix, ZI.ServerResponse ) -> Maybe (Cmd Msg)) (Result Http.Error ( Time.Posix, ZI.ServerResponse ))
     | TAReplyData Data.TASelection (Result Http.Error ( Time.Posix, ZI.ServerResponse ))
-    | PublicReplyData (Result Http.Error PI.ServerResponse)
+    | PublicReplyData (Result Http.Error ( Time.Posix, PI.ServerResponse ))
     | ErrorIndexNote (Result Http.Error PI.ServerResponse)
     | LoadUrl String
     | InternalUrl Url
@@ -262,7 +262,8 @@ routeStateInternal model route =
                     , case model.state of
                         EView _ _ ->
                             -- if we're in "EView" then do this request to stay in EView.
-                            PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNote id)) PublicReplyData
+                            -- PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNoteAndLinksWhat id)) PublicReplyData
+                            sendPIMsg model.location (PI.GetZkNoteAndLinks { zknote = id, what = "" })
 
                         _ ->
                             sendZIMsg model.location (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
@@ -273,7 +274,8 @@ routeStateInternal model route =
                         { message = "loading article"
                         }
                         (Just model.state)
-                    , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNote id)) PublicReplyData
+                      -- , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNoteAndLinksWhat id)) PublicReplyData
+                    , sendPIMsg model.location (PI.GetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
         PublicZkPubId pubid ->
@@ -290,7 +292,8 @@ routeStateInternal model route =
                         { message = "loading article"
                         }
                         (Just model.state)
-            , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNotePubId pubid)) PublicReplyData
+              -- , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNotePubId pubid)) PublicReplyData
+            , sendPIMsg model.location (PI.GetZkNotePubId pubid)
             )
 
         EditZkNoteR id ->
@@ -307,7 +310,8 @@ routeStateInternal model route =
 
                 EView st login ->
                     ( EView st login
-                    , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNote id)) PublicReplyData
+                      -- , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNoteAndLinks id "")) PublicReplyData
+                    , sendPIMsg model.location (PI.GetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
                 st ->
@@ -322,7 +326,8 @@ routeStateInternal model route =
                         Nothing ->
                             ( PubShowMessage { message = "loading note..." }
                                 (Just model.state)
-                            , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNote id)) PublicReplyData
+                              -- , PI.getPublicZkNote model.location (PI.encodeSendMsg (PI.GetZkNoteAndLinks id "")) PublicReplyData
+                            , sendPIMsg model.location (PI.GetZkNoteAndLinks { zknote = id, what = "" })
                             )
 
         EditZkNoteNew ->
@@ -1167,11 +1172,18 @@ sendSearch model search =
 
 sendPIMsg : String -> PI.SendMsg -> Cmd Msg
 sendPIMsg location msg =
-    Http.post
+    sendPIMsgExp location msg PublicReplyData
+
+
+sendPIMsgExp : String -> PI.SendMsg -> (Result Http.Error ( Time.Posix, PI.ServerResponse ) -> Msg) -> Cmd Msg
+sendPIMsgExp location msg tomsg =
+    HE.postJsonTask
         { url = location ++ "/public"
         , body = Http.jsonBody (PI.encodeSendMsg msg)
-        , expect = Http.expectJson PublicReplyData PI.serverResponseDecoder
+        , decoder = PI.serverResponseDecoder
         }
+        |> Task.andThen (\x -> Task.map (\posix -> ( posix, x )) Time.now)
+        |> Task.attempt tomsg
 
 
 addRecentZkListNote : List Data.ZkListNote -> Data.ZkListNote -> List Data.ZkListNote
@@ -1852,7 +1864,7 @@ actualupdate msg model =
                     , Cmd.none
                     )
 
-                Ok piresponse ->
+                Ok ( pt, piresponse ) ->
                     case piresponse of
                         PI.ServerError e ->
                             let
@@ -1873,27 +1885,37 @@ actualupdate msg model =
                                 Nothing ->
                                     ( displayMessageDialog { model | state = prevstate } e, Cmd.none )
 
-                        PI.ZkNote fbe ->
-                            let
-                                vstate =
-                                    case stateLogin state of
-                                        Just _ ->
-                                            EView
-                                                (View.initFull
-                                                    model.sysids
-                                                    fbe
-                                                )
-                                                state
+                        PI.ZkNoteAndLinks fbe ->
+                            if fbe.what == "cache" then
+                                ( { model
+                                    | noteCache =
+                                        NC.addNote pt fbe.zne model.noteCache
+                                            |> NC.purgeNotes
+                                  }
+                                , Cmd.none
+                                )
 
-                                        Nothing ->
-                                            View (View.initFull model.sysids fbe)
+                            else
+                                let
+                                    vstate =
+                                        case stateLogin state of
+                                            Just _ ->
+                                                EView
+                                                    (View.initFull
+                                                        model.sysids
+                                                        fbe.zne
+                                                    )
+                                                    state
 
-                                ngets =
-                                    makeNoteCacheGets fbe.zknote.content model
-                            in
-                            ( { model | state = vstate }
-                            , Cmd.batch ngets
-                            )
+                                            Nothing ->
+                                                View (View.initFull model.sysids fbe.zne)
+
+                                    ngets =
+                                        makePubNoteCacheGets fbe.zne.zknote.content model
+                                in
+                                ( { model | state = vstate }
+                                , Cmd.batch ngets
+                                )
 
         ( ErrorIndexNote rsein, _ ) ->
             case rsein of
@@ -1908,8 +1930,8 @@ actualupdate msg model =
                             -- if there's an error on getting the error index note, just display it.
                             ( displayMessageDialog model <| e, Cmd.none )
 
-                        PI.ZkNote fbe ->
-                            ( { model | errorNotes = MC.linkDict fbe.zknote.content }
+                        PI.ZkNoteAndLinks fbe ->
+                            ( { model | errorNotes = MC.linkDict fbe.zne.zknote.content }
                             , Cmd.none
                             )
 
@@ -2321,9 +2343,8 @@ actualupdate msg model =
 
                         ZI.ZkNote zkn ->
                             case state of
-                                EditZkNote ezn login ->
-                                    handleEditZkNoteCmd model login (EditZkNote.onZkNote zkn ezn)
-
+                                -- EditZkNote ezn login ->
+                                --     handleEditZkNoteCmd model login (EditZkNote.onZkNote zkn ezn)
                                 ArchiveListing st login ->
                                     handleArchiveListing model login (ArchiveListing.onZkNote zkn st)
 
@@ -2332,7 +2353,7 @@ actualupdate msg model =
                                     , Cmd.none
                                     )
 
-                        ZI.ZkNoteEditWhat znew ->
+                        ZI.ZkNoteAndLinksWhat znew ->
                             onZkNoteEditWhat model pt znew
 
                         ZI.ZkNoteComments zc ->
@@ -2461,8 +2482,7 @@ actualupdate msg model =
                                 }
                                 (Just model.state)
                       }
-                    , sendPIMsg model.location
-                        (PI.GetZkNote id)
+                    , sendPIMsg model.location (PI.GetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
         ( ViewMsg em, EView es state ) ->
@@ -2494,8 +2514,7 @@ actualupdate msg model =
 
                 View.Switch id ->
                     ( model
-                      -- , sendUIMsg model.location (UI.GetZkNoteEdit { zknote = id })
-                    , sendPIMsg model.location (PI.GetZkNote id)
+                    , sendPIMsg model.location (PI.GetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
         ( EditZkNoteMsg em, EditZkNote es login ) ->
@@ -2695,7 +2714,7 @@ actualupdate msg model =
                         ZI.ServerError e ->
                             ( displayMessageDialog model <| e, Cmd.none )
 
-                        ZI.ZkNoteEditWhat znew ->
+                        ZI.ZkNoteAndLinksWhat znew ->
                             onZkNoteEditWhat model pt znew
 
                         ZI.FilesUploaded files ->
@@ -2844,6 +2863,25 @@ makeNoteCacheGets md model =
                         sendZIMsg
                             model.location
                             (ZI.GetZkNoteAndLinks { zknote = id, what = "cache" })
+            )
+
+
+makePubNoteCacheGets : String -> Model -> List (Cmd Msg)
+makePubNoteCacheGets md model =
+    MC.noteIds md
+        |> Set.toList
+        |> List.map
+            (\id ->
+                case NC.getNote id model.noteCache of
+                    Just zkn ->
+                        sendPIMsg
+                            model.location
+                            (PI.GetZnlIfChanged { zknote = id, what = "cache", changeddate = zkn.zknote.changeddate })
+
+                    Nothing ->
+                        sendPIMsg
+                            model.location
+                            (PI.GetZkNoteAndLinks { zknote = id, what = "cache" })
             )
 
 

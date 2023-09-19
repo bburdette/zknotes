@@ -27,7 +27,7 @@ module EditZkNote exposing
     , onSaved
     , onTASelection
     , onWkKeyPress
-    , onZkNote
+      -- , onZkNote
     , pageLink
     , renderMd
     , replaceOrAdd
@@ -212,7 +212,7 @@ type Command
         { note : Data.SaveZkNote
         , createdate : Maybe Int
         , changeddate : Maybe Int
-        , panelnote : Maybe Data.ZkNote
+        , panelnote : Maybe Int
         , links : List Data.EditLink
         }
     | Delete Int
@@ -234,17 +234,18 @@ type Command
     | Cmd (Cmd Msg)
 
 
-onZkNote : Data.ZkNote -> Model -> ( Model, Command )
-onZkNote zkn model =
-    ( { model | panelNote = Just zkn }
-    , View
-        { note = sznFromModel model
-        , createdate = model.createdate
-        , changeddate = model.changeddate
-        , panelnote = Just zkn
-        , links = model.zklDict |> Dict.values |> List.filterMap elToDel
-        }
-    )
+
+-- onZkNote : Data.ZkNote -> Model -> ( Model, Command )
+-- onZkNote zkn model =
+--     ( { model | panelNote = Just zkn }
+--     , View
+--         { note = sznFromModel model
+--         , createdate = model.createdate
+--         , changeddate = model.changeddate
+--         , panelnote = Just zkn
+--         , links = model.zklDict |> Dict.values |> List.filterMap elToDel
+--         }
+--     )
 
 
 newWithSave : Model -> ( Model, Command )
@@ -2189,7 +2190,7 @@ update msg model =
                             { note = sznFromModel model
                             , createdate = model.createdate
                             , changeddate = model.changeddate
-                            , panelnote = model.panelNote
+                            , panelnote = model.panelNote |> Maybe.map .id
                             , links = model.zklDict |> Dict.values |> List.filterMap elToDel
                             }
                         )

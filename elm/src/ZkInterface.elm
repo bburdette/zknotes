@@ -32,7 +32,7 @@ type ServerResponse
     | SavedZkNote Data.SavedZkNote
     | DeletedZkNote Int
     | ZkNote Data.ZkNote
-    | ZkNoteEditWhat Data.ZkNoteAndLinksWhat
+    | ZkNoteAndLinksWhat Data.ZkNoteAndLinksWhat
     | ZkNoteComments (List Data.ZkNote)
     | ServerError String
     | SavedZkLinks
@@ -65,7 +65,7 @@ showServerResponse sr =
         ZkNote _ ->
             "ZkNote"
 
-        ZkNoteEditWhat _ ->
+        ZkNoteAndLinksWhat _ ->
             "ZkNoteEdit"
 
         ZkNoteComments _ ->
@@ -226,7 +226,7 @@ serverResponseDecoder =
                         JD.map ZkNote (JD.at [ "content" ] <| Data.decodeZkNote)
 
                     "zknoteedit" ->
-                        JD.map ZkNoteEditWhat (JD.at [ "content" ] <| Data.decodeZkNoteEditWhat)
+                        JD.map ZkNoteAndLinksWhat (JD.at [ "content" ] <| Data.decodeZkNoteEditWhat)
 
                     "zknotecomments" ->
                         JD.map ZkNoteComments (JD.at [ "content" ] <| JD.list Data.decodeZkNote)

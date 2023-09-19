@@ -287,20 +287,23 @@ pub fn public_interface(
   match msg.what.as_str() {
     "getzknote" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let id: i64 = serde_json::from_value(msgdata.clone())?;
+      let gzne: GetZkNoteEdit = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-      let note = sqldata::read_zknote(&conn, None, id)?;
+      let note = sqldata::read_zknote(&conn, None, gzne.zknote)?;
       info!(
         "public#getzknote: {} - {} - {:?}",
-        id,
+        gzne.zknote,
         note.title,
         req.connection_info().realip_remote_addr()
       );
       Ok(ServerResponse {
         what: "zknote".to_string(),
-        content: serde_json::to_value(ZkNoteEdit {
-          links: sqldata::read_public_zklinks(&conn, note.id)?,
-          zknote: note,
+        content: serde_json::to_value(ZkNoteEditWhat {
+          what: gzne.what,
+          zne: ZkNoteEdit {
+            links: sqldata::read_public_zklinks(&conn, note.id)?,
+            zknote: note,
+          },
         })?,
       })
     }
@@ -317,9 +320,12 @@ pub fn public_interface(
       );
       Ok(ServerResponse {
         what: "zknote".to_string(),
-        content: serde_json::to_value(ZkNoteEdit {
-          links: sqldata::read_public_zklinks(&conn, note.id)?,
-          zknote: note,
+        content: serde_json::to_value(ZkNoteEditWhat {
+          what: "".to_string(),
+          zne: ZkNoteEdit {
+            links: sqldata::read_public_zklinks(&conn, note.id)?,
+            zknote: note,
+          },
         })?,
       })
     }
