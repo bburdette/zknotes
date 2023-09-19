@@ -27,7 +27,6 @@ module EditZkNote exposing
     , onSaved
     , onTASelection
     , onWkKeyPress
-    , onZkNote
     , pageLink
     , renderMd
     , replaceOrAdd
@@ -212,7 +211,7 @@ type Command
         { note : Data.SaveZkNote
         , createdate : Maybe Int
         , changeddate : Maybe Int
-        , panelnote : Maybe Data.ZkNote
+        , panelnote : Maybe Int
         , links : List Data.EditLink
         }
     | Delete Int
@@ -225,26 +224,12 @@ type Command
     | Settings
     | Admin
     | Requests
-    | GetZkNoteWhat Int String
     | SetHomeNote Int
     | AddToRecent Data.ZkListNote
     | ShowMessage String
     | ShowArchives Int
     | FileUpload
     | Cmd (Cmd Msg)
-
-
-onZkNote : Data.ZkNote -> Model -> ( Model, Command )
-onZkNote zkn model =
-    ( { model | panelNote = Just zkn }
-    , View
-        { note = sznFromModel model
-        , createdate = model.createdate
-        , changeddate = model.changeddate
-        , panelnote = Just zkn
-        , links = model.zklDict |> Dict.values |> List.filterMap elToDel
-        }
-    )
 
 
 newWithSave : Model -> ( Model, Command )
@@ -2181,25 +2166,20 @@ update msg model =
             )
 
         ViewPress ->
-            case MC.mdPanel model.md of
-                Just panel ->
-                    if Maybe.map .id model.panelNote == Just panel.noteid then
+            MC.mdPanel model.md
+                |> Maybe.map
+                    (\panel ->
                         ( model
                         , View
                             { note = sznFromModel model
                             , createdate = model.createdate
                             , changeddate = model.changeddate
-                            , panelnote = model.panelNote
+                            , panelnote = Just panel.noteid
                             , links = model.zklDict |> Dict.values |> List.filterMap elToDel
                             }
                         )
-
-                    else
-                        ( model
-                        , GetZkNoteWhat panel.noteid "panel"
-                        )
-
-                Nothing ->
+                    )
+                |> Maybe.withDefault
                     ( model
                     , View
                         { note = sznFromModel model

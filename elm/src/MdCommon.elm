@@ -649,22 +649,39 @@ noteIds markdown =
                 (\block ids ->
                     case block of
                         Block.HtmlBlock (Block.HtmlElement tag attr childs) ->
-                            case
-                                ( tag
-                                , List.foldl
-                                    (\i mbv ->
-                                        if i.name == "id" then
-                                            String.toInt i.value
+                            case tag of
+                                "note" ->
+                                    case
+                                        List.foldl
+                                            (\i mbv ->
+                                                if i.name == "id" then
+                                                    String.toInt i.value
 
-                                        else
+                                                else
+                                                    Nothing
+                                            )
                                             Nothing
-                                    )
-                                    Nothing
-                                    attr
-                                )
-                            of
-                                ( "note", Just id ) ->
-                                    Set.insert id ids
+                                            attr
+                                    of
+                                        Just id ->
+                                            Set.insert id ids
+
+                                        Nothing ->
+                                            ids
+
+                                "panel" ->
+                                    let
+                                        am =
+                                            Dict.fromList <| List.map (\trib -> ( trib.name, trib.value )) attr
+                                    in
+                                    am
+                                        |> Dict.get "noteid"
+                                        |> Maybe.andThen String.toInt
+                                        |> Maybe.map
+                                            (\id ->
+                                                Set.insert id ids
+                                            )
+                                        |> Maybe.withDefault ids
 
                                 _ ->
                                     ids

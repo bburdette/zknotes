@@ -9,8 +9,8 @@ import Util
 
 type SendMsg
     = GetZkNote Int
-    | GetZkNoteEdit Data.GetZkNoteEdit
-    | GetZneIfChanged Data.GetZneIfChanged
+    | GetZkNoteAndLinks Data.GetZkNoteAndLinks
+    | GetZnlIfChanged Data.GetZnlIfChanged
     | GetZkNoteComments Data.GetZkNoteComments
     | GetZkNoteArchives Data.GetZkNoteArchives
     | GetArchiveZkNote Data.GetArchiveZkNote
@@ -32,7 +32,7 @@ type ServerResponse
     | SavedZkNote Data.SavedZkNote
     | DeletedZkNote Int
     | ZkNote Data.ZkNote
-    | ZkNoteEditWhat Data.ZkNoteEditWhat
+    | ZkNoteAndLinksWhat Data.ZkNoteAndLinksWhat
     | ZkNoteComments (List Data.ZkNote)
     | ServerError String
     | SavedZkLinks
@@ -65,7 +65,7 @@ showServerResponse sr =
         ZkNote _ ->
             "ZkNote"
 
-        ZkNoteEditWhat _ ->
+        ZkNoteAndLinksWhat _ ->
             "ZkNoteEdit"
 
         ZkNoteComments _ ->
@@ -108,13 +108,13 @@ encodeSendMsg sm =
                 , ( "data", JE.int id )
                 ]
 
-        GetZkNoteEdit zkne ->
+        GetZkNoteAndLinks zkne ->
             JE.object
                 [ ( "what", JE.string "getzknoteedit" )
                 , ( "data", Data.encodeGetZkNoteEdit zkne )
                 ]
 
-        GetZneIfChanged x ->
+        GetZnlIfChanged x ->
             JE.object
                 [ ( "what", JE.string "getzneifchanged" )
                 , ( "data", Data.encodeGetZneIfChanged x )
@@ -226,7 +226,7 @@ serverResponseDecoder =
                         JD.map ZkNote (JD.at [ "content" ] <| Data.decodeZkNote)
 
                     "zknoteedit" ->
-                        JD.map ZkNoteEditWhat (JD.at [ "content" ] <| Data.decodeZkNoteEditWhat)
+                        JD.map ZkNoteAndLinksWhat (JD.at [ "content" ] <| Data.decodeZkNoteEditWhat)
 
                     "zknotecomments" ->
                         JD.map ZkNoteComments (JD.at [ "content" ] <| JD.list Data.decodeZkNote)

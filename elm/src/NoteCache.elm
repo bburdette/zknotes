@@ -1,6 +1,6 @@
 module NoteCache exposing (NoteCache, addNote, empty, getNote, purgeNotes, setKeeps)
 
-import Data exposing (ZkNoteEdit)
+import Data exposing (ZkNoteAndLinks)
 import Dict exposing (Dict)
 import Set exposing (Set)
 import Time
@@ -8,7 +8,7 @@ import Util
 
 
 type alias ZneEntry =
-    { receivetime : Int, zne : ZkNoteEdit }
+    { receivetime : Int, zne : ZkNoteAndLinks }
 
 
 type alias NoteCache =
@@ -24,7 +24,7 @@ setKeeps keep nc =
     { nc | keep = keep }
 
 
-addNote : Time.Posix -> ZkNoteEdit -> NoteCache -> NoteCache
+addNote : Time.Posix -> ZkNoteAndLinks -> NoteCache -> NoteCache
 addNote pt zne nc =
     let
         ms =
@@ -51,7 +51,7 @@ addNote pt zne nc =
     }
 
 
-getNote : Int -> NoteCache -> Maybe ZkNoteEdit
+getNote : Int -> NoteCache -> Maybe ZkNoteAndLinks
 getNote id nc =
     Dict.get id nc.byId
         |> Maybe.map .zne

@@ -10,9 +10,9 @@ use orgauth::endpoints::Callbacks;
 use std::error::Error;
 use std::time::Duration;
 use zkprotocol::content::{
-  GetArchiveZkNote, GetZkNoteArchives, GetZkNoteComments, GetZkNoteEdit, GetZneIfChanged,
-  ImportZkNote, SaveZkNote, SaveZkNotePlusLinks, Sysids, ZkLinks, ZkNoteArchives, ZkNoteEdit,
-  ZkNoteEditWhat,
+  GetArchiveZkNote, GetZkNoteAndLinks, GetZkNoteArchives, GetZkNoteComments, GetZnlIfChanged,
+  ImportZkNote, SaveZkNote, SaveZkNotePlusLinks, Sysids, ZkLinks, ZkNoteAndLinks,
+  ZkNoteAndLinksWhat, ZkNoteArchives,
 };
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 use zkprotocol::search::{TagSearch, ZkListNoteSearchResult, ZkNoteSearch};
@@ -100,17 +100,17 @@ pub fn zk_interface_loggedin(
     }
     "getzknoteedit" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let gzne: GetZkNoteEdit = serde_json::from_value(msgdata.clone())?;
+      let gzne: GetZkNoteAndLinks = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-      let note = sqldata::read_zknoteedit(&conn, uid, gzne.zknote)?;
+      let note = sqldata::read_zknoteedit(&conn, Some(uid), gzne.zknote)?;
       info!(
         "user#getzknoteedit: {} - {}",
         gzne.zknote, note.zknote.title
       );
 
-      let znew = ZkNoteEditWhat {
+      let znew = ZkNoteAndLinksWhat {
         what: gzne.what,
-        zne: note,
+        znl: note,
       };
 
       Ok(ServerResponse {
@@ -120,20 +120,20 @@ pub fn zk_interface_loggedin(
     }
     "getzneifchanged" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let gzic: GetZneIfChanged = serde_json::from_value(msgdata.clone())?;
+      let gzic: GetZnlIfChanged = serde_json::from_value(msgdata.clone())?;
       info!(
         "user#getzneifchanged: {} - {}",
         gzic.zknote, gzic.changeddate
       );
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-      let ozkne = sqldata::read_zneifchanged(&conn, uid, &gzic)?;
+      let ozkne = sqldata::read_zneifchanged(&conn, Some(uid), &gzic)?;
 
       match ozkne {
         Some(zkne) => Ok(ServerResponse {
           what: "zknoteedit".to_string(),
-          content: serde_json::to_value(ZkNoteEditWhat {
+          content: serde_json::to_value(ZkNoteAndLinksWhat {
             what: gzic.what,
-            zne: zkne,
+            znl: zkne,
           })?,
         }),
         None => Ok(ServerResponse {
@@ -287,22 +287,49 @@ pub fn public_interface(
   match msg.what.as_str() {
     "getzknote" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let id: i64 = serde_json::from_value(msgdata.clone())?;
+      let gzne: GetZkNoteAndLinks = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-      let note = sqldata::read_zknote(&conn, None, id)?;
+      let note = sqldata::read_zknote(&conn, None, gzne.zknote)?;
       info!(
         "public#getzknote: {} - {} - {:?}",
-        id,
+        gzne.zknote,
         note.title,
         req.connection_info().realip_remote_addr()
       );
       Ok(ServerResponse {
         what: "zknote".to_string(),
-        content: serde_json::to_value(ZkNoteEdit {
-          links: sqldata::read_public_zklinks(&conn, note.id)?,
-          zknote: note,
+        content: serde_json::to_value(ZkNoteAndLinksWhat {
+          what: gzne.what,
+          znl: ZkNoteAndLinks {
+            links: sqldata::read_public_zklinks(&conn, note.id)?,
+            zknote: note,
+          },
         })?,
       })
+    }
+    "getzneifchanged" => {
+      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      let gzic: GetZnlIfChanged = serde_json::from_value(msgdata.clone())?;
+      info!(
+        "user#getzneifchanged: {} - {}",
+        gzic.zknote, gzic.changeddate
+      );
+      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+      let ozkne = sqldata::read_zneifchanged(&conn, None, &gzic)?;
+
+      match ozkne {
+        Some(zkne) => Ok(ServerResponse {
+          what: "zknoteedit".to_string(),
+          content: serde_json::to_value(ZkNoteAndLinksWhat {
+            what: gzic.what,
+            znl: zkne,
+          })?,
+        }),
+        None => Ok(ServerResponse {
+          what: "noop".to_string(),
+          content: serde_json::Value::Null,
+        }),
+      }
     }
     "getzknotepubid" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
@@ -317,9 +344,12 @@ pub fn public_interface(
       );
       Ok(ServerResponse {
         what: "zknote".to_string(),
-        content: serde_json::to_value(ZkNoteEdit {
-          links: sqldata::read_public_zklinks(&conn, note.id)?,
-          zknote: note,
+        content: serde_json::to_value(ZkNoteAndLinksWhat {
+          what: "".to_string(),
+          znl: ZkNoteAndLinks {
+            links: sqldata::read_public_zklinks(&conn, note.id)?,
+            zknote: note,
+          },
         })?,
       })
     }
