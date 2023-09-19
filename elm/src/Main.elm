@@ -2344,8 +2344,6 @@ actualupdate msg model =
 
                         ZI.ZkNote zkn ->
                             case state of
-                                -- EditZkNote ezn login ->
-                                --     handleEditZkNoteCmd model login (EditZkNote.onZkNote zkn ezn)
                                 ArchiveListing st login ->
                                     handleArchiveListing model login (ArchiveListing.onZkNote zkn st)
 
