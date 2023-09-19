@@ -3066,7 +3066,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                                 )
                                 (EditZkNote emod login)
                       }
-                    , Cmd.none
+                    , Cmd.batch <| makeNoteCacheGets v.note.content model
                     )
 
                 EditZkNote.GetTASelection id what ->
@@ -3093,16 +3093,6 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                 EditZkNote.Admin ->
                     ( model
                     , sendAIMsg model.location AI.GetUsers
-                    )
-
-                EditZkNote.GetZkNoteWhat id what ->
-                    ( { model | state = EditZkNote emod login }
-                    , case what of
-                        "panel" ->
-                            sendZIMsg model.location (ZI.GetZkNote id)
-
-                        _ ->
-                            sendZIMsg model.location (ZI.GetZkNoteAndLinks { zknote = id, what = what })
                     )
 
                 EditZkNote.SetHomeNote id ->

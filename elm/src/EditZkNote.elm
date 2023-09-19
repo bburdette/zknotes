@@ -224,7 +224,6 @@ type Command
     | Settings
     | Admin
     | Requests
-    | GetZkNoteWhat Int String
     | SetHomeNote Int
     | AddToRecent Data.ZkListNote
     | ShowMessage String
@@ -2167,25 +2166,20 @@ update msg model =
             )
 
         ViewPress ->
-            case MC.mdPanel model.md of
-                Just panel ->
-                    if Maybe.map .id model.panelNote == Just panel.noteid then
+            MC.mdPanel model.md
+                |> Maybe.map
+                    (\panel ->
                         ( model
                         , View
                             { note = sznFromModel model
                             , createdate = model.createdate
                             , changeddate = model.changeddate
-                            , panelnote = model.panelNote |> Maybe.map .id
+                            , panelnote = Just panel.noteid
                             , links = model.zklDict |> Dict.values |> List.filterMap elToDel
                             }
                         )
-
-                    else
-                        ( model
-                        , GetZkNoteWhat panel.noteid "panel"
-                        )
-
-                Nothing ->
+                    )
+                |> Maybe.withDefault
                     ( model
                     , View
                         { note = sznFromModel model
