@@ -1690,7 +1690,8 @@ initFull si ld zkl zknote dtlinks spm =
       , panelNote = Nothing
       , mbReplaceString = Nothing
       }
-    , { zknote = zknote.id, offset = 0, limit = Nothing }
+      -- , { zknote = zknote.id, offset = 0, limit = Nothing }
+    , { zknote = zknote.id, offset = 0 }
     )
 
 

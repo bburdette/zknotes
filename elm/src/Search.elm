@@ -76,6 +76,7 @@ type alias ZkNoteSearch =
 
 type SearchMod
     = ExactMatch
+    | ZkNoteId
     | Tag
     | Note
     | User
@@ -134,6 +135,9 @@ encodeSearchMod smod =
         ExactMatch ->
             JE.string "ExactMatch"
 
+        ZkNoteId ->
+            JE.string "ZkNoteId"
+
         Tag ->
             JE.string "Tag"
 
@@ -155,6 +159,9 @@ decodeSearchMod =
                 case s of
                     "ExactMatch" ->
                         JD.succeed ExactMatch
+
+                    "ZkNoteId" ->
+                        JD.succeed ZkNoteId
 
                     "Tag" ->
                         JD.succeed Tag
@@ -290,6 +297,9 @@ showSearchMod mod =
         ExactMatch ->
             "ExactMatch"
 
+        ZkNoteId ->
+            "ZkNoteId"
+
         Tag ->
             "Tag"
 
@@ -332,6 +342,9 @@ printSearchMod mod =
         ExactMatch ->
             "e"
 
+        ZkNoteId ->
+            "z"
+
         Tag ->
             "t"
 
@@ -373,6 +386,8 @@ searchMod =
     oneOf
         [ succeed ExactMatch
             |. symbol "e"
+        , succeed ZkNoteId
+            |. symbol "z"
         , succeed Tag
             |. symbol "t"
         , succeed Note

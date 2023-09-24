@@ -213,7 +213,8 @@ type alias GetZkLinks =
 type alias GetZkNoteComments =
     { zknote : Int
     , offset : Int
-    , limit : Maybe Int
+
+    -- , limit : Maybe Int
     }
 
 
@@ -374,14 +375,16 @@ encodeGetZkNoteComments x =
         [ ( "zknote", JE.int x.zknote )
         , ( "offset", JE.int x.offset )
         ]
-            ++ (case x.limit of
-                    Just l ->
-                        [ ( "limit", JE.int l )
-                        ]
 
-                    Nothing ->
-                        []
-               )
+
+
+-- ++ (case x.limit of
+--         Just l ->
+--             [ ( "limit", JE.int l )
+--             ]
+--         Nothing ->
+--             []
+--    )
 
 
 encodeZkLinks : ZkLinks -> JE.Value

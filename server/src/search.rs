@@ -57,6 +57,9 @@ pub fn search_zknotes(
 ) -> Result<Either<ZkListNoteSearchResult, ZkNoteSearchResult>, Box<dyn Error>> {
   let (sql, args) = build_sql(&conn, user, search.clone())?;
 
+  println!("sql {}", sql);
+  println!("args {:?}", args);
+
   let mut pstmt = conn.prepare(sql.as_str())?;
 
   let sysid = user_id(&conn, "system")?;
@@ -362,6 +365,7 @@ fn build_sql_clause(
   let (cls, args) = match search {
     TagSearch::SearchTerm { mods, term } => {
       let mut exact = false;
+      let mut zknoteid = false;
       let mut tag = false;
       let mut desc = false;
       let mut user = false;
@@ -370,6 +374,7 @@ fn build_sql_clause(
       for m in mods {
         match m {
           SearchMod::ExactMatch => exact = true,
+          SearchMod::ZkNoteId => zknoteid = true,
           SearchMod::Tag => tag = true,
           SearchMod::Note => desc = true,
           SearchMod::User => user = true,
@@ -389,10 +394,12 @@ fn build_sql_clause(
         if tag {
           let fileclause = if file { "and zkn.file is not null" } else { "" };
 
-          let clause = if exact {
+          let clause = if zknoteid {
+            format!("zkn.id = cast(? as integer)")
+          } else if exact {
             format!("zkn.{} = ? {}", field, fileclause)
           } else {
-            format!("zkn.{}  like ? {}", field, fileclause)
+            format!("zkn.{} like ? {}", field, fileclause)
           };
 
           let notstr = if not { "not" } else { "" };
@@ -410,7 +417,9 @@ fn build_sql_clause(
               notstr, clause, clause
             ),
             // args
-            if exact {
+            if zknoteid {
+              vec![term.clone(), term]
+            } else if exact {
               vec![term.clone(), term]
             } else {
               vec![
@@ -431,13 +440,17 @@ fn build_sql_clause(
 
           (
             // clause
-            if exact {
+            if zknoteid {
+              format!("N.id = cast(? as integer)")
+            } else if exact {
               format!("N.{} {}= ? {}", field, notstr, fileclause)
             } else {
               format!("N.{} {} like ? {}", field, notstr, fileclause)
             },
             // args
-            if exact {
+            if zknoteid {
+              vec![term]
+            } else if exact {
               vec![term]
             } else {
               vec![format!("%{}%", term).to_string()]
@@ -464,5 +477,6 @@ fn build_sql_clause(
       (cls, arg1)
     }
   };
+  println!("cls: {}", cls);
   Ok((cls, args))
 }

@@ -28,6 +28,7 @@ pub enum TagSearch {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub enum SearchMod {
   ExactMatch,
+  ZkNoteId,
   Tag,
   Note,
   User,
