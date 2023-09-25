@@ -189,12 +189,16 @@ pub fn zk_interface_loggedin(
       // let res = search::search_zknotes_simple(&conn, uid, &search)?;
       let res = search::search_zknotes(&conn, uid, &search)?;
       match res {
-        Left(res) => Ok(ServerResponse {
+        search::SearchResult::SrListNote(res) => Ok(ServerResponse {
           what: "zklistnotesearchresult".to_string(),
           content: serde_json::to_value(res)?,
         }),
-        Right(res) => Ok(ServerResponse {
+        search::SearchResult::SrNote(res) => Ok(ServerResponse {
           what: "zknotesearchresult".to_string(),
+          content: serde_json::to_value(res)?,
+        }),
+        search::SearchResult::SrNoteAndLink(res) => Ok(ServerResponse {
+          what: "zknoteandlinkssearchresult".to_string(),
           content: serde_json::to_value(res)?,
         }),
       }

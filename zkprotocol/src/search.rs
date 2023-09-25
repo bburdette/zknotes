@@ -1,4 +1,4 @@
-use crate::content::{ZkListNote, ZkNote};
+use crate::content::{ZkListNote, ZkNote, ZkNoteAndLinks};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ZkNoteSearch {
@@ -6,7 +6,14 @@ pub struct ZkNoteSearch {
   pub offset: i64,
   pub limit: Option<i64>,
   pub what: String,
-  pub list: bool,
+  pub resulttype: ResultType,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub enum ResultType {
+  RtListNote,
+  RtNote,
+  RtNoteAndLinks,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -51,6 +58,12 @@ pub struct ZkListNoteSearchResult {
 #[derive(Serialize, Debug, Clone)]
 pub struct ZkNoteSearchResult {
   pub notes: Vec<ZkNote>,
+  pub offset: i64,
+  pub what: String,
+}
+#[derive(Serialize, Debug, Clone)]
+pub struct ZkNoteAndLinksSearchResult {
+  pub notes: Vec<ZkNoteAndLinks>,
   pub offset: i64,
   pub what: String,
 }

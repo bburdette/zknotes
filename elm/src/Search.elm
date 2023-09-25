@@ -1,6 +1,7 @@
 module Search exposing
     ( AndOr(..)
     , FieldText(..)
+    , ResultType(..)
     , SearchMod(..)
     , TSText(..)
     , TagSearch(..)
@@ -70,8 +71,14 @@ type alias ZkNoteSearch =
     , offset : Int
     , limit : Maybe Int
     , what : String
-    , list : Bool
+    , resultType : ResultType
     }
+
+
+type ResultType
+    = RtListNote
+    | RtNote
+    | RtNoteAndLinks
 
 
 type SearchMod
@@ -125,8 +132,21 @@ defaultSearch =
     , offset = 0
     , limit = Just defaultSearchLimit
     , what = ""
-    , list = True
+    , resultType = RtListNote
     }
+
+
+encodeResultType : ResultType -> JE.Value
+encodeResultType smod =
+    case smod of
+        RtListNote ->
+            JE.string "RtListNote"
+
+        RtNote ->
+            JE.string "RtNote"
+
+        RtNoteAndLinks ->
+            JE.string "RtNoteAndLinks"
 
 
 encodeSearchMod : SearchMod -> JE.Value
@@ -283,7 +303,7 @@ encodeZkNoteSearch zns =
         [ ( "tagsearch", encodeTagSearch (andifySearches zns.tagSearch) )
         , ( "offset", JE.int zns.offset )
         , ( "what", JE.string zns.what )
-        , ( "list", JE.bool zns.list )
+        , ( "resulttype", encodeResultType zns.resultType )
         ]
             ++ (zns.limit
                     |> Maybe.map (\i -> [ ( "limit", JE.int i ) ])

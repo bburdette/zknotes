@@ -9,7 +9,8 @@ use std::error::Error;
 use std::path::PathBuf;
 use zkprotocol::content::ZkListNote;
 use zkprotocol::search::{
-  AndOr, SearchMod, TagSearch, ZkListNoteSearchResult, ZkNoteSearch, ZkNoteSearchResult,
+  AndOr, ResultType, SearchMod, TagSearch, ZkListNoteSearchResult, ZkNoteAndLinksSearchResult,
+  ZkNoteSearch, ZkNoteSearchResult,
 };
 
 pub fn power_delete_zknotes(
@@ -26,12 +27,12 @@ pub fn power_delete_zknotes(
     offset: 0,
     limit: None,
     what: "".to_string(),
-    list: true,
+    resulttype: ResultType::RtListNote,
   };
 
   let znsr = search_zknotes(conn, user, &nolimsearch)?;
   match znsr {
-    Left(znsr) => {
+    SearchResult::SrListNote(znsr) => {
       let c = znsr.notes.len().try_into()?;
 
       for n in znsr.notes {
@@ -39,22 +40,36 @@ pub fn power_delete_zknotes(
       }
       Ok(c)
     }
-    Right(znsr) => {
+    SearchResult::SrNote(znsr) => {
       let c = znsr.notes.len().try_into()?;
 
       for n in znsr.notes {
         delete_zknote(&conn, file_path.clone(), user, n.id)?;
+      }
+      Ok(c)
+    }
+    SearchResult::SrNoteAndLink(znsr) => {
+      let c = znsr.notes.len().try_into()?;
+
+      for n in znsr.notes {
+        delete_zknote(&conn, file_path.clone(), user, n.zknote.id)?;
       }
       Ok(c)
     }
   }
 }
 
+pub enum SearchResult {
+  SrListNote(ZkListNoteSearchResult),
+  SrNote(ZkNoteSearchResult),
+  SrNoteAndLink(ZkNoteAndLinksSearchResult),
+}
+
 pub fn search_zknotes(
   conn: &Connection,
   user: i64,
   search: &ZkNoteSearch,
-) -> Result<Either<ZkListNoteSearchResult, ZkNoteSearchResult>, Box<dyn Error>> {
+) -> Result<SearchResult, Box<dyn Error>> {
   let (sql, args) = build_sql(&conn, user, search.clone())?;
 
   println!("sql {}", sql);
@@ -84,40 +99,61 @@ pub fn search_zknotes(
     })
   })?;
 
-  if search.list {
-    let mut pv = Vec::new();
+  match search.resulttype {
+    ResultType::RtListNote => {
+      let mut pv = Vec::new();
 
-    for rsrec in rec_iter {
-      match rsrec {
-        Ok(rec) => {
-          pv.push(rec);
+      for rsrec in rec_iter {
+        match rsrec {
+          Ok(rec) => {
+            pv.push(rec);
+          }
+          Err(_) => (),
         }
-        Err(_) => (),
       }
+
+      Ok(SearchResult::SrListNote(ZkListNoteSearchResult {
+        notes: pv,
+        offset: search.offset,
+        what: search.what.clone(),
+      }))
     }
+    ResultType::RtNote => {
+      let mut pv = Vec::new();
 
-    Ok(Left(ZkListNoteSearchResult {
-      notes: pv,
-      offset: search.offset,
-      what: search.what.clone(),
-    }))
-  } else {
-    let mut pv = Vec::new();
-
-    for rsrec in rec_iter {
-      match rsrec {
-        Ok(rec) => {
-          pv.push(sqldata::read_zknote(&conn, Some(user), rec.id)?);
+      for rsrec in rec_iter {
+        match rsrec {
+          Ok(rec) => {
+            pv.push(sqldata::read_zknote(&conn, Some(user), rec.id)?);
+          }
+          Err(_) => (),
         }
-        Err(_) => (),
       }
-    }
 
-    Ok(Right(ZkNoteSearchResult {
-      notes: pv,
-      offset: search.offset,
-      what: search.what.clone(),
-    }))
+      Ok(SearchResult::SrNote(ZkNoteSearchResult {
+        notes: pv,
+        offset: search.offset,
+        what: search.what.clone(),
+      }))
+    }
+    ResultType::RtNoteAndLinks => {
+      let mut pv = Vec::new();
+
+      for rsrec in rec_iter {
+        match rsrec {
+          Ok(rec) => {
+            pv.push(sqldata::read_zknoteedit(&conn, Some(user), rec.id)?);
+          }
+          Err(_) => (),
+        }
+      }
+
+      Ok(SearchResult::SrNoteAndLink(ZkNoteAndLinksSearchResult {
+        notes: pv,
+        offset: search.offset,
+        what: search.what.clone(),
+      }))
+    }
   }
 }
 
@@ -247,7 +283,7 @@ pub fn search_zknotes_simple(
   conn: &Connection,
   user: i64,
   search: &ZkNoteSearch,
-) -> Result<Either<ZkListNoteSearchResult, ZkNoteSearchResult>, Box<dyn Error>> {
+) -> Result<SearchResult, Box<dyn Error>> {
   let (sql, args) = build_simple_sql(&conn, user, search.clone())?;
 
   let mut pstmt = conn.prepare(sql.as_str())?;
@@ -284,40 +320,61 @@ pub fn search_zknotes_simple(
     }
   })?;
 
-  if search.list {
-    let mut pv = Vec::new();
+  match search.resulttype {
+    ResultType::RtListNote => {
+      let mut pv = Vec::new();
 
-    for rsrec in rec_iter {
-      match rsrec {
-        Ok(Some(rec)) => {
-          pv.push(rec);
+      for rsrec in rec_iter {
+        match rsrec {
+          Ok(Some(rec)) => {
+            pv.push(rec);
+          }
+          _ => (),
         }
-        _ => (),
       }
+
+      Ok(SearchResult::SrListNote(ZkListNoteSearchResult {
+        notes: pv,
+        offset: search.offset,
+        what: search.what.clone(),
+      }))
     }
+    ResultType::RtNote => {
+      let mut pv = Vec::new();
 
-    Ok(Left(ZkListNoteSearchResult {
-      notes: pv,
-      offset: search.offset,
-      what: search.what.clone(),
-    }))
-  } else {
-    let mut pv = Vec::new();
-
-    for rsrec in rec_iter {
-      match rsrec {
-        Ok(Some(rec)) => {
-          pv.push(sqldata::read_zknote(&conn, Some(user), rec.id)?);
+      for rsrec in rec_iter {
+        match rsrec {
+          Ok(Some(rec)) => {
+            pv.push(sqldata::read_zknote(&conn, Some(user), rec.id)?);
+          }
+          _ => (),
         }
-        _ => (),
       }
-    }
 
-    Ok(Right(ZkNoteSearchResult {
-      notes: pv,
-      offset: search.offset,
-      what: search.what.clone(),
-    }))
+      Ok(SearchResult::SrNote(ZkNoteSearchResult {
+        notes: pv,
+        offset: search.offset,
+        what: search.what.clone(),
+      }))
+    }
+    ResultType::RtNoteAndLinks => {
+      let mut pv = Vec::new();
+
+      for rsrec in rec_iter {
+        match rsrec {
+          Ok(Some(rec)) => {
+            pv.push(sqldata::read_zknoteedit(&conn, Some(user), rec.id)?);
+          }
+          _ => (),
+        }
+      }
+
+      Ok(SearchResult::SrNoteAndLink(ZkNoteAndLinksSearchResult {
+        notes: pv,
+        offset: search.offset,
+        what: search.what.clone(),
+      }))
+    }
   }
 }
 

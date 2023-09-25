@@ -1568,7 +1568,7 @@ actualupdate msg model =
                                             , offset = 0
                                             , limit = Nothing
                                             , what = ""
-                                            , list = True
+                                            , resultType = S.RtListNote
                                             }
                                         )
 
@@ -3371,7 +3371,7 @@ prevSearchQuery login =
     , offset = 0
     , limit = Just 50
     , what = "prevSearches"
-    , list = False
+    , resultType = S.RtNote
     }
 
 

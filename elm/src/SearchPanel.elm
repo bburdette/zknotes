@@ -60,7 +60,7 @@ getSearch model =
                 , offset = model.paginationModel.offset
                 , limit = Just model.paginationModel.increment
                 , what = ""
-                , list = True
+                , resultType = S.RtListNote
                 }
             )
 
@@ -153,7 +153,7 @@ handleTspUpdate model ( nm, cmd ) =
                 , offset = 0
                 , limit = Just model.paginationModel.increment
                 , what = ""
-                , list = True
+                , resultType = S.RtListNote
                 }
             )
 
@@ -193,7 +193,7 @@ update msg model =
                                 , offset = nm.offset
                                 , limit = Just nm.increment
                                 , what = ""
-                                , list = True
+                                , resultType = S.RtListNote
                                 }
                             )
 
