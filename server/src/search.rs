@@ -9,8 +9,8 @@ use std::error::Error;
 use std::path::PathBuf;
 use zkprotocol::content::ZkListNote;
 use zkprotocol::search::{
-  AndOr, ResultType, SearchMod, TagSearch, ZkListNoteSearchResult, ZkNoteAndLinksSearchResult,
-  ZkNoteSearch, ZkNoteSearchResult,
+  AndOr, ResultType, SearchMod, TagSearch, ZkIdSearchResult, ZkListNoteSearchResult,
+  ZkNoteAndLinksSearchResult, ZkNoteSearch, ZkNoteSearchResult,
 };
 
 pub fn power_delete_zknotes(
@@ -32,6 +32,14 @@ pub fn power_delete_zknotes(
 
   let znsr = search_zknotes(conn, user, &nolimsearch)?;
   match znsr {
+    SearchResult::SrId(znsr) => {
+      let c = znsr.notes.len().try_into()?;
+
+      for n in znsr.notes {
+        delete_zknote(&conn, file_path.clone(), user, n)?;
+      }
+      Ok(c)
+    }
     SearchResult::SrListNote(znsr) => {
       let c = znsr.notes.len().try_into()?;
 
@@ -60,6 +68,7 @@ pub fn power_delete_zknotes(
 }
 
 pub enum SearchResult {
+  SrId(ZkIdSearchResult),
   SrListNote(ZkListNoteSearchResult),
   SrNote(ZkNoteSearchResult),
   SrNoteAndLink(ZkNoteAndLinksSearchResult),
@@ -100,6 +109,24 @@ pub fn search_zknotes(
   })?;
 
   match search.resulttype {
+    ResultType::RtId => {
+      let mut pv = Vec::new();
+
+      for rsrec in rec_iter {
+        match rsrec {
+          Ok(rec) => {
+            pv.push(rec.id);
+          }
+          Err(_) => (),
+        }
+      }
+
+      Ok(SearchResult::SrId(ZkIdSearchResult {
+        notes: pv,
+        offset: search.offset,
+        what: search.what.clone(),
+      }))
+    }
     ResultType::RtListNote => {
       let mut pv = Vec::new();
 
@@ -321,6 +348,25 @@ pub fn search_zknotes_simple(
   })?;
 
   match search.resulttype {
+    // TODO: modify query to return data needed rather than always listnote
+    ResultType::RtId => {
+      let mut pv = Vec::new();
+
+      for rsrec in rec_iter {
+        match rsrec {
+          Ok(Some(rec)) => {
+            pv.push(rec);
+          }
+          _ => (),
+        }
+      }
+
+      Ok(SearchResult::SrListNote(ZkListNoteSearchResult {
+        notes: pv,
+        offset: search.offset,
+        what: search.what.clone(),
+      }))
+    }
     ResultType::RtListNote => {
       let mut pv = Vec::new();
 

@@ -11,6 +11,7 @@ pub struct ZkNoteSearch {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub enum ResultType {
+  RtId,
   RtListNote,
   RtNote,
   RtNoteAndLinks,
@@ -46,6 +47,13 @@ pub enum SearchMod {
 pub enum AndOr {
   And,
   Or,
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub struct ZkIdSearchResult {
+  pub notes: Vec<i64>,
+  pub offset: i64,
+  pub what: String,
 }
 
 #[derive(Serialize, Debug, Clone)]

@@ -76,7 +76,8 @@ type alias ZkNoteSearch =
 
 
 type ResultType
-    = RtListNote
+    = RtId
+    | RtListNote
     | RtNote
     | RtNoteAndLinks
 
@@ -139,6 +140,9 @@ defaultSearch =
 encodeResultType : ResultType -> JE.Value
 encodeResultType smod =
     case smod of
+        RtId ->
+            JE.string "RtId"
+
         RtListNote ->
             JE.string "RtListNote"
 

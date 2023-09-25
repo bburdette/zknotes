@@ -189,6 +189,10 @@ pub fn zk_interface_loggedin(
       // let res = search::search_zknotes_simple(&conn, uid, &search)?;
       let res = search::search_zknotes(&conn, uid, &search)?;
       match res {
+        search::SearchResult::SrId(res) => Ok(ServerResponse {
+          what: "zkidsearchresult".to_string(),
+          content: serde_json::to_value(res)?,
+        }),
         search::SearchResult::SrListNote(res) => Ok(ServerResponse {
           what: "zklistnotesearchresult".to_string(),
           content: serde_json::to_value(res)?,

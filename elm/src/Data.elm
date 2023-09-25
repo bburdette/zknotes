@@ -98,6 +98,13 @@ type alias ZkListNote =
     }
 
 
+type alias ZkIdSearchResult =
+    { notes : List Int
+    , offset : Int
+    , what : String
+    }
+
+
 type alias ZkListNoteSearchResult =
     { notes : List ZkListNote
     , offset : Int
@@ -530,6 +537,14 @@ decodeZkListNote =
         |> andMap (JD.field "createdate" JD.int)
         |> andMap (JD.field "changeddate" JD.int)
         |> andMap (JD.field "sysids" (JD.list JD.int))
+
+
+decodeZkIdSearchResult : JD.Decoder ZkIdSearchResult
+decodeZkIdSearchResult =
+    JD.map3 ZkIdSearchResult
+        (JD.field "notes" (JD.list JD.int))
+        (JD.field "offset" JD.int)
+        (JD.field "what" JD.string)
 
 
 decodeZkListNoteSearchResult : JD.Decoder ZkListNoteSearchResult
