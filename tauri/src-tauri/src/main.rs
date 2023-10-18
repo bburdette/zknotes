@@ -24,6 +24,13 @@ fn main() {
   //   }
   // });
 
+  let ret = zknotes_server_lib::sqldata::dbinit(
+    config.orgauth_config.db.as_path(),
+    config.orgauth_config.login_token_expiration_ms,
+  );
+
+  println!("dbinit ret: {:?}", ret);
+
   // #[cfg(desktop)]
   // app_lib::run();
   tauri::Builder::default()

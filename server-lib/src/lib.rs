@@ -4,7 +4,7 @@ pub mod config;
 pub mod interfaces;
 mod migrations;
 mod search;
-mod sqldata;
+pub mod sqldata;
 mod sqltest;
 use actix_cors::Cors;
 use actix_files::NamedFile;
