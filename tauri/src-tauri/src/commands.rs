@@ -34,8 +34,8 @@ pub fn zimsg(state: State<ZkState>, msg: UserMessage) -> ServerResponse {
       sr
     }
     Err(e) => ServerResponse {
-      what: "error".to_string(),
-      content: Value::String("error".to_string()),
+      what: "server error".to_string(),
+      content: Value::String(e.to_string()),
     },
   }
 }
@@ -54,8 +54,8 @@ pub fn pimsg(state: State<ZkState>, msg: PublicMessage) -> ServerResponse {
       sr
     }
     Err(e) => ServerResponse {
-      what: "erro".to_string(),
-      content: Value::String("erro".to_string()),
+      what: "server error".to_string(),
+      content: Value::String(e.to_string()),
     },
   }
 }
@@ -76,8 +76,8 @@ pub fn uimsg(state: State<ZkState>, msg: WhatMessage) -> WhatMessage {
       sr
     }
     Err(e) => WhatMessage {
-      what: "erro".to_string(),
-      data: Some(Value::String("erro".to_string())),
+      what: "server error".to_string(),
+      data: Some(Value::String(e.to_string())),
     },
   };
 
