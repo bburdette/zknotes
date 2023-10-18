@@ -246,6 +246,7 @@ pub fn udpate2() -> Migration {
 pub fn udpate3(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   // db connection without foreign key checking.
   let conn = Connection::open(dbfile)?;
+  conn.execute("PRAGMA foreign_keys = false;", params![])?;
   let mut m1 = Migration::new();
 
   // temp table to hold zknote data.
@@ -336,6 +337,7 @@ pub fn udpate3(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 pub fn udpate4(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   // db connection without foreign key checking.
   let conn = Connection::open(dbfile)?;
+  conn.execute("PRAGMA foreign_keys = false;", params![])?;
   let mut m1 = Migration::new();
 
   // temp table to hold zknote data.
@@ -680,6 +682,7 @@ pub fn udpate4(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 pub fn udpate5(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   // db connection without foreign key checking.
   let conn = Connection::open(dbfile)?;
+  conn.execute("PRAGMA foreign_keys = false;", params![])?;
   let mut m1 = Migration::new();
 
   m1.create_table("usertemp", |t| {
@@ -708,8 +711,10 @@ pub fn udpate5(dbfile: &Path) -> Result<(), orgauth::error::Error> {
     t.add_column("createdate", types::integer().nullable(false));
   });
 
+  println!("udpate5 - m1");
   conn.execute_batch(m1.make::<Sqlite>().as_str())?;
 
+  println!("insert");
   // copy everything from user.
   conn.execute(
     "insert into usertemp (id, name, hashwd, zknote, salt, email, registration_key, createdate)
@@ -749,8 +754,10 @@ pub fn udpate5(dbfile: &Path) -> Result<(), orgauth::error::Error> {
     t.add_column("tokendate", types::integer().nullable(true));
   });
 
+  println!("m2");
   conn.execute_batch(m2.make::<Sqlite>().as_str())?;
 
+  println!("insert 2");
   // copy everything from usertemp.
   conn.execute(
     "insert into user (id, name, hashwd, zknote, salt, email, registration_key, createdate)
@@ -762,6 +769,7 @@ pub fn udpate5(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 
   m3.drop_table("usertemp");
 
+  println!("m3");
   conn.execute_batch(m3.make::<Sqlite>().as_str())?;
 
   Ok(())
@@ -770,6 +778,7 @@ pub fn udpate5(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 pub fn udpate6(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   // db connection without foreign key checking.
   let conn = Connection::open(dbfile)?;
+  conn.execute("PRAGMA foreign_keys = false;", params![])?;
   let mut m1 = Migration::new();
 
   m1.create_table("usertemp", |t| {
@@ -875,6 +884,7 @@ pub fn udpate6(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 pub fn udpate7(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   // db connection without foreign key checking.
   let conn = Connection::open(dbfile)?;
+  conn.execute("PRAGMA foreign_keys = false;", params![])?;
   let mut m1 = Migration::new();
 
   m1.create_table("zknotetemp", |t| {
@@ -1002,6 +1012,7 @@ pub fn udpate8(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 pub fn udpate9(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   // db connection without foreign key checking.
   let conn = Connection::open(dbfile)?;
+  conn.execute("PRAGMA foreign_keys = false;", params![])?;
   let mut m1 = Migration::new();
 
   // add newemail table.  each request for a new email creates an entry.
@@ -1033,6 +1044,7 @@ pub fn udpate9(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 pub fn udpate10(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   // db connection without foreign key checking.
   let conn = Connection::open(dbfile)?;
+  conn.execute("PRAGMA foreign_keys = false;", params![])?;
   let mut m1 = Migration::new();
 
   m1.create_table("usertemp", |t| {
@@ -1131,6 +1143,7 @@ pub fn udpate10(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 pub fn udpate11(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   // db connection without foreign key checking.
   let conn = Connection::open(dbfile)?;
+  conn.execute("PRAGMA foreign_keys = false;", params![])?;
   let mut m1 = Migration::new();
 
   // add newpassword table.  each request for a new password creates an entry.
@@ -1161,6 +1174,7 @@ pub fn udpate11(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 pub fn udpate12(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   // db connection without foreign key checking.
   let conn = Connection::open(dbfile)?;
+  conn.execute("PRAGMA foreign_keys = false;", params![])?;
   let mut m1 = Migration::new();
 
   m1.create_table("zknotetemp", |t| {
@@ -1256,6 +1270,7 @@ pub fn udpate12(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 pub fn udpate13(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   // db connection without foreign key checking.
   let conn = Connection::open(dbfile)?;
+  conn.execute("PRAGMA foreign_keys = false;", params![])?;
 
   migrations::udpate1(dbfile)?;
 
@@ -1543,6 +1558,7 @@ pub fn udpate17(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 pub fn udpate18(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   // db connection without foreign key checking.
   let conn = Connection::open(dbfile)?;
+  conn.execute("PRAGMA foreign_keys = false;", params![])?;
   let mut m1 = Migration::new();
 
   m1.create_table("zknotetemp", |t| {
@@ -1637,6 +1653,7 @@ pub fn udpate18(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 pub fn udpate19(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   // db connection without foreign key checking.
   let conn = Connection::open(dbfile)?;
+  conn.execute("PRAGMA foreign_keys = false;", params![])?;
 
   // we don't just call note_id because note_id ftn of the future may be
   // different!  then migrations would break.  yes this happened.
@@ -1669,6 +1686,7 @@ pub fn udpate20(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 
 pub fn udpate21(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   let conn = Connection::open(dbfile)?;
+  conn.execute("PRAGMA foreign_keys = false;", params![])?;
 
   let mut m = Migration::new();
 
@@ -1800,6 +1818,7 @@ pub fn udpate23(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 
 pub fn udpate24(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   let conn = Connection::open(dbfile)?;
+  conn.execute("PRAGMA foreign_keys = false;", params![])?;
 
   let mut m1 = Migration::new();
 
@@ -1878,6 +1897,7 @@ pub fn udpate24(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 
 pub fn udpate25(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   let conn = Connection::open(dbfile)?;
+  conn.execute("PRAGMA foreign_keys = false;", params![])?;
 
   let mut m1 = Migration::new();
 
@@ -1906,6 +1926,7 @@ pub fn udpate25(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 
 pub fn udpate26(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   let conn = Connection::open(dbfile)?;
+  conn.execute("PRAGMA foreign_keys = false;", params![])?;
 
   let mut m1 = Migration::new();
 

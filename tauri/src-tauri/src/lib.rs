@@ -13,6 +13,9 @@ pub fn run() {
     .setup(|app| {
       let mut dbpath = app.path().data_dir().unwrap();
       dbpath.push("zknotes.db");
+
+      // std::fs::remove_file(dbpath.clone());
+
       println!("dbpath: {:?}", dbpath);
       match app.state::<ZkState>().config.lock() {
         Ok(mut config) => {
