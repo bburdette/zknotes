@@ -450,6 +450,7 @@ pub fn defcon() -> Config {
     reset_token_expiration_ms: 1 * 24 * 60 * 60 * 1000, // 1 day in milliseconds
     invite_token_expiration_ms: 7 * 24 * 60 * 60 * 1000, // 7 day in milliseconds
     open_registration: false,
+    send_registration_email: false,
     non_admin_invite: true,
   };
   Config {
@@ -465,7 +466,7 @@ pub fn defcon() -> Config {
   }
 }
 
-fn load_config(filename: &str) -> Result<Config, Box<dyn Error>> {
+pub fn load_config(filename: &str) -> Result<Config, Box<dyn Error>> {
   info!("loading config: {}", filename);
   let c = toml::from_str(util::load_string(filename)?.as_str())?;
   Ok(c)

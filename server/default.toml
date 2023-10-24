@@ -17,4 +17,5 @@ email_token_expiration_ms = 86400000
 reset_token_expiration_ms = 86400000
 invite_token_expiration_ms = 604800000
 open_registration = true
+send_registration_email = true
 non_admin_invite = true

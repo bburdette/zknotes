@@ -20,6 +20,7 @@ pub fn run() {
       match app.state::<ZkState>().config.lock() {
         Ok(mut config) => {
           config.orgauth_config.db = dbpath;
+          config.orgauth_config.open_registration = true;
           zknotes_server_lib::sqldata::dbinit(
             config.orgauth_config.db.as_path(),
             config.orgauth_config.login_token_expiration_ms,

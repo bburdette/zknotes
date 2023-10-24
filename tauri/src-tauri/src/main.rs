@@ -4,6 +4,7 @@ use log::{error, info};
 use serde;
 use serde_json;
 use serde_json::Value;
+use std::sync::Mutex;
 use std::thread;
 use tauri::State;
 use zknotes_server_lib::err_main;
@@ -24,21 +25,30 @@ fn main() {
   //   }
   // });
 
-  let ret = zknotes_server_lib::sqldata::dbinit(
-    config.orgauth_config.db.as_path(),
-    config.orgauth_config.login_token_expiration_ms,
-  );
+  let config = zknotes_server_lib::load_config("tauri-dev.toml");
+  match config {
+    Ok(config) => {
+      let ret = zknotes_server_lib::sqldata::dbinit(
+        config.orgauth_config.db.as_path(),
+        config.orgauth_config.login_token_expiration_ms,
+      );
 
-  println!("dbinit ret: {:?}", ret);
+      println!("dbinit ret: {:?}", ret);
+      tauri::Builder::default()
+        .manage(ZkState {
+          config: Mutex::new(config),
+          uid: None.into(),
+        })
+        .invoke_handler(tauri::generate_handler![greet, zimsg, pimsg, uimsg])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+    }
+    Err(e) => {
+      println!("bad config: {}", e);
+      panic!("bye");
+    }
+  }
 
   // #[cfg(desktop)]
   // app_lib::run();
-  tauri::Builder::default()
-    .manage(ZkState {
-      config: zknotes_server_lib::defcon(),
-      uid: None,
-    })
-    .invoke_handler(tauri::generate_handler![greet, zimsg, pimsg, uimsg])
-    .run(tauri::generate_context!())
-    .expect("error while running tauri application");
 }
