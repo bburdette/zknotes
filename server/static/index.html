@@ -2,7 +2,6 @@
 <html>
   <head>
     <meta charset="UTF-8">
-    <title>Main</title>
     <meta name="viewport" content="width=device-width">
     <style>html,head,body { padding:0; margin:0; }
       body { font-family: mono, calibri, helvetica, arial, sans-serif; background-color:#EEEEEC; }</style>
@@ -53,6 +52,25 @@
         .then((response) => {
           console.log("response!");
           app.ports.receiveUITauriResponse.send(response) });
+
+      function getTASelection(request) {
+          var range = { text: "", offset: null };
+          var activeEl = document.getElementById(request.id);
+          var activeElTagName = activeEl ? activeEl.tagName.toLowerCase() : null;
+          if (
+            (activeElTagName == "textarea") || (activeElTagName == "input" &&
+            /^(?:text|search|password|tel|url)$/i.test(activeEl.type)) &&
+            (typeof activeEl.selectionStart == "number")
+          ) {
+              range.text = activeEl.value.slice(activeEl.selectionStart, activeEl.selectionEnd);
+              range.offset = activeEl.selectionStart;
+              range.what = request.what;
+              app.ports.receiveTASelection.send(range);
+          }
+          else {
+              var error = { what: request.what };
+              app.ports.receiveTAError.send(error);
+          }
       }
 
       // `invoke` returns a Promise

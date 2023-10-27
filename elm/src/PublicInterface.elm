@@ -1,4 +1,4 @@
-module PublicInterface exposing (SendMsg(..), ServerResponse(..), encodeSendMsg, getErrorIndexNote, getPublicZkNote, serverResponseDecoder)
+module PublicInterface exposing (SendMsg(..), ServerResponse(..), encodeSendMsg, getErrorIndexNote, serverResponseDecoder)
 
 import Data
 import Http
@@ -11,28 +11,36 @@ import Util
 
 
 type SendMsg
-    = GetZkNote Int
+    = GetZkNoteAndLinks Data.GetZkNoteAndLinks
     | GetZkNotePubId String
+    | GetZnlIfChanged Data.GetZnlIfChanged
 
 
 type ServerResponse
     = ServerError String
-    | ZkNote Data.PubZkNote
+    | ZkNoteAndLinks Data.ZkNoteAndLinksWhat
+    | Noop
 
 
 encodeSendMsg : SendMsg -> JE.Value
 encodeSendMsg sm =
     case sm of
-        GetZkNote id ->
+        GetZkNoteAndLinks x ->
             JE.object
                 [ ( "what", JE.string "getzknote" )
-                , ( "data", JE.int id )
+                , ( "data", Data.encodeGetZkNoteEdit x )
                 ]
 
         GetZkNotePubId pubid ->
             JE.object
                 [ ( "what", JE.string "getzknotepubid" )
                 , ( "data", JE.string pubid )
+                ]
+
+        GetZnlIfChanged x ->
+            JE.object
+                [ ( "what", JE.string "getzneifchanged" )
+                , ( "data", Data.encodeGetZneIfChanged x )
                 ]
 
 
@@ -42,21 +50,14 @@ serverResponseDecoder =
         (\what ->
             case what of
                 "zknote" ->
-                    JD.map ZkNote
-                        (JD.at [ "content" ] <|
-                            JD.map
-                                (\zne ->
-                                    -- PubZkNote
-                                    { zknote = zne.zknote
-                                    , links = zne.links
-                                    , panelNote = Nothing
-                                    }
-                                )
-                                Data.decodeZkNoteEdit
-                        )
+                    JD.map ZkNoteAndLinks
+                        (JD.at [ "content" ] <| Data.decodeZkNoteEditWhat)
 
                 "server error" ->
                     JD.map ServerError (JD.at [ "content" ] JD.string)
+
+                "noop" ->
+                    JD.succeed Noop
 
                 wat ->
                     JD.succeed
@@ -67,62 +68,18 @@ serverResponseDecoder =
         )
 
 
-firstTask : String -> JE.Value -> Task Http.Error ServerResponse
-firstTask location jsonBody =
-    HT.post
-        { url = location ++ "/public"
-        , body = Http.jsonBody jsonBody
-        , resolver = HT.resolveJson serverResponseDecoder
-        }
-
-
-secondTask : String -> ServerResponse -> Task Http.Error ServerResponse
-secondTask location sr =
-    case sr of
-        ZkNote zknoteedit ->
-            zknoteedit.zknote.content
-                |> MC.mdPanel
-                |> Maybe.map
-                    (\panel ->
-                        HT.post
-                            { url = location ++ "/public"
-                            , body = Http.jsonBody <| encodeSendMsg (GetZkNote panel.noteid)
-                            , resolver =
-                                HT.resolveJson
-                                    (serverResponseDecoder
-                                        |> JD.andThen
-                                            (\sr2 ->
-                                                case sr2 of
-                                                    ZkNote panelnoteedit ->
-                                                        JD.succeed (ZkNote { zknoteedit | panelNote = Just panelnoteedit.zknote })
-
-                                                    _ ->
-                                                        JD.succeed sr2
-                                            )
-                                    )
-                            }
-                    )
-                |> Maybe.withDefault
-                    (Task.succeed <|
-                        ZkNote zknoteedit
-                    )
-
-        _ ->
-            Task.succeed sr
-
-
-getPublicZkNote : String -> JE.Value -> (Result Http.Error ServerResponse -> msg) -> Cmd msg
-getPublicZkNote location jsonBody tomsg =
-    firstTask location jsonBody
-        |> Task.andThen (\sr -> secondTask location sr)
-        |> Task.attempt tomsg
-
-
 getErrorIndexNote : String -> Int -> (Result Http.Error ServerResponse -> msg) -> Cmd msg
 getErrorIndexNote location noteid tomsg =
     HT.post
         { url = location ++ "/public"
-        , body = Http.jsonBody <| encodeSendMsg (GetZkNote noteid)
+        , body =
+            Http.jsonBody <|
+                encodeSendMsg
+                    (GetZkNoteAndLinks
+                        { zknote = noteid
+                        , what = ""
+                        }
+                    )
         , resolver =
             HT.resolveJson
                 serverResponseDecoder
