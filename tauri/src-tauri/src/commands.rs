@@ -1,5 +1,7 @@
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::Mutex;
+use std::time::SystemTime;
 use tauri::State;
 use zknotes_server_lib::err_main;
 use zknotes_server_lib::orgauth::data::WhatMessage;
@@ -17,50 +19,84 @@ pub fn greet(name: &str) -> String {
   format!("Hello, {}!", name)
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct TimedData {
+  utcmillis: u128,
+  data: ServerResponse,
+}
+
 #[tauri::command]
-pub fn zimsg(state: State<ZkState>, msg: UserMessage) -> ServerResponse {
+pub fn zimsg(state: State<ZkState>, msg: UserMessage) -> TimedData {
   // gonna need config obj, uid.
   // uid could be passed from elm maybe.
 
   println!("zimsg");
 
-  // match state.uid {
-  //   Some(uid) =>
-  // }
-
-  match zknotes_server_lib::interfaces::zk_interface_loggedin(
-    &&state.config.lock().unwrap(),
-    2,
-    &msg,
+  match (
+    zknotes_server_lib::interfaces::zk_interface_loggedin(&&state.config.lock().unwrap(), 2, &msg),
+    SystemTime::now()
+      .duration_since(SystemTime::UNIX_EPOCH)
+      .map(|n| n.as_millis()),
   ) {
-    Ok(sr) => {
+    (Ok(sr), Ok(t)) => {
       println!("sr: {}", sr.what);
       // serde_json::to_value(&sr).unwrap());
-      sr
+      TimedData {
+        utcmillis: t,
+        data: sr,
+      }
     }
-    Err(e) => ServerResponse {
-      what: "server error".to_string(),
-      content: Value::String(e.to_string()),
+    (Err(e), _) => TimedData {
+      utcmillis: 0,
+      data: ServerResponse {
+        what: "server error".to_string(),
+        content: Value::String(e.to_string()),
+      },
+    },
+    (_, Err(e)) => TimedData {
+      utcmillis: 0,
+      data: ServerResponse {
+        what: "server error".to_string(),
+        content: Value::String(e.to_string()),
+      },
     },
   }
 }
 
 #[tauri::command]
-pub fn pimsg(state: State<ZkState>, msg: PublicMessage) -> ServerResponse {
+pub fn pimsg(state: State<ZkState>, msg: PublicMessage) -> TimedData {
   // gonna need config obj, uid.
   // uid could be passed from elm maybe.
 
   println!("pimsg");
 
-  match zknotes_server_lib::interfaces::public_interface(&state.config.lock().unwrap(), msg, None) {
-    Ok(sr) => {
+  match (
+    zknotes_server_lib::interfaces::public_interface(&state.config.lock().unwrap(), msg, None),
+    SystemTime::now()
+      .duration_since(SystemTime::UNIX_EPOCH)
+      .map(|n| n.as_millis()),
+  ) {
+    (Ok(sr), Ok(t)) => {
       println!("sr: {}", sr.what);
       // serde_json::to_value(&sr).unwrap());
-      sr
+      TimedData {
+        utcmillis: t,
+        data: sr,
+      }
     }
-    Err(e) => ServerResponse {
-      what: "server error".to_string(),
-      content: Value::String(e.to_string()),
+    (Err(e), _) => TimedData {
+      utcmillis: 0,
+      data: ServerResponse {
+        what: "server error".to_string(),
+        content: Value::String(e.to_string()),
+      },
+    },
+    (_, Err(e)) => TimedData {
+      utcmillis: 0,
+      data: ServerResponse {
+        what: "server error".to_string(),
+        content: Value::String(e.to_string()),
+      },
     },
   }
 }

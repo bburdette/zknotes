@@ -52,6 +52,7 @@
         .then((response) => {
           console.log("response!");
           app.ports.receiveUITauriResponse.send(response) });
+      }
 
       function getTASelection(request) {
           var range = { text: "", offset: null };
