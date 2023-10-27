@@ -282,7 +282,7 @@ pub fn zk_interface_loggedin(
 pub fn public_interface(
   config: &Config,
   msg: PublicMessage,
-  ip: Option<&str>,
+  ipaddr: Option<&str>,
 ) -> Result<ServerResponse, Box<dyn Error>> {
   match msg.what.as_str() {
     "getzknote" => {
@@ -293,9 +293,7 @@ pub fn public_interface(
       let note = sqldata::read_zknote(&conn, None, gzne.zknote)?;
       info!(
         "public#getzknote: {} - {} - {:?}",
-        gzne.zknote,
-        note.title,
-        req.connection_info().realip_remote_addr()
+        gzne.zknote, note.title, ipaddr
       );
       Ok(ServerResponse {
         what: "zknote".to_string(),
@@ -339,7 +337,7 @@ pub fn public_interface(
       let note = sqldata::read_zknotepubid(&conn, None, pubid.as_str())?;
       info!(
         "public#getzknotepubid: {} - {} - {:?}",
-        pubid, note.title, ip,
+        pubid, note.title, ipaddr,
       );
       Ok(ServerResponse {
         what: "zknote".to_string(),

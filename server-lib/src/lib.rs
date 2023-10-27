@@ -24,7 +24,7 @@ use either::Either;
 use futures_util::TryStreamExt as _;
 use log::{error, info};
 pub use orgauth;
-use orgauth::endpoints::{ActixTokener, Callbacks, Tokener};
+use orgauth::endpoints::{ActixTokener, Callbacks};
 use orgauth::util;
 use rusqlite::Connection;
 use serde_json;

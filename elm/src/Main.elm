@@ -267,10 +267,10 @@ routeStateInternal model route =
                     , case model.state of
                         EView _ _ ->
                             -- if we're in "EView" then do this request to stay in EView.
-                            sendPIMsg model.location (PI.GetZkNoteAndLinks { zknote = id, what = "" })
+                            sendPIMsg model.tauri model.location (PI.GetZkNoteAndLinks { zknote = id, what = "" })
 
                         _ ->
-                            sendZIMsg model.tauri model.location  (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
+                            sendZIMsg model.tauri model.location (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
                 Nothing ->
@@ -278,7 +278,7 @@ routeStateInternal model route =
                         { message = "loading article"
                         }
                         (Just model.state)
-                    , sendPIMsg model.location (PI.GetZkNoteAndLinks { zknote = id, what = "" })
+                    , sendPIMsg model.tauri model.location (PI.GetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
         PublicZkPubId pubid ->
@@ -295,7 +295,7 @@ routeStateInternal model route =
                         { message = "loading article"
                         }
                         (Just model.state)
-            , sendPIMsg model.location (PI.GetZkNotePubId pubid)
+            , sendPIMsg model.tauri model.location (PI.GetZkNotePubId pubid)
             )
 
         EditZkNoteR id ->
@@ -312,7 +312,7 @@ routeStateInternal model route =
 
                 EView st login ->
                     ( EView st login
-                    , sendPIMsg model.location (PI.GetZkNoteAndLinks { zknote = id, what = "" })
+                    , sendPIMsg model.tauri model.location (PI.GetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
                 st ->
@@ -327,7 +327,7 @@ routeStateInternal model route =
                         Nothing ->
                             ( PubShowMessage { message = "loading note..." }
                                 (Just model.state)
-                            , sendPIMsg model.location (PI.GetZkNoteAndLinks { zknote = id, what = "" })
+                            , sendPIMsg model.tauri model.location (PI.GetZkNoteAndLinks { zknote = id, what = "" })
                             )
 
         EditZkNoteNew ->
@@ -1210,13 +1210,13 @@ sendSearch model search =
             )
 
 
-sendPIMsg : bool -> String -> PI.SendMsg -> Cmd Msg
+sendPIMsg : Bool -> String -> PI.SendMsg -> Cmd Msg
 sendPIMsg tauri location msg =
     sendPIMsgExp tauri location msg PublicReplyData
 
 
-sendPIMsgExp : String -> PI.SendMsg -> (Result Http.Error ( Time.Posix, PI.ServerResponse ) -> Msg) -> Cmd Msg
-sendPIMsgExp location msg tomsg =
+sendPIMsgExp : Bool -> String -> PI.SendMsg -> (Result Http.Error ( Time.Posix, PI.ServerResponse ) -> Msg) -> Cmd Msg
+sendPIMsgExp tauri location msg tomsg =
     if tauri then
         sendPIValueTauri <| PI.encodeSendMsg msg
 
@@ -1585,6 +1585,19 @@ onZkNoteEditWhat model pt znew =
                 )
 
 
+type alias TauriData a =
+    { utc : Time.Posix
+    , data : a
+    }
+
+
+makeTDDecoder : JD.Decoder a -> JD.Decoder (TauriData a)
+makeTDDecoder ad =
+    JD.map2 TauriData
+        (JD.field "utcmillis" (JD.map Time.millisToPosix JD.int))
+        (JD.field "data" ad)
+
+
 actualupdate : Msg -> Model -> ( Model, Cmd Msg )
 actualupdate msg model =
     case ( msg, model.state ) of
@@ -1604,10 +1617,10 @@ actualupdate msg model =
                 _ =
                     Debug.log "TauriReceiveZkReplyData" ""
             in
-            case JD.decodeValue ZI.serverResponseDecoder jd of
-                Ok d ->
+            case JD.decodeValue (makeTDDecoder ZI.serverResponseDecoder) jd of
+                Ok td ->
                     -- TODO fix this bs
-                    actualupdate (ZkReplyData (Ok ( Time.millisToPosix 0, d ))) model
+                    actualupdate (ZkReplyData (Ok ( td.utc, td.data ))) model
 
                 Err e ->
                     ( displayMessageDialog model <| JD.errorToString e
@@ -1647,9 +1660,9 @@ actualupdate msg model =
                 _ =
                     Debug.log "TauriPublicReplyData" ""
             in
-            case JD.decodeValue PI.serverResponseDecoder jd of
-                Ok d ->
-                    actualupdate (PublicReplyData (Ok d)) model
+            case JD.decodeValue (makeTDDecoder PI.serverResponseDecoder) jd of
+                Ok td ->
+                    actualupdate (PublicReplyData (Ok ( td.utc, td.data ))) model
 
                 Err e ->
                     ( displayMessageDialog model <| JD.errorToString e
@@ -2983,12 +2996,12 @@ makePubNoteCacheGets md model =
             (\id ->
                 case NC.getNote id model.noteCache of
                     Just zkn ->
-                        sendPIMsg
+                        sendPIMsg model.tauri
                             model.location
                             (PI.GetZnlIfChanged { zknote = id, what = "cache", changeddate = zkn.zknote.changeddate })
 
                     Nothing ->
-                        sendPIMsg
+                        sendPIMsg model.tauri
                             model.location
                             (PI.GetZkNoteAndLinks { zknote = id, what = "cache" })
             )
@@ -3207,16 +3220,14 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     , sendAIMsg model.location AI.GetUsers
                     )
 
-                EditZkNote.GetZkNoteWhat id what ->
-                    ( { model | state = EditZkNote emod login }
-                    , case what of
-                        "panel" ->
-                            sendZIMsg model.tauri model.location (ZI.GetZkNote id)
-
-                        _ ->
-                            sendZIMsg model.tauri model.location (ZI.GetZkNoteAndLinks { zknote = id, what = what })
-                    )
-
+                -- EditZkNote.GetZkNoteWhat id what ->
+                --     ( { model | state = EditZkNote emod login }
+                --     , case what of
+                --         "panel" ->
+                --             sendZIMsg model.tauri model.location (ZI.GetZkNote id)
+                --         _ ->
+                --             sendZIMsg model.tauri model.location (ZI.GetZkNoteAndLinks { zknote = id, what = what })
+                --     )
                 EditZkNote.SetHomeNote id ->
                     ( { model | state = EditZkNote emod login }
                     , sendZIMsg model.tauri model.location (ZI.SetHomeNote id)
