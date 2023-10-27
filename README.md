@@ -33,7 +33,7 @@ If you want to compile and run this on your own machine, without bothering with 
 
 To create the first zknotes admin account, use the -a option, like so:
 
-`../target/debug/zknotes-server -c myconfig.tomll -a the-admin`
+`../target/debug/zknotes-server -c myconfig.toml -a the-admin`
 
 By default zknotes uses 'invite links' for new users.  To onboard a new user, an admin gets an invite link from the admin panel, and sends that to the new user via email, signal, slack, etc.  Whoever uses the invite link can set their username and password to get an account.
 
