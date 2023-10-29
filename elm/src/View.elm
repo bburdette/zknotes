@@ -144,7 +144,7 @@ view zone maxw noteCache model loggedin =
             , E.column
                 [ E.width (E.fill |> E.maximum 1000), E.centerX, E.spacing 20, E.padding 10, E.alignTop ]
                 [ if model.showtitle then
-                    E.row [ E.width E.fill ] [ E.row [ E.centerX ] [ E.paragraph [ E.centerX, Font.bold, Font.size 20 ] [ E.text model.title ] ] ]
+                    E.row [ E.centerX ] [ E.paragraph [ Font.bold, Font.size 20 ] [ E.text model.title ] ]
 
                   else
                     E.none
