@@ -1089,10 +1089,10 @@ stateLogin state =
 
 sendUIMsg : Bool -> String -> UI.SendMsg -> Cmd Msg
 sendUIMsg tauri location msg =
-    let
-        _ =
-            Debug.log "sendUIMsg tauri:" tauri
-    in
+    -- let
+    --     _ =
+    --         Debug.log "sendUIMsg tauri:" tauri
+    -- in
     if tauri then
         sendUIValueTauri (UI.encodeSendMsg msg)
 
@@ -1120,22 +1120,22 @@ sendAIMsgExp location msg tomsg =
 
 sendZIMsg : Bool -> String -> ZI.SendMsg -> Cmd Msg
 sendZIMsg tauri location msg =
-    let
-        _ =
-            Debug.log "zzzz sendZIMsg tauri:" tauri
-    in
+    -- let
+    --     _ =
+    --         Debug.log "zzzz sendZIMsg tauri:" tauri
+    -- in
     if tauri then
-        let
-            _ =
-                Debug.log "zzzz sendZIMsgTauri" msg
-        in
+        --     let
+        --         _ =
+        --             Debug.log "zzzz sendZIMsgTauri" msg
+        --     in
         sendZIMsgTauri msg
 
     else
-        let
-            _ =
-                Debug.log "zzzz sendZIMsgExp" msg
-        in
+        --     let
+        --         _ =
+        --             Debug.log "zzzz sendZIMsgExp" msg
+        --     in
         sendZIMsgExp location msg ZkReplyData
 
 
@@ -1613,10 +1613,10 @@ actualupdate msg model =
             ( model, Cmd.none )
 
         ( TauriZkReplyData jd, _ ) ->
-            let
-                _ =
-                    Debug.log "TauriReceiveZkReplyData" ""
-            in
+            --         let
+            --             _ =
+            --                 Debug.log "TauriReceiveZkReplyData" ""
+            --         in
             case JD.decodeValue (makeTDDecoder ZI.serverResponseDecoder) jd of
                 Ok td ->
                     -- TODO fix this bs
@@ -1628,10 +1628,10 @@ actualupdate msg model =
                     )
 
         ( TauriUserReplyData jd, _ ) ->
-            let
-                _ =
-                    Debug.log "TauriUserReplyData" ""
-            in
+            --         let
+            --             _ =
+            --                 Debug.log "TauriUserReplyData" ""
+            --         in
             case JD.decodeValue UI.serverResponseDecoder jd of
                 Ok d ->
                     actualupdate (UserReplyData (Ok d)) model
@@ -1642,10 +1642,10 @@ actualupdate msg model =
                     )
 
         ( TauriAdminReplyData jd, _ ) ->
-            let
-                _ =
-                    Debug.log "TauriAdminReplyData" ""
-            in
+            --         let
+            --             _ =
+            --                 Debug.log "TauriAdminReplyData" ""
+            --         in
             case JD.decodeValue AI.serverResponseDecoder jd of
                 Ok d ->
                     actualupdate (AdminReplyData (Ok d)) model
@@ -1656,10 +1656,10 @@ actualupdate msg model =
                     )
 
         ( TauriPublicReplyData jd, _ ) ->
-            let
-                _ =
-                    Debug.log "TauriPublicReplyData" ""
-            in
+            --         let
+            --             _ =
+            --                 Debug.log "TauriPublicReplyData" ""
+            --         in
             case JD.decodeValue (makeTDDecoder PI.serverResponseDecoder) jd of
                 Ok td ->
                     actualupdate (PublicReplyData (Ok ( td.utc, td.data ))) model
