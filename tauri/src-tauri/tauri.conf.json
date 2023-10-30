@@ -2,7 +2,7 @@
   "build": {
     "beforeBuildCommand": "",
     "beforeDevCommand": "",
-    "devPath": "http://10.0.0.85:8010",
+    "devPath": "http://10.0.0.223:8010",
     "distDir": "static",
     "withGlobalTauri": true
   },

@@ -4,13 +4,9 @@
   inputs = {
     flake-utils.url = "github:numtide/flake-utils";
     naersk.url = "github:nmattia/naersk";
-    fenix = {
-      url = "github:nix-community/fenix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
-  outputs = { self, nixpkgs, flake-utils, naersk, fenix }:
+  outputs = { self, nixpkgs, flake-utils, naersk }:
     let
       makeElmPkg = { pkgs, additionalInputs ? [ ], pythonPackages ? (ps: [ ]) }:
         pkgs.stdenv.mkDerivation {
@@ -34,18 +30,11 @@
               elmPackages.elm-optimize-level-2
             ] ++ additionalInputs;
         };
-      mytauri = { pkgs }: pkgs.callPackage ./my-tauri.nix {};
-      mytaurimobile = { pkgs }: pkgs.callPackage ./my-tauri-mobile.nix {};
     in
     flake-utils.lib.eachDefaultSystem (
-      system:
-      let
+      system: let
         pname = "zknotes";
-        # pkgs = nixpkgs.legacyPackages."${system}"
-        pkgs = import nixpkgs {
-          config.android_sdk.accept_license = true;
-          config.allowUnfree = true;
-          system = "${system}"; };
+        pkgs = nixpkgs.legacyPackages."${system}";
         naersk-lib = naersk.lib."${system}";
         elm-stuff = makeElmPkg { inherit pkgs; };
         rust-stuff = naersk-lib.buildPackage {
@@ -56,31 +45,9 @@
               rustc
               sqlite
               pkgconfig
-              openssl.dev
+              openssl.dev 
               ];
           };
-
-        my-tauri = mytauri { inherit pkgs; };
-        my-tauri-mobile = mytaurimobile { inherit pkgs; };
-
-        # fenix stuff for adding other compile targets
-        mkToolchain = fenix.packages.${system}.combine;
-        toolchain = fenix.packages.${system}.stable;
-        target1 = fenix.packages.${system}.targets."aarch64-linux-android".stable;
-        target2 = fenix.packages.${system}.targets."armv7-linux-androideabi".stable;
-        target3 = fenix.packages.${system}.targets."i686-linux-android".stable;
-        target4 = fenix.packages.${system}.targets."x86_64-linux-android".stable;
-
-        mobileTargets = mkToolchain (with toolchain; [
-          cargo
-          rustc
-          target1.rust-std
-          target2.rust-std
-          target3.rust-std
-          target4.rust-std
-        ]);
-
-
       in
         rec {
           inherit pname;
@@ -108,45 +75,17 @@
           };
           defaultApp = apps.${pname};
 
-          # meh = pkgs.androidenv.androidPkgs_9_0 // { android_sdk.accept_license = true; };
-          # androidComposition = pkgs.androidenv.androidPkgs_9_0 // { includeNDK = true; };
-
-          androidEnv = pkgs.androidenv.override { licenseAccepted = true; };
-          androidComposition = androidEnv.composeAndroidPackages {
-            includeNDK = true;
-            platformToolsVersion = "33.0.3";
-            buildToolsVersions = [ "30.0.3" ];
-            platformVersions  = ["33"];
-            extraLicenses = [
-              "android-googletv-license"
-              "android-sdk-arm-dbt-license"
-              "android-sdk-license"
-              "android-sdk-preview-license"
-              "google-gdk-license"
-              "intel-android-extra-license"
-              "intel-android-sysimage-license"
-              "mips-android-sysimage-license"            ];
-          };
           # `nix develop`
           devShell = pkgs.mkShell {
-
-            NIX_LD= "${pkgs.stdenv.cc.libc}/lib/ld-linux-x86-64.so.2";
-            ANDROID_HOME = "${androidComposition.androidsdk}/libexec/android-sdk";
-            NDK_HOME = "${androidComposition.androidsdk}/libexec/android-sdk/ndk/${builtins.head (pkgs.lib.lists.reverseList (builtins.split "-" "${androidComposition.ndk-bundle}"))}";
-
             nativeBuildInputs = with pkgs; [
-              androidComposition.androidsdk
-              androidComposition.ndk-bundle
-              # cargo
-              # rustc
+              cargo
               cargo-watch
+              rustc
               rustfmt
               rust-analyzer
               sqlite
-              openssl.dev
-              # aarch64-linux-android-pkgs.sqlite
-              # aarch64-linux-android-pkgs.openssl.dev
               pkgconfig
+              openssl.dev
               elm2nix
               elmPackages.elm
               elmPackages.elm-analyse
@@ -160,31 +99,7 @@
               elmPackages.elm-verify-examples
               elmPackages.elmi-to-json
               elmPackages.elm-optimize-level-2
-              # extra stuff for tauri
-              my-tauri
-              # cargo-tauri
-              libsoup
-              cairo
-              atk
-              webkitgtk
-              gst_all_1.gstreamer
-              gst_all_1.gst-plugins-base
-              gst_all_1.gst-plugins-good
-              gst_all_1.gst-plugins-bad
-              # for tauti-mobile
-              librsvg
-              webkitgtk_4_1
-              # tauri-mobile
-              my-tauri-mobile
-              lldb
-              nodejs
-              # rustup # `cargo tauri android init` wants this, even though targets already installed.
-                     # should be fixed though, https://github.com/tauri-apps/tauri/issues/7044
-              alsa-lib
-              mobileTargets
-              # they suggest using the jbr (jetbrains runtime?) from android-studio, but that is not accessible.
-              jetbrains.jdk
-              ];
+            ];
           };
         }
     );
