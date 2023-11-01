@@ -110,7 +110,7 @@ view zone maxw noteCache model loggedin =
             \x -> E.row [ E.width E.fill ] [ E.row [ E.centerX, E.spacing 10 ] x ]
           )
             [ model.panelNote
-                |> Maybe.andThen (\id -> NC.getNote id noteCache)
+                |> Maybe.andThen (NC.getNote noteCache)
                 |> Maybe.map
                     (\pn ->
                         E.el

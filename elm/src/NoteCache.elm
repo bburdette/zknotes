@@ -51,14 +51,14 @@ addNote pt zne nc =
     }
 
 
-getNote : Int -> NoteCache -> Maybe ZkNoteAndLinks
-getNote id nc =
+getNote : NoteCache -> Int -> Maybe ZkNoteAndLinks
+getNote nc id =
     Dict.get id nc.byId
         |> Maybe.map .zne
 
 
-removeNote : Int -> NoteCache -> NoteCache
-removeNote id nc =
+removeNote : NoteCache -> Int -> NoteCache
+removeNote nc id =
     case Dict.get id nc.byId of
         Just ze ->
             { byId = Dict.remove id nc.byId
@@ -112,7 +112,7 @@ purgeNotes nc =
                             Util.Go ( rmv, nnc )
 
                         else
-                            Util.Go ( rmv - 1, removeNote id nnc )
+                            Util.Go ( rmv - 1, removeNote nnc id )
                     )
                     ( toremove, nc )
                     br
