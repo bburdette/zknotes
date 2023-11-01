@@ -420,7 +420,7 @@ noteView : Data.Sysids -> NoteCache -> String -> List (Element a) -> Element a
 noteView si noteCache id _ =
     case
         String.toInt id
-            |> Maybe.andThen (\iid -> NC.getNote iid noteCache)
+            |> Maybe.andThen (NC.getNote noteCache)
     of
         Just zne ->
             if zne.zknote.isFile then

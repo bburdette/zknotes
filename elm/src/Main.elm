@@ -2004,12 +2004,36 @@ actualupdate msg model =
 
                         PI.ZkNoteAndLinks fbe ->
                             if fbe.what == "cache" then
+                                let
+                                    gets =
+                                        (case state of
+                                            EView vs _ ->
+                                                Just vs
+
+                                            View vs ->
+                                                Just vs
+
+                                            _ ->
+                                                Nothing
+                                        )
+                                            |> Maybe.andThen .panelNote
+                                            |> Maybe.andThen
+                                                (\pn ->
+                                                    if pn == fbe.znl.zknote.id then
+                                                        Just fbe.znl.zknote.content
+
+                                                    else
+                                                        Nothing
+                                                )
+                                            |> Maybe.map (makePubNoteCacheGets model >> Cmd.batch)
+                                            |> Maybe.withDefault Cmd.none
+                                in
                                 ( { model
                                     | noteCache =
                                         NC.addNote pt fbe.znl model.noteCache
                                             |> NC.purgeNotes
                                   }
-                                , Cmd.none
+                                , gets
                                 )
 
                             else
@@ -2028,7 +2052,7 @@ actualupdate msg model =
                                                 View (View.initFull model.sysids fbe.znl)
 
                                     ngets =
-                                        makePubNoteCacheGets fbe.znl.zknote.content model
+                                        makePubNoteCacheGets model fbe.znl.zknote.content
                                 in
                                 ( { model | state = vstate }
                                 , Cmd.batch ngets
@@ -2975,7 +2999,7 @@ makeNoteCacheGets md model =
         |> Set.toList
         |> List.map
             (\id ->
-                case NC.getNote id model.noteCache of
+                case NC.getNote model.noteCache id of
                     Just zkn ->
                         sendZIMsg model.tauri
                             model.location
@@ -2988,36 +3012,36 @@ makeNoteCacheGets md model =
             )
 
 
-makePubNoteCacheGets : String -> Model -> List (Cmd Msg)
-makePubNoteCacheGets md model =
+makePubNoteCacheGets : Model -> String -> List (Cmd Msg)
+makePubNoteCacheGets model md =
     MC.noteIds md
         |> Set.toList
         |> List.map
-            (\id ->
-                case NC.getNote id model.noteCache of
-                    Just zkn ->
-                        sendPIMsg model.tauri
-                            model.location
-                            (PI.GetZnlIfChanged { zknote = id, what = "cache", changeddate = zkn.zknote.changeddate })
-
-                    Nothing ->
-                        sendPIMsg model.tauri
-                            model.location
-                            (PI.GetZkNoteAndLinks { zknote = id, what = "cache" })
-            )
+            (makePubNoteCacheGet model)
 
 
+makePubNoteCacheGet : Model -> Int -> Cmd Msg
+makePubNoteCacheGet model id =
+    case NC.getNote model.noteCache id of
+        Just zkn ->
+            sendPIMsg model.tauri
+                model.location
+                (PI.GetZnlIfChanged { zknote = id, what = "cache", changeddate = zkn.zknote.changeddate })
 
--- only retreive not-found notes.
+        Nothing ->
+            sendPIMsg model.tauri
+                model.location
+                (PI.GetZkNoteAndLinks { zknote = id, what = "cache" })
 
 
 makeNewNoteCacheGets : String -> Model -> List (Cmd Msg)
 makeNewNoteCacheGets md model =
+    -- only retreive not-found notes.
     MC.noteIds md
         |> Set.toList
         |> List.filterMap
             (\id ->
-                case NC.getNote id model.noteCache of
+                case NC.getNote model.noteCache id of
                     Just zkn ->
                         Nothing
 

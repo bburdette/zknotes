@@ -110,7 +110,7 @@ view zone maxw noteCache model loggedin =
             \x -> E.row [ E.width E.fill ] [ E.row [ E.centerX, E.spacing 10 ] x ]
           )
             [ model.panelNote
-                |> Maybe.andThen (\id -> NC.getNote id noteCache)
+                |> Maybe.andThen (NC.getNote noteCache)
                 |> Maybe.map
                     (\pn ->
                         E.el
@@ -144,7 +144,7 @@ view zone maxw noteCache model loggedin =
             , E.column
                 [ E.width (E.fill |> E.maximum 1000), E.centerX, E.spacing 20, E.padding 10, E.alignTop ]
                 [ if model.showtitle then
-                    E.row [ E.width E.fill ] <| List.singleton <| E.el [ E.centerX, Font.bold, Font.size 20 ] <| E.text model.title
+                    E.row [ E.centerX ] [ E.paragraph [ Font.bold, Font.size 20 ] [ E.text model.title ] ]
 
                   else
                     E.none
