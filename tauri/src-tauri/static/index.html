@@ -1,0 +1,110 @@
+<!DOCTYPE HTML>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width">
+    <style>html,head,body { padding:0; margin:0; }
+      body { font-family: mono, calibri, helvetica, arial, sans-serif; background-color:#EEEEEC; }</style>
+    <script type="text/javascript" src="main.js"></script>
+    <script type="text/javascript" src="localvals.js"></script>
+    <script type="text/javascript" src="windowkey.js"></script>
+    <script type="text/javascript" src="taselection.js"></script>
+  </head>
+  <body>
+    <div id="elm"></div>
+    <script type="text/javascript">
+      // login = {{logindata}};
+      // sysids = {{sysids}};
+      // errorid = {{errorid}};
+      // adminsettings = {{adminsettings}};
+      // login = {"active":true,"admin":true,"data":{"homenote":2623,"userid":2,"zknote":309},"email":"bburdette@protonmail.com","name":"ben","userid":2};
+      login = null;
+      sysids = {"commentid":6,"publicid":1,"searchid":3,"shareid":2};
+      errorid = null;
+      adminsettings = {"non_admin_invite":true,"open_registration":true};
+      
+      const { invoke } = window.__TAURI__.tauri
+
+      function sendZIValueTauri(request) {
+        console.log("sendZIValueTauri", request);
+        invoke('zimsg', { msg: request })
+        .then((response) => {
+          console.log("response!");
+          app.ports.receiveZITauriResponse.send(response) });
+      }
+      function sendPIValueTauri(request) {
+        console.log("sendPIValueTauri", request);
+        invoke('zimsg', { msg: request })
+        .then((response) => {
+          console.log("response!");
+          app.ports.receivePITauriResponse.send(response) });
+      }
+      function sendAIValueTauri(request) {
+        console.log("sendAIValueTauri", request);
+        invoke('zimsg', { msg: request })
+        .then((response) => {
+          console.log("response!");
+          app.ports.receiveAITauriResponse.send(response) });
+      }
+      function sendUIValueTauri(request) {
+        console.log("sendUIValueTauri", request);
+        invoke('uimsg', { msg: request })
+        .then((response) => {
+          console.log("response!");
+          app.ports.receiveUITauriResponse.send(response) });
+      }
+
+      function getTASelection(request) {
+          var range = { text: "", offset: null };
+          var activeEl = document.getElementById(request.id);
+          var activeElTagName = activeEl ? activeEl.tagName.toLowerCase() : null;
+          if (
+            (activeElTagName == "textarea") || (activeElTagName == "input" &&
+            /^(?:text|search|password|tel|url)$/i.test(activeEl.type)) &&
+            (typeof activeEl.selectionStart == "number")
+          ) {
+              range.text = activeEl.value.slice(activeEl.selectionStart, activeEl.selectionEnd);
+              range.offset = activeEl.selectionStart;
+              range.what = request.what;
+              app.ports.receiveTASelection.send(range);
+          }
+          else {
+              var error = { what: request.what };
+              app.ports.receiveTAError.send(error);
+          }
+      }
+
+      // `invoke` returns a Promise
+      invoke('greet', { name: 'World' })
+      .then((response) => console.log(response))
+
+      app = Elm.Main.init({
+        node: document.getElementById('elm'),
+        flags: { seed : Math.floor(Math.random()*0x0FFFFFFF),
+                 location : document.location.origin || "",
+                 useragent : navigator.userAgent,
+                 debugstring : "initial-info",
+                 width : window.innerWidth,
+                 height : window.innerHeight,
+                 errorid : errorid,
+                 login : login,
+                 sysids : sysids,
+                 adminsettings : adminsettings,
+                 tauri : true}});
+      // local storage
+      app.ports.storeLocalVal.subscribe(storeVal);
+      app.ports.getLocalVal.subscribe(getVal);
+      app.ports.sendZIValueTauri.subscribe(sendZIValueTauri);
+      app.ports.sendUIValueTauri.subscribe(sendUIValueTauri);
+      // app.ports.clearLocalStorage.subscribe(clearStorage);
+
+      // selected text
+      app.ports.getTASelection.subscribe(getTASelection);
+      app.ports.setTASelection.subscribe(setTASelection);
+      // keydown events
+      app.ports.sendKeyCommand.subscribe(sendKeyCommand);
+      window.addEventListener( "keydown", keycheck, false );
+
+    </script>
+  </body>
+</html>
