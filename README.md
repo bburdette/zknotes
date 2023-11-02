@@ -50,9 +50,7 @@ Strictly speaking you only need git, rust, elm, sqlite and openssl to do develop
 
 currently my orgauth lib is used here with submodules.  so you have to:
 ```
-$ git submodule update
-$ cd orgauth
-$ git submodule update
+ git submodule update --init --recursive
 ```
 yes, there is a submodule within a submodule.  hopefully this will change sooner than later.
 
