@@ -1,12 +1,14 @@
 ip = '0.0.0.0'
 port = 8010
 createdirs = false
-altmainsite = [ "http://localhost:8010"]
+# altmainsite = ["https://tauri.localhost"]
+altmainsite = ["https://tauri.localhost"]
 file_tmp_path = "./temp"
 file_path = "./files"
 
 [orgauth_config]
-mainsite = 'http://localhost:8010'
+mainsite = 'http://10.0.0.2233:8010'
+# mainsite = 'https://tauri.localhost'
 appname = 'zknotes'
 emaildomain = 'zknotes.com'
 db = './zknotes.db'
@@ -17,5 +19,5 @@ email_token_expiration_ms = 86400000
 reset_token_expiration_ms = 86400000
 invite_token_expiration_ms = 604800000
 open_registration = true
-send_emails = true
+send_emails = false
 non_admin_invite = true

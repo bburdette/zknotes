@@ -6,7 +6,7 @@ use actix_web::HttpRequest;
 use either::Either::{Left, Right};
 use log::info;
 use orgauth;
-use orgauth::endpoints::Callbacks;
+use orgauth::endpoints::{Callbacks, Tokener};
 use std::error::Error;
 use std::time::Duration;
 use zkprotocol::content::{
@@ -69,12 +69,12 @@ pub fn zknotes_callbacks() -> Callbacks {
 
 // Just like orgauth::endpoints::user_interface, except adds in extra user data.
 pub fn user_interface(
-  session: &Session,
+  tokener: &mut dyn Tokener,
   config: &Config,
   msg: orgauth::data::WhatMessage,
 ) -> Result<orgauth::data::WhatMessage, Box<dyn Error>> {
   Ok(orgauth::endpoints::user_interface(
-    &session,
+    tokener,
     &config.orgauth_config,
     &mut zknotes_callbacks(),
     msg,
@@ -282,19 +282,18 @@ pub fn zk_interface_loggedin(
 pub fn public_interface(
   config: &Config,
   msg: PublicMessage,
-  req: HttpRequest,
+  ipaddr: Option<&str>,
 ) -> Result<ServerResponse, Box<dyn Error>> {
   match msg.what.as_str() {
     "getzknote" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let gzne: GetZkNoteAndLinks = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+      // let note = sqldata::read_zknote(&conn, None, id)?;
       let note = sqldata::read_zknote(&conn, None, gzne.zknote)?;
       info!(
         "public#getzknote: {} - {} - {:?}",
-        gzne.zknote,
-        note.title,
-        req.connection_info().realip_remote_addr()
+        gzne.zknote, note.title, ipaddr
       );
       Ok(ServerResponse {
         what: "zknote".to_string(),
@@ -338,9 +337,7 @@ pub fn public_interface(
       let note = sqldata::read_zknotepubid(&conn, None, pubid.as_str())?;
       info!(
         "public#getzknotepubid: {} - {} - {:?}",
-        pubid,
-        note.title,
-        req.connection_info().realip_remote_addr()
+        pubid, note.title, ipaddr,
       );
       Ok(ServerResponse {
         what: "zknote".to_string(),

@@ -79,6 +79,10 @@ type Msg
     | TAReplyData Data.TASelection (Result Http.Error ( Time.Posix, ZI.ServerResponse ))
     | PublicReplyData (Result Http.Error ( Time.Posix, PI.ServerResponse ))
     | ErrorIndexNote (Result Http.Error PI.ServerResponse)
+    | TauriZkReplyData JD.Value
+    | TauriUserReplyData JD.Value
+    | TauriAdminReplyData JD.Value
+    | TauriPublicReplyData JD.Value
     | LoadUrl String
     | InternalUrl Url
     | TASelection JD.Value
@@ -146,6 +150,7 @@ decodeFlags =
         |> andMap (JD.field "login" (JD.maybe Data.decodeLoginData))
         |> andMap (JD.field "sysids" Data.decodeSysids)
         |> andMap (JD.field "adminsettings" OD.decodeAdminSettings)
+        |> andMap (JD.field "tauri" JD.bool)
 
 
 type alias Flags =
@@ -159,6 +164,7 @@ type alias Flags =
     , login : Maybe Data.LoginData
     , sysids : Data.Sysids
     , adminsettings : OD.AdminSettings
+    , tauri : Bool
     }
 
 
@@ -191,6 +197,7 @@ type alias Model =
     , adminSettings : OD.AdminSettings
     , trackedRequests : TRequests
     , noteCache : NoteCache
+    , tauri : Bool
     }
 
 
@@ -235,9 +242,7 @@ routeState model route =
             ( st
             , Cmd.batch
                 [ cmds
-                , sendZIMsg
-                    model.location
-                    (ZI.SearchZkNotes <| prevSearchQuery login)
+                , sendZIMsg model.tauri model.location (ZI.SearchZkNotes <| prevSearchQuery login)
                 ]
             )
 
@@ -262,10 +267,10 @@ routeStateInternal model route =
                     , case model.state of
                         EView _ _ ->
                             -- if we're in "EView" then do this request to stay in EView.
-                            sendPIMsg model.location (PI.GetZkNoteAndLinks { zknote = id, what = "" })
+                            sendPIMsg model.tauri model.location (PI.GetZkNoteAndLinks { zknote = id, what = "" })
 
                         _ ->
-                            sendZIMsg model.location (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
+                            sendZIMsg model.tauri model.location (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
                 Nothing ->
@@ -273,7 +278,7 @@ routeStateInternal model route =
                         { message = "loading article"
                         }
                         (Just model.state)
-                    , sendPIMsg model.location (PI.GetZkNoteAndLinks { zknote = id, what = "" })
+                    , sendPIMsg model.tauri model.location (PI.GetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
         PublicZkPubId pubid ->
@@ -290,24 +295,24 @@ routeStateInternal model route =
                         { message = "loading article"
                         }
                         (Just model.state)
-            , sendPIMsg model.location (PI.GetZkNotePubId pubid)
+            , sendPIMsg model.tauri model.location (PI.GetZkNotePubId pubid)
             )
 
         EditZkNoteR id ->
             case model.state of
                 EditZkNote st login ->
                     ( EditZkNote st login
-                    , sendZIMsg model.location (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
+                    , sendZIMsg model.tauri model.location (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
                 EditZkNoteListing st login ->
                     ( EditZkNoteListing st login
-                    , sendZIMsg model.location (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
+                    , sendZIMsg model.tauri model.location (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
                 EView st login ->
                     ( EView st login
-                    , sendPIMsg model.location (PI.GetZkNoteAndLinks { zknote = id, what = "" })
+                    , sendPIMsg model.tauri model.location (PI.GetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
                 st ->
@@ -316,13 +321,13 @@ routeStateInternal model route =
                             ( ShowMessage { message = "loading note..." }
                                 login
                                 (Just model.state)
-                            , sendZIMsg model.location (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
+                            , sendZIMsg model.tauri model.location (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
                             )
 
                         Nothing ->
                             ( PubShowMessage { message = "loading note..." }
                                 (Just model.state)
-                            , sendPIMsg model.location (PI.GetZkNoteAndLinks { zknote = id, what = "" })
+                            , sendPIMsg model.tauri model.location (PI.GetZkNoteAndLinks { zknote = id, what = "" })
                             )
 
         EditZkNoteNew ->
@@ -363,7 +368,8 @@ routeStateInternal model route =
             case model.state of
                 ArchiveListing st login ->
                     ( ArchiveListing st login
-                    , sendZIMsg model.location
+                    , sendZIMsg model.tauri
+                        model.location
                         (ZI.GetZkNoteArchives
                             { zknote = id
                             , offset = 0
@@ -378,7 +384,8 @@ routeStateInternal model route =
                             ( ShowMessage { message = "loading archives..." }
                                 login
                                 (Just model.state)
-                            , sendZIMsg model.location
+                            , sendZIMsg model.tauri
+                                model.location
                                 (ZI.GetZkNoteArchives
                                     { zknote = id
                                     , offset = 0
@@ -403,7 +410,8 @@ routeStateInternal model route =
                         (ZkReplyDataSeq
                             (\_ ->
                                 Just <|
-                                    sendZIMsg model.location
+                                    sendZIMsg model.tauri
+                                        model.location
                                         (ZI.GetArchiveZkNote { parentnote = id, noteid = aid })
                             )
                         )
@@ -412,7 +420,8 @@ routeStateInternal model route =
                 ArchiveListing st login ->
                     if st.noteid == id then
                         ( ArchiveListing st login
-                        , sendZIMsg model.location
+                        , sendZIMsg model.tauri
+                            model.location
                             (ZI.GetArchiveZkNote { parentnote = id, noteid = aid })
                         )
 
@@ -446,7 +455,7 @@ routeStateInternal model route =
 
         Invite token ->
             ( PubShowMessage { message = "retrieving invite" } Nothing
-            , sendUIMsg model.location (UI.ReadInvite token)
+            , sendUIMsg model.tauri model.location (UI.ReadInvite token)
             )
 
         Top ->
@@ -456,10 +465,10 @@ routeStateInternal model route =
                         Just id ->
                             ( model.state
                             , Cmd.batch
-                                [ sendZIMsg
+                                [ sendZIMsg model.tauri
                                     model.location
                                     (ZI.SearchZkNotes <| prevSearchQuery login)
-                                , sendZIMsg model.location (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
+                                , sendZIMsg model.tauri model.location (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
                                 ]
                             )
 
@@ -475,7 +484,7 @@ routeStateInternal model route =
                                     []
                                 )
                                 login
-                            , sendZIMsg
+                            , sendZIMsg model.tauri
                                 model.location
                                 (ZI.SearchZkNotes <| prevSearchQuery login)
                             )
@@ -677,6 +686,18 @@ showMessage msg =
 
         ReceiveLocalVal _ ->
             "ReceiveLocalVal"
+
+        TauriZkReplyData _ ->
+            "TauriReceiveZkReplyData"
+
+        TauriUserReplyData _ ->
+            "TauriUserReplyData"
+
+        TauriAdminReplyData _ ->
+            "TauriAdminReplyData"
+
+        TauriPublicReplyData _ ->
+            "TauriPublicReplyData"
 
         SelectDialogMsg _ ->
             "SelectDialogMsg"
@@ -1066,18 +1087,17 @@ stateLogin state =
             Just login
 
 
-sendUIMsg : String -> UI.SendMsg -> Cmd Msg
-sendUIMsg location msg =
-    sendUIMsgExp location msg UserReplyData
+sendUIMsg : Bool -> String -> UI.SendMsg -> Cmd Msg
+sendUIMsg tauri location msg =
+    if tauri then
+        sendUIValueTauri (UI.encodeSendMsg msg)
 
-
-sendUIMsgExp : String -> UI.SendMsg -> (Result Http.Error UI.ServerResponse -> Msg) -> Cmd Msg
-sendUIMsgExp location msg tomsg =
-    Http.post
-        { url = location ++ "/user"
-        , body = Http.jsonBody (UI.encodeSendMsg msg)
-        , expect = Http.expectJson tomsg UI.serverResponseDecoder
-        }
+    else
+        Http.post
+            { url = location ++ "/user"
+            , body = Http.jsonBody (UI.encodeSendMsg msg)
+            , expect = Http.expectJson UserReplyData UI.serverResponseDecoder
+            }
 
 
 sendAIMsg : String -> AI.SendMsg -> Cmd Msg
@@ -1094,9 +1114,18 @@ sendAIMsgExp location msg tomsg =
         }
 
 
-sendZIMsg : String -> ZI.SendMsg -> Cmd Msg
-sendZIMsg location msg =
-    sendZIMsgExp location msg ZkReplyData
+sendZIMsg : Bool -> String -> ZI.SendMsg -> Cmd Msg
+sendZIMsg tauri location msg =
+    if tauri then
+        sendZIMsgTauri msg
+
+    else
+        sendZIMsgExp location msg ZkReplyData
+
+
+sendZIMsgTauri : ZI.SendMsg -> Cmd Msg
+sendZIMsgTauri msg =
+    sendZIValueTauri <| ZI.encodeSendMsg msg
 
 
 sendZIMsgExp : String -> ZI.SendMsg -> (Result Http.Error ( Time.Posix, ZI.ServerResponse ) -> Msg) -> Cmd Msg
@@ -1143,13 +1172,13 @@ sendSearch model search =
                     || (search.tagSearch == [ S.SearchTerm [] "" ])
             then
                 ( model
-                , sendZIMsg model.location (ZI.SearchZkNotes search)
+                , sendZIMsg model.tauri model.location (ZI.SearchZkNotes search)
                 )
 
             else
                 ( { model | prevSearches = search.tagSearch :: model.prevSearches }
                 , Cmd.batch
-                    [ sendZIMsg model.location (ZI.SearchZkNotes search)
+                    [ sendZIMsg model.tauri model.location (ZI.SearchZkNotes search)
                     , sendZIMsgExp model.location
                         (ZI.SaveZkNotePlusLinks searchnote)
                         -- ignore the reply!  otherwise if you search while
@@ -1165,20 +1194,24 @@ sendSearch model search =
             )
 
 
-sendPIMsg : String -> PI.SendMsg -> Cmd Msg
-sendPIMsg location msg =
-    sendPIMsgExp location msg PublicReplyData
+sendPIMsg : Bool -> String -> PI.SendMsg -> Cmd Msg
+sendPIMsg tauri location msg =
+    sendPIMsgExp tauri location msg PublicReplyData
 
 
-sendPIMsgExp : String -> PI.SendMsg -> (Result Http.Error ( Time.Posix, PI.ServerResponse ) -> Msg) -> Cmd Msg
-sendPIMsgExp location msg tomsg =
-    HE.postJsonTask
-        { url = location ++ "/public"
-        , body = Http.jsonBody (PI.encodeSendMsg msg)
-        , decoder = PI.serverResponseDecoder
-        }
-        |> Task.andThen (\x -> Task.map (\posix -> ( posix, x )) Time.now)
-        |> Task.attempt tomsg
+sendPIMsgExp : Bool -> String -> PI.SendMsg -> (Result Http.Error ( Time.Posix, PI.ServerResponse ) -> Msg) -> Cmd Msg
+sendPIMsgExp tauri location msg tomsg =
+    if tauri then
+        sendPIValueTauri <| PI.encodeSendMsg msg
+
+    else
+        HE.postJsonTask
+            { url = location ++ "/public"
+            , body = Http.jsonBody (PI.encodeSendMsg msg)
+            , decoder = PI.serverResponseDecoder
+            }
+            |> Task.andThen (\x -> Task.map (\posix -> ( posix, x )) Time.now)
+            |> Task.attempt tomsg
 
 
 addRecentZkListNote : List Data.ZkListNote -> Data.ZkListNote -> List Data.ZkListNote
@@ -1338,7 +1371,8 @@ urlupdate msg model =
                                     if EditZkNote.dirty s then
                                         Cmd.batch
                                             [ icmd
-                                            , sendZIMsg model.location
+                                            , sendZIMsg model.tauri
+                                                model.location
                                                 (ZI.SaveZkNotePlusLinks <| EditZkNote.fullSave s)
                                             ]
 
@@ -1526,13 +1560,26 @@ onZkNoteEditWhat model pt znew =
                             }
                     , noteCache = NC.setKeeps (MC.noteIds nst.md) model.noteCache
                   }
-                , Cmd.batch ((sendZIMsg model.location <| ZI.GetZkNoteComments c) :: ngets)
+                , Cmd.batch ((sendZIMsg model.tauri model.location <| ZI.GetZkNoteComments c) :: ngets)
                 )
 
             _ ->
                 ( unexpectedMessage model "ZkNoteEditWhat"
                 , Cmd.none
                 )
+
+
+type alias TauriData a =
+    { utc : Time.Posix
+    , data : a
+    }
+
+
+makeTDDecoder : JD.Decoder a -> JD.Decoder (TauriData a)
+makeTDDecoder ad =
+    JD.map2 TauriData
+        (JD.field "utcmillis" (JD.map Time.millisToPosix JD.int))
+        (JD.field "data" ad)
 
 
 actualupdate : Msg -> Model -> ( Model, Cmd Msg )
@@ -1549,6 +1596,46 @@ actualupdate msg model =
             -- update the font size
             ( model, Cmd.none )
 
+        ( TauriZkReplyData jd, _ ) ->
+            case JD.decodeValue (makeTDDecoder ZI.serverResponseDecoder) jd of
+                Ok td ->
+                    actualupdate (ZkReplyData (Ok ( td.utc, td.data ))) model
+
+                Err e ->
+                    ( displayMessageDialog model <| JD.errorToString e
+                    , Cmd.none
+                    )
+
+        ( TauriUserReplyData jd, _ ) ->
+            case JD.decodeValue UI.serverResponseDecoder jd of
+                Ok d ->
+                    actualupdate (UserReplyData (Ok d)) model
+
+                Err e ->
+                    ( displayMessageDialog model <| JD.errorToString e
+                    , Cmd.none
+                    )
+
+        ( TauriAdminReplyData jd, _ ) ->
+            case JD.decodeValue AI.serverResponseDecoder jd of
+                Ok d ->
+                    actualupdate (AdminReplyData (Ok d)) model
+
+                Err e ->
+                    ( displayMessageDialog model <| JD.errorToString e
+                    , Cmd.none
+                    )
+
+        ( TauriPublicReplyData jd, _ ) ->
+            case JD.decodeValue (makeTDDecoder PI.serverResponseDecoder) jd of
+                Ok td ->
+                    actualupdate (PublicReplyData (Ok ( td.utc, td.data ))) model
+
+                Err e ->
+                    ( displayMessageDialog model <| JD.errorToString e
+                    , Cmd.none
+                    )
+
         ( WindowSize s, _ ) ->
             ( { model | size = s }, Cmd.none )
 
@@ -1562,7 +1649,8 @@ actualupdate msg model =
                         Just ts ->
                             let
                                 sendsearch =
-                                    sendZIMsg model.location
+                                    sendZIMsg model.tauri
+                                        model.location
                                         (ZI.SearchZkNotes
                                             { tagSearch = ts
                                             , offset = 0
@@ -1602,7 +1690,7 @@ actualupdate msg model =
 
                 GD.Ok return ->
                     ( { model | state = instate }
-                    , sendUIMsg model.location <| UI.ChangePassword return
+                    , sendUIMsg model.tauri model.location <| UI.ChangePassword return
                     )
 
                 GD.Cancel ->
@@ -1615,7 +1703,7 @@ actualupdate msg model =
 
                 GD.Ok return ->
                     ( { model | state = instate }
-                    , sendUIMsg model.location <| UI.ChangeEmail return
+                    , sendUIMsg model.tauri model.location <| UI.ChangeEmail return
                     )
 
                 GD.Cancel ->
@@ -1629,7 +1717,8 @@ actualupdate msg model =
             case cmd of
                 ResetPassword.Ok ->
                     ( { model | state = ResetPassword nst }
-                    , sendUIMsg model.location
+                    , sendUIMsg model.tauri
+                        model.location
                         (UI.SetPassword { uid = nst.userId, newpwd = nst.password, reset_key = nst.reset_key })
                     )
 
@@ -1679,7 +1768,7 @@ actualupdate msg model =
 
                 UserSettings.LogOut ->
                     ( { model | state = initLoginState model Top }
-                    , sendUIMsg model.location UI.Logout
+                    , sendUIMsg model.tauri model.location UI.Logout
                     )
 
                 UserSettings.ChangePassword ->
@@ -2505,7 +2594,7 @@ actualupdate msg model =
                                 }
                                 (Just model.state)
                       }
-                    , sendPIMsg model.location (PI.GetZkNoteAndLinks { zknote = id, what = "" })
+                    , sendPIMsg model.tauri model.location (PI.GetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
         ( ViewMsg em, EView es state ) ->
@@ -2527,7 +2616,7 @@ actualupdate msg model =
                             case es.id of
                                 Just id ->
                                     ( { model | state = state }
-                                    , sendZIMsg model.location (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
+                                    , sendZIMsg model.tauri model.location (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
                                     )
 
                                 Nothing ->
@@ -2537,7 +2626,7 @@ actualupdate msg model =
 
                 View.Switch id ->
                     ( model
-                    , sendPIMsg model.location (PI.GetZkNoteAndLinks { zknote = id, what = "" })
+                    , sendPIMsg model.tauri model.location (PI.GetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
         ( EditZkNoteMsg em, EditZkNote es login ) ->
@@ -2584,7 +2673,8 @@ actualupdate msg model =
                         notecmds =
                             List.map
                                 (\n ->
-                                    sendZIMsg model.location
+                                    sendZIMsg model.tauri
+                                        model.location
                                         (ZI.SaveImportZkNotes [ n ])
                                 )
                                 notes
@@ -2878,12 +2968,12 @@ makeNoteCacheGets md model =
             (\id ->
                 case NC.getNote model.noteCache id of
                     Just zkn ->
-                        sendZIMsg
+                        sendZIMsg model.tauri
                             model.location
                             (ZI.GetZnlIfChanged { zknote = id, what = "cache", changeddate = zkn.zknote.changeddate })
 
                     Nothing ->
-                        sendZIMsg
+                        sendZIMsg model.tauri
                             model.location
                             (ZI.GetZkNoteAndLinks { zknote = id, what = "cache" })
             )
@@ -2901,22 +2991,19 @@ makePubNoteCacheGet : Model -> Int -> Cmd Msg
 makePubNoteCacheGet model id =
     case NC.getNote model.noteCache id of
         Just zkn ->
-            sendPIMsg
+            sendPIMsg model.tauri
                 model.location
                 (PI.GetZnlIfChanged { zknote = id, what = "cache", changeddate = zkn.zknote.changeddate })
 
         Nothing ->
-            sendPIMsg
+            sendPIMsg model.tauri
                 model.location
                 (PI.GetZkNoteAndLinks { zknote = id, what = "cache" })
 
 
-
--- only retreive not-found notes.
-
-
 makeNewNoteCacheGets : String -> Model -> List (Cmd Msg)
 makeNewNoteCacheGets md model =
+    -- only retreive not-found notes.
     MC.noteIds md
         |> Set.toList
         |> List.filterMap
@@ -2927,7 +3014,7 @@ makeNewNoteCacheGets md model =
 
                     Nothing ->
                         Just <|
-                            sendZIMsg
+                            sendZIMsg model.tauri
                                 model.location
                                 (ZI.GetZkNoteAndLinks { zknote = id, what = "cache" })
             )
@@ -3010,7 +3097,8 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                                 )
                                 onmsg
                       }
-                    , sendZIMsg model.location
+                    , sendZIMsg model.tauri
+                        model.location
                         (ZI.SaveZkNotePlusLinks snpl)
                     )
 
@@ -3021,7 +3109,8 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                         -- reset keeps on save, to get rid of unused notes.
                         , noteCache = NC.setKeeps (MC.noteIds emod.md) model.noteCache
                       }
-                    , sendZIMsg model.location
+                    , sendZIMsg model.tauri
+                        model.location
                         (ZI.SaveZkNotePlusLinks snpl)
                     )
 
@@ -3046,7 +3135,8 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                                     ( { mod | state = m.state }, c )
                                 )
                       }
-                    , sendZIMsg model.location
+                    , sendZIMsg model.tauri
+                        model.location
                         (ZI.DeleteZkNote id)
                     )
 
@@ -3056,7 +3146,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                             ( ShowMessage { message = "loading note..." }
                                 login
                                 (Just model.state)
-                            , sendZIMsg model.location (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
+                            , sendZIMsg model.tauri model.location (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
                             )
                     in
                     ( { model | state = st }, cmd )
@@ -3067,13 +3157,14 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                             ( ShowMessage { message = "loading note..." }
                                 login
                                 (Just model.state)
-                            , sendZIMsg model.location (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
+                            , sendZIMsg model.tauri model.location (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
                             )
                     in
                     ( { model | state = st }
                     , Cmd.batch
                         [ cmd
-                        , sendZIMsg model.location
+                        , sendZIMsg model.tauri
+                            model.location
                             (ZI.SaveZkNotePlusLinks s)
                         ]
                     )
@@ -3122,7 +3213,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
 
                 EditZkNote.SetHomeNote id ->
                     ( { model | state = EditZkNote emod login }
-                    , sendZIMsg model.location (ZI.SetHomeNote id)
+                    , sendZIMsg model.tauri model.location (ZI.SetHomeNote id)
                     )
 
                 EditZkNote.AddToRecent zkln ->
@@ -3138,7 +3229,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
 
                 EditZkNote.ShowArchives id ->
                     ( model
-                    , sendZIMsg model.location (ZI.GetZkNoteArchives { zknote = id, offset = 0, limit = Just S.defaultSearchLimit })
+                    , sendZIMsg model.tauri model.location (ZI.GetZkNoteArchives { zknote = id, offset = 0, limit = Just S.defaultSearchLimit })
                     )
 
                 EditZkNote.FileUpload ->
@@ -3192,7 +3283,8 @@ handleEditZkNoteListing model login ( emod, ecmd ) =
 
         EditZkNoteListing.PowerDelete s ->
             ( { model | state = EditZkNoteListing emod login }
-            , sendZIMsg model.location
+            , sendZIMsg model.tauri
+                model.location
                 (ZI.PowerDelete s)
             )
 
@@ -3210,7 +3302,7 @@ handleArchiveListing model login ( emod, ecmd ) =
 
         ArchiveListing.Selected id ->
             ( { model | state = ArchiveListing emod login }
-            , sendZIMsg model.location (ZI.GetZkNote id)
+            , sendZIMsg model.tauri model.location (ZI.GetZkNote id)
             )
 
         ArchiveListing.Done ->
@@ -3220,7 +3312,7 @@ handleArchiveListing model login ( emod, ecmd ) =
 
         ArchiveListing.GetArchives msg ->
             ( { model | state = ArchiveListing emod login }
-            , sendZIMsg model.location <| ZI.GetZkNoteArchives msg
+            , sendZIMsg model.tauri model.location <| ZI.GetZkNoteArchives msg
             )
 
 
@@ -3232,7 +3324,8 @@ handleLogin model route ( lmod, lcmd ) =
 
         Login.Register ->
             ( { model | state = Login lmod route }
-            , sendUIMsg model.location
+            , sendUIMsg model.tauri
+                model.location
                 (UI.Register
                     { uid = lmod.userId
                     , pwd = lmod.password
@@ -3243,7 +3336,7 @@ handleLogin model route ( lmod, lcmd ) =
 
         Login.Login ->
             ( { model | state = Login lmod route }
-            , sendUIMsg model.location <|
+            , sendUIMsg model.tauri model.location <|
                 UI.Login
                     { uid = lmod.userId
                     , pwd = lmod.password
@@ -3252,7 +3345,7 @@ handleLogin model route ( lmod, lcmd ) =
 
         Login.Reset ->
             ( { model | state = Login lmod route }
-            , sendUIMsg model.location <|
+            , sendUIMsg model.tauri model.location <|
                 UI.ResetPassword
                     { uid = lmod.userId
                     }
@@ -3267,7 +3360,8 @@ handleInvited model ( lmod, lcmd ) =
 
         Invited.RSVP ->
             ( { model | state = Invited lmod }
-            , sendUIMsg model.location
+            , sendUIMsg model.tauri
+                model.location
                 (UI.RSVP
                     { uid = lmod.userId
                     , pwd = lmod.password
@@ -3323,7 +3417,8 @@ handleTagFiles model ( lmod, lcmd ) login st =
                                     []
                     in
                     ( { model | state = st }
-                    , sendZIMsg model.location
+                    , sendZIMsg model.tauri
+                        model.location
                         (ZI.SaveZkLinks { links = zklinks })
                     )
 
@@ -3480,6 +3575,7 @@ init flags url key zone fontsize =
             , adminSettings = flags.adminsettings
             , trackedRequests = { requestCount = 0, requests = Dict.empty }
             , noteCache = NC.empty maxCacheNotes
+            , tauri = flags.tauri
             }
 
         geterrornote =
@@ -3543,6 +3639,10 @@ main =
                     , Browser.Events.onResize (\w h -> WindowSize { width = w, height = h })
                     , keyreceive
                     , LS.localVal ReceiveLocalVal
+                    , receiveZITauriResponse TauriZkReplyData
+                    , receiveAITauriResponse TauriAdminReplyData
+                    , receiveUITauriResponse TauriUserReplyData
+                    , receivePITauriResponse TauriPublicReplyData
                     ]
                         ++ tracks
         , onUrlRequest = urlRequest
@@ -3563,6 +3663,30 @@ port receiveTAError : (JD.Value -> msg) -> Sub msg
 
 
 port receiveKeyMsg : (JD.Value -> msg) -> Sub msg
+
+
+port sendZIValueTauri : JD.Value -> Cmd msg
+
+
+port receiveZITauriResponse : (JD.Value -> msg) -> Sub msg
+
+
+port sendAIValueTauri : JD.Value -> Cmd msg
+
+
+port receiveAITauriResponse : (JD.Value -> msg) -> Sub msg
+
+
+port sendUIValueTauri : JD.Value -> Cmd msg
+
+
+port receiveUITauriResponse : (JD.Value -> msg) -> Sub msg
+
+
+port sendPIValueTauri : JD.Value -> Cmd msg
+
+
+port receivePITauriResponse : (JD.Value -> msg) -> Sub msg
 
 
 keyreceive : Sub Msg
