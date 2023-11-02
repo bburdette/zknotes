@@ -1,1 +1,0 @@
-../../server/static/localvals.js

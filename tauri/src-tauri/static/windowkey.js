@@ -1,1 +1,0 @@
-../../server/static/windowkey.js

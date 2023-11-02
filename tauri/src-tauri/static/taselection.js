@@ -1,1 +1,0 @@
-../../server/static/taselection.js
