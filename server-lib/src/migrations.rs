@@ -711,10 +711,8 @@ pub fn udpate5(dbfile: &Path) -> Result<(), orgauth::error::Error> {
     t.add_column("createdate", types::integer().nullable(false));
   });
 
-  println!("udpate5 - m1");
   conn.execute_batch(m1.make::<Sqlite>().as_str())?;
 
-  println!("insert");
   // copy everything from user.
   conn.execute(
     "insert into usertemp (id, name, hashwd, zknote, salt, email, registration_key, createdate)
@@ -754,10 +752,8 @@ pub fn udpate5(dbfile: &Path) -> Result<(), orgauth::error::Error> {
     t.add_column("tokendate", types::integer().nullable(true));
   });
 
-  println!("m2");
   conn.execute_batch(m2.make::<Sqlite>().as_str())?;
 
-  println!("insert 2");
   // copy everything from usertemp.
   conn.execute(
     "insert into user (id, name, hashwd, zknote, salt, email, registration_key, createdate)
@@ -769,7 +765,6 @@ pub fn udpate5(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 
   m3.drop_table("usertemp");
 
-  println!("m3");
   conn.execute_batch(m3.make::<Sqlite>().as_str())?;
 
   Ok(())
@@ -1874,22 +1869,16 @@ pub fn udpate24(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 
   for (id, hash, createdate) in r {
     // get file size.
-
-    println!("attempting file {}", hash);
-
     let pstr = format!("files/{}", hash);
     let stpath = Path::new(pstr.as_str());
     let md = std::fs::metadata(stpath)?;
-
     let size = md.len();
-    println!("file size {} - {}", hash, size);
 
     conn.execute(
       "insert  into file (id, hash, createdate, size)
       values (?1, ?2, ?3, ?4)",
       params![id, hash, createdate, size],
     )?;
-    println!("insert complete");
   }
 
   Ok(())
