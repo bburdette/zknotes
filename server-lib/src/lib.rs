@@ -9,7 +9,6 @@ mod sqltest;
 use actix_cors::Cors;
 use actix_files::NamedFile;
 use actix_multipart::Multipart;
-// use actix_session::{CookieSession, Session};
 use actix_session::{
   config::PersistentSession, storage::CookieSessionStore, Session, SessionMiddleware,
 };
@@ -43,20 +42,6 @@ pub use zkprotocol;
 pub use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 
 use tracing_actix_web::TracingLogger;
-// pub fn add(left: usize, right: usize) -> usize {
-//   left + right
-// }
-
-// #[cfg(test)]
-// mod tests {
-//   use super::*;
-
-//   #[test]
-//   fn it_works() {
-//     let result = add(2, 2);
-//     assert_eq!(result, 4);
-//   }
-// }
 
 /*
 use actix_files::NamedFile;
@@ -300,7 +285,6 @@ async fn receive_files(
   }
 }
 
-// TODO: move out of main.rs
 async fn make_file_notes(
   session: Session,
   config: web::Data<Config>,
@@ -544,14 +528,9 @@ pub async fn err_main() -> Result<(), Box<dyn Error>> {
   };
 
   // verify/create file directories.
-
-  // TODO upgrade when stable
-  // if !std::fs::try_exists(config.file_tmp_path)?
   if !std::path::Path::exists(&config.file_tmp_path) {
     std::fs::create_dir_all(&config.file_tmp_path)?
   }
-  // TODO upgrade when stable
-  // if !std::fs::try_exists(config.file_path)?
   if !std::path::Path::exists(&config.file_path) {
     std::fs::create_dir_all(&config.file_path)?
   }

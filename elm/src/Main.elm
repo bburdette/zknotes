@@ -3211,14 +3211,6 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     , sendAIMsg model.location AI.GetUsers
                     )
 
-                -- EditZkNote.GetZkNoteWhat id what ->
-                --     ( { model | state = EditZkNote emod login }
-                --     , case what of
-                --         "panel" ->
-                --             sendZIMsg model.tauri model.location (ZI.GetZkNote id)
-                --         _ ->
-                --             sendZIMsg model.tauri model.location (ZI.GetZkNoteAndLinks { zknote = id, what = what })
-                --     )
                 EditZkNote.SetHomeNote id ->
                     ( { model | state = EditZkNote emod login }
                     , sendZIMsg model.tauri model.location (ZI.SetHomeNote id)
