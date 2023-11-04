@@ -2,7 +2,6 @@ use crate::config::Config;
 use crate::search;
 use crate::sqldata;
 use actix_session::Session;
-use actix_web::HttpRequest;
 use either::Either::{Left, Right};
 use log::info;
 use orgauth;

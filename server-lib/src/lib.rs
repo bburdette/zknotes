@@ -31,7 +31,6 @@ use simple_error::simple_error;
 use std::env;
 use std::error::Error;
 use std::fs::File;
-use std::io::Read;
 use std::io::{stdin, Write};
 use std::path::Path;
 use std::path::PathBuf;
@@ -54,7 +53,7 @@ fn sitemap(_req: &HttpRequest) -> Result<NamedFile> {
 */
 
 async fn favicon(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
-  let mut staticpath = data.static_path.clone().unwrap_or(PathBuf::from("static/"));
+  let staticpath = data.static_path.clone().unwrap_or(PathBuf::from("static/"));
   let icopath = staticpath.join("favicon.ico");
   match NamedFile::open(&icopath) {
     Ok(f) => f.into_response(&req),
