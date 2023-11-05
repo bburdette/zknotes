@@ -81,9 +81,11 @@ pub fn extra_login_data_callback(
   Ok(Some(serde_json::to_value(extra_login_data(&conn, uid)?)?))
 }
 
-// ok to delete user?
+// for-real delete of user - no archives?
 pub fn on_delete_user(conn: &Connection, uid: i64) -> Result<bool, orgauth::error::Error> {
   // try deleting all their links and notes.
+  // TODO: delete archive notes that have system ownership.
+  conn.execute("delete from zklinkarchive where user = ?1", params!(uid))?;
   conn.execute("delete from zklink where user = ?1", params!(uid))?;
   conn.execute("delete from zknote where user = ?1", params!(uid))?;
   conn.execute("delete from user where id = ?1", params!(uid))?;
@@ -329,6 +331,11 @@ pub fn dbinit(
     zkm::udpate27(&dbfile)?;
     set_single_value(&conn, "migration_level", "27")?;
   }
+  if nlevel < 28 {
+    info!("udpate28");
+    zkm::udpate28(&dbfile)?;
+    set_single_value(&conn, "migration_level", "28")?;
+  }
 
   info!("db up to date.");
 
@@ -391,10 +398,22 @@ pub fn save_zklink(
   };
   let _wat = orwat?;
 
+  let now = now()?;
+
+  // if there's already a record that is NOT like this record, make an archive record.
+  // if the record is just like what we have now, nothing happens.
   conn.execute(
-    "insert into zklink (fromid, toid, user, linkzknote) values (?1, ?2, ?3, ?4)
+    "insert into zklinkarchive (fromid, toid, user, linkzknote, createdate, deletedate)
+      select fromid, toid, user, linkzknote, createdate, ?1 from zklink
+      where fromid = ?2 and toid = ?3 and user = ?4 and linkzknote <> ?5",
+    params![now, fromid, toid, user, linkzknote],
+  )?;
+
+  // now create the new record or modify the existing.
+  conn.execute(
+    "insert into zklink (fromid, toid, user, linkzknote, createdate) values (?1, ?2, ?3, ?4, ?5)
       on conflict (fromid, toid, user) do update set linkzknote = ?4 where fromid = ?1 and toid = ?2 and user = ?3",
-    params![fromid, toid, user, linkzknote],
+    params![fromid, toid, user, linkzknote, now],
   )?;
 
   Ok(conn.last_insert_rowid())
@@ -701,7 +720,7 @@ pub fn save_zknote(
           note.editable,
           note.showtitle,
           note.deleted,
-uuid::Uuid::new_v4().to_string(),
+          uuid::Uuid::new_v4().to_string(),
           now,
           now
         ],
@@ -1081,6 +1100,15 @@ pub fn save_zklinks(
   for zklink in zklinks.iter() {
     if zklink.user == uid {
       if zklink.delete == Some(true) {
+        // create archive record.
+        let now = now()?;
+        conn.execute(
+          "insert into zklinkarchive (fromid, toid, user, linkzknote, createdate, deletedate)
+            select fromid, toid, user, linkzknote, createdate, ?1 from zklink
+            where fromid = ?2 and toid = ?3 and user = ?4",
+          params![now, zklink.from, zklink.to, uid],
+        )?;
+        // delete link.
         conn.execute(
           "delete from zklink where fromid = ?1 and toid = ?2 and user = ?3",
           params![zklink.from, zklink.to, uid],
@@ -1107,6 +1135,15 @@ pub fn save_savezklinks(
     };
     if link.user == uid {
       if link.delete == Some(true) {
+        // create archive record.
+        let now = now()?;
+        conn.execute(
+          "insert into zklinkarchive (fromid, toid, user, linkzknote, createdate, deletedate)
+            select fromid, toid, user, linkzknote, createdate, ?1 from zklink
+            where fromid = ?2 and toid = ?3 and user = ?4",
+          params![now, from, to, uid],
+        )?;
+        // delete the link.
         conn.execute(
           "delete from zklink where fromid = ?1 and toid = ?2 and user = ?3",
           params![from, to, uid],
