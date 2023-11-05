@@ -37,9 +37,9 @@ pub fn on_new_user(
 
   // make a corresponding note,
   conn.execute(
-    "insert into zknote (title, content, user, editable, showtitle, deleted, createdate, changeddate)
-     values (?1, ?2, ?3, 0, 1, 0, ?4, ?5)",
-    params![rd.uid, "", systemid, now, now],
+    "insert into zknote (title, content, user, editable, showtitle, deleted, uuid, createdate, changeddate)
+     values (?1, ?2, ?3, 0, 1, 0, ?4, ?5, ?6)",
+    params![rd.uid, "", systemid, uuid::Uuid::new_v4().to_string(), now, now],
   )?;
 
   let zknid = conn.last_insert_rowid();
@@ -324,6 +324,11 @@ pub fn dbinit(
     zkm::udpate26(&dbfile)?;
     set_single_value(&conn, "migration_level", "26")?;
   }
+  if nlevel < 27 {
+    info!("udpate27");
+    zkm::udpate27(&dbfile)?;
+    set_single_value(&conn, "migration_level", "27")?;
+  }
 
   info!("db up to date.");
 
@@ -596,10 +601,10 @@ pub fn archive_zknote(
   // copy the note, with user 'system'.
   // exclude pubid, to avoid unique constraint problems.
   conn.execute(
-    "insert into zknote (title, content, user, editable, showtitle, deleted, createdate, changeddate)
-     select title, content, ?1, editable, showtitle, deleted, createdate, changeddate from
-         zknote where id = ?2",
-    params![sysid, noteid],
+    "insert into zknote (title, content, user, editable, showtitle, deleted, uuid, createdate, changeddate)
+     select title, content, ?1, editable, showtitle, deleted, ?2, createdate, changeddate from
+         zknote where id = ?3",
+    params![sysid, uuid::Uuid::new_v4().to_string(), noteid],
   )?;
   let archive_note_id = conn.last_insert_rowid();
 
@@ -686,8 +691,8 @@ pub fn save_zknote(
     None => {
       // new note!
       conn.execute(
-        "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, createdate, changeddate)
-         values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate)
+         values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
         params![
           note.title,
           note.content,
@@ -696,6 +701,7 @@ pub fn save_zknote(
           note.editable,
           note.showtitle,
           note.deleted,
+uuid::Uuid::new_v4().to_string(),
           now,
           now
         ],
