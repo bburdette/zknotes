@@ -605,7 +605,17 @@ pub async fn err_main() -> Result<(), Box<dyn Error>> {
 
     println!("rd: {:?}", rd);
 
-    orgauth::dbfun::new_user(&conn, &rd, None, None, true, None, &mut cb.on_new_user)?;
+    orgauth::dbfun::new_user(
+      &conn,
+      &rd,
+      None,
+      None,
+      true,
+      None,
+      None,
+      None,
+      &mut cb.on_new_user,
+    )?;
 
     println!("admin user created: {}", username);
     return Ok(());

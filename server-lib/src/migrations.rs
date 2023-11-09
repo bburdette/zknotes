@@ -2256,6 +2256,11 @@ pub fn udpate28(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   Ok(())
 }
 
+pub fn udpate29(dbfile: &Path) -> Result<(), orgauth::error::Error> {
+  orgauth::migrations::udpate8(dbfile)?;
+  Ok(())
+}
+
 // Add remote login columns to 'user' table.
 // pub fn udpate29(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 //   // db connection without foreign key checking.
