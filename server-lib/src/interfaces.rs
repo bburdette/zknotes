@@ -67,17 +67,20 @@ pub fn zknotes_callbacks() -> Callbacks {
 }
 
 // Just like orgauth::endpoints::user_interface, except adds in extra user data.
-pub fn user_interface(
+pub async fn user_interface(
   tokener: &mut dyn Tokener,
   config: &Config,
   msg: orgauth::data::WhatMessage,
 ) -> Result<orgauth::data::WhatMessage, Box<dyn Error>> {
-  Ok(orgauth::endpoints::user_interface(
-    tokener,
-    &config.orgauth_config,
-    &mut zknotes_callbacks(),
-    msg,
-  )?)
+  Ok(
+    orgauth::endpoints::user_interface(
+      tokener,
+      &config.orgauth_config,
+      &mut zknotes_callbacks(),
+      msg,
+    )
+    .await?,
+  )
 }
 
 pub fn zk_interface_loggedin(

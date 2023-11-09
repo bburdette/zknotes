@@ -150,7 +150,9 @@ async fn user(
     &mut ActixTokener { session: &session },
     &data,
     item.into_inner(),
-  ) {
+  )
+  .await
+  {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'user' err: {:?}", e);
@@ -598,6 +600,7 @@ pub async fn err_main() -> Result<(), Box<dyn Error>> {
       uid: username.to_string(),
       pwd: pwd.trim().to_string(),
       email: "".to_string(),
+      remoteUrl: "".to_string(),
     };
 
     println!("rd: {:?}", rd);
