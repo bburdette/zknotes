@@ -3330,6 +3330,7 @@ handleLogin model route ( lmod, lcmd ) =
                     { uid = lmod.userId
                     , pwd = lmod.password
                     , email = lmod.email
+                    , remoteUrl = lmod.remoteUrl
                     }
                 )
             )

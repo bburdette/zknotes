@@ -435,6 +435,7 @@ pub fn defcon() -> Config {
     open_registration: false,
     send_emails: false,
     non_admin_invite: true,
+    remote_registration: false,
   };
   Config {
     ip: "127.0.0.1".to_string(),

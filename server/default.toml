@@ -19,3 +19,4 @@ invite_token_expiration_ms = 604800000
 open_registration = true
 send_emails = true
 non_admin_invite = true
+remote_registration = true
