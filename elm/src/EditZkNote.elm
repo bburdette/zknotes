@@ -106,6 +106,7 @@ type Msg
     | ViewPress
     | NewPress
     | UploadPress
+    | SyncPress
     | LinkBackPress
     | CopyPress
     | SearchHistoryPress
@@ -229,6 +230,7 @@ type Command
     | ShowMessage String
     | ShowArchives Int
     | FileUpload
+    | Sync
     | Cmd (Cmd Msg)
 
 
@@ -1484,6 +1486,10 @@ zknview zone size recentZkns trqs noteCache model =
               else
                 E.none
             , EI.button (E.alignRight :: Common.buttonStyle)
+                { onPress = Just SyncPress
+                , label = E.text "sync"
+                }
+            , EI.button (E.alignRight :: Common.buttonStyle)
                 { onPress = Just UploadPress
                 , label = E.text "upload"
                 }
@@ -2250,6 +2256,11 @@ update msg model =
         UploadPress ->
             ( model
             , FileUpload
+            )
+
+        SyncPress ->
+            ( model
+            , Sync
             )
 
         ToLinkPress zkln ->

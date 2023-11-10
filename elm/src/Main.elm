@@ -2570,6 +2570,10 @@ actualupdate msg model =
                             , Cmd.none
                             )
 
+                        ZI.SyncComplete ->
+                            -- just ignore these.
+                            ( displayMessageDialog model <| "remote sync complete", Cmd.none )
+
                         ZI.Noop ->
                             -- just ignore these.
                             ( model, Cmd.none )
@@ -3235,6 +3239,11 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                 EditZkNote.FileUpload ->
                     ( model
                     , FS.files [] OnFileSelected
+                    )
+
+                EditZkNote.Sync ->
+                    ( model
+                    , sendZIMsg model.tauri model.location ZI.SyncRemote
                     )
 
                 EditZkNote.Requests ->

@@ -22,6 +22,7 @@ type SendMsg
     | SaveImportZkNotes (List Data.ImportZkNote)
     | PowerDelete S.TagSearch
     | SetHomeNote Int
+    | SyncRemote
 
 
 type ServerResponse
@@ -41,6 +42,7 @@ type ServerResponse
     | PowerDeleteComplete Int
     | HomeNoteSet Int
     | FilesUploaded (List Data.ZkListNote)
+    | SyncComplete
     | Noop
 
 
@@ -94,6 +96,9 @@ showServerResponse sr =
 
         FilesUploaded _ ->
             "FilesUploaded"
+
+        SyncComplete ->
+            "SyncComplete"
 
         Noop ->
             "Noop"
@@ -186,6 +191,12 @@ encodeSendMsg sm =
                 , ( "data", JE.int id )
                 ]
 
+        SyncRemote ->
+            JE.object
+                [ ( "what", JE.string "syncremote" )
+                , ( "data", JE.null )
+                ]
+
 
 encodeEmail : String -> JE.Value
 encodeEmail email =
@@ -248,6 +259,9 @@ serverResponseDecoder =
 
                     "savedfiles" ->
                         JD.map FilesUploaded (JD.field "content" <| JD.list Data.decodeZkListNote)
+
+                    "synccomplete" ->
+                        JD.succeed SyncComplete
 
                     "noop" ->
                         JD.succeed Noop

@@ -374,7 +374,7 @@ async fn private(
   item: web::Json<UserMessage>,
   _req: HttpRequest,
 ) -> HttpResponse {
-  match zk_interface_check(&session, &data, item.into_inner()) {
+  match zk_interface_check(&session, &data, item.into_inner()).await {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'private' err: {:?}", e);
@@ -387,7 +387,7 @@ async fn private(
   }
 }
 
-fn zk_interface_check(
+async fn zk_interface_check(
   session: &Session,
   config: &Config,
   msg: UserMessage,
@@ -415,7 +415,7 @@ fn zk_interface_check(
         }
         Ok(userdata) => {
           // finally!  processing messages as logged in user.
-          interfaces::zk_interface_loggedin(&config, userdata.id, &msg)
+          interfaces::zk_interface_loggedin(&config, userdata.id, &msg).await
         }
       }
     }

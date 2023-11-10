@@ -6,7 +6,10 @@ use either::Either::{Left, Right};
 use log::info;
 use orgauth;
 use orgauth::endpoints::{Callbacks, Tokener};
+use reqwest;
+use reqwest::cookie;
 use std::error::Error;
+use std::sync::Arc;
 use std::time::Duration;
 use zkprotocol::content::{
   GetArchiveZkNote, GetZkNoteAndLinks, GetZkNoteArchives, GetZkNoteComments, GetZnlIfChanged,
@@ -83,7 +86,7 @@ pub async fn user_interface(
   )
 }
 
-pub fn zk_interface_loggedin(
+pub async fn zk_interface_loggedin(
   config: &Config,
   uid: i64,
   msg: &UserMessage,
@@ -272,6 +275,63 @@ pub fn zk_interface_loggedin(
         what: "homenoteset".to_string(),
         content: serde_json::to_value(hn)?,
       })
+    }
+    "syncremote" => {
+      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+      let user = orgauth::dbfun::read_user_by_id(&conn, uid)?; // TODO pass this in from calling ftn?
+
+      // execute any command from here.  search?
+      let zns = ZkNoteSearch {
+        tagsearch: TagSearch::SearchTerm {
+          mods: Vec::new(),
+          term: "".to_string(),
+        },
+        offset: 0,
+        limit: Some(100),
+        what: "".to_string(),
+        list: true,
+      };
+
+      // let jar = reqwest::cookies::Jar;
+      match (user.cookie, user.remote_url) {
+        (Some(c), Some(url)) => {
+          let url = reqwest::Url::parse(&url)?;
+
+          let jar = Arc::new(cookie::Jar::default());
+          jar.add_cookie_str(&c, &url);
+          let client = reqwest::Client::builder().cookie_provider(jar).build()?;
+
+          let l = UserMessage {
+            what: "searchzknotes".to_string(),
+            data: Some(serde_json::to_value(zns)?),
+          };
+
+          // TODO actual url.
+
+          let actual_url = reqwest::Url::parse(
+            format!(
+              "https://{}/private",
+              url
+                .domain()
+                // TODO: zknotes lib error type
+                .ok_or::<orgauth::error::Error>("no domain".into())?
+            )
+            .as_str(),
+          )?;
+
+          let res = client.post(actual_url).json(&l).send().await?;
+
+          println!("res: {:?}", res);
+          println!("text: {:?}", res.text().await);
+
+          // TODO update cookie
+          Ok(ServerResponse {
+            what: "synccomplete".to_string(),
+            content: serde_json::Value::Null,
+          })
+        }
+        _ => Err("can't remote sync".into()),
+      }
     }
     wat => Err(Box::new(simple_error::SimpleError::new(format!(
       "invalid 'what' code:'{}'",
