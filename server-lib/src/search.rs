@@ -128,11 +128,16 @@ pub fn build_sql(
   uid: i64,
   search: ZkNoteSearch,
 ) -> Result<(String, Vec<String>), Box<dyn Error>> {
-  let (cls, clsargs) = build_sql_clause(&conn, uid, false, search.tagsearch)?;
+  let (mut dtcls, mut dtclsargs) = build_daterange_clause(&search)?;
+
+  println!("dtcls: {:?}", dtcls);
+
+  let (cls, clsargs) = build_tagsearch_clause(&conn, uid, false, &search.tagsearch)?;
 
   let publicid = note_id(&conn, "system", "public")?;
   let archiveid = note_id(&conn, "system", "archive")?;
   let shareid = note_id(&conn, "system", "share")?;
+  let aid = note_id(&conn, "system", "archive")?;
 
   let limclause = match search.limit {
     Some(lm) => format!(" limit {} offset {}", lm, search.offset),
@@ -142,24 +147,59 @@ pub fn build_sql(
 
   let ordclause = " order by N.changeddate desc ";
 
-  // TODO: filter deleted notes from search. (?)
+  let archives = search.archives;
 
-  // notes that are mine.
-  let mut sqlbase = format!(
-    "select N.id, N.title, N.file, N.user, N.createdate, N.changeddate
+  let (mut sqlbase, mut baseargs) = if archives {
+    (
+      // archives of notes that are mine.
+      format!(
+        "select N.id, N.title, N.file, N.user, N.createdate, N.changeddate
+      from zknote N, zknote O, zklink OL, zklink AL where
+      (O.user = ?
+        and OL.fromid = N.id and OL.toid = O.id
+        and AL.fromid = N.id and AL.toid = ?)
+      and O.deleted = 0"
+      ),
+      vec![uid.to_string(), aid.to_string()],
+    )
+  } else {
+    // notes that are mine.
+    (
+      format!(
+        "select N.id, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N where N.user = ?
       and N.deleted = 0"
-  );
-  let mut baseargs = vec![uid.to_string()];
+      ),
+      vec![uid.to_string()],
+    )
+  };
 
   // notes that are public, and not mine.
-  let mut sqlpub = format!(
-    "select N.id, N.title, N.file, N.user, N.createdate, N.changeddate
+  let (mut sqlpub, mut pubargs) = if archives {
+    (
+      // archives of notes that are public, and not mine.
+      format!(
+        "select N.id, N.title, N.file, N.user, N.createdate, N.changeddate
+      from zknote N, zklink L, zknote O, zklink OL, zklink AL where
+      where (N.user != ?
+        and L.fromid = N.id and L.toid = ?
+        and OL.fromid = N.id and OL.toid = O.id
+        and AL.fromid = N.id and AL.toid = ?)
+      and N.deleted = 0"
+      ),
+      vec![uid.to_string(), publicid.to_string(), aid.to_string()],
+    )
+  } else {
+    (
+      format!(
+        "select N.id, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N, zklink L
       where (N.user != ? and L.fromid = N.id and L.toid = ?)
       and N.deleted = 0"
-  );
-  let mut pubargs = vec![uid.to_string(), publicid.to_string()];
+      ),
+      vec![uid.to_string(), publicid.to_string()],
+    )
+  };
 
   // notes shared with a share tag.
   let usernoteid = sqldata::user_note_id(&conn, uid)?;
@@ -170,42 +210,96 @@ pub fn build_sql(
   //
   // clause 3 is M.from (the share)
   // is that share linked to usernoteid?
-  let mut sqlshare = format!(
-    "select N.id, N.title, N.file, N.user, N.createdate, N.changeddate
+  let (mut sqlshare, mut shareargs) = if archives {
+    (
+      format!(
+        "select N.id, N.title, N.file, N.user, N.createdate, N.changeddate
+      from zknote N, zklink L, zklink M, zklink U, zknote O, zklink OL, zklink AL
+      where (N.user != ? and
+        (M.toid = ? and (
+          (L.fromid = N.id and L.toid = M.fromid ) or
+          (L.toid = N.id and L.fromid = M.fromid ))
+        and OL.fromid = N.id and OL.toid = O.id
+        and AL.fromid = N.id and AL.toid = ?)
+    )
+      and
+        L.linkzknote is not ?
+      and
+        ((U.fromid = ? and U.toid = M.fromid) or (U.fromid = M.fromid and U.toid = ?)))
+      and N.deleted = 0"
+      ),
+      vec![
+        uid.to_string(),
+        shareid.to_string(),
+        archiveid.to_string(),
+        archiveid.to_string(),
+        usernoteid.to_string(),
+        usernoteid.to_string(),
+      ],
+    )
+  } else {
+    (
+      format!(
+        "select N.id, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N, zklink L, zklink M, zklink U
       where (N.user != ? and
         (M.toid = ? and (
           (L.fromid = N.id and L.toid = M.fromid ) or
-          (L.toid = N.id and L.fromid = M.fromid )))
-      and 
+          (L.toid = N.id and L.fromid = M.fromid ))
+    )
+      and
         L.linkzknote is not ?
       and
         ((U.fromid = ? and U.toid = M.fromid) or (U.fromid = M.fromid and U.toid = ?)))
       and N.deleted = 0",
-  );
-  let mut shareargs = vec![
-    uid.to_string(),
-    shareid.to_string(),
-    archiveid.to_string(),
-    usernoteid.to_string(),
-    usernoteid.to_string(),
-  ];
+      ),
+      vec![
+        uid.to_string(),
+        shareid.to_string(),
+        archiveid.to_string(),
+        usernoteid.to_string(),
+        usernoteid.to_string(),
+      ],
+    )
+  };
 
   // notes that are tagged with my usernoteid, and not mine.
-  let mut sqluser = format!(
-    "select N.id, N.title, N.file, N.user, N.createdate, N.changeddate
+  let (mut sqluser, mut userargs) = if archives {
+    (
+      format!(
+        "select N.id, N.title, N.file, N.user, N.createdate, N.changeddate
+      from zknote N, zklink L, zknote O, zklink OL, zklink AL
+      where (
+        N.user != ? and
+        ((L.fromid = N.id and L.toid = ?) or (L.toid = N.id and L.fromid = ?)))
+        and OL.fromid = N.id and OL.toid = O.id
+        and AL.fromid = N.id and AL.toid = ?)
+        and N.deleted = 0"
+      ),
+      vec![
+        uid.to_string(),
+        usernoteid.to_string(),
+        usernoteid.to_string(),
+        archiveid.to_string(),
+      ],
+    )
+  } else {
+    (
+      format!(
+        "select N.id, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N, zklink L
       where (
         N.user != ? and
         ((L.fromid = N.id and L.toid = ?) or (L.toid = N.id and L.fromid = ?)))
         and N.deleted = 0"
-  );
-  let mut userargs = vec![
-    uid.to_string(),
-    usernoteid.to_string(),
-    usernoteid.to_string(),
-  ];
-
+      ),
+      vec![
+        uid.to_string(),
+        usernoteid.to_string(),
+        usernoteid.to_string(),
+      ],
+    )
+  };
   // local ftn to add clause and args.
   let addcls = |sql: &mut String, args: &mut Vec<String>| {
     if !args.is_empty() {
@@ -222,6 +316,7 @@ pub fn build_sql(
   addcls(&mut sqlpub, &mut pubargs);
   addcls(&mut sqluser, &mut userargs);
   addcls(&mut sqlshare, &mut shareargs);
+  addcls(&mut dtcls, &mut dtclsargs);
 
   // combine the queries.
   sqlbase.push_str(" union ");
@@ -245,11 +340,38 @@ pub fn build_sql(
   Ok((sqlbase, baseargs))
 }
 
-fn build_sql_clause(
+fn build_daterange_clause(search: &ZkNoteSearch) -> Result<(String, Vec<String>), Box<dyn Error>> {
+  let clawses = [
+    search
+      .created_after
+      .map(|dt| ("N.createddate < ?", dt.to_string())),
+    search
+      .created_before
+      .map(|dt| ("N.createddate < ?", dt.to_string())),
+    search
+      .changed_after
+      .map(|dt| ("N.changeddate < ?", dt.to_string())),
+    search
+      .changed_before
+      .map(|dt| ("N.changeddate < ?", dt.to_string())),
+  ];
+  let clause = clawses
+    .iter()
+    .filter_map(|pair| pair.as_ref().map(|(s, _)| s.to_string()))
+    .collect::<Vec<String>>()
+    .join(" and ");
+  let args = clawses
+    .iter()
+    .filter_map(|pair| pair.as_ref().map(|(_, dt)| dt.clone()))
+    .collect();
+  Ok((clause, args))
+}
+
+fn build_tagsearch_clause(
   conn: &Connection,
   uid: i64,
   not: bool,
-  search: TagSearch,
+  search: &TagSearch,
 ) -> Result<(String, Vec<String>), Box<dyn Error>> {
   let (cls, args) = match search {
     TagSearch::SearchTerm { mods, term } => {
@@ -303,7 +425,7 @@ fn build_sql_clause(
             ),
             // args
             if exact {
-              vec![term.clone(), term]
+              vec![term.clone(), term.clone()]
             } else {
               vec![
                 format!("%{}%", term).to_string(),
@@ -330,7 +452,7 @@ fn build_sql_clause(
             },
             // args
             if exact {
-              vec![term]
+              vec![term.clone()]
             } else {
               vec![format!("%{}%", term).to_string()]
             },
@@ -338,10 +460,10 @@ fn build_sql_clause(
         }
       }
     }
-    TagSearch::Not { ts } => build_sql_clause(&conn, uid, true, *ts)?,
+    TagSearch::Not { ts } => build_tagsearch_clause(&conn, uid, true, &*ts)?,
     TagSearch::Boolex { ts1, ao, ts2 } => {
-      let (cl1, mut arg1) = build_sql_clause(&conn, uid, false, *ts1)?;
-      let (cl2, mut arg2) = build_sql_clause(&conn, uid, false, *ts2)?;
+      let (cl1, mut arg1) = build_tagsearch_clause(&conn, uid, false, &*ts1)?;
+      let (cl2, mut arg2) = build_tagsearch_clause(&conn, uid, false, &*ts2)?;
       let mut cls = String::new();
       let conj = match ao {
         AndOr::Or => " or ",
