@@ -27,6 +27,11 @@ pub fn power_delete_zknotes(
     limit: None,
     what: "".to_string(),
     list: true,
+    archives: false,
+    created_after: None,
+    created_before: None,
+    changed_after: None,
+    changed_before: None,
   };
 
   let znsr = search_zknotes(conn, user, &nolimsearch)?;

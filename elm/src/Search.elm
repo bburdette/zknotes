@@ -71,6 +71,11 @@ type alias ZkNoteSearch =
     , limit : Maybe Int
     , what : String
     , list : Bool
+    , archives : Bool
+    , createdAfter : Maybe Int
+    , createdBefore : Maybe Int
+    , changedAfter : Maybe Int
+    , changedBefore : Maybe Int
     }
 
 
@@ -125,6 +130,11 @@ defaultSearch =
     , limit = Just defaultSearchLimit
     , what = ""
     , list = True
+    , archives = False
+    , createdAfter = Nothing
+    , createdBefore = Nothing
+    , changedAfter = Nothing
+    , changedBefore = Nothing
     }
 
 
@@ -270,6 +280,11 @@ decodeAndOr =
             )
 
 
+encodeMaybe : String -> Maybe a -> (a -> JE.Value) -> Maybe ( String, JE.Value )
+encodeMaybe name mb toval =
+    Maybe.map (\a -> ( name, toval a )) mb
+
+
 encodeZkNoteSearch : ZkNoteSearch -> JE.Value
 encodeZkNoteSearch zns =
     JE.object <|
@@ -277,11 +292,15 @@ encodeZkNoteSearch zns =
         , ( "offset", JE.int zns.offset )
         , ( "what", JE.string zns.what )
         , ( "list", JE.bool zns.list )
+        , ( "archives", JE.bool zns.archives )
         ]
-            ++ (zns.limit
-                    |> Maybe.map (\i -> [ ( "limit", JE.int i ) ])
-                    |> Maybe.withDefault []
-               )
+            ++ List.filterMap identity
+                [ encodeMaybe "created_after" zns.createdAfter JE.int
+                , encodeMaybe "created_before" zns.createdBefore JE.int
+                , encodeMaybe "changed_after" zns.changedAfter JE.int
+                , encodeMaybe "changed_before" zns.changedBefore JE.int
+                , encodeMaybe "limit" zns.limit JE.int
+                ]
 
 
 showSearchMod : SearchMod -> String

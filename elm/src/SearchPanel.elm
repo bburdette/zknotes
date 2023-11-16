@@ -61,6 +61,11 @@ getSearch model =
                 , limit = Just model.paginationModel.increment
                 , what = ""
                 , list = True
+                , archives = False
+                , createdAfter = Nothing
+                , createdBefore = Nothing
+                , changedAfter = Nothing
+                , changedBefore = Nothing
                 }
             )
 
@@ -154,6 +159,11 @@ handleTspUpdate model ( nm, cmd ) =
                 , limit = Just model.paginationModel.increment
                 , what = ""
                 , list = True
+                , archives = False
+                , createdAfter = Nothing
+                , createdBefore = Nothing
+                , changedAfter = Nothing
+                , changedBefore = Nothing
                 }
             )
 
@@ -194,6 +204,11 @@ update msg model =
                                 , limit = Just nm.increment
                                 , what = ""
                                 , list = True
+                                , archives = False
+                                , createdAfter = Nothing
+                                , createdBefore = Nothing
+                                , changedAfter = Nothing
+                                , changedBefore = Nothing
                                 }
                             )
 

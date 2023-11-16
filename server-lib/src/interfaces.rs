@@ -290,6 +290,11 @@ pub async fn zk_interface_loggedin(
         limit: Some(100),
         what: "".to_string(),
         list: true,
+        archives: false,
+        created_after: None,
+        created_before: None,
+        changed_after: None,
+        changed_before: None,
       };
 
       // let jar = reqwest::cookies::Jar;
@@ -305,8 +310,6 @@ pub async fn zk_interface_loggedin(
             what: "searchzknotes".to_string(),
             data: Some(serde_json::to_value(zns)?),
           };
-
-          // TODO actual url.
 
           let actual_url = reqwest::Url::parse(
             format!(

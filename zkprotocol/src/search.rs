@@ -7,6 +7,11 @@ pub struct ZkNoteSearch {
   pub limit: Option<i64>,
   pub what: String,
   pub list: bool,
+  pub archives: bool,
+  pub created_after: Option<i64>,
+  pub created_before: Option<i64>,
+  pub changed_after: Option<i64>,
+  pub changed_before: Option<i64>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

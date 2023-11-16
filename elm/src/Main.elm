@@ -1657,6 +1657,11 @@ actualupdate msg model =
                                             , limit = Nothing
                                             , what = ""
                                             , list = True
+                                            , archives = False
+                                            , createdAfter = Nothing
+                                            , createdBefore = Nothing
+                                            , changedAfter = Nothing
+                                            , changedBefore = Nothing
                                             }
                                         )
 
@@ -3504,6 +3509,11 @@ prevSearchQuery login =
     , limit = Just 50
     , what = "prevSearches"
     , list = False
+    , archives = False
+    , createdAfter = Nothing
+    , createdBefore = Nothing
+    , changedAfter = Nothing
+    , changedBefore = Nothing
     }
 
 
