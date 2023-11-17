@@ -45,7 +45,7 @@ pub enum AndOr {
   Or,
 }
 
-#[derive(Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ZkListNoteSearchResult {
   pub notes: Vec<ZkListNote>,
   pub offset: i64,

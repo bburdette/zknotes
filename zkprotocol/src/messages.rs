@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ServerResponse {
   pub what: String,
   pub content: Value,

@@ -60,16 +60,8 @@ pub async fn sync(
         data: Some(serde_json::to_value(zns)?),
       };
 
-      let actual_url = reqwest::Url::parse(
-        format!(
-          "https://{}/private",
-          url
-            .domain()
-            // TODO: zknotes lib error type
-            .ok_or::<orgauth::error::Error>("no domain".into())?
-        )
-        .as_str(),
-      )?;
+      let actual_url =
+        reqwest::Url::parse(format!("{}/private", url.origin().unicode_serialization(),).as_str())?;
 
       let res = client.post(actual_url).json(&l).send().await?;
 
@@ -78,7 +70,9 @@ pub async fn sync(
       let resp = res.json::<ServerResponse>().await?;
       let searchres: ZkNoteSearchResult = match resp.what.as_str() {
         "zknotesearchresult" => serde_json::from_value(resp.content).map_err(|e| e.into()),
-        _ => Err::<ZkNoteSearchResult, Box<dyn std::error::Error>>("unexpected message".into()),
+        _ => Err::<ZkNoteSearchResult, Box<dyn std::error::Error>>(
+          format!("unexpected message: {:?}", resp).into(),
+        ),
       }?;
 
       println!("searchres: {:?}", searchres);
@@ -86,22 +80,31 @@ pub async fn sync(
       // write the notes!
       let sysid = user_id(&conn, "system")?;
 
-      // let zk
+      for note in searchres.notes {
+        // if we had a sha, we'd insert based on that, right?
+        // these are archive notes so should be able to insert if they don't exist, otherwise discard.
+        // because archive notes shouldn't change.
+        conn.execute(
+          "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate)
+           values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+          params![
+            note.title,
+            note.content,
+            sysid,
+            note.pubid,
+            note.editable,
+            note.showtitle,
+            note.deleted,
+            note.uuid,
+            note.createdate,
+            note.changeddate,
+          ],
+        )?;
+      }
 
-      // for (n in res.json().zknotes) {
-      // does note exist?
+      // Ok now get the archive links.  Special query!
 
-      //
-
-      // }
-
-      // Q: use create/mod dates from soure database, or use 'now'?
-      // A: use source.
-
-      // println!("res: {:?}", res);
-      // println!("text: {:?}", res.text().await);
-
-      // TODO update cookie
+      // TODO update cookie?
       Ok(ServerResponse {
         what: "synccomplete".to_string(),
         content: serde_json::Value::Null,

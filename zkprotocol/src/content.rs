@@ -20,6 +20,7 @@ pub struct Sysids {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ZkNote {
   pub id: i64,
+  pub uuid: String,
   pub title: String,
   pub content: String,
   pub user: i64,
@@ -36,7 +37,7 @@ pub struct ZkNote {
   pub sysids: Vec<i64>,
 }
 
-#[derive(Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ZkListNote {
   pub id: i64,
   pub title: String,

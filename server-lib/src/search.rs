@@ -106,10 +106,12 @@ pub fn search_zknotes(
   } else {
     let mut pv = Vec::new();
 
+    let s_user = if search.archives { sysid } else { user };
+
     for rsrec in rec_iter {
       match rsrec {
         Ok(rec) => {
-          pv.push(sqldata::read_zknote(&conn, Some(user), rec.id)?);
+          pv.push(sqldata::read_zknote(&conn, Some(s_user), rec.id)?);
         }
         Err(_) => (),
       }
@@ -179,7 +181,7 @@ pub fn build_sql(
       // archives of notes that are public, and not mine.
       format!(
         "select N.id, N.title, N.file, N.user, N.createdate, N.changeddate
-      from zknote N, zklink L, zknote O, zklink OL, zklink AL where
+      from zknote N, zklink L, zknote O, zklink OL, zklink AL
       where (N.user != ?
         and L.fromid = N.id and L.toid = ?
         and OL.fromid = N.id and OL.toid = O.id
@@ -219,12 +221,11 @@ pub fn build_sql(
           (L.fromid = N.id and L.toid = M.fromid ) or
           (L.toid = N.id and L.fromid = M.fromid ))
         and OL.fromid = N.id and OL.toid = O.id
-        and AL.fromid = N.id and AL.toid = ?)
-    )
+        and AL.fromid = N.id and AL.toid = ?))
       and
         L.linkzknote is not ?
       and
-        ((U.fromid = ? and U.toid = M.fromid) or (U.fromid = M.fromid and U.toid = ?)))
+        ((U.fromid = ? and U.toid = M.fromid) or (U.fromid = M.fromid and U.toid = ?))
       and N.deleted = 0"
       ),
       vec![
@@ -241,11 +242,10 @@ pub fn build_sql(
       format!(
         "select N.id, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N, zklink L, zklink M, zklink U
-      where (N.user != ? and
-        (M.toid = ? and (
-          (L.fromid = N.id and L.toid = M.fromid ) or
-          (L.toid = N.id and L.fromid = M.fromid ))
-    )
+      where (N.user != ? 
+        and M.toid = ? 
+        and ((L.fromid = N.id and L.toid = M.fromid )
+             or (L.toid = N.id and L.fromid = M.fromid ))
       and
         L.linkzknote is not ?
       and
@@ -268,11 +268,10 @@ pub fn build_sql(
       format!(
         "select N.id, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N, zklink L, zknote O, zklink OL, zklink AL
-      where (
-        N.user != ? and
-        ((L.fromid = N.id and L.toid = ?) or (L.toid = N.id and L.fromid = ?)))
+      where N.user != ?
+        and ((L.fromid = N.id and L.toid = ?) or (L.toid = N.id and L.fromid = ?))
         and OL.fromid = N.id and OL.toid = O.id
-        and AL.fromid = N.id and AL.toid = ?)
+        and AL.fromid = N.id and AL.toid = ?
         and N.deleted = 0"
       ),
       vec![

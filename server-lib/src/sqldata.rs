@@ -783,29 +783,30 @@ pub fn read_zknote(
   let sysids = get_sysids(conn, sysid, id)?;
 
   let mut note = conn.query_row(
-    "select ZN.title, ZN.content, ZN.user, OU.name, U.zknote, ZN.pubid, ZN.editable, ZN.showtitle, ZN.deleted, ZN.file, ZN.createdate, ZN.changeddate
+    "select ZN.uuid, ZN.title, ZN.content, ZN.user, OU.name, U.zknote, ZN.pubid, ZN.editable, ZN.showtitle, ZN.deleted, ZN.file, ZN.createdate, ZN.changeddate
       from zknote ZN, orgauth_user OU, user U where ZN.id = ?1 and U.id = ZN.user and OU.id = ZN.user",
     params![id],
     |row| {
       Ok(ZkNote {
         id: id,
-        title: row.get(0)?,
-        content: row.get(1)?,
-        user: row.get(2)?,
-        username: row.get(3)?,
-        usernote: row.get(4)?,
-        pubid: row.get(5)?,
-        editable: row.get(6)?,                // editable same as editableValue!
-        editableValue: row.get(6)?,           // <--- same index.
-        showtitle: row.get(7)?,
-        deleted: row.get(8)?,
-        is_file: { let wat : Option<i64> = row.get(9)?;
+        uuid: row.get(0)?,
+        title: row.get(1)?,
+        content: row.get(2)?,
+        user: row.get(3)?,
+        username: row.get(4)?,
+        usernote: row.get(5)?,
+        pubid: row.get(6)?,
+        editable: row.get(7)?,                // editable same as editableValue!
+        editableValue: row.get(7)?,           // <--- same index.
+        showtitle: row.get(8)?,
+        deleted: row.get(9)?,
+        is_file: { let wat : Option<i64> = row.get(10)?;
           match wat {
           Some(_) => true,
           None => false,
         }},
-        createdate: row.get(10)?,
-        changeddate: row.get(11)?,
+        createdate: row.get(11)?,
+        changeddate: row.get(12)?,
         sysids: sysids,
       })
     },
@@ -980,7 +981,7 @@ pub fn read_zknotepubid(
 ) -> Result<ZkNote, orgauth::error::Error> {
   let publicid = note_id(&conn, "system", "public")?;
   let mut note = conn.query_row(
-    "select A.id, A.title, A.content, A.user, OU.name, U.zknote, A.pubid, A.editable, A.showtitle, A.deleted, A.file, A.createdate, A.changeddate
+    "select A.id, A.uuid, A.title, A.content, A.user, OU.name, U.zknote, A.pubid, A.editable, A.showtitle, A.deleted, A.file, A.createdate, A.changeddate
       from zknote A, user U, orgauth_user OU, zklink L where A.pubid = ?1
       and ((A.id = L.fromid
       and L.toid = ?2) or (A.id = L.toid
@@ -991,23 +992,24 @@ pub fn read_zknotepubid(
     |row| {
       Ok(ZkNote {
         id: row.get(0)?,
-        title: row.get(1)?,
-        content: row.get(2)?,
-        user: row.get(3)?,
-        username: row.get(4)?,
-        usernote: row.get(5)?,
-        pubid: row.get(6)?,
+        uuid: row.get(1)?,
+        title: row.get(2)?,
+        content: row.get(3)?,
+        user: row.get(4)?,
+        username: row.get(5)?,
+        usernote: row.get(6)?,
+        pubid: row.get(7)?,
         editable: false,
-        editableValue: row.get(7)?,
-        showtitle: row.get(8)?,
-        deleted: row.get(9)?,
-        is_file: { let wat : Option<i64> = row.get(10)?;
+        editableValue: row.get(8)?,
+        showtitle: row.get(9)?,
+        deleted: row.get(10)?,
+        is_file: { let wat : Option<i64> = row.get(11)?;
           match wat {
           Some(_) => true,
           None => false,
         }},
-        createdate: row.get(11)?,
-        changeddate: row.get(12)?,
+        createdate: row.get(12)?,
+        changeddate: row.get(13)?,
         sysids: Vec::new(),
       })
     },
