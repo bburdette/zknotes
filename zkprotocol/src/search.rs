@@ -52,7 +52,7 @@ pub struct ZkListNoteSearchResult {
   pub what: String,
 }
 
-#[derive(Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ZkNoteSearchResult {
   pub notes: Vec<ZkNote>,
   pub offset: i64,

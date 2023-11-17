@@ -6,6 +6,7 @@ mod migrations;
 mod search;
 pub mod sqldata;
 mod sqltest;
+mod sync;
 use actix_cors::Cors;
 use actix_files::NamedFile;
 use actix_multipart::Multipart;

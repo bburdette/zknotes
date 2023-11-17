@@ -137,7 +137,6 @@ pub fn build_sql(
   let publicid = note_id(&conn, "system", "public")?;
   let archiveid = note_id(&conn, "system", "archive")?;
   let shareid = note_id(&conn, "system", "share")?;
-  let aid = note_id(&conn, "system", "archive")?;
 
   let limclause = match search.limit {
     Some(lm) => format!(" limit {} offset {}", lm, search.offset),
@@ -160,7 +159,7 @@ pub fn build_sql(
         and AL.fromid = N.id and AL.toid = ?)
       and O.deleted = 0"
       ),
-      vec![uid.to_string(), aid.to_string()],
+      vec![uid.to_string(), archiveid.to_string()],
     )
   } else {
     // notes that are mine.
@@ -187,7 +186,7 @@ pub fn build_sql(
         and AL.fromid = N.id and AL.toid = ?)
       and N.deleted = 0"
       ),
-      vec![uid.to_string(), publicid.to_string(), aid.to_string()],
+      vec![uid.to_string(), publicid.to_string(), archiveid.to_string()],
     )
   } else {
     (
