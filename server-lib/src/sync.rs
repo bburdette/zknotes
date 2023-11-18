@@ -16,9 +16,9 @@ use std::error::Error;
 use std::sync::Arc;
 use std::time::Duration;
 use zkprotocol::content::{
-  GetArchiveZkNote, GetZkNoteAndLinks, GetZkNoteArchives, GetZkNoteComments, GetZnlIfChanged,
-  ImportZkNote, SaveZkNote, SaveZkNotePlusLinks, Sysids, ZkLinks, ZkNoteAndLinks,
-  ZkNoteAndLinksWhat, ZkNoteArchives,
+  ArchiveZkLink, GetArchiveZkLinks, GetArchiveZkNote, GetZkNoteAndLinks, GetZkNoteArchives,
+  GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkNote, SaveZkNotePlusLinks, Sysids,
+  ZkLinks, ZkNoteAndLinks, ZkNoteAndLinksWhat, ZkNoteArchives,
 };
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 use zkprotocol::search::{TagSearch, ZkListNoteSearchResult, ZkNoteSearch, ZkNoteSearchResult};
@@ -108,13 +108,56 @@ pub async fn sync(
         }
       }
 
-      // Ok now get the archive links.  Special query!
-      let links = sqldata::read_archivezklinks(&conn, user.id, 0)?;
+      if getarchivelinks {
+        let gazl = GetArchiveZkLinks {
+          createddate_after: 0,
+        };
+        let l = UserMessage {
+          what: "getarchivezklinks".to_string(),
+          data: Some(serde_json::to_value(gazl)?),
+        };
+
+        let actual_url = reqwest::Url::parse(
+          format!("{}/private", url.origin().unicode_serialization(),).as_str(),
+        )?;
+
+        let res = client.post(actual_url).json(&l).send().await?;
+
+        // Ok now get the archive links.  Special query!
+        let resp = res.json::<ServerResponse>().await?;
+        let links: Vec<ArchiveZkLink> = match resp.what.as_str() {
+          "archivezklinks" => serde_json::from_value(resp.content).map_err(|e| e.into()),
+          _ => Err::<Vec<ArchiveZkLink>, Box<dyn std::error::Error>>(
+            format!("unexpected messge: {:?}", resp).into(),
+          ),
+        }?;
+
+        for l in links {
+          println!("archiving link!");
+          conn.execute(
+            "insert into zklinkarchive (fromid, toid, user, linkzknote, createdate, deletedate)
+          select FN.id, TN.id, U.id, LN.id, ?1, ?2
+          from zknote FN, zknote TN, orgauth_user U, zknote LN
+          where FN.uuid = ?3
+          and TN.uuid = ?4
+          and U.uuid = ?5
+          and LN.uuid = ?6",
+            params![
+              l.createdate,
+              l.deletedate,
+              l.fromUuid,
+              l.toUuid,
+              l.userUuid,
+              l.linkUuid
+            ],
+          )?;
+        }
+      }
 
       // TODO update cookie?
       Ok(ServerResponse {
         what: "synccomplete".to_string(),
-        content: serde_json::to_value(links)?,
+        content: serde_json::Value::Null,
       })
     }
     _ => Err("can't remote sync".into()),

@@ -164,7 +164,7 @@ pub struct GetArchiveZkLinks {
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct ArchiveZkLink {
-  pub user: String, // uuid too!
+  pub userUuid: String, // uuid too!
   pub fromUuid: String,
   pub toUuid: String,
   pub linkUuid: Option<String>,

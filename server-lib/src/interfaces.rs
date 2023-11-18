@@ -190,13 +190,14 @@ pub async fn zk_interface_loggedin(
       })
     }
     "getarchivezklinks" => {
+      println!("getarchivezklinks");
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let rq: GetArchiveZkLinks = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       let links = sqldata::read_archivezklinks(&conn, uid, rq.createddate_after)?;
-      // info!("user#getarchivezknote: {} - {}", note.id, note.title);
+      info!("user#getarchivezklinks: {}", links.len());
       Ok(ServerResponse {
-        what: "zknote".to_string(),
+        what: "archivezklinks".to_string(),
         content: serde_json::to_value(links)?,
       })
     }

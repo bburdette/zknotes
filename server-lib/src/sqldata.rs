@@ -1554,17 +1554,23 @@ pub fn read_archivezklinks(
   baseargs.append(&mut userargs);
 
   let mut pstmt = conn.prepare(
-       format!("with accessible_notes as ({})
-      select ZLA.user, FN.uuid, TN.uuid, LN.uuid, ZLA.createdate from zklinkarchive ZLA, zknote FN, zknote TN, zknote LN
+    format!(
+      "with accessible_notes as ({})
+      select ZLA.user, FN.uuid, TN.uuid, LN.uuid, ZLA.createdate, ZLA.deletedate
+      from zklinkarchive ZLA, zknote FN, zknote TN, zknote LN
       where FN.id = ZLA.fromid
       and TN.id = ZLA.toid
       and LN.id = ZLA.toid
       and ZLA.fromid in accessible_notes
-      and ZLA.toid in accessible_notes", sqlbase).as_str())?;
+      and ZLA.toid in accessible_notes",
+      sqlbase
+    )
+    .as_str(),
+  )?;
 
   let rec_iter = pstmt.query_map(rusqlite::params_from_iter(baseargs.iter()), |row| {
     Ok(ArchiveZkLink {
-      user: row.get(0)?,
+      userUuid: "2".to_string(), // row.get(0)?,
       fromUuid: row.get(1)?,
       toUuid: row.get(2)?,
       linkUuid: row.get(3)?,
