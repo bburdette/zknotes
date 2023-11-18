@@ -158,6 +158,21 @@ pub struct GetArchiveZkNote {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
+pub struct GetArchiveZkLinks {
+  pub createddate_after: i64,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct ArchiveZkLink {
+  pub user: String, // uuid too!
+  pub fromUuid: String,
+  pub toUuid: String,
+  pub linkUuid: Option<String>,
+  pub createdate: i64,
+  pub deletedate: i64,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
 pub struct GetZkNoteComments {
   pub zknote: i64,
   pub offset: i64,

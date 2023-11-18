@@ -55,36 +55,41 @@ pub async fn sync(
       jar.add_cookie_str(c.as_str(), &url);
       let client = reqwest::Client::builder().cookie_provider(jar).build()?;
 
-      let l = UserMessage {
-        what: "searchzknotes".to_string(),
-        data: Some(serde_json::to_value(zns)?),
-      };
+      let getarchivenotes = false;
+      let getarchivelinks = true;
 
-      let actual_url =
-        reqwest::Url::parse(format!("{}/private", url.origin().unicode_serialization(),).as_str())?;
+      if getarchivenotes {
+        let l = UserMessage {
+          what: "searchzknotes".to_string(),
+          data: Some(serde_json::to_value(zns)?),
+        };
 
-      let res = client.post(actual_url).json(&l).send().await?;
+        let actual_url = reqwest::Url::parse(
+          format!("{}/private", url.origin().unicode_serialization(),).as_str(),
+        )?;
 
-      // should recieve a whatmessage, yes?
+        let res = client.post(actual_url).json(&l).send().await?;
 
-      let resp = res.json::<ServerResponse>().await?;
-      let searchres: ZkNoteSearchResult = match resp.what.as_str() {
-        "zknotesearchresult" => serde_json::from_value(resp.content).map_err(|e| e.into()),
-        _ => Err::<ZkNoteSearchResult, Box<dyn std::error::Error>>(
-          format!("unexpected message: {:?}", resp).into(),
-        ),
-      }?;
+        // should recieve a whatmessage, yes?
 
-      println!("searchres: {:?}", searchres);
+        let resp = res.json::<ServerResponse>().await?;
+        let searchres: ZkNoteSearchResult = match resp.what.as_str() {
+          "zknotesearchresult" => serde_json::from_value(resp.content).map_err(|e| e.into()),
+          _ => Err::<ZkNoteSearchResult, Box<dyn std::error::Error>>(
+            format!("unexpected message: {:?}", resp).into(),
+          ),
+        }?;
 
-      // write the notes!
-      let sysid = user_id(&conn, "system")?;
+        println!("searchres: {:?}", searchres);
 
-      for note in searchres.notes {
-        // if we had a sha, we'd insert based on that, right?
-        // these are archive notes so should be able to insert if they don't exist, otherwise discard.
-        // because archive notes shouldn't change.
-        conn.execute(
+        // write the notes!
+        let sysid = user_id(&conn, "system")?;
+
+        for note in searchres.notes {
+          // if we had a sha, we'd insert based on that, right?
+          // these are archive notes so should be able to insert if they don't exist, otherwise discard.
+          // because archive notes shouldn't change.
+          conn.execute(
           "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate)
            values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
           params![
@@ -100,14 +105,16 @@ pub async fn sync(
             note.changeddate,
           ],
         )?;
+        }
       }
 
       // Ok now get the archive links.  Special query!
+      let links = sqldata::read_archivezklinks(&conn, user.id, 0)?;
 
       // TODO update cookie?
       Ok(ServerResponse {
         what: "synccomplete".to_string(),
-        content: serde_json::Value::Null,
+        content: serde_json::to_value(links)?,
       })
     }
     _ => Err("can't remote sync".into()),

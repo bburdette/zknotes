@@ -139,6 +139,7 @@ pub fn build_sql(
   let publicid = note_id(&conn, "system", "public")?;
   let archiveid = note_id(&conn, "system", "archive")?;
   let shareid = note_id(&conn, "system", "share")?;
+  let usernoteid = sqldata::user_note_id(&conn, uid)?;
 
   let limclause = match search.limit {
     Some(lm) => format!(" limit {} offset {}", lm, search.offset),
@@ -202,8 +203,7 @@ pub fn build_sql(
     )
   };
 
-  // notes shared with a share tag.
-  let usernoteid = sqldata::user_note_id(&conn, uid)?;
+  // notes shared with a share tag, and not mine.
   // clause 1: user is not-me
   //
   // clause 2: is N linked to a share note?

@@ -10,9 +10,9 @@ use simple_error::bail;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use zkprotocol::content::{
-  Direction, EditLink, ExtraLoginData, GetArchiveZkNote, GetZkLinks, GetZkNoteArchives,
-  GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkLink, SaveZkNote, SavedZkNote, Sysids,
-  ZkLink, ZkListNote, ZkNote, ZkNoteAndLinks,
+  ArchiveZkLink, Direction, EditLink, ExtraLoginData, GetArchiveZkNote, GetZkLinks,
+  GetZkNoteArchives, GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkLink, SaveZkNote,
+  SavedZkNote, Sysids, ZkLink, ZkListNote, ZkNote, ZkNoteAndLinks,
 };
 
 #[derive(Clone, Deserialize, Serialize, Debug)]
@@ -1451,6 +1451,129 @@ pub fn read_archivezknote(
 
   // now read the archive note AS SYSTEM.
   read_zknote(conn, Some(sysid), gazn.noteid)
+}
+
+pub fn read_archivezklinks(
+  conn: &Connection,
+  uid: i64,
+  after: i64,
+) -> Result<Vec<ArchiveZkLink>, orgauth::error::Error> {
+  let archiveid = note_id(&conn, "system", "archive")?;
+  let sysid = user_id(&conn, "system")?;
+  let publicid = note_id(&conn, "system", "public")?;
+  let archiveid = note_id(&conn, "system", "archive")?;
+  let shareid = note_id(&conn, "system", "share")?;
+  let usernoteid = user_note_id(&conn, uid)?;
+
+  // query: archivelinks that attach to notes I can access.
+  // my notes + public notes + shared notes + ??
+
+  let (mut sqlbase, mut baseargs) = {
+    // notes that are mine.
+    (
+      format!(
+        "select N.id
+        from zknote N where N.user = ?"
+      ),
+      vec![uid.to_string()],
+    )
+  };
+
+  // notes that are public, and not mine.
+  let (mut sqlpub, mut pubargs) = {
+    (
+      format!(
+        "select N.id
+      from zknote N, zklink L
+      where (N.user != ? and L.fromid = N.id and L.toid = ?)"
+      ),
+      vec![uid.to_string(), publicid.to_string()],
+    )
+  };
+
+  // notes shared with a share tag, and not mine.
+  // clause 1: user is not-me
+  //
+  // clause 2: is N linked to a share note?
+  // link M is to shareid, and L links either to or from M's from.
+  //
+  // clause 3 is M.from (the share)
+  // is that share linked to usernoteid?
+  let (mut sqlshare, mut shareargs) = {
+    (
+      format!(
+        "select N.id
+      from zknote N, zklink L, zklink M, zklink U
+      where (N.user != ?
+        and M.toid = ?
+        and ((L.fromid = N.id and L.toid = M.fromid )
+             or (L.toid = N.id and L.fromid = M.fromid ))
+      and
+        L.linkzknote is not ?
+      and
+        ((U.fromid = ? and U.toid = M.fromid) or (U.fromid = M.fromid and U.toid = ?)))",
+      ),
+      vec![
+        uid.to_string(),
+        shareid.to_string(),
+        archiveid.to_string(),
+        usernoteid.to_string(),
+        usernoteid.to_string(),
+      ],
+    )
+  };
+
+  // notes that are tagged with my usernoteid, and not mine.
+  let (mut sqluser, mut userargs) = {
+    (
+      format!(
+        "select N.id
+      from zknote N, zklink L
+      where (
+        N.user != ? and
+        ((L.fromid = N.id and L.toid = ?) or (L.toid = N.id and L.fromid = ?)))"
+      ),
+      vec![
+        uid.to_string(),
+        usernoteid.to_string(),
+        usernoteid.to_string(),
+      ],
+    )
+  };
+
+  sqlbase.push_str(" union ");
+  sqlbase.push_str(sqlpub.as_str());
+  baseargs.append(&mut pubargs);
+
+  sqlbase.push_str(" union ");
+  sqlbase.push_str(sqlshare.as_str());
+  baseargs.append(&mut shareargs);
+
+  sqlbase.push_str(" union ");
+  sqlbase.push_str(sqluser.as_str());
+  baseargs.append(&mut userargs);
+
+  let mut pstmt = conn.prepare(
+       format!("with accessible_notes as ({})
+      select ZLA.user, FN.uuid, TN.uuid, LN.uuid, ZLA.createdate from zklinkarchive ZLA, zknote FN, zknote TN, zknote LN
+      where FN.id = ZLA.fromid
+      and TN.id = ZLA.toid
+      and LN.id = ZLA.toid
+      and ZLA.fromid in accessible_notes
+      and ZLA.toid in accessible_notes", sqlbase).as_str())?;
+
+  let rec_iter = pstmt.query_map(rusqlite::params_from_iter(baseargs.iter()), |row| {
+    Ok(ArchiveZkLink {
+      user: row.get(0)?,
+      fromUuid: row.get(1)?,
+      toUuid: row.get(2)?,
+      linkUuid: row.get(3)?,
+      createdate: row.get(4)?,
+      deletedate: row.get(5)?,
+    })
+  })?;
+
+  Ok(rec_iter.filter_map(|x| x.ok()).collect())
 }
 
 pub fn read_zknoteedit(

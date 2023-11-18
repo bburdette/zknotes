@@ -14,8 +14,8 @@ use std::error::Error;
 use std::sync::Arc;
 use std::time::Duration;
 use zkprotocol::content::{
-  GetArchiveZkNote, GetZkNoteAndLinks, GetZkNoteArchives, GetZkNoteComments, GetZnlIfChanged,
-  ImportZkNote, SaveZkNote, SaveZkNotePlusLinks, Sysids, ZkLinks, ZkNoteAndLinks,
+  GetArchiveZkLinks, GetArchiveZkNote, GetZkNoteAndLinks, GetZkNoteArchives, GetZkNoteComments,
+  GetZnlIfChanged, ImportZkNote, SaveZkNote, SaveZkNotePlusLinks, Sysids, ZkLinks, ZkNoteAndLinks,
   ZkNoteAndLinksWhat, ZkNoteArchives,
 };
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
@@ -187,6 +187,17 @@ pub async fn zk_interface_loggedin(
       Ok(ServerResponse {
         what: "zknote".to_string(),
         content: serde_json::to_value(note)?,
+      })
+    }
+    "getarchivezklinks" => {
+      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      let rq: GetArchiveZkLinks = serde_json::from_value(msgdata.clone())?;
+      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+      let links = sqldata::read_archivezklinks(&conn, uid, rq.createddate_after)?;
+      // info!("user#getarchivezknote: {} - {}", note.id, note.title);
+      Ok(ServerResponse {
+        what: "zknote".to_string(),
+        content: serde_json::to_value(links)?,
       })
     }
     "searchzknotes" => {
