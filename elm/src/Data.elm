@@ -66,6 +66,7 @@ decodeTAError =
 
 type alias LoginData =
     { userid : UserId
+    , uuid : String
     , name : String
     , email : String
     , admin : Bool
@@ -270,7 +271,7 @@ type alias GetArchiveZkNote =
 fromOaLd : Orgauth.Data.LoginData -> Result JD.Error LoginData
 fromOaLd oald =
     JD.decodeValue
-        (JD.succeed (LoginData oald.userid oald.name oald.email oald.admin oald.active)
+        (JD.succeed (LoginData oald.userid oald.uuid oald.name oald.email oald.admin oald.active)
             |> andMap (JD.field "zknote" JD.int)
             |> andMap (JD.field "homenote" (JD.maybe JD.int))
         )
@@ -598,6 +599,7 @@ decodeLoginData =
     JD.succeed LoginData
         |> andMap (JD.field "userid" decodeUserId)
         |> andMap (JD.field "name" JD.string)
+        |> andMap (JD.field "uuid" JD.string)
         |> andMap (JD.field "email" JD.string)
         |> andMap (JD.field "admin" JD.bool)
         |> andMap (JD.field "active" JD.bool)

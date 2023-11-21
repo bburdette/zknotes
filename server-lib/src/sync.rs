@@ -6,15 +6,18 @@ use actix_session::Session;
 use either::Either::{Left, Right};
 use log::info;
 use orgauth;
-use orgauth::data::{ChangeEmail, ChangePassword, LoginData, User, UserInvite};
+use orgauth::data::WhatMessage;
+use orgauth::data::{ChangeEmail, ChangePassword, LoginData, PhantomUser, User, UserInvite};
 use orgauth::dbfun::user_id;
 use orgauth::endpoints::{Callbacks, Tokener};
 use reqwest;
 use reqwest::cookie;
 use rusqlite::{params, Connection};
+use std::collections::HashMap;
 use std::error::Error;
 use std::sync::Arc;
 use std::time::Duration;
+use uuid;
 use zkprotocol::content::{
   ArchiveZkLink, GetArchiveZkLinks, GetArchiveZkNote, GetZkNoteAndLinks, GetZkNoteArchives,
   GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkNote, SaveZkNotePlusLinks, Sysids,
@@ -26,26 +29,11 @@ use zkprotocol::search::{TagSearch, ZkListNoteSearchResult, ZkNoteSearch, ZkNote
 pub async fn sync(
   conn: &Connection,
   user: &User,
+  callbacks: &mut Callbacks,
 ) -> Result<ServerResponse, Box<dyn std::error::Error>> {
   let now = now()?;
 
   // execute any command from here.  search?
-  let zns = ZkNoteSearch {
-    tagsearch: TagSearch::SearchTerm {
-      mods: Vec::new(),
-      term: "".to_string(),
-    },
-    offset: 0,
-    limit: None,
-    what: "".to_string(),
-    list: false,
-    archives: true,
-    created_after: None,
-    created_before: None,
-    changed_after: None,
-    changed_before: Some(now),
-  };
-
   // let jar = reqwest::cookies::Jar;
   match (user.cookie.clone(), user.remote_url.clone()) {
     (Some(c), Some(url)) => {
@@ -55,10 +43,150 @@ pub async fn sync(
       jar.add_cookie_str(c.as_str(), &url);
       let client = reqwest::Client::builder().cookie_provider(jar).build()?;
 
+      let getnotes = true;
+      let getlinks = false;
       let getarchivenotes = false;
-      let getarchivelinks = true;
+      let getarchivelinks = false;
 
+      if getnotes {
+        let zns = ZkNoteSearch {
+          tagsearch: TagSearch::SearchTerm {
+            mods: Vec::new(),
+            term: "".to_string(),
+          },
+          offset: 0,
+          limit: None,
+          what: "".to_string(),
+          list: false,
+          archives: false,
+          created_after: None,
+          created_before: None,
+          changed_after: None,
+          changed_before: Some(now),
+        };
+
+        let l = UserMessage {
+          what: "searchzknotes".to_string(),
+          data: Some(serde_json::to_value(zns)?),
+        };
+
+        let private_url = reqwest::Url::parse(
+          format!("{}/private", url.origin().unicode_serialization(),).as_str(),
+        )?;
+
+        let res = client.post(private_url).json(&l).send().await?;
+
+        // should recieve a whatmessage, yes?
+
+        let resp = res.json::<ServerResponse>().await?;
+        let searchres: ZkNoteSearchResult = match resp.what.as_str() {
+          "zknotesearchresult" => serde_json::from_value(resp.content).map_err(|e| e.into()),
+          _ => Err::<ZkNoteSearchResult, Box<dyn std::error::Error>>(
+            format!("unexpected message: {:?}", resp).into(),
+          ),
+        }?;
+
+        println!("searchres: {:?}", searchres);
+
+        // write the notes!
+        let sysid = user_id(&conn, "system")?;
+
+        // map of remote user ids to local user ids.
+        let mut userhash = HashMap::<i64, i64>::new();
+        let user_url =
+          reqwest::Url::parse(format!("{}/user", url.origin().unicode_serialization(),).as_str())?;
+
+        for note in searchres.notes {
+          // got this user already?
+          let user_uid: i64 = match userhash.get(&note.user) {
+            Some(u) => *u,
+            None => {
+              println!("fetching remote user: {:?}", note.user);
+              // fetch a remote user record.
+              let res = client
+                .post(user_url.clone())
+                .json(&UserMessage {
+                  what: "read_remote_user".to_string(),
+                  data: Some(serde_json::to_value(note.user)?),
+                })
+                .send()
+                .await?;
+              let wm: WhatMessage = serde_json::from_value(res.json().await?)?;
+              println!("remote user wm: {:?}", wm);
+              let pu: PhantomUser = match wm.what.as_str() {
+                "remote_user" => serde_json::from_value(
+                  wm.data
+                    .ok_or::<orgauth::error::Error>("missing data".into())?,
+                )?, // .map_err(|e| e.into())?,
+                _ => Err::<PhantomUser, Box<dyn std::error::Error>>(
+                  orgauth::error::Error::String(format!("unexpected message: {:?}", wm)).into(),
+                )?,
+              };
+              println!("phantom user: {:?}", pu);
+              let localuserid = match orgauth::dbfun::read_user_by_uuid(&conn, pu.uuid.as_str()) {
+                Ok(user) => {
+                  println!("found local user {} for remote {}", user.id, pu.id);
+                  userhash.insert(pu.id, user.id);
+                  user.id
+                }
+                _ => {
+                  let localpuid = orgauth::dbfun::phantom_user(
+                    &conn,
+                    pu.name,
+                    uuid::Uuid::parse_str(pu.uuid.as_str())?,
+                    pu.active,
+                    &mut callbacks.on_new_user,
+                  )?;
+                  println!(
+                    "createing phantom user {} for remote user: {:?}",
+                    pu.id, localpuid
+                  );
+                  userhash.insert(pu.id, localpuid);
+                  localpuid
+                }
+              };
+              localuserid
+            }
+          };
+
+          // if we had a sha, we'd insert based on that, right?
+          // these are archive notes so should be able to insert if they don't exist, otherwise discard.
+          // because archive notes shouldn't change.
+          conn.execute(
+          "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate)
+           values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+          params![
+            note.title,
+            note.content,
+            user_uid,
+            note.pubid,
+            note.editable,
+            note.showtitle,
+            note.deleted,
+            note.uuid,
+            note.createdate,
+            note.changeddate,
+          ],
+        )?;
+        }
+      }
       if getarchivenotes {
+        let zns = ZkNoteSearch {
+          tagsearch: TagSearch::SearchTerm {
+            mods: Vec::new(),
+            term: "".to_string(),
+          },
+          offset: 0,
+          limit: None,
+          what: "".to_string(),
+          list: false,
+          archives: true,
+          created_after: None,
+          created_before: None,
+          changed_after: None,
+          changed_before: Some(now),
+        };
+
         let l = UserMessage {
           what: "searchzknotes".to_string(),
           data: Some(serde_json::to_value(zns)?),
@@ -133,15 +261,15 @@ pub async fn sync(
         }?;
 
         for l in links {
-          println!("archiving link!");
-          conn.execute(
+          println!("archiving link!, {:?}", l);
+          let count = conn.execute(
             "insert into zklinkarchive (fromid, toid, user, linkzknote, createdate, deletedate)
-          select FN.id, TN.id, U.id, LN.id, ?1, ?2
-          from zknote FN, zknote TN, orgauth_user U, zknote LN
-          where FN.uuid = ?3
-          and TN.uuid = ?4
-          and U.uuid = ?5
-          and LN.uuid = ?6",
+              select FN.id, TN.id, U.id, LN.id, ?1, ?2
+              from zknote FN, zknote TN, orgauth_user U, zknote LN
+              where FN.uuid = ?3
+                and TN.uuid = ?4
+                and U.uuid = ?5
+                and LN.uuid = ?6",
             params![
               l.createdate,
               l.deletedate,
@@ -151,6 +279,7 @@ pub async fn sync(
               l.linkUuid
             ],
           )?;
+          println!("archived link count:, {}", count);
         }
       }
 

@@ -1459,7 +1459,7 @@ pub fn read_archivezklinks(
   after: i64,
 ) -> Result<Vec<ArchiveZkLink>, orgauth::error::Error> {
   let archiveid = note_id(&conn, "system", "archive")?;
-  let sysid = user_id(&conn, "system")?;
+  // let sysid = user_id(&conn, "system")?;
   let publicid = note_id(&conn, "system", "public")?;
   let archiveid = note_id(&conn, "system", "archive")?;
   let shareid = note_id(&conn, "system", "share")?;
@@ -1480,7 +1480,7 @@ pub fn read_archivezklinks(
   };
 
   // notes that are public, and not mine.
-  let (mut sqlpub, mut pubargs) = {
+  let (sqlpub, mut pubargs) = {
     (
       format!(
         "select N.id
@@ -1499,7 +1499,7 @@ pub fn read_archivezklinks(
   //
   // clause 3 is M.from (the share)
   // is that share linked to usernoteid?
-  let (mut sqlshare, mut shareargs) = {
+  let (sqlshare, mut shareargs) = {
     (
       format!(
         "select N.id
@@ -1524,7 +1524,7 @@ pub fn read_archivezklinks(
   };
 
   // notes that are tagged with my usernoteid, and not mine.
-  let (mut sqluser, mut userargs) = {
+  let (sqluser, mut userargs) = {
     (
       format!(
         "select N.id

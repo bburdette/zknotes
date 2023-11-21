@@ -190,12 +190,10 @@ pub async fn zk_interface_loggedin(
       })
     }
     "getarchivezklinks" => {
-      println!("getarchivezklinks");
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let rq: GetArchiveZkLinks = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       let links = sqldata::read_archivezklinks(&conn, uid, rq.createddate_after)?;
-      info!("user#getarchivezklinks: {}", links.len());
       Ok(ServerResponse {
         what: "archivezklinks".to_string(),
         content: serde_json::to_value(links)?,
@@ -294,7 +292,7 @@ pub async fn zk_interface_loggedin(
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       let user = orgauth::dbfun::read_user_by_id(&conn, uid)?; // TODO pass this in from calling ftn?
 
-      sync::sync(&conn, &user).await
+      sync::sync(&conn, &user, &mut zknotes_callbacks()).await
     }
     wat => Err(Box::new(simple_error::SimpleError::new(format!(
       "invalid 'what' code:'{}'",
