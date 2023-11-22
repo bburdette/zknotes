@@ -96,6 +96,33 @@ pub async fn sync(
         let user_url =
           reqwest::Url::parse(format!("{}/user", url.origin().unicode_serialization(),).as_str())?;
 
+        // first try to get user 8!
+        {
+          let user = 8;
+          println!("fetching remote user: {:?}", user);
+          // fetch a remote user record.
+          let res = client
+            .post(user_url.clone())
+            .json(&UserMessage {
+              what: "read_remote_user".to_string(),
+              data: Some(serde_json::to_value(user)?),
+            })
+            .send()
+            .await?;
+          let wm: WhatMessage = serde_json::from_value(res.json().await?)?;
+          println!("remote user wm: {:?}", wm);
+          let pu: PhantomUser = match wm.what.as_str() {
+            "remote_user" => serde_json::from_value(
+              wm.data
+                .ok_or::<orgauth::error::Error>("missing data".into())?,
+            )?, // .map_err(|e| e.into())?,
+            _ => Err::<PhantomUser, Box<dyn std::error::Error>>(
+              orgauth::error::Error::String(format!("unexpected message: {:?}", wm)).into(),
+            )?,
+          };
+          println!("phantom user: {:?}", pu);
+        }
+
         for note in searchres.notes {
           // got this user already?
           let user_uid: i64 = match userhash.get(&note.user) {

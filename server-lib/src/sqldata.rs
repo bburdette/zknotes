@@ -341,6 +341,11 @@ pub fn dbinit(
     zkm::udpate29(&dbfile)?;
     set_single_value(&conn, "migration_level", "29")?;
   }
+  if nlevel < 30 {
+    info!("udpate30");
+    zkm::udpate30(&dbfile)?;
+    set_single_value(&conn, "migration_level", "30")?;
+  }
 
   info!("db up to date.");
 
