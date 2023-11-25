@@ -12,7 +12,7 @@ use std::time::Duration;
 use zkprotocol::content::{
   ArchiveZkLink, Direction, EditLink, ExtraLoginData, GetArchiveZkNote, GetZkLinks,
   GetZkNoteArchives, GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkLink, SaveZkNote,
-  SavedZkNote, Sysids, ZkLink, ZkListNote, ZkNote, ZkNoteAndLinks,
+  SavedZkNote, Sysids, UuidZkLink, ZkLink, ZkListNote, ZkNote, ZkNoteAndLinks,
 };
 
 #[derive(Clone, Deserialize, Serialize, Debug)]
@@ -491,11 +491,8 @@ pub fn user_shares(conn: &Connection, uid: i64) -> Result<Vec<i64>, orgauth::err
          (A.toid = B.toid and B.fromid = ?2))
       ",
   )?;
-  let r = pstmt
-    .query_map(params![shareid, usernoteid], |row| Ok(row.get(0)?))?
-    .filter_map(|x| x.ok())
-    .collect();
-  Ok(r)
+  let r = pstmt.query_map(params![shareid, usernoteid], |row| Ok(row.get(0)?))?;
+  Ok(r.collect::<Result<Vec<i64>, rusqlite::Error>>()?)
 }
 
 // is there a connection between this note and uid's user note?
@@ -1463,6 +1460,97 @@ pub fn read_archivezklinks(
   uid: i64,
   after: i64,
 ) -> Result<Vec<ArchiveZkLink>, orgauth::error::Error> {
+  let (acc_sql, acc_args) = accessible_notes(&conn, uid)?;
+
+  let mut pstmt = conn.prepare(
+    format!(
+      "with accessible_notes as ({})
+      select ZLA.user, FN.uuid, TN.uuid, LN.uuid, ZLA.createdate, ZLA.deletedate
+      from zklinkarchive ZLA, zknote FN, zknote TN, zknote LN
+      where FN.id = ZLA.fromid
+      and TN.id = ZLA.toid
+      and LN.id = ZLA.toid
+      and ZLA.fromid in accessible_notes
+      and ZLA.toid in accessible_notes",
+      acc_sql
+    )
+    .as_str(),
+  )?;
+
+  let rec_iter = pstmt.query_map(rusqlite::params_from_iter(acc_args.iter()), |row| {
+    Ok(ArchiveZkLink {
+      userUuid: row.get(0)?,
+      fromUuid: row.get(1)?,
+      toUuid: row.get(2)?,
+      linkUuid: row.get(3)?,
+      createdate: row.get(4)?,
+      deletedate: row.get(5)?,
+    })
+  })?;
+
+  Ok(rec_iter.filter_map(|x| x.ok()).collect())
+}
+
+pub fn read_zklinks_since(
+  conn: &Connection,
+  uid: i64,
+  after: i64,
+) -> Result<Vec<UuidZkLink>, orgauth::error::Error> {
+  let (acc_sql, acc_args) = accessible_notes(&conn, uid)?;
+
+  println!("acc_sql {}", acc_sql);
+  println!("acc_args {:?}", acc_args);
+
+  println!("anotes");
+
+  let mut astmt = conn.prepare(acc_sql.as_str())?;
+
+  let arec_iter = astmt.query_map(rusqlite::params_from_iter(acc_args.iter()), |row| {
+    println!("accnote {:?}", row.get::<usize, i64>(0)?);
+    Ok(())
+  })?;
+
+  for ar in arec_iter {
+    println!("ac {:?}", ar);
+  }
+
+  println!("linzk");
+
+  let mut pstmt = conn.prepare(
+    format!(
+      "with accessible_notes as ({})
+        select OU.uuid, FN.uuid, TN.uuid, ZL.createdate
+        from zklink ZL, zknote FN, zknote TN, orgauth_user OU
+        where FN.id = ZL.fromid
+        and TN.id = ZL.toid
+        and ZL.user = OU.id
+        and ZL.fromid in accessible_notes
+        and ZL.toid in accessible_notes",
+      acc_sql
+    )
+    .as_str(),
+  )?;
+
+  println!("accarts {}", acc_args.len());
+
+  let rec_iter = pstmt.query_map(rusqlite::params_from_iter(acc_args.iter()), |row| {
+    println!("uuidzklink {:?}", row.get::<usize, String>(0)?);
+    Ok(UuidZkLink {
+      userUuid: row.get(0)?,
+      fromUuid: row.get(1)?,
+      toUuid: row.get(2)?,
+      linkUuid: None,
+      createdate: row.get(3)?,
+    })
+  })?;
+
+  Ok(rec_iter.collect::<Result<Vec<UuidZkLink>, rusqlite::Error>>()?)
+}
+
+pub fn accessible_notes(
+  conn: &Connection,
+  uid: i64,
+) -> Result<(String, Vec<String>), orgauth::error::Error> {
   let archiveid = note_id(&conn, "system", "archive")?;
   // let sysid = user_id(&conn, "system")?;
   let publicid = note_id(&conn, "system", "public")?;
@@ -1558,33 +1646,7 @@ pub fn read_archivezklinks(
   sqlbase.push_str(sqluser.as_str());
   baseargs.append(&mut userargs);
 
-  let mut pstmt = conn.prepare(
-    format!(
-      "with accessible_notes as ({})
-      select ZLA.user, FN.uuid, TN.uuid, LN.uuid, ZLA.createdate, ZLA.deletedate
-      from zklinkarchive ZLA, zknote FN, zknote TN, zknote LN
-      where FN.id = ZLA.fromid
-      and TN.id = ZLA.toid
-      and LN.id = ZLA.toid
-      and ZLA.fromid in accessible_notes
-      and ZLA.toid in accessible_notes",
-      sqlbase
-    )
-    .as_str(),
-  )?;
-
-  let rec_iter = pstmt.query_map(rusqlite::params_from_iter(baseargs.iter()), |row| {
-    Ok(ArchiveZkLink {
-      userUuid: "2".to_string(), // row.get(0)?,
-      fromUuid: row.get(1)?,
-      toUuid: row.get(2)?,
-      linkUuid: row.get(3)?,
-      createdate: row.get(4)?,
-      deletedate: row.get(5)?,
-    })
-  })?;
-
-  Ok(rec_iter.filter_map(|x| x.ok()).collect())
+  Ok((sqlbase, baseargs))
 }
 
 pub fn read_zknoteedit(

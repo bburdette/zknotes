@@ -163,6 +163,11 @@ pub struct GetArchiveZkLinks {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
+pub struct GetZkLinksSince {
+  pub createddate_after: i64,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
 pub struct ArchiveZkLink {
   pub userUuid: String, // uuid too!
   pub fromUuid: String,
@@ -170,6 +175,15 @@ pub struct ArchiveZkLink {
   pub linkUuid: Option<String>,
   pub createdate: i64,
   pub deletedate: i64,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct UuidZkLink {
+  pub userUuid: String, // uuid too!
+  pub fromUuid: String,
+  pub toUuid: String,
+  pub linkUuid: Option<String>,
+  pub createdate: i64,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
