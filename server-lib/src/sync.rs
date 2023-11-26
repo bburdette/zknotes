@@ -19,9 +19,10 @@ use std::sync::Arc;
 use std::time::Duration;
 use uuid;
 use zkprotocol::content::{
-    GetZkLinksSince , UuidZkLink,  ArchiveZkLink,ZkLink, GetArchiveZkLinks, GetArchiveZkNote, GetZkNoteAndLinks, GetZkNoteArchives,
-  GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkNote, SaveZkNotePlusLinks, Sysids,
-  ZkLinks, ZkNoteAndLinks, ZkNoteAndLinksWhat, ZkNoteArchives,
+  ArchiveZkLink, GetArchiveZkLinks, GetArchiveZkNote, GetZkLinksSince, GetZkNoteAndLinks,
+  GetZkNoteArchives, GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkNote,
+  SaveZkNotePlusLinks, Sysids, UuidZkLink, ZkLink, ZkLinks, ZkNoteAndLinks, ZkNoteAndLinksWhat,
+  ZkNoteArchives,
 };
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 use zkprotocol::search::{TagSearch, ZkListNoteSearchResult, ZkNoteSearch, ZkNoteSearchResult};
@@ -179,8 +180,7 @@ pub async fn sync(
                   // SqliteFailure(Error { code: ConstraintViolation, extended_code: 2067 }, Some("UNIQUE constraint failed: zknote.uuid"));
                   Ok(1)
                 } else {
-                  Err(rusqlite::Error::SqliteFailure(e, s)) 
-                     
+                  Err(rusqlite::Error::SqliteFailure(e, s))
                 }
               Err(e) => Err(e),
             }?;
@@ -347,23 +347,60 @@ pub async fn sync(
 
         for l in links {
           println!("saving link!, {:?}", l);
-          let count = conn.execute(
-            "insert into zklink (fromid, toid, user, linkzknote, createdate)
+          let count = match conn.execute(
+            "with vals(a,b,c,d,e) as (
               select FN.id, TN.id, U.id, LN.id, ?1
-              from zknote FN, zknote TN, orgauth_user U, zknote LN
+              from zknote FN, zknote TN, orgauth_user U
+                left outer join zknote LN
+                 on LN.uuid = ?5
               where FN.uuid = ?2
                 and TN.uuid = ?3
-                and U.uuid = ?4
-                and LN.uuid = ?5",
-            params![
-              l.createdate,
-              l.fromUuid,
-              l.toUuid,
-              l.userUuid,
-              l.linkUuid
-            ],
-          )?;
+                and U.uuid = ?4)
+              insert into zklink (fromid, toid, user, linkzknote, createdate)
+                select * from vals ",
+            params![l.createdate, l.fromUuid, l.toUuid, l.userUuid, l.linkUuid],
+          ) {
+            Ok(c) => {
+              println!("inserted {}", c);
+              Ok(c)
+            }
+            Err(rusqlite::Error::SqliteFailure(e, s)) => {
+              if e.code == rusqlite::ErrorCode::ConstraintViolation {
+                // do update, since we can't ON CONFLICT without a values () clause.
+                let count = conn.execute(
+                  "with vals(a,b,c,d,e) as (
+                    select FN.id, TN.id, U.id, LN.id, ?1
+                    from zknote FN, zknote TN, orgauth_user U
+                      left outer join zknote LN
+                       on LN.uuid = ?5
+                    where FN.uuid = ?2
+                      and TN.uuid = ?3
+                      and U.uuid = ?4)
+                    update zklink set linkzknote = vals.d, createdate = vals.e
+                      from vals
+                      where fromid = vals.a
+                        and toid = vals.b
+                        and user = vals.c",
+                  params![l.createdate, l.fromUuid, l.toUuid, l.userUuid, l.linkUuid],
+                )?;
+                println!("updated {}", count);
+                // TODO: uuid conflict;  resolve with old one becoming archive note.
+                // SqliteFailure(Error { code: ConstraintViolation, extended_code: 2067 }, Some("UNIQUE constraint failed: zknote.uuid"));
+                Ok(count)
+              } else {
+                Err(rusqlite::Error::SqliteFailure(e, s))
+              }
+            }
+            Err(e) => Err(e),
+          }?;
+
           println!("archived link count:, {}", count);
+          if count == 0 {
+            println!(
+              "{:?}",
+              (l.createdate, l.fromUuid, l.toUuid, l.userUuid, l.linkUuid)
+            )
+          }
         }
       }
 
