@@ -44,7 +44,7 @@ pub async fn sync(
       jar.add_cookie_str(c.as_str(), &url);
       let client = reqwest::Client::builder().cookie_provider(jar).build()?;
 
-      let getnotes = false;
+      let getnotes = true;
       let getlinks = true;
       let getarchivenotes = false;
       let getarchivelinks = false;

@@ -423,6 +423,7 @@ async fn zk_interface_check(
   }
 }
 
+// TODO: fns for mobile app default, web server default, I guess desktop too.
 pub fn defcon() -> Config {
   let oc = orgauth::data::Config {
     db: PathBuf::from("./zknotes.db"),
@@ -438,7 +439,7 @@ pub fn defcon() -> Config {
     open_registration: false,
     send_emails: false,
     non_admin_invite: true,
-    remote_registration: false,
+    remote_registration: true,
   };
   Config {
     ip: "127.0.0.1".to_string(),
