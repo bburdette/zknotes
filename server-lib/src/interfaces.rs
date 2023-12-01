@@ -8,10 +8,8 @@ use log::info;
 use orgauth;
 use orgauth::endpoints::{Callbacks, Tokener};
 use orgauth::util::now;
-use reqwest;
-use reqwest::cookie;
+// use reqwest;
 use std::error::Error;
-use std::sync::Arc;
 use std::time::Duration;
 use zkprotocol::content::{
   GetArchiveZkLinks, GetArchiveZkNote, GetZkLinksSince, GetZkNoteAndLinks, GetZkNoteArchives,
@@ -226,6 +224,26 @@ pub async fn zk_interface_loggedin(
         }),
       }
     }
+    // "searchzknotesstream" => {
+    //   let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+    //   let search: ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
+    //   let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+    //   // let res = search::search_zknotes_simple(&conn, uid, &search)?;
+    //   let res = search::search_zknotes_stream(&conn, uid, &search)?;
+    //   HttpResponse::Ok()
+    //     .content_type("application/json")
+    //     .streaming(res)?
+    //   // match res {
+    //   //   Left(res) => Ok(ServerResponse {
+    //   //     what: "zklistnotesearchresult".to_string(),
+    //   //     content: serde_json::to_value(res)?,
+    //   //   }),
+    //   //   Right(res) => Ok(ServerResponse {
+    //   //     what: "zknotesearchresult".to_string(),
+    //   //     content: serde_json::to_value(res)?,
+    //   //   }),
+    //   // }
+    // }
     "powerdelete" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let search: TagSearch = serde_json::from_value(msgdata.clone())?;

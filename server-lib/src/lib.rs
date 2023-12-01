@@ -383,6 +383,7 @@ async fn private(
         what: "server error".to_string(),
         content: serde_json::Value::String(e.to_string()),
       };
+      // HttpResponse::Ok().json(se)
       HttpResponse::Ok().json(se)
     }
   }
@@ -422,6 +423,61 @@ async fn zk_interface_check(
     }
   }
 }
+
+// async fn stream(
+//   session: Session,
+//   data: web::Data<Config>,
+//   item: web::Json<UserMessage>,
+//   _req: HttpRequest,
+// ) -> HttpResponse {
+//   match zk_interface_stream(&session, &data, item.into_inner()).await {
+//     Ok(sr) => HttpResponse::Ok().json(sr),
+//     Err(e) => {
+//       error!("'private' err: {:?}", e);
+//       let se = ServerResponse {
+//         what: "server error".to_string(),
+//         content: serde_json::Value::String(e.to_string()),
+//       };
+//       // HttpResponse::Ok().json(se)
+//       HttpResponse::Ok().streaming(se)
+//     }
+//   }
+// }
+
+// async fn zk_interface_stream(
+//   session: &Session,
+//   config: &Config,
+//   msg: UserMessage,
+// ) -> Result<ServerResponse, Box<dyn Error>> {
+//   match session.get::<Uuid>("token")? {
+//     None => Ok(ServerResponse {
+//       what: "not logged in".to_string(),
+//       content: serde_json::Value::Null,
+//     }),
+//     Some(token) => {
+//       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+//       match orgauth::dbfun::read_user_by_token_api(
+//         &conn,
+//         token,
+//         config.orgauth_config.login_token_expiration_ms,
+//         config.orgauth_config.regen_login_tokens,
+//       ) {
+//         Err(e) => {
+//           info!("read_user_by_token_api error2: {:?}, {:?}", token, e);
+
+//           Ok(ServerResponse {
+//             what: "login error".to_string(),
+//             content: serde_json::to_value(format!("{:?}", e).as_str())?,
+//           })
+//         }
+//         Ok(userdata) => {
+//           // finally!  processing messages as logged in user.
+//           interfaces::zk_interface_loggedin(&config, userdata.id, &msg).await
+//         }
+//       }
+//     }
+//   }
+// }
 
 // TODO: fns for mobile app default, web server default, I guess desktop too.
 pub fn defcon() -> Config {
@@ -678,6 +734,7 @@ pub async fn err_main() -> Result<(), Box<dyn Error>> {
       .service(web::resource("/upload").route(web::post().to(receive_files)))
       .service(web::resource("/public").route(web::post().to(public)))
       .service(web::resource("/private").route(web::post().to(private)))
+      // .service(web::resource("/stream").route(web::post().to(stream)))
       .service(web::resource("/user").route(web::post().to(user)))
       .service(web::resource("/admin").route(web::post().to(admin)))
       .service(web::resource(r"/file/{id}").route(web::get().to(file)))

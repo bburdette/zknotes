@@ -2,11 +2,14 @@ use crate::sqldata;
 use crate::sqldata::{delete_zknote, get_sysids, note_id};
 use either::Either;
 use either::Either::{Left, Right};
+use futures::Stream;
 use orgauth::dbfun::user_id;
-use rusqlite::Connection;
+use rusqlite::{Connection, MappedRows, Row};
 use std::convert::TryInto;
 use std::error::Error;
 use std::path::PathBuf;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use zkprotocol::content::ZkListNote;
 use zkprotocol::search::{
   AndOr, SearchMod, TagSearch, ZkListNoteSearchResult, ZkNoteSearch, ZkNoteSearchResult,
@@ -123,6 +126,183 @@ pub fn search_zknotes(
       what: search.what.clone(),
     }))
   }
+}
+
+// pub struct ZkNoteStream<'a, T> {
+//   // conn: Connection,
+//   // stmt: rusqlite::Statement<'a>,
+//   rec_iter: Box<dyn Iterator<Item = T> + 'a>,
+//   // rec_iter: Box<MappedRows<'a, dyn FnMut(&Row<'_>) -> rusqlite::Result<T>>>,
+// }
+
+pub struct ZkNoteStream<'a, T> {
+  rec_iter: Box<dyn Iterator<Item = T> + 'a>,
+}
+
+pub struct ZnsMaker<'a> {
+  // conn: &'a Connection,
+  pstmt: rusqlite::Statement<'a>,
+  sysid: i64,
+  args: Vec<String>,
+}
+
+impl<'a> ZnsMaker<'a> {
+  pub fn init(
+    conn: &'a Connection,
+    user: i64,
+    search: &ZkNoteSearch,
+  ) -> Result<Self, Box<dyn Error>> {
+    let (sql, args) = build_sql(&conn, user, search.clone())?;
+
+    let sysid = user_id(&conn, "system")?;
+
+    Ok(ZnsMaker {
+      // conn: conn,
+      args: args,
+      sysid: sysid,
+      pstmt: conn.prepare(sql.as_str())?,
+    })
+  }
+
+  pub fn make_stream(
+    &'a mut self,
+    conn: &'a Connection,
+  ) -> Result<ZkNoteStream<'a, Result<ZkListNote, rusqlite::Error>>, rusqlite::Error> {
+    let sysid = self.sysid;
+    let rec_iter = self
+      .pstmt
+      .query_map(rusqlite::params_from_iter(self.args.iter()), |row| {
+        let id = row.get(0)?;
+        // let sysids = get_sysids(&conn, 12, id)?;
+        Ok(ZkListNote {
+          id: id,
+          title: row.get(1)?,
+          is_file: {
+            let wat: Option<i64> = row.get(2)?;
+            wat.is_some()
+          },
+          user: row.get(3)?,
+          createdate: row.get(4)?,
+          changeddate: row.get(5)?,
+          // sysids: sysids,
+          sysids: Vec::new(),
+        })
+      })?;
+
+    // Ok(ZkNoteStream::<'a, Result<ZkListNote, rusqlite::Error>> {
+    //   rec_iter: Box::new(rec_iter),
+    // })
+    Ok(ZkNoteStream::<'a, Result<ZkListNote, rusqlite::Error>> {
+      rec_iter: Box::new(rec_iter),
+    })
+  }
+}
+
+// impl<'a> ZkNoteStream<'a, Result<ZkListNote, rusqlite::Error>> {
+//   // pub fn init(
+//   //   conn: &'a Connection,
+//   //   user: i64,
+//   //   search: &ZkNoteSearch,
+//   // ) -> Result<Self, Box<dyn Error>> {
+//   //   let (sql, args) = build_sql(&conn, user, search.clone())?;
+
+//   //   let sysid = user_id(&conn, "system")?;
+//   //   let mut pstmt = conn.prepare(sql.as_str())?;
+
+//   //   let rec_iter = pstmt.query_map(rusqlite::params_from_iter(args.iter()), move |row| {
+//   //     let id = row.get(0)?;
+//   //     let sysids = get_sysids(&conn, sysid, id)?;
+//   //     Ok(ZkListNote {
+//   //       id: id,
+//   //       title: row.get(1)?,
+//   //       is_file: {
+//   //         let wat: Option<i64> = row.get(2)?;
+//   //         wat.is_some()
+//   //       },
+//   //       user: row.get(3)?,
+//   //       createdate: row.get(4)?,
+//   //       changeddate: row.get(5)?,
+//   //       sysids: sysids,
+//   //     })
+//   //   })?;
+
+//   //   Ok(ZkNoteStream::<Result<ZkListNote, rusqlite::Error>> {
+//   //     rec_iter: Box::new(rec_iter),
+//   //   })
+//   // }
+//   // pub fn init(
+//   //   conn: &'a Connection,
+//   //   user: i64,
+//   //   search: &ZkNoteSearch,
+//   // ) -> Result<Self, Box<dyn Error>> {
+//   //   let (sql, args) = build_sql(&conn, user, search.clone())?;
+
+//   //   let sysid = user_id(&conn, "system")?;
+//   //   let mut pstmt = conn.prepare(sql.as_str())?;
+
+//   //   let rec_iter = pstmt.query_map(rusqlite::params_from_iter(args.iter()), move |row| {
+//   //     let id = row.get(0)?;
+//   //     let sysids = get_sysids(&conn, sysid, id)?;
+//   //     Ok(ZkListNote {
+//   //       id: id,
+//   //       title: row.get(1)?,
+//   //       is_file: {
+//   //         let wat: Option<i64> = row.get(2)?;
+//   //         wat.is_some()
+//   //       },
+//   //       user: row.get(3)?,
+//   //       createdate: row.get(4)?,
+//   //       changeddate: row.get(5)?,
+//   //       sysids: sysids,
+//   //     })
+//   //   })?;
+
+//   //   Ok(ZkNoteStream::<Result<ZkListNote, rusqlite::Error>> {
+//   //     rec_iter: Box::new(rec_iter),
+//   //   })
+//   // }
+// }
+
+impl<'a> Stream for ZkNoteStream<'a, serde_json::Value> {
+  type Item = serde_json::Value;
+
+  fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+    Poll::Ready(self.rec_iter.next())
+  }
+}
+
+pub fn search_zknotes_stream(
+  conn: &Connection,
+  user: i64,
+  search: &ZkNoteSearch,
+) -> Result<Either<ZkListNoteSearchResult, ZkNoteSearchResult>, Box<dyn Error>> {
+  Err("wat".into())
+
+  // let (sql, args) = build_sql(&conn, user, search.clone())?;
+
+  // let mut pstmt = conn.prepare(sql.as_str())?;
+
+  // let sysid = user_id(&conn, "system")?;
+
+  // let rec_iter = pstmt.query_map(rusqlite::params_from_iter(args.iter()), |row| {
+  //   let id = row.get(0)?;
+  //   let sysids = get_sysids(conn, sysid, id)?;
+  //   Ok(ZkListNote {
+  //     id: id,
+  //     title: row.get(1)?,
+  //     is_file: {
+  //       let wat: Option<i64> = row.get(2)?;
+  //       match wat {
+  //         Some(_) => true,
+  //         None => false,
+  //       }
+  //     },
+  //     user: row.get(3)?,
+  //     createdate: row.get(4)?,
+  //     changeddate: row.get(5)?,
+  //     sysids: sysids,
+  //   })
+  // })?;
 }
 
 pub fn build_sql(

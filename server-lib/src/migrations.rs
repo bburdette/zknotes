@@ -2308,3 +2308,60 @@ pub fn udpate30(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 
   Ok(())
 }
+
+pub fn udpate31(dbfile: &Path) -> Result<(), orgauth::error::Error> {
+  // db connection without foreign key checking.
+  let conn = Connection::open(dbfile)?;
+  conn.execute("PRAGMA foreign_keys = false;", params![])?;
+
+  // replace note ids with uuids in hyperlinks.
+  /*
+
+  - look at text of all notes.
+  - find markdown style links, extract id.
+  - replace id with uuid.
+  - find <note id=numba> style links, extract & replace id.
+
+  */
+
+  // update system notes with specific uuids.
+  // let publicId = "f596bc2c-a882-4c1c-b739-8c4e25f34eb2";
+  // let shareId = "466d39ec-2ea7-4d43-b44c-1d3d083f8a9d";
+  // let searchId = "84f72fd0-8836-43a3-ac66-89e0ab49dd87";
+  // let userId = "4fb37d76-6fc8-4869-8ee4-8e05fa5077f7";
+  // let systemId = "0efcc98f-dffd-40e5-af07-90da26b1d469";
+
+  let archiveid: i64 = conn.query_row(
+    "select zknote.id from
+      zknote, orgauth_user
+      where zknote.title = ?2
+      and orgauth_user.name = ?1
+      and zknote.user = orgauth_user.id",
+    params!["system", "archive"],
+    |row| Ok(row.get(0)?),
+  )?;
+
+  let updateNoteId = |title, uuid| {
+    conn.execute(
+      "update zknote set uuid = ?1
+      where zknote.title = ?2
+        and not exists (select * from zklink where fromid = zknote.id and toid = ?3)
+        and user in (select id from orgauth_user where name = 'system')",
+      params![uuid, title, archiveid],
+    )
+  };
+
+  updateNoteId("public", SpecialUuids::Public.str())?;
+  updateNoteId("share", SpecialUuids::Share.str())?;
+  updateNoteId("search", SpecialUuids::Search.str())?;
+  updateNoteId("user", SpecialUuids::User.str())?;
+
+  // update system user uuid.
+  conn.execute(
+    "update orgauth_user set uuid = ?1
+      where name= 'system'",
+    params![SpecialUuids::System.str()],
+  )?;
+
+  Ok(())
+}
