@@ -169,25 +169,25 @@ impl<'a> ZnsMaker<'a> {
     conn: &'a Connection,
   ) -> Result<ZkNoteStream<'a, Result<ZkListNote, rusqlite::Error>>, rusqlite::Error> {
     let sysid = self.sysid;
-    let rec_iter = self
-      .pstmt
-      .query_map(rusqlite::params_from_iter(self.args.iter()), |row| {
-        let id = row.get(0)?;
-        // let sysids = get_sysids(&conn, 12, id)?;
-        Ok(ZkListNote {
-          id: id,
-          title: row.get(1)?,
-          is_file: {
-            let wat: Option<i64> = row.get(2)?;
-            wat.is_some()
-          },
-          user: row.get(3)?,
-          createdate: row.get(4)?,
-          changeddate: row.get(5)?,
-          // sysids: sysids,
-          sysids: Vec::new(),
-        })
-      })?;
+    let rec_iter =
+      self
+        .pstmt
+        .query_map(rusqlite::params_from_iter(self.args.iter()), move |row| {
+          let id = row.get(0)?;
+          let sysids = get_sysids(&conn, sysid, id)?;
+          Ok(ZkListNote {
+            id: id,
+            title: row.get(1)?,
+            is_file: {
+              let wat: Option<i64> = row.get(2)?;
+              wat.is_some()
+            },
+            user: row.get(3)?,
+            createdate: row.get(4)?,
+            changeddate: row.get(5)?,
+            sysids: sysids,
+          })
+        })?;
 
     // Ok(ZkNoteStream::<'a, Result<ZkListNote, rusqlite::Error>> {
     //   rec_iter: Box::new(rec_iter),
