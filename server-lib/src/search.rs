@@ -139,8 +139,15 @@ pub struct ZkNoteStream<'a, T> {
   rec_iter: Box<dyn Iterator<Item = T> + 'a>,
 }
 
+impl<'a> Stream for ZkNoteStream<'a, Result<ZkListNote, rusqlite::Error>> {
+  type Item = Result<ZkListNote, rusqlite::Error>;
+
+  fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+    Poll::Ready(self.rec_iter.next())
+  }
+}
+
 pub struct ZnsMaker<'a> {
-  // conn: &'a Connection,
   pstmt: rusqlite::Statement<'a>,
   sysid: i64,
   args: Vec<String>,
@@ -157,7 +164,6 @@ impl<'a> ZnsMaker<'a> {
     let sysid = user_id(&conn, "system")?;
 
     Ok(ZnsMaker {
-      // conn: conn,
       args: args,
       sysid: sysid,
       pstmt: conn.prepare(sql.as_str())?,
@@ -189,9 +195,6 @@ impl<'a> ZnsMaker<'a> {
           })
         })?;
 
-    // Ok(ZkNoteStream::<'a, Result<ZkListNote, rusqlite::Error>> {
-    //   rec_iter: Box::new(rec_iter),
-    // })
     Ok(ZkNoteStream::<'a, Result<ZkListNote, rusqlite::Error>> {
       rec_iter: Box::new(rec_iter),
     })
@@ -262,14 +265,6 @@ impl<'a> ZnsMaker<'a> {
 //   //   })
 //   // }
 // }
-
-impl<'a> Stream for ZkNoteStream<'a, serde_json::Value> {
-  type Item = serde_json::Value;
-
-  fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-    Poll::Ready(self.rec_iter.next())
-  }
-}
 
 pub fn search_zknotes_stream(
   conn: &Connection,
