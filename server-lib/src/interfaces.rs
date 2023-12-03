@@ -3,12 +3,15 @@ use crate::search;
 use crate::sqldata;
 use crate::sync;
 use actix_session::Session;
+use actix_web::HttpResponse;
 use either::Either::{Left, Right};
 use log::info;
 use orgauth;
 use orgauth::endpoints::{Callbacks, Tokener};
 use orgauth::util::now;
 // use reqwest;
+use futures_util::Stream;
+use search::ZkNoteStream;
 use std::error::Error;
 use std::time::Duration;
 use zkprotocol::content::{
@@ -84,6 +87,34 @@ pub async fn user_interface(
     )
     .await?,
   )
+}
+
+// Ok(
+//   HttpResponse::Ok()
+//     .content_type("application/json")
+//     .streaming(),
+// )
+
+pub async fn zk_interface_loggedin_streaming(
+  config: &Config,
+  uid: i64,
+  msg: &UserMessage,
+) -> Result<HttpResponse, Box<dyn Error>> {
+  match msg.what.as_str() {
+    "searchzknotesstream" => {
+      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      let search: ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
+      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+      // let mut znsm = ZnsMaker::init(conn, uid, &search)?;
+      // Ok(HttpResponse::Ok().streaming(znsm.into_iter()))
+      // {
+      //   // borrowed value of znsm doesn't live long enough!  wat do?
+      //   let znsstream = &znsm.make_stream(&conn)?;
+      // }
+      Err("wat".into())
+    }
+    wat => Err(format!("invalid 'what' code:'{}'", wat).into()),
+  }
 }
 
 pub async fn zk_interface_loggedin(
