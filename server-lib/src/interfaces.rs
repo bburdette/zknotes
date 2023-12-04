@@ -11,7 +11,7 @@ use orgauth::endpoints::{Callbacks, Tokener};
 use orgauth::util::now;
 // use reqwest;
 use futures_util::Stream;
-use search::ZkNoteStream;
+use search::{ZkNoteStream, ZnsMaker};
 use std::error::Error;
 use std::time::Duration;
 use zkprotocol::content::{
@@ -105,13 +105,20 @@ pub async fn zk_interface_loggedin_streaming(
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let search: ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-      // let mut znsm = ZnsMaker::init(conn, uid, &search)?;
+      // let znsm = ZnsMaker::init(conn, uid, &search)?;
+      // let mut znsstream = ZkNoteStream::init(znsm)?;
+      let mut z = ZkNoteStream::init(ZnsMaker::init(conn, uid, &search)?)?;
+      z.go_stream()?;
+      Ok(HttpResponse::Ok().streaming(z))
       // Ok(HttpResponse::Ok().streaming(znsm.into_iter()))
       // {
       //   // borrowed value of znsm doesn't live long enough!  wat do?
       //   let znsstream = &znsm.make_stream(&conn)?;
       // }
-      Err("wat".into())
+
+      // let mut znsstream = ZkNoteStream::init(conn, uid, &search)?;
+      // HttpResponse::Ok().streaming(znsstream)
+      // Err("wat".into())
     }
     wat => Err(format!("invalid 'what' code:'{}'", wat).into()),
   }
