@@ -1,16 +1,21 @@
 use crate::sqldata;
 use crate::sqldata::{delete_zknote, get_sysids, note_id};
+use async_stream::try_stream;
 use bytes::Bytes;
 use either::Either;
 use either::Either::{Left, Right};
 use futures::Stream;
 use orgauth::dbfun::user_id;
+use ouroboros::self_referencing;
 use rusqlite::{Connection, MappedRows, Row};
+use std::cell::Cell;
 use std::convert::TryInto;
 use std::error::Error;
 use std::iter::IntoIterator;
+use std::marker::PhantomData;
 use std::path::PathBuf;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 use zkprotocol::content::ZkListNote;
 use zkprotocol::search::{
@@ -565,6 +570,10 @@ error[E0505]: cannot move out of `z` because it is borrowed
     |                                       ^ move out of `z` occurs here
 */
 
+/*
+
+// doesn't work; there's a borrow that happens in the go_stream and then the struct is stuck
+// in the thread context somehow.
 pub struct ZkNoteStream<'a> {
   znsmaker: ZnsMaker,
   pstmt: Option<rusqlite::Statement<'a>>,
@@ -661,6 +670,331 @@ impl ZnsMaker {
     self.conn.prepare(self.sql.as_str())
   }
 }
+
+*/
+
+/*
+// Try this Rc thing.
+// Nah, because
+
+/*
+error[E0515]: cannot return value referencing temporary value
+   --> server-lib/src/search.rs:693:5
+    |
+691 |       let rpstmt = Rc::new(Rc::clone(&rconn).prepare(rsql.as_str())?);
+    |                            ----------------- temporary value created here
+692 |
+693 | /     Ok(ZkNoteStream {
+694 | |       conn: rconn,
+695 | |       sql: rsql,
+696 | |       args: rargs,
+697 | |       pstmt: rpstmt,
+698 | |     })
+    | |______^ returns a value referencing data owned by the current function
+*/
+pub struct ZkNoteStream<'a> {
+  conn: Rc<Connection>,
+  sql: Rc<String>,
+  args: Rc<Vec<String>>,
+  pstmt: Rc<rusqlite::Statement<'a>>,
+  // rec_iter: Rc<Box<dyn Iterator<Item = Result<Bytes, orgauth::error::Error>> + 'a>>,
+}
+
+impl<'a> ZkNoteStream<'a> {
+  pub fn init(conn: Connection, user: i64, search: &ZkNoteSearch) -> Result<Self, Box<dyn Error>> {
+    let (sql, args) = build_sql(&conn, user, search.clone())?;
+
+    let sysid = user_id(&conn, "system")?;
+
+    let rsql = Rc::new(sql);
+    let rargs = Rc::new(args);
+    let rconn = Rc::new(conn);
+    let rpstmt = Rc::new(Rc::clone(&rconn).prepare(rsql.as_str())?);
+
+    Ok(ZkNoteStream {
+      conn: rconn,
+      sql: rsql,
+      args: rargs,
+      pstmt: rpstmt,
+    })
+  }
+}
+*/
+
+/*
+// This compiles.  no iterator though.
+#[self_referencing]
+pub struct ZkNoteStream {
+  conn: Connection,
+  sql: String,
+  // args: Vec<String>,
+  #[borrows(conn, sql)]
+  #[not_covariant]
+  // pstmt: &'this Result<rusqlite::Statement<'this>, rusqlite::Error>,
+  pstmt: rusqlite::Statement<'this>,
+}
+
+impl ZkNoteStream {
+  pub fn init(conn: Connection, user: i64, search: &ZkNoteSearch) -> Result<Self, Box<dyn Error>> {
+    let (sql, args) = build_sql(&conn, user, search.clone())?;
+
+    let sysid = user_id(&conn, "system")?;
+
+    Ok(
+      ZkNoteStreamTryBuilder {
+        conn: conn,
+        sql: sql,
+        pstmt_builder: |conn_data: &Connection, sql: &String| conn_data.prepare(sql.as_str()),
+      }
+      .try_build()?,
+    )
+  }
+}
+*/
+/*
+// This almost compiles, but problem with pstmt doesn't live long enough.
+#[self_referencing]
+pub struct ZkNoteStream {
+  conn: Connection,
+  sql: String,
+  // args: Vec<String>,
+  #[borrows(conn, sql)]
+  pstmt: rusqlite::Statement<'this>,
+
+  #[borrows(mut pstmt)]
+  #[covariant]
+  rec_iter: Box<Iterator<Item = Result<Bytes, orgauth::error::Error>> + 'this>,
+}
+
+impl ZkNoteStream {
+  pub fn init(conn: Connection, user: i64, search: &ZkNoteSearch) -> Result<Self, Box<dyn Error>> {
+    let (sql, args) = build_sql(&conn, user, search.clone())?;
+
+    // let sysid = user_id(&conn, "system")?;
+
+    Ok(
+      ZkNoteStreamTryBuilder {
+        conn: conn,
+        sql: sql,
+        pstmt_builder: |conn_data: &Connection, sql: &String| conn_data.prepare(sql.as_str()),
+        rec_iter_builder: |pstmt| {
+
+          let i = pstmt.query_map(rusqlite::params_from_iter(args.iter()), move |row| {
+            let id = row.get(0)?;
+            Ok(ZkListNote {
+              id: id,
+              title: row.get(1)?,
+              is_file: {
+                let wat: Option<i64> = row.get(2)?;
+                wat.is_some()
+              },
+              user: row.get(3)?,
+              createdate: row.get(4)?,
+              changeddate: row.get(5)?,
+              sysids: Vec::new(),
+            })
+          })?;
+          let val_iter = i
+            .filter_map(|x| x.ok())
+            .map(|x| serde_json::to_value(x).map_err(|e| e.into()));
+
+          let bytes_iter = val_iter
+            .filter_map(|x: Result<serde_json::Value, orgauth::error::Error>| x.ok())
+            .map(|x| Ok(Bytes::from(x.to_string())));
+
+          Ok(Box::new(bytes_iter))
+        },
+      }
+      .try_build()?,
+    )
+  }
+}
+*/
+
+/*
+
+// this one creates a temporary at conn.prepare.  the statmment must be stored!
+
+#[self_referencing]
+pub struct ZkNoteStream {
+  conn: Connection,
+  sql: String,
+  // args: Vec<String>,
+  // pstmt: rusqlite::Statement<'this>,
+  // #[borrows(mut pstmt)]
+  #[borrows(conn, sql)]
+  #[covariant]
+  rec_iter: rusqlite::Rows<'this>,
+  // Box<Iterator<Item = Result<Bytes, orgauth::error::Error>> + 'this>,
+}
+
+impl ZkNoteStream {
+  pub fn init(conn: Connection, user: i64, search: &ZkNoteSearch) -> Result<Self, Box<dyn Error>> {
+    let (sql, args) = build_sql(&conn, user, search.clone())?;
+
+    // let sysid = user_id(&conn, "system")?;
+
+    Ok(
+      ZkNoteStreamTryBuilder {
+        conn: conn,
+        sql: sql,
+        rec_iter_builder: |conn: &Connection, sql: &String| {
+          conn
+            .prepare(sql.as_str())?
+            .query(rusqlite::params_from_iter(args.iter()))
+        }, // let i = pstmt.query_map(rusqlite::params_from_iter(args.iter()), move |row| {
+           //   let id = row.get(0)?;
+           //   Ok(ZkListNote {
+           //     id: id,
+           //     title: row.get(1)?,
+           //     is_file: {
+           //       let wat: Option<i64> = row.get(2)?;
+           //       wat.is_some()
+           //     },
+           //     user: row.get(3)?,
+           //     createdate: row.get(4)?,
+           //     changeddate: row.get(5)?,
+           //     sysids: Vec::new(),
+           //   })
+           // })?;
+
+           // Ok(i)
+
+           // let val_iter = i
+           //   .filter_map(|x| x.ok())
+           //   .map(|x| serde_json::to_value(x).map_err(|e| e.into()));
+
+           // let bytes_iter = val_iter
+           //   .filter_map(|x: Result<serde_json::Value, orgauth::error::Error>| x.ok())
+           //   .map(|x| Ok(Bytes::from(x.to_string())));
+
+           // Ok(Box::new(bytes_iter))
+           // },
+      }
+      .try_build()?,
+    )
+  }
+}
+*/
+
+/*
+// pstmt doesn't live long enough
+#[self_referencing]
+pub struct ZkNoteStream {
+  conn: Connection,
+  #[borrows(conn)]
+  pstmt: rusqlite::Statement<'this>,
+  #[borrows(mut pstmt)]
+  #[covariant]
+  rows: rusqlite::Rows<'this>,
+}
+
+impl ZkNoteStream {
+  pub fn init(conn: Connection, user: i64, search: &ZkNoteSearch) -> Result<Self, Box<dyn Error>> {
+    let (sql, args) = build_sql(&conn, user, search.clone())?;
+
+    Ok(
+      ZkNoteStreamTryBuilder {
+        conn: conn,
+        pstmt_builder: |conn: &Connection| conn.prepare(sql.as_str()),
+        rows_builder: |pstmt: &mut rusqlite::Statement<'_>| {
+          let q = pstmt.query(rusqlite::params_from_iter(args.iter()));
+          q
+        },
+      }
+      .try_build()?,
+    )
+  }
+}
+*/
+
+pub fn zkn_stream(
+  conn: Arc<Connection>,
+  user: i64,
+  search: ZkNoteSearch,
+) -> impl Stream<Item = Result<Bytes, Box<dyn std::error::Error>>> + 'static {
+  try_stream! {
+    let (sql, args) = build_sql(&conn, user, search.clone())?;
+    let mut stmt = conn.prepare(sql.as_str())?;
+
+    let mut rows = stmt.query(rusqlite::params_from_iter(args.iter()))?;
+
+    while let Some(row) = rows.next()? {
+   let zln = ZkListNote {
+     id: row.get(0)?,
+     title: row.get(1)?,
+     is_file: {
+       let wat: Option<i64> = row.get(2)?;
+       wat.is_some()
+     },
+     user: row.get(3)?,
+     createdate: row.get(4)?,
+     changeddate: row.get(5)?,
+     sysids: Vec::new(),
+   };
+
+   yield Bytes::from(serde_json::to_value(zln)?.to_string())
+    }
+  }
+}
+
+/*
+// Trying to add the iterator.
+#[self_referencing]
+pub struct ZkNoteStream<'a> {
+  meh: String,
+  pstmt: rusqlite::Statement<'a>,
+
+  #[borrows(mut pstmt)]
+  rec_iter: Box<dyn Iterator<Item = Result<Bytes, orgauth::error::Error>>>,
+  // phantom: PhantomData<'this>,
+}
+
+impl ZkNoteStream<'_> {
+  pub fn init(conn: Connection, user: i64, search: &ZkNoteSearch) -> Result<Self, Box<dyn Error>> {
+    let (sql, args) = build_sql(&conn, user, search.clone())?;
+
+    let sysid = user_id(&conn, "system")?;
+
+    let pstmt = conn.prepare(sql.as_str());
+    // Ok(
+    ZkNoteStreamTryBuilder {
+      // conn: conn,
+      // sql: sql,
+      meh: "meh".to_string(),
+      pstmt,
+      // compiler doesn't like this.  but 'this doesn't work either.
+      rec_iter_builder: |pstmt| {
+        let i = pstmt.query_map(rusqlite::params_from_iter(args.iter()), move |row| {
+          let id = row.get(0)?;
+          Ok(ZkListNote {
+            id: id,
+            title: row.get(1)?,
+            is_file: {
+              let wat: Option<i64> = row.get(2)?;
+              wat.is_some()
+            },
+            user: row.get(3)?,
+            createdate: row.get(4)?,
+            changeddate: row.get(5)?,
+            sysids: Vec::new(),
+          })
+        })?;
+        let val_iter = i
+          .filter_map(|x| x.ok())
+          .map(|x| serde_json::to_value(x).map_err(|e| e.into()));
+
+        let bytes_iter = val_iter
+          .filter_map(|x: Result<serde_json::Value, orgauth::error::Error>| x.ok())
+          .map(|x| Ok(Bytes::from(x.to_string())));
+
+        Ok(Box::new(bytes_iter))
+      },
+    }
+    .try_build()
+  }
+}
+*/
 
 // pub fn make_stream(
 //   &'a mut self,

@@ -11,8 +11,9 @@ use orgauth::endpoints::{Callbacks, Tokener};
 use orgauth::util::now;
 // use reqwest;
 use futures_util::Stream;
-use search::{ZkNoteStream, ZnsMaker};
+// use search;
 use std::error::Error;
+use std::sync::Arc;
 use std::time::Duration;
 use zkprotocol::content::{
   GetArchiveZkLinks, GetArchiveZkNote, GetZkLinksSince, GetZkNoteAndLinks, GetZkNoteArchives,
@@ -104,12 +105,18 @@ pub async fn zk_interface_loggedin_streaming(
     "searchzknotesstream" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let search: ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
-      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-      // let znsm = ZnsMaker::init(conn, uid, &search)?;
-      // let mut znsstream = ZkNoteStream::init(znsm)?;
-      let mut z = ZkNoteStream::init(ZnsMaker::init(conn, uid, &search)?)?;
-      z.go_stream()?;
-      Ok(HttpResponse::Ok().streaming(z))
+      let conn = Arc::new(sqldata::connection_open(
+        config.orgauth_config.db.as_path(),
+      )?);
+      // let conn = Arc::new(Connection::open_in_memory().unwrap());
+
+      let znsstream = search::zkn_stream(conn, uid, search);
+      Ok(HttpResponse::Ok().streaming(znsstream))
+
+      // let mut z = ZkNoteStream::init(ZnsMaker::init(conn, uid, &search)?)?;
+      // z.go_stream()?;
+      // Ok(HttpResponse::Ok().streaming(z))
+
       // Ok(HttpResponse::Ok().streaming(znsm.into_iter()))
       // {
       //   // borrowed value of znsm doesn't live long enough!  wat do?
