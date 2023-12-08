@@ -90,43 +90,20 @@ pub async fn user_interface(
   )
 }
 
-// Ok(
-//   HttpResponse::Ok()
-//     .content_type("application/json")
-//     .streaming(),
-// )
-
 pub async fn zk_interface_loggedin_streaming(
   config: &Config,
   uid: i64,
   msg: &UserMessage,
 ) -> Result<HttpResponse, Box<dyn Error>> {
   match msg.what.as_str() {
-    // "searchzknotesstream" => {
-    "searchzknotes" => {
+    "searchzknotesstream" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let search: ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
       let conn = Arc::new(sqldata::connection_open(
         config.orgauth_config.db.as_path(),
       )?);
-      // let conn = Arc::new(Connection::open_in_memory().unwrap());
-
       let znsstream = search::zkn_stream(conn, uid, search);
       Ok(HttpResponse::Ok().streaming(znsstream))
-
-      // let mut z = ZkNoteStream::init(ZnsMaker::init(conn, uid, &search)?)?;
-      // z.go_stream()?;
-      // Ok(HttpResponse::Ok().streaming(z))
-
-      // Ok(HttpResponse::Ok().streaming(znsm.into_iter()))
-      // {
-      //   // borrowed value of znsm doesn't live long enough!  wat do?
-      //   let znsstream = &znsm.make_stream(&conn)?;
-      // }
-
-      // let mut znsstream = ZkNoteStream::init(conn, uid, &search)?;
-      // HttpResponse::Ok().streaming(znsstream)
-      // Err("wat".into())
     }
     wat => Err(format!("invalid 'what' code:'{}'", wat).into()),
   }
