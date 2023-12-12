@@ -96,7 +96,7 @@ pub async fn zk_interface_loggedin_streaming(
   msg: &UserMessage,
 ) -> Result<HttpResponse, Box<dyn Error>> {
   match msg.what.as_str() {
-    "searchzknotesstream" => {
+    "searchzknotestream" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let search: ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
       let conn = Arc::new(sqldata::connection_open(

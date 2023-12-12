@@ -4,6 +4,10 @@ use crate::sqldata;
 use crate::util::now;
 use actix_session::Session;
 use either::Either::{Left, Right};
+use futures_util::io::BufReader;
+use futures_util::AsyncBufRead;
+use futures_util::AsyncRead;
+use futures_util::TryStreamExt;
 use log::info;
 use orgauth;
 use orgauth::data::WhatMessage;
@@ -15,17 +19,27 @@ use reqwest::cookie;
 use rusqlite::{params, Connection};
 use std::collections::HashMap;
 use std::error::Error;
+// use std::io::BufReader;
+use std::io::Read;
 use std::sync::Arc;
 use std::time::Duration;
+// use tokio::io::util::async_buf_read_ext::AsyncBufReadExt;
+use tokio::io::AsyncBufReadExt;
+use tokio_util::io::StreamReader;
+
 use uuid;
 use zkprotocol::content::{
   ArchiveZkLink, GetArchiveZkLinks, GetArchiveZkNote, GetZkLinksSince, GetZkNoteAndLinks,
   GetZkNoteArchives, GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkNote,
-  SaveZkNotePlusLinks, Sysids, UuidZkLink, ZkLink, ZkLinks, ZkNoteAndLinks, ZkNoteAndLinksWhat,
-  ZkNoteArchives,
+  SaveZkNotePlusLinks, Sysids, UuidZkLink, ZkLink, ZkLinks, ZkListNote, ZkNote, ZkNoteAndLinks,
+  ZkNoteAndLinksWhat, ZkNoteArchives,
 };
 use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 use zkprotocol::search::{TagSearch, ZkListNoteSearchResult, ZkNoteSearch, ZkNoteSearchResult};
+
+fn convert_err(err: reqwest::Error) -> std::io::Error {
+  todo!()
+}
 
 pub async fn sync(
   conn: &Connection,
@@ -53,14 +67,16 @@ pub async fn sync(
         let mut offset: i64 = 0;
         let step: i64 = 50;
         let mut userhash = HashMap::<i64, i64>::new();
-        loop {
+        // loop {
+        {
           let zns = ZkNoteSearch {
             tagsearch: TagSearch::SearchTerm {
               mods: Vec::new(),
               term: "".to_string(),
             },
             offset: offset,
-            limit: Some(step),
+            // limit: Some(step),
+            limit: None,
             what: "".to_string(),
             list: false,
             archives: false,
@@ -71,27 +87,37 @@ pub async fn sync(
           };
 
           let l = UserMessage {
-            what: "searchzknotes".to_string(),
+            what: "searchzknotestream".to_string(),
             data: Some(serde_json::to_value(zns)?),
           };
 
           let private_url = reqwest::Url::parse(
-            format!("{}/private", url.origin().unicode_serialization(),).as_str(),
+            format!("{}/stream", url.origin().unicode_serialization(),).as_str(),
           )?;
 
           let res = client.post(private_url).json(&l).send().await?;
 
-          // should recieve a whatmessage, yes?
+          // handle streaming response!
 
-          let resp = res.json::<ServerResponse>().await?;
-          let searchres: ZkNoteSearchResult = match resp.what.as_str() {
-            "zknotesearchresult" => serde_json::from_value(resp.content).map_err(|e| e.into()),
-            _ => Err::<ZkNoteSearchResult, Box<dyn std::error::Error>>(
-              format!("unexpected message: {:?}", resp).into(),
-            ),
-          }?;
+          // let resp = res.json::<ServerResponse>().await?;
+          let mut rstream = res.bytes_stream().map_err(convert_err);
 
-          println!("searchres: {:?}", searchres);
+          let mut br = StreamReader::new(rstream);
+
+          let mut line = String::new();
+          let nc = br.read_line(&mut line).await?;
+
+          if nc == 0 {
+            return Err("empty stream!".into());
+          }
+
+          println!("line: {}", line);
+
+          let sr = serde_json::from_str::<ServerResponse>(line.trim())?;
+
+          if sr.what != "zknotesearchresult" {
+            return Err(format!("unexpected what {}", sr.what).into());
+          }
 
           // write the notes!
           let sysid = user_id(&conn, "system")?;
@@ -101,7 +127,47 @@ pub async fn sync(
             format!("{}/user", url.origin().unicode_serialization(),).as_str(),
           )?;
 
-          for note in &searchres.notes {
+          /*
+          // this code streamed 10232 records in about 4 secs.
+
+          let mut count = 0;
+          let mut bytes = 0;
+
+          println!("first message! {:?}", sr);
+          loop {
+            line.clear();
+            let nc = br.read_line(&mut line).await?;
+
+            if nc == 0 {
+              break;
+            }
+
+            bytes = bytes + nc;
+            count = count + 1;
+            println!("note line: {}", line);
+
+            let zn = serde_json::from_str::<ZkNote>(line.trim())?;
+
+            println!("zklistnote: {:?}", zn);
+          }
+
+          println!("synched {} records, with {} bytes!", count, bytes);
+          */
+
+          // TODO: speed this up!  WAAAY slower than just downloading the records.
+          loop {
+            line.clear();
+            let nc = br.read_line(&mut line).await?;
+
+            if nc == 0 {
+              break;
+            }
+
+            println!("note line: {}", line);
+
+            let note = serde_json::from_str::<ZkNote>(line.trim())?;
+
+            println!("zknote: {:?}", note);
             // got this user already?
             let user_uid: i64 = match userhash.get(&note.user) {
               Some(u) => *u,
@@ -184,12 +250,6 @@ pub async fn sync(
                 }
               Err(e) => Err(e),
             }?;
-          }
-          if searchres.notes.len() < step as usize {
-            println!("notes loop complete");
-            break;
-          } else {
-            offset = offset + step;
           }
         }
       }

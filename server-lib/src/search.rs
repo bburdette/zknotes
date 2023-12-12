@@ -18,8 +18,10 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use zkprotocol::content::ZkListNote;
+use zkprotocol::messages::ServerResponse;
 use zkprotocol::search::{
   AndOr, SearchMod, TagSearch, ZkListNoteSearchResult, ZkNoteSearch, ZkNoteSearchResult,
+  ZkSearchResultHeader,
 };
 
 pub fn power_delete_zknotes(
@@ -140,27 +142,56 @@ pub fn zkn_stream(
   user: i64,
   search: ZkNoteSearch,
 ) -> impl Stream<Item = Result<Bytes, Box<dyn std::error::Error>>> + 'static {
+  // {
   try_stream! {
+    // let sysid = user_id(&conn, "system")?;
+    let s_user = if search.archives { user_id(&conn, "system")? } else { user };
     let (sql, args) = build_sql(&conn, user, search.clone())?;
     let mut stmt = conn.prepare(sql.as_str())?;
 
     let mut rows = stmt.query(rusqlite::params_from_iter(args.iter()))?;
 
-    while let Some(row) = rows.next()? {
-      let zln = ZkListNote {
-        id: row.get(0)?,
-        title: row.get(1)?,
-        is_file: {
-          let wat: Option<i64> = row.get(2)?;
-          wat.is_some()
-        },
-        user: row.get(3)?,
-        createdate: row.get(4)?,
-        changeddate: row.get(5)?,
-        sysids: Vec::new(),
-      };
+    let mut header = serde_json::to_value(ServerResponse {
+      what: if search.list {
+        "zklistnotesearchresult".to_string()
+      } else {
+        "zknotesearchresult".to_string()
+      },
+      content: serde_json::to_value(ZkSearchResultHeader {
+        what: search.what,
+        offset: search.offset,
+      })?,
+    })?
+    .to_string();
 
-      yield Bytes::from(serde_json::to_value(zln)?.to_string())
+    header.push_str("\n");
+
+    yield Bytes::from(header);
+
+    while let Some(row) = rows.next()? {
+      if search.list {
+        let zln = ZkListNote {
+          id: row.get(0)?,
+          title: row.get(1)?,
+          is_file: {
+            let wat: Option<i64> = row.get(2)?;
+            wat.is_some()
+          },
+          user: row.get(3)?,
+          createdate: row.get(4)?,
+          changeddate: row.get(5)?,
+          sysids: Vec::new(),
+        };
+
+        let mut s = serde_json::to_value(zln)?.to_string().to_string();
+        s.push_str("\n");
+        yield Bytes::from(s);
+      } else {
+        let zn = sqldata::read_zknote(&conn, Some(s_user), row.get(0)?)?;
+        let mut s = serde_json::to_value(zn)?.to_string().to_string();
+        s.push_str("\n");
+        yield Bytes::from(s);
+      }
     }
   }
 }
