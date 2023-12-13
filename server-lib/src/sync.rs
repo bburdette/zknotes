@@ -58,7 +58,7 @@ pub async fn sync(
       jar.add_cookie_str(c.as_str(), &url);
       let client = reqwest::Client::builder().cookie_provider(jar).build()?;
 
-      let getnotes = true;
+      let getnotes = false;
       let getlinks = true;
       let getarchivenotes = false;
       let getarchivelinks = false;
@@ -91,11 +91,11 @@ pub async fn sync(
             data: Some(serde_json::to_value(zns)?),
           };
 
-          let private_url = reqwest::Url::parse(
+          let url = reqwest::Url::parse(
             format!("{}/stream", url.origin().unicode_serialization(),).as_str(),
           )?;
 
-          let res = client.post(private_url).json(&l).send().await?;
+          let res = client.post(url.clone()).json(&l).send().await?;
 
           // handle streaming response!
 
@@ -123,7 +123,7 @@ pub async fn sync(
           let sysid = user_id(&conn, "system")?;
 
           // map of remote user ids to local user ids.
-          let user_url = reqwest::Url::parse(
+          let url = reqwest::Url::parse(
             format!("{}/user", url.origin().unicode_serialization(),).as_str(),
           )?;
 
@@ -169,13 +169,14 @@ pub async fn sync(
 
             println!("zknote: {:?}", note);
             // got this user already?
+            // If not, make a phantom user.
             let user_uid: i64 = match userhash.get(&note.user) {
               Some(u) => *u,
               None => {
                 println!("fetching remote user: {:?}", note.user);
                 // fetch a remote user record.
                 let res = client
-                  .post(user_url.clone())
+                  .post(url.clone())
                   .json(&UserMessage {
                     what: "read_remote_user".to_string(),
                     data: Some(serde_json::to_value(note.user)?),
@@ -257,55 +258,73 @@ pub async fn sync(
         let mut offset: i64 = 0;
         let step: i64 = 50;
 
+        println!("reading archive notes: offset {}", offset);
+        let zns = ZkNoteSearch {
+          tagsearch: TagSearch::SearchTerm {
+            mods: Vec::new(),
+            term: "".to_string(),
+          },
+          offset: offset,
+          limit: None,
+          what: "".to_string(),
+          list: false,
+          archives: true,
+          created_after: None,
+          created_before: None,
+          changed_after: None,
+          changed_before: Some(now),
+        };
+
+        let l = UserMessage {
+          what: "searchzknotes".to_string(),
+          data: Some(serde_json::to_value(zns)?),
+        };
+
+        let actual_url = reqwest::Url::parse(
+          format!("{}/stream", url.origin().unicode_serialization(),).as_str(),
+        )?;
+
+        let res = client.post(actual_url).json(&l).send().await?;
+        let mut rstream = res.bytes_stream().map_err(convert_err);
+        let mut br = StreamReader::new(rstream);
+
+        let mut line = String::new();
+        let nc = br.read_line(&mut line).await?;
+
+        if nc == 0 {
+          return Err("empty stream!".into());
+        }
+
+        println!("line: {}", line);
+
+        let sr = serde_json::from_str::<ServerResponse>(line.trim())?;
+
+        if sr.what != "zknotesearchresult" {
+          return Err(format!("unexpected what {}", sr.what).into());
+        }
+
+        // write the notes!
+        let sysid = user_id(&conn, "system")?;
+
+        let mut count = 0;
+        let mut bytes = 0;
+
         loop {
-          println!("reading notes: offset {}", offset);
-          let zns = ZkNoteSearch {
-            tagsearch: TagSearch::SearchTerm {
-              mods: Vec::new(),
-              term: "".to_string(),
-            },
-            offset: offset,
-            limit: Some(step),
-            what: "".to_string(),
-            list: false,
-            archives: true,
-            created_after: None,
-            created_before: None,
-            changed_after: None,
-            changed_before: Some(now),
-          };
+          line.clear();
+          let nc = br.read_line(&mut line).await?;
 
-          let l = UserMessage {
-            what: "searchzknotes".to_string(),
-            data: Some(serde_json::to_value(zns)?),
-          };
+          if nc == 0 {
+            break;
+          }
 
-          let actual_url = reqwest::Url::parse(
-            format!("{}/private", url.origin().unicode_serialization(),).as_str(),
-          )?;
+          println!("note line: {}", line);
 
-          let res = client.post(actual_url).json(&l).send().await?;
+          let note = serde_json::from_str::<ZkNote>(line.trim())?;
 
-          // should recieve a whatmessage, yes?
+          count = count + 1;
+          bytes = bytes + nc;
 
-          let resp = res.json::<ServerResponse>().await?;
-          let searchres: ZkNoteSearchResult = match resp.what.as_str() {
-            "zknotesearchresult" => serde_json::from_value(resp.content).map_err(|e| e.into()),
-            _ => Err::<ZkNoteSearchResult, Box<dyn std::error::Error>>(
-              format!("unexpected message: {:?}", resp).into(),
-            ),
-          }?;
-
-          println!("searchres: {:?}", searchres);
-
-          // write the notes!
-          let sysid = user_id(&conn, "system")?;
-
-          for note in &searchres.notes {
-            // if we had a sha, we'd insert based on that, right?
-            // these are archive notes so should be able to insert if they don't exist, otherwise discard.
-            // because archive notes shouldn't change.
-            conn.execute(
+          conn.execute(
           "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate)
            values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![
@@ -320,14 +339,9 @@ pub async fn sync(
               note.createdate,
               note.changeddate,
               ])?;
-          }
-          if searchres.notes.len() < step as usize {
-            println!("notes loop complete");
-            break;
-          } else {
-            offset = offset + step;
-          }
         }
+
+        println!("synched {} archive notes, with {} bytes!", count, bytes);
       }
 
       if getarchivelinks {
@@ -340,25 +354,45 @@ pub async fn sync(
         };
 
         let actual_url = reqwest::Url::parse(
-          format!("{}/private", url.origin().unicode_serialization(),).as_str(),
+          format!("{}/stream", url.origin().unicode_serialization(),).as_str(),
         )?;
 
         let res = client.post(actual_url).json(&l).send().await?;
 
-        // Ok now get the archive links.  Special query!
-        let resp = res.json::<ServerResponse>().await?;
-        let links: Vec<ArchiveZkLink> = match resp.what.as_str() {
-          "archivezklinks" => serde_json::from_value(resp.content).map_err(|e| e.into()),
-          _ => Err::<Vec<ArchiveZkLink>, Box<dyn std::error::Error>>(
-            format!("unexpected messge: {:?}", resp).into(),
-          ),
-        }?;
+        let mut rstream = res.bytes_stream().map_err(convert_err);
+        let mut br = StreamReader::new(rstream);
+        let mut line = String::new();
 
-        println!("receieved links: {}", links.len());
+        let nc = br.read_line(&mut line).await?;
+        if nc == 0 {
+          return Err("empty stream!".into());
+        }
 
-        for l in links {
-          println!("archiving link!, {:?}", l);
-          let count = conn.execute(
+        println!("line: {}", line);
+
+        let sr = serde_json::from_str::<ServerResponse>(line.trim())?;
+
+        if sr.what != "archivezklinks" {
+          return Err(format!("unexpected what {}", sr.what).into());
+        }
+
+        let mut count = 0;
+        let mut saved = 0;
+        let mut bytes = 0;
+
+        loop {
+          line.clear();
+          let nc = br.read_line(&mut line).await?;
+
+          if nc == 0 {
+            break;
+          }
+
+          println!("note line: {}", line);
+
+          let l = serde_json::from_str::<ArchiveZkLink>(line.trim())?;
+
+          let ins = conn.execute(
             "insert into zklinkarchive (fromid, toid, user, linkzknote, createdate, deletedate)
               select FN.id, TN.id, U.id, LN.id, ?1, ?2
               from zknote FN, zknote TN, orgauth_user U, zknote LN
@@ -375,8 +409,17 @@ pub async fn sync(
               l.linkUuid
             ],
           )?;
+
+          count = count + 1;
+          saved = saved + ins;
+          bytes = bytes + nc;
           println!("archived link count:, {}", count);
         }
+
+        println!(
+          "receieved archive links: {}, saved {}, bytes {}",
+          count, saved, bytes
+        );
       }
 
       if getlinks {
@@ -389,25 +432,46 @@ pub async fn sync(
         };
 
         let actual_url = reqwest::Url::parse(
-          format!("{}/private", url.origin().unicode_serialization(),).as_str(),
+          format!("{}/stream", url.origin().unicode_serialization(),).as_str(),
         )?;
 
         let res = client.post(actual_url).json(&l).send().await?;
 
-        // Ok now get the archive links.  Special query!
-        let resp = res.json::<ServerResponse>().await?;
-        let links: Vec<UuidZkLink> = match resp.what.as_str() {
-          "zklinks" => serde_json::from_value(resp.content).map_err(|e| e.into()),
-          _ => Err::<Vec<UuidZkLink>, Box<dyn std::error::Error>>(
-            format!("unexpected messge: {:?}", resp).into(),
-          ),
-        }?;
+        let mut rstream = res.bytes_stream().map_err(convert_err);
+        let mut br = StreamReader::new(rstream);
+        let mut line = String::new();
 
-        println!("receieved links: {}", links.len());
+        let nc = br.read_line(&mut line).await?;
+        if nc == 0 {
+          return Err("empty stream!".into());
+        }
 
-        for l in links {
+        println!("line: {}", line);
+
+        let sr = serde_json::from_str::<ServerResponse>(line.trim())?;
+
+        if sr.what != "zklinks" {
+          return Err(format!("unexpected what {}", sr.what).into());
+        }
+
+        let mut count = 0;
+        let mut saved = 0;
+        let mut bytes = 0;
+
+        loop {
+          line.clear();
+          let nc = br.read_line(&mut line).await?;
+
+          if nc == 0 {
+            break;
+          }
+
+          println!("note line: {}", line);
+
+          let l = serde_json::from_str::<UuidZkLink>(line.trim())?;
+
           println!("saving link!, {:?}", l);
-          let count = match conn.execute(
+          let ins = match conn.execute(
             "with vals(a,b,c,d,e) as (
               select FN.id, TN.id, U.id, LN.id, ?1
               from zknote FN, zknote TN, orgauth_user U
@@ -453,15 +517,14 @@ pub async fn sync(
             }
             Err(e) => Err(e),
           }?;
-
-          println!("archived link count:, {}", count);
-          if count == 0 {
-            println!(
-              "{:?}",
-              (l.createdate, l.fromUuid, l.toUuid, l.userUuid, l.linkUuid)
-            )
-          }
+          count = count + 1;
+          saved = saved + ins;
+          bytes = bytes + nc;
         }
+        println!(
+          "receieved links: {}, saved {}, bytes {}",
+          count, saved, bytes
+        );
       }
 
       // TODO update cookie?

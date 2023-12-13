@@ -1,5 +1,8 @@
 use crate::migrations as zkm;
+use async_stream::try_stream;
 use barrel::backend::Sqlite;
+use bytes::Bytes;
+use futures::Stream;
 use log::info;
 use orgauth::data::RegistrationData;
 use orgauth::dbfun::user_id;
@@ -8,12 +11,14 @@ use rusqlite::{params, Connection};
 use serde_derive::{Deserialize, Serialize};
 use simple_error::bail;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Duration;
 use zkprotocol::content::{
   ArchiveZkLink, Direction, EditLink, ExtraLoginData, GetArchiveZkNote, GetZkLinks,
   GetZkNoteArchives, GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkLink, SaveZkNote,
   SavedZkNote, Sysids, UuidZkLink, ZkLink, ZkListNote, ZkNote, ZkNoteAndLinks,
 };
+use zkprotocol::messages::ServerResponse;
 
 #[derive(Clone, Deserialize, Serialize, Debug)]
 pub struct User {
@@ -1491,6 +1496,61 @@ pub fn read_archivezklinks(
   Ok(rec_iter.filter_map(|x| x.ok()).collect())
 }
 
+pub fn read_archivezklinks_stream(
+  conn: Arc<Connection>,
+  uid: i64,
+  after: i64,
+) -> impl Stream<Item = Result<Bytes, Box<dyn std::error::Error>>> + 'static {
+  // {
+  try_stream! {
+    let (acc_sql, acc_args) = accessible_notes(&conn, uid)?;
+
+    let mut pstmt = conn.prepare(
+      format!(
+        "with accessible_notes as ({})
+      select ZLA.user, FN.uuid, TN.uuid, LN.uuid, ZLA.createdate, ZLA.deletedate
+      from zklinkarchive ZLA, zknote FN, zknote TN, zknote LN
+      where FN.id = ZLA.fromid
+      and TN.id = ZLA.toid
+      and LN.id = ZLA.toid
+      and ZLA.fromid in accessible_notes
+      and ZLA.toid in accessible_notes",
+        acc_sql
+      )
+      .as_str(),
+    )?;
+
+    let rec_iter = pstmt.query_map(rusqlite::params_from_iter(acc_args.iter()), |row| {
+      Ok(ArchiveZkLink {
+        userUuid: row.get(0)?,
+        fromUuid: row.get(1)?,
+        toUuid: row.get(2)?,
+        linkUuid: row.get(3)?,
+        createdate: row.get(4)?,
+        deletedate: row.get(5)?,
+      })
+    })?;
+
+    {
+      let mut s = serde_json::to_value(ServerResponse {
+        what: "archivezklinks".to_string(),
+        content: serde_json::Value::Null,
+      })?
+      .to_string();
+      s.push_str("\n");
+      yield Bytes::from(s);
+    }
+
+    for rec in rec_iter {
+      if let Ok(r) = rec {
+        let mut s = serde_json::to_value(r)?.to_string();
+        s.push_str("\n");
+        yield Bytes::from(s);
+      }
+    }
+  }
+}
+
 pub fn read_zklinks_since(
   conn: &Connection,
   uid: i64,
@@ -1545,6 +1605,75 @@ pub fn read_zklinks_since(
   })?;
 
   Ok(rec_iter.collect::<Result<Vec<UuidZkLink>, rusqlite::Error>>()?)
+}
+pub fn read_zklinks_since_stream(
+  conn: Arc<Connection>,
+  uid: i64,
+  after: i64,
+) -> impl Stream<Item = Result<Bytes, Box<dyn std::error::Error>>> + 'static {
+  // {
+  try_stream! {
+    let (acc_sql, acc_args) = accessible_notes(&conn, uid)?;
+
+    let mut astmt = conn.prepare(acc_sql.as_str())?;
+
+    let arec_iter = astmt.query_map(rusqlite::params_from_iter(acc_args.iter()), |row| {
+      println!("accnote {:?}", row.get::<usize, i64>(0)?);
+      Ok(())
+    })?;
+
+    for ar in arec_iter {
+      println!("ac {:?}", ar);
+    }
+
+    println!("linzk");
+
+    let mut pstmt = conn.prepare(
+      format!(
+        "with accessible_notes as ({})
+        select OU.uuid, FN.uuid, TN.uuid, ZL.createdate
+        from zklink ZL, zknote FN, zknote TN, orgauth_user OU
+        where FN.id = ZL.fromid
+        and TN.id = ZL.toid
+        and ZL.user = OU.id
+        and ZL.fromid in accessible_notes
+        and ZL.toid in accessible_notes",
+        acc_sql
+      )
+      .as_str(),
+    )?;
+
+    println!("accarts {}", acc_args.len());
+
+    {
+      let mut s = serde_json::to_value(ServerResponse {
+        what: "zklinks".to_string(),
+        content: serde_json::Value::Null,
+      })?
+      .to_string();
+      s.push_str("\n");
+      yield Bytes::from(s);
+    }
+
+    let rec_iter = pstmt.query_map(rusqlite::params_from_iter(acc_args.iter()), |row| {
+      println!("uuidzklink {:?}", row.get::<usize, String>(0)?);
+      Ok(UuidZkLink {
+        userUuid: row.get(0)?,
+        fromUuid: row.get(1)?,
+        toUuid: row.get(2)?,
+        linkUuid: None,
+        createdate: row.get(3)?,
+      })
+    })?;
+
+    for rec in rec_iter {
+      if let Ok(r) = rec {
+        let mut s = serde_json::to_value(r)?.to_string();
+        s.push_str("\n");
+        yield Bytes::from(s);
+      }
+    }
+  }
 }
 
 pub fn accessible_notes(

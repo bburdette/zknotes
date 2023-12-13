@@ -96,7 +96,7 @@ pub async fn zk_interface_loggedin_streaming(
   msg: &UserMessage,
 ) -> Result<HttpResponse, Box<dyn Error>> {
   match msg.what.as_str() {
-    "searchzknotestream" => {
+    "searchzknotes" => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let search: ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
       let conn = Arc::new(sqldata::connection_open(
@@ -104,6 +104,24 @@ pub async fn zk_interface_loggedin_streaming(
       )?);
       let znsstream = search::zkn_stream(conn, uid, search);
       Ok(HttpResponse::Ok().streaming(znsstream))
+    }
+    "getarchivezklinks" => {
+      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      let rq: GetArchiveZkLinks = serde_json::from_value(msgdata.clone())?;
+      let conn = Arc::new(sqldata::connection_open(
+        config.orgauth_config.db.as_path(),
+      )?);
+      let bstream = sqldata::read_archivezklinks_stream(conn, uid, rq.createddate_after);
+      Ok(HttpResponse::Ok().streaming(bstream))
+    }
+    "getzklinkssince" => {
+      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      let rq: GetZkLinksSince = serde_json::from_value(msgdata.clone())?;
+      let conn = Arc::new(sqldata::connection_open(
+        config.orgauth_config.db.as_path(),
+      )?);
+      let bstream = sqldata::read_zklinks_since_stream(conn, uid, rq.createddate_after);
+      Ok(HttpResponse::Ok().streaming(bstream))
     }
     wat => Err(format!("invalid 'what' code:'{}'", wat).into()),
   }
