@@ -449,7 +449,35 @@ async fn zk_interface_check_streaming(
   config: &Config,
   msg: UserMessage,
 ) -> Result<HttpResponse, Box<dyn Error>> {
-  interfaces::zk_interface_loggedin_streaming(&config, 2, &msg).await
+  match session.get::<Uuid>("token")? {
+    None => Ok(HttpResponse::Ok().json(ServerResponse {
+      what: "not logged in".to_string(),
+      content: serde_json::Value::Null,
+    })),
+
+    Some(token) => {
+      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+      match orgauth::dbfun::read_user_by_token_api(
+        &conn,
+        token,
+        config.orgauth_config.login_token_expiration_ms,
+        config.orgauth_config.regen_login_tokens,
+      ) {
+        Err(e) => {
+          info!("read_user_by_token_api error2: {:?}, {:?}", token, e);
+
+          Ok(HttpResponse::Ok().json(ServerResponse {
+            what: "login error".to_string(),
+            content: serde_json::to_value(format!("{:?}", e).as_str())?,
+          }))
+        }
+        Ok(userdata) => {
+          // finally!  processing messages as logged in user.
+          interfaces::zk_interface_loggedin_streaming(&config, userdata.id, &msg).await
+        }
+      }
+    }
+  }
 }
 
 // TODO: fns for mobile app default, web server default, I guess desktop too.

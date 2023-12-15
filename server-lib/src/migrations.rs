@@ -2284,7 +2284,7 @@ pub fn udpate30(dbfile: &Path) -> Result<(), orgauth::error::Error> {
     |row| Ok(row.get(0)?),
   )?;
 
-  let updateNoteId = |title, uuid| {
+  let update_note_id = |title, uuid| {
     conn.execute(
       "update zknote set uuid = ?1
       where zknote.title = ?2
@@ -2294,10 +2294,10 @@ pub fn udpate30(dbfile: &Path) -> Result<(), orgauth::error::Error> {
     )
   };
 
-  updateNoteId("public", SpecialUuids::Public.str())?;
-  updateNoteId("share", SpecialUuids::Share.str())?;
-  updateNoteId("search", SpecialUuids::Search.str())?;
-  updateNoteId("user", SpecialUuids::User.str())?;
+  update_note_id("public", SpecialUuids::Public.str())?;
+  update_note_id("share", SpecialUuids::Share.str())?;
+  update_note_id("search", SpecialUuids::Search.str())?;
+  update_note_id("user", SpecialUuids::User.str())?;
 
   // update system user uuid.
   conn.execute(
@@ -2314,7 +2314,7 @@ pub fn udpate31(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   let conn = Connection::open(dbfile)?;
   conn.execute("PRAGMA foreign_keys = false;", params![])?;
 
-  // replace note ids with uuids in hyperlinks.
+  // TODO replace note ids with uuids in hyperlinks.
 
   Ok(())
 }

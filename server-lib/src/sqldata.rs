@@ -1680,8 +1680,6 @@ pub fn accessible_notes(
   conn: &Connection,
   uid: i64,
 ) -> Result<(String, Vec<String>), orgauth::error::Error> {
-  let archiveid = note_id(&conn, "system", "archive")?;
-  // let sysid = user_id(&conn, "system")?;
   let publicid = note_id(&conn, "system", "public")?;
   let archiveid = note_id(&conn, "system", "archive")?;
   let shareid = note_id(&conn, "system", "share")?;

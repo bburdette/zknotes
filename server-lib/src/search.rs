@@ -6,17 +6,11 @@ use either::Either;
 use either::Either::{Left, Right};
 use futures::Stream;
 use orgauth::dbfun::user_id;
-use ouroboros::self_referencing;
-use rusqlite::{Connection, MappedRows, Row};
-use std::cell::Cell;
+use rusqlite::Connection;
 use std::convert::TryInto;
 use std::error::Error;
-use std::iter::IntoIterator;
-use std::marker::PhantomData;
 use std::path::PathBuf;
-use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{Context, Poll};
 use zkprotocol::content::ZkListNote;
 use zkprotocol::messages::ServerResponse;
 use zkprotocol::search::{
@@ -137,7 +131,7 @@ pub fn search_zknotes(
   }
 }
 
-pub fn zkn_stream(
+pub fn search_zknotes_stream(
   conn: Arc<Connection>,
   user: i64,
   search: ZkNoteSearch,
@@ -194,14 +188,6 @@ pub fn zkn_stream(
       }
     }
   }
-}
-
-pub fn search_zknotes_stream(
-  conn: &Connection,
-  user: i64,
-  search: &ZkNoteSearch,
-) -> Result<Either<ZkListNoteSearchResult, ZkNoteSearchResult>, Box<dyn Error>> {
-  Err("wat".into())
 }
 
 pub fn build_sql(

@@ -1,41 +1,22 @@
-use crate::config::Config;
-use crate::search;
-use crate::sqldata;
 use crate::util::now;
-use actix_session::Session;
-use either::Either::{Left, Right};
-use futures_util::io::BufReader;
-use futures_util::AsyncBufRead;
-use futures_util::AsyncRead;
 use futures_util::TryStreamExt;
-use log::info;
 use orgauth;
 use orgauth::data::WhatMessage;
-use orgauth::data::{ChangeEmail, ChangePassword, LoginData, PhantomUser, User, UserInvite};
+use orgauth::data::{PhantomUser, User};
 use orgauth::dbfun::user_id;
-use orgauth::endpoints::{Callbacks, Tokener};
+use orgauth::endpoints::Callbacks;
 use reqwest;
 use reqwest::cookie;
 use rusqlite::{params, Connection};
 use std::collections::HashMap;
-use std::error::Error;
-// use std::io::BufReader;
-use std::io::Read;
 use std::sync::Arc;
-use std::time::Duration;
-// use tokio::io::util::async_buf_read_ext::AsyncBufReadExt;
 use tokio::io::AsyncBufReadExt;
 use tokio_util::io::StreamReader;
 
 use uuid;
-use zkprotocol::content::{
-  ArchiveZkLink, GetArchiveZkLinks, GetArchiveZkNote, GetZkLinksSince, GetZkNoteAndLinks,
-  GetZkNoteArchives, GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkNote,
-  SaveZkNotePlusLinks, Sysids, UuidZkLink, ZkLink, ZkLinks, ZkListNote, ZkNote, ZkNoteAndLinks,
-  ZkNoteAndLinksWhat, ZkNoteArchives,
-};
-use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
-use zkprotocol::search::{TagSearch, ZkListNoteSearchResult, ZkNoteSearch, ZkNoteSearchResult};
+use zkprotocol::content::{ArchiveZkLink, GetArchiveZkLinks, GetZkLinksSince, UuidZkLink, ZkNote};
+use zkprotocol::messages::{ServerResponse, UserMessage};
+use zkprotocol::search::{TagSearch, ZkNoteSearch};
 
 fn convert_err(err: reqwest::Error) -> std::io::Error {
   todo!()
@@ -64,167 +45,159 @@ pub async fn sync(
       let getarchivelinks = false;
 
       if getnotes {
-        let mut offset: i64 = 0;
-        let step: i64 = 50;
         let mut userhash = HashMap::<i64, i64>::new();
-        // loop {
-        {
-          let zns = ZkNoteSearch {
-            tagsearch: TagSearch::SearchTerm {
-              mods: Vec::new(),
-              term: "".to_string(),
-            },
-            offset: offset,
-            // limit: Some(step),
-            limit: None,
-            what: "".to_string(),
-            list: false,
-            archives: false,
-            created_after: None,
-            created_before: None,
-            changed_after: None,
-            changed_before: Some(now),
-          };
 
-          let l = UserMessage {
-            what: "searchzknotestream".to_string(),
-            data: Some(serde_json::to_value(zns)?),
-          };
+        let zns = ZkNoteSearch {
+          tagsearch: TagSearch::SearchTerm {
+            mods: Vec::new(),
+            term: "".to_string(),
+          },
+          offset: 0,
+          limit: None,
+          what: "".to_string(),
+          list: false,
+          archives: false,
+          created_after: None,
+          created_before: None,
+          changed_after: None,
+          changed_before: Some(now),
+        };
 
-          let url = reqwest::Url::parse(
-            format!("{}/stream", url.origin().unicode_serialization(),).as_str(),
-          )?;
+        let l = UserMessage {
+          what: "searchzknotestream".to_string(),
+          data: Some(serde_json::to_value(zns)?),
+        };
 
-          let res = client.post(url.clone()).json(&l).send().await?;
+        let url = reqwest::Url::parse(
+          format!("{}/stream", url.origin().unicode_serialization(),).as_str(),
+        )?;
 
-          // handle streaming response!
+        let res = client.post(url.clone()).json(&l).send().await?;
 
-          // let resp = res.json::<ServerResponse>().await?;
-          let mut rstream = res.bytes_stream().map_err(convert_err);
+        // handle streaming response!
 
-          let mut br = StreamReader::new(rstream);
+        // let resp = res.json::<ServerResponse>().await?;
+        let rstream = res.bytes_stream().map_err(convert_err);
 
-          let mut line = String::new();
+        let mut br = StreamReader::new(rstream);
+
+        let mut line = String::new();
+        let nc = br.read_line(&mut line).await?;
+
+        if nc == 0 {
+          return Err("empty stream!".into());
+        }
+
+        println!("line: {}", line);
+
+        let sr = serde_json::from_str::<ServerResponse>(line.trim())?;
+
+        if sr.what != "zknotesearchresult" {
+          return Err(format!("unexpected what {}", sr.what).into());
+        }
+
+        // map of remote user ids to local user ids.
+        let url =
+          reqwest::Url::parse(format!("{}/user", url.origin().unicode_serialization(),).as_str())?;
+
+        /*
+        // this code streamed 10232 records in about 4 secs.
+
+        let mut count = 0;
+        let mut bytes = 0;
+
+        println!("first message! {:?}", sr);
+        loop {
+          line.clear();
           let nc = br.read_line(&mut line).await?;
 
           if nc == 0 {
-            return Err("empty stream!".into());
+            break;
           }
 
-          println!("line: {}", line);
+          bytes = bytes + nc;
+          count = count + 1;
+          println!("note line: {}", line);
 
-          let sr = serde_json::from_str::<ServerResponse>(line.trim())?;
+          let zn = serde_json::from_str::<ZkNote>(line.trim())?;
 
-          if sr.what != "zknotesearchresult" {
-            return Err(format!("unexpected what {}", sr.what).into());
+          println!("zklistnote: {:?}", zn);
+        }
+
+        println!("synched {} records, with {} bytes!", count, bytes);
+        */
+
+        // TODO: speed this up!  WAAAY slower than just downloading the records.
+        loop {
+          line.clear();
+          let nc = br.read_line(&mut line).await?;
+
+          if nc == 0 {
+            break;
           }
 
-          // write the notes!
-          let sysid = user_id(&conn, "system")?;
+          println!("note line: {}", line);
 
-          // map of remote user ids to local user ids.
-          let url = reqwest::Url::parse(
-            format!("{}/user", url.origin().unicode_serialization(),).as_str(),
-          )?;
+          let note = serde_json::from_str::<ZkNote>(line.trim())?;
 
-          /*
-          // this code streamed 10232 records in about 4 secs.
-
-          let mut count = 0;
-          let mut bytes = 0;
-
-          println!("first message! {:?}", sr);
-          loop {
-            line.clear();
-            let nc = br.read_line(&mut line).await?;
-
-            if nc == 0 {
-              break;
+          println!("zknote: {:?}", note);
+          // got this user already?
+          // If not, make a phantom user.
+          let user_uid: i64 = match userhash.get(&note.user) {
+            Some(u) => *u,
+            None => {
+              println!("fetching remote user: {:?}", note.user);
+              // fetch a remote user record.
+              let res = client
+                .post(url.clone())
+                .json(&UserMessage {
+                  what: "read_remote_user".to_string(),
+                  data: Some(serde_json::to_value(note.user)?),
+                })
+                .send()
+                .await?;
+              let wm: WhatMessage = serde_json::from_value(res.json().await?)?;
+              println!("remote user wm: {:?}", wm);
+              let pu: PhantomUser = match wm.what.as_str() {
+                "remote_user" => serde_json::from_value(
+                  wm.data
+                    .ok_or::<orgauth::error::Error>("missing data".into())?,
+                )?, // .map_err(|e| e.into())?,
+                _ => Err::<PhantomUser, Box<dyn std::error::Error>>(
+                  orgauth::error::Error::String(format!("unexpected message: {:?}", wm)).into(),
+                )?,
+              };
+              println!("phantom user: {:?}", pu);
+              let localuserid = match orgauth::dbfun::read_user_by_uuid(&conn, pu.uuid.as_str()) {
+                Ok(user) => {
+                  println!("found local user {} for remote {}", user.id, pu.id);
+                  userhash.insert(pu.id, user.id);
+                  user.id
+                }
+                _ => {
+                  let localpuid = orgauth::dbfun::phantom_user(
+                    &conn,
+                    pu.name,
+                    uuid::Uuid::parse_str(pu.uuid.as_str())?,
+                    pu.active,
+                    &mut callbacks.on_new_user,
+                  )?;
+                  println!(
+                    "createing phantom user {} for remote user: {:?}",
+                    pu.id, localpuid
+                  );
+                  userhash.insert(pu.id, localpuid);
+                  localpuid
+                }
+              };
+              localuserid
             }
+          };
 
-            bytes = bytes + nc;
-            count = count + 1;
-            println!("note line: {}", line);
-
-            let zn = serde_json::from_str::<ZkNote>(line.trim())?;
-
-            println!("zklistnote: {:?}", zn);
-          }
-
-          println!("synched {} records, with {} bytes!", count, bytes);
-          */
-
-          // TODO: speed this up!  WAAAY slower than just downloading the records.
-          loop {
-            line.clear();
-            let nc = br.read_line(&mut line).await?;
-
-            if nc == 0 {
-              break;
-            }
-
-            println!("note line: {}", line);
-
-            let note = serde_json::from_str::<ZkNote>(line.trim())?;
-
-            println!("zknote: {:?}", note);
-            // got this user already?
-            // If not, make a phantom user.
-            let user_uid: i64 = match userhash.get(&note.user) {
-              Some(u) => *u,
-              None => {
-                println!("fetching remote user: {:?}", note.user);
-                // fetch a remote user record.
-                let res = client
-                  .post(url.clone())
-                  .json(&UserMessage {
-                    what: "read_remote_user".to_string(),
-                    data: Some(serde_json::to_value(note.user)?),
-                  })
-                  .send()
-                  .await?;
-                let wm: WhatMessage = serde_json::from_value(res.json().await?)?;
-                println!("remote user wm: {:?}", wm);
-                let pu: PhantomUser = match wm.what.as_str() {
-                  "remote_user" => serde_json::from_value(
-                    wm.data
-                      .ok_or::<orgauth::error::Error>("missing data".into())?,
-                  )?, // .map_err(|e| e.into())?,
-                  _ => Err::<PhantomUser, Box<dyn std::error::Error>>(
-                    orgauth::error::Error::String(format!("unexpected message: {:?}", wm)).into(),
-                  )?,
-                };
-                println!("phantom user: {:?}", pu);
-                let localuserid = match orgauth::dbfun::read_user_by_uuid(&conn, pu.uuid.as_str()) {
-                  Ok(user) => {
-                    println!("found local user {} for remote {}", user.id, pu.id);
-                    userhash.insert(pu.id, user.id);
-                    user.id
-                  }
-                  _ => {
-                    let localpuid = orgauth::dbfun::phantom_user(
-                      &conn,
-                      pu.name,
-                      uuid::Uuid::parse_str(pu.uuid.as_str())?,
-                      pu.active,
-                      &mut callbacks.on_new_user,
-                    )?;
-                    println!(
-                      "createing phantom user {} for remote user: {:?}",
-                      pu.id, localpuid
-                    );
-                    userhash.insert(pu.id, localpuid);
-                    localpuid
-                  }
-                };
-                localuserid
-              }
-            };
-
-            // if we had a sha, we'd insert based on that, right?
-            // these are archive notes so should be able to insert if they don't exist, otherwise discard.
-            // because archive notes shouldn't change.
-            match conn.execute(
+          // if we had a sha, we'd insert based on that, right?
+          // these are archive notes so should be able to insert if they don't exist, otherwise discard.
+          // because archive notes shouldn't change.
+          match conn.execute(
               "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate)
                values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
               params![
@@ -251,20 +224,16 @@ pub async fn sync(
                 }
               Err(e) => Err(e),
             }?;
-          }
         }
       }
       if getarchivenotes {
-        let mut offset: i64 = 0;
-        let step: i64 = 50;
-
-        println!("reading archive notes: offset {}", offset);
+        println!("reading archive notes");
         let zns = ZkNoteSearch {
           tagsearch: TagSearch::SearchTerm {
             mods: Vec::new(),
             term: "".to_string(),
           },
-          offset: offset,
+          offset: 0,
           limit: None,
           what: "".to_string(),
           list: false,
@@ -285,7 +254,7 @@ pub async fn sync(
         )?;
 
         let res = client.post(actual_url).json(&l).send().await?;
-        let mut rstream = res.bytes_stream().map_err(convert_err);
+        let rstream = res.bytes_stream().map_err(convert_err);
         let mut br = StreamReader::new(rstream);
 
         let mut line = String::new();
@@ -359,7 +328,7 @@ pub async fn sync(
 
         let res = client.post(actual_url).json(&l).send().await?;
 
-        let mut rstream = res.bytes_stream().map_err(convert_err);
+        let rstream = res.bytes_stream().map_err(convert_err);
         let mut br = StreamReader::new(rstream);
         let mut line = String::new();
 
@@ -437,7 +406,7 @@ pub async fn sync(
 
         let res = client.post(actual_url).json(&l).send().await?;
 
-        let mut rstream = res.bytes_stream().map_err(convert_err);
+        let rstream = res.bytes_stream().map_err(convert_err);
         let mut br = StreamReader::new(rstream);
         let mut line = String::new();
 

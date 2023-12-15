@@ -8,10 +8,6 @@ use either::Either::{Left, Right};
 use log::info;
 use orgauth;
 use orgauth::endpoints::{Callbacks, Tokener};
-use orgauth::util::now;
-// use reqwest;
-use futures_util::Stream;
-// use search;
 use std::error::Error;
 use std::sync::Arc;
 use std::time::Duration;
@@ -102,7 +98,7 @@ pub async fn zk_interface_loggedin_streaming(
       let conn = Arc::new(sqldata::connection_open(
         config.orgauth_config.db.as_path(),
       )?);
-      let znsstream = search::zkn_stream(conn, uid, search);
+      let znsstream = search::search_zknotes_stream(conn, uid, search);
       Ok(HttpResponse::Ok().streaming(znsstream))
     }
     "getarchivezklinks" => {
