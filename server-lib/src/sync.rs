@@ -14,8 +14,9 @@ use tokio::io::AsyncBufReadExt;
 use tokio_util::io::StreamReader;
 
 use uuid;
+use zkprotocol::constants::{PrivateRequests, PrivateStreamingRequests};
 use zkprotocol::content::{ArchiveZkLink, GetArchiveZkLinks, GetZkLinksSince, UuidZkLink, ZkNote};
-use zkprotocol::messages::{ServerResponse, UserMessage};
+use zkprotocol::messages::{PrivateMessage, PrivateStreamingMessage, ServerResponse, UserMessage};
 use zkprotocol::search::{TagSearch, ZkNoteSearch};
 
 fn convert_err(err: reqwest::Error) -> std::io::Error {
@@ -63,8 +64,8 @@ pub async fn sync(
           changed_before: Some(now),
         };
 
-        let l = UserMessage {
-          what: "searchzknotestream".to_string(),
+        let l = PrivateMessage {
+          what: zkprotocol::constants::PrivateRequests::SearchZkNotes,
           data: Some(serde_json::to_value(zns)?),
         };
 
@@ -244,8 +245,8 @@ pub async fn sync(
           changed_before: Some(now),
         };
 
-        let l = UserMessage {
-          what: "searchzknotes".to_string(),
+        let l = PrivateStreamingMessage {
+          what: PrivateStreamingRequests::SearchZknotes,
           data: Some(serde_json::to_value(zns)?),
         };
 
@@ -317,8 +318,8 @@ pub async fn sync(
         let gazl = GetArchiveZkLinks {
           createddate_after: 0,
         };
-        let l = UserMessage {
-          what: "getarchivezklinks".to_string(),
+        let l = PrivateStreamingMessage {
+          what: PrivateStreamingRequests::GetArchiveZkLinks,
           data: Some(serde_json::to_value(gazl)?),
         };
 
@@ -395,8 +396,8 @@ pub async fn sync(
         let gazl = GetZkLinksSince {
           createddate_after: 0,
         };
-        let l = UserMessage {
-          what: "getzklinkssince".to_string(),
+        let l = PrivateStreamingMessage {
+          what: PrivateStreamingRequests::GetZkLinksSince,
           data: Some(serde_json::to_value(gazl)?),
         };
 

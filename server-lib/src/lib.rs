@@ -39,7 +39,10 @@ use std::str::FromStr;
 use timer;
 use uuid::Uuid;
 pub use zkprotocol;
-pub use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
+use zkprotocol::constants::PrivateRequests;
+pub use zkprotocol::messages::{
+  PrivateMessage, PrivateStreamingMessage, PublicMessage, ServerResponse,
+};
 
 use tracing_actix_web::TracingLogger;
 
@@ -372,7 +375,7 @@ async fn save_files(
 async fn private(
   session: Session,
   data: web::Data<Config>,
-  item: web::Json<UserMessage>,
+  item: web::Json<PrivateMessage>,
   _req: HttpRequest,
 ) -> HttpResponse {
   match zk_interface_check(&session, &data, item.into_inner()).await {
@@ -392,7 +395,7 @@ async fn private(
 async fn private_streaming(
   session: Session,
   data: web::Data<Config>,
-  item: web::Json<UserMessage>,
+  item: web::Json<PrivateStreamingMessage>,
   _req: HttpRequest,
 ) -> HttpResponse {
   match zk_interface_check_streaming(&session, &data, item.into_inner()).await {
@@ -412,7 +415,7 @@ async fn private_streaming(
 async fn zk_interface_check(
   session: &Session,
   config: &Config,
-  msg: UserMessage,
+  msg: PrivateMessage,
 ) -> Result<ServerResponse, Box<dyn Error>> {
   match session.get::<Uuid>("token")? {
     None => Ok(ServerResponse {
@@ -447,7 +450,7 @@ async fn zk_interface_check(
 async fn zk_interface_check_streaming(
   session: &Session,
   config: &Config,
-  msg: UserMessage,
+  msg: PrivateStreamingMessage,
 ) -> Result<HttpResponse, Box<dyn Error>> {
   match session.get::<Uuid>("token")? {
     None => Ok(HttpResponse::Ok().json(ServerResponse {
@@ -527,6 +530,14 @@ async fn new_email(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
 #[actix_web::main]
 pub async fn err_main() -> Result<(), Box<dyn Error>> {
   env_logger::init();
+
+  let x = PrivateRequests::GetZkNote;
+
+  println!("meh: {:?}", serde_json::to_value(x));
+  println!(
+    "meh: {:?}",
+    serde_json::from_str::<PrivateRequests>("\"GetZkNote\"")
+  );
 
   let matches = clap::App::new("zknotes server")
     .version("1.0")

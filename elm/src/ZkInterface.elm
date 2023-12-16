@@ -109,91 +109,91 @@ encodeSendMsg sm =
     case sm of
         GetZkNote id ->
             JE.object
-                [ ( "what", JE.string "getzknote" )
+                [ ( "what", JE.string "GetZkNote" )
                 , ( "data", JE.int id )
                 ]
 
         GetZkNoteAndLinks zkne ->
             JE.object
-                [ ( "what", JE.string "getzknoteedit" )
+                [ ( "what", JE.string "GetZkNoteAndLinks" )
                 , ( "data", Data.encodeGetZkNoteEdit zkne )
                 ]
 
         GetZnlIfChanged x ->
             JE.object
-                [ ( "what", JE.string "getzneifchanged" )
+                [ ( "what", JE.string "GetZnlIfChanged" )
                 , ( "data", Data.encodeGetZneIfChanged x )
                 ]
 
         GetZkNoteComments msg ->
             JE.object
-                [ ( "what", JE.string "getzknotecomments" )
+                [ ( "what", JE.string "GetZkNoteComments" )
                 , ( "data", Data.encodeGetZkNoteComments msg )
                 ]
 
         GetZkNoteArchives msg ->
             JE.object
-                [ ( "what", JE.string "getzknotearchives" )
+                [ ( "what", JE.string "GetZkNoteArchives" )
                 , ( "data", Data.encodeGetZkNoteArchives msg )
                 ]
 
         GetArchiveZkNote msg ->
             JE.object
-                [ ( "what", JE.string "getarchivezknote" )
+                [ ( "what", JE.string "GetArchiveZkNote" )
                 , ( "data", Data.encodeGetArchiveZkNote msg )
                 ]
 
         DeleteZkNote id ->
             JE.object
-                [ ( "what", JE.string "deletezknote" )
+                [ ( "what", JE.string "DeleteZkNote" )
                 , ( "data", JE.int id )
                 ]
 
         SaveZkNote x ->
             JE.object
-                [ ( "what", JE.string "savezknote" )
+                [ ( "what", JE.string "SaveZkNote" )
                 , ( "data", Data.encodeSaveZkNote x )
                 ]
 
         SaveZkNotePlusLinks s ->
             JE.object
-                [ ( "what", JE.string "savezknotepluslinks" )
+                [ ( "what", JE.string "SaveZkNotePlusLinks" )
                 , ( "data", Data.encodeSaveZkNotePlusLinks s )
                 ]
 
         SaveZkLinks zklinks ->
             JE.object
-                [ ( "what", JE.string "savezklinks" )
+                [ ( "what", JE.string "SaveZkLinks" )
                 , ( "data", Data.encodeZkLinks zklinks )
                 ]
 
         SearchZkNotes s ->
             JE.object
-                [ ( "what", JE.string "searchzknotes" )
+                [ ( "what", JE.string "SearchZkNotes" )
                 , ( "data", S.encodeZkNoteSearch s )
                 ]
 
         SaveImportZkNotes n ->
             JE.object
-                [ ( "what", JE.string "saveimportzknotes" )
+                [ ( "what", JE.string "SaveImportZkNotes" )
                 , ( "data", JE.list Data.encodeImportZkNote n )
                 ]
 
         PowerDelete s ->
             JE.object
-                [ ( "what", JE.string "powerdelete" )
+                [ ( "what", JE.string "PowerDelete" )
                 , ( "data", S.encodeTagSearch s )
                 ]
 
         SetHomeNote id ->
             JE.object
-                [ ( "what", JE.string "sethomenote" )
+                [ ( "what", JE.string "SetHomeNote" )
                 , ( "data", JE.int id )
                 ]
 
         SyncRemote ->
             JE.object
-                [ ( "what", JE.string "syncremote" )
+                [ ( "what", JE.string "SyncRemote" )
                 , ( "data", JE.null )
                 ]
 

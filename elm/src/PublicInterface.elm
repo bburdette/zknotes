@@ -27,19 +27,19 @@ encodeSendMsg sm =
     case sm of
         GetZkNoteAndLinks x ->
             JE.object
-                [ ( "what", JE.string "getzknote" )
+                [ ( "what", JE.string "GetZkNoteAndLinks" )
                 , ( "data", Data.encodeGetZkNoteEdit x )
                 ]
 
         GetZkNotePubId pubid ->
             JE.object
-                [ ( "what", JE.string "getzknotepubid" )
+                [ ( "what", JE.string "GetZkNotePubId" )
                 , ( "data", JE.string pubid )
                 ]
 
         GetZnlIfChanged x ->
             JE.object
-                [ ( "what", JE.string "getzneifchanged" )
+                [ ( "what", JE.string "GetZnlIfChanged" )
                 , ( "data", Data.encodeGetZneIfChanged x )
                 ]
 

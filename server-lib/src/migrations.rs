@@ -4,7 +4,7 @@ use barrel::{types, Migration};
 use orgauth::migrations;
 use rusqlite::{params, Connection};
 use std::path::Path;
-use zkprotocol::content::SpecialUuids;
+use zkprotocol::constants::SpecialUuids;
 
 pub fn initialdb() -> Migration {
   let mut m = Migration::new();

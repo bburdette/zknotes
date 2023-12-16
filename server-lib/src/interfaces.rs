@@ -11,12 +11,16 @@ use orgauth::endpoints::{Callbacks, Tokener};
 use std::error::Error;
 use std::sync::Arc;
 use std::time::Duration;
+use zkprotocol::constants::PrivateReplies;
+use zkprotocol::constants::{PrivateRequests, PrivateStreamingRequests, PublicRequests};
 use zkprotocol::content::{
   GetArchiveZkLinks, GetArchiveZkNote, GetZkLinksSince, GetZkNoteAndLinks, GetZkNoteArchives,
   GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkNote, SaveZkNotePlusLinks, Sysids,
   ZkLinks, ZkNoteAndLinks, ZkNoteAndLinksWhat, ZkNoteArchives,
 };
-use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
+use zkprotocol::messages::{
+  PrivateMessage, PrivateStreamingMessage, PublicMessage, ServerResponse,
+};
 use zkprotocol::search::{TagSearch, ZkListNoteSearchResult, ZkNoteSearch};
 
 pub fn login_data_for_token(
@@ -89,10 +93,10 @@ pub async fn user_interface(
 pub async fn zk_interface_loggedin_streaming(
   config: &Config,
   uid: i64,
-  msg: &UserMessage,
+  msg: &PrivateStreamingMessage,
 ) -> Result<HttpResponse, Box<dyn Error>> {
-  match msg.what.as_str() {
-    "searchzknotes" => {
+  match msg.what {
+    PrivateStreamingRequests::SearchZknotes => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let search: ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
       let conn = Arc::new(sqldata::connection_open(
@@ -101,7 +105,7 @@ pub async fn zk_interface_loggedin_streaming(
       let znsstream = search::search_zknotes_stream(conn, uid, search);
       Ok(HttpResponse::Ok().streaming(znsstream))
     }
-    "getarchivezklinks" => {
+    PrivateStreamingRequests::GetArchiveZkLinks => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let rq: GetArchiveZkLinks = serde_json::from_value(msgdata.clone())?;
       let conn = Arc::new(sqldata::connection_open(
@@ -110,7 +114,7 @@ pub async fn zk_interface_loggedin_streaming(
       let bstream = sqldata::read_archivezklinks_stream(conn, uid, rq.createddate_after);
       Ok(HttpResponse::Ok().streaming(bstream))
     }
-    "getzklinkssince" => {
+    PrivateStreamingRequests::GetZkLinksSince => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let rq: GetZkLinksSince = serde_json::from_value(msgdata.clone())?;
       let conn = Arc::new(sqldata::connection_open(
@@ -118,18 +122,18 @@ pub async fn zk_interface_loggedin_streaming(
       )?);
       let bstream = sqldata::read_zklinks_since_stream(conn, uid, rq.createddate_after);
       Ok(HttpResponse::Ok().streaming(bstream))
-    }
-    wat => Err(format!("invalid 'what' code:'{}'", wat).into()),
+    } // wat => Err(format!("invalid 'what' code:'{}'", wat).into()),
   }
 }
 
 pub async fn zk_interface_loggedin(
   config: &Config,
   uid: i64,
-  msg: &UserMessage,
+  msg: &PrivateMessage,
 ) -> Result<ServerResponse, Box<dyn Error>> {
-  match msg.what.as_str() {
-    "getzknote" => {
+  // match PrivateRequests::fromstr(msg.what.as_str()) {
+  match msg.what {
+    PrivateRequests::GetZkNote => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let id: i64 = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
@@ -140,7 +144,7 @@ pub async fn zk_interface_loggedin(
         content: serde_json::to_value(note)?,
       })
     }
-    "getzknoteedit" => {
+    PrivateRequests::GetZkNoteAndLinks => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let gzne: GetZkNoteAndLinks = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
@@ -160,7 +164,7 @@ pub async fn zk_interface_loggedin(
         content: serde_json::to_value(znew)?,
       })
     }
-    "getzneifchanged" => {
+    PrivateRequests::GetZnlIfChanged => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let gzic: GetZnlIfChanged = serde_json::from_value(msgdata.clone())?;
       info!(
@@ -184,7 +188,7 @@ pub async fn zk_interface_loggedin(
         }),
       }
     }
-    "getzknotecomments" => {
+    PrivateRequests::GetZkNoteComments => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let gzne: GetZkNoteComments = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
@@ -194,7 +198,7 @@ pub async fn zk_interface_loggedin(
         content: serde_json::to_value(notes)?,
       })
     }
-    "getzknotearchives" => {
+    PrivateRequests::GetZkNoteArchives => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let gzne: GetZkNoteArchives = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
@@ -213,7 +217,7 @@ pub async fn zk_interface_loggedin(
         content: serde_json::to_value(zka)?,
       })
     }
-    "getarchivezknote" => {
+    PrivateRequests::GetArchiveZkNote => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let rq: GetArchiveZkNote = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
@@ -224,7 +228,7 @@ pub async fn zk_interface_loggedin(
         content: serde_json::to_value(note)?,
       })
     }
-    "getarchivezklinks" => {
+    PrivateRequests::GetArchiveZklinks => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let rq: GetArchiveZkLinks = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
@@ -234,7 +238,7 @@ pub async fn zk_interface_loggedin(
         content: serde_json::to_value(links)?,
       })
     }
-    "getzklinkssince" => {
+    PrivateRequests::GetZkLinksSince => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let rq: GetZkLinksSince = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
@@ -244,7 +248,7 @@ pub async fn zk_interface_loggedin(
         content: serde_json::to_value(links)?,
       })
     }
-    "searchzknotes" => {
+    PrivateRequests::SearchZkNotes => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let search: ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
@@ -256,32 +260,12 @@ pub async fn zk_interface_loggedin(
           content: serde_json::to_value(res)?,
         }),
         Right(res) => Ok(ServerResponse {
-          what: "zknotesearchresult".to_string(),
+          what: "ZkNotesearchresult".to_string(),
           content: serde_json::to_value(res)?,
         }),
       }
     }
-    // "searchzknotesstream" => {
-    //   let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-    //   let search: ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
-    //   let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-    //   // let res = search::search_zknotes_simple(&conn, uid, &search)?;
-    //   let res = search::search_zknotes_stream(&conn, uid, &search)?;
-    //   HttpResponse::Ok()
-    //     .content_type("application/json")
-    //     .streaming(res)?
-    //   // match res {
-    //   //   Left(res) => Ok(ServerResponse {
-    //   //     what: "zklistnotesearchresult".to_string(),
-    //   //     content: serde_json::to_value(res)?,
-    //   //   }),
-    //   //   Right(res) => Ok(ServerResponse {
-    //   //     what: "zknotesearchresult".to_string(),
-    //   //     content: serde_json::to_value(res)?,
-    //   //   }),
-    //   // }
-    // }
-    "powerdelete" => {
+    PrivateRequests::PowerDelete => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let search: TagSearch = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
@@ -291,7 +275,7 @@ pub async fn zk_interface_loggedin(
         content: serde_json::to_value(res)?,
       })
     }
-    "deletezknote" => {
+    PrivateRequests::DeleteZkNote => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let id: i64 = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
@@ -301,7 +285,7 @@ pub async fn zk_interface_loggedin(
         content: serde_json::to_value(id)?,
       })
     }
-    "savezknote" => {
+    PrivateRequests::SaveZkNote => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let sbe: SaveZkNote = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
@@ -311,7 +295,7 @@ pub async fn zk_interface_loggedin(
         content: serde_json::to_value(s)?,
       })
     }
-    "savezklinks" => {
+    PrivateRequests::SaveZkLinks => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let msg: ZkLinks = serde_json::from_value(msgdata.clone())?;
       let s = sqldata::save_zklinks(&config.orgauth_config.db.as_path(), uid, msg.links)?;
@@ -320,7 +304,7 @@ pub async fn zk_interface_loggedin(
         content: serde_json::to_value(s)?,
       })
     }
-    "savezknotepluslinks" => {
+    PrivateRequests::SaveZkNoteAndLinks => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let sznpl: SaveZkNotePlusLinks = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
@@ -331,7 +315,7 @@ pub async fn zk_interface_loggedin(
         content: serde_json::to_value(szkn)?,
       })
     }
-    "saveimportzknotes" => {
+    PrivateRequests::SaveImportZkNotes => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let gzl: Vec<ImportZkNote> = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
@@ -341,7 +325,7 @@ pub async fn zk_interface_loggedin(
         content: serde_json::to_value(())?,
       })
     }
-    "sethomenote" => {
+    PrivateRequests::SetHomeNote => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let hn: i64 = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
@@ -353,16 +337,16 @@ pub async fn zk_interface_loggedin(
         content: serde_json::to_value(hn)?,
       })
     }
-    "syncremote" => {
+    PrivateRequests::SyncRemote => {
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       let user = orgauth::dbfun::read_user_by_id(&conn, uid)?; // TODO pass this in from calling ftn?
 
       sync::sync(&conn, &user, &mut zknotes_callbacks()).await
     }
-    wat => Err(Box::new(simple_error::SimpleError::new(format!(
-      "invalid 'what' code:'{}'",
-      wat
-    )))),
+    // Err(_) => Err(Box::new(simple_error::SimpleError::new(format!(
+    //   "invalid 'what' code:'{}'",
+    //   msg.what
+    // )))),
   }
 }
 
@@ -372,8 +356,8 @@ pub fn public_interface(
   msg: PublicMessage,
   ipaddr: Option<&str>,
 ) -> Result<ServerResponse, Box<dyn Error>> {
-  match msg.what.as_str() {
-    "getzknote" => {
+  match msg.what {
+    PublicRequests::GetZkNote => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let gzne: GetZkNoteAndLinks = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
@@ -394,7 +378,7 @@ pub fn public_interface(
         })?,
       })
     }
-    "getzneifchanged" => {
+    PublicRequests::GetZneIfChanged => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let gzic: GetZnlIfChanged = serde_json::from_value(msgdata.clone())?;
       info!(
@@ -418,7 +402,7 @@ pub fn public_interface(
         }),
       }
     }
-    "getzknotepubid" => {
+    PublicRequests::GetZkNotePubId => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let pubid: String = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
@@ -438,9 +422,5 @@ pub fn public_interface(
         })?,
       })
     }
-    wat => Err(Box::new(simple_error::SimpleError::new(format!(
-      "invalid 'what' code:'{}'",
-      wat
-    )))),
   }
 }
