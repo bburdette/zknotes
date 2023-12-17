@@ -130,7 +130,7 @@ encodeSendMsg sm =
         GetZnlIfChanged x ->
             JE.object
                 [ ( "what", JE.string "GetZnlIfChanged" )
-                , ( "data", Data.encodeGetZneIfChanged x )
+                , ( "data", Data.encodeGetZnlIfChanged x )
                 ]
 
         GetZkNoteComments msg ->

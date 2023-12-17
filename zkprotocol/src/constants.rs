@@ -53,7 +53,7 @@ pub enum PrivateStreamingRequests {
 #[derive(Deserialize, Serialize, Debug)]
 pub enum PublicRequests {
   GetZkNoteAndLinks,
-  GetZneIfChanged,
+  GetZnlIfChanged,
   GetZkNotePubId,
 }
 

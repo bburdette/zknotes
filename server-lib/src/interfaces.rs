@@ -376,7 +376,7 @@ pub fn public_interface(
         })?,
       })
     }
-    PublicRequests::GetZneIfChanged => {
+    PublicRequests::GetZnlIfChanged => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let gzic: GetZnlIfChanged = serde_json::from_value(msgdata.clone())?;
       info!(

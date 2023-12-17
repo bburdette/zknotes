@@ -360,8 +360,8 @@ encodeGetZkNoteEdit gzl =
         ]
 
 
-encodeGetZneIfChanged : GetZnlIfChanged -> JE.Value
-encodeGetZneIfChanged x =
+encodeGetZnlIfChanged : GetZnlIfChanged -> JE.Value
+encodeGetZnlIfChanged x =
     JE.object
         [ ( "zknote", JE.int x.zknote )
         , ( "changeddate", JE.int x.changeddate )
