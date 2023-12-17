@@ -598,8 +598,8 @@ decodeLoginData : JD.Decoder LoginData
 decodeLoginData =
     JD.succeed LoginData
         |> andMap (JD.field "userid" decodeUserId)
-        |> andMap (JD.field "name" JD.string)
         |> andMap (JD.field "uuid" JD.string)
+        |> andMap (JD.field "name" JD.string)
         |> andMap (JD.field "email" JD.string)
         |> andMap (JD.field "admin" JD.bool)
         |> andMap (JD.field "active" JD.bool)
