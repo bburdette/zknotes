@@ -13,12 +13,13 @@ use simple_error::bail;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
+use zkprotocol::constants::PrivateReplies;
 use zkprotocol::content::{
   ArchiveZkLink, Direction, EditLink, ExtraLoginData, GetArchiveZkNote, GetZkLinks,
   GetZkNoteArchives, GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkLink, SaveZkNote,
   SavedZkNote, Sysids, UuidZkLink, ZkLink, ZkListNote, ZkNote, ZkNoteAndLinks,
 };
-use zkprotocol::messages::ServerResponse;
+use zkprotocol::messages::PrivateReplyMessage;
 
 #[derive(Clone, Deserialize, Serialize, Debug)]
 pub struct User {
@@ -1532,8 +1533,8 @@ pub fn read_archivezklinks_stream(
     })?;
 
     {
-      let mut s = serde_json::to_value(ServerResponse {
-        what: "archivezklinks".to_string(),
+      let mut s = serde_json::to_value(PrivateReplyMessage {
+        what: PrivateReplies::ArchiveZkLinks, // "archivezklinks".to_string(),
         content: serde_json::Value::Null,
       })?
       .to_string();
@@ -1646,8 +1647,8 @@ pub fn read_zklinks_since_stream(
     println!("accarts {}", acc_args.len());
 
     {
-      let mut s = serde_json::to_value(ServerResponse {
-        what: "zklinks".to_string(),
+      let mut s = serde_json::to_value(PrivateReplyMessage {
+        what: PrivateReplies::ZkLinks,
         content: serde_json::Value::Null,
       })?
       .to_string();

@@ -1,5 +1,4 @@
 use crate::util::now;
-use actix_web::cookie::PrivateJar;
 use futures_util::TryStreamExt;
 use orgauth;
 use orgauth::data::{PhantomUser, User, UserResponse, UserResponseMessage};
@@ -14,13 +13,9 @@ use tokio::io::AsyncBufReadExt;
 use tokio_util::io::StreamReader;
 
 use uuid;
-use zkprotocol::constants::{
-  PrivateReplies, PrivateRequests, PrivateStreamingRequests, PublicReplies,
-};
+use zkprotocol::constants::{PrivateReplies, PrivateRequests, PrivateStreamingRequests};
 use zkprotocol::content::{ArchiveZkLink, GetArchiveZkLinks, GetZkLinksSince, UuidZkLink, ZkNote};
-use zkprotocol::messages::{
-  PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage, ServerResponse, UserMessage,
-};
+use zkprotocol::messages::{PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage};
 use zkprotocol::search::{TagSearch, ZkNoteSearch};
 
 fn convert_err(err: reqwest::Error) -> std::io::Error {
@@ -69,7 +64,7 @@ pub async fn sync(
         };
 
         let l = PrivateMessage {
-          what: zkprotocol::constants::PrivateRequests::SearchZkNotes,
+          what: PrivateRequests::SearchZkNotes,
           data: Some(serde_json::to_value(zns)?),
         };
 
@@ -95,10 +90,10 @@ pub async fn sync(
 
         println!("line: {}", line);
 
-        let sr = serde_json::from_str::<ServerResponse>(line.trim())?;
+        let sr = serde_json::from_str::<PrivateReplyMessage>(line.trim())?;
 
-        if sr.what != "zknotesearchresult" {
-          return Err(format!("unexpected what {}", sr.what).into());
+        if sr.what != PrivateReplies::ZkNoteSearchResult {
+          return Err(format!("unexpected what {:?}", sr.what).into());
         }
 
         // map of remote user ids to local user ids.
@@ -155,8 +150,8 @@ pub async fn sync(
               // fetch a remote user record.
               let res = client
                 .post(url.clone())
-                .json(&UserMessage {
-                  what: "read_remote_user".to_string(),
+                .json(&orgauth::data::UserRequestMessage {
+                  what: orgauth::data::UserRequest::ReadRemoteUser,
                   data: Some(serde_json::to_value(note.user)?),
                 })
                 .send()
@@ -271,10 +266,10 @@ pub async fn sync(
 
         println!("line: {}", line);
 
-        let sr = serde_json::from_str::<ServerResponse>(line.trim())?;
+        let sr = serde_json::from_str::<PrivateReplyMessage>(line.trim())?;
 
-        if sr.what != "zknotesearchresult" {
-          return Err(format!("unexpected what {}", sr.what).into());
+        if sr.what != PrivateReplies::ZkNoteSearchResult {
+          return Err(format!("unexpected what {:?}", sr.what).into());
         }
 
         // write the notes!
@@ -344,10 +339,10 @@ pub async fn sync(
 
         println!("line: {}", line);
 
-        let sr = serde_json::from_str::<ServerResponse>(line.trim())?;
+        let sr = serde_json::from_str::<PrivateReplyMessage>(line.trim())?;
 
-        if sr.what != "archivezklinks" {
-          return Err(format!("unexpected what {}", sr.what).into());
+        if sr.what != PrivateReplies::ArchiveZkLinks {
+          return Err(format!("unexpected what {:?}", sr.what).into());
         }
 
         let mut count = 0;
@@ -422,10 +417,10 @@ pub async fn sync(
 
         println!("line: {}", line);
 
-        let sr = serde_json::from_str::<ServerResponse>(line.trim())?;
+        let sr = serde_json::from_str::<PrivateReplyMessage>(line.trim())?;
 
-        if sr.what != "zklinks" {
-          return Err(format!("unexpected what {}", sr.what).into());
+        if sr.what != PrivateReplies::ZkLinks {
+          return Err(format!("unexpected what {:?}", sr.what).into());
         }
 
         let mut count = 0;

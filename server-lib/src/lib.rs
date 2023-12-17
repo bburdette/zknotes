@@ -21,7 +21,7 @@ use chrono;
 use clap::Arg;
 use config::Config;
 use either::Either;
-use futures_util::{task::UnsafeFutureObj, TryStreamExt as _};
+use futures_util::TryStreamExt as _;
 use log::{error, info};
 pub use orgauth;
 use orgauth::util;
@@ -42,9 +42,12 @@ use std::str::FromStr;
 use timer;
 use uuid::Uuid;
 pub use zkprotocol;
-use zkprotocol::constants::{PrivateReplies, PrivateRequests};
 pub use zkprotocol::messages::{
-  PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage, PublicMessage, ServerResponse,
+  PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage, PublicMessage,
+};
+use zkprotocol::{
+  constants::{PrivateReplies, PrivateRequests, PublicReplies},
+  messages::PublicReplyMessage,
 };
 
 use tracing_actix_web::TracingLogger;
@@ -132,8 +135,8 @@ async fn public(
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'public' err: {:?}", e);
-      let se = ServerResponse {
-        what: "server error".to_string(),
+      let se = PublicReplyMessage {
+        what: PublicReplies::ServerError,
         content: serde_json::Value::String(e.to_string()),
       };
       HttpResponse::Ok().json(se)
@@ -211,10 +214,10 @@ fn session_user(
   conn: &Connection,
   session: Session,
   config: &web::Data<Config>,
-) -> Result<Either<orgauth::data::User, ServerResponse>, Box<dyn Error>> {
+) -> Result<Either<orgauth::data::User, PrivateReplyMessage>, Box<dyn Error>> {
   match session.get::<Uuid>("token")? {
-    None => Ok(Either::Right(ServerResponse {
-      what: "not logged in".to_string(),
+    None => Ok(Either::Right(PrivateReplyMessage {
+      what: PrivateReplies::NotLoggedIn,
       content: serde_json::Value::Null,
     })),
     Some(token) => {
@@ -227,8 +230,8 @@ fn session_user(
         Err(e) => {
           info!("read_user_by_token_api error: {:?}", e);
 
-          Ok(Either::Right(ServerResponse {
-            what: "login error".to_string(),
+          Ok(Either::Right(PrivateReplyMessage {
+            what: PrivateReplies::LoginError,
             content: serde_json::to_value(format!("{:?}", e).as_str())?,
           }))
         }
@@ -297,7 +300,7 @@ async fn make_file_notes(
   session: Session,
   config: web::Data<Config>,
   payload: &mut Multipart,
-) -> Result<ServerResponse, Box<dyn Error>> {
+) -> Result<PrivateReplyMessage, Box<dyn Error>> {
   let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
   let userdata = match session_user(&conn, session, &config)? {
     Either::Left(ud) => ud,
@@ -325,8 +328,8 @@ async fn make_file_notes(
 
     zklns.push(listnote);
   }
-  Ok(ServerResponse {
-    what: "savedfiles".to_string(),
+  Ok(PrivateReplyMessage {
+    what: PrivateReplies::FilesUploaded,
     content: serde_json::to_value(zklns)?,
   })
 }
@@ -385,8 +388,8 @@ async fn private(
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'private' err: {:?}", e);
-      let se = ServerResponse {
-        what: "server error".to_string(),
+      let se = PrivateReplyMessage {
+        what: PrivateReplies::ServerError,
         content: serde_json::Value::String(e.to_string()),
       };
       // HttpResponse::Ok().json(se)
@@ -405,8 +408,8 @@ async fn private_streaming(
     Ok(hr) => hr,
     Err(e) => {
       error!("'private' err: {:?}", e);
-      let se = ServerResponse {
-        what: "server error".to_string(),
+      let se = PrivateReplyMessage {
+        what: PrivateReplies::ServerError,
         content: serde_json::Value::String(e.to_string()),
       };
       // HttpResponse::Ok().json(se)
@@ -456,8 +459,8 @@ async fn zk_interface_check_streaming(
   msg: PrivateStreamingMessage,
 ) -> Result<HttpResponse, Box<dyn Error>> {
   match session.get::<Uuid>("token")? {
-    None => Ok(HttpResponse::Ok().json(ServerResponse {
-      what: "not logged in".to_string(),
+    None => Ok(HttpResponse::Ok().json(PrivateReplyMessage {
+      what: PrivateReplies::NotLoggedIn,
       content: serde_json::Value::Null,
     })),
 
@@ -472,8 +475,8 @@ async fn zk_interface_check_streaming(
         Err(e) => {
           info!("read_user_by_token_api error2: {:?}, {:?}", token, e);
 
-          Ok(HttpResponse::Ok().json(ServerResponse {
-            what: "login error".to_string(),
+          Ok(HttpResponse::Ok().json(PrivateReplyMessage {
+            what: PrivateReplies::LoginError,
             content: serde_json::to_value(format!("{:?}", e).as_str())?,
           }))
         }

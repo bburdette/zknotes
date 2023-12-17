@@ -21,7 +21,7 @@ use zkprotocol::content::{
 };
 use zkprotocol::messages::PublicReplyMessage;
 use zkprotocol::messages::{
-  PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage, PublicMessage, ServerResponse,
+  PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage, PublicMessage,
 };
 use zkprotocol::search::{TagSearch, ZkListNoteSearchResult, ZkNoteSearch};
 

@@ -11,8 +11,9 @@ use std::convert::TryInto;
 use std::error::Error;
 use std::path::PathBuf;
 use std::sync::Arc;
+use zkprotocol::constants::PrivateReplies;
 use zkprotocol::content::ZkListNote;
-use zkprotocol::messages::ServerResponse;
+use zkprotocol::messages::PrivateReplyMessage;
 use zkprotocol::search::{
   AndOr, SearchMod, TagSearch, ZkListNoteSearchResult, ZkNoteSearch, ZkNoteSearchResult,
   ZkSearchResultHeader,
@@ -136,20 +137,24 @@ pub fn search_zknotes_stream(
   user: i64,
   search: ZkNoteSearch,
 ) -> impl Stream<Item = Result<Bytes, Box<dyn std::error::Error>>> + 'static {
-  // {
+  // {       // uncomment for formatting, lsp
   try_stream! {
     // let sysid = user_id(&conn, "system")?;
-    let s_user = if search.archives { user_id(&conn, "system")? } else { user };
+    let s_user = if search.archives {
+      user_id(&conn, "system")?
+    } else {
+      user
+    };
     let (sql, args) = build_sql(&conn, user, search.clone())?;
     let mut stmt = conn.prepare(sql.as_str())?;
 
     let mut rows = stmt.query(rusqlite::params_from_iter(args.iter()))?;
 
-    let mut header = serde_json::to_value(ServerResponse {
+    let mut header = serde_json::to_value(PrivateReplyMessage {
       what: if search.list {
-        "zklistnotesearchresult".to_string()
+        PrivateReplies::ZkListNoteSearchResult
       } else {
-        "zknotesearchresult".to_string()
+        PrivateReplies::ZkNoteSearchResult
       },
       content: serde_json::to_value(ZkSearchResultHeader {
         what: search.what,
