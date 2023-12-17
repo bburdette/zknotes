@@ -21,11 +21,14 @@ use chrono;
 use clap::Arg;
 use config::Config;
 use either::Either;
-use futures_util::TryStreamExt as _;
+use futures_util::{task::UnsafeFutureObj, TryStreamExt as _};
 use log::{error, info};
 pub use orgauth;
-use orgauth::endpoints::{ActixTokener, Callbacks};
 use orgauth::util;
+use orgauth::{
+  data::{AdminResponse, UserResponse, UserResponseMessage},
+  endpoints::{ActixTokener, Callbacks},
+};
 use rusqlite::Connection;
 use serde_json;
 use simple_error::simple_error;
@@ -141,11 +144,11 @@ async fn public(
 async fn user(
   session: Session,
   data: web::Data<Config>,
-  item: web::Json<orgauth::data::WhatMessage>,
+  item: web::Json<orgauth::data::UserMessage>,
   req: HttpRequest,
 ) -> HttpResponse {
   info!(
-    "user msg: {}, {:?}  \n connection_info: {:?}",
+    "user msg: {:?}, {:?}  \n connection_info: {:?}",
     &item.what,
     &item.data,
     req.connection_info()
@@ -160,8 +163,8 @@ async fn user(
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'user' err: {:?}", e);
-      let se = orgauth::data::WhatMessage {
-        what: "server error".to_string(),
+      let se = UserResponseMessage {
+        what: UserResponse::ServerError,
         data: Some(serde_json::Value::String(e.to_string())),
       };
       HttpResponse::Ok().json(se)
@@ -172,11 +175,11 @@ async fn user(
 async fn admin(
   session: Session,
   data: web::Data<Config>,
-  item: web::Json<orgauth::data::WhatMessage>,
+  item: web::Json<orgauth::data::AdminMessage>,
   req: HttpRequest,
 ) -> HttpResponse {
   info!(
-    "admin msg: {}, {:?}  \n connection_info: {:?}",
+    "admin msg: {:?}, {:?}  \n connection_info: {:?}",
     &item.what,
     &item.data,
     req.connection_info()
@@ -195,8 +198,8 @@ async fn admin(
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'user' err: {:?}", e);
-      let se = orgauth::data::WhatMessage {
-        what: "server error".to_string(),
+      let se = orgauth::data::AdminResponseMessage {
+        what: AdminResponse::ServerError,
         data: Some(serde_json::Value::String(e.to_string())),
       };
       HttpResponse::Ok().json(se)

@@ -1,8 +1,7 @@
 use crate::util::now;
 use futures_util::TryStreamExt;
 use orgauth;
-use orgauth::data::WhatMessage;
-use orgauth::data::{PhantomUser, User};
+use orgauth::data::{PhantomUser, User, UserResponse, UserResponseMessage};
 use orgauth::dbfun::user_id;
 use orgauth::endpoints::Callbacks;
 use reqwest;
@@ -157,10 +156,10 @@ pub async fn sync(
                 })
                 .send()
                 .await?;
-              let wm: WhatMessage = serde_json::from_value(res.json().await?)?;
+              let wm: UserResponseMessage = serde_json::from_value(res.json().await?)?;
               println!("remote user wm: {:?}", wm);
-              let pu: PhantomUser = match wm.what.as_str() {
-                "remote_user" => serde_json::from_value(
+              let pu: PhantomUser = match wm.what {
+                UserResponse::RemoteUser => serde_json::from_value(
                   wm.data
                     .ok_or::<orgauth::error::Error>("missing data".into())?,
                 )?, // .map_err(|e| e.into())?,

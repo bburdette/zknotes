@@ -77,8 +77,8 @@ pub fn zknotes_callbacks() -> Callbacks {
 pub async fn user_interface(
   tokener: &mut dyn Tokener,
   config: &Config,
-  msg: orgauth::data::WhatMessage,
-) -> Result<orgauth::data::WhatMessage, Box<dyn Error>> {
+  msg: orgauth::data::UserMessage,
+) -> Result<orgauth::data::UserResponseMessage, Box<dyn Error>> {
   Ok(
     orgauth::endpoints::user_interface(
       tokener,
@@ -343,10 +343,6 @@ pub async fn zk_interface_loggedin(
 
       sync::sync(&conn, &user, &mut zknotes_callbacks()).await
     }
-    // Err(_) => Err(Box::new(simple_error::SimpleError::new(format!(
-    //   "invalid 'what' code:'{}'",
-    //   msg.what
-    // )))),
   }
 }
 
