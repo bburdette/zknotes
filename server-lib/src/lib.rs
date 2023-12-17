@@ -144,7 +144,7 @@ async fn public(
 async fn user(
   session: Session,
   data: web::Data<Config>,
-  item: web::Json<orgauth::data::UserMessage>,
+  item: web::Json<orgauth::data::UserRequestMessage>,
   req: HttpRequest,
 ) -> HttpResponse {
   info!(
@@ -175,7 +175,7 @@ async fn user(
 async fn admin(
   session: Session,
   data: web::Data<Config>,
-  item: web::Json<orgauth::data::AdminMessage>,
+  item: web::Json<orgauth::data::AdminRequestMessage>,
   req: HttpRequest,
 ) -> HttpResponse {
   info!(

@@ -77,7 +77,7 @@ pub fn zknotes_callbacks() -> Callbacks {
 pub async fn user_interface(
   tokener: &mut dyn Tokener,
   config: &Config,
-  msg: orgauth::data::UserMessage,
+  msg: orgauth::data::UserRequestMessage,
 ) -> Result<orgauth::data::UserResponseMessage, Box<dyn Error>> {
   Ok(
     orgauth::endpoints::user_interface(
