@@ -45,7 +45,7 @@ pub enum PrivateRequests {
 
 #[derive(Deserialize, Serialize, Debug)]
 pub enum PrivateStreamingRequests {
-  SearchZknotes,
+  SearchZkNotes,
   GetArchiveZkLinks,
   GetZkLinksSince,
 }

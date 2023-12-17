@@ -39,10 +39,10 @@ pub async fn sync(
       jar.add_cookie_str(c.as_str(), &url);
       let client = reqwest::Client::builder().cookie_provider(jar).build()?;
 
-      let getnotes = false;
+      let getnotes = true;
       let getlinks = true;
-      let getarchivenotes = false;
-      let getarchivelinks = false;
+      let getarchivenotes = true;
+      let getarchivelinks = true;
 
       if getnotes {
         let mut userhash = HashMap::<i64, i64>::new();
@@ -245,7 +245,7 @@ pub async fn sync(
         };
 
         let l = PrivateStreamingMessage {
-          what: PrivateStreamingRequests::SearchZknotes,
+          what: PrivateStreamingRequests::SearchZkNotes,
           data: Some(serde_json::to_value(zns)?),
         };
 
