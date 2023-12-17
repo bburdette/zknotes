@@ -44,6 +44,8 @@ type ServerResponse
     | FilesUploaded (List Data.ZkListNote)
     | SyncComplete
     | Noop
+    | NotLoggedIn
+    | LoginError
 
 
 showServerResponse : ServerResponse -> String
@@ -102,6 +104,12 @@ showServerResponse sr =
 
         Noop ->
             "Noop"
+
+        NotLoggedIn ->
+            "NotLoggedIn"
+
+        LoginError ->
+            "LoginError"
 
 
 encodeSendMsg : SendMsg -> JE.Value
@@ -212,59 +220,65 @@ serverResponseDecoder =
         |> JD.andThen
             (\what ->
                 case what of
-                    "server error" ->
+                    "ServerError" ->
                         JD.map ServerError (JD.at [ "content" ] JD.string)
 
-                    "zknotesearchresult" ->
+                    "ZkNoteSearchResult" ->
                         JD.map ZkNoteSearchResult (JD.at [ "content" ] <| Data.decodeZkNoteSearchResult)
 
-                    "zklistnotesearchresult" ->
+                    "ZkListNoteSearchResult" ->
                         JD.map ZkListNoteSearchResult (JD.at [ "content" ] <| Data.decodeZkListNoteSearchResult)
 
-                    "zknotearchives" ->
+                    "ArchiveList" ->
                         JD.map ArchiveList (JD.at [ "content" ] <| Data.decodeZkNoteArchives)
 
-                    "savedzknote" ->
+                    "SavedZkNote" ->
                         JD.map SavedZkNote (JD.at [ "content" ] <| Data.decodeSavedZkNote)
 
-                    "savedzknotepluslinks" ->
+                    "SavedZkNotePlusLinks" ->
                         JD.map SavedZkNotePlusLinks (JD.at [ "content" ] <| Data.decodeSavedZkNote)
 
-                    "deletedzknote" ->
+                    "DeletedZkNote" ->
                         JD.map DeletedZkNote (JD.at [ "content" ] <| JD.int)
 
-                    "zknote" ->
+                    "ZkNote" ->
                         JD.map ZkNote (JD.at [ "content" ] <| Data.decodeZkNote)
 
-                    "zknoteedit" ->
+                    "ZkNoteAndLinksWhat" ->
                         JD.map ZkNoteAndLinksWhat (JD.at [ "content" ] <| Data.decodeZkNoteEditWhat)
 
-                    "zknotecomments" ->
+                    "ZkNoteComments" ->
                         JD.map ZkNoteComments (JD.at [ "content" ] <| JD.list Data.decodeZkNote)
 
-                    "savedzklinks" ->
+                    "SavedZkLinks" ->
                         JD.succeed SavedZkLinks
 
-                    "savedimportzknotes" ->
+                    "SavedImportZkNotes" ->
                         JD.succeed SavedImportZkNotes
 
-                    "zklinks" ->
+                    "ZkLinks" ->
                         JD.map ZkLinks (JD.field "content" Data.decodeZkLinks)
 
-                    "powerdeletecomplete" ->
+                    "PowerDeleteComplete" ->
                         JD.map PowerDeleteComplete (JD.field "content" JD.int)
 
-                    "homenoteset" ->
+                    "HomeNoteSet" ->
                         JD.map HomeNoteSet (JD.field "content" JD.int)
 
-                    "savedfiles" ->
+                    "FilesUploaded" ->
                         JD.map FilesUploaded (JD.field "content" <| JD.list Data.decodeZkListNote)
 
-                    "synccomplete" ->
+                    "SyncComplete" ->
                         JD.succeed SyncComplete
 
-                    "noop" ->
+                    "Noop" ->
                         JD.succeed Noop
+
+                    "NotLoggedIn" ->
+                        JD.succeed NotLoggedIn
+
+                    "LoginError" ->
+                        JD.succeed LoginError
 
                     wat ->
                         JD.succeed

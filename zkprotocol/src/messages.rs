@@ -1,4 +1,6 @@
-use crate::constants::{PrivateRequests, PrivateStreamingRequests, PublicRequests};
+use crate::constants::{
+  PrivateReplies, PrivateRequests, PrivateStreamingRequests, PublicReplies, PublicRequests,
+};
 use serde_json::Value;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -11,6 +13,12 @@ pub struct ServerResponse {
 pub struct PrivateMessage {
   pub what: PrivateRequests,
   pub data: Option<Value>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct PrivateReplyMessage {
+  pub what: PrivateReplies,
+  pub content: Value,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -29,4 +37,9 @@ pub struct UserMessage {
 pub struct PublicMessage {
   pub what: PublicRequests,
   pub data: Option<Value>,
+}
+#[derive(Deserialize, Serialize, Debug)]
+pub struct PublicReplyMessage {
+  pub what: PublicReplies,
+  pub content: Value,
 }

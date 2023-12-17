@@ -42,9 +42,9 @@ use std::str::FromStr;
 use timer;
 use uuid::Uuid;
 pub use zkprotocol;
-use zkprotocol::constants::PrivateRequests;
+use zkprotocol::constants::{PrivateReplies, PrivateRequests};
 pub use zkprotocol::messages::{
-  PrivateMessage, PrivateStreamingMessage, PublicMessage, ServerResponse,
+  PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage, PublicMessage, ServerResponse,
 };
 
 use tracing_actix_web::TracingLogger;
@@ -419,10 +419,10 @@ async fn zk_interface_check(
   session: &Session,
   config: &Config,
   msg: PrivateMessage,
-) -> Result<ServerResponse, Box<dyn Error>> {
+) -> Result<PrivateReplyMessage, Box<dyn Error>> {
   match session.get::<Uuid>("token")? {
-    None => Ok(ServerResponse {
-      what: "not logged in".to_string(),
+    None => Ok(PrivateReplyMessage {
+      what: PrivateReplies::NotLoggedIn,
       content: serde_json::Value::Null,
     }),
     Some(token) => {
@@ -436,8 +436,8 @@ async fn zk_interface_check(
         Err(e) => {
           info!("read_user_by_token_api error2: {:?}, {:?}", token, e);
 
-          Ok(ServerResponse {
-            what: "login error".to_string(),
+          Ok(PrivateReplyMessage {
+            what: PrivateReplies::LoginError,
             content: serde_json::to_value(format!("{:?}", e).as_str())?,
           })
         }

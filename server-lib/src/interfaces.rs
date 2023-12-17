@@ -12,14 +12,16 @@ use std::error::Error;
 use std::sync::Arc;
 use std::time::Duration;
 use zkprotocol::constants::PrivateReplies;
+use zkprotocol::constants::PublicReplies;
 use zkprotocol::constants::{PrivateRequests, PrivateStreamingRequests, PublicRequests};
 use zkprotocol::content::{
   GetArchiveZkLinks, GetArchiveZkNote, GetZkLinksSince, GetZkNoteAndLinks, GetZkNoteArchives,
   GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkNote, SaveZkNotePlusLinks, Sysids,
   ZkLinks, ZkNoteAndLinks, ZkNoteAndLinksWhat, ZkNoteArchives,
 };
+use zkprotocol::messages::PublicReplyMessage;
 use zkprotocol::messages::{
-  PrivateMessage, PrivateStreamingMessage, PublicMessage, ServerResponse,
+  PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage, PublicMessage, ServerResponse,
 };
 use zkprotocol::search::{TagSearch, ZkListNoteSearchResult, ZkNoteSearch};
 
@@ -130,7 +132,7 @@ pub async fn zk_interface_loggedin(
   config: &Config,
   uid: i64,
   msg: &PrivateMessage,
-) -> Result<ServerResponse, Box<dyn Error>> {
+) -> Result<PrivateReplyMessage, Box<dyn Error>> {
   // match PrivateRequests::fromstr(msg.what.as_str()) {
   match msg.what {
     PrivateRequests::GetZkNote => {
@@ -139,8 +141,8 @@ pub async fn zk_interface_loggedin(
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       let note = sqldata::read_zknote(&conn, Some(uid), id)?;
       info!("user#getzknote: {} - {}", id, note.title);
-      Ok(ServerResponse {
-        what: "zknote".to_string(),
+      Ok(PrivateReplyMessage {
+        what: PrivateReplies::ZkNote,
         content: serde_json::to_value(note)?,
       })
     }
@@ -159,8 +161,8 @@ pub async fn zk_interface_loggedin(
         znl: note,
       };
 
-      Ok(ServerResponse {
-        what: "zknoteedit".to_string(),
+      Ok(PrivateReplyMessage {
+        what: PrivateReplies::ZkNoteAndLinksWhat,
         content: serde_json::to_value(znew)?,
       })
     }
@@ -175,15 +177,15 @@ pub async fn zk_interface_loggedin(
       let ozkne = sqldata::read_zneifchanged(&conn, Some(uid), &gzic)?;
 
       match ozkne {
-        Some(zkne) => Ok(ServerResponse {
-          what: "zknoteedit".to_string(),
+        Some(zkne) => Ok(PrivateReplyMessage {
+          what: PrivateReplies::ZkNoteAndLinksWhat,
           content: serde_json::to_value(ZkNoteAndLinksWhat {
             what: gzic.what,
             znl: zkne,
           })?,
         }),
-        None => Ok(ServerResponse {
-          what: "noop".to_string(),
+        None => Ok(PrivateReplyMessage {
+          what: PrivateReplies::Noop,
           content: serde_json::Value::Null,
         }),
       }
@@ -193,8 +195,8 @@ pub async fn zk_interface_loggedin(
       let gzne: GetZkNoteComments = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       let notes = sqldata::read_zknotecomments(&conn, uid, &gzne)?;
-      Ok(ServerResponse {
-        what: "zknotecomments".to_string(),
+      Ok(PrivateReplyMessage {
+        what: PrivateReplies::ZkNoteComments,
         content: serde_json::to_value(notes)?,
       })
     }
@@ -212,8 +214,8 @@ pub async fn zk_interface_loggedin(
         zknote: gzne.zknote,
         results: zlnsr,
       };
-      Ok(ServerResponse {
-        what: "zknotearchives".to_string(),
+      Ok(PrivateReplyMessage {
+        what: PrivateReplies::ZkNoteArchives,
         content: serde_json::to_value(zka)?,
       })
     }
@@ -223,8 +225,8 @@ pub async fn zk_interface_loggedin(
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       let note = sqldata::read_archivezknote(&conn, uid, &rq)?;
       info!("user#getarchivezknote: {} - {}", note.id, note.title);
-      Ok(ServerResponse {
-        what: "zknote".to_string(),
+      Ok(PrivateReplyMessage {
+        what: PrivateReplies::ZkNote,
         content: serde_json::to_value(note)?,
       })
     }
@@ -233,8 +235,8 @@ pub async fn zk_interface_loggedin(
       let rq: GetArchiveZkLinks = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       let links = sqldata::read_archivezklinks(&conn, uid, rq.createddate_after)?;
-      Ok(ServerResponse {
-        what: "archivezklinks".to_string(),
+      Ok(PrivateReplyMessage {
+        what: PrivateReplies::ArchiveZkLinks,
         content: serde_json::to_value(links)?,
       })
     }
@@ -243,8 +245,8 @@ pub async fn zk_interface_loggedin(
       let rq: GetZkLinksSince = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       let links = sqldata::read_zklinks_since(&conn, uid, rq.createddate_after)?;
-      Ok(ServerResponse {
-        what: "zklinks".to_string(),
+      Ok(PrivateReplyMessage {
+        what: PrivateReplies::ZkLinks,
         content: serde_json::to_value(links)?,
       })
     }
@@ -255,12 +257,12 @@ pub async fn zk_interface_loggedin(
       // let res = search::search_zknotes_simple(&conn, uid, &search)?;
       let res = search::search_zknotes(&conn, uid, &search)?;
       match res {
-        Left(res) => Ok(ServerResponse {
-          what: "zklistnotesearchresult".to_string(),
+        Left(res) => Ok(PrivateReplyMessage {
+          what: PrivateReplies::ZkListNoteSearchResult,
           content: serde_json::to_value(res)?,
         }),
-        Right(res) => Ok(ServerResponse {
-          what: "ZkNotesearchresult".to_string(),
+        Right(res) => Ok(PrivateReplyMessage {
+          what: PrivateReplies::ZkNoteSearchResult,
           content: serde_json::to_value(res)?,
         }),
       }
@@ -270,8 +272,8 @@ pub async fn zk_interface_loggedin(
       let search: TagSearch = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       let res = search::power_delete_zknotes(&conn, config.file_path.clone(), uid, &search)?;
-      Ok(ServerResponse {
-        what: "powerdeletecomplete".to_string(),
+      Ok(PrivateReplyMessage {
+        what: PrivateReplies::PowerDeleteComplete,
         content: serde_json::to_value(res)?,
       })
     }
@@ -280,8 +282,8 @@ pub async fn zk_interface_loggedin(
       let id: i64 = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       sqldata::delete_zknote(&conn, config.file_path.clone(), uid, id)?;
-      Ok(ServerResponse {
-        what: "deletedzknote".to_string(),
+      Ok(PrivateReplyMessage {
+        what: PrivateReplies::DeletedZkNote,
         content: serde_json::to_value(id)?,
       })
     }
@@ -290,8 +292,8 @@ pub async fn zk_interface_loggedin(
       let sbe: SaveZkNote = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       let s = sqldata::save_zknote(&conn, uid, &sbe)?;
-      Ok(ServerResponse {
-        what: "savedzknote".to_string(),
+      Ok(PrivateReplyMessage {
+        what: PrivateReplies::SavedZkNote,
         content: serde_json::to_value(s)?,
       })
     }
@@ -299,8 +301,8 @@ pub async fn zk_interface_loggedin(
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let msg: ZkLinks = serde_json::from_value(msgdata.clone())?;
       let s = sqldata::save_zklinks(&config.orgauth_config.db.as_path(), uid, msg.links)?;
-      Ok(ServerResponse {
-        what: "savedzklinks".to_string(),
+      Ok(PrivateReplyMessage {
+        what: PrivateReplies::SavedZkLinks,
         content: serde_json::to_value(s)?,
       })
     }
@@ -310,8 +312,8 @@ pub async fn zk_interface_loggedin(
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       let szkn = sqldata::save_zknote(&conn, uid, &sznpl.note)?;
       let _s = sqldata::save_savezklinks(&conn, uid, szkn.id, sznpl.links)?;
-      Ok(ServerResponse {
-        what: "savedzknotepluslinks".to_string(),
+      Ok(PrivateReplyMessage {
+        what: PrivateReplies::SavedZkNotePlusLinks,
         content: serde_json::to_value(szkn)?,
       })
     }
@@ -320,8 +322,8 @@ pub async fn zk_interface_loggedin(
       let gzl: Vec<ImportZkNote> = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       sqldata::save_importzknotes(&conn, uid, gzl)?;
-      Ok(ServerResponse {
-        what: "savedimportzknotes".to_string(),
+      Ok(PrivateReplyMessage {
+        what: PrivateReplies::SavedImportZkNotes,
         content: serde_json::to_value(())?,
       })
     }
@@ -332,8 +334,8 @@ pub async fn zk_interface_loggedin(
       let mut user = sqldata::read_user_by_id(&conn, uid)?;
       user.homenoteid = Some(hn);
       sqldata::update_user(&conn, &user)?;
-      Ok(ServerResponse {
-        what: "homenoteset".to_string(),
+      Ok(PrivateReplyMessage {
+        what: PrivateReplies::HomeNoteSet,
         content: serde_json::to_value(hn)?,
       })
     }
@@ -351,9 +353,9 @@ pub fn public_interface(
   config: &Config,
   msg: PublicMessage,
   ipaddr: Option<&str>,
-) -> Result<ServerResponse, Box<dyn Error>> {
+) -> Result<PublicReplyMessage, Box<dyn Error>> {
   match msg.what {
-    PublicRequests::GetZkNote => {
+    PublicRequests::GetZkNoteAndLinks => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let gzne: GetZkNoteAndLinks = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
@@ -363,8 +365,8 @@ pub fn public_interface(
         "public#getzknote: {} - {} - {:?}",
         gzne.zknote, note.title, ipaddr
       );
-      Ok(ServerResponse {
-        what: "zknote".to_string(),
+      Ok(PublicReplyMessage {
+        what: PublicReplies::ZkNoteAndLinks,
         content: serde_json::to_value(ZkNoteAndLinksWhat {
           what: gzne.what,
           znl: ZkNoteAndLinks {
@@ -385,15 +387,15 @@ pub fn public_interface(
       let ozkne = sqldata::read_zneifchanged(&conn, None, &gzic)?;
 
       match ozkne {
-        Some(zkne) => Ok(ServerResponse {
-          what: "zknoteedit".to_string(),
+        Some(zkne) => Ok(PublicReplyMessage {
+          what: PublicReplies::ZkNoteAndLinks,
           content: serde_json::to_value(ZkNoteAndLinksWhat {
             what: gzic.what,
             znl: zkne,
           })?,
         }),
-        None => Ok(ServerResponse {
-          what: "noop".to_string(),
+        None => Ok(PublicReplyMessage {
+          what: PublicReplies::Noop,
           content: serde_json::Value::Null,
         }),
       }
@@ -407,8 +409,8 @@ pub fn public_interface(
         "public#getzknotepubid: {} - {} - {:?}",
         pubid, note.title, ipaddr,
       );
-      Ok(ServerResponse {
-        what: "zknote".to_string(),
+      Ok(PublicReplyMessage {
+        what: PublicReplies::ZkNoteAndLinks,
         content: serde_json::to_value(ZkNoteAndLinksWhat {
           what: "".to_string(),
           znl: ZkNoteAndLinks {

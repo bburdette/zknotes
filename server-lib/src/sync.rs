@@ -1,4 +1,5 @@
 use crate::util::now;
+use actix_web::cookie::PrivateJar;
 use futures_util::TryStreamExt;
 use orgauth;
 use orgauth::data::{PhantomUser, User, UserResponse, UserResponseMessage};
@@ -13,9 +14,13 @@ use tokio::io::AsyncBufReadExt;
 use tokio_util::io::StreamReader;
 
 use uuid;
-use zkprotocol::constants::{PrivateRequests, PrivateStreamingRequests};
+use zkprotocol::constants::{
+  PrivateReplies, PrivateRequests, PrivateStreamingRequests, PublicReplies,
+};
 use zkprotocol::content::{ArchiveZkLink, GetArchiveZkLinks, GetZkLinksSince, UuidZkLink, ZkNote};
-use zkprotocol::messages::{PrivateMessage, PrivateStreamingMessage, ServerResponse, UserMessage};
+use zkprotocol::messages::{
+  PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage, ServerResponse, UserMessage,
+};
 use zkprotocol::search::{TagSearch, ZkNoteSearch};
 
 fn convert_err(err: reqwest::Error) -> std::io::Error {
@@ -26,7 +31,7 @@ pub async fn sync(
   conn: &Connection,
   user: &User,
   callbacks: &mut Callbacks,
-) -> Result<ServerResponse, Box<dyn std::error::Error>> {
+) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>> {
   let now = now()?;
 
   // execute any command from here.  search?
@@ -497,8 +502,8 @@ pub async fn sync(
       }
 
       // TODO update cookie?
-      Ok(ServerResponse {
-        what: "synccomplete".to_string(),
+      Ok(PrivateReplyMessage {
+        what: PrivateReplies::SyncComplete,
         content: serde_json::Value::Null,
       })
     }

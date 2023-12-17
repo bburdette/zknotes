@@ -2355,6 +2355,12 @@ actualupdate msg model =
                         ZI.ServerError e ->
                             ( displayMessageDialog model <| e, Cmd.none )
 
+                        ZI.NotLoggedIn ->
+                            ( displayMessageDialog model <| "not logged in", Cmd.none )
+
+                        ZI.LoginError ->
+                            ( displayMessageDialog model <| "login error", Cmd.none )
+
                         ZI.PowerDeleteComplete count ->
                             case model.state of
                                 EditZkNoteListing mod li ->

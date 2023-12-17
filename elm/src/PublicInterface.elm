@@ -49,14 +49,14 @@ serverResponseDecoder =
     JD.andThen
         (\what ->
             case what of
-                "zknote" ->
+                "ZkNoteAndLinks" ->
                     JD.map ZkNoteAndLinks
                         (JD.at [ "content" ] <| Data.decodeZkNoteEditWhat)
 
-                "server error" ->
+                "ServerError" ->
                     JD.map ServerError (JD.at [ "content" ] JD.string)
 
-                "noop" ->
+                "Noop" ->
                     JD.succeed Noop
 
                 wat ->
