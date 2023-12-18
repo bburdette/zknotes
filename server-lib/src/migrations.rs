@@ -2316,83 +2316,50 @@ fn replace_all<E>(
   haystack: &str,
   replacement: impl Fn(&Captures) -> Result<String, E>,
 ) -> Result<String, E> {
-  // println!("meh5");
   let mut new = String::with_capacity(haystack.len());
   let mut last_match = 0;
   for caps in re.captures_iter(haystack) {
-    //   println!("incpas");
     let m = caps.get(1).unwrap();
     new.push_str(&haystack[last_match..m.start()]);
     new.push_str(&replacement(&caps)?);
     last_match = m.end();
   }
-  // println!("meh6");
 
   new.push_str(&haystack[last_match..]);
   Ok(new)
 }
 
-// change to uuids in note links.
+// replace note ids with uuids in hyperlinks.
 pub fn udpate31(dbfile: &Path) -> Result<(), zkerr::Error> {
-  // db connection without foreign key checking.
   let conn = Connection::open(dbfile)?;
   conn.execute("PRAGMA foreign_keys = false;", params![])?;
 
-  let printid = |caps: &Captures| {
-    //   println!("parseid: {:?}", caps[1].parse::<i64>());
-    Ok::<String, zkerr::Error>("wat".to_string())
-  };
-  let oldstyle = Regex::new(r#"\[.+\]\(\/note\/([0-9]+)\)"#)?;
-  let oldblah = replace_all(&oldstyle, r#"woo`[this kind](/note/20077)__`"#, printid)?;
-  // println!("oldex: {}", oldblah);
-  // let newstyle = Regex::new(r#"\<note id=\"([0-9]+)\"/>"#)?;
-  let newstyle = Regex::new(r#"\<note id=\"([0-9]+)\"/>"#)?;
-  let newblah = replace_all(&newstyle, r#"woo`<note id="20050"/>__`"#, printid)?;
-  // println!("newex: {}", newblah);
-  // TODO replace note ids with uuids in hyperlinks.
-
-  // panic!("bye");
-
-  // println!("meh1");
   let mut stmt = conn.prepare("select zknote.id, zknote.content from zknote")?;
 
-  // println!("meh2");
   let notes = stmt
     .query_map(params![], |row| {
       Ok((row.get::<usize, i64>(0)?, row.get::<usize, String>(1)?))
     })?
     .filter_map(|x| x.ok());
 
-  // println!("meh3");
   let idconn = Connection::open(dbfile)?;
   let replaceid = |caps: &Captures| {
-    //   println!("replace id1");
     if let Ok(id) = caps[1].parse::<i64>() {
-      //     println!("replace id: {}", id);
-      let rt = idconn.query_row(
-        "select uuid from zknote where id=?1",
-        params![id],
-        |row| row.get::<usize, String>(0), // match row.get::<usize, String>(0) {
-                                           //   Ok(uuid) => uuid,
-                                           //   Err(_) => Err("wat".into()),
-                                           // },
-      );
-      //     println!("replace uuid: {:?}", rt);
+      let rt = idconn.query_row("select uuid from zknote where id=?1", params![id], |row| {
+        row.get::<usize, String>(0)
+      });
       match rt {
         Ok(rt) => Ok::<String, zkerr::Error>(rt),
-        Err(_) => Ok(String::from(&caps[1])),
+        Err(_) => Ok(String::from(&caps[1])), // note id not found.  leave it.
       }
     } else {
-      //     println!("replace id2");
+      // bad id.  leave it.
       Ok(String::from(&caps[1]))
-      // Err(rusqlite::Error::InvalidQuery)
     }
   };
-  // println!("meh4");
 
-  // let oldstyle = Regex::new("\[.+\]\(\/note\/([0-9]+)\)")?;
   let oldstyle = Regex::new(r#"\[.+\]\(\/note\/([0-9]+)\)"#)?;
-  // let newstyle = Regex::new("\<note id=\"([0-9]+)\"\/\>")?;
+  let newstyle = Regex::new(r#"\<note id=\"([0-9]+)\"/>"#)?;
 
   for (id, text) in notes {
     // search and replace the two note styles:
@@ -2403,7 +2370,6 @@ pub fn udpate31(dbfile: &Path) -> Result<(), zkerr::Error> {
     let rnew = replace_all(&newstyle, rold.as_str(), replaceid)?;
 
     if rnew != text {
-      //     println!("changed text {}", rnew);
       conn.execute(
         "update zknote set content=?1 where id = ?2",
         params![rnew, id],
