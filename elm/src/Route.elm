@@ -8,12 +8,12 @@ import Url.Parser as UP exposing ((</>))
 
 type Route
     = LoginR
-    | PublicZkNote Int
+    | PublicZkNote UUID
     | PublicZkPubId String
-    | EditZkNoteR Int
+    | EditZkNoteR UUID
     | EditZkNoteNew
-    | ArchiveNoteListingR Int
-    | ArchiveNoteR Int Int
+    | ArchiveNoteListingR UUID
+    | ArchiveNoteR UUID Int
     | ResetPasswordR String UUID
     | SettingsR
     | Invite String
@@ -26,23 +26,23 @@ routeTitle route =
         LoginR ->
             "login"
 
-        PublicZkNote id ->
-            "zknote " ++ String.fromInt id
+        PublicZkNote uuid ->
+            "zknote " ++ UUID.toString uuid
 
         PublicZkPubId id ->
             id ++ " - zknotes"
 
-        EditZkNoteR id ->
-            "zknote " ++ String.fromInt id
+        EditZkNoteR uuid ->
+            "zknote " ++ UUID.toString uuid
 
         EditZkNoteNew ->
             "new zknote"
 
-        ArchiveNoteListingR id ->
-            "archives " ++ String.fromInt id
+        ArchiveNoteListingR uuid ->
+            "archives " ++ UUID.toString uuid
 
-        ArchiveNoteR id aid ->
-            "archive " ++ String.fromInt id ++ ": " ++ String.fromInt aid
+        ArchiveNoteR uuid aid ->
+            "archive " ++ UUID.toString uuid ++ ": " ++ String.fromInt aid
 
         ResetPasswordR _ _ ->
             "password reset"
@@ -67,7 +67,7 @@ parseUrl url =
             , UP.map PublicZkNote <|
                 UP.s
                     "note"
-                    </> UP.int
+                    </> UP.custom "UUID" (UUID.fromString >> Result.toMaybe)
             , UP.map (\i -> PublicZkPubId (Maybe.withDefault "" (Url.percentDecode i))) <|
                 UP.s
                     "page"
@@ -75,16 +75,16 @@ parseUrl url =
             , UP.map ArchiveNoteListingR <|
                 UP.s
                     "archivelisting"
-                    </> UP.int
+                    </> UP.custom "UUID" (UUID.fromString >> Result.toMaybe)
             , UP.map ArchiveNoteR <|
                 UP.s
                     "archivenote"
-                    </> UP.int
+                    </> UP.custom "UUID" (UUID.fromString >> Result.toMaybe)
                     </> UP.int
             , UP.map EditZkNoteR <|
                 UP.s
                     "editnote"
-                    </> UP.int
+                    </> UP.custom "UUID" (UUID.fromString >> Result.toMaybe)
             , UP.map EditZkNoteNew <|
                 UP.s
                     "editnote"
@@ -113,23 +113,23 @@ routeUrl route =
         LoginR ->
             UB.absolute [ "login" ] []
 
-        PublicZkNote id ->
-            UB.absolute [ "note", String.fromInt id ] []
+        PublicZkNote uuid ->
+            UB.absolute [ "note", UUID.toString uuid ] []
 
         PublicZkPubId pubid ->
             UB.absolute [ "page", pubid ] []
 
-        EditZkNoteR id ->
-            UB.absolute [ "editnote", String.fromInt id ] []
+        EditZkNoteR uuid ->
+            UB.absolute [ "editnote", UUID.toString uuid ] []
 
         EditZkNoteNew ->
             UB.absolute [ "editnote", "new" ] []
 
-        ArchiveNoteListingR id ->
-            UB.absolute [ "archivelisting", String.fromInt id ] []
+        ArchiveNoteListingR uuid ->
+            UB.absolute [ "archivelisting", UUID.toString uuid ] []
 
-        ArchiveNoteR id aid ->
-            UB.absolute [ "archivenote", String.fromInt id, String.fromInt aid ] []
+        ArchiveNoteR uuid aid ->
+            UB.absolute [ "archivenote", UUID.toString uuid, String.fromInt aid ] []
 
         ResetPasswordR user key ->
             UB.absolute [ "reset", user, UUID.toString key ] []
