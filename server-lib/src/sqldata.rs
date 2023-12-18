@@ -1,3 +1,4 @@
+use crate::error as zkerr;
 use crate::migrations as zkm;
 use async_stream::try_stream;
 use barrel::backend::Sqlite;
@@ -176,10 +177,7 @@ pub fn set_single_value(
   Ok(())
 }
 
-pub fn dbinit(
-  dbfile: &Path,
-  token_expiration_ms: Option<i64>,
-) -> Result<(), orgauth::error::Error> {
+pub fn dbinit(dbfile: &Path, token_expiration_ms: Option<i64>) -> Result<(), zkerr::Error> {
   let exists = dbfile.exists();
 
   let conn = connection_open(dbfile)?;
@@ -351,6 +349,11 @@ pub fn dbinit(
     info!("udpate30");
     zkm::udpate30(&dbfile)?;
     set_single_value(&conn, "migration_level", "30")?;
+  }
+  if nlevel < 31 {
+    info!("udpate31");
+    zkm::udpate31(&dbfile)?;
+    set_single_value(&conn, "migration_level", "31")?;
   }
 
   info!("db up to date.");

@@ -1,6 +1,7 @@
 //
 
 pub mod config;
+pub mod error;
 pub mod interfaces;
 mod migrations;
 mod search;
