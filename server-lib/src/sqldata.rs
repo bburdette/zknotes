@@ -926,18 +926,21 @@ pub fn read_zklistnote(
   }?;
 
   let note = conn.query_row(
-    "select ZN.title, ZN.file, ZN.user, ZN.createdate, ZN.changeddate
+    "select ZN.uuid, ZN.title, ZN.file, ZN.user, ZN.createdate, ZN.changeddate
       from zknote ZN, orgauth_user OU, user U where ZN.id = ?1 and U.id = ZN.user and OU.id = ZN.user",
     params![id],
     |row| {
-      let wat : Option<i64> = row.get(1)?;
+      let wat : Option<i64> = row.get(2)?;
       let zln = ZkListNote {
         id: id,
-        title: row.get(0)?,
+        uuid: Uuid::parse_str(row.get::<usize,String>(0)?.as_str())
+            .map_err(|_| rusqlite::Error::InvalidQuery)?,
+
+        title: row.get(1)?,
         is_file: wat.is_some(),
-        user: row.get(2)?,
-        createdate: row.get(3)?,
-        changeddate: row.get(4)?,
+        user: row.get(3)?,
+        createdate: row.get(4)?,
+        changeddate: row.get(5)?,
         sysids: sysids,
       };
       Ok(zln)

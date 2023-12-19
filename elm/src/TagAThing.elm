@@ -202,7 +202,7 @@ showSr model zkln =
             , E.inFront
                 (E.row [ E.height E.fill, E.alignRight, EBk.color TC.white ]
                     [ E.el [ E.centerY ] <|
-                        ZC.golink zkln.id ZC.otherLinkColor
+                        ZC.golink zkln.uuid ZC.otherLinkColor
                     ]
                 )
             ]

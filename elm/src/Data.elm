@@ -66,13 +66,13 @@ decodeTAError =
 
 type alias LoginData =
     { userid : UserId
-    , uuid : String
+    , uuid : UUID
     , name : String
     , email : String
     , admin : Bool
     , active : Bool
     , zknote : Int
-    , homenote : Maybe Int
+    , homenote : Maybe UUID
     }
 
 
@@ -300,7 +300,7 @@ fromOaLd oald =
     JD.decodeValue
         (JD.succeed (LoginData oald.userid oald.uuid oald.name oald.email oald.admin oald.active)
             |> andMap (JD.field "zknote" JD.int)
-            |> andMap (JD.field "homenote" (JD.maybe JD.int))
+            |> andMap (JD.field "homenote" (JD.maybe UUID.jsonDecoder))
         )
         oald.data
 
@@ -390,7 +390,7 @@ encodeGetZkNoteEdit gzl =
 encodeGetZnlIfChanged : GetZnlIfChanged -> JE.Value
 encodeGetZnlIfChanged x =
     JE.object
-        [ ( "zknote", encodeZkNoteId  x.zknote )
+        [ ( "zknote", encodeZkNoteId x.zknote )
         , ( "changeddate", JE.int x.changeddate )
         , ( "what", JE.string x.what )
         ]
@@ -630,13 +630,13 @@ decodeLoginData : JD.Decoder LoginData
 decodeLoginData =
     JD.succeed LoginData
         |> andMap (JD.field "userid" decodeUserId)
-        |> andMap (JD.field "uuid" JD.string)
+        |> andMap (JD.field "uuid" UUID.jsonDecoder)
         |> andMap (JD.field "name" JD.string)
         |> andMap (JD.field "email" JD.string)
         |> andMap (JD.field "admin" JD.bool)
         |> andMap (JD.field "active" JD.bool)
         |> andMap (JD.field "data" (JD.field "zknote" JD.int))
-        |> andMap (JD.field "data" (JD.field "homenote" (JD.maybe JD.int)))
+        |> andMap (JD.field "data" (JD.field "homenote" (JD.maybe UUID.jsonDecoder)))
 
 
 encodeImportZkNote : ImportZkNote -> JE.Value
@@ -679,9 +679,9 @@ encodeGetArchiveZkNote x =
 ----------------------------------------
 
 
-editNoteLink : Int -> String
+editNoteLink : UUID -> String
 editNoteLink noteid =
-    UB.absolute [ "editnote", String.fromInt noteid ] []
+    UB.absolute [ "editnote", UUID.toString noteid ] []
 
 
 archiveNoteLink : Int -> Int -> String

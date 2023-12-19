@@ -252,13 +252,13 @@ newWithSave model =
     )
 
 
-setHomeNote : Model -> Int -> Model
-setHomeNote model id =
+setHomeNote : Model -> UUID -> Model
+setHomeNote model uuid =
     let
         nld =
             model.ld
     in
-    { model | ld = { nld | homenote = Just id } }
+    { model | ld = { nld | homenote = Just uuid } }
 
 
 elToDel : EditLink -> Maybe EditLink
@@ -752,7 +752,7 @@ showSr bkcolor model isdirty zkln =
                             )
 
                       else
-                        ZC.golink zkln.id
+                        ZC.golink zkln.uuid
                             (if isdirty then
                                 ZC.saveColor
 

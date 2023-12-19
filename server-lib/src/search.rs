@@ -11,6 +11,7 @@ use std::convert::TryInto;
 use std::error::Error;
 use std::path::PathBuf;
 use std::sync::Arc;
+use uuid::Uuid;
 use zkprotocol::constants::PrivateReplies;
 use zkprotocol::content::ZkListNote;
 use zkprotocol::content::ZkNoteId;
@@ -76,20 +77,23 @@ pub fn search_zknotes(
 
   let rec_iter = pstmt.query_map(rusqlite::params_from_iter(args.iter()), |row| {
     let id = row.get(0)?;
+    let uuid = Uuid::parse_str(row.get::<usize, String>(1)?.as_str())
+      .map_err(|_| rusqlite::Error::InvalidQuery)?;
     let sysids = get_sysids(conn, sysid, id)?;
     Ok(ZkListNote {
       id: id,
-      title: row.get(1)?,
+      uuid: uuid,
+      title: row.get(2)?,
       is_file: {
-        let wat: Option<i64> = row.get(2)?;
+        let wat: Option<i64> = row.get(3)?;
         match wat {
           Some(_) => true,
           None => false,
         }
       },
-      user: row.get(3)?,
-      createdate: row.get(4)?,
-      changeddate: row.get(5)?,
+      user: row.get(4)?,
+      createdate: row.get(5)?,
+      changeddate: row.get(6)?,
       sysids: sysids,
     })
   })?;
@@ -142,7 +146,7 @@ pub fn search_zknotes_stream(
   user: i64,
   search: ZkNoteSearch,
 ) -> impl Stream<Item = Result<Bytes, Box<dyn std::error::Error>>> + 'static {
-  // {       // uncomment for formatting, lsp
+  // { uncomment for formatting, lsp
   try_stream! {
     // let sysid = user_id(&conn, "system")?;
     let s_user = if search.archives {
@@ -176,14 +180,16 @@ pub fn search_zknotes_stream(
       if search.list {
         let zln = ZkListNote {
           id: row.get(0)?,
-          title: row.get(1)?,
+          uuid: Uuid::parse_str(row.get::<usize, String>(1)?.as_str())
+            .map_err(|_| rusqlite::Error::InvalidQuery)?,
+          title: row.get(2)?,
           is_file: {
-            let wat: Option<i64> = row.get(2)?;
+            let wat: Option<i64> = row.get(3)?;
             wat.is_some()
           },
-          user: row.get(3)?,
-          createdate: row.get(4)?,
-          changeddate: row.get(5)?,
+          user: row.get(4)?,
+          createdate: row.get(5)?,
+          changeddate: row.get(6)?,
           sysids: Vec::new(),
         };
 
@@ -230,7 +236,7 @@ pub fn build_sql(
     (
       // archives of notes that are mine.
       format!(
-        "select N.id, N.title, N.file, N.user, N.createdate, N.changeddate
+        "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N, zknote O, zklink OL, zklink AL where
       (O.user = ?
         and OL.fromid = N.id and OL.toid = O.id
@@ -243,7 +249,7 @@ pub fn build_sql(
     // notes that are mine.
     (
       format!(
-        "select N.id, N.title, N.file, N.user, N.createdate, N.changeddate
+        "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N where N.user = ?
       and N.deleted = 0"
       ),
@@ -256,7 +262,7 @@ pub fn build_sql(
     (
       // archives of notes that are public, and not mine.
       format!(
-        "select N.id, N.title, N.file, N.user, N.createdate, N.changeddate
+        "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N, zklink L, zknote O, zklink OL, zklink AL
       where (N.user != ?
         and L.fromid = N.id and L.toid = ?
@@ -269,7 +275,7 @@ pub fn build_sql(
   } else {
     (
       format!(
-        "select N.id, N.title, N.file, N.user, N.createdate, N.changeddate
+        "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N, zklink L
       where (N.user != ? and L.fromid = N.id and L.toid = ?)
       and N.deleted = 0"
@@ -289,7 +295,7 @@ pub fn build_sql(
   let (mut sqlshare, mut shareargs) = if archives {
     (
       format!(
-        "select N.id, N.title, N.file, N.user, N.createdate, N.changeddate
+        "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N, zklink L, zklink M, zklink U, zknote O, zklink OL, zklink AL
       where (N.user != ? and
         (M.toid = ? and (
@@ -315,7 +321,7 @@ pub fn build_sql(
   } else {
     (
       format!(
-        "select N.id, N.title, N.file, N.user, N.createdate, N.changeddate
+        "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N, zklink L, zklink M, zklink U
       where (N.user != ? 
         and M.toid = ? 
@@ -341,7 +347,7 @@ pub fn build_sql(
   let (mut sqluser, mut userargs) = if archives {
     (
       format!(
-        "select N.id, N.title, N.file, N.user, N.createdate, N.changeddate
+        "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N, zklink L, zknote O, zklink OL, zklink AL
       where N.user != ?
         and ((L.fromid = N.id and L.toid = ?) or (L.toid = N.id and L.fromid = ?))
@@ -359,7 +365,7 @@ pub fn build_sql(
   } else {
     (
       format!(
-        "select N.id, N.title, N.file, N.user, N.createdate, N.changeddate
+        "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N, zklink L
       where (
         N.user != ? and

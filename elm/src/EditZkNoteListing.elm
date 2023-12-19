@@ -192,7 +192,7 @@ listview si ld size model =
                                         )
                                         [ E.link
                                             [ E.height <| E.px 30 ]
-                                            { url = Data.editNoteLink n.id
+                                            { url = Data.editNoteLink n.uuid
                                             , label = E.text n.title
                                             }
                                         ]

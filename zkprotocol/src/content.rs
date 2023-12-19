@@ -47,6 +47,7 @@ pub struct ZkNote {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ZkListNote {
   pub id: i64,
+  pub uuid: Uuid,
   pub title: String,
   pub is_file: bool,
   pub user: i64,
