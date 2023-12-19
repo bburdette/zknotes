@@ -90,6 +90,7 @@ type alias ZkInviteData =
 
 type alias ZkListNote =
     { id : Int
+    , uuid : UUID
     , user : UserId
     , title : String
     , isFile : Bool
@@ -115,12 +116,14 @@ type alias ZkNoteSearchResult =
 
 type alias SavedZkNote =
     { id : Int
+    , uuid : UUID
     , changeddate : Int
     }
 
 
 type alias ZkNote =
     { id : Int
+    , uuid : UUID
     , user : UserId
     , username : String
     , usernote : Int
@@ -138,15 +141,26 @@ type alias ZkNote =
     }
 
 
-type alias SaveZkNote =
-    { id : Maybe Int
-    , pubid : Maybe String
-    , title : String
-    , content : String
-    , editable : Bool
-    , showtitle : Bool
-    , deleted : Bool
-    }
+type ZkNoteId
+    = ZkInt Int
+    | ZkUUID UUID
+
+
+encodeZkNoteId zni =
+    case zni of
+        ZkInt id ->
+            JE.object [ ( "ZkInt", JE.int id ) ]
+
+        ZkUUID id ->
+            JE.object [ ( "ZkUUID", UUID.toValue id ) ]
+
+
+decodeZkNoteId : JD.Decoder ZkNoteId
+decodeZkNoteId =
+    JD.oneOf
+        [ JD.map ZkInt (JD.field "ZkInt" JD.int)
+        , JD.map ZkUUID (JD.field "ZkUUID" UUID.jsonDecoder)
+        ]
 
 
 type alias ZkLink =
@@ -173,6 +187,18 @@ type alias EditLink =
     , othername : Maybe String
     , sysids : List Int
     , delete : Maybe Bool
+    }
+
+
+type alias SaveZkNote =
+    { id : Maybe Int
+    , uuid : Maybe UUID
+    , pubid : Maybe String
+    , title : String
+    , content : String
+    , editable : Bool
+    , showtitle : Bool
+    , deleted : Bool
     }
 
 
@@ -207,25 +233,25 @@ type alias ImportZkNote =
 
 
 type alias GetZkLinks =
-    { zknote : Int
+    { zknote : ZkNoteId
     }
 
 
 type alias GetZkNoteComments =
-    { zknote : Int
+    { zknote : ZkNoteId
     , offset : Int
     , limit : Maybe Int
     }
 
 
 type alias GetZkNoteAndLinks =
-    { zknote : Int
+    { zknote : ZkNoteId
     , what : String
     }
 
 
 type alias GetZnlIfChanged =
-    { zknote : Int
+    { zknote : ZkNoteId
     , changeddate : Int
     , what : String
     }
@@ -244,7 +270,7 @@ type alias ZkNoteAndLinks =
 
 
 type alias GetZkNoteArchives =
-    { zknote : Int
+    { zknote : ZkNoteId
     , offset : Int
     , limit : Maybe Int
     }
@@ -252,12 +278,13 @@ type alias GetZkNoteArchives =
 
 type alias ZkNoteArchives =
     { zknote : Int
+    , zkuuid : UUID
     , results : ZkListNoteSearchResult
     }
 
 
 type alias GetArchiveZkNote =
-    { parentnote : Int
+    { parentnote : ZkNoteId
     , noteid : Int
     }
 
@@ -348,14 +375,14 @@ encodeZkInviteData zid =
 encodeGetZkLinks : GetZkLinks -> JE.Value
 encodeGetZkLinks gzl =
     JE.object
-        [ ( "zknote", JE.int gzl.zknote )
+        [ ( "zknote", encodeZkNoteId gzl.zknote )
         ]
 
 
 encodeGetZkNoteEdit : GetZkNoteAndLinks -> JE.Value
 encodeGetZkNoteEdit gzl =
     JE.object
-        [ ( "zknote", JE.int gzl.zknote )
+        [ ( "zknote", encodeZkNoteId gzl.zknote )
         , ( "what", JE.string gzl.what )
         ]
 
@@ -363,7 +390,7 @@ encodeGetZkNoteEdit gzl =
 encodeGetZnlIfChanged : GetZnlIfChanged -> JE.Value
 encodeGetZnlIfChanged x =
     JE.object
-        [ ( "zknote", JE.int x.zknote )
+        [ ( "zknote", encodeZkNoteId  x.zknote )
         , ( "changeddate", JE.int x.changeddate )
         , ( "what", JE.string x.what )
         ]
@@ -372,7 +399,7 @@ encodeGetZnlIfChanged x =
 encodeGetZkNoteComments : GetZkNoteComments -> JE.Value
 encodeGetZkNoteComments x =
     JE.object <|
-        [ ( "zknote", JE.int x.zknote )
+        [ ( "zknote", encodeZkNoteId x.zknote )
         , ( "offset", JE.int x.offset )
         ]
             ++ (case x.limit of
@@ -484,6 +511,7 @@ decodeEditLink =
 saveZkNote : ZkNote -> SaveZkNote
 saveZkNote fzn =
     { id = Just fzn.id
+    , uuid = Just fzn.uuid
     , pubid = fzn.pubid
     , title = fzn.title
     , content = fzn.content
@@ -522,6 +550,7 @@ decodeZkListNote : JD.Decoder ZkListNote
 decodeZkListNote =
     JD.succeed ZkListNote
         |> andMap (JD.field "id" JD.int)
+        |> andMap (JD.field "uuid" UUID.jsonDecoder)
         |> andMap (JD.field "user" decodeUserId)
         |> andMap (JD.field "title" JD.string)
         |> andMap (JD.field "is_file" JD.bool)
@@ -548,8 +577,9 @@ decodeZkNoteSearchResult =
 
 decodeSavedZkNote : JD.Decoder SavedZkNote
 decodeSavedZkNote =
-    JD.map2 SavedZkNote
+    JD.map3 SavedZkNote
         (JD.field "id" JD.int)
+        (JD.field "uuid" UUID.jsonDecoder)
         (JD.field "changeddate" JD.int)
 
 
@@ -557,6 +587,7 @@ decodeZkNote : JD.Decoder ZkNote
 decodeZkNote =
     JD.succeed ZkNote
         |> andMap (JD.field "id" JD.int)
+        |> andMap (JD.field "uuid" UUID.jsonDecoder)
         |> andMap (JD.field "user" decodeUserId)
         |> andMap (JD.field "username" JD.string)
         |> andMap (JD.field "usernote" JD.int)
@@ -575,8 +606,9 @@ decodeZkNote =
 
 decodeZkNoteArchives : JD.Decoder ZkNoteArchives
 decodeZkNoteArchives =
-    JD.map2 ZkNoteArchives
+    JD.map3 ZkNoteArchives
         (JD.field "zknote" JD.int)
+        (JD.field "zkuuid" UUID.jsonDecoder)
         (JD.field "results" decodeZkListNoteSearchResult)
 
 
@@ -620,7 +652,7 @@ encodeImportZkNote izn =
 encodeGetZkNoteArchives : GetZkNoteArchives -> JE.Value
 encodeGetZkNoteArchives x =
     JE.object <|
-        [ ( "zknote", JE.int x.zknote )
+        [ ( "zknote", encodeZkNoteId x.zknote )
         , ( "offset", JE.int x.offset )
         ]
             ++ (case x.limit of
@@ -636,7 +668,7 @@ encodeGetZkNoteArchives x =
 encodeGetArchiveZkNote : GetArchiveZkNote -> JE.Value
 encodeGetArchiveZkNote x =
     JE.object <|
-        [ ( "parentnote", JE.int x.parentnote )
+        [ ( "parentnote", encodeZkNoteId x.parentnote )
         , ( "noteid", JE.int x.noteid )
         ]
 

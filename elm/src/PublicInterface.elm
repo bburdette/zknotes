@@ -76,7 +76,7 @@ getErrorIndexNote location noteid tomsg =
             Http.jsonBody <|
                 encodeSendMsg
                     (GetZkNoteAndLinks
-                        { zknote = noteid
+                        { zknote = Data.ZkInt noteid
                         , what = ""
                         }
                     )

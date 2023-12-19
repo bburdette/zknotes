@@ -22,6 +22,7 @@ import NoteCache as NC exposing (NoteCache)
 import Schelme.Show exposing (showTerm)
 import TangoColors as TC
 import Time
+import UUID exposing (UUID)
 import Util
 
 
@@ -34,6 +35,7 @@ type Msg
 
 type alias Model =
     { id : Maybe Int
+    , uuid : Maybe UUID
     , sysids : Data.Sysids
     , pubid : Maybe String
     , title : String
@@ -212,6 +214,7 @@ initFull sysids zknaa =
                 (mkCc cells)
     in
     { id = Just zknote.id
+    , uuid = Just zknote.uuid
     , sysids = sysids
     , pubid = zknote.pubid
     , title = zknote.title
@@ -243,6 +246,7 @@ initSzn sysids zknote mbcreatedate mbchangeddate links mbpanelid =
                 (mkCc cells)
     in
     { id = zknote.id
+    , uuid = zknote.uuid
     , sysids = sysids
     , pubid = zknote.pubid
     , title = zknote.title

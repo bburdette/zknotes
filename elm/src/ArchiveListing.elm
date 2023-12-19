@@ -1,7 +1,7 @@
 module ArchiveListing exposing (..)
 
 import Common
-import Data
+import Data exposing (ZkNoteId(..))
 import Dialog as D
 import Dict exposing (Dict(..))
 import Element as E exposing (Element)
@@ -19,6 +19,7 @@ import TagSearchPanel as TSP
 import TangoColors as TC
 import Time
 import Toop
+import UUID exposing (UUID)
 import Util
 import WindowKeys as WK
 import ZkCommon as ZC
@@ -32,6 +33,7 @@ type Msg
 
 type alias Model =
     { noteid : Int
+    , uuid : UUID
     , notes : List Data.ZkListNote
     , selected : Maybe Int
     , fullnotes : Dict Int Data.ZkNote
@@ -49,6 +51,7 @@ type Command
 init : Data.ZkNoteArchives -> Model
 init zna =
     { noteid = zna.zknote
+    , uuid = zna.zkuuid
     , notes = zna.results.notes
     , selected = Nothing
     , fullnotes = Dict.empty
@@ -136,7 +139,7 @@ listview si ld zone size model =
                 [ E.row [ E.width E.fill ]
                     [ E.link
                         Common.linkStyle
-                        { url = R.routeUrl <| R.EditZkNoteR model.noteid
+                        { url = R.routeUrl <| R.EditZkNoteR model.uuid
                         , label = E.text "back"
                         }
                     , E.el [ E.centerX ] <|
@@ -205,7 +208,7 @@ update msg model ld =
             ( { model | ppmodel = nm }
             , case cmd of
                 PP.RangeChanged ->
-                    GetArchives { zknote = model.noteid, offset = nm.offset, limit = Just nm.increment }
+                    GetArchives { zknote = ZkInt model.noteid, offset = nm.offset, limit = Just nm.increment }
 
                 PP.None ->
                     None

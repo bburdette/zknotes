@@ -538,14 +538,6 @@ async fn new_email(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
 pub async fn err_main() -> Result<(), Box<dyn Error>> {
   env_logger::init();
 
-  let x = PrivateRequests::GetZkNote;
-
-  println!("meh: {:?}", serde_json::to_value(x));
-  println!(
-    "meh: {:?}",
-    serde_json::from_str::<PrivateRequests>("\"GetZkNote\"")
-  );
-
   let matches = clap::App::new("zknotes server")
     .version("1.0")
     .author("Ben Burdette")

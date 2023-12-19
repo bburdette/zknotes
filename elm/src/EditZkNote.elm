@@ -80,6 +80,7 @@ import TangoColors as TC
 import Task
 import Time
 import Toop
+import UUID exposing (UUID)
 import Url as U
 import Url.Builder as UB
 import Url.Parser as UP exposing ((</>))
@@ -168,6 +169,7 @@ type alias NewCommentState =
 
 type alias Model =
     { id : Maybe Int
+    , uuid : Maybe UUID
     , si : Data.Sysids
     , ld : Data.LoginData
     , noteUser : UserId
@@ -293,10 +295,11 @@ getSysids model =
 
 toZkListNote : Model -> Maybe Data.ZkListNote
 toZkListNote model =
-    case ( model.id, model.createdate, model.changeddate ) of
-        ( Just id, Just createdate, Just changeddate ) ->
+    case Toop.T4 model.id model.uuid model.createdate model.changeddate of
+        Toop.T4 (Just id) (Just uuid) (Just createdate) (Just changeddate) ->
             Just
                 { id = id
+                , uuid = uuid
                 , user = model.noteUser
                 , title = model.title
                 , isFile = model.isFile
@@ -311,10 +314,11 @@ toZkListNote model =
 
 toZkNote : Model -> Maybe Data.ZkNote
 toZkNote model =
-    case ( model.id, model.createdate, model.changeddate ) of
-        ( Just id, Just createdate, Just changeddate ) ->
+    case Toop.T4 model.id model.uuid model.createdate model.changeddate of
+        Toop.T4 (Just id) (Just uuid) (Just createdate) (Just changeddate) ->
             Just
                 { id = id
+                , uuid = uuid
                 , user = model.noteUser
                 , username = model.noteUserName
                 , usernote = model.usernote
@@ -343,6 +347,7 @@ toZkNote model =
 sznFromModel : Model -> Data.SaveZkNote
 sznFromModel model =
     { id = model.id
+    , uuid = model.uuid
     , title = model.title
     , content = model.md
     , pubid = toPubId (isPublic model) model.pubidtxt
@@ -1658,6 +1663,7 @@ initFull si ld zkl zknote dtlinks spm =
                 dtlinks
     in
     ( { id = Just zknote.id
+      , uuid = Just zknote.uuid
       , si = si
       , ld = ld
       , noteUser = zknote.user
@@ -1696,7 +1702,7 @@ initFull si ld zkl zknote dtlinks spm =
       , panelNote = Nothing
       , mbReplaceString = Nothing
       }
-    , { zknote = zknote.id, offset = 0, limit = Nothing }
+    , { zknote = Data.ZkInt zknote.id, offset = 0, limit = Nothing }
     )
 
 
@@ -1716,6 +1722,7 @@ initNew si ld zkl spm links =
                 (mkCc cells)
     in
     { id = Nothing
+    , uuid = Nothing
     , si = si
     , ld = ld
     , noteUser = ld.userid
@@ -1773,6 +1780,7 @@ replaceOrAdd items replacement compare mergef =
 sznToZkn : UserId -> String -> Int -> List Int -> Data.SavedZkNote -> Data.SaveZkNote -> Data.ZkNote
 sznToZkn uid uname unote sysids sdzn szn =
     { id = sdzn.id
+    , uuid = sdzn.uuid
     , user = uid
     , username = uname
     , usernote = unote
@@ -2477,6 +2485,7 @@ update msg model =
                     let
                         nc =
                             { id = Nothing
+                            , uuid = Nothing
                             , pubid = Nothing
                             , title = "comment"
                             , content = newcomment.text

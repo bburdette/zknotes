@@ -1,6 +1,13 @@
 #![allow(non_snake_case)]
 
 use crate::search::ZkListNoteSearchResult;
+use uuid::Uuid;
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum ZkNoteId {
+  ZkInt(i64),
+  ZkUUID(Uuid),
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ExtraLoginData {
