@@ -412,7 +412,7 @@ routeStateInternal model route =
                                 Just <|
                                     sendZIMsg model.tauri
                                         model.location
-                                        (ZI.GetArchiveZkNote { parentnote = ZkUUID id, noteid = aid })
+                                        (ZI.GetArchiveZkNote { parentnote = ZkUUID id, noteid = ZkInt aid })
                             )
                         )
             in
@@ -422,7 +422,7 @@ routeStateInternal model route =
                         ( ArchiveListing st login
                         , sendZIMsg model.tauri
                             model.location
-                            (ZI.GetArchiveZkNote { parentnote = ZkUUID id, noteid = aid })
+                            (ZI.GetArchiveZkNote { parentnote = ZkUUID id, noteid = ZkInt aid })
                         )
 
                     else

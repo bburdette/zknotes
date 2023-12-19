@@ -13,6 +13,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use zkprotocol::constants::PrivateReplies;
 use zkprotocol::content::ZkListNote;
+use zkprotocol::content::ZkNoteId;
 use zkprotocol::messages::PrivateReplyMessage;
 use zkprotocol::search::{
   AndOr, SearchMod, TagSearch, ZkListNoteSearchResult, ZkNoteSearch, ZkNoteSearchResult,
@@ -118,7 +119,11 @@ pub fn search_zknotes(
     for rsrec in rec_iter {
       match rsrec {
         Ok(rec) => {
-          pv.push(sqldata::read_zknote(&conn, Some(s_user), rec.id)?);
+          pv.push(sqldata::read_zknote(
+            &conn,
+            Some(s_user),
+            &ZkNoteId::ZkInt(rec.id),
+          )?);
         }
         Err(_) => (),
       }
@@ -186,7 +191,7 @@ pub fn search_zknotes_stream(
         s.push_str("\n");
         yield Bytes::from(s);
       } else {
-        let zn = sqldata::read_zknote(&conn, Some(s_user), row.get(0)?)?;
+        let zn = sqldata::read_zknote(&conn, Some(s_user), &ZkNoteId::ZkInt(row.get(0)?))?;
         let mut s = serde_json::to_value(zn)?.to_string().to_string();
         s.push_str("\n");
         yield Bytes::from(s);

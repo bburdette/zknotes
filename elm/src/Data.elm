@@ -285,7 +285,7 @@ type alias ZkNoteArchives =
 
 type alias GetArchiveZkNote =
     { parentnote : ZkNoteId
-    , noteid : Int
+    , noteid : ZkNoteId
     }
 
 
@@ -669,7 +669,7 @@ encodeGetArchiveZkNote : GetArchiveZkNote -> JE.Value
 encodeGetArchiveZkNote x =
     JE.object <|
         [ ( "parentnote", encodeZkNoteId x.parentnote )
-        , ( "noteid", JE.int x.noteid )
+        , ( "noteid", encodeZkNoteId x.noteid )
         ]
 
 

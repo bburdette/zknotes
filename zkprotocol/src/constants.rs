@@ -7,6 +7,7 @@ pub enum SpecialUuids {
   Share,
   Search,
   User,
+  Archive,
   System,
 }
 
@@ -17,6 +18,7 @@ impl SpecialUuids {
       SpecialUuids::Share => "466d39ec-2ea7-4d43-b44c-1d3d083f8a9d",
       SpecialUuids::Search => "84f72fd0-8836-43a3-ac66-89e0ab49dd87",
       SpecialUuids::User => "4fb37d76-6fc8-4869-8ee4-8e05fa5077f7",
+      SpecialUuids::Archive => "ad6a4ca8-0446-4ecc-b047-46282ced0d84",
       SpecialUuids::System => "0efcc98f-dffd-40e5-af07-90da26b1d469",
     }
   }

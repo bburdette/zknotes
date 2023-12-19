@@ -3,7 +3,7 @@
 use crate::search::ZkListNoteSearchResult;
 use uuid::Uuid;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum ZkNoteId {
   ZkInt(i64),
   ZkUUID(Uuid),
@@ -64,6 +64,7 @@ pub struct SavedZkNote {
 #[derive(Deserialize, Debug, Clone)]
 pub struct SaveZkNote {
   pub id: Option<i64>,
+  pub uuid: Option<Uuid>,
   pub title: String,
   pub pubid: Option<String>,
   pub content: String,
@@ -129,25 +130,25 @@ pub struct ImportZkNote {
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct GetZkLinks {
-  pub zknote: i64,
+  pub zknote: ZkNoteId,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct GetZkNoteAndLinks {
-  pub zknote: i64,
+  pub zknote: ZkNoteId,
   pub what: String,
 }
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct GetZnlIfChanged {
-  pub zknote: i64,
+  pub zknote: ZkNoteId,
   pub changeddate: i64,
   pub what: String,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct GetZkNoteArchives {
-  pub zknote: i64,
+  pub zknote: ZkNoteId,
   pub offset: i64,
   pub limit: Option<i64>,
 }
@@ -155,13 +156,14 @@ pub struct GetZkNoteArchives {
 #[derive(Serialize, Debug)]
 pub struct ZkNoteArchives {
   pub zknote: i64,
+  pub uuid: Uuid,
   pub results: ZkListNoteSearchResult,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct GetArchiveZkNote {
-  pub parentnote: i64,
-  pub noteid: i64,
+  pub parentnote: ZkNoteId,
+  pub noteid: ZkNoteId,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -195,7 +197,7 @@ pub struct UuidZkLink {
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct GetZkNoteComments {
-  pub zknote: i64,
+  pub zknote: ZkNoteId,
   pub offset: i64,
   pub limit: Option<i64>,
 }

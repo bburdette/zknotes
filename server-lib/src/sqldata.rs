@@ -8,17 +8,20 @@ use log::info;
 use orgauth::data::RegistrationData;
 use orgauth::dbfun::user_id;
 use orgauth::util::now;
+use rusqlite::Row;
 use rusqlite::{params, Connection};
 use serde_derive::{Deserialize, Serialize};
 use simple_error::bail;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
+use uuid::Uuid;
 use zkprotocol::constants::PrivateReplies;
+use zkprotocol::constants::SpecialUuids;
 use zkprotocol::content::{
   ArchiveZkLink, Direction, EditLink, ExtraLoginData, GetArchiveZkNote, GetZkLinks,
   GetZkNoteArchives, GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkLink, SaveZkNote,
-  SavedZkNote, Sysids, UuidZkLink, ZkLink, ZkListNote, ZkNote, ZkNoteAndLinks,
+  SavedZkNote, Sysids, UuidZkLink, ZkLink, ZkListNote, ZkNote, ZkNoteAndLinks, ZkNoteId,
 };
 use zkprotocol::messages::PrivateReplyMessage;
 
@@ -472,6 +475,47 @@ pub fn note_id2(
   }
 }
 
+pub fn id_uuid_for_zknoteid(
+  conn: &Connection,
+  zknoteid: &ZkNoteId,
+) -> Result<(i64, Uuid), orgauth::error::Error> {
+  match zknoteid {
+    ZkNoteId::ZkInt(i) => Ok((*i, uuid_for_note_id(&conn, *i)?)),
+    ZkNoteId::ZkUUID(uuid) => Ok((note_id_for_uuid(&conn, &uuid)?, *uuid)),
+  }
+}
+
+pub fn note_id_for_zknoteid(
+  conn: &Connection,
+  zknoteid: &ZkNoteId,
+) -> Result<i64, orgauth::error::Error> {
+  match zknoteid {
+    ZkNoteId::ZkInt(i) => Ok(*i),
+    ZkNoteId::ZkUUID(uuid) => note_id_for_uuid(&conn, &uuid),
+  }
+}
+
+pub fn uuid_for_note_id(conn: &Connection, id: i64) -> Result<Uuid, orgauth::error::Error> {
+  let s: String = conn.query_row(
+    "select zknote.uuid from zknote
+      where zknote.id = ?1",
+    params![id],
+    |row| Ok(row.get(0)?),
+  )?;
+  Ok(Uuid::parse_str(s.as_str())?)
+  // Ok(uuid)
+}
+
+pub fn note_id_for_uuid(conn: &Connection, uuid: &Uuid) -> Result<i64, orgauth::error::Error> {
+  let id: i64 = conn.query_row(
+    "select zknote.id from zknote
+      where zknote.uuid = ?1",
+    params![uuid.to_string()],
+    |row| Ok(row.get(0)?),
+  )?;
+  Ok(id)
+}
+
 pub fn user_note_id(conn: &Connection, uid: i64) -> Result<i64, orgauth::error::Error> {
   let id: i64 = conn.query_row(
     "select zknote from user
@@ -788,40 +832,59 @@ pub fn read_user_by_id(conn: &Connection, id: i64) -> Result<User, orgauth::erro
 pub fn read_zknote(
   conn: &Connection,
   uid: Option<i64>,
-  id: i64,
+  id: &ZkNoteId,
 ) -> Result<ZkNote, orgauth::error::Error> {
-  let sysid = user_id(&conn, "system")?;
-  let sysids = get_sysids(conn, sysid, id)?;
-
-  let mut note = conn.query_row(
-    "select ZN.uuid, ZN.title, ZN.content, ZN.user, OU.name, U.zknote, ZN.pubid, ZN.editable, ZN.showtitle, ZN.deleted, ZN.file, ZN.createdate, ZN.changeddate
-      from zknote ZN, orgauth_user OU, user U where ZN.id = ?1 and U.id = ZN.user and OU.id = ZN.user",
-    params![id],
-    |row| {
-      Ok(ZkNote {
-        id: id,
-        uuid: row.get(0)?,
-        title: row.get(1)?,
-        content: row.get(2)?,
-        user: row.get(3)?,
-        username: row.get(4)?,
-        usernote: row.get(5)?,
-        pubid: row.get(6)?,
-        editable: row.get(7)?,                // editable same as editableValue!
-        editableValue: row.get(7)?,           // <--- same index.
-        showtitle: row.get(8)?,
-        deleted: row.get(9)?,
-        is_file: { let wat : Option<i64> = row.get(10)?;
-          match wat {
+  let closure = |row: &Row<'_>| {
+    Ok(ZkNote {
+      id: row.get(0)?,
+      uuid: row.get(1)?,
+      title: row.get(2)?,
+      content: row.get(3)?,
+      user: row.get(4)?,
+      username: row.get(5)?,
+      usernote: row.get(6)?,
+      pubid: row.get(7)?,
+      editable: row.get(8)?,      // editable same as editableValue!
+      editableValue: row.get(8)?, // <--- same index.
+      showtitle: row.get(9)?,
+      deleted: row.get(10)?,
+      is_file: {
+        let wat: Option<i64> = row.get(11)?;
+        match wat {
           Some(_) => true,
           None => false,
-        }},
-        createdate: row.get(11)?,
-        changeddate: row.get(12)?,
-        sysids: sysids,
-      })
-    },
-  )?;
+        }
+      },
+      createdate: row.get(12)?,
+      changeddate: row.get(13)?,
+      sysids: Vec::new(),
+    })
+  };
+
+  // TODO check for query returned no rows and return better message.
+  let mut note = match id {
+    ZkNoteId::ZkInt(id) => {
+      println!("queryrow: {:?}", id);
+      conn.query_row(
+        "select ZN.id, ZN.uuid, ZN.title, ZN.content, ZN.user, OU.name, U.zknote, ZN.pubid, ZN.editable, ZN.showtitle, ZN.deleted, ZN.file, ZN.createdate, ZN.changeddate
+          from zknote ZN, orgauth_user OU, user U where ZN.id = ?1 and U.id = ZN.user and OU.id = ZN.user",
+          params![id],
+          closure)?
+    }
+    ZkNoteId::ZkUUID(uuid) => {
+      println!("queryrow: {:?}", uuid);
+      conn.query_row(
+        "select ZN.id, ZN.uuid, ZN.title, ZN.content, ZN.user, OU.name, U.zknote, ZN.pubid, ZN.editable, ZN.showtitle, ZN.deleted, ZN.file, ZN.createdate, ZN.changeddate
+          from zknote ZN, orgauth_user OU, user U where ZN.uuid = ?1 and U.id = ZN.user and OU.id = ZN.user",
+          params![uuid.to_string()],
+        closure)?
+    }
+  };
+
+  let sysid = user_id(&conn, "system")?;
+  let sysids = get_sysids(conn, sysid, note.id)?;
+
+  note.sysids = sysids;
 
   match zknote_access(conn, uid, &note) {
     Ok(zna) => match zna {
@@ -1198,6 +1261,8 @@ pub fn read_zklinks(
     .collect::<String>();
   s.truncate(s.len() - 1);
 
+  let zknid = note_id_for_zknoteid(&conn, &gzl.zknote)?;
+
   // good old fashioned string templating here, since I can't figure out how to
   // do array parameters.
   //
@@ -1259,21 +1324,21 @@ pub fn read_zklinks(
   let mut pstmt = conn.prepare(sqlstr.as_str())?;
   let r = Ok(
     pstmt
-      .query_map(params![uid, gzl.zknote, pubid, unid], |row| {
+      .query_map(params![uid, zknid, pubid, unid], |row| {
         let fromid = row.get(0)?;
         let toid = row.get(1)?;
-        let otherid = if fromid == gzl.zknote { toid } else { fromid };
+        let otherid = if fromid == zknid { toid } else { fromid };
         let sysids = get_sysids(&conn, sysid, otherid)?;
         Ok(EditLink {
           otherid: otherid,
-          direction: if fromid == gzl.zknote {
+          direction: if fromid == zknid {
             Direction::To
           } else {
             Direction::From
           },
           user: row.get(2)?,
           zknote: row.get(3)?,
-          othername: if fromid == gzl.zknote {
+          othername: if fromid == zknid {
             row.get(5)?
           } else {
             row.get(4)?
@@ -1343,6 +1408,7 @@ pub fn read_zknotecomments(
 ) -> Result<Vec<ZkNote>, orgauth::error::Error> {
   let cid = note_id(&conn, "system", "comment")?;
 
+  let zknid = note_id_for_zknoteid(&conn, &gznc.zknote)?;
   // notes with a TO link to our note
   // and a TO link to 'comment'
   let mut stmt = conn.prepare(
@@ -1350,13 +1416,13 @@ pub fn read_zknotecomments(
       where N.fromid = C.fromid
       and N.toid = ?1 and C.toid = ?2",
   )?;
-  let c_iter = stmt.query_map(params![gznc.zknote, cid], |row| Ok(row.get(0)?))?;
+  let c_iter = stmt.query_map(params![zknid, cid], |row| Ok(row.get(0)?))?;
 
   let mut nv = Vec::new();
 
   for id in c_iter {
     match id {
-      Ok(id) => match read_zknote(&conn, Some(uid), id) {
+      Ok(id) => match read_zknote(&conn, Some(uid), &ZkNoteId::ZkInt(id)) {
         Ok(note) => {
           nv.push(note);
           match gznc.limit {
@@ -1385,14 +1451,21 @@ pub fn read_zknotearchives(
   let aid = note_id(&conn, "system", "archive")?;
   let sysid = user_id(&conn, "system")?;
 
+  // let zknid = note_id_for_zknoteid(&conn, &gzna.zknote)?;
   // if this is the archive note itself, return empty array.
   // otherwise we can see all the archives for everyone's notes!
-  if gzna.zknote == aid {
+  if gzna.zknote == ZkNoteId::ZkInt(aid) {
+    // handled the int case, without bothering with read_zknote.
     return Ok(Vec::new());
   }
 
   // users that can't see a note, can't see the archives either.
-  read_zknote(&conn, Some(uid), gzna.zknote)?;
+  let zkn = read_zknote(&conn, Some(uid), &gzna.zknote)?;
+
+  // chancking again in case of uuid gzna.zknote
+  if zkn.id == aid {
+    return Ok(Vec::new());
+  }
 
   // notes with a TO link to our note
   // and a TO link to 'archive'
@@ -1405,7 +1478,7 @@ pub fn read_zknotearchives(
   )?;
 
   let c_iter = stmt
-    .query_map(params![gzna.zknote, aid], |row| Ok(row.get(0)?))?
+    .query_map(params![zkn.id, aid], |row| Ok(row.get(0)?))?
     .skip(gzna.offset as usize);
 
   let mut nv = Vec::new();
@@ -1436,15 +1509,18 @@ pub fn read_archivezknote(
   uid: i64,
   gazn: &GetArchiveZkNote,
 ) -> Result<ZkNote, orgauth::error::Error> {
-  let archiveid = note_id(&conn, "system", "archive")?;
   let sysid = user_id(&conn, "system")?;
+  let auid = Uuid::parse_str(SpecialUuids::Archive.str())?;
+  let archiveid = note_id_for_uuid(&conn, &auid)?;
 
-  if gazn.parentnote == archiveid {
+  if gazn.parentnote == ZkNoteId::ZkInt(archiveid) || gazn.parentnote == ZkNoteId::ZkUUID(auid) {
     bail!("query not allowed!");
   }
 
   // have access to the parent note?
-  read_zknote(conn, Some(uid), gazn.parentnote)?;
+  let pnote = read_zknote(conn, Some(uid), &gazn.parentnote)?;
+
+  let note_id = note_id_for_zknoteid(conn, &gazn.noteid)?;
 
   // archive note should have a TO link to the parent note
   // and a TO link to 'archive'
@@ -1452,7 +1528,7 @@ pub fn read_archivezknote(
     "select N.fromid from zklink C, zklink N
       where N.fromid = C.fromid
       and N.toid = ?1 and C.toid = ?2 and N.fromid = ?3",
-    params![gazn.parentnote, archiveid, gazn.noteid],
+    params![pnote.id, archiveid, note_id],
     |row| Ok(row.get(0)?),
   ) {
     Ok(v) => Ok::<i64, orgauth::error::Error>(v),
@@ -1461,7 +1537,7 @@ pub fn read_archivezknote(
   }?;
 
   // now read the archive note AS SYSTEM.
-  read_zknote(conn, Some(sysid), gazn.noteid)
+  read_zknote(conn, Some(sysid), &gazn.noteid)
 }
 
 pub fn read_archivezklinks(
@@ -1783,14 +1859,19 @@ pub fn accessible_notes(
 pub fn read_zknoteedit(
   conn: &Connection,
   uid: Option<i64>,
-  zknoteid: i64,
+  zknoteid: &ZkNoteId,
 ) -> Result<ZkNoteAndLinks, orgauth::error::Error> {
   // should do an ownership check for us
   let zknote = read_zknote(conn, uid, zknoteid)?;
 
   let zklinks = match uid {
-    Some(uid) => read_zklinks(conn, uid, &GetZkLinks { zknote: zknote.id })?,
-
+    Some(uid) => read_zklinks(
+      conn,
+      uid,
+      &GetZkLinks {
+        zknote: ZkNoteId::ZkInt(zknote.id),
+      },
+    )?,
     None => read_public_zklinks(conn, zknote.id)?,
   };
 
@@ -1805,15 +1886,16 @@ pub fn read_zneifchanged(
   uid: Option<i64>,
   gzic: &GetZnlIfChanged,
 ) -> Result<Option<ZkNoteAndLinks>, orgauth::error::Error> {
+  let id = note_id_for_zknoteid(&conn, &gzic.zknote)?;
   let changeddate: i64 = conn.query_row(
     "select changeddate from zknote N
       where N.id = ?1",
-    params![gzic.zknote],
+    params![id],
     |row| Ok(row.get(0)?),
   )?;
 
   if changeddate > gzic.changeddate {
-    return read_zknoteedit(conn, uid, gzic.zknote).map(Some);
+    return read_zknoteedit(conn, uid, &gzic.zknote).map(Some);
   } else {
     Ok(None)
   }
@@ -1844,6 +1926,7 @@ pub fn save_importzknotes(
           uid,
           &SaveZkNote {
             id: None,
+            uuid: None,
             title: izn.title.clone(),
             pubid: None,
             content: izn.content.clone(),
@@ -1867,6 +1950,7 @@ pub fn save_importzknotes(
             uid,
             &SaveZkNote {
               id: None,
+              uuid: None,
               title: title.clone(),
               pubid: None,
               content: "".to_string(),
@@ -1893,6 +1977,7 @@ pub fn save_importzknotes(
             uid,
             &SaveZkNote {
               id: None,
+              uuid: None,
               title: title.clone(),
               pubid: None,
               content: "".to_string(),
@@ -1967,6 +2052,7 @@ pub fn make_file_note(
     uid,
     &SaveZkNote {
       id: None,
+      uuid: None,
       title: name.to_string(),
       pubid: None,
       content: "".to_string(),

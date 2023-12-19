@@ -2300,6 +2300,7 @@ pub fn udpate30(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   update_note_id("share", SpecialUuids::Share.str())?;
   update_note_id("search", SpecialUuids::Search.str())?;
   update_note_id("user", SpecialUuids::User.str())?;
+  update_note_id("archive", SpecialUuids::Archive.str())?;
 
   // update system user uuid.
   conn.execute(
