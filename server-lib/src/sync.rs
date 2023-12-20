@@ -168,7 +168,7 @@ pub async fn sync(
                 )?,
               };
               println!("phantom user: {:?}", pu);
-              let localuserid = match orgauth::dbfun::read_user_by_uuid(&conn, pu.uuid.as_str()) {
+              let localuserid = match orgauth::dbfun::read_user_by_uuid(&conn, &pu.uuid) {
                 Ok(user) => {
                   println!("found local user {} for remote {}", user.id, pu.id);
                   userhash.insert(pu.id, user.id);
@@ -178,7 +178,7 @@ pub async fn sync(
                   let localpuid = orgauth::dbfun::phantom_user(
                     &conn,
                     pu.name,
-                    uuid::Uuid::parse_str(pu.uuid.as_str())?,
+                    pu.uuid,
                     pu.active,
                     &mut callbacks.on_new_user,
                   )?;
