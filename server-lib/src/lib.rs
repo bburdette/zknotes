@@ -47,7 +47,7 @@ pub use zkprotocol::messages::{
   PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage, PublicMessage,
 };
 use zkprotocol::{
-  constants::{PrivateReplies, PrivateRequests, PublicReplies},
+  constants::{PrivateReplies, PublicReplies},
   messages::PublicReplyMessage,
 };
 

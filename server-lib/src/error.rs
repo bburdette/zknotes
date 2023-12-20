@@ -1,8 +1,5 @@
 use actix_session;
 use actix_web::error as awe;
-// use lettre;
-// use lettre::transport::smtp as lts;
-use orgauth::error;
 use regex;
 use reqwest;
 use rusqlite;

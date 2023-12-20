@@ -11,8 +11,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::io::AsyncBufReadExt;
 use tokio_util::io::StreamReader;
-
-use uuid;
 use zkprotocol::constants::{PrivateReplies, PrivateRequests, PrivateStreamingRequests};
 use zkprotocol::content::{ArchiveZkLink, GetArchiveZkLinks, GetZkLinksSince, UuidZkLink, ZkNote};
 use zkprotocol::messages::{PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage};
