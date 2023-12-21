@@ -1,5 +1,6 @@
 module Data exposing (..)
 
+import TSet exposing (TSet)
 import Json.Decode as JD
 import Json.Encode as JE
 import Orgauth.Data exposing (UserId, decodeUserId, encodeUserId)
@@ -7,7 +8,7 @@ import Search as S
 import UUID exposing (UUID)
 import Url.Builder as UB
 import Util exposing (andMap)
-
+import TDict
 
 
 ------------------------------------------------------------
@@ -71,16 +72,16 @@ type alias LoginData =
     , email : String
     , admin : Bool
     , active : Bool
-    , zknote : Int
-    , homenote : Maybe UUID
+    , zknote : ZkNoteId
+    , homenote : Maybe ZkNoteId
     }
 
 
 type alias Sysids =
-    { publicid : Int
-    , shareid : Int
-    , searchid : Int
-    , commentid : Int
+    { publicid : ZkNoteId
+    , shareid : ZkNoteId
+    , searchid : ZkNoteId
+    , commentid : ZkNoteId
     }
 
 
@@ -89,14 +90,13 @@ type alias ZkInviteData =
 
 
 type alias ZkListNote =
-    { id : Int
-    , uuid : UUID
+    { id : ZkNoteId
     , user : UserId
     , title : String
     , isFile : Bool
     , createdate : Int
     , changeddate : Int
-    , sysids : List Int
+    , sysids : List ZkNoteId
     }
 
 
@@ -115,18 +115,16 @@ type alias ZkNoteSearchResult =
 
 
 type alias SavedZkNote =
-    { id : Int
-    , uuid : UUID
+    { id : ZkNoteId
     , changeddate : Int
     }
 
 
 type alias ZkNote =
-    { id : Int
-    , uuid : UUID
+    { id : ZkNoteId
     , user : UserId
     , username : String
-    , usernote : Int
+    , usernote : ZkNoteId
     , title : String
     , content : String
     , pubid : Maybe String
@@ -137,37 +135,90 @@ type alias ZkNote =
     , changeddate : Int
     , deleted : Bool
     , isFile : Bool
-    , sysids : List Int
+    , sysids : List ZkNoteId
     }
 
 
+
+-- type ZkNoteId
+--     = ZkInt Int
+--     | ZkUUID UUID
+
+
 type ZkNoteId
-    = ZkInt Int
-    | ZkUUID UUID
+    = ZkNoteId String
 
 
-encodeZkNoteId zni =
-    case zni of
-        ZkInt id ->
-            JE.object [ ( "ZkInt", JE.int id ) ]
+zniEq : ZkNoteId -> ZkNoteId -> Bool
+zniEq (ZkNoteId l) (ZkNoteId r) =
+    l == r
 
-        ZkUUID id ->
-            JE.object [ ( "ZkUUID", UUID.toValue id ) ]
+
+zniCompare : ZkNoteId -> ZkNoteId -> Order
+zniCompare (ZkNoteId l) (ZkNoteId r) =
+    compare l r
+
+
+encodeZkNoteId : ZkNoteId -> JE.Value
+encodeZkNoteId (ZkNoteId zni) =
+    JE.string zni
+
+
+zkNoteIdToString (ZkNoteId zni) =
+    zni
+
+
+zkNoteIdFromString : String -> Result UUID.Error ZkNoteId
+zkNoteIdFromString zni =
+    UUID.fromString
+        zni
+        |> Result.map (\_ -> ZkNoteId zni)
+
+
+trustedZkNoteIdFromString : String -> ZkNoteId
+trustedZkNoteIdFromString zni =
+        ZkNoteId zni
+
+
+zkNoteIdFromUUID : UUID -> ZkNoteId
+zkNoteIdFromUUID zni =
+    ZkNoteId (UUID.toString zni)
+
+
+
+-- case zni of
+--     ZkInt id ->
+--         JE.object [ ( "ZkInt", JE.int id ) ]
+--     ZkUUID id ->
+--         JE.object [ ( "ZkUUID", UUID.toValue id ) ]
 
 
 decodeZkNoteId : JD.Decoder ZkNoteId
 decodeZkNoteId =
-    JD.oneOf
-        [ JD.map ZkInt (JD.field "ZkInt" JD.int)
-        , JD.map ZkUUID (JD.field "ZkUUID" UUID.jsonDecoder)
-        ]
+    UUID.jsonDecoder
+        |> JD.map zkNoteIdFromUUID
+
+type alias ZniSet = 
+    TSet ZkNoteId String
+
+emptyZniSet : ZniSet
+emptyZniSet =
+    TSet.empty zkNoteIdToString trustedZkNoteIdFromString
+
+emptyZniDict = 
+    TDict.empty zkNoteIdToString trustedZkNoteIdFromString
+
+-- JD.oneOf
+--     [ JD.map ZkInt (JD.field "ZkInt" JD.int)
+--     , JD.map ZkUUID (JD.field "ZkUUID" decodeZkNoteId)
+--     ]
 
 
 type alias ZkLink =
-    { from : Int
-    , to : Int
+    { from : ZkNoteId
+    , to : ZkNoteId
     , user : UserId
-    , zknote : Maybe Int
+    , zknote : Maybe ZkNoteId
     , fromname : Maybe String
     , toname : Maybe String
     , delete : Maybe Bool
@@ -180,19 +231,18 @@ type Direction
 
 
 type alias EditLink =
-    { otherid : Int
+    { otherid : ZkNoteId
     , direction : Direction
     , user : UserId
-    , zknote : Maybe Int
+    , zknote : Maybe ZkNoteId
     , othername : Maybe String
-    , sysids : List Int
+    , sysids : List ZkNoteId
     , delete : Maybe Bool
     }
 
 
 type alias SaveZkNote =
-    { id : Maybe Int
-    , uuid : Maybe UUID
+    { id : Maybe ZkNoteId
     , pubid : Maybe String
     , title : String
     , content : String
@@ -203,10 +253,10 @@ type alias SaveZkNote =
 
 
 type alias SaveZkLink =
-    { otherid : Int
+    { otherid : ZkNoteId
     , direction : Direction
     , user : UserId
-    , zknote : Maybe Int
+    , zknote : Maybe ZkNoteId
     , delete : Maybe Bool
     }
 
@@ -277,8 +327,7 @@ type alias GetZkNoteArchives =
 
 
 type alias ZkNoteArchives =
-    { zknote : Int
-    , zkuuid : UUID
+    { zknote : ZkNoteId
     , results : ZkListNoteSearchResult
     }
 
@@ -299,8 +348,8 @@ fromOaLd : Orgauth.Data.LoginData -> Result JD.Error LoginData
 fromOaLd oald =
     JD.decodeValue
         (JD.succeed (LoginData oald.userid oald.uuid oald.name oald.email oald.admin oald.active)
-            |> andMap (JD.field "zknote" JD.int)
-            |> andMap (JD.field "homenote" (JD.maybe UUID.jsonDecoder))
+            |> andMap (JD.field "zknote" decodeZkNoteId)
+            |> andMap (JD.field "homenote" (JD.maybe decodeZkNoteId))
         )
         oald.data
 
@@ -308,13 +357,13 @@ fromOaLd oald =
 decodeSysids : JD.Decoder Sysids
 decodeSysids =
     JD.succeed Sysids
-        |> andMap (JD.field "publicid" JD.int)
-        |> andMap (JD.field "shareid" JD.int)
-        |> andMap (JD.field "searchid" JD.int)
-        |> andMap (JD.field "commentid" JD.int)
+        |> andMap (JD.field "publicid" decodeZkNoteId)
+        |> andMap (JD.field "shareid" decodeZkNoteId)
+        |> andMap (JD.field "searchid" decodeZkNoteId)
+        |> andMap (JD.field "commentid" decodeZkNoteId)
 
 
-toZkLink : Int -> UserId -> EditLink -> ZkLink
+toZkLink : ZkNoteId -> UserId -> EditLink -> ZkLink
 toZkLink noteid user el =
     { from =
         case el.direction of
@@ -338,9 +387,9 @@ toZkLink noteid user el =
     }
 
 
-zklKey : { a | otherid : Int, direction : Direction } -> String
+zklKey : { a | otherid : ZkNoteId, direction : Direction } -> String
 zklKey zkl =
-    String.fromInt zkl.otherid
+    zkNoteIdToString zkl.otherid
         ++ ":"
         ++ (case zkl.direction of
                 From ->
@@ -448,10 +497,10 @@ decodeDirection =
 
 encodeSaveZkLink : SaveZkLink -> JE.Value
 encodeSaveZkLink s =
-    [ Just ( "otherid", JE.int s.otherid )
+    [ Just ( "otherid", encodeZkNoteId s.otherid )
     , Just ( "direction", encodeDirection s.direction )
     , Just ( "user", encodeUserId s.user )
-    , s.zknote |> Maybe.map (\n -> ( "zknote", JE.int n ))
+    , s.zknote |> Maybe.map (\n -> ( "zknote", encodeZkNoteId n ))
     , s.delete |> Maybe.map (\n -> ( "delete", JE.bool n ))
     ]
         |> List.filterMap identity
@@ -467,8 +516,8 @@ decodeZkLinks =
 encodeZkLink : ZkLink -> JE.Value
 encodeZkLink zklink =
     JE.object <|
-        [ ( "from", JE.int zklink.from )
-        , ( "to", JE.int zklink.to )
+        [ ( "from", encodeZkNoteId zklink.from )
+        , ( "to", encodeZkNoteId zklink.to )
         , ( "user", encodeUserId zklink.user )
         ]
             ++ (zklink.delete
@@ -478,7 +527,7 @@ encodeZkLink zklink =
             ++ (zklink.zknote
                     |> Maybe.map
                         (\id ->
-                            [ ( "linkzknote", JE.int id ) ]
+                            [ ( "linkzknote", encodeZkNoteId id ) ]
                         )
                     |> Maybe.withDefault
                         []
@@ -488,10 +537,10 @@ encodeZkLink zklink =
 decodeZkLink : JD.Decoder ZkLink
 decodeZkLink =
     JD.map7 ZkLink
-        (JD.field "from" JD.int)
-        (JD.field "to" JD.int)
+        (JD.field "from" decodeZkNoteId)
+        (JD.field "to" decodeZkNoteId)
         (JD.field "user" decodeUserId)
-        (JD.maybe (JD.field "linkzknote" JD.int))
+        (JD.maybe (JD.field "linkzknote" decodeZkNoteId))
         (JD.maybe (JD.field "fromname" JD.string))
         (JD.maybe (JD.field "toname" JD.string))
         (JD.succeed Nothing)
@@ -500,18 +549,17 @@ decodeZkLink =
 decodeEditLink : JD.Decoder EditLink
 decodeEditLink =
     JD.map6 (\a b c d e f -> EditLink a b c d e f Nothing)
-        (JD.field "otherid" JD.int)
+        (JD.field "otherid" decodeZkNoteId)
         (JD.field "direction" decodeDirection)
         (JD.field "user" decodeUserId)
-        (JD.maybe (JD.field "zknote" JD.int))
+        (JD.maybe (JD.field "zknote" decodeZkNoteId))
         (JD.maybe (JD.field "othername" JD.string))
-        (JD.field "sysids" (JD.list JD.int))
+        (JD.field "sysids" (JD.list decodeZkNoteId))
 
 
 saveZkNote : ZkNote -> SaveZkNote
 saveZkNote fzn =
     { id = Just fzn.id
-    , uuid = Just fzn.uuid
     , pubid = fzn.pubid
     , title = fzn.title
     , content = fzn.content
@@ -532,7 +580,7 @@ encodeSaveZkNotePlusLinks s =
 encodeSaveZkNote : SaveZkNote -> JE.Value
 encodeSaveZkNote zkn =
     JE.object <|
-        (Maybe.map (\id -> [ ( "id", JE.int id ) ]) zkn.id
+        (Maybe.map (\id -> [ ( "id", encodeZkNoteId id ) ]) zkn.id
             |> Maybe.withDefault []
         )
             ++ (Maybe.map (\pubid -> [ ( "pubid", JE.string pubid ) ]) zkn.pubid
@@ -549,14 +597,13 @@ encodeSaveZkNote zkn =
 decodeZkListNote : JD.Decoder ZkListNote
 decodeZkListNote =
     JD.succeed ZkListNote
-        |> andMap (JD.field "id" JD.int)
-        |> andMap (JD.field "uuid" UUID.jsonDecoder)
+        |> andMap (JD.field "id" decodeZkNoteId)
         |> andMap (JD.field "user" decodeUserId)
         |> andMap (JD.field "title" JD.string)
         |> andMap (JD.field "is_file" JD.bool)
         |> andMap (JD.field "createdate" JD.int)
         |> andMap (JD.field "changeddate" JD.int)
-        |> andMap (JD.field "sysids" (JD.list JD.int))
+        |> andMap (JD.field "sysids" (JD.list decodeZkNoteId))
 
 
 decodeZkListNoteSearchResult : JD.Decoder ZkListNoteSearchResult
@@ -577,20 +624,18 @@ decodeZkNoteSearchResult =
 
 decodeSavedZkNote : JD.Decoder SavedZkNote
 decodeSavedZkNote =
-    JD.map3 SavedZkNote
-        (JD.field "id" JD.int)
-        (JD.field "uuid" UUID.jsonDecoder)
+    JD.map2 SavedZkNote
+        (JD.field "id" decodeZkNoteId)
         (JD.field "changeddate" JD.int)
 
 
 decodeZkNote : JD.Decoder ZkNote
 decodeZkNote =
     JD.succeed ZkNote
-        |> andMap (JD.field "id" JD.int)
-        |> andMap (JD.field "uuid" UUID.jsonDecoder)
+        |> andMap (JD.field "id" decodeZkNoteId)
         |> andMap (JD.field "user" decodeUserId)
         |> andMap (JD.field "username" JD.string)
-        |> andMap (JD.field "usernote" JD.int)
+        |> andMap (JD.field "usernote" decodeZkNoteId)
         |> andMap (JD.field "title" JD.string)
         |> andMap (JD.field "content" JD.string)
         |> andMap (JD.field "pubid" (JD.maybe JD.string))
@@ -601,14 +646,13 @@ decodeZkNote =
         |> andMap (JD.field "changeddate" JD.int)
         |> andMap (JD.field "deleted" JD.bool)
         |> andMap (JD.field "is_file" JD.bool)
-        |> andMap (JD.field "sysids" <| JD.list JD.int)
+        |> andMap (JD.field "sysids" <| JD.list decodeZkNoteId)
 
 
 decodeZkNoteArchives : JD.Decoder ZkNoteArchives
 decodeZkNoteArchives =
-    JD.map3 ZkNoteArchives
-        (JD.field "zknote" JD.int)
-        (JD.field "zkuuid" UUID.jsonDecoder)
+    JD.map2 ZkNoteArchives
+        (JD.field "zknote" decodeZkNoteId)
         (JD.field "results" decodeZkListNoteSearchResult)
 
 
@@ -635,8 +679,8 @@ decodeLoginData =
         |> andMap (JD.field "email" JD.string)
         |> andMap (JD.field "admin" JD.bool)
         |> andMap (JD.field "active" JD.bool)
-        |> andMap (JD.field "data" (JD.field "zknote" JD.int))
-        |> andMap (JD.field "data" (JD.field "homenote" (JD.maybe UUID.jsonDecoder)))
+        |> andMap (JD.field "data" (JD.field "zknote" decodeZkNoteId))
+        |> andMap (JD.field "data" (JD.field "homenote" (JD.maybe decodeZkNoteId)))
 
 
 encodeImportZkNote : ImportZkNote -> JE.Value
@@ -679,14 +723,14 @@ encodeGetArchiveZkNote x =
 ----------------------------------------
 
 
-editNoteLink : UUID -> String
+editNoteLink : ZkNoteId -> String
 editNoteLink noteid =
-    UB.absolute [ "editnote", UUID.toString noteid ] []
+    UB.absolute [ "editnote", zkNoteIdToString noteid ] []
 
 
-archiveNoteLink : Int -> Int -> String
+archiveNoteLink : ZkNoteId -> ZkNoteId -> String
 archiveNoteLink parentnoteid noteid =
-    UB.absolute [ "archivenote", String.fromInt parentnoteid, String.fromInt noteid ] []
+    UB.absolute [ "archivenote", zkNoteIdToString parentnoteid, zkNoteIdToString noteid ] []
 
 
 flipDirection : Direction -> Direction

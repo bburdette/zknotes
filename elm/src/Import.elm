@@ -24,7 +24,7 @@ module Import exposing
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
 import Common
-import Data
+import Data exposing (ZkNoteId, zniEq)
 import Dialog as D
 import Dict exposing (Dict)
 import Element as E exposing (Element)
@@ -45,6 +45,7 @@ import MdCommon exposing (..)
 import Schelme.Show exposing (showTerm)
 import Search as S
 import SearchStackPanel as SP
+import TDict exposing (TDict)
 import TangoColors as TC
 import Task
 import Url as U
@@ -58,7 +59,7 @@ type Msg
     | CancelPress
     | FilesPress
     | LinkPress Data.ZkListNote
-    | RemoveLink Int
+    | RemoveLink ZkNoteId
     | SPMsg SP.Msg
     | DialogMsg D.Msg
     | FilesSelected F.File (List F.File)
@@ -83,7 +84,7 @@ type alias Model =
     { ld : Data.LoginData
     , notes : List Data.ImportZkNote
     , zknSearchResult : Data.ZkListNoteSearchResult
-    , globlinks : Dict Int LinkHalf
+    , globlinks : TDict ZkNoteId String LinkHalf
     , spmodel : SP.Model
     , dialog : Maybe D.Model
     }
@@ -131,19 +132,19 @@ addLinks izn lh =
     }
 
 
-zkLinkName : Data.ZkLink -> Int -> String
+zkLinkName : Data.ZkLink -> ZkNoteId -> String
 zkLinkName zklink noteid =
-    if noteid == zklink.from then
-        zklink.toname |> Maybe.withDefault (String.fromInt zklink.to)
+    if zniEq noteid zklink.from then
+        zklink.toname |> Maybe.withDefault (Data.zkNoteIdToString zklink.to)
 
-    else if noteid == zklink.to then
-        zklink.fromname |> Maybe.withDefault (String.fromInt zklink.from)
+    else if zniEq noteid zklink.to then
+        zklink.fromname |> Maybe.withDefault (Data.zkNoteIdToString zklink.from)
 
     else
         "link error"
 
 
-showLh : Int -> LinkHalf -> Element Msg
+showLh : ZkNoteId -> LinkHalf -> Element Msg
 showLh id lh =
     E.row [ E.spacing 8, E.width E.fill ]
         [ case ( lh.from, lh.to ) of
@@ -209,7 +210,7 @@ importview size model =
             E.row [ EF.bold ] [ E.text "links" ]
                 :: List.map
                     (\( a, b ) -> showLh a b)
-                    (Dict.toList model.globlinks)
+                    (TDict.toList model.globlinks)
 
         searchPanel =
             let
@@ -237,7 +238,7 @@ importview size model =
                             (\zkln ->
                                 let
                                     tolinked =
-                                        Dict.get zkln.id model.globlinks
+                                        TDict.get zkln.id model.globlinks
                                             |> Maybe.map
                                                 (\lh -> lh.to)
                                             |> Maybe.withDefault
@@ -322,7 +323,7 @@ init ld zkl spm =
     { ld = ld
     , zknSearchResult = zkl
     , notes = []
-    , globlinks = Dict.empty -- Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) zklDict.links)
+    , globlinks = TDict.empty Data.zkNoteIdToString Data.trustedZkNoteIdFromString
     , spmodel = SP.searchResultUpdated zkl spm
     , dialog = Nothing
     }
@@ -386,7 +387,7 @@ update msg model =
         SavePress ->
             let
                 gl =
-                    Dict.values model.globlinks
+                    TDict.values model.globlinks
             in
             ( model
             , SaveExit <|
@@ -441,14 +442,14 @@ update msg model =
         LinkPress zkln ->
             -- add a zklink, or newlink?
             ( { model
-                | globlinks = Dict.insert zkln.id { title = zkln.title, to = True, from = False } model.globlinks
+                | globlinks = TDict.insert zkln.id { title = zkln.title, to = True, from = False } model.globlinks
               }
             , None
             )
 
         RemoveLink id ->
             ( { model
-                | globlinks = Dict.remove id model.globlinks
+                | globlinks = TDict.remove id model.globlinks
               }
             , None
             )

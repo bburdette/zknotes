@@ -1,5 +1,6 @@
 module Route exposing (Route(..), parseUrl, routeTitle, routeUrl)
 
+import Data exposing (ZkNoteId, zkNoteIdFromString, zkNoteIdToString)
 import UUID exposing (UUID)
 import Url exposing (Url)
 import Url.Builder as UB
@@ -8,12 +9,12 @@ import Url.Parser as UP exposing ((</>))
 
 type Route
     = LoginR
-    | PublicZkNote UUID
+    | PublicZkNote ZkNoteId
     | PublicZkPubId String
-    | EditZkNoteR UUID
+    | EditZkNoteR ZkNoteId
     | EditZkNoteNew
-    | ArchiveNoteListingR UUID
-    | ArchiveNoteR UUID Int
+    | ArchiveNoteListingR ZkNoteId
+    | ArchiveNoteR ZkNoteId ZkNoteId
     | ResetPasswordR String UUID
     | SettingsR
     | Invite String
@@ -26,23 +27,23 @@ routeTitle route =
         LoginR ->
             "login"
 
-        PublicZkNote uuid ->
-            "zknote " ++ UUID.toString uuid
+        PublicZkNote id ->
+            "zknote " ++ zkNoteIdToString id
 
         PublicZkPubId id ->
             id ++ " - zknotes"
 
-        EditZkNoteR uuid ->
-            "zknote " ++ UUID.toString uuid
+        EditZkNoteR id ->
+            "zknote " ++ zkNoteIdToString id
 
         EditZkNoteNew ->
             "new zknote"
 
-        ArchiveNoteListingR uuid ->
-            "archives " ++ UUID.toString uuid
+        ArchiveNoteListingR id ->
+            "archives " ++ zkNoteIdToString id
 
-        ArchiveNoteR uuid aid ->
-            "archive " ++ UUID.toString uuid ++ ": " ++ String.fromInt aid
+        ArchiveNoteR id aid ->
+            "archive " ++ zkNoteIdToString id ++ ": " ++ zkNoteIdToString aid
 
         ResetPasswordR _ _ ->
             "password reset"
@@ -67,7 +68,7 @@ parseUrl url =
             , UP.map PublicZkNote <|
                 UP.s
                     "note"
-                    </> UP.custom "UUID" (UUID.fromString >> Result.toMaybe)
+                    </> UP.custom "ZkNoteId" (zkNoteIdFromString >> Result.toMaybe)
             , UP.map (\i -> PublicZkPubId (Maybe.withDefault "" (Url.percentDecode i))) <|
                 UP.s
                     "page"
@@ -75,16 +76,16 @@ parseUrl url =
             , UP.map ArchiveNoteListingR <|
                 UP.s
                     "archivelisting"
-                    </> UP.custom "UUID" (UUID.fromString >> Result.toMaybe)
+                    </> UP.custom "ZkNoteId" (zkNoteIdFromString >> Result.toMaybe)
             , UP.map ArchiveNoteR <|
                 UP.s
                     "archivenote"
-                    </> UP.custom "UUID" (UUID.fromString >> Result.toMaybe)
-                    </> UP.int
+                    </> UP.custom "ZkNoteId" (zkNoteIdFromString >> Result.toMaybe)
+                    </> UP.custom "ZkNoteId" (zkNoteIdFromString >> Result.toMaybe)
             , UP.map EditZkNoteR <|
                 UP.s
                     "editnote"
-                    </> UP.custom "UUID" (UUID.fromString >> Result.toMaybe)
+                    </> UP.custom "ZkNoteId" (zkNoteIdFromString >> Result.toMaybe)
             , UP.map EditZkNoteNew <|
                 UP.s
                     "editnote"
@@ -114,22 +115,22 @@ routeUrl route =
             UB.absolute [ "login" ] []
 
         PublicZkNote uuid ->
-            UB.absolute [ "note", UUID.toString uuid ] []
+            UB.absolute [ "note", zkNoteIdToString uuid ] []
 
         PublicZkPubId pubid ->
             UB.absolute [ "page", pubid ] []
 
         EditZkNoteR uuid ->
-            UB.absolute [ "editnote", UUID.toString uuid ] []
+            UB.absolute [ "editnote", zkNoteIdToString uuid ] []
 
         EditZkNoteNew ->
             UB.absolute [ "editnote", "new" ] []
 
         ArchiveNoteListingR uuid ->
-            UB.absolute [ "archivelisting", UUID.toString uuid ] []
+            UB.absolute [ "archivelisting", zkNoteIdToString uuid ] []
 
         ArchiveNoteR uuid aid ->
-            UB.absolute [ "archivenote", UUID.toString uuid, String.fromInt aid ] []
+            UB.absolute [ "archivenote", zkNoteIdToString uuid, zkNoteIdToString aid ] []
 
         ResetPasswordR user key ->
             UB.absolute [ "reset", user, UUID.toString key ] []

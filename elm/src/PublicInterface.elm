@@ -1,6 +1,6 @@
 module PublicInterface exposing (SendMsg(..), ServerResponse(..), encodeSendMsg, getErrorIndexNote, serverResponseDecoder)
 
-import Data
+import Data exposing (ZkNoteId)
 import Http
 import Http.Tasks as HT
 import Json.Decode as JD
@@ -68,7 +68,7 @@ serverResponseDecoder =
         )
 
 
-getErrorIndexNote : String -> Int -> (Result Http.Error ServerResponse -> msg) -> Cmd msg
+getErrorIndexNote : String -> ZkNoteId -> (Result Http.Error ServerResponse -> msg) -> Cmd msg
 getErrorIndexNote location noteid tomsg =
     HT.post
         { url = location ++ "/public"
@@ -76,7 +76,7 @@ getErrorIndexNote location noteid tomsg =
             Http.jsonBody <|
                 encodeSendMsg
                     (GetZkNoteAndLinks
-                        { zknote = Data.ZkInt noteid
+                        { zknote = noteid
                         , what = ""
                         }
                     )

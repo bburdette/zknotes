@@ -1,7 +1,7 @@
 module TagAThing exposing (..)
 
 import Common
-import Data exposing (Direction(..), zklKey)
+import Data exposing (Direction(..), ZkNoteId, zklKey, zniCompare )
 import Dict exposing (Dict(..))
 import Element as E exposing (Element)
 import Element.Background as EBk
@@ -55,7 +55,7 @@ type alias Model tmod tmsg tcmd =
     , zklDict : Dict String Data.EditLink
     , zknSearchResult : Data.ZkListNoteSearchResult
     , searchOrRecent : SearchOrRecent
-    , focusSr : Maybe Int -- note id in search result.
+    , focusSr : Maybe ZkNoteId -- note id in search result.
     , focusLink : Maybe Data.EditLink
     }
 
@@ -66,7 +66,7 @@ type Msg tmsg
     | AddToSearchAsTag String
     | ToLinkPress Data.ZkListNote
     | FromLinkPress Data.ZkListNote
-    | SrFocusPress Int
+    | SrFocusPress ZkNoteId
     | LinkFocusPress Data.EditLink
     | FlipLink Data.EditLink
     | RemoveLink Data.EditLink
@@ -202,7 +202,7 @@ showSr model zkln =
             , E.inFront
                 (E.row [ E.height E.fill, E.alignRight, EBk.color TC.white ]
                     [ E.el [ E.centerY ] <|
-                        ZC.golink zkln.uuid ZC.otherLinkColor
+                        ZC.golink zkln.id ZC.otherLinkColor
                     ]
                 )
             ]
@@ -212,7 +212,7 @@ showSr model zkln =
         listingrow
 
 
-showZkl : Maybe Data.EditLink -> Data.LoginData -> Maybe Int -> Maybe E.Color -> Bool -> Data.EditLink -> Element (Msg tmsg)
+showZkl : Maybe Data.EditLink -> Data.LoginData -> Maybe ZkNoteId -> Maybe E.Color -> Bool -> Data.EditLink -> Element (Msg tmsg)
 showZkl focusLink ld id sysColor showflip zkl =
     let
         ( dir, otherid ) =
@@ -386,7 +386,7 @@ view stylePalette recentZkns mbsize model =
                                 (\( l, lc ) ( r, rc ) ->
                                     case ( lc, rc ) of
                                         ( Nothing, Nothing ) ->
-                                            compare r.otherid l.otherid
+                                            zniCompare r.otherid l.otherid
 
                                         ( Just _, Nothing ) ->
                                             GT
@@ -397,7 +397,7 @@ view stylePalette recentZkns mbsize model =
                                         ( Just lcolor, Just rcolor ) ->
                                             case Util.compareColor lcolor rcolor of
                                                 EQ ->
-                                                    compare r.otherid l.otherid
+                                                    zniCompare  r.otherid l.otherid
 
                                                 a ->
                                                     a

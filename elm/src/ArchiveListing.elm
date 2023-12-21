@@ -15,6 +15,7 @@ import PaginationPanel as PP
 import Route as R
 import Search as S exposing (TagSearch(..))
 import SearchStackPanel as SP
+import TDict exposing (TDict)
 import TagSearchPanel as TSP
 import TangoColors as TC
 import Time
@@ -26,23 +27,22 @@ import ZkCommon as ZC
 
 
 type Msg
-    = SelectPress Int
+    = SelectPress ZkNoteId
     | PPMsg PP.Msg
     | DonePress
 
 
 type alias Model =
-    { noteid : Int
-    , uuid : UUID
+    { noteid : ZkNoteId
     , notes : List Data.ZkListNote
-    , selected : Maybe Int
-    , fullnotes : Dict Int Data.ZkNote
+    , selected : Maybe ZkNoteId
+    , fullnotes : TDict ZkNoteId String Data.ZkNote
     , ppmodel : PP.Model
     }
 
 
 type Command
-    = Selected Int
+    = Selected ZkNoteId
     | GetArchives Data.GetZkNoteArchives
     | Done
     | None
@@ -51,17 +51,16 @@ type Command
 init : Data.ZkNoteArchives -> Model
 init zna =
     { noteid = zna.zknote
-    , uuid = zna.zkuuid
     , notes = zna.results.notes
     , selected = Nothing
-    , fullnotes = Dict.empty
+    , fullnotes = Data.emptyZniDict
     , ppmodel = PP.searchResultUpdated zna.results PP.initModel
     }
 
 
 onZkNote : Data.ZkNote -> Model -> ( Model, Command )
 onZkNote zkn model =
-    ( { model | fullnotes = Dict.insert zkn.id zkn model.fullnotes, selected = Just zkn.id }
+    ( { model | fullnotes = TDict.insert zkn.id zkn model.fullnotes, selected = Just zkn.id }
     , None
     )
 
@@ -84,7 +83,7 @@ view si ld zone size model =
     )
         [ listview si ld zone size model
         , model.selected
-            |> Maybe.andThen (\id -> Dict.get id model.fullnotes)
+            |> Maybe.andThen (\id -> TDict.get id model.fullnotes)
             |> Maybe.map (\zkn -> E.column [ E.width (E.maximum 700 E.fill), E.scrollbarX ] <| [ E.text zkn.content ])
             |> Maybe.withDefault E.none
         ]
@@ -139,7 +138,7 @@ listview si ld zone size model =
                 [ E.row [ E.width E.fill ]
                     [ E.link
                         Common.linkStyle
-                        { url = R.routeUrl <| R.EditZkNoteR model.uuid
+                        { url = R.routeUrl <| R.EditZkNoteR model.noteid
                         , label = E.text "back"
                         }
                     , E.el [ E.centerX ] <|
@@ -208,7 +207,7 @@ update msg model ld =
             ( { model | ppmodel = nm }
             , case cmd of
                 PP.RangeChanged ->
-                    GetArchives { zknote = ZkInt model.noteid, offset = nm.offset, limit = Just nm.increment }
+                    GetArchives { zknote = model.noteid, offset = nm.offset, limit = Just nm.increment }
 
                 PP.None ->
                     None

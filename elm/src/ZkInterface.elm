@@ -1,6 +1,6 @@
 module ZkInterface exposing (SendMsg(..), ServerResponse(..), encodeEmail, encodeSendMsg, serverResponseDecoder, showServerResponse)
 
-import Data
+import Data exposing (ZkNoteId)
 import Json.Decode as JD
 import Json.Encode as JE
 import Search as S
@@ -8,20 +8,20 @@ import Util
 
 
 type SendMsg
-    = GetZkNote Int
+    = GetZkNote ZkNoteId
     | GetZkNoteAndLinks Data.GetZkNoteAndLinks
     | GetZnlIfChanged Data.GetZnlIfChanged
     | GetZkNoteComments Data.GetZkNoteComments
     | GetZkNoteArchives Data.GetZkNoteArchives
     | GetArchiveZkNote Data.GetArchiveZkNote
-    | DeleteZkNote Int
+    | DeleteZkNote ZkNoteId
     | SaveZkNote Data.SaveZkNote
     | SaveZkLinks Data.ZkLinks
     | SaveZkNotePlusLinks Data.SaveZkNotePlusLinks
     | SearchZkNotes S.ZkNoteSearch
     | SaveImportZkNotes (List Data.ImportZkNote)
     | PowerDelete S.TagSearch
-    | SetHomeNote Int
+    | SetHomeNote ZkNoteId
     | SyncRemote
 
 
@@ -40,7 +40,7 @@ type ServerResponse
     | ZkLinks Data.ZkLinks
     | SavedImportZkNotes
     | PowerDeleteComplete Int
-    | HomeNoteSet Int
+    | HomeNoteSet ZkNoteId
     | FilesUploaded (List Data.ZkListNote)
     | SyncComplete
     | Noop
@@ -118,7 +118,7 @@ encodeSendMsg sm =
         GetZkNote id ->
             JE.object
                 [ ( "what", JE.string "GetZkNote" )
-                , ( "data", JE.int id )
+                , ( "data", Data.encodeZkNoteId id )
                 ]
 
         GetZkNoteAndLinks zkne ->
@@ -154,7 +154,7 @@ encodeSendMsg sm =
         DeleteZkNote id ->
             JE.object
                 [ ( "what", JE.string "DeleteZkNote" )
-                , ( "data", JE.int id )
+                , ( "data", Data.encodeZkNoteId id )
                 ]
 
         SaveZkNote x ->
@@ -196,7 +196,7 @@ encodeSendMsg sm =
         SetHomeNote id ->
             JE.object
                 [ ( "what", JE.string "SetHomeNote" )
-                , ( "data", JE.int id )
+                , ( "data", Data.encodeZkNoteId id )
                 ]
 
         SyncRemote ->
@@ -263,7 +263,7 @@ serverResponseDecoder =
                         JD.map PowerDeleteComplete (JD.field "content" JD.int)
 
                     "HomeNoteSet" ->
-                        JD.map HomeNoteSet (JD.field "content" JD.int)
+                        JD.map HomeNoteSet (JD.field "content" Data.decodeZkNoteId)
 
                     "FilesUploaded" ->
                         JD.map FilesUploaded (JD.field "content" <| JD.list Data.decodeZkListNote)
