@@ -206,7 +206,7 @@ pub async fn sync(
                 note.editable,
                 note.showtitle,
                 note.deleted,
-                note.uuid,
+                note.id.to_string(),
                 note.createdate,
                 note.changeddate,
               ],
@@ -302,7 +302,7 @@ pub async fn sync(
               note.editable,
               note.showtitle,
               note.deleted,
-              note.uuid,
+              note.id.to_string(),
               note.createdate,
               note.changeddate,
               ])?;

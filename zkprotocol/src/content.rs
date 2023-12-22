@@ -3,36 +3,34 @@
 use crate::search::ZkListNoteSearchResult;
 use uuid::Uuid;
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub enum ZkNoteId {
-  ZkInt(i64),
-  ZkUUID(Uuid),
-}
+pub type ZkNoteId = Uuid;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ExtraLoginData {
   pub userid: i64,
-  pub zknote: i64,
-  pub homenote: Option<i64>,
+  pub zknote: ZkNoteId,
+  pub homenote: Option<ZkNoteId>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Sysids {
-  pub publicid: i64,
-  pub shareid: i64,
-  pub searchid: i64,
-  pub commentid: i64,
+  pub publicid: ZkNoteId,
+  pub commentid: ZkNoteId,
+  pub shareid: ZkNoteId,
+  pub searchid: ZkNoteId,
+  pub userid: ZkNoteId,
+  pub archiveid: ZkNoteId,
+  pub systemid: ZkNoteId,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ZkNote {
-  pub id: i64,
-  pub uuid: String,
+  pub id: ZkNoteId,
   pub title: String,
   pub content: String,
   pub user: i64,
   pub username: String,
-  pub usernote: i64,
+  pub usernote: ZkNoteId,
   pub editable: bool,
   pub editableValue: bool,
   pub showtitle: bool,
@@ -41,31 +39,29 @@ pub struct ZkNote {
   pub changeddate: i64,
   pub deleted: bool,
   pub is_file: bool,
-  pub sysids: Vec<i64>,
+  pub sysids: Vec<ZkNoteId>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ZkListNote {
-  pub id: i64,
-  pub uuid: Uuid,
+  pub id: ZkNoteId,
   pub title: String,
   pub is_file: bool,
   pub user: i64,
   pub createdate: i64,
   pub changeddate: i64,
-  pub sysids: Vec<i64>,
+  pub sysids: Vec<ZkNoteId>,
 }
 
 #[derive(Serialize, Debug, Clone)]
 pub struct SavedZkNote {
-  pub id: i64,
+  pub id: ZkNoteId,
   pub changeddate: i64,
 }
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct SaveZkNote {
-  pub id: Option<i64>,
-  pub uuid: Option<Uuid>,
+  pub id: Option<ZkNoteId>,
   pub title: String,
   pub pubid: Option<String>,
   pub content: String,
@@ -82,10 +78,10 @@ pub enum Direction {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct SaveZkLink {
-  pub otherid: i64,
+  pub otherid: ZkNoteId,
   pub direction: Direction,
   pub user: i64,
-  pub zknote: Option<i64>,
+  pub zknote: Option<ZkNoteId>,
   pub delete: Option<bool>,
 }
 
@@ -97,10 +93,10 @@ pub struct SaveZkNotePlusLinks {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ZkLink {
-  pub from: i64,
-  pub to: i64,
+  pub from: ZkNoteId,
+  pub to: ZkNoteId,
   pub user: i64,
-  pub linkzknote: Option<i64>,
+  pub linkzknote: Option<ZkNoteId>,
   pub delete: Option<bool>,
   pub fromname: Option<String>,
   pub toname: Option<String>,
@@ -108,12 +104,12 @@ pub struct ZkLink {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct EditLink {
-  pub otherid: i64,
+  pub otherid: ZkNoteId,
   pub direction: Direction,
   pub user: i64,
-  pub zknote: Option<i64>,
+  pub zknote: Option<ZkNoteId>,
   pub othername: Option<String>,
-  pub sysids: Vec<i64>,
+  pub sysids: Vec<ZkNoteId>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -156,8 +152,7 @@ pub struct GetZkNoteArchives {
 
 #[derive(Serialize, Debug)]
 pub struct ZkNoteArchives {
-  pub zknote: i64,
-  pub uuid: Uuid,
+  pub zknote: ZkNoteId,
   pub results: ZkListNoteSearchResult,
 }
 

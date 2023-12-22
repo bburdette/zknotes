@@ -318,10 +318,10 @@ async fn make_file_notes(
     // compute hash.
     let fpath = Path::new(&fp);
 
-    let (noteid, _fid) = sqldata::make_file_note(&conn, userdata.id, &name, fpath)?;
+    let (nid64, _noteid, _fid) = sqldata::make_file_note(&conn, userdata.id, &name, fpath)?;
 
     // return zknoteedit.
-    let listnote = sqldata::read_zklistnote(&conn, Some(userdata.id), noteid)?;
+    let listnote = sqldata::read_zklistnote(&conn, Some(userdata.id), nid64)?;
     info!(
       "user#filer_uploaded-zknote: {} - {}",
       listnote.id, listnote.title

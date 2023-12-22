@@ -12,14 +12,26 @@ pub enum Error {
   String(String),
   ActixError(awe::Error),
   SerdeJson(serde_json::Error),
-  // LettreError(lettre::error::Error),
-  // LettreSmtpError(lts::Error),
-  // AddressError(lettre::address::AddressError),
   IoError(std::io::Error),
   Reqwest(reqwest::Error),
   Uuid(uuid::Error),
   Orgauth(orgauth::error::Error),
   Regex(regex::Error),
+}
+
+pub fn toOrgauthError(e: Error) -> orgauth::error::Error {
+  match e {
+    Error::Rusqlite(ze) => orgauth::error::Error::Rusqlite(ze),
+    Error::SystemTimeError(ze) => orgauth::error::Error::SystemTimeError(ze),
+    Error::String(ze) => orgauth::error::Error::String(ze),
+    Error::ActixError(ze) => orgauth::error::Error::ActixError(ze),
+    Error::SerdeJson(ze) => orgauth::error::Error::SerdeJson(ze),
+    Error::IoError(ze) => orgauth::error::Error::IoError(ze),
+    Error::Reqwest(ze) => orgauth::error::Error::Reqwest(ze),
+    Error::Uuid(ze) => orgauth::error::Error::Uuid(ze),
+    Error::Orgauth(ze) => ze,
+    Error::Regex(ze) => orgauth::error::Error::String(ze.to_string()),
+  }
 }
 
 impl std::error::Error for Error {
@@ -36,9 +48,6 @@ impl fmt::Display for Error {
       Error::String(e) => write!(f, "{}", e),
       Error::ActixError(e) => write!(f, "{}", e),
       Error::SerdeJson(e) => write!(f, "{}", e),
-      // Error::LettreError(e) => write!(f, "{}", e),
-      // Error::LettreSmtpError(e) => write!(f, "{}", e),
-      // Error::AddressError(e) => write!(f, "{}", e),
       Error::IoError(e) => write!(f, "{}", e),
       Error::Reqwest(e) => write!(f, "{}", e),
       Error::Uuid(e) => write!(f, "{}", e),
@@ -56,9 +65,6 @@ impl fmt::Debug for Error {
       Error::String(e) => write!(f, "{}", e),
       Error::ActixError(e) => write!(f, "{}", e),
       Error::SerdeJson(e) => write!(f, "{}", e),
-      // Error::LettreError(e) => write!(f, "{}", e),
-      // Error::LettreSmtpError(e) => write!(f, "{}", e),
-      // Error::AddressError(e) => write!(f, "{}", e),
       Error::IoError(e) => write!(f, "{}", e),
       Error::Reqwest(e) => write!(f, "{}", e),
       Error::Uuid(e) => write!(f, "{}", e),
@@ -103,24 +109,6 @@ impl From<serde_json::Error> for Error {
     Error::SerdeJson(e)
   }
 }
-
-// impl From<lettre::error::Error> for Error {
-//   fn from(e: lettre::error::Error) -> Self {
-//     Error::LettreError(e)
-//   }
-// }
-
-// impl From<lettre::address::AddressError> for Error {
-//   fn from(e: lettre::address::AddressError) -> Self {
-//     Error::AddressError(e)
-//   }
-// }
-
-// impl From<lts::Error> for Error {
-//   fn from(e: lts::Error) -> Self {
-//     Error::LettreSmtpError(e)
-//   }
-// }
 
 impl From<std::io::Error> for Error {
   fn from(e: std::io::Error) -> Self {

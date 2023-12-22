@@ -49,7 +49,7 @@ pub fn power_delete_zknotes(
       let c = znsr.notes.len().try_into()?;
 
       for n in znsr.notes {
-        delete_zknote(&conn, file_path.clone(), user, n.id)?;
+        delete_zknote(&conn, file_path.clone(), user, &n.id)?;
       }
       Ok(c)
     }
@@ -57,7 +57,7 @@ pub fn power_delete_zknotes(
       let c = znsr.notes.len().try_into()?;
 
       for n in znsr.notes {
-        delete_zknote(&conn, file_path.clone(), user, n.id)?;
+        delete_zknote(&conn, file_path.clone(), user, &n.id)?;
       }
       Ok(c)
     }
@@ -81,8 +81,7 @@ pub fn search_zknotes(
       .map_err(|_| rusqlite::Error::InvalidQuery)?;
     let sysids = get_sysids(conn, sysid, id)?;
     Ok(ZkListNote {
-      id: id,
-      uuid: uuid,
+      id: uuid,
       title: row.get(2)?,
       is_file: {
         let wat: Option<i64> = row.get(3)?;
@@ -123,11 +122,7 @@ pub fn search_zknotes(
     for rsrec in rec_iter {
       match rsrec {
         Ok(rec) => {
-          pv.push(sqldata::read_zknote(
-            &conn,
-            Some(s_user),
-            &ZkNoteId::ZkInt(rec.id),
-          )?);
+          pv.push(sqldata::read_zknote(&conn, Some(s_user), &rec.id)?.1);
         }
         Err(_) => (),
       }
@@ -179,8 +174,7 @@ pub fn search_zknotes_stream(
     while let Some(row) = rows.next()? {
       if search.list {
         let zln = ZkListNote {
-          id: row.get(0)?,
-          uuid: Uuid::parse_str(row.get::<usize, String>(1)?.as_str())
+          id: Uuid::parse_str(row.get::<usize, String>(1)?.as_str())
             .map_err(|_| rusqlite::Error::InvalidQuery)?,
           title: row.get(2)?,
           is_file: {
@@ -197,7 +191,8 @@ pub fn search_zknotes_stream(
         s.push_str("\n");
         yield Bytes::from(s);
       } else {
-        let zn = sqldata::read_zknote(&conn, Some(s_user), &ZkNoteId::ZkInt(row.get(0)?))?;
+
+        let zn = sqldata::read_zknote_i64(&conn, Some(s_user), row.get(0)?)?;
         let mut s = serde_json::to_value(zn)?.to_string().to_string();
         s.push_str("\n");
         yield Bytes::from(s);
