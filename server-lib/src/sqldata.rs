@@ -20,9 +20,9 @@ use uuid::Uuid;
 use zkprotocol::constants::PrivateReplies;
 use zkprotocol::constants::SpecialUuids;
 use zkprotocol::content::{
-  ArchiveZkLink, Direction, EditLink, ExtraLoginData, GetArchiveZkNote, GetZkLinks,
-  GetZkNoteArchives, GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkLink, SaveZkNote,
-  SavedZkNote, Sysids, UuidZkLink, ZkLink, ZkListNote, ZkNote, ZkNoteAndLinks, ZkNoteId,
+  ArchiveZkLink, Direction, EditLink, ExtraLoginData, GetArchiveZkNote, GetZkNoteArchives,
+  GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkLink, SaveZkNote, SavedZkNote, Sysids,
+  UuidZkLink, ZkLink, ZkListNote, ZkNote, ZkNoteAndLinks, ZkNoteId,
 };
 use zkprotocol::messages::PrivateReplyMessage;
 
@@ -120,7 +120,7 @@ pub fn extra_login_data(
   Ok(eld)
 }
 
-pub fn sysids() -> Result<Sysids, crate::error::Error> {
+pub fn sysids() -> Result<Sysids, zkerr::Error> {
   Ok(Sysids {
     publicid: Uuid::parse_str(SpecialUuids::Public.str())?,
     commentid: Uuid::parse_str(SpecialUuids::Comment.str())?,
@@ -133,11 +133,7 @@ pub fn sysids() -> Result<Sysids, crate::error::Error> {
 }
 
 // will this work??
-pub fn set_homenote(
-  conn: &Connection,
-  uid: i64,
-  homenote: ZkNoteId,
-) -> Result<(), crate::error::Error> {
+pub fn set_homenote(conn: &Connection, uid: i64, homenote: ZkNoteId) -> Result<(), zkerr::Error> {
   conn.execute(
     "with hn as (select id from zknote where uuid = ?1)
     update user set homenote = zknote.id
@@ -148,7 +144,7 @@ pub fn set_homenote(
   Ok(())
 }
 
-pub fn connection_open(dbfile: &Path) -> Result<Connection, crate::error::Error> {
+pub fn connection_open(dbfile: &Path) -> Result<Connection, zkerr::Error> {
   let conn = Connection::open(dbfile)?;
 
   // conn.busy_timeout(Duration::from_millis(500))?;
@@ -164,10 +160,7 @@ pub fn connection_open(dbfile: &Path) -> Result<Connection, crate::error::Error>
   Ok(conn)
 }
 
-pub fn get_single_value(
-  conn: &Connection,
-  name: &str,
-) -> Result<Option<String>, crate::error::Error> {
+pub fn get_single_value(conn: &Connection, name: &str) -> Result<Option<String>, zkerr::Error> {
   match conn.query_row(
     "select value from singlevalue where name = ?1",
     params![name],
@@ -179,11 +172,7 @@ pub fn get_single_value(
   }
 }
 
-pub fn set_single_value(
-  conn: &Connection,
-  name: &str,
-  value: &str,
-) -> Result<(), crate::error::Error> {
+pub fn set_single_value(conn: &Connection, name: &str, value: &str) -> Result<(), zkerr::Error> {
   conn.execute(
     "insert into singlevalue (name, value) values (?1, ?2)
         on conflict (name) do update set value = ?2 where name = ?1",
@@ -388,7 +377,7 @@ pub fn save_zklink(
   toid: i64,
   user: i64,
   linkzknote: Option<i64>,
-) -> Result<i64, crate::error::Error> {
+) -> Result<i64, zkerr::Error> {
   // ok to link to notes you don't own.
   // can link between notes you don't own, even.
   // but linking from a note you don't own to 'share' or 'public' is not allowed.
@@ -425,7 +414,7 @@ pub fn save_zklink(
   };
 
   // yeesh.  doing this to exit with ? instead of having a big if-then to the end.
-  let orwat: Result<(), crate::error::Error> = if authed {
+  let orwat: Result<(), zkerr::Error> = if authed {
     Ok(())
   } else {
     Err("link not allowed".into())
@@ -466,11 +455,7 @@ pub fn note_id(conn: &Connection, name: &str, title: &str) -> Result<i64, orgaut
   Ok(id)
 }
 
-pub fn note_id2(
-  conn: &Connection,
-  uid: i64,
-  title: &str,
-) -> Result<Option<i64>, crate::error::Error> {
+pub fn note_id2(conn: &Connection, uid: i64, title: &str) -> Result<Option<i64>, zkerr::Error> {
   match conn.query_row(
     "select zknote.id from
       zknote
@@ -487,10 +472,7 @@ pub fn note_id2(
   }
 }
 
-pub fn note_id_for_zknoteid(
-  conn: &Connection,
-  zknoteid: &ZkNoteId,
-) -> Result<i64, crate::error::Error> {
+pub fn note_id_for_zknoteid(conn: &Connection, zknoteid: &ZkNoteId) -> Result<i64, zkerr::Error> {
   note_id_for_uuid(&conn, &zknoteid)
 }
 
@@ -551,7 +533,7 @@ pub fn is_zknote_usershared(
   conn: &Connection,
   zknoteid: i64,
   uid: i64,
-) -> Result<bool, crate::error::Error> {
+) -> Result<bool, zkerr::Error> {
   let usernoteid: i64 = user_note_id(&conn, uid)?;
 
   let ret = are_notes_linked(&conn, zknoteid, usernoteid)?;
@@ -559,18 +541,14 @@ pub fn is_zknote_usershared(
   Ok(ret)
 }
 
-pub fn is_zknote_shared(
-  conn: &Connection,
-  zknoteid: i64,
-  uid: i64,
-) -> Result<bool, crate::error::Error> {
+pub fn is_zknote_shared(conn: &Connection, zknoteid: i64, uid: i64) -> Result<bool, zkerr::Error> {
   let shareid: i64 = note_id(conn, "system", "share")?;
   let publicid: i64 = note_id(conn, "system", "public")?;
   let usernoteid: i64 = user_note_id(&conn, uid)?;
 
   // does note link to a note that links to share?
   // and does that note link to usernoteid?
-  let ret: Result<bool, crate::error::Error> = match conn.query_row(
+  let ret: Result<bool, zkerr::Error> = match conn.query_row(
     "select count(*)
       from zklink L,
         (select U.toid id
@@ -603,7 +581,7 @@ pub fn is_zknote_shared(
   Ok(ret?)
 }
 
-pub fn is_zknote_public(conn: &Connection, zknoteid: i64) -> Result<bool, crate::error::Error> {
+pub fn is_zknote_public(conn: &Connection, zknoteid: i64) -> Result<bool, zkerr::Error> {
   let pubid: i64 = note_id(conn, "system", "public")?;
   match conn.query_row(
     "select count(*) from
@@ -622,11 +600,7 @@ pub fn is_zknote_public(conn: &Connection, zknoteid: i64) -> Result<bool, crate:
   }
 }
 
-pub fn is_zknote_mine(
-  conn: &Connection,
-  zknoteid: i64,
-  userid: i64,
-) -> Result<bool, crate::error::Error> {
+pub fn is_zknote_mine(conn: &Connection, zknoteid: i64, userid: i64) -> Result<bool, zkerr::Error> {
   match conn.query_row(
     "select count(*) from
       zknote
@@ -643,11 +617,7 @@ pub fn is_zknote_mine(
   }
 }
 
-pub fn are_notes_linked(
-  conn: &Connection,
-  nid1: i64,
-  nid2: i64,
-) -> Result<bool, crate::error::Error> {
+pub fn are_notes_linked(conn: &Connection, nid1: i64, nid2: i64) -> Result<bool, zkerr::Error> {
   match conn.query_row(
     "select count(*) from
       zklink
@@ -665,7 +635,7 @@ pub fn are_notes_linked(
   }
 }
 
-pub fn archive_zknote(conn: &Connection, noteid: i64) -> Result<SavedZkNote, crate::error::Error> {
+pub fn archive_zknote(conn: &Connection, noteid: i64) -> Result<SavedZkNote, zkerr::Error> {
   let now = now()?;
   let sysid = user_id(&conn, "system")?;
   let aid = note_id(&conn, "system", "archive")?;
@@ -692,11 +662,7 @@ pub fn archive_zknote(conn: &Connection, noteid: i64) -> Result<SavedZkNote, cra
   })
 }
 
-pub fn set_zknote_file(
-  conn: &Connection,
-  noteid: i64,
-  fileid: i64,
-) -> Result<(), crate::error::Error> {
+pub fn set_zknote_file(conn: &Connection, noteid: i64, fileid: i64) -> Result<(), zkerr::Error> {
   conn.execute(
     "update zknote set file = ?1
          where id = ?2",
@@ -819,7 +785,7 @@ pub fn get_sysids(
   r
 }
 
-pub fn read_user_by_id(conn: &Connection, id: i64) -> Result<User, crate::error::Error> {
+pub fn read_user_by_id(conn: &Connection, id: i64) -> Result<User, zkerr::Error> {
   let (uid, noteid, hn) = conn.query_row(
     "select user.id, zknote.uuid, homenote
       from user, zknote where user.id = ?1
@@ -853,7 +819,7 @@ pub fn read_zknote_i64(
   conn: &Connection,
   uid: Option<i64>,
   id: i64,
-) -> Result<ZkNote, crate::error::Error> {
+) -> Result<ZkNote, zkerr::Error> {
   read_zknote(&conn, uid, &uuid_for_note_id(&conn, id)?).map(|x| x.1)
 }
 
@@ -861,20 +827,17 @@ pub fn read_zknote(
   conn: &Connection,
   uid: Option<i64>,
   id: &ZkNoteId,
-) -> Result<(i64, ZkNote), crate::error::Error> {
+) -> Result<(i64, ZkNote), zkerr::Error> {
   let closure = |row: &Row<'_>| {
-    Ok((
+    Ok::<_, zkerr::Error>((
       row.get(0)?,
       ZkNote {
-        // id: row.get(0)?,
-        id: Uuid::parse_str(row.get::<usize, String>(1)?.as_str())
-          .map_err(|_| rusqlite::Error::InvalidQuery)?,
+        id: Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?,
         title: row.get(2)?,
         content: row.get(3)?,
         user: row.get(4)?,
         username: row.get(5)?,
-        usernote: Uuid::parse_str(row.get::<usize, String>(6)?.as_str())
-          .map_err(|_| rusqlite::Error::InvalidQuery)?,
+        usernote: Uuid::parse_str(row.get::<usize, String>(6)?.as_str())?,
         pubid: row.get(7)?,
         editable: row.get(8)?,      // editable same as editableValue!
         editableValue: row.get(8)?, // <--- same index.
@@ -896,7 +859,7 @@ pub fn read_zknote(
 
   // TODO check for query returned no rows and return better message.
   let (id, mut note) =
-      conn.query_row(
+      conn.query_row_and_then(
         "select ZN.id, ZN.uuid, ZN.title, ZN.content, ZN.user, OU.name, ZKN.uuid, ZN.pubid, ZN.editable, ZN.showtitle, ZN.deleted, ZN.file, ZN.createdate, ZN.changeddate
           from zknote ZN, orgauth_user OU, user U, zknote ZKN where ZN.uuid = ?1 and U.id = ZN.user and OU.id = ZN.user and ZKN.id = U.zknote",
           params![id.to_string()],
@@ -927,34 +890,33 @@ pub fn read_zklistnote(
   conn: &Connection,
   uid: Option<i64>,
   id: i64,
-) -> Result<ZkListNote, crate::error::Error> {
+) -> Result<ZkListNote, zkerr::Error> {
   let sysid = user_id(&conn, "system")?;
   let sysids = get_sysids(conn, sysid, id)?;
 
   // access check
   let zna = zknote_access_id(conn, uid, id)?;
   match zna {
-    Access::Private => Err::<_, crate::error::Error>("can't read zknote; note is private".into()),
+    Access::Private => Err::<_, zkerr::Error>("can't read zknote; note is private".into()),
     _ => Ok(()),
   }?;
 
-  let note = conn.query_row(
+  let note = conn.query_row_and_then(
     "select ZN.uuid, ZN.title, ZN.file, ZN.user, ZN.createdate, ZN.changeddate
       from zknote ZN, orgauth_user OU, user U where ZN.id = ?1 and U.id = ZN.user and OU.id = ZN.user",
     params![id],
     |row| {
       let wat : Option<i64> = row.get(2)?;
       let zln = ZkListNote {
-        id:  Uuid::parse_str(row.get::<usize,String>(0)?.as_str())
-            .map_err(|_| rusqlite::Error::InvalidQuery)?,
+        id:  Uuid::parse_str(row.get::<usize,String>(0)?.as_str())?,
         title: row.get(1)?,
         is_file: wat.is_some(),
         user: row.get(3)?,
         createdate: row.get(4)?,
         changeddate: row.get(5)?,
-        sysids: sysids,
+        sysids,
       };
-      Ok(zln)
+      Ok::<_, zkerr::Error>(zln)
     },
   )?;
 
@@ -973,7 +935,7 @@ pub fn zknote_access(
   uid: Option<i64>,
   id: i64,
   note: &ZkNote,
-) -> Result<Access, crate::error::Error> {
+) -> Result<Access, zkerr::Error> {
   match uid {
     Some(uid) => {
       if uid == note.user {
@@ -1014,7 +976,7 @@ pub fn zknote_access_id(
   conn: &Connection,
   uid: Option<i64>,
   noteid: i64,
-) -> Result<Access, crate::error::Error> {
+) -> Result<Access, zkerr::Error> {
   match uid {
     Some(uid) => {
       if is_zknote_mine(&conn, noteid, uid)? {
@@ -1047,7 +1009,7 @@ pub fn read_zknote_filehash(
   conn: &Connection,
   uid: Option<i64>,
   noteid: &i64,
-) -> Result<Option<String>, crate::error::Error> {
+) -> Result<Option<String>, zkerr::Error> {
   if zknote_access_id(&conn, uid, *noteid)? != Access::Private {
     let hash = conn.query_row(
       "select F.hash from zknote N, file F
@@ -1067,9 +1029,9 @@ pub fn read_zknotepubid(
   conn: &Connection,
   uid: Option<i64>,
   pubid: &str,
-) -> Result<ZkNote, crate::error::Error> {
+) -> Result<ZkNote, zkerr::Error> {
   let publicid = note_id(&conn, "system", "public")?;
-  let (id, mut note) = conn.query_row(
+  let (id, mut note) = conn.query_row_and_then(
     "select A.id, A.uuid, A.title, A.content, A.user, OU.name, U.zknote, A.pubid, A.editable, A.showtitle, A.deleted, A.file, A.createdate, A.changeddate
       from zknote A, user U, orgauth_user OU, zklink L where A.pubid = ?1
       and ((A.id = L.fromid
@@ -1079,15 +1041,13 @@ pub fn read_zknotepubid(
       and OU.id = A.user",
     params![pubid, publicid],
     |row| {
-      Ok((row.get(0)?, ZkNote {
-        id: Uuid::parse_str(row.get::<usize,String>(1)?.as_str())
-            .map_err(|_| rusqlite::Error::InvalidQuery)?,
+      Ok::<_, zkerr::Error>((row.get(0)?, ZkNote {
+        id: Uuid::parse_str(row.get::<usize,String>(1)?.as_str())?,
         title: row.get(2)?,
         content: row.get(3)?,
         user: row.get(4)?,
         username: row.get(5)?,
-        usernote:  Uuid::parse_str(row.get::<usize,String>(6)?.as_str())
-            .map_err(|_| rusqlite::Error::InvalidQuery)?,
+        usernote:  Uuid::parse_str(row.get::<usize,String>(6)?.as_str())?,
         pubid: row.get(7)?,
         editable: false,
         editableValue: row.get(8)?,
@@ -1130,10 +1090,10 @@ pub fn delete_zknote(
   file_path: PathBuf,
   uid: i64,
   noteid: &ZkNoteId,
-) -> Result<(), crate::error::Error> {
+) -> Result<(), zkerr::Error> {
   let nid = note_id_for_uuid(&conn, &noteid)?;
   match zknote_access_id(&conn, Some(uid), nid)? {
-    Access::ReadWrite => Ok::<(), crate::error::Error>(()),
+    Access::ReadWrite => Ok::<_, zkerr::Error>(()),
     _ => Err("can't delete zknote; write permission denied.".into()),
   }?;
 
@@ -1184,11 +1144,7 @@ pub fn delete_zknote(
   Ok(())
 }
 
-pub fn save_zklinks(
-  dbfile: &Path,
-  uid: i64,
-  zklinks: Vec<ZkLink>,
-) -> Result<(), crate::error::Error> {
+pub fn save_zklinks(dbfile: &Path, uid: i64, zklinks: Vec<ZkLink>) -> Result<(), zkerr::Error> {
   let conn = connection_open(dbfile)?;
 
   for zklink in zklinks.iter() {
@@ -1227,7 +1183,7 @@ pub fn save_savezklinks(
   uid: i64,
   zknid: ZkNoteId,
   zklinks: Vec<SaveZkLink>,
-) -> Result<(), crate::error::Error> {
+) -> Result<(), zkerr::Error> {
   for link in zklinks.iter() {
     let (uufrom, uuto) = match link.direction {
       Direction::From => (link.otherid, zknid),
@@ -1366,8 +1322,8 @@ pub fn read_zklinks(
         Some(i) => Some(uuid_for_note_id(&conn, i)?),
         None => None,
       };
-      Ok::<EditLink, zkerr::Error>(EditLink {
-        otherid: Uuid::parse_str(otheruuid.as_str()).map_err(|_| rusqlite::Error::InvalidQuery)?,
+      Ok::<_, zkerr::Error>(EditLink {
+        otherid: Uuid::parse_str(otheruuid.as_str())?,
         direction,
         user: row.get(2)?,
         zknote,
@@ -1383,7 +1339,7 @@ pub fn read_zklinks(
 pub fn read_public_zklinks(
   conn: &Connection,
   noteid: &ZkNoteId,
-) -> Result<Vec<EditLink>, crate::error::Error> {
+) -> Result<Vec<EditLink>, zkerr::Error> {
   let pubid = note_id(&conn, "system", "public")?;
   let sysid = user_id(&conn, "system")?;
   let zknid = note_id_for_zknoteid(&conn, noteid)?;
@@ -1425,7 +1381,7 @@ pub fn read_public_zklinks(
       .get::<usize, Option<String>>(3)?
       .and_then(|s| Uuid::parse_str(s.as_str()).ok());
 
-    Ok::<EditLink, crate::error::Error>(EditLink {
+    Ok::<_, zkerr::Error>(EditLink {
       otherid: otheruuid,
       direction,
       user: row.get(2)?,
@@ -1442,7 +1398,7 @@ pub fn read_zknotecomments(
   conn: &Connection,
   uid: i64,
   gznc: &GetZkNoteComments,
-) -> Result<Vec<ZkNote>, crate::error::Error> {
+) -> Result<Vec<ZkNote>, zkerr::Error> {
   let cid = note_id(&conn, "system", "comment")?;
 
   let zknid = note_id_for_zknoteid(&conn, &gznc.zknote)?;
@@ -1484,7 +1440,7 @@ pub fn read_zknotearchives(
   conn: &Connection,
   uid: i64,
   gzna: &GetZkNoteArchives,
-) -> Result<Vec<ZkListNote>, crate::error::Error> {
+) -> Result<Vec<ZkListNote>, zkerr::Error> {
   let aid = note_id(&conn, "system", "archive")?;
   let sysid = user_id(&conn, "system")?;
 
@@ -1496,7 +1452,7 @@ pub fn read_zknotearchives(
   }
 
   // users that can't see a note, can't see the archives either.
-  let (id, zkn) = read_zknote(&conn, Some(uid), &gzna.zknote)?;
+  let (id, _zkn) = read_zknote(&conn, Some(uid), &gzna.zknote)?;
 
   // notes with a TO link to our note
   // and a TO link to 'archive'
@@ -1539,7 +1495,7 @@ pub fn read_archivezknote(
   conn: &Connection,
   uid: i64,
   gazn: &GetArchiveZkNote,
-) -> Result<(i64, ZkNote), crate::error::Error> {
+) -> Result<(i64, ZkNote), zkerr::Error> {
   let sysid = user_id(&conn, "system")?;
   let auid = Uuid::parse_str(SpecialUuids::Archive.str())?;
   let archiveid = note_id_for_uuid(&conn, &auid)?;
@@ -1549,7 +1505,7 @@ pub fn read_archivezknote(
   }
 
   // have access to the parent note?
-  let (pid, pnote) = read_zknote(conn, Some(uid), &gazn.parentnote)?;
+  let (pid, _pnote) = read_zknote(conn, Some(uid), &gazn.parentnote)?;
 
   let note_id = note_id_for_zknoteid(conn, &gazn.noteid)?;
 
@@ -1562,7 +1518,7 @@ pub fn read_archivezknote(
     params![pid, archiveid, note_id],
     |row| Ok(row.get(0)?),
   ) {
-    Ok(v) => Ok::<i64, crate::error::Error>(v),
+    Ok(v) => Ok::<_, zkerr::Error>(v),
     Err(rusqlite::Error::QueryReturnedNoRows) => Err("not an archive note!".into()),
     Err(x) => Err(x.into()),
   }?;
@@ -1575,7 +1531,7 @@ pub fn read_archivezklinks(
   conn: &Connection,
   uid: i64,
   after: i64,
-) -> Result<Vec<ArchiveZkLink>, crate::error::Error> {
+) -> Result<Vec<ArchiveZkLink>, zkerr::Error> {
   let (acc_sql, acc_args) = accessible_notes(&conn, uid)?;
 
   let mut pstmt = conn.prepare(
@@ -1666,7 +1622,7 @@ pub fn read_zklinks_since(
   conn: &Connection,
   uid: i64,
   after: i64,
-) -> Result<Vec<UuidZkLink>, crate::error::Error> {
+) -> Result<Vec<UuidZkLink>, zkerr::Error> {
   let (acc_sql, acc_args) = accessible_notes(&conn, uid)?;
 
   println!("acc_sql {}", acc_sql);
@@ -1790,7 +1746,7 @@ pub fn read_zklinks_since_stream(
 pub fn accessible_notes(
   conn: &Connection,
   uid: i64,
-) -> Result<(String, Vec<String>), crate::error::Error> {
+) -> Result<(String, Vec<String>), zkerr::Error> {
   let publicid = note_id(&conn, "system", "public")?;
   let archiveid = note_id(&conn, "system", "archive")?;
   let shareid = note_id(&conn, "system", "share")?;
@@ -1891,26 +1847,23 @@ pub fn read_zknoteandlinks(
   conn: &Connection,
   uid: Option<i64>,
   zknoteid: &ZkNoteId,
-) -> Result<ZkNoteAndLinks, crate::error::Error> {
+) -> Result<ZkNoteAndLinks, zkerr::Error> {
   // should do an ownership check for us
   let (id, zknote) = read_zknote(conn, uid, zknoteid)?;
 
-  let zklinks = match uid {
+  let links = match uid {
     Some(uid) => read_zklinks(conn, uid, id)?,
     None => read_public_zklinks(conn, &zknote.id)?,
   };
 
-  Ok(ZkNoteAndLinks {
-    zknote: zknote,
-    links: zklinks,
-  })
+  Ok(ZkNoteAndLinks { zknote, links })
 }
 
 pub fn read_zneifchanged(
   conn: &Connection,
   uid: Option<i64>,
   gzic: &GetZnlIfChanged,
-) -> Result<Option<ZkNoteAndLinks>, crate::error::Error> {
+) -> Result<Option<ZkNoteAndLinks>, zkerr::Error> {
   let id = note_id_for_zknoteid(&conn, &gzic.zknote)?;
   let changeddate: i64 = conn.query_row(
     "select changeddate from zknote N
@@ -1930,7 +1883,7 @@ pub fn save_importzknotes(
   conn: &Connection,
   uid: i64,
   izns: Vec<ImportZkNote>,
-) -> Result<(), crate::error::Error> {
+) -> Result<(), zkerr::Error> {
   for izn in izns.iter() {
     // create the note if it doesn't exist.
     let nid = match note_id2(&conn, uid, izn.title.as_str())? {
@@ -2025,7 +1978,7 @@ pub fn make_file_note(
   uid: i64,
   name: &String,
   fpath: &Path,
-) -> Result<(i64, ZkNoteId, i64), crate::error::Error> {
+) -> Result<(i64, ZkNoteId, i64), zkerr::Error> {
   // compute hash.
   // let fpath = Path::new(&filepath);
   let fh = sha256::try_digest(fpath)?;
@@ -2096,7 +2049,7 @@ pub struct ZkDatabase {
   users: Vec<User>,
 }
 
-pub fn export_db(_dbfile: &Path) -> Result<ZkDatabase, crate::error::Error> {
+pub fn export_db(_dbfile: &Path) -> Result<ZkDatabase, zkerr::Error> {
   /*  let conn = connection_open(dbfile)?;
   let sysid = user_id(&conn, "system")?;
 

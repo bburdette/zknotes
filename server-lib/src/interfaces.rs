@@ -16,8 +16,8 @@ use zkprotocol::constants::PublicReplies;
 use zkprotocol::constants::{PrivateRequests, PrivateStreamingRequests, PublicRequests};
 use zkprotocol::content::{
   GetArchiveZkLinks, GetArchiveZkNote, GetZkLinksSince, GetZkNoteAndLinks, GetZkNoteArchives,
-  GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkNote, SaveZkNoteAndLinks, Sysids,
-  ZkLinks, ZkNoteAndLinks, ZkNoteAndLinksWhat, ZkNoteArchives, ZkNoteId,
+  GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkNote, SaveZkNoteAndLinks, ZkLinks,
+  ZkNoteAndLinks, ZkNoteAndLinksWhat, ZkNoteArchives, ZkNoteId,
 };
 use zkprotocol::messages::PublicReplyMessage;
 use zkprotocol::messages::{
@@ -28,7 +28,7 @@ use zkprotocol::search::{TagSearch, ZkListNoteSearchResult, ZkNoteSearch};
 pub fn login_data_for_token(
   session: Session,
   config: &Config,
-) -> Result<(Option<orgauth::data::LoginData>), Box<dyn Error>> {
+) -> Result<Option<orgauth::data::LoginData>, Box<dyn Error>> {
   let mut conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
   conn.busy_timeout(Duration::from_millis(500))?;
 

@@ -1,3 +1,4 @@
+use crate::error as zkerr;
 use crate::sqldata;
 use crate::sqldata::{delete_zknote, get_sysids, note_id};
 use async_stream::try_stream;
@@ -14,7 +15,6 @@ use std::sync::Arc;
 use uuid::Uuid;
 use zkprotocol::constants::PrivateReplies;
 use zkprotocol::content::ZkListNote;
-use zkprotocol::content::ZkNoteId;
 use zkprotocol::messages::PrivateReplyMessage;
 use zkprotocol::search::{
   AndOr, SearchMod, TagSearch, ZkListNoteSearchResult, ZkNoteSearch, ZkNoteSearchResult,
@@ -75,12 +75,11 @@ pub fn search_zknotes(
 
   let sysid = user_id(&conn, "system")?;
 
-  let rec_iter = pstmt.query_map(rusqlite::params_from_iter(args.iter()), |row| {
+  let rec_iter = pstmt.query_and_then(rusqlite::params_from_iter(args.iter()), |row| {
     let id = row.get(0)?;
-    let uuid = Uuid::parse_str(row.get::<usize, String>(1)?.as_str())
-      .map_err(|_| rusqlite::Error::InvalidQuery)?;
+    let uuid = Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?;
     let sysids = get_sysids(conn, sysid, id)?;
-    Ok(ZkListNote {
+    Ok::<ZkListNote, zkerr::Error>(ZkListNote {
       id: uuid,
       title: row.get(2)?,
       is_file: {
@@ -93,7 +92,7 @@ pub fn search_zknotes(
       user: row.get(4)?,
       createdate: row.get(5)?,
       changeddate: row.get(6)?,
-      sysids: sysids,
+      sysids,
     })
   })?;
 
@@ -174,8 +173,7 @@ pub fn search_zknotes_stream(
     while let Some(row) = rows.next()? {
       if search.list {
         let zln = ZkListNote {
-          id: Uuid::parse_str(row.get::<usize, String>(1)?.as_str())
-            .map_err(|_| rusqlite::Error::InvalidQuery)?,
+          id: Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?,
           title: row.get(2)?,
           is_file: {
             let wat: Option<i64> = row.get(3)?;
