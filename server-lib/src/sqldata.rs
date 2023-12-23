@@ -120,7 +120,7 @@ pub fn extra_login_data(
   Ok(eld)
 }
 
-pub fn read_sysids(conn: &Connection) -> Result<Sysids, crate::error::Error> {
+pub fn sysids() -> Result<Sysids, crate::error::Error> {
   Ok(Sysids {
     publicid: Uuid::parse_str(SpecialUuids::Public.str())?,
     commentid: Uuid::parse_str(SpecialUuids::Comment.str())?,
@@ -494,7 +494,7 @@ pub fn note_id_for_zknoteid(
   note_id_for_uuid(&conn, &zknoteid)
 }
 
-pub fn uuid_for_note_id(conn: &Connection, id: i64) -> Result<Uuid, crate::error::Error> {
+pub fn uuid_for_note_id(conn: &Connection, id: i64) -> Result<Uuid, zkerr::Error> {
   let s: String = conn.query_row(
     "select zknote.uuid from zknote
       where zknote.id = ?1",
@@ -504,7 +504,7 @@ pub fn uuid_for_note_id(conn: &Connection, id: i64) -> Result<Uuid, crate::error
   Ok(Uuid::parse_str(s.as_str())?)
 }
 
-pub fn note_id_for_uuid(conn: &Connection, uuid: &Uuid) -> Result<i64, crate::error::Error> {
+pub fn note_id_for_uuid(conn: &Connection, uuid: &Uuid) -> Result<i64, zkerr::Error> {
   let id: i64 = conn.query_row(
     "select zknote.id from zknote
       where zknote.uuid = ?1",
@@ -514,7 +514,7 @@ pub fn note_id_for_uuid(conn: &Connection, uuid: &Uuid) -> Result<i64, crate::er
   Ok(id)
 }
 
-pub fn user_note_id(conn: &Connection, uid: i64) -> Result<i64, crate::error::Error> {
+pub fn user_note_id(conn: &Connection, uid: i64) -> Result<i64, zkerr::Error> {
   let id: i64 = conn.query_row(
     "select zknote from user
       where user.id = ?1",
@@ -524,7 +524,7 @@ pub fn user_note_id(conn: &Connection, uid: i64) -> Result<i64, crate::error::Er
   Ok(id)
 }
 
-pub fn user_shares(conn: &Connection, uid: i64) -> Result<Vec<i64>, crate::error::Error> {
+pub fn user_shares(conn: &Connection, uid: i64) -> Result<Vec<i64>, zkerr::Error> {
   let shareid = note_id(&conn, "system", "share")?;
   let usernoteid = user_note_id(&conn, uid)?;
 
@@ -709,7 +709,7 @@ pub fn save_zknote(
   conn: &Connection,
   uid: i64,
   note: &SaveZkNote,
-) -> Result<(i64, SavedZkNote), crate::error::Error> {
+) -> Result<(i64, SavedZkNote), zkerr::Error> {
   let now = now()?;
 
   match note.id {
@@ -776,7 +776,7 @@ pub fn save_zknote(
           note.editable,
           note.showtitle,
           note.deleted,
-          uuid::Uuid::new_v4().to_string(),
+          uuid.to_string(),
           now,
           now
         ],
@@ -820,22 +820,30 @@ pub fn get_sysids(
 }
 
 pub fn read_user_by_id(conn: &Connection, id: i64) -> Result<User, crate::error::Error> {
-  let user = conn.query_row(
-    "select id, zknote, homenote
-      from user where id = ?1",
+  let (uid, noteid, hn) = conn.query_row(
+    "select user.id, zknote.uuid, homenote
+      from user, zknote where user.id = ?1
+      and zknote.id = user.zknote",
     params![id],
     |row| {
-      Ok(User {
-        id: row.get(0)?,
-        noteid: Uuid::parse_str(row.get::<usize, String>(1)?.as_str())
-          .map_err(|_| rusqlite::Error::InvalidQuery)?,
-        homenoteid: {
-          let os = row.get::<usize, Option<String>>(2)?;
-          os.and_then(|s| Uuid::parse_str(s.as_str()).ok())
-        },
-      })
+      Ok((
+        row.get(0)?,
+        row.get::<usize, String>(1)?,
+        row.get::<usize, Option<i64>>(2)?,
+      ))
     },
   )?;
+
+  let hnid = match hn {
+    Some(i) => Some(uuid_for_note_id(&conn, i)?),
+    None => None,
+  };
+
+  let user = User {
+    id: uid,
+    noteid: Uuid::parse_str(noteid.as_str())?,
+    homenoteid: hnid,
+  };
 
   Ok(user)
 }
@@ -889,8 +897,8 @@ pub fn read_zknote(
   // TODO check for query returned no rows and return better message.
   let (id, mut note) =
       conn.query_row(
-        "select ZN.id, ZN.uuid, ZN.title, ZN.content, ZN.user, OU.name, U.zknote, ZN.pubid, ZN.editable, ZN.showtitle, ZN.deleted, ZN.file, ZN.createdate, ZN.changeddate
-          from zknote ZN, orgauth_user OU, user U where ZN.uuid = ?1 and U.id = ZN.user and OU.id = ZN.user",
+        "select ZN.id, ZN.uuid, ZN.title, ZN.content, ZN.user, OU.name, ZKN.uuid, ZN.pubid, ZN.editable, ZN.showtitle, ZN.deleted, ZN.file, ZN.createdate, ZN.changeddate
+          from zknote ZN, orgauth_user OU, user U, zknote ZKN where ZN.uuid = ?1 and U.id = ZN.user and OU.id = ZN.user and ZKN.id = U.zknote",
           params![id.to_string()],
         closure)?  ;
 
@@ -1258,13 +1266,11 @@ pub fn save_savezklinks(
 pub fn read_zklinks(
   conn: &Connection,
   uid: i64,
-  gzl: &GetZkLinks,
-) -> Result<Vec<EditLink>, crate::error::Error> {
+  zknid: i64,
+) -> Result<Vec<EditLink>, zkerr::Error> {
   let pubid = note_id(&conn, "system", "public")?;
   let sysid = user_id(&conn, "system")?;
-
   let usershares = user_shares(&conn, uid)?;
-
   let unid = user_note_id(&conn, uid)?;
 
   // user shares in '1,3,4,5,6' form (minus the quotes!)
@@ -1278,7 +1284,7 @@ pub fn read_zklinks(
     .collect::<String>();
   s.truncate(s.len() - 1);
 
-  let zknid = note_id_for_zknoteid(&conn, &gzl.zknote)?;
+  // let zknid = note_id_for_zknoteid(&conn, &gzl.zknote)?;
 
   // good old fashioned string templating here, since I can't figure out how to
   // do array parameters.
@@ -1340,38 +1346,37 @@ pub fn read_zklinks(
   );
 
   let mut pstmt = conn.prepare(sqlstr.as_str())?;
-  let r = Ok(
-    pstmt
-      .query_map(params![uid, zknid, pubid, unid], |row| {
-        let fromid = row.get(0)?;
-        let toid = row.get(1)?;
-        let (otherid, otheruuid, othername, direction) = if fromid == zknid {
-          (
-            toid,
-            row.get::<usize, String>(5)?,
-            row.get(6)?,
-            Direction::To,
-          )
-        } else {
-          (fromid, row.get(7)?, row.get(8)?, Direction::From)
-        };
-        let sysids = get_sysids(&conn, sysid, otherid)?;
-        let zknote = row
-          .get::<usize, Option<String>>(3)?
-          .and_then(|s| Uuid::parse_str(s.as_str()).ok());
-        Ok(EditLink {
-          otherid: Uuid::parse_str(otheruuid.as_str())
-            .map_err(|_| rusqlite::Error::InvalidQuery)?,
-          direction,
-          user: row.get(2)?,
-          zknote,
-          othername,
-          sysids,
-        })
-      })?
-      .filter_map(|x| x.ok())
-      .collect(),
+  let r = Result::from_iter(
+    pstmt.query_and_then(params![uid, zknid, pubid, unid], |row| {
+      let fromid = row.get(0)?;
+      let toid = row.get(1)?;
+      let (otherid, otheruuid, othername, direction) = if fromid == zknid {
+        (
+          toid,
+          row.get::<usize, String>(6)?,
+          row.get(7)?,
+          Direction::To,
+        )
+      } else {
+        (fromid, row.get(4)?, row.get(5)?, Direction::From)
+      };
+      let sysids = get_sysids(&conn, sysid, otherid)?;
+      let zknotei64 = row.get::<usize, Option<i64>>(3)?;
+      let zknote = match zknotei64 {
+        Some(i) => Some(uuid_for_note_id(&conn, i)?),
+        None => None,
+      };
+      Ok::<EditLink, zkerr::Error>(EditLink {
+        otherid: Uuid::parse_str(otheruuid.as_str()).map_err(|_| rusqlite::Error::InvalidQuery)?,
+        direction,
+        user: row.get(2)?,
+        zknote,
+        othername,
+        sysids,
+      })
+    })?,
   );
+  println!("readlainksxi {:?}", r);
   r
 }
 
@@ -1397,41 +1402,39 @@ pub fn read_public_zklinks(
         (A.fromid = ?1 and A.toid = B.fromid and B.toid = ?2))",
   )?;
 
-  let r = Ok(Result::from_iter(pstmt.query_and_then(
-    params![zknid, pubid, sysid],
-    |row| {
-      let fromid: i64 = row.get(0)?;
-      let toid: i64 = row.get(1)?;
-      let (otherid, direction, otheruuid, othername) = if fromid == zknid {
-        (
-          toid,
-          Direction::To,
-          Uuid::parse_str(row.get::<usize, String>(5)?.as_str())?,
-          row.get(6)?,
-        )
-      } else {
-        (
-          fromid,
-          Direction::From,
-          Uuid::parse_str(row.get::<usize, String>(7)?.as_str())?,
-          row.get(8)?,
-        )
-      };
+  let r = Result::from_iter(pstmt.query_and_then(params![zknid, pubid, sysid], |row| {
+    let fromid: i64 = row.get(0)?;
+    let toid: i64 = row.get(1)?;
+    let (otherid, direction, otheruuid, othername) = if fromid == zknid {
+      (
+        toid,
+        Direction::To,
+        Uuid::parse_str(row.get::<usize, String>(5)?.as_str())?,
+        row.get(6)?,
+      )
+    } else {
+      (
+        fromid,
+        Direction::From,
+        Uuid::parse_str(row.get::<usize, String>(7)?.as_str())?,
+        row.get(8)?,
+      )
+    };
 
-      let zknote = row
-        .get::<usize, Option<String>>(3)?
-        .and_then(|s| Uuid::parse_str(s.as_str()).ok());
+    let zknote = row
+      .get::<usize, Option<String>>(3)?
+      .and_then(|s| Uuid::parse_str(s.as_str()).ok());
 
-      Ok::<EditLink, crate::error::Error>(EditLink {
-        otherid: otheruuid,
-        direction,
-        user: row.get(2)?,
-        zknote,
-        othername,
-        sysids: get_sysids(&conn, sysid, otherid)?,
-      })
-    },
-  )?)?);
+    Ok::<EditLink, crate::error::Error>(EditLink {
+      otherid: otheruuid,
+      direction,
+      user: row.get(2)?,
+      zknote,
+      othername,
+      sysids: get_sysids(&conn, sysid, otherid)?,
+    })
+  })?);
+
   r
 }
 
@@ -1884,7 +1887,7 @@ pub fn accessible_notes(
   Ok((sqlbase, baseargs))
 }
 
-pub fn read_zknoteedit(
+pub fn read_zknoteandlinks(
   conn: &Connection,
   uid: Option<i64>,
   zknoteid: &ZkNoteId,
@@ -1893,7 +1896,7 @@ pub fn read_zknoteedit(
   let (id, zknote) = read_zknote(conn, uid, zknoteid)?;
 
   let zklinks = match uid {
-    Some(uid) => read_zklinks(conn, uid, &GetZkLinks { zknote: zknote.id })?,
+    Some(uid) => read_zklinks(conn, uid, id)?,
     None => read_public_zklinks(conn, &zknote.id)?,
   };
 
@@ -1917,7 +1920,7 @@ pub fn read_zneifchanged(
   )?;
 
   if changeddate > gzic.changeddate {
-    return read_zknoteedit(conn, uid, &gzic.zknote).map(Some);
+    return read_zknoteandlinks(conn, uid, &gzic.zknote).map(Some);
   } else {
     Ok(None)
   }

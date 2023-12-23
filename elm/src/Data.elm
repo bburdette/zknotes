@@ -1,14 +1,15 @@
 module Data exposing (..)
 
-import TSet exposing (TSet)
 import Json.Decode as JD
 import Json.Encode as JE
 import Orgauth.Data exposing (UserId, decodeUserId, encodeUserId)
 import Search as S
+import TDict
+import TSet exposing (TSet)
 import UUID exposing (UUID)
 import Url.Builder as UB
 import Util exposing (andMap)
-import TDict
+
 
 
 ------------------------------------------------------------
@@ -177,7 +178,7 @@ zkNoteIdFromString zni =
 
 trustedZkNoteIdFromString : String -> ZkNoteId
 trustedZkNoteIdFromString zni =
-        ZkNoteId zni
+    ZkNoteId zni
 
 
 zkNoteIdFromUUID : UUID -> ZkNoteId
@@ -198,15 +199,20 @@ decodeZkNoteId =
     UUID.jsonDecoder
         |> JD.map zkNoteIdFromUUID
 
-type alias ZniSet = 
+
+type alias ZniSet =
     TSet ZkNoteId String
+
 
 emptyZniSet : ZniSet
 emptyZniSet =
     TSet.empty zkNoteIdToString trustedZkNoteIdFromString
 
-emptyZniDict = 
+
+emptyZniDict =
     TDict.empty zkNoteIdToString trustedZkNoteIdFromString
+
+
 
 -- JD.oneOf
 --     [ JD.map ZkInt (JD.field "ZkInt" JD.int)
@@ -261,7 +267,7 @@ type alias SaveZkLink =
     }
 
 
-type alias SaveZkNotePlusLinks =
+type alias SaveZkNoteAndLinks =
     { note : SaveZkNote
     , links : List SaveZkLink
     }
@@ -569,8 +575,8 @@ saveZkNote fzn =
     }
 
 
-encodeSaveZkNotePlusLinks : SaveZkNotePlusLinks -> JE.Value
-encodeSaveZkNotePlusLinks s =
+encodeSaveZkNoteAndLinks : SaveZkNoteAndLinks -> JE.Value
+encodeSaveZkNoteAndLinks s =
     JE.object
         [ ( "note", encodeSaveZkNote s.note )
         , ( "links", JE.list encodeSaveZkLink s.links )

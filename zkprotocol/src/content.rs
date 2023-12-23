@@ -86,7 +86,7 @@ pub struct SaveZkLink {
 }
 
 #[derive(Deserialize, Debug, Clone)]
-pub struct SaveZkNotePlusLinks {
+pub struct SaveZkNoteAndLinks {
   pub note: SaveZkNote,
   pub links: Vec<SaveZkLink>,
 }

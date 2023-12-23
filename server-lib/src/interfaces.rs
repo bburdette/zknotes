@@ -16,7 +16,7 @@ use zkprotocol::constants::PublicReplies;
 use zkprotocol::constants::{PrivateRequests, PrivateStreamingRequests, PublicRequests};
 use zkprotocol::content::{
   GetArchiveZkLinks, GetArchiveZkNote, GetZkLinksSince, GetZkNoteAndLinks, GetZkNoteArchives,
-  GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkNote, SaveZkNotePlusLinks, Sysids,
+  GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkNote, SaveZkNoteAndLinks, Sysids,
   ZkLinks, ZkNoteAndLinks, ZkNoteAndLinksWhat, ZkNoteArchives, ZkNoteId,
 };
 use zkprotocol::messages::PublicReplyMessage;
@@ -28,11 +28,9 @@ use zkprotocol::search::{TagSearch, ZkListNoteSearchResult, ZkNoteSearch};
 pub fn login_data_for_token(
   session: Session,
   config: &Config,
-) -> Result<(Option<orgauth::data::LoginData>, Sysids), Box<dyn Error>> {
+) -> Result<(Option<orgauth::data::LoginData>), Box<dyn Error>> {
   let mut conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
   conn.busy_timeout(Duration::from_millis(500))?;
-
-  let sysids = sqldata::read_sysids(&conn)?;
 
   let mut cb = Callbacks {
     on_new_user: Box::new(sqldata::on_new_user),
@@ -60,11 +58,14 @@ pub fn login_data_for_token(
             None
           }
         }
-        Err(_e) => None, // Err(e.into()),
+        Err(e) => match e {
+          orgauth::error::Error::Rusqlite(rusqlite::Error::QueryReturnedNoRows) => None,
+          _ => return Err(e.into()), // Err(e.into()),
+        },
       }
     }
   };
-  Ok((ldopt, sysids))
+  Ok(ldopt)
 }
 
 pub fn zknotes_callbacks() -> Callbacks {
@@ -150,7 +151,7 @@ pub async fn zk_interface_loggedin(
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let gzne: GetZkNoteAndLinks = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-      let note = sqldata::read_zknoteedit(&conn, Some(uid), &gzne.zknote)?;
+      let note = sqldata::read_zknoteandlinks(&conn, Some(uid), &gzne.zknote)?;
       info!(
         "user#getzknoteedit: {:?} - {}",
         gzne.zknote, note.zknote.title
@@ -309,12 +310,12 @@ pub async fn zk_interface_loggedin(
     }
     PrivateRequests::SaveZkNoteAndLinks => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let sznpl: SaveZkNotePlusLinks = serde_json::from_value(msgdata.clone())?;
+      let sznpl: SaveZkNoteAndLinks = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       let (_, szkn) = sqldata::save_zknote(&conn, uid, &sznpl.note)?;
       let _s = sqldata::save_savezklinks(&conn, uid, szkn.id, sznpl.links)?;
       Ok(PrivateReplyMessage {
-        what: PrivateReplies::SavedZkNotePlusLinks,
+        what: PrivateReplies::SavedZkNoteAndLinks,
         content: serde_json::to_value(szkn)?,
       })
     }

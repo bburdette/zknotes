@@ -1181,7 +1181,7 @@ sendSearch model search =
                 , Cmd.batch
                     [ sendZIMsg model.tauri model.location (ZI.SearchZkNotes search)
                     , sendZIMsgExp model.location
-                        (ZI.SaveZkNotePlusLinks searchnote)
+                        (ZI.SaveZkNoteAndLinks searchnote)
                         -- ignore the reply!  otherwise if you search while
                         -- creating a new note, that new note gets the search note
                         -- id.
@@ -1374,7 +1374,7 @@ urlupdate msg model =
                                             [ icmd
                                             , sendZIMsg model.tauri
                                                 model.location
-                                                (ZI.SaveZkNotePlusLinks <| EditZkNote.fullSave s)
+                                                (ZI.SaveZkNoteAndLinks <| EditZkNote.fullSave s)
                                             ]
 
                                     else
@@ -2065,7 +2065,7 @@ actualupdate msg model =
                         ZI.ServerError e ->
                             ( displayMessageDialog model <| e, Cmd.none )
 
-                        ZI.SavedZkNotePlusLinks szkn ->
+                        ZI.SavedZkNoteAndLinks szkn ->
                             case state of
                                 EditZkNote emod login ->
                                     let
@@ -2520,7 +2520,7 @@ actualupdate msg model =
                                     -- just ignore if we're not editing a new note.
                                     ( model, Cmd.none )
 
-                        ZI.SavedZkNotePlusLinks szkn ->
+                        ZI.SavedZkNoteAndLinks szkn ->
                             case state of
                                 EditZkNote emod login ->
                                     let
@@ -2954,7 +2954,7 @@ handleTASelection model emod login tas =
         EditZkNote.TASave s ->
             ( model
             , sendZIMsgExp model.location
-                (ZI.SaveZkNotePlusLinks s)
+                (ZI.SaveZkNoteAndLinks s)
                 (TAReplyData tas)
             )
 
@@ -3089,7 +3089,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                         onmsg : Model -> Msg -> ( Model, Cmd Msg )
                         onmsg _ ms =
                             case ms of
-                                ZkReplyData (Ok ( _, ZI.SavedZkNotePlusLinks _ )) ->
+                                ZkReplyData (Ok ( _, ZI.SavedZkNoteAndLinks _ )) ->
                                     gotres
 
                                 ZkReplyData (Ok ( _, ZI.ServerError e )) ->
@@ -3115,7 +3115,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                       }
                     , sendZIMsg model.tauri
                         model.location
-                        (ZI.SaveZkNotePlusLinks snpl)
+                        (ZI.SaveZkNoteAndLinks snpl)
                     )
 
                 EditZkNote.Save snpl ->
@@ -3127,7 +3127,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                       }
                     , sendZIMsg model.tauri
                         model.location
-                        (ZI.SaveZkNotePlusLinks snpl)
+                        (ZI.SaveZkNoteAndLinks snpl)
                     )
 
                 EditZkNote.None ->
@@ -3181,7 +3181,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                         [ cmd
                         , sendZIMsg model.tauri
                             model.location
-                            (ZI.SaveZkNotePlusLinks s)
+                            (ZI.SaveZkNoteAndLinks s)
                         ]
                     )
 

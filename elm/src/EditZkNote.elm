@@ -206,8 +206,8 @@ type alias Model =
 
 type Command
     = None
-    | Save Data.SaveZkNotePlusLinks
-    | SaveExit Data.SaveZkNotePlusLinks
+    | Save Data.SaveZkNoteAndLinks
+    | SaveExit Data.SaveZkNoteAndLinks
     | Revert
     | View
         { note : Data.SaveZkNote
@@ -218,7 +218,7 @@ type Command
         }
     | Delete ZkNoteId
     | Switch ZkNoteId
-    | SaveSwitch Data.SaveZkNotePlusLinks ZkNoteId
+    | SaveSwitch Data.SaveZkNoteAndLinks ZkNoteId
     | GetTASelection String String
     | Search S.ZkNoteSearch
     | SearchHistory
@@ -353,7 +353,7 @@ sznFromModel model =
     }
 
 
-fullSave : Model -> Data.SaveZkNotePlusLinks
+fullSave : Model -> Data.SaveZkNoteAndLinks
 fullSave model =
     { note = sznFromModel model
     , links = saveZkLinkList model
@@ -1829,7 +1829,7 @@ onSaved oldmodel szn =
 
 
 type TACommand
-    = TASave Data.SaveZkNotePlusLinks
+    = TASave Data.SaveZkNoteAndLinks
     | TAError String
     | TAUpdated Model (Maybe Data.SetSelection)
     | TANoop

@@ -17,7 +17,7 @@ type SendMsg
     | DeleteZkNote ZkNoteId
     | SaveZkNote Data.SaveZkNote
     | SaveZkLinks Data.ZkLinks
-    | SaveZkNotePlusLinks Data.SaveZkNotePlusLinks
+    | SaveZkNoteAndLinks Data.SaveZkNoteAndLinks
     | SearchZkNotes S.ZkNoteSearch
     | SaveImportZkNotes (List Data.ImportZkNote)
     | PowerDelete S.TagSearch
@@ -29,7 +29,7 @@ type ServerResponse
     = ZkNoteSearchResult Data.ZkNoteSearchResult
     | ZkListNoteSearchResult Data.ZkListNoteSearchResult
     | ArchiveList Data.ZkNoteArchives
-    | SavedZkNotePlusLinks Data.SavedZkNote
+    | SavedZkNoteAndLinks Data.SavedZkNote
     | SavedZkNote Data.SavedZkNote
     | DeletedZkNote Int
     | ZkNote Data.ZkNote
@@ -81,8 +81,8 @@ showServerResponse sr =
         SavedZkLinks ->
             "SavedZkLinks"
 
-        SavedZkNotePlusLinks _ ->
-            "SavedZkNotePlusLinks"
+        SavedZkNoteAndLinks _ ->
+            "SavedZkNoteAndLinks"
 
         SavedImportZkNotes ->
             "SavedImportZkNotes"
@@ -163,10 +163,10 @@ encodeSendMsg sm =
                 , ( "data", Data.encodeSaveZkNote x )
                 ]
 
-        SaveZkNotePlusLinks s ->
+        SaveZkNoteAndLinks s ->
             JE.object
-                [ ( "what", JE.string "SaveZkNotePlusLinks" )
-                , ( "data", Data.encodeSaveZkNotePlusLinks s )
+                [ ( "what", JE.string "SaveZkNoteAndLinks" )
+                , ( "data", Data.encodeSaveZkNoteAndLinks s )
                 ]
 
         SaveZkLinks zklinks ->
@@ -235,8 +235,8 @@ serverResponseDecoder =
                     "SavedZkNote" ->
                         JD.map SavedZkNote (JD.at [ "content" ] <| Data.decodeSavedZkNote)
 
-                    "SavedZkNotePlusLinks" ->
-                        JD.map SavedZkNotePlusLinks (JD.at [ "content" ] <| Data.decodeSavedZkNote)
+                    "SavedZkNoteAndLinks" ->
+                        JD.map SavedZkNoteAndLinks (JD.at [ "content" ] <| Data.decodeSavedZkNote)
 
                     "DeletedZkNote" ->
                         JD.map DeletedZkNote (JD.at [ "content" ] <| JD.int)

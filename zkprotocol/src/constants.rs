@@ -85,7 +85,7 @@ pub enum PrivateReplies {
   DeletedZkNote,
   SavedZkNote,
   SavedZkLinks,
-  SavedZkNotePlusLinks,
+  SavedZkNoteAndLinks,
   SavedImportZkNotes,
   HomeNoteSet,
   SyncComplete,

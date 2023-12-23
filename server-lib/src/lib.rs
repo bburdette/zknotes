@@ -53,6 +53,8 @@ use zkprotocol::{
 
 use tracing_actix_web::TracingLogger;
 
+use crate::sqldata::get_sysids;
+
 /*
 use actix_files::NamedFile;
 
@@ -76,18 +78,23 @@ async fn favicon(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
 async fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
   info!("remote ip: {:?}, request:{:?}", req.connection_info(), req);
 
-  // logged in?
-  let (logindata, sysids) = match interfaces::login_data_for_token(session, &data) {
-    Ok((optld, sysids)) => (
-      match optld {
-        Some(logindata) => serde_json::to_value(logindata).unwrap_or(serde_json::Value::Null),
-        _ => serde_json::Value::Null,
-      },
-      serde_json::to_value(sysids).unwrap_or(serde_json::Value::Null),
-    ),
-    _ => (serde_json::Value::Null, serde_json::Value::Null),
+  let sysids = match sqldata::sysids() {
+    Ok(si) => serde_json::to_value(si).unwrap_or(serde_json::Value::Null),
+    Err(e) => return HttpResponse::InternalServerError().body(e.to_string()),
   };
 
+  // logged in?
+  let logindata = match interfaces::login_data_for_token(session, &data) {
+    Ok(optld) => match optld {
+      Some(logindata) => serde_json::to_value(logindata).unwrap_or(serde_json::Value::Null),
+      _ => serde_json::Value::Null,
+    },
+    _ => serde_json::Value::Null,
+  };
+
+  println!("logindata {:?}", logindata);
+
+  // TODO: hardcode the UUID of this?
   let errorid = match data.error_index_note {
     Some(eid) => serde_json::to_value(eid).unwrap_or(serde_json::Value::Null),
     None => serde_json::Value::Null,
@@ -95,6 +102,10 @@ async fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -
 
   let adminsettings = serde_json::to_value(orgauth::data::admin_settings(&data.orgauth_config))
     .unwrap_or(serde_json::Value::Null);
+
+  println!("sysids {:?}", sysids.to_string().as_str());
+  println!("errorid {:?}", errorid.to_string().as_str());
+  println!("adminsettings {:?}", adminsettings.to_string().as_str());
 
   let mut staticpath = data.static_path.clone().unwrap_or(PathBuf::from("static/"));
   staticpath.push("index.html");
