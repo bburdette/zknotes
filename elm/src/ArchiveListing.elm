@@ -2,27 +2,19 @@ module ArchiveListing exposing (..)
 
 import Common
 import Data exposing (ZkNoteId(..))
-import Dialog as D
 import Dict exposing (Dict(..))
 import Element as E exposing (Element)
 import Element.Background as EBk
 import Element.Border as EBd
 import Element.Font as EF
 import Element.Input as EI
-import Element.Region
-import Import
 import PaginationPanel as PP
 import Route as R
-import Search as S exposing (TagSearch(..))
-import SearchStackPanel as SP
+import Search exposing (TagSearch(..))
 import TDict exposing (TDict)
-import TagSearchPanel as TSP
 import TangoColors as TC
 import Time
-import Toop
-import UUID exposing (UUID)
 import Util
-import WindowKeys as WK
 import ZkCommon as ZC
 
 
@@ -95,8 +87,8 @@ listview si ld zone size model =
         maxwidth =
             700
 
-        titlemaxconst =
-            85
+        -- titlemaxconst =
+        --     85
     in
     E.el
         [ E.width E.fill
@@ -192,7 +184,7 @@ listview si ld zone size model =
 
 
 update : Msg -> Model -> Data.LoginData -> ( Model, Command )
-update msg model ld =
+update msg model _ =
     case msg of
         SelectPress id ->
             ( model

@@ -11,7 +11,6 @@ module Import exposing
     , jsplit
     , noteLink
     , parseContent
-    , processFile
     , rbrak
     , showLh
     , update
@@ -21,35 +20,25 @@ module Import exposing
     , zklKey
     )
 
-import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
-import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
+import Cellme.Cellme exposing (CellContainer(..), RunState(..))
+import Cellme.DictCellme exposing (CellDict(..))
 import Common
 import Data exposing (ZkNoteId, zniEq)
 import Dialog as D
-import Dict exposing (Dict)
 import Element as E exposing (Element)
 import Element.Background as EBk
-import Element.Border as EBd
 import Element.Font as EF
 import Element.Input as EI
-import Element.Region as ER
 import File as F
-import Html exposing (Attribute, Html)
-import Html.Attributes
 import Json.Decode as JD
-import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..), inlineFoldl)
-import Markdown.Html
-import Markdown.Parser
-import Markdown.Renderer
+import Markdown.Block exposing (ListItem(..), Task(..))
 import MdCommon exposing (..)
-import Schelme.Show exposing (showTerm)
 import Search as S
 import SearchStackPanel as SP
 import TDict exposing (TDict)
 import TangoColors as TC
 import Task
 import Url as U
-import Url.Builder as UB
 import Url.Parser as UP exposing ((</>))
 import Util
 
@@ -282,13 +271,12 @@ importview size model =
         , E.row [ E.width E.fill, E.spacing 8 ]
             [ EI.button Common.buttonStyle { onPress = Just FilesPress, label = E.text "select files" }
             , EI.button Common.buttonStyle { onPress = Just CancelPress, label = E.text "cancel" }
-            , case isdirty of
-                True ->
-                    EI.button (Common.buttonStyle ++ [ EBk.color TC.darkYellow ])
-                        { onPress = Just SavePress, label = E.text "save" }
+            , if isdirty then
+                EI.button (Common.buttonStyle ++ [ EBk.color TC.darkYellow ])
+                    { onPress = Just SavePress, label = E.text "save" }
 
-                False ->
-                    E.none
+              else
+                E.none
             ]
         , E.row
             [ E.width E.fill
@@ -336,11 +324,6 @@ noteLink str =
     U.fromString ("http://wat" ++ str)
         |> Maybe.andThen
             (UP.parse (UP.s "note" </> UP.int))
-
-
-processFile : F.File -> Data.ImportZkNote
-processFile file =
-    { title = "", content = "", fromLinks = [], toLinks = [] }
 
 
 parseContent : String -> Result JD.Error Links

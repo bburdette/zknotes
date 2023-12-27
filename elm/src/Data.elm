@@ -140,12 +140,6 @@ type alias ZkNote =
     }
 
 
-
--- type ZkNoteId
---     = ZkInt Int
---     | ZkUUID UUID
-
-
 type ZkNoteId
     = ZkNoteId String
 
@@ -165,6 +159,7 @@ encodeZkNoteId (ZkNoteId zni) =
     JE.string zni
 
 
+zkNoteIdToString : ZkNoteId -> String
 zkNoteIdToString (ZkNoteId zni) =
     zni
 
@@ -186,14 +181,6 @@ zkNoteIdFromUUID zni =
     ZkNoteId (UUID.toString zni)
 
 
-
--- case zni of
---     ZkInt id ->
---         JE.object [ ( "ZkInt", JE.int id ) ]
---     ZkUUID id ->
---         JE.object [ ( "ZkUUID", UUID.toValue id ) ]
-
-
 decodeZkNoteId : JD.Decoder ZkNoteId
 decodeZkNoteId =
     UUID.jsonDecoder
@@ -211,13 +198,6 @@ emptyZniSet =
 
 emptyZniDict =
     TDict.empty zkNoteIdToString trustedZkNoteIdFromString
-
-
-
--- JD.oneOf
---     [ JD.map ZkInt (JD.field "ZkInt" JD.int)
---     , JD.map ZkUUID (JD.field "ZkUUID" decodeZkNoteId)
---     ]
 
 
 type alias ZkLink =

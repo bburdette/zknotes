@@ -1,7 +1,7 @@
 module MdCommon exposing (Panel, ViewMode(..), blockCells, blockPanels, cellView, codeBlock, codeSpan, defCell, heading, imageView, linkDict, markdownView, mdCells, mdPanel, mdPanels, mkRenderer, noteFile, noteIds, panelView, rawTextToId, searchView, showRunState)
 
-import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
-import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
+import Cellme.Cellme exposing (CellContainer(..), RunState(..))
+import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr)
 import Common exposing (buttonStyle)
 import Data exposing (ZkNoteId, ZniSet, emptyZniSet, zkNoteIdFromString, zkNoteIdToString)
 import Dict exposing (Dict)
@@ -376,9 +376,6 @@ noteFile si filename zknote =
                 |> List.drop 1
                 |> List.reverse
                 |> List.head
-
-        fileurl =
-            "/file/" ++ zkNoteIdToString zknote.id
     in
     case suffix of
         Nothing ->
