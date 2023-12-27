@@ -45,6 +45,8 @@ pub async fn sync(
       if getnotes {
         let mut userhash = HashMap::<i64, i64>::new();
 
+        // TODO: get recs with sync date newer than.
+        // TODO: order by?
         let zns = ZkNoteSearch {
           tagsearch: TagSearch::SearchTerm {
             mods: Vec::new(),
@@ -59,6 +61,8 @@ pub async fn sync(
           created_before: None,
           changed_after: None,
           changed_before: Some(now),
+          synced_after: None,
+          synced_before: Some(now),
         };
 
         let l = PrivateMessage {
@@ -240,6 +244,8 @@ pub async fn sync(
           created_before: None,
           changed_after: None,
           changed_before: Some(now),
+          synced_after: None,
+          synced_before: Some(now),
         };
 
         let l = PrivateStreamingMessage {

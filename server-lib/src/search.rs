@@ -41,6 +41,8 @@ pub fn power_delete_zknotes(
     created_before: None,
     changed_after: None,
     changed_before: None,
+    synced_after: None,
+    synced_before: None,
   };
 
   let znsr = search_zknotes(conn, user, &nolimsearch)?;
@@ -426,6 +428,12 @@ fn build_daterange_clause(search: &ZkNoteSearch) -> Result<(String, Vec<String>)
     search
       .changed_before
       .map(|dt| ("N.changeddate < ?", dt.to_string())),
+    search
+      .synced_after
+      .map(|dt| ("N.syncdate < ?", dt.to_string())),
+    search
+      .synced_before
+      .map(|dt| ("N.syncdate < ?", dt.to_string())),
   ];
   let clause = clawses
     .iter()

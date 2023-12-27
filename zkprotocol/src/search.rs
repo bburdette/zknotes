@@ -12,6 +12,8 @@ pub struct ZkNoteSearch {
   pub created_before: Option<i64>,
   pub changed_after: Option<i64>,
   pub changed_before: Option<i64>,
+  pub synced_after: Option<i64>,
+  pub synced_before: Option<i64>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
