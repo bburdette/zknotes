@@ -63,6 +63,7 @@ pub async fn sync(
           changed_before: Some(now),
           synced_after: None,
           synced_before: Some(now),
+          ordering: None,
         };
 
         let l = PrivateMessage {
@@ -246,6 +247,7 @@ pub async fn sync(
           changed_before: Some(now),
           synced_after: None,
           synced_before: Some(now),
+          ordering: None,
         };
 
         let l = PrivateStreamingMessage {

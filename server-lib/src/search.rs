@@ -17,8 +17,8 @@ use zkprotocol::constants::PrivateReplies;
 use zkprotocol::content::ZkListNote;
 use zkprotocol::messages::PrivateReplyMessage;
 use zkprotocol::search::{
-  AndOr, SearchMod, TagSearch, ZkListNoteSearchResult, ZkNoteSearch, ZkNoteSearchResult,
-  ZkSearchResultHeader,
+  AndOr, OrderDirection, OrderField, SearchMod, TagSearch, ZkListNoteSearchResult, ZkNoteSearch,
+  ZkNoteSearchResult, ZkSearchResultHeader,
 };
 
 pub fn power_delete_zknotes(
@@ -43,6 +43,7 @@ pub fn power_delete_zknotes(
     changed_before: None,
     synced_after: None,
     synced_before: None,
+    ordering: None,
   };
 
   let znsr = search_zknotes(conn, user, &nolimsearch)?;
@@ -223,7 +224,21 @@ pub fn build_sql(
                             // None => format!(" offset {}", search.offset),
   };
 
-  let ordclause = " order by N.changeddate desc ";
+  let ordclause = if let Some(o) = search.ordering {
+    let ord = match o.field {
+      OrderField::Title => "order by N.title",
+      OrderField::Created => "order by N.createddate",
+      OrderField::Changed => "order by N.changeddate",
+      OrderField::Synced => "order by N.syncdate",
+    };
+    let dir = match o.direction {
+      OrderDirection::Ascending => " asc",
+      OrderDirection::Descending => " desc",
+    };
+    format!("{}{}", ord, dir)
+  } else {
+    " order by N.changeddate desc ".to_string()
+  };
 
   let archives = search.archives;
 
@@ -406,7 +421,7 @@ pub fn build_sql(
   baseargs.append(&mut userargs);
 
   // add order clause to the end.
-  sqlbase.push_str(ordclause);
+  sqlbase.push_str(ordclause.as_str());
 
   // add limit clause to the end.
   sqlbase.push_str(limclause.as_str());

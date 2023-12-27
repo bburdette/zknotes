@@ -14,6 +14,26 @@ pub struct ZkNoteSearch {
   pub changed_before: Option<i64>,
   pub synced_after: Option<i64>,
   pub synced_before: Option<i64>,
+  pub ordering: Option<Ordering>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct Ordering {
+  pub field: OrderField,
+  pub direction: OrderDirection,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub enum OrderDirection {
+  Ascending,
+  Descending,
+}
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub enum OrderField {
+  Title,
+  Created,
+  Changed,
+  Synced,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

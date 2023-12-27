@@ -2387,8 +2387,6 @@ pub fn udpate32(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   let conn = Connection::open(dbfile)?;
   conn.execute("PRAGMA foreign_keys = false;", params![])?;
 
-  let mut m1 = Migration::new();
-
   // ---------------------------------------------------
   // add sync date to zknote.
 

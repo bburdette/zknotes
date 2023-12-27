@@ -71,14 +71,14 @@ pub fn on_new_user(
   )?;
 
   // indicate a 'user' record, and 'public'
-  save_zklink(&conn, zknid, usernoteid, systemid, None).map_err(zkerr::toOrgauthError)?;
-  save_zklink(&conn, zknid, publicnoteid, systemid, None).map_err(zkerr::toOrgauthError)?;
+  save_zklink(&conn, zknid, usernoteid, systemid, None).map_err(zkerr::to_orgauth_error)?;
+  save_zklink(&conn, zknid, publicnoteid, systemid, None).map_err(zkerr::to_orgauth_error)?;
 
   // add extra links from 'data'
   match (&data, creator) {
     (Some(data), Some(creator)) => {
       let extra_links: Vec<SaveZkLink> = serde_json::from_str(data.as_str())?;
-      save_savezklinks(&conn, creator, uuid, extra_links).map_err(zkerr::toOrgauthError)?;
+      save_savezklinks(&conn, creator, uuid, extra_links).map_err(zkerr::to_orgauth_error)?;
     }
     _ => (),
   }
@@ -109,7 +109,7 @@ pub fn extra_login_data(
   conn: &Connection,
   uid: i64,
 ) -> Result<ExtraLoginData, orgauth::error::Error> {
-  let user = read_user_by_id(&conn, uid).map_err(zkerr::toOrgauthError)?;
+  let user = read_user_by_id(&conn, uid).map_err(zkerr::to_orgauth_error)?;
 
   let eld = ExtraLoginData {
     userid: uid,

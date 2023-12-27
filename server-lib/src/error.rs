@@ -19,7 +19,7 @@ pub enum Error {
   Regex(regex::Error),
 }
 
-pub fn toOrgauthError(e: Error) -> orgauth::error::Error {
+pub fn to_orgauth_error(e: Error) -> orgauth::error::Error {
   match e {
     Error::Rusqlite(ze) => orgauth::error::Error::Rusqlite(ze),
     Error::SystemTimeError(ze) => orgauth::error::Error::SystemTimeError(ze),
