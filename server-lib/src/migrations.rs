@@ -2381,3 +2381,206 @@ pub fn udpate31(dbfile: &Path) -> Result<(), zkerr::Error> {
 
   Ok(())
 }
+
+// add sync_date to zknote, zklink, zkarchivelink.
+pub fn udpate32(dbfile: &Path) -> Result<(), orgauth::error::Error> {
+  let conn = Connection::open(dbfile)?;
+  conn.execute("PRAGMA foreign_keys = false;", params![])?;
+
+  let mut m1 = Migration::new();
+
+  // ---------------------------------------------------
+  // add sync date to zknote.
+
+  // zknote temp.
+  conn.execute(
+    r#"CREATE TABLE IF NOT EXISTS "zknotetemp" ("id" INTEGER PRIMARY KEY NOT NULL,
+         "title" TEXT NOT NULL,
+         "content" TEXT NOT NULL,
+         "sysdata" TEXT,
+         "pubid" TEXT UNIQUE,
+         "user" INTEGER NOT NULL REFERENCES orgauth_user(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+         "editable" BOOLEAN NOT NULL,
+         "showtitle" BOOLEAN NOT NULL,
+         "deleted" BOOLEAN NOT NULL,
+         "file" INTEGER REFERENCES file(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+         "uuid" TEXT NOT NULL,
+         "createdate" INTEGER NOT NULL,
+         "changeddate" INTEGER NOT NULL)"#,
+    params![],
+  )?;
+
+  // copy everything from zknote table.
+  conn.execute(
+    "insert into zknotetemp 
+                 ( id,
+                   title,
+                   content,
+                   sysdata,
+                   pubid,
+                   user,
+                   editable,
+                   showtitle,
+                   deleted,
+                   file,
+                   uuid,
+                   createdate,
+                   changeddate)
+     select  id,
+             title,
+             content,
+             sysdata,
+             pubid,
+             user,
+             editable,
+             showtitle,
+             deleted,
+             file,
+             uuid,
+             createdate,
+             changeddate
+     from zknote",
+    params![],
+  )?;
+
+  // drop zknote, make new zkknote with syncdate column.
+  conn.execute("drop table zknote", params![])?;
+  conn.execute(
+    r#"CREATE TABLE IF NOT EXISTS "zknote" 
+        ("id" INTEGER PRIMARY KEY NOT NULL,
+         "title" TEXT NOT NULL,
+         "content" TEXT NOT NULL,
+         "sysdata" TEXT,
+         "pubid" TEXT UNIQUE,
+         "user" INTEGER NOT NULL REFERENCES orgauth_user(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+         "editable" BOOLEAN NOT NULL,
+         "showtitle" BOOLEAN NOT NULL,
+         "deleted" BOOLEAN NOT NULL,
+         "file" INTEGER REFERENCES file(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+         "uuid" TEXT NOT NULL,
+         "createdate" INTEGER NOT NULL,
+         "changeddate" INTEGER NOT NULL,
+         "syncdate" INTEGER)"#,
+    params![],
+  )?;
+
+  // copy everything back.
+  conn.execute(
+    "insert into zknote 
+                 ( id,
+                   title,
+                   content,
+                   sysdata,
+                   pubid,
+                   user,
+                   editable,
+                   showtitle,
+                   deleted,
+                   file,
+                   uuid,
+                   createdate,
+                   changeddate)
+     select  id,
+             title,
+             content,
+             sysdata,
+             pubid,
+             user,
+             editable,
+             showtitle,
+             deleted,
+             file,
+             uuid,
+             createdate,
+             changeddate
+     from zknotetemp",
+    params![],
+  )?;
+
+  conn.execute("drop table zknotetemp", params![])?;
+
+  // ---------------------------------------------------
+  // zklink
+
+  conn.execute(
+    r#" CREATE TABLE IF NOT EXISTS "zklinktemp" 
+    ("fromid" INTEGER NOT NULL REFERENCES zknote(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+     "toid" INTEGER NOT NULL REFERENCES zknote(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+     "user" INTEGER NOT NULL REFERENCES orgauth_user(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+     "linkzknote" INTEGER REFERENCES zknote(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+     "createdate" INTEGER NOT NULL)"#,
+    params![],
+  )?;
+
+  conn.execute(
+    r#" insert into zklinktemp (fromid, toid, user, linkzknote, createdate) 
+    select fromid, toid, user, linkzknote, createdate from zklink"#,
+    params![],
+  )?;
+
+  conn.execute("drop table zklink", params![])?;
+
+  conn.execute(
+    r#" CREATE TABLE IF NOT EXISTS "zklink" 
+    ("fromid" INTEGER NOT NULL REFERENCES zknote(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+     "toid" INTEGER NOT NULL REFERENCES zknote(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+     "user" INTEGER NOT NULL REFERENCES orgauth_user(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+     "linkzknote" INTEGER REFERENCES zknote(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+     "createdate" INTEGER NOT NULL, 
+     "syncdate" INTEGER)"#,
+    params![],
+  )?;
+
+  conn.execute(
+    r#" insert into zklink (fromid, toid, user, linkzknote, createdate) 
+    select fromid, toid, user, linkzknote, createdate from zklinktemp"#,
+    params![],
+  )?;
+  conn.execute("drop table zklinktemp", params![])?;
+
+  // ---------------------------------------------------
+  // zklinkarchive
+
+  conn.execute(
+    r#"CREATE TABLE IF NOT EXISTS "zklinkarchivetemp" 
+    ("id" INTEGER PRIMARY KEY NOT NULL,
+     "fromid" INTEGER NOT NULL REFERENCES zknote(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+     "toid" INTEGER NOT NULL REFERENCES zknote(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+     "user" INTEGER NOT NULL REFERENCES orgauth_user(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+     "linkzknote" INTEGER REFERENCES zknote(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+     "createdate" INTEGER NOT NULL,
+     "deletedate" INTEGER NOT NULL)"#,
+    params![],
+  )?;
+
+  conn.execute(
+    r#" insert into zklinkarchivetemp (id, fromid, toid, user, linkzknote, createdate, deletedate) 
+    select id, fromid, toid, user, linkzknote, createdate, deletedate from zklinkarchive"#,
+    params![],
+  )?;
+
+  conn.execute("drop table zklinkarchive", params![])?;
+
+  conn.execute(
+    r#"CREATE TABLE IF NOT EXISTS "zklinkarchive" 
+    ("id" INTEGER PRIMARY KEY NOT NULL,
+     "fromid" INTEGER NOT NULL REFERENCES zknote(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+     "toid" INTEGER NOT NULL REFERENCES zknote(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+     "user" INTEGER NOT NULL REFERENCES orgauth_user(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+     "linkzknote" INTEGER REFERENCES zknote(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+     "createdate" INTEGER NOT NULL,
+     "deletedate" INTEGER NOT NULL,
+     "syncdate" INTEGER)"#,
+    params![],
+  )?;
+
+  conn.execute(
+    r#" insert into zklinkarchive (id, fromid, toid, user, linkzknote, createdate, deletedate) 
+    select id, fromid, toid, user, linkzknote, createdate, deletedate from zklinkarchivetemp"#,
+    params![],
+  )?;
+
+  conn.execute("drop table zklinkarchivetemp", params![])?;
+
+  Ok(())
+}
