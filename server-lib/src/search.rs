@@ -3,8 +3,6 @@ use crate::sqldata;
 use crate::sqldata::{delete_zknote, get_sysids, note_id};
 use async_stream::try_stream;
 use bytes::Bytes;
-use either::Either;
-use either::Either::{Left, Right};
 use futures::Stream;
 use orgauth::dbfun::user_id;
 use rusqlite::Connection;
@@ -17,8 +15,9 @@ use zkprotocol::constants::PrivateReplies;
 use zkprotocol::content::ZkListNote;
 use zkprotocol::messages::PrivateReplyMessage;
 use zkprotocol::search::{
-  AndOr, OrderDirection, OrderField, SearchMod, TagSearch, ZkListNoteSearchResult, ZkNoteSearch,
-  ZkNoteSearchResult, ZkSearchResultHeader,
+  AndOr, OrderDirection, OrderField, ResultType, SearchMod, TagSearch, ZkIdSearchResult,
+  ZkListNoteSearchResult, ZkNoteAndLinksSearchResult, ZkNoteSearch, ZkNoteSearchResult,
+  ZkSearchResultHeader,
 };
 
 pub fn power_delete_zknotes(
@@ -35,7 +34,7 @@ pub fn power_delete_zknotes(
     offset: 0,
     limit: None,
     what: "".to_string(),
-    list: true,
+    resulttype: ResultType::RtListNote,
     archives: false,
     created_after: None,
     created_before: None,
@@ -45,10 +44,17 @@ pub fn power_delete_zknotes(
     synced_before: None,
     ordering: None,
   };
-
   let znsr = search_zknotes(conn, user, &nolimsearch)?;
   match znsr {
-    Left(znsr) => {
+    SearchResult::SrId(znsr) => {
+      let c = znsr.notes.len().try_into()?;
+
+      for n in znsr.notes {
+        delete_zknote(&conn, file_path.clone(), user, &n)?;
+      }
+      Ok(c)
+    }
+    SearchResult::SrListNote(znsr) => {
       let c = znsr.notes.len().try_into()?;
 
       for n in znsr.notes {
@@ -56,22 +62,37 @@ pub fn power_delete_zknotes(
       }
       Ok(c)
     }
-    Right(znsr) => {
+    SearchResult::SrNote(znsr) => {
       let c = znsr.notes.len().try_into()?;
 
       for n in znsr.notes {
         delete_zknote(&conn, file_path.clone(), user, &n.id)?;
+      }
+      Ok(c)
+    }
+    SearchResult::SrNoteAndLink(znsr) => {
+      let c = znsr.notes.len().try_into()?;
+
+      for n in znsr.notes {
+        delete_zknote(&conn, file_path.clone(), user, &n.zknote.id)?;
       }
       Ok(c)
     }
   }
 }
 
+pub enum SearchResult {
+  SrId(ZkIdSearchResult),
+  SrListNote(ZkListNoteSearchResult),
+  SrNote(ZkNoteSearchResult),
+  SrNoteAndLink(ZkNoteAndLinksSearchResult),
+}
+
 pub fn search_zknotes(
   conn: &Connection,
   user: i64,
   search: &ZkNoteSearch,
-) -> Result<Either<ZkListNoteSearchResult, ZkNoteSearchResult>, Box<dyn Error>> {
+) -> Result<SearchResult, Box<dyn Error>> {
   let (sql, args) = build_sql(&conn, user, search.clone())?;
 
   let mut pstmt = conn.prepare(sql.as_str())?;
@@ -99,42 +120,79 @@ pub fn search_zknotes(
     })
   })?;
 
-  if search.list {
-    let mut pv = Vec::new();
+  match search.resulttype {
+    ResultType::RtId => {
+      let mut pv = Vec::new();
 
-    for rsrec in rec_iter {
-      match rsrec {
-        Ok(rec) => {
-          pv.push(rec);
+      for rsrec in rec_iter {
+        match rsrec {
+          Ok(rec) => {
+            pv.push(rec.id);
+          }
+          Err(_) => (),
         }
-        Err(_) => (),
       }
+
+      Ok(SearchResult::SrId(ZkIdSearchResult {
+        notes: pv,
+        offset: search.offset,
+        what: search.what.clone(),
+      }))
     }
+    ResultType::RtListNote => {
+      let mut pv = Vec::new();
 
-    Ok(Left(ZkListNoteSearchResult {
-      notes: pv,
-      offset: search.offset,
-      what: search.what.clone(),
-    }))
-  } else {
-    let mut pv = Vec::new();
-
-    let s_user = if search.archives { sysid } else { user };
-
-    for rsrec in rec_iter {
-      match rsrec {
-        Ok(rec) => {
-          pv.push(sqldata::read_zknote(&conn, Some(s_user), &rec.id)?.1);
+      for rsrec in rec_iter {
+        match rsrec {
+          Ok(rec) => {
+            pv.push(rec);
+          }
+          Err(_) => (),
         }
-        Err(_) => (),
       }
-    }
 
-    Ok(Right(ZkNoteSearchResult {
-      notes: pv,
-      offset: search.offset,
-      what: search.what.clone(),
-    }))
+      Ok(SearchResult::SrListNote(ZkListNoteSearchResult {
+        notes: pv,
+        offset: search.offset,
+        what: search.what.clone(),
+      }))
+    }
+    ResultType::RtNote => {
+      let mut pv = Vec::new();
+
+      for rsrec in rec_iter {
+        match rsrec {
+          Ok(rec) => {
+            pv.push(sqldata::read_zknote(&conn, Some(user), &rec.id)?.1);
+          }
+          Err(_) => (),
+        }
+      }
+
+      Ok(SearchResult::SrNote(ZkNoteSearchResult {
+        notes: pv,
+        offset: search.offset,
+        what: search.what.clone(),
+      }))
+    }
+    ResultType::RtNoteAndLinks => {
+      let mut pv = Vec::new();
+
+      for rsrec in rec_iter {
+        match rsrec {
+          Ok(rec) => {
+            pv.push(sqldata::read_zknoteandlinks(&conn, Some(user), &rec.id)?);
+          }
+          Err(_) => (),
+        }
+      }
+
+      Ok(SearchResult::SrNoteAndLink(ZkNoteAndLinksSearchResult {
+        notes: pv,
+        offset: search.offset,
+        what: search.what.clone(),
+      }))
+    }
   }
 }
 
@@ -143,7 +201,8 @@ pub fn search_zknotes_stream(
   user: i64,
   search: ZkNoteSearch,
 ) -> impl Stream<Item = Result<Bytes, Box<dyn std::error::Error>>> + 'static {
-  // { uncomment for formatting, lsp
+  // uncomment for formatting, lsp
+  // {
   try_stream! {
     // let sysid = user_id(&conn, "system")?;
     let s_user = if search.archives {
@@ -157,10 +216,11 @@ pub fn search_zknotes_stream(
     let mut rows = stmt.query(rusqlite::params_from_iter(args.iter()))?;
 
     let mut header = serde_json::to_value(PrivateReplyMessage {
-      what: if search.list {
-        PrivateReplies::ZkListNoteSearchResult
-      } else {
-        PrivateReplies::ZkNoteSearchResult
+      what: match search.resulttype {
+        ResultType::RtId => PrivateReplies::ZkNoteIdSearchResult,
+        ResultType::RtListNote => PrivateReplies::ZkListNoteSearchResult,
+        ResultType::RtNote => PrivateReplies::ZkNoteSearchResult,
+        ResultType::RtNoteAndLinks => PrivateReplies::ZkNoteAndLinksSearchResult,
       },
       content: serde_json::to_value(ZkSearchResultHeader {
         what: search.what,
@@ -174,29 +234,46 @@ pub fn search_zknotes_stream(
     yield Bytes::from(header);
 
     while let Some(row) = rows.next()? {
-      if search.list {
-        let zln = ZkListNote {
-          id: Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?,
-          title: row.get(2)?,
-          is_file: {
-            let wat: Option<i64> = row.get(3)?;
-            wat.is_some()
-          },
-          user: row.get(4)?,
-          createdate: row.get(5)?,
-          changeddate: row.get(6)?,
-          sysids: Vec::new(),
-        };
+      match search.resulttype {
+        ResultType::RtId => {
+          let mut s = serde_json::to_value(row.get::<usize, String>(1)?.as_str())?
+            .to_string()
+            .to_string();
+          s.push_str("\n");
+          yield Bytes::from(s);
+        }
+        ResultType::RtListNote => {
+          let zln = ZkListNote {
+            id: Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?,
+            title: row.get(2)?,
+            is_file: {
+              let wat: Option<i64> = row.get(3)?;
+              wat.is_some()
+            },
+            user: row.get(4)?,
+            createdate: row.get(5)?,
+            changeddate: row.get(6)?,
+            sysids: Vec::new(),
+          };
 
-        let mut s = serde_json::to_value(zln)?.to_string().to_string();
-        s.push_str("\n");
-        yield Bytes::from(s);
-      } else {
-
-        let zn = sqldata::read_zknote_i64(&conn, Some(s_user), row.get(0)?)?;
-        let mut s = serde_json::to_value(zn)?.to_string().to_string();
-        s.push_str("\n");
-        yield Bytes::from(s);
+          let mut s = serde_json::to_value(zln)?.to_string().to_string();
+          s.push_str("\n");
+          yield Bytes::from(s);
+        }
+        ResultType::RtNote => {
+          let zn = sqldata::read_zknote_i64(&conn, Some(s_user), row.get(0)?)?;
+          let mut s = serde_json::to_value(zn)?.to_string().to_string();
+          s.push_str("\n");
+          yield Bytes::from(s);
+        }
+        ResultType::RtNoteAndLinks => {
+          // TODO: i64 version
+          let uuid = Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?;
+          let zn = sqldata::read_zknoteandlinks(&conn, Some(s_user), &uuid)?;
+          let mut s = serde_json::to_value(zn)?.to_string().to_string();
+          s.push_str("\n");
+          yield Bytes::from(s);
+        }
       }
     }
   }
@@ -471,6 +548,7 @@ fn build_tagsearch_clause(
   let (cls, args) = match search {
     TagSearch::SearchTerm { mods, term } => {
       let mut exact = false;
+      let mut zknoteid = false;
       let mut tag = false;
       let mut desc = false;
       let mut user = false;
@@ -483,6 +561,7 @@ fn build_tagsearch_clause(
           SearchMod::Note => desc = true,
           SearchMod::User => user = true,
           SearchMod::File => file = true,
+          SearchMod::ZkNoteId => zknoteid = true,
         }
       }
       let field = if desc { "content" } else { "title" };
@@ -540,7 +619,9 @@ fn build_tagsearch_clause(
 
           (
             // clause
-            if exact {
+            if zknoteid {
+              format!("N.uuid = ?")
+            } else if exact {
               format!("N.{} {}= ? {}", field, notstr, fileclause)
             } else {
               format!("N.{} {} like ? {}", field, notstr, fileclause)

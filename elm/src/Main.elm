@@ -1657,7 +1657,7 @@ actualupdate msg model =
                                             , offset = 0
                                             , limit = Nothing
                                             , what = ""
-                                            , list = True
+                                            , resultType = S.RtListNote
                                             , archives = False
                                             , createdAfter = Nothing
                                             , createdBefore = Nothing
@@ -2408,6 +2408,13 @@ actualupdate msg model =
 
                             else
                                 ( model, Cmd.none )
+
+                        ZI.ZkIdSearchResult sr ->
+                            let
+                                _ =
+                                    Debug.log "id_search recvd" ""
+                            in
+                            ( model, Cmd.none )
 
                         ZI.ZkListNoteSearchResult sr ->
                             case state of
@@ -3515,7 +3522,7 @@ prevSearchQuery login =
     , offset = 0
     , limit = Just 50
     , what = "prevSearches"
-    , list = False
+    , resultType = S.RtNote
     , archives = False
     , createdAfter = Nothing
     , createdBefore = Nothing

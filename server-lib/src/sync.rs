@@ -17,7 +17,9 @@ use tokio_util::io::StreamReader;
 use zkprotocol::constants::{PrivateReplies, PrivateRequests, PrivateStreamingRequests};
 use zkprotocol::content::{ArchiveZkLink, GetArchiveZkLinks, GetZkLinksSince, UuidZkLink, ZkNote};
 use zkprotocol::messages::{PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage};
-use zkprotocol::search::{OrderDirection, OrderField, Ordering, TagSearch, ZkNoteSearch};
+use zkprotocol::search::{
+  OrderDirection, OrderField, Ordering, ResultType, TagSearch, ZkNoteSearch,
+};
 
 fn convert_err(err: reqwest::Error) -> std::io::Error {
   todo!()
@@ -37,7 +39,7 @@ pub async fn prev_sync(conn: &Connection, user: &User) -> Result<CompletedSync, 
     offset: 0,
     limit: Some(1),
     what: "".to_string(),
-    list: false,
+    resulttype: ResultType::RtNote,
     archives: false,
     created_after: None,
     created_before: None,
@@ -93,7 +95,7 @@ pub async fn sync(
           offset: 0,
           limit: None,
           what: "".to_string(),
-          list: false,
+          resulttype: ResultType::RtNote,
           archives: false,
           created_after: None,
           created_before: None,
@@ -277,7 +279,7 @@ pub async fn sync(
           offset: 0,
           limit: None,
           what: "".to_string(),
-          list: false,
+          resulttype: ResultType::RtNote,
           archives: true,
           created_after: None,
           created_before: None,

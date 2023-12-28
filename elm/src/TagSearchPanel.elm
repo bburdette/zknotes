@@ -351,6 +351,9 @@ viewSearchHelper mbfocusloc indent lts ts =
                                         ExactMatch ->
                                             "e"
 
+                                        ZkNoteId ->
+                                            "e"
+
                                         Tag ->
                                             "t"
 

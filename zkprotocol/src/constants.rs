@@ -81,6 +81,8 @@ pub enum PrivateReplies {
   ZkLinks,
   ZkListNoteSearchResult,
   ZkNoteSearchResult,
+  ZkNoteIdSearchResult,
+  ZkNoteAndLinksSearchResult,
   PowerDeleteComplete,
   DeletedZkNote,
   SavedZkNote,

@@ -4,7 +4,6 @@ use crate::sqldata;
 use crate::sync;
 use actix_session::Session;
 use actix_web::HttpResponse;
-use either::Either::{Left, Right};
 use log::info;
 use orgauth;
 use orgauth::endpoints::{Callbacks, Tokener};
@@ -259,12 +258,20 @@ pub async fn zk_interface_loggedin(
       // let res = search::search_zknotes_simple(&conn, uid, &search)?;
       let res = search::search_zknotes(&conn, uid, &search)?;
       match res {
-        Left(res) => Ok(PrivateReplyMessage {
+        search::SearchResult::SrId(res) => Ok(PrivateReplyMessage {
+          what: PrivateReplies::ZkNoteIdSearchResult,
+          content: serde_json::to_value(res)?,
+        }),
+        search::SearchResult::SrListNote(res) => Ok(PrivateReplyMessage {
           what: PrivateReplies::ZkListNoteSearchResult,
           content: serde_json::to_value(res)?,
         }),
-        Right(res) => Ok(PrivateReplyMessage {
+        search::SearchResult::SrNote(res) => Ok(PrivateReplyMessage {
           what: PrivateReplies::ZkNoteSearchResult,
+          content: serde_json::to_value(res)?,
+        }),
+        search::SearchResult::SrNoteAndLink(res) => Ok(PrivateReplyMessage {
+          what: PrivateReplies::ZkNoteAndLinksSearchResult,
           content: serde_json::to_value(res)?,
         }),
       }

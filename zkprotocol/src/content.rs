@@ -198,7 +198,7 @@ pub struct GetZkNoteComments {
   pub limit: Option<i64>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone)]
 pub struct ZkNoteAndLinks {
   pub zknote: ZkNote,
   pub links: Vec<EditLink>,

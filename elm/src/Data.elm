@@ -101,6 +101,13 @@ type alias ZkListNote =
     }
 
 
+type alias ZkIdSearchResult =
+    { notes : List Int
+    , offset : Int
+    , what : String
+    }
+
+
 type alias ZkListNoteSearchResult =
     { notes : List ZkListNote
     , offset : Int
@@ -276,7 +283,8 @@ type alias GetZkLinks =
 type alias GetZkNoteComments =
     { zknote : ZkNoteId
     , offset : Int
-    , limit : Maybe Int
+
+    -- , limit : Maybe Int
     }
 
 
@@ -437,14 +445,16 @@ encodeGetZkNoteComments x =
         [ ( "zknote", encodeZkNoteId x.zknote )
         , ( "offset", JE.int x.offset )
         ]
-            ++ (case x.limit of
-                    Just l ->
-                        [ ( "limit", JE.int l )
-                        ]
 
-                    Nothing ->
-                        []
-               )
+
+
+-- ++ (case x.limit of
+--         Just l ->
+--             [ ( "limit", JE.int l )
+--             ]
+--         Nothing ->
+--             []
+--    )
 
 
 encodeZkLinks : ZkLinks -> JE.Value
@@ -590,6 +600,14 @@ decodeZkListNote =
         |> andMap (JD.field "createdate" JD.int)
         |> andMap (JD.field "changeddate" JD.int)
         |> andMap (JD.field "sysids" (JD.list decodeZkNoteId))
+
+
+decodeZkIdSearchResult : JD.Decoder ZkIdSearchResult
+decodeZkIdSearchResult =
+    JD.map3 ZkIdSearchResult
+        (JD.field "notes" (JD.list JD.int))
+        (JD.field "offset" JD.int)
+        (JD.field "what" JD.string)
 
 
 decodeZkListNoteSearchResult : JD.Decoder ZkListNoteSearchResult

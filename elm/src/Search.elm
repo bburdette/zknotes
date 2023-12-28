@@ -1,6 +1,7 @@
 module Search exposing
     ( AndOr(..)
     , FieldText(..)
+    , ResultType(..)
     , SearchMod(..)
     , TSText(..)
     , TagSearch(..)
@@ -70,7 +71,7 @@ type alias ZkNoteSearch =
     , offset : Int
     , limit : Maybe Int
     , what : String
-    , list : Bool
+    , resultType : ResultType
     , archives : Bool
     , createdAfter : Maybe Int
     , createdBefore : Maybe Int
@@ -79,8 +80,16 @@ type alias ZkNoteSearch =
     }
 
 
+type ResultType
+    = RtId
+    | RtListNote
+    | RtNote
+    | RtNoteAndLinks
+
+
 type SearchMod
     = ExactMatch
+    | ZkNoteId
     | Tag
     | Note
     | User
@@ -129,7 +138,7 @@ defaultSearch =
     , offset = 0
     , limit = Just defaultSearchLimit
     , what = ""
-    , list = True
+    , resultType = RtListNote
     , archives = False
     , createdAfter = Nothing
     , createdBefore = Nothing
@@ -138,11 +147,30 @@ defaultSearch =
     }
 
 
+encodeResultType : ResultType -> JE.Value
+encodeResultType smod =
+    case smod of
+        RtId ->
+            JE.string "RtId"
+
+        RtListNote ->
+            JE.string "RtListNote"
+
+        RtNote ->
+            JE.string "RtNote"
+
+        RtNoteAndLinks ->
+            JE.string "RtNoteAndLinks"
+
+
 encodeSearchMod : SearchMod -> JE.Value
 encodeSearchMod smod =
     case smod of
         ExactMatch ->
             JE.string "ExactMatch"
+
+        ZkNoteId ->
+            JE.string "ZkNoteId"
 
         Tag ->
             JE.string "Tag"
@@ -165,6 +193,9 @@ decodeSearchMod =
                 case s of
                     "ExactMatch" ->
                         JD.succeed ExactMatch
+
+                    "ZkNoteId" ->
+                        JD.succeed ZkNoteId
 
                     "Tag" ->
                         JD.succeed Tag
@@ -291,7 +322,7 @@ encodeZkNoteSearch zns =
         [ ( "tagsearch", encodeTagSearch (andifySearches zns.tagSearch) )
         , ( "offset", JE.int zns.offset )
         , ( "what", JE.string zns.what )
-        , ( "list", JE.bool zns.list )
+        , ( "resulttype", encodeResultType zns.resultType )
         , ( "archives", JE.bool zns.archives )
         ]
             ++ List.filterMap identity
@@ -308,6 +339,9 @@ showSearchMod mod =
     case mod of
         ExactMatch ->
             "ExactMatch"
+
+        ZkNoteId ->
+            "ZkNoteId"
 
         Tag ->
             "Tag"
@@ -351,6 +385,9 @@ printSearchMod mod =
         ExactMatch ->
             "e"
 
+        ZkNoteId ->
+            "z"
+
         Tag ->
             "t"
 
@@ -392,6 +429,8 @@ searchMod =
     oneOf
         [ succeed ExactMatch
             |. symbol "e"
+        , succeed ZkNoteId
+            |. symbol "z"
         , succeed Tag
             |. symbol "t"
         , succeed Note
