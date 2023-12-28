@@ -1,5 +1,7 @@
 use crate::util::now;
 use futures_util::TryStreamExt;
+// use json::JsonResult;
+use crate::error as zkerr;
 use orgauth;
 use orgauth::data::{PhantomUser, User, UserResponse, UserResponseMessage};
 use orgauth::dbfun::user_id;
@@ -7,6 +9,7 @@ use orgauth::endpoints::Callbacks;
 use reqwest;
 use reqwest::cookie;
 use rusqlite::{params, Connection};
+use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::io::AsyncBufReadExt;
@@ -14,10 +17,41 @@ use tokio_util::io::StreamReader;
 use zkprotocol::constants::{PrivateReplies, PrivateRequests, PrivateStreamingRequests};
 use zkprotocol::content::{ArchiveZkLink, GetArchiveZkLinks, GetZkLinksSince, UuidZkLink, ZkNote};
 use zkprotocol::messages::{PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage};
-use zkprotocol::search::{TagSearch, ZkNoteSearch};
+use zkprotocol::search::{OrderDirection, OrderField, Ordering, TagSearch, ZkNoteSearch};
 
 fn convert_err(err: reqwest::Error) -> std::io::Error {
   todo!()
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct CompletedSync {
+  after: Option<i64>,
+}
+
+pub async fn prev_sync(conn: &Connection, user: &User) -> Result<CompletedSync, zkerr::Error> {
+  let zns = ZkNoteSearch {
+    tagsearch: TagSearch::SearchTerm {
+      mods: Vec::new(),
+      term: "".to_string(),
+    },
+    offset: 0,
+    limit: Some(1),
+    what: "".to_string(),
+    list: false,
+    archives: false,
+    created_after: None,
+    created_before: None,
+    changed_after: None,
+    changed_before: None,
+    synced_after: None,
+    synced_before: None,
+    ordering: Some(Ordering {
+      field: OrderField::Changed,
+      direction: OrderDirection::Descending,
+    }),
+  };
+
+  Err("meh".into())
 }
 
 pub async fn sync(
@@ -26,6 +60,10 @@ pub async fn sync(
   callbacks: &mut Callbacks,
 ) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>> {
   let now = now()?;
+
+  // get previous sync.
+
+  // TODO:  get previous sync information!
 
   // execute any command from here.  search?
   // let jar = reqwest::cookies::Jar;

@@ -1575,7 +1575,7 @@ pub fn read_archivezklinks_stream(
 ) -> impl Stream<Item = Result<Bytes, Box<dyn std::error::Error>>> + 'static {
   // {
   try_stream! {
-    let (acc_sql, acc_args) = accessible_notes(&conn, uid)?;
+    let (acc_sql, mut acc_args) = accessible_notes(&conn, uid)?;
 
     let mut pstmt = conn.prepare(
       format!(
@@ -1586,11 +1586,17 @@ pub fn read_archivezklinks_stream(
       and TN.id = ZLA.toid
       and LN.id = ZLA.toid
       and ZLA.fromid in accessible_notes
-      and ZLA.toid in accessible_notes",
+      and ZLA.toid in accessible_notes
+      and (FN.syncdate > ? or FN.changeddate > ?)",
         acc_sql
       )
       .as_str(),
     )?;
+
+    let a = after.to_string();
+    let mut av = vec!(a.clone(), a.clone());
+
+    acc_args.append(&mut av);
 
     let rec_iter = pstmt.query_map(rusqlite::params_from_iter(acc_args.iter()), |row| {
       Ok(ArchiveZkLink {
@@ -1685,7 +1691,7 @@ pub fn read_zklinks_since_stream(
 ) -> impl Stream<Item = Result<Bytes, Box<dyn std::error::Error>>> + 'static {
   // {
   try_stream! {
-    let (acc_sql, acc_args) = accessible_notes(&conn, uid)?;
+    let (acc_sql, mut acc_args) = accessible_notes(&conn, uid)?;
 
     let mut astmt = conn.prepare(acc_sql.as_str())?;
 
@@ -1709,11 +1715,18 @@ pub fn read_zklinks_since_stream(
         and TN.id = ZL.toid
         and ZL.user = OU.id
         and ZL.fromid in accessible_notes
-        and ZL.toid in accessible_notes",
+        and ZL.toid in accessible_notes
+        and (ZL.syncdate > ? or ZL.createdate > ?)",
         acc_sql
       )
       .as_str(),
     )?;
+
+    let a = after.to_string();
+    let mut av = vec!(a.clone(), a.clone());
+
+    acc_args.append(&mut av);
+
 
     println!("accarts {}", acc_args.len());
 
