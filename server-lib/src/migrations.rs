@@ -2443,24 +2443,52 @@ pub fn udpate32(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 
   // drop zknote, make new zkknote with syncdate column.
   conn.execute("drop table zknote", params![])?;
-  conn.execute(
-    r#"CREATE TABLE IF NOT EXISTS "zknote" 
-        ("id" INTEGER PRIMARY KEY NOT NULL,
-         "title" TEXT NOT NULL,
-         "content" TEXT NOT NULL,
-         "sysdata" TEXT,
-         "pubid" TEXT UNIQUE,
-         "user" INTEGER NOT NULL REFERENCES orgauth_user(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
-         "editable" BOOLEAN NOT NULL,
-         "showtitle" BOOLEAN NOT NULL,
-         "deleted" BOOLEAN NOT NULL,
-         "file" INTEGER REFERENCES file(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
-         "uuid" TEXT NOT NULL,
-         "createdate" INTEGER NOT NULL,
-         "changeddate" INTEGER NOT NULL,
-         "syncdate" INTEGER)"#,
-    params![],
-  )?;
+
+  let mut m1 = Migration::new();
+  // new zknote with syncdate column
+  m1.create_table("zknote", |t| {
+    t.add_column(
+      "id",
+      types::integer()
+        .primary(true)
+        .increments(true)
+        .nullable(false),
+    );
+    t.add_column("title", types::text().nullable(false));
+    t.add_column("content", types::text().nullable(false));
+    t.add_column("sysdata", types::text().nullable(true));
+    t.add_column("pubid", types::text().nullable(true).unique(true));
+    t.add_column(
+      "user",
+      types::foreign(
+        "orgauth_user",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column("editable", types::boolean());
+    t.add_column("showtitle", types::boolean());
+    t.add_column("deleted", types::boolean());
+    t.add_column(
+      "file",
+      types::foreign(
+        "file",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(true),
+    );
+    t.add_column("uuid", types::text().nullable(false));
+    t.add_column("createdate", types::integer().nullable(false));
+    t.add_column("changeddate", types::integer().nullable(false));
+    t.add_column("syncdate", types::integer().nullable(true));
+    t.add_index("unq_uuid", types::index(vec!["uuid"]).unique(true));
+  });
+
+  conn.execute_batch(m1.make::<Sqlite>().as_str())?;
 
   // copy everything back.
   conn.execute(
@@ -2518,16 +2546,57 @@ pub fn udpate32(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 
   conn.execute("drop table zklink", params![])?;
 
-  conn.execute(
-    r#" CREATE TABLE IF NOT EXISTS "zklink" 
-    ("fromid" INTEGER NOT NULL REFERENCES zknote(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
-     "toid" INTEGER NOT NULL REFERENCES zknote(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
-     "user" INTEGER NOT NULL REFERENCES orgauth_user(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
-     "linkzknote" INTEGER REFERENCES zknote(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
-     "createdate" INTEGER NOT NULL, 
-     "syncdate" INTEGER)"#,
-    params![],
-  )?;
+  let mut m2 = Migration::new();
+  // new zklink with syncdate
+  m2.create_table("zklink", |t| {
+    t.add_column(
+      "fromid",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "toid",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "user",
+      types::foreign(
+        "orgauth_user",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "linkzknote",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(true),
+    );
+    t.add_column("createdate", types::integer().nullable(false));
+    t.add_column("syncdate", types::integer().nullable(true));
+    t.add_index(
+      "zklinkunq",
+      types::index(vec!["fromid", "toid", "user"]).unique(true),
+    );
+  });
+  conn.execute_batch(m2.make::<Sqlite>().as_str())?;
 
   conn.execute(
     r#" insert into zklink (fromid, toid, user, linkzknote, createdate) 
@@ -2559,18 +2628,62 @@ pub fn udpate32(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 
   conn.execute("drop table zklinkarchive", params![])?;
 
-  conn.execute(
-    r#"CREATE TABLE IF NOT EXISTS "zklinkarchive" 
-    ("id" INTEGER PRIMARY KEY NOT NULL,
-     "fromid" INTEGER NOT NULL REFERENCES zknote(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
-     "toid" INTEGER NOT NULL REFERENCES zknote(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
-     "user" INTEGER NOT NULL REFERENCES orgauth_user(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
-     "linkzknote" INTEGER REFERENCES zknote(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
-     "createdate" INTEGER NOT NULL,
-     "deletedate" INTEGER NOT NULL,
-     "syncdate" INTEGER)"#,
-    params![],
-  )?;
+  let mut m3 = Migration::new();
+  // archive table, adding syncdate
+  m3.create_table("zklinkarchive", |t| {
+    t.add_column(
+      "id",
+      types::integer()
+        .primary(true)
+        .increments(true)
+        .nullable(false),
+    );
+    t.add_column(
+      "fromid",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "toid",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "user",
+      types::foreign(
+        "orgauth_user",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "linkzknote",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(true),
+    );
+    t.add_column("createdate", types::integer().nullable(false));
+    t.add_column("deletedate", types::integer().nullable(false));
+    t.add_column("syncdate", types::integer().nullable(true));
+  });
+
+  conn.execute_batch(m3.make::<Sqlite>().as_str())?;
 
   conn.execute(
     r#" insert into zklinkarchive (id, fromid, toid, user, linkzknote, createdate, deletedate) 

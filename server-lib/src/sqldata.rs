@@ -529,6 +529,7 @@ pub fn user_shares(conn: &Connection, uid: i64) -> Result<Vec<i64>, zkerr::Error
          (A.toid = B.toid and B.fromid = ?2))
       ",
   )?;
+
   let r = pstmt.query_map(params![shareid, usernoteid], |row| Ok(row.get(0)?))?;
   Ok(r.collect::<Result<Vec<i64>, rusqlite::Error>>()?)
 }
@@ -1245,8 +1246,6 @@ pub fn read_zklinks(
     .collect::<String>();
   s.truncate(s.len() - 1);
 
-  // let zknid = note_id_for_zknoteid(&conn, &gzl.zknote)?;
-
   // good old fashioned string templating here, since I can't figure out how to
   // do array parameters.
   //
@@ -1337,7 +1336,6 @@ pub fn read_zklinks(
       })
     })?,
   );
-  println!("readlainksxi {:?}", r);
   r
 }
 
