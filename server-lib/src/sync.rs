@@ -1,3 +1,4 @@
+use crate::search::{search_zknotes, SearchResult};
 use crate::util::now;
 use futures_util::TryStreamExt;
 // use json::JsonResult;
@@ -28,9 +29,13 @@ fn convert_err(err: reqwest::Error) -> std::io::Error {
 #[derive(Deserialize, Serialize, Debug)]
 pub struct CompletedSync {
   after: Option<i64>,
+  now: i64,
 }
 
-pub async fn prev_sync(conn: &Connection, user: &User) -> Result<CompletedSync, zkerr::Error> {
+pub async fn prev_sync(
+  conn: &Connection,
+  user: &User,
+) -> Result<Option<CompletedSync>, Box<dyn std::error::Error>> {
   let zns = ZkNoteSearch {
     tagsearch: TagSearch::SearchTerm {
       mods: Vec::new(),
@@ -53,7 +58,16 @@ pub async fn prev_sync(conn: &Connection, user: &User) -> Result<CompletedSync, 
     }),
   };
 
-  Err("meh".into())
+  if let SearchResult::SrNote(res) = search_zknotes(conn, user.id, &zns)? {
+    Ok(
+      res
+        .notes
+        .first()
+        .and_then(|n| serde_json::from_str::<CompletedSync>(n.content.as_str()).ok()),
+    )
+  } else {
+    Err("unexpected search result type".into())
+  }
 }
 
 pub async fn sync(
@@ -64,6 +78,7 @@ pub async fn sync(
   let now = now()?;
 
   // get previous sync.
+  let after = prev_sync(&conn, &user).await?.map(|cs| cs.now);
 
   // TODO:  get previous sync information!
 
@@ -99,9 +114,9 @@ pub async fn sync(
           archives: false,
           created_after: None,
           created_before: None,
-          changed_after: None,
+          changed_after: after,
           changed_before: Some(now),
-          synced_after: None,
+          synced_after: after,
           synced_before: Some(now),
           ordering: None,
         };
@@ -283,9 +298,9 @@ pub async fn sync(
           archives: true,
           created_after: None,
           created_before: None,
-          changed_after: None,
+          changed_after: after,
           changed_before: Some(now),
-          synced_after: None,
+          synced_after: after,
           synced_before: Some(now),
           ordering: None,
         };
@@ -361,7 +376,7 @@ pub async fn sync(
 
       if getarchivelinks {
         let gazl = GetArchiveZkLinks {
-          createddate_after: 0,
+          createddate_after: after,
         };
         let l = PrivateStreamingMessage {
           what: PrivateStreamingRequests::GetArchiveZkLinks,
@@ -439,7 +454,7 @@ pub async fn sync(
 
       if getlinks {
         let gazl = GetZkLinksSince {
-          createddate_after: 0,
+          createddate_after: after,
         };
         let l = PrivateStreamingMessage {
           what: PrivateStreamingRequests::GetZkLinksSince,

@@ -164,12 +164,12 @@ pub struct GetArchiveZkNote {
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct GetArchiveZkLinks {
-  pub createddate_after: i64,
+  pub createddate_after: Option<i64>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct GetZkLinksSince {
-  pub createddate_after: i64,
+  pub createddate_after: Option<i64>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
