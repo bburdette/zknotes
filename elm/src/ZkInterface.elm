@@ -29,7 +29,7 @@ type ServerResponse
     = ZkNoteSearchResult Data.ZkNoteSearchResult
     | ZkListNoteSearchResult Data.ZkListNoteSearchResult
     | ZkIdSearchResult Data.ZkIdSearchResult
-    | ArchiveList Data.ZkNoteArchives
+    | ZkNoteArchives Data.ZkNoteArchives
     | SavedZkNoteAndLinks Data.SavedZkNote
     | SavedZkNote Data.SavedZkNote
     | DeletedZkNote Int
@@ -61,8 +61,8 @@ showServerResponse sr =
         ZkListNoteSearchResult _ ->
             "ZkListNoteSearchResult"
 
-        ArchiveList _ ->
-            "ArchiveList"
+        ZkNoteArchives _ ->
+            "ZkNoteArchives"
 
         SavedZkNote _ ->
             "SavedZkNote"
@@ -236,8 +236,8 @@ serverResponseDecoder =
                     "ZkIdSearchResult" ->
                         JD.map ZkIdSearchResult (JD.at [ "content" ] <| Data.decodeZkIdSearchResult)
 
-                    "ArchiveList" ->
-                        JD.map ArchiveList (JD.at [ "content" ] <| Data.decodeZkNoteArchives)
+                    "ZkNoteArchives" ->
+                        JD.map ZkNoteArchives (JD.at [ "content" ] <| Data.decodeZkNoteArchives)
 
                     "SavedZkNote" ->
                         JD.map SavedZkNote (JD.at [ "content" ] <| Data.decodeSavedZkNote)

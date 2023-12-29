@@ -2453,7 +2453,7 @@ actualupdate msg model =
                                     , Cmd.none
                                     )
 
-                        ZI.ArchiveList ar ->
+                        ZI.ZkNoteArchives ar ->
                             case model.state of
                                 ArchiveListing al login ->
                                     ( { model | state = ArchiveListing (ArchiveListing.updateSearchResult ar.results al) login }
