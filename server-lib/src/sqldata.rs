@@ -1,4 +1,5 @@
 use crate::error as zkerr;
+use crate::error::to_orgauth_error;
 use crate::migrations as zkm;
 use async_stream::try_stream;
 use barrel::backend::Sqlite;
@@ -25,13 +26,6 @@ use zkprotocol::content::{
   UuidZkLink, ZkLink, ZkListNote, ZkNote, ZkNoteAndLinks, ZkNoteId,
 };
 use zkprotocol::messages::PrivateReplyMessage;
-
-#[derive(Clone, Deserialize, Serialize, Debug)]
-pub struct User {
-  pub id: i64,
-  pub noteid: ZkNoteId,
-  pub homenoteid: Option<ZkNoteId>,
-}
 
 pub fn on_new_user(
   conn: &Connection,
@@ -99,7 +93,9 @@ pub fn extra_login_data_callback(
   conn: &Connection,
   uid: i64,
 ) -> Result<Option<serde_json::Value>, orgauth::error::Error> {
-  Ok(Some(serde_json::to_value(extra_login_data(&conn, uid)?)?))
+  Ok(Some(serde_json::to_value(
+    read_user_by_id(&conn, uid).map_err(to_orgauth_error)?,
+  )?))
 }
 
 // for-real delete of user - no archives?
@@ -111,21 +107,6 @@ pub fn on_delete_user(conn: &Connection, uid: i64) -> Result<bool, orgauth::erro
   conn.execute("delete from zknote where user = ?1", params!(uid))?;
   conn.execute("delete from user where id = ?1", params!(uid))?;
   Ok(true)
-}
-
-pub fn extra_login_data(
-  conn: &Connection,
-  uid: i64,
-) -> Result<ExtraLoginData, orgauth::error::Error> {
-  let user = read_user_by_id(&conn, uid).map_err(zkerr::to_orgauth_error)?;
-
-  let eld = ExtraLoginData {
-    userid: uid,
-    zknote: user.noteid,
-    homenote: user.homenoteid,
-  };
-
-  Ok(eld)
 }
 
 pub fn sysids() -> Result<Sysids, zkerr::Error> {
@@ -846,7 +827,7 @@ pub fn get_sysids(
   r
 }
 
-pub fn read_user_by_id(conn: &Connection, id: i64) -> Result<User, zkerr::Error> {
+pub fn read_user_by_id(conn: &Connection, id: i64) -> Result<ExtraLoginData, zkerr::Error> {
   let (uid, noteid, hn) = conn.query_row(
     "select user.id, zknote.uuid, homenote
       from user, zknote where user.id = ?1
@@ -865,14 +846,13 @@ pub fn read_user_by_id(conn: &Connection, id: i64) -> Result<User, zkerr::Error>
     Some(i) => Some(uuid_for_note_id(&conn, i)?),
     None => None,
   };
-
-  let user = User {
-    id: uid,
-    noteid: Uuid::parse_str(noteid.as_str())?,
-    homenoteid: hnid,
+  let eld = ExtraLoginData {
+    userid: uid,
+    zknote: Uuid::parse_str(noteid.as_str())?,
+    homenote: hnid,
   };
 
-  Ok(user)
+  Ok(eld)
 }
 
 // TODO: do better than this janky hack.
@@ -2154,7 +2134,7 @@ pub fn make_file_note(
 pub struct ZkDatabase {
   notes: Vec<ZkNote>,
   links: Vec<ZkLink>,
-  users: Vec<User>,
+  users: Vec<ExtraLoginData>,
 }
 
 pub fn export_db(_dbfile: &Path) -> Result<ZkDatabase, zkerr::Error> {
