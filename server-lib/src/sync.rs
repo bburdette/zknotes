@@ -1,8 +1,10 @@
 use crate::search::{search_zknotes, SearchResult};
 use crate::util::now;
+use actix_web::body::None;
 use futures_util::TryStreamExt;
 // use json::JsonResult;
 use crate::error as zkerr;
+use crate::sqldata::{self, note_id_for_uuid, save_zklink, save_zknote, user_note_id};
 use orgauth;
 use orgauth::data::{PhantomUser, User, UserResponse, UserResponseMessage};
 use orgauth::dbfun::user_id;
@@ -15,8 +17,13 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::io::AsyncBufReadExt;
 use tokio_util::io::StreamReader;
-use zkprotocol::constants::{PrivateReplies, PrivateRequests, PrivateStreamingRequests};
-use zkprotocol::content::{ArchiveZkLink, GetArchiveZkLinks, GetZkLinksSince, UuidZkLink, ZkNote};
+use uuid::Uuid;
+use zkprotocol::constants::{
+  PrivateReplies, PrivateRequests, PrivateStreamingRequests, SpecialUuids,
+};
+use zkprotocol::content::{
+  ArchiveZkLink, GetArchiveZkLinks, GetZkLinksSince, SaveZkNote, UuidZkLink, ZkNote,
+};
 use zkprotocol::messages::{PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage};
 use zkprotocol::search::{
   OrderDirection, OrderField, Ordering, ResultType, TagSearch, ZkNoteSearch,
@@ -69,6 +76,37 @@ pub async fn prev_sync(
     Err("unexpected search result type".into())
   }
 }
+pub async fn save_sync(
+  conn: &Connection,
+  uid: i64,
+  usernoteid: i64,
+  sync: CompletedSync,
+) -> Result<i64, Box<dyn std::error::Error>> {
+  let syncid = note_id_for_uuid(conn, &Uuid::parse_str(SpecialUuids::Sync.str())?)?;
+  let sysid = user_id(&conn, "system")?;
+
+  let (id, _szn) = save_zknote(
+    conn,
+    sysid, // save under system id.
+    &SaveZkNote {
+      id: None,
+      title: "sync".to_string(),
+      pubid: None,
+      content: serde_json::to_string_pretty(&serde_json::to_value(sync)?)?,
+      editable: false,
+      showtitle: false,
+      deleted: false,
+    },
+  )?;
+
+  // link to 'sync' system note.
+  save_zklink(conn, id, syncid, sysid, None)?;
+
+  // link to user note for access
+  save_zklink(conn, id, usernoteid, sysid, None)?;
+
+  Ok(id)
+}
 
 pub async fn sync(
   conn: &Connection,
@@ -96,6 +134,8 @@ pub async fn sync(
       let getlinks = true;
       let getarchivenotes = true;
       let getarchivelinks = true;
+
+      // TODO: get time on remote system, bail if too far out.
 
       if getnotes {
         let mut userhash = HashMap::<i64, i64>::new();
@@ -252,6 +292,8 @@ pub async fn sync(
             }
           };
 
+          // Syncing a remote note.
+
           // if we had a sha, we'd insert based on that, right?
           // these are archive notes so should be able to insert if they don't exist, otherwise discard.
           // because archive notes shouldn't change.
@@ -274,8 +316,27 @@ pub async fn sync(
               Ok(x) => Ok(x),
               Err(rusqlite::Error::SqliteFailure(e, s)) =>
                 if e.code == rusqlite::ErrorCode::ConstraintViolation {
-                  // TODO: uuid conflict;  resolve with old one becoming archive note.
+                  let (nid, n) = sqldata::read_zknote_unchecked(&conn, &note.id)?;
+                  // TODO: uuid conflict;  resolve with older one becoming archive note.
                   // SqliteFailure(Error { code: ConstraintViolation, extended_code: 2067 }, Some("UNIQUE constraint failed: zknote.uuid"));
+                  if note.changeddate > n.changeddate {
+                    // note is newer.  archive the old and replace.
+                    sqldata::save_zknote(&conn,
+                                         user_uid,
+                                         &SaveZkNote {
+                                           id: Some(note.id),
+                                           title: note.title,
+                                           pubid: note.pubid,
+                                           content: note.content,
+                                           editable: note.editable,
+                                           showtitle: note.showtitle,
+                                           deleted: note.deleted,
+                                         })?;
+                  } else {
+                    // note is older.  add as archive note.
+                    // may create duplicate archive notes if edited on two systems and then synced.
+                    sqldata::archive_zknote(&conn, nid, now, &note)?;
+                  }
                   Ok(1)
                 } else {
                   Err(rusqlite::Error::SqliteFailure(e, s))
@@ -354,7 +415,7 @@ pub async fn sync(
           count = count + 1;
           bytes = bytes + nc;
 
-          conn.execute(
+          match conn.execute(
           "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate)
            values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![
@@ -368,7 +429,18 @@ pub async fn sync(
               note.id.to_string(),
               note.createdate,
               note.changeddate,
-              ])?;
+              ])
+            {
+              Ok(_x) => (),
+              Err(rusqlite::Error::SqliteFailure(e, s)) =>
+                if e.code == rusqlite::ErrorCode::ConstraintViolation {
+                  // if duplicate record, just ignore and go on.
+                 ()
+                } else {
+                  return Err(rusqlite::Error::SqliteFailure(e, s).into())
+                }
+              Err(e) => return Err(e)?,
+            }
         }
 
         println!("synched {} archive notes, with {} bytes!", count, bytes);
@@ -422,7 +494,7 @@ pub async fn sync(
 
           let l = serde_json::from_str::<ArchiveZkLink>(line.trim())?;
 
-          let ins = conn.execute(
+          let ins = match conn.execute(
             "insert into zklinkarchive (fromid, toid, user, linkzknote, createdate, deletedate)
               select FN.id, TN.id, U.id, LN.id, ?1, ?2
               from zknote FN, zknote TN, orgauth_user U, zknote LN
@@ -438,8 +510,18 @@ pub async fn sync(
               l.userUuid,
               l.linkUuid
             ],
-          )?;
-
+          ) {
+            Ok(_x) => 1,
+            Err(rusqlite::Error::SqliteFailure(e, s)) => {
+              if e.code == rusqlite::ErrorCode::ConstraintViolation {
+                // if duplicate record, just ignore and go on.
+                0
+              } else {
+                return Err(rusqlite::Error::SqliteFailure(e, s).into());
+              }
+            }
+            Err(e) => return Err(e)?,
+          };
           count = count + 1;
           saved = saved + ins;
           bytes = bytes + nc;
@@ -556,6 +638,12 @@ pub async fn sync(
           count, saved, bytes
         );
       }
+
+      let unote = user_note_id(conn, user.id)?;
+
+      save_sync(conn, user.id, unote, CompletedSync { after, now }).await?;
+
+      println!("meh");
 
       // TODO update cookie?
       Ok(PrivateReplyMessage {

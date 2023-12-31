@@ -10,6 +10,7 @@ pub enum SpecialUuids {
   User,
   Archive,
   System,
+  Sync,
 }
 
 impl SpecialUuids {
@@ -22,6 +23,7 @@ impl SpecialUuids {
       SpecialUuids::User => "4fb37d76-6fc8-4869-8ee4-8e05fa5077f7",
       SpecialUuids::Archive => "ad6a4ca8-0446-4ecc-b047-46282ced0d84",
       SpecialUuids::System => "0efcc98f-dffd-40e5-af07-90da26b1d469",
+      SpecialUuids::Sync => "528ccfc2-8488-41e0-a4e1-cbab6406674e",
     }
   }
 }

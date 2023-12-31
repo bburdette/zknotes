@@ -364,6 +364,11 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: Option<i64>) -> Result<(), zke
     zkm::udpate32(&dbfile)?;
     set_single_value(&conn, "migration_level", "32")?;
   }
+  if nlevel < 33 {
+    info!("udpate33");
+    zkm::udpate33(&dbfile)?;
+    set_single_value(&conn, "migration_level", "33")?;
+  }
 
   info!("db up to date.");
 
@@ -641,7 +646,7 @@ pub fn are_notes_linked(conn: &Connection, nid1: i64, nid2: i64) -> Result<bool,
   }
 }
 
-pub fn archive_zknote(conn: &Connection, noteid: i64) -> Result<SavedZkNote, zkerr::Error> {
+pub fn archive_zknote_i64(conn: &Connection, noteid: i64) -> Result<SavedZkNote, zkerr::Error> {
   let now = now()?;
   let sysid = user_id(&conn, "system")?;
   let aid = note_id(&conn, "system", "archive")?;
@@ -668,6 +673,48 @@ pub fn archive_zknote(conn: &Connection, noteid: i64) -> Result<SavedZkNote, zke
   })
 }
 
+// write a zknote straight to archives.  should only happen during sync.
+pub fn archive_zknote(
+  conn: &Connection,
+  noteid: i64,
+  syncdate: i64,
+  note: &ZkNote,
+) -> Result<SavedZkNote, zkerr::Error> {
+  let sysid = user_id(&conn, "system")?;
+  let aid = note_id(&conn, "system", "archive")?;
+  let uuid = uuid::Uuid::new_v4();
+  // copy the note, with user 'system'.
+  // exclude pubid, to avoid unique constraint problems.
+  conn.execute(
+    "insert into zknote (title, content, user, editable, showtitle, deleted, uuid, createdate, changeddate, syncdate)
+     values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+    params![
+      note.title,
+      note.content,
+      sysid,
+      note.editable,
+      note.showtitle,
+      note.deleted,
+      uuid.to_string(),
+      note.createdate,
+      note.changeddate,
+      syncdate,
+    ])?;
+
+  let archive_note_id = conn.last_insert_rowid();
+
+  // mark the note as an archive note.
+  save_zklink(&conn, archive_note_id, aid, sysid, None)?;
+
+  // link the note to the original note, AND indicate this is an archive link.
+  save_zklink(&conn, archive_note_id, noteid, sysid, Some(aid))?;
+
+  Ok(SavedZkNote {
+    id: uuid,
+    changeddate: note.changeddate,
+  })
+}
+
 pub fn set_zknote_file(conn: &Connection, noteid: i64, fileid: i64) -> Result<(), zkerr::Error> {
   conn.execute(
     "update zknote set file = ?1
@@ -687,7 +734,7 @@ pub fn save_zknote(
   match note.id {
     Some(uuid) => {
       let id = note_id_for_uuid(conn, &uuid)?;
-      archive_zknote(&conn, id)?;
+      archive_zknote_i64(&conn, id)?;
       // existing note.  update IF mine.
       match conn.execute(
         "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4, editable = ?5, showtitle = ?6, deleted = ?7
@@ -829,9 +876,9 @@ pub fn read_zknote_i64(
   read_zknote(&conn, uid, &uuid_for_note_id(&conn, id)?).map(|x| x.1)
 }
 
-pub fn read_zknote(
+// read zknote without any access checking.
+pub fn read_zknote_unchecked(
   conn: &Connection,
-  uid: Option<i64>,
   id: &ZkNoteId,
 ) -> Result<(i64, ZkNote), zkerr::Error> {
   let closure = |row: &Row<'_>| {
@@ -864,12 +911,20 @@ pub fn read_zknote(
   };
 
   // TODO check for query returned no rows and return better message.
-  let (id, mut note) =
-      conn.query_row_and_then(
+  conn.query_row_and_then(
         "select ZN.id, ZN.uuid, ZN.title, ZN.content, ZN.user, OU.name, ZKN.uuid, ZN.pubid, ZN.editable, ZN.showtitle, ZN.deleted, ZN.file, ZN.createdate, ZN.changeddate
           from zknote ZN, orgauth_user OU, user U, zknote ZKN where ZN.uuid = ?1 and U.id = ZN.user and OU.id = ZN.user and ZKN.id = U.zknote",
           params![id.to_string()],
-        closure)?  ;
+        closure)
+}
+
+// 'normal' zknote read with access checking
+pub fn read_zknote(
+  conn: &Connection,
+  uid: Option<i64>,
+  id: &ZkNoteId,
+) -> Result<(i64, ZkNote), zkerr::Error> {
+  let (id, mut note) = read_zknote_unchecked(&conn, id)?;
 
   let sysid = user_id(&conn, "system")?;
   let sysids = get_sysids(conn, sysid, id)?;
@@ -1103,7 +1158,7 @@ pub fn delete_zknote(
     _ => Err("can't delete zknote; write permission denied.".into()),
   }?;
 
-  archive_zknote(&conn, nid)?;
+  archive_zknote_i64(&conn, nid)?;
 
   // get file info, if any.
   let filerec: Option<(i64, String)> = match conn.query_row(

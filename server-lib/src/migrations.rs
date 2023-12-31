@@ -2695,3 +2695,39 @@ pub fn udpate32(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 
   Ok(())
 }
+
+// add 'sync' system note.
+pub fn udpate33(dbfile: &Path) -> Result<(), orgauth::error::Error> {
+  let conn = Connection::open(dbfile)?;
+
+  let sysid: i64 = conn.query_row(
+    "select id from orgauth_user
+      where orgauth_user.name = ?1",
+    params!["system"],
+    |row| Ok(row.get(0)?),
+  )?;
+  let now = now()?;
+
+  let publicid: i64 = conn.query_row(
+    "select zknote.id from
+      zknote where uuid = ?1",
+    params![SpecialUuids::Public.str()],
+    |row| Ok(row.get(0)?),
+  )?;
+
+  conn.execute(
+    "insert into zknote (title, content, showtitle, editable, deleted, user, uuid, createdate, changeddate)
+      values ('sync', '', 0, 0, 0, ?1, ?2, ?3, ?4)",
+    params![sysid, SpecialUuids::Sync.str(), now, now],
+  )?;
+
+  let id = conn.last_insert_rowid();
+
+  conn.execute(
+    "insert into zklink (fromid, toid, user, createdate) 
+    values (?1, ?2, ?3, ?4)",
+    params![id, publicid, sysid, now],
+  )?;
+
+  Ok(())
+}
