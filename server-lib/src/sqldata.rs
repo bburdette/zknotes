@@ -135,9 +135,9 @@ pub fn sysids() -> Result<Sysids, zkerr::Error> {
 // will this work??
 pub fn set_homenote(conn: &Connection, uid: i64, homenote: ZkNoteId) -> Result<(), zkerr::Error> {
   conn.execute(
-    "with hn as (select id from zknote where uuid = ?1)
-    update user set homenote = zknote.id
-           where id = ?2",
+    "update user set homenote = zknote.id
+        from zknote
+           where user.id = ?2 and zknote.uuid = ?1",
     params![homenote.to_string(), uid],
   )?;
 
