@@ -695,6 +695,7 @@ pub async fn err_main() -> Result<(), Box<dyn Error>> {
       None,
       None,
       None,
+      None,
       &mut cb.on_new_user,
     )?;
 

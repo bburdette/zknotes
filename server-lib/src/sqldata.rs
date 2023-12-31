@@ -37,6 +37,7 @@ pub fn on_new_user(
   conn: &Connection,
   rd: &RegistrationData,
   data: Option<String>,
+  remote_data: Option<serde_json::Value>,
   creator: Option<i64>,
   uid: i64,
 ) -> Result<(), orgauth::error::Error> {
@@ -46,7 +47,14 @@ pub fn on_new_user(
 
   let now = now()?;
 
-  let uuid = uuid::Uuid::new_v4();
+  let uuid = match remote_data {
+    Some(remote_data) => {
+      println!("remote_data {:?}", remote_data);
+      let remd: ExtraLoginData = serde_json::from_value(remote_data)?;
+      remd.zknote
+    }
+    None => uuid::Uuid::new_v4(),
+  };
 
   // make a corresponding note,
   conn.execute(
