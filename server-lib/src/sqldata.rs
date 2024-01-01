@@ -1593,7 +1593,7 @@ pub fn read_archivezklinks(
       {}",
       acc_sql,
       if after.is_some() {
-        " and (FN.syncdate > ? or FN.changeddate > ?)"
+        " and (ZLA.syncdate > ? or ZLA.deletedate > ? or ZLA.createdate > ?)"
       } else {
         ""
       }
@@ -1603,7 +1603,7 @@ pub fn read_archivezklinks(
 
   if let Some(a64) = after {
     let a = a64.to_string();
-    let mut av = vec![a.clone(), a.clone()];
+    let mut av = vec![a.clone(), a.clone(), a.clone()];
     acc_args.append(&mut av);
   }
 
@@ -1633,37 +1633,46 @@ pub fn read_archivezklinks_stream(
     let mut pstmt = conn.prepare(
       format!(
         "with accessible_notes as ({})
-        select ZLA.user, FN.uuid, TN.uuid, LN.uuid, ZLA.createdate, ZLA.deletedate
-        from zklinkarchive ZLA, zknote FN, zknote TN, zknote LN
+        select OU.uuid, FN.uuid, TN.uuid, LN.uuid, ZLA.createdate, ZLA.deletedate
+        from zklinkarchive ZLA, zknote FN, zknote TN, zknote LN, orgauth_user OU
         where FN.id = ZLA.fromid
         and TN.id = ZLA.toid
         and LN.id = ZLA.toid
+        and ZLA.user = OU.id
         and ZLA.fromid in accessible_notes
         and ZLA.toid in accessible_notes
         {}",
-        acc_sql
-        , if after.is_some() {
-          " and (FN.syncdate > ? or FN.changeddate > ?)"
-        } else {""}
+        acc_sql,
+        if after.is_some() {
+          " and (ZLA.syncdate > ? or ZLA.deletedate > ? or ZLA.createdate > ?)"
+        } else {
+          ""
+        }
       )
       .as_str(),
     )?;
 
     if let Some(a64) = after {
-    let a = a64.to_string();
-    let mut av = vec!(a.clone(), a.clone());
-    acc_args.append(&mut av);
+      let a = a64.to_string();
+    let mut av = vec![a.clone(), a.clone(), a.clone()];
+      acc_args.append(&mut av);
     }
 
+    println!("\n\n read_archivezklinks_stream \n {:?}", pstmt.expanded_sql());
+    println!("\n\n args \n {:?}", acc_args);
+
     let rec_iter = pstmt.query_map(rusqlite::params_from_iter(acc_args.iter()), |row| {
-      Ok(ArchiveZkLink {
+      println!("archive zklink row {:?}", row);
+      let azl = ArchiveZkLink {
         userUuid: row.get(0)?,
         fromUuid: row.get(1)?,
         toUuid: row.get(2)?,
         linkUuid: row.get(3)?,
         createdate: row.get(4)?,
         deletedate: row.get(5)?,
-      })
+      };
+      println!("archivezklink: {:?}", azl);
+      Ok(azl)
     })?;
 
     {
@@ -1678,6 +1687,7 @@ pub fn read_archivezklinks_stream(
 
     for rec in rec_iter {
       if let Ok(r) = rec {
+        println!("sending archive link: {:?}", r);
         let mut s = serde_json::to_value(r)?.to_string();
         s.push_str("\n");
         yield Bytes::from(s);
@@ -1724,7 +1734,7 @@ pub fn read_zklinks_since(
       {}",
       acc_sql,
       if after.is_some() {
-        " and (FN.syncdate > ? or FN.changeddate > ?)"
+        " and (ZL.syncdate > ? or ZL.createdate > ?)"
       } else {
         ""
       }
@@ -1786,17 +1796,21 @@ pub fn read_zklinks_since_stream(
         and ZL.fromid in accessible_notes
         and ZL.toid in accessible_notes
         {}",
-        acc_sql, if after.is_none() { "" } else { " and (ZL.syncdate > ? or ZL.createdate > ?)"}
+        acc_sql,
+        if after.is_none() {
+          ""
+        } else {
+          " and (ZL.syncdate > ? or ZL.createdate > ?)"
+        }
       )
       .as_str(),
     )?;
 
     if let Some(a64) = after {
       let a = a64.to_string();
-      let mut av = vec!(a.clone(), a.clone());
+      let mut av = vec![a.clone(), a.clone()];
       acc_args.append(&mut av);
     }
-
 
     println!("accarts {}", acc_args.len());
 

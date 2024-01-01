@@ -284,11 +284,15 @@ pub fn build_sql(
   uid: i64,
   search: ZkNoteSearch,
 ) -> Result<(String, Vec<String>), Box<dyn Error>> {
-  let (mut dtcls, mut dtclsargs) = build_daterange_clause(&search)?;
+  let (mut cls, mut clsargs) = build_tagsearch_clause(&conn, uid, false, &search.tagsearch)?;
 
-  println!("dtcls: {:?}", dtcls);
-
-  let (cls, clsargs) = build_tagsearch_clause(&conn, uid, false, &search.tagsearch)?;
+  let (dtcls, mut dtclsargs) = build_daterange_clause(&search)?;
+  if !dtclsargs.is_empty() {
+    cls.push_str("\nand (");
+    cls.push_str(dtcls.as_str());
+    cls.push_str(")");
+    clsargs.append(&mut dtclsargs);
+  }
 
   let publicid = note_id(&conn, "system", "public")?;
   let archiveid = note_id(&conn, "system", "archive")?;
@@ -304,7 +308,7 @@ pub fn build_sql(
   let ordclause = if let Some(o) = search.ordering {
     let ord = match o.field {
       OrderField::Title => "order by N.title",
-      OrderField::Created => "order by N.createddate",
+      OrderField::Created => "order by N.createdate",
       OrderField::Changed => "order by N.changeddate",
       OrderField::Synced => "order by N.syncdate",
     };
@@ -466,10 +470,11 @@ pub fn build_sql(
       ],
     )
   };
+
   // local ftn to add clause and args.
   let addcls = |sql: &mut String, args: &mut Vec<String>| {
     if !args.is_empty() {
-      sql.push_str(" and ");
+      sql.push_str("\nand ");
       sql.push_str(cls.as_str());
 
       // clone, otherwise no clause vals next time!
@@ -482,18 +487,17 @@ pub fn build_sql(
   addcls(&mut sqlpub, &mut pubargs);
   addcls(&mut sqluser, &mut userargs);
   addcls(&mut sqlshare, &mut shareargs);
-  addcls(&mut dtcls, &mut dtclsargs);
 
   // combine the queries.
-  sqlbase.push_str(" union ");
+  sqlbase.push_str("\nunion ");
   sqlbase.push_str(sqlpub.as_str());
   baseargs.append(&mut pubargs);
 
-  sqlbase.push_str(" union ");
+  sqlbase.push_str("\nunion ");
   sqlbase.push_str(sqlshare.as_str());
   baseargs.append(&mut shareargs);
 
-  sqlbase.push_str(" union ");
+  sqlbase.push_str("\nunion ");
   sqlbase.push_str(sqluser.as_str());
   baseargs.append(&mut userargs);
 
@@ -503,39 +507,71 @@ pub fn build_sql(
   // add limit clause to the end.
   sqlbase.push_str(limclause.as_str());
 
+  println!("sqlbase: {}", sqlbase);
+  println!("sqlargs: {:?}", baseargs);
+
   Ok((sqlbase, baseargs))
 }
 
 fn build_daterange_clause(search: &ZkNoteSearch) -> Result<(String, Vec<String>), Box<dyn Error>> {
-  let clawses = [
+  let create_clawses = [
     search
       .created_after
-      .map(|dt| ("N.createddate < ?", dt.to_string())),
+      .map(|dt| ("N.createdate > ?", dt.to_string())),
     search
       .created_before
-      .map(|dt| ("N.createddate < ?", dt.to_string())),
+      .map(|dt| ("N.createdate < ?", dt.to_string())),
+  ];
+  let changed_clawses = [
     search
       .changed_after
-      .map(|dt| ("N.changeddate < ?", dt.to_string())),
+      .map(|dt| ("N.changeddate > ?", dt.to_string())),
     search
       .changed_before
       .map(|dt| ("N.changeddate < ?", dt.to_string())),
+  ];
+  let sync_clawses = [
     search
       .synced_after
-      .map(|dt| ("N.syncdate < ?", dt.to_string())),
+      .map(|dt| ("N.syncdate > ?", dt.to_string())),
     search
       .synced_before
       .map(|dt| ("N.syncdate < ?", dt.to_string())),
   ];
-  let clause = clawses
-    .iter()
-    .filter_map(|pair| pair.as_ref().map(|(s, _)| s.to_string()))
-    .collect::<Vec<String>>()
-    .join(" and ");
-  let args = clawses
-    .iter()
-    .filter_map(|pair| pair.as_ref().map(|(_, dt)| dt.clone()))
-    .collect();
+  let join = |clawses: Vec<Option<(&str, String)>>, conj| {
+    let clause = clawses
+      .iter()
+      .filter_map(|pair| pair.as_ref().map(|(s, _)| s.to_string()))
+      .collect::<Vec<String>>()
+      .join(conj);
+    let mut args: Vec<String> = clawses
+      .iter()
+      .filter_map(|pair| pair.as_ref().map(|(_, dt)| dt.clone()))
+      .collect();
+    (clause, args)
+  };
+
+  let (crcls, mut crargs) = join(create_clawses.to_vec(), " and ");
+  let (changedcls, mut changedargs) = join(changed_clawses.to_vec(), " and ");
+  let (synccls, mut syncargs) = join(sync_clawses.to_vec(), " and ");
+
+  let clause: String = {
+    let mut v: Vec<String> = Vec::new();
+    if crcls != "" {
+      v.push(crcls);
+    }
+    if changedcls != "" {
+      v.push(changedcls);
+    }
+    if synccls != "" {
+      v.push(synccls);
+    }
+    v.join(" or ")
+  };
+  let mut args: Vec<String> = Vec::new();
+  args.append(&mut crargs);
+  args.append(&mut changedargs);
+  args.append(&mut syncargs);
   Ok((clause, args))
 }
 
@@ -564,7 +600,13 @@ fn build_tagsearch_clause(
           SearchMod::ZkNoteId => zknoteid = true,
         }
       }
-      let field = if desc { "content" } else { "title" };
+      let field = if zknoteid {
+        "uuid"
+      } else if desc {
+        "content"
+      } else {
+        "title"
+      };
 
       if user {
         let user = user_id(conn, &term)?;
@@ -577,7 +619,7 @@ fn build_tagsearch_clause(
         if tag {
           let fileclause = if file { "and zkn.file is not null" } else { "" };
 
-          let clause = if exact {
+          let clause = if exact || zknoteid {
             format!("zkn.{} = ? {}", field, fileclause)
           } else {
             format!("zkn.{}  like ? {}", field, fileclause)
@@ -598,7 +640,7 @@ fn build_tagsearch_clause(
               notstr, clause, clause
             ),
             // args
-            if exact {
+            if exact || zknoteid {
               vec![term.clone(), term.clone()]
             } else {
               vec![
@@ -619,15 +661,13 @@ fn build_tagsearch_clause(
 
           (
             // clause
-            if zknoteid {
-              format!("N.uuid = ?")
-            } else if exact {
+            if exact || zknoteid {
               format!("N.{} {}= ? {}", field, notstr, fileclause)
             } else {
               format!("N.{} {} like ? {}", field, notstr, fileclause)
             },
             // args
-            if exact {
+            if exact || zknoteid {
               vec![term.clone()]
             } else {
               vec![format!("%{}%", term).to_string()]

@@ -2486,6 +2486,15 @@ pub fn udpate32(dbfile: &Path) -> Result<(), orgauth::error::Error> {
     t.add_column("changeddate", types::integer().nullable(false));
     t.add_column("syncdate", types::integer().nullable(true));
     t.add_index("unq_uuid", types::index(vec!["uuid"]).unique(true));
+    t.add_index(
+      "idx_createdate",
+      types::index(vec!["createdate"]).unique(false),
+    );
+    t.add_index(
+      "idx_changeddate",
+      types::index(vec!["changeddate"]).unique(false),
+    );
+    t.add_index("idx_syncdate", types::index(vec!["syncdate"]).unique(false));
   });
 
   conn.execute_batch(m1.make::<Sqlite>().as_str())?;

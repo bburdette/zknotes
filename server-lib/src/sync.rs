@@ -2,6 +2,7 @@ use crate::search::{search_zknotes, SearchResult};
 use crate::util::now;
 use actix_web::body::None;
 use futures_util::TryStreamExt;
+use log::{error, info};
 // use json::JsonResult;
 use crate::error as zkerr;
 use crate::sqldata::{self, note_id_for_uuid, save_zklink, save_zknote, user_note_id};
@@ -22,14 +23,15 @@ use zkprotocol::constants::{
   PrivateReplies, PrivateRequests, PrivateStreamingRequests, SpecialUuids,
 };
 use zkprotocol::content::{
-  ArchiveZkLink, GetArchiveZkLinks, GetZkLinksSince, SaveZkNote, UuidZkLink, ZkNote,
+  ArchiveZkLink, GetArchiveZkLinks, GetZkLinksSince, SaveZkNote, UuidZkLink, ZkNote, ZkNoteId,
 };
 use zkprotocol::messages::{PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage};
 use zkprotocol::search::{
-  OrderDirection, OrderField, Ordering, ResultType, TagSearch, ZkNoteSearch,
+  OrderDirection, OrderField, Ordering, ResultType, SearchMod, TagSearch, ZkNoteSearch,
 };
 
 fn convert_err(err: reqwest::Error) -> std::io::Error {
+  error!("convert_err {:?}", err);
   todo!()
 }
 
@@ -42,11 +44,20 @@ pub struct CompletedSync {
 pub async fn prev_sync(
   conn: &Connection,
   user: &User,
+  usernoteid: &ZkNoteId,
 ) -> Result<Option<CompletedSync>, Box<dyn std::error::Error>> {
+  let sysid = user_id(&conn, "system")?;
   let zns = ZkNoteSearch {
-    tagsearch: TagSearch::SearchTerm {
-      mods: Vec::new(),
-      term: "".to_string(),
+    tagsearch: TagSearch::Boolex {
+      ts1: Box::new(TagSearch::SearchTerm {
+        mods: vec![SearchMod::Tag, SearchMod::ZkNoteId],
+        term: SpecialUuids::Sync.str().to_string(),
+      }),
+      ao: zkprotocol::search::AndOr::And,
+      ts2: Box::new(TagSearch::SearchTerm {
+        mods: vec![SearchMod::Tag, SearchMod::ZkNoteId],
+        term: usernoteid.to_string(),
+      }),
     },
     offset: 0,
     limit: Some(1),
@@ -65,17 +76,23 @@ pub async fn prev_sync(
     }),
   };
 
-  if let SearchResult::SrNote(res) = search_zknotes(conn, user.id, &zns)? {
-    Ok(
-      res
-        .notes
-        .first()
-        .and_then(|n| serde_json::from_str::<CompletedSync>(n.content.as_str()).ok()),
-    )
+  if let SearchResult::SrNote(res) = search_zknotes(conn, sysid, &zns)? {
+    println!("result noates: {:?}", res.notes);
+    match res.notes.first() {
+      Some(n) => match serde_json::from_str::<CompletedSync>(n.content.as_str()) {
+        Ok(s) => Ok(Some(s)),
+        Err(e) => {
+          error!("CompletedSync parse error: {:?}", e);
+          Ok(None)
+        }
+      },
+      None => Ok(None),
+    }
   } else {
     Err("unexpected search result type".into())
   }
 }
+
 pub async fn save_sync(
   conn: &Connection,
   uid: i64,
@@ -115,8 +132,18 @@ pub async fn sync(
 ) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>> {
   let now = now()?;
 
+  let extra_login_data = sqldata::read_user_by_id(conn, user.id)?;
+
   // get previous sync.
-  let after = prev_sync(&conn, &user).await?.map(|cs| cs.now);
+  let after = prev_sync(&conn, &user, &extra_login_data.zknote)
+    .await?
+    .map(|cs| cs.now);
+
+  println!("\n\n start sync, prev_sync {:?} \n\n", after);
+
+  // if after.is_none() {
+  //   return Err("is none".into());
+  // }
 
   // TODO:  get previous sync information!
 
@@ -152,12 +179,12 @@ pub async fn sync(
           what: "".to_string(),
           resulttype: ResultType::RtNote,
           archives: false,
-          created_after: None,
+          created_after: after,
           created_before: None,
           changed_after: after,
-          changed_before: Some(now),
+          changed_before: None,
           synced_after: after,
-          synced_before: Some(now),
+          synced_before: None,
           ordering: None,
         };
 
@@ -234,7 +261,7 @@ pub async fn sync(
             break;
           }
 
-          println!("note line: {}", line);
+          // println!("note line: {}", line);
 
           let note = serde_json::from_str::<ZkNote>(line.trim())?;
 
@@ -357,12 +384,12 @@ pub async fn sync(
           what: "".to_string(),
           resulttype: ResultType::RtNote,
           archives: true,
-          created_after: None,
+          created_after: after,
           created_before: None,
           changed_after: after,
-          changed_before: Some(now),
+          changed_before: None,
           synced_after: after,
-          synced_before: Some(now),
+          synced_before: None,
           ordering: None,
         };
 
@@ -408,9 +435,9 @@ pub async fn sync(
             break;
           }
 
-          println!("note line: {}", line);
-
           let note = serde_json::from_str::<ZkNote>(line.trim())?;
+
+          println!("archivenote: {:?}", note);
 
           count = count + 1;
           bytes = bytes + nc;
@@ -490,7 +517,7 @@ pub async fn sync(
             break;
           }
 
-          println!("note line: {}", line);
+          println!("archive link line: {}", line);
 
           let l = serde_json::from_str::<ArchiveZkLink>(line.trim())?;
 
