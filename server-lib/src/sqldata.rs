@@ -1593,7 +1593,7 @@ pub fn read_archivezklinks(
       {}",
       acc_sql,
       if after.is_some() {
-        " and (ZLA.syncdate > ? or ZLA.deletedate > ? or ZLA.createdate > ?)"
+        " and unlikely(ZLA.syncdate > ? or ZLA.deletedate > ? or ZLA.createdate > ?)"
       } else {
         ""
       }
@@ -1644,7 +1644,7 @@ pub fn read_archivezklinks_stream(
         {}",
         acc_sql,
         if after.is_some() {
-          " and (ZLA.syncdate > ? or ZLA.deletedate > ? or ZLA.createdate > ?)"
+          " and unlikely(ZLA.syncdate > ? or ZLA.deletedate > ? or ZLA.createdate > ?)"
         } else {
           ""
         }
@@ -1654,7 +1654,7 @@ pub fn read_archivezklinks_stream(
 
     if let Some(a64) = after {
       let a = a64.to_string();
-    let mut av = vec![a.clone(), a.clone(), a.clone()];
+      let mut av = vec![a.clone(), a.clone(), a.clone()];
       acc_args.append(&mut av);
     }
 
@@ -1734,7 +1734,7 @@ pub fn read_zklinks_since(
       {}",
       acc_sql,
       if after.is_some() {
-        " and (ZL.syncdate > ? or ZL.createdate > ?)"
+        " and unlikely(ZL.syncdate > ? or ZL.createdate > ?)"
       } else {
         ""
       }
@@ -1770,37 +1770,26 @@ pub fn read_zklinks_since_stream(
 ) -> impl Stream<Item = Result<Bytes, Box<dyn std::error::Error>>> + 'static {
   // {
   try_stream! {
+
+    println!("read_zklinks_since_stream");
     let (acc_sql, mut acc_args) = accessible_notes(&conn, uid)?;
 
-    let mut astmt = conn.prepare(acc_sql.as_str())?;
-
-    let arec_iter = astmt.query_map(rusqlite::params_from_iter(acc_args.iter()), |row| {
-      println!("accnote {:?}", row.get::<usize, i64>(0)?);
-      Ok(())
-    })?;
-
-    for ar in arec_iter {
-      println!("ac {:?}", ar);
-    }
-
-    println!("linzk");
-
     let mut pstmt = conn.prepare(
-      format!(
-        "with accessible_notes as ({})
-        select OU.uuid, FN.uuid, TN.uuid, ZL.createdate
-        from zklink ZL, zknote FN, zknote TN, orgauth_user OU
+      format!("with accessible_notes as ({})
+        select OU.uuid, FN.uuid, TN.uuid, LN.uuid, ZL.createdate
+        from zklink ZL, zknote FN, zknote TN, zknote LN, orgauth_user OU
         where FN.id = ZL.fromid
         and TN.id = ZL.toid
+        and LN.id = ZL.toid
         and ZL.user = OU.id
         and ZL.fromid in accessible_notes
         and ZL.toid in accessible_notes
-        {}",
+        {} ",
         acc_sql,
         if after.is_none() {
           ""
         } else {
-          " and (ZL.syncdate > ? or ZL.createdate > ?)"
+          " and unlikely(ZL.syncdate > ? or ZL.createdate > ?)"
         }
       )
       .as_str(),
@@ -1812,9 +1801,13 @@ pub fn read_zklinks_since_stream(
       acc_args.append(&mut av);
     }
 
-    println!("accarts {}", acc_args.len());
+    println!("acc_sql {}", acc_sql);
+    println!("acc_args {:?}", acc_args);
+
+    println!("read_zklinks_since_stream 2");
 
     {
+      // send the header.
       let mut s = serde_json::to_value(PrivateReplyMessage {
         what: PrivateReplies::ZkLinks,
         content: serde_json::Value::Null,
@@ -1824,24 +1817,28 @@ pub fn read_zklinks_since_stream(
       yield Bytes::from(s);
     }
 
+    println!("read_zklinks_since_stream - pstmt");
     let rec_iter = pstmt.query_map(rusqlite::params_from_iter(acc_args.iter()), |row| {
       println!("uuidzklink {:?}", row.get::<usize, String>(0)?);
       Ok(UuidZkLink {
         userUuid: row.get(0)?,
         fromUuid: row.get(1)?,
         toUuid: row.get(2)?,
-        linkUuid: None,
-        createdate: row.get(3)?,
+        linkUuid: row.get(3)?,
+        createdate: row.get(4)?,
       })
     })?;
 
+    println!("read_zklinks_since_stream - for");
     for rec in rec_iter {
+      println!("rec {:?}", rec);
       if let Ok(r) = rec {
         let mut s = serde_json::to_value(r)?.to_string();
         s.push_str("\n");
         yield Bytes::from(s);
       }
     }
+    println!("read_zklinks_since_stream - end");
   }
 }
 
@@ -1930,17 +1927,19 @@ pub fn accessible_notes(
     )
   };
 
-  sqlbase.push_str(" union ");
+  sqlbase.push_str("\nunion ");
   sqlbase.push_str(sqlpub.as_str());
   baseargs.append(&mut pubargs);
 
-  sqlbase.push_str(" union ");
+  sqlbase.push_str("\nunion ");
   sqlbase.push_str(sqlshare.as_str());
   baseargs.append(&mut shareargs);
 
-  sqlbase.push_str(" union ");
+  sqlbase.push_str("\nunion ");
   sqlbase.push_str(sqluser.as_str());
   baseargs.append(&mut userargs);
+
+  sqlbase.push_str("\n order by id");
 
   Ok((sqlbase, baseargs))
 }

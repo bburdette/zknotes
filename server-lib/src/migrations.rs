@@ -2604,6 +2604,14 @@ pub fn udpate32(dbfile: &Path) -> Result<(), orgauth::error::Error> {
       "zklinkunq",
       types::index(vec!["fromid", "toid", "user"]).unique(true),
     );
+    t.add_index(
+      "zklinkcreatedate",
+      types::index(vec!["createdate"]).unique(false),
+    );
+    t.add_index(
+      "zklinksyncdate",
+      types::index(vec!["syncdate"]).unique(false),
+    );
   });
   conn.execute_batch(m2.make::<Sqlite>().as_str())?;
 
@@ -2690,6 +2698,18 @@ pub fn udpate32(dbfile: &Path) -> Result<(), orgauth::error::Error> {
     t.add_column("createdate", types::integer().nullable(false));
     t.add_column("deletedate", types::integer().nullable(false));
     t.add_column("syncdate", types::integer().nullable(true));
+    t.add_index(
+      "zklinkarchive_createdate",
+      types::index(vec!["createdate"]).unique(false),
+    );
+    t.add_index(
+      "zklinkarchive_deletedate",
+      types::index(vec!["deletedate"]).unique(false),
+    );
+    t.add_index(
+      "zklinkarchive_syncdate",
+      types::index(vec!["syncdate"]).unique(false),
+    );
   });
 
   conn.execute_batch(m3.make::<Sqlite>().as_str())?;
