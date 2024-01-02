@@ -605,7 +605,7 @@ pub async fn sync(
             break;
           }
 
-          println!("note line: {}", line);
+          println!("link line: {}", line);
 
           let l = serde_json::from_str::<UuidZkLink>(line.trim())?;
 
@@ -665,6 +665,21 @@ pub async fn sync(
           count, saved, bytes
         );
       }
+
+      println!("dropping deleted links");
+      // drop zklinks which have a zklinkarchive with newer deletedate
+      let dropped = conn.execute(
+        "with dels as (select ZL.fromid, ZL.toid, ZL.user from zklink ZL, zklinkarchive ZLA
+          where ZL.fromid = ZLA.fromid
+          and ZL.toid = ZLA.toid
+          and ZL.user = ZLA.user
+          and ZL.createdate < ZLA.deletedate)
+          delete from zklink where
+            (zklink.fromid, zklink.toid, zklink.user) in dels ",
+        params![],
+      )?;
+
+      println!("dropped {} links", dropped);
 
       let unote = user_note_id(conn, user.id)?;
 
