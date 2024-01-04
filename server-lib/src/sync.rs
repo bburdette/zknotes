@@ -308,7 +308,7 @@ pub async fn sync(
                     &mut callbacks.on_new_user,
                   )?;
                   println!(
-                    "createing phantom user {} for remote user: {:?}",
+                    "creating phantom user {} for remote user: {:?}",
                     pu.id, localpuid
                   );
                   userhash.insert(pu.id, localpuid);
@@ -339,7 +339,8 @@ pub async fn sync(
                 note.createdate,
                 note.changeddate,
               ],
-            ) {
+            ) 
+            {
               Ok(x) => Ok(x),
               Err(rusqlite::Error::SqliteFailure(e, s)) =>
                 if e.code == rusqlite::ErrorCode::ConstraintViolation {
