@@ -5,6 +5,7 @@ use reqwest;
 use rusqlite;
 use serde_json;
 use std::fmt;
+use url;
 
 pub enum Error {
   Rusqlite(rusqlite::Error),
@@ -17,6 +18,7 @@ pub enum Error {
   Uuid(uuid::Error),
   Orgauth(orgauth::error::Error),
   Regex(regex::Error),
+  UrlParser(url::ParseError),
 }
 
 pub fn to_orgauth_error(e: Error) -> orgauth::error::Error {
@@ -31,6 +33,7 @@ pub fn to_orgauth_error(e: Error) -> orgauth::error::Error {
     Error::Uuid(ze) => orgauth::error::Error::Uuid(ze),
     Error::Orgauth(ze) => ze,
     Error::Regex(ze) => orgauth::error::Error::String(ze.to_string()),
+    Error::UrlParser(ze) => orgauth::error::Error::String(ze.to_string()),
   }
 }
 
@@ -53,6 +56,7 @@ impl fmt::Display for Error {
       Error::Uuid(e) => write!(f, "{}", e),
       Error::Orgauth(e) => write!(f, "{}", e),
       Error::Regex(e) => write!(f, "{}", e),
+      Error::UrlParser(e) => write!(f, "{}", e),
     }
   }
 }
@@ -70,6 +74,7 @@ impl fmt::Debug for Error {
       Error::Uuid(e) => write!(f, "{}", e),
       Error::Orgauth(e) => write!(f, "{}", e),
       Error::Regex(e) => write!(f, "{}", e),
+      Error::UrlParser(e) => write!(f, "{}", e),
     }
   }
 }
@@ -145,6 +150,11 @@ impl From<orgauth::error::Error> for Error {
 }
 impl From<regex::Error> for Error {
   fn from(e: regex::Error) -> Self {
+    Error::String(e.to_string())
+  }
+}
+impl From<url::ParseError> for Error {
+  fn from(e: url::ParseError) -> Self {
     Error::String(e.to_string())
   }
 }

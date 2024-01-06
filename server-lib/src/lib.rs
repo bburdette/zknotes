@@ -1,6 +1,4 @@
-//
-
-pub mod config;
+pub mod appdata;
 pub mod error;
 pub mod interfaces;
 mod migrations;
@@ -8,6 +6,7 @@ mod search;
 pub mod sqldata;
 mod sqltest;
 mod sync;
+
 use actix_cors::Cors;
 use actix_files::NamedFile;
 use actix_multipart::Multipart;
@@ -18,9 +17,9 @@ use actix_web::{
   cookie::{self, Key},
   web, App, HttpRequest, HttpResponse, HttpServer, Result,
 };
+use appdata::{AppData, Config};
 use chrono;
 use clap::Arg;
-use config::Config;
 use either::Either;
 use futures_util::TryStreamExt as _;
 use log::{error, info};
@@ -33,13 +32,15 @@ use orgauth::{
 use rusqlite::Connection;
 use serde_json;
 use simple_error::simple_error;
-use std::env;
 use std::error::Error;
 use std::fs::File;
 use std::io::{stdin, Write};
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::sync::Arc;
+use std::sync::Mutex;
+use std::{collections::HashMap, env};
 use timer;
 use uuid::Uuid;
 pub use zkprotocol;
@@ -65,8 +66,12 @@ fn sitemap(_req: &HttpRequest) -> Result<NamedFile> {
 }
 */
 
-async fn favicon(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
-  let staticpath = data.static_path.clone().unwrap_or(PathBuf::from("static/"));
+async fn favicon(data: web::Data<AppData>, req: HttpRequest) -> HttpResponse {
+  let staticpath = data
+    .config
+    .static_path
+    .clone()
+    .unwrap_or(PathBuf::from("static/"));
   let icopath = staticpath.join("favicon.ico");
   match NamedFile::open(&icopath) {
     Ok(f) => f.into_response(&req),
@@ -75,7 +80,7 @@ async fn favicon(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
 }
 
 // simple index handler
-async fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
+async fn mainpage(session: Session, data: web::Data<AppData>, req: HttpRequest) -> HttpResponse {
   info!("remote ip: {:?}, request:{:?}", req.connection_info(), req);
 
   let sysids = match sqldata::sysids() {
@@ -84,7 +89,7 @@ async fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -
   };
 
   // logged in?
-  let logindata = match interfaces::login_data_for_token(session, &data) {
+  let logindata = match interfaces::login_data_for_token(session, &data.config) {
     Ok(optld) => match optld {
       Some(logindata) => serde_json::to_value(logindata).unwrap_or(serde_json::Value::Null),
       _ => serde_json::Value::Null,
@@ -95,19 +100,24 @@ async fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -
   println!("logindata {:?}", logindata);
 
   // TODO: hardcode the UUID of this?
-  let errorid = match data.error_index_note {
+  let errorid = match data.config.error_index_note {
     Some(eid) => serde_json::to_value(eid).unwrap_or(serde_json::Value::Null),
     None => serde_json::Value::Null,
   };
 
-  let adminsettings = serde_json::to_value(orgauth::data::admin_settings(&data.orgauth_config))
-    .unwrap_or(serde_json::Value::Null);
+  let adminsettings =
+    serde_json::to_value(orgauth::data::admin_settings(&data.config.orgauth_config))
+      .unwrap_or(serde_json::Value::Null);
 
   println!("sysids {:?}", sysids.to_string().as_str());
   println!("errorid {:?}", errorid.to_string().as_str());
   println!("adminsettings {:?}", adminsettings.to_string().as_str());
 
-  let mut staticpath = data.static_path.clone().unwrap_or(PathBuf::from("static/"));
+  let mut staticpath = data
+    .config
+    .static_path
+    .clone()
+    .unwrap_or(PathBuf::from("static/"));
   staticpath.push("index.html");
   match staticpath.to_str() {
     Some(path) => match util::load_string(path) {
@@ -129,7 +139,7 @@ async fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -
 }
 
 async fn public(
-  data: web::Data<Config>,
+  data: web::Data<AppData>,
   item: web::Json<PublicMessage>,
   req: HttpRequest,
 ) -> HttpResponse {
@@ -140,7 +150,7 @@ async fn public(
   );
 
   match interfaces::public_interface(
-    &data,
+    &data.config,
     item.into_inner(),
     req.connection_info().realip_remote_addr(),
   ) {
@@ -158,7 +168,7 @@ async fn public(
 
 async fn user(
   session: Session,
-  data: web::Data<Config>,
+  data: web::Data<AppData>,
   item: web::Json<orgauth::data::UserRequestMessage>,
   req: HttpRequest,
 ) -> HttpResponse {
@@ -170,7 +180,7 @@ async fn user(
   );
   match interfaces::user_interface(
     &mut ActixTokener { session: &session },
-    &data,
+    &data.config,
     item.into_inner(),
   )
   .await
@@ -189,7 +199,7 @@ async fn user(
 
 async fn admin(
   session: Session,
-  data: web::Data<Config>,
+  data: web::Data<AppData>,
   item: web::Json<orgauth::data::AdminRequestMessage>,
   req: HttpRequest,
 ) -> HttpResponse {
@@ -206,7 +216,7 @@ async fn admin(
   };
   match orgauth::endpoints::admin_interface_check(
     &mut ActixTokener { session: &session },
-    &data.orgauth_config,
+    &data.config.orgauth_config,
     &mut cb,
     item.into_inner(),
   ) {
@@ -225,7 +235,7 @@ async fn admin(
 fn session_user(
   conn: &Connection,
   session: Session,
-  config: &web::Data<Config>,
+  data: &web::Data<AppData>,
 ) -> Result<Either<orgauth::data::User, PrivateReplyMessage>, Box<dyn Error>> {
   match session.get::<Uuid>("token")? {
     None => Ok(Either::Right(PrivateReplyMessage {
@@ -236,8 +246,8 @@ fn session_user(
       match orgauth::dbfun::read_user_by_token_api(
         &conn,
         token,
-        config.orgauth_config.login_token_expiration_ms,
-        config.orgauth_config.regen_login_tokens,
+        data.config.orgauth_config.login_token_expiration_ms,
+        data.config.orgauth_config.regen_login_tokens,
       ) {
         Err(e) => {
           info!("read_user_by_token_api error: {:?}", e);
@@ -253,13 +263,13 @@ fn session_user(
   }
 }
 
-async fn file(session: Session, config: web::Data<Config>, req: HttpRequest) -> HttpResponse {
-  let conn = match sqldata::connection_open(config.orgauth_config.db.as_path()) {
+async fn file(session: Session, data: web::Data<AppData>, req: HttpRequest) -> HttpResponse {
+  let conn = match sqldata::connection_open(data.config.orgauth_config.db.as_path()) {
     Ok(c) => c,
     Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
   };
 
-  let suser = match session_user(&conn, session, &config) {
+  let suser = match session_user(&conn, session, &data) {
     Ok(Either::Left(user)) => Some(user),
     Ok(Either::Right(_sr)) => None,
     Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
@@ -299,7 +309,7 @@ async fn file(session: Session, config: web::Data<Config>, req: HttpRequest) -> 
 
 async fn receive_files(
   session: Session,
-  config: web::Data<Config>,
+  config: web::Data<AppData>,
   mut payload: Multipart,
 ) -> HttpResponse {
   match make_file_notes(session, config, &mut payload).await {
@@ -310,17 +320,17 @@ async fn receive_files(
 
 async fn make_file_notes(
   session: Session,
-  config: web::Data<Config>,
+  data: web::Data<AppData>,
   payload: &mut Multipart,
 ) -> Result<PrivateReplyMessage, Box<dyn Error>> {
-  let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-  let userdata = match session_user(&conn, session, &config)? {
+  let conn = sqldata::connection_open(data.config.orgauth_config.db.as_path())?;
+  let userdata = match session_user(&conn, session, &data)? {
     Either::Left(ud) => ud,
     Either::Right(sr) => return Ok(sr),
   };
 
   // Save the files to our temp path.
-  let tp = config.file_tmp_path.clone();
+  let tp = data.config.file_tmp_path.clone();
   let saved_files = save_files(&tp, payload).await?;
 
   let mut zklns = Vec::new();
@@ -392,7 +402,7 @@ async fn save_files(
 
 async fn private(
   session: Session,
-  data: web::Data<Config>,
+  data: web::Data<AppData>,
   item: web::Json<PrivateMessage>,
   _req: HttpRequest,
 ) -> HttpResponse {
@@ -412,11 +422,11 @@ async fn private(
 
 async fn private_streaming(
   session: Session,
-  data: web::Data<Config>,
+  data: web::Data<AppData>,
   item: web::Json<PrivateStreamingMessage>,
   _req: HttpRequest,
 ) -> HttpResponse {
-  match zk_interface_check_streaming(&session, &data, item.into_inner()).await {
+  match zk_interface_check_streaming(&session, &data.config, item.into_inner()).await {
     Ok(hr) => hr,
     Err(e) => {
       error!("'private' err: {:?}", e);
@@ -432,7 +442,7 @@ async fn private_streaming(
 
 async fn zk_interface_check(
   session: &Session,
-  config: &Config,
+  appdata: &AppData,
   msg: PrivateMessage,
 ) -> Result<PrivateReplyMessage, Box<dyn Error>> {
   match session.get::<Uuid>("token")? {
@@ -441,12 +451,12 @@ async fn zk_interface_check(
       content: serde_json::Value::Null,
     }),
     Some(token) => {
-      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+      let conn = sqldata::connection_open(appdata.config.orgauth_config.db.as_path())?;
       match orgauth::dbfun::read_user_by_token_api(
         &conn,
         token,
-        config.orgauth_config.login_token_expiration_ms,
-        config.orgauth_config.regen_login_tokens,
+        appdata.config.orgauth_config.login_token_expiration_ms,
+        appdata.config.orgauth_config.regen_login_tokens,
       ) {
         Err(e) => {
           info!("read_user_by_token_api error2: {:?}, {:?}", token, e);
@@ -458,7 +468,7 @@ async fn zk_interface_check(
         }
         Ok(userdata) => {
           // finally!  processing messages as logged in user.
-          interfaces::zk_interface_loggedin(&config, userdata.id, &msg).await
+          interfaces::zk_interface_loggedin(&appdata, userdata.id, &msg).await
         }
       }
     }
@@ -538,11 +548,11 @@ pub fn load_config(filename: &str) -> Result<Config, Box<dyn Error>> {
   Ok(c)
 }
 
-async fn register(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
-  orgauth::endpoints::register(&data.orgauth_config, req)
+async fn register(data: web::Data<AppData>, req: HttpRequest) -> HttpResponse {
+  orgauth::endpoints::register(&data.config.orgauth_config, req)
 }
-async fn new_email(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
-  orgauth::endpoints::new_email(&data.orgauth_config, req)
+async fn new_email(data: web::Data<AppData>, req: HttpRequest) -> HttpResponse {
+  orgauth::endpoints::new_email(&data.config.orgauth_config, req)
 }
 
 #[actix_web::main]
@@ -741,8 +751,12 @@ pub async fn err_main() -> Result<(), Box<dyn Error>> {
       .allow_any_method()
       .max_age(3600);
 
+    let ad = AppData {
+      config: c.clone(),
+      wstokens: Arc::new(Mutex::new(HashMap::new())),
+    };
     App::new()
-      .app_data(web::Data::new(c.clone())) // <- create app with shared state
+      .app_data(web::Data::new(ad.clone())) // <- create app with shared state
       .wrap(cors)
       .wrap(TracingLogger::default())
       .wrap(

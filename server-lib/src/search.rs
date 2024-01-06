@@ -25,7 +25,7 @@ pub fn power_delete_zknotes(
   file_path: PathBuf,
   user: i64,
   search: &TagSearch,
-) -> Result<i64, Box<dyn Error>> {
+) -> Result<usize, zkerr::Error> {
   // get all, and delete all.  Maybe not a good idea for a big database, but ours is small
   // and soon to be replaced with indradb, perhaps.
 
@@ -47,7 +47,7 @@ pub fn power_delete_zknotes(
   let znsr = search_zknotes(conn, user, &nolimsearch)?;
   match znsr {
     SearchResult::SrId(znsr) => {
-      let c = znsr.notes.len().try_into()?;
+      let c = znsr.notes.len();
 
       for n in znsr.notes {
         delete_zknote(&conn, file_path.clone(), user, &n)?;
@@ -55,7 +55,7 @@ pub fn power_delete_zknotes(
       Ok(c)
     }
     SearchResult::SrListNote(znsr) => {
-      let c = znsr.notes.len().try_into()?;
+      let c = znsr.notes.len();
 
       for n in znsr.notes {
         delete_zknote(&conn, file_path.clone(), user, &n.id)?;
@@ -63,7 +63,7 @@ pub fn power_delete_zknotes(
       Ok(c)
     }
     SearchResult::SrNote(znsr) => {
-      let c = znsr.notes.len().try_into()?;
+      let c = znsr.notes.len();
 
       for n in znsr.notes {
         delete_zknote(&conn, file_path.clone(), user, &n.id)?;
@@ -71,7 +71,7 @@ pub fn power_delete_zknotes(
       Ok(c)
     }
     SearchResult::SrNoteAndLink(znsr) => {
-      let c = znsr.notes.len().try_into()?;
+      let c = znsr.notes.len();
 
       for n in znsr.notes {
         delete_zknote(&conn, file_path.clone(), user, &n.zknote.id)?;
@@ -92,7 +92,7 @@ pub fn search_zknotes(
   conn: &Connection,
   user: i64,
   search: &ZkNoteSearch,
-) -> Result<SearchResult, Box<dyn Error>> {
+) -> Result<SearchResult, zkerr::Error> {
   let (sql, args) = build_sql(&conn, user, search.clone())?;
 
   let mut pstmt = conn.prepare(sql.as_str())?;
@@ -283,7 +283,7 @@ pub fn build_sql(
   conn: &Connection,
   uid: i64,
   search: ZkNoteSearch,
-) -> Result<(String, Vec<String>), Box<dyn Error>> {
+) -> Result<(String, Vec<String>), zkerr::Error> {
   let (mut cls, mut clsargs) = build_tagsearch_clause(&conn, uid, false, &search.tagsearch)?;
 
   let (dtcls, mut dtclsargs) = build_daterange_clause(&search)?;
@@ -513,7 +513,7 @@ pub fn build_sql(
   Ok((sqlbase, baseargs))
 }
 
-fn build_daterange_clause(search: &ZkNoteSearch) -> Result<(String, Vec<String>), Box<dyn Error>> {
+fn build_daterange_clause(search: &ZkNoteSearch) -> Result<(String, Vec<String>), zkerr::Error> {
   let create_clawses = [
     search
       .created_after
@@ -580,7 +580,7 @@ fn build_tagsearch_clause(
   uid: i64,
   not: bool,
   search: &TagSearch,
-) -> Result<(String, Vec<String>), Box<dyn Error>> {
+) -> Result<(String, Vec<String>), zkerr::Error> {
   let (cls, args) = match search {
     TagSearch::SearchTerm { mods, term } => {
       let mut exact = false;

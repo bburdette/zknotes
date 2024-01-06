@@ -47,6 +47,7 @@ pub enum PrivateRequests {
   SaveImportZkNotes,
   SetHomeNote,
   SyncRemote,
+  GetWsToken,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -96,4 +97,5 @@ pub enum PrivateReplies {
   NotLoggedIn,
   LoginError,
   FilesUploaded,
+  WsToken,
 }
