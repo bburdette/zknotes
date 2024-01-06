@@ -7,6 +7,8 @@ pub mod sqldata;
 mod sqltest;
 mod sync;
 
+use crate::error as zkerr;
+
 use actix_cors::Cors;
 use actix_files::NamedFile;
 use actix_multipart::Multipart;
@@ -17,6 +19,7 @@ use actix_web::{
   cookie::{self, Key},
   web, App, HttpRequest, HttpResponse, HttpServer, Result,
 };
+use actix_web_actors::ws;
 use appdata::{AppData, Config};
 use chrono;
 use clap::Arg;
@@ -53,8 +56,6 @@ use zkprotocol::{
 };
 
 use tracing_actix_web::TracingLogger;
-
-use crate::sqldata::get_sysids;
 
 /*
 use actix_files::NamedFile;
@@ -768,6 +769,7 @@ pub async fn err_main() -> Result<(), Box<dyn Error>> {
           )
           .build(),
       )
+      .route("/ws/{wstoken}", web::get().to(wsstart))
       .service(web::resource("/upload").route(web::post().to(receive_files)))
       .service(web::resource("/public").route(web::post().to(public)))
       .service(web::resource("/private").route(web::post().to(private)))
@@ -786,4 +788,56 @@ pub async fn err_main() -> Result<(), Box<dyn Error>> {
   .await?;
 
   Ok(())
+}
+
+async fn wsstart(
+  data: web::Data<AppData>,
+  req: HttpRequest,
+  stream: web::Payload,
+) -> Result<HttpResponse, actix_web::Error> {
+  let wststr = req
+    .match_info()
+    .get("wstoken")
+    .ok_or(actix_web::error::ErrorUnauthorized(zkerr::Error::String(
+      "token parameter not found".into(),
+    )))?;
+
+  // apparently unstable feature?
+  // let tokes = data.wstokens.lock().unwrap_or_else(|mut e| {
+  //   // in case of poison, revert to empty hashmap.
+  //     **e.get_mut() = HashMap::new();
+  //     data.wstokens.clear_poison();
+  //     e.into_inner()
+  // });
+  let mut tokes = data.wstokens.lock().unwrap();
+
+  let wst = Uuid::parse_str(wststr).map_err(|_| {
+    actix_web::error::ErrorUnauthorized(zkerr::Error::String("invalid token format".into()))
+  })?;
+
+  let exptime = tokes
+    .get(&wst)
+    .ok_or(actix_web::error::ErrorUnauthorized(zkerr::Error::String(
+      "token not found".into(),
+    )))?
+    .clone();
+
+  // remove the token.
+  tokes.remove(&wst);
+
+  drop(tokes);
+
+  let now = util::now().unwrap();
+
+  if now - exptime > 1000 {
+    return Err(actix_web::error::ErrorUnauthorized(zkerr::Error::String(
+      "token expired".into(),
+    )));
+  };
+
+  // Ok found the token and it wasn't expired: start the socket.
+
+  let resp = ws::start(interfaces::StreamingWebSocket {}, &req, stream);
+  println!("{:?}", resp);
+  resp
 }

@@ -164,7 +164,13 @@ pub async fn websocket_sync_from(
 
       let res = client.post(private_url.clone()).json(&PrivateMessage { what: PrivateRequests::GetWsToken, data: None }).send().await?;
 
-      let pm = serde_json::from_value::<PrivateMessage>(res.json().await?)?;
+      let pm = serde_json::from_value::<PrivateReplyMessage>(res.json().await?)?;
+
+      let wstoken = match pm.what {
+        PrivateReplies::WsToken => 
+         serde_json::from_value::<Uuid>(pm.content).map_err(|e| Into::<zkerr::Error>::into(e)),
+        _ => Err(format!("unexpected what: {:?}", pm.what).as_str().into()), 
+      }?;
 
 
       // TODO: get time on remote system, bail if too far out.
@@ -292,7 +298,7 @@ pub async fn websocket_sync_from(
                 UserResponse::RemoteUser => serde_json::from_value(
                   wm.data
                     .ok_or::<orgauth::error::Error>("missing data".into())?,
-                )?, // .map_err(|e| e.into())?,
+                )?,
                 _ => Err::<PhantomUser, zkerr::Error>(
                   zkerr::Error::String(format!("unexpected message: {:?}", wm)).into(),
                 )?,
