@@ -96,6 +96,7 @@ pub async fn user_interface(
   )
 }
 
+// TODO: have the socket close on timeout as in example?
 pub struct StreamingWebSocket {}
 
 impl actix::Actor for StreamingWebSocket {

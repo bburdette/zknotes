@@ -19,6 +19,7 @@ pub enum Error {
   Orgauth(orgauth::error::Error),
   Regex(regex::Error),
   UrlParser(url::ParseError),
+  WsClientError(awc::error::WsClientError),
 }
 
 pub fn to_orgauth_error(e: Error) -> orgauth::error::Error {
@@ -34,6 +35,7 @@ pub fn to_orgauth_error(e: Error) -> orgauth::error::Error {
     Error::Orgauth(ze) => ze,
     Error::Regex(ze) => orgauth::error::Error::String(ze.to_string()),
     Error::UrlParser(ze) => orgauth::error::Error::String(ze.to_string()),
+    Error::WsClientError(ze) => orgauth::error::Error::String(ze.to_string()),
   }
 }
 
@@ -57,6 +59,7 @@ impl fmt::Display for Error {
       Error::Orgauth(e) => write!(f, "{}", e),
       Error::Regex(e) => write!(f, "{}", e),
       Error::UrlParser(e) => write!(f, "{}", e),
+      Error::WsClientError(e) => write!(f, "{}", e),
     }
   }
 }
@@ -75,6 +78,7 @@ impl fmt::Debug for Error {
       Error::Orgauth(e) => write!(f, "{}", e),
       Error::Regex(e) => write!(f, "{}", e),
       Error::UrlParser(e) => write!(f, "{}", e),
+      Error::WsClientError(e) => write!(f, "{}", e),
     }
   }
 }
@@ -155,6 +159,11 @@ impl From<regex::Error> for Error {
 }
 impl From<url::ParseError> for Error {
   fn from(e: url::ParseError) -> Self {
+    Error::String(e.to_string())
+  }
+}
+impl From<awc::error::WsClientError> for Error {
+  fn from(e: awc::error::WsClientError) -> Self {
     Error::String(e.to_string())
   }
 }

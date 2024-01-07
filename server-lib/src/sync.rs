@@ -1,11 +1,16 @@
 use crate::search::{search_zknotes, SearchResult};
 use crate::util::now;
 use actix_web::body::None;
+use bytes::Bytes;
+use bytestring::ByteString;
 use futures_util::TryStreamExt;
 use log::{error, info};
+use std::{io, thread};
 // use json::JsonResult;
 use crate::error as zkerr;
 use crate::sqldata::{self, note_id_for_uuid, save_zklink, save_zknote, user_note_id};
+use awc::ws;
+use core::pin::Pin;
 use orgauth;
 use orgauth::data::{PhantomUser, User, UserResponse, UserResponseMessage};
 use orgauth::dbfun::user_id;
@@ -17,6 +22,8 @@ use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::io::AsyncBufReadExt;
+use tokio::{select, sync::mpsc};
+use tokio_stream::wrappers::UnboundedReceiverStream;
 use tokio_util::io::StreamReader;
 use uuid::Uuid;
 use zkprotocol::constants::{
@@ -129,7 +136,7 @@ pub async fn websocket_sync_from(
   conn: &Connection,
   user: &User,
   callbacks: &mut Callbacks,
-// ) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>> {
+  // ) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>> {
 ) -> Result<PrivateReplyMessage, zkerr::Error> {
   let now = now()?;
 
@@ -157,21 +164,61 @@ pub async fn websocket_sync_from(
       let getarchivenotes = true;
       let getarchivelinks = true;
 
-  // Request a ws token from remote.
-        let private_url = reqwest::Url::parse(
-          format!("{}/private", url.origin().unicode_serialization(),).as_str(),
-        )?;
+      // Request a ws token from remote.
+      let private_url =
+        reqwest::Url::parse(format!("{}/private", url.origin().unicode_serialization(),).as_str())?;
 
-      let res = client.post(private_url.clone()).json(&PrivateMessage { what: PrivateRequests::GetWsToken, data: None }).send().await?;
+      let res = client
+        .post(private_url.clone())
+        .json(&PrivateMessage {
+          what: PrivateRequests::GetWsToken,
+          data: None,
+        })
+        .send()
+        .await?;
 
       let pm = serde_json::from_value::<PrivateReplyMessage>(res.json().await?)?;
 
       let wstoken = match pm.what {
-        PrivateReplies::WsToken => 
-         serde_json::from_value::<Uuid>(pm.content).map_err(|e| Into::<zkerr::Error>::into(e)),
-        _ => Err(format!("unexpected what: {:?}", pm.what).as_str().into()), 
+        PrivateReplies::WsToken => {
+          serde_json::from_value::<Uuid>(pm.content).map_err(|e| Into::<zkerr::Error>::into(e))
+        }
+        _ => Err(format!("unexpected what: {:?}", pm.what).as_str().into()),
       }?;
 
+      // naio.  connect to the websocket.
+
+      // maybe use http::url here.
+      let wsurl = reqwest::Url::parse(
+        format!(
+          "{}/ws/{}",
+          url.origin().unicode_serialization(),
+          wstoken.to_string()
+        )
+        .as_str(),
+      )?;
+
+      /*
+      let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
+      let mut cmd_rx = UnboundedReceiverStream::new(cmd_rx);
+
+      // run blocking terminal input reader on separate thread
+      let input_thread = thread::spawn(move || loop {
+        let mut cmd = String::with_capacity(32);
+
+        if io::stdin().read_line(&mut cmd).is_err() {
+          log::error!("error reading line");
+          return;
+        }
+
+        // decode each message and send.
+        cmd_tx.send(cmd).unwrap();
+      });
+      */
+
+      let (res, mut ws) = awc::Client::new().ws(wsurl.as_str()).connect().await?;
+
+      println!("connect res: {:?}", res);
 
       // TODO: get time on remote system, bail if too far out.
 
@@ -204,15 +251,27 @@ pub async fn websocket_sync_from(
           data: Some(serde_json::to_value(zns)?),
         };
 
-        let url = reqwest::Url::parse(
-          format!("{}/stream", url.origin().unicode_serialization(),).as_str(),
-        )?;
+        // send over ws.
 
-        let res = client.post(url.clone()).json(&l).send().await?;
+        ws.send(ws::Message::Text(ByteString::from(serde_json::to_string(
+          &zns,
+        )?)));
+        // Pin::new(&mut ws).write(ws::Message::Text(ByteString::from(serde_json::to_string(
+        //   &zns,
+        // )?)));
+
+        // match Pin::new(&mut ws).next_item() {}
+
+        // let url = reqwest::Url::parse(
+        //   format!("{}/stream", url.origin().unicode_serialization(),).as_str(),
+        // )?;
+
+        // let res = client.post(url.clone()).json(&l).send().await?;
 
         // handle streaming response!
 
         // let resp = res.json::<ServerResponse>().await?;
+        /*
         let rstream = res.bytes_stream().map_err(convert_err);
 
         let mut br = StreamReader::new(rstream);
@@ -223,6 +282,8 @@ pub async fn websocket_sync_from(
         if nc == 0 {
           return Err("empty stream!".into());
         }
+        */
+        match ws.next().await {}
 
         println!("line: {}", line);
 
@@ -350,7 +411,7 @@ pub async fn websocket_sync_from(
                 note.createdate,
                 note.changeddate,
               ],
-            ) 
+            )
             {
               Ok(x) => Ok(x),
               Err(rusqlite::Error::SqliteFailure(e, s)) =>
@@ -710,7 +771,6 @@ pub async fn websocket_sync_from(
 
   // let jar = reqwest::cookies::Jar;
   // match (user.cookie, user.remote_url) {}
-  
 }
 
 pub async fn sync(
@@ -927,7 +987,7 @@ pub async fn sync(
                 note.createdate,
                 note.changeddate,
               ],
-            ) 
+            )
             {
               Ok(x) => Ok(x),
               Err(rusqlite::Error::SqliteFailure(e, s)) =>
