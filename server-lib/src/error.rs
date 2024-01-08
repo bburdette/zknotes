@@ -1,10 +1,12 @@
 use actix_session;
 use actix_web::error as awe;
+use actix_web_actors::ws::ProtocolError;
 use regex;
 use reqwest;
 use rusqlite;
 use serde_json;
-use std::fmt;
+use std::{fmt, str::Utf8Error};
+use str;
 use url;
 
 pub enum Error {
@@ -20,6 +22,8 @@ pub enum Error {
   Regex(regex::Error),
   UrlParser(url::ParseError),
   WsClientError(awc::error::WsClientError),
+  ProtocolError(ProtocolError),
+  Utf8Error(std::str::Utf8Error),
 }
 
 pub fn to_orgauth_error(e: Error) -> orgauth::error::Error {
@@ -36,6 +40,8 @@ pub fn to_orgauth_error(e: Error) -> orgauth::error::Error {
     Error::Regex(ze) => orgauth::error::Error::String(ze.to_string()),
     Error::UrlParser(ze) => orgauth::error::Error::String(ze.to_string()),
     Error::WsClientError(ze) => orgauth::error::Error::String(ze.to_string()),
+    Error::ProtocolError(ze) => orgauth::error::Error::String(ze.to_string()),
+    Error::Utf8Error(ze) => orgauth::error::Error::String(ze.to_string()),
   }
 }
 
@@ -60,6 +66,8 @@ impl fmt::Display for Error {
       Error::Regex(e) => write!(f, "{}", e),
       Error::UrlParser(e) => write!(f, "{}", e),
       Error::WsClientError(e) => write!(f, "{}", e),
+      Error::ProtocolError(e) => write!(f, "{}", e),
+      Error::Utf8Error(e) => write!(f, "{}", e),
     }
   }
 }
@@ -79,6 +87,8 @@ impl fmt::Debug for Error {
       Error::Regex(e) => write!(f, "{}", e),
       Error::UrlParser(e) => write!(f, "{}", e),
       Error::WsClientError(e) => write!(f, "{}", e),
+      Error::ProtocolError(e) => write!(f, "{}", e),
+      Error::Utf8Error(e) => write!(f, "{}", e),
     }
   }
 }
@@ -164,6 +174,16 @@ impl From<url::ParseError> for Error {
 }
 impl From<awc::error::WsClientError> for Error {
   fn from(e: awc::error::WsClientError) -> Self {
+    Error::String(e.to_string())
+  }
+}
+impl From<ProtocolError> for Error {
+  fn from(e: ProtocolError) -> Self {
+    Error::String(e.to_string())
+  }
+}
+impl From<Utf8Error> for Error {
+  fn from(e: Utf8Error) -> Self {
     Error::String(e.to_string())
   }
 }

@@ -172,6 +172,10 @@ pub async fn zk_interface_loggedin(
   uid: i64,
   msg: &PrivateMessage,
 ) -> Result<PrivateReplyMessage, Box<dyn Error>> {
+  {
+    let tokes = appdata.wstokens.lock().unwrap();
+    println!("zk_interface_loggedin tokes {:?}", tokes);
+  }
   // match PrivateRequests::fromstr(msg.what.as_str()) {
   match msg.what {
     PrivateRequests::GetZkNote => {
@@ -392,15 +396,20 @@ pub async fn zk_interface_loggedin(
       let conn = sqldata::connection_open(appdata.config.orgauth_config.db.as_path())?;
       let user = orgauth::dbfun::read_user_by_id(&conn, uid)?; // TODO pass this in from calling ftn?
 
-      sync::sync(&conn, &user, &mut zknotes_callbacks()).await
+      // sync::sync(&conn, &user, &mut zknotes_callbacks()).await
+      sync::websocket_sync_from(&conn, &user, &mut zknotes_callbacks())
+        .await
+        .map_err(|e| e.into())
     }
     PrivateRequests::GetWsToken => {
+      println!("PrivateRequests::GetWsToken");
       let uuid = Uuid::new_v4();
       let now = orgauth::util::now()?;
 
       {
         let mut wst = appdata.wstokens.lock().unwrap();
         wst.insert(uuid, now);
+        println!("wst: {:?}", wst);
       }
 
       Ok(PrivateReplyMessage {

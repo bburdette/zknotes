@@ -728,6 +728,11 @@ pub async fn err_main() -> Result<(), Box<dyn Error>> {
     );
 
   let c = config.clone();
+  let ad = AppData {
+    config: c.clone(),
+    wstokens: Arc::new(Mutex::new(HashMap::new())),
+  };
+  let add = web::Data::new(ad);
   HttpServer::new(move || {
     let staticpath = c.static_path.clone().unwrap_or(PathBuf::from("static/"));
     let d = c.clone();
@@ -752,12 +757,8 @@ pub async fn err_main() -> Result<(), Box<dyn Error>> {
       .allow_any_method()
       .max_age(3600);
 
-    let ad = AppData {
-      config: c.clone(),
-      wstokens: Arc::new(Mutex::new(HashMap::new())),
-    };
     App::new()
-      .app_data(web::Data::new(ad.clone())) // <- create app with shared state
+      .app_data(add.clone()) // <- create app with shared state
       .wrap(cors)
       .wrap(TracingLogger::default())
       .wrap(
@@ -802,6 +803,8 @@ async fn wsstart(
       "token parameter not found".into(),
     )))?;
 
+  println!("wsstart token: {}", wststr);
+
   // apparently unstable feature?
   // let tokes = data.wstokens.lock().unwrap_or_else(|mut e| {
   //   // in case of poison, revert to empty hashmap.
@@ -810,6 +813,8 @@ async fn wsstart(
   //     e.into_inner()
   // });
   let mut tokes = data.wstokens.lock().unwrap();
+
+  println!("tokes: {:?}", tokes);
 
   let wst = Uuid::parse_str(wststr).map_err(|_| {
     actix_web::error::ErrorUnauthorized(zkerr::Error::String("invalid token format".into()))

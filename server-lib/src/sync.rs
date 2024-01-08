@@ -1,16 +1,19 @@
 use crate::search::{search_zknotes, SearchResult};
 use crate::util::now;
 use actix_web::body::None;
+use actix_web_actors::ws::ProtocolError;
 use bytes::Bytes;
 use bytestring::ByteString;
 use futures_util::TryStreamExt;
 use log::{error, info};
+use std::str;
 use std::{io, thread};
 // use json::JsonResult;
 use crate::error as zkerr;
 use crate::sqldata::{self, note_id_for_uuid, save_zklink, save_zknote, user_note_id};
 use awc::ws;
 use core::pin::Pin;
+use futures_util::{SinkExt as _, StreamExt as _};
 use orgauth;
 use orgauth::data::{PhantomUser, User, UserResponse, UserResponseMessage};
 use orgauth::dbfun::user_id;
@@ -181,22 +184,27 @@ pub async fn websocket_sync_from(
 
       let wstoken = match pm.what {
         PrivateReplies::WsToken => {
+          println!("token content: {:?}", pm.content);
           serde_json::from_value::<Uuid>(pm.content).map_err(|e| Into::<zkerr::Error>::into(e))
         }
         _ => Err(format!("unexpected what: {:?}", pm.what).as_str().into()),
       }?;
 
       // naio.  connect to the websocket.
+      std::thread::sleep(std::time::Duration::new(1, 0));
 
       // maybe use http::url here.
       let wsurl = reqwest::Url::parse(
         format!(
-          "{}/ws/{}",
-          url.origin().unicode_serialization(),
+          "{}:{}/ws/{}",
+          if url.scheme() == "http" { "ws" } else { "wss" },
+          url.authority(), // .unicode_serialization(),
           wstoken.to_string()
         )
         .as_str(),
       )?;
+
+      println!("wsurl {}", wsurl);
 
       /*
       let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
@@ -216,7 +224,12 @@ pub async fn websocket_sync_from(
       });
       */
 
-      let (res, mut ws) = awc::Client::new().ws(wsurl.as_str()).connect().await?;
+      // let (res, mut ws) = awc::Client::new().ws(wsurl.as_str()).connect().await?;
+      let (res, mut ws) = awc::Client::new()
+        .ws(wsurl.as_str())
+        .connect()
+        .await
+        .unwrap();
 
       println!("connect res: {:?}", res);
 
@@ -254,8 +267,10 @@ pub async fn websocket_sync_from(
         // send over ws.
 
         ws.send(ws::Message::Text(ByteString::from(serde_json::to_string(
-          &zns,
-        )?)));
+          &l,
+        )?)))
+        .await?;
+
         // Pin::new(&mut ws).write(ws::Message::Text(ByteString::from(serde_json::to_string(
         //   &zns,
         // )?)));
@@ -283,14 +298,22 @@ pub async fn websocket_sync_from(
           return Err("empty stream!".into());
         }
         */
-        match ws.next().await {}
 
-        println!("line: {}", line);
-
-        let sr = serde_json::from_str::<PrivateReplyMessage>(line.trim())?;
-
-        if sr.what != PrivateReplies::ZkNoteSearchResult {
-          return Err(format!("unexpected what {:?}", sr.what).into());
+        match ws.next().await {
+          Some(msg) => match msg {
+            Ok(ws::Frame::Text(txt)) => {
+              println!("line: {:?}", txt);
+              let sr = serde_json::from_str::<PrivateReplyMessage>(&str::from_utf8(&txt)?)?;
+              if sr.what != PrivateReplies::ZkNoteSearchResult {
+                return Err(format!("unexpected what {:?}", sr.what).into());
+              }
+            }
+            Ok(_) => {
+              return Err(format!("unexpected ws msg: {:?}", msg).into());
+            }
+            Err(e) => return Err(e.into()),
+          },
+          None => return Err("no search result".into()),
         }
 
         // map of remote user ids to local user ids.
@@ -325,17 +348,31 @@ pub async fn websocket_sync_from(
         */
 
         // TODO: speed this up!  WAAAY slower than just downloading the records.
+        let mut line = String::new();
         loop {
-          line.clear();
-          let nc = br.read_line(&mut line).await?;
+          let note = match ws.next().await {
+            Some(msg) => match msg {
+              Ok(ws::Frame::Text(txt)) => {
+                println!("zknote msg {:?}", txt);
+                serde_json::from_str::<ZkNote>(&str::from_utf8(&txt)?)?
+              }
+              Ok(_) => {
+                return Err(format!("unexpected ws msg: {:?}", msg).into());
+              }
+              Err(e) => return Err(e.into()),
+            },
+            None => break,
+          };
 
-          if nc == 0 {
-            break;
-          }
+          // line.clear();
+          // let nc = br.read_line(&mut line).await?;
+          // if nc == 0 {
+          //   break;
+          // }
 
           // println!("note line: {}", line);
 
-          let note = serde_json::from_str::<ZkNote>(line.trim())?;
+          // let note = serde_json::from_str::<ZkNote>(line.trim())?;
 
           println!("zknote: {:?}", note);
           // got this user already?
