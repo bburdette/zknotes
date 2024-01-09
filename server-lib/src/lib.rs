@@ -6,6 +6,7 @@ mod search;
 pub mod sqldata;
 mod sqltest;
 mod sync;
+pub mod websocket;
 
 use crate::error as zkerr;
 
@@ -820,7 +821,7 @@ async fn wsstart(
     actix_web::error::ErrorUnauthorized(zkerr::Error::String("invalid token format".into()))
   })?;
 
-  let exptime = tokes
+  let tokeninfo = tokes
     .get(&wst)
     .ok_or(actix_web::error::ErrorUnauthorized(zkerr::Error::String(
       "token not found".into(),
@@ -834,7 +835,7 @@ async fn wsstart(
 
   let now = util::now().unwrap();
 
-  if now - exptime > 1000 {
+  if now - tokeninfo.create_time > 1000 {
     return Err(actix_web::error::ErrorUnauthorized(zkerr::Error::String(
       "token expired".into(),
     )));
@@ -842,7 +843,14 @@ async fn wsstart(
 
   // Ok found the token and it wasn't expired: start the socket.
 
-  let resp = ws::start(interfaces::StreamingWebSocket {}, &req, stream);
+  let resp = ws::start(
+    websocket::StreamingWebSocket {
+      config: data.config.clone(),
+      uid: tokeninfo.uid,
+    },
+    &req,
+    stream,
+  );
   println!("{:?}", resp);
   resp
 }

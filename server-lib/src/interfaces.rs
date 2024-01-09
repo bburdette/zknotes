@@ -1,5 +1,7 @@
 use crate::appdata::AppData;
 use crate::appdata::Config;
+use crate::appdata::TokenInfo;
+use crate::error as zkerr;
 use crate::search;
 use crate::sqldata;
 use crate::sync;
@@ -96,40 +98,92 @@ pub async fn user_interface(
   )
 }
 
-// TODO: have the socket close on timeout as in example?
-pub struct StreamingWebSocket {}
+// // TODO: have the socket close on timeout as in example?
+// pub struct StreamingWebSocket {
+//   pub config: Config,
+//   pub uid: i64,
+// }
 
-impl actix::Actor for StreamingWebSocket {
-  type Context = ws::WebsocketContext<Self>;
+// impl actix::Actor for StreamingWebSocket {
+//   type Context = ws::WebsocketContext<Self>;
 
-  // /// Method is called on actor start. We start the heartbeat process here.
-  // fn started(&mut self, ctx: &mut Self::Context) {
-  //   self.hb(ctx);
-  // }
-}
+//   // /// Method is called on actor start. We start the heartbeat process here.
+//   // fn started(&mut self, ctx: &mut Self::Context) {
+//   //   self.hb(ctx);
+//   // }
+// }
 
-impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for StreamingWebSocket {
-  fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
-    // process websocket messages
-    println!("WS: {msg:?}");
-    match msg {
-      Ok(ws::Message::Ping(msg)) => {
-        // self.hb = Instant::now();
-        ctx.pong(&msg);
-      }
-      Ok(ws::Message::Pong(_)) => {
-        // self.hb = Instant::now();
-      }
-      Ok(ws::Message::Text(text)) => ctx.text(text),
-      Ok(ws::Message::Binary(bin)) => ctx.binary(bin),
-      Ok(ws::Message::Close(reason)) => {
-        ctx.close(reason);
-        ctx.stop();
-      }
-      _ => ctx.stop(),
-    }
-  }
-}
+// impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for StreamingWebSocket {
+//   fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
+//     // process websocket messages
+//     println!("WS: {msg:?}");
+//     match msg {
+//       Ok(ws::Message::Ping(msg)) => {
+//         // self.hb = Instant::now();
+//         ctx.pong(&msg);
+//       }
+//       Ok(ws::Message::Pong(_)) => {
+//         // self.hb = Instant::now();
+//       }
+//       Ok(ws::Message::Text(text)) => match std::str::from_utf8(text.as_bytes()) {
+//         Ok(utf8) => match serde_json::from_str(utf8) {
+//           Ok(psm) => match zk_interface_loggedin_wsstreaming(&self.config, self.uid, &psm, ctx) {
+//             Ok(_) => {}
+//             Err(e) => {}
+//           },
+//           Err(_) => {}
+//         },
+//         Err(_) => {}
+//       },
+//       Ok(ws::Message::Binary(bin)) => ctx.binary(bin),
+//       Ok(ws::Message::Close(reason)) => {
+//         ctx.close(reason);
+//         ctx.stop();
+//       }
+//       _ => ctx.stop(),
+//     }
+//   }
+// }
+
+// pub fn zk_interface_loggedin_wsstreaming(
+//   config: &Config,
+//   uid: i64,
+//   msg: &PrivateStreamingMessage,
+//   ctx: &mut ws::WebsocketContext<StreamingWebSocket>,
+// ) -> Result<(), zkerr::Error> {
+//   // Ok(HttpResponse::Ok().into())
+//   match msg.what {
+//     PrivateStreamingRequests::SearchZkNotes => {
+//       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+//       let search: ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
+//       let conn = Arc::new(sqldata::connection_open(
+//         config.orgauth_config.db.as_path(),
+//       )?);
+//       let znsstream = search::search_zknotes_wsstream(conn, uid, search, ctx);
+//       Ok(())
+//     }
+//     _ => Ok(()),
+//   }
+//   //   PrivateStreamingRequests::GetArchiveZkLinks => {
+//   //     let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+//   //     let rq: GetArchiveZkLinks = serde_json::from_value(msgdata.clone())?;
+//   //     let conn = Arc::new(sqldata::connection_open(
+//   //       config.orgauth_config.db.as_path(),
+//   //     )?);
+//   //     let bstream = sqldata::read_archivezklinks_stream(conn, uid, rq.createddate_after);
+//   //     Ok(HttpResponse::Ok().streaming(bstream))
+//   //   }
+//   //   PrivateStreamingRequests::GetZkLinksSince => {
+//   //     let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+//   //     let rq: GetZkLinksSince = serde_json::from_value(msgdata.clone())?;
+//   //     let conn = Arc::new(sqldata::connection_open(
+//   //       config.orgauth_config.db.as_path(),
+//   //     )?);
+//   //     let bstream = sqldata::read_zklinks_since_stream(conn, uid, rq.createddate_after);
+//   //     Ok(HttpResponse::Ok().streaming(bstream))
+//   //   } // wat => Err(format!("invalid 'what' code:'{}'", wat).into()),
+//   // }
+// }
 
 pub async fn zk_interface_loggedin_streaming(
   config: &Config,
@@ -408,7 +462,13 @@ pub async fn zk_interface_loggedin(
 
       {
         let mut wst = appdata.wstokens.lock().unwrap();
-        wst.insert(uuid, now);
+        wst.insert(
+          uuid,
+          TokenInfo {
+            create_time: now,
+            uid,
+          },
+        );
         println!("wst: {:?}", wst);
       }
 

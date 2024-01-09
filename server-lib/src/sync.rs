@@ -86,21 +86,24 @@ pub async fn prev_sync(
     }),
   };
 
-  if let SearchResult::SrNote(res) = search_zknotes(conn, sysid, &zns)? {
-    println!("result noates: {:?}", res.notes);
-    match res.notes.first() {
-      Some(n) => match serde_json::from_str::<CompletedSync>(n.content.as_str()) {
-        Ok(s) => Ok(Some(s)),
-        Err(e) => {
-          error!("CompletedSync parse error: {:?}", e);
-          Ok(None)
-        }
-      },
-      None => Ok(None),
-    }
-  } else {
-    Err("unexpected search result type".into())
-  }
+  // TODO: remove
+  return Ok(None);
+
+  // if let SearchResult::SrNote(res) = search_zknotes(conn, sysid, &zns)? {
+  //   println!("result noates: {:?}", res.notes);
+  //   match res.notes.first() {
+  //     Some(n) => match serde_json::from_str::<CompletedSync>(n.content.as_str()) {
+  //       Ok(s) => Ok(Some(s)),
+  //       Err(e) => {
+  //         error!("CompletedSync parse error: {:?}", e);
+  //         Ok(None)
+  //       }
+  //     },
+  //     None => Ok(None),
+  //   }
+  // } else {
+  //   Err("unexpected search result type".into())
+  // }
 }
 
 pub async fn save_sync(
@@ -163,9 +166,9 @@ pub async fn websocket_sync_from(
       let client = reqwest::Client::builder().cookie_provider(jar).build()?;
 
       let getnotes = true;
-      let getlinks = true;
-      let getarchivenotes = true;
-      let getarchivelinks = true;
+      let getlinks = false;
+      let getarchivenotes = false;
+      let getarchivelinks = false;
 
       // Request a ws token from remote.
       let private_url =
@@ -191,7 +194,7 @@ pub async fn websocket_sync_from(
       }?;
 
       // naio.  connect to the websocket.
-      std::thread::sleep(std::time::Duration::new(1, 0));
+      // std::thread::sleep(std::time::Duration::new(1, 0));
 
       // maybe use http::url here.
       let wsurl = reqwest::Url::parse(
@@ -348,7 +351,8 @@ pub async fn websocket_sync_from(
         */
 
         // TODO: speed this up!  WAAAY slower than just downloading the records.
-        let mut line = String::new();
+
+        let mut count = 0;
         loop {
           let note = match ws.next().await {
             Some(msg) => match msg {
@@ -361,7 +365,10 @@ pub async fn websocket_sync_from(
               }
               Err(e) => return Err(e.into()),
             },
-            None => break,
+            None => {
+              println!("breakkk");
+              break;
+            }
           };
 
           // line.clear();
@@ -374,7 +381,9 @@ pub async fn websocket_sync_from(
 
           // let note = serde_json::from_str::<ZkNote>(line.trim())?;
 
-          println!("zknote: {:?}", note);
+          println!("zknote: {:?}", count);
+          count = count + 1;
+          /*
           // got this user already?
           // If not, make a phantom user.
           let user_uid: i64 = match userhash.get(&note.user) {
@@ -480,8 +489,11 @@ pub async fn websocket_sync_from(
                 }
               Err(e) => Err(e),
             }?;
+          */
         }
       }
+      println!("note sync complete");
+
       if getarchivenotes {
         println!("reading archive notes");
         let zns = ZkNoteSearch {
