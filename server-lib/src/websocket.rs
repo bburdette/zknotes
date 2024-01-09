@@ -104,7 +104,7 @@ pub fn zk_interface_loggedin_wsstreaming(
       )?);
 
       // search_zknotes_wsstream_sync(conn, uid, search, ctx)?;
-      let znsstream = search_zknotes_wsstream_sync(conn, uid, search, ctx);
+      let znsstream = search_zknotes_wsstream_async(conn, uid, search, ctx);
       // let q = znsstream.map_err(|x| ws::ProtocolError::Io(std::io::Error::other(x)));
 
       StreamingWebSocket::add_stream(
@@ -141,7 +141,7 @@ pub fn zk_interface_loggedin_wsstreaming(
   // }
 }
 
-pub fn search_zknotes_wsstream_sync(
+pub fn search_zknotes_wsstream_async(
   conn: Arc<Connection>,
   user: i64,
   search: ZkNoteSearch,
@@ -238,7 +238,7 @@ pub fn search_zknotes_wsstream_sync(
   }
 }
 
-pub fn search_zknotes_wsstream(
+pub fn search_zknotes_wsstream_sync(
   conn: Arc<Connection>,
   user: i64,
   search: ZkNoteSearch,
