@@ -352,7 +352,7 @@ pub async fn zk_interface_loggedin(
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       let user = orgauth::dbfun::read_user_by_id(&conn, uid)?; // TODO pass this in from calling ftn?
 
-      sync::sync(&conn, &user, &mut zknotes_callbacks()).await
+      sync::sync_from_remote(&conn, &user, &mut zknotes_callbacks()).await
     }
   }
 }

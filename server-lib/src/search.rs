@@ -200,7 +200,8 @@ pub fn search_zknotes_stream(
   conn: Arc<Connection>,
   user: i64,
   search: ZkNoteSearch,
-) -> impl Stream<Item = Result<Bytes, Box<dyn std::error::Error>>> + 'static {
+) -> impl Stream<Item = Result<Bytes, Box<dyn std::error::Error>>> {
+  // ) -> impl futures_util::Stream<Item = Result<Bytes, Box<dyn std::error::Error>>> {
   // uncomment for formatting, lsp
   // {
   try_stream! {
