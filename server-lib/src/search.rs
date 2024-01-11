@@ -92,7 +92,7 @@ pub fn search_zknotes(
   conn: &Connection,
   user: i64,
   search: &ZkNoteSearch,
-) -> Result<SearchResult, Box<dyn Error>> {
+) -> Result<SearchResult, zkerr::Error> {
   let (sql, args) = build_sql(&conn, user, search.clone())?;
 
   let mut pstmt = conn.prepare(sql.as_str())?;
@@ -284,7 +284,7 @@ pub fn build_sql(
   conn: &Connection,
   uid: i64,
   search: ZkNoteSearch,
-) -> Result<(String, Vec<String>), Box<dyn Error>> {
+) -> Result<(String, Vec<String>), zkerr::Error> {
   let (mut cls, mut clsargs) = build_tagsearch_clause(&conn, uid, false, &search.tagsearch)?;
 
   let (dtcls, mut dtclsargs) = build_daterange_clause(&search)?;
@@ -514,7 +514,7 @@ pub fn build_sql(
   Ok((sqlbase, baseargs))
 }
 
-fn build_daterange_clause(search: &ZkNoteSearch) -> Result<(String, Vec<String>), Box<dyn Error>> {
+fn build_daterange_clause(search: &ZkNoteSearch) -> Result<(String, Vec<String>), zkerr::Error> {
   let create_clawses = [
     search
       .created_after
@@ -581,7 +581,7 @@ fn build_tagsearch_clause(
   uid: i64,
   not: bool,
   search: &TagSearch,
-) -> Result<(String, Vec<String>), Box<dyn Error>> {
+) -> Result<(String, Vec<String>), zkerr::Error> {
   let (cls, args) = match search {
     TagSearch::SearchTerm { mods, term } => {
       let mut exact = false;

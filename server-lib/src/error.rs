@@ -1,5 +1,6 @@
 use actix_session;
 use actix_web::error as awe;
+use cookie;
 use regex;
 use reqwest;
 use rusqlite;
@@ -17,6 +18,7 @@ pub enum Error {
   Uuid(uuid::Error),
   Orgauth(orgauth::error::Error),
   Regex(regex::Error),
+  Cookie(cookie::ParseError),
 }
 
 pub fn to_orgauth_error(e: Error) -> orgauth::error::Error {
@@ -31,6 +33,7 @@ pub fn to_orgauth_error(e: Error) -> orgauth::error::Error {
     Error::Uuid(ze) => orgauth::error::Error::Uuid(ze),
     Error::Orgauth(ze) => ze,
     Error::Regex(ze) => orgauth::error::Error::String(ze.to_string()),
+    Error::Cookie(ze) => orgauth::error::Error::String(ze.to_string()),
   }
 }
 
@@ -53,6 +56,7 @@ impl fmt::Display for Error {
       Error::Uuid(e) => write!(f, "{}", e),
       Error::Orgauth(e) => write!(f, "{}", e),
       Error::Regex(e) => write!(f, "{}", e),
+      Error::Cookie(e) => write!(f, "{}", e),
     }
   }
 }
@@ -70,6 +74,7 @@ impl fmt::Debug for Error {
       Error::Uuid(e) => write!(f, "{}", e),
       Error::Orgauth(e) => write!(f, "{}", e),
       Error::Regex(e) => write!(f, "{}", e),
+      Error::Cookie(e) => write!(f, "{}", e),
     }
   }
 }
@@ -145,6 +150,11 @@ impl From<orgauth::error::Error> for Error {
 }
 impl From<regex::Error> for Error {
   fn from(e: regex::Error) -> Self {
+    Error::String(e.to_string())
+  }
+}
+impl From<cookie::ParseError> for Error {
+  fn from(e: cookie::ParseError) -> Self {
     Error::String(e.to_string())
   }
 }
