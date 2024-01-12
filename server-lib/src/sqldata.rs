@@ -1625,7 +1625,7 @@ pub fn read_archivezklinks_stream(
   conn: Arc<Connection>,
   uid: i64,
   after: Option<i64>,
-) -> impl Stream<Item = Result<Bytes, Box<dyn std::error::Error>>> + 'static {
+) -> impl futures_util::Stream<Item = Result<Bytes, Box<dyn std::error::Error>>> {
   // {
   try_stream! {
     let (acc_sql, mut acc_args) = accessible_notes(&conn, uid)?;
@@ -1767,7 +1767,7 @@ pub fn read_zklinks_since_stream(
   conn: Arc<Connection>,
   uid: i64,
   after: Option<i64>,
-) -> impl Stream<Item = Result<Bytes, Box<dyn std::error::Error>>> + 'static {
+) -> impl futures_util::Stream<Item = Result<Bytes, Box<dyn std::error::Error>>> {
   // {
   try_stream! {
 

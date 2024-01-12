@@ -1,8 +1,9 @@
-use crate::search::{search_zknotes, search_zknotes_stream, SearchResult};
+use crate::search::{search_zknotes, search_zknotes_stream, sync_users, SearchResult};
 use crate::util::now;
 use actix_web::body::None;
 use actix_web::{HttpMessage, HttpRequest, HttpResponse};
 use async_stream::__private::AsyncStream;
+use async_stream::try_stream;
 use bytes::Bytes;
 use core::pin::{pin, Pin};
 use futures::future;
@@ -721,6 +722,8 @@ pub async fn sync_to_remote(
 ) -> Result<PrivateReplyMessage, zkerr::Error> {
   let extra_login_data = sqldata::read_user_by_id(&conn, user.id)?;
 
+  // TODO: get time on remote system, bail if too far out.
+
   // get previous sync.
   let after = prev_sync(&conn, &user, &extra_login_data.zknote)
     .await?
@@ -745,8 +748,11 @@ pub async fn sync_to_remote(
   let client = awc::Client::new();
   let cookie = cookie::Cookie::parse(c)?;
 
-  let ss = sync_stream(conn, user, after, callbacks);
-  // let res = awc::Client::new().post(url).cookie(cookie).send_body(awc::body::BodyStream::new(ss));
+  let ss = sync_stream(conn, user.id, after, callbacks);
+  let res = awc::Client::new()
+    .post(url)
+    .cookie(cookie)
+    .send_body(awc::body::BodyStream::new(ss));
 
   Ok(PrivateReplyMessage {
     what: PrivateReplies::SyncComplete,
@@ -754,32 +760,19 @@ pub async fn sync_to_remote(
   })
 }
 
+pub fn empty_stream() -> impl Stream<Item = Result<Bytes, Box<dyn std::error::Error + 'static>>> {
+  try_stream! {
+    yield Bytes::from("");
+  }
+}
+
 // Make a stream of all the records needed to sync the remote.
-pub async fn sync_stream(
+pub fn sync_stream(
   conn: Arc<Connection>,
-  user: &User,
+  uid: i64,
   after: Option<i64>,
   callbacks: &mut Callbacks,
 ) -> impl Stream<Item = Result<Bytes, Box<dyn std::error::Error + 'static>>> {
-  // if after.is_none() {
-  //   return Err("is none".into());
-  // }
-
-  // execute any command from here.  search?
-  // let jar = reqwest::cookies::Jar;
-
-  // let jar = Arc::new(cookie::Jar::default());
-  // jar.add_cookie_str(c.as_str(), &url);
-  // let client = reqwest::Client::builder().cookie_provider(jar).build()?;
-
-  let getnotes = true;
-  let getlinks = true;
-  let getarchivenotes = true;
-  let getarchivelinks = true;
-
-  // TODO: get time on remote system, bail if too far out.
-
-  // if getnotes {
   let mut userhash = HashMap::<i64, i64>::new();
 
   // TODO: get recs with sync date newer than.
@@ -803,14 +796,38 @@ pub async fn sync_stream(
     ordering: None,
   };
 
-  // post the stream to our url.
-  let znsstream = search_zknotes_stream(conn.clone(), 12, zns.clone());
-  let res = awc::Client::new()
-    .post("meh")
-    .send_body(awc::body::BodyStream::new(znsstream));
+  let sync_users = sync_users(conn.clone(), uid, after, &zns);
 
-  let znsstream = search_zknotes_stream(conn.clone(), 12, zns);
-  znsstream
+  let znstream = search_zknotes_stream(conn.clone(), uid, zns);
+
+  let ans = ZkNoteSearch {
+    tagsearch: TagSearch::SearchTerm {
+      mods: Vec::new(),
+      term: "".to_string(),
+    },
+    offset: 0,
+    limit: None,
+    what: "".to_string(),
+    resulttype: ResultType::RtNote,
+    archives: true,
+    created_after: after,
+    created_before: None,
+    changed_after: after,
+    changed_before: None,
+    synced_after: after,
+    synced_before: None,
+    ordering: None,
+  };
+  let anstream = search_zknotes_stream(conn.clone(), uid, ans);
+
+  let als = sqldata::read_archivezklinks_stream(conn.clone(), uid, after);
+  let ls = sqldata::read_zklinks_since_stream(conn, uid, after);
+
+  sync_users
+    .chain(znstream)
+    .chain(anstream)
+    .chain(als)
+    .chain(ls)
 }
 
 // let (tx, rx) = tokio::sync::mpsc::channel(1);

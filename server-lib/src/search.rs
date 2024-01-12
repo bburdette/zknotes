@@ -4,6 +4,7 @@ use crate::sqldata::{delete_zknote, get_sysids, note_id};
 use async_stream::try_stream;
 use bytes::Bytes;
 use futures::Stream;
+use orgauth::data::PhantomUser;
 use orgauth::dbfun::user_id;
 use rusqlite::Connection;
 use std::convert::TryInto;
@@ -93,7 +94,7 @@ pub fn search_zknotes(
   user: i64,
   search: &ZkNoteSearch,
 ) -> Result<SearchResult, zkerr::Error> {
-  let (sql, args) = build_sql(&conn, user, search.clone())?;
+  let (sql, args) = build_sql(&conn, user, &search)?;
 
   let mut pstmt = conn.prepare(sql.as_str())?;
 
@@ -200,7 +201,7 @@ pub fn search_zknotes_stream(
   conn: Arc<Connection>,
   user: i64,
   search: ZkNoteSearch,
-) -> impl Stream<Item = Result<Bytes, Box<dyn std::error::Error>>> {
+) -> impl Stream<Item = Result<Bytes, Box<dyn std::error::Error + 'static>>> {
   // ) -> impl futures_util::Stream<Item = Result<Bytes, Box<dyn std::error::Error>>> {
   // uncomment for formatting, lsp
   // {
@@ -211,7 +212,7 @@ pub fn search_zknotes_stream(
     } else {
       user
     };
-    let (sql, args) = build_sql(&conn, user, search.clone())?;
+    let (sql, args) = build_sql(&conn, user, &search)?;
     let mut stmt = conn.prepare(sql.as_str())?;
 
     let mut rows = stmt.query(rusqlite::params_from_iter(args.iter()))?;
@@ -280,10 +281,80 @@ pub fn search_zknotes_stream(
   }
 }
 
+pub fn sync_users(
+  conn: Arc<Connection>,
+  uid: i64,
+  after: Option<i64>,
+  zkns: &ZkNoteSearch,
+) -> impl futures_util::Stream<Item = Result<Bytes, Box<dyn std::error::Error>>> {
+  // {
+  let lzkns = zkns.clone();
+  try_stream! {
+
+    println!("read_zklinks_since_stream");
+    let (sql, args) = build_sql(&conn, uid, &lzkns)?;
+
+    let mut pstmt = conn.prepare(
+      format!(
+        "with search_notes ( id, uuid, title, file, user, createdate, changeddate) as ({})
+        select U.id, U.uuid, U.name, U.active
+        from orgauth_user U where
+          U.id in (select distinct user from search_notes)",
+        sql,
+      )
+      .as_str(),
+    )?;
+
+    // if let Some(a64) = after {
+    //   let a = a64.to_string();
+    //   let mut av = vec![a.clone(), a.clone()];
+    //   args.append(&mut av);
+    // }
+
+    println!("sync_users_sql {}", sql);
+    println!("sync_users_args {:?}", args);
+
+    println!("read_zklinks_since_stream 2");
+
+    {
+      // send the header.
+      let mut s = serde_json::to_value(PrivateReplyMessage {
+        what: PrivateReplies::ZkLinks,
+        content: serde_json::Value::Null,
+      })?
+      .to_string();
+      s.push_str("\n");
+      yield Bytes::from(s);
+    }
+
+    let rec_iter = pstmt.query_map(rusqlite::params_from_iter(args.iter()), |row| {
+      match Uuid::parse_str(row.get::<usize,String>(1)?.as_str()) {
+        Ok(uuid) =>
+      Ok(PhantomUser {
+        id: row.get(0)?,
+        uuid: uuid,
+        name: row.get(2)?,
+        active: row.get(3)?,
+      }),
+        Err(e) => Err(rusqlite::Error::InvalidColumnType(0, "uuid".to_string() , rusqlite::types::Type::Text )),
+        }
+    })?;
+
+    for rec in rec_iter {
+      println!("rec {:?}", rec);
+      if let Ok(r) = rec {
+        let mut s = serde_json::to_value(r)?.to_string();
+        s.push_str("\n");
+        yield Bytes::from(s);
+      }
+    }
+  }
+}
+
 pub fn build_sql(
   conn: &Connection,
   uid: i64,
-  search: ZkNoteSearch,
+  search: &ZkNoteSearch,
 ) -> Result<(String, Vec<String>), zkerr::Error> {
   let (mut cls, mut clsargs) = build_tagsearch_clause(&conn, uid, false, &search.tagsearch)?;
 
@@ -306,7 +377,7 @@ pub fn build_sql(
                             // None => format!(" offset {}", search.offset),
   };
 
-  let ordclause = if let Some(o) = search.ordering {
+  let ordclause = if let Some(o) = &search.ordering {
     let ord = match o.field {
       OrderField::Title => "order by N.title",
       OrderField::Created => "order by N.createdate",
