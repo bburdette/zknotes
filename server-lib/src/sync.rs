@@ -13,6 +13,7 @@ use futures_util::TryStreamExt;
 use log::{error, info};
 use std::convert::TryFrom;
 use std::thread::spawn;
+use std::time::Duration;
 // use json::JsonResult;
 use crate::error as zkerr;
 use crate::sqldata::{self, note_id_for_uuid, save_zklink, save_zknote, user_note_id};
@@ -728,6 +729,7 @@ pub async fn sync_to_remote(
   let after = prev_sync(&conn, &user, &extra_login_data.zknote)
     .await?
     .map(|cs| cs.now);
+  // let after = None;
 
   println!("\n\n start sync, prev_sync {:?} \n\n", after);
 
@@ -736,24 +738,30 @@ pub async fn sync_to_remote(
     _ => return Err("can't remote sync".into()),
   };
 
+  println!("sync to remote 2");
   let now = now()?;
   // let user_url  = Into::<awc::http::Uri>::into(url)?;
   let user_url = awc::http::Uri::try_from(url).map_err(|x| zkerr::Error::String(x.to_string()))?;
   let mut parts = awc::http::uri::Parts::default();
   parts.scheme = user_url.scheme().cloned();
   parts.authority = user_url.authority().cloned();
-  parts.path_and_query = Some(awc::http::uri::PathAndQuery::from_static("/stream"));
+  parts.path_and_query = Some(awc::http::uri::PathAndQuery::from_static("/upstream"));
   let url = awc::http::Uri::from_parts(parts).map_err(|x| zkerr::Error::String(x.to_string()))?;
 
   let client = awc::Client::new();
-  let cookie = cookie::Cookie::parse(c)?;
+  let cookie = cookie::Cookie::parse_encoded(c)?;
+  println!("sync to remote 3 - cookie: {:?}", cookie);
 
   let ss = sync_stream(conn, user.id, after, callbacks);
+  println!("sync to remote 4");
   let res = awc::Client::new()
     .post(url)
     .cookie(cookie)
-    .send_body(awc::body::BodyStream::new(ss));
+    .timeout(Duration::from_secs(60 * 60))
+    .send_body(awc::body::BodyStream::new(ss))
+    .await;
 
+  println!("sync to remote 5 : {:?}", res);
   Ok(PrivateReplyMessage {
     what: PrivateReplies::SyncComplete,
     content: serde_json::Value::Null,

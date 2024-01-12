@@ -1763,6 +1763,7 @@ pub fn read_zklinks_since(
 
   Ok(rec_iter.collect::<Result<Vec<UuidZkLink>, rusqlite::Error>>()?)
 }
+
 pub fn read_zklinks_since_stream(
   conn: Arc<Connection>,
   uid: i64,

@@ -500,6 +500,66 @@ async fn zk_interface_check_streaming(
     }
   }
 }
+async fn private_upstreaming(
+  session: Session,
+  data: web::Data<Config>,
+  // item: web::Json<PrivateStreamingMessage>,
+  // req: HttpRequest,
+  body: web::Payload,
+) -> HttpResponse {
+  // pass to another fn that returns a result, for ?
+  match zk_interface_check_upstreaming(&session, &data, body).await {
+    Ok(hr) => hr,
+    Err(e) => {
+      error!("'private' err: {:?}", e);
+      let se = PrivateReplyMessage {
+        what: PrivateReplies::ServerError,
+        content: serde_json::Value::String(e.to_string()),
+      };
+      HttpResponse::Ok().json(se)
+    }
+  }
+}
+
+async fn zk_interface_check_upstreaming(
+  session: &Session,
+  config: &Config,
+  body: web::Payload,
+) -> Result<HttpResponse, Box<dyn Error>> {
+  println!(
+    "session.get::<Uuid>(\"token\")? {:?}",
+    session.get::<Uuid>("token")?
+  );
+  match session.get::<Uuid>("token")? {
+    None => Ok(HttpResponse::Ok().json(PrivateReplyMessage {
+      what: PrivateReplies::NotLoggedIn,
+      content: serde_json::Value::Null,
+    })),
+
+    Some(token) => {
+      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+      match orgauth::dbfun::read_user_by_token_api(
+        &conn,
+        token,
+        config.orgauth_config.login_token_expiration_ms,
+        config.orgauth_config.regen_login_tokens,
+      ) {
+        Err(e) => {
+          info!("read_user_by_token_api error2: {:?}, {:?}", token, e);
+
+          Ok(HttpResponse::Ok().json(PrivateReplyMessage {
+            what: PrivateReplies::LoginError,
+            content: serde_json::to_value(format!("{:?}", e).as_str())?,
+          }))
+        }
+        Ok(userdata) => {
+          // finally!  processing messages as logged in user.
+          interfaces::zk_interface_loggedin_upstreaming(&config, userdata.id, body).await
+        }
+      }
+    }
+  }
+}
 
 // TODO: fns for mobile app default, web server default, I guess desktop too.
 pub fn defcon() -> Config {
@@ -758,6 +818,7 @@ pub async fn err_main() -> Result<(), Box<dyn Error>> {
       .service(web::resource("/public").route(web::post().to(public)))
       .service(web::resource("/private").route(web::post().to(private)))
       .service(web::resource("/stream").route(web::post().to(private_streaming)))
+      .service(web::resource("/upstream").route(web::post().to(private_upstreaming)))
       .service(web::resource("/user").route(web::post().to(user)))
       .service(web::resource("/admin").route(web::post().to(admin)))
       .service(web::resource(r"/file/{id}").route(web::get().to(file)))

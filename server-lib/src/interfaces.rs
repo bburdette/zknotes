@@ -3,13 +3,17 @@ use crate::search;
 use crate::sqldata;
 use crate::sync;
 use actix_session::Session;
-use actix_web::HttpResponse;
-use log::info;
+use actix_web::error::PayloadError;
+use actix_web::{web::Payload, HttpResponse};
+use futures_util::TryStreamExt;
+use log::{error, info};
 use orgauth;
 use orgauth::endpoints::{Callbacks, Tokener};
 use std::error::Error;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::io::AsyncBufReadExt;
+use tokio_util::io::StreamReader;
 use zkprotocol::constants::PrivateReplies;
 use zkprotocol::constants::PublicReplies;
 use zkprotocol::constants::{PrivateRequests, PrivateStreamingRequests, PublicRequests};
@@ -126,6 +130,29 @@ pub async fn zk_interface_loggedin_streaming(
       Ok(HttpResponse::Ok().streaming(bstream))
     } // wat => Err(format!("invalid 'what' code:'{}'", wat).into()),
   }
+}
+
+fn convert_err(err: PayloadError) -> std::io::Error {
+  error!("convert_err {:?}", err);
+  todo!()
+}
+
+pub async fn zk_interface_loggedin_upstreaming(
+  config: &Config,
+  uid: i64,
+  body: Payload,
+) -> Result<HttpResponse, Box<dyn Error>> {
+  // pull in line by line and println
+  let rstream = body.map_err(convert_err);
+
+  let mut br = StreamReader::new(rstream);
+
+  let mut line = String::new();
+  while br.read_line(&mut line).await? != 0 {
+    println!("upstreamline: {:?}", line);
+  }
+
+  Ok(HttpResponse::Ok().finish())
 }
 
 pub async fn zk_interface_loggedin(
@@ -349,10 +376,14 @@ pub async fn zk_interface_loggedin(
       })
     }
     PrivateRequests::SyncRemote => {
-      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+      // let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+      let conn = Arc::new(sqldata::connection_open(
+        config.orgauth_config.db.as_path(),
+      )?);
       let user = orgauth::dbfun::read_user_by_id(&conn, uid)?; // TODO pass this in from calling ftn?
 
-      sync::sync_from_remote(&conn, &user, &mut zknotes_callbacks()).await
+      // sync::sync_from_remote(&conn, &user, &mut zknotes_callbacks()).await
+      Ok(sync::sync_to_remote(conn, &user, &mut zknotes_callbacks()).await?)
     }
   }
 }
