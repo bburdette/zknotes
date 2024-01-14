@@ -1658,11 +1658,11 @@ pub fn read_archivezklinks_stream(
       acc_args.append(&mut av);
     }
 
-    println!("\n\n read_archivezklinks_stream \n {:?}", pstmt.expanded_sql());
-    println!("\n\n args \n {:?}", acc_args);
+    // println!("\n\n read_archivezklinks_stream \n {:?}", pstmt.expanded_sql());
+    // println!("\n\n args \n {:?}", acc_args);
 
     let rec_iter = pstmt.query_map(rusqlite::params_from_iter(acc_args.iter()), |row| {
-      println!("archive zklink row {:?}", row);
+      // println!("archive zklink row {:?}", row);
       let azl = ArchiveZkLink {
         userUuid: row.get(0)?,
         fromUuid: row.get(1)?,
@@ -1671,7 +1671,7 @@ pub fn read_archivezklinks_stream(
         createdate: row.get(4)?,
         deletedate: row.get(5)?,
       };
-      println!("archivezklink: {:?}", azl);
+      // println!("archivezklink: {:?}", azl);
       Ok(azl)
     })?;
 
@@ -1687,7 +1687,7 @@ pub fn read_archivezklinks_stream(
 
     for rec in rec_iter {
       if let Ok(r) = rec {
-        println!("sending archive link: {:?}", r);
+        println!("archive link: {:?}", r);
         let mut s = serde_json::to_value(r)?.to_string();
         s.push_str("\n");
         yield Bytes::from(s);
@@ -1703,10 +1703,10 @@ pub fn read_zklinks_since(
 ) -> Result<Vec<UuidZkLink>, zkerr::Error> {
   let (acc_sql, mut acc_args) = accessible_notes(&conn, uid)?;
 
-  println!("acc_sql {}", acc_sql);
-  println!("acc_args {:?}", acc_args);
+  // println!("acc_sql {}", acc_sql);
+  // println!("acc_args {:?}", acc_args);
 
-  println!("anotes");
+  // println!("anotes");
 
   let mut astmt = conn.prepare(acc_sql.as_str())?;
 
@@ -1748,7 +1748,7 @@ pub fn read_zklinks_since(
     acc_args.append(&mut av);
   }
 
-  println!("accarts {}", acc_args.len());
+  // println!("accarts {}", acc_args.len());
 
   let rec_iter = pstmt.query_map(rusqlite::params_from_iter(acc_args.iter()), |row| {
     println!("uuidzklink {:?}", row.get::<usize, String>(0)?);
@@ -1787,10 +1787,10 @@ pub fn read_zklinks_since_stream(
         and ZL.toid in accessible_notes
         {} ",
         acc_sql,
-        if after.is_none() {
-          ""
-        } else {
+        if after.is_some() {
           " and unlikely(ZL.syncdate > ? or ZL.createdate > ?)"
+        } else {
+          ""
         }
       )
       .as_str(),
@@ -1802,10 +1802,12 @@ pub fn read_zklinks_since_stream(
       acc_args.append(&mut av);
     }
 
-    println!("acc_sql {}", acc_sql);
+    println!("rzls sql {:?}", pstmt);
+
+    // println!("acc_sql {}", acc_sql);
     println!("acc_args {:?}", acc_args);
 
-    println!("read_zklinks_since_stream 2");
+    // println!("read_zklinks_since_stream 2");
 
     {
       // send the header.
@@ -1820,7 +1822,7 @@ pub fn read_zklinks_since_stream(
 
     println!("read_zklinks_since_stream - pstmt");
     let rec_iter = pstmt.query_map(rusqlite::params_from_iter(acc_args.iter()), |row| {
-      println!("uuidzklink {:?}", row.get::<usize, String>(0)?);
+      // println!("zklink uuid {:?}", row.get::<usize, String>(0)?);
       Ok(UuidZkLink {
         userUuid: row.get(0)?,
         fromUuid: row.get(1)?,
@@ -1832,8 +1834,8 @@ pub fn read_zklinks_since_stream(
 
     println!("read_zklinks_since_stream - for");
     for rec in rec_iter {
-      println!("rec {:?}", rec);
       if let Ok(r) = rec {
+        println!("zklink {:?}", r);
         let mut s = serde_json::to_value(r)?.to_string();
         s.push_str("\n");
         yield Bytes::from(s);

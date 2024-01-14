@@ -236,6 +236,8 @@ pub fn search_zknotes_stream(
     yield Bytes::from(header);
 
     while let Some(row) = rows.next()? {
+      let title = row.get::<usize, String>(2)?;
+      println!("zknote title {}", title);
       match search.resulttype {
         ResultType::RtId => {
           let mut s = serde_json::to_value(row.get::<usize, String>(1)?.as_str())?
@@ -291,7 +293,7 @@ pub fn sync_users(
   let lzkns = zkns.clone();
   try_stream! {
 
-    println!("read_zklinks_since_stream");
+    // println!("read_zklinks_since_stream");
     let (sql, args) = build_sql(&conn, uid, &lzkns)?;
 
     let mut pstmt = conn.prepare(
@@ -311,8 +313,8 @@ pub fn sync_users(
     //   args.append(&mut av);
     // }
 
-    println!("sync_users_sql {}", sql);
-    println!("sync_users_args {:?}", args);
+    // println!("sync_users_sql {}", sql);
+    // println!("sync_users_args {:?}", args);
 
     println!("read_zklinks_since_stream 2");
 
@@ -341,7 +343,7 @@ pub fn sync_users(
     })?;
 
     for rec in rec_iter {
-      println!("rec {:?}", rec);
+      println!("sync user {:?}", rec);
       if let Ok(r) = rec {
         let mut s = serde_json::to_value(r)?.to_string();
         s.push_str("\n");
@@ -579,8 +581,8 @@ pub fn build_sql(
   // add limit clause to the end.
   sqlbase.push_str(limclause.as_str());
 
-  println!("sqlbase: {}", sqlbase);
-  println!("sqlargs: {:?}", baseargs);
+  // println!("sqlbase: {}", sqlbase);
+  // println!("sqlargs: {:?}", baseargs);
 
   Ok((sqlbase, baseargs))
 }

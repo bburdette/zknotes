@@ -142,6 +142,7 @@ pub async fn zk_interface_loggedin_upstreaming(
   uid: i64,
   body: Payload,
 ) -> Result<HttpResponse, Box<dyn Error>> {
+  println!("zk_interface_loggedin_upstreaming");
   // pull in line by line and println
   let rstream = body.map_err(convert_err);
 

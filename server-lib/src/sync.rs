@@ -746,7 +746,9 @@ pub async fn sync_to_remote(
   parts.scheme = user_url.scheme().cloned();
   parts.authority = user_url.authority().cloned();
   parts.path_and_query = Some(awc::http::uri::PathAndQuery::from_static("/upstream"));
-  let url = awc::http::Uri::from_parts(parts).map_err(|x| zkerr::Error::String(x.to_string()))?;
+  let uri = awc::http::Uri::from_parts(parts).map_err(|x| zkerr::Error::String(x.to_string()))?;
+
+  println!("sync uri {:?}", uri);
 
   let client = awc::Client::new();
   let cookie = cookie::Cookie::parse_encoded(c)?;
@@ -755,7 +757,7 @@ pub async fn sync_to_remote(
   let ss = sync_stream(conn, user.id, after, callbacks);
   println!("sync to remote 4");
   let res = awc::Client::new()
-    .post(url)
+    .post(uri)
     .cookie(cookie)
     .timeout(Duration::from_secs(60 * 60))
     .send_body(awc::body::BodyStream::new(ss))
@@ -781,7 +783,7 @@ pub fn sync_stream(
   after: Option<i64>,
   callbacks: &mut Callbacks,
 ) -> impl Stream<Item = Result<Bytes, Box<dyn std::error::Error + 'static>>> {
-  let mut userhash = HashMap::<i64, i64>::new();
+  // let mut userhash = HashMap::<i64, i64>::new();
 
   // TODO: get recs with sync date newer than.
   // TODO: order by?
