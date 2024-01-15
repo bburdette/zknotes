@@ -197,7 +197,6 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: Option<i64>) -> Result<(), zke
     conn.execute_batch(zkm::udpate1().make::<Sqlite>().as_str())?;
     set_single_value(&conn, "migration_level", "1")?;
   }
-
   if nlevel < 2 {
     info!("udpate2");
     conn.execute_batch(zkm::udpate2().make::<Sqlite>().as_str())?;
@@ -1773,20 +1772,29 @@ pub fn read_zklinks_since_stream(
   try_stream! {
 
     println!("read_zklinks_since_stream");
-    let (acc_sql, mut acc_args) = accessible_notes(&conn, uid)?;
+    let (acc_sql, acc_args) = accessible_notes(&conn, uid)?;
 
-    let mut pstmt = conn.prepare(
-      format!("with accessible_notes as ({})
-        select OU.uuid, FN.uuid, TN.uuid, LN.uuid, ZL.createdate
-        from zklink ZL, zknote FN, zknote TN, zknote LN, orgauth_user OU
+    // make an accessible notes temp table.
+
+    let tabname = format!("accnotes_{}", uid);
+
+    conn.execute(format!("create temporary table if not exists {} (\"id\" integer primary key not null)", tabname).as_str(), params![])?;
+    // in case the temp table exists, clear it out  (TODO give it a unique name just for this sync process?)
+    conn.execute(format!("delete from {}", tabname).as_str(), params![])?;
+    conn.execute(format!("insert into {} {}", tabname, acc_sql).as_str(), rusqlite::params_from_iter(acc_args.iter()))?;
+
+
+    let pstmt1 = conn.prepare(
+      format!("select OU.uuid, FN.uuid, TN.uuid, LN.uuid, ZL.createdate
+        from zklink ZL, zknote FN, zknote TN, zknote LN, orgauth_user OU, {} FW, {} TW
         where FN.id = ZL.fromid
         and TN.id = ZL.toid
         and LN.id = ZL.toid
         and ZL.user = OU.id
-        and ZL.fromid in accessible_notes
-        and ZL.toid in accessible_notes
+        and ZL.fromid = FW.id
+        and ZL.toid = TW.id
         {} ",
-        acc_sql,
+        tabname, tabname,
         if after.is_some() {
           " and unlikely(ZL.syncdate > ? or ZL.createdate > ?)"
         } else {
@@ -1794,20 +1802,16 @@ pub fn read_zklinks_since_stream(
         }
       )
       .as_str(),
-    )?;
+    );
 
+    let mut pstmt = pstmt1?;
+
+    let mut lnargs = Vec::new();
     if let Some(a64) = after {
       let a = a64.to_string();
       let mut av = vec![a.clone(), a.clone()];
-      acc_args.append(&mut av);
+      lnargs.append(&mut av);
     }
-
-    println!("rzls sql {:?}", pstmt);
-
-    // println!("acc_sql {}", acc_sql);
-    println!("acc_args {:?}", acc_args);
-
-    // println!("read_zklinks_since_stream 2");
 
     {
       // send the header.
@@ -1820,8 +1824,8 @@ pub fn read_zklinks_since_stream(
       yield Bytes::from(s);
     }
 
-    println!("read_zklinks_since_stream - pstmt");
-    let rec_iter = pstmt.query_map(rusqlite::params_from_iter(acc_args.iter()), |row| {
+    let rec_iter = pstmt.query_map( rusqlite::params_from_iter(lnargs.iter()),
+      |row| {
       // println!("zklink uuid {:?}", row.get::<usize, String>(0)?);
       Ok(UuidZkLink {
         userUuid: row.get(0)?,
@@ -1832,7 +1836,8 @@ pub fn read_zklinks_since_stream(
       })
     })?;
 
-    println!("read_zklinks_since_stream - for");
+    conn.execute("drop table ?", params![tabname]);
+
     for rec in rec_iter {
       if let Ok(r) = rec {
         println!("zklink {:?}", r);
