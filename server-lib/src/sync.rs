@@ -785,8 +785,6 @@ pub fn sync_stream(
 ) -> impl Stream<Item = Result<Bytes, Box<dyn std::error::Error + 'static>>> {
   // let mut userhash = HashMap::<i64, i64>::new();
 
-  // TODO: get recs with sync date newer than.
-  // TODO: order by?
   let zns = ZkNoteSearch {
     tagsearch: TagSearch::SearchTerm {
       mods: Vec::new(),
@@ -807,6 +805,7 @@ pub fn sync_stream(
   };
 
   let sync_users = sync_users(conn.clone(), uid, after, &zns);
+  // TODO: sync_users derived from read_zklinks_since_stream ?
 
   let znstream = search_zknotes_stream(conn.clone(), uid, zns);
 
