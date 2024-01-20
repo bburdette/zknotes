@@ -221,9 +221,10 @@ pub struct ZkPhantomUser {
 
 #[derive(Deserialize, Serialize, Debug)]
 pub enum SyncMessage {
+  PhantomUserHeader,
   PhantomUser(ZkPhantomUser),
   ZkSearchResultHeader(ZkSearchResultHeader),
-  Uuid(Uuid),
+  ZkNoteId(String),
   ZkListNote(ZkListNote),
   ZkNote(ZkNote),
   ZkNoteAndLinks(ZkNoteAndLinks),
@@ -242,11 +243,6 @@ impl From<ZkPhantomUser> for SyncMessage {
 impl From<ZkSearchResultHeader> for SyncMessage {
   fn from(a: ZkSearchResultHeader) -> Self {
     SyncMessage::ZkSearchResultHeader(a)
-  }
-}
-impl From<Uuid> for SyncMessage {
-  fn from(a: Uuid) -> Self {
-    SyncMessage::Uuid(a)
   }
 }
 impl From<ZkListNote> for SyncMessage {

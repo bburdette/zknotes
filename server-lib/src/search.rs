@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use uuid::Uuid;
 use zkprotocol::constants::PrivateReplies;
-use zkprotocol::content::ZkListNote;
+use zkprotocol::content::{SyncMessage, ZkListNote, ZkPhantomUser};
 use zkprotocol::messages::PrivateReplyMessage;
 use zkprotocol::search::{
   AndOr, OrderDirection, OrderField, ResultType, SearchMod, TagSearch, ZkIdSearchResult,
@@ -202,7 +202,6 @@ pub fn search_zknotes_stream(
   user: i64,
   search: ZkNoteSearch,
 ) -> impl Stream<Item = Result<Bytes, Box<dyn std::error::Error + 'static>>> {
-  // ) -> impl futures_util::Stream<Item = Result<Bytes, Box<dyn std::error::Error>>> {
   // uncomment for formatting, lsp
   // {
   try_stream! {
@@ -213,22 +212,14 @@ pub fn search_zknotes_stream(
       user
     };
     let (sql, args) = build_sql(&conn, user, &search)?;
+
     let mut stmt = conn.prepare(sql.as_str())?;
-
     let mut rows = stmt.query(rusqlite::params_from_iter(args.iter()))?;
-
-    let mut header = serde_json::to_value(PrivateReplyMessage {
-      what: match search.resulttype {
-        ResultType::RtId => PrivateReplies::ZkNoteIdSearchResult,
-        ResultType::RtListNote => PrivateReplies::ZkListNoteSearchResult,
-        ResultType::RtNote => PrivateReplies::ZkNoteSearchResult,
-        ResultType::RtNoteAndLinks => PrivateReplies::ZkNoteAndLinksSearchResult,
-      },
-      content: serde_json::to_value(ZkSearchResultHeader {
-        what: search.what,
-        offset: search.offset,
-      })?,
-    })?
+    let mut header = serde_json::to_value(SyncMessage::from(ZkSearchResultHeader {
+      what: search.what,
+      resultType: search.resulttype,
+      offset: search.offset,
+    }))?
     .to_string();
 
     header.push_str("\n");
@@ -240,7 +231,7 @@ pub fn search_zknotes_stream(
       println!("zknote title {}", title);
       match search.resulttype {
         ResultType::RtId => {
-          let mut s = serde_json::to_value(row.get::<usize, String>(1)?.as_str())?
+          let mut s = serde_json::to_value(SyncMessage::ZkNoteId(row.get::<usize, String>(1)?))?
             .to_string()
             .to_string();
           s.push_str("\n");
@@ -260,13 +251,17 @@ pub fn search_zknotes_stream(
             sysids: Vec::new(),
           };
 
-          let mut s = serde_json::to_value(zln)?.to_string().to_string();
+          let mut s = serde_json::to_value(SyncMessage::from(zln))?
+            .to_string()
+            .to_string();
           s.push_str("\n");
           yield Bytes::from(s);
         }
         ResultType::RtNote => {
           let zn = sqldata::read_zknote_i64(&conn, Some(s_user), row.get(0)?)?;
-          let mut s = serde_json::to_value(zn)?.to_string().to_string();
+          let mut s = serde_json::to_value(SyncMessage::from(zn))?
+            .to_string()
+            .to_string();
           s.push_str("\n");
           yield Bytes::from(s);
         }
@@ -274,7 +269,9 @@ pub fn search_zknotes_stream(
           // TODO: i64 version
           let uuid = Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?;
           let zn = sqldata::read_zknoteandlinks(&conn, Some(s_user), &uuid)?;
-          let mut s = serde_json::to_value(zn)?.to_string().to_string();
+          let mut s = serde_json::to_value(SyncMessage::from(zn))?
+            .to_string()
+            .to_string();
           s.push_str("\n");
           yield Bytes::from(s);
         }
@@ -289,8 +286,8 @@ pub fn sync_users(
   after: Option<i64>,
   zkns: &ZkNoteSearch,
 ) -> impl futures_util::Stream<Item = Result<Bytes, Box<dyn std::error::Error>>> {
-  // {
   let lzkns = zkns.clone();
+  // {
   try_stream! {
 
     // println!("read_zklinks_since_stream");
@@ -307,40 +304,31 @@ pub fn sync_users(
       .as_str(),
     )?;
 
-    // if let Some(a64) = after {
-    //   let a = a64.to_string();
-    //   let mut av = vec![a.clone(), a.clone()];
-    //   args.append(&mut av);
-    // }
-
-    // println!("sync_users_sql {}", sql);
-    // println!("sync_users_args {:?}", args);
-
     println!("read_zklinks_since_stream 2");
 
     {
-      // send the header.
-      let mut s = serde_json::to_value(PrivateReplyMessage {
-        what: PrivateReplies::ZkLinks,
-        content: serde_json::Value::Null,
-      })?
-      .to_string();
+      let mut s = serde_json::to_value(SyncMessage::PhantomUserHeader)?.to_string();
       s.push_str("\n");
       yield Bytes::from(s);
     }
 
-    let rec_iter = pstmt.query_map(rusqlite::params_from_iter(args.iter()), |row| {
-      match Uuid::parse_str(row.get::<usize,String>(1)?.as_str()) {
-        Ok(uuid) =>
-      Ok(PhantomUser {
-        id: row.get(0)?,
-        uuid: uuid,
-        name: row.get(2)?,
-        active: row.get(3)?,
-      }),
-        Err(e) => Err(rusqlite::Error::InvalidColumnType(0, "uuid".to_string() , rusqlite::types::Type::Text )),
-        }
-    })?;
+    let rec_iter =
+      pstmt.query_map(
+        rusqlite::params_from_iter(args.iter()),
+        |row| match Uuid::parse_str(row.get::<usize, String>(1)?.as_str()) {
+          Ok(uuid) => Ok(SyncMessage::from(ZkPhantomUser {
+            id: row.get(0)?,
+            uuid: uuid,
+            name: row.get(2)?,
+            active: row.get(3)?,
+          })),
+          Err(e) => Err(rusqlite::Error::InvalidColumnType(
+            0,
+            "uuid".to_string(),
+            rusqlite::types::Type::Text,
+          )),
+        },
+      )?;
 
     for rec in rec_iter {
       println!("sync user {:?}", rec);

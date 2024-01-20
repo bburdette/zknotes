@@ -100,6 +100,7 @@ pub struct ZkNoteSearchResult {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ZkSearchResultHeader {
   pub what: String,
+  pub resultType: ResultType,
   pub offset: i64,
 }
 

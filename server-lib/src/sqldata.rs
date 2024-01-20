@@ -22,8 +22,8 @@ use zkprotocol::constants::PrivateReplies;
 use zkprotocol::constants::SpecialUuids;
 use zkprotocol::content::{
   ArchiveZkLink, Direction, EditLink, ExtraLoginData, GetArchiveZkNote, GetZkNoteArchives,
-  GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkLink, SaveZkNote, SavedZkNote, Sysids,
-  UuidZkLink, ZkLink, ZkListNote, ZkNote, ZkNoteAndLinks, ZkNoteId,
+  GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkLink, SaveZkNote, SavedZkNote,
+  SyncMessage, Sysids, UuidZkLink, ZkLink, ZkListNote, ZkNote, ZkNoteAndLinks, ZkNoteId,
 };
 use zkprotocol::messages::PrivateReplyMessage;
 
@@ -1675,11 +1675,7 @@ pub fn read_archivezklinks_stream(
     })?;
 
     {
-      let mut s = serde_json::to_value(PrivateReplyMessage {
-        what: PrivateReplies::ArchiveZkLinks, // "archivezklinks".to_string(),
-        content: serde_json::Value::Null,
-      })?
-      .to_string();
+      let mut s = serde_json::to_value(SyncMessage::ArchiveZkLinkHeader)?.to_string();
       s.push_str("\n");
       yield Bytes::from(s);
     }
@@ -1687,7 +1683,7 @@ pub fn read_archivezklinks_stream(
     for rec in rec_iter {
       if let Ok(r) = rec {
         println!("archive link: {:?}", r);
-        let mut s = serde_json::to_value(r)?.to_string();
+        let mut s = serde_json::to_value(SyncMessage::from(r))?.to_string();
         s.push_str("\n");
         yield Bytes::from(s);
       }
@@ -1778,14 +1774,24 @@ pub fn read_zklinks_since_stream(
 
     let tabname = format!("accnotes_{}", uid);
 
-    conn.execute(format!("create temporary table if not exists {} (\"id\" integer primary key not null)", tabname).as_str(), params![])?;
+    conn.execute(
+      format!(
+        "create temporary table if not exists {} (\"id\" integer primary key not null)",
+        tabname
+      )
+      .as_str(),
+      params![],
+    )?;
     // in case the temp table exists, clear it out  (TODO give it a unique name just for this sync process?)
     conn.execute(format!("delete from {}", tabname).as_str(), params![])?;
-    conn.execute(format!("insert into {} {}", tabname, acc_sql).as_str(), rusqlite::params_from_iter(acc_args.iter()))?;
-
+    conn.execute(
+      format!("insert into {} {}", tabname, acc_sql).as_str(),
+      rusqlite::params_from_iter(acc_args.iter()),
+    )?;
 
     let pstmt1 = conn.prepare(
-      format!("select OU.uuid, FN.uuid, TN.uuid, LN.uuid, ZL.createdate
+      format!(
+        "select OU.uuid, FN.uuid, TN.uuid, LN.uuid, ZL.createdate
         from zklink ZL, zknote FN, zknote TN, zknote LN, orgauth_user OU, {} FW, {} TW
         where FN.id = ZL.fromid
         and TN.id = ZL.toid
@@ -1794,7 +1800,8 @@ pub fn read_zklinks_since_stream(
         and ZL.fromid = FW.id
         and ZL.toid = TW.id
         {} ",
-        tabname, tabname,
+        tabname,
+        tabname,
         if after.is_some() {
           " and unlikely(ZL.syncdate > ? or ZL.createdate > ?)"
         } else {
@@ -1814,29 +1821,23 @@ pub fn read_zklinks_since_stream(
     }
 
     {
-      // send the header.
-      let mut s = serde_json::to_value(PrivateReplyMessage {
-        what: PrivateReplies::ZkLinks,
-        content: serde_json::Value::Null,
-      })?
-      .to_string();
+      let mut s = serde_json::to_value(SyncMessage::UuidZkLinkHeader)?.to_string();
       s.push_str("\n");
       yield Bytes::from(s);
     }
 
-    let rec_iter = pstmt.query_map( rusqlite::params_from_iter(lnargs.iter()),
-      |row| {
+    let rec_iter = pstmt.query_map(rusqlite::params_from_iter(lnargs.iter()), |row| {
       // println!("zklink uuid {:?}", row.get::<usize, String>(0)?);
-      Ok(UuidZkLink {
+      Ok(SyncMessage::from(UuidZkLink {
         userUuid: row.get(0)?,
         fromUuid: row.get(1)?,
         toUuid: row.get(2)?,
         linkUuid: row.get(3)?,
         createdate: row.get(4)?,
-      })
+      }))
     })?;
 
-    conn.execute("drop table ?", params![tabname]);
+    conn.execute("drop table ?", params![tabname])?;
 
     for rec in rec_iter {
       if let Ok(r) = rec {
