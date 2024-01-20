@@ -5,6 +5,7 @@ use crate::sync;
 use actix_session::Session;
 use actix_web::error::PayloadError;
 use actix_web::{web::Payload, HttpResponse};
+use futures_util::StreamExt;
 use futures_util::TryStreamExt;
 use log::{error, info};
 use orgauth;
@@ -108,7 +109,7 @@ pub async fn zk_interface_loggedin_streaming(
       let conn = Arc::new(sqldata::connection_open(
         config.orgauth_config.db.as_path(),
       )?);
-      let znsstream = search::search_zknotes_stream(conn, uid, search);
+      let znsstream = search::search_zknotes_stream(conn, uid, search).map(sync::bytesify);
       Ok(HttpResponse::Ok().streaming(znsstream))
     }
     PrivateStreamingRequests::GetArchiveZkLinks => {
@@ -117,7 +118,8 @@ pub async fn zk_interface_loggedin_streaming(
       let conn = Arc::new(sqldata::connection_open(
         config.orgauth_config.db.as_path(),
       )?);
-      let bstream = sqldata::read_archivezklinks_stream(conn, uid, rq.createddate_after);
+      let bstream =
+        sqldata::read_archivezklinks_stream(conn, uid, rq.createddate_after).map(sync::bytesify);
       Ok(HttpResponse::Ok().streaming(bstream))
     }
     PrivateStreamingRequests::GetZkLinksSince => {
@@ -126,7 +128,8 @@ pub async fn zk_interface_loggedin_streaming(
       let conn = Arc::new(sqldata::connection_open(
         config.orgauth_config.db.as_path(),
       )?);
-      let bstream = sqldata::read_zklinks_since_stream(conn, uid, rq.createddate_after);
+      let bstream =
+        sqldata::read_zklinks_since_stream(conn, uid, rq.createddate_after).map(sync::bytesify);
       Ok(HttpResponse::Ok().streaming(bstream))
     } // wat => Err(format!("invalid 'what' code:'{}'", wat).into()),
   }

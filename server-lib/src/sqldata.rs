@@ -1624,7 +1624,7 @@ pub fn read_archivezklinks_stream(
   conn: Arc<Connection>,
   uid: i64,
   after: Option<i64>,
-) -> impl futures_util::Stream<Item = Result<Bytes, Box<dyn std::error::Error>>> {
+) -> impl futures_util::Stream<Item = Result<SyncMessage, Box<dyn std::error::Error>>> {
   // {
   try_stream! {
     let (acc_sql, mut acc_args) = accessible_notes(&conn, uid)?;
@@ -1674,18 +1674,12 @@ pub fn read_archivezklinks_stream(
       Ok(azl)
     })?;
 
-    {
-      let mut s = serde_json::to_value(SyncMessage::ArchiveZkLinkHeader)?.to_string();
-      s.push_str("\n");
-      yield Bytes::from(s);
-    }
+    yield SyncMessage::ArchiveZkLinkHeader;
 
     for rec in rec_iter {
       if let Ok(r) = rec {
         println!("archive link: {:?}", r);
-        let mut s = serde_json::to_value(SyncMessage::from(r))?.to_string();
-        s.push_str("\n");
-        yield Bytes::from(s);
+        yield SyncMessage::from(r);
       }
     }
   }
@@ -1763,7 +1757,7 @@ pub fn read_zklinks_since_stream(
   conn: Arc<Connection>,
   uid: i64,
   after: Option<i64>,
-) -> impl futures_util::Stream<Item = Result<Bytes, Box<dyn std::error::Error>>> {
+) -> impl futures_util::Stream<Item = Result<SyncMessage, Box<dyn std::error::Error>>> {
   // {
   try_stream! {
 
@@ -1820,11 +1814,7 @@ pub fn read_zklinks_since_stream(
       lnargs.append(&mut av);
     }
 
-    {
-      let mut s = serde_json::to_value(SyncMessage::UuidZkLinkHeader)?.to_string();
-      s.push_str("\n");
-      yield Bytes::from(s);
-    }
+    yield SyncMessage::UuidZkLinkHeader;
 
     let rec_iter = pstmt.query_map(rusqlite::params_from_iter(lnargs.iter()), |row| {
       // println!("zklink uuid {:?}", row.get::<usize, String>(0)?);
@@ -1842,9 +1832,7 @@ pub fn read_zklinks_since_stream(
     for rec in rec_iter {
       if let Ok(r) = rec {
         println!("zklink {:?}", r);
-        let mut s = serde_json::to_value(r)?.to_string();
-        s.push_str("\n");
-        yield Bytes::from(s);
+        yield r;
       }
     }
     println!("read_zklinks_since_stream - end");

@@ -36,7 +36,8 @@ use zkprotocol::constants::{
   PrivateReplies, PrivateRequests, PrivateStreamingRequests, SpecialUuids,
 };
 use zkprotocol::content::{
-  ArchiveZkLink, GetArchiveZkLinks, GetZkLinksSince, SaveZkNote, UuidZkLink, ZkNote, ZkNoteId,
+  ArchiveZkLink, GetArchiveZkLinks, GetZkLinksSince, SaveZkNote, SyncMessage, UuidZkLink, ZkNote,
+  ZkNoteId,
 };
 use zkprotocol::messages::{PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage};
 use zkprotocol::search::{
@@ -776,6 +777,22 @@ pub fn empty_stream() -> impl Stream<Item = Result<Bytes, Box<dyn std::error::Er
   }
 }
 
+pub fn bytesify(
+  x: Result<SyncMessage, Box<dyn std::error::Error>>,
+) -> Result<Bytes, Box<dyn std::error::Error>> {
+  x.and_then(|x| {
+    serde_json::to_value(x)
+      .map(|x| {
+        Bytes::from({
+          let mut z = x.to_string();
+          z.push_str("\n");
+          z
+        })
+      })
+      .map_err(|e| e.into())
+  })
+}
+
 // Make a stream of all the records needed to sync the remote.
 pub fn sync_stream(
   conn: Arc<Connection>,
@@ -804,10 +821,11 @@ pub fn sync_stream(
     ordering: None,
   };
 
-  let sync_users = sync_users(conn.clone(), uid, after, &zns);
+  let sync_users = sync_users(conn.clone(), uid, after, &zns).map(bytesify);
+
   // TODO: sync_users derived from read_zklinks_since_stream ?
 
-  let znstream = search_zknotes_stream(conn.clone(), uid, zns);
+  let znstream = search_zknotes_stream(conn.clone(), uid, zns).map(bytesify);
 
   let ans = ZkNoteSearch {
     tagsearch: TagSearch::SearchTerm {
@@ -827,10 +845,10 @@ pub fn sync_stream(
     synced_before: None,
     ordering: None,
   };
-  let anstream = search_zknotes_stream(conn.clone(), uid, ans);
+  let anstream = search_zknotes_stream(conn.clone(), uid, ans).map(bytesify);
 
-  let als = sqldata::read_archivezklinks_stream(conn.clone(), uid, after);
-  let ls = sqldata::read_zklinks_since_stream(conn, uid, after);
+  let als = sqldata::read_archivezklinks_stream(conn.clone(), uid, after).map(bytesify);
+  let ls = sqldata::read_zklinks_since_stream(conn, uid, after).map(bytesify);
 
   sync_users
     .chain(znstream)
