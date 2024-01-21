@@ -1836,7 +1836,7 @@ pub fn read_zklinks_since_stream(
       }))
     })?;
 
-    conn.execute("drop table ?", params![tabname])?;
+    conn.execute(format!("drop table {}", tabname).as_str(), params![])?;
 
     for rec in rec_iter {
       if let Ok(r) = rec {

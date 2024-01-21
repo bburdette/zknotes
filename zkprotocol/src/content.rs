@@ -221,6 +221,7 @@ pub struct ZkPhantomUser {
 
 #[derive(Deserialize, Serialize, Debug)]
 pub enum SyncMessage {
+  Token(Uuid),
   PhantomUserHeader,
   PhantomUser(ZkPhantomUser),
   ZkSearchResultHeader(ZkSearchResultHeader),

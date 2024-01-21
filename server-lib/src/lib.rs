@@ -496,6 +496,7 @@ async fn zk_interface_check_streaming(
     }
   }
 }
+
 async fn private_upstreaming(
   session: Session,
   data: web::Data<Config>,
@@ -557,7 +558,6 @@ async fn zk_interface_check_upstreaming(
                 .await?,
             ),
           )
-          // interfaces::zk_interface_loggedin_upstreaming(&config, userdata.id, body).await
         }
       }
     }

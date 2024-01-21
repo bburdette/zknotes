@@ -722,6 +722,7 @@ pub async fn sync_from_stream(
   callbacks: &mut Callbacks,
   body: actix_web::web::Payload,
 ) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>> {
+  println!("sync_from_stream 1");
   // pull in line by line and println
   let rstream = body.map_err(convert_bodyerr);
 
@@ -732,25 +733,32 @@ pub async fn sync_from_stream(
   let sysid = user_id(&conn, "system")?;
 
   let mut line = String::new();
+  line.clear();
   let nc = br.read_line(&mut line).await?;
 
   if nc == 0 {
     return Err("empty stream!".into());
   }
 
-  let mut sm: SyncMessage = serde_json::from_str(line.as_str())?;
+  println!("sync_from_stream 2");
+  println!("line: '{}'", line.trim());
+  let mut sm: SyncMessage = serde_json::from_str(line.trim())?;
+  println!("sync_from_stream 3");
 
   match sm {
     SyncMessage::PhantomUserHeader => (),
     _ => return Err(format!("unexpected syncmessage: {:?}", sm).into()),
   }
 
+  line.clear();
   if br.read_line(&mut line).await? == 0 {
     return Err("empty stream!".into());
   }
-  sm = serde_json::from_str(line.as_str())?;
+  println!("sync_from_stream 4 '{}'", line.trim());
+  sm = serde_json::from_str(line.trim())?;
   let mut userhash = HashMap::<i64, i64>::new();
 
+  println!("sync_from_stream 5");
   while let SyncMessage::PhantomUser(ref pu) = sm {
     match userhash.get(&pu.id) {
       Some(u) => (),
@@ -778,10 +786,12 @@ pub async fn sync_from_stream(
         };
       }
     };
+    line.clear();
     if br.read_line(&mut line).await? == 0 {
       return Err("empty stream!".into());
     }
-    sm = serde_json::from_str(line.as_str())?;
+    sm = serde_json::from_str(line.trim())?;
+    println!("sync_from_stream 6");
   }
 
   // First should be the current notes.
@@ -796,10 +806,11 @@ pub async fn sync_from_stream(
     );
   }
 
+  line.clear();
   if br.read_line(&mut line).await? == 0 {
     return Err("empty stream!".into());
   }
-  sm = serde_json::from_str(line.as_str())?;
+  sm = serde_json::from_str(line.trim())?;
 
   while let SyncMessage::ZkNote(ref note) = sm {
     let uid = userhash
@@ -853,10 +864,11 @@ pub async fn sync_from_stream(
           }
         Err(e) => Err(e),
       }?;
+    line.clear();
     if br.read_line(&mut line).await? == 0 {
       return Err("empty stream!".into());
     }
-    sm = serde_json::from_str(line.as_str())?;
+    sm = serde_json::from_str(line.trim())?;
   }
 
   // After the current notes are the archivenotes.
@@ -871,10 +883,11 @@ pub async fn sync_from_stream(
     );
   }
 
+  line.clear();
   if br.read_line(&mut line).await? == 0 {
     return Err("empty stream!".into());
   }
-  sm = serde_json::from_str(line.as_str())?;
+  sm = serde_json::from_str(line.trim())?;
 
   while let SyncMessage::ZkNote(ref note) = sm {
     let uid = userhash
@@ -906,10 +919,11 @@ pub async fn sync_from_stream(
             }
           Err(e) => return Err(e)?,
         }
+    line.clear();
     if br.read_line(&mut line).await? == 0 {
       return Err("empty stream!".into());
     }
-    sm = serde_json::from_str(line.as_str())?;
+    sm = serde_json::from_str(line.trim())?;
   }
 
   if let SyncMessage::ArchiveZkLinkHeader = sm {
@@ -923,10 +937,11 @@ pub async fn sync_from_stream(
     );
   }
 
+  line.clear();
   if br.read_line(&mut line).await? == 0 {
     return Err("empty stream!".into());
   }
-  sm = serde_json::from_str(line.as_str())?;
+  sm = serde_json::from_str(line.trim())?;
 
   let mut count = 0;
   let mut saved = 0;
@@ -965,10 +980,11 @@ pub async fn sync_from_stream(
     saved = saved + ins;
     bytes = bytes + nc;
     println!("archived link count:, {}", count);
+    line.clear();
     if br.read_line(&mut line).await? == 0 {
       return Err("empty stream!".into());
     }
-    sm = serde_json::from_str(line.as_str())?;
+    sm = serde_json::from_str(line.trim())?;
   }
 
   if let SyncMessage::UuidZkLinkHeader = sm {
@@ -985,10 +1001,11 @@ pub async fn sync_from_stream(
   saved = 0;
   bytes = 0;
 
+  line.clear();
   if br.read_line(&mut line).await? == 0 {
     return Err("empty stream!".into());
   }
-  sm = serde_json::from_str(line.as_str())?;
+  sm = serde_json::from_str(line.trim())?;
 
   while let SyncMessage::UuidZkLink(ref l) = sm {
     println!("saving link!, {:?}", l);
@@ -1041,10 +1058,11 @@ pub async fn sync_from_stream(
     count = count + 1;
     saved = saved + ins;
     bytes = bytes + nc;
+    line.clear();
     if br.read_line(&mut line).await? == 0 {
       return Err("empty stream!".into());
     }
-    sm = serde_json::from_str(line.as_str())?;
+    sm = serde_json::from_str(line.trim())?;
   }
   println!(
     "receieved links: {}, saved {}, bytes {}",
@@ -1129,8 +1147,15 @@ pub fn bytesify(
       .map(|x| {
         Bytes::from({
           let mut z = x.to_string();
+          // println!("x.to_string(): '{}'", z);
+
+          let sm: Result<SyncMessage, serde_json::Error> = serde_json::from_str(z.as_str());
+
+          // println!("sm res {:?}", sm);
+
           z.push_str("\n");
           z
+          // x.to_string()
         })
       })
       .map_err(|e| e.into())
