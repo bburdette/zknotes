@@ -28,7 +28,6 @@ use zkprotocol::messages::{
   PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage, PublicMessage,
 };
 use zkprotocol::search::{TagSearch, ZkListNoteSearchResult, ZkNoteSearch};
-
 pub fn login_data_for_token(
   session: Session,
   config: &Config,
@@ -36,11 +35,7 @@ pub fn login_data_for_token(
   let mut conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
   conn.busy_timeout(Duration::from_millis(500))?;
 
-  let mut cb = Callbacks {
-    on_new_user: Box::new(sqldata::on_new_user),
-    extra_login_data: Box::new(sqldata::extra_login_data_callback),
-    on_delete_user: Box::new(sqldata::on_delete_user),
-  };
+  let mut cb = sqldata::zknotes_callbacks();
   let ldopt = match session.get("token")? {
     None => None,
     Some(token) => {
@@ -72,14 +67,6 @@ pub fn login_data_for_token(
   Ok(ldopt)
 }
 
-pub fn zknotes_callbacks() -> Callbacks {
-  Callbacks {
-    on_new_user: Box::new(sqldata::on_new_user),
-    extra_login_data: Box::new(sqldata::extra_login_data_callback),
-    on_delete_user: Box::new(sqldata::on_delete_user),
-  }
-}
-
 // Just like orgauth::endpoints::user_interface, except adds in extra user data.
 pub async fn user_interface(
   tokener: &mut dyn Tokener,
@@ -90,7 +77,7 @@ pub async fn user_interface(
     orgauth::endpoints::user_interface(
       tokener,
       &config.orgauth_config,
-      &mut zknotes_callbacks(),
+      &mut sqldata::zknotes_callbacks(),
       msg,
     )
     .await?,
@@ -140,24 +127,28 @@ fn convert_err(err: PayloadError) -> std::io::Error {
   todo!()
 }
 
-pub async fn zk_interface_loggedin_upstreaming(
-  config: &Config,
-  uid: i64,
-  body: Payload,
-) -> Result<HttpResponse, Box<dyn Error>> {
-  println!("zk_interface_loggedin_upstreaming");
-  // pull in line by line and println
-  let rstream = body.map_err(convert_err);
+// pub async fn zk_interface_loggedin_upstreaming(
+//   config: &Config,
+//   uid: i64,
+//   body: Payload,
+// ) -> Result<HttpResponse, Box<dyn Error>> {
+//   let conn = Arc::new(sqldata::connection_open(
+//     config.orgauth_config.db.as_path(),
+//   )?);
 
-  let mut br = StreamReader::new(rstream);
+//   println!("zk_interface_loggedin_upstreaming");
+//   // pull in line by line and println
+//   let rstream = body.map_err(convert_err);
 
-  let mut line = String::new();
-  while br.read_line(&mut line).await? != 0 {
-    println!("upstreamline: {:?}", line);
-  }
+//   let mut br = StreamReader::new(rstream);
 
-  Ok(HttpResponse::Ok().finish())
-}
+//   let mut line = String::new();
+//   while br.read_line(&mut line).await? != 0 {
+//     println!("upstreamline: {:?}", line);
+//   }
+
+//   Ok(HttpResponse::Ok().finish())
+// }
 
 pub async fn zk_interface_loggedin(
   config: &Config,
@@ -387,7 +378,7 @@ pub async fn zk_interface_loggedin(
       let user = orgauth::dbfun::read_user_by_id(&conn, uid)?; // TODO pass this in from calling ftn?
 
       // sync::sync_from_remote(&conn, &user, &mut zknotes_callbacks()).await
-      Ok(sync::sync_to_remote(conn, &user, &mut zknotes_callbacks()).await?)
+      Ok(sync::sync_to_remote(conn, &user, &mut sqldata::zknotes_callbacks()).await?)
     }
   }
 }

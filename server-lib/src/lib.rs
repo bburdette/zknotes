@@ -199,11 +199,7 @@ async fn admin(
     &item.data,
     req.connection_info()
   );
-  let mut cb = Callbacks {
-    on_new_user: Box::new(sqldata::on_new_user),
-    extra_login_data: Box::new(sqldata::extra_login_data_callback),
-    on_delete_user: Box::new(sqldata::on_delete_user),
-  };
+  let mut cb = sqldata::zknotes_callbacks();
   match orgauth::endpoints::admin_interface_check(
     &mut ActixTokener { session: &session },
     &data.orgauth_config,
@@ -555,7 +551,13 @@ async fn zk_interface_check_upstreaming(
         }
         Ok(userdata) => {
           // finally!  processing messages as logged in user.
-          interfaces::zk_interface_loggedin_upstreaming(&config, userdata.id, body).await
+          Ok(
+            HttpResponse::Ok().json(
+              sync::sync_from_stream(&conn, &userdata, &mut sqldata::zknotes_callbacks(), body)
+                .await?,
+            ),
+          )
+          // interfaces::zk_interface_loggedin_upstreaming(&config, userdata.id, body).await
         }
       }
     }
@@ -729,11 +731,7 @@ pub async fn err_main() -> Result<(), Box<dyn Error>> {
     println!("Enter password for admin user '{}':", username);
     let mut pwd = String::new();
     stdin().read_line(&mut pwd)?;
-    let mut cb = Callbacks {
-      on_new_user: Box::new(sqldata::on_new_user),
-      extra_login_data: Box::new(sqldata::extra_login_data_callback),
-      on_delete_user: Box::new(sqldata::on_delete_user),
-    };
+    let mut cb = sqldata::zknotes_callbacks();
 
     let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
     // make new registration i

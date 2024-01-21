@@ -8,6 +8,7 @@ use futures::Stream;
 use log::info;
 use orgauth::data::RegistrationData;
 use orgauth::dbfun::user_id;
+use orgauth::endpoints::Callbacks;
 use orgauth::util::now;
 use rusqlite::Row;
 use rusqlite::{params, Connection};
@@ -26,6 +27,14 @@ use zkprotocol::content::{
   SyncMessage, Sysids, UuidZkLink, ZkLink, ZkListNote, ZkNote, ZkNoteAndLinks, ZkNoteId,
 };
 use zkprotocol::messages::PrivateReplyMessage;
+
+pub fn zknotes_callbacks() -> Callbacks {
+  Callbacks {
+    on_new_user: Box::new(on_new_user),
+    extra_login_data: Box::new(extra_login_data_callback),
+    on_delete_user: Box::new(on_delete_user),
+  }
+}
 
 pub fn on_new_user(
   conn: &Connection,
