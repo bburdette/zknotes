@@ -6,6 +6,7 @@ mod search;
 pub mod sqldata;
 mod sqltest;
 mod sync;
+
 use crate::sqldata::get_sysids;
 use actix_cors::Cors;
 use actix_files::NamedFile;
@@ -397,7 +398,6 @@ async fn private(
         what: PrivateReplies::ServerError,
         content: serde_json::Value::String(e.to_string()),
       };
-      // HttpResponse::Ok().json(se)
       HttpResponse::Ok().json(se)
     }
   }
@@ -409,6 +409,7 @@ async fn private_streaming(
   item: web::Json<PrivateStreamingMessage>,
   _req: HttpRequest,
 ) -> HttpResponse {
+  println!("priavte_streaming item: {:?}", item);
   match zk_interface_check_streaming(&session, &data, item.into_inner()).await {
     Ok(hr) => hr,
     Err(e) => {
@@ -417,7 +418,6 @@ async fn private_streaming(
         what: PrivateReplies::ServerError,
         content: serde_json::Value::String(e.to_string()),
       };
-      // HttpResponse::Ok().json(se)
       HttpResponse::Ok().json(se)
     }
   }

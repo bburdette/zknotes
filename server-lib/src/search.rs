@@ -13,6 +13,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use uuid::Uuid;
 use zkprotocol::constants::PrivateReplies;
+use zkprotocol::constants::SpecialUuids;
 use zkprotocol::content::{SyncMessage, ZkListNote, ZkPhantomUser};
 use zkprotocol::messages::PrivateReplyMessage;
 use zkprotocol::search::{
@@ -318,6 +319,23 @@ pub fn sync_users(
         yield r;
       }
     }
+  }
+}
+
+pub fn system_user(
+  conn: Arc<Connection>,
+) -> impl futures_util::Stream<Item = Result<SyncMessage, Box<dyn std::error::Error>>> {
+  try_stream! {
+
+  let sysid = user_id(&conn, "system")?;
+
+          yield SyncMessage::from(ZkPhantomUser {
+            id: sysid,
+            uuid: Uuid::parse_str(&SpecialUuids::System.str())?,
+            name: "system".to_string(),
+            active: true,
+          });
+
   }
 }
 
