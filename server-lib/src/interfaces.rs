@@ -1,6 +1,7 @@
 use crate::config::Config;
 use crate::search;
 use crate::sqldata;
+use crate::sqldata::zknotes_callbacks;
 use crate::sync;
 use actix_session::Session;
 use actix_web::error::PayloadError;
@@ -20,8 +21,8 @@ use zkprotocol::constants::PublicReplies;
 use zkprotocol::constants::{PrivateRequests, PrivateStreamingRequests, PublicRequests};
 use zkprotocol::content::{
   GetArchiveZkLinks, GetArchiveZkNote, GetZkLinksSince, GetZkNoteAndLinks, GetZkNoteArchives,
-  GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkNote, SaveZkNoteAndLinks, ZkLinks,
-  ZkNoteAndLinks, ZkNoteAndLinksWhat, ZkNoteArchives, ZkNoteId,
+  GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkNote, SaveZkNoteAndLinks, SyncSince,
+  ZkLinks, ZkNoteAndLinks, ZkNoteAndLinksWhat, ZkNoteArchives, ZkNoteId,
 };
 use zkprotocol::messages::PublicReplyMessage;
 use zkprotocol::messages::{
@@ -89,9 +90,9 @@ pub async fn zk_interface_loggedin_streaming(
   uid: i64,
   msg: &PrivateStreamingMessage,
 ) -> Result<HttpResponse, Box<dyn Error>> {
+  let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
   match msg.what {
     PrivateStreamingRequests::SearchZkNotes => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let search: ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
       let conn = Arc::new(sqldata::connection_open(
         config.orgauth_config.db.as_path(),
@@ -100,7 +101,6 @@ pub async fn zk_interface_loggedin_streaming(
       Ok(HttpResponse::Ok().streaming(znsstream))
     }
     PrivateStreamingRequests::GetArchiveZkLinks => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let rq: GetArchiveZkLinks = serde_json::from_value(msgdata.clone())?;
       let conn = Arc::new(sqldata::connection_open(
         config.orgauth_config.db.as_path(),
@@ -110,7 +110,6 @@ pub async fn zk_interface_loggedin_streaming(
       Ok(HttpResponse::Ok().streaming(bstream))
     }
     PrivateStreamingRequests::GetZkLinksSince => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let rq: GetZkLinksSince = serde_json::from_value(msgdata.clone())?;
       let conn = Arc::new(sqldata::connection_open(
         config.orgauth_config.db.as_path(),
@@ -119,6 +118,14 @@ pub async fn zk_interface_loggedin_streaming(
         sqldata::read_zklinks_since_stream(conn, uid, rq.createddate_after).map(sync::bytesify);
       Ok(HttpResponse::Ok().streaming(bstream))
     } // wat => Err(format!("invalid 'what' code:'{}'", wat).into()),
+    PrivateStreamingRequests::Sync => {
+      let conn = Arc::new(sqldata::connection_open(
+        config.orgauth_config.db.as_path(),
+      )?);
+      let rq: SyncSince = serde_json::from_value(msgdata.clone())?;
+      let ss = sync::sync_stream(conn, uid, rq.after, &mut zknotes_callbacks());
+      Ok(HttpResponse::Ok().streaming(ss))
+    }
   }
 }
 
@@ -377,8 +384,12 @@ pub async fn zk_interface_loggedin(
       )?);
       let user = orgauth::dbfun::read_user_by_id(&conn, uid)?; // TODO pass this in from calling ftn?
 
-      // sync::sync_from_remote(&conn, &user, &mut zknotes_callbacks()).await
-      Ok(sync::sync_to_remote(conn, &user, &mut sqldata::zknotes_callbacks()).await?)
+      let res = sync::sync_from_remote(&conn, &user, &mut zknotes_callbacks()).await?;
+      if res.what != PrivateReplies::SyncComplete {
+        Ok(res)
+      } else {
+        Ok(sync::sync_to_remote(conn, &user, &mut sqldata::zknotes_callbacks()).await?)
+      }
     }
   }
 }

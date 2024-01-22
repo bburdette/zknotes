@@ -1,6 +1,8 @@
 use crate::search::{search_zknotes, search_zknotes_stream, sync_users, SearchResult};
 use crate::util::now;
 use actix_web::body::None;
+use actix_web::error::PayloadError;
+use actix_web::web::Payload;
 use actix_web::{HttpMessage, HttpRequest, HttpResponse};
 use async_stream::__private::AsyncStream;
 use async_stream::try_stream;
@@ -36,8 +38,8 @@ use zkprotocol::constants::{
   PrivateReplies, PrivateRequests, PrivateStreamingRequests, SpecialUuids,
 };
 use zkprotocol::content::{
-  ArchiveZkLink, GetArchiveZkLinks, GetZkLinksSince, SaveZkNote, SyncMessage, UuidZkLink, ZkNote,
-  ZkNoteId,
+  ArchiveZkLink, GetArchiveZkLinks, GetZkLinksSince, SaveZkNote, SyncMessage, SyncSince,
+  UuidZkLink, ZkNote, ZkNoteId,
 };
 use zkprotocol::messages::{PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage};
 use zkprotocol::search::{
@@ -45,6 +47,11 @@ use zkprotocol::search::{
 };
 
 fn convert_err(err: reqwest::Error) -> std::io::Error {
+  error!("convert_err {:?}", err);
+  todo!()
+}
+
+fn convert_payloaderr(err: PayloadError) -> std::io::Error {
   error!("convert_err {:?}", err);
   todo!()
 }
@@ -139,7 +146,7 @@ pub async fn save_sync(
   Ok(id)
 }
 
-pub async fn sync_from_remote(
+pub async fn sync_from_remote_prev(
   conn: &Connection,
   user: &User,
   callbacks: &mut Callbacks,
@@ -716,68 +723,139 @@ fn convert_bodyerr(err: actix_web::error::PayloadError) -> std::io::Error {
   todo!()
 }
 
-// pub async fn read_sync_message(
+// pub async fn read_sync_messsage(
 //   line: &mut String,
-//   sm: &mut SyncMessage,
-//   // stream: StreamReader<futures_util::stream::MapErr<actix_web::web::Payload, fn(PayloadError) -> std::io::Error {convert_bodyerr}>, bytes::Bytes>,
-//   stream: &StreamReader<
+//   br: &mut StreamReader<
 //     futures_util::stream::MapErr<
 //       actix_web::web::Payload,
 //       fn(actix_web::error::PayloadError) -> std::io::Error,
 //     >,
 //     bytes::Bytes,
 //   >,
-//   // stream: &StreamReader<
-//   //   futures_util::stream::MapErr<
-//   //     actix_web::web::Payload,
-//   //     fn(actix_web::error::PayloadError) -> std::io::Error,
-//   //   >,
-//   //   bytes::Bytes,
-//   // >,
-// ) -> Result<(), Box<dyn std::error::Error>> {
+// ) -> Result<SyncMessage, Box<dyn std::error::Error>> {
 //   line.clear();
-//   if stream.read_line(&mut line).await? == 0 {
-//     return Err("empty stream!".into());
+//   if br.read_line(line).await? == 0 {
+//     return Err::<SyncMessage, Box<dyn std::error::Error>>(
+//       zkerr::Error::String("empty stream!".to_string()).into(),
+//     );
 //   }
-//   println!("sync_from_stream 4 '{}'", line.trim());
-//   let s: SyncMessage = serde_json::from_str(line.trim())?;
-//   *sm = s;
-//   Ok(())
+//   println!("readline: '{}'", line.trim());
+//   let sm = serde_json::from_str(line.trim())?;
+//   Ok(sm)
 // }
-pub async fn read_sync_messsage(
+
+pub async fn sync_from_remote(
+  conn: &Connection,
+  user: &User,
+  callbacks: &mut Callbacks,
+) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>> {
+  let now = now()?;
+
+  let extra_login_data = sqldata::read_user_by_id(conn, user.id)?;
+
+  // get previous sync.
+  let after = prev_sync(&conn, &user, &extra_login_data.zknote)
+    .await?
+    .map(|cs| cs.now);
+
+  println!("\n\n start sync, prev_sync {:?} \n\n", after);
+
+  // if after.is_none() {
+  //   return Err("is none".into());
+  // }
+
+  // execute any command from here.  search?
+  // let jar = reqwest::cookies::Jar;
+  let (c, url) = match (user.cookie.clone(), user.remote_url.clone()) {
+    (Some(c), Some(url)) => (c, url),
+    _ => return Err("can't remote sync".into()),
+  };
+
+  let user_url = awc::http::Uri::try_from(url).map_err(|x| zkerr::Error::String(x.to_string()))?;
+  let mut parts = awc::http::uri::Parts::default();
+  parts.scheme = user_url.scheme().cloned();
+  parts.authority = user_url.authority().cloned();
+  parts.path_and_query = Some(awc::http::uri::PathAndQuery::from_static("/stream"));
+  let uri = awc::http::Uri::from_parts(parts).map_err(|x| zkerr::Error::String(x.to_string()))?;
+
+  println!("sync uri {:?}", uri);
+
+  let client = awc::Client::new();
+  let cookie = cookie::Cookie::parse_encoded(c)?;
+  println!("sync to remote 3 - cookie: {:?}", cookie);
+
+  // let ss = sync_stream(conn, user.id, after, callbacks);
+
+  println!("sync to remote 4");
+  let res = awc::Client::new()
+    .post(uri)
+    .cookie(cookie)
+    .timeout(Duration::from_secs(60 * 60))
+    .send_body(
+      serde_json::to_value(PrivateStreamingMessage {
+        what: PrivateStreamingRequests::Sync,
+        data: Some(serde_json::to_value(SyncSince { after: after })?),
+      })?
+      .to_string(),
+    )
+    .await?;
+
+  let mut sr = StreamReader::new(res.map_err(convert_payloaderr));
+
+  let reply = sync_from_stream(conn, user, callbacks, &mut sr).await?;
+  Ok(reply)
+
+  // match (user.cookie.clone(), user.remote_url.clone()) {
+  //   (Some(c), Some(url)) => {
+  //     let url = reqwest::Url::parse(url.as_str())?;
+
+  //     let jar = Arc::new(reqwest::cookie::Jar::default());
+  //     jar.add_cookie_str(c.as_str(), &url);
+  //     let client = reqwest::Client::builder().cookie_provider(jar).build()?;
+
+  //     let res = client
+  //       .post(url.clone())
+  //       .json(&SyncSince { after: after })
+  //       .send()
+  //       .await?;
+
+  //     let reply = sync_from_stream(conn, user, callbacks, res.bytes_stream()).await?;
+
+  //     Ok(reply)
+  //   }
+  //   _ => Err("can't remote sync".into()),
+  // }
+}
+
+pub async fn read_sync_messsage<S>(
   line: &mut String,
-  br: &mut StreamReader<
-    futures_util::stream::MapErr<
-      actix_web::web::Payload,
-      fn(actix_web::error::PayloadError) -> std::io::Error,
-    >,
-    bytes::Bytes,
-  >,
-) -> Result<SyncMessage, Box<dyn std::error::Error>> {
+  br: &mut StreamReader<S, bytes::Bytes>,
+) -> Result<SyncMessage, Box<dyn std::error::Error>>
+where
+  S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin,
+{
   line.clear();
   if br.read_line(line).await? == 0 {
     return Err::<SyncMessage, Box<dyn std::error::Error>>(
       zkerr::Error::String("empty stream!".to_string()).into(),
     );
   }
-  println!("sync_from_stream 4 '{}'", line.trim());
+  println!("readline: '{}'", line.trim());
   let sm = serde_json::from_str(line.trim())?;
   Ok(sm)
 }
 
-pub async fn sync_from_stream(
+pub async fn sync_from_stream<S>(
   conn: &Connection,
   user: &User,
   callbacks: &mut Callbacks,
-  body: actix_web::web::Payload,
-) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>> {
+  br: &mut StreamReader<S, bytes::Bytes>,
+) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>>
+where
+  S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin,
+{
   println!("sync_from_stream 1");
   // pull in line by line and println
-  let rstream =
-    body.map_err(convert_bodyerr as fn(actix_web::error::PayloadError) -> std::io::Error);
-
-  let mut br = StreamReader::new(rstream);
-
   // TODO: pass in now instead of compute here?
   let now = now()?;
   let sysid = user_id(&conn, "system")?;
@@ -786,40 +864,14 @@ pub async fn sync_from_stream(
 
   let mut sm = SyncMessage::PhantomUserHeader;
 
-  // read_sync_message(&mut line, &mut sm, &br).await?;
-
-  /*
-  let read_sync_messsage = |mut line: &String,
-                            mut br: &StreamReader<
-    futures_util::stream::MapErr<
-      actix_web::web::Payload,
-      fn(actix_web::error::PayloadError) -> std::io::Error,
-    >,
-    bytes::Bytes,
-  >| async {
-    line.clear();
-    if br.read_line(&mut line).await? == 0 {
-      return Err::<(), zkerr::Error>("empty stream!".into());
-    }
-    println!("sync_from_stream 4 '{}'", line.trim());
-    sm = serde_json::from_str(line.trim())?;
-    Ok(())
-  };
-  */
-
-  sm = read_sync_messsage(&mut line, &mut br).await?;
-  // line.clear();
-  // if br.read_line(&mut line).await? == 0 {
-  //   return Err("empty stream!".into());
-  // };
-  // sm = serde_json::from_str(line.trim())?;
+  sm = read_sync_messsage(&mut line, br).await?;
 
   match sm {
     SyncMessage::PhantomUserHeader => (),
     _ => return Err(format!("unexpected syncmessage: {:?}", sm).into()),
   }
 
-  sm = read_sync_messsage(&mut line, &mut br).await?;
+  sm = read_sync_messsage(&mut line, br).await?;
   let mut userhash = HashMap::<i64, i64>::new();
 
   println!("sync_from_stream 5");
@@ -850,7 +902,7 @@ pub async fn sync_from_stream(
         };
       }
     };
-    sm = read_sync_messsage(&mut line, &mut br).await?;
+    sm = read_sync_messsage(&mut line, br).await?;
     println!("sync_from_stream 6 : {}", line);
   }
 
@@ -866,7 +918,7 @@ pub async fn sync_from_stream(
     );
   }
 
-  sm = read_sync_messsage(&mut line, &mut br).await?;
+  sm = read_sync_messsage(&mut line, br).await?;
 
   while let SyncMessage::ZkNote(ref note) = sm {
     let uid = userhash
@@ -920,7 +972,7 @@ pub async fn sync_from_stream(
           }
         Err(e) => Err(e),
       }?;
-    sm = read_sync_messsage(&mut line, &mut br).await?;
+    sm = read_sync_messsage(&mut line, br).await?;
     println!("sync_from_stream 7");
   }
 
@@ -937,7 +989,7 @@ pub async fn sync_from_stream(
   }
 
   println!("sync_from_stream 8");
-  sm = read_sync_messsage(&mut line, &mut br).await?;
+  sm = read_sync_messsage(&mut line, br).await?;
   println!("sync_from_stream 9");
   while let SyncMessage::ZkNote(ref note) = sm {
     let uid = userhash
@@ -969,7 +1021,7 @@ pub async fn sync_from_stream(
             }
           Err(e) => return Err(e)?,
         }
-    sm = read_sync_messsage(&mut line, &mut br).await?;
+    sm = read_sync_messsage(&mut line, br).await?;
   }
 
   println!("sync_from_stream 11");
@@ -984,7 +1036,7 @@ pub async fn sync_from_stream(
     );
   }
 
-  sm = read_sync_messsage(&mut line, &mut br).await?;
+  sm = read_sync_messsage(&mut line, br).await?;
   println!("sync_from_stream 12");
 
   let mut count = 0;
@@ -1024,7 +1076,7 @@ pub async fn sync_from_stream(
     saved = saved + ins;
     // bytes = bytes + nc;
     println!("archived link count:, {}", count);
-    sm = read_sync_messsage(&mut line, &mut br).await?;
+    sm = read_sync_messsage(&mut line, br).await?;
   }
 
   println!("sync_from_stream 13");
@@ -1043,7 +1095,7 @@ pub async fn sync_from_stream(
   // bytes = 0;
 
   println!("sync_from_stream 14");
-  sm = read_sync_messsage(&mut line, &mut br).await?;
+  sm = read_sync_messsage(&mut line, br).await?;
 
   while let SyncMessage::UuidZkLink(ref l) = sm {
     println!("saving link!, {:?}", l);
@@ -1096,12 +1148,10 @@ pub async fn sync_from_stream(
     count = count + 1;
     saved = saved + ins;
     // bytes = bytes + nc;
-    sm = read_sync_messsage(&mut line, &mut br).await?;
+    sm = read_sync_messsage(&mut line, br).await?;
   }
   println!("receieved links: {}, saved {}", count, saved);
 
-  // // let jar = reqwest::cookies::Jar;
-  // // match (user.cookie, user.remote_url) {}
   Ok(PrivateReplyMessage {
     what: PrivateReplies::SyncComplete,
     content: serde_json::Value::Null,
@@ -1113,7 +1163,6 @@ pub async fn sync_to_remote(
   conn: Arc<Connection>,
   user: &User,
   callbacks: &mut Callbacks,
-  // ) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>> {
 ) -> Result<PrivateReplyMessage, zkerr::Error> {
   let extra_login_data = sqldata::read_user_by_id(&conn, user.id)?;
 

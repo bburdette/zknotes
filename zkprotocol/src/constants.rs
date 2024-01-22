@@ -54,6 +54,7 @@ pub enum PrivateStreamingRequests {
   SearchZkNotes,
   GetArchiveZkLinks,
   GetZkLinksSince,
+  Sync,
 }
 
 #[derive(Deserialize, Serialize, Debug)]

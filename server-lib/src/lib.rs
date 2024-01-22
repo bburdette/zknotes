@@ -1,5 +1,3 @@
-//
-
 pub mod config;
 pub mod error;
 pub mod interfaces;
@@ -8,6 +6,7 @@ mod search;
 pub mod sqldata;
 mod sqltest;
 mod sync;
+use crate::sqldata::get_sysids;
 use actix_cors::Cors;
 use actix_files::NamedFile;
 use actix_multipart::Multipart;
@@ -41,6 +40,8 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 use timer;
+use tokio_util::io::StreamReader;
+use tracing_actix_web::TracingLogger;
 use uuid::Uuid;
 pub use zkprotocol;
 pub use zkprotocol::messages::{
@@ -50,10 +51,6 @@ use zkprotocol::{
   constants::{PrivateReplies, PublicReplies},
   messages::PublicReplyMessage,
 };
-
-use tracing_actix_web::TracingLogger;
-
-use crate::sqldata::get_sysids;
 
 /*
 use actix_files::NamedFile;
@@ -519,6 +516,11 @@ async fn private_upstreaming(
   }
 }
 
+fn convert_bodyerr(err: actix_web::error::PayloadError) -> std::io::Error {
+  error!("convert_err {:?}", err);
+  todo!()
+}
+
 async fn zk_interface_check_upstreaming(
   session: &Session,
   config: &Config,
@@ -552,9 +554,16 @@ async fn zk_interface_check_upstreaming(
         }
         Ok(userdata) => {
           // finally!  processing messages as logged in user.
+          let rstream =
+            body.map_err(convert_bodyerr as fn(actix_web::error::PayloadError) -> std::io::Error);
+
+          // futures_util::stream::MapErr<actix_web::web::Payload, fn(PayloadError) -> std::io::Error>
+
+          let mut br = StreamReader::new(rstream);
+
           Ok(
             HttpResponse::Ok().json(
-              sync::sync_from_stream(&conn, &userdata, &mut sqldata::zknotes_callbacks(), body)
+              sync::sync_from_stream(&conn, &userdata, &mut sqldata::zknotes_callbacks(), &mut br)
                 .await?,
             ),
           )

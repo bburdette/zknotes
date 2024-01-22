@@ -173,6 +173,11 @@ pub struct GetZkLinksSince {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
+pub struct SyncSince {
+  pub after: Option<i64>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
 pub struct ArchiveZkLink {
   pub userUuid: String, // uuid too!
   pub fromUuid: String,
@@ -219,6 +224,7 @@ pub struct ZkPhantomUser {
   pub active: bool,
 }
 
+// TODO: add time on first msg.
 #[derive(Deserialize, Serialize, Debug)]
 pub enum SyncMessage {
   Token(Uuid),
