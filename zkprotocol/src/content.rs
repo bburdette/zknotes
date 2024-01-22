@@ -233,6 +233,7 @@ pub enum SyncMessage {
   ArchiveZkLink(ArchiveZkLink),
   UuidZkLinkHeader,
   UuidZkLink(UuidZkLink),
+  SyncEnd,
 }
 
 impl From<ZkPhantomUser> for SyncMessage {
