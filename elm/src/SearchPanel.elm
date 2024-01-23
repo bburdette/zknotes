@@ -51,6 +51,11 @@ searchResultUpdated zsr model =
     { model | paginationModel = PP.searchResultUpdated zsr model.paginationModel }
 
 
+deleted : Bool
+deleted =
+    True
+
+
 getSearch : Model -> Maybe S.ZkNoteSearch
 getSearch model =
     TSP.getSearch model.tagSearchModel
@@ -62,7 +67,7 @@ getSearch model =
                 , what = ""
                 , resultType = S.RtListNote
                 , archives = False
-                , deleted = False
+                , deleted = deleted
                 , createdAfter = Nothing
                 , createdBefore = Nothing
                 , changedAfter = Nothing
@@ -161,7 +166,7 @@ handleTspUpdate model ( nm, cmd ) =
                 , what = ""
                 , resultType = S.RtListNote
                 , archives = False
-                , deleted = False
+                , deleted = deleted
                 , createdAfter = Nothing
                 , createdBefore = Nothing
                 , changedAfter = Nothing
@@ -207,7 +212,7 @@ update msg model =
                                 , what = ""
                                 , resultType = S.RtListNote
                                 , archives = False
-                                , deleted = False
+                                , deleted = deleted
                                 , createdAfter = Nothing
                                 , createdBefore = Nothing
                                 , changedAfter = Nothing

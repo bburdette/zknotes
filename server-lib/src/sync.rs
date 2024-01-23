@@ -906,6 +906,7 @@ where
       .get(&note.user)
       .ok_or_else(|| zkerr::Error::String("user not found".to_string()))?;
 
+    println!("synching note: {} {}", note.id, note.deleted);
     match conn.execute(
         "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate)
          values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
@@ -930,6 +931,7 @@ where
             // TODO: uuid conflict;  resolve with older one becoming archive note.
             // SqliteFailure(Error { code: ConstraintViolation, extended_code: 2067 }, Some("UNIQUE constraint failed: zknote.uuid"));
             if note.changeddate > n.changeddate {
+              println!("saving note: {} {}", note.id, note.deleted);
               // note is newer.  archive the old and replace.
               sqldata::save_zknote(&conn,
                                    *uid,
@@ -943,6 +945,7 @@ where
                                      deleted: note.deleted,
                                    })?;
             } else {
+              println!("saving as archive: {} {}", note.id, note.deleted);
               // note is older.  add as archive note.
               // may create duplicate archive notes if edited on two systems and then synced.
               sqldata::archive_zknote(&conn, nid, now, &note)?;

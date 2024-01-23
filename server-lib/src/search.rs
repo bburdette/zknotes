@@ -207,6 +207,9 @@ pub fn search_zknotes_stream(
   // uncomment for formatting, lsp
   // {
   try_stream! {
+
+    println!("search_zknotes_stream search {:?}", search);
+
     // let sysid = user_id(&conn, "system")?;
     let s_user = if search.archives {
       user_id(&conn, "system")?

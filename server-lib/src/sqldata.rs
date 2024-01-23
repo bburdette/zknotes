@@ -1169,12 +1169,14 @@ pub fn delete_zknote(
     Err(e) => Err(e)?,
   };
 
+  let now = now()?;
+
   // only delete when user is the owner.
   conn.execute(
-    "update zknote set deleted = 1, title = '<deleted>', content = '', file = null
-      where uuid = ?1
-      and user = ?2",
-    params![noteid.to_string(), uid],
+    "update zknote set deleted = 1, title = '<deleted>', content = '', file = null, changeddate = ?1
+      where uuid = ?2
+      and user = ?3",
+    params![now, noteid.to_string(), uid],
   )?;
 
   // is this file referred to by any other notes?
