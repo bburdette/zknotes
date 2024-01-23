@@ -26,7 +26,7 @@ use orgauth::endpoints::Callbacks;
 use reqwest;
 // use reqwest::{Body, cookie};
 use awc;
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, Transaction};
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
@@ -815,13 +815,28 @@ where
 
   let mut line = String::new();
 
-  let mut sm = SyncMessage::PhantomUserHeader;
+  let mut sm;
+
+  sm = read_sync_messsage(&mut line, br).await?;
+
+  let after = match sm {
+    SyncMessage::SyncStart(after) => after,
+    _ => return Err(format!("expected SyncStart; unexpected syncmessage: {:?}", sm).into()),
+  };
 
   sm = read_sync_messsage(&mut line, br).await?;
 
   match sm {
     SyncMessage::PhantomUserHeader => (),
-    _ => return Err(format!("unexpected syncmessage: {:?}", sm).into()),
+    _ => {
+      return Err(
+        format!(
+          "expected PhantomUserHeader; unexpected syncmessage: {:?}",
+          sm
+        )
+        .into(),
+      )
+    }
   }
 
   sm = read_sync_messsage(&mut line, br).await?;
@@ -1106,6 +1121,24 @@ where
   }
   println!("receieved links: {}, saved {}", count, saved);
 
+  println!("dropping deleted links");
+  // drop zklinks which have a zklinkarchive with newer deletedate
+  let dropped = conn.execute(
+    "with dels as (select ZL.fromid, ZL.toid, ZL.user from zklink ZL, zklinkarchive ZLA
+        where ZL.fromid = ZLA.fromid
+        and ZL.toid = ZLA.toid
+        and ZL.user = ZLA.user
+        and ZL.createdate < ZLA.deletedate)
+        delete from zklink where
+          (zklink.fromid, zklink.toid, zklink.user) in dels ",
+    params![],
+  )?;
+
+  println!("dropped {} links", dropped);
+
+  let unote = user_note_id(conn, user.id)?;
+  save_sync(conn, user.id, unote, CompletedSync { after, now }).await?;
+
   Ok(PrivateReplyMessage {
     what: PrivateReplies::SyncComplete,
     content: serde_json::Value::Null,
@@ -1118,6 +1151,8 @@ pub async fn sync_to_remote(
   user: &User,
   callbacks: &mut Callbacks,
 ) -> Result<PrivateReplyMessage, zkerr::Error> {
+  // let tr = conn.transaction()?;
+
   let extra_login_data = sqldata::read_user_by_id(&conn, user.id)?;
 
   // TODO: get time on remote system, bail if too far out.
@@ -1159,6 +1194,8 @@ pub async fn sync_to_remote(
     .send_body(awc::body::BodyStream::new(ss))
     .await;
 
+  // tr.commit()?;
+
   println!("sync to remote 5 : {:?}", res);
   Ok(PrivateReplyMessage {
     what: PrivateReplies::SyncComplete,
@@ -1190,6 +1227,7 @@ pub fn sync_stream(
   after: Option<i64>,
   callbacks: &mut Callbacks,
 ) -> impl Stream<Item = Result<Bytes, Box<dyn std::error::Error + 'static>>> {
+  let start = try_stream! { yield SyncMessage::SyncStart(after); }.map(bytesify);
   let zns = ZkNoteSearch {
     tagsearch: TagSearch::SearchTerm {
       mods: Vec::new(),
@@ -1242,7 +1280,8 @@ pub fn sync_stream(
 
   let end = try_stream! { yield SyncMessage::SyncEnd; }.map(bytesify);
 
-  sync_users
+  start
+    .chain(sync_users)
     .chain(system_user)
     .chain(znstream)
     .chain(anstream)

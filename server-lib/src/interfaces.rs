@@ -384,12 +384,22 @@ pub async fn zk_interface_loggedin(
       )?);
       let user = orgauth::dbfun::read_user_by_id(&conn, uid)?; // TODO pass this in from calling ftn?
 
-      let res = sync::sync_from_remote(&conn, &user, &mut zknotes_callbacks()).await?;
-      if res.what != PrivateReplies::SyncComplete {
-        Ok(res)
-      } else {
-        Ok(sync::sync_to_remote(conn, &user, &mut sqldata::zknotes_callbacks()).await?)
-      }
+      // let tr = conn.unchecked_transaction()?;
+      // let res = sync::sync_to_remote(conn, &user, &mut sqldata::zknotes_callbacks()).await?;
+      // if res.what != PrivateReplies::SyncComplete {
+      //   Ok(res)
+      // } else {
+      //   // use a separate conn for this.
+      //   let conn = Arc::new(sqldata::connection_open(
+      //     config.orgauth_config.db.as_path(),
+      //   )?);
+      //   let remres = sync::sync_from_remote(&conn, &user, &mut zknotes_callbacks()).await?;
+      //   // tr.commit();
+      //   Ok(remres)
+      // }
+      let remres = sync::sync_from_remote(&conn, &user, &mut zknotes_callbacks()).await?;
+      // tr.commit();
+      Ok(remres)
     }
   }
 }

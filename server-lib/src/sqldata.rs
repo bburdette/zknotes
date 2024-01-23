@@ -1666,8 +1666,8 @@ pub fn read_archivezklinks_stream(
       acc_args.append(&mut av);
     }
 
-    // println!("\n\n read_archivezklinks_stream \n {:?}", pstmt.expanded_sql());
-    // println!("\n\n args \n {:?}", acc_args);
+    println!("\n\n read_archivezklinks_stream \n {:?}", pstmt.expanded_sql());
+    println!("\n\n args \n {:?}", acc_args);
 
     let rec_iter = pstmt.query_map(rusqlite::params_from_iter(acc_args.iter()), |row| {
       // println!("archive zklink row {:?}", row);
@@ -1770,12 +1770,14 @@ pub fn read_zklinks_since_stream(
   // {
   try_stream! {
 
-    println!("read_zklinks_since_stream");
+    println!("read_zklinks_since_stream, after: {:?}", after);
     let (acc_sql, acc_args) = accessible_notes(&conn, uid)?;
 
     // make an accessible notes temp table.
 
     let tabname = format!("accnotes_{}", uid);
+
+    println!("table name {}", tabname);
 
     conn.execute(
       format!(
@@ -1836,14 +1838,15 @@ pub fn read_zklinks_since_stream(
       }))
     })?;
 
-    conn.execute(format!("drop table {}", tabname).as_str(), params![])?;
-
     for rec in rec_iter {
       if let Ok(r) = rec {
         println!("zklink {:?}", r);
         yield r;
       }
     }
+
+    conn.execute(format!("drop table {}", tabname).as_str(), params![])?;
+
     println!("read_zklinks_since_stream - end");
   }
 }
