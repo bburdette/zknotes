@@ -38,6 +38,7 @@ pub fn power_delete_zknotes(
     what: "".to_string(),
     resulttype: ResultType::RtListNote,
     archives: false,
+    deleted: false,
     created_after: None,
     created_before: None,
     changed_after: None,
@@ -382,6 +383,13 @@ pub fn build_sql(
   };
 
   let archives = search.archives;
+  let deleted = if search.deleted {
+    ""
+  } else {
+    "and N.deleted = 0"
+  };
+
+  println!("deleted {}", deleted);
 
   let (mut sqlbase, mut baseargs) = if archives {
     (
@@ -392,7 +400,8 @@ pub fn build_sql(
       (O.user = ?
         and OL.fromid = N.id and OL.toid = O.id
         and AL.fromid = N.id and AL.toid = ?)
-      and O.deleted = 0"
+        {}",
+        deleted
       ),
       vec![uid.to_string(), archiveid.to_string()],
     )
@@ -402,7 +411,8 @@ pub fn build_sql(
       format!(
         "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N where N.user = ?
-      and N.deleted = 0"
+        {}",
+        deleted
       ),
       vec![uid.to_string()],
     )
@@ -419,7 +429,8 @@ pub fn build_sql(
         and L.fromid = N.id and L.toid = ?
         and OL.fromid = N.id and OL.toid = O.id
         and AL.fromid = N.id and AL.toid = ?)
-      and N.deleted = 0"
+        {}",
+        deleted
       ),
       vec![uid.to_string(), publicid.to_string(), archiveid.to_string()],
     )
@@ -429,7 +440,8 @@ pub fn build_sql(
         "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N, zklink L
       where (N.user != ? and L.fromid = N.id and L.toid = ?)
-      and N.deleted = 0"
+      {}",
+        deleted
       ),
       vec![uid.to_string(), publicid.to_string()],
     )
@@ -458,7 +470,8 @@ pub fn build_sql(
         L.linkzknote is not ?
       and
         ((U.fromid = ? and U.toid = M.fromid) or (U.fromid = M.fromid and U.toid = ?))
-      and N.deleted = 0"
+        {}",
+        deleted
       ),
       vec![
         uid.to_string(),
@@ -482,7 +495,8 @@ pub fn build_sql(
         L.linkzknote is not ?
       and
         ((U.fromid = ? and U.toid = M.fromid) or (U.fromid = M.fromid and U.toid = ?)))
-      and N.deleted = 0",
+        {}",
+        deleted,
       ),
       vec![
         uid.to_string(),
@@ -504,7 +518,8 @@ pub fn build_sql(
         and ((L.fromid = N.id and L.toid = ?) or (L.toid = N.id and L.fromid = ?))
         and OL.fromid = N.id and OL.toid = O.id
         and AL.fromid = N.id and AL.toid = ?
-        and N.deleted = 0"
+        {}",
+        deleted
       ),
       vec![
         uid.to_string(),
@@ -521,7 +536,8 @@ pub fn build_sql(
       where (
         N.user != ? and
         ((L.fromid = N.id and L.toid = ?) or (L.toid = N.id and L.fromid = ?)))
-        and N.deleted = 0"
+        {}",
+        deleted
       ),
       vec![
         uid.to_string(),

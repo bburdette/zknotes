@@ -85,6 +85,7 @@ pub async fn prev_sync(
     what: "".to_string(),
     resulttype: ResultType::RtNote,
     archives: false,
+    deleted: false,
     created_after: None,
     created_before: None,
     changed_after: None,
@@ -200,6 +201,7 @@ pub async fn sync_from_remote_prev(
           what: "".to_string(),
           resulttype: ResultType::RtNote,
           archives: false,
+          deleted: false,
           created_after: after,
           created_before: None,
           changed_after: after,
@@ -402,6 +404,7 @@ pub async fn sync_from_remote_prev(
           what: "".to_string(),
           resulttype: ResultType::RtNote,
           archives: true,
+          deleted: false,
           created_after: after,
           created_before: None,
           changed_after: after,
@@ -819,10 +822,20 @@ where
 
   sm = read_sync_messsage(&mut line, br).await?;
 
-  let after = match sm {
-    SyncMessage::SyncStart(after) => after,
+  let (after, remotenow) = match sm {
+    SyncMessage::SyncStart(after, rn) => (after, rn),
     _ => return Err(format!("expected SyncStart; unexpected syncmessage: {:?}", sm).into()),
   };
+
+  if (now - remotenow).abs() > 10 {
+    return Err(
+      format!(
+        "remote time too far off! local: {}, remote: {}",
+        now, remotenow,
+      )
+      .into(),
+    );
+  }
 
   sm = read_sync_messsage(&mut line, br).await?;
 
@@ -1227,7 +1240,8 @@ pub fn sync_stream(
   after: Option<i64>,
   callbacks: &mut Callbacks,
 ) -> impl Stream<Item = Result<Bytes, Box<dyn std::error::Error + 'static>>> {
-  let start = try_stream! { yield SyncMessage::SyncStart(after); }.map(bytesify);
+  let start = try_stream! { yield SyncMessage::SyncStart(after, now()?); }.map(bytesify);
+
   let zns = ZkNoteSearch {
     tagsearch: TagSearch::SearchTerm {
       mods: Vec::new(),
@@ -1238,6 +1252,7 @@ pub fn sync_stream(
     what: "".to_string(),
     resulttype: ResultType::RtNote,
     archives: false,
+    deleted: true,
     created_after: after,
     created_before: None,
     changed_after: after,
@@ -1265,6 +1280,7 @@ pub fn sync_stream(
     what: "".to_string(),
     resulttype: ResultType::RtNote,
     archives: true,
+    deleted: false,
     created_after: after,
     created_before: None,
     changed_after: after,
@@ -1276,6 +1292,7 @@ pub fn sync_stream(
   let anstream = search_zknotes_stream(conn.clone(), uid, ans).map(bytesify);
 
   let als = sqldata::read_archivezklinks_stream(conn.clone(), uid, after).map(bytesify);
+
   let ls = sqldata::read_zklinks_since_stream(conn, uid, after).map(bytesify);
 
   let end = try_stream! { yield SyncMessage::SyncEnd; }.map(bytesify);

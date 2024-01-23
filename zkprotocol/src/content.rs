@@ -227,7 +227,7 @@ pub struct ZkPhantomUser {
 // TODO: add time on first msg.
 #[derive(Deserialize, Serialize, Debug)]
 pub enum SyncMessage {
-  SyncStart(Option<i64>),
+  SyncStart(Option<i64>, i64),
   PhantomUserHeader,
   PhantomUser(ZkPhantomUser),
   ZkSearchResultHeader(ZkSearchResultHeader),

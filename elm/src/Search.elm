@@ -73,6 +73,7 @@ type alias ZkNoteSearch =
     , what : String
     , resultType : ResultType
     , archives : Bool
+    , deleted : Bool
     , createdAfter : Maybe Int
     , createdBefore : Maybe Int
     , changedAfter : Maybe Int
@@ -140,6 +141,7 @@ defaultSearch =
     , what = ""
     , resultType = RtListNote
     , archives = False
+    , deleted = False
     , createdAfter = Nothing
     , createdBefore = Nothing
     , changedAfter = Nothing
@@ -324,6 +326,7 @@ encodeZkNoteSearch zns =
         , ( "what", JE.string zns.what )
         , ( "resulttype", encodeResultType zns.resultType )
         , ( "archives", JE.bool zns.archives )
+        , ( "deleted", JE.bool zns.deleted )
         ]
             ++ List.filterMap identity
                 [ encodeMaybe "created_after" zns.createdAfter JE.int
