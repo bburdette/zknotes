@@ -43,8 +43,7 @@ pub fn power_delete_zknotes(
     created_before: None,
     changed_after: None,
     changed_before: None,
-    synced_after: None,
-    synced_before: None,
+    unsynced: false,
     ordering: None,
   };
   let znsr = search_zknotes(conn, user, &nolimsearch)?;
@@ -609,14 +608,11 @@ fn build_daterange_clause(search: &ZkNoteSearch) -> Result<(String, Vec<String>)
       .changed_before
       .map(|dt| ("N.changeddate < ?", dt.to_string())),
   ];
-  let sync_clawses = [
-    search
-      .synced_after
-      .map(|dt| ("N.syncdate > ?", dt.to_string())),
-    search
-      .synced_before
-      .map(|dt| ("N.syncdate < ?", dt.to_string())),
-  ];
+  let sync_clawse = if search.unsynced {
+    Some("(N.syncdate < N.changeddate or N.syncdate is null)")
+  } else {
+    None
+  };
   let join = |clawses: Vec<Option<(&str, String)>>, conj| {
     let clause = clawses
       .iter()
@@ -632,7 +628,7 @@ fn build_daterange_clause(search: &ZkNoteSearch) -> Result<(String, Vec<String>)
 
   let (crcls, mut crargs) = join(create_clawses.to_vec(), " and ");
   let (changedcls, mut changedargs) = join(changed_clawses.to_vec(), " and ");
-  let (synccls, mut syncargs) = join(sync_clawses.to_vec(), " and ");
+  // let (synccls, mut syncargs) = join(sync_clawses.to_vec(), " and ");
 
   let clause: String = {
     let mut v: Vec<String> = Vec::new();
@@ -642,15 +638,14 @@ fn build_daterange_clause(search: &ZkNoteSearch) -> Result<(String, Vec<String>)
     if changedcls != "" {
       v.push(changedcls);
     }
-    if synccls != "" {
-      v.push(synccls);
+    if let Some(synccls) = sync_clawse {
+      v.push(synccls.to_string());
     }
-    v.join(" or ")
+    v.join(" and ")
   };
   let mut args: Vec<String> = Vec::new();
   args.append(&mut crargs);
   args.append(&mut changedargs);
-  args.append(&mut syncargs);
   Ok((clause, args))
 }
 

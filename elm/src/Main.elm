@@ -1664,6 +1664,7 @@ actualupdate msg model =
                                             , createdBefore = Nothing
                                             , changedAfter = Nothing
                                             , changedBefore = Nothing
+                                            , unsynced = False
                                             }
                                         )
 
@@ -3530,6 +3531,7 @@ prevSearchQuery login =
     , createdBefore = Nothing
     , changedAfter = Nothing
     , changedBefore = Nothing
+    , unsynced = False
     }
 
 

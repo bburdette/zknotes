@@ -725,6 +725,7 @@ pub fn save_zknote(
   conn: &Connection,
   uid: i64,
   note: &SaveZkNote,
+  syncdate: Option<i64>,
 ) -> Result<(i64, SavedZkNote), zkerr::Error> {
   let now = now()?;
 
@@ -734,7 +735,7 @@ pub fn save_zknote(
       archive_zknote_i64(&conn, id)?;
       // existing note.  update IF mine.
       match conn.execute(
-        "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4, editable = ?5, showtitle = ?6, deleted = ?7
+        "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4, editable = ?5, showtitle = ?6, deleted = ?7, syncdate = ?10
          where id = ?8 and user = ?9 and deleted = 0",
         params![
           note.title,
@@ -745,7 +746,8 @@ pub fn save_zknote(
           note.showtitle,
           note.deleted,
           id,
-          uid
+          uid,
+          syncdate
         ],
       ) {
         Ok(1) => {
@@ -782,8 +784,8 @@ pub fn save_zknote(
 
       let uuid = uuid::Uuid::new_v4();
       conn.execute(
-        "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate)
-         values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+        "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate, syncdate)
+         values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
         params![
           note.title,
           note.content,
@@ -794,7 +796,8 @@ pub fn save_zknote(
           note.deleted,
           uuid.to_string(),
           now,
-          now
+          now,
+          syncdate
         ],
       )?;
       let id = conn.last_insert_rowid();
@@ -2023,6 +2026,7 @@ pub fn save_importzknotes(
             showtitle: true,
             deleted: false,
           },
+          None,
         )?
         .0
       }
@@ -2046,6 +2050,7 @@ pub fn save_importzknotes(
               showtitle: true,
               deleted: false,
             },
+            None,
           )?
           .0
         }
@@ -2072,6 +2077,7 @@ pub fn save_importzknotes(
               showtitle: true,
               deleted: false,
             },
+            None,
           )?
           .0
         }
@@ -2146,6 +2152,7 @@ pub fn make_file_note(
       showtitle: false,
       deleted: false,
     },
+    None,
   )?;
 
   // set the file id in that note.

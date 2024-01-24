@@ -51,9 +51,9 @@ searchResultUpdated zsr model =
     { model | paginationModel = PP.searchResultUpdated zsr model.paginationModel }
 
 
-deleted : Bool
-deleted =
-    True
+showDeleted : Bool
+showDeleted =
+    False
 
 
 getSearch : Model -> Maybe S.ZkNoteSearch
@@ -67,11 +67,12 @@ getSearch model =
                 , what = ""
                 , resultType = S.RtListNote
                 , archives = False
-                , deleted = deleted
+                , deleted = showDeleted
                 , createdAfter = Nothing
                 , createdBefore = Nothing
                 , changedAfter = Nothing
                 , changedBefore = Nothing
+                , unsynced = False
                 }
             )
 
@@ -166,11 +167,12 @@ handleTspUpdate model ( nm, cmd ) =
                 , what = ""
                 , resultType = S.RtListNote
                 , archives = False
-                , deleted = deleted
+                , deleted = showDeleted
                 , createdAfter = Nothing
                 , createdBefore = Nothing
                 , changedAfter = Nothing
                 , changedBefore = Nothing
+                , unsynced = False
                 }
             )
 
@@ -212,11 +214,12 @@ update msg model =
                                 , what = ""
                                 , resultType = S.RtListNote
                                 , archives = False
-                                , deleted = deleted
+                                , deleted = showDeleted
                                 , createdAfter = Nothing
                                 , createdBefore = Nothing
                                 , changedAfter = Nothing
                                 , changedBefore = Nothing
+                                , unsynced = False
                                 }
                             )
 

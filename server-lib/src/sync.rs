@@ -90,8 +90,7 @@ pub async fn prev_sync(
     created_before: None,
     changed_after: None,
     changed_before: None,
-    synced_after: None,
-    synced_before: None,
+    unsynced: false,
     ordering: Some(Ordering {
       field: OrderField::Changed,
       direction: OrderDirection::Descending,
@@ -136,6 +135,7 @@ pub async fn save_sync(
       showtitle: false,
       deleted: false,
     },
+    None,
   )?;
 
   // link to 'sync' system note.
@@ -170,7 +170,6 @@ pub async fn sync_from_remote_prev(
   // TODO:  get previous sync information!
 
   // execute any command from here.  search?
-  // let jar = reqwest::cookies::Jar;
   match (user.cookie.clone(), user.remote_url.clone()) {
     (Some(c), Some(url)) => {
       let url = reqwest::Url::parse(url.as_str())?;
@@ -202,12 +201,11 @@ pub async fn sync_from_remote_prev(
           resulttype: ResultType::RtNote,
           archives: false,
           deleted: false,
-          created_after: after,
+          created_after: None,
           created_before: None,
           changed_after: after,
           changed_before: None,
-          synced_after: after,
-          synced_before: None,
+          unsynced: true,
           ordering: None,
         };
 
@@ -378,7 +376,7 @@ pub async fn sync_from_remote_prev(
                                            editable: note.editable,
                                            showtitle: note.showtitle,
                                            deleted: note.deleted,
-                                         })?;
+                                         }, Some(now))?;
                   } else {
                     // note is older.  add as archive note.
                     // may create duplicate archive notes if edited on two systems and then synced.
@@ -405,12 +403,11 @@ pub async fn sync_from_remote_prev(
           resulttype: ResultType::RtNote,
           archives: true,
           deleted: false,
-          created_after: after,
+          created_after: None,
           created_before: None,
           changed_after: after,
           changed_before: None,
-          synced_after: after,
-          synced_before: None,
+          unsynced: true,
           ordering: None,
         };
 
@@ -716,9 +713,6 @@ pub async fn sync_from_remote_prev(
     }
     _ => Err("can't remote sync".into()),
   }
-
-  // let jar = reqwest::cookies::Jar;
-  // match (user.cookie, user.remote_url) {}
 }
 
 fn convert_bodyerr(err: actix_web::error::PayloadError) -> std::io::Error {
@@ -726,28 +720,46 @@ fn convert_bodyerr(err: actix_web::error::PayloadError) -> std::io::Error {
   todo!()
 }
 
-pub async fn sync_from_remote(
-  conn: &Connection,
-  user: &User,
+pub async fn sync(
+  dbpath: &Path,
+  uid: i64,
   callbacks: &mut Callbacks,
 ) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>> {
-  let now = now()?;
-
-  let extra_login_data = sqldata::read_user_by_id(conn, user.id)?;
+  let conn = Arc::new(sqldata::connection_open(dbpath)?);
+  let user = orgauth::dbfun::read_user_by_id(&conn, uid)?; // TODO pass this in from calling ftn?
+  let extra_login_data = sqldata::read_user_by_id(&conn, user.id)?;
 
   // get previous sync.
   let after = prev_sync(&conn, &user, &extra_login_data.zknote)
     .await?
     .map(|cs| cs.now);
 
+  let now = now()?;
+
   println!("\n\n start sync, prev_sync {:?} \n\n", after);
 
-  // if after.is_none() {
-  //   return Err("is none".into());
-  // }
+  // TODO: pass in 'now'?
+  let res = sync_from_remote(&conn, &user, after, callbacks).await?;
+  if res.what != PrivateReplies::SyncComplete {
+    Ok(res)
+  } else {
+    // use a separate conn for this.
+    let conn2 = Arc::new(sqldata::connection_open(dbpath)?);
+    let remres = sync_to_remote(conn2, &user, callbacks).await?;
 
-  // execute any command from here.  search?
-  // let jar = reqwest::cookies::Jar;
+    let unote = user_note_id(&conn, user.id)?;
+    save_sync(&conn, user.id, unote, CompletedSync { after, now }).await?;
+
+    Ok(remres)
+  }
+}
+
+pub async fn sync_from_remote(
+  conn: &Connection,
+  user: &User,
+  after: Option<i64>,
+  callbacks: &mut Callbacks,
+) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>> {
   let (c, url) = match (user.cookie.clone(), user.remote_url.clone()) {
     (Some(c), Some(url)) => (c, url),
     _ => return Err("can't remote sync".into()),
@@ -827,7 +839,8 @@ where
     _ => return Err(format!("expected SyncStart; unexpected syncmessage: {:?}", sm).into()),
   };
 
-  if (now - remotenow).abs() > 10 {
+  // milliseconds
+  if (now - remotenow).abs() > 10000 {
     return Err(
       format!(
         "remote time too far off! local: {}, remote: {}",
@@ -908,8 +921,8 @@ where
 
     println!("synching note: {} {}", note.id, note.deleted);
     match conn.execute(
-        "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate)
-         values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+        "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate, syncdate)
+         values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
         params![
           note.title,
           note.content,
@@ -921,7 +934,8 @@ where
           note.id.to_string(),
           note.createdate,
           note.changeddate,
-        ],
+          now
+         ],
       )
       {
         Ok(x) => Ok(x),
@@ -943,7 +957,7 @@ where
                                      editable: note.editable,
                                      showtitle: note.showtitle,
                                      deleted: note.deleted,
-                                   })?;
+                                   }, Some(now))?;
             } else {
               println!("saving as archive: {} {}", note.id, note.deleted);
               // note is older.  add as archive note.
@@ -981,8 +995,8 @@ where
       .ok_or_else(|| zkerr::Error::String("user not found".to_string()))?;
     assert!(*uid == sysid);
     match conn.execute(
-      "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate)
-       values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+      "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate, syncdate)
+       values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
         params![
           note.title,
           note.content,
@@ -994,6 +1008,7 @@ where
           note.id.to_string(),
           note.createdate,
           note.changeddate,
+          now
           ])
         {
           Ok(_x) => (),
@@ -1152,8 +1167,8 @@ where
 
   println!("dropped {} links", dropped);
 
-  let unote = user_note_id(conn, user.id)?;
-  save_sync(conn, user.id, unote, CompletedSync { after, now }).await?;
+  // let unote = user_note_id(conn, user.id)?;
+  // save_sync(conn, user.id, unote, CompletedSync { after, now }).await?;
 
   Ok(PrivateReplyMessage {
     what: PrivateReplies::SyncComplete,
@@ -1256,12 +1271,11 @@ pub fn sync_stream(
     resulttype: ResultType::RtNote,
     archives: false,
     deleted: true,
-    created_after: after,
+    created_after: None,
     created_before: None,
     changed_after: after,
     changed_before: None,
-    synced_after: after,
-    synced_before: None,
+    unsynced: true,
     ordering: None,
   };
 
@@ -1284,12 +1298,11 @@ pub fn sync_stream(
     resulttype: ResultType::RtNote,
     archives: true,
     deleted: false,
-    created_after: after,
+    created_after: None,
     created_before: None,
     changed_after: after,
     changed_before: None,
-    synced_after: after,
-    synced_before: None,
+    unsynced: true,
     ordering: None,
   };
   let anstream = search_zknotes_stream(conn.clone(), uid, ans).map(bytesify);

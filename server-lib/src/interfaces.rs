@@ -329,7 +329,7 @@ pub async fn zk_interface_loggedin(
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let sbe: SaveZkNote = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-      let s = sqldata::save_zknote(&conn, uid, &sbe)?;
+      let s = sqldata::save_zknote(&conn, uid, &sbe, None)?;
       Ok(PrivateReplyMessage {
         what: PrivateReplies::SavedZkNote,
         content: serde_json::to_value(s)?,
@@ -348,7 +348,7 @@ pub async fn zk_interface_loggedin(
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let sznpl: SaveZkNoteAndLinks = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-      let (_, szkn) = sqldata::save_zknote(&conn, uid, &sznpl.note)?;
+      let (_, szkn) = sqldata::save_zknote(&conn, uid, &sznpl.note, None)?;
       let _s = sqldata::save_savezklinks(&conn, uid, szkn.id, sznpl.links)?;
       Ok(PrivateReplyMessage {
         what: PrivateReplies::SavedZkNoteAndLinks,
@@ -377,30 +377,14 @@ pub async fn zk_interface_loggedin(
         content: serde_json::to_value(hn)?,
       })
     }
-    PrivateRequests::SyncRemote => {
-      // let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-      let conn = Arc::new(sqldata::connection_open(
-        config.orgauth_config.db.as_path(),
-      )?);
-      let user = orgauth::dbfun::read_user_by_id(&conn, uid)?; // TODO pass this in from calling ftn?
-
-      // let tr = conn.unchecked_transaction()?;
-      // let res = sync::sync_to_remote(conn, &user, &mut sqldata::zknotes_callbacks()).await?;
-      // if res.what != PrivateReplies::SyncComplete {
-      //   Ok(res)
-      // } else {
-      //   // use a separate conn for this.
-      //   let conn = Arc::new(sqldata::connection_open(
-      //     config.orgauth_config.db.as_path(),
-      //   )?);
-      //   let remres = sync::sync_from_remote(&conn, &user, &mut zknotes_callbacks()).await?;
-      //   // tr.commit();
-      //   Ok(remres)
-      // }
-      let remres = sync::sync_from_remote(&conn, &user, &mut zknotes_callbacks()).await?;
-      // tr.commit();
-      Ok(remres)
-    }
+    PrivateRequests::SyncRemote => Ok(
+      sync::sync(
+        &config.orgauth_config.db.as_path(),
+        uid,
+        &mut zknotes_callbacks(),
+      )
+      .await?,
+    ),
   }
 }
 

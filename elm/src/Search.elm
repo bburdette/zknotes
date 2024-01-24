@@ -78,6 +78,7 @@ type alias ZkNoteSearch =
     , createdBefore : Maybe Int
     , changedAfter : Maybe Int
     , changedBefore : Maybe Int
+    , unsynced : Bool
     }
 
 
@@ -146,6 +147,7 @@ defaultSearch =
     , createdBefore = Nothing
     , changedAfter = Nothing
     , changedBefore = Nothing
+    , unsynced = False
     }
 
 
@@ -327,6 +329,7 @@ encodeZkNoteSearch zns =
         , ( "resulttype", encodeResultType zns.resultType )
         , ( "archives", JE.bool zns.archives )
         , ( "deleted", JE.bool zns.deleted )
+        , ( "unsynced", JE.bool zns.unsynced )
         ]
             ++ List.filterMap identity
                 [ encodeMaybe "created_after" zns.createdAfter JE.int
