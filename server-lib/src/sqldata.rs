@@ -1780,6 +1780,13 @@ pub fn read_zklinks_since_stream(
 
     // make an accessible notes temp table.
 
+    // add links for archive notes.
+    // archive notes being:
+    // notes that link to accessible notes, with links that have linknoteid = 'archive', and are owned by 'sysid'.
+    // all links to such notes?
+    // or, just the ones to 'archive' and to 'accessible notes' with linknoteid = 'archive'.
+
+    // TODO: unique id for this temp table.
     let tabname = format!("accnotes_{}", uid);
 
     println!("table name {}", tabname);
@@ -1799,54 +1806,71 @@ pub fn read_zklinks_since_stream(
       rusqlite::params_from_iter(acc_args.iter()),
     )?;
 
-    let pstmt1 = conn.prepare(
-      format!(
-        "select OU.uuid, FN.uuid, TN.uuid, LN.uuid, ZL.createdate
-        from zklink ZL, zknote FN, zknote TN, zknote LN, orgauth_user OU, {} FW, {} TW
-        where FN.id = ZL.fromid
-        and TN.id = ZL.toid
-        and LN.id = ZL.toid
-        and ZL.user = OU.id
-        and ZL.fromid = FW.id
-        and ZL.toid = TW.id
-        {} ",
-        tabname,
-        tabname,
-        if after.is_some() {
-          " and unlikely(ZL.syncdate > ? or ZL.createdate > ?)"
-        } else {
-          ""
+    let systemid = user_id(&conn, "system")?;
+    // archive note id.
+    let auid = Uuid::parse_str(SpecialUuids::Archive.str())?;
+    let archiveid = note_id_for_uuid(&conn, &auid)?;
+
+    // also insert archive notes into accessible notes!
+    let r = conn.execute(
+      format!("insert into {} select ZL.fromid from zklink ZL, {} AN
+          where ZL.toid = AN.id
+           and ZL.linkzknote = ?1
+           and ZL.user = ?2
+           on conflict DO NOTHING", tabname, tabname).as_str(),
+      params![archiveid, systemid],
+    )?;
+
+    // links.
+    {
+      let pstmt1 = conn.prepare(
+        format!(
+          "select OU.uuid, FN.uuid, TN.uuid, LN.uuid, ZL.createdate
+          from zklink ZL, zknote FN, zknote TN, zknote LN, orgauth_user OU, {} FW, {} TW
+          where FN.id = ZL.fromid
+          and TN.id = ZL.toid
+          and LN.id = ZL.toid
+          and ZL.user = OU.id
+          and ZL.fromid = FW.id
+          and ZL.toid = TW.id
+          {} ",
+          tabname,
+          tabname,
+          if after.is_some() {
+            " and unlikely(ZL.syncdate > ? or ZL.createdate > ?)"
+          } else {
+            ""
+          }
+        )
+        .as_str(),
+      );
+
+      let mut pstmt = pstmt1?;
+
+      let mut lnargs = Vec::new();
+      if let Some(a64) = after {
+        let a = a64.to_string();
+        let mut av = vec![a.clone(), a.clone()];
+        lnargs.append(&mut av);
+      }
+
+      yield SyncMessage::UuidZkLinkHeader;
+
+      let rec_iter = pstmt.query_map(rusqlite::params_from_iter(lnargs.iter()), |row| {
+        // println!("zklink uuid {:?}", row.get::<usize, String>(0)?);
+        Ok(SyncMessage::from(UuidZkLink {
+          userUuid: row.get(0)?,
+          fromUuid: row.get(1)?,
+          toUuid: row.get(2)?,
+          linkUuid: row.get(3)?,
+          createdate: row.get(4)?,
+        }))
+      })?;
+      for rec in rec_iter {
+        if let Ok(r) = rec {
+          println!("zklink {:?}", r);
+          yield r;
         }
-      )
-      .as_str(),
-    );
-
-    let mut pstmt = pstmt1?;
-
-    let mut lnargs = Vec::new();
-    if let Some(a64) = after {
-      let a = a64.to_string();
-      let mut av = vec![a.clone(), a.clone()];
-      lnargs.append(&mut av);
-    }
-
-    yield SyncMessage::UuidZkLinkHeader;
-
-    let rec_iter = pstmt.query_map(rusqlite::params_from_iter(lnargs.iter()), |row| {
-      // println!("zklink uuid {:?}", row.get::<usize, String>(0)?);
-      Ok(SyncMessage::from(UuidZkLink {
-        userUuid: row.get(0)?,
-        fromUuid: row.get(1)?,
-        toUuid: row.get(2)?,
-        linkUuid: row.get(3)?,
-        createdate: row.get(4)?,
-      }))
-    })?;
-
-    for rec in rec_iter {
-      if let Ok(r) = rec {
-        println!("zklink {:?}", r);
-        yield r;
       }
     }
 

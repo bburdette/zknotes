@@ -283,8 +283,6 @@ type alias GetZkLinks =
 type alias GetZkNoteComments =
     { zknote : ZkNoteId
     , offset : Int
-
-    -- , limit : Maybe Int
     }
 
 
