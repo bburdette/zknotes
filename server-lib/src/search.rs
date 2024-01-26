@@ -217,6 +217,9 @@ pub fn search_zknotes_stream(
     };
     let (sql, args) = build_sql(&conn, user, &search)?;
 
+    println!("zknote search sql {}", sql);
+    println!("zknote search args {:?}", args);
+
     let mut stmt = conn.prepare(sql.as_str())?;
     let mut rows = stmt.query(rusqlite::params_from_iter(args.iter()))?;
     yield SyncMessage::from(ZkSearchResultHeader {
@@ -349,13 +352,12 @@ pub fn build_sql(
 ) -> Result<(String, Vec<String>), zkerr::Error> {
   let (mut cls, mut clsargs) = build_tagsearch_clause(&conn, uid, false, &search.tagsearch)?;
 
-  let (dtcls, mut dtclsargs) = build_daterange_clause(&search)?;
-  if !dtclsargs.is_empty() {
+  if let Some((dtcls, mut dtclsargs)) = build_daterange_clause(&search)? {
     cls.push_str("\nand (");
     cls.push_str(dtcls.as_str());
     cls.push_str(")");
     clsargs.append(&mut dtclsargs);
-  }
+  };
 
   let publicid = note_id(&conn, "system", "public")?;
   let archiveid = note_id(&conn, "system", "archive")?;
@@ -591,7 +593,9 @@ pub fn build_sql(
   Ok((sqlbase, baseargs))
 }
 
-fn build_daterange_clause(search: &ZkNoteSearch) -> Result<(String, Vec<String>), zkerr::Error> {
+fn build_daterange_clause(
+  search: &ZkNoteSearch,
+) -> Result<Option<(String, Vec<String>)>, zkerr::Error> {
   let create_clawses = [
     search
       .created_after
@@ -628,7 +632,6 @@ fn build_daterange_clause(search: &ZkNoteSearch) -> Result<(String, Vec<String>)
 
   let (crcls, mut crargs) = join(create_clawses.to_vec(), " and ");
   let (changedcls, mut changedargs) = join(changed_clawses.to_vec(), " and ");
-  // let (synccls, mut syncargs) = join(sync_clawses.to_vec(), " and ");
 
   let clause: String = {
     let mut v: Vec<String> = Vec::new();
@@ -646,7 +649,11 @@ fn build_daterange_clause(search: &ZkNoteSearch) -> Result<(String, Vec<String>)
   let mut args: Vec<String> = Vec::new();
   args.append(&mut crargs);
   args.append(&mut changedargs);
-  Ok((clause, args))
+  if clause == "" {
+    Ok(None)
+  } else {
+    Ok(Some((clause, args)))
+  }
 }
 
 fn build_tagsearch_clause(

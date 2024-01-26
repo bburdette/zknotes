@@ -733,6 +733,7 @@ pub async fn sync(
   let after = prev_sync(&conn, &user, &extra_login_data.zknote)
     .await?
     .map(|cs| cs.now);
+  let after = None;
 
   let now = now()?;
 
@@ -745,7 +746,7 @@ pub async fn sync(
   } else {
     // use a separate conn for this.
     let conn2 = Arc::new(sqldata::connection_open(dbpath)?);
-    let remres = sync_to_remote(conn2, &user, callbacks).await?;
+    let remres = sync_to_remote(conn2, &user, after, callbacks).await?;
 
     let unote = user_note_id(&conn, user.id)?;
     save_sync(&conn, user.id, unote, CompletedSync { after, now }).await?;
@@ -919,7 +920,7 @@ where
       .get(&note.user)
       .ok_or_else(|| zkerr::Error::String("user not found".to_string()))?;
 
-    println!("synching note: {} {}", note.id, note.deleted);
+    println!("syncing note: {} {}", note.id, note.deleted);
     match conn.execute(
         "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate, syncdate)
          values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
@@ -1180,6 +1181,7 @@ where
 pub async fn sync_to_remote(
   conn: Arc<Connection>,
   user: &User,
+  after: Option<i64>,
   callbacks: &mut Callbacks,
 ) -> Result<PrivateReplyMessage, zkerr::Error> {
   // let tr = conn.transaction()?;
@@ -1189,9 +1191,9 @@ pub async fn sync_to_remote(
   // TODO: get time on remote system, bail if too far out.
 
   // get previous sync.
-  let after = prev_sync(&conn, &user, &extra_login_data.zknote)
-    .await?
-    .map(|cs| cs.now);
+  // let after = prev_sync(&conn, &user, &extra_login_data.zknote)
+  //   .await?
+  //   .map(|cs| cs.now);
   // let after = None;
 
   println!("\n\n start sync, prev_sync {:?} \n\n", after);
@@ -1217,6 +1219,26 @@ pub async fn sync_to_remote(
   println!("sync to remote 3 - cookie: {:?}", cookie);
 
   let ss = sync_stream(conn, user.id, after, callbacks);
+
+  // use futures::executor::block_on;
+  // use futures::{future, future::FutureExt, stream, stream::StreamExt};
+  // use tokio::io::AsyncWriteExt;
+  // let mut file = tokio::fs::OpenOptions::new()
+  //   .write(true)
+  //   .create(true)
+  //   .open("some_file")
+  //   .await
+  //   .unwrap();
+
+  // ss.for_each(|item| match item {
+  //   Ok(bytes) => {
+  //     block_on(file.write(&bytes));
+  //     future::ready(())
+  //   }
+  //   Err(e) => future::ready(()),
+  // })
+  // .await;
+
   println!("sync to remote 4");
   let res = awc::Client::new()
     .post(uri)
@@ -1224,10 +1246,8 @@ pub async fn sync_to_remote(
     .timeout(Duration::from_secs(60 * 60))
     .send_body(awc::body::BodyStream::new(ss))
     .await;
-
-  // tr.commit()?;
-
   println!("sync to remote 5 : {:?}", res);
+
   Ok(PrivateReplyMessage {
     what: PrivateReplies::SyncComplete,
     content: serde_json::Value::Null,
@@ -1238,6 +1258,7 @@ pub fn bytesify(
   x: Result<SyncMessage, Box<dyn std::error::Error>>,
 ) -> Result<Bytes, Box<dyn std::error::Error>> {
   x.and_then(|x| {
+    // Err("this is the error from bytesify".into())
     serde_json::to_value(x)
       .map(|x| {
         Bytes::from({
