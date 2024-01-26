@@ -18,6 +18,7 @@ use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
+use tracing::debug;
 use uuid::Uuid;
 use zkprotocol::constants::PrivateReplies;
 use zkprotocol::constants::SpecialUuids;
@@ -365,6 +366,11 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: Option<i64>) -> Result<(), zke
     info!("udpate33");
     zkm::udpate33(&dbfile)?;
     set_single_value(&conn, "migration_level", "33")?;
+  }
+  if nlevel < 34 {
+    info!("udpate34");
+    zkm::udpate34(&dbfile)?;
+    set_single_value(&conn, "migration_level", "34")?;
   }
 
   info!("db up to date.");
@@ -1209,12 +1215,15 @@ pub fn delete_zknote(
 pub fn save_zklinks(dbfile: &Path, uid: i64, zklinks: Vec<ZkLink>) -> Result<(), zkerr::Error> {
   let conn = connection_open(dbfile)?;
 
+  println!("save_zklinks");
+
   for zklink in zklinks.iter() {
     // TODO: integrate into sql instead of separate queries.
     let to = note_id_for_uuid(&conn, &zklink.to)?;
     let from = note_id_for_uuid(&conn, &zklink.from)?;
     if zklink.user == uid {
       if zklink.delete == Some(true) {
+        println!("deleting zklink! {:?}", zklink);
         // create archive record.
         let now = now()?;
         conn.execute(
@@ -1223,6 +1232,8 @@ pub fn save_zklinks(dbfile: &Path, uid: i64, zklinks: Vec<ZkLink>) -> Result<(),
             where fromid = ?2 and toid = ?3 and user = ?4",
           params![now, from, to, uid],
         )?;
+
+        println!("created zklinkarchive {}", conn.last_insert_rowid());
         // delete link.
         conn.execute(
           "delete from zklink where fromid = ?1 and toid = ?2 and user = ?3",
@@ -1246,6 +1257,7 @@ pub fn save_savezklinks(
   zknid: ZkNoteId,
   zklinks: Vec<SaveZkLink>,
 ) -> Result<(), zkerr::Error> {
+  println!("save_savezklinks");
   for link in zklinks.iter() {
     let (uufrom, uuto) = match link.direction {
       Direction::From => (link.otherid, zknid),
@@ -1256,6 +1268,7 @@ pub fn save_savezklinks(
     let from = note_id_for_uuid(&conn, &uufrom)?;
     if link.user == uid {
       if link.delete == Some(true) {
+        println!("deleting zklink! {:?}", link);
         // create archive record.
         let now = now()?;
         conn.execute(
@@ -1264,6 +1277,7 @@ pub fn save_savezklinks(
             where fromid = ?2 and toid = ?3 and user = ?4",
           params![now, from, to, uid],
         )?;
+        println!("created zklinkarchive {}", conn.last_insert_rowid());
         // delete the link.
         conn.execute(
           "delete from zklink where fromid = ?1 and toid = ?2 and user = ?3",
@@ -1654,10 +1668,11 @@ pub fn read_archivezklinks_stream(
         and ZLA.user = OU.id
         and ZLA.fromid in accessible_notes
         and ZLA.toid in accessible_notes
+        and ZLA.syncdate is null
         {}",
         acc_sql,
         if after.is_some() {
-          " and unlikely(ZLA.syncdate > ? or ZLA.deletedate > ? or ZLA.createdate > ?)"
+          " and unlikely(ZLA.deletedate > ? or ZLA.createdate > ?)"
         } else {
           ""
         }
@@ -1667,8 +1682,8 @@ pub fn read_archivezklinks_stream(
 
     if let Some(a64) = after {
       let a = a64.to_string();
-      let mut av = vec![a.clone(), a.clone(), a.clone()];
-      acc_args.append(&mut av);
+      acc_args.push(a.clone());
+      acc_args.push(a);
     }
 
     println!("\n\n read_archivezklinks_stream \n {:?}", pstmt.expanded_sql());
@@ -1734,10 +1749,11 @@ pub fn read_zklinks_since(
         and ZL.user = OU.id
         and ZL.fromid in accessible_notes
         and ZL.toid in accessible_notes
+        and ZL.syncdate is null
       {}",
       acc_sql,
       if after.is_some() {
-        " and unlikely(ZL.syncdate > ? or ZL.createdate > ?)"
+        " and unlikely(ZL.createdate > ?)"
       } else {
         ""
       }
@@ -1747,8 +1763,7 @@ pub fn read_zklinks_since(
 
   if let Some(a64) = after {
     let a = a64.to_string();
-    let mut av = vec![a.clone(), a.clone()];
-    acc_args.append(&mut av);
+    acc_args.push(a);
   }
 
   // println!("accarts {}", acc_args.len());
@@ -1821,7 +1836,9 @@ pub fn read_zklinks_since_stream(
       params![archiveid, systemid],
     )?;
 
-    // links.
+    // links.  Fact:  these records are only created when a link is deleted!
+    // so the createdate is the date the original link was created, and the deletedate is the date the
+    // zklinkarchive record was created.
     {
       let pstmt1 = conn.prepare(
         format!(
@@ -1833,11 +1850,12 @@ pub fn read_zklinks_since_stream(
           and ZL.user = OU.id
           and ZL.fromid = FW.id
           and ZL.toid = TW.id
+          and ZL.syncdate is null
           {} ",
           tabname,
           tabname,
           if after.is_some() {
-            " and unlikely(ZL.syncdate > ? or ZL.createdate > ?)"
+            " and unlikely(ZL.createdate > ?)"
           } else {
             ""
           }
@@ -1849,9 +1867,7 @@ pub fn read_zklinks_since_stream(
 
       let mut lnargs = Vec::new();
       if let Some(a64) = after {
-        let a = a64.to_string();
-        let mut av = vec![a.clone(), a.clone()];
-        lnargs.append(&mut av);
+        lnargs.push(a64.to_string());
       }
 
       yield SyncMessage::UuidZkLinkHeader;

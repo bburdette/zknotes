@@ -733,7 +733,6 @@ pub async fn sync(
   let after = prev_sync(&conn, &user, &extra_login_data.zknote)
     .await?
     .map(|cs| cs.now);
-  let after = None;
 
   let now = now()?;
 
@@ -775,7 +774,6 @@ pub async fn sync_from_remote(
 
   println!("sync uri {:?}", uri);
 
-  // let client = awc::Client::new();
   let cookie = cookie::Cookie::parse_encoded(c)?;
   println!("sync to remote 3 - cookie: {:?}", cookie);
 
@@ -1046,8 +1044,8 @@ where
 
   while let SyncMessage::ArchiveZkLink(ref l) = sm {
     let ins = match conn.execute(
-      "insert into zklinkarchive (fromid, toid, user, linkzknote, createdate, deletedate)
-              select FN.id, TN.id, U.id, LN.id, ?1, ?2
+      "insert into zklinkarchive (fromid, toid, user, linkzknote, createdate, deletedate, syncdate)
+              select FN.id, TN.id, U.id, LN.id, ?1, ?2, ?7
               from zknote FN, zknote TN, orgauth_user U, zknote LN
               where FN.uuid = ?3
                 and TN.uuid = ?4
@@ -1059,7 +1057,8 @@ where
         l.fromUuid,
         l.toUuid,
         l.userUuid,
-        l.linkUuid
+        l.linkUuid,
+        now
       ],
     ) {
       Ok(_x) => 1,
@@ -1101,17 +1100,24 @@ where
   while let SyncMessage::UuidZkLink(ref l) = sm {
     println!("saving link!, {:?}", l);
     let ins = match conn.execute(
-      "with vals(a,b,c,d,e) as (
-              select FN.id, TN.id, U.id, LN.id, ?1
+      "with vals(a,b,c,d,e,f) as (
+              select FN.id, TN.id, U.id, LN.id, ?1, ?6
               from zknote FN, zknote TN, orgauth_user U
                 left outer join zknote LN
                  on LN.uuid = ?5
               where FN.uuid = ?2
                 and TN.uuid = ?3
                 and U.uuid = ?4)
-              insert into zklink (fromid, toid, user, linkzknote, createdate)
+              insert into zklink (fromid, toid, user, linkzknote, createdate, syncdate)
                 select * from vals ",
-      params![l.createdate, l.fromUuid, l.toUuid, l.userUuid, l.linkUuid],
+      params![
+        l.createdate,
+        l.fromUuid,
+        l.toUuid,
+        l.userUuid,
+        l.linkUuid,
+        now
+      ],
     ) {
       Ok(c) => {
         println!("inserted {}", c);
@@ -1168,9 +1174,6 @@ where
 
   println!("dropped {} links", dropped);
 
-  // let unote = user_note_id(conn, user.id)?;
-  // save_sync(conn, user.id, unote, CompletedSync { after, now }).await?;
-
   Ok(PrivateReplyMessage {
     what: PrivateReplies::SyncComplete,
     content: serde_json::Value::Null,
@@ -1189,12 +1192,6 @@ pub async fn sync_to_remote(
   let extra_login_data = sqldata::read_user_by_id(&conn, user.id)?;
 
   // TODO: get time on remote system, bail if too far out.
-
-  // get previous sync.
-  // let after = prev_sync(&conn, &user, &extra_login_data.zknote)
-  //   .await?
-  //   .map(|cs| cs.now);
-  // let after = None;
 
   println!("\n\n start sync, prev_sync {:?} \n\n", after);
 
@@ -1257,19 +1254,23 @@ pub async fn sync_to_remote(
 pub fn bytesify(
   x: Result<SyncMessage, Box<dyn std::error::Error>>,
 ) -> Result<Bytes, Box<dyn std::error::Error>> {
-  x.and_then(|x| {
-    // Err("this is the error from bytesify".into())
-    serde_json::to_value(x)
-      .map(|x| {
-        Bytes::from({
-          let mut z = x.to_string();
-          println!("bytesify '{}'", z);
-          z.push_str("\n");
-          z
-        })
+  // map errors to SyncErrors so we'll at least see them on the client.
+  // not sure how to log these on the server side.
+  let sm = match x {
+    Ok(sm) => sm,
+    Err(e) => SyncMessage::SyncError(e.to_string()),
+  };
+
+  serde_json::to_value(sm)
+    .map(|x| {
+      Bytes::from({
+        let mut z = x.to_string();
+        println!("bytesify '{}'", z);
+        z.push_str("\n");
+        z
       })
-      .map_err(|e| e.into())
-  })
+    })
+    .map_err(|e| e.into())
 }
 
 // Make a stream of all the records needed to sync the remote.

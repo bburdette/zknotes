@@ -239,6 +239,7 @@ pub enum SyncMessage {
   ArchiveZkLink(ArchiveZkLink),
   UuidZkLinkHeader,
   UuidZkLink(UuidZkLink),
+  SyncError(String),
   SyncEnd,
 }
 

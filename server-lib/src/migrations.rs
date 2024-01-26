@@ -2760,3 +2760,29 @@ pub fn udpate33(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 
   Ok(())
 }
+
+// default system notes get 0 dates so they won't generate archive notes on first sync.
+pub fn udpate34(dbfile: &Path) -> Result<(), orgauth::error::Error> {
+  let conn = Connection::open(dbfile)?;
+
+  let mut ids = Vec::new();
+
+  ids.push(format!("'{}'", SpecialUuids::Public.str()).to_string());
+  ids.push(format!("'{}'", SpecialUuids::Comment.str()).to_string());
+  ids.push(format!("'{}'", SpecialUuids::Share.str()).to_string());
+  ids.push(format!("'{}'", SpecialUuids::Search.str()).to_string());
+  ids.push(format!("'{}'", SpecialUuids::User.str()).to_string());
+  ids.push(format!("'{}'", SpecialUuids::Archive.str()).to_string());
+  ids.push(format!("'{}'", SpecialUuids::Sync.str()).to_string());
+
+  conn.execute(
+    format!(
+      "update zknote set createdate = 0, changeddate = 0 where uuid in ({})",
+      ids.join(",").as_str()
+    )
+    .as_str(),
+    params![],
+  )?;
+
+  Ok(())
+}
