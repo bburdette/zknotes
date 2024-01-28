@@ -43,7 +43,7 @@ pub fn power_delete_zknotes(
     created_before: None,
     changed_after: None,
     changed_before: None,
-    unsynced: false,
+    unsynced: None,
     ordering: None,
   };
   let znsr = search_zknotes(conn, user, &nolimsearch)?;
@@ -350,6 +350,31 @@ pub fn build_sql(
   uid: i64,
   search: &ZkNoteSearch,
 ) -> Result<(String, Vec<String>), zkerr::Error> {
+  let (sql, args) = build_base_sql(conn, uid, search)?;
+  match search.unsynced {
+    Some(remotenoteid) => {
+      let nusql = format!(
+        "with SN ( id, uuid, title, file, user, createdate, changeddate) as ({})
+        select SN.id, SN.uuid, SN.title, SN.file, SN.user, SN.createdate, SN.changeddate
+        from SN 
+        left join zklink ZL
+        on ZL.fromid = SN.id
+        where ZL.toid = {}
+        and (ZL.createdate is null or ZL.createdate < SN.changedate)
+        ",
+        sql, remotenoteid
+      );
+      Ok((nusql, args))
+    }
+    None => Ok((sql, args)),
+  }
+}
+
+pub fn build_base_sql(
+  conn: &Connection,
+  uid: i64,
+  search: &ZkNoteSearch,
+) -> Result<(String, Vec<String>), zkerr::Error> {
   let (mut cls, mut clsargs) = build_tagsearch_clause(&conn, uid, false, &search.tagsearch)?;
 
   if let Some((dtcls, mut dtclsargs)) = build_daterange_clause(&search)? {
@@ -392,8 +417,6 @@ pub fn build_sql(
   } else {
     "and N.deleted = 0"
   };
-
-  println!("deleted {}", deleted);
 
   let (mut sqlbase, mut baseargs) = if archives {
     (
@@ -612,11 +635,6 @@ fn build_daterange_clause(
       .changed_before
       .map(|dt| ("N.changeddate < ?", dt.to_string())),
   ];
-  let sync_clawse = if search.unsynced {
-    Some("(N.syncdate < N.changeddate or N.syncdate is null)")
-  } else {
-    None
-  };
   let join = |clawses: Vec<Option<(&str, String)>>, conj| {
     let clause = clawses
       .iter()
@@ -640,9 +658,6 @@ fn build_daterange_clause(
     }
     if changedcls != "" {
       v.push(changedcls);
-    }
-    if let Some(synccls) = sync_clawse {
-      v.push(synccls.to_string());
     }
     v.join(" and ")
   };

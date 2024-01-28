@@ -90,7 +90,7 @@ pub async fn prev_sync(
     created_before: None,
     changed_after: None,
     changed_before: None,
-    unsynced: false,
+    unsynced: None,
     ordering: Some(Ordering {
       field: OrderField::Changed,
       direction: OrderDirection::Descending,
@@ -205,7 +205,7 @@ pub async fn sync_from_remote_prev(
           created_before: None,
           changed_after: after,
           changed_before: None,
-          unsynced: true,
+          unsynced: None, // TODO: point at 'remote' note.
           ordering: None,
         };
 
@@ -407,7 +407,7 @@ pub async fn sync_from_remote_prev(
           created_before: None,
           changed_after: after,
           changed_before: None,
-          unsynced: true,
+          unsynced: None, // TODO: point at 'remote' note.
           ordering: None,
         };
 
@@ -1297,7 +1297,7 @@ pub fn sync_stream(
     created_before: None,
     changed_after: after,
     changed_before: None,
-    unsynced: true,
+    unsynced: None, // TODO: point at 'remote' note.
     ordering: None,
   };
 
@@ -1324,7 +1324,7 @@ pub fn sync_stream(
     created_before: None,
     changed_after: after,
     changed_before: None,
-    unsynced: true,
+    unsynced: None, // TODO: point at 'remote' note.
     ordering: None,
   };
   let anstream = search_zknotes_stream(conn.clone(), uid, ans).map(bytesify);
