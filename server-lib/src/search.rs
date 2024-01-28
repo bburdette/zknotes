@@ -1,5 +1,6 @@
 use crate::error as zkerr;
 use crate::sqldata;
+use crate::sqldata::note_id_for_uuid;
 use crate::sqldata::{delete_zknote, get_sysids, note_id};
 use async_stream::try_stream;
 use bytes::Bytes;
@@ -353,6 +354,7 @@ pub fn build_sql(
   let (sql, args) = build_base_sql(conn, uid, search)?;
   match search.unsynced {
     Some(remotenoteid) => {
+      let rnid = sqldata::note_id_for_zknoteid(conn, &remotenoteid)?;
       let nusql = format!(
         "with SN ( id, uuid, title, file, user, createdate, changeddate) as ({})
         select SN.id, SN.uuid, SN.title, SN.file, SN.user, SN.createdate, SN.changeddate
@@ -362,7 +364,7 @@ pub fn build_sql(
         where ZL.toid = {}
         and (ZL.createdate is null or ZL.createdate < SN.changedate)
         ",
-        sql, remotenoteid
+        sql, rnid
       );
       Ok((nusql, args))
     }

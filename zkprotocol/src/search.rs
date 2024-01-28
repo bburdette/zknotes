@@ -13,7 +13,7 @@ pub struct ZkNoteSearch {
   pub created_before: Option<i64>,
   pub changed_after: Option<i64>,
   pub changed_before: Option<i64>,
-  pub unsynced: Option<i64>,
+  pub unsynced: Option<ZkNoteId>,
   pub ordering: Option<Ordering>,
 }
 
