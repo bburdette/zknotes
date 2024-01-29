@@ -1,4 +1,5 @@
 use crate::error as zkerr;
+use crate::sqldata::set_single_value;
 use crate::util::now;
 use barrel::backend::Sqlite;
 use barrel::{types, Migration};
@@ -6,6 +7,7 @@ use orgauth::migrations;
 use regex::{Captures, Regex};
 use rusqlite::{params, Connection};
 use std::path::Path;
+use uuid::Uuid;
 use zkprotocol::constants::SpecialUuids;
 
 pub fn initialdb() -> Migration {
@@ -2382,351 +2384,8 @@ pub fn udpate31(dbfile: &Path) -> Result<(), zkerr::Error> {
   Ok(())
 }
 
-// add sync_date to zknote, zklink, zkarchivelink.
-pub fn udpate32(dbfile: &Path) -> Result<(), orgauth::error::Error> {
-  let conn = Connection::open(dbfile)?;
-  conn.execute("PRAGMA foreign_keys = false;", params![])?;
-
-  // ---------------------------------------------------
-  // add sync date to zknote.
-
-  // zknote temp.
-  conn.execute(
-    r#"CREATE TABLE IF NOT EXISTS "zknotetemp" ("id" INTEGER PRIMARY KEY NOT NULL,
-         "title" TEXT NOT NULL,
-         "content" TEXT NOT NULL,
-         "sysdata" TEXT,
-         "pubid" TEXT UNIQUE,
-         "user" INTEGER NOT NULL REFERENCES orgauth_user(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
-         "editable" BOOLEAN NOT NULL,
-         "showtitle" BOOLEAN NOT NULL,
-         "deleted" BOOLEAN NOT NULL,
-         "file" INTEGER REFERENCES file(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
-         "uuid" TEXT NOT NULL,
-         "createdate" INTEGER NOT NULL,
-         "changeddate" INTEGER NOT NULL)"#,
-    params![],
-  )?;
-
-  // copy everything from zknote table.
-  conn.execute(
-    "insert into zknotetemp 
-                 ( id,
-                   title,
-                   content,
-                   sysdata,
-                   pubid,
-                   user,
-                   editable,
-                   showtitle,
-                   deleted,
-                   file,
-                   uuid,
-                   createdate,
-                   changeddate)
-     select  id,
-             title,
-             content,
-             sysdata,
-             pubid,
-             user,
-             editable,
-             showtitle,
-             deleted,
-             file,
-             uuid,
-             createdate,
-             changeddate
-     from zknote",
-    params![],
-  )?;
-
-  // drop zknote, make new zkknote with syncdate column.
-  conn.execute("drop table zknote", params![])?;
-
-  let mut m1 = Migration::new();
-  // new zknote with syncdate column
-  m1.create_table("zknote", |t| {
-    t.add_column(
-      "id",
-      types::integer()
-        .primary(true)
-        .increments(true)
-        .nullable(false),
-    );
-    t.add_column("title", types::text().nullable(false));
-    t.add_column("content", types::text().nullable(false));
-    t.add_column("sysdata", types::text().nullable(true));
-    t.add_column("pubid", types::text().nullable(true).unique(true));
-    t.add_column(
-      "user",
-      types::foreign(
-        "orgauth_user",
-        "id",
-        types::ReferentialAction::Restrict,
-        types::ReferentialAction::Restrict,
-      )
-      .nullable(false),
-    );
-    t.add_column("editable", types::boolean());
-    t.add_column("showtitle", types::boolean());
-    t.add_column("deleted", types::boolean());
-    t.add_column(
-      "file",
-      types::foreign(
-        "file",
-        "id",
-        types::ReferentialAction::Restrict,
-        types::ReferentialAction::Restrict,
-      )
-      .nullable(true),
-    );
-    t.add_column("uuid", types::text().nullable(false));
-    t.add_column("createdate", types::integer().nullable(false));
-    t.add_column("changeddate", types::integer().nullable(false));
-    t.add_column("syncdate", types::integer().nullable(true));
-    t.add_index("unq_uuid", types::index(vec!["uuid"]).unique(true));
-    t.add_index(
-      "idx_createdate",
-      types::index(vec!["createdate"]).unique(false),
-    );
-    t.add_index(
-      "idx_changeddate",
-      types::index(vec!["changeddate"]).unique(false),
-    );
-    t.add_index("idx_syncdate", types::index(vec!["syncdate"]).unique(false));
-  });
-
-  conn.execute_batch(m1.make::<Sqlite>().as_str())?;
-
-  // copy everything back.
-  conn.execute(
-    "insert into zknote 
-                 ( id,
-                   title,
-                   content,
-                   sysdata,
-                   pubid,
-                   user,
-                   editable,
-                   showtitle,
-                   deleted,
-                   file,
-                   uuid,
-                   createdate,
-                   changeddate)
-     select  id,
-             title,
-             content,
-             sysdata,
-             pubid,
-             user,
-             editable,
-             showtitle,
-             deleted,
-             file,
-             uuid,
-             createdate,
-             changeddate
-     from zknotetemp",
-    params![],
-  )?;
-
-  conn.execute("drop table zknotetemp", params![])?;
-
-  // ---------------------------------------------------
-  // zklink
-
-  conn.execute(
-    r#" CREATE TABLE IF NOT EXISTS "zklinktemp" 
-    ("fromid" INTEGER NOT NULL REFERENCES zknote(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
-     "toid" INTEGER NOT NULL REFERENCES zknote(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
-     "user" INTEGER NOT NULL REFERENCES orgauth_user(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
-     "linkzknote" INTEGER REFERENCES zknote(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
-     "createdate" INTEGER NOT NULL)"#,
-    params![],
-  )?;
-
-  conn.execute(
-    r#" insert into zklinktemp (fromid, toid, user, linkzknote, createdate) 
-    select fromid, toid, user, linkzknote, createdate from zklink"#,
-    params![],
-  )?;
-
-  conn.execute("drop table zklink", params![])?;
-
-  let mut m2 = Migration::new();
-  // new zklink with syncdate
-  m2.create_table("zklink", |t| {
-    t.add_column(
-      "fromid",
-      types::foreign(
-        "zknote",
-        "id",
-        types::ReferentialAction::Restrict,
-        types::ReferentialAction::Restrict,
-      )
-      .nullable(false),
-    );
-    t.add_column(
-      "toid",
-      types::foreign(
-        "zknote",
-        "id",
-        types::ReferentialAction::Restrict,
-        types::ReferentialAction::Restrict,
-      )
-      .nullable(false),
-    );
-    t.add_column(
-      "user",
-      types::foreign(
-        "orgauth_user",
-        "id",
-        types::ReferentialAction::Restrict,
-        types::ReferentialAction::Restrict,
-      )
-      .nullable(false),
-    );
-    t.add_column(
-      "linkzknote",
-      types::foreign(
-        "zknote",
-        "id",
-        types::ReferentialAction::Restrict,
-        types::ReferentialAction::Restrict,
-      )
-      .nullable(true),
-    );
-    t.add_column("createdate", types::integer().nullable(false));
-    t.add_column("syncdate", types::integer().nullable(true));
-    t.add_index(
-      "zklinkunq",
-      types::index(vec!["fromid", "toid", "user"]).unique(true),
-    );
-    t.add_index(
-      "zklinkcreatedate",
-      types::index(vec!["createdate"]).unique(false),
-    );
-    t.add_index(
-      "zklinksyncdate",
-      types::index(vec!["syncdate"]).unique(false),
-    );
-  });
-  conn.execute_batch(m2.make::<Sqlite>().as_str())?;
-
-  conn.execute(
-    r#" insert into zklink (fromid, toid, user, linkzknote, createdate) 
-    select fromid, toid, user, linkzknote, createdate from zklinktemp"#,
-    params![],
-  )?;
-  conn.execute("drop table zklinktemp", params![])?;
-
-  // ---------------------------------------------------
-  // zklinkarchive
-
-  conn.execute(
-    r#"CREATE TABLE IF NOT EXISTS "zklinkarchivetemp" 
-    ("id" INTEGER PRIMARY KEY NOT NULL,
-     "fromid" INTEGER NOT NULL REFERENCES zknote(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
-     "toid" INTEGER NOT NULL REFERENCES zknote(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
-     "user" INTEGER NOT NULL REFERENCES orgauth_user(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
-     "linkzknote" INTEGER REFERENCES zknote(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
-     "createdate" INTEGER NOT NULL,
-     "deletedate" INTEGER NOT NULL)"#,
-    params![],
-  )?;
-
-  conn.execute(
-    r#" insert into zklinkarchivetemp (id, fromid, toid, user, linkzknote, createdate, deletedate) 
-    select id, fromid, toid, user, linkzknote, createdate, deletedate from zklinkarchive"#,
-    params![],
-  )?;
-
-  conn.execute("drop table zklinkarchive", params![])?;
-
-  let mut m3 = Migration::new();
-  // archive table, adding syncdate
-  m3.create_table("zklinkarchive", |t| {
-    t.add_column(
-      "id",
-      types::integer()
-        .primary(true)
-        .increments(true)
-        .nullable(false),
-    );
-    t.add_column(
-      "fromid",
-      types::foreign(
-        "zknote",
-        "id",
-        types::ReferentialAction::Restrict,
-        types::ReferentialAction::Restrict,
-      )
-      .nullable(false),
-    );
-    t.add_column(
-      "toid",
-      types::foreign(
-        "zknote",
-        "id",
-        types::ReferentialAction::Restrict,
-        types::ReferentialAction::Restrict,
-      )
-      .nullable(false),
-    );
-    t.add_column(
-      "user",
-      types::foreign(
-        "orgauth_user",
-        "id",
-        types::ReferentialAction::Restrict,
-        types::ReferentialAction::Restrict,
-      )
-      .nullable(false),
-    );
-    t.add_column(
-      "linkzknote",
-      types::foreign(
-        "zknote",
-        "id",
-        types::ReferentialAction::Restrict,
-        types::ReferentialAction::Restrict,
-      )
-      .nullable(true),
-    );
-    t.add_column("createdate", types::integer().nullable(false));
-    t.add_column("deletedate", types::integer().nullable(false));
-    t.add_column("syncdate", types::integer().nullable(true));
-    t.add_index(
-      "zklinkarchive_createdate",
-      types::index(vec!["createdate"]).unique(false),
-    );
-    t.add_index(
-      "zklinkarchive_deletedate",
-      types::index(vec!["deletedate"]).unique(false),
-    );
-    t.add_index(
-      "zklinkarchive_syncdate",
-      types::index(vec!["syncdate"]).unique(false),
-    );
-  });
-
-  conn.execute_batch(m3.make::<Sqlite>().as_str())?;
-
-  conn.execute(
-    r#" insert into zklinkarchive (id, fromid, toid, user, linkzknote, createdate, deletedate) 
-    select id, fromid, toid, user, linkzknote, createdate, deletedate from zklinkarchivetemp"#,
-    params![],
-  )?;
-
-  conn.execute("drop table zklinkarchivetemp", params![])?;
-
-  Ok(())
-}
-
 // add 'sync' system note.
-pub fn udpate33(dbfile: &Path) -> Result<(), orgauth::error::Error> {
+pub fn udpate32(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   let conn = Connection::open(dbfile)?;
 
   let sysid: i64 = conn.query_row(
@@ -2762,7 +2421,7 @@ pub fn udpate33(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 }
 
 // default system notes get 0 dates so they won't generate archive notes on first sync.
-pub fn udpate34(dbfile: &Path) -> Result<(), orgauth::error::Error> {
+pub fn udpate33(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   let conn = Connection::open(dbfile)?;
 
   let mut ids = Vec::new();
@@ -2782,6 +2441,40 @@ pub fn udpate34(dbfile: &Path) -> Result<(), orgauth::error::Error> {
     )
     .as_str(),
     params![],
+  )?;
+
+  Ok(())
+}
+
+// add unique server id in singlevalue table.
+pub fn udpate34(dbfile: &Path) -> Result<(), orgauth::error::Error> {
+  let conn = Connection::open(dbfile)?;
+
+  // let sysid: i64 = conn.query_row(
+  //   "select id from orgauth_user
+  //     where orgauth_user.name = ?1",
+  //   params!["system"],
+  //   |row| Ok(row.get(0)?),
+  // )?;
+
+  // // system note 'remote'
+  // conn.execute(
+  //   "insert into zknote (title, content, user, uuid, editable, showtitle, deleted, createdate, changeddate)
+  //     values ('remote', '', ?1, ?2, 0, 0, 0, 0, 0)",
+  //   params![sysid, SpecialUuids::Remote.str().to_string()],
+  // )?;
+
+  let sid = Uuid::new_v4();
+
+  conn.execute(
+    "insert into singlevalue (name, value) values (?1, ?2)",
+    params!["server_id", sid.to_string()],
+  )?;
+
+  // sync id for unique sync work table name
+  conn.execute(
+    "insert into singlevalue (name, value) values (?1, ?2)",
+    params!["sync_id", 0],
   )?;
 
   Ok(())

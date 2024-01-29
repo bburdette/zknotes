@@ -44,7 +44,6 @@ pub fn power_delete_zknotes(
     created_before: None,
     changed_after: None,
     changed_before: None,
-    unsynced: None,
     ordering: None,
   };
   let znsr = search_zknotes(conn, user, &nolimsearch)?;
@@ -96,7 +95,7 @@ pub fn search_zknotes(
   user: i64,
   search: &ZkNoteSearch,
 ) -> Result<SearchResult, zkerr::Error> {
-  let (sql, args) = build_sql(&conn, user, &search)?;
+  let (sql, args) = build_sql(&conn, user, &search, None)?;
 
   let mut pstmt = conn.prepare(sql.as_str())?;
 
@@ -203,6 +202,7 @@ pub fn search_zknotes_stream(
   conn: Arc<Connection>,
   user: i64,
   search: ZkNoteSearch,
+  exclude_notes: Option<String>,
 ) -> impl Stream<Item = Result<SyncMessage, Box<dyn std::error::Error + 'static>>> {
   // uncomment for formatting, lsp
   // {
@@ -216,7 +216,8 @@ pub fn search_zknotes_stream(
     } else {
       user
     };
-    let (sql, args) = build_sql(&conn, user, &search)?;
+
+    let (sql, args) = build_sql(&conn, user, &search, exclude_notes)?;
 
     println!("zknote search sql {}", sql);
     println!("zknote search args {:?}", args);
@@ -277,7 +278,7 @@ pub fn sync_users(
   try_stream! {
 
     // println!("read_zklinks_since_stream");
-    let (sql, args) = build_sql(&conn, uid, &lzkns)?;
+    let (sql, args) = build_sql(&conn, uid, &lzkns, None)?;
 
     let mut pstmt = conn.prepare(
       format!(
@@ -350,21 +351,19 @@ pub fn build_sql(
   conn: &Connection,
   uid: i64,
   search: &ZkNoteSearch,
+  exclude_notes: Option<String>,
 ) -> Result<(String, Vec<String>), zkerr::Error> {
   let (sql, args) = build_base_sql(conn, uid, search)?;
-  match search.unsynced {
-    Some(remotenoteid) => {
-      let rnid = sqldata::note_id_for_zknoteid(conn, &remotenoteid)?;
+  match exclude_notes {
+    Some(exclude_note_table) => {
       let nusql = format!(
         "with SN ( id, uuid, title, file, user, createdate, changeddate) as ({})
         select SN.id, SN.uuid, SN.title, SN.file, SN.user, SN.createdate, SN.changeddate
-        from SN 
-        left join zklink ZL
-        on ZL.fromid = SN.id
-        where ZL.toid = {}
-        and (ZL.createdate is null or ZL.createdate < SN.changedate)
-        ",
-        sql, rnid
+        from SN
+        left join {} as EN
+        on SN.id = EN.id
+        where EN.id is null",
+        sql, exclude_note_table
       );
       Ok((nusql, args))
     }
@@ -402,7 +401,6 @@ pub fn build_base_sql(
       OrderField::Title => "order by N.title",
       OrderField::Created => "order by N.createdate",
       OrderField::Changed => "order by N.changeddate",
-      OrderField::Synced => "order by N.syncdate",
     };
     let dir = match o.direction {
       OrderDirection::Ascending => " asc",

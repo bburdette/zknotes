@@ -90,7 +90,6 @@ pub async fn prev_sync(
     created_before: None,
     changed_after: None,
     changed_before: None,
-    unsynced: None,
     ordering: Some(Ordering {
       field: OrderField::Changed,
       direction: OrderDirection::Descending,
@@ -135,7 +134,6 @@ pub async fn save_sync(
       showtitle: false,
       deleted: false,
     },
-    None,
   )?;
 
   // link to 'sync' system note.
@@ -205,7 +203,6 @@ pub async fn sync_from_remote_prev(
           created_before: None,
           changed_after: after,
           changed_before: None,
-          unsynced: None, // TODO: point at 'remote' note.
           ordering: None,
         };
 
@@ -376,11 +373,11 @@ pub async fn sync_from_remote_prev(
                                            editable: note.editable,
                                            showtitle: note.showtitle,
                                            deleted: note.deleted,
-                                         }, Some(now))?;
+                                         })?;
                   } else {
                     // note is older.  add as archive note.
                     // may create duplicate archive notes if edited on two systems and then synced.
-                    sqldata::archive_zknote(&conn, nid, now, &note)?;
+                    sqldata::archive_zknote(&conn, nid, &note)?;
                   }
                   Ok(1)
                 } else {
@@ -407,7 +404,6 @@ pub async fn sync_from_remote_prev(
           created_before: None,
           changed_after: after,
           changed_before: None,
-          unsynced: None, // TODO: point at 'remote' note.
           ordering: None,
         };
 
@@ -738,17 +734,86 @@ pub async fn sync(
 
   println!("\n\n start sync, prev_sync {:?} \n\n", after);
 
+  let tr = conn.unchecked_transaction()?;
+
+  // create temporary tables for links and notes we get from the remote.
+  let id = sqldata::update_single_value(&conn, "sync_id", |x| match x.parse::<i64>() {
+    Ok(n) => (n + 1).to_string(),
+    Err(_) => 0.to_string(),
+  })?;
+
+  let notetemp = format!("notetemp_{}", id);
+  let linktemp = format!("linktemp_{}", id);
+  let archivelinktemp = format!("archivelinktemp_{}", id);
+
+  conn.execute(
+    format!(
+      "create temporary table {} (\"id\" integer primary key not null)",
+      notetemp
+    )
+    .as_str(),
+    params![],
+  )?;
+
+  conn.execute(
+    format!(
+      "create temporary table {} (
+      \"fromid\" INTEGER NOT NULL REFERENCES zknote(id),
+      \"toid\" INTEGER NOT NULL REFERENCES zknote(id),
+      \"user\" INTEGER NOT NULL)",
+      linktemp
+    )
+    .as_str(),
+    params![],
+  )?;
+
+  conn.execute(
+    format!(
+      "CREATE UNIQUE INDEX \"{}unq\" ON \"zklink\" (\"fromid\", \"toid\", \"user\")",
+      linktemp
+    )
+    .as_str(),
+    params![],
+  )?;
+
+  conn.execute(
+    format!(
+      "create temporary table {} (\"id\" integer primary key not null)",
+      archivelinktemp
+    )
+    .as_str(),
+    params![],
+  )?;
+
   // TODO: pass in 'now'?
-  let res = sync_from_remote(&conn, &user, after, callbacks).await?;
+  let res = sync_from_remote(&conn, &user, after, &notetemp, &linktemp, callbacks).await?;
   if res.what != PrivateReplies::SyncComplete {
     Ok(res)
   } else {
     // use a separate conn for this.
     let conn2 = Arc::new(sqldata::connection_open(dbpath)?);
-    let remres = sync_to_remote(conn2, &user, after, callbacks).await?;
+    let remres = sync_to_remote(
+      conn2,
+      &user,
+      Some(notetemp.clone()),
+      Some(linktemp.clone()),
+      after,
+      callbacks,
+    )
+    .await?;
 
     let unote = user_note_id(&conn, user.id)?;
     save_sync(&conn, user.id, unote, CompletedSync { after, now }).await?;
+
+    // drop our work tables.
+    conn.execute(format!("drop table {}", &notetemp).as_str(), params![])?;
+    conn.execute(format!("drop table {}", &linktemp).as_str(), params![])?;
+    conn.execute(
+      format!("drop table {}", &archivelinktemp).as_str(),
+      params![],
+    )?;
+
+    tr.commit()?;
 
     Ok(remres)
   }
@@ -758,6 +823,8 @@ pub async fn sync_from_remote(
   conn: &Connection,
   user: &User,
   after: Option<i64>,
+  notetemp: &String,
+  linktemp: &String,
   callbacks: &mut Callbacks,
 ) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>> {
   let (c, url) = match (user.cookie.clone(), user.remote_url.clone()) {
@@ -790,7 +857,15 @@ pub async fn sync_from_remote(
 
   let mut sr = StreamReader::new(res.map_err(convert_payloaderr));
 
-  let reply = sync_from_stream(conn, user, callbacks, &mut sr).await?;
+  let reply = sync_from_stream(
+    conn,
+    user,
+    Some(notetemp),
+    Some(linktemp),
+    callbacks,
+    &mut sr,
+  )
+  .await?;
   Ok(reply)
 }
 
@@ -815,6 +890,8 @@ where
 pub async fn sync_from_stream<S>(
   conn: &Connection,
   user: &User,
+  notetemp: Option<&str>,
+  linktemp: Option<&str>,
   callbacks: &mut Callbacks,
   br: &mut StreamReader<S, bytes::Bytes>,
 ) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>>
@@ -919,9 +996,9 @@ where
       .ok_or_else(|| zkerr::Error::String("user not found".to_string()))?;
 
     println!("syncing note: {} {}", note.id, note.deleted);
-    match conn.execute(
-        "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate, syncdate)
-         values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+    let id = match conn.execute(
+        "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate)
+         values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
         params![
           note.title,
           note.content,
@@ -933,11 +1010,10 @@ where
           note.id.to_string(),
           note.createdate,
           note.changeddate,
-          now
          ],
       )
       {
-        Ok(x) => Ok(x),
+        Ok(x) => Ok(conn.last_insert_rowid()),
         Err(rusqlite::Error::SqliteFailure(e, s)) =>
           if e.code == rusqlite::ErrorCode::ConstraintViolation {
             let (nid, n) = sqldata::read_zknote_unchecked(&conn, &note.id)?;
@@ -956,19 +1032,26 @@ where
                                      editable: note.editable,
                                      showtitle: note.showtitle,
                                      deleted: note.deleted,
-                                   }, Some(now))?;
+                                   }).map(|x|x.0)
             } else {
               println!("saving as archive: {} {}", note.id, note.deleted);
               // note is older.  add as archive note.
               // may create duplicate archive notes if edited on two systems and then synced.
-              sqldata::archive_zknote(&conn, nid, now, &note)?;
+              sqldata::archive_zknote(&conn, nid, &note).map(|x|x.0)
             }
-            Ok(1)
           } else {
-            Err(rusqlite::Error::SqliteFailure(e, s))
+            Err(rusqlite::Error::SqliteFailure(e, s).into())
           }
-        Err(e) => Err(e),
+        Err(e) => Err(e.into()),
       }?;
+
+    if let Some(ref nt) = notetemp {
+      conn.execute(
+        format!("insert into {} values (?1)", nt).as_str(),
+        params![id],
+      )?;
+    }
+
     sm = read_sync_messsage(&mut line, br).await?;
     println!("sync_from_stream 7");
   }
@@ -993,8 +1076,8 @@ where
       .get(&note.user)
       .ok_or_else(|| zkerr::Error::String("user not found".to_string()))?;
     assert!(*uid == sysid);
-    match conn.execute(
-      "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate, syncdate)
+    let mbid = match conn.execute(
+      "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate)
        values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
         params![
           note.title,
@@ -1007,19 +1090,24 @@ where
           note.id.to_string(),
           note.createdate,
           note.changeddate,
-          now
           ])
         {
-          Ok(_x) => (),
+          Ok(_x) => Ok::<_, zkerr::Error>(Some(conn.last_insert_rowid())),
           Err(rusqlite::Error::SqliteFailure(e, s)) =>
             if e.code == rusqlite::ErrorCode::ConstraintViolation {
               // if duplicate record, just ignore and go on.
-             ()
+             Ok(None)
             } else {
               return Err(rusqlite::Error::SqliteFailure(e, s).into())
             }
           Err(e) => return Err(e)?,
-        }
+        }?;
+    if let (Some(id), Some(nt)) = (mbid, &notetemp) {
+      conn.execute(
+        format!("insert into {} values (?1)", nt).as_str(),
+        params![id],
+      )?;
+    }
     sm = read_sync_messsage(&mut line, br).await?;
   }
 
@@ -1044,7 +1132,7 @@ where
 
   while let SyncMessage::ArchiveZkLink(ref l) = sm {
     let ins = match conn.execute(
-      "insert into zklinkarchive (fromid, toid, user, linkzknote, createdate, deletedate, syncdate)
+      "insert into zklinkarchive (fromid, toid, user, linkzknote, createdate, deletedate)
               select FN.id, TN.id, U.id, LN.id, ?1, ?2, ?7
               from zknote FN, zknote TN, orgauth_user U, zknote LN
               where FN.uuid = ?3
@@ -1058,7 +1146,6 @@ where
         l.toUuid,
         l.userUuid,
         l.linkUuid,
-        now
       ],
     ) {
       Ok(_x) => 1,
@@ -1072,6 +1159,21 @@ where
       }
       Err(e) => return Err(e)?,
     };
+    if let Some(lt) = &linktemp {
+      conn.execute(
+        format!(
+          "insert into {} (fromid, toid, user)
+          select FN.id, TN.id, U.id
+            from zknote FN, zknote TN, orgauth_user U
+                where FN.uuid = ?1
+                  and TN.uuid = ?2
+                  and U.uuid = ?3",
+          lt
+        )
+        .as_str(),
+        params![l.fromUuid, l.toUuid, l.userUuid],
+      )?;
+    }
     count = count + 1;
     saved = saved + ins;
     // bytes = bytes + nc;
@@ -1108,21 +1210,11 @@ where
               where FN.uuid = ?2
                 and TN.uuid = ?3
                 and U.uuid = ?4)
-              insert into zklink (fromid, toid, user, linkzknote, createdate, syncdate)
+              insert into zklink (fromid, toid, user, linkzknote, createdate)
                 select * from vals ",
-      params![
-        l.createdate,
-        l.fromUuid,
-        l.toUuid,
-        l.userUuid,
-        l.linkUuid,
-        now
-      ],
+      params![l.createdate, l.fromUuid, l.toUuid, l.userUuid, l.linkUuid],
     ) {
-      Ok(c) => {
-        println!("inserted {}", c);
-        Ok(c)
-      }
+      Ok(c) => Ok(c),
       Err(rusqlite::Error::SqliteFailure(e, s)) => {
         if e.code == rusqlite::ErrorCode::ConstraintViolation {
           // do update, since we can't ON CONFLICT without a values () clause.
@@ -1152,6 +1244,24 @@ where
       }
       Err(e) => Err(e),
     }?;
+    if let Some(lt) = &linktemp {
+      if ins == 1 {
+        conn.execute(
+          format!(
+            "insert into {} (fromid, toid, user)
+            select FN.id, TN.id, U.id
+              from zknote FN, zknote TN, orgauth_user U
+                  where FN.uuid = ?1
+                    and TN.uuid = ?2
+                    and U.uuid = ?3",
+            lt
+          )
+          .as_str(),
+          params![l.fromUuid, l.toUuid, l.userUuid],
+        )?;
+      }
+    }
+
     count = count + 1;
     saved = saved + ins;
     // bytes = bytes + nc;
@@ -1184,12 +1294,14 @@ where
 pub async fn sync_to_remote(
   conn: Arc<Connection>,
   user: &User,
+  exclude_notes: Option<String>,
+  exclude_links: Option<String>,
   after: Option<i64>,
   callbacks: &mut Callbacks,
 ) -> Result<PrivateReplyMessage, zkerr::Error> {
   // let tr = conn.transaction()?;
 
-  let extra_login_data = sqldata::read_user_by_id(&conn, user.id)?;
+  // let extra_login_data = sqldata::read_user_by_id(&conn, user.id)?;
 
   // TODO: get time on remote system, bail if too far out.
 
@@ -1201,7 +1313,7 @@ pub async fn sync_to_remote(
   };
 
   println!("sync to remote 2");
-  let now = now()?;
+  // let now = now()?;
   // let user_url  = Into::<awc::http::Uri>::into(url)?;
   let user_url = awc::http::Uri::try_from(url).map_err(|x| zkerr::Error::String(x.to_string()))?;
   let mut parts = awc::http::uri::Parts::default();
@@ -1215,7 +1327,14 @@ pub async fn sync_to_remote(
   let cookie = cookie::Cookie::parse_encoded(c)?;
   println!("sync to remote 3 - cookie: {:?}", cookie);
 
-  let ss = sync_stream(conn, user.id, after, callbacks);
+  let ss = sync_stream(
+    conn,
+    user.id,
+    exclude_notes,
+    exclude_links,
+    after,
+    callbacks,
+  );
 
   // use futures::executor::block_on;
   // use futures::{future, future::FutureExt, stream, stream::StreamExt};
@@ -1277,6 +1396,8 @@ pub fn bytesify(
 pub fn sync_stream(
   conn: Arc<Connection>,
   uid: i64,
+  exclude_notes: Option<String>,
+  exclude_links: Option<String>,
   after: Option<i64>,
   callbacks: &mut Callbacks,
 ) -> impl Stream<Item = Result<Bytes, Box<dyn std::error::Error + 'static>>> {
@@ -1297,7 +1418,6 @@ pub fn sync_stream(
     created_before: None,
     changed_after: after,
     changed_before: None,
-    unsynced: None, // TODO: point at 'remote' note.
     ordering: None,
   };
 
@@ -1307,7 +1427,7 @@ pub fn sync_stream(
 
   // TODO: sync_users derived from read_zklinks_since_stream ?
 
-  let znstream = search_zknotes_stream(conn.clone(), uid, zns).map(bytesify);
+  let znstream = search_zknotes_stream(conn.clone(), uid, zns, exclude_notes.clone()).map(bytesify);
 
   let ans = ZkNoteSearch {
     tagsearch: TagSearch::SearchTerm {
@@ -1324,14 +1444,14 @@ pub fn sync_stream(
     created_before: None,
     changed_after: after,
     changed_before: None,
-    unsynced: None, // TODO: point at 'remote' note.
     ordering: None,
   };
-  let anstream = search_zknotes_stream(conn.clone(), uid, ans).map(bytesify);
+  let anstream = search_zknotes_stream(conn.clone(), uid, ans, exclude_notes).map(bytesify);
 
-  let als = sqldata::read_archivezklinks_stream(conn.clone(), uid, after).map(bytesify);
+  let als = sqldata::read_archivezklinks_stream(conn.clone(), uid, after, exclude_links.clone())
+    .map(bytesify);
 
-  let ls = sqldata::read_zklinks_since_stream(conn, uid, after).map(bytesify);
+  let ls = sqldata::read_zklinks_since_stream(conn, uid, after, exclude_links).map(bytesify);
 
   let end = try_stream! { yield SyncMessage::SyncEnd; }.map(bytesify);
 

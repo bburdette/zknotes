@@ -563,8 +563,15 @@ async fn zk_interface_check_upstreaming(
 
           Ok(
             HttpResponse::Ok().json(
-              sync::sync_from_stream(&conn, &userdata, &mut sqldata::zknotes_callbacks(), &mut br)
-                .await?,
+              sync::sync_from_stream(
+                &conn,
+                &userdata,
+                None,
+                None,
+                &mut sqldata::zknotes_callbacks(),
+                &mut br,
+              )
+              .await?,
             ),
           )
         }

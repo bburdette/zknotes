@@ -180,6 +180,33 @@ pub fn set_single_value(conn: &Connection, name: &str, value: &str) -> Result<()
   Ok(())
 }
 
+// update the single value with a function.  should be atomic, ie if someone else gets there
+// first it will try again.
+pub fn update_single_value(
+  conn: &Connection,
+  name: &str,
+  updatefn: fn(x: &str) -> String,
+) -> Result<String, zkerr::Error> {
+  loop {
+    let val: String = conn.query_row(
+      "select value from singlevalue where name = ?1",
+      params![name],
+      |row| Ok(row.get(0)?),
+    )?;
+
+    let newval = updatefn(val.as_str());
+
+    let rows = conn.execute(
+      "update singlevalue set value = ?1 where name = ?2 and value = ?3",
+      params![newval, name, val],
+    )?;
+
+    if rows == 1 {
+      return Ok(newval);
+    }
+  }
+}
+
 pub fn dbinit(dbfile: &Path, token_expiration_ms: Option<i64>) -> Result<(), zkerr::Error> {
   let exists = dbfile.exists();
 
@@ -680,17 +707,16 @@ pub fn archive_zknote_i64(conn: &Connection, noteid: i64) -> Result<SavedZkNote,
 pub fn archive_zknote(
   conn: &Connection,
   noteid: i64,
-  syncdate: i64,
   note: &ZkNote,
-) -> Result<SavedZkNote, zkerr::Error> {
+) -> Result<(i64, SavedZkNote), zkerr::Error> {
   let sysid = user_id(&conn, "system")?;
   let aid = note_id(&conn, "system", "archive")?;
   let uuid = uuid::Uuid::new_v4();
   // copy the note, with user 'system'.
   // exclude pubid, to avoid unique constraint problems.
   conn.execute(
-    "insert into zknote (title, content, user, editable, showtitle, deleted, uuid, createdate, changeddate, syncdate)
-     values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+    "insert into zknote (title, content, user, editable, showtitle, deleted, uuid, createdate, changeddate)
+     values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
     params![
       note.title,
       note.content,
@@ -701,7 +727,6 @@ pub fn archive_zknote(
       uuid.to_string(),
       note.createdate,
       note.changeddate,
-      syncdate,
     ])?;
 
   let archive_note_id = conn.last_insert_rowid();
@@ -712,10 +737,13 @@ pub fn archive_zknote(
   // link the note to the original note, AND indicate this is an archive link.
   save_zklink(&conn, archive_note_id, noteid, sysid, Some(aid))?;
 
-  Ok(SavedZkNote {
-    id: uuid,
-    changeddate: note.changeddate,
-  })
+  Ok((
+    archive_note_id,
+    SavedZkNote {
+      id: uuid,
+      changeddate: note.changeddate,
+    },
+  ))
 }
 
 pub fn set_zknote_file(conn: &Connection, noteid: i64, fileid: i64) -> Result<(), zkerr::Error> {
@@ -731,7 +759,6 @@ pub fn save_zknote(
   conn: &Connection,
   uid: i64,
   note: &SaveZkNote,
-  syncdate: Option<i64>,
 ) -> Result<(i64, SavedZkNote), zkerr::Error> {
   let now = now()?;
 
@@ -741,7 +768,7 @@ pub fn save_zknote(
       archive_zknote_i64(&conn, id)?;
       // existing note.  update IF mine.
       match conn.execute(
-        "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4, editable = ?5, showtitle = ?6, deleted = ?7, syncdate = ?10
+        "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4, editable = ?5, showtitle = ?6, deleted = ?7
          where id = ?8 and user = ?9 and deleted = 0",
         params![
           note.title,
@@ -753,7 +780,6 @@ pub fn save_zknote(
           note.deleted,
           id,
           uid,
-          syncdate
         ],
       ) {
         Ok(1) => {
@@ -790,7 +816,7 @@ pub fn save_zknote(
 
       let uuid = uuid::Uuid::new_v4();
       conn.execute(
-        "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate, syncdate)
+        "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate)
          values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
         params![
           note.title,
@@ -803,7 +829,6 @@ pub fn save_zknote(
           uuid.to_string(),
           now,
           now,
-          syncdate
         ],
       )?;
       let id = conn.last_insert_rowid();
@@ -1620,7 +1645,7 @@ pub fn read_archivezklinks(
       {}",
       acc_sql,
       if after.is_some() {
-        " and unlikely(ZLA.syncdate > ? or ZLA.deletedate > ? or ZLA.createdate > ?)"
+        " and unlikely(ZLA.deletedate > ? or ZLA.createdate > ?)"
       } else {
         ""
       }
@@ -1652,6 +1677,7 @@ pub fn read_archivezklinks_stream(
   conn: Arc<Connection>,
   uid: i64,
   after: Option<i64>,
+  exclude_archivelinks: Option<String>,
 ) -> impl futures_util::Stream<Item = Result<SyncMessage, Box<dyn std::error::Error>>> {
   // {
   try_stream! {
@@ -1668,14 +1694,20 @@ pub fn read_archivezklinks_stream(
         and ZLA.user = OU.id
         and ZLA.fromid in accessible_notes
         and ZLA.toid in accessible_notes
-        and ZLA.syncdate is null
+        {}
         {}",
         acc_sql,
         if after.is_some() {
           " and unlikely(ZLA.deletedate > ? or ZLA.createdate > ?)"
         } else {
           ""
+        },
+        if let Some(el) = exclude_archivelinks {
+          format!("and ZLA.id not in (select id from {})", el)
         }
+        else { "".to_string()
+        }
+
       )
       .as_str(),
     )?;
@@ -1749,7 +1781,6 @@ pub fn read_zklinks_since(
         and ZL.user = OU.id
         and ZL.fromid in accessible_notes
         and ZL.toid in accessible_notes
-        and ZL.syncdate is null
       {}",
       acc_sql,
       if after.is_some() {
@@ -1786,6 +1817,7 @@ pub fn read_zklinks_since_stream(
   conn: Arc<Connection>,
   uid: i64,
   after: Option<i64>,
+  exclude_links: Option<String>,
 ) -> impl futures_util::Stream<Item = Result<SyncMessage, Box<dyn std::error::Error>>> {
   // {
   try_stream! {
@@ -1850,7 +1882,7 @@ pub fn read_zklinks_since_stream(
           and ZL.user = OU.id
           and ZL.fromid = FW.id
           and ZL.toid = TW.id
-          and ZL.syncdate is null
+          {}
           {} ",
           tabname,
           tabname,
@@ -1858,7 +1890,12 @@ pub fn read_zklinks_since_stream(
             " and unlikely(ZL.createdate > ?)"
           } else {
             ""
+          },
+          if let Some(el) = exclude_links {
+            format!(" and (ZL.fromid, ZL.toid, ZL.user) not in (select fromid, toid, user from {})", el)
           }
+        else { "".to_string()
+        }
         )
         .as_str(),
       );
@@ -2066,7 +2103,6 @@ pub fn save_importzknotes(
             showtitle: true,
             deleted: false,
           },
-          None,
         )?
         .0
       }
@@ -2090,7 +2126,6 @@ pub fn save_importzknotes(
               showtitle: true,
               deleted: false,
             },
-            None,
           )?
           .0
         }
@@ -2117,7 +2152,6 @@ pub fn save_importzknotes(
               showtitle: true,
               deleted: false,
             },
-            None,
           )?
           .0
         }
@@ -2192,7 +2226,6 @@ pub fn make_file_note(
       showtitle: false,
       deleted: false,
     },
-    None,
   )?;
 
   // set the file id in that note.
