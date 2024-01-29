@@ -123,7 +123,15 @@ pub async fn zk_interface_loggedin_streaming(
         config.orgauth_config.db.as_path(),
       )?);
       let rq: SyncSince = serde_json::from_value(msgdata.clone())?;
-      let ss = sync::sync_stream(conn, uid, None, None, rq.after, &mut zknotes_callbacks());
+      let ss = sync::sync_stream(
+        conn,
+        uid,
+        None,
+        None,
+        None,
+        rq.after,
+        &mut zknotes_callbacks(),
+      );
       Ok(HttpResponse::Ok().streaming(ss))
     }
   }

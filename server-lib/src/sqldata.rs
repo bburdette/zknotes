@@ -817,7 +817,7 @@ pub fn save_zknote(
       let uuid = uuid::Uuid::new_v4();
       conn.execute(
         "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate)
-         values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+         values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
         params![
           note.title,
           note.content,
