@@ -734,7 +734,7 @@ pub async fn sync(
 
   println!("\n\n start sync, prev_sync {:?} \n\n", after);
 
-  // let tr = conn.unchecked_transaction()?;
+  let tr = conn.unchecked_transaction()?;
 
   // create temporary tables for links and notes we get from the remote.
   let id = sqldata::update_single_value(&conn, "sync_id", |x| match x.parse::<i64>() {
@@ -746,10 +746,10 @@ pub async fn sync(
   let linktemp = format!("linktemp_{}", id);
   let archivelinktemp = format!("archivelinktemp_{}", id);
 
+  // temporary tables.  should drop when the db connection ends.
   conn.execute(
     format!(
-      // "create temporary table {} (\"id\" integer primary key not null)",
-      "create table {} (\"id\" integer primary key not null)",
+      "create temporary table {} (\"id\" integer primary key not null)",
       notetemp
     )
     .as_str(),
@@ -758,8 +758,7 @@ pub async fn sync(
 
   conn.execute(
     format!(
-      // "create temporary table {} (
-      "create table {} (
+      "create temporary table {} (
       \"fromid\" INTEGER NOT NULL,
       \"toid\" INTEGER NOT NULL,
       \"user\" INTEGER NOT NULL)",
@@ -780,8 +779,7 @@ pub async fn sync(
 
   conn.execute(
     format!(
-      // "create temporary table {} (\"id\" integer primary key not null)",
-      "create table {} (\"id\" integer primary key not null)",
+      "create temporary table {} (\"id\" integer primary key not null)",
       archivelinktemp
     )
     .as_str(),
@@ -802,10 +800,8 @@ pub async fn sync(
   if res.what != PrivateReplies::SyncComplete {
     Ok(res)
   } else {
-    // use a separate conn for this.
-    let conn2 = Arc::new(sqldata::connection_open(dbpath)?);
     let remres = sync_to_remote(
-      conn2,
+      conn.clone(),
       &user,
       Some(notetemp.clone()),
       Some(linktemp.clone()),
@@ -818,15 +814,7 @@ pub async fn sync(
     let unote = user_note_id(&conn, user.id)?;
     save_sync(&conn, user.id, unote, CompletedSync { after, now }).await?;
 
-    // drop our work tables.
-    conn.execute(format!("drop table {}", &notetemp).as_str(), params![])?;
-    conn.execute(format!("drop table {}", &linktemp).as_str(), params![])?;
-    conn.execute(
-      format!("drop table {}", &archivelinktemp).as_str(),
-      params![],
-    )?;
-
-    // tr.commit()?;
+    tr.commit()?;
 
     Ok(remres)
   }
@@ -1338,8 +1326,6 @@ pub async fn sync_to_remote(
   };
 
   println!("sync to remote 2");
-  // let now = now()?;
-  // let user_url  = Into::<awc::http::Uri>::into(url)?;
   let user_url = awc::http::Uri::try_from(url).map_err(|x| zkerr::Error::String(x.to_string()))?;
   let mut parts = awc::http::uri::Parts::default();
   parts.scheme = user_url.scheme().cloned();
@@ -1362,6 +1348,9 @@ pub async fn sync_to_remote(
     callbacks,
   );
 
+  // -----------------------------------
+  // Writing the stream to a file
+  // -----------------------------------
   // use futures::executor::block_on;
   // use futures::{future, future::FutureExt, stream, stream::StreamExt};
   // use tokio::io::AsyncWriteExt;
