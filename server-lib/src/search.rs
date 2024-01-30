@@ -277,7 +277,6 @@ pub fn sync_users(
   // {
   try_stream! {
 
-    // println!("read_zklinks_since_stream");
     let (sql, args) = build_sql(&conn, uid, &lzkns, None)?;
 
     let mut pstmt = conn.prepare(
@@ -293,12 +292,7 @@ pub fn sync_users(
 
     println!("read_zklinks_since_stream 2");
 
-    {
-      // let mut s = serde_json::to_value(SyncMessage::PhantomUserHeader)?.to_string();
-      // s.push_str("\n");
-      // yield Bytes::from(s);
-      yield SyncMessage::PhantomUserHeader;
-    }
+    yield SyncMessage::PhantomUserHeader;
 
     let rec_iter =
       pstmt.query_map(
@@ -321,9 +315,6 @@ pub fn sync_users(
     for rec in rec_iter {
       println!("sync user {:?}", rec);
       if let Ok(r) = rec {
-        // let mut s = serde_json::to_value(r)?.to_string();
-        // s.push_str("\n");
-        // yield Bytes::from(s);
         yield r;
       }
     }
@@ -335,15 +326,14 @@ pub fn system_user(
 ) -> impl futures_util::Stream<Item = Result<SyncMessage, Box<dyn std::error::Error>>> {
   try_stream! {
 
-  let sysid = user_id(&conn, "system")?;
+    let sysid = user_id(&conn, "system")?;
 
-          yield SyncMessage::from(ZkPhantomUser {
-            id: sysid,
-            uuid: Uuid::parse_str(&SpecialUuids::System.str())?,
-            name: "system".to_string(),
-            active: true,
-          });
-
+    yield SyncMessage::from(ZkPhantomUser {
+      id: sysid,
+      uuid: Uuid::parse_str(&SpecialUuids::System.str())?,
+      name: "system".to_string(),
+      active: true,
+    });
   }
 }
 

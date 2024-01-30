@@ -6,6 +6,7 @@ use actix_web::web::Payload;
 use actix_web::{HttpMessage, HttpRequest, HttpResponse};
 use async_stream::__private::AsyncStream;
 use async_stream::try_stream;
+use barrel::Table;
 use bytes::Bytes;
 use core::pin::{pin, Pin};
 use futures::future;
@@ -43,7 +44,7 @@ use zkprotocol::content::{
 };
 use zkprotocol::messages::{PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage};
 use zkprotocol::search::{
-  OrderDirection, OrderField, Ordering, ResultType, SearchMod, TagSearch, ZkNoteSearch,
+  AndOr, OrderDirection, OrderField, Ordering, ResultType, SearchMod, TagSearch, ZkNoteSearch,
 };
 
 fn convert_err(err: reqwest::Error) -> std::io::Error {
@@ -1419,11 +1420,127 @@ pub fn sync_stream(
 ) -> impl Stream<Item = Result<Bytes, Box<dyn std::error::Error + 'static>>> {
   let start = try_stream! { yield SyncMessage::SyncStart(after, now()?); }.map(bytesify);
 
+  // !(et'sync' & u'system')
+  // !(et'user' & u'system')
+  // and not z'' of the SpecialUuids::
+  // (!z'f596bc2c-a882-4c1c-b739-8c4e25f34eb2' &
+  // (!z'e82fefee-bcd3-4e2e-b350-9963863e516d' &
+  // (!z'466d39ec-2ea7-4d43-b44c-1d3d083f8a9d' &
+  // (!z'84f72fd0-8836-43a3-ac66-89e0ab49dd87' &
+  // (!z'4fb37d76-6fc8-4869-8ee4-8e05fa5077f7' &
+  // (!z'ad6a4ca8-0446-4ecc-b047-46282ced0d84' &
+  // (!z'0efcc98f-dffd-40e5-af07-90da26b1d469' &
+  // !z'528ccfc2-8488-41e0-a4e1-cbab6406674e')))))))
+
+  // Don't sync 'sync' notes.
+  let exclude_sync = TagSearch::Not {
+    ts: Box::new(TagSearch::Boolex {
+      ts1: Box::new(TagSearch::SearchTerm {
+        mods: vec![SearchMod::ZkNoteId, SearchMod::Tag],
+        term: SpecialUuids::Sync.str().to_string(),
+      }),
+      ao: AndOr::And,
+      ts2: Box::new(TagSearch::SearchTerm {
+        mods: vec![SearchMod::User],
+        term: "system".to_string(),
+      }),
+    }),
+  };
+
+  // Don't sync user notes.
+  let exclude_user = TagSearch::Not {
+    ts: Box::new(TagSearch::Boolex {
+      ts1: Box::new(TagSearch::SearchTerm {
+        mods: vec![SearchMod::ZkNoteId, SearchMod::Tag],
+        term: SpecialUuids::User.str().to_string(),
+      }),
+      ao: AndOr::And,
+      ts2: Box::new(TagSearch::SearchTerm {
+        mods: vec![SearchMod::User, SearchMod::Tag],
+        term: "system".to_string(),
+      }),
+    }),
+  };
+
+  // Don't sync the special system notes.
+  // remind me to write a search parser in rust!  tedious
+  let exclude_system = TagSearch::Boolex {
+    ts1: Box::new(TagSearch::Not {
+      ts: Box::new(TagSearch::SearchTerm {
+        mods: vec![SearchMod::ZkNoteId],
+        term: SpecialUuids::Public.str().to_string(),
+      }),
+    }),
+    ao: AndOr::And,
+    ts2: Box::new(TagSearch::Boolex {
+      ts1: Box::new(TagSearch::Not {
+        ts: Box::new(TagSearch::SearchTerm {
+          mods: vec![SearchMod::ZkNoteId],
+          term: SpecialUuids::Comment.str().to_string(),
+        }),
+      }),
+      ao: AndOr::And,
+      ts2: Box::new(TagSearch::Boolex {
+        ts1: Box::new(TagSearch::Not {
+          ts: Box::new(TagSearch::SearchTerm {
+            mods: vec![SearchMod::ZkNoteId],
+            term: SpecialUuids::Share.str().to_string(),
+          }),
+        }),
+        ao: AndOr::And,
+        ts2: Box::new(TagSearch::Boolex {
+          ts1: Box::new(TagSearch::Not {
+            ts: Box::new(TagSearch::SearchTerm {
+              mods: vec![SearchMod::ZkNoteId],
+              term: SpecialUuids::Search.str().to_string(),
+            }),
+          }),
+          ao: AndOr::And,
+          ts2: Box::new(TagSearch::Boolex {
+            ts1: Box::new(TagSearch::Not {
+              ts: Box::new(TagSearch::SearchTerm {
+                mods: vec![SearchMod::ZkNoteId],
+                term: SpecialUuids::User.str().to_string(),
+              }),
+            }),
+            ao: AndOr::And,
+            ts2: Box::new(TagSearch::Boolex {
+              ts1: Box::new(TagSearch::Not {
+                ts: Box::new(TagSearch::SearchTerm {
+                  mods: vec![SearchMod::ZkNoteId],
+                  term: SpecialUuids::Archive.str().to_string(),
+                }),
+              }),
+              ao: AndOr::And,
+              ts2: Box::new(TagSearch::Boolex {
+                ts1: Box::new(TagSearch::Not {
+                  ts: Box::new(TagSearch::SearchTerm {
+                    mods: vec![SearchMod::ZkNoteId],
+                    term: SpecialUuids::System.str().to_string(),
+                  }),
+                }),
+                ao: AndOr::And,
+                ts2: Box::new(TagSearch::Not {
+                  ts: Box::new(TagSearch::SearchTerm {
+                    mods: vec![SearchMod::ZkNoteId],
+                    term: SpecialUuids::Sync.str().to_string(),
+                  }),
+                }),
+              }),
+            }),
+          }),
+        }),
+      }),
+    }),
+  };
+
+  let emptyts = TagSearch::SearchTerm {
+    mods: Vec::new(),
+    term: "".to_string(),
+  };
+
   let zns = ZkNoteSearch {
-    tagsearch: TagSearch::SearchTerm {
-      mods: Vec::new(),
-      term: "".to_string(),
-    },
+    tagsearch: emptyts.clone(),
     offset: 0,
     limit: None,
     what: "".to_string(),
@@ -1443,13 +1560,35 @@ pub fn sync_stream(
 
   // TODO: sync_users derived from read_zklinks_since_stream ?
 
+  let full_excl = TagSearch::Boolex {
+    ts1: Box::new(exclude_sync),
+    ao: AndOr::And,
+    ts2: Box::new(TagSearch::Boolex {
+      ts1: Box::new(exclude_user),
+      ao: AndOr::And,
+      ts2: Box::new(exclude_system),
+    }),
+  };
+
+  let zns = ZkNoteSearch {
+    tagsearch: full_excl,
+    offset: 0,
+    limit: None,
+    what: "".to_string(),
+    resulttype: ResultType::RtNote,
+    archives: false,
+    deleted: true,
+    created_after: None,
+    created_before: None,
+    changed_after: after,
+    changed_before: None,
+    ordering: None,
+  };
+
   let znstream = search_zknotes_stream(conn.clone(), uid, zns, exclude_notes.clone()).map(bytesify);
 
   let ans = ZkNoteSearch {
-    tagsearch: TagSearch::SearchTerm {
-      mods: Vec::new(),
-      term: "".to_string(),
-    },
+    tagsearch: emptyts,
     offset: 0,
     limit: None,
     what: "".to_string(),
@@ -1462,6 +1601,7 @@ pub fn sync_stream(
     changed_before: None,
     ordering: None,
   };
+
   let anstream = search_zknotes_stream(conn.clone(), uid, ans, exclude_notes).map(bytesify);
 
   let als =
