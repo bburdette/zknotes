@@ -693,7 +693,10 @@ fn build_tagsearch_clause(
           SearchMod::Note => desc = true,
           SearchMod::User => user = true,
           SearchMod::File => file = true,
-          SearchMod::ZkNoteId => zknoteid = true,
+          SearchMod::ZkNoteId => {
+            zknoteid = true;
+            exact = true; // zknoteid implies exact.
+          }
         }
       }
       let field = if zknoteid {
@@ -715,7 +718,7 @@ fn build_tagsearch_clause(
         if tag {
           let fileclause = if file { "and zkn.file is not null" } else { "" };
 
-          let clause = if exact || zknoteid {
+          let clause = if exact {
             format!("zkn.{} = ? {}", field, fileclause)
           } else {
             format!("zkn.{}  like ? {}", field, fileclause)
@@ -736,7 +739,7 @@ fn build_tagsearch_clause(
               notstr, clause, clause
             ),
             // args
-            if exact || zknoteid {
+            if exact {
               vec![term.clone(), term.clone()]
             } else {
               vec![
@@ -757,13 +760,13 @@ fn build_tagsearch_clause(
 
           (
             // clause
-            if exact || zknoteid {
+            if exact {
               format!("N.{} {}= ? {}", field, notstr, fileclause)
             } else {
               format!("N.{} {} like ? {}", field, notstr, fileclause)
             },
             // args
-            if exact || zknoteid {
+            if exact {
               vec![term.clone()]
             } else {
               vec![format!("%{}%", term).to_string()]
@@ -781,6 +784,9 @@ fn build_tagsearch_clause(
         AndOr::Or => " or ",
         AndOr::And => " and ",
       };
+      if not {
+        cls.push_str(" not ");
+      }
       cls.push_str("(");
       cls.push_str(cl1.as_str());
       cls.push_str(conj);
