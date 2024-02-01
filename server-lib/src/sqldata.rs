@@ -1123,8 +1123,10 @@ pub fn read_zknotepubid(
 ) -> Result<ZkNote, zkerr::Error> {
   let publicid = note_id(&conn, "system", "public")?;
   let (id, mut note) = conn.query_row_and_then(
-    "select A.id, A.uuid, A.title, A.content, A.user, OU.name, U.zknote, A.pubid, A.editable, A.showtitle, A.deleted, A.file, A.createdate, A.changeddate
-      from zknote A, user U, orgauth_user OU, zklink L where A.pubid = ?1
+    "select A.id, A.uuid, A.title, A.content, A.user, OU.name, ZU.uuid, A.pubid, A.editable, A.showtitle, A.deleted, A.file, A.createdate, A.changeddate
+      from zknote A, user U, orgauth_user OU, zklink L
+      left join zknote ZU on ZU.id = U.zknote
+      where A.pubid = ?1
       and ((A.id = L.fromid
       and L.toid = ?2) or (A.id = L.toid
       and L.fromid = ?2))
