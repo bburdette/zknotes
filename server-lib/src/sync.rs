@@ -717,26 +717,13 @@ fn convert_bodyerr(err: actix_web::error::PayloadError) -> std::io::Error {
   todo!()
 }
 
-pub async fn sync(
-  dbpath: &Path,
-  uid: i64,
-  callbacks: &mut Callbacks,
-) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>> {
-  let conn = Arc::new(sqldata::connection_open(dbpath)?);
-  let user = orgauth::dbfun::read_user_by_id(&conn, uid)?; // TODO pass this in from calling ftn?
-  let extra_login_data = sqldata::read_user_by_id(&conn, user.id)?;
+pub struct TempTableNames {
+  pub notetemp: String,
+  pub linktemp: String,
+  pub archivelinktemp: String,
+}
 
-  // get previous sync.
-  let after = prev_sync(&conn, &user, &extra_login_data.zknote)
-    .await?
-    .map(|cs| cs.now);
-
-  let now = now()?;
-
-  println!("\n\n start sync, prev_sync {:?} \n\n", after);
-
-  let tr = conn.unchecked_transaction()?;
-
+pub fn temp_tables(conn: &Connection) -> Result<TempTableNames, zkerr::Error> {
   // create temporary tables for links and notes we get from the remote.
   let id = sqldata::update_single_value(&conn, "sync_id", |x| match x.parse::<i64>() {
     Ok(n) => (n + 1).to_string(),
@@ -787,14 +774,43 @@ pub async fn sync(
     params![],
   )?;
 
+  Ok(TempTableNames {
+    notetemp,
+    linktemp,
+    archivelinktemp,
+  })
+}
+
+pub async fn sync(
+  dbpath: &Path,
+  uid: i64,
+  callbacks: &mut Callbacks,
+) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>> {
+  let conn = Arc::new(sqldata::connection_open(dbpath)?);
+  let user = orgauth::dbfun::read_user_by_id(&conn, uid)?; // TODO pass this in from calling ftn?
+  let extra_login_data = sqldata::read_user_by_id(&conn, user.id)?;
+
+  // get previous sync.
+  let after = prev_sync(&conn, &user, &extra_login_data.zknote)
+    .await?
+    .map(|cs| cs.now);
+
+  let now = now()?;
+
+  println!("\n\n start sync, prev_sync {:?} \n\n", after);
+
+  let tr = conn.unchecked_transaction()?;
+
+  let ttn = temp_tables(&conn)?;
+
   // TODO: pass in 'now'?
   let res = sync_from_remote(
     &conn,
     &user,
     after,
-    &notetemp,
-    &linktemp,
-    &archivelinktemp,
+    &ttn.notetemp,
+    &ttn.linktemp,
+    &ttn.archivelinktemp,
     callbacks,
   )
   .await?;
@@ -804,9 +820,9 @@ pub async fn sync(
     let remres = sync_to_remote(
       conn.clone(),
       &user,
-      Some(notetemp.clone()),
-      Some(linktemp.clone()),
-      Some(archivelinktemp.clone()),
+      Some(ttn.notetemp.clone()),
+      Some(ttn.linktemp.clone()),
+      Some(ttn.archivelinktemp.clone()),
       after,
       callbacks,
     )
@@ -862,7 +878,6 @@ pub async fn sync_from_remote(
 
   let reply = sync_from_stream(
     conn,
-    user,
     Some(notetemp),
     Some(linktemp),
     Some(archivelinktemp),
@@ -893,7 +908,6 @@ where
 
 pub async fn sync_from_stream<S>(
   conn: &Connection,
-  user: &User,
   notetemp: Option<&str>,
   linktemp: Option<&str>,
   archivelinktemp: Option<&str>,
@@ -1007,54 +1021,79 @@ where
       .ok_or_else(|| zkerr::Error::String("user not found".to_string()))?;
 
     println!("syncing note: {} {}", note.id, note.deleted);
-    let id = match conn.execute(
+
+    let ex =  conn.execute(
         "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate)
-         values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
-        params![
-          note.title,
-          note.content,
-          uid,
-          note.pubid,
-          note.editable,
-          note.showtitle,
-          note.deleted,
-          note.id.to_string(),
-          note.createdate,
-          note.changeddate,
-         ],
-      )
-      {
-        Ok(x) => Ok(conn.last_insert_rowid()),
-        Err(rusqlite::Error::SqliteFailure(e, s)) =>
-          if e.code == rusqlite::ErrorCode::ConstraintViolation {
+         values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)", 
+      params![
+        note.title,
+        note.content,
+     uid,
+        note.pubid,
+        note.editable,
+        note.showtitle,
+       note.deleted,
+        note.id.to_string(),
+        note.createdate,
+        note.changeddate,
+      ]
+      );
+    println!("ex: {:?}", ex);
+    let id: i64 = match ex {
+      Ok(x) => Ok(conn.last_insert_rowid()),
+      Err(rusqlite::Error::SqliteFailure(e, Some(s))) => {
+        if e.code == rusqlite::ErrorCode::ConstraintViolation {
+          if s.contains("uuid") {
             let (nid, n) = sqldata::read_zknote_unchecked(&conn, &note.id)?;
             // TODO: uuid conflict;  resolve with older one becoming archive note.
             // SqliteFailure(Error { code: ConstraintViolation, extended_code: 2067 }, Some("UNIQUE constraint failed: zknote.uuid"));
             if note.changeddate > n.changeddate {
-              println!("saving note: {} {}", note.id, note.deleted);
+              println!("replacing note: {} {}", note.id, note.deleted);
               // note is newer.  archive the old and replace.
-              sqldata::save_zknote(&conn,
-                                   *uid,
-                                   &SaveZkNote {
-                                     id: Some(note.id),
-                                     title: note.title.clone(),
-                                     pubid: note.pubid.clone(),
-                                     content: note.content.clone(),
-                                     editable: note.editable,
-                                     showtitle: note.showtitle,
-                                     deleted: note.deleted,
-                                   }).map(|x|x.0)
+              sqldata::save_zknote(
+                &conn,
+                *uid,
+                &SaveZkNote {
+                  id: Some(note.id),
+                  title: note.title.clone(),
+                  pubid: note.pubid.clone(),
+                  content: note.content.clone(),
+                  editable: note.editable,
+                  showtitle: note.showtitle,
+                  deleted: note.deleted,
+                },
+              )
+              .map(|x| x.0)
             } else {
               println!("saving as archive: {} {}", note.id, note.deleted);
               // note is older.  add as archive note.
               // may create duplicate archive notes if edited on two systems and then synced.
-              sqldata::archive_zknote(&conn, nid, &note).map(|x|x.0)
+              sqldata::archive_zknote(&conn, nid, &note).map(|x| x.0)
             }
+          } else if s.contains("pubid") {
+            // Error out to alert user to conflict.
+            Err(
+              zkerr::Error::String(format!(
+                "note exists with duplicate public id: {}",
+                note.pubid.clone().unwrap_or("".to_string())
+              ))
+              .into(),
+            )
           } else {
-            Err(rusqlite::Error::SqliteFailure(e, s).into())
+            println!("sqliatesfailure {:?}", e);
+            Err(rusqlite::Error::SqliteFailure(e, Some(s)).into())
           }
-        Err(e) => Err(e.into()),
-      }?;
+        } else {
+          Err(rusqlite::Error::SqliteFailure(e, Some(s)).into())
+        }
+      }
+      Err(e) => {
+        println!("alskdnflawen: {:?}", e);
+        Err(e.into())
+      }
+    }?;
+
+    println!("saved note");
 
     if let Some(ref nt) = notetemp {
       println!("insert into {} values (?1)", nt);
