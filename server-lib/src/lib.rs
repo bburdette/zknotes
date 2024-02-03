@@ -4,8 +4,9 @@ pub mod interfaces;
 mod migrations;
 mod search;
 pub mod sqldata;
-mod sqltest;
+// mod sqltest;
 mod sync;
+mod synctest;
 
 use crate::sqldata::get_sysids;
 use actix_cors::Cors;
@@ -565,7 +566,6 @@ async fn zk_interface_check_upstreaming(
             HttpResponse::Ok().json(
               sync::sync_from_stream(
                 &conn,
-                &userdata,
                 None,
                 None,
                 None,

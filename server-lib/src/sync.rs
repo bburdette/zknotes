@@ -724,6 +724,7 @@ pub struct TempTableNames {
 }
 
 pub fn temp_tables(conn: &Connection) -> Result<TempTableNames, zkerr::Error> {
+  // // create temporary tables for links and notes we get from the remote.
   // create temporary tables for links and notes we get from the remote.
   let id = sqldata::update_single_value(&conn, "sync_id", |x| match x.parse::<i64>() {
     Ok(n) => (n + 1).to_string(),
@@ -737,7 +738,8 @@ pub fn temp_tables(conn: &Connection) -> Result<TempTableNames, zkerr::Error> {
   // temporary tables.  should drop when the db connection ends.
   conn.execute(
     format!(
-      "create temporary table {} (\"id\" integer primary key not null)",
+      //     "create temporary table {} (\"id\" integer primary key not null)",
+      "create table {} (\"id\" integer primary key not null)",
       notetemp
     )
     .as_str(),
@@ -746,7 +748,8 @@ pub fn temp_tables(conn: &Connection) -> Result<TempTableNames, zkerr::Error> {
 
   conn.execute(
     format!(
-      "create temporary table {} (
+      //     "create temporary table {} (
+      "create table {} (
       \"fromid\" INTEGER NOT NULL,
       \"toid\" INTEGER NOT NULL,
       \"user\" INTEGER NOT NULL)",
@@ -767,7 +770,8 @@ pub fn temp_tables(conn: &Connection) -> Result<TempTableNames, zkerr::Error> {
 
   conn.execute(
     format!(
-      "create temporary table {} (\"id\" integer primary key not null)",
+      //     "create temporary table {} (\"id\" integer primary key not null)",
+      "create table {} (\"id\" integer primary key not null)",
       archivelinktemp
     )
     .as_str(),

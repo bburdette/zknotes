@@ -42,7 +42,7 @@ pub struct ZkNote {
   pub sysids: Vec<ZkNoteId>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
 pub struct ZkListNote {
   pub id: ZkNoteId,
   pub title: String,

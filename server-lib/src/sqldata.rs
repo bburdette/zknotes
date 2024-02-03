@@ -1122,7 +1122,7 @@ pub fn read_zknotepubid(
   pubid: &str,
 ) -> Result<ZkNote, zkerr::Error> {
   let publicid = note_id(&conn, "system", "public")?;
-  let (id, mut note) = conn.query_row_and_then(
+  let (id, mut note) = match conn.query_row_and_then(
     "select A.id, A.uuid, A.title, A.content, A.user, OU.name, ZU.uuid, A.pubid, A.editable, A.showtitle, A.deleted, A.file, A.createdate, A.changeddate
       from zknote A, user U, orgauth_user OU, zklink L
       left join zknote ZU on ZU.id = U.zknote
@@ -1156,7 +1156,11 @@ pub fn read_zknotepubid(
         sysids: Vec::new(),
       }))
     },
-  )?;
+  ) {
+    Ok(x) => Ok(x),
+    Err(zkerr::Error::Rusqlite(rusqlite::Error::QueryReturnedNoRows)) => Err(zkerr::Error::String(format!("note not found for public id: {}", pubid))),
+    Err(e) => Err(e),
+  }?;
   let sysid = user_id(&conn, "system")?;
   let sysids = get_sysids(conn, sysid, id)?;
 

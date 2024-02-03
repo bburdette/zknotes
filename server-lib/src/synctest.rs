@@ -6,16 +6,21 @@ mod tests {
   use crate::sync::*;
   use either::Either;
   use futures::executor::block_on;
+  use futures_util::pin_mut;
   use futures_util::TryStreamExt;
   use orgauth::data::RegistrationData;
   use orgauth::dbfun::{new_user, user_id};
   use orgauth::endpoints::Callbacks;
+  use rusqlite::params;
   use rusqlite::Connection;
   use std::error::Error;
   use std::fs;
   use std::path::Path;
   use std::sync::Arc;
   use tokio_util::io::StreamReader;
+  use uuid::Uuid;
+  use zkprotocol::content::GetArchiveZkNote;
+  use zkprotocol::content::GetZkNoteArchives;
   use zkprotocol::content::SaveZkNote;
   use zkprotocol::content::SavedZkNote;
   use zkprotocol::search::*;
@@ -28,7 +33,7 @@ mod tests {
     let res = match block_on(err_test()) {
       Ok(()) => true,
       Err(e) => {
-        println!("error {:?}", e);
+        println!("test failed with error: {:?}", e);
         false
       }
     };
@@ -38,6 +43,7 @@ mod tests {
   fn setup_db(
     conn: &Connection,
     cb: &mut Callbacks,
+    user1uuid: Option<Uuid>,
     basename: &str,
   ) -> Result<((i64, SavedZkNote), (i64, SavedZkNote)), Box<dyn Error>> {
     let publicid = note_id(&conn, "system", "public")?;
@@ -54,7 +60,7 @@ mod tests {
       None,
       None,
       false,
-      None,
+      user1uuid,
       None,
       None,
       None,
@@ -84,7 +90,7 @@ mod tests {
     // let _unid1 = user_note_id(&conn, uid1)?;
     let unid2 = user_note_id(&conn, uid2)?;
 
-    let _szn1_1 = save_zknote(
+    let (szn1_1_share_id, szn1_1_share) = save_zknote(
       &conn,
       uid1,
       &SaveZkNote {
@@ -288,9 +294,11 @@ mod tests {
 
     println!("14");
 
-    let pn = format!("{}-publicid1", basename);
+    let pn = format!("{}-not-publicid1", basename);
 
     // TODO test that pubid read works, since that broke in 'production'
+
+    // note with public id, but not linked to 'public'.
     let (pubzn1_id, pubzn1) = save_zknote(
       &conn,
       uid1,
@@ -298,8 +306,8 @@ mod tests {
         id: None,
         title: pn.clone(),
         showtitle: true,
-        pubid: Some("publicid1".to_string()), // test duplicate public notes!
-        // pubid: Some(format!("{}-publicid1", basename)),
+        pubid: Some("not-publicid1".to_string()), // test duplicate public notes!
+        // pubid: Some(format!("{}-not-publicid1", basename)),
         content: "note1 content".to_string(),
         editable: false,
         deleted: false,
@@ -376,33 +384,60 @@ mod tests {
     Ok(((pubzn1_id, pubzn1), (pubzn2_id, pubzn2)))
   }
 
+  // ---------------------------------------------------------------
+  // testing
+  // ---------------------------------------------------------------
   async fn err_test() -> Result<(), Box<dyn Error>> {
     let dbp_client = Path::new("client.db");
-    match fs::remove_file(dbp_client) {
-      Ok(_) => (),
-      Err(e) => {
-        println!("error removing test.db: {}", e);
-      }
-    }
     let dbp_server = Path::new("server.db");
-    match fs::remove_file(dbp_server) {
-      Ok(_) => (),
-      Err(e) => {
-        println!("error removing test.db: {}", e);
-      }
-    }
-
-    dbinit(dbp_client, None)?;
-
-    dbinit(dbp_server, None)?;
 
     let mut cb = zknotes_callbacks();
 
-    let client_conn = connection_open(dbp_client)?;
+    // Set up dbs.
+    // for now, copying saved databases that are pre-sync, to speed up
+    // dev of these tests.
+
+    // set up server first.
+    match fs::copy(Path::new("server.db.saved"), dbp_server) {
+      Ok(_) => (), // already have a saved initted db.
+      Err(_) => {
+        // init and save in *.saved
+        match fs::remove_file(dbp_server) {
+          Ok(_) => (),
+          Err(e) => {
+            println!("error removing test.db: {}", e);
+          }
+        }
+        dbinit(dbp_server, None)?;
+        let server_conn = connection_open(dbp_server)?;
+        setup_db(&server_conn, &mut cb, None, "server")?;
+        fs::copy(dbp_server, Path::new("server.db.saved"))?;
+      }
+    }
     let server_conn = connection_open(dbp_server)?;
 
-    let ((cpubid1, cpub1), (cpubid2, cpub2)) = setup_db(&client_conn, &mut cb, "client")?;
-    setup_db(&server_conn, &mut cb, "server")?;
+    let suser1 = user_id(&server_conn, "server-user1")?;
+    let suser1ld = orgauth::dbfun::login_data(&server_conn, suser1)?;
+
+    match fs::copy(Path::new("client.db.saved"), dbp_client) {
+      Ok(_) => (), // already have a saved initted db.
+      Err(_) => {
+        // init and save in *.saved
+        match fs::remove_file(dbp_client) {
+          Ok(_) => (),
+          Err(e) => {
+            println!("error removing test.db: {}", e);
+          }
+        }
+        dbinit(dbp_client, None)?;
+        let client_conn = connection_open(dbp_client)?;
+        // passing in the UUID for "server-user1".
+        // We'll sync client-user1 and server-user1.
+        setup_db(&client_conn, &mut cb, Some(suser1ld.uuid), "client")?;
+        fs::copy(dbp_client, Path::new("client.db.saved"))?;
+      }
+    }
+    let client_conn = connection_open(dbp_client)?;
 
     println!("1");
 
@@ -437,8 +472,6 @@ mod tests {
         println!("convert_err {:?}", err);
         todo!()
       }
-      // use futures::executor::block_on;
-      use futures_util::pin_mut;
 
       let ss = server_stream.map_err(convert_err);
       pin_mut!(ss);
@@ -456,7 +489,7 @@ mod tests {
       {
         Ok(_) => Err("expected error from public id conflict!")?,
         Err(e) => {
-          if e.to_string() == "note exists with duplicate public id: publicid1" {
+          if e.to_string() == "note exists with duplicate public id: not-publicid1" {
             ()
           } else {
             Err(e)?
@@ -466,23 +499,36 @@ mod tests {
 
       ctr.rollback()?;
     }
+    println!("1");
+
+    let cpubid = caconn.query_row(
+      "select id from zknote where pubid = ?1",
+      params!["not-publicid1"],
+      |row| Ok(row.get(0)?),
+    )?;
+
+    let cpub1 = read_zknote_i64(&caconn, Some(cuser1), cpubid)?;
+    let cpub2 = read_zknotepubid(&caconn, None, "publicid2")?;
 
     // rename public ids.
-    save_zknote(
+    let (cpc1_id, cpc1) = save_zknote(
       &caconn,
       cuser1,
       &SaveZkNote {
         id: Some(cpub1.id),
         title: "public client 1".to_string(),
         showtitle: true,
-        pubid: Some("publicid1-client".to_string()), // test duplicate public notes!
+        pubid: Some("not-publicid1-client".to_string()), // test duplicate public notes!
         content: "public note1 content".to_string(),
         editable: false,
         deleted: false,
       },
     )?;
 
-    save_zknote(
+    println!("2");
+    assert!(cpub1.id == cpc1.id);
+
+    let (spc2_id, spc2) = save_zknote(
       &caconn,
       cuser1,
       &SaveZkNote {
@@ -495,8 +541,12 @@ mod tests {
         deleted: false,
       },
     )?;
+    assert!(cpub2.id == spc2.id);
 
-    let server_stream = sync_stream(saconn, suser1, None, None, None, None, &mut cb);
+    // ------------------------------------------------------------
+    // sync from server to client.
+    // ------------------------------------------------------------
+    let server_stream = sync_stream(saconn.clone(), suser1, None, None, None, None, &mut cb);
 
     // let ctr = caconn.unchecked_transaction()?;
 
@@ -505,8 +555,6 @@ mod tests {
       println!("convert_err {:?}", err);
       todo!()
     }
-    // use futures::executor::block_on;
-    use futures_util::pin_mut;
 
     let ss = server_stream.map_err(convert_err);
     pin_mut!(ss);
@@ -521,6 +569,124 @@ mod tests {
       &mut br,
     )
     .await?;
+
+    // ------------------------------------------------------------
+    // sync from client to server.
+    // ------------------------------------------------------------
+    let client_stream = sync_stream(
+      caconn.clone(),
+      cuser1,
+      Some(ttn.notetemp),
+      Some(ttn.linktemp),
+      Some(ttn.archivelinktemp),
+      None,
+      &mut cb,
+    );
+
+    let cs = client_stream.map_err(convert_err);
+    pin_mut!(cs);
+    let mut cbr = StreamReader::new(cs);
+
+    sync_from_stream(&saconn, None, None, None, &mut cb, &mut cbr).await?;
+
+    // ------------------------------------------------------------
+    // post-sync tests.
+    // ------------------------------------------------------------
+
+    println!("3");
+    // read_zknotepubid(&caconn, None, "not-publicid1")?;
+    read_zknotepubid(&caconn, None, "publicid2")?;
+    println!("3.5");
+    // read_zknotepubid(&caconn, Some(cuser1), "not-publicid1")?;
+    read_zknotepubid(&caconn, Some(cuser1), "publicid2")?;
+    println!("4");
+    // let cnot_publicid1_client = read_zknotepubid(&caconn, Some(cuser1), "not-publicid1-client")?;
+    let cpublicid2_client = read_zknotepubid(&caconn, Some(cuser1), "publicid2-client")?;
+
+    println!("5");
+    // client public notes on server.
+    // let snot_publicid1_client = read_zknotepubid(&saconn, Some(suser1), "not-publicid1-client")?;
+    let spublicid2_client = read_zknotepubid(&saconn, Some(suser1), "publicid2-client")?;
+
+    // ids are the same.
+    // assert!(cnot_publicid1_client.id == snot_publicid1_client.id);
+    assert!(spublicid2_client.id == cpublicid2_client.id);
+
+    println!("6");
+    // archives present for revised notes.
+    {
+      let cpcarchs = read_zknotearchives(
+        &caconn,
+        cuser1,
+        &GetZkNoteArchives {
+          zknote: cpublicid2_client.id,
+          offset: 0,
+          limit: None,
+        },
+      )?;
+
+      let spcarchs = read_zknotearchives(
+        &saconn,
+        suser1,
+        &GetZkNoteArchives {
+          zknote: spublicid2_client.id,
+          offset: 0,
+          limit: None,
+        },
+      )?;
+
+      assert!(cpcarchs.len() > 0);
+
+      assert!(cpcarchs == spcarchs);
+    }
+    println!("7");
+
+    {
+      println!("7.1");
+      println!("cpub1.id: {}", cpub1.id);
+      // archives present for revised notes.
+      let cpcarchs = read_zknotearchives(
+        &caconn,
+        cuser1,
+        &GetZkNoteArchives {
+          zknote: cpub1.id,
+          offset: 0,
+          limit: None,
+        },
+      )?;
+
+      println!("7.2");
+      // uh oh, is owned by phantom client-user1, note server-user1 as hoped.
+      let spcarchs = read_zknotearchives(
+        &saconn,
+        suser1,
+        &GetZkNoteArchives {
+          zknote: cpub1.id,
+          offset: 0,
+          limit: None,
+        },
+      )?;
+
+      assert!(cpcarchs == spcarchs);
+    }
+
+    // TESTING:
+    // user ids on client and server don't match.
+    //   should sync fail if user ids don't match?  do user ids match on remote users now?
+    // phantom user stuff (like what?)
+    //
+
+    // szn1_1_share
+    // szn1_2_share
+    // szn1_3_share
+    // szn1_4
+    // szn1_5
+    // szn1_6
+    // szn1_7
+    // szn2_1
+    // pubzn1
+    // pubzn2
+    // szn1_6
 
     Ok(())
   }
