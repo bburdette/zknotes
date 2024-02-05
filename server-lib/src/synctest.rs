@@ -28,9 +28,9 @@ mod tests {
   // Note this useful idiom: importing names from outer (for mod tests) scope.
   // use super::*;
 
-  #[test]
-  fn test_sync() {
-    let res = match block_on(err_test()) {
+  #[tokio::test]
+  async fn test_sync() {
+    let res = match err_test().await {
       Ok(()) => true,
       Err(e) => {
         println!("test failed with error: {:?}", e);
@@ -317,14 +317,14 @@ mod tests {
     println!("14");
 
     // despite public id, shouldn't be able to read. because doesn't link to 'public'
-    println!("14.1");
-    match read_zknotepubid(&conn, None, pn.as_str()) {
-      Ok(_) => panic!("wat"),
-      Err(_e) => (),
-    };
-    println!("14.2");
+    // println!("14.1");
+    // match read_zknotepubid(&conn, None, pn.as_str()) {
+    //   Ok(_) => panic!("wat"),
+    //   Err(_e) => (),
+    // };
+    // println!("14.2");
 
-    println!("15");
+    // println!("15");
 
     let (pubzn2_id, pubzn2) = save_zknote(
       &conn,
@@ -334,7 +334,7 @@ mod tests {
         title: format!("{} - u1 public note2", basename),
         showtitle: true,
         pubid: Some("publicid2".to_string()),
-        content: "note1 content".to_string(),
+        content: "note2 content".to_string(),
         editable: false,
         deleted: false,
       },
@@ -456,14 +456,16 @@ mod tests {
     // test searches.
     // ---------------------------------------------------------------
 
+    // use user2, since user2 has limited visibility to user1 notes.
     let cuser1 = user_id(&client_conn, "client-user1")?;
-    let suser1 = user_id(&server_conn, "server-user1")?;
+    let cuser2 = user_id(&client_conn, "client-user2")?;
+    let suser2 = user_id(&server_conn, "server-user2")?;
     let caconn = Arc::new(client_conn);
     let saconn = Arc::new(server_conn);
 
     // initial sync, testing duplicate public ids.
     {
-      let server_stream = sync_stream(saconn.clone(), suser1, None, None, None, None, &mut cb);
+      let server_stream = sync_stream(saconn.clone(), suser2, None, None, None, None, &mut cb);
 
       let ctr = caconn.unchecked_transaction()?;
 
@@ -489,7 +491,7 @@ mod tests {
       {
         Ok(_) => Err("expected error from public id conflict!")?,
         Err(e) => {
-          if e.to_string() == "note exists with duplicate public id: not-publicid1" {
+          if e.to_string() == "note exists with duplicate public id: publicid2" {
             ()
           } else {
             Err(e)?
@@ -501,33 +503,34 @@ mod tests {
     }
     println!("1");
 
-    let cpubid = caconn.query_row(
+    let cpubid: i64 = caconn.query_row(
       "select id from zknote where pubid = ?1",
-      params!["not-publicid1"],
+      params!["publicid2"],
       |row| Ok(row.get(0)?),
     )?;
 
-    let cpub1 = read_zknote_i64(&caconn, Some(cuser1), cpubid)?;
+    // let cpub1 = read_zknote_i64(&caconn, Some(cuser2), cpubid)?;
     let cpub2 = read_zknotepubid(&caconn, None, "publicid2")?;
 
     // rename public ids.
-    let (cpc1_id, cpc1) = save_zknote(
-      &caconn,
-      cuser1,
-      &SaveZkNote {
-        id: Some(cpub1.id),
-        title: "public client 1".to_string(),
-        showtitle: true,
-        pubid: Some("not-publicid1-client".to_string()), // test duplicate public notes!
-        content: "public note1 content".to_string(),
-        editable: false,
-        deleted: false,
-      },
-    )?;
+    // let (cpc1_id, cpc1) = save_zknote(
+    //   &caconn,
+    //   cuser2,
+    //   &SaveZkNote {
+    //     id: Some(cpub1.id),
+    //     title: "public client 1".to_string(),
+    //     showtitle: true,
+    //     pubid: Some("not-publicid1-client".to_string()), // test duplicate public notes!
+    //     content: "public note1 content".to_string(),
+    //     editable: false,
+    //     deleted: false,
+    //   },
+    // )?;
 
     println!("2");
-    assert!(cpub1.id == cpc1.id);
+    // assert!(cpub1.id == cpc1.id);
 
+    // alter as user1
     let (spc2_id, spc2) = save_zknote(
       &caconn,
       cuser1,
@@ -543,10 +546,71 @@ mod tests {
     )?;
     assert!(cpub2.id == spc2.id);
 
+    {
+      let server_stream = sync_stream(saconn.clone(), suser2, None, None, None, None, &mut cb);
+      // -----------------------------------
+      // Writing the stream to a file
+      // -----------------------------------
+      use futures::executor::block_on;
+      use futures::{future, future::FutureExt, stream, stream::StreamExt};
+      use tokio::io::AsyncWriteExt;
+      let mut file = tokio::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .open("server-stream.txt")
+        .await
+        .unwrap();
+
+      server_stream
+        .for_each(|item| match item {
+          Ok(bytes) => {
+            block_on(file.write(&bytes));
+            future::ready(())
+          }
+          Err(e) => future::ready(()),
+        })
+        .await;
+    }
+    {
+      let client_stream = sync_stream(
+        caconn.clone(),
+        cuser2,
+        // Some(ttn.notetemp.clone()),
+        None,
+        // Some(ttn.linktemp.clone()),
+        None,
+        // Some(ttn.archivelinktemp.clone()),
+        None,
+        None,
+        &mut cb,
+      );
+      // -----------------------------------
+      // Writing the stream to a file
+      // -----------------------------------
+      use futures::executor::block_on;
+      use futures::{future, future::FutureExt, stream, stream::StreamExt};
+      use tokio::io::AsyncWriteExt;
+      let mut file = tokio::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .open("client_stream.txt")
+        .await
+        .unwrap();
+
+      client_stream
+        .for_each(|item| match item {
+          Ok(bytes) => {
+            block_on(file.write(&bytes));
+            future::ready(())
+          }
+          Err(e) => future::ready(()),
+        })
+        .await;
+    }
     // ------------------------------------------------------------
     // sync from server to client.
     // ------------------------------------------------------------
-    let server_stream = sync_stream(saconn.clone(), suser1, None, None, None, None, &mut cb);
+    let server_stream = sync_stream(saconn.clone(), suser2, None, None, None, None, &mut cb);
 
     // let ctr = caconn.unchecked_transaction()?;
 
@@ -575,7 +639,7 @@ mod tests {
     // ------------------------------------------------------------
     let client_stream = sync_stream(
       caconn.clone(),
-      cuser1,
+      cuser2,
       Some(ttn.notetemp),
       Some(ttn.linktemp),
       Some(ttn.archivelinktemp),
@@ -598,38 +662,41 @@ mod tests {
     read_zknotepubid(&caconn, None, "publicid2")?;
     println!("3.5");
     // read_zknotepubid(&caconn, Some(cuser1), "not-publicid1")?;
-    read_zknotepubid(&caconn, Some(cuser1), "publicid2")?;
+    read_zknotepubid(&caconn, Some(cuser2), "publicid2")?;
     println!("4");
     // let cnot_publicid1_client = read_zknotepubid(&caconn, Some(cuser1), "not-publicid1-client")?;
-    let cpublicid2_client = read_zknotepubid(&caconn, Some(cuser1), "publicid2-client")?;
+    let cpublicid2_client = read_zknotepubid(&caconn, Some(cuser2), "publicid2-client")?;
 
     println!("5");
     // client public notes on server.
     // let snot_publicid1_client = read_zknotepubid(&saconn, Some(suser1), "not-publicid1-client")?;
-    let spublicid2_client = read_zknotepubid(&saconn, Some(suser1), "publicid2-client")?;
+    let spublicid2_client = read_zknotepubid(&saconn, Some(suser2), "publicid2-client")?;
 
     // ids are the same.
     // assert!(cnot_publicid1_client.id == snot_publicid1_client.id);
     assert!(spublicid2_client.id == cpublicid2_client.id);
 
     println!("6");
-    // archives present for revised notes.
+
     {
+      println!("cpub2.id: {}", cpub2.id);
+      // archives present for revised notes.
       let cpcarchs = read_zknotearchives(
         &caconn,
-        cuser1,
+        cuser2,
         &GetZkNoteArchives {
-          zknote: cpublicid2_client.id,
+          zknote: cpub2.id,
           offset: 0,
           limit: None,
         },
       )?;
 
+      println!("7.2");
       let spcarchs = read_zknotearchives(
         &saconn,
-        suser1,
+        suser2,
         &GetZkNoteArchives {
-          zknote: spublicid2_client.id,
+          zknote: cpub2.id,
           offset: 0,
           limit: None,
         },
@@ -639,36 +706,10 @@ mod tests {
 
       assert!(cpcarchs == spcarchs);
     }
-    println!("7");
 
-    {
-      println!("7.1");
-      println!("cpub1.id: {}", cpub1.id);
-      // archives present for revised notes.
-      let cpcarchs = read_zknotearchives(
-        &caconn,
-        cuser1,
-        &GetZkNoteArchives {
-          zknote: cpub1.id,
-          offset: 0,
-          limit: None,
-        },
-      )?;
+    assert!(false);
 
-      println!("7.2");
-      // uh oh, is owned by phantom client-user1, note server-user1 as hoped.
-      let spcarchs = read_zknotearchives(
-        &saconn,
-        suser1,
-        &GetZkNoteArchives {
-          zknote: cpub1.id,
-          offset: 0,
-          limit: None,
-        },
-      )?;
-
-      assert!(cpcarchs == spcarchs);
-    }
+    // Verify notes not visible to user1 are not on server.
 
     // TESTING:
     // user ids on client and server don't match.
@@ -687,6 +728,11 @@ mod tests {
     // pubzn1
     // pubzn2
     // szn1_6
+
+    // TEST: give user access to a share, then resync.  do they get the old notes?
+    // implement by checking for new links to shares.  when found, sync the whole share.
+    // in stream, first find new links to shares and new links from notes to user, and new links to public.
+    // or, query for the same thing??  mod date after last sync, OR links to new share, OR new links to new user.
 
     Ok(())
   }

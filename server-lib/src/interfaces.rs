@@ -97,7 +97,8 @@ pub async fn zk_interface_loggedin_streaming(
       let conn = Arc::new(sqldata::connection_open(
         config.orgauth_config.db.as_path(),
       )?);
-      let znsstream = search::search_zknotes_stream(conn, uid, search, None).map(sync::bytesify);
+      let znsstream =
+        search::search_zknotes_stream(conn, uid, search, None, "".to_string()).map(sync::bytesify);
       Ok(HttpResponse::Ok().streaming(znsstream))
     }
     PrivateStreamingRequests::GetArchiveZkLinks => {

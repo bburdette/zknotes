@@ -1628,7 +1628,14 @@ pub fn sync_stream(
     ordering: None,
   };
 
-  let znstream = search_zknotes_stream(conn.clone(), uid, zns, exclude_notes.clone()).map(bytesify);
+  let znstream = search_zknotes_stream(
+    conn.clone(),
+    uid,
+    zns,
+    exclude_notes.clone(),
+    "fullexcl-notes-search".to_string(),
+  )
+  .map(bytesify);
 
   let ans = ZkNoteSearch {
     tagsearch: emptyts,
@@ -1645,7 +1652,16 @@ pub fn sync_stream(
     ordering: None,
   };
 
-  let anstream = search_zknotes_stream(conn.clone(), uid, ans, exclude_notes).map(bytesify);
+  println!("search archive notes");
+
+  let anstream = search_zknotes_stream(
+    conn.clone(),
+    uid,
+    ans,
+    exclude_notes,
+    "archive-notes-search".to_string(),
+  )
+  .map(bytesify);
 
   let als =
     sqldata::read_archivezklinks_stream(conn.clone(), uid, after, exclude_archivelinks.clone())
