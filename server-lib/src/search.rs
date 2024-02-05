@@ -203,15 +203,16 @@ pub fn search_zknotes_stream(
   user: i64,
   search: ZkNoteSearch,
   exclude_notes: Option<String>,
+  what: String,
 ) -> impl Stream<Item = Result<SyncMessage, Box<dyn std::error::Error + 'static>>> {
   // uncomment for formatting, lsp
   // {
   try_stream! {
 
-    println!("search_zknotes_stream search {:?}", search);
+    println!("search_zknotes_stream - what: {} \nsearch {:?}", what, search);
 
     // let sysid = user_id(&conn, "system")?;
-    let s_user = if search.archives {
+    let user = if search.archives {
       user_id(&conn, "system")?
     } else {
       user
@@ -219,8 +220,8 @@ pub fn search_zknotes_stream(
 
     let (sql, args) = build_sql(&conn, user, &search, exclude_notes)?;
 
-    println!("zknote search sql {}", sql);
-    println!("zknote search args {:?}", args);
+    println!("zknote search what: {} sql {}", what, sql);
+    println!("zknote search what: {} args {:?}", what, args);
 
     let mut stmt = conn.prepare(sql.as_str())?;
     let mut rows = stmt.query(rusqlite::params_from_iter(args.iter()))?;
@@ -253,13 +254,13 @@ pub fn search_zknotes_stream(
           yield SyncMessage::from(zln)
         }
         ResultType::RtNote => {
-          let zn = sqldata::read_zknote_i64(&conn, Some(s_user), row.get(0)?)?;
+          let zn = sqldata::read_zknote_i64(&conn, Some(user), row.get(0)?)?;
           yield SyncMessage::from(zn)
         }
         ResultType::RtNoteAndLinks => {
           // TODO: i64 version
           let uuid = Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?;
-          let zn = sqldata::read_zknoteandlinks(&conn, Some(s_user), &uuid)?;
+          let zn = sqldata::read_zknoteandlinks(&conn, Some(user), &uuid)?;
           yield SyncMessage::from(zn)
         }
       }
