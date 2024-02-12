@@ -37,14 +37,14 @@ mod tests {
   }
 
   struct TestStuff {
-    visible_notes: Vec<(i64, SavedZkNote)>,
-    unvisible_notes: Vec<(i64, SavedZkNote)>,
+    visible_notes: Vec<(i64, Uuid)>,
+    unvisible_notes: Vec<(i64, Uuid)>,
     savedlinks: Vec<UuidZkLink>,
   }
 
-  fn idin(id: &Uuid, szns: &Vec<(i64, SavedZkNote)>) -> bool {
+  fn idin(id: &Uuid, szns: &Vec<(i64, Uuid)>) -> bool {
     for (_, szn) in szns {
-      if *id == szn.id {
+      if *id == *szn {
         return true;
       }
     }
@@ -151,11 +151,17 @@ mod tests {
 
     let otheruser_note = user_note_id(&conn, otheruser)?;
     let syncuser_note = user_note_id(&conn, syncuser)?;
+    {
+      // let ozkn = read_zknote_i64(conn, None, otheruser_note)?;
+      let szkn = read_zknote_i64(conn, None, syncuser_note)?;
+      // ts.visible_notes.push((otheruser_note, ozkn.id));
+      ts.visible_notes.push((syncuser_note, szkn.id));
+    }
 
     // private note for sync user
     let (private_note_id, private_notesd) =
       makenote(&conn, syncuser, format!("{} syncuser private", basename))?;
-    ts.visible_notes.push((private_note_id, private_notesd));
+    ts.visible_notes.push((private_note_id, private_notesd.id));
 
     // share note, syncuser and otheruser both connected.
     let (share_note_id, share_notesd) = makenote(
@@ -163,7 +169,7 @@ mod tests {
       otheruser,
       format!("{} otheruser, syncuser share", basename),
     )?;
-    ts.visible_notes.push((share_note_id, share_notesd));
+    ts.visible_notes.push((share_note_id, share_notesd.id));
     savelink(share_note_id, shareid, otheruser, &mut ts)?;
     savelink(syncuser_note, share_note_id, otheruser, &mut ts)?;
     savelink(otheruser_note, share_note_id, otheruser, &mut ts)?;
@@ -180,7 +186,7 @@ mod tests {
         basename
       ),
     )?;
-    ts.visible_notes.push((shared_note_id, shared_notesd));
+    ts.visible_notes.push((shared_note_id, shared_notesd.id));
     savelink(shared_note_id, share_note_id, otheruser, &mut ts)?;
 
     // public note owned by otheruser.
@@ -189,7 +195,7 @@ mod tests {
       otheruser,
       format!("{} otheruser public note", basename),
     )?;
-    ts.visible_notes.push((publid_note_id, publid_notesd));
+    ts.visible_notes.push((publid_note_id, publid_notesd.id));
     savelink(publid_note_id, publicid, otheruser, &mut ts)?;
 
     // public note owned by syncuser, with a public id
@@ -208,7 +214,7 @@ mod tests {
       },
     )?;
 
-    ts.visible_notes.push((public_note_id, public_notesd));
+    ts.visible_notes.push((public_note_id, public_notesd.id));
     savelink(public_note_id, publicid, syncuser, &mut ts)?; // should be visible, and get synced!
     println!(
       "visible link: {:?} ",
@@ -222,7 +228,7 @@ mod tests {
       format!("{} otheruser note linked to syncuser", basename),
     )?;
     ts.visible_notes
-      .push((user_linked_note_id, user_linked_notesd));
+      .push((user_linked_note_id, user_linked_notesd.id));
     savelink(user_linked_note_id, syncuser_note, otheruser, &mut ts)?;
 
     // ------------------------------------------------------------------
@@ -232,7 +238,7 @@ mod tests {
     let (otheruser_private_note_id, otheruser_private_notesd) =
       makenote(&conn, otheruser, format!("{} otheruser private", basename))?;
     ts.unvisible_notes
-      .push((otheruser_private_note_id, otheruser_private_notesd));
+      .push((otheruser_private_note_id, otheruser_private_notesd.id));
 
     // share note, only otheruser connected.
     let (othershare_note_id, othershare_notesd) = makenote(
@@ -241,7 +247,7 @@ mod tests {
       format!("{} otheruser othershare, not visible to syncuser", basename),
     )?;
     ts.unvisible_notes
-      .push((othershare_note_id, othershare_notesd));
+      .push((othershare_note_id, othershare_notesd.id));
     savelink(othershare_note_id, shareid, otheruser, &mut ts)?;
     savelink(otheruser_note, othershare_note_id, otheruser, &mut ts)?;
 
@@ -255,7 +261,7 @@ mod tests {
       ),
     )?;
     ts.unvisible_notes
-      .push((othershared_note_id, othershared_notesd));
+      .push((othershared_note_id, othershared_notesd.id));
     savelink(shared_note_id, share_note_id, otheruser, &mut ts)?;
 
     println!("setup_db end");
@@ -308,7 +314,7 @@ mod tests {
       }
     }
     let server_conn = connection_open(dbp_server)?;
-    let client_ts = setup_db(&server_conn, &mut cb, None, "server")?;
+    let server_ts = setup_db(&server_conn, &mut cb, None, "server")?;
 
     println!("0.1");
     let ssyncuser = user_id(&server_conn, "server-syncuser")?;
@@ -333,7 +339,7 @@ mod tests {
       }
     }
     let client_conn = connection_open(dbp_client)?;
-    let server_ts = setup_db(&client_conn, &mut cb, Some(ssyncuserld.uuid), "client")?;
+    let client_ts = setup_db(&client_conn, &mut cb, Some(ssyncuserld.uuid), "client")?;
 
     println!("0.1");
 
@@ -595,30 +601,36 @@ mod tests {
 
     // Visible notes from client are in server?
     for (_, szn) in &client_ts.visible_notes {
-      sqldata::read_zknote(&saconn, Some(ssyncuser), &szn.id)?;
+      match sqldata::read_zknote(&saconn, Some(ssyncuser), &szn) {
+        Err(zkerr::Error::Rusqlite(rusqlite::Error::QueryReturnedNoRows)) => {
+          Err(format!("not found: {:?}", szn).into())
+        }
+        Err(e) => Err(e),
+        Ok(x) => Ok(x),
+      }?;
     }
 
     // Visible notes from server are in client?
     for (_, szn) in &server_ts.visible_notes {
-      sqldata::read_zknote(&caconn, Some(csyncuser), &szn.id)?;
+      sqldata::read_zknote(&caconn, Some(csyncuser), &szn)?;
     }
 
     // non-visible notes from client are not in server?
     for (_, szn) in client_ts.unvisible_notes {
-      match sqldata::read_zknote(&saconn, Some(ssyncuser), &szn.id) {
+      match sqldata::read_zknote(&saconn, Some(ssyncuser), &szn) {
         Ok(_) => Err(format!(
           "client note was not supposed to sync to server: {}",
-          szn.id
+          szn
         )),
         Err(_) => Ok(()),
       }?
     }
 
     for (_, szn) in server_ts.unvisible_notes {
-      match sqldata::read_zknote(&caconn, Some(csyncuser), &szn.id) {
+      match sqldata::read_zknote(&caconn, Some(csyncuser), &szn) {
         Ok(_) => Err(format!(
           "server note was not supposed to sync to client: {}",
-          szn.id
+          szn
         )),
         Err(_) => Ok(()),
       }?
