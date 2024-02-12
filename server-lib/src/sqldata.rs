@@ -409,6 +409,61 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: Option<i64>) -> Result<(), zke
   Ok(())
 }
 
+// read the uuidzklink.
+pub fn read_uuidzklink(
+  conn: &Connection,
+  fromid: i64,
+  toid: i64,
+  user: i64,
+) -> Result<UuidZkLink, zkerr::Error> {
+  conn
+    .query_row(
+      "select F.uuid, T.uuid, OU.uuid, LN.uuid, zklink.createdate 
+      from zklink, zknote F, zknote T, orgauth_user OU
+      left join zknote LN on zklink.linkzknote = LN.id
+      where zklink.fromid = F.id
+       and F.id = ?1
+       and  zklink.toid = T.id
+       and T.id = ?2
+       and zklink.user = OU.id
+       and OU.id = ?3",
+      params![fromid, toid, user],
+      |row| {
+        Ok(UuidZkLink {
+          fromUuid: row.get(0)?,
+          toUuid: row.get(1)?,
+          userUuid: row.get(2)?,
+          linkUuid: row.get(3)?,
+          createdate: row.get(4)?,
+        })
+      },
+    )
+    .map_err(|e| e.into())
+}
+
+// really just for checking existence of the zklink.
+pub fn read_uuidzklink_createdate(
+  conn: &Connection,
+  fromid: &str,
+  toid: &str,
+  user: &str,
+) -> Result<i64, zkerr::Error> {
+  conn
+    .query_row(
+      "select zklink.createdate from
+      zklink, zknote F, zknote T, orgauth_user OU
+      where zklink.fromid = F.id
+       and F.uuid = ?1
+       and zklink.toid = T.id
+       and T.uuid = ?2
+       and zklink.user = OU.id
+       and OU.uuid = ?3",
+      params![fromid, toid, user],
+      |row| Ok(row.get(0)?),
+    )
+    .map_err(|e| e.into())
+}
+
 // user CRUD
 
 pub fn save_zklink(

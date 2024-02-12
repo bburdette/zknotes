@@ -3,6 +3,7 @@ mod tests {
   use crate::error as zkerr;
   use crate::interfaces::*;
   use crate::search::*;
+  use crate::sqldata;
   use crate::sqldata::*;
   use crate::sync::*;
   use either::Either;
@@ -20,30 +21,35 @@ mod tests {
   use std::sync::Arc;
   use tokio_util::io::StreamReader;
   use uuid::Uuid;
-  use zkprotocol::content::GetArchiveZkNote;
-  use zkprotocol::content::GetZkNoteArchives;
-  use zkprotocol::content::SaveZkNote;
-  use zkprotocol::content::SavedZkNote;
+  use zkprotocol::constants::SpecialUuids;
+  use zkprotocol::content::{
+    GetArchiveZkNote, GetZkNoteArchives, SaveZkNote, SavedZkNote, UuidZkLink,
+  };
   use zkprotocol::search::*;
 
+  use std::collections::hash_set::HashSet;
   // Note this useful idiom: importing names from outer (for mod tests) scope.
   // use super::*;
 
   #[tokio::test]
-  async fn test_sync() {
-    let res = match err_test().await {
-      Ok(()) => true,
-      Err(e) => {
-        println!("test failed with error: {:?}", e);
-        false
-      }
-    };
-    assert_eq!(res, true);
+  async fn test_sync() -> Result<(), Box<dyn Error>> {
+    err_test().await
   }
 
   struct TestStuff {
     visible_notes: Vec<(i64, SavedZkNote)>,
     unvisible_notes: Vec<(i64, SavedZkNote)>,
+    savedlinks: Vec<UuidZkLink>,
+  }
+
+  fn idin(id: &Uuid, szns: &Vec<(i64, SavedZkNote)>) -> bool {
+    for (_, szn) in szns {
+      if *id == szn.id {
+        return true;
+      }
+    }
+
+    false
   }
 
   fn makenote(
@@ -119,6 +125,15 @@ mod tests {
     let mut ts = TestStuff {
       visible_notes: Vec::new(),
       unvisible_notes: Vec::new(),
+      savedlinks: Vec::new(),
+    };
+
+    let savelink = |from, to, user, teststuff: &mut TestStuff| -> Result<(), zkerr::Error> {
+      save_zklink(&conn, from, to, user, None)?;
+      teststuff
+        .savedlinks
+        .push(read_uuidzklink(&conn, from, to, user)?);
+      Ok(())
     };
 
     // visible notes
@@ -149,9 +164,9 @@ mod tests {
       format!("{} otheruser, syncuser share", basename),
     )?;
     ts.visible_notes.push((share_note_id, share_notesd));
-    save_zklink(&conn, share_note_id, shareid, otheruser, None)?;
-    save_zklink(&conn, syncuser_note, share_note_id, otheruser, None)?;
-    save_zklink(&conn, otheruser_note, share_note_id, otheruser, None)?;
+    savelink(share_note_id, shareid, otheruser, &mut ts)?;
+    savelink(syncuser_note, share_note_id, otheruser, &mut ts)?;
+    savelink(otheruser_note, share_note_id, otheruser, &mut ts)?;
 
     // ------------------------------------------------------------------
     // notes visible to syncuser.
@@ -166,7 +181,7 @@ mod tests {
       ),
     )?;
     ts.visible_notes.push((shared_note_id, shared_notesd));
-    save_zklink(&conn, shared_note_id, share_note_id, otheruser, None)?;
+    savelink(shared_note_id, share_note_id, otheruser, &mut ts)?;
 
     // public note owned by otheruser.
     let (publid_note_id, publid_notesd) = makenote(
@@ -175,7 +190,7 @@ mod tests {
       format!("{} otheruser public note", basename),
     )?;
     ts.visible_notes.push((publid_note_id, publid_notesd));
-    save_zklink(&conn, publid_note_id, publicid, otheruser, None)?;
+    savelink(publid_note_id, publicid, otheruser, &mut ts)?;
 
     // public note owned by syncuser, with a public id
     // public id the same on client and server, so should conflict.
@@ -194,7 +209,11 @@ mod tests {
     )?;
 
     ts.visible_notes.push((public_note_id, public_notesd));
-    save_zklink(&conn, public_note_id, publicid, syncuser, None)?;
+    savelink(public_note_id, publicid, syncuser, &mut ts)?; // should be visible, and get synced!
+    println!(
+      "visible link: {:?} ",
+      read_uuidzklink(&conn, public_note_id, publicid, syncuser)?
+    );
 
     // user-link-shared note
     let (user_linked_note_id, user_linked_notesd) = makenote(
@@ -204,7 +223,7 @@ mod tests {
     )?;
     ts.visible_notes
       .push((user_linked_note_id, user_linked_notesd));
-    save_zklink(&conn, user_linked_note_id, syncuser_note, otheruser, None)?;
+    savelink(user_linked_note_id, syncuser_note, otheruser, &mut ts)?;
 
     // ------------------------------------------------------------------
     // notes not visible to syncuser.
@@ -223,8 +242,8 @@ mod tests {
     )?;
     ts.unvisible_notes
       .push((othershare_note_id, othershare_notesd));
-    save_zklink(&conn, othershare_note_id, shareid, otheruser, None)?;
-    save_zklink(&conn, otheruser_note, othershare_note_id, otheruser, None)?;
+    savelink(othershare_note_id, shareid, otheruser, &mut ts)?;
+    savelink(otheruser_note, othershare_note_id, otheruser, &mut ts)?;
 
     // note linked to share note NOT visible to user
     let (othershared_note_id, othershared_notesd) = makenote(
@@ -237,7 +256,7 @@ mod tests {
     )?;
     ts.unvisible_notes
       .push((othershared_note_id, othershared_notesd));
-    save_zklink(&conn, shared_note_id, share_note_id, otheruser, None)?;
+    savelink(shared_note_id, share_note_id, otheruser, &mut ts)?;
 
     println!("setup_db end");
 
@@ -250,6 +269,17 @@ mod tests {
   async fn err_test() -> Result<(), Box<dyn Error>> {
     let dbp_client = Path::new("client.db");
     let dbp_server = Path::new("server.db");
+
+    let systemnotes = HashSet::from([
+      Uuid::parse_str(SpecialUuids::Public.str())?,
+      Uuid::parse_str(SpecialUuids::Comment.str())?,
+      Uuid::parse_str(SpecialUuids::Share.str())?,
+      Uuid::parse_str(SpecialUuids::Search.str())?,
+      Uuid::parse_str(SpecialUuids::User.str())?,
+      Uuid::parse_str(SpecialUuids::Archive.str())?,
+      Uuid::parse_str(SpecialUuids::System.str())?,
+      Uuid::parse_str(SpecialUuids::Sync.str())?,
+    ]);
 
     let mut cb = zknotes_callbacks();
     println!("0");
@@ -274,12 +304,11 @@ mod tests {
           }
         }
         dbinit(dbp_server, None)?;
-        let server_conn = connection_open(dbp_server)?;
-        setup_db(&server_conn, &mut cb, None, "server")?;
         fs::copy(dbp_server, Path::new("server.db.saved"))?;
       }
     }
     let server_conn = connection_open(dbp_server)?;
+    let client_ts = setup_db(&server_conn, &mut cb, None, "server")?;
 
     println!("0.1");
     let ssyncuser = user_id(&server_conn, "server-syncuser")?;
@@ -300,12 +329,11 @@ mod tests {
           }
         }
         dbinit(dbp_client, None)?;
-        let client_conn = connection_open(dbp_client)?;
-        setup_db(&client_conn, &mut cb, Some(ssyncuserld.uuid), "client")?;
         fs::copy(dbp_client, Path::new("client.db.saved"))?;
       }
     }
     let client_conn = connection_open(dbp_client)?;
+    let server_ts = setup_db(&client_conn, &mut cb, Some(ssyncuserld.uuid), "client")?;
 
     println!("0.1");
 
@@ -380,25 +408,8 @@ mod tests {
     // let cpub1 = read_zknote_i64(&caconn, Some(cuser2), cpubid)?;
     let cpub2 = read_zknotepubid(&caconn, None, "public-note")?;
 
-    // rename public ids.
-    // let (cpc1_id, cpc1) = save_zknote(
-    //   &caconn,
-    //   cuser2,
-    //   &SaveZkNote {
-    //     id: Some(cpub1.id),
-    //     title: "public client 1".to_string(),
-    //     showtitle: true,
-    //     pubid: Some("not-publicid1-client".to_string()), // test duplicate public notes!
-    //     content: "public note1 content".to_string(),
-    //     editable: false,
-    //     deleted: false,
-    //   },
-    // )?;
-
     println!("2");
-    // assert!(cpub1.id == cpc1.id);
 
-    // alter as otheruser
     let (spc2_id, spc2) = save_zknote(
       &caconn,
       csyncuser,
@@ -578,6 +589,86 @@ mod tests {
     // ------------------------------------------------------------
     // Notes get synced, client to server and server to client.
     // archive note for each type of note, is synced both ways.
+
+    println!("visible notes: {:?}", client_ts.visible_notes);
+    println!("unvisible notes: {:?}", client_ts.unvisible_notes);
+
+    // Visible notes from client are in server?
+    for (_, szn) in &client_ts.visible_notes {
+      sqldata::read_zknote(&saconn, Some(ssyncuser), &szn.id)?;
+    }
+
+    // Visible notes from server are in client?
+    for (_, szn) in &server_ts.visible_notes {
+      sqldata::read_zknote(&caconn, Some(csyncuser), &szn.id)?;
+    }
+
+    // non-visible notes from client are not in server?
+    for (_, szn) in client_ts.unvisible_notes {
+      match sqldata::read_zknote(&saconn, Some(ssyncuser), &szn.id) {
+        Ok(_) => Err(format!(
+          "client note was not supposed to sync to server: {}",
+          szn.id
+        )),
+        Err(_) => Ok(()),
+      }?
+    }
+
+    for (_, szn) in server_ts.unvisible_notes {
+      match sqldata::read_zknote(&caconn, Some(csyncuser), &szn.id) {
+        Ok(_) => Err(format!(
+          "server note was not supposed to sync to client: {}",
+          szn.id
+        )),
+        Err(_) => Ok(()),
+      }?
+    }
+
+    // links between two visible notes should sync.
+    // links between less than two visible notes should not sync.
+
+    println!("systemnotes: {:?}", systemnotes);
+
+    for uzl in client_ts.savedlinks {
+      let fromid = Uuid::parse_str(uzl.fromUuid.as_str())?;
+      let toid = Uuid::parse_str(uzl.toUuid.as_str())?;
+      println!(
+        "from visible? {} {}",
+        &fromid,
+        idin(&fromid, &client_ts.visible_notes) || systemnotes.contains(&fromid)
+      );
+      println!(
+        "to visible? {} {}",
+        &toid,
+        idin(&toid, &client_ts.visible_notes) || systemnotes.contains(&toid)
+      );
+      if (idin(&fromid, &client_ts.visible_notes) || systemnotes.contains(&fromid))
+        && (idin(&toid, &client_ts.visible_notes) || systemnotes.contains(&toid))
+      {
+        // link should be on the server.
+        println!("checking link: {:?}", uzl);
+        read_uuidzklink_createdate(
+          &saconn,
+          uzl.fromUuid.as_str(),
+          uzl.toUuid.as_str(),
+          uzl.userUuid.as_str(),
+        )?;
+      } else {
+        // link should not be on the server.
+        println!("checking unsynced link: {:?}", uzl);
+        match read_uuidzklink_createdate(
+          &saconn,
+          uzl.fromUuid.as_str(),
+          uzl.toUuid.as_str(),
+          uzl.userUuid.as_str(),
+        ) {
+          Ok(_) => Err(format!("link shouldn't sync: {:?}", uzl)),
+          Err(_) => Ok(()),
+        }?;
+      }
+    }
+
+    assert!(false);
 
     // user note for sync user
     // share note visible to user
