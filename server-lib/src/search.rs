@@ -299,12 +299,13 @@ pub fn sync_users(
       pstmt.query_map(
         rusqlite::params_from_iter(args.iter()),
         |row| match Uuid::parse_str(row.get::<usize, String>(1)?.as_str()) {
-          Ok(uuid) => Ok(SyncMessage::from(ZkPhantomUser {
+          Ok(uuid) => Ok(ZkPhantomUser {
             id: row.get(0)?,
             uuid: uuid,
+            data: serde_json::Value::Null,
             name: row.get(2)?,
             active: row.get(3)?,
-          })),
+          }),
           Err(e) => Err(rusqlite::Error::InvalidColumnType(
             0,
             "uuid".to_string(),
@@ -315,8 +316,10 @@ pub fn sync_users(
 
     for rec in rec_iter {
       println!("sync user {:?}", rec);
-      if let Ok(r) = rec {
-        yield r;
+      if let Ok(mut r) = rec {
+        let ed = serde_json::to_value(sqldata::read_extra_login_data(&conn, r.id)?)?;
+        r.data = ed;
+        yield SyncMessage::from(r);
       }
     }
   }
@@ -333,6 +336,7 @@ pub fn system_user(
       id: sysid,
       uuid: Uuid::parse_str(&SpecialUuids::System.str())?,
       name: "system".to_string(),
+      data: serde_json::to_value(sqldata::read_extra_login_data(&conn, sysid)?)?,
       active: true,
     });
   }

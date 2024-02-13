@@ -219,7 +219,8 @@ pub struct ZkNoteAndLinksWhat {
 #[derive(Clone, Deserialize, Serialize, Debug)]
 pub struct ZkPhantomUser {
   pub id: i64,
-  pub uuid: Uuid,
+  pub uuid: Uuid,              // uuid in orgauth_user record.
+  pub data: serde_json::Value, // uuid in user note.
   pub name: String,
   pub active: bool,
 }

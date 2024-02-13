@@ -153,7 +153,7 @@ pub async fn sync_from_remote_prev(
 ) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>> {
   let now = now()?;
 
-  let extra_login_data = sqldata::read_user_by_id(conn, user.id)?;
+  let extra_login_data = sqldata::read_extra_login_data(conn, user.id)?;
 
   // get previous sync.
   let after = prev_sync(&conn, &user, &extra_login_data.zknote)
@@ -323,6 +323,7 @@ pub async fn sync_from_remote_prev(
                     &conn,
                     &pu.name,
                     pu.uuid,
+                    Some(pu.extra_login_data),
                     pu.active,
                     &mut callbacks.on_new_user,
                   )?;
@@ -792,7 +793,7 @@ pub async fn sync(
 ) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>> {
   let conn = Arc::new(sqldata::connection_open(dbpath)?);
   let user = orgauth::dbfun::read_user_by_id(&conn, uid)?; // TODO pass this in from calling ftn?
-  let extra_login_data = sqldata::read_user_by_id(&conn, user.id)?;
+  let extra_login_data = sqldata::read_extra_login_data(&conn, user.id)?;
 
   // get previous sync.
   let after = prev_sync(&conn, &user, &extra_login_data.zknote)
@@ -986,6 +987,7 @@ where
               &conn,
               &pu.name,
               pu.uuid,
+              Some(pu.data.clone()),
               pu.active,
               &mut callbacks.on_new_user,
             )?;

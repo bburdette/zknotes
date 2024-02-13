@@ -11,6 +11,7 @@ mod tests {
   use futures_util::pin_mut;
   use futures_util::TryStreamExt;
   use orgauth::data::RegistrationData;
+  use orgauth::dbfun::read_user_by_id;
   use orgauth::dbfun::{new_user, user_id};
   use orgauth::endpoints::Callbacks;
   use rusqlite::params;
@@ -22,6 +23,7 @@ mod tests {
   use tokio_util::io::StreamReader;
   use uuid::Uuid;
   use zkprotocol::constants::SpecialUuids;
+  use zkprotocol::content::ExtraLoginData;
   use zkprotocol::content::{
     GetArchiveZkNote, GetZkNoteArchives, SaveZkNote, SavedZkNote, UuidZkLink,
   };
@@ -38,6 +40,7 @@ mod tests {
 
   struct TestStuff {
     visible_notes: Vec<(i64, Uuid)>,
+    synced_notes: Vec<(i64, Uuid)>,
     unvisible_notes: Vec<(i64, Uuid)>,
     savedlinks: Vec<UuidZkLink>,
   }
@@ -75,7 +78,7 @@ mod tests {
   fn setup_db(
     conn: &Connection,
     cb: &mut Callbacks,
-    syncuuid: Option<Uuid>,
+    syncuser: Option<(Uuid, ExtraLoginData)>,
     basename: &str,
   ) -> Result<TestStuff, Box<dyn Error>> {
     // system note ids
@@ -102,6 +105,11 @@ mod tests {
       &mut cb.on_new_user,
     )?;
 
+    let (syncuuid, synced) = match syncuser {
+      Some((l, r)) => (Some(l), Some(serde_json::to_value(r)?)),
+      None => (None, None),
+    };
+
     let syncuser = new_user(
       &conn,
       &RegistrationData {
@@ -116,13 +124,14 @@ mod tests {
       syncuuid,
       None,
       None,
-      None,
+      synced,
       None,
       &mut cb.on_new_user,
     )?;
 
     // returning this.
     let mut ts = TestStuff {
+      synced_notes: Vec::new(),
       visible_notes: Vec::new(),
       unvisible_notes: Vec::new(),
       savedlinks: Vec::new(),
@@ -152,9 +161,10 @@ mod tests {
     let otheruser_note = user_note_id(&conn, otheruser)?;
     let syncuser_note = user_note_id(&conn, syncuser)?;
     {
-      // let ozkn = read_zknote_i64(conn, None, otheruser_note)?;
+      // visible but not synced.
+      let ozkn = read_zknote_i64(conn, None, otheruser_note)?;
       let szkn = read_zknote_i64(conn, None, syncuser_note)?;
-      // ts.visible_notes.push((otheruser_note, ozkn.id));
+      ts.visible_notes.push((otheruser_note, ozkn.id));
       ts.visible_notes.push((syncuser_note, szkn.id));
     }
 
@@ -170,6 +180,7 @@ mod tests {
       format!("{} otheruser, syncuser share", basename),
     )?;
     ts.visible_notes.push((share_note_id, share_notesd.id));
+    ts.synced_notes.push((share_note_id, share_notesd.id));
     savelink(share_note_id, shareid, otheruser, &mut ts)?;
     savelink(syncuser_note, share_note_id, otheruser, &mut ts)?;
     savelink(otheruser_note, share_note_id, otheruser, &mut ts)?;
@@ -187,6 +198,7 @@ mod tests {
       ),
     )?;
     ts.visible_notes.push((shared_note_id, shared_notesd.id));
+    ts.synced_notes.push((shared_note_id, shared_notesd.id));
     savelink(shared_note_id, share_note_id, otheruser, &mut ts)?;
 
     // public note owned by otheruser.
@@ -196,6 +208,7 @@ mod tests {
       format!("{} otheruser public note", basename),
     )?;
     ts.visible_notes.push((publid_note_id, publid_notesd.id));
+    ts.synced_notes.push((publid_note_id, publid_notesd.id));
     savelink(publid_note_id, publicid, otheruser, &mut ts)?;
 
     // public note owned by syncuser, with a public id
@@ -215,6 +228,7 @@ mod tests {
     )?;
 
     ts.visible_notes.push((public_note_id, public_notesd.id));
+    ts.synced_notes.push((public_note_id, public_notesd.id));
     savelink(public_note_id, publicid, syncuser, &mut ts)?; // should be visible, and get synced!
     println!(
       "visible link: {:?} ",
@@ -318,7 +332,8 @@ mod tests {
 
     println!("0.1");
     let ssyncuser = user_id(&server_conn, "server-syncuser")?;
-    let ssyncuserld = orgauth::dbfun::login_data(&server_conn, ssyncuser)?;
+    let ssyncuserld = sqldata::read_extra_login_data(&server_conn, ssyncuser)?;
+    let ssu = read_user_by_id(&server_conn, ssyncuser)?;
 
     match fs::copy(Path::new("client.db.saved"), dbp_client) {
       Ok(_) => (), // already have a saved initted db.
@@ -339,7 +354,12 @@ mod tests {
       }
     }
     let client_conn = connection_open(dbp_client)?;
-    let client_ts = setup_db(&client_conn, &mut cb, Some(ssyncuserld.uuid), "client")?;
+    let client_ts = setup_db(
+      &client_conn,
+      &mut cb,
+      Some((ssu.uuid, ssyncuserld)),
+      "client",
+    )?;
 
     println!("0.1");
 
@@ -542,6 +562,28 @@ mod tests {
     // post-sync tests.
     // ------------------------------------------------------------
 
+    // ------------------------------------------------------------
+    let scotheruser = user_id(&saconn, "client-otheruser")?; // phantom user on server?
+                                                             // check that user note ids and user uuids match on client and server.
+    {
+      let celd = sqldata::read_extra_login_data(&caconn, csyncuser)?;
+      let seld = sqldata::read_extra_login_data(&saconn, ssyncuser)?;
+      assert!(celd.zknote == seld.zknote);
+      let cu = orgauth::dbfun::read_user_by_id(&caconn, csyncuser)?;
+      let su = orgauth::dbfun::read_user_by_id(&saconn, ssyncuser)?;
+      assert!(cu.uuid == su.uuid);
+    }
+
+    {
+      let cu = orgauth::dbfun::read_user_by_id(&caconn, cotheruser)?;
+      let su = orgauth::dbfun::read_user_by_id(&saconn, scotheruser)?;
+      assert!(cu.uuid == su.uuid);
+      let celd = sqldata::read_extra_login_data(&caconn, cotheruser)?;
+      let seld = sqldata::read_extra_login_data(&saconn, scotheruser)?;
+      assert!(celd.zknote == seld.zknote);
+    }
+
+    // ------------------------------------------------------------
     println!("3");
     // read_zknotepubid(&caconn, None, "not-publicid1")?;
     read_zknotepubid(&caconn, None, "public-note")?;
@@ -600,7 +642,8 @@ mod tests {
     println!("unvisible notes: {:?}", client_ts.unvisible_notes);
 
     // Visible notes from client are in server?
-    for (_, szn) in &client_ts.visible_notes {
+    for (_, szn) in &client_ts.synced_notes {
+      println!("checking clieint syned: {:?}", szn);
       match sqldata::read_zknote(&saconn, Some(ssyncuser), &szn) {
         Err(zkerr::Error::Rusqlite(rusqlite::Error::QueryReturnedNoRows)) => {
           Err(format!("not found: {:?}", szn).into())
@@ -611,12 +654,14 @@ mod tests {
     }
 
     // Visible notes from server are in client?
-    for (_, szn) in &server_ts.visible_notes {
+    for (_, szn) in &server_ts.synced_notes {
+      println!("checking server syned: {:?}", szn);
       sqldata::read_zknote(&caconn, Some(csyncuser), &szn)?;
     }
 
     // non-visible notes from client are not in server?
     for (_, szn) in client_ts.unvisible_notes {
+      println!("checking client unvis: {:?}", szn);
       match sqldata::read_zknote(&saconn, Some(ssyncuser), &szn) {
         Ok(_) => Err(format!(
           "client note was not supposed to sync to server: {}",
@@ -627,6 +672,7 @@ mod tests {
     }
 
     for (_, szn) in server_ts.unvisible_notes {
+      println!("checking server unvis: {:?}", szn);
       match sqldata::read_zknote(&caconn, Some(csyncuser), &szn) {
         Ok(_) => Err(format!(
           "server note was not supposed to sync to client: {}",
@@ -680,7 +726,7 @@ mod tests {
       }
     }
 
-    assert!(false);
+    // assert!(false);
 
     // user note for sync user
     // share note visible to user

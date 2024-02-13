@@ -51,7 +51,7 @@ pub fn on_new_user(
 
   let now = now()?;
 
-  let uuid = match remote_data {
+  let user_note_uuid = match remote_data {
     Some(remote_data) => {
       println!("remote_data {:?}", remote_data);
       let remd: ExtraLoginData = serde_json::from_value(remote_data)?;
@@ -64,7 +64,7 @@ pub fn on_new_user(
   conn.execute(
     "insert into zknote (title, content, user, editable, showtitle, deleted, uuid, createdate, changeddate)
      values (?1, ?2, ?3, 0, 1, 0, ?4, ?5, ?6)",
-    params![rd.uid, "", systemid, uuid.to_string(), now, now],
+    params![rd.uid, "", systemid, user_note_uuid.to_string(), now, now],
   )?;
 
   let zknid = conn.last_insert_rowid();
@@ -90,7 +90,8 @@ pub fn on_new_user(
   match (&data, creator) {
     (Some(data), Some(creator)) => {
       let extra_links: Vec<SaveZkLink> = serde_json::from_str(data.as_str())?;
-      save_savezklinks(&conn, creator, uuid, extra_links).map_err(zkerr::to_orgauth_error)?;
+      save_savezklinks(&conn, creator, user_note_uuid, extra_links)
+        .map_err(zkerr::to_orgauth_error)?;
     }
     _ => (),
   }
@@ -104,7 +105,7 @@ pub fn extra_login_data_callback(
   uid: i64,
 ) -> Result<Option<serde_json::Value>, orgauth::error::Error> {
   Ok(Some(serde_json::to_value(
-    read_user_by_id(&conn, uid).map_err(to_orgauth_error)?,
+    read_extra_login_data(&conn, uid).map_err(to_orgauth_error)?,
   )?))
 }
 
@@ -924,7 +925,7 @@ pub fn get_sysids(
   r
 }
 
-pub fn read_user_by_id(conn: &Connection, id: i64) -> Result<ExtraLoginData, zkerr::Error> {
+pub fn read_extra_login_data(conn: &Connection, id: i64) -> Result<ExtraLoginData, zkerr::Error> {
   let (uid, noteid, hn) = conn.query_row(
     "select user.id, zknote.uuid, homenote
       from user, zknote where user.id = ?1
@@ -2006,6 +2007,7 @@ pub fn accessible_notes(
   // query: archivelinks that attach to notes I can access.
   // my notes + public notes + shared notes + ??
 
+  // notes that are mine.
   let (mut sqlbase, mut baseargs) = {
     // notes that are mine.
     (
