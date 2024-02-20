@@ -726,47 +726,10 @@ mod tests {
       }
     }
 
-    // assert!(false);
-
-    // user note for sync user
-    // share note visible to user
-    // note linked to share note.
-    // public note not otherwise shared with user goes
-    // public note owned by user
-    // user-link-shared note
-
     // ------------------------------------------------------------
-    // Notes don't get synced:
-    // archive note for each type of note, is not synced.
-
-    // user note NOT visible to user
-    // share note NOT visible to user
-    // note linked to share note NOT visible to user
-    // system notes.
-    // user notes?
-    // sync notes.
-
-    // ------------------------------------------------------------
-    // links get synced:
-
-    // from/to user note to user note.
-    // from/to user note to share note.
-    // from/to user note to public note.
-    // from/to user note to user-linked note.
-    // from/to share note to share note.
-    // from/to share note to public note.
-    // from/to share note to user-linked note.
-    // from/to public note to user-linked note.
-
-    // ------------------------------------------------------------
-    // links don't get synced:
-
-    // from/to other-user note to other-user note.
-    // from/to share note to other-user note.
-    // from/to public note to other-user note.
-    // from/to user-link-shared to other-user note.
-    // from/to share note to other-share note.
-    // from/to user-link-shared to other-share note.
+    // archive link testing.
+    //  - archive links transfer.
+    //  - after changes
 
     // ------------------------------------------------------------
     // sync 2:
@@ -781,20 +744,6 @@ mod tests {
     // TESTING:
     // user ids on client and server don't match.
     //   should sync fail if user ids don't match?  do user ids match on remote users now?
-    // phantom user stuff (like what?)
-    //
-
-    // szn1_1_share
-    // szn1_2_share
-    // szn1_3_share
-    // szn1_4
-    // szn1_5
-    // szn1_6
-    // szn1_7
-    // szn2_1
-    // pubzn1
-    // pubzn2
-    // szn1_6
 
     // TEST: give user access to a share, then resync.  do they get the old notes?
     // implement by checking for new links to shares.  when found, sync the whole share.

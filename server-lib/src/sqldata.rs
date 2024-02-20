@@ -3,8 +3,6 @@ use crate::error::to_orgauth_error;
 use crate::migrations as zkm;
 use async_stream::try_stream;
 use barrel::backend::Sqlite;
-use bytes::Bytes;
-use futures::Stream;
 use log::info;
 use orgauth::data::RegistrationData;
 use orgauth::dbfun::user_id;
@@ -18,16 +16,13 @@ use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::debug;
 use uuid::Uuid;
-use zkprotocol::constants::PrivateReplies;
 use zkprotocol::constants::SpecialUuids;
 use zkprotocol::content::{
   ArchiveZkLink, Direction, EditLink, ExtraLoginData, GetArchiveZkNote, GetZkNoteArchives,
   GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkLink, SaveZkNote, SavedZkNote,
   SyncMessage, Sysids, UuidZkLink, ZkLink, ZkListNote, ZkNote, ZkNoteAndLinks, ZkNoteId,
 };
-use zkprotocol::messages::PrivateReplyMessage;
 
 pub fn zknotes_callbacks() -> Callbacks {
   Callbacks {
@@ -1921,7 +1916,7 @@ pub fn read_zklinks_since_stream(
     let archiveid = note_id_for_uuid(&conn, &auid)?;
 
     // also insert archive notes into accessible notes!
-    let r = conn.execute(
+    conn.execute(
       format!("insert into {} select ZL.fromid from zklink ZL, {} AN
           where ZL.toid = AN.id
            and ZL.linkzknote = ?1

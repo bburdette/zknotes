@@ -4,18 +4,14 @@ use crate::sqldata;
 use crate::sqldata::zknotes_callbacks;
 use crate::sync;
 use actix_session::Session;
-use actix_web::error::PayloadError;
-use actix_web::{web::Payload, HttpResponse};
+use actix_web::HttpResponse;
 use futures_util::StreamExt;
-use futures_util::TryStreamExt;
-use log::{error, info};
+use log::info;
 use orgauth;
-use orgauth::endpoints::{Callbacks, Tokener};
+use orgauth::endpoints::Tokener;
 use std::error::Error;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::io::AsyncBufReadExt;
-use tokio_util::io::StreamReader;
 use zkprotocol::constants::PrivateReplies;
 use zkprotocol::constants::PublicReplies;
 use zkprotocol::constants::{PrivateRequests, PrivateStreamingRequests, PublicRequests};
@@ -137,34 +133,6 @@ pub async fn zk_interface_loggedin_streaming(
     }
   }
 }
-
-fn convert_err(err: PayloadError) -> std::io::Error {
-  error!("convert_err {:?}", err);
-  todo!()
-}
-
-// pub async fn zk_interface_loggedin_upstreaming(
-//   config: &Config,
-//   uid: i64,
-//   body: Payload,
-// ) -> Result<HttpResponse, Box<dyn Error>> {
-//   let conn = Arc::new(sqldata::connection_open(
-//     config.orgauth_config.db.as_path(),
-//   )?);
-
-//   println!("zk_interface_loggedin_upstreaming");
-//   // pull in line by line and println
-//   let rstream = body.map_err(convert_err);
-
-//   let mut br = StreamReader::new(rstream);
-
-//   let mut line = String::new();
-//   while br.read_line(&mut line).await? != 0 {
-//     println!("upstreamline: {:?}", line);
-//   }
-
-//   Ok(HttpResponse::Ok().finish())
-// }
 
 pub async fn zk_interface_loggedin(
   config: &Config,

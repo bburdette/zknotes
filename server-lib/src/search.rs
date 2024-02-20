@@ -1,11 +1,8 @@
 use crate::error as zkerr;
 use crate::sqldata;
-use crate::sqldata::note_id_for_uuid;
 use crate::sqldata::{delete_zknote, get_sysids, note_id};
 use async_stream::try_stream;
-use bytes::Bytes;
 use futures::Stream;
-use orgauth::data::PhantomUser;
 use orgauth::dbfun::user_id;
 use rusqlite::Connection;
 use std::convert::TryInto;
@@ -13,10 +10,8 @@ use std::error::Error;
 use std::path::PathBuf;
 use std::sync::Arc;
 use uuid::Uuid;
-use zkprotocol::constants::PrivateReplies;
 use zkprotocol::constants::SpecialUuids;
 use zkprotocol::content::{SyncMessage, ZkListNote, ZkPhantomUser};
-use zkprotocol::messages::PrivateReplyMessage;
 use zkprotocol::search::{
   AndOr, OrderDirection, OrderField, ResultType, SearchMod, TagSearch, ZkIdSearchResult,
   ZkListNoteSearchResult, ZkNoteAndLinksSearchResult, ZkNoteSearch, ZkNoteSearchResult,
@@ -227,7 +222,7 @@ pub fn search_zknotes_stream(
     let mut rows = stmt.query(rusqlite::params_from_iter(args.iter()))?;
     yield SyncMessage::from(ZkSearchResultHeader {
       what: search.what,
-      resultType: search.resulttype,
+      resulttype: search.resulttype,
       offset: search.offset,
     });
 
@@ -271,7 +266,7 @@ pub fn search_zknotes_stream(
 pub fn sync_users(
   conn: Arc<Connection>,
   uid: i64,
-  after: Option<i64>,
+  _after: Option<i64>,
   zkns: &ZkNoteSearch,
 ) -> impl futures_util::Stream<Item = Result<SyncMessage, Box<dyn std::error::Error>>> {
   let lzkns = zkns.clone();
@@ -306,7 +301,7 @@ pub fn sync_users(
             name: row.get(2)?,
             active: row.get(3)?,
           }),
-          Err(e) => Err(rusqlite::Error::InvalidColumnType(
+          Err(_e) => Err(rusqlite::Error::InvalidColumnType(
             0,
             "uuid".to_string(),
             rusqlite::types::Type::Text,
@@ -636,7 +631,7 @@ fn build_daterange_clause(
       .filter_map(|pair| pair.as_ref().map(|(s, _)| s.to_string()))
       .collect::<Vec<String>>()
       .join(conj);
-    let mut args: Vec<String> = clawses
+    let args: Vec<String> = clawses
       .iter()
       .filter_map(|pair| pair.as_ref().map(|(_, dt)| dt.clone()))
       .collect();

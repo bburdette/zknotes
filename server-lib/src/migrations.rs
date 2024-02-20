@@ -1,6 +1,5 @@
 use crate::error as zkerr;
-use crate::sqldata::set_single_value;
-use crate::util::now;
+use crate::util::{now, nowms};
 use barrel::backend::Sqlite;
 use barrel::{types, Migration};
 use orgauth::migrations;
@@ -1998,12 +1997,17 @@ pub fn udpate27(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 
   // this is horrifically slow
   for id in ids {
+    let snow = nowms()?;
     let uuid = uuid::Uuid::new_v4();
+    let unow = nowms()?;
+    println!("uuid duration: {}", unow - snow);
 
     conn.execute(
       "update zknotetemp set uuid = ?1 where id = ?2",
       params![uuid.to_string(), id],
     )?;
+    let upnow = nowms()?;
+    println!("update duration: {}", upnow - unow);
 
     println!("updated {} {}", id, uuid);
   }
@@ -2253,7 +2257,6 @@ pub fn udpate28(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   )?;
 
   let mut m3 = Migration::new();
-  // drop zknotetemp.
   m3.drop_table("zklinktemp");
 
   conn.execute_batch(m3.make::<Sqlite>().as_str())?;

@@ -8,7 +8,6 @@ pub mod sqldata;
 mod sync;
 mod synctest;
 
-use crate::sqldata::get_sysids;
 use actix_cors::Cors;
 use actix_files::NamedFile;
 use actix_multipart::Multipart;
@@ -29,7 +28,7 @@ pub use orgauth;
 use orgauth::util;
 use orgauth::{
   data::{AdminResponse, UserResponse, UserResponseMessage},
-  endpoints::{ActixTokener, Callbacks},
+  endpoints::ActixTokener,
 };
 use rusqlite::Connection;
 use serde_json;
@@ -553,7 +552,7 @@ async fn zk_interface_check_upstreaming(
             content: serde_json::to_value(format!("{:?}", e).as_str())?,
           }))
         }
-        Ok(userdata) => {
+        Ok(_userdata) => {
           // finally!  processing messages as logged in user.
           let rstream =
             body.map_err(convert_bodyerr as fn(actix_web::error::PayloadError) -> std::io::Error);
