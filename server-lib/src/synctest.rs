@@ -1,13 +1,9 @@
 #[cfg(test)]
 mod tests {
   use crate::error as zkerr;
-  use crate::interfaces::*;
-  use crate::search::*;
   use crate::sqldata;
   use crate::sqldata::*;
   use crate::sync::*;
-  use either::Either;
-  use futures::executor::block_on;
   use futures_util::pin_mut;
   use futures_util::TryStreamExt;
   use orgauth::data::RegistrationData;
@@ -24,10 +20,7 @@ mod tests {
   use uuid::Uuid;
   use zkprotocol::constants::SpecialUuids;
   use zkprotocol::content::ExtraLoginData;
-  use zkprotocol::content::{
-    GetArchiveZkNote, GetZkNoteArchives, SaveZkNote, SavedZkNote, UuidZkLink,
-  };
-  use zkprotocol::search::*;
+  use zkprotocol::content::{GetZkNoteArchives, SaveZkNote, SavedZkNote, UuidZkLink};
 
   use std::collections::hash_set::HashSet;
   // Note this useful idiom: importing names from outer (for mod tests) scope.
@@ -43,6 +36,8 @@ mod tests {
     synced_notes: Vec<(i64, Uuid)>,
     unvisible_notes: Vec<(i64, Uuid)>,
     savedlinks: Vec<UuidZkLink>,
+    otherusershare: Option<(i64, Uuid)>,
+    otherusersharenote: Option<(i64, Uuid)>,
   }
 
   fn idin(id: &Uuid, szns: &Vec<(i64, Uuid)>) -> bool {
@@ -135,6 +130,8 @@ mod tests {
       visible_notes: Vec::new(),
       unvisible_notes: Vec::new(),
       savedlinks: Vec::new(),
+      otherusershare: None,
+      otherusersharenote: None,
     };
 
     let savelink = |from, to, user, teststuff: &mut TestStuff| -> Result<(), zkerr::Error> {
@@ -265,6 +262,7 @@ mod tests {
     savelink(othershare_note_id, shareid, otheruser, &mut ts)?;
     savelink(otheruser_note, othershare_note_id, otheruser, &mut ts)?;
 
+    ts.otherusershare = Some((othershare_note_id, othershare_notesd.id));
     // note linked to share note NOT visible to user
     let (othershared_note_id, othershared_notesd) = makenote(
       &conn,
@@ -277,6 +275,8 @@ mod tests {
     ts.unvisible_notes
       .push((othershared_note_id, othershared_notesd.id));
     savelink(shared_note_id, share_note_id, otheruser, &mut ts)?;
+
+    ts.otherusersharenote = Some((othershared_note_id, othershared_notesd.id));
 
     println!("setup_db end");
 
@@ -457,24 +457,24 @@ mod tests {
       // Writing the stream to a file
       // -----------------------------------
       use futures::executor::block_on;
-      use futures::{future, future::FutureExt, stream, stream::StreamExt};
+      use futures::{future, stream::StreamExt};
       use tokio::io::AsyncWriteExt;
       let mut file = tokio::fs::OpenOptions::new()
         .write(true)
         .create(true)
-        .open("server-stream.txt")
+        .open("server_stream.txt")
         .await
         .unwrap();
 
       server_stream
-        .for_each(|item| match item {
-          Ok(bytes) => {
-            block_on(file.write(&bytes));
-            future::ready(())
-          }
-          Err(e) => future::ready(()),
+        .try_for_each(|bytes| {
+          future::ready(
+            block_on(file.write(&bytes))
+              .map(|_| ())
+              .map_err(|e| e.into()),
+          )
         })
-        .await;
+        .await?;
     }
     {
       let client_stream = sync_stream(
@@ -493,7 +493,7 @@ mod tests {
       // Writing the stream to a file
       // -----------------------------------
       use futures::executor::block_on;
-      use futures::{future, future::FutureExt, stream, stream::StreamExt};
+      use futures::{future, stream::StreamExt};
       use tokio::io::AsyncWriteExt;
       let mut file = tokio::fs::OpenOptions::new()
         .write(true)
@@ -503,14 +503,14 @@ mod tests {
         .unwrap();
 
       client_stream
-        .for_each(|item| match item {
-          Ok(bytes) => {
-            block_on(file.write(&bytes));
-            future::ready(())
-          }
-          Err(e) => future::ready(()),
+        .try_for_each(|bytes| {
+          future::ready(
+            block_on(file.write(&bytes))
+              .map(|_| ())
+              .map_err(|e| e.into()),
+          )
         })
-        .await;
+        .await?;
     }
     // ------------------------------------------------------------
     // sync from server to client.
@@ -725,6 +725,8 @@ mod tests {
         }?;
       }
     }
+
+    // add a new share, or link user in to a share, then sync again.
 
     // ------------------------------------------------------------
     // archive link testing.
