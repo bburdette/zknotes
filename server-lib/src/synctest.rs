@@ -36,8 +36,11 @@ mod tests {
     synced_notes: Vec<(i64, Uuid)>,
     unvisible_notes: Vec<(i64, Uuid)>,
     savedlinks: Vec<UuidZkLink>,
-    otherusershare: Option<(i64, Uuid)>,
-    otherusersharenote: Option<(i64, Uuid)>,
+    otherusershare: (i64, Uuid),
+    otherusersharenote: (i64, Uuid),
+    syncuser: i64,
+    syncusernote: i64,
+    otheruser: i64,
   }
 
   fn idin(id: &Uuid, szns: &Vec<(i64, Uuid)>) -> bool {
@@ -125,20 +128,14 @@ mod tests {
     )?;
 
     // returning this.
-    let mut ts = TestStuff {
-      synced_notes: Vec::new(),
-      visible_notes: Vec::new(),
-      unvisible_notes: Vec::new(),
-      savedlinks: Vec::new(),
-      otherusershare: None,
-      otherusersharenote: None,
-    };
+    let mut visible_notes: Vec<(i64, Uuid)> = Vec::new();
+    let mut synced_notes: Vec<(i64, Uuid)> = Vec::new();
+    let mut unvisible_notes: Vec<(i64, Uuid)> = Vec::new();
+    let mut savedlinks: Vec<UuidZkLink> = Vec::new();
 
-    let savelink = |from, to, user, teststuff: &mut TestStuff| -> Result<(), zkerr::Error> {
+    let savelink = |from, to, user, savedlinks: &mut Vec<UuidZkLink>| -> Result<(), zkerr::Error> {
       save_zklink(&conn, from, to, user, None)?;
-      teststuff
-        .savedlinks
-        .push(read_uuidzklink(&conn, from, to, user)?);
+      savedlinks.push(read_uuidzklink(&conn, from, to, user)?);
       Ok(())
     };
 
@@ -161,14 +158,14 @@ mod tests {
       // visible but not synced.
       let ozkn = read_zknote_i64(conn, None, otheruser_note)?;
       let szkn = read_zknote_i64(conn, None, syncuser_note)?;
-      ts.visible_notes.push((otheruser_note, ozkn.id));
-      ts.visible_notes.push((syncuser_note, szkn.id));
+      visible_notes.push((otheruser_note, ozkn.id));
+      visible_notes.push((syncuser_note, szkn.id));
     }
 
     // private note for sync user
     let (private_note_id, private_notesd) =
       makenote(&conn, syncuser, format!("{} syncuser private", basename))?;
-    ts.visible_notes.push((private_note_id, private_notesd.id));
+    visible_notes.push((private_note_id, private_notesd.id));
 
     // share note, syncuser and otheruser both connected.
     let (share_note_id, share_notesd) = makenote(
@@ -176,11 +173,11 @@ mod tests {
       otheruser,
       format!("{} otheruser, syncuser share", basename),
     )?;
-    ts.visible_notes.push((share_note_id, share_notesd.id));
-    ts.synced_notes.push((share_note_id, share_notesd.id));
-    savelink(share_note_id, shareid, otheruser, &mut ts)?;
-    savelink(syncuser_note, share_note_id, otheruser, &mut ts)?;
-    savelink(otheruser_note, share_note_id, otheruser, &mut ts)?;
+    visible_notes.push((share_note_id, share_notesd.id));
+    synced_notes.push((share_note_id, share_notesd.id));
+    savelink(share_note_id, shareid, otheruser, &mut savedlinks)?;
+    savelink(syncuser_note, share_note_id, otheruser, &mut savedlinks)?;
+    savelink(otheruser_note, share_note_id, otheruser, &mut savedlinks)?;
 
     // ------------------------------------------------------------------
     // notes visible to syncuser.
@@ -194,9 +191,9 @@ mod tests {
         basename
       ),
     )?;
-    ts.visible_notes.push((shared_note_id, shared_notesd.id));
-    ts.synced_notes.push((shared_note_id, shared_notesd.id));
-    savelink(shared_note_id, share_note_id, otheruser, &mut ts)?;
+    visible_notes.push((shared_note_id, shared_notesd.id));
+    synced_notes.push((shared_note_id, shared_notesd.id));
+    savelink(shared_note_id, share_note_id, otheruser, &mut savedlinks)?;
 
     // public note owned by otheruser.
     let (publid_note_id, publid_notesd) = makenote(
@@ -204,9 +201,9 @@ mod tests {
       otheruser,
       format!("{} otheruser public note", basename),
     )?;
-    ts.visible_notes.push((publid_note_id, publid_notesd.id));
-    ts.synced_notes.push((publid_note_id, publid_notesd.id));
-    savelink(publid_note_id, publicid, otheruser, &mut ts)?;
+    visible_notes.push((publid_note_id, publid_notesd.id));
+    synced_notes.push((publid_note_id, publid_notesd.id));
+    savelink(publid_note_id, publicid, otheruser, &mut savedlinks)?;
 
     // public note owned by syncuser, with a public id
     // public id the same on client and server, so should conflict.
@@ -224,9 +221,9 @@ mod tests {
       },
     )?;
 
-    ts.visible_notes.push((public_note_id, public_notesd.id));
-    ts.synced_notes.push((public_note_id, public_notesd.id));
-    savelink(public_note_id, publicid, syncuser, &mut ts)?; // should be visible, and get synced!
+    visible_notes.push((public_note_id, public_notesd.id));
+    synced_notes.push((public_note_id, public_notesd.id));
+    savelink(public_note_id, publicid, syncuser, &mut savedlinks)?; // should be visible, and get synced!
     println!(
       "visible link: {:?} ",
       read_uuidzklink(&conn, public_note_id, publicid, syncuser)?
@@ -238,9 +235,13 @@ mod tests {
       otheruser,
       format!("{} otheruser note linked to syncuser", basename),
     )?;
-    ts.visible_notes
-      .push((user_linked_note_id, user_linked_notesd.id));
-    savelink(user_linked_note_id, syncuser_note, otheruser, &mut ts)?;
+    visible_notes.push((user_linked_note_id, user_linked_notesd.id));
+    savelink(
+      user_linked_note_id,
+      syncuser_note,
+      otheruser,
+      &mut savedlinks,
+    )?;
 
     // ------------------------------------------------------------------
     // notes not visible to syncuser.
@@ -248,8 +249,7 @@ mod tests {
     // otheruser private note NOT visible to user
     let (otheruser_private_note_id, otheruser_private_notesd) =
       makenote(&conn, otheruser, format!("{} otheruser private", basename))?;
-    ts.unvisible_notes
-      .push((otheruser_private_note_id, otheruser_private_notesd.id));
+    unvisible_notes.push((otheruser_private_note_id, otheruser_private_notesd.id));
 
     // share note, only otheruser connected.
     let (othershare_note_id, othershare_notesd) = makenote(
@@ -257,12 +257,15 @@ mod tests {
       otheruser,
       format!("{} otheruser othershare, not visible to syncuser", basename),
     )?;
-    ts.unvisible_notes
-      .push((othershare_note_id, othershare_notesd.id));
-    savelink(othershare_note_id, shareid, otheruser, &mut ts)?;
-    savelink(otheruser_note, othershare_note_id, otheruser, &mut ts)?;
+    unvisible_notes.push((othershare_note_id, othershare_notesd.id));
+    savelink(othershare_note_id, shareid, otheruser, &mut savedlinks)?;
+    savelink(
+      otheruser_note,
+      othershare_note_id,
+      otheruser,
+      &mut savedlinks,
+    )?;
 
-    ts.otherusershare = Some((othershare_note_id, othershare_notesd.id));
     // note linked to share note NOT visible to user
     let (othershared_note_id, othershared_notesd) = makenote(
       &conn,
@@ -272,13 +275,27 @@ mod tests {
         basename
       ),
     )?;
-    ts.unvisible_notes
-      .push((othershared_note_id, othershared_notesd.id));
-    savelink(shared_note_id, share_note_id, otheruser, &mut ts)?;
-
-    ts.otherusersharenote = Some((othershared_note_id, othershared_notesd.id));
+    unvisible_notes.push((othershared_note_id, othershared_notesd.id));
+    savelink(
+      othershared_note_id,
+      othershare_note_id,
+      otheruser,
+      &mut savedlinks,
+    )?;
 
     println!("setup_db end");
+
+    let ts = TestStuff {
+      synced_notes,
+      visible_notes,
+      unvisible_notes,
+      savedlinks,
+      otherusershare: (othershare_note_id, othershare_notesd.id),
+      otherusersharenote: (othershared_note_id, othershared_notesd.id),
+      syncuser,
+      syncusernote: syncuser_note,
+      otheruser,
+    };
 
     Ok(ts)
   }
@@ -726,7 +743,128 @@ mod tests {
       }
     }
 
+    // ------------------------------------------------------------
     // add a new share, or link user in to a share, then sync again.
+    // the cases:
+    //   - add a share link on the server.  document using that share is on the server.
+    //   - add a share link on the client.
+    // ------------------------------------------------------------
+
+    save_zklink(
+      &saconn,
+      server_ts.syncusernote,
+      server_ts.otherusershare.0,
+      server_ts.otheruser,
+      None,
+    )?;
+
+    // is otherusersharenote on the client now?
+    read_zknote(
+      &saconn,
+      Some(server_ts.otheruser),
+      &server_ts.otherusersharenote.1,
+    )
+    .map_err(|e| {
+      zkerr::annotate_string(
+        "othersharenote not accessible to otheruser on server".to_string(),
+        e,
+      )
+    })?;
+
+    // can syncuser access it on the server?
+    read_zknote(
+      &saconn,
+      Some(server_ts.syncuser),
+      &server_ts.otherusersharenote.1,
+    )
+    .map_err(|e| {
+      zkerr::annotate_string(
+        "othersharenote not accessible to syncuser on server".to_string(),
+        e,
+      )
+    })?;
+
+    // ------------------------------------------------------------
+    // sync from server to client.
+    let server_stream = sync_stream(saconn.clone(), ssyncuser, None, None, None, None, &mut cb);
+
+    // let ctr = caconn.unchecked_transaction()?;
+
+    let ttn = temp_tables(&caconn)?;
+    // fn convert_err(err: Box<dyn Error>) -> std::io::Error {
+    //   println!("convert_err {:?}", err);
+    //   todo!()
+    // }
+
+    let ss = server_stream.map_err(convert_err);
+    pin_mut!(ss);
+    let mut br = StreamReader::new(ss);
+
+    sync_from_stream(
+      &caconn,
+      Some(&ttn.notetemp),
+      Some(&ttn.linktemp),
+      Some(&ttn.archivelinktemp),
+      &mut cb,
+      &mut br,
+    )
+    .await?;
+
+    // ------------------------------------------------------------
+    // sync from client to server.
+    let client_stream = sync_stream(
+      caconn.clone(),
+      csyncuser,
+      Some(ttn.notetemp),
+      Some(ttn.linktemp),
+      Some(ttn.archivelinktemp),
+      None,
+      &mut cb,
+    );
+
+    let cs = client_stream.map_err(convert_err);
+    pin_mut!(cs);
+    let mut cbr = StreamReader::new(cs);
+
+    sync_from_stream(&saconn, None, None, None, &mut cb, &mut cbr).await?;
+
+    // is otherusersharenote on the client now?
+    read_zknote(
+      &caconn,
+      Some(client_ts.otheruser),
+      &server_ts.otherusersharenote.1,
+    )
+    .map_err(|e| {
+      zkerr::annotate_string(
+        "othersharenote not accessible to otheruser on client".to_string(),
+        e,
+      )
+    })?;
+
+    // can syncuser access it?
+    read_zknote(
+      &caconn,
+      Some(client_ts.syncuser),
+      &server_ts.otherusersharenote.1,
+    )
+    .map_err(|e| {
+      zkerr::annotate_string(
+        "othersharenote not accessible to syncuser on client".to_string(),
+        e,
+      )
+    })?;
+
+    // otherusersharenote
+    // save_zklink(
+    //   &caconn,
+    //   client_ts.syncuser,
+    //   client_ts.otherusershare.0,
+    //   client_ts.otheruser,
+    //   None,
+    // )?;
+
+    // add a new document in the share that syncuser can now access.  It should
+    // be visible on sync, as well as the old document in that share.
 
     // ------------------------------------------------------------
     // archive link testing.
