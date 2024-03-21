@@ -19,6 +19,29 @@ pub enum Error {
   Orgauth(orgauth::error::Error),
   Regex(regex::Error),
   Cookie(cookie::ParseError),
+  Annotated(AnnotatedE),
+}
+
+pub struct AnnotatedE {
+  pub error: Box<Error>,
+  pub source: Box<Error>,
+}
+
+pub fn annotate(e: Error, source: Error) -> Error {
+  Error::Annotated(AnnotatedE {
+    error: Box::new(e),
+    source: Box::new(source),
+  })
+}
+
+pub fn annotate_string(s: String, source: Error) -> Error {
+  annotate(Error::String(s), source)
+}
+
+impl fmt::Display for AnnotatedE {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{} \n source: {}", self.error, self.source)
+  }
 }
 
 pub fn to_orgauth_error(e: Error) -> orgauth::error::Error {
@@ -34,6 +57,7 @@ pub fn to_orgauth_error(e: Error) -> orgauth::error::Error {
     Error::Orgauth(ze) => ze,
     Error::Regex(ze) => orgauth::error::Error::String(ze.to_string()),
     Error::Cookie(ze) => orgauth::error::Error::String(ze.to_string()),
+    Error::Annotated(e) => orgauth::error::Error::String(e.to_string()),
   }
 }
 
@@ -57,6 +81,7 @@ impl fmt::Display for Error {
       Error::Orgauth(e) => write!(f, "{}", e),
       Error::Regex(e) => write!(f, "{}", e),
       Error::Cookie(e) => write!(f, "{}", e),
+      Error::Annotated(e) => write!(f, "{}", e),
     }
   }
 }
@@ -75,6 +100,7 @@ impl fmt::Debug for Error {
       Error::Orgauth(e) => write!(f, "{}", e),
       Error::Regex(e) => write!(f, "{}", e),
       Error::Cookie(e) => write!(f, "{}", e),
+      Error::Annotated(e) => write!(f, "{}", e),
     }
   }
 }
@@ -138,21 +164,25 @@ impl From<actix_session::SessionInsertError> for Error {
     Error::String(e.to_string())
   }
 }
+
 impl From<uuid::Error> for Error {
   fn from(e: uuid::Error) -> Self {
     Error::String(e.to_string())
   }
 }
+
 impl From<orgauth::error::Error> for Error {
   fn from(e: orgauth::error::Error) -> Self {
     Error::String(e.to_string())
   }
 }
+
 impl From<regex::Error> for Error {
   fn from(e: regex::Error) -> Self {
     Error::String(e.to_string())
   }
 }
+
 impl From<cookie::ParseError> for Error {
   fn from(e: cookie::ParseError) -> Self {
     Error::String(e.to_string())
