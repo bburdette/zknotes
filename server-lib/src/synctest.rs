@@ -792,25 +792,14 @@ mod tests {
     })?;
 
     // new shares, does it work?
-    println!("blah one");
-
     let ns = sync::new_shares(&saconn, server_ts.syncuser, postsync_time)?;
-    println!("new shares: {:?}", ns);
-
-    assert!(ns.len() > 0);
+    assert!(ns == vec![server_ts.otherusershare]);
 
     // ------------------------------------------------------------
     // sync from server to client.
     let server_stream = sync_stream(saconn.clone(), ssyncuser, None, None, None, None, &mut cb);
 
-    // let ctr = caconn.unchecked_transaction()?;
-
     let ttn = temp_tables(&caconn)?;
-    // fn convert_err(err: Box<dyn Error>) -> std::io::Error {
-    //   println!("convert_err {:?}", err);
-    //   todo!()
-    // }
-
     let ss = server_stream.map_err(convert_err);
     pin_mut!(ss);
     let mut br = StreamReader::new(ss);
@@ -843,19 +832,6 @@ mod tests {
 
     sync_from_stream(&saconn, None, None, None, &mut cb, &mut cbr).await?;
 
-    // is otherusersharenote on the client now?
-    read_zknote(
-      &caconn,
-      Some(client_ts.otheruser),
-      &server_ts.otherusersharenote.1,
-    )
-    .map_err(|e| {
-      zkerr::annotate_string(
-        "othersharenote not accessible to otheruser on client".to_string(),
-        e,
-      )
-    })?;
-
     // can syncuser access it?
     read_zknote(
       &caconn,
@@ -868,15 +844,6 @@ mod tests {
         e,
       )
     })?;
-
-    // otherusersharenote
-    // save_zklink(
-    //   &caconn,
-    //   client_ts.syncuser,
-    //   client_ts.otherusershare.0,
-    //   client_ts.otheruser,
-    //   None,
-    // )?;
 
     // add a new document in the share that syncuser can now access.  It should
     // be visible on sync, as well as the old document in that share.

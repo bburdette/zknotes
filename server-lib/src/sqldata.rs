@@ -996,7 +996,7 @@ pub fn read_zknote_unchecked(
         "select ZN.id, ZN.uuid, ZN.title, ZN.content, ZN.user, OU.name, ZKN.uuid, ZN.pubid, ZN.editable, ZN.showtitle, ZN.deleted, ZN.file, ZN.createdate, ZN.changeddate
           from zknote ZN, orgauth_user OU, user U, zknote ZKN where ZN.uuid = ?1 and U.id = ZN.user and OU.id = ZN.user and ZKN.id = U.zknote",
           params![id.to_string()],
-        closure)
+        closure).map_err(|e| zkerr::annotate_string(format!("note not found: {}", id), e ))
 }
 
 // 'normal' zknote read with access checking

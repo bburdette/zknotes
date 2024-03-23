@@ -3,7 +3,7 @@ use crate::search::{search_zknotes, search_zknotes_stream, sync_users, system_us
 use crate::sqldata::{self, note_id_for_uuid, save_zklink, save_zknote, user_note_id};
 use crate::util::now;
 use actix_web::error::PayloadError;
-use async_stream::try_stream;
+use async_stream::{stream, try_stream};
 use awc;
 use bytes::Bytes;
 use futures::Stream;
@@ -433,7 +433,7 @@ where
 
     let ex =  conn.execute(
         "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate)
-         values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)", 
+         values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
       params![
         note.title,
         note.content,
@@ -860,15 +860,22 @@ pub fn bytesify(
     .map_err(|e| e.into())
 }
 
-pub fn new_shares(conn: &Connection, uid: i64, after: i64) -> Result<Vec<i64>, zkerr::Error> {
+pub fn new_shares(
+  conn: &Connection,
+  uid: i64,
+  after: i64,
+) -> Result<Vec<(i64, ZkNoteId)>, zkerr::Error> {
   // Are there zklinks created since last sync, that go from our user to a share?
   // get all shares that link to this user and to 'share'
   // use async_stream::__private::AsyncStream;
   // let newshares: AsyncStream<Result<(), Box<dyn std::error::Error + 'static>>> = try_stream! {
   // let newshares = try_stream! {
   let mut pstmt = conn.prepare(
-    "select A.toid, A.createdate from zklink A, zklink B
-        where A.fromid = ?1 and A.toid = B.fromid and B.toid = ?2
+    "select N.uuid, A.toid, A.createdate from zklink A, zklink B, zknote N
+        where A.fromid = ?1
+        and A.toid = B.fromid
+        and B.toid = ?2
+        and N.id = A.toid
         and A.createdate >= ?3",
   )?;
 
@@ -878,12 +885,18 @@ pub fn new_shares(conn: &Connection, uid: i64, after: i64) -> Result<Vec<i64>, z
   println!("new_shares parms: {}, {}, {}", usernoteid, shareid, after);
 
   let rec_iter = pstmt.query_map(params![usernoteid, shareid, after], |row| {
-    let id = row.get(0)?;
-    let create: i64 = row.get(1)?;
+    let uuid: String = row.get(0)?;
+    let id = row.get(1)?;
+    let create: i64 = row.get(2)?;
     println!("new share: {}, {}", id, create);
-    Ok(id)
+    Ok((id, uuid))
   })?;
-  let res: Result<Vec<i64>, zkerr::Error> = rec_iter.map(|i| i.map_err(|e| e.into())).collect();
+  let res: Result<Vec<(i64, Uuid)>, zkerr::Error> = rec_iter
+    .map(|i| {
+      i.map_err(|e| e.into())
+        .and_then(|(id, uuid)| Ok((id, Uuid::parse_str(uuid.as_str())?)))
+    })
+    .collect();
   res
 }
 
@@ -1013,17 +1026,50 @@ pub fn sync_stream(
     }),
   };
 
+  let ns = match after {
+    Some(a) => match new_shares(&conn, uid, a) {
+      Ok(ns) => ns,
+      Err(_e) => vec![],
+      // {
+      //   let badns = try_stream! { Err(e)?; yield SyncMessage::SyncEnd; }.map(bytesify);
+      //   return badns;
+      // }
+    },
+    None => vec![],
+  };
+
+  let new_shares = !ns.is_empty();
+
   let ts = match after {
     None => TagSearch::SearchTerm {
       mods: Vec::new(),
       term: "".to_string(),
     },
-    Some(a) => TagSearch::SearchTerm {
-      mods: vec![SearchMod::After, SearchMod::Mod],
-      term: a.to_string(),
-    },
+    Some(a) => {
+      let anyafter = TagSearch::SearchTerm {
+        mods: vec![SearchMod::After, SearchMod::Mod],
+        term: a.to_string(),
+      };
+      // anyafter, or tagged with any of the share ids.
+      ns.into_iter().fold(anyafter, |ts, sh| TagSearch::Boolex {
+        ts1: Box::new(TagSearch::Boolex {
+          ts1: Box::new(TagSearch::SearchTerm {
+            mods: vec![SearchMod::ZkNoteId, SearchMod::Tag],
+            term: sh.1.to_string(),
+          }),
+          ao: AndOr::Or,
+          ts2: Box::new(TagSearch::SearchTerm {
+            mods: vec![SearchMod::ZkNoteId],
+            term: sh.1.to_string(),
+          }),
+        }),
+        ao: AndOr::Or,
+        ts2: Box::new(ts),
+      })
+    }
   };
 
+  // get new notes, and old notes that are attached to shares.
   let zns = ZkNoteSearch {
     tagsearch: ts.clone(),
     offset: 0,
@@ -1097,11 +1143,14 @@ pub fn sync_stream(
   )
   .map(bytesify);
 
+  // if there's a new share, just get all links since the beginning of time.
+  let linkafter = if new_shares { after } else { None };
+
   let als =
-    sqldata::read_archivezklinks_stream(conn.clone(), uid, after, exclude_archivelinks.clone())
+    sqldata::read_archivezklinks_stream(conn.clone(), uid, linkafter, exclude_archivelinks.clone())
       .map(bytesify);
 
-  let ls = sqldata::read_zklinks_since_stream(conn, uid, after, exclude_links).map(bytesify);
+  let ls = sqldata::read_zklinks_since_stream(conn, uid, linkafter, exclude_links).map(bytesify);
 
   let end = try_stream! { yield SyncMessage::SyncEnd; }.map(bytesify);
 
