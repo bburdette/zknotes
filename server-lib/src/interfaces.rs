@@ -215,7 +215,6 @@ pub async fn zk_interface_loggedin(
         offset: gzne.offset,
         what: "archives".to_string(),
       };
-      // let (id, uuid) = sqldata::id_uuid_for_zknoteid(&conn, &gzne.zknote)?;
       let zka = ZkNoteArchives {
         zknote: gzne.zknote,
         results: zlnsr,
@@ -345,8 +344,6 @@ pub async fn zk_interface_loggedin(
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let hn: ZkNoteId = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-      // let mut user = sqldata::read_user_by_id(&conn, uid)?;
-      // user.homenoteid = Some(hn);
       sqldata::set_homenote(&conn, uid, hn)?;
       Ok(PrivateReplyMessage {
         what: PrivateReplies::HomeNoteSet,
@@ -375,7 +372,6 @@ pub fn public_interface(
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let gzne: GetZkNoteAndLinks = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-      // let note = sqldata::read_zknote(&conn, None, id)?;
       let (_, note) = sqldata::read_zknote(&conn, None, &gzne.zknote)?;
       info!(
         "public#getzknote: {:?} - {} - {:?}",

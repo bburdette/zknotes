@@ -90,8 +90,6 @@ async fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -
     _ => serde_json::Value::Null,
   };
 
-  println!("logindata {:?}", logindata);
-
   // TODO: hardcode the UUID of this?
   let errorid = match data.error_index_note {
     Some(eid) => serde_json::to_value(eid).unwrap_or(serde_json::Value::Null),
@@ -100,10 +98,6 @@ async fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -
 
   let adminsettings = serde_json::to_value(orgauth::data::admin_settings(&data.orgauth_config))
     .unwrap_or(serde_json::Value::Null);
-
-  println!("sysids {:?}", sysids.to_string().as_str());
-  println!("errorid {:?}", errorid.to_string().as_str());
-  println!("adminsettings {:?}", adminsettings.to_string().as_str());
 
   let mut staticpath = data.static_path.clone().unwrap_or(PathBuf::from("static/"));
   staticpath.push("index.html");
@@ -409,11 +403,10 @@ async fn private_streaming(
   item: web::Json<PrivateStreamingMessage>,
   _req: HttpRequest,
 ) -> HttpResponse {
-  println!("priavte_streaming item: {:?}", item);
   match zk_interface_check_streaming(&session, &data, item.into_inner()).await {
     Ok(hr) => hr,
     Err(e) => {
-      error!("'private' err: {:?}", e);
+      error!("'private_streaming err: {:?}", e);
       let se = PrivateReplyMessage {
         what: PrivateReplies::ServerError,
         content: serde_json::Value::String(e.to_string()),
@@ -497,12 +490,9 @@ async fn zk_interface_check_streaming(
 async fn private_upstreaming(
   session: Session,
   data: web::Data<Config>,
-  // item: web::Json<PrivateStreamingMessage>,
-  // req: HttpRequest,
   body: web::Payload,
 ) -> HttpResponse {
   // pass to another fn that returns a result, for ?
-  println!("private_upstreaming");
   match zk_interface_check_upstreaming(&session, &data, body).await {
     Ok(hr) => hr,
     Err(e) => {
@@ -526,10 +516,6 @@ async fn zk_interface_check_upstreaming(
   config: &Config,
   body: web::Payload,
 ) -> Result<HttpResponse, Box<dyn Error>> {
-  println!(
-    "session.get::<Uuid>(\"token\")? {:?}",
-    session.get::<Uuid>("token")?
-  );
   match session.get::<Uuid>("token")? {
     None => Ok(HttpResponse::Ok().json(PrivateReplyMessage {
       what: PrivateReplies::NotLoggedIn,
