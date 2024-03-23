@@ -309,7 +309,7 @@ where
       zkerr::Error::String("empty stream!".to_string()).into(),
     );
   }
-  println!("readline: '{}'", line.trim());
+  // println!("readline: '{}'", line.trim());
   let sm = serde_json::from_str(line.trim())?;
   Ok(sm)
 }
@@ -429,7 +429,7 @@ where
       .get(&note.user)
       .ok_or_else(|| zkerr::Error::String("user not found".to_string()))?;
 
-    println!("syncing note: {} {}", note.id, note.deleted);
+    // println!("syncing note: {} {}", note.id, note.deleted);
 
     let ex =  conn.execute(
         "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate)
@@ -473,11 +473,15 @@ where
                 },
               )
               .map(|x| x.0)
-            } else {
-              println!("saving as archive: {} {}", note.id, note.deleted);
+            } else if note.changeddate < n.changeddate {
+              println!("archiving note: {} {}", note.id, note.deleted);
+              // println!("saving as archive: {} {}", note.id, note.deleted);
               // note is older.  add as archive note.
               // may create duplicate archive notes if edited on two systems and then synced.
               sqldata::archive_zknote(&conn, nid, &note).map(|x| x.0)
+            } else {
+              println!("same changeddate, no change");
+              Ok(nid)
             }
           } else if s.contains("pubid") {
             // Error out to alert user to conflict.
@@ -502,7 +506,7 @@ where
       }
     }?;
 
-    println!("saved note");
+    // println!("saved note");
 
     if let Some(ref nt) = notetemp {
       println!("insert into {} values (?1)", nt);
@@ -660,7 +664,7 @@ where
   sm = read_sync_message(&mut line, br).await?;
 
   while let SyncMessage::UuidZkLink(ref l) = sm {
-    println!("saving link!, {:?}", l);
+    // println!("saving link!, {:?}", l);
     let ins = match conn.execute(
       "with vals(a,b,c,d,e) as (
               select FN.id, TN.id, U.id, LN.id, ?1
@@ -694,7 +698,7 @@ where
                         and user = vals.c",
             params![l.createdate, l.fromUuid, l.toUuid, l.userUuid, l.linkUuid],
           )?;
-          println!("updated {}", count);
+          // println!("updated {}", count);
           // TODO: uuid conflict;  resolve with old one becoming archive note.
           // SqliteFailure(Error { code: ConstraintViolation, extended_code: 2067 }, Some("UNIQUE constraint failed: zknote.uuid"));
           Ok(count)
@@ -728,9 +732,9 @@ where
     // bytes = bytes + nc;
     sm = read_sync_message(&mut line, br).await?;
   }
-  println!("receieved links: {}, saved {}", count, saved);
+  // println!("receieved links: {}, saved {}", count, saved);
 
-  println!("dropping deleted links");
+  // println!("dropping deleted links");
   // drop zklinks which have a zklinkarchive with newer deletedate
   let dropped = conn.execute(
     "with dels as (select ZL.fromid, ZL.toid, ZL.user from zklink ZL, zklinkarchive ZLA
@@ -743,7 +747,7 @@ where
     params![],
   )?;
 
-  println!("dropped {} links", dropped);
+  // println!("dropped {} links", dropped);
 
   Ok(PrivateReplyMessage {
     what: PrivateReplies::SyncComplete,
@@ -848,12 +852,39 @@ pub fn bytesify(
     .map(|x| {
       Bytes::from({
         let mut z = x.to_string();
-        println!("bytesify '{}'", z);
+        // println!("bytesify '{}'", z);
         z.push_str("\n");
         z
       })
     })
     .map_err(|e| e.into())
+}
+
+pub fn new_shares(conn: &Connection, uid: i64, after: i64) -> Result<Vec<i64>, zkerr::Error> {
+  // Are there zklinks created since last sync, that go from our user to a share?
+  // get all shares that link to this user and to 'share'
+  // use async_stream::__private::AsyncStream;
+  // let newshares: AsyncStream<Result<(), Box<dyn std::error::Error + 'static>>> = try_stream! {
+  // let newshares = try_stream! {
+  let mut pstmt = conn.prepare(
+    "select A.toid, A.createdate from zklink A, zklink B
+        where A.fromid = ?1 and A.toid = B.fromid and B.toid = ?2
+        and A.createdate >= ?3",
+  )?;
+
+  let shareid = sqldata::note_id(&conn, "system", "share")?;
+  let usernoteid = user_note_id(&conn, uid)?;
+
+  println!("new_shares parms: {}, {}, {}", usernoteid, shareid, after);
+
+  let rec_iter = pstmt.query_map(params![usernoteid, shareid, after], |row| {
+    let id = row.get(0)?;
+    let create: i64 = row.get(1)?;
+    println!("new share: {}, {}", id, create);
+    Ok(id)
+  })?;
+  let res: Result<Vec<i64>, zkerr::Error> = rec_iter.map(|i| i.map_err(|e| e.into())).collect();
+  res
 }
 
 // Make a stream of all the records needed to sync the remote.

@@ -200,7 +200,7 @@ pub fn search_zknotes_stream(
   // {
   try_stream! {
 
-    println!("search_zknotes_stream - what: {} \nsearch {:?}", what, search);
+    // println!("search_zknotes_stream - what: {} \nsearch {:?}", what, search);
 
     // let sysid = user_id(&conn, "system")?;
     let user = if search.archives {
@@ -211,8 +211,8 @@ pub fn search_zknotes_stream(
 
     let (sql, args) = build_sql(&conn, user, &search, exclude_notes)?;
 
-    println!("zknote search what: {} sql {}", what, sql);
-    println!("zknote search what: {} args {:?}", what, args);
+    // println!("zknote search what: {} sql {}", what, sql);
+    // println!("zknote search what: {} args {:?}", what, args);
 
     let mut stmt = conn.prepare(sql.as_str())?;
     let mut rows = stmt.query(rusqlite::params_from_iter(args.iter()))?;
@@ -224,7 +224,7 @@ pub fn search_zknotes_stream(
 
     while let Some(row) = rows.next()? {
       let title = row.get::<usize, String>(2)?;
-      println!("zknote title {}", title);
+      // println!("zknote title {}", title);
       match search.resulttype {
         ResultType::RtId => {
           yield SyncMessage::ZkNoteId(row.get::<usize, String>(1)?)
@@ -282,7 +282,7 @@ pub fn sync_users(
       .as_str(),
     )?;
 
-    println!("read_zklinks_since_stream 2");
+    // println!("read_zklinks_since_stream 2");
 
     yield SyncMessage::PhantomUserHeader;
 

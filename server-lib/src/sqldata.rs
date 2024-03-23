@@ -48,7 +48,7 @@ pub fn on_new_user(
 
   let user_note_uuid = match remote_data {
     Some(remote_data) => {
-      println!("remote_data {:?}", remote_data);
+      // println!("remote_data {:?}", remote_data);
       let remd: ExtraLoginData = serde_json::from_value(remote_data)?;
       remd.zknote
     }
@@ -1297,7 +1297,7 @@ pub fn delete_zknote(
 pub fn save_zklinks(dbfile: &Path, uid: i64, zklinks: Vec<ZkLink>) -> Result<(), zkerr::Error> {
   let conn = connection_open(dbfile)?;
 
-  println!("save_zklinks");
+  // println!("save_zklinks");
 
   for zklink in zklinks.iter() {
     // TODO: integrate into sql instead of separate queries.
@@ -1305,7 +1305,7 @@ pub fn save_zklinks(dbfile: &Path, uid: i64, zklinks: Vec<ZkLink>) -> Result<(),
     let from = note_id_for_uuid(&conn, &zklink.from)?;
     if zklink.user == uid {
       if zklink.delete == Some(true) {
-        println!("deleting zklink! {:?}", zklink);
+        // println!("deleting zklink! {:?}", zklink);
         // create archive record.
         let now = now()?;
         conn.execute(
@@ -1315,7 +1315,7 @@ pub fn save_zklinks(dbfile: &Path, uid: i64, zklinks: Vec<ZkLink>) -> Result<(),
           params![now, from, to, uid],
         )?;
 
-        println!("created zklinkarchive {}", conn.last_insert_rowid());
+        // println!("created zklinkarchive {}", conn.last_insert_rowid());
         // delete link.
         conn.execute(
           "delete from zklink where fromid = ?1 and toid = ?2 and user = ?3",
@@ -1339,7 +1339,7 @@ pub fn save_savezklinks(
   zknid: ZkNoteId,
   zklinks: Vec<SaveZkLink>,
 ) -> Result<(), zkerr::Error> {
-  println!("save_savezklinks");
+  // println!("save_savezklinks");
   for link in zklinks.iter() {
     let (uufrom, uuto) = match link.direction {
       Direction::From => (link.otherid, zknid),
@@ -1350,7 +1350,7 @@ pub fn save_savezklinks(
     let from = note_id_for_uuid(&conn, &uufrom)?;
     if link.user == uid {
       if link.delete == Some(true) {
-        println!("deleting zklink! {:?}", link);
+        // println!("deleting zklink! {:?}", link);
         // create archive record.
         let now = now()?;
         conn.execute(
@@ -1359,7 +1359,7 @@ pub fn save_savezklinks(
             where fromid = ?2 and toid = ?3 and user = ?4",
           params![now, from, to, uid],
         )?;
-        println!("created zklinkarchive {}", conn.last_insert_rowid());
+        // println!("created zklinkarchive {}", conn.last_insert_rowid());
         // delete the link.
         conn.execute(
           "delete from zklink where fromid = ?1 and toid = ?2 and user = ?3",
@@ -1775,8 +1775,8 @@ pub fn read_archivezklinks_stream(
       acc_args.push(a);
     }
 
-    println!("\n\n read_archivezklinks_stream \n {:?}", pstmt.expanded_sql());
-    println!("\n\n args \n {:?}", acc_args);
+    // println!("\n\n read_archivezklinks_stream \n {:?}", pstmt.expanded_sql());
+    // println!("\n\n args \n {:?}", acc_args);
 
     let rec_iter = pstmt.query_map(rusqlite::params_from_iter(acc_args.iter()), |row| {
       // println!("archive zklink row {:?}", row);
@@ -1796,7 +1796,7 @@ pub fn read_archivezklinks_stream(
 
     for rec in rec_iter {
       if let Ok(r) = rec {
-        println!("archive link: {:?}", r);
+        // println!("archive link: {:?}", r);
         yield SyncMessage::from(r);
       }
     }
@@ -1818,15 +1818,15 @@ pub fn read_zklinks_since(
   let mut astmt = conn.prepare(acc_sql.as_str())?;
 
   let arec_iter = astmt.query_map(rusqlite::params_from_iter(acc_args.iter()), |row| {
-    println!("accnote {:?}", row.get::<usize, i64>(0)?);
+    // println!("accnote {:?}", row.get::<usize, i64>(0)?);
     Ok(())
   })?;
 
-  for ar in arec_iter {
-    println!("ac {:?}", ar);
-  }
+  // for ar in arec_iter {
+  //   println!("ac {:?}", ar);
+  // }
 
-  println!("linzk");
+  // println!("linzk");
 
   let mut pstmt = conn.prepare(
     format!(
@@ -1857,7 +1857,7 @@ pub fn read_zklinks_since(
   // println!("accarts {}", acc_args.len());
 
   let rec_iter = pstmt.query_map(rusqlite::params_from_iter(acc_args.iter()), |row| {
-    println!("uuidzklink {:?}", row.get::<usize, String>(0)?);
+    // println!("uuidzklink {:?}", row.get::<usize, String>(0)?);
     Ok(UuidZkLink {
       userUuid: row.get(0)?,
       fromUuid: row.get(1)?,
@@ -1879,7 +1879,7 @@ pub fn read_zklinks_since_stream(
   // {
   try_stream! {
 
-    println!("read_zklinks_since_stream, after: {:?}", after);
+    // println!("read_zklinks_since_stream, after: {:?}", after);
     let (acc_sql, acc_args) = accessible_notes(&conn, uid)?;
 
     // make an accessible notes temp table.
@@ -1893,7 +1893,7 @@ pub fn read_zklinks_since_stream(
     // TODO: unique id for this temp table.
     let tabname = format!("accnotes_{}", uid);
 
-    println!("table name {}", tabname);
+    // println!("table name {}", tabname);
 
     conn.execute(
       format!(
@@ -1978,7 +1978,7 @@ pub fn read_zklinks_since_stream(
       })?;
       for rec in rec_iter {
         if let Ok(r) = rec {
-          println!("zklink {:?}", r);
+          // println!("zklink {:?}", r);
           yield r;
         }
       }

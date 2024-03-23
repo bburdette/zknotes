@@ -3,7 +3,9 @@ mod tests {
   use crate::error as zkerr;
   use crate::sqldata;
   use crate::sqldata::*;
+  use crate::sync;
   use crate::sync::*;
+  use crate::util;
   use futures_util::pin_mut;
   use futures_util::TryStreamExt;
   use orgauth::data::RegistrationData;
@@ -575,6 +577,10 @@ mod tests {
 
     sync_from_stream(&saconn, None, None, None, &mut cb, &mut cbr).await?;
 
+    let postsync_time = util::now()?;
+
+    println!("blah minus one");
+
     // ------------------------------------------------------------
     // post-sync tests.
     // ------------------------------------------------------------
@@ -743,6 +749,7 @@ mod tests {
       }
     }
 
+    println!("blah zero");
     // ------------------------------------------------------------
     // add a new share, or link user in to a share, then sync again.
     // the cases:
@@ -783,6 +790,14 @@ mod tests {
         e,
       )
     })?;
+
+    // new shares, does it work?
+    println!("blah one");
+
+    let ns = sync::new_shares(&saconn, server_ts.syncuser, postsync_time)?;
+    println!("new shares: {:?}", ns);
+
+    assert!(ns.len() > 0);
 
     // ------------------------------------------------------------
     // sync from server to client.
