@@ -1810,24 +1810,6 @@ pub fn read_zklinks_since(
 ) -> Result<Vec<UuidZkLink>, zkerr::Error> {
   let (acc_sql, mut acc_args) = accessible_notes(&conn, uid)?;
 
-  // println!("acc_sql {}", acc_sql);
-  // println!("acc_args {:?}", acc_args);
-
-  // println!("anotes");
-
-  let mut astmt = conn.prepare(acc_sql.as_str())?;
-
-  let arec_iter = astmt.query_map(rusqlite::params_from_iter(acc_args.iter()), |row| {
-    // println!("accnote {:?}", row.get::<usize, i64>(0)?);
-    Ok(())
-  })?;
-
-  // for ar in arec_iter {
-  //   println!("ac {:?}", ar);
-  // }
-
-  // println!("linzk");
-
   let mut pstmt = conn.prepare(
     format!(
       "with accessible_notes as ({})

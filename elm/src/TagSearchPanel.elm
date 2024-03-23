@@ -28,7 +28,7 @@ import Element.Input as EI
 import Element.Keyed as EK
 import Html.Attributes as HA
 import Parser
-import Search exposing (AndOr(..), SearchMod(..), TSText, TagSearch(..), tagSearchParser)
+import Search exposing (AndOr(..), SearchMod(..), TSText, TagSearch(..), showSearchMod, tagSearchParser)
 import SearchHelpPanel
 import SearchLoc as SL exposing (TSLoc(..))
 import TDict exposing (TDict)
@@ -347,37 +347,7 @@ viewSearchHelper mbfocusloc indent lts ts =
                             { onPress = Nothing
                             , label =
                                 text
-                                    (case mod of
-                                        ExactMatch ->
-                                            "e"
-
-                                        ZkNoteId ->
-                                            "e"
-
-                                        Tag ->
-                                            "t"
-
-                                        Note ->
-                                            "n"
-
-                                        User ->
-                                            "u"
-
-                                        File ->
-                                            "f"
-
-                                        Before ->
-                                            "b"
-
-                                        After ->
-                                            "a"
-
-                                        Create ->
-                                            "c"
-
-                                        Mod ->
-                                            "m"
-                                    )
+                                    (showSearchMod mod)
                             }
             in
             [ E.row [ E.width E.fill, E.spacing 8 ]

@@ -3,7 +3,7 @@ use crate::search::{search_zknotes, search_zknotes_stream, sync_users, system_us
 use crate::sqldata::{self, note_id_for_uuid, save_zklink, save_zknote, user_note_id};
 use crate::util::now;
 use actix_web::error::PayloadError;
-use async_stream::{stream, try_stream};
+use async_stream::try_stream;
 use awc;
 use bytes::Bytes;
 use futures::Stream;
@@ -73,7 +73,6 @@ pub async fn prev_sync(
   };
 
   if let SearchResult::SrNote(res) = search_zknotes(conn, sysid, &zns)? {
-    println!("result noates: {:?}", res.notes);
     match res.notes.first() {
       Some(n) => match serde_json::from_str::<CompletedSync>(n.content.as_str()) {
         Ok(s) => Ok(Some(s)),
@@ -205,8 +204,6 @@ pub async fn sync(
 
   let now = now()?;
 
-  println!("\n\n start sync, prev_sync {:?} \n\n", after);
-
   let tr = conn.unchecked_transaction()?;
 
   let ttn = temp_tables(&conn)?;
@@ -266,12 +263,7 @@ pub async fn sync_from_remote(
   parts.path_and_query = Some(awc::http::uri::PathAndQuery::from_static("/stream"));
   let uri = awc::http::Uri::from_parts(parts).map_err(|x| zkerr::Error::String(x.to_string()))?;
 
-  println!("sync uri {:?}", uri);
-
   let cookie = cookie::Cookie::parse_encoded(c)?;
-  println!("sync to remote 3 - cookie: {:?}", cookie);
-
-  println!("sync to remote 4");
   let res = awc::Client::new()
     .post(uri)
     .cookie(cookie)
@@ -309,7 +301,6 @@ where
       zkerr::Error::String("empty stream!".to_string()).into(),
     );
   }
-  // println!("readline: '{}'", line.trim());
   let sm = serde_json::from_str(line.trim())?;
   Ok(sm)
 }
@@ -325,11 +316,6 @@ pub async fn sync_from_stream<S>(
 where
   S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin,
 {
-  println!(
-    "sync_from_stream 1, {:?}, {:?}, {:?}",
-    notetemp, linktemp, archivelinktemp
-  );
-  // pull in line by line and println
   // TODO: pass in now instead of compute here?
   let now = now()?;
   let sysid = user_id(&conn, "system")?;
@@ -374,15 +360,12 @@ where
   sm = read_sync_message(&mut line, br).await?;
   let mut userhash = HashMap::<i64, i64>::new();
 
-  println!("sync_from_stream 5");
   while let SyncMessage::PhantomUser(ref pu) = sm {
     match userhash.get(&pu.id) {
       Some(_) => (),
       None => {
-        println!("phantom user: {:?}", pu);
         match orgauth::dbfun::read_user_by_uuid(&conn, &pu.uuid) {
           Ok(user) => {
-            println!("found local user {} for remote {}", user.id, pu.id);
             userhash.insert(pu.id, user.id);
           }
           _ => {
@@ -394,17 +377,12 @@ where
               pu.active,
               &mut callbacks.on_new_user,
             )?;
-            println!(
-              "creating phantom user {} for remote user: {:?}",
-              pu.id, localpuid
-            );
             userhash.insert(pu.id, localpuid);
           }
         };
       }
     };
     sm = read_sync_message(&mut line, br).await?;
-    println!("sync_from_stream 6 : {}", line);
   }
 
   // ----------------------------------------------------------------------------------
@@ -429,8 +407,6 @@ where
       .get(&note.user)
       .ok_or_else(|| zkerr::Error::String("user not found".to_string()))?;
 
-    // println!("syncing note: {} {}", note.id, note.deleted);
-
     let ex =  conn.execute(
         "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate)
          values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
@@ -447,7 +423,6 @@ where
         note.changeddate,
       ]
       );
-    println!("ex: {:?}", ex);
     let id: i64 = match ex {
       Ok(_) => Ok(conn.last_insert_rowid()),
       Err(rusqlite::Error::SqliteFailure(e, Some(s))) => {
@@ -457,7 +432,6 @@ where
             // TODO: uuid conflict;  resolve with older one becoming archive note.
             // SqliteFailure(Error { code: ConstraintViolation, extended_code: 2067 }, Some("UNIQUE constraint failed: zknote.uuid"));
             if note.changeddate > n.changeddate {
-              println!("replacing note: {} {}", note.id, note.deleted);
               // note is newer.  archive the old and replace.
               sqldata::save_zknote(
                 &conn,
@@ -474,13 +448,10 @@ where
               )
               .map(|x| x.0)
             } else if note.changeddate < n.changeddate {
-              println!("archiving note: {} {}", note.id, note.deleted);
-              // println!("saving as archive: {} {}", note.id, note.deleted);
               // note is older.  add as archive note.
               // may create duplicate archive notes if edited on two systems and then synced.
               sqldata::archive_zknote(&conn, nid, &note).map(|x| x.0)
             } else {
-              println!("same changeddate, no change");
               Ok(nid)
             }
           } else if s.contains("pubid") {
@@ -493,23 +464,16 @@ where
               .into(),
             )
           } else {
-            println!("sqliatesfailure {:?}", e);
             Err(rusqlite::Error::SqliteFailure(e, Some(s)).into())
           }
         } else {
           Err(rusqlite::Error::SqliteFailure(e, Some(s)).into())
         }
       }
-      Err(e) => {
-        println!("alskdnflawen: {:?}", e);
-        Err(e.into())
-      }
+      Err(e) => Err(e.into()),
     }?;
 
-    // println!("saved note");
-
     if let Some(ref nt) = notetemp {
-      println!("insert into {} values (?1)", nt);
       conn.execute(
         format!("insert into {} values (?1)", nt).as_str(),
         params![id],
@@ -517,7 +481,6 @@ where
     }
 
     sm = read_sync_message(&mut line, br).await?;
-    println!("sync_from_stream 7");
   }
 
   // ----------------------------------------------------------------------------------
@@ -535,9 +498,7 @@ where
     );
   }
 
-  println!("sync_from_stream 8");
   sm = read_sync_message(&mut line, br).await?;
-  println!("sync_from_stream 9");
   while let SyncMessage::ZkNote(ref note) = sm {
     let uid = userhash
       .get(&note.user)
@@ -578,7 +539,6 @@ where
     sm = read_sync_message(&mut line, br).await?;
   }
 
-  println!("sync_from_stream 11");
   if let SyncMessage::ArchiveZkLinkHeader = sm {
   } else {
     return Err(
@@ -594,7 +554,6 @@ where
   // archive links
   // ----------------------------------------------------------------------------------
   sm = read_sync_message(&mut line, br).await?;
-  println!("sync_from_stream 12");
 
   let mut count = 0;
   let mut saved = 0;
@@ -638,14 +597,12 @@ where
     count = count + 1;
     saved = saved + mbid.map_or(0, |_| 1);
     // bytes = bytes + nc;
-    println!("archived link count:, {}", count);
     sm = read_sync_message(&mut line, br).await?;
   }
 
   // ----------------------------------------------------------------------------------
   // current links
   // ----------------------------------------------------------------------------------
-  println!("sync_from_stream 13");
   if let SyncMessage::UuidZkLinkHeader = sm {
   } else {
     return Err(
@@ -658,13 +615,10 @@ where
   }
   count = 0;
   saved = 0;
-  // bytes = 0;
 
-  println!("sync_from_stream 14");
   sm = read_sync_message(&mut line, br).await?;
 
   while let SyncMessage::UuidZkLink(ref l) = sm {
-    // println!("saving link!, {:?}", l);
     let ins = match conn.execute(
       "with vals(a,b,c,d,e) as (
               select FN.id, TN.id, U.id, LN.id, ?1
@@ -698,9 +652,6 @@ where
                         and user = vals.c",
             params![l.createdate, l.fromUuid, l.toUuid, l.userUuid, l.linkUuid],
           )?;
-          // println!("updated {}", count);
-          // TODO: uuid conflict;  resolve with old one becoming archive note.
-          // SqliteFailure(Error { code: ConstraintViolation, extended_code: 2067 }, Some("UNIQUE constraint failed: zknote.uuid"));
           Ok(count)
         } else {
           Err(rusqlite::Error::SqliteFailure(e, s))
@@ -732,9 +683,6 @@ where
     // bytes = bytes + nc;
     sm = read_sync_message(&mut line, br).await?;
   }
-  // println!("receieved links: {}, saved {}", count, saved);
-
-  // println!("dropping deleted links");
   // drop zklinks which have a zklinkarchive with newer deletedate
   let dropped = conn.execute(
     "with dels as (select ZL.fromid, ZL.toid, ZL.user from zklink ZL, zklinkarchive ZLA
@@ -746,8 +694,6 @@ where
           (zklink.fromid, zklink.toid, zklink.user) in dels ",
     params![],
   )?;
-
-  // println!("dropped {} links", dropped);
 
   Ok(PrivateReplyMessage {
     what: PrivateReplies::SyncComplete,
@@ -771,14 +717,11 @@ pub async fn sync_to_remote(
 
   // TODO: get time on remote system, bail if too far out.
 
-  println!("\n\n start sync, prev_sync {:?} \n\n", after);
-
   let (c, url) = match (user.cookie.clone(), user.remote_url.clone()) {
     (Some(c), Some(url)) => (c, url),
     _ => return Err("can't remote sync".into()),
   };
 
-  println!("sync to remote 2");
   let user_url = awc::http::Uri::try_from(url).map_err(|x| zkerr::Error::String(x.to_string()))?;
   let mut parts = awc::http::uri::Parts::default();
   parts.scheme = user_url.scheme().cloned();
@@ -786,10 +729,7 @@ pub async fn sync_to_remote(
   parts.path_and_query = Some(awc::http::uri::PathAndQuery::from_static("/upstream"));
   let uri = awc::http::Uri::from_parts(parts).map_err(|x| zkerr::Error::String(x.to_string()))?;
 
-  println!("sync uri {:?}", uri);
-
   let cookie = cookie::Cookie::parse_encoded(c)?;
-  println!("sync to remote 3 - cookie: {:?}", cookie);
 
   let ss = sync_stream(
     conn,
@@ -823,14 +763,14 @@ pub async fn sync_to_remote(
   // })
   // .await;
 
-  println!("sync to remote 4");
   let res = awc::Client::new()
     .post(uri)
     .cookie(cookie)
     .timeout(Duration::from_secs(60 * 60))
     .send_body(awc::body::BodyStream::new(ss))
     .await;
-  println!("sync to remote 5 : {:?}", res);
+
+  // TODO: send back Sync results... how many records and etc.
 
   Ok(PrivateReplyMessage {
     what: PrivateReplies::SyncComplete,
@@ -852,7 +792,6 @@ pub fn bytesify(
     .map(|x| {
       Bytes::from({
         let mut z = x.to_string();
-        // println!("bytesify '{}'", z);
         z.push_str("\n");
         z
       })
@@ -871,7 +810,7 @@ pub fn new_shares(
   // let newshares: AsyncStream<Result<(), Box<dyn std::error::Error + 'static>>> = try_stream! {
   // let newshares = try_stream! {
   let mut pstmt = conn.prepare(
-    "select N.uuid, A.toid, A.createdate from zklink A, zklink B, zknote N
+    "select N.uuid, A.toid from zklink A, zklink B, zknote N
         where A.fromid = ?1
         and A.toid = B.fromid
         and B.toid = ?2
@@ -882,13 +821,9 @@ pub fn new_shares(
   let shareid = sqldata::note_id(&conn, "system", "share")?;
   let usernoteid = user_note_id(&conn, uid)?;
 
-  println!("new_shares parms: {}, {}, {}", usernoteid, shareid, after);
-
   let rec_iter = pstmt.query_map(params![usernoteid, shareid, after], |row| {
     let uuid: String = row.get(0)?;
     let id = row.get(1)?;
-    let create: i64 = row.get(2)?;
-    println!("new share: {}, {}", id, create);
     Ok((id, uuid))
   })?;
   let res: Result<Vec<(i64, Uuid)>, zkerr::Error> = rec_iter
@@ -1112,14 +1047,7 @@ pub fn sync_stream(
     ordering: None,
   };
 
-  let znstream = search_zknotes_stream(
-    conn.clone(),
-    uid,
-    zns,
-    exclude_notes.clone(),
-    "fullexcl-notes-search".to_string(),
-  )
-  .map(bytesify);
+  let znstream = search_zknotes_stream(conn.clone(), uid, zns, exclude_notes.clone()).map(bytesify);
 
   let ans = ZkNoteSearch {
     tagsearch: ts,
@@ -1132,16 +1060,7 @@ pub fn sync_stream(
     ordering: None,
   };
 
-  println!("search archive notes");
-
-  let anstream = search_zknotes_stream(
-    conn.clone(),
-    uid,
-    ans,
-    exclude_notes,
-    "archive-notes-search".to_string(),
-  )
-  .map(bytesify);
+  let anstream = search_zknotes_stream(conn.clone(), uid, ans, exclude_notes).map(bytesify);
 
   // if there's a new share, just get all links since the beginning of time.
   let linkafter = if new_shares { after } else { None };
