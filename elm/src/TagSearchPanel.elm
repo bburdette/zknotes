@@ -365,6 +365,18 @@ viewSearchHelper mbfocusloc indent lts ts =
 
                                         File ->
                                             "f"
+
+                                        Before ->
+                                            "b"
+
+                                        After ->
+                                            "a"
+
+                                        Create ->
+                                            "c"
+
+                                        Mod ->
+                                            "m"
                                     )
                             }
             in

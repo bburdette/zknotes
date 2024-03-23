@@ -675,6 +675,10 @@ fn build_tagsearch_clause(
       let mut desc = false;
       let mut user = false;
       let mut file = false;
+      let mut before = false;
+      let mut after = false;
+      let mut create = false;
+      let mut modd = false;
 
       for m in mods {
         match m {
@@ -683,6 +687,10 @@ fn build_tagsearch_clause(
           SearchMod::Note => desc = true,
           SearchMod::User => user = true,
           SearchMod::File => file = true,
+          SearchMod::Before => before = true,
+          SearchMod::After => after = true,
+          SearchMod::Create => create = true,
+          SearchMod::Mod => modd = true,
           SearchMod::ZkNoteId => {
             zknoteid = true;
             exact = true; // zknoteid implies exact.
@@ -697,13 +705,26 @@ fn build_tagsearch_clause(
         "title"
       };
 
-      if user {
-        let user = user_id(conn, &term)?;
+      if create || modd {
+        let op = if before {
+          " < "
+        } else if after {
+          " > "
+        } else {
+          " = "
+        };
+        if create {
+          (format!("N.createdate {} ?", op), vec![term.clone()])
+        } else {
+          (format!("N.changeddate {} ?", op), vec![term.clone()])
+        }
+      } else if user {
+        let userid = user_id(conn, &term)?;
         let notstr = match not {
           true => "!",
           false => "",
         };
-        (format!("N.user {}= ?", notstr), vec![format!("{}", user)])
+        (format!("N.user {}= ?", notstr), vec![format!("{}", userid)])
       } else {
         if tag {
           let fileclause = if file { "and zkn.file is not null" } else { "" };

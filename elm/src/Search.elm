@@ -96,6 +96,10 @@ type SearchMod
     | Note
     | User
     | File
+    | Before
+    | After
+    | Create
+    | Mod
 
 
 type TagSearch
@@ -188,6 +192,18 @@ encodeSearchMod smod =
         File ->
             JE.string "File"
 
+        Before ->
+            JE.string "Before"
+
+        After ->
+            JE.string "After"
+
+        Create ->
+            JE.string "Create"
+
+        Mod ->
+            JE.string "Mod"
+
 
 decodeSearchMod : JD.Decoder SearchMod
 decodeSearchMod =
@@ -212,6 +228,18 @@ decodeSearchMod =
 
                     "File" ->
                         JD.succeed File
+
+                    "Before" ->
+                        JD.succeed Before
+
+                    "After" ->
+                        JD.succeed After
+
+                    "Create" ->
+                        JD.succeed Create
+
+                    "Mod" ->
+                        JD.succeed Mod
 
                     wat ->
                         JD.fail <| "invalid search mod: " ++ wat
@@ -361,6 +389,18 @@ showSearchMod mod =
         File ->
             "File"
 
+        Before ->
+            "Before"
+
+        After ->
+            "After"
+
+        Create ->
+            "Create"
+
+        Mod ->
+            "Mod"
+
 
 showAndOr : AndOr -> String
 showAndOr ao =
@@ -406,6 +446,18 @@ printSearchMod mod =
         File ->
             "f"
 
+        Before ->
+            "b"
+
+        After ->
+            "a"
+
+        Create ->
+            "c"
+
+        Mod ->
+            "m"
+
 
 printAndOr : AndOr -> String
 printAndOr ao =
@@ -445,6 +497,16 @@ searchMod =
             |. symbol "u"
         , succeed File
             |. symbol "f"
+        , succeed File
+            |. symbol "f"
+        , succeed Before
+            |. symbol "b"
+        , succeed After
+            |. symbol "a"
+        , succeed Create
+            |. symbol "c"
+        , succeed Mod
+            |. symbol "m"
         ]
 
 

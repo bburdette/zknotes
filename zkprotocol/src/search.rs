@@ -66,6 +66,10 @@ pub enum SearchMod {
   Note,
   User,
   File,
+  Before,
+  After,
+  Create,
+  Mod,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
