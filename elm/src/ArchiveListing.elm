@@ -86,9 +86,6 @@ listview si ld zone size model =
     let
         maxwidth =
             700
-
-        -- titlemaxconst =
-        --     85
     in
     E.el
         [ E.width E.fill

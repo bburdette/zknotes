@@ -1,10 +1,10 @@
 module NoteCache exposing (NoteCache, addNote, empty, getNote, purgeNotes, setKeeps)
 
-import Data exposing (ZkNoteAndLinks, ZkNoteId, ZniSet) 
+import Data exposing (ZkNoteAndLinks, ZkNoteId, ZniSet)
 import Dict exposing (Dict)
 import Set exposing (Set)
-import TSet exposing (TSet)
 import TDict exposing (TDict)
+import TSet exposing (TSet)
 import Time
 import Util
 
@@ -20,6 +20,7 @@ type alias NoteCache =
     , max : Int
     }
 
+
 type alias ZneDict =
     TDict ZkNoteId String ZneEntry
 
@@ -27,7 +28,6 @@ type alias ZneDict =
 emptyZneDict : ZneDict
 emptyZneDict =
     TDict.empty Data.zkNoteIdToString Data.trustedZkNoteIdFromString
-
 
 
 setKeeps : ZniSet -> NoteCache -> NoteCache

@@ -2408,10 +2408,6 @@ actualupdate msg model =
                                 ( model, Cmd.none )
 
                         ZI.ZkIdSearchResult sr ->
-                            let
-                                _ =
-                                    Debug.log "id_search recvd" ""
-                            in
                             ( model, Cmd.none )
 
                         ZI.ZkListNoteSearchResult sr ->
