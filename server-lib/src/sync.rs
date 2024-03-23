@@ -66,10 +66,6 @@ pub async fn prev_sync(
     resulttype: ResultType::RtNote,
     archives: false,
     deleted: false,
-    created_after: None,
-    created_before: None,
-    changed_after: None,
-    changed_before: None,
     ordering: Some(Ordering {
       field: OrderField::Changed,
       direction: OrderDirection::Descending,
@@ -986,23 +982,25 @@ pub fn sync_stream(
     }),
   };
 
-  let emptyts = TagSearch::SearchTerm {
-    mods: Vec::new(),
-    term: "".to_string(),
+  let ts = match after {
+    None => TagSearch::SearchTerm {
+      mods: Vec::new(),
+      term: "".to_string(),
+    },
+    Some(a) => TagSearch::SearchTerm {
+      mods: vec![SearchMod::After, SearchMod::Mod],
+      term: a.to_string(),
+    },
   };
 
   let zns = ZkNoteSearch {
-    tagsearch: emptyts.clone(),
+    tagsearch: ts.clone(),
     offset: 0,
     limit: None,
     what: "".to_string(),
     resulttype: ResultType::RtNote,
     archives: false,
     deleted: true,
-    created_after: None,
-    created_before: None,
-    changed_after: after,
-    changed_before: None,
     ordering: None,
   };
 
@@ -1013,12 +1011,16 @@ pub fn sync_stream(
   // TODO: sync_users derived from read_zklinks_since_stream ?
 
   let full_excl = TagSearch::Boolex {
-    ts1: Box::new(exclude_sync),
+    ts1: Box::new(ts.clone()),
     ao: AndOr::And,
     ts2: Box::new(TagSearch::Boolex {
-      ts1: Box::new(exclude_user),
+      ts1: Box::new(exclude_sync),
       ao: AndOr::And,
-      ts2: Box::new(exclude_system),
+      ts2: Box::new(TagSearch::Boolex {
+        ts1: Box::new(exclude_user),
+        ao: AndOr::And,
+        ts2: Box::new(exclude_system),
+      }),
     }),
   };
 
@@ -1030,10 +1032,6 @@ pub fn sync_stream(
     resulttype: ResultType::RtNote,
     archives: false,
     deleted: true,
-    created_after: None,
-    created_before: None,
-    changed_after: after,
-    changed_before: None,
     ordering: None,
   };
 
@@ -1047,17 +1045,13 @@ pub fn sync_stream(
   .map(bytesify);
 
   let ans = ZkNoteSearch {
-    tagsearch: emptyts,
+    tagsearch: ts,
     offset: 0,
     limit: None,
     what: "".to_string(),
     resulttype: ResultType::RtNote,
     archives: true,
     deleted: false,
-    created_after: None,
-    created_before: None,
-    changed_after: after,
-    changed_before: None,
     ordering: None,
   };
 

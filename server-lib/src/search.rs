@@ -35,10 +35,6 @@ pub fn power_delete_zknotes(
     resulttype: ResultType::RtListNote,
     archives: false,
     deleted: false,
-    created_after: None,
-    created_before: None,
-    changed_after: None,
-    changed_before: None,
     ordering: None,
   };
   let znsr = search_zknotes(conn, user, &nolimsearch)?;
@@ -366,14 +362,7 @@ pub fn build_base_sql(
   uid: i64,
   search: &ZkNoteSearch,
 ) -> Result<(String, Vec<String>), zkerr::Error> {
-  let (mut cls, mut clsargs) = build_tagsearch_clause(&conn, uid, false, &search.tagsearch)?;
-
-  if let Some((dtcls, mut dtclsargs)) = build_daterange_clause(&search)? {
-    cls.push_str("\nand (");
-    cls.push_str(dtcls.as_str());
-    cls.push_str(")");
-    clsargs.append(&mut dtclsargs);
-  };
+  let (cls, clsargs) = build_tagsearch_clause(&conn, uid, false, &search.tagsearch)?;
 
   let publicid = note_id(&conn, "system", "public")?;
   let archiveid = note_id(&conn, "system", "archive")?;
@@ -604,61 +593,6 @@ pub fn build_base_sql(
   // println!("sqlargs: {:?}", baseargs);
 
   Ok((sqlbase, baseargs))
-}
-
-fn build_daterange_clause(
-  search: &ZkNoteSearch,
-) -> Result<Option<(String, Vec<String>)>, zkerr::Error> {
-  let create_clawses = [
-    search
-      .created_after
-      .map(|dt| ("N.createdate > ?", dt.to_string())),
-    search
-      .created_before
-      .map(|dt| ("N.createdate < ?", dt.to_string())),
-  ];
-  let changed_clawses = [
-    search
-      .changed_after
-      .map(|dt| ("N.changeddate > ?", dt.to_string())),
-    search
-      .changed_before
-      .map(|dt| ("N.changeddate < ?", dt.to_string())),
-  ];
-  let join = |clawses: Vec<Option<(&str, String)>>, conj| {
-    let clause = clawses
-      .iter()
-      .filter_map(|pair| pair.as_ref().map(|(s, _)| s.to_string()))
-      .collect::<Vec<String>>()
-      .join(conj);
-    let args: Vec<String> = clawses
-      .iter()
-      .filter_map(|pair| pair.as_ref().map(|(_, dt)| dt.clone()))
-      .collect();
-    (clause, args)
-  };
-
-  let (crcls, mut crargs) = join(create_clawses.to_vec(), " and ");
-  let (changedcls, mut changedargs) = join(changed_clawses.to_vec(), " and ");
-
-  let clause: String = {
-    let mut v: Vec<String> = Vec::new();
-    if crcls != "" {
-      v.push(crcls);
-    }
-    if changedcls != "" {
-      v.push(changedcls);
-    }
-    v.join(" and ")
-  };
-  let mut args: Vec<String> = Vec::new();
-  args.append(&mut crargs);
-  args.append(&mut changedargs);
-  if clause == "" {
-    Ok(None)
-  } else {
-    Ok(Some((clause, args)))
-  }
 }
 
 fn build_tagsearch_clause(

@@ -9,10 +9,6 @@ pub struct ZkNoteSearch {
   pub resulttype: ResultType,
   pub archives: bool,
   pub deleted: bool, // include deleted notes
-  pub created_after: Option<i64>,
-  pub created_before: Option<i64>,
-  pub changed_after: Option<i64>,
-  pub changed_before: Option<i64>,
   pub ordering: Option<Ordering>,
 }
 

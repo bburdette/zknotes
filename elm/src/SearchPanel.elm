@@ -68,10 +68,6 @@ getSearch model =
                 , resultType = S.RtListNote
                 , archives = False
                 , deleted = showDeleted
-                , createdAfter = Nothing
-                , createdBefore = Nothing
-                , changedAfter = Nothing
-                , changedBefore = Nothing
                 , unsynced = False
                 }
             )
@@ -168,10 +164,6 @@ handleTspUpdate model ( nm, cmd ) =
                 , resultType = S.RtListNote
                 , archives = False
                 , deleted = showDeleted
-                , createdAfter = Nothing
-                , createdBefore = Nothing
-                , changedAfter = Nothing
-                , changedBefore = Nothing
                 , unsynced = False
                 }
             )
@@ -215,10 +207,6 @@ update msg model =
                                 , resultType = S.RtListNote
                                 , archives = False
                                 , deleted = showDeleted
-                                , createdAfter = Nothing
-                                , createdBefore = Nothing
-                                , changedAfter = Nothing
-                                , changedBefore = Nothing
                                 , unsynced = False
                                 }
                             )

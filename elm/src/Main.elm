@@ -1660,10 +1660,6 @@ actualupdate msg model =
                                             , resultType = S.RtListNote
                                             , archives = False
                                             , deleted = False
-                                            , createdAfter = Nothing
-                                            , createdBefore = Nothing
-                                            , changedAfter = Nothing
-                                            , changedBefore = Nothing
                                             , unsynced = False
                                             }
                                         )
@@ -3527,10 +3523,6 @@ prevSearchQuery login =
     , resultType = S.RtNote
     , archives = False
     , deleted = False
-    , createdAfter = Nothing
-    , createdBefore = Nothing
-    , changedAfter = Nothing
-    , changedBefore = Nothing
     , unsynced = False
     }
 

@@ -74,10 +74,6 @@ type alias ZkNoteSearch =
     , resultType : ResultType
     , archives : Bool
     , deleted : Bool
-    , createdAfter : Maybe Int
-    , createdBefore : Maybe Int
-    , changedAfter : Maybe Int
-    , changedBefore : Maybe Int
     , unsynced : Bool
     }
 
@@ -147,10 +143,6 @@ defaultSearch =
     , resultType = RtListNote
     , archives = False
     , deleted = False
-    , createdAfter = Nothing
-    , createdBefore = Nothing
-    , changedAfter = Nothing
-    , changedBefore = Nothing
     , unsynced = False
     }
 
@@ -360,11 +352,7 @@ encodeZkNoteSearch zns =
         , ( "unsynced", JE.bool zns.unsynced )
         ]
             ++ List.filterMap identity
-                [ encodeMaybe "created_after" zns.createdAfter JE.int
-                , encodeMaybe "created_before" zns.createdBefore JE.int
-                , encodeMaybe "changed_after" zns.changedAfter JE.int
-                , encodeMaybe "changed_before" zns.changedBefore JE.int
-                , encodeMaybe "limit" zns.limit JE.int
+                [ encodeMaybe "limit" zns.limit JE.int
                 ]
 
 
