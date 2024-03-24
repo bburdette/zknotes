@@ -141,8 +141,7 @@ pub fn temp_tables(conn: &Connection) -> Result<TempTableNames, zkerr::Error> {
   // temporary tables.  should drop when the db connection ends.
   conn.execute(
     format!(
-      //     "create temporary table {} (\"id\" integer primary key not null)",
-      "create table {} (\"id\" integer primary key not null)",
+      "create temporary table {} (\"id\" integer primary key not null)",
       notetemp
     )
     .as_str(),
@@ -151,8 +150,7 @@ pub fn temp_tables(conn: &Connection) -> Result<TempTableNames, zkerr::Error> {
 
   conn.execute(
     format!(
-      //     "create temporary table {} (
-      "create table {} (
+      "create temporary table {} (
       \"fromid\" INTEGER NOT NULL,
       \"toid\" INTEGER NOT NULL,
       \"user\" INTEGER NOT NULL)",
@@ -173,8 +171,7 @@ pub fn temp_tables(conn: &Connection) -> Result<TempTableNames, zkerr::Error> {
 
   conn.execute(
     format!(
-      //     "create temporary table {} (\"id\" integer primary key not null)",
-      "create table {} (\"id\" integer primary key not null)",
+      "create temporary table {} (\"id\" integer primary key not null)",
       archivelinktemp
     )
     .as_str(),
