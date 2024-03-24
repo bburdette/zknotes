@@ -199,7 +199,6 @@ pub fn search_zknotes_stream(
   // {
   try_stream! {
 
-    // let sysid = user_id(&conn, "system")?;
     let user = if search.archives {
       user_id(&conn, "system")?
     } else {
@@ -218,9 +217,7 @@ pub fn search_zknotes_stream(
 
     while let Some(row) = rows.next()? {
       match search.resulttype {
-        ResultType::RtId => {
-          yield SyncMessage::ZkNoteId(row.get::<usize, String>(1)?)
-        }
+        ResultType::RtId => yield SyncMessage::ZkNoteId(row.get::<usize, String>(1)?),
         ResultType::RtListNote => {
           let zln = ZkListNote {
             id: Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?,
@@ -273,7 +270,6 @@ pub fn sync_users(
       )
       .as_str(),
     )?;
-
 
     yield SyncMessage::PhantomUserHeader;
 

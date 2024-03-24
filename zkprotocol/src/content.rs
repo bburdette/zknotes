@@ -255,36 +255,31 @@ impl From<ZkSearchResultHeader> for SyncMessage {
     SyncMessage::ZkSearchResultHeader(a)
   }
 }
+
 impl From<ZkListNote> for SyncMessage {
   fn from(a: ZkListNote) -> Self {
     SyncMessage::ZkListNote(a)
   }
 }
+
 impl From<ZkNote> for SyncMessage {
   fn from(a: ZkNote) -> Self {
     SyncMessage::ZkNote(a)
   }
 }
+
 impl From<ZkNoteAndLinks> for SyncMessage {
   fn from(a: ZkNoteAndLinks) -> Self {
     SyncMessage::ZkNoteAndLinks(a)
   }
 }
-// impl From<ArchiveZkLinkHeader> for SyncMessage {
-//   fn from(a: ArchiveZkLinkHeader) -> Self {
-//     SyncMessage::ArchiveZkLinkHeader(a)
-//   }
-// }
+
 impl From<ArchiveZkLink> for SyncMessage {
   fn from(a: ArchiveZkLink) -> Self {
     SyncMessage::ArchiveZkLink(a)
   }
 }
-// impl From<UuidZkLinkHeader> for SyncMessage {
-//   fn from(a: UuidZkLinkHeader) -> Self {
-//     SyncMessage::UuidZkLinkHeader(a)
-//   }
-// }
+
 impl From<UuidZkLink> for SyncMessage {
   fn from(a: UuidZkLink) -> Self {
     SyncMessage::UuidZkLink(a)

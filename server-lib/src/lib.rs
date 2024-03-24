@@ -4,10 +4,9 @@ pub mod interfaces;
 mod migrations;
 mod search;
 pub mod sqldata;
-// mod sqltest;
+mod sqltest;
 mod sync;
 mod synctest;
-
 use actix_cors::Cors;
 use actix_files::NamedFile;
 use actix_multipart::Multipart;
@@ -492,7 +491,6 @@ async fn private_upstreaming(
   data: web::Data<Config>,
   body: web::Payload,
 ) -> HttpResponse {
-  // pass to another fn that returns a result, for ?
   match zk_interface_check_upstreaming(&session, &data, body).await {
     Ok(hr) => hr,
     Err(e) => {
@@ -542,8 +540,6 @@ async fn zk_interface_check_upstreaming(
           // finally!  processing messages as logged in user.
           let rstream =
             body.map_err(convert_bodyerr as fn(actix_web::error::PayloadError) -> std::io::Error);
-
-          // futures_util::stream::MapErr<actix_web::web::Payload, fn(PayloadError) -> std::io::Error>
 
           let mut br = StreamReader::new(rstream);
 

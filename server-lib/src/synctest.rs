@@ -380,18 +380,7 @@ mod tests {
       "client",
     )?;
 
-    println!("0.1");
-
     println!("0.2");
-
-    // let publicid = note_id(&conn, "system", "public")?;
-    // let shareid = note_id(&conn, "system", "share")?;
-    // let _searchid = note_id(&conn, "system", "search")?;
-
-    println!("0.2.5");
-
-    // let _unid1 = user_note_id(&conn, uid1)?;
-    // let unid2 = user_note_id(&conn, uid2)?;
 
     // ---------------------------------------------------------------
     // test searches.
@@ -450,7 +439,6 @@ mod tests {
       |row| Ok(row.get(0)?),
     )?;
 
-    // let cpub1 = read_zknote_i64(&caconn, Some(cuser2), cpubid)?;
     let cpub2 = read_zknotepubid(&caconn, None, "public-note")?;
 
     println!("2");
@@ -586,8 +574,9 @@ mod tests {
     // ------------------------------------------------------------
 
     // ------------------------------------------------------------
-    let scotheruser = user_id(&saconn, "client-otheruser")?; // phantom user on server?
-                                                             // check that user note ids and user uuids match on client and server.
+    // phantom user on server?
+    let scotheruser = user_id(&saconn, "client-otheruser")?;
+    // check that user note ids and user uuids match on client and server.
     {
       let celd = sqldata::read_extra_login_data(&caconn, csyncuser)?;
       let seld = sqldata::read_extra_login_data(&saconn, ssyncuser)?;
@@ -608,22 +597,17 @@ mod tests {
 
     // ------------------------------------------------------------
     println!("3");
-    // read_zknotepubid(&caconn, None, "not-publicid1")?;
     read_zknotepubid(&caconn, None, "public-note")?;
     println!("3.5");
-    // read_zknotepubid(&caconn, Some(cuser1), "not-publicid1")?;
     read_zknotepubid(&caconn, Some(csyncuser), "public-note")?;
     println!("4");
-    // let cnot_publicid1_client = read_zknotepubid(&caconn, Some(cuser1), "not-publicid1-client")?;
     let cpublic_note_client = read_zknotepubid(&caconn, Some(csyncuser), "public-note-client")?;
 
     println!("5");
     // client public notes on server.
-    // let snot_publicid1_client = read_zknotepubid(&saconn, Some(suser1), "not-publicid1-client")?;
     let spublic_note_client = read_zknotepubid(&saconn, Some(ssyncuser), "public-note-client")?;
 
     // ids are the same.
-    // assert!(cnot_publicid1_client.id == snot_publicid1_client.id);
     assert!(spublic_note_client.id == cpublic_note_client.id);
 
     println!("6");
@@ -795,6 +779,9 @@ mod tests {
     let ns = sync::new_shares(&saconn, server_ts.syncuser, postsync_time)?;
     assert!(ns == vec![server_ts.otherusershare]);
 
+    // TODO: tweak a file on the server, and on the client.
+    // check that those files synced.
+
     // ------------------------------------------------------------
     // sync from server to client.
     let server_stream = sync_stream(saconn.clone(), ssyncuser, None, None, None, None, &mut cb);
@@ -845,6 +832,8 @@ mod tests {
       )
     })?;
 
+    // TODO: file sync testing.
+
     // add a new document in the share that syncuser can now access.  It should
     // be visible on sync, as well as the old document in that share.
 
@@ -859,18 +848,11 @@ mod tests {
     // delete links.  updated?  hmm.  will unshares ever get synced?
     // reinstate links.  updated?  link archives?
 
-    // assert!(false);
-
     // Verify notes not visible to user1 are not on server.
 
     // TESTING:
     // user ids on client and server don't match.
     //   should sync fail if user ids don't match?  do user ids match on remote users now?
-
-    // TEST: give user access to a share, then resync.  do they get the old notes?
-    // implement by checking for new links to shares.  when found, sync the whole share.
-    // in stream, first find new links to shares and new links from notes to user, and new links to public.
-    // or, query for the same thing??  mod date after last sync, OR links to new share, OR new links to new user.
 
     Ok(())
   }

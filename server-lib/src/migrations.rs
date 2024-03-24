@@ -2275,12 +2275,6 @@ pub fn udpate30(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   conn.execute("PRAGMA foreign_keys = false;", params![])?;
 
   // update system notes with specific uuids.
-  // let publicId = "f596bc2c-a882-4c1c-b739-8c4e25f34eb2";
-  // let shareId = "466d39ec-2ea7-4d43-b44c-1d3d083f8a9d";
-  // let searchId = "84f72fd0-8836-43a3-ac66-89e0ab49dd87";
-  // let userId = "4fb37d76-6fc8-4869-8ee4-8e05fa5077f7";
-  // let systemId = "0efcc98f-dffd-40e5-af07-90da26b1d469";
-
   let archiveid: i64 = conn.query_row(
     "select zknote.id from
       zknote, orgauth_user
@@ -2452,20 +2446,6 @@ pub fn udpate33(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 // add unique server id in singlevalue table.
 pub fn udpate34(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   let conn = Connection::open(dbfile)?;
-
-  // let sysid: i64 = conn.query_row(
-  //   "select id from orgauth_user
-  //     where orgauth_user.name = ?1",
-  //   params!["system"],
-  //   |row| Ok(row.get(0)?),
-  // )?;
-
-  // // system note 'remote'
-  // conn.execute(
-  //   "insert into zknote (title, content, user, uuid, editable, showtitle, deleted, createdate, changeddate)
-  //     values ('remote', '', ?1, ?2, 0, 0, 0, 0, 0)",
-  //   params![sysid, SpecialUuids::Remote.str().to_string()],
-  // )?;
 
   let sid = Uuid::new_v4();
 

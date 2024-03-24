@@ -48,7 +48,6 @@ pub fn on_new_user(
 
   let user_note_uuid = match remote_data {
     Some(remote_data) => {
-      // println!("remote_data {:?}", remote_data);
       let remd: ExtraLoginData = serde_json::from_value(remote_data)?;
       remd.zknote
     }
@@ -948,7 +947,6 @@ pub fn read_extra_login_data(conn: &Connection, id: i64) -> Result<ExtraLoginDat
   Ok(eld)
 }
 
-// TODO: do better than this janky hack.
 pub fn read_zknote_i64(
   conn: &Connection,
   uid: Option<i64>,
@@ -1297,15 +1295,12 @@ pub fn delete_zknote(
 pub fn save_zklinks(dbfile: &Path, uid: i64, zklinks: Vec<ZkLink>) -> Result<(), zkerr::Error> {
   let conn = connection_open(dbfile)?;
 
-  // println!("save_zklinks");
-
   for zklink in zklinks.iter() {
     // TODO: integrate into sql instead of separate queries.
     let to = note_id_for_uuid(&conn, &zklink.to)?;
     let from = note_id_for_uuid(&conn, &zklink.from)?;
     if zklink.user == uid {
       if zklink.delete == Some(true) {
-        // println!("deleting zklink! {:?}", zklink);
         // create archive record.
         let now = now()?;
         conn.execute(
@@ -1315,7 +1310,6 @@ pub fn save_zklinks(dbfile: &Path, uid: i64, zklinks: Vec<ZkLink>) -> Result<(),
           params![now, from, to, uid],
         )?;
 
-        // println!("created zklinkarchive {}", conn.last_insert_rowid());
         // delete link.
         conn.execute(
           "delete from zklink where fromid = ?1 and toid = ?2 and user = ?3",
@@ -1339,7 +1333,6 @@ pub fn save_savezklinks(
   zknid: ZkNoteId,
   zklinks: Vec<SaveZkLink>,
 ) -> Result<(), zkerr::Error> {
-  // println!("save_savezklinks");
   for link in zklinks.iter() {
     let (uufrom, uuto) = match link.direction {
       Direction::From => (link.otherid, zknid),
@@ -1350,7 +1343,6 @@ pub fn save_savezklinks(
     let from = note_id_for_uuid(&conn, &uufrom)?;
     if link.user == uid {
       if link.delete == Some(true) {
-        // println!("deleting zklink! {:?}", link);
         // create archive record.
         let now = now()?;
         conn.execute(
@@ -1359,7 +1351,6 @@ pub fn save_savezklinks(
             where fromid = ?2 and toid = ?3 and user = ?4",
           params![now, from, to, uid],
         )?;
-        // println!("created zklinkarchive {}", conn.last_insert_rowid());
         // delete the link.
         conn.execute(
           "delete from zklink where fromid = ?1 and toid = ?2 and user = ?3",
@@ -1775,11 +1766,7 @@ pub fn read_archivezklinks_stream(
       acc_args.push(a);
     }
 
-    // println!("\n\n read_archivezklinks_stream \n {:?}", pstmt.expanded_sql());
-    // println!("\n\n args \n {:?}", acc_args);
-
     let rec_iter = pstmt.query_map(rusqlite::params_from_iter(acc_args.iter()), |row| {
-      // println!("archive zklink row {:?}", row);
       let azl = ArchiveZkLink {
         userUuid: row.get(0)?,
         fromUuid: row.get(1)?,
@@ -1788,7 +1775,6 @@ pub fn read_archivezklinks_stream(
         createdate: row.get(4)?,
         deletedate: row.get(5)?,
       };
-      // println!("archivezklink: {:?}", azl);
       Ok(azl)
     })?;
 
@@ -1796,7 +1782,6 @@ pub fn read_archivezklinks_stream(
 
     for rec in rec_iter {
       if let Ok(r) = rec {
-        // println!("archive link: {:?}", r);
         yield SyncMessage::from(r);
       }
     }
@@ -1836,10 +1821,7 @@ pub fn read_zklinks_since(
     acc_args.push(a);
   }
 
-  // println!("accarts {}", acc_args.len());
-
   let rec_iter = pstmt.query_map(rusqlite::params_from_iter(acc_args.iter()), |row| {
-    // println!("uuidzklink {:?}", row.get::<usize, String>(0)?);
     Ok(UuidZkLink {
       userUuid: row.get(0)?,
       fromUuid: row.get(1)?,
@@ -1861,7 +1843,6 @@ pub fn read_zklinks_since_stream(
   // {
   try_stream! {
 
-    // println!("read_zklinks_since_stream, after: {:?}", after);
     let (acc_sql, acc_args) = accessible_notes(&conn, uid)?;
 
     // make an accessible notes temp table.
@@ -1875,7 +1856,6 @@ pub fn read_zklinks_since_stream(
     // TODO: unique id for this temp table.
     let tabname = format!("accnotes_{}", uid);
 
-    // println!("table name {}", tabname);
 
     conn.execute(
       format!(
@@ -1949,7 +1929,6 @@ pub fn read_zklinks_since_stream(
       yield SyncMessage::UuidZkLinkHeader;
 
       let rec_iter = pstmt.query_map(rusqlite::params_from_iter(lnargs.iter()), |row| {
-        // println!("zklink uuid {:?}", row.get::<usize, String>(0)?);
         Ok(SyncMessage::from(UuidZkLink {
           userUuid: row.get(0)?,
           fromUuid: row.get(1)?,
@@ -1960,7 +1939,6 @@ pub fn read_zklinks_since_stream(
       })?;
       for rec in rec_iter {
         if let Ok(r) = rec {
-          // println!("zklink {:?}", r);
           yield r;
         }
       }
@@ -1968,7 +1946,6 @@ pub fn read_zklinks_since_stream(
 
     conn.execute(format!("drop table {}", tabname).as_str(), params![])?;
 
-    println!("read_zklinks_since_stream - end");
   }
 }
 
@@ -2212,7 +2189,6 @@ pub fn make_file_note(
   fpath: &Path,
 ) -> Result<(i64, ZkNoteId, i64), zkerr::Error> {
   // compute hash.
-  // let fpath = Path::new(&filepath);
   let fh = sha256::try_digest(fpath)?;
   let size = std::fs::metadata(fpath)?.len();
   let fhp = format!("files/{}", fh);
