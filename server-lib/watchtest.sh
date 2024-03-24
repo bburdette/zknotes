@@ -8,4 +8,4 @@ cargo watch -c \
   -w ../orgauth/rustlib/Cargo.toml \
   -w ../server-lib/src/ \
   -w ../server-lib/Cargo.toml \
-  -x build -s ./run.sh
+  -x test

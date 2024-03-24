@@ -3,17 +3,8 @@ module PaginationPanel exposing (Command(..), Model, Msg(..), initModel, searchR
 import Common exposing (buttonStyle)
 import Data
 import Element as E exposing (Element)
-import Element.Background as Background
-import Element.Border as Border
-import Element.Events exposing (onClick)
-import Element.Font as Font
 import Element.Input as Input
-import Parser
-import Search as S exposing (AndOr(..), SearchMod(..), TSText, TagSearch(..), tagSearchParser)
-import SearchHelpPanel
-import TDict exposing (TDict)
-import TangoColors as Color
-import Util exposing (Size)
+import Search as S exposing (AndOr(..), SearchMod(..), TagSearch(..))
 
 
 type alias Model =

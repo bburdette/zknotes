@@ -1,11 +1,9 @@
 module InviteUser exposing (..)
 
 import Common
-import Data
 import Element as E exposing (Element)
 import Element.Background as EBk
 import Element.Border as EBd
-import Element.Events as EE
 import Element.Font as EF
 import Element.Input as EI
 import TagAThing exposing (Thing)

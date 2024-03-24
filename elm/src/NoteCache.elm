@@ -1,8 +1,10 @@
 module NoteCache exposing (NoteCache, addNote, empty, getNote, purgeNotes, setKeeps)
 
-import Data exposing (ZkNoteAndLinks)
+import Data exposing (ZkNoteAndLinks, ZkNoteId, ZniSet)
 import Dict exposing (Dict)
 import Set exposing (Set)
+import TDict exposing (TDict)
+import TSet exposing (TSet)
 import Time
 import Util
 
@@ -12,14 +14,23 @@ type alias ZneEntry =
 
 
 type alias NoteCache =
-    { byId : Dict Int ZneEntry
-    , byReceipt : Dict Int (Set Int)
-    , keep : Set Int
+    { byId : ZneDict
+    , byReceipt : Dict Int ZniSet
+    , keep : ZniSet
     , max : Int
     }
 
 
-setKeeps : Set Int -> NoteCache -> NoteCache
+type alias ZneDict =
+    TDict ZkNoteId String ZneEntry
+
+
+emptyZneDict : ZneDict
+emptyZneDict =
+    TDict.empty Data.zkNoteIdToString Data.trustedZkNoteIdFromString
+
+
+setKeeps : ZniSet -> NoteCache -> NoteCache
 setKeeps keep nc =
     { nc | keep = keep }
 
@@ -34,42 +45,42 @@ addNote pt zne nc =
             zne.zknote.id
     in
     { byId =
-        Dict.insert id
+        TDict.insert id
             { receivetime = ms, zne = zne }
             nc.byId
     , byReceipt =
         case Dict.get ms nc.byReceipt of
             Just set ->
-                Dict.insert ms (Set.insert id set) nc.byReceipt
+                Dict.insert ms (TSet.insert id set) nc.byReceipt
 
             Nothing ->
-                Dict.insert ms (Set.insert id Set.empty) nc.byReceipt
+                Dict.insert ms (TSet.insert id Data.emptyZniSet) nc.byReceipt
 
-    -- add new notes to keeps!  assuming they belong in the current note.
-    , keep = Set.insert id nc.keep
+    -- (TODO?) add new notes to keeps!  assuming they belong in the current note.
+    , keep = TSet.insert id nc.keep
     , max = nc.max
     }
 
 
-getNote : NoteCache -> Int -> Maybe ZkNoteAndLinks
+getNote : NoteCache -> ZkNoteId -> Maybe ZkNoteAndLinks
 getNote nc id =
-    Dict.get id nc.byId
+    TDict.get id nc.byId
         |> Maybe.map .zne
 
 
-removeNote : NoteCache -> Int -> NoteCache
+removeNote : NoteCache -> ZkNoteId -> NoteCache
 removeNote nc id =
-    case Dict.get id nc.byId of
+    case TDict.get id nc.byId of
         Just ze ->
-            { byId = Dict.remove id nc.byId
+            { byId = TDict.remove id nc.byId
             , byReceipt =
                 case Dict.get ze.receivetime nc.byReceipt of
                     Just set ->
                         let
                             ns =
-                                Set.remove id set
+                                TSet.remove id set
                         in
-                        if Set.isEmpty ns then
+                        if TSet.isEmpty ns then
                             Dict.remove ze.receivetime nc.byReceipt
 
                         else
@@ -77,7 +88,7 @@ removeNote nc id =
 
                     Nothing ->
                         nc.byReceipt
-            , keep = Set.remove id nc.keep
+            , keep = TSet.remove id nc.keep
             , max = nc.max
             }
 
@@ -89,7 +100,7 @@ purgeNotes : NoteCache -> NoteCache
 purgeNotes nc =
     let
         ncount =
-            Dict.size nc.byId
+            TDict.size nc.byId
 
         toremove =
             ncount - nc.max
@@ -100,7 +111,7 @@ purgeNotes nc =
     else
         let
             br =
-                nc.byReceipt |> Dict.toList |> List.map (Tuple.second >> Set.toList) |> List.concat
+                nc.byReceipt |> Dict.toList |> List.map (Tuple.second >> TSet.toList) |> List.concat
 
             ( rcount, nnnc ) =
                 Util.foldUntil
@@ -108,7 +119,7 @@ purgeNotes nc =
                         if rmv <= 0 then
                             Util.Stop ( rmv, nnc )
 
-                        else if Set.member id nc.keep then
+                        else if TSet.member id nc.keep then
                             Util.Go ( rmv, nnc )
 
                         else
@@ -122,8 +133,8 @@ purgeNotes nc =
 
 empty : Int -> NoteCache
 empty max =
-    { byId = Dict.empty
+    { byId = emptyZneDict
     , byReceipt = Dict.empty
-    , keep = Set.empty
+    , keep = Data.emptyZniSet
     , max = max
     }

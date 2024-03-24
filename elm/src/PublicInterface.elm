@@ -1,6 +1,6 @@
 module PublicInterface exposing (SendMsg(..), ServerResponse(..), encodeSendMsg, getErrorIndexNote, serverResponseDecoder)
 
-import Data
+import Data exposing (ZkNoteId)
 import Http
 import Http.Tasks as HT
 import Json.Decode as JD
@@ -27,20 +27,20 @@ encodeSendMsg sm =
     case sm of
         GetZkNoteAndLinks x ->
             JE.object
-                [ ( "what", JE.string "getzknote" )
+                [ ( "what", JE.string "GetZkNoteAndLinks" )
                 , ( "data", Data.encodeGetZkNoteEdit x )
                 ]
 
         GetZkNotePubId pubid ->
             JE.object
-                [ ( "what", JE.string "getzknotepubid" )
+                [ ( "what", JE.string "GetZkNotePubId" )
                 , ( "data", JE.string pubid )
                 ]
 
         GetZnlIfChanged x ->
             JE.object
-                [ ( "what", JE.string "getzneifchanged" )
-                , ( "data", Data.encodeGetZneIfChanged x )
+                [ ( "what", JE.string "GetZnlIfChanged" )
+                , ( "data", Data.encodeGetZnlIfChanged x )
                 ]
 
 
@@ -49,14 +49,14 @@ serverResponseDecoder =
     JD.andThen
         (\what ->
             case what of
-                "zknote" ->
+                "ZkNoteAndLinks" ->
                     JD.map ZkNoteAndLinks
                         (JD.at [ "content" ] <| Data.decodeZkNoteEditWhat)
 
-                "server error" ->
+                "ServerError" ->
                     JD.map ServerError (JD.at [ "content" ] JD.string)
 
-                "noop" ->
+                "Noop" ->
                     JD.succeed Noop
 
                 wat ->
@@ -68,7 +68,7 @@ serverResponseDecoder =
         )
 
 
-getErrorIndexNote : String -> Int -> (Result Http.Error ServerResponse -> msg) -> Cmd msg
+getErrorIndexNote : String -> ZkNoteId -> (Result Http.Error ServerResponse -> msg) -> Cmd msg
 getErrorIndexNote location noteid tomsg =
     HT.post
         { url = location ++ "/public"

@@ -1,11 +1,12 @@
-//
-
 pub mod config;
+pub mod error;
 pub mod interfaces;
 mod migrations;
 mod search;
 pub mod sqldata;
 mod sqltest;
+mod sync;
+mod synctest;
 use actix_cors::Cors;
 use actix_files::NamedFile;
 use actix_multipart::Multipart;
@@ -23,25 +24,33 @@ use either::Either;
 use futures_util::TryStreamExt as _;
 use log::{error, info};
 pub use orgauth;
-use orgauth::endpoints::{ActixTokener, Callbacks};
 use orgauth::util;
+use orgauth::{
+  data::{AdminResponse, UserResponse, UserResponseMessage},
+  endpoints::ActixTokener,
+};
 use rusqlite::Connection;
 use serde_json;
 use simple_error::simple_error;
 use std::env;
 use std::error::Error;
 use std::fs::File;
-use std::io::Read;
 use std::io::{stdin, Write};
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 use timer;
+use tokio_util::io::StreamReader;
+use tracing_actix_web::TracingLogger;
 use uuid::Uuid;
 pub use zkprotocol;
-pub use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
-
-use tracing_actix_web::TracingLogger;
+pub use zkprotocol::messages::{
+  PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage, PublicMessage,
+};
+use zkprotocol::{
+  constants::{PrivateReplies, PublicReplies},
+  messages::PublicReplyMessage,
+};
 
 /*
 use actix_files::NamedFile;
@@ -54,7 +63,7 @@ fn sitemap(_req: &HttpRequest) -> Result<NamedFile> {
 */
 
 async fn favicon(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
-  let mut staticpath = data.static_path.clone().unwrap_or(PathBuf::from("static/"));
+  let staticpath = data.static_path.clone().unwrap_or(PathBuf::from("static/"));
   let icopath = staticpath.join("favicon.ico");
   match NamedFile::open(&icopath) {
     Ok(f) => f.into_response(&req),
@@ -66,18 +75,21 @@ async fn favicon(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
 async fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
   info!("remote ip: {:?}, request:{:?}", req.connection_info(), req);
 
-  // logged in?
-  let (logindata, sysids) = match interfaces::login_data_for_token(session, &data) {
-    Ok((optld, sysids)) => (
-      match optld {
-        Some(logindata) => serde_json::to_value(logindata).unwrap_or(serde_json::Value::Null),
-        _ => serde_json::Value::Null,
-      },
-      serde_json::to_value(sysids).unwrap_or(serde_json::Value::Null),
-    ),
-    _ => (serde_json::Value::Null, serde_json::Value::Null),
+  let sysids = match sqldata::sysids() {
+    Ok(si) => serde_json::to_value(si).unwrap_or(serde_json::Value::Null),
+    Err(e) => return HttpResponse::InternalServerError().body(e.to_string()),
   };
 
+  // logged in?
+  let logindata = match interfaces::login_data_for_token(session, &data) {
+    Ok(optld) => match optld {
+      Some(logindata) => serde_json::to_value(logindata).unwrap_or(serde_json::Value::Null),
+      _ => serde_json::Value::Null,
+    },
+    _ => serde_json::Value::Null,
+  };
+
+  // TODO: hardcode the UUID of this?
   let errorid = match data.error_index_note {
     Some(eid) => serde_json::to_value(eid).unwrap_or(serde_json::Value::Null),
     None => serde_json::Value::Null,
@@ -126,8 +138,8 @@ async fn public(
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'public' err: {:?}", e);
-      let se = ServerResponse {
-        what: "server error".to_string(),
+      let se = PublicReplyMessage {
+        what: PublicReplies::ServerError,
         content: serde_json::Value::String(e.to_string()),
       };
       HttpResponse::Ok().json(se)
@@ -138,11 +150,11 @@ async fn public(
 async fn user(
   session: Session,
   data: web::Data<Config>,
-  item: web::Json<orgauth::data::WhatMessage>,
+  item: web::Json<orgauth::data::UserRequestMessage>,
   req: HttpRequest,
 ) -> HttpResponse {
   info!(
-    "user msg: {}, {:?}  \n connection_info: {:?}",
+    "user msg: {:?}, {:?}  \n connection_info: {:?}",
     &item.what,
     &item.data,
     req.connection_info()
@@ -151,12 +163,14 @@ async fn user(
     &mut ActixTokener { session: &session },
     &data,
     item.into_inner(),
-  ) {
+  )
+  .await
+  {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'user' err: {:?}", e);
-      let se = orgauth::data::WhatMessage {
-        what: "server error".to_string(),
+      let se = UserResponseMessage {
+        what: UserResponse::ServerError,
         data: Some(serde_json::Value::String(e.to_string())),
       };
       HttpResponse::Ok().json(se)
@@ -167,20 +181,16 @@ async fn user(
 async fn admin(
   session: Session,
   data: web::Data<Config>,
-  item: web::Json<orgauth::data::WhatMessage>,
+  item: web::Json<orgauth::data::AdminRequestMessage>,
   req: HttpRequest,
 ) -> HttpResponse {
   info!(
-    "admin msg: {}, {:?}  \n connection_info: {:?}",
+    "admin msg: {:?}, {:?}  \n connection_info: {:?}",
     &item.what,
     &item.data,
     req.connection_info()
   );
-  let mut cb = Callbacks {
-    on_new_user: Box::new(sqldata::on_new_user),
-    extra_login_data: Box::new(sqldata::extra_login_data_callback),
-    on_delete_user: Box::new(sqldata::on_delete_user),
-  };
+  let mut cb = sqldata::zknotes_callbacks();
   match orgauth::endpoints::admin_interface_check(
     &mut ActixTokener { session: &session },
     &data.orgauth_config,
@@ -190,8 +200,8 @@ async fn admin(
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'user' err: {:?}", e);
-      let se = orgauth::data::WhatMessage {
-        what: "server error".to_string(),
+      let se = orgauth::data::AdminResponseMessage {
+        what: AdminResponse::ServerError,
         data: Some(serde_json::Value::String(e.to_string())),
       };
       HttpResponse::Ok().json(se)
@@ -203,10 +213,10 @@ fn session_user(
   conn: &Connection,
   session: Session,
   config: &web::Data<Config>,
-) -> Result<Either<orgauth::data::User, ServerResponse>, Box<dyn Error>> {
+) -> Result<Either<orgauth::data::User, PrivateReplyMessage>, Box<dyn Error>> {
   match session.get::<Uuid>("token")? {
-    None => Ok(Either::Right(ServerResponse {
-      what: "not logged in".to_string(),
+    None => Ok(Either::Right(PrivateReplyMessage {
+      what: PrivateReplies::NotLoggedIn,
       content: serde_json::Value::Null,
     })),
     Some(token) => {
@@ -219,8 +229,8 @@ fn session_user(
         Err(e) => {
           info!("read_user_by_token_api error: {:?}", e);
 
-          Ok(Either::Right(ServerResponse {
-            what: "login error".to_string(),
+          Ok(Either::Right(PrivateReplyMessage {
+            what: PrivateReplies::LoginError,
             content: serde_json::to_value(format!("{:?}", e).as_str())?,
           }))
         }
@@ -289,7 +299,7 @@ async fn make_file_notes(
   session: Session,
   config: web::Data<Config>,
   payload: &mut Multipart,
-) -> Result<ServerResponse, Box<dyn Error>> {
+) -> Result<PrivateReplyMessage, Box<dyn Error>> {
   let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
   let userdata = match session_user(&conn, session, &config)? {
     Either::Left(ud) => ud,
@@ -306,10 +316,10 @@ async fn make_file_notes(
     // compute hash.
     let fpath = Path::new(&fp);
 
-    let (noteid, _fid) = sqldata::make_file_note(&conn, userdata.id, &name, fpath)?;
+    let (nid64, _noteid, _fid) = sqldata::make_file_note(&conn, userdata.id, &name, fpath)?;
 
     // return zknoteedit.
-    let listnote = sqldata::read_zklistnote(&conn, Some(userdata.id), noteid)?;
+    let listnote = sqldata::read_zklistnote(&conn, Some(userdata.id), nid64)?;
     info!(
       "user#filer_uploaded-zknote: {} - {}",
       listnote.id, listnote.title
@@ -317,8 +327,8 @@ async fn make_file_notes(
 
     zklns.push(listnote);
   }
-  Ok(ServerResponse {
-    what: "savedfiles".to_string(),
+  Ok(PrivateReplyMessage {
+    what: PrivateReplies::FilesUploaded,
     content: serde_json::to_value(zklns)?,
   })
 }
@@ -370,15 +380,15 @@ async fn save_files(
 async fn private(
   session: Session,
   data: web::Data<Config>,
-  item: web::Json<UserMessage>,
+  item: web::Json<PrivateMessage>,
   _req: HttpRequest,
 ) -> HttpResponse {
-  match zk_interface_check(&session, &data, item.into_inner()) {
+  match zk_interface_check(&session, &data, item.into_inner()).await {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'private' err: {:?}", e);
-      let se = ServerResponse {
-        what: "server error".to_string(),
+      let se = PrivateReplyMessage {
+        what: PrivateReplies::ServerError,
         content: serde_json::Value::String(e.to_string()),
       };
       HttpResponse::Ok().json(se)
@@ -386,14 +396,33 @@ async fn private(
   }
 }
 
-fn zk_interface_check(
+async fn private_streaming(
+  session: Session,
+  data: web::Data<Config>,
+  item: web::Json<PrivateStreamingMessage>,
+  _req: HttpRequest,
+) -> HttpResponse {
+  match zk_interface_check_streaming(&session, &data, item.into_inner()).await {
+    Ok(hr) => hr,
+    Err(e) => {
+      error!("'private_streaming err: {:?}", e);
+      let se = PrivateReplyMessage {
+        what: PrivateReplies::ServerError,
+        content: serde_json::Value::String(e.to_string()),
+      };
+      HttpResponse::Ok().json(se)
+    }
+  }
+}
+
+async fn zk_interface_check(
   session: &Session,
   config: &Config,
-  msg: UserMessage,
-) -> Result<ServerResponse, Box<dyn Error>> {
+  msg: PrivateMessage,
+) -> Result<PrivateReplyMessage, Box<dyn Error>> {
   match session.get::<Uuid>("token")? {
-    None => Ok(ServerResponse {
-      what: "not logged in".to_string(),
+    None => Ok(PrivateReplyMessage {
+      what: PrivateReplies::NotLoggedIn,
       content: serde_json::Value::Null,
     }),
     Some(token) => {
@@ -407,20 +436,133 @@ fn zk_interface_check(
         Err(e) => {
           info!("read_user_by_token_api error2: {:?}, {:?}", token, e);
 
-          Ok(ServerResponse {
-            what: "login error".to_string(),
+          Ok(PrivateReplyMessage {
+            what: PrivateReplies::LoginError,
             content: serde_json::to_value(format!("{:?}", e).as_str())?,
           })
         }
         Ok(userdata) => {
           // finally!  processing messages as logged in user.
-          interfaces::zk_interface_loggedin(&config, userdata.id, &msg)
+          interfaces::zk_interface_loggedin(&config, userdata.id, &msg).await
         }
       }
     }
   }
 }
 
+async fn zk_interface_check_streaming(
+  session: &Session,
+  config: &Config,
+  msg: PrivateStreamingMessage,
+) -> Result<HttpResponse, Box<dyn Error>> {
+  match session.get::<Uuid>("token")? {
+    None => Ok(HttpResponse::Ok().json(PrivateReplyMessage {
+      what: PrivateReplies::NotLoggedIn,
+      content: serde_json::Value::Null,
+    })),
+
+    Some(token) => {
+      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+      match orgauth::dbfun::read_user_by_token_api(
+        &conn,
+        token,
+        config.orgauth_config.login_token_expiration_ms,
+        config.orgauth_config.regen_login_tokens,
+      ) {
+        Err(e) => {
+          info!("read_user_by_token_api error2: {:?}, {:?}", token, e);
+
+          Ok(HttpResponse::Ok().json(PrivateReplyMessage {
+            what: PrivateReplies::LoginError,
+            content: serde_json::to_value(format!("{:?}", e).as_str())?,
+          }))
+        }
+        Ok(userdata) => {
+          // finally!  processing messages as logged in user.
+          interfaces::zk_interface_loggedin_streaming(&config, userdata.id, &msg).await
+        }
+      }
+    }
+  }
+}
+
+async fn private_upstreaming(
+  session: Session,
+  data: web::Data<Config>,
+  body: web::Payload,
+) -> HttpResponse {
+  match zk_interface_check_upstreaming(&session, &data, body).await {
+    Ok(hr) => hr,
+    Err(e) => {
+      error!("'private' err: {:?}", e);
+      let se = PrivateReplyMessage {
+        what: PrivateReplies::ServerError,
+        content: serde_json::Value::String(e.to_string()),
+      };
+      HttpResponse::Ok().json(se)
+    }
+  }
+}
+
+fn convert_bodyerr(err: actix_web::error::PayloadError) -> std::io::Error {
+  error!("convert_err {:?}", err);
+  todo!()
+}
+
+async fn zk_interface_check_upstreaming(
+  session: &Session,
+  config: &Config,
+  body: web::Payload,
+) -> Result<HttpResponse, Box<dyn Error>> {
+  match session.get::<Uuid>("token")? {
+    None => Ok(HttpResponse::Ok().json(PrivateReplyMessage {
+      what: PrivateReplies::NotLoggedIn,
+      content: serde_json::Value::Null,
+    })),
+
+    Some(token) => {
+      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+      match orgauth::dbfun::read_user_by_token_api(
+        &conn,
+        token,
+        config.orgauth_config.login_token_expiration_ms,
+        config.orgauth_config.regen_login_tokens,
+      ) {
+        Err(e) => {
+          info!("read_user_by_token_api error2: {:?}, {:?}", token, e);
+
+          Ok(HttpResponse::Ok().json(PrivateReplyMessage {
+            what: PrivateReplies::LoginError,
+            content: serde_json::to_value(format!("{:?}", e).as_str())?,
+          }))
+        }
+        Ok(_userdata) => {
+          // finally!  processing messages as logged in user.
+          let rstream =
+            body.map_err(convert_bodyerr as fn(actix_web::error::PayloadError) -> std::io::Error);
+
+          let mut br = StreamReader::new(rstream);
+
+          Ok(
+            HttpResponse::Ok().json(
+              sync::sync_from_stream(
+                &conn,
+                None,
+                None,
+                None,
+                &mut sqldata::zknotes_callbacks(),
+                &mut br,
+              )
+              .await?,
+            ),
+          )
+        }
+      }
+    }
+  }
+}
+
+// TODO: fns for mobile app default, web server default, I guess desktop too.
 pub fn defcon() -> Config {
   let oc = orgauth::data::Config {
     db: PathBuf::from("./zknotes.db"),
@@ -436,6 +578,7 @@ pub fn defcon() -> Config {
     open_registration: false,
     send_emails: false,
     non_admin_invite: true,
+    remote_registration: true,
   };
   Config {
     ip: "127.0.0.1".to_string(),
@@ -586,11 +729,7 @@ pub async fn err_main() -> Result<(), Box<dyn Error>> {
     println!("Enter password for admin user '{}':", username);
     let mut pwd = String::new();
     stdin().read_line(&mut pwd)?;
-    let mut cb = Callbacks {
-      on_new_user: Box::new(sqldata::on_new_user),
-      extra_login_data: Box::new(sqldata::extra_login_data_callback),
-      on_delete_user: Box::new(sqldata::on_delete_user),
-    };
+    let mut cb = sqldata::zknotes_callbacks();
 
     let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
     // make new registration i
@@ -598,11 +737,24 @@ pub async fn err_main() -> Result<(), Box<dyn Error>> {
       uid: username.to_string(),
       pwd: pwd.trim().to_string(),
       email: "".to_string(),
+      remote_url: "".to_string(),
     };
 
     println!("rd: {:?}", rd);
 
-    orgauth::dbfun::new_user(&conn, &rd, None, None, true, None, &mut cb.on_new_user)?;
+    orgauth::dbfun::new_user(
+      &conn,
+      &rd,
+      None,
+      None,
+      true,
+      None,
+      None,
+      None,
+      None,
+      None,
+      &mut cb.on_new_user,
+    )?;
 
     println!("admin user created: {}", username);
     return Ok(());
@@ -662,6 +814,8 @@ pub async fn err_main() -> Result<(), Box<dyn Error>> {
       .service(web::resource("/upload").route(web::post().to(receive_files)))
       .service(web::resource("/public").route(web::post().to(public)))
       .service(web::resource("/private").route(web::post().to(private)))
+      .service(web::resource("/stream").route(web::post().to(private_streaming)))
+      .service(web::resource("/upstream").route(web::post().to(private_upstreaming)))
       .service(web::resource("/user").route(web::post().to(user)))
       .service(web::resource("/admin").route(web::post().to(admin)))
       .service(web::resource(r"/file/{id}").route(web::get().to(file)))

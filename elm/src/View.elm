@@ -3,7 +3,7 @@ module View exposing (Command(..), Model, Msg(..), initFull, initSzn, update, vi
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
 import Common
-import Data
+import Data exposing (ZkNoteId, zkNoteIdToString, zniEq)
 import Dict exposing (Dict)
 import Element as E exposing (Element)
 import Element.Background as EBk
@@ -22,25 +22,26 @@ import NoteCache as NC exposing (NoteCache)
 import Schelme.Show exposing (showTerm)
 import TangoColors as TC
 import Time
+import UUID exposing (UUID)
 import Util
 
 
 type Msg
     = OnSchelmeCodeChanged String String
     | DonePress
-    | SwitchPress Int
+    | SwitchPress ZkNoteId
     | Noop
 
 
 type alias Model =
-    { id : Maybe Int
+    { id : Maybe ZkNoteId
     , sysids : Data.Sysids
     , pubid : Maybe String
     , title : String
     , showtitle : Bool
     , md : String
     , cells : CellDict
-    , panelNote : Maybe Int
+    , panelNote : Maybe ZkNoteId
     , zklinks : List Data.EditLink
     , createdate : Maybe Int
     , changeddate : Maybe Int
@@ -50,22 +51,22 @@ type alias Model =
 type Command
     = None
     | Done
-    | Switch Int
+    | Switch ZkNoteId
 
 
-zkLinkName : Data.ZkLink -> Int -> String
+zkLinkName : Data.ZkLink -> ZkNoteId -> String
 zkLinkName zklink noteid =
-    if noteid == zklink.from then
-        zklink.toname |> Maybe.withDefault (String.fromInt zklink.to)
+    if zniEq noteid zklink.from then
+        zklink.toname |> Maybe.withDefault (zkNoteIdToString zklink.to)
 
-    else if noteid == zklink.to then
-        zklink.fromname |> Maybe.withDefault (String.fromInt zklink.from)
+    else if zniEq noteid zklink.to then
+        zklink.fromname |> Maybe.withDefault (zkNoteIdToString zklink.from)
 
     else
         "link error"
 
 
-showZkl : Int -> Data.EditLink -> Element Msg
+showZkl : ZkNoteId -> Data.EditLink -> Element Msg
 showZkl id zkl =
     E.row [ E.spacing 8, E.width E.fill ]
         [ case zkl.direction of
@@ -225,7 +226,7 @@ initFull sysids zknaa =
     }
 
 
-initSzn : Data.Sysids -> Data.SaveZkNote -> Maybe Int -> Maybe Int -> List Data.EditLink -> Maybe Int -> Model
+initSzn : Data.Sysids -> Data.SaveZkNote -> Maybe Int -> Maybe Int -> List Data.EditLink -> Maybe ZkNoteId -> Model
 initSzn sysids zknote mbcreatedate mbchangeddate links mbpanelid =
     let
         cells =

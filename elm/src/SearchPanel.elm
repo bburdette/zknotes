@@ -51,6 +51,11 @@ searchResultUpdated zsr model =
     { model | paginationModel = PP.searchResultUpdated zsr model.paginationModel }
 
 
+showDeleted : Bool
+showDeleted =
+    False
+
+
 getSearch : Model -> Maybe S.ZkNoteSearch
 getSearch model =
     TSP.getSearch model.tagSearchModel
@@ -60,7 +65,10 @@ getSearch model =
                 , offset = model.paginationModel.offset
                 , limit = Just model.paginationModel.increment
                 , what = ""
-                , list = True
+                , resultType = S.RtListNote
+                , archives = False
+                , deleted = showDeleted
+                , unsynced = False
                 }
             )
 
@@ -153,7 +161,10 @@ handleTspUpdate model ( nm, cmd ) =
                 , offset = 0
                 , limit = Just model.paginationModel.increment
                 , what = ""
-                , list = True
+                , resultType = S.RtListNote
+                , archives = False
+                , deleted = showDeleted
+                , unsynced = False
                 }
             )
 
@@ -193,7 +204,10 @@ update msg model =
                                 , offset = nm.offset
                                 , limit = Just nm.increment
                                 , what = ""
-                                , list = True
+                                , resultType = S.RtListNote
+                                , archives = False
+                                , deleted = showDeleted
+                                , unsynced = False
                                 }
                             )
 

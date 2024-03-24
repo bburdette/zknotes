@@ -1,6 +1,6 @@
 module ZkCommon exposing (..)
 
-import Data as D
+import Data as D exposing (ZkNoteId, zniEq)
 import Element as E exposing (Element)
 import Element.Background as EBk
 import Element.Border as EBd
@@ -41,21 +41,21 @@ shareColor =
     TC.darkBrown
 
 
-systemColor : D.Sysids -> List Int -> Maybe E.Color
+systemColor : D.Sysids -> List ZkNoteId -> Maybe E.Color
 systemColor ld ids =
     let
-        sysColor : Int -> Maybe E.Color
+        sysColor : ZkNoteId -> Maybe E.Color
         sysColor color =
-            if color == ld.publicid then
+            if zniEq color ld.publicid then
                 Just publicColor
 
-            else if color == ld.shareid then
+            else if zniEq color ld.shareid then
                 Just shareColor
 
-            else if color == ld.searchid then
+            else if zniEq color ld.searchid then
                 Just searchColor
 
-            else if color == ld.commentid then
+            else if zniEq color ld.commentid then
                 Just commentColor
 
             else

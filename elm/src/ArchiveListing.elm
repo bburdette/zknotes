@@ -1,46 +1,40 @@
 module ArchiveListing exposing (..)
 
 import Common
-import Data
-import Dialog as D
+import Data exposing (ZkNoteId(..))
 import Dict exposing (Dict(..))
 import Element as E exposing (Element)
 import Element.Background as EBk
 import Element.Border as EBd
 import Element.Font as EF
 import Element.Input as EI
-import Element.Region
-import Import
 import PaginationPanel as PP
 import Route as R
-import Search as S exposing (TagSearch(..))
-import SearchStackPanel as SP
-import TagSearchPanel as TSP
+import Search exposing (TagSearch(..))
+import TDict exposing (TDict)
 import TangoColors as TC
 import Time
-import Toop
 import Util
-import WindowKeys as WK
 import ZkCommon as ZC
 
 
 type Msg
-    = SelectPress Int
+    = SelectPress ZkNoteId
     | PPMsg PP.Msg
     | DonePress
 
 
 type alias Model =
-    { noteid : Int
+    { noteid : ZkNoteId
     , notes : List Data.ZkListNote
-    , selected : Maybe Int
-    , fullnotes : Dict Int Data.ZkNote
+    , selected : Maybe ZkNoteId
+    , fullnotes : TDict ZkNoteId String Data.ZkNote
     , ppmodel : PP.Model
     }
 
 
 type Command
-    = Selected Int
+    = Selected ZkNoteId
     | GetArchives Data.GetZkNoteArchives
     | Done
     | None
@@ -51,14 +45,14 @@ init zna =
     { noteid = zna.zknote
     , notes = zna.results.notes
     , selected = Nothing
-    , fullnotes = Dict.empty
+    , fullnotes = Data.emptyZniDict
     , ppmodel = PP.searchResultUpdated zna.results PP.initModel
     }
 
 
 onZkNote : Data.ZkNote -> Model -> ( Model, Command )
 onZkNote zkn model =
-    ( { model | fullnotes = Dict.insert zkn.id zkn model.fullnotes, selected = Just zkn.id }
+    ( { model | fullnotes = TDict.insert zkn.id zkn model.fullnotes, selected = Just zkn.id }
     , None
     )
 
@@ -81,7 +75,7 @@ view si ld zone size model =
     )
         [ listview si ld zone size model
         , model.selected
-            |> Maybe.andThen (\id -> Dict.get id model.fullnotes)
+            |> Maybe.andThen (\id -> TDict.get id model.fullnotes)
             |> Maybe.map (\zkn -> E.column [ E.width (E.maximum 700 E.fill), E.scrollbarX ] <| [ E.text zkn.content ])
             |> Maybe.withDefault E.none
         ]
@@ -92,9 +86,6 @@ listview si ld zone size model =
     let
         maxwidth =
             700
-
-        titlemaxconst =
-            85
     in
     E.el
         [ E.width E.fill
@@ -190,7 +181,7 @@ listview si ld zone size model =
 
 
 update : Msg -> Model -> Data.LoginData -> ( Model, Command )
-update msg model ld =
+update msg model _ =
     case msg of
         SelectPress id ->
             ( model

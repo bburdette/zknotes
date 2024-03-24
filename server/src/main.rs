@@ -1,4 +1,4 @@
-use log::{error, info};
+use log::error;
 use zknotes_server_lib::err_main;
 
 fn main() {
