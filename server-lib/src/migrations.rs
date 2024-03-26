@@ -2462,3 +2462,42 @@ pub fn udpate34(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 
   Ok(())
 }
+
+// file_source table
+pub fn udpate35(dbfile: &Path) -> Result<(), orgauth::error::Error> {
+  let conn = Connection::open(dbfile)?;
+
+  m.create_table("file_source", |t| {
+    t.add_column(
+      "id",
+      types::integer()
+        .primary(true)
+        .increments(true)
+        .nullable(false),
+    );
+    t.add_column("file_id", types::text().nullable(false));
+    t.add_column("user_id", types::text().nullable(false));
+    t.add_column(
+      "file_id",
+      types::foreign(
+        "file",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "user_id",
+      types::foreign(
+        "orgauth_user",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+  });
+
+  Ok(())
+}
