@@ -399,7 +399,7 @@ where
 
   sm = read_sync_message(&mut line, br).await?;
 
-  while let SyncMessage::ZkNote(ref note) = sm {
+  while let SyncMessage::ZkNote(ref note, mbf) = sm {
     let uid = userhash
       .get(&note.user)
       .ok_or_else(|| zkerr::Error::String("user not found".to_string()))?;
@@ -496,7 +496,7 @@ where
   }
 
   sm = read_sync_message(&mut line, br).await?;
-  while let SyncMessage::ZkNote(ref note) = sm {
+  while let SyncMessage::ZkNote(ref note, mbf) = sm {
     let uid = userhash
       .get(&note.user)
       .ok_or_else(|| zkerr::Error::String("user not found".to_string()))?;

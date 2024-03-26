@@ -2466,6 +2466,8 @@ pub fn udpate34(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 // file_source table
 pub fn udpate35(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   let conn = Connection::open(dbfile)?;
+  conn.execute("PRAGMA foreign_keys = false;", params![])?;
+  let mut m = Migration::new();
 
   m.create_table("file_source", |t| {
     t.add_column(
@@ -2498,6 +2500,8 @@ pub fn udpate35(dbfile: &Path) -> Result<(), orgauth::error::Error> {
       .nullable(false),
     );
   });
+
+  conn.execute_batch(m.make::<Sqlite>().as_str())?;
 
   Ok(())
 }

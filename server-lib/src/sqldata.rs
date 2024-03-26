@@ -19,9 +19,10 @@ use std::time::Duration;
 use uuid::Uuid;
 use zkprotocol::constants::SpecialUuids;
 use zkprotocol::content::{
-  ArchiveZkLink, Direction, EditLink, ExtraLoginData, GetArchiveZkNote, GetZkNoteArchives,
-  GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkLink, SaveZkNote, SavedZkNote,
-  SyncMessage, Sysids, UuidZkLink, ZkLink, ZkListNote, ZkNote, ZkNoteAndLinks, ZkNoteId,
+  ArchiveZkLink, Direction, EditLink, ExtraLoginData, FileInfo, GetArchiveZkNote,
+  GetZkNoteArchives, GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkLink, SaveZkNote,
+  SavedZkNote, SyncMessage, Sysids, UuidZkLink, ZkLink, ZkListNote, ZkNote, ZkNoteAndLinks,
+  ZkNoteId,
 };
 
 pub fn zknotes_callbacks() -> Callbacks {
@@ -994,12 +995,31 @@ pub fn read_zknote_unchecked(
     ))
   };
 
-  // TODO check for query returned no rows and return better message.
   conn.query_row_and_then(
         "select ZN.id, ZN.uuid, ZN.title, ZN.content, ZN.user, OU.name, ZKN.uuid, ZN.pubid, ZN.editable, ZN.showtitle, ZN.deleted, ZN.file, ZN.createdate, ZN.changeddate
           from zknote ZN, orgauth_user OU, user U, zknote ZKN where ZN.uuid = ?1 and U.id = ZN.user and OU.id = ZN.user and ZKN.id = U.zknote",
           params![id.to_string()],
         closure).map_err(|e| zkerr::annotate_string(format!("note not found: {}", id), e ))
+}
+
+pub fn read_file_info(conn: &Connection, noteid: i64) -> Result<FileInfo, zkerr::Error> {
+  let closure = |row: &Row<'_>| {
+    Ok::<_, zkerr::Error>(FileInfo {
+      hash: row.get(0)?,
+      size: row.get(1)?,
+    })
+  };
+
+  conn
+    .query_row_and_then(
+      "select F.hash, F.size
+          from file F, zknote N
+          where N.id = ?1
+          and N.file = F.id",
+      params![noteid],
+      closure,
+    )
+    .map_err(|e| zkerr::annotate_string(format!("file record not found for note: {}", noteid), e))
 }
 
 // 'normal' zknote read with access checking

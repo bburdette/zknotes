@@ -219,29 +219,32 @@ pub fn search_zknotes_stream(
       match search.resulttype {
         ResultType::RtId => yield SyncMessage::ZkNoteId(row.get::<usize, String>(1)?),
         ResultType::RtListNote => {
-          let zln = ZkListNote {
-            id: Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?,
-            title: row.get(2)?,
-            is_file: {
-              let wat: Option<i64> = row.get(3)?;
-              wat.is_some()
-            },
-            user: row.get(4)?,
-            createdate: row.get(5)?,
-            changeddate: row.get(6)?,
-            sysids: Vec::new(),
-          };
-          yield SyncMessage::from(zln)
+          // let zln = ZkListNote {
+          //   id: Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?,
+          //   title: row.get(2)?,
+          //   is_file: {
+          //     let wat: Option<i64> = row.get(3)?;
+          //     wat.is_some()
+          //   },
+          //   user: row.get(4)?,
+          //   createdate: row.get(5)?,
+          //   changeddate: row.get(6)?,
+          //   sysids: Vec::new(),
+          // };
+          // yield SyncMessage::from(zln)
+          yield SyncMessage::SyncError("unimplemented".to_string())
         }
         ResultType::RtNote => {
           let zn = sqldata::read_zknote_i64(&conn, Some(user), row.get(0)?)?;
-          yield SyncMessage::from(zn)
+          let mbf = if zn.is_file {Some( sqldata::read_file_info(&conn, row.get(0)?)? )} else { None };
+          yield SyncMessage::from((zn, mbf))
         }
         ResultType::RtNoteAndLinks => {
           // TODO: i64 version
-          let uuid = Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?;
-          let zn = sqldata::read_zknoteandlinks(&conn, Some(user), &uuid)?;
-          yield SyncMessage::from(zn)
+          // let uuid = Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?;
+          // let zn = sqldata::read_zknoteandlinks(&conn, Some(user), &uuid)?;
+          // yield SyncMessage::from(zn)
+          yield SyncMessage::SyncError("unimplemented".to_string())
         }
       }
     }
