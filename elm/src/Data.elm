@@ -236,6 +236,12 @@ type alias ZkNoteAndLinksWhat =
     }
 
 
+type alias ErrPrivateNote =
+    { what : String
+    , zknote : Int
+    }
+
+
 type alias ZkNoteAndLinks =
     { zknote : ZkNote
     , links : List EditLink

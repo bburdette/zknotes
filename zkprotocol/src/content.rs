@@ -174,3 +174,9 @@ pub struct ZkNoteAndLinksWhat {
   pub what: String,
   pub znl: ZkNoteAndLinks,
 }
+
+#[derive(Serialize, Debug)]
+pub struct ErrPrivateNote {
+  pub what: String,
+  pub zknote: i64,
+}
