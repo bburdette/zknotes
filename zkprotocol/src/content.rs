@@ -180,3 +180,9 @@ pub struct ErrPrivateNote {
   pub what: String,
   pub zknote: i64,
 }
+
+#[derive(Serialize, Debug)]
+pub enum ServerError {
+  PrivateNote(ErrPrivateNote),
+  String(String),
+}

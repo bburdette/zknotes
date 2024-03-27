@@ -236,7 +236,7 @@ type alias ZkNoteAndLinksWhat =
     }
 
 
-type alias ErrPrivateNote =
+type alias ZkNotePrivateErr =
     { what : String
     , zknote : Int
     }
@@ -643,6 +643,13 @@ encodeGetArchiveZkNote x =
         [ ( "parentnote", JE.int x.parentnote )
         , ( "noteid", JE.int x.noteid )
         ]
+
+
+decodeZkNotePrivateErr : JD.Decoder ZkNotePrivateErr
+decodeZkNotePrivateErr =
+    JD.succeed ZkNotePrivateErr
+        |> andMap (JD.field "what" JD.string)
+        |> andMap (JD.field "zknote" JD.int)
 
 
 

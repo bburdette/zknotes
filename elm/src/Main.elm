@@ -1950,7 +1950,7 @@ actualupdate msg model =
 
                 Ok ( pt, piresponse ) ->
                     case piresponse of
-                        PI.ServerError e ->
+                        PI.ServerError (PI.String e) ->
                             let
                                 prevstate =
                                     case stateLogin state of
@@ -1968,6 +1968,14 @@ actualupdate msg model =
 
                                 Nothing ->
                                     ( displayMessageDialog { model | state = prevstate } e, Cmd.none )
+
+                        PI.ServerError (PI.PrivateNote pn) ->
+                            if pn.what == "cache" then
+                                -- ignore private cache errors.
+                                ( model, Cmd.none )
+
+                            else
+                                ( displayMessageDialog model <| "error: private note!" ++ String.fromInt pn.zknote, Cmd.none )
 
                         PI.ZkNoteAndLinks fbe ->
                             if fbe.what == "cache" then
@@ -2037,9 +2045,13 @@ actualupdate msg model =
 
                 Ok resp ->
                     case resp of
-                        PI.ServerError e ->
+                        PI.ServerError (PI.String e) ->
                             -- if there's an error on getting the error index note, just display it.
                             ( displayMessageDialog model <| e, Cmd.none )
+
+                        PI.ServerError (PI.PrivateNote pn) ->
+                            -- if there's an error on getting the error index note, just display it.
+                            ( displayMessageDialog model <| "error: private note!" ++ String.fromInt pn.zknote, Cmd.none )
 
                         PI.ZkNoteAndLinks fbe ->
                             ( { model | errorNotes = MC.linkDict fbe.znl.zknote.content }

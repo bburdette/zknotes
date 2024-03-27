@@ -1,13 +1,17 @@
-module PublicInterface exposing (SendMsg(..), ServerResponse(..), encodeSendMsg, getErrorIndexNote, serverResponseDecoder)
+module PublicInterface exposing (SendMsg(..), ServerError(..), ServerResponse(..), encodeSendMsg, getErrorIndexNote, serverErrorDecoder, serverResponseDecoder)
+
+-- import MdCommon as MC
 
 import Data
 import Http
 import Http.Tasks as HT
 import Json.Decode as JD
 import Json.Encode as JE
-import MdCommon as MC
 import Task exposing (Task)
-import Util
+
+
+
+-- import Util
 
 
 type SendMsg
@@ -17,9 +21,32 @@ type SendMsg
 
 
 type ServerResponse
-    = ServerError String
+    = ServerError ServerError
     | ZkNoteAndLinks Data.ZkNoteAndLinksWhat
     | Noop
+
+
+type ServerError
+    = String String
+    | PrivateNote Data.ZkNotePrivateErr
+
+
+serverErrorDecoder : JD.Decoder ServerError
+serverErrorDecoder =
+    JD.oneOf
+        [ JD.field "String" JD.string
+            |> JD.andThen (\s -> JD.succeed (String s))
+        , JD.field "PrivateNote" Data.decodeZkNotePrivateErr
+            |> JD.andThen (\s -> JD.succeed (PrivateNote s))
+        ]
+
+
+
+-- #[derive(Serialize, Debug)]
+-- pub enum ServerError {
+--   PrivateNote(ErrPrivateNote),
+--   String(String),
+-- }
 
 
 encodeSendMsg : SendMsg -> JE.Value
@@ -54,14 +81,14 @@ serverResponseDecoder =
                         (JD.at [ "content" ] <| Data.decodeZkNoteEditWhat)
 
                 "server error" ->
-                    JD.map ServerError (JD.at [ "content" ] JD.string)
+                    JD.map ServerError (JD.at [ "content" ] serverErrorDecoder)
 
                 "noop" ->
                     JD.succeed Noop
 
                 wat ->
                     JD.succeed
-                        (ServerError ("invalid 'what' from server: " ++ wat))
+                        (ServerError <| String ("invalid 'what' from server: " ++ wat))
         )
         (JD.at [ "what" ]
             JD.string

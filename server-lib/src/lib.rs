@@ -39,6 +39,7 @@ use std::str::FromStr;
 use timer;
 use uuid::Uuid;
 pub use zkprotocol;
+use zkprotocol::content::ErrPrivateNote;
 pub use zkprotocol::messages::{PublicMessage, ServerResponse, UserMessage};
 
 use tracing_actix_web::TracingLogger;
@@ -466,6 +467,15 @@ async fn new_email(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
 #[actix_web::main]
 pub async fn err_main() -> Result<(), Box<dyn Error>> {
   env_logger::init();
+
+  // use zkprotocol::content::ServerError;
+  // let se = ServerError::String("meh".to_string());
+  // orgauth::util::write_string("meh.txt", serde_json::to_value(se)?.to_string().as_str());
+  // let se = ServerError::PrivateNote(ErrPrivateNote {
+  //   what: "meh".to_string(),
+  //   zknote: 64,
+  // });
+  // orgauth::util::write_string("meh2.txt", serde_json::to_value(se)?.to_string().as_str());
 
   let matches = clap::App::new("zknotes server")
     .version("1.0")
