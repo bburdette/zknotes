@@ -187,6 +187,7 @@ pub fn temp_tables(conn: &Connection) -> Result<TempTableNames, zkerr::Error> {
 
 pub async fn sync(
   dbpath: &Path,
+  file_path: &Path,
   uid: i64,
   callbacks: &mut Callbacks,
 ) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>> {
@@ -210,6 +211,7 @@ pub async fn sync(
     &conn,
     &user,
     after,
+    &file_path,
     &ttn.notetemp,
     &ttn.linktemp,
     &ttn.archivelinktemp,
@@ -243,6 +245,7 @@ pub async fn sync_from_remote(
   conn: &Connection,
   user: &User,
   after: Option<i64>,
+  file_path: &Path,
   notetemp: &String,
   linktemp: &String,
   archivelinktemp: &String,
@@ -275,6 +278,7 @@ pub async fn sync_from_remote(
 
   let reply = sync_from_stream(
     conn,
+    file_path,
     Some(notetemp),
     Some(linktemp),
     Some(archivelinktemp),
@@ -304,6 +308,7 @@ where
 
 pub async fn sync_from_stream<S>(
   conn: &Connection,
+  file_path: &Path,
   notetemp: Option<&str>,
   linktemp: Option<&str>,
   archivelinktemp: Option<&str>,
@@ -399,14 +404,62 @@ where
 
   sm = read_sync_message(&mut line, br).await?;
 
-  while let SyncMessage::ZkNote(ref note, mbf) = sm {
+  while let SyncMessage::ZkNote(ref note, ref mbf) = sm {
     let uid = userhash
       .get(&note.user)
       .ok_or_else(|| zkerr::Error::String("user not found".to_string()))?;
 
+    let file_id: Option<i64> = match mbf {
+      None => None,
+      Some(fileinfo) =>
+      // already have a file for this hash?
+      {
+        match conn.query_row(
+          "select id from file where hash = ?1",
+          params![fileinfo.hash],
+          |row| Ok(row.get(0)?),
+        ) {
+          Err(rusqlite::Error::QueryReturnedNoRows) => {
+            // insert new file record, and source.
+            let now = orgauth::util::now()?;
+
+            // add table entry
+            conn.execute(
+              "insert into file (hash, createdate, size)
+                       values (?1, ?2, ?3)",
+              params![fileinfo.hash, now, fileinfo.size],
+            )?;
+            let file_id = conn.last_insert_rowid();
+
+            // add source record.
+            conn.execute(
+              "insert into file_source (file_id, user_id) values (?1, ?2)",
+              params![file_id, uid],
+            )?;
+            Some(file_id)
+          }
+          Ok(file_id) => {
+            // does the file exist?
+            let stpath = file_path.join(fileinfo.hash.clone());
+            if Path::exists(stpath.as_path()) {
+              Some(file_id)
+            } else {
+              // add source record.
+              conn.execute(
+                "insert into file_source (file_id, user_id) values (?1, ?2)",
+                params![file_id, uid],
+              )?;
+              Some(file_id)
+            }
+          }
+          Err(e) => return Err(e.into()).into(),
+        }
+      }
+    };
+
     let ex =  conn.execute(
-        "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate)
-         values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+        "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, file, createdate, changeddate)
+         values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
       params![
         note.title,
         note.content,
@@ -416,6 +469,7 @@ where
         note.showtitle,
        note.deleted,
         note.id.to_string(),
+        file_id,
         note.createdate,
         note.changeddate,
       ]
@@ -496,7 +550,7 @@ where
   }
 
   sm = read_sync_message(&mut line, br).await?;
-  while let SyncMessage::ZkNote(ref note, mbf) = sm {
+  while let SyncMessage::ZkNote(ref note, ref mbf) = sm {
     let uid = userhash
       .get(&note.user)
       .ok_or_else(|| zkerr::Error::String("user not found".to_string()))?;

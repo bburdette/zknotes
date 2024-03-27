@@ -2471,15 +2471,6 @@ pub fn udpate35(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 
   m.create_table("file_source", |t| {
     t.add_column(
-      "id",
-      types::integer()
-        .primary(true)
-        .increments(true)
-        .nullable(false),
-    );
-    t.add_column("file_id", types::text().nullable(false));
-    t.add_column("user_id", types::text().nullable(false));
-    t.add_column(
       "file_id",
       types::foreign(
         "file",
@@ -2498,6 +2489,10 @@ pub fn udpate35(dbfile: &Path) -> Result<(), orgauth::error::Error> {
         types::ReferentialAction::Restrict,
       )
       .nullable(false),
+    );
+    t.add_index(
+      "file_source_unq",
+      types::index(vec!["file_id", "user_id"]).unique(true),
     );
   });
 

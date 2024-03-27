@@ -353,6 +353,7 @@ pub async fn zk_interface_loggedin(
     PrivateRequests::SyncRemote => Ok(
       sync::sync(
         &config.orgauth_config.db.as_path(),
+        &config.file_path.as_path(),
         uid,
         &mut zknotes_callbacks(),
       )

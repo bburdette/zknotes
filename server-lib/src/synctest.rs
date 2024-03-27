@@ -17,6 +17,7 @@ mod tests {
   use std::error::Error;
   use std::fs;
   use std::path::Path;
+  use std::path::PathBuf;
   use std::sync::Arc;
   use tokio_util::io::StreamReader;
   use uuid::Uuid;
@@ -43,6 +44,7 @@ mod tests {
     syncuser: i64,
     syncusernote: i64,
     otheruser: i64,
+    file_path: PathBuf,
   }
 
   fn idin(id: &Uuid, szns: &Vec<(i64, Uuid)>) -> bool {
@@ -245,6 +247,22 @@ mod tests {
       &mut savedlinks,
     )?;
 
+    // file note.
+    let filesdir = format!("{}_files", basename);
+    std::fs::create_dir(Path::new(filesdir.as_str()));
+    let fname = format!("{}_test_file.txt", basename);
+    orgauth::util::write_string(fname.as_str(), format!("{} tesssst", basename).as_str())
+      .map_err(|e| zkerr::annotate_string("write_string error".to_string(), e.into()))?;
+    let fpath = Path::new(&fname);
+    let (nid64, _noteid, _fid) =
+      sqldata::make_file_note(&conn, Path::new(filesdir.as_str()), syncuser, &fname, fpath)
+        .map_err(|e| {
+          zkerr::annotate_string(
+            format!("make_file_note error: {}", fpath.display()),
+            e.into(),
+          )
+        })?;
+
     // ------------------------------------------------------------------
     // notes not visible to syncuser.
 
@@ -297,6 +315,7 @@ mod tests {
       syncuser,
       syncusernote: syncuser_note,
       otheruser,
+      file_path: Path::new(&filesdir).to_path_buf(),
     };
 
     Ok(ts)
@@ -411,6 +430,7 @@ mod tests {
 
       match sync_from_stream(
         &caconn,
+        &client_ts.file_path,
         Some(&ttn.notetemp),
         Some(&ttn.linktemp),
         Some(&ttn.archivelinktemp),
@@ -538,6 +558,7 @@ mod tests {
 
     sync_from_stream(
       &caconn,
+      &client_ts.file_path,
       Some(&ttn.notetemp),
       Some(&ttn.linktemp),
       Some(&ttn.archivelinktemp),
@@ -563,7 +584,16 @@ mod tests {
     pin_mut!(cs);
     let mut cbr = StreamReader::new(cs);
 
-    sync_from_stream(&saconn, None, None, None, &mut cb, &mut cbr).await?;
+    sync_from_stream(
+      &saconn,
+      &server_ts.file_path,
+      None,
+      None,
+      None,
+      &mut cb,
+      &mut cbr,
+    )
+    .await?;
 
     let postsync_time = util::now()?;
 
@@ -793,6 +823,7 @@ mod tests {
 
     sync_from_stream(
       &caconn,
+      &client_ts.file_path,
       Some(&ttn.notetemp),
       Some(&ttn.linktemp),
       Some(&ttn.archivelinktemp),
@@ -817,7 +848,16 @@ mod tests {
     pin_mut!(cs);
     let mut cbr = StreamReader::new(cs);
 
-    sync_from_stream(&saconn, None, None, None, &mut cb, &mut cbr).await?;
+    sync_from_stream(
+      &saconn,
+      &server_ts.file_path,
+      None,
+      None,
+      None,
+      &mut cb,
+      &mut cbr,
+    )
+    .await?;
 
     // can syncuser access it?
     read_zknote(

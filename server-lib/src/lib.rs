@@ -271,8 +271,7 @@ async fn file(session: Session, config: web::Data<Config>, req: HttpRequest) -> 
         Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
       };
 
-      let pstr = format!("files/{}", hash);
-      let stpath = Path::new(pstr.as_str());
+      let stpath = config.file_path.join(hash);
 
       match File::open(stpath).and_then(|f| NamedFile::from_file(f, Path::new(zkln.title.as_str())))
       {
@@ -316,7 +315,8 @@ async fn make_file_notes(
     // compute hash.
     let fpath = Path::new(&fp);
 
-    let (nid64, _noteid, _fid) = sqldata::make_file_note(&conn, userdata.id, &name, fpath)?;
+    let (nid64, _noteid, _fid) =
+      sqldata::make_file_note(&conn, &config.file_path, userdata.id, &name, fpath)?;
 
     // return zknoteedit.
     let listnote = sqldata::read_zklistnote(&conn, Some(userdata.id), nid64)?;
@@ -547,6 +547,7 @@ async fn zk_interface_check_upstreaming(
             HttpResponse::Ok().json(
               sync::sync_from_stream(
                 &conn,
+                &config.file_path,
                 None,
                 None,
                 None,

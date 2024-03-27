@@ -2209,6 +2209,7 @@ pub fn save_importzknotes(
 
 pub fn make_file_note(
   conn: &Connection,
+  files_dir: &Path,
   uid: i64,
   name: &String,
   fpath: &Path,
@@ -2216,8 +2217,7 @@ pub fn make_file_note(
   // compute hash.
   let fh = sha256::try_digest(fpath)?;
   let size = std::fs::metadata(fpath)?.len();
-  let fhp = format!("files/{}", fh);
-  let hashpath = Path::new(&fhp);
+  let hashpath = files_dir.join(Path::new(fh.as_str()));
 
   // file exists?
   if hashpath.exists() {
