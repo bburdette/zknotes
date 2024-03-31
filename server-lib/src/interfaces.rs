@@ -359,6 +359,21 @@ pub async fn zk_interface_loggedin(
       )
       .await?,
     ),
+    PrivateRequests::SyncFiles => {
+      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      let zns: ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
+      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+      Ok(
+        sync::sync_files(
+          &conn,
+          &config.file_path.as_path(),
+          uid,
+          &mut zknotes_callbacks(),
+          &zns,
+        )
+        .await?,
+      )
+    }
   }
 }
 

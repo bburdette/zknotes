@@ -474,5 +474,8 @@ update msg model =
                 SP.Search ts ->
                     ( mod, Search ts )
 
+                SP.SyncFiles ts ->
+                    ( mod, None )
+
         Noop ->
             ( model, None )

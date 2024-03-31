@@ -232,6 +232,7 @@ type Command
     | ShowArchives ZkNoteId
     | FileUpload
     | Sync
+    | SyncFiles S.ZkNoteSearch
     | Cmd (Cmd Msg)
 
 
@@ -2122,6 +2123,13 @@ handleSPUpdate model ( nm, cmd ) =
                     mod.zknSearchResult
             in
             ( { mod | zknSearchResult = { zsr | notes = [] } }, Search ts )
+
+        SP.SyncFiles ts ->
+            let
+                zsr =
+                    mod.zknSearchResult
+            in
+            ( { mod | zknSearchResult = { zsr | notes = [] } }, SyncFiles ts )
 
 
 update : Msg -> Model -> ( Model, Command )

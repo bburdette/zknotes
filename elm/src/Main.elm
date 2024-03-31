@@ -3210,6 +3210,11 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                 EditZkNote.Search s ->
                     sendSearch { model | state = EditZkNote emod login } s
 
+                EditZkNote.SyncFiles s ->
+                    ( { model | state = EditZkNote emod login }
+                    , sendZIMsg model.tauri model.location (ZI.SyncFiles s)
+                    )
+
                 EditZkNote.SearchHistory ->
                     ( shDialog model
                     , Cmd.none
@@ -3302,6 +3307,11 @@ handleEditZkNoteListing model login ( emod, ecmd ) =
 
         EditZkNoteListing.Search s ->
             sendSearch { model | state = EditZkNoteListing emod login } s
+
+        EditZkNoteListing.SyncFiles s ->
+            ( { model | state = EditZkNoteListing emod login }
+            , sendZIMsg model.tauri model.location (ZI.SyncFiles s)
+            )
 
         EditZkNoteListing.PowerDelete s ->
             ( { model | state = EditZkNoteListing emod login }
@@ -3410,6 +3420,11 @@ handleTagFiles model ( lmod, lcmd ) login st =
         TagAThing.Search s ->
             sendSearch { model | state = updstate } s
 
+        TagAThing.SyncFiles s ->
+            ( { model | state = updstate }
+            , sendZIMsg model.tauri model.location (ZI.SyncFiles s)
+            )
+
         TagAThing.SearchHistory ->
             ( { model | state = updstate }, Cmd.none )
 
@@ -3466,6 +3481,11 @@ handleInviteUser model ( lmod, lcmd ) login st =
     case lcmd of
         TagAThing.Search s ->
             sendSearch { model | state = updstate } s
+
+        TagAThing.SyncFiles s ->
+            ( { model | state = updstate }
+            , sendZIMsg model.tauri model.location (ZI.SyncFiles s)
+            )
 
         TagAThing.SearchHistory ->
             ( { model | state = updstate }, Cmd.none )

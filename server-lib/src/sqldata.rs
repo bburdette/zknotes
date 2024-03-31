@@ -583,12 +583,14 @@ pub fn uuid_for_note_id(conn: &Connection, id: i64) -> Result<Uuid, zkerr::Error
 }
 
 pub fn note_id_for_uuid(conn: &Connection, uuid: &Uuid) -> Result<i64, zkerr::Error> {
-  let id: i64 = conn.query_row(
-    "select zknote.id from zknote
+  let id: i64 = conn
+    .query_row(
+      "select zknote.id from zknote
       where zknote.uuid = ?1",
-    params![uuid.to_string()],
-    |row| Ok(row.get(0)?),
-  )?;
+      params![uuid.to_string()],
+      |row| Ok(row.get(0)?),
+    )
+    .map_err(|e| zkerr::annotate_string("note not found".to_string(), e.into()))?;
   Ok(id)
 }
 
@@ -1173,9 +1175,9 @@ pub fn zknote_access_id(
 pub fn read_zknote_filehash(
   conn: &Connection,
   uid: Option<i64>,
-  noteid: &i64,
+  noteid: i64,
 ) -> Result<Option<String>, zkerr::Error> {
-  if zknote_access_id(&conn, uid, *noteid)? != Access::Private {
+  if zknote_access_id(&conn, uid, noteid)? != Access::Private {
     let hash = conn.query_row(
       "select F.hash from zknote N, file F
       where N.id = ?1
@@ -2243,7 +2245,6 @@ pub fn make_file_note(
     Some(id) => id,
     None => {
       let now = now()?;
-
       // add table entry
       conn.execute(
         "insert into file (hash, createdate, size)

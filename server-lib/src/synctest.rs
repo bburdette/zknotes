@@ -11,7 +11,9 @@ mod tests {
   use orgauth::data::RegistrationData;
   use orgauth::dbfun::read_user_by_id;
   use orgauth::dbfun::{new_user, user_id};
+  use orgauth::endpoints::log_user_in;
   use orgauth::endpoints::Callbacks;
+  use orgauth::endpoints::UuidTokener;
   use rusqlite::params;
   use rusqlite::Connection;
   use std::error::Error;
@@ -43,6 +45,7 @@ mod tests {
     otherusersharenote: (i64, Uuid),
     syncuser: i64,
     syncusernote: i64,
+    syncusertoken: Uuid,
     otheruser: i64,
     file_path: PathBuf,
   }
@@ -80,6 +83,8 @@ mod tests {
   fn setup_db(
     conn: &Connection,
     cb: &mut Callbacks,
+    remote_url: String,
+    syncuser_token: Option<String>,
     syncuser: Option<(Uuid, ExtraLoginData)>,
     basename: &str,
   ) -> Result<TestStuff, Box<dyn Error>> {
@@ -118,18 +123,28 @@ mod tests {
         uid: format!("{}-syncuser", basename),
         pwd: "".to_string(),
         email: "".to_string(),
-        remote_url: "".to_string(),
+        remote_url: remote_url.clone(),
       },
       None,
       None,
       false,
       syncuuid,
       None,
-      None,
+      if remote_url == "" {
+        None
+      } else {
+        Some(remote_url)
+      },
       synced,
-      None,
+      syncuser_token,
       &mut cb.on_new_user,
     )?;
+
+    let mut ut = UuidTokener { uuid: None };
+    let usr = log_user_in(&mut ut, cb, conn, syncuser)?;
+    let syncusertoken = ut
+      .uuid
+      .ok_or(zkerr::Error::String("no uuid token!".to_string()))?;
 
     // returning this.
     let mut visible_notes: Vec<(i64, Uuid)> = Vec::new();
@@ -314,6 +329,7 @@ mod tests {
       otherusersharenote: (othershared_note_id, othershared_notesd.id),
       syncuser,
       syncusernote: syncuser_note,
+      syncusertoken,
       otheruser,
       file_path: Path::new(&filesdir).to_path_buf(),
     };
@@ -366,7 +382,7 @@ mod tests {
       }
     }
     let server_conn = connection_open(dbp_server)?;
-    let server_ts = setup_db(&server_conn, &mut cb, None, "server")?;
+    let server_ts = setup_db(&server_conn, &mut cb, "".to_string(), None, None, "server")?;
 
     println!("0.1");
     let ssyncuser = user_id(&server_conn, "server-syncuser")?;
@@ -395,6 +411,8 @@ mod tests {
     let client_ts = setup_db(
       &client_conn,
       &mut cb,
+      "http://localhost:8010".to_string(),
+      Some(server_ts.syncusertoken.to_string()),
       Some((ssu.uuid, ssyncuserld)),
       "client",
     )?;
@@ -871,6 +889,8 @@ mod tests {
         e,
       )
     })?;
+
+    // assert!(2 == 5);
 
     // TODO: file sync testing.
 

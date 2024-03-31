@@ -443,14 +443,16 @@ encodeGetZkNoteComments x =
         [ ( "zknote", encodeZkNoteId x.zknote )
         , ( "offset", JE.int x.offset )
         ]
-            ++ (case x.limit of
-                    Just l ->
-                        [ ( "limit", JE.int l )
-                        ]
 
-                    Nothing ->
-                        []
-               )
+
+
+-- ++ (case x.limit of
+--         Just l ->
+--             [ ( "limit", JE.int l )
+--             ]
+--         Nothing ->
+--             []
+--    )
 
 
 encodeZkLinks : ZkLinks -> JE.Value

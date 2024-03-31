@@ -4,7 +4,7 @@ pub mod interfaces;
 mod migrations;
 mod search;
 pub mod sqldata;
-mod sqltest;
+// mod sqltest;
 mod sync;
 mod synctest;
 use actix_cors::Cors;
@@ -32,6 +32,7 @@ use orgauth::{
 use rusqlite::Connection;
 use serde_json;
 use simple_error::simple_error;
+use sqldata::note_id_for_uuid;
 use std::env;
 use std::error::Error;
 use std::fs::File;
@@ -257,16 +258,24 @@ async fn file(session: Session, config: web::Data<Config>, req: HttpRequest) -> 
   match req
     .match_info()
     .get("id")
-    .and_then(|s| s.parse::<i64>().ok())
+    // .and_then(|s| s.parse::<i64>().ok())
   {
     Some(noteid) => {
-      let hash = match sqldata::read_zknote_filehash(&conn, uid, &noteid) {
+      let uuid = match Uuid::parse_str(noteid) {
+        Ok(id) => id,
+        Err(e) => return HttpResponse::BadRequest().body(e.to_string())
+       };
+      let nid = match sqldata::note_id_for_uuid(&conn, &uuid) {
+        Ok(id) => id,
+        Err(e) => return HttpResponse::NotFound().body(e.to_string())
+       };
+        let hash = match sqldata::read_zknote_filehash(&conn, uid, nid) {
         Ok(Some(hash)) => hash,
         Ok(None) => return HttpResponse::NotFound().body("not found"),
         Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
       };
 
-      let zkln = match sqldata::read_zklistnote(&conn, uid, noteid) {
+      let zkln = match sqldata::read_zklistnote(&conn, uid, nid) {
         Ok(zkln) => zkln,
         Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
       };
@@ -279,7 +288,7 @@ async fn file(session: Session, config: web::Data<Config>, req: HttpRequest) -> 
         Err(e) => HttpResponse::NotFound().body(format!("{:?}", e)),
       }
     }
-    None => HttpResponse::BadRequest().body("file id required: /files/<id>"),
+    None => HttpResponse::BadRequest().body("file id required: /file/<id>"),
   }
 }
 
@@ -383,6 +392,7 @@ async fn private(
   item: web::Json<PrivateMessage>,
   _req: HttpRequest,
 ) -> HttpResponse {
+  println!("prvate");
   match zk_interface_check(&session, &data, item.into_inner()).await {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {

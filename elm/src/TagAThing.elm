@@ -1,7 +1,7 @@
 module TagAThing exposing (..)
 
 import Common
-import Data exposing (Direction(..), ZkNoteId, zklKey, zniCompare )
+import Data exposing (Direction(..), ZkNoteId, zklKey, zniCompare)
 import Dict exposing (Dict(..))
 import Element as E exposing (Element)
 import Element.Background as EBk
@@ -80,6 +80,7 @@ type Command tcmd
     = None
     | SearchHistory
     | Search S.ZkNoteSearch
+    | SyncFiles S.ZkNoteSearch
     | AddToRecent Data.ZkListNote
     | ThingCommand tcmd
 
@@ -328,6 +329,13 @@ handleSPUpdate model ( nm, cmd ) =
             in
             ( { mod | zknSearchResult = { zsr | notes = [] } }, Search ts )
 
+        SP.SyncFiles ts ->
+            let
+                zsr =
+                    mod.zknSearchResult
+            in
+            ( { mod | zknSearchResult = { zsr | notes = [] } }, SyncFiles ts )
+
 
 updateSearchResult : Data.ZkListNoteSearchResult -> Model tmod tmsg tcmd -> Model tmod tmsg tcmd
 updateSearchResult zsr model =
@@ -397,7 +405,7 @@ view stylePalette recentZkns mbsize model =
                                         ( Just lcolor, Just rcolor ) ->
                                             case Util.compareColor lcolor rcolor of
                                                 EQ ->
-                                                    zniCompare  r.otherid l.otherid
+                                                    zniCompare r.otherid l.otherid
 
                                                 a ->
                                                     a

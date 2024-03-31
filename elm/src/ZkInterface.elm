@@ -23,6 +23,7 @@ type SendMsg
     | PowerDelete S.TagSearch
     | SetHomeNote ZkNoteId
     | SyncRemote
+    | SyncFiles S.ZkNoteSearch
 
 
 type ServerResponse
@@ -207,6 +208,12 @@ encodeSendMsg sm =
             JE.object
                 [ ( "what", JE.string "SyncRemote" )
                 , ( "data", JE.null )
+                ]
+
+        SyncFiles s ->
+            JE.object
+                [ ( "what", JE.string "SyncFiles" )
+                , ( "data", S.encodeZkNoteSearch s )
                 ]
 
 

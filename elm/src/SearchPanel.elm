@@ -115,6 +115,7 @@ type Command
     = None
     | Save
     | Search S.ZkNoteSearch
+    | SyncFiles S.ZkNoteSearch
     | Copy String
     | And TagSearch
 
@@ -157,6 +158,20 @@ handleTspUpdate model ( nm, cmd ) =
         TSP.Search ts ->
             ( { model | tagSearchModel = nm, paginationModel = PP.initModel }
             , Search <|
+                { tagSearch = [ ts ]
+                , offset = 0
+                , limit = Just model.paginationModel.increment
+                , what = ""
+                , resultType = S.RtListNote
+                , archives = False
+                , deleted = showDeleted
+                , unsynced = False
+                }
+            )
+
+        TSP.SyncFiles ts ->
+            ( { model | tagSearchModel = nm, paginationModel = PP.initModel }
+            , SyncFiles <|
                 { tagSearch = [ ts ]
                 , offset = 0
                 , limit = Just model.paginationModel.increment

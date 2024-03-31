@@ -48,6 +48,7 @@ type Command
     | Import
     | None
     | Search S.ZkNoteSearch
+    | SyncFiles S.ZkNoteSearch
     | PowerDelete S.TagSearch
     | SearchHistory
 
@@ -291,3 +292,6 @@ handleSPUpdate model ( nm, cm ) =
 
         SP.Search ts ->
             ( mod, Search ts )
+
+        SP.SyncFiles ts ->
+            ( mod, SyncFiles ts )
