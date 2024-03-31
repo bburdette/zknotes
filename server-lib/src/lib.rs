@@ -15,6 +15,7 @@ use actix_session::{
 };
 use actix_web::{
   cookie::{self, Key},
+  dev::Server,
   web, App, HttpRequest, HttpResponse, HttpServer, Result,
 };
 use chrono;
@@ -706,23 +707,6 @@ pub async fn err_main() -> Result<(), Box<dyn Error>> {
     return Ok(());
   }
 
-  // normal server ops
-  info!("server init!");
-  if config.static_path == None {
-    for (key, value) in env::vars() {
-      if key == "ZKNOTES_STATIC_PATH" {
-        config.static_path = PathBuf::from_str(value.as_str()).ok();
-      }
-    }
-  }
-
-  info!("config parameters:\n\n{}", toml::to_string_pretty(&config)?);
-
-  sqldata::dbinit(
-    config.orgauth_config.db.as_path(),
-    config.orgauth_config.login_token_expiration_ms,
-  )?;
-
   // promoting a user to admin?
   if let Some(uid) = matches.value_of("promote_to_admin") {
     let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
@@ -771,6 +755,33 @@ pub async fn err_main() -> Result<(), Box<dyn Error>> {
     return Ok(());
   }
 
+  let server = init_server(config)?;
+
+  server.await?;
+
+  Ok(())
+}
+
+#[actix_web::main]
+pub async fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
+  // ------------------------------------------------------
+  // normal server ops
+  info!("server init!");
+  if config.static_path == None {
+    for (key, value) in env::vars() {
+      if key == "ZKNOTES_STATIC_PATH" {
+        config.static_path = PathBuf::from_str(value.as_str()).ok();
+      }
+    }
+  }
+
+  info!("config parameters:\n\n{}", toml::to_string_pretty(&config)?);
+
+  sqldata::dbinit(
+    config.orgauth_config.db.as_path(),
+    config.orgauth_config.login_token_expiration_ms,
+  )?;
+
   let timer = timer::Timer::new();
 
   let ptconfig = config.clone();
@@ -785,7 +796,7 @@ pub async fn err_main() -> Result<(), Box<dyn Error>> {
     );
 
   let c = config.clone();
-  HttpServer::new(move || {
+  let server = HttpServer::new(move || {
     let staticpath = c.static_path.clone().unwrap_or(PathBuf::from("static/"));
     let d = c.clone();
     let cors = Cors::default()
@@ -837,8 +848,8 @@ pub async fn err_main() -> Result<(), Box<dyn Error>> {
       .service(web::resource("/{tail:.*}").route(web::get().to(mainpage)))
   })
   .bind(format!("{}:{}", config.ip, config.port))?
-  .run()
-  .await?;
+  .run();
+  // .await?;
 
-  Ok(())
+  Ok(server)
 }

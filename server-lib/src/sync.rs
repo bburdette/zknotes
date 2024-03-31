@@ -296,7 +296,6 @@ pub async fn download_file(
   };
 
   // let user_uri = awc::http::Uri::try_from(url).map_err(|x| zkerr::Error::String(x.to_string()))?;
-  // let file_uri = replace_uri_path(&user_uri, format!("/file/{}", uuid).as_str())?;
 
   println!("download_file 3");
   let file_uri = awc::http::Uri::try_from(format!("{}/file/{}", url, uuid).as_str())
