@@ -2223,7 +2223,7 @@ pub fn make_file_note(
 
   // file exists?
   if hashpath.exists() {
-    // new file already exists.
+    // file already exists.  don't need the new one.
     std::fs::remove_file(fpath)?;
   } else {
     // move into hashed-files dir.

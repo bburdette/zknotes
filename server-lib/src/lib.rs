@@ -33,7 +33,6 @@ use orgauth::{
 use rusqlite::Connection;
 use serde_json;
 use simple_error::simple_error;
-use sqldata::note_id_for_uuid;
 use std::env;
 use std::error::Error;
 use std::fs::File;
@@ -676,7 +675,7 @@ pub async fn err_main() -> Result<(), Box<dyn Error>> {
   }
 
   // specifying a config file?  otherwise try to load the default.
-  let mut config = match matches.value_of("config") {
+  let config = match matches.value_of("config") {
     Some(filename) => load_config(filename)?,
     None => load_config("config.toml")?,
   };
@@ -756,14 +755,13 @@ pub async fn err_main() -> Result<(), Box<dyn Error>> {
   }
 
   let server = init_server(config)?;
-
+  // let server = init_server(config)?;
   server.await?;
 
   Ok(())
 }
 
-#[actix_web::main]
-pub async fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
+pub fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
   // ------------------------------------------------------
   // normal server ops
   info!("server init!");
@@ -849,7 +847,6 @@ pub async fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
   })
   .bind(format!("{}:{}", config.ip, config.port))?
   .run();
-  // .await?;
 
   Ok(server)
 }

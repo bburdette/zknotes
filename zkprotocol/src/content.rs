@@ -239,9 +239,7 @@ pub enum SyncMessage {
   PhantomUser(ZkPhantomUser),
   ZkSearchResultHeader(ZkSearchResultHeader),
   ZkNoteId(String),
-  // ZkListNote(ZkListNote),
   ZkNote(ZkNote, Option<FileInfo>),
-  // ZkNoteAndLinks(ZkNoteAndLinks),
   ArchiveZkLinkHeader,
   ArchiveZkLink(ArchiveZkLink),
   UuidZkLinkHeader,
@@ -262,23 +260,11 @@ impl From<ZkSearchResultHeader> for SyncMessage {
   }
 }
 
-// impl From<ZkListNote> for SyncMessage {
-//   fn from(a: ZkListNote) -> Self {
-//     SyncMessage::ZkListNote(a)
-//   }
-// }
-
 impl From<(ZkNote, Option<FileInfo>)> for SyncMessage {
   fn from(a: (ZkNote, Option<FileInfo>)) -> Self {
     SyncMessage::ZkNote(a.0, a.1)
   }
 }
-
-// impl From<ZkNoteAndLinks> for SyncMessage {
-//   fn from(a: ZkNoteAndLinks) -> Self {
-//     SyncMessage::ZkNoteAndLinks(a)
-//   }
-// }
 
 impl From<ArchiveZkLink> for SyncMessage {
   fn from(a: ArchiveZkLink) -> Self {

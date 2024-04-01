@@ -4,16 +4,14 @@ use crate::search::{search_zknotes, search_zknotes_stream, sync_users, system_us
 use crate::sqldata::{self, note_id_for_uuid, save_zklink, save_zknote, user_note_id};
 use crate::util::now;
 use actix_web::error::PayloadError;
-use actix_web::http::uri::PathAndQuery;
 use async_stream::try_stream;
 use awc;
-use awc::http::Uri;
-use bytes::{Bytes, BytesMut};
+use bytes::Bytes;
 use futures::executor::block_on;
 use futures::future;
 use futures::Stream;
-use futures_util::StreamExt;
 use futures_util::TryStreamExt;
+use futures_util::{StreamExt, TryFutureExt};
 use log::error;
 use orgauth;
 use orgauth::data::User;
@@ -295,6 +293,8 @@ pub async fn download_file(
     _ => return Err("can't remote sync - not a remote user".into()),
   };
 
+  println!("cookie, url: {}, {}", c, url);
+
   // let user_uri = awc::http::Uri::try_from(url).map_err(|x| zkerr::Error::String(x.to_string()))?;
 
   println!("download_file 3");
@@ -357,7 +357,6 @@ pub async fn sync_files(
   conn: &Connection,
   file_path: &Path,
   uid: i64,
-  callbacks: &mut Callbacks,
   search: &ZkNoteSearch,
 ) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>> {
   // TODO pass this in from calling ftn?
@@ -715,7 +714,7 @@ where
   }
 
   sm = read_sync_message(&mut line, br).await?;
-  while let SyncMessage::ZkNote(ref note, ref mbf) = sm {
+  while let SyncMessage::ZkNote(ref note, ref _mbf) = sm {
     // TODO: make file source record (?)
 
     let uid = userhash
@@ -902,7 +901,7 @@ where
     sm = read_sync_message(&mut line, br).await?;
   }
   // drop zklinks which have a zklinkarchive with newer deletedate
-  let dropped = conn.execute(
+  let _dropped = conn.execute(
     "with dels as (select ZL.fromid, ZL.toid, ZL.user from zklink ZL, zklinkarchive ZLA
         where ZL.fromid = ZLA.fromid
         and ZL.toid = ZLA.toid
@@ -929,10 +928,6 @@ pub async fn sync_to_remote(
   after: Option<i64>,
   callbacks: &mut Callbacks,
 ) -> Result<PrivateReplyMessage, zkerr::Error> {
-  // let tr = conn.transaction()?;
-
-  // let extra_login_data = sqldata::read_user_by_id(&conn, user.id)?;
-
   // TODO: get time on remote system, bail if too far out.
 
   let (c, url) = match (user.cookie.clone(), user.remote_url.clone()) {
@@ -982,12 +977,13 @@ pub async fn sync_to_remote(
   // .await;
 
   // TODO: error?
-  let res = awc::Client::new()
+  awc::Client::new()
     .post(uri)
     .cookie(cookie)
     .timeout(Duration::from_secs(60 * 60))
     .send_body(awc::body::BodyStream::new(ss))
-    .await;
+    .map_err(|e| zkerr::Error::String(e.to_string()))
+    .await?;
 
   // TODO: send back Sync results... how many records and etc.
 
@@ -1184,10 +1180,6 @@ pub fn sync_stream(
     Some(a) => match new_shares(&conn, uid, a) {
       Ok(ns) => ns,
       Err(_e) => vec![],
-      // {
-      //   let badns = try_stream! { Err(e)?; yield SyncMessage::SyncEnd; }.map(bytesify);
-      //   return badns;
-      // }
     },
     None => vec![],
   };

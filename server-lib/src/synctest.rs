@@ -1,6 +1,8 @@
 #[cfg(test)]
 mod tests {
   use crate::error as zkerr;
+  use crate::init_server;
+  use crate::load_config;
   use crate::sqldata;
   use crate::sqldata::*;
   use crate::sync;
@@ -8,8 +10,11 @@ mod tests {
   use crate::util;
   use futures_util::pin_mut;
   use futures_util::TryStreamExt;
+  use orgauth::data::Login;
   use orgauth::data::RegistrationData;
+  use orgauth::data::UserRequestMessage;
   use orgauth::dbfun::read_user_by_id;
+  use orgauth::dbfun::update_user;
   use orgauth::dbfun::{new_user, user_id};
   use orgauth::endpoints::log_user_in;
   use orgauth::endpoints::Callbacks;
@@ -21,6 +26,10 @@ mod tests {
   use std::path::Path;
   use std::path::PathBuf;
   use std::sync::Arc;
+  use zkprotocol::search::SearchMod;
+  use zkprotocol::search::TagSearch;
+  use zkprotocol::search::ZkNoteSearch;
+  // use std::thread::spawn;
   use tokio_util::io::StreamReader;
   use uuid::Uuid;
   use zkprotocol::constants::SpecialUuids;
@@ -31,8 +40,9 @@ mod tests {
   // Note this useful idiom: importing names from outer (for mod tests) scope.
   // use super::*;
 
-  #[tokio::test]
+  #[actix_web::test]
   async fn test_sync() -> Result<(), Box<dyn Error>> {
+    // let _ = System::new();
     err_test().await
   }
 
@@ -47,7 +57,8 @@ mod tests {
     syncusernote: i64,
     syncusertoken: Uuid,
     otheruser: i64,
-    file_path: PathBuf,
+    filenote: i64,
+    filepath: PathBuf,
   }
 
   fn idin(id: &Uuid, szns: &Vec<(i64, Uuid)>) -> bool {
@@ -70,7 +81,7 @@ mod tests {
       uid,
       &SaveZkNote {
         id: None,
-        title: title,
+        title,
         showtitle: true,
         pubid: None,
         content: "initial content".to_string(),
@@ -141,7 +152,7 @@ mod tests {
     )?;
 
     let mut ut = UuidTokener { uuid: None };
-    let usr = log_user_in(&mut ut, cb, conn, syncuser)?;
+    let _usr = log_user_in(&mut ut, cb, conn, syncuser)?;
     let syncusertoken = ut
       .uuid
       .ok_or(zkerr::Error::String("no uuid token!".to_string()))?;
@@ -264,12 +275,18 @@ mod tests {
 
     // file note.
     let filesdir = format!("{}_files", basename);
-    std::fs::create_dir(Path::new(filesdir.as_str()));
+    let fdpath = Path::new(filesdir.as_str());
+    match std::fs::remove_dir_all(fdpath) {
+      Ok(_) => (),
+      Err(e) => println!("remove_dir_all error: {:?}", e),
+    };
+    std::fs::create_dir(fdpath)
+      .map_err(|e| zkerr::annotate_string("create_dir".to_string(), e.into()))?;
     let fname = format!("{}_test_file.txt", basename);
     orgauth::util::write_string(fname.as_str(), format!("{} tesssst", basename).as_str())
       .map_err(|e| zkerr::annotate_string("write_string error".to_string(), e.into()))?;
     let fpath = Path::new(&fname);
-    let (nid64, _noteid, _fid) =
+    let (filenote, _noteid, _fid) =
       sqldata::make_file_note(&conn, Path::new(filesdir.as_str()), syncuser, &fname, fpath)
         .map_err(|e| {
           zkerr::annotate_string(
@@ -331,7 +348,8 @@ mod tests {
       syncusernote: syncuser_note,
       syncusertoken,
       otheruser,
-      file_path: Path::new(&filesdir).to_path_buf(),
+      filenote,
+      filepath: Path::new(&filesdir).to_path_buf(),
     };
 
     Ok(ts)
@@ -448,7 +466,7 @@ mod tests {
 
       match sync_from_stream(
         &caconn,
-        &client_ts.file_path,
+        &client_ts.filepath,
         Some(&ttn.notetemp),
         Some(&ttn.linktemp),
         Some(&ttn.archivelinktemp),
@@ -471,7 +489,7 @@ mod tests {
     }
     println!("1");
 
-    let cpubid: i64 = caconn.query_row(
+    let _cpubid: i64 = caconn.query_row(
       "select id from zknote where pubid = ?1",
       params!["public-note"],
       |row| Ok(row.get(0)?),
@@ -481,7 +499,7 @@ mod tests {
 
     println!("2");
 
-    let (spc2_id, spc2) = save_zknote(
+    let (_spc2_id, spc2) = save_zknote(
       &caconn,
       csyncuser,
       &SaveZkNote {
@@ -502,7 +520,7 @@ mod tests {
       // Writing the stream to a file
       // -----------------------------------
       use futures::executor::block_on;
-      use futures::{future, stream::StreamExt};
+      use futures::future;
       use tokio::io::AsyncWriteExt;
       let mut file = tokio::fs::OpenOptions::new()
         .write(true)
@@ -538,7 +556,7 @@ mod tests {
       // Writing the stream to a file
       // -----------------------------------
       use futures::executor::block_on;
-      use futures::{future, stream::StreamExt};
+      use futures::future;
       use tokio::io::AsyncWriteExt;
       let mut file = tokio::fs::OpenOptions::new()
         .write(true)
@@ -576,7 +594,7 @@ mod tests {
 
     sync_from_stream(
       &caconn,
-      &client_ts.file_path,
+      &client_ts.filepath,
       Some(&ttn.notetemp),
       Some(&ttn.linktemp),
       Some(&ttn.archivelinktemp),
@@ -604,7 +622,7 @@ mod tests {
 
     sync_from_stream(
       &saconn,
-      &server_ts.file_path,
+      &server_ts.filepath,
       None,
       None,
       None,
@@ -841,7 +859,7 @@ mod tests {
 
     sync_from_stream(
       &caconn,
-      &client_ts.file_path,
+      &client_ts.filepath,
       Some(&ttn.notetemp),
       Some(&ttn.linktemp),
       Some(&ttn.archivelinktemp),
@@ -868,7 +886,7 @@ mod tests {
 
     sync_from_stream(
       &saconn,
-      &server_ts.file_path,
+      &server_ts.filepath,
       None,
       None,
       None,
@@ -890,18 +908,83 @@ mod tests {
       )
     })?;
 
-    // assert!(2 == 5);
+    // ------------------------------------------------------------
+    // file sync testing.
 
-    // TODO: file sync testing.
+    // start a server in another thread.
+    let config = load_config("testserver.toml")?;
+    let server = init_server(config.clone())?;
+    let handle = server.handle();
+    let _joinhandle = tokio::task::spawn(async move { server.await });
 
-    // add a new document in the share that syncuser can now access.  It should
-    // be visible on sync, as well as the old document in that share.
+    // log in the server-syncuser so they get a cookie.
+    let client = reqwest::Client::new();
+    let l = UserRequestMessage {
+      what: orgauth::data::UserRequest::Login,
+      data: Some(serde_json::to_value(Login {
+        uid: "server-syncuser".to_string(),
+        pwd: "".to_string(),
+      })?),
+    };
+    let res = client
+      .post(format!("http://{}:{}/user", config.ip, config.port).as_str())
+      .json(&l)
+      .send()
+      .await?;
+    let cookie = match res.headers().get(reqwest::header::SET_COOKIE) {
+      Some(ck) => Ok(
+        ck.to_str()
+          .map_err(|_| zkerr::Error::String("invalid cookie".to_string()))?
+          .to_string(),
+      ),
+      None => Err(zkerr::Error::String("no cookie".to_string())),
+    }?;
+    let mut client_syncuser = read_user_by_id(&caconn, client_ts.syncuser)?;
+    client_syncuser.cookie = Some(cookie);
+    update_user(&caconn, &client_syncuser)?;
+
+    // Should be set to sync.
+    let fsts = TagSearch::SearchTerm {
+      mods: vec![SearchMod::File],
+      term: "".to_string(),
+    };
+
+    let fssearch = ZkNoteSearch {
+      tagsearch: fsts,
+      offset: 0,
+      limit: None,
+      what: "".to_string(),
+      resulttype: zkprotocol::search::ResultType::RtListNote,
+      archives: false,
+      deleted: false, // include deleted notes
+      ordering: None,
+    };
+    // use actix_web::actix_rt::{Arbiter, System};
+
+    let reply = sync_files(
+      &caconn,
+      client_ts.filepath.as_path(),
+      client_ts.syncuser,
+      &fssearch,
+    )
+    .await?;
+
+    let fi = read_file_info(&saconn, server_ts.filenote)?;
+
+    // client should have the server file now.
+    assert!(Path::new(
+      format!("{}/{}", client_ts.filepath.to_str().expect("wat"), fi.hash).as_str()
+    )
+    .exists());
+
+    println!("sync_files result: {:?}", reply);
+
+    handle.stop(true).await;
 
     // ------------------------------------------------------------
     // archive link testing.
     //  - archive links transfer.
     //  - after changes
-
     // ------------------------------------------------------------
     // sync 2:
     // change all notes above and sync.  updated?
