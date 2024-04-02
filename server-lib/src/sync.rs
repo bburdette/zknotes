@@ -262,7 +262,6 @@ pub async fn download_file(
   files_dir: &Path,
   note_id: i64,
 ) -> Result<DownloadResult, zkerr::Error> {
-  println!("download_file 1 {}", note_id);
   // get the note hash, and verify there's a source with this user's id.
   let (uuid, ohash, fs_user_id): (String, Option<String>, Option<i64>) = conn.query_row(
     "select N.uuid, F.hash, FS.user_id from zknote N
@@ -290,21 +289,13 @@ pub async fn download_file(
     return Ok(DownloadResult::AlreadyDownloaded);
   }
 
-  println!("download_file 2");
   let (c, url) = match (user.cookie.clone(), user.remote_url.clone()) {
     (Some(c), Some(url)) => (c, url),
     _ => return Err("can't remote sync - not a remote user".into()),
   };
 
-  println!("cookie, url: {}, {}", c, url);
-
-  // let user_uri = awc::http::Uri::try_from(url).map_err(|x| zkerr::Error::String(x.to_string()))?;
-
-  println!("download_file 3");
   let file_uri = awc::http::Uri::try_from(format!("{}/file/{}", url, uuid).as_str())
     .map_err(|x| zkerr::Error::String(x.to_string()))?;
-
-  println!("uri: {:?}", file_uri);
 
   let res = awc::Client::new()
     .get(file_uri)
@@ -371,7 +362,6 @@ pub async fn upload_file(
   files_dir: &Path,
   note_id: i64,
 ) -> Result<UploadResult, zkerr::Error> {
-  println!("upload_file 1 {}", note_id);
   // get the note hash
   let (uuid, ohash): (String, Option<String>) = conn.query_row(
     "select N.uuid, F.hash from zknote N
@@ -394,14 +384,12 @@ pub async fn upload_file(
     return Ok(UploadResult::FileNotPresent);
   }
 
-  println!("upload_file 2");
   let (c, url) = match (user.cookie.clone(), user.remote_url.clone()) {
     (Some(c), Some(url)) => (c, url),
     _ => return Err("can't upload file - not a remote user".into()),
   };
 
   let cookie = cookie::Cookie::parse_encoded(c)?;
-  println!("upload_file 3");
 
   // let user_uri = awc::http::Uri::try_from(url).map_err(|x| zkerr::Error::String(x.to_string()))?;
 
@@ -409,17 +397,14 @@ pub async fn upload_file(
   let private_uri = awc::http::Uri::try_from(format!("{}/private", url).as_str())
     .map_err(|x| zkerr::Error::String(x.to_string()))?;
 
-  println!("upload_file 4");
   let getzknote = PrivateMessage {
     what: zkprotocol::constants::PrivateRequests::GetZkNote,
     data: Some(serde_json::to_value(Uuid::from_str(uuid.as_str())?)?),
   };
-  println!("upload_file 5");
   let gj = serde_json::to_value(getzknote)?;
 
   let client = awc::Client::new();
 
-  println!("upload_file 6");
   let mut res = client
     .post(private_uri)
     .cookie(cookie.clone())
@@ -428,21 +413,16 @@ pub async fn upload_file(
     .await
     .map_err(|e| zkerr::Error::String(e.to_string()))?;
 
-  println!("res {:?}", res);
-
   let b: Bytes = res
     .body()
     .map_err(|e| zkerr::Error::String(e.to_string()))
     .await?;
 
-  println!("upload_file 7");
   let j = serde_json::from_slice(b.as_ref())?;
 
-  println!("upload_file 8");
   let msg: PrivateReplyMessage = serde_json::from_value(j)?;
   assert!(msg.what == PrivateReplies::ZkNote);
 
-  println!("upload_file 9");
   let zkn: ZkNote = serde_json::from_value(msg.content)?;
 
   match zkn.filestatus {
@@ -466,16 +446,12 @@ pub async fn upload_file(
     .await
     .map_err(|e| zkerr::Error::String(e.to_string()))?;
 
-  println!("rq: {:?}", rq);
-
   let prm: PrivateReplyMessage = serde_json::from_slice(
     rq.body()
       .map_err(|e| zkerr::Error::String(e.to_string()))
       .await?
       .as_ref(),
   )?;
-
-  println!("prm: {:?}", prm);
 
   if prm.what == PrivateReplies::FileSyncComplete {
     Ok(UploadResult::Uploaded)
@@ -495,24 +471,16 @@ pub async fn sync_files_down(
 
   let (sql, args) = build_sql(&conn, uid, &search, None)?;
 
-  println!("search: {:?}", search);
-  println!("sql, args: {}, {:?}", sql, args);
-
   let mut pstmt = conn.prepare(sql.as_str())?;
-
-  println!("sync_files 1");
 
   let rec_iter = pstmt.query_and_then(rusqlite::params_from_iter(args.iter()), |row| {
     Ok::<i64, rusqlite::Error>(row.get(0)?)
   })?;
 
   let mut resvec = Vec::new();
-  println!("sync_files 2");
-
   for rec in rec_iter {
     match rec {
       Ok(id) => {
-        println!("dodownlaod file: {:?} {}]", file_path, id);
         match download_file(&conn, &user, file_path, id).await? {
           DownloadResult::Downloaded => resvec.push(DownloadResult::Downloaded),
           DownloadResult::AlreadyDownloaded => (), // resvec.push(DownloadResult::AlreadyDownloaded),
@@ -537,24 +505,17 @@ pub async fn sync_files_up(
 
   let (sql, args) = build_sql(&conn, uid, &search, None)?;
 
-  println!("search: {:?}", search);
-  println!("sql, args: {}, {:?}", sql, args);
-
   let mut pstmt = conn.prepare(sql.as_str())?;
-
-  println!("sync_files 1");
 
   let rec_iter = pstmt.query_and_then(rusqlite::params_from_iter(args.iter()), |row| {
     Ok::<i64, rusqlite::Error>(row.get(0)?)
   })?;
 
   let mut resvec = Vec::new();
-  println!("sync_files 2");
 
   for rec in rec_iter {
     match rec {
       Ok(id) => {
-        println!("uploading file: {:?} {}]", file_path, id);
         match upload_file(&conn, &user, file_path, id).await? {
           UploadResult::Uploaded => resvec.push(UploadResult::Uploaded),
           UploadResult::NotAFile => resvec.push(UploadResult::NotAFile),
@@ -760,7 +721,6 @@ where
             )?;
             let file_id = conn.last_insert_rowid();
 
-            println!("blah two");
             // add source record.
             conn.execute(
               "insert into file_source (file_id, user_id) values (?1, ?2)
@@ -775,7 +735,6 @@ where
             if Path::exists(stpath.as_path()) {
               Some(file_id)
             } else {
-              println!("blah one");
               // add source record.
               conn.execute(
                 "insert into file_source (file_id, user_id) values (?1, ?2)
