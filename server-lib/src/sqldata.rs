@@ -1560,15 +1560,25 @@ pub fn read_public_zklinks(
       (
         toid,
         Direction::To,
-        Uuid::parse_str(row.get::<usize, String>(5)?.as_str())?,
-        row.get(6)?,
+        Uuid::parse_str(row.get::<usize, String>(6)?.as_str()).map_err(|e| {
+          zkerr::annotate_string(
+            format!("error parsing link uuid: {:?}", row.get::<usize, String>(6)),
+            e.into(),
+          )
+        })?,
+        row.get(7)?,
       )
     } else {
       (
         fromid,
         Direction::From,
-        Uuid::parse_str(row.get::<usize, String>(7)?.as_str())?,
-        row.get(8)?,
+        Uuid::parse_str(row.get::<usize, String>(4)?.as_str()).map_err(|e| {
+          zkerr::annotate_string(
+            format!("error parsing link uuid: {:?}", row.get::<usize, String>(4)),
+            e.into(),
+          )
+        })?,
+        row.get(5)?,
       )
     };
 
