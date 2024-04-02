@@ -2330,6 +2330,43 @@ fn replace_all<E>(
   Ok(new)
 }
 
+#[test]
+fn testreplaceall() {
+  let meh = r#"<panel noteid="16340"/>
+### the old nix-channels way
+
+I'm used to having multiple nix channels in my system, like this:
+
+```
+[bburdette@HOSS:/etc/nixos]$ sudo nix-channel --list
+nixos https://nixos.org/channels/nixos-22.11
+nixos-unstable https://nixos.org/channels/nixos-unstable
+```
+
+And then in my configuration.nix I typically do
+
+```
+{ config, pkgs, ... }:
+
+let"#;
+  let replaceid = |caps: &Captures| {
+    if let Ok(id) = caps[1].parse::<i64>() {
+      assert!(id == 16340);
+      println!("id == 16340");
+    } else {
+      // bad id.  leave it.
+      println!("bad: {}", String::from(&caps[1]));
+      assert!(false);
+    }
+    Ok::<String, zkerr::Error>("replaced".to_string())
+  };
+
+  let panelstyle = Regex::new(r#"\<panel noteid=\"([0-9]+)\"/>"#).unwrap();
+  let replaced = replace_all(&panelstyle, meh, replaceid).unwrap();
+  println!("{}", replaced);
+  assert!(replaced.find(r#"<panel noteid="replaced""#) != None);
+}
+
 // replace note ids with uuids in hyperlinks.
 pub fn udpate31(dbfile: &Path) -> Result<(), zkerr::Error> {
   let conn = Connection::open(dbfile)?;
@@ -2361,20 +2398,20 @@ pub fn udpate31(dbfile: &Path) -> Result<(), zkerr::Error> {
 
   let oldstyle = Regex::new(r#"\[.+\]\(\/note\/([0-9]+)\)"#)?;
   let newstyle = Regex::new(r#"\<note id=\"([0-9]+)\"/>"#)?;
+  let panelstyle = Regex::new(r#"\<panel noteid=\"([0-9]+)\"/>"#)?;
 
   for (id, text) in notes {
-    // search and replace the two note styles:
+    // search and replace the three note styles:
     // `<note id="20050"/>`
     // `[this kind](/note/20077).`
+    // '<panel noteid=\"16340\"/>'
 
-    let rold = replace_all(&oldstyle, text.as_str(), replaceid)?;
-    let rnew = replace_all(&newstyle, rold.as_str(), replaceid)?;
+    let r = replace_all(&oldstyle, text.as_str(), replaceid)?;
+    let r = replace_all(&newstyle, r.as_str(), replaceid)?;
+    let r = replace_all(&panelstyle, r.as_str(), replaceid)?;
 
-    if rnew != text {
-      conn.execute(
-        "update zknote set content=?1 where id = ?2",
-        params![rnew, id],
-      )?;
+    if r != text {
+      conn.execute("update zknote set content=?1 where id = ?2", params![r, id])?;
     }
   }
 
