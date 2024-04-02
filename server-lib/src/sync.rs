@@ -489,7 +489,7 @@ pub async fn sync_files_down(
   file_path: &Path,
   uid: i64,
   search: &ZkNoteSearch,
-) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>> {
+) -> Result<Vec<DownloadResult>, Box<dyn std::error::Error>> {
   // TODO pass this in from calling ftn?
   let user = orgauth::dbfun::read_user_by_id(&conn, uid)?;
 
@@ -524,17 +524,14 @@ pub async fn sync_files_down(
     }
   }
 
-  Ok(PrivateReplyMessage {
-    what: PrivateReplies::FileSyncComplete,
-    content: serde_json::to_value(resvec)?,
-  })
+  Ok(resvec)
 }
 pub async fn sync_files_up(
   conn: &Connection,
   file_path: &Path,
   uid: i64,
   search: &ZkNoteSearch,
-) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>> {
+) -> Result<Vec<UploadResult>, Box<dyn std::error::Error>> {
   // TODO pass this in from calling ftn?
   let user = orgauth::dbfun::read_user_by_id(&conn, uid)?;
 
@@ -570,10 +567,7 @@ pub async fn sync_files_up(
     }
   }
 
-  Ok(PrivateReplyMessage {
-    what: PrivateReplies::FileSyncComplete,
-    content: serde_json::to_value(resvec)?,
-  })
+  Ok(resvec)
 }
 
 pub async fn sync_from_remote(

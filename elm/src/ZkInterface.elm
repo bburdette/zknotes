@@ -45,6 +45,7 @@ type ServerResponse
     | HomeNoteSet ZkNoteId
     | FilesUploaded (List Data.ZkListNote)
     | SyncComplete
+    | FileSyncComplete
     | Noop
     | NotLoggedIn
     | LoginError
@@ -106,6 +107,9 @@ showServerResponse sr =
 
         SyncComplete ->
             "SyncComplete"
+
+        FileSyncComplete ->
+            "FileSyncComplete"
 
         Noop ->
             "Noop"
@@ -284,6 +288,9 @@ serverResponseDecoder =
 
                     "SyncComplete" ->
                         JD.succeed SyncComplete
+
+                    "FileSyncComplete" ->
+                        JD.succeed FileSyncComplete
 
                     "Noop" ->
                         JD.succeed Noop

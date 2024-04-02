@@ -2584,8 +2584,10 @@ actualupdate msg model =
                             )
 
                         ZI.SyncComplete ->
-                            -- just ignore these.
                             ( displayMessageDialog model <| "remote sync complete", Cmd.none )
+
+                        ZI.FileSyncComplete ->
+                            ( displayMessageDialog model <| "file sync complete", Cmd.none )
 
                         ZI.Noop ->
                             -- just ignore these.
