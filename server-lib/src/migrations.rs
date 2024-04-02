@@ -2062,8 +2062,8 @@ pub fn udpate27(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 
   // copy everything from zknotetemp.
   conn.execute(
-    "insert into zknote (id, title, content, sysdata, pubid, user, editable, showtitle, deleted, uuid, createdate, changeddate)
-        select id, title, content, sysdata, pubid, user, editable, showtitle, deleted, uuid, createdate, changeddate from zknotetemp",
+    "insert into zknote (id, title, content, sysdata, pubid, user, editable, showtitle, deleted, file, uuid, createdate, changeddate)
+        select id, title, content, sysdata, pubid, user, editable, showtitle, deleted, file, uuid, createdate, changeddate from zknotetemp",
     params![],
   )?;
 
