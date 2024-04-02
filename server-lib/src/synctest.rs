@@ -103,6 +103,9 @@ mod tests {
     let publicid = note_id(&conn, "system", "public")?;
     let shareid = note_id(&conn, "system", "share")?;
 
+    let filesdir = format!("{}_files", basename);
+    let fdpath = Path::new(filesdir.as_str());
+
     // test users.
     let otheruser = new_user(
       &conn,
@@ -186,8 +189,8 @@ mod tests {
     let syncuser_note = user_note_id(&conn, syncuser)?;
     {
       // visible but not synced.
-      let ozkn = read_zknote_i64(conn, None, otheruser_note)?;
-      let szkn = read_zknote_i64(conn, None, syncuser_note)?;
+      let ozkn = read_zknote_i64(conn, fdpath, None, otheruser_note)?;
+      let szkn = read_zknote_i64(conn, fdpath, None, syncuser_note)?;
       visible_notes.push((otheruser_note, ozkn.id));
       visible_notes.push((syncuser_note, szkn.id));
     }
@@ -274,8 +277,6 @@ mod tests {
     )?;
 
     // file note.
-    let filesdir = format!("{}_files", basename);
-    let fdpath = Path::new(filesdir.as_str());
     match std::fs::remove_dir_all(fdpath) {
       Ok(_) => (),
       Err(e) => println!("remove_dir_all error: {:?}", e),
@@ -450,7 +451,16 @@ mod tests {
 
     // initial sync, testing duplicate public ids.
     {
-      let server_stream = sync_stream(saconn.clone(), ssyncuser, None, None, None, None, &mut cb);
+      let server_stream = sync_stream(
+        saconn.clone(),
+        server_ts.filepath.clone(),
+        ssyncuser,
+        None,
+        None,
+        None,
+        None,
+        &mut cb,
+      );
 
       let ctr = caconn.unchecked_transaction()?;
 
@@ -495,7 +505,7 @@ mod tests {
       |row| Ok(row.get(0)?),
     )?;
 
-    let cpub2 = read_zknotepubid(&caconn, None, "public-note")?;
+    let cpub2 = read_zknotepubid(&caconn, client_ts.filepath.as_path(), None, "public-note")?;
 
     println!("2");
 
@@ -515,7 +525,16 @@ mod tests {
     assert!(cpub2.id == spc2.id);
 
     {
-      let server_stream = sync_stream(saconn.clone(), ssyncuser, None, None, None, None, &mut cb);
+      let server_stream = sync_stream(
+        saconn.clone(),
+        server_ts.filepath.clone(),
+        ssyncuser,
+        None,
+        None,
+        None,
+        None,
+        &mut cb,
+      );
       // -----------------------------------
       // Writing the stream to a file
       // -----------------------------------
@@ -542,6 +561,7 @@ mod tests {
     {
       let client_stream = sync_stream(
         caconn.clone(),
+        client_ts.filepath.clone(),
         csyncuser,
         // Some(ttn.notetemp.clone()),
         None,
@@ -578,7 +598,16 @@ mod tests {
     // ------------------------------------------------------------
     // sync from server to client.
     // ------------------------------------------------------------
-    let server_stream = sync_stream(saconn.clone(), ssyncuser, None, None, None, None, &mut cb);
+    let server_stream = sync_stream(
+      saconn.clone(),
+      server_ts.filepath.clone(),
+      ssyncuser,
+      None,
+      None,
+      None,
+      None,
+      &mut cb,
+    );
 
     // let ctr = caconn.unchecked_transaction()?;
 
@@ -608,6 +637,7 @@ mod tests {
     // ------------------------------------------------------------
     let client_stream = sync_stream(
       caconn.clone(),
+      client_ts.filepath.clone(),
       csyncuser,
       Some(ttn.notetemp),
       Some(ttn.linktemp),
@@ -663,15 +693,25 @@ mod tests {
 
     // ------------------------------------------------------------
     println!("3");
-    read_zknotepubid(&caconn, None, "public-note")?;
+    read_zknotepubid(&caconn, &client_ts.filepath, None, "public-note")?;
     println!("3.5");
-    read_zknotepubid(&caconn, Some(csyncuser), "public-note")?;
+    read_zknotepubid(&caconn, &client_ts.filepath, Some(csyncuser), "public-note")?;
     println!("4");
-    let cpublic_note_client = read_zknotepubid(&caconn, Some(csyncuser), "public-note-client")?;
+    let cpublic_note_client = read_zknotepubid(
+      &caconn,
+      &client_ts.filepath,
+      Some(csyncuser),
+      "public-note-client",
+    )?;
 
     println!("5");
     // client public notes on server.
-    let spublic_note_client = read_zknotepubid(&saconn, Some(ssyncuser), "public-note-client")?;
+    let spublic_note_client = read_zknotepubid(
+      &saconn,
+      &server_ts.filepath,
+      Some(ssyncuser),
+      "public-note-client",
+    )?;
 
     // ids are the same.
     assert!(spublic_note_client.id == cpublic_note_client.id);
@@ -683,6 +723,7 @@ mod tests {
       // archives present for revised notes.
       let cpcarchs = read_zknotearchives(
         &caconn,
+        &client_ts.filepath,
         csyncuser,
         &GetZkNoteArchives {
           zknote: cpub2.id,
@@ -694,6 +735,7 @@ mod tests {
       println!("7.2");
       let spcarchs = read_zknotearchives(
         &saconn,
+        &server_ts.filepath,
         ssyncuser,
         &GetZkNoteArchives {
           zknote: cpub2.id,
@@ -717,7 +759,7 @@ mod tests {
     // Visible notes from client are in server?
     for (_, szn) in &client_ts.synced_notes {
       println!("checking clieint syned: {:?}", szn);
-      match sqldata::read_zknote(&saconn, Some(ssyncuser), &szn) {
+      match sqldata::read_zknote(&saconn, &server_ts.filepath, Some(ssyncuser), &szn) {
         Err(zkerr::Error::Rusqlite(rusqlite::Error::QueryReturnedNoRows)) => {
           Err(format!("not found: {:?}", szn).into())
         }
@@ -729,13 +771,13 @@ mod tests {
     // Visible notes from server are in client?
     for (_, szn) in &server_ts.synced_notes {
       println!("checking server syned: {:?}", szn);
-      sqldata::read_zknote(&caconn, Some(csyncuser), &szn)?;
+      sqldata::read_zknote(&caconn, &client_ts.filepath, Some(csyncuser), &szn)?;
     }
 
     // non-visible notes from client are not in server?
     for (_, szn) in client_ts.unvisible_notes {
       println!("checking client unvis: {:?}", szn);
-      match sqldata::read_zknote(&saconn, Some(ssyncuser), &szn) {
+      match sqldata::read_zknote(&saconn, &server_ts.filepath, Some(ssyncuser), &szn) {
         Ok(_) => Err(format!(
           "client note was not supposed to sync to server: {}",
           szn
@@ -746,7 +788,7 @@ mod tests {
 
     for (_, szn) in server_ts.unvisible_notes {
       println!("checking server unvis: {:?}", szn);
-      match sqldata::read_zknote(&caconn, Some(csyncuser), &szn) {
+      match sqldata::read_zknote(&caconn, &client_ts.filepath, Some(csyncuser), &szn) {
         Ok(_) => Err(format!(
           "server note was not supposed to sync to client: {}",
           szn
@@ -818,6 +860,7 @@ mod tests {
     // is otherusersharenote on the client now?
     read_zknote(
       &saconn,
+      &server_ts.filepath,
       Some(server_ts.otheruser),
       &server_ts.otherusersharenote.1,
     )
@@ -831,6 +874,7 @@ mod tests {
     // can syncuser access it on the server?
     read_zknote(
       &saconn,
+      &server_ts.filepath,
       Some(server_ts.syncuser),
       &server_ts.otherusersharenote.1,
     )
@@ -850,7 +894,16 @@ mod tests {
 
     // ------------------------------------------------------------
     // sync from server to client.
-    let server_stream = sync_stream(saconn.clone(), ssyncuser, None, None, None, None, &mut cb);
+    let server_stream = sync_stream(
+      saconn.clone(),
+      server_ts.filepath.clone(),
+      ssyncuser,
+      None,
+      None,
+      None,
+      None,
+      &mut cb,
+    );
 
     let ttn = temp_tables(&caconn)?;
     let ss = server_stream.map_err(convert_err);
@@ -872,6 +925,7 @@ mod tests {
     // sync from client to server.
     let client_stream = sync_stream(
       caconn.clone(),
+      client_ts.filepath.clone(),
       csyncuser,
       Some(ttn.notetemp),
       Some(ttn.linktemp),
@@ -898,6 +952,7 @@ mod tests {
     // can syncuser access it?
     read_zknote(
       &caconn,
+      &client_ts.filepath,
       Some(client_ts.syncuser),
       &server_ts.otherusersharenote.1,
     )
@@ -961,7 +1016,7 @@ mod tests {
     };
     // use actix_web::actix_rt::{Arbiter, System};
 
-    let reply = sync_files(
+    let reply = sync_files_down(
       &caconn,
       client_ts.filepath.as_path(),
       client_ts.syncuser,
@@ -978,6 +1033,16 @@ mod tests {
     .exists());
 
     println!("sync_files result: {:?}", reply);
+
+    let reply = sync_files_up(
+      &caconn,
+      client_ts.filepath.as_path(),
+      client_ts.syncuser,
+      &fssearch,
+    )
+    .await?;
+
+    println!("syncfilesup reply {:?}", reply);
 
     handle.stop(true).await;
 

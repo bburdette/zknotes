@@ -19,7 +19,7 @@ use std::time::Duration;
 use uuid::Uuid;
 use zkprotocol::constants::SpecialUuids;
 use zkprotocol::content::{
-  ArchiveZkLink, Direction, EditLink, ExtraLoginData, FileInfo, GetArchiveZkNote,
+  ArchiveZkLink, Direction, EditLink, ExtraLoginData, FileInfo, FileStatus, GetArchiveZkNote,
   GetZkNoteArchives, GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkLink, SaveZkNote,
   SavedZkNote, SyncMessage, Sysids, UuidZkLink, ZkLink, ZkListNote, ZkNote, ZkNoteAndLinks,
   ZkNoteId,
@@ -957,15 +957,34 @@ pub fn read_extra_login_data(conn: &Connection, id: i64) -> Result<ExtraLoginDat
 
 pub fn read_zknote_i64(
   conn: &Connection,
+  files_dir: &Path,
   uid: Option<i64>,
   id: i64,
 ) -> Result<ZkNote, zkerr::Error> {
-  read_zknote(&conn, uid, &uuid_for_note_id(&conn, id)?).map(|x| x.1)
+  read_zknote(&conn, &files_dir, uid, &uuid_for_note_id(&conn, id)?).map(|x| x.1)
+}
+
+pub fn file_status(
+  conn: &Connection,
+  filedir: &Path,
+  file_id: Option<i64>,
+) -> Result<FileStatus, zkerr::Error> {
+  match file_id {
+    Some(fid) => {
+      if file_exists(&conn, filedir, fid)? {
+        Ok(FileStatus::FilePresent)
+      } else {
+        Ok(FileStatus::FileMissing)
+      }
+    }
+    None => Ok(FileStatus::NotAFile),
+  }
 }
 
 // read zknote without any access checking.
 pub fn read_zknote_unchecked(
   conn: &Connection,
+  filedir: &Path,
   id: &ZkNoteId,
 ) -> Result<(i64, ZkNote), zkerr::Error> {
   let closure = |row: &Row<'_>| {
@@ -983,13 +1002,7 @@ pub fn read_zknote_unchecked(
         editableValue: row.get(8)?, // <--- same index.
         showtitle: row.get(9)?,
         deleted: row.get(10)?,
-        is_file: {
-          let wat: Option<i64> = row.get(11)?;
-          match wat {
-            Some(_) => true,
-            None => false,
-          }
-        },
+        filestatus: file_status(&conn, &filedir, row.get(11)?)?,
         createdate: row.get(12)?,
         changeddate: row.get(13)?,
         sysids: Vec::new(),
@@ -1027,10 +1040,11 @@ pub fn read_file_info(conn: &Connection, noteid: i64) -> Result<FileInfo, zkerr:
 // 'normal' zknote read with access checking
 pub fn read_zknote(
   conn: &Connection,
+  files_dir: &Path,
   uid: Option<i64>,
   id: &ZkNoteId,
 ) -> Result<(i64, ZkNote), zkerr::Error> {
-  let (id, mut note) = read_zknote_unchecked(&conn, id)?;
+  let (id, mut note) = read_zknote_unchecked(&conn, &files_dir, id)?;
 
   let sysid = user_id(&conn, "system")?;
   let sysids = get_sysids(conn, sysid, id)?;
@@ -1055,6 +1069,7 @@ pub fn read_zknote(
 
 pub fn read_zklistnote(
   conn: &Connection,
+  files_dir: &Path,
   uid: Option<i64>,
   id: i64,
 ) -> Result<ZkListNote, zkerr::Error> {
@@ -1073,11 +1088,10 @@ pub fn read_zklistnote(
       from zknote ZN, orgauth_user OU, user U where ZN.id = ?1 and U.id = ZN.user and OU.id = ZN.user",
     params![id],
     |row| {
-      let wat : Option<i64> = row.get(2)?;
       let zln = ZkListNote {
         id:  Uuid::parse_str(row.get::<usize,String>(0)?.as_str())?,
         title: row.get(1)?,
-        is_file: wat.is_some(),
+        filestatus: file_status(&conn, &files_dir, row.get(2)?)?,
         user: row.get(3)?,
         createdate: row.get(4)?,
         changeddate: row.get(5)?,
@@ -1192,8 +1206,20 @@ pub fn read_zknote_filehash(
   }
 }
 
+pub fn file_exists(conn: &Connection, filedir: &Path, file_id: i64) -> Result<bool, zkerr::Error> {
+  let hash: String = conn.query_row(
+    "select F.hash from file F
+      where N.file = ?1",
+    params![file_id],
+    |row| Ok(row.get(0)?),
+  )?;
+
+  Ok(filedir.join(hash).as_path().exists())
+}
+
 pub fn read_zknotepubid(
   conn: &Connection,
+  files_dir: &Path,
   uid: Option<i64>,
   pubid: &str,
 ) -> Result<ZkNote, zkerr::Error> {
@@ -1222,11 +1248,7 @@ pub fn read_zknotepubid(
         editableValue: row.get(8)?,
         showtitle: row.get(9)?,
         deleted: row.get(10)?,
-        is_file: { let wat : Option<i64> = row.get(11)?;
-          match wat {
-          Some(_) => true,
-          None => false,
-        }},
+        filestatus: file_status(&conn, &files_dir, row.get(11)?)?,
         createdate: row.get(12)?,
         changeddate: row.get(13)?,
         sysids: Vec::new(),
@@ -1569,6 +1591,7 @@ pub fn read_public_zklinks(
 
 pub fn read_zknotecomments(
   conn: &Connection,
+  files_dir: &Path,
   uid: i64,
   gznc: &GetZkNoteComments,
 ) -> Result<Vec<ZkNote>, zkerr::Error> {
@@ -1588,7 +1611,7 @@ pub fn read_zknotecomments(
 
   for id in c_iter {
     match id {
-      Ok(id) => match read_zknote_i64(&conn, Some(uid), id) {
+      Ok(id) => match read_zknote_i64(&conn, files_dir, Some(uid), id) {
         Ok(note) => {
           nv.push(note);
           match gznc.limit {
@@ -1611,6 +1634,7 @@ pub fn read_zknotecomments(
 
 pub fn read_zknotearchives(
   conn: &Connection,
+  files_dir: &Path,
   uid: i64,
   gzna: &GetZkNoteArchives,
 ) -> Result<Vec<ZkListNote>, zkerr::Error> {
@@ -1625,7 +1649,7 @@ pub fn read_zknotearchives(
   }
 
   // users that can't see a note, can't see the archives either.
-  let (id, _zkn) = read_zknote(&conn, Some(uid), &gzna.zknote)?;
+  let (id, _zkn) = read_zknote(&conn, files_dir, Some(uid), &gzna.zknote)?;
 
   // notes with a TO link to our note
   // and a TO link to 'archive'
@@ -1646,7 +1670,7 @@ pub fn read_zknotearchives(
   for id in c_iter {
     match id {
       Ok(id) => {
-        let note = read_zklistnote(&conn, Some(sysid), id)?;
+        let note = read_zklistnote(&conn, files_dir, Some(sysid), id)?;
         nv.push(note);
         match gzna.limit {
           Some(l) => {
@@ -1666,6 +1690,7 @@ pub fn read_zknotearchives(
 
 pub fn read_archivezknote(
   conn: &Connection,
+  files_dir: &Path,
   uid: i64,
   gazn: &GetArchiveZkNote,
 ) -> Result<(i64, ZkNote), zkerr::Error> {
@@ -1678,7 +1703,7 @@ pub fn read_archivezknote(
   }
 
   // have access to the parent note?
-  let (pid, _pnote) = read_zknote(conn, Some(uid), &gazn.parentnote)?;
+  let (pid, _pnote) = read_zknote(conn, files_dir, Some(uid), &gazn.parentnote)?;
 
   let note_id = note_id_for_zknoteid(conn, &gazn.noteid)?;
 
@@ -1697,7 +1722,7 @@ pub fn read_archivezknote(
   }?;
 
   // now read the archive note AS SYSTEM.
-  read_zknote(conn, Some(sysid), &gazn.noteid)
+  read_zknote(conn, files_dir, Some(sysid), &gazn.noteid)
 }
 
 pub fn read_archivezklinks(
@@ -2081,11 +2106,12 @@ pub fn accessible_notes(
 
 pub fn read_zknoteandlinks(
   conn: &Connection,
+  files_dir: &Path,
   uid: Option<i64>,
   zknoteid: &ZkNoteId,
 ) -> Result<ZkNoteAndLinks, zkerr::Error> {
   // should do an ownership check for us
-  let (id, zknote) = read_zknote(conn, uid, zknoteid)?;
+  let (id, zknote) = read_zknote(conn, files_dir, uid, zknoteid)?;
 
   let links = match uid {
     Some(uid) => read_zklinks(conn, uid, id)?,
@@ -2097,6 +2123,7 @@ pub fn read_zknoteandlinks(
 
 pub fn read_zneifchanged(
   conn: &Connection,
+  files_dir: &Path,
   uid: Option<i64>,
   gzic: &GetZnlIfChanged,
 ) -> Result<Option<ZkNoteAndLinks>, zkerr::Error> {
@@ -2109,7 +2136,7 @@ pub fn read_zneifchanged(
   )?;
 
   if changeddate > gzic.changeddate {
-    return read_zknoteandlinks(conn, uid, &gzic.zknote).map(Some);
+    return read_zknoteandlinks(conn, files_dir, uid, &gzic.zknote).map(Some);
   } else {
     Ok(None)
   }

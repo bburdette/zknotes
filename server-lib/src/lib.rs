@@ -275,7 +275,7 @@ async fn file(session: Session, config: web::Data<Config>, req: HttpRequest) -> 
         Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
       };
 
-      let zkln = match sqldata::read_zklistnote(&conn, uid, nid) {
+      let zkln = match sqldata::read_zklistnote(&conn, &config.file_path, uid, nid) {
         Ok(zkln) => zkln,
         Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
       };
@@ -328,7 +328,7 @@ async fn make_file_notes(
       sqldata::make_file_note(&conn, &config.file_path, userdata.id, &name, fpath)?;
 
     // return zknoteedit.
-    let listnote = sqldata::read_zklistnote(&conn, Some(userdata.id), nid64)?;
+    let listnote = sqldata::read_zklistnote(&conn, &config.file_path, Some(userdata.id), nid64)?;
     info!(
       "user#filer_uploaded-zknote: {} - {}",
       listnote.id, listnote.title

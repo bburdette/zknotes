@@ -7,10 +7,12 @@ use orgauth::dbfun::user_id;
 use rusqlite::Connection;
 use std::convert::TryInto;
 use std::error::Error;
+use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 use uuid::Uuid;
 use zkprotocol::constants::SpecialUuids;
+use zkprotocol::content::FileStatus;
 use zkprotocol::content::{SyncMessage, ZkListNote, ZkPhantomUser};
 use zkprotocol::search::{
   AndOr, OrderDirection, OrderField, ResultType, SearchMod, TagSearch, ZkIdSearchResult,
@@ -37,7 +39,7 @@ pub fn power_delete_zknotes(
     deleted: false,
     ordering: None,
   };
-  let znsr = search_zknotes(conn, user, &nolimsearch)?;
+  let znsr = search_zknotes(conn, &file_path, user, &nolimsearch)?;
   match znsr {
     SearchResult::SrId(znsr) => {
       let c = znsr.notes.len().try_into()?;
@@ -83,6 +85,7 @@ pub enum SearchResult {
 
 pub fn search_zknotes(
   conn: &Connection,
+  filedir: &Path,
   user: i64,
   search: &ZkNoteSearch,
 ) -> Result<SearchResult, zkerr::Error> {
@@ -99,11 +102,17 @@ pub fn search_zknotes(
     Ok::<ZkListNote, zkerr::Error>(ZkListNote {
       id: uuid,
       title: row.get(2)?,
-      is_file: {
+      filestatus: {
         let wat: Option<i64> = row.get(3)?;
         match wat {
-          Some(_) => true,
-          None => false,
+          Some(file_id) => {
+            if sqldata::file_exists(&conn, filedir, file_id)? {
+              FileStatus::FilePresent
+            } else {
+              FileStatus::FileMissing
+            }
+          }
+          None => FileStatus::NotAFile,
         }
       },
       user: row.get(4)?,
@@ -156,7 +165,7 @@ pub fn search_zknotes(
       for rsrec in rec_iter {
         match rsrec {
           Ok(rec) => {
-            pv.push(sqldata::read_zknote(&conn, Some(user), &rec.id)?.1);
+            pv.push(sqldata::read_zknote(&conn, filedir, Some(user), &rec.id)?.1);
           }
           Err(_) => (),
         }
@@ -174,7 +183,12 @@ pub fn search_zknotes(
       for rsrec in rec_iter {
         match rsrec {
           Ok(rec) => {
-            pv.push(sqldata::read_zknoteandlinks(&conn, Some(user), &rec.id)?);
+            pv.push(sqldata::read_zknoteandlinks(
+              &conn,
+              filedir,
+              Some(user),
+              &rec.id,
+            )?);
           }
           Err(_) => (),
         }
@@ -191,6 +205,7 @@ pub fn search_zknotes(
 
 pub fn search_zknotes_stream(
   conn: Arc<Connection>,
+  files_dir: PathBuf,
   user: i64,
   search: ZkNoteSearch,
   exclude_notes: Option<String>,
@@ -235,8 +250,9 @@ pub fn search_zknotes_stream(
           yield SyncMessage::SyncError("unimplemented".to_string())
         }
         ResultType::RtNote => {
-          let zn = sqldata::read_zknote_i64(&conn, Some(user), row.get(0)?)?;
-          let mbf = if zn.is_file {Some( sqldata::read_file_info(&conn, row.get(0)?)? )} else { None };
+          let zn = sqldata::read_zknote_i64(&conn, &files_dir,Some(user), row.get(0)?)?;
+          let mbf = if zn.filestatus != FileStatus::NotAFile {
+            Some( sqldata::read_file_info(&conn, row.get(0)?)? )} else { None };
           yield SyncMessage::from((zn, mbf))
         }
         ResultType::RtNoteAndLinks => {

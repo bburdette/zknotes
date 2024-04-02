@@ -21,7 +21,7 @@ use rusqlite::{params, Connection};
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::AsyncBufReadExt;
@@ -29,8 +29,8 @@ use tokio::io::AsyncWriteExt;
 use tokio_util::io::StreamReader;
 use uuid::Uuid;
 use zkprotocol::constants::{PrivateReplies, PrivateStreamingRequests, SpecialUuids};
-use zkprotocol::content::{SaveZkNote, SyncMessage, SyncSince, ZkNoteId};
-use zkprotocol::messages::{PrivateReplyMessage, PrivateStreamingMessage};
+use zkprotocol::content::{GetZkNoteAndLinks, SaveZkNote, SyncMessage, SyncSince, ZkNoteId};
+use zkprotocol::messages::{PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage};
 use zkprotocol::search::{
   AndOr, OrderDirection, OrderField, Ordering, ResultType, SearchMod, TagSearch, ZkNoteSearch,
 };
@@ -48,7 +48,7 @@ pub struct CompletedSync {
 
 pub async fn prev_sync(
   conn: &Connection,
-  _user: &User,
+  file_path: &Path,
   usernoteid: &ZkNoteId,
 ) -> Result<Option<CompletedSync>, zkerr::Error> {
   let sysid = user_id(&conn, "system")?;
@@ -76,7 +76,7 @@ pub async fn prev_sync(
     }),
   };
 
-  if let SearchResult::SrNote(res) = search_zknotes(conn, sysid, &zns)? {
+  if let SearchResult::SrNote(res) = search_zknotes(conn, &file_path, sysid, &zns)? {
     match res.notes.first() {
       Some(n) => match serde_json::from_str::<CompletedSync>(n.content.as_str()) {
         Ok(s) => Ok(Some(s)),
@@ -200,7 +200,7 @@ pub async fn sync(
   let extra_login_data = sqldata::read_extra_login_data(&conn, user.id)?;
 
   // get previous sync.
-  let after = prev_sync(&conn, &user, &extra_login_data.zknote)
+  let after = prev_sync(&conn, &file_path, &extra_login_data.zknote)
     .await?
     .map(|cs| cs.now);
 
@@ -227,6 +227,7 @@ pub async fn sync(
   } else {
     let remres = sync_to_remote(
       conn.clone(),
+      file_path,
       &user,
       Some(ttn.notetemp.clone()),
       Some(ttn.linktemp.clone()),
@@ -353,7 +354,141 @@ pub async fn download_file(
   Ok(DownloadResult::Downloaded)
 }
 
-pub async fn sync_files(
+#[derive(Deserialize, Serialize, Debug, PartialEq)]
+pub enum UploadResult {
+  Uploaded,
+  NotAFile,
+  FileNotPresent,
+  UploadFailed,
+}
+
+pub async fn upload_file(
+  conn: &Connection,
+  user: &User,
+  files_dir: &Path,
+  note_id: i64,
+) -> Result<UploadResult, zkerr::Error> {
+  println!("upload_file 1 {}", note_id);
+  // get the note hash
+  let (uuid, ohash): (String, Option<String>) = conn.query_row(
+    "select N.uuid, F.hash from zknote N
+      left join file F on N.file = F.id 
+      where N.id = ?1",
+    params![note_id],
+    |row| Ok((row.get(0)?, row.get(1)?)),
+  )?;
+
+  let hash = match ohash {
+    Some(h) => h,
+    None => return Ok(UploadResult::NotAFile),
+  };
+
+  let hashpath = files_dir.join(Path::new(hash.as_str()));
+
+  // file exists?
+  if !hashpath.exists() {
+    // file already exists.
+    return Ok(UploadResult::FileNotPresent);
+  }
+
+  println!("upload_file 2");
+  let (c, url) = match (user.cookie.clone(), user.remote_url.clone()) {
+    (Some(c), Some(url)) => (c, url),
+    _ => return Err("can't upload file - not a remote user".into()),
+  };
+
+  let cookie = cookie::Cookie::parse_encoded(c)?;
+
+  // let user_uri = awc::http::Uri::try_from(url).map_err(|x| zkerr::Error::String(x.to_string()))?;
+
+  // is the note on the server, and the file?
+  let private_uri = awc::http::Uri::try_from(format!("{}/private", url).as_str())
+    .map_err(|x| zkerr::Error::String(x.to_string()))?;
+
+  let getzknote = PrivateMessage {
+    what: zkprotocol::constants::PrivateRequests::GetZkNote,
+    data: Some(serde_json::to_value(Uuid::from_slice(
+      uuid.as_str().as_bytes(),
+    )?)?),
+  };
+  let gj = serde_json::to_value(getzknote)?;
+
+  let client = awc::Client::new();
+
+  let mut res = client
+    .post(private_uri)
+    .cookie(cookie)
+    .timeout(Duration::from_secs(60 * 60))
+    .send_json(&gj)
+    .await
+    .map_err(|e| zkerr::Error::String(e.to_string()))?;
+
+  println!("res {:?}", res);
+
+  let b: Bytes = res
+    .body()
+    .map_err(|e| zkerr::Error::String(e.to_string()))
+    .await?;
+
+  // println!("upload_file 3");
+  // let file_uri = awc::http::Uri::try_from(format!("{}/file/{}", url, uuid).as_str())
+  //   .map_err(|x| zkerr::Error::String(x.to_string()))?;
+
+  // println!("uri: {:?}", file_uri);
+
+  // let client = awc::Client::new();
+
+  // let res = client
+  //   .get(file_uri)
+  //   .cookie(cookie::Cookie::parse_encoded(c)?)
+  //   .timeout(Duration::from_secs(60 * 60))
+  //   .send()
+  //   .await
+  //   .map_err(|e| zkerr::Error::String(e.to_string()))?;
+
+  // // Write the body to a file.
+  // let mut file = tokio::fs::OpenOptions::new()
+  //   .write(true)
+  //   .create(true)
+  //   .open(hash.clone())
+  //   .await
+  //   .unwrap();
+
+  // res
+  //   .try_for_each(|bytes| match block_on(file.write(&bytes)) {
+  //     Ok(_) => future::ok(()),
+  //     Err(e) => future::err(e.into()),
+  //   })
+  //   .await
+  //   .map_err(|e| zkerr::Error::String(e.to_string()))?;
+
+  // let fpath = Path::new(hash.as_str());
+  // let fh = sha256::try_digest(fpath)?;
+
+  // // does the hash match?
+  // if fh != hash {
+  //   return Err(zkerr::Error::String(
+  //     "downloaded file hash doesn't match!".to_string(),
+  //   ));
+  // }
+
+  // // let size = std::fs::metadata(fpath)?.len();
+  // let hashpath = files_dir.join(Path::new(fh.as_str()));
+
+  // // file exists?
+  // if hashpath.exists() {
+  //   // new file already exists.
+  //   std::fs::remove_file(fpath)?;
+  // } else {
+  //   // move into hashed-files dir.
+  //   std::fs::rename(fpath, hashpath)?;
+  // }
+
+  // TODO: remove source records??
+  Ok(UploadResult::UploadFailed)
+}
+
+pub async fn sync_files_down(
   conn: &Connection,
   file_path: &Path,
   uid: i64,
@@ -371,8 +506,6 @@ pub async fn sync_files(
 
   println!("sync_files 1");
 
-  // let sysid = user_id(&conn, "system")?;
-
   let rec_iter = pstmt.query_and_then(rusqlite::params_from_iter(args.iter()), |row| {
     Ok::<i64, rusqlite::Error>(row.get(0)?)
   })?;
@@ -389,6 +522,51 @@ pub async fn sync_files(
           DownloadResult::AlreadyDownloaded => (), // resvec.push(DownloadResult::AlreadyDownloaded),
           DownloadResult::NoSource => resvec.push(DownloadResult::NoSource),
           DownloadResult::DownloadFailed => resvec.push(DownloadResult::DownloadFailed),
+        };
+      }
+      Err(_) => (),
+    }
+  }
+
+  Ok(PrivateReplyMessage {
+    what: PrivateReplies::FileSyncComplete,
+    content: serde_json::to_value(resvec)?,
+  })
+}
+pub async fn sync_files_up(
+  conn: &Connection,
+  file_path: &Path,
+  uid: i64,
+  search: &ZkNoteSearch,
+) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>> {
+  // TODO pass this in from calling ftn?
+  let user = orgauth::dbfun::read_user_by_id(&conn, uid)?;
+
+  let (sql, args) = build_sql(&conn, uid, &search, None)?;
+
+  println!("search: {:?}", search);
+  println!("sql, args: {}, {:?}", sql, args);
+
+  let mut pstmt = conn.prepare(sql.as_str())?;
+
+  println!("sync_files 1");
+
+  let rec_iter = pstmt.query_and_then(rusqlite::params_from_iter(args.iter()), |row| {
+    Ok::<i64, rusqlite::Error>(row.get(0)?)
+  })?;
+
+  let mut resvec = Vec::new();
+  println!("sync_files 2");
+
+  for rec in rec_iter {
+    match rec {
+      Ok(id) => {
+        println!("dodownlaod file: {:?} {}]", file_path, id);
+        match upload_file(&conn, &user, file_path, id).await? {
+          UploadResult::Uploaded => resvec.push(UploadResult::Uploaded),
+          UploadResult::NotAFile => resvec.push(UploadResult::NotAFile),
+          UploadResult::FileNotPresent => resvec.push(UploadResult::FileNotPresent),
+          UploadResult::UploadFailed => resvec.push(UploadResult::UploadFailed),
         };
       }
       Err(_) => (),
@@ -643,7 +821,7 @@ where
       Err(rusqlite::Error::SqliteFailure(e, Some(s))) => {
         if e.code == rusqlite::ErrorCode::ConstraintViolation {
           if s.contains("uuid") {
-            let (nid, n) = sqldata::read_zknote_unchecked(&conn, &note.id)?;
+            let (nid, n) = sqldata::read_zknote_unchecked(&conn, file_path, &note.id)?;
             // TODO: uuid conflict;  resolve with older one becoming archive note.
             // SqliteFailure(Error { code: ConstraintViolation, extended_code: 2067 }, Some("UNIQUE constraint failed: zknote.uuid"));
             if note.changeddate > n.changeddate {
@@ -921,6 +1099,7 @@ where
 // Make a stream of all the records needed to sync the remote.
 pub async fn sync_to_remote(
   conn: Arc<Connection>,
+  files_dir: &Path,
   user: &User,
   exclude_notes: Option<String>,
   exclude_links: Option<String>,
@@ -946,6 +1125,7 @@ pub async fn sync_to_remote(
 
   let ss = sync_stream(
     conn,
+    PathBuf::from(files_dir),
     user.id,
     exclude_notes,
     exclude_links,
@@ -1053,6 +1233,7 @@ pub fn new_shares(
 // Make a stream of all the records needed to sync the remote.
 pub fn sync_stream(
   conn: Arc<Connection>,
+  files_dir: PathBuf,
   uid: i64,
   exclude_notes: Option<String>,
   exclude_links: Option<String>,
@@ -1258,7 +1439,14 @@ pub fn sync_stream(
     ordering: None,
   };
 
-  let znstream = search_zknotes_stream(conn.clone(), uid, zns, exclude_notes.clone()).map(bytesify);
+  let znstream = search_zknotes_stream(
+    conn.clone(),
+    files_dir.clone(),
+    uid,
+    zns,
+    exclude_notes.clone(),
+  )
+  .map(bytesify);
 
   let ans = ZkNoteSearch {
     tagsearch: ts,
@@ -1271,7 +1459,8 @@ pub fn sync_stream(
     ordering: None,
   };
 
-  let anstream = search_zknotes_stream(conn.clone(), uid, ans, exclude_notes).map(bytesify);
+  let anstream =
+    search_zknotes_stream(conn.clone(), files_dir, uid, ans, exclude_notes).map(bytesify);
 
   // if there's a new share, just get all links since the beginning of time.
   let linkafter = if new_shares { after } else { None };

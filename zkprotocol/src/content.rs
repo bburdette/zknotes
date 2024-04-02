@@ -38,15 +38,22 @@ pub struct ZkNote {
   pub createdate: i64,
   pub changeddate: i64,
   pub deleted: bool,
-  pub is_file: bool,
+  pub filestatus: FileStatus,
   pub sysids: Vec<ZkNoteId>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
+pub enum FileStatus {
+  NotAFile,
+  FileMissing,
+  FilePresent,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
 pub struct ZkListNote {
   pub id: ZkNoteId,
   pub title: String,
-  pub is_file: bool,
+  pub filestatus: FileStatus,
   pub user: i64,
   pub createdate: i64,
   pub changeddate: i64,
