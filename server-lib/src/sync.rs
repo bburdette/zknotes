@@ -3,6 +3,8 @@ use crate::search::build_sql;
 use crate::search::{search_zknotes, search_zknotes_stream, sync_users, system_user, SearchResult};
 use crate::sqldata::{self, note_id_for_uuid, save_zklink, save_zknote, user_note_id};
 use crate::util::now;
+use actix_multipart_rfc7578 as multipart;
+use actix_web::body::BodyStream;
 use actix_web::error::PayloadError;
 use async_stream::try_stream;
 use awc;
@@ -17,19 +19,24 @@ use orgauth;
 use orgauth::data::User;
 use orgauth::dbfun::user_id;
 use orgauth::endpoints::Callbacks;
+use rand::AsByteSliceMut;
 use rusqlite::{params, Connection};
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::fs::File;
 use tokio::io::AsyncBufReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio_util::io::StreamReader;
 use uuid::Uuid;
 use zkprotocol::constants::{PrivateReplies, PrivateStreamingRequests, SpecialUuids};
-use zkprotocol::content::{GetZkNoteAndLinks, SaveZkNote, SyncMessage, SyncSince, ZkNoteId};
+use zkprotocol::content::{
+  FileStatus, GetZkNoteAndLinks, SaveZkNote, SyncMessage, SyncSince, ZkNote, ZkNoteId,
+};
 use zkprotocol::messages::{PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage};
 use zkprotocol::search::{
   AndOr, OrderDirection, OrderField, Ordering, ResultType, SearchMod, TagSearch, ZkNoteSearch,
@@ -359,6 +366,7 @@ pub enum UploadResult {
   Uploaded,
   NotAFile,
   FileNotPresent,
+  ExistsOnRemote,
   UploadFailed,
 }
 
@@ -398,6 +406,7 @@ pub async fn upload_file(
   };
 
   let cookie = cookie::Cookie::parse_encoded(c)?;
+  println!("upload_file 3");
 
   // let user_uri = awc::http::Uri::try_from(url).map_err(|x| zkerr::Error::String(x.to_string()))?;
 
@@ -405,19 +414,20 @@ pub async fn upload_file(
   let private_uri = awc::http::Uri::try_from(format!("{}/private", url).as_str())
     .map_err(|x| zkerr::Error::String(x.to_string()))?;
 
+  println!("upload_file 4");
   let getzknote = PrivateMessage {
     what: zkprotocol::constants::PrivateRequests::GetZkNote,
-    data: Some(serde_json::to_value(Uuid::from_slice(
-      uuid.as_str().as_bytes(),
-    )?)?),
+    data: Some(serde_json::to_value(Uuid::from_str(uuid.as_str())?)?),
   };
+  println!("upload_file 5");
   let gj = serde_json::to_value(getzknote)?;
 
   let client = awc::Client::new();
 
+  println!("upload_file 6");
   let mut res = client
     .post(private_uri)
-    .cookie(cookie)
+    .cookie(cookie.clone())
     .timeout(Duration::from_secs(60 * 60))
     .send_json(&gj)
     .await
@@ -430,62 +440,53 @@ pub async fn upload_file(
     .map_err(|e| zkerr::Error::String(e.to_string()))
     .await?;
 
-  // println!("upload_file 3");
-  // let file_uri = awc::http::Uri::try_from(format!("{}/file/{}", url, uuid).as_str())
-  //   .map_err(|x| zkerr::Error::String(x.to_string()))?;
+  println!("upload_file 7");
+  let j = serde_json::from_slice(b.as_ref())?;
 
-  // println!("uri: {:?}", file_uri);
+  println!("upload_file 8");
+  let msg: PrivateReplyMessage = serde_json::from_value(j)?;
+  assert!(msg.what == PrivateReplies::ZkNote);
 
-  // let client = awc::Client::new();
+  println!("upload_file 9");
+  let zkn: ZkNote = serde_json::from_value(msg.content)?;
 
-  // let res = client
-  //   .get(file_uri)
-  //   .cookie(cookie::Cookie::parse_encoded(c)?)
-  //   .timeout(Duration::from_secs(60 * 60))
-  //   .send()
-  //   .await
-  //   .map_err(|e| zkerr::Error::String(e.to_string()))?;
+  match zkn.filestatus {
+    FileStatus::NotAFile => return Ok(UploadResult::NotAFile),
+    FileStatus::FileMissing => (),
+    FileStatus::FilePresent => return Ok(UploadResult::ExistsOnRemote),
+  }
 
-  // // Write the body to a file.
-  // let mut file = tokio::fs::OpenOptions::new()
-  //   .write(true)
-  //   .create(true)
-  //   .open(hash.clone())
-  //   .await
-  //   .unwrap();
+  let upload_uri = awc::http::Uri::try_from(format!("{}/upload", url).as_str())
+    .map_err(|x| zkerr::Error::String(x.to_string()))?;
 
-  // res
-  //   .try_for_each(|bytes| match block_on(file.write(&bytes)) {
-  //     Ok(_) => future::ok(()),
-  //     Err(e) => future::err(e.into()),
-  //   })
-  //   .await
-  //   .map_err(|e| zkerr::Error::String(e.to_string()))?;
+  let mut form = multipart::client::multipart::Form::default();
+  form.add_file_with_mime(zkn.title, hashpath, mime::STAR_STAR)?;
 
-  // let fpath = Path::new(hash.as_str());
-  // let fh = sha256::try_digest(fpath)?;
+  let mut rq = client
+    .post(upload_uri)
+    .cookie(cookie)
+    .timeout(Duration::from_secs(60 * 60))
+    .content_type(form.content_type())
+    .send_body(multipart::client::multipart::Body::from(form))
+    .await
+    .map_err(|e| zkerr::Error::String(e.to_string()))?;
 
-  // // does the hash match?
-  // if fh != hash {
-  //   return Err(zkerr::Error::String(
-  //     "downloaded file hash doesn't match!".to_string(),
-  //   ));
-  // }
+  println!("rq: {:?}", rq);
 
-  // // let size = std::fs::metadata(fpath)?.len();
-  // let hashpath = files_dir.join(Path::new(fh.as_str()));
+  let prm: PrivateReplyMessage = serde_json::from_slice(
+    rq.body()
+      .map_err(|e| zkerr::Error::String(e.to_string()))
+      .await?
+      .as_ref(),
+  )?;
 
-  // // file exists?
-  // if hashpath.exists() {
-  //   // new file already exists.
-  //   std::fs::remove_file(fpath)?;
-  // } else {
-  //   // move into hashed-files dir.
-  //   std::fs::rename(fpath, hashpath)?;
-  // }
+  println!("prm: {:?}", prm);
 
-  // TODO: remove source records??
-  Ok(UploadResult::UploadFailed)
+  if prm.what == PrivateReplies::FileSyncComplete {
+    Ok(UploadResult::Uploaded)
+  } else {
+    Ok(UploadResult::UploadFailed)
+  }
 }
 
 pub async fn sync_files_down(
@@ -561,10 +562,11 @@ pub async fn sync_files_up(
   for rec in rec_iter {
     match rec {
       Ok(id) => {
-        println!("dodownlaod file: {:?} {}]", file_path, id);
+        println!("uploading file: {:?} {}]", file_path, id);
         match upload_file(&conn, &user, file_path, id).await? {
           UploadResult::Uploaded => resvec.push(UploadResult::Uploaded),
           UploadResult::NotAFile => resvec.push(UploadResult::NotAFile),
+          UploadResult::ExistsOnRemote => resvec.push(UploadResult::ExistsOnRemote),
           UploadResult::FileNotPresent => resvec.push(UploadResult::FileNotPresent),
           UploadResult::UploadFailed => resvec.push(UploadResult::UploadFailed),
         };

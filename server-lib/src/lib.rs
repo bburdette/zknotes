@@ -308,6 +308,8 @@ async fn make_file_notes(
   config: web::Data<Config>,
   payload: &mut Multipart,
 ) -> Result<PrivateReplyMessage, Box<dyn Error>> {
+  println!("make_file_notes");
+
   let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
   let userdata = match session_user(&conn, session, &config)? {
     Either::Left(ud) => ud,
@@ -316,7 +318,10 @@ async fn make_file_notes(
 
   // Save the files to our temp path.
   let tp = config.file_tmp_path.clone();
-  let saved_files = save_files(&tp, payload).await?;
+  let saved_files_res = save_files(&tp, payload).await;
+  println!("saved_files_res {:?}", saved_files_res);
+  let saved_files = saved_files_res?;
+  // let saved_files = save_files(&tp, payload).await?;
 
   let mut zklns = Vec::new();
 
@@ -348,9 +353,12 @@ async fn save_files(
 ) -> Result<Vec<(String, String)>, Box<dyn Error>> {
   // iterate over multipart stream
 
+  println!("save_files");
+
   let mut rv = Vec::new();
 
   while let Some(mut field) = payload.try_next().await? {
+    println!("tryenext 1 {:?}", field);
     // A multipart/form-data stream has to contain `content_disposition`
     let content_disposition = field.content_disposition().clone();
     // .ok_or(simple_error::SimpleError::new("bad"))?;
@@ -359,6 +367,8 @@ async fn save_files(
       .get_filename()
       .unwrap_or("filename not found");
 
+    println!("save_files filename {}", filename);
+
     let wkfilename = Uuid::new_v4().to_string();
 
     let mut filepath = to_dir.to_path_buf();
@@ -366,8 +376,12 @@ async fn save_files(
 
     let rf = filepath.clone();
 
+    println!("save_files filepath {:?}", filepath);
+
     // File::create is blocking operation, use threadpool
-    let mut f = web::block(|| std::fs::File::create(filepath)).await??;
+    let mut f = web::block(|| std::fs::File::create(rf)).await??;
+
+    println!("got f");
 
     // Field in turn is stream of *Bytes* object
     while let Some(chunk) = field.try_next().await? {
@@ -375,11 +389,12 @@ async fn save_files(
       f = web::block(move || f.write_all(&chunk).map(|_| f)).await??;
     }
 
-    let ps = rf
+    let ps = filepath
       .into_os_string()
       .into_string()
       .map_err(|osstr| simple_error!("couldn't convert filename to string: {:?}", osstr));
 
+    println!("sf end");
     rv.push((filename.to_string(), ps?));
   }
 
@@ -769,6 +784,17 @@ pub fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
     for (key, value) in env::vars() {
       if key == "ZKNOTES_STATIC_PATH" {
         config.static_path = PathBuf::from_str(value.as_str()).ok();
+      }
+    }
+  }
+
+  match std::fs::create_dir(config.file_tmp_path.clone()) {
+    Ok(()) => (),
+    Err(e) => {
+      if e.kind() == std::io::ErrorKind::AlreadyExists {
+        ()
+      } else {
+        Err(e)?
       }
     }
   }

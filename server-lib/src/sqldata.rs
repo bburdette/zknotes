@@ -1209,7 +1209,7 @@ pub fn read_zknote_filehash(
 pub fn file_exists(conn: &Connection, filedir: &Path, file_id: i64) -> Result<bool, zkerr::Error> {
   let hash: String = conn.query_row(
     "select F.hash from file F
-      where N.file = ?1",
+      where F.id = ?1",
     params![file_id],
     |row| Ok(row.get(0)?),
   )?;

@@ -970,7 +970,7 @@ mod tests {
     let config = load_config("testserver.toml")?;
     let server = init_server(config.clone())?;
     let handle = server.handle();
-    let _joinhandle = tokio::task::spawn(async move { server.await });
+    let joinhandle = tokio::task::spawn(async move { server.await });
 
     // log in the server-syncuser so they get a cookie.
     let client = reqwest::Client::new();
@@ -1028,7 +1028,15 @@ mod tests {
 
     // client should have the server file now.
     assert!(Path::new(
-      format!("{}/{}", client_ts.filepath.to_str().expect("wat"), fi.hash).as_str()
+      format!(
+        "{}/{}",
+        client_ts
+          .filepath
+          .to_str()
+          .expect("server file missing from client dir"),
+        fi.hash
+      )
+      .as_str()
     )
     .exists());
 
@@ -1044,7 +1052,28 @@ mod tests {
 
     println!("syncfilesup reply {:?}", reply);
 
+    // server should have the client file now.
+    let fi = read_file_info(&caconn, client_ts.filenote)?;
+
+    // client should have the server file now.
+    assert!(Path::new(
+      format!(
+        "{}/{}",
+        server_ts
+          .filepath
+          .to_str()
+          .expect("client file missing from server dir"),
+        fi.hash
+      )
+      .as_str()
+    )
+    .exists());
+
     handle.stop(true).await;
+
+    println!("joinhandle: {:?}", joinhandle);
+
+    // assert!(2 == 3);
 
     // ------------------------------------------------------------
     // archive link testing.

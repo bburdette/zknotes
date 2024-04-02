@@ -42,3 +42,5 @@ tokio = "1.35.0"
 regex = "1.10.2"
 awc = { version = "3.3.0", features = ["cookies", "rustls"] }
 cookie = "0.16.2"
+actix-multipart-rfc7578 = "0.10.0"
+mime = "0.3.17"
