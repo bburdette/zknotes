@@ -90,11 +90,17 @@ type alias ZkInviteData =
     List SaveZkLink
 
 
+type FileStatus
+    = NotAFile
+    | FileMissing
+    | FilePresent
+
+
 type alias ZkListNote =
     { id : ZkNoteId
     , user : UserId
     , title : String
-    , isFile : Bool
+    , filestatus : FileStatus
     , createdate : Int
     , changeddate : Int
     , sysids : List ZkNoteId
@@ -142,7 +148,7 @@ type alias ZkNote =
     , createdate : Int
     , changeddate : Int
     , deleted : Bool
-    , isFile : Bool
+    , filestatus : FileStatus
     , sysids : List ZkNoteId
     }
 
@@ -588,13 +594,33 @@ encodeSaveZkNote zkn =
                ]
 
 
+decodeFileStatus : JD.Decoder FileStatus
+decodeFileStatus =
+    JD.string
+        |> JD.andThen
+            (\s ->
+                case s of
+                    "NotAFile" ->
+                        JD.succeed NotAFile
+
+                    "FileMissing" ->
+                        JD.succeed FileMissing
+
+                    "FilePresent" ->
+                        JD.succeed FilePresent
+
+                    wup ->
+                        JD.fail <| "invalid filestatus: " ++ wup
+            )
+
+
 decodeZkListNote : JD.Decoder ZkListNote
 decodeZkListNote =
     JD.succeed ZkListNote
         |> andMap (JD.field "id" decodeZkNoteId)
         |> andMap (JD.field "user" decodeUserId)
         |> andMap (JD.field "title" JD.string)
-        |> andMap (JD.field "is_file" JD.bool)
+        |> andMap (JD.field "filestatus" decodeFileStatus)
         |> andMap (JD.field "createdate" JD.int)
         |> andMap (JD.field "changeddate" JD.int)
         |> andMap (JD.field "sysids" (JD.list decodeZkNoteId))
@@ -647,7 +673,7 @@ decodeZkNote =
         |> andMap (JD.field "createdate" JD.int)
         |> andMap (JD.field "changeddate" JD.int)
         |> andMap (JD.field "deleted" JD.bool)
-        |> andMap (JD.field "is_file" JD.bool)
+        |> andMap (JD.field "filestatus" decodeFileStatus)
         |> andMap (JD.field "sysids" <| JD.list decodeZkNoteId)
 
 

@@ -185,7 +185,7 @@ type alias Model =
     , editableValue : Bool -- is this note editable by other users?
     , showtitle : Bool
     , deleted : Bool
-    , isFile : Bool
+    , filestatus : Data.FileStatus
     , pubidtxt : String
     , title : String
     , createdate : Maybe Int
@@ -301,7 +301,7 @@ toZkListNote model =
                 { id = id
                 , user = model.noteUser
                 , title = model.title
-                , isFile = model.isFile
+                , filestatus = model.filestatus
                 , createdate = createdate
                 , changeddate = changeddate
                 , sysids = getSysids model
@@ -334,7 +334,7 @@ toZkNote model =
                 , createdate = createdate
                 , changeddate = changeddate
                 , deleted = model.deleted
-                , isFile = model.isFile
+                , filestatus = model.filestatus
                 , sysids = getSysids model
                 }
 
@@ -587,7 +587,7 @@ pageLink model =
     model.id
         |> Maybe.andThen
             (\id ->
-                if model.isFile then
+                if model.filestatus /= Data.NotAFile then
                     Just <| UB.absolute [ "file", zkNoteIdToString id ] []
 
                 else if isPublic model then
@@ -1084,7 +1084,7 @@ zknview zone size recentZkns trqs noteCache model =
                             EI.labelLeft
                                 edlabelattr
                                 (E.text
-                                    (if model.isFile then
+                                    (if model.filestatus /= Data.NotAFile then
                                         "filename"
 
                                      else
@@ -1309,8 +1309,8 @@ zknview zone size recentZkns trqs noteCache model =
                             EI.button (E.alignRight :: Common.buttonStyle)
                                 { label = E.text ">", onPress = Just <| AddToSearchAsTag model.title }
                         ]
-                    , case ( model.isFile, toZkNote model ) of
-                        ( True, Just zkn ) ->
+                    , case ( model.filestatus, toZkNote model ) of
+                        ( Data.FilePresent, Just zkn ) ->
                             MC.noteFile model.si model.title zkn
 
                         _ ->
@@ -1427,7 +1427,7 @@ zknview zone size recentZkns trqs noteCache model =
         showpagelink =
             case pageLink model of
                 Just pl ->
-                    E.link Common.linkStyle { url = pl, label = E.text pl }
+                    E.newTabLink Common.linkStyle { url = pl, label = E.text pl }
 
                 Nothing ->
                     E.none
@@ -1684,7 +1684,7 @@ initFull si ld zkl zknote dtlinks spm =
       , editable = zknote.editable
       , editableValue = zknote.editableValue
       , deleted = zknote.deleted
-      , isFile = zknote.isFile
+      , filestatus = zknote.filestatus
       , showtitle = zknote.showtitle
       , createdate = Just zknote.createdate
       , changeddate = Just zknote.changeddate
@@ -1736,7 +1736,7 @@ initNew si ld zkl spm links =
     , editable = True
     , editableValue = False
     , deleted = False
-    , isFile = False
+    , filestatus = Data.NotAFile
     , showtitle = True
     , createdate = Nothing
     , changeddate = Nothing
@@ -1787,7 +1787,7 @@ sznToZkn uid uname unote sysids sdzn szn =
     , createdate = sdzn.changeddate
     , changeddate = sdzn.changeddate
     , deleted = szn.deleted
-    , isFile = False
+    , filestatus = Data.NotAFile
     , sysids = sysids
     }
 

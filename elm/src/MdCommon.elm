@@ -422,7 +422,7 @@ noteView si noteCache id _ =
             |> Maybe.andThen (NC.getNote noteCache)
     of
         Just zne ->
-            if zne.zknote.isFile then
+            if zne.zknote.filestatus /= Data.NotAFile then
                 noteFile si zne.zknote.title zne.zknote
 
             else
