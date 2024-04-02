@@ -7,6 +7,7 @@ pub mod sqldata;
 // mod sqltest;
 mod sync;
 mod synctest;
+use crate::error as zkerr;
 use actix_cors::Cors;
 use actix_files::NamedFile;
 use actix_multipart::Multipart;
@@ -363,9 +364,12 @@ async fn save_files(
     let content_disposition = field.content_disposition().clone();
     // .ok_or(simple_error::SimpleError::new("bad"))?;
 
-    let filename = content_disposition
-      .get_filename()
-      .unwrap_or("filename not found");
+    let filename = content_disposition.get_name().ok_or(zkerr::Error::String(
+      "filename not found in content_disposition".to_string(),
+    ))?;
+
+    // can't add this in actix_multipart_rfc7578
+    // let mbuuid = content_disposition.get_unknown("noteuuid");
 
     println!("save_files filename {}", filename);
 

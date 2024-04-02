@@ -4,7 +4,6 @@ use crate::search::{search_zknotes, search_zknotes_stream, sync_users, system_us
 use crate::sqldata::{self, note_id_for_uuid, save_zklink, save_zknote, user_note_id};
 use crate::util::now;
 use actix_multipart_rfc7578 as multipart;
-use actix_web::body::BodyStream;
 use actix_web::error::PayloadError;
 use async_stream::try_stream;
 use awc;
@@ -19,7 +18,6 @@ use orgauth;
 use orgauth::data::User;
 use orgauth::dbfun::user_id;
 use orgauth::endpoints::Callbacks;
-use rand::AsByteSliceMut;
 use rusqlite::{params, Connection};
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -28,15 +26,12 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::fs::File;
 use tokio::io::AsyncBufReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio_util::io::StreamReader;
 use uuid::Uuid;
 use zkprotocol::constants::{PrivateReplies, PrivateStreamingRequests, SpecialUuids};
-use zkprotocol::content::{
-  FileStatus, GetZkNoteAndLinks, SaveZkNote, SyncMessage, SyncSince, ZkNote, ZkNoteId,
-};
+use zkprotocol::content::{FileStatus, SaveZkNote, SyncMessage, SyncSince, ZkNote, ZkNoteId};
 use zkprotocol::messages::{PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage};
 use zkprotocol::search::{
   AndOr, OrderDirection, OrderField, Ordering, ResultType, SearchMod, TagSearch, ZkNoteSearch,

@@ -2267,9 +2267,20 @@ pub fn make_file_note(
       Err(x) => Err(x),
     }?;
 
-  // use existing id, or create new
+  // use existing file.id, or create new
   let fid = match oid {
-    Some(id) => id,
+    Some(fid) => {
+      // note exists too, for this user?
+      match conn.query_row_and_then(
+        "select id, uuid from zknote where file = ?1 and user = ?2",
+        params![fid, uid],
+        |row| Ok((row.get(0)?, row.get::<usize, String>(1)?)),
+      ) {
+        Ok((id, uuid)) => return Ok((id, Uuid::parse_str(uuid.as_str())?, fid)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => fid,
+        Err(e) => Err(e)?,
+      }
+    }
     None => {
       let now = now()?;
       // add table entry
@@ -2282,7 +2293,7 @@ pub fn make_file_note(
     }
   };
 
-  // now make a new note.
+  // make a new note.
   let (id, sn) = save_zknote(
     &conn,
     uid,
