@@ -174,7 +174,7 @@ handleTspUpdate model ( nm, cmd ) =
             , SyncFiles <|
                 { tagSearch = [ ts ]
                 , offset = 0
-                , limit = Just model.paginationModel.increment
+                , limit = Nothing
                 , what = ""
                 , resultType = S.RtListNote
                 , archives = False
