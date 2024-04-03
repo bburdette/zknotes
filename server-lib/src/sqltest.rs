@@ -2,7 +2,6 @@
 mod tests {
   use crate::search::*;
   use crate::sqldata::*;
-  use either::Either;
   use orgauth::data::RegistrationData;
   use orgauth::dbfun::{new_user, user_id};
   use std::error::Error;
@@ -35,6 +34,8 @@ mod tests {
       }
     }
     let mut cb = zknotes_callbacks();
+
+    let filesdir = Path::new("");
 
     dbinit(dbp, None)?;
 
@@ -126,7 +127,7 @@ mod tests {
     println!("4");
 
     // user 1 note 3 - share
-    let (szn1_3_share_id, szn1_3_share) = save_zknote(
+    let (szn1_3_share_id, _szn1_3_share) = save_zknote(
       &conn,
       uid1,
       &SaveZkNote {
@@ -193,7 +194,7 @@ mod tests {
     save_zklink(&conn, szn1_5_id, szn1_3_share_id, uid1, None)?;
 
     // user 1 note 6 - shared w user link
-    let (szn1_6_id, szn1_6) = save_zknote(
+    let (szn1_6_id, _szn1_6) = save_zknote(
       &conn,
       uid1,
       &SaveZkNote {
@@ -211,7 +212,7 @@ mod tests {
     println!("9");
 
     // user 1 note 7 - shared w reversed user link
-    let (szn1_7_id, szn1_7) = save_zknote(
+    let (szn1_7_id, _szn1_7) = save_zknote(
       &conn,
       uid1,
       &SaveZkNote {
@@ -271,7 +272,7 @@ mod tests {
 
     println!("12");
 
-    let (szn2_1_id, szn2_1) = save_zknote(
+    let (szn2_1_id, _szn2_1) = save_zknote(
       &conn,
       uid2,
       &SaveZkNote {
@@ -316,14 +317,14 @@ mod tests {
     println!("14");
 
     // despite public id, shouldn't be able to read. because doesn't link to 'public'
-    match read_zknotepubid(&conn, None, "publicid1") {
+    match read_zknotepubid(&conn, filesdir, None, "publicid1") {
       Ok(_) => panic!("wat"),
       Err(_e) => (),
     };
 
     println!("15");
 
-    let (pubzn2_id, pubzn2) = save_zknote(
+    let (pubzn2_id, _pubzn2) = save_zknote(
       &conn,
       uid1,
       &SaveZkNote {
@@ -340,7 +341,7 @@ mod tests {
     save_zklink(&conn, pubzn2_id, publicid, uid1, None)?;
     println!("15.2");
     // should be able to read because links to 'public'.
-    read_zknotepubid(&conn, None, "publicid2")?;
+    read_zknotepubid(&conn, filesdir, None, "publicid2")?;
     println!("15.3");
 
     // should be able to save changes to a share note without error.
@@ -363,7 +364,7 @@ mod tests {
     // TODO test that 'public' is not treated as a share.
 
     // test notes linked with user BY CREATOR are editable.
-    let (szn1_6_id, szn1_6) = save_zknote(
+    let (_szn1_6_id, _szn1_6) = save_zknote(
       &conn,
       uid2,
       &SaveZkNote {
@@ -398,7 +399,7 @@ mod tests {
       deleted: false,
     };
 
-    match search_zknotes(&conn, uid1, &u1pubnote2_search)? {
+    match search_zknotes(&conn, filesdir, uid1, &u1pubnote2_search)? {
       SearchResult::SrListNote(zklr) => {
         if zklr.notes.len() == 1 {
           ()
@@ -413,7 +414,7 @@ mod tests {
     println!("17");
 
     // u2 can see the note too.
-    match search_zknotes(&conn, uid2, &u1pubnote2_search)? {
+    match search_zknotes(&conn, filesdir, uid2, &u1pubnote2_search)? {
       SearchResult::SrListNote(zklr) => {
         if zklr.notes.len() == 1 {
           ()
@@ -440,7 +441,7 @@ mod tests {
     };
 
     // u2 can't see u1's private note..
-    match search_zknotes(&conn, uid2, &u1note1_search)? {
+    match search_zknotes(&conn, filesdir, uid2, &u1note1_search)? {
       SearchResult::SrListNote(zklr) => {
         if zklr.notes.len() > 0 {
           // not supposed to see it!
@@ -454,7 +455,7 @@ mod tests {
     println!("18");
 
     // u1 can see their own private note..
-    match search_zknotes(&conn, uid1, &u1note1_search)? {
+    match search_zknotes(&conn, filesdir, uid1, &u1note1_search)? {
       SearchResult::SrListNote(zklr) => {
         if zklr.notes.len() > 0 {
           ()
@@ -482,7 +483,7 @@ mod tests {
     };
 
     // u2 can see a note shared directly with them.
-    match search_zknotes(&conn, uid2, &u1note6_search)? {
+    match search_zknotes(&conn, filesdir, uid2, &u1note6_search)? {
       SearchResult::SrListNote(zklr) => {
         if zklr.notes.len() > 0 {
           ()
@@ -510,7 +511,7 @@ mod tests {
     };
 
     // u2 can see a note shared directly with them, reversed link.
-    match search_zknotes(&conn, uid2, &u1note7_search)? {
+    match search_zknotes(&conn, filesdir, uid2, &u1note7_search)? {
       SearchResult::SrListNote(zklr) => {
         if zklr.notes.len() > 0 {
           ()
@@ -537,7 +538,7 @@ mod tests {
       deleted: false,
     };
 
-    match search_zknotes(&conn, uid2, &u1note4_search)? {
+    match search_zknotes(&conn, filesdir, uid2, &u1note4_search)? {
       SearchResult::SrListNote(zklr) => {
         if zklr.notes.len() > 0 {
           ()
@@ -565,7 +566,7 @@ mod tests {
       deleted: false,
     };
 
-    match search_zknotes(&conn, uid2, &u1note5_search)? {
+    match search_zknotes(&conn, filesdir, uid2, &u1note5_search)? {
       SearchResult::SrListNote(zklr) => {
         if zklr.notes.len() > 0 {
           // not supposed to see it!
@@ -593,7 +594,7 @@ mod tests {
       deleted: false,
     };
 
-    match search_zknotes(&conn, uid2, &u1note4_archive_search)? {
+    match search_zknotes(&conn, filesdir, uid2, &u1note4_archive_search)? {
       SearchResult::SrListNote(zklr) => {
         if zklr.notes.len() > 0 {
           // not supposed to see it!
@@ -609,7 +610,7 @@ mod tests {
 
     // system user can see the archive note
     let systemid = user_id(&conn, "system")?;
-    match search_zknotes(&conn, systemid, &u1note4_archive_search)? {
+    match search_zknotes(&conn, filesdir, systemid, &u1note4_archive_search)? {
       SearchResult::SrListNote(zklr) => {
         if zklr.notes.len() > 0 {
           ()
@@ -645,7 +646,7 @@ mod tests {
       deleted: false,
     };
 
-    match search_zknotes(&conn, uid1, &u1pubnote2_exact_search)? {
+    match search_zknotes(&conn, filesdir, uid1, &u1pubnote2_exact_search)? {
       SearchResult::SrListNote(zklr) => {
         if zklr.notes.len() == 1 {
           panic!("test failed")
@@ -672,7 +673,7 @@ mod tests {
       deleted: false,
     };
 
-    match search_zknotes(&conn, uid1, &u1pubnote2_exact_search)? {
+    match search_zknotes(&conn, filesdir, uid1, &u1pubnote2_exact_search)? {
       SearchResult::SrListNote(zklr) => {
         if zklr.notes.len() == 4 {
           ()
@@ -699,7 +700,7 @@ mod tests {
       deleted: false,
     };
 
-    match search_zknotes(&conn, uid1, &u1pubnote2_exact_search)? {
+    match search_zknotes(&conn, filesdir, uid1, &u1pubnote2_exact_search)? {
       SearchResult::SrListNote(zklr) => {
         if zklr.notes.len() == 9 {
           ()
@@ -726,7 +727,7 @@ mod tests {
       deleted: false,
     };
 
-    match search_zknotes(&conn, uid1, &u1pubnote2_exact_search)? {
+    match search_zknotes(&conn, filesdir, uid1, &u1pubnote2_exact_search)? {
       SearchResult::SrListNote(zklr) => {
         if zklr.notes.len() == 1 {
           ()

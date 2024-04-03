@@ -309,9 +309,14 @@ pub async fn download_file(
   let mut file = tokio::fs::OpenOptions::new()
     .write(true)
     .create(true)
-    .open(hash.clone())
+    .open(hash.clone()) // temporary filename
     .await
-    .unwrap();
+    .map_err(|e| {
+      zkerr::annotate_string(
+        format!("error saving downloaded file: {:?}", hash),
+        e.into(),
+      )
+    })?;
 
   res
     .try_for_each(|bytes| match block_on(file.write(&bytes)) {

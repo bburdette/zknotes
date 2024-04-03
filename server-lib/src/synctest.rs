@@ -106,6 +106,10 @@ mod tests {
     let filesdir = format!("{}_files", basename);
     let fdpath = Path::new(filesdir.as_str());
 
+    if !fdpath.exists() {
+      std::fs::create_dir_all(&fdpath)?;
+    }
+
     // test users.
     let otheruser = new_user(
       &conn,

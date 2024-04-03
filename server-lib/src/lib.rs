@@ -4,7 +4,7 @@ pub mod interfaces;
 mod migrations;
 mod search;
 pub mod sqldata;
-// mod sqltest;
+mod sqltest;
 mod sync;
 mod synctest;
 use crate::error as zkerr;
@@ -611,7 +611,16 @@ pub fn defcon() -> Config {
 
 pub fn load_config(filename: &str) -> Result<Config, Box<dyn Error>> {
   info!("loading config: {}", filename);
-  let c = toml::from_str(util::load_string(filename)?.as_str())?;
+  let c = toml::from_str(
+    util::load_string(filename)
+      .map_err(|e| {
+        zkerr::annotate_string(
+          format!("failed to load config: '{}'", filename),
+          zkerr::Error::String(e.to_string()),
+        )
+      })?
+      .as_str(),
+  )?;
   Ok(c)
 }
 
@@ -686,11 +695,13 @@ pub async fn err_main() -> Result<(), Box<dyn Error>> {
   };
 
   // verify/create file directories.
-  if !std::path::Path::exists(&config.file_tmp_path) {
-    std::fs::create_dir_all(&config.file_tmp_path)?
-  }
-  if !std::path::Path::exists(&config.file_path) {
-    std::fs::create_dir_all(&config.file_path)?
+  if config.createdirs {
+    if !std::path::Path::exists(&config.file_tmp_path) {
+      std::fs::create_dir_all(&config.file_tmp_path)?
+    }
+    if !std::path::Path::exists(&config.file_path) {
+      std::fs::create_dir_all(&config.file_path)?
+    }
   }
 
   // are we exporting the DB?
@@ -718,7 +729,7 @@ pub async fn err_main() -> Result<(), Box<dyn Error>> {
     user.admin = true;
     orgauth::dbfun::update_user(&conn, &user)?;
 
-    println!("promoted user {} to admin", uid);
+    info!("promoted user {} to admin", uid);
     return Ok(());
   }
 
