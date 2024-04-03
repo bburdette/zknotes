@@ -1,5 +1,6 @@
 module Route exposing (Route(..), parseUrl, routeTitle, routeUrl)
 
+import Data exposing (ZkNoteId, zkNoteIdFromString, zkNoteIdToString)
 import UUID exposing (UUID)
 import Url exposing (Url)
 import Url.Builder as UB
@@ -8,12 +9,12 @@ import Url.Parser as UP exposing ((</>))
 
 type Route
     = LoginR
-    | PublicZkNote Int
+    | PublicZkNote ZkNoteId
     | PublicZkPubId String
-    | EditZkNoteR Int
+    | EditZkNoteR ZkNoteId
     | EditZkNoteNew
-    | ArchiveNoteListingR Int
-    | ArchiveNoteR Int Int
+    | ArchiveNoteListingR ZkNoteId
+    | ArchiveNoteR ZkNoteId ZkNoteId
     | ResetPasswordR String UUID
     | SettingsR
     | Invite String
@@ -27,22 +28,22 @@ routeTitle route =
             "login"
 
         PublicZkNote id ->
-            "zknote " ++ String.fromInt id
+            "zknote " ++ zkNoteIdToString id
 
         PublicZkPubId id ->
             id ++ " - zknotes"
 
         EditZkNoteR id ->
-            "zknote " ++ String.fromInt id
+            "zknote " ++ zkNoteIdToString id
 
         EditZkNoteNew ->
             "new zknote"
 
         ArchiveNoteListingR id ->
-            "archives " ++ String.fromInt id
+            "archives " ++ zkNoteIdToString id
 
         ArchiveNoteR id aid ->
-            "archive " ++ String.fromInt id ++ ": " ++ String.fromInt aid
+            "archive " ++ zkNoteIdToString id ++ ": " ++ zkNoteIdToString aid
 
         ResetPasswordR _ _ ->
             "password reset"
@@ -67,7 +68,7 @@ parseUrl url =
             , UP.map PublicZkNote <|
                 UP.s
                     "note"
-                    </> UP.int
+                    </> UP.custom "ZkNoteId" (zkNoteIdFromString >> Result.toMaybe)
             , UP.map (\i -> PublicZkPubId (Maybe.withDefault "" (Url.percentDecode i))) <|
                 UP.s
                     "page"
@@ -75,16 +76,16 @@ parseUrl url =
             , UP.map ArchiveNoteListingR <|
                 UP.s
                     "archivelisting"
-                    </> UP.int
+                    </> UP.custom "ZkNoteId" (zkNoteIdFromString >> Result.toMaybe)
             , UP.map ArchiveNoteR <|
                 UP.s
                     "archivenote"
-                    </> UP.int
-                    </> UP.int
+                    </> UP.custom "ZkNoteId" (zkNoteIdFromString >> Result.toMaybe)
+                    </> UP.custom "ZkNoteId" (zkNoteIdFromString >> Result.toMaybe)
             , UP.map EditZkNoteR <|
                 UP.s
                     "editnote"
-                    </> UP.int
+                    </> UP.custom "ZkNoteId" (zkNoteIdFromString >> Result.toMaybe)
             , UP.map EditZkNoteNew <|
                 UP.s
                     "editnote"
@@ -113,23 +114,23 @@ routeUrl route =
         LoginR ->
             UB.absolute [ "login" ] []
 
-        PublicZkNote id ->
-            UB.absolute [ "note", String.fromInt id ] []
+        PublicZkNote uuid ->
+            UB.absolute [ "note", zkNoteIdToString uuid ] []
 
         PublicZkPubId pubid ->
             UB.absolute [ "page", pubid ] []
 
-        EditZkNoteR id ->
-            UB.absolute [ "editnote", String.fromInt id ] []
+        EditZkNoteR uuid ->
+            UB.absolute [ "editnote", zkNoteIdToString uuid ] []
 
         EditZkNoteNew ->
             UB.absolute [ "editnote", "new" ] []
 
-        ArchiveNoteListingR id ->
-            UB.absolute [ "archivelisting", String.fromInt id ] []
+        ArchiveNoteListingR uuid ->
+            UB.absolute [ "archivelisting", zkNoteIdToString uuid ] []
 
-        ArchiveNoteR id aid ->
-            UB.absolute [ "archivenote", String.fromInt id, String.fromInt aid ] []
+        ArchiveNoteR uuid aid ->
+            UB.absolute [ "archivenote", zkNoteIdToString uuid, zkNoteIdToString aid ] []
 
         ResetPasswordR user key ->
             UB.absolute [ "reset", user, UUID.toString key ] []

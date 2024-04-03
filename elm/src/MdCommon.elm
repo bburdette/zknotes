@@ -1,9 +1,9 @@
 module MdCommon exposing (Panel, ViewMode(..), blockCells, blockPanels, cellView, codeBlock, codeSpan, defCell, heading, imageView, linkDict, markdownView, mdCells, mdPanel, mdPanels, mkRenderer, noteFile, noteIds, panelView, rawTextToId, searchView, showRunState)
 
-import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
-import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
+import Cellme.Cellme exposing (CellContainer(..), RunState(..))
+import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr)
 import Common exposing (buttonStyle)
-import Data
+import Data exposing (ZkNoteId, ZniSet, emptyZniSet, zkNoteIdFromString, zkNoteIdToString)
 import Dict exposing (Dict)
 import Element as E exposing (Element)
 import Element.Background as EBk
@@ -21,6 +21,7 @@ import Maybe.Extra as ME
 import NoteCache as NC exposing (NoteCache)
 import Schelme.Show exposing (showTerm)
 import Set exposing (Set(..))
+import TSet
 import TangoColors as TC
 import Util
 import ZkCommon
@@ -43,7 +44,7 @@ mdCells markdown =
 
 
 type alias Panel =
-    { noteid : Int }
+    { noteid : ZkNoteId }
 
 
 mdPanel : String -> Maybe Panel
@@ -76,7 +77,7 @@ blockPanels blocks =
                             in
                             am
                                 |> Dict.get "noteid"
-                                |> Maybe.andThen String.toInt
+                                |> Maybe.andThen (zkNoteIdFromString >> Result.toMaybe)
                                 |> Maybe.andThen
                                     (\id ->
                                         Just { noteid = id }
@@ -239,15 +240,15 @@ mkRenderer si viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged not
                 |> Markdown.Html.withAttribute "query"
             , Markdown.Html.tag "panel"
                 (\noteid renderedChildren ->
-                    case String.toInt noteid of
-                        Just id ->
+                    case zkNoteIdFromString noteid of
+                        Ok id ->
                             if showPanelElt then
                                 panelView id renderedChildren
 
                             else
                                 E.none
 
-                        Nothing ->
+                        Err _ ->
                             E.text "error"
                 )
                 |> Markdown.Html.withAttribute "noteid"
@@ -296,10 +297,10 @@ searchView viewMode restoreSearchMsg search renderedChildren =
         )
 
 
-panelView : Int -> List (Element a) -> Element a
+panelView : ZkNoteId -> List (Element a) -> Element a
 panelView noteid renderedChildren =
     E.el [ E.padding 5, EBk.color TC.darkGray ] <|
-        E.text ("Side panel note :" ++ String.fromInt noteid)
+        E.text ("Side panel note :" ++ zkNoteIdToString noteid)
 
 
 imageView : String -> String -> Maybe String -> List (Element a) -> Element a
@@ -325,15 +326,15 @@ htmlAudioView url text =
 audioNoteView : Data.Sysids -> Data.ZkNote -> Element a
 audioNoteView si zkn =
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
-        [ link (Just zkn.title) ("/note/" ++ String.fromInt zkn.id) [ E.text zkn.title ]
+        [ link (Just zkn.title) ("/note/" ++ zkNoteIdToString zkn.id) [ E.text zkn.title ]
         , E.row [ E.spacing 20 ]
-            [ htmlAudioView ("/file/" ++ String.fromInt zkn.id) zkn.title
+            [ htmlAudioView ("/file/" ++ zkNoteIdToString zkn.id) zkn.title
 
             -- TODO pass in url instead of hardcoded
             , if List.filter (\i -> i == si.publicid) zkn.sysids /= [] then
                 link
                     (Just "ts↗")
-                    ("https://29a.ch/timestretch/#a=https://www.zknotes.com/file/" ++ String.fromInt zkn.id)
+                    ("https://29a.ch/timestretch/#a=https://www.zknotes.com/file/" ++ zkNoteIdToString zkn.id)
                     [ E.text "ts↗" ]
 
               else
@@ -347,10 +348,10 @@ videoNoteView : Data.ZkNote -> Element a
 videoNoteView zknote =
     let
         fileurl =
-            "/file/" ++ String.fromInt zknote.id
+            "/file/" ++ zkNoteIdToString zknote.id
     in
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
-        [ link (Just zknote.title) ("/note/" ++ String.fromInt zknote.id) [ E.text zknote.title ]
+        [ link (Just zknote.title) ("/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
         , videoView 500 fileurl (Just zknote.title) Nothing Nothing []
         ]
 
@@ -359,10 +360,10 @@ imageNoteView : Data.ZkNote -> Element a
 imageNoteView zknote =
     let
         fileurl =
-            "/file/" ++ String.fromInt zknote.id
+            "/file/" ++ zkNoteIdToString zknote.id
     in
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
-        [ link (Just zknote.title) ("/note/" ++ String.fromInt zknote.id) [ E.text zknote.title ]
+        [ link (Just zknote.title) ("/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
         , imageView zknote.title fileurl Nothing []
         ]
 
@@ -375,9 +376,6 @@ noteFile si filename zknote =
                 |> List.drop 1
                 |> List.reverse
                 |> List.head
-
-        fileurl =
-            "/file/" ++ String.fromInt zknote.id
     in
     case suffix of
         Nothing ->
@@ -413,17 +411,18 @@ noteFile si filename zknote =
                     imageNoteView zknote
 
                 _ ->
-                    link (Just zknote.title) ("/note/" ++ String.fromInt zknote.id) [ E.text zknote.title ]
+                    link (Just zknote.title) ("/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
 
 
 noteView : Data.Sysids -> NoteCache -> String -> List (Element a) -> Element a
 noteView si noteCache id _ =
     case
-        String.toInt id
+        zkNoteIdFromString id
+            |> Result.toMaybe
             |> Maybe.andThen (NC.getNote noteCache)
     of
         Just zne ->
-            if zne.zknote.isFile then
+            if zne.zknote.filestatus /= Data.NotAFile then
                 noteFile si zne.zknote.title zne.zknote
 
             else
@@ -631,7 +630,7 @@ linkDict markdown =
                 |> Dict.fromList
 
 
-noteIds : String -> Set Int
+noteIds : String -> ZniSet
 noteIds markdown =
     -- build a dict of description->url
     let
@@ -642,7 +641,7 @@ noteIds markdown =
     in
     case parsedmd of
         Err _ ->
-            Set.empty
+            emptyZniSet
 
         Ok blocks ->
             foldl
@@ -655,7 +654,7 @@ noteIds markdown =
                                         List.foldl
                                             (\i mbv ->
                                                 if i.name == "id" then
-                                                    String.toInt i.value
+                                                    zkNoteIdFromString i.value |> Result.toMaybe
 
                                                 else
                                                     Nothing
@@ -664,7 +663,7 @@ noteIds markdown =
                                             attr
                                     of
                                         Just id ->
-                                            Set.insert id ids
+                                            TSet.insert id ids
 
                                         Nothing ->
                                             ids
@@ -676,10 +675,10 @@ noteIds markdown =
                                     in
                                     am
                                         |> Dict.get "noteid"
-                                        |> Maybe.andThen String.toInt
+                                        |> Maybe.andThen (zkNoteIdFromString >> Result.toMaybe)
                                         |> Maybe.map
                                             (\id ->
-                                                Set.insert id ids
+                                                TSet.insert id ids
                                             )
                                         |> Maybe.withDefault ids
 
@@ -689,7 +688,7 @@ noteIds markdown =
                         _ ->
                             ids
                 )
-                Set.empty
+                emptyZniSet
                 blocks
                 |> (\bids ->
                         inlineFoldl
@@ -701,7 +700,7 @@ noteIds markdown =
                                             , List.foldl
                                                 (\i mbv ->
                                                     if i.name == "id" then
-                                                        String.toInt i.value
+                                                        zkNoteIdFromString i.value |> Result.toMaybe
 
                                                     else
                                                         Nothing
@@ -711,7 +710,7 @@ noteIds markdown =
                                             )
                                         of
                                             ( "note", Just id ) ->
-                                                Set.insert id ids
+                                                TSet.insert id ids
 
                                             _ ->
                                                 ids

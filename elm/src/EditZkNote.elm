@@ -51,7 +51,7 @@ import Browser.Dom as BD
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
 import Common
-import Data exposing (Direction(..), EditLink, zklKey)
+import Data exposing (Direction(..), EditLink, ZkNoteId, zkNoteIdToString, zklKey, zniCompare, zniEq)
 import Dialog as D
 import Dict exposing (Dict)
 import Element as E exposing (Element)
@@ -80,6 +80,7 @@ import TangoColors as TC
 import Task
 import Time
 import Toop
+import UUID exposing (UUID)
 import Url as U
 import Url.Builder as UB
 import Url.Parser as UP exposing ((</>))
@@ -106,10 +107,11 @@ type Msg
     | ViewPress
     | NewPress
     | UploadPress
+    | SyncPress
     | LinkBackPress
     | CopyPress
     | SearchHistoryPress
-    | SwitchPress Int
+    | SwitchPress ZkNoteId
     | ToLinkPress Data.ZkListNote
     | FromLinkPress Data.ZkListNote
     | PublicPress Bool
@@ -121,7 +123,7 @@ type Msg
     | NavChoiceChanged NavChoice
     | DialogMsg D.Msg
     | RestoreSearch String
-    | SrFocusPress Int
+    | SrFocusPress ZkNoteId
     | LinkFocusPress EditLink
     | AddToSearch Data.ZkListNote
     | AddToSearchAsTag String
@@ -166,14 +168,14 @@ type alias NewCommentState =
 
 
 type alias Model =
-    { id : Maybe Int
+    { id : Maybe ZkNoteId
     , si : Data.Sysids
     , ld : Data.LoginData
     , noteUser : UserId
     , noteUserName : String
-    , usernote : Int
+    , usernote : ZkNoteId
     , zknSearchResult : Data.ZkListNoteSearchResult
-    , focusSr : Maybe Int -- note id in search result.
+    , focusSr : Maybe ZkNoteId -- note id in search result.
     , zklDict : Dict String EditLink
     , focusLink : Maybe EditLink
     , comments : List Data.ZkNote
@@ -183,7 +185,7 @@ type alias Model =
     , editableValue : Bool -- is this note editable by other users?
     , showtitle : Bool
     , deleted : Bool
-    , isFile : Bool
+    , filestatus : Data.FileStatus
     , pubidtxt : String
     , title : String
     , createdate : Maybe Int
@@ -204,19 +206,19 @@ type alias Model =
 
 type Command
     = None
-    | Save Data.SaveZkNotePlusLinks
-    | SaveExit Data.SaveZkNotePlusLinks
+    | Save Data.SaveZkNoteAndLinks
+    | SaveExit Data.SaveZkNoteAndLinks
     | Revert
     | View
         { note : Data.SaveZkNote
         , createdate : Maybe Int
         , changeddate : Maybe Int
-        , panelnote : Maybe Int
+        , panelnote : Maybe ZkNoteId
         , links : List Data.EditLink
         }
-    | Delete Int
-    | Switch Int
-    | SaveSwitch Data.SaveZkNotePlusLinks Int
+    | Delete ZkNoteId
+    | Switch ZkNoteId
+    | SaveSwitch Data.SaveZkNoteAndLinks ZkNoteId
     | GetTASelection String String
     | Search S.ZkNoteSearch
     | SearchHistory
@@ -224,11 +226,13 @@ type Command
     | Settings
     | Admin
     | Requests
-    | SetHomeNote Int
+    | SetHomeNote ZkNoteId
     | AddToRecent Data.ZkListNote
     | ShowMessage String
-    | ShowArchives Int
+    | ShowArchives ZkNoteId
     | FileUpload
+    | Sync
+    | SyncFiles S.ZkNoteSearch
     | Cmd (Cmd Msg)
 
 
@@ -248,7 +252,7 @@ newWithSave model =
     )
 
 
-setHomeNote : Model -> Int -> Model
+setHomeNote : Model -> ZkNoteId -> Model
 setHomeNote model id =
     let
         nld =
@@ -267,7 +271,7 @@ elToDel el =
             Just el
 
 
-getSysids : Model -> List Int
+getSysids : Model -> List ZkNoteId
 getSysids model =
     List.filterMap
         (\el ->
@@ -291,13 +295,13 @@ getSysids model =
 
 toZkListNote : Model -> Maybe Data.ZkListNote
 toZkListNote model =
-    case ( model.id, model.createdate, model.changeddate ) of
-        ( Just id, Just createdate, Just changeddate ) ->
+    case Toop.T3 model.id model.createdate model.changeddate of
+        Toop.T3 (Just id) (Just createdate) (Just changeddate) ->
             Just
                 { id = id
                 , user = model.noteUser
                 , title = model.title
-                , isFile = model.isFile
+                , filestatus = model.filestatus
                 , createdate = createdate
                 , changeddate = changeddate
                 , sysids = getSysids model
@@ -309,8 +313,8 @@ toZkListNote model =
 
 toZkNote : Model -> Maybe Data.ZkNote
 toZkNote model =
-    case ( model.id, model.createdate, model.changeddate ) of
-        ( Just id, Just createdate, Just changeddate ) ->
+    case Toop.T3 model.id model.createdate model.changeddate of
+        Toop.T3 (Just id) (Just createdate) (Just changeddate) ->
             Just
                 { id = id
                 , user = model.noteUser
@@ -330,7 +334,7 @@ toZkNote model =
                 , createdate = createdate
                 , changeddate = changeddate
                 , deleted = model.deleted
-                , isFile = model.isFile
+                , filestatus = model.filestatus
                 , sysids = getSysids model
                 }
 
@@ -350,7 +354,7 @@ sznFromModel model =
     }
 
 
-fullSave : Model -> Data.SaveZkNotePlusLinks
+fullSave : Model -> Data.SaveZkNoteAndLinks
 fullSave model =
     { note = sznFromModel model
     , links = saveZkLinkList model
@@ -409,13 +413,13 @@ toPubId public pubidtxt =
         Nothing
 
 
-zkLinkName : Data.ZkLink -> Int -> String
+zkLinkName : Data.ZkLink -> ZkNoteId -> String
 zkLinkName zklink noteid =
-    if noteid == zklink.from then
-        zklink.toname |> Maybe.withDefault (String.fromInt zklink.to)
+    if zniEq noteid zklink.from then
+        zklink.toname |> Maybe.withDefault (zkNoteIdToString zklink.to)
 
-    else if noteid == zklink.to then
-        zklink.fromname |> Maybe.withDefault (String.fromInt zklink.from)
+    else if zniEq noteid zklink.to then
+        zklink.fromname |> Maybe.withDefault (zkNoteIdToString zklink.from)
 
     else
         "link error"
@@ -457,7 +461,7 @@ revert model =
             (initNew model.si model.ld model.zknSearchResult model.spmodel (Dict.values model.initialZklDict))
 
 
-showZkl : E.Color -> Bool -> Bool -> Maybe EditLink -> Data.LoginData -> Maybe Int -> Maybe E.Color -> Bool -> EditLink -> Element Msg
+showZkl : E.Color -> Bool -> Bool -> Maybe EditLink -> Data.LoginData -> Maybe ZkNoteId -> Maybe E.Color -> Bool -> EditLink -> Element Msg
 showZkl bkcolor isDirty editable focusLink ld id sysColor showflip zkl =
     let
         ( dir, otherid ) =
@@ -583,18 +587,18 @@ pageLink model =
     model.id
         |> Maybe.andThen
             (\id ->
-                if model.isFile then
-                    Just <| UB.absolute [ "file", String.fromInt id ] []
+                if model.filestatus /= Data.NotAFile then
+                    Just <| UB.absolute [ "file", zkNoteIdToString id ] []
 
                 else if isPublic model then
                     if model.pubidtxt /= "" then
                         Just <| UB.absolute [ "page", model.pubidtxt ] []
 
                     else
-                        Just <| UB.absolute [ "note", String.fromInt id ] []
+                        Just <| UB.absolute [ "note", zkNoteIdToString id ] []
 
                 else
-                    Just <| UB.absolute [ "editnote", String.fromInt id ] []
+                    Just <| UB.absolute [ "editnote", zkNoteIdToString id ] []
             )
 
 
@@ -1026,7 +1030,7 @@ zknview zone size recentZkns trqs noteCache model =
                             (\( l, lc ) ( r, rc ) ->
                                 case ( lc, rc ) of
                                     ( Nothing, Nothing ) ->
-                                        compare r.otherid l.otherid
+                                        zniCompare r.otherid l.otherid
 
                                     ( Just _, Nothing ) ->
                                         GT
@@ -1037,7 +1041,7 @@ zknview zone size recentZkns trqs noteCache model =
                                     ( Just lcolor, Just rcolor ) ->
                                         case Util.compareColor lcolor rcolor of
                                             EQ ->
-                                                compare r.otherid l.otherid
+                                                zniCompare r.otherid l.otherid
 
                                             a ->
                                                 a
@@ -1080,7 +1084,7 @@ zknview zone size recentZkns trqs noteCache model =
                             EI.labelLeft
                                 edlabelattr
                                 (E.text
-                                    (if model.isFile then
+                                    (if model.filestatus /= Data.NotAFile then
                                         "filename"
 
                                      else
@@ -1305,8 +1309,8 @@ zknview zone size recentZkns trqs noteCache model =
                             EI.button (E.alignRight :: Common.buttonStyle)
                                 { label = E.text ">", onPress = Just <| AddToSearchAsTag model.title }
                         ]
-                    , case ( model.isFile, toZkNote model ) of
-                        ( True, Just zkn ) ->
+                    , case ( model.filestatus, toZkNote model ) of
+                        ( Data.FilePresent, Just zkn ) ->
                             MC.noteFile model.si model.title zkn
 
                         _ ->
@@ -1423,7 +1427,7 @@ zknview zone size recentZkns trqs noteCache model =
         showpagelink =
             case pageLink model of
                 Just pl ->
-                    E.link Common.linkStyle { url = pl, label = E.text pl }
+                    E.newTabLink Common.linkStyle { url = pl, label = E.text pl }
 
                 Nothing ->
                     E.none
@@ -1483,6 +1487,10 @@ zknview zone size recentZkns trqs noteCache model =
 
               else
                 E.none
+            , EI.button (E.alignRight :: Common.buttonStyle)
+                { onPress = Just SyncPress
+                , label = E.text "sync"
+                }
             , EI.button (E.alignRight :: Common.buttonStyle)
                 { onPress = Just UploadPress
                 , label = E.text "upload"
@@ -1586,9 +1594,9 @@ zknview zone size recentZkns trqs noteCache model =
         ]
 
 
-linksWith : List EditLink -> Int -> Bool
+linksWith : List EditLink -> ZkNoteId -> Bool
 linksWith links linkid =
-    Util.trueforany (\l -> l.otherid == linkid) links
+    Util.trueforany (\l -> zniEq l.otherid linkid) links
 
 
 isPublic : Model -> Bool
@@ -1676,7 +1684,7 @@ initFull si ld zkl zknote dtlinks spm =
       , editable = zknote.editable
       , editableValue = zknote.editableValue
       , deleted = zknote.deleted
-      , isFile = zknote.isFile
+      , filestatus = zknote.filestatus
       , showtitle = zknote.showtitle
       , createdate = Just zknote.createdate
       , changeddate = Just zknote.changeddate
@@ -1690,7 +1698,7 @@ initFull si ld zkl zknote dtlinks spm =
       , panelNote = Nothing
       , mbReplaceString = Nothing
       }
-    , { zknote = zknote.id, offset = 0, limit = Nothing }
+    , { zknote = zknote.id, offset = 0 }
     )
 
 
@@ -1728,7 +1736,7 @@ initNew si ld zkl spm links =
     , editable = True
     , editableValue = False
     , deleted = False
-    , isFile = False
+    , filestatus = Data.NotAFile
     , showtitle = True
     , createdate = Nothing
     , changeddate = Nothing
@@ -1764,7 +1772,7 @@ replaceOrAdd items replacement compare mergef =
             [ replacement ]
 
 
-sznToZkn : UserId -> String -> Int -> List Int -> Data.SavedZkNote -> Data.SaveZkNote -> Data.ZkNote
+sznToZkn : UserId -> String -> ZkNoteId -> List ZkNoteId -> Data.SavedZkNote -> Data.SaveZkNote -> Data.ZkNote
 sznToZkn uid uname unote sysids sdzn szn =
     { id = sdzn.id
     , user = uid
@@ -1779,7 +1787,7 @@ sznToZkn uid uname unote sysids sdzn szn =
     , createdate = sdzn.changeddate
     , changeddate = sdzn.changeddate
     , deleted = szn.deleted
-    , isFile = False
+    , filestatus = Data.NotAFile
     , sysids = sysids
     }
 
@@ -1822,7 +1830,7 @@ onSaved oldmodel szn =
 
 
 type TACommand
-    = TASave Data.SaveZkNotePlusLinks
+    = TASave Data.SaveZkNoteAndLinks
     | TAError String
     | TAUpdated Model (Maybe Data.SetSelection)
     | TANoop
@@ -1865,14 +1873,14 @@ onTASelection model recentZkns tas =
             let
                 linktext =
                     if tas.text == "" then
-                        "<note id=\"" ++ String.fromInt id ++ "\"/>"
+                        "<note id=\"" ++ zkNoteIdToString id ++ "\"/>"
 
                     else
                         "["
                             ++ tas.text
                             ++ "]("
                             ++ "/note/"
-                            ++ String.fromInt id
+                            ++ zkNoteIdToString id
                             ++ ")"
             in
             TAUpdated
@@ -1998,7 +2006,7 @@ onLinkBackSaved model mbtas szn =
                                     ++ tas.text
                                     ++ "]("
                                     ++ "/note/"
-                                    ++ String.fromInt szn.id
+                                    ++ zkNoteIdToString szn.id
                                     ++ ")"
                                     ++ String.dropLeft (tas.offset + String.length tas.text) model.md
                             , zklDict = Dict.insert (zklKey linkback) linkback model.zklDict
@@ -2023,9 +2031,9 @@ noteLink str =
 
 compareZklinks : Data.ZkLink -> Data.ZkLink -> Order
 compareZklinks left right =
-    case compare left.from right.from of
+    case zniCompare left.from right.from of
         EQ ->
-            compare left.to right.to
+            zniCompare left.to right.to
 
         ltgt ->
             ltgt
@@ -2115,6 +2123,13 @@ handleSPUpdate model ( nm, cmd ) =
                     mod.zknSearchResult
             in
             ( { mod | zknSearchResult = { zsr | notes = [] } }, Search ts )
+
+        SP.SyncFiles ts ->
+            let
+                zsr =
+                    mod.zknSearchResult
+            in
+            ( { mod | zknSearchResult = { zsr | notes = [] } }, SyncFiles ts )
 
 
 update : Msg -> Model -> ( Model, Command )
@@ -2250,6 +2265,11 @@ update msg model =
         UploadPress ->
             ( model
             , FileUpload
+            )
+
+        SyncPress ->
+            ( model
+            , Sync
             )
 
         ToLinkPress zkln ->

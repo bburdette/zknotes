@@ -131,6 +131,15 @@ handleSpUpdate model ( nm, cmd ) =
                 }
             )
 
+        SP.SyncFiles ts ->
+            ( { model | spmodel = nm }
+            , SyncFiles <|
+                { ts
+                    | tagSearch =
+                        model.searchStack ++ ts.tagSearch
+                }
+            )
+
         SP.Copy s ->
             ( model, Copy s )
 
@@ -157,6 +166,7 @@ type Command
     = None
     | Save
     | Search S.ZkNoteSearch
+    | SyncFiles S.ZkNoteSearch
     | Copy String
 
 

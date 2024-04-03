@@ -28,7 +28,7 @@ import Element.Input as EI
 import Element.Keyed as EK
 import Html.Attributes as HA
 import Parser
-import Search exposing (AndOr(..), SearchMod(..), TSText, TagSearch(..), tagSearchParser)
+import Search exposing (AndOr(..), SearchMod(..), TSText, TagSearch(..), showSearchMod, tagSearchParser)
 import SearchHelpPanel
 import SearchLoc as SL exposing (TSLoc(..))
 import TDict exposing (TDict)
@@ -73,6 +73,7 @@ type Msg
     | STFocus Bool
     | SearchDetails
     | SearchClick
+    | SyncFilesClick
     | ToggleHelp
     | Clear
     | TogglePrev
@@ -94,6 +95,7 @@ type Command
     = None
     | Save
     | Search TagSearch
+    | SyncFiles TagSearch
     | AddToStack
     | Copy String
 
@@ -347,22 +349,7 @@ viewSearchHelper mbfocusloc indent lts ts =
                             { onPress = Nothing
                             , label =
                                 text
-                                    (case mod of
-                                        ExactMatch ->
-                                            "e"
-
-                                        Tag ->
-                                            "t"
-
-                                        Note ->
-                                            "n"
-
-                                        User ->
-                                            "u"
-
-                                        File ->
-                                            "f"
-                                    )
+                                    (showSearchMod mod)
                             }
             in
             [ E.row [ E.width E.fill, E.spacing 8 ]
@@ -597,6 +584,14 @@ view showCopy narrow nblevel model =
                 _ ->
                     EI.button sbs { onPress = Just SearchClick, label = text "search" }
 
+        fileSyncButton =
+            case model.search of
+                TagSearch (Err _) ->
+                    EI.button (sbs ++ [ EBk.color TC.grey, E.alignRight ]) { onPress = Nothing, label = text "search" }
+
+                _ ->
+                    EI.button (sbs ++ [ E.alignRight ]) { onPress = Just SyncFilesClick, label = text "FS" }
+
         tinput =
             EI.multiline
                 (htmlAttribute (HA.id "searchtext") :: onFocus (STFocus True) :: onLoseFocus (STFocus False) :: tiattribs)
@@ -639,6 +634,7 @@ view showCopy narrow nblevel model =
 
         buttons =
             [ searchButton
+            , fileSyncButton
             , if showCopy then
                 EI.button (E.alignRight :: buttonStyle)
                     { label = E.text "<"
@@ -787,6 +783,18 @@ doSearchClick model =
     )
 
 
+doFileSyncClick : Model -> ( Model, Command )
+doFileSyncClick model =
+    ( model
+    , case getSearch model of
+        Just s ->
+            SyncFiles s
+
+        Nothing ->
+            None
+    )
+
+
 update : Msg -> Model -> ( Model, Command )
 update msg model =
     case msg of
@@ -828,6 +836,9 @@ update msg model =
 
         SearchClick ->
             doSearchClick model
+
+        SyncFilesClick ->
+            doFileSyncClick model
 
         ToggleHelp ->
             ( { model | showHelp = not model.showHelp }, None )

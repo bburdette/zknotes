@@ -1,9 +1,13 @@
-use crate::util::now;
+use crate::error as zkerr;
+use crate::util::{now, nowms};
 use barrel::backend::Sqlite;
 use barrel::{types, Migration};
 use orgauth::migrations;
+use regex::{Captures, Regex};
 use rusqlite::{params, Connection};
 use std::path::Path;
+use uuid::Uuid;
+use zkprotocol::constants::SpecialUuids;
 
 pub fn initialdb() -> Migration {
   let mut m = Migration::new();
@@ -1923,6 +1927,613 @@ pub fn udpate26(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   m1.drop_table("yeetfile");
 
   conn.execute_batch(m1.make::<Sqlite>().as_str())?;
+
+  Ok(())
+}
+
+pub fn udpate27(dbfile: &Path) -> Result<(), orgauth::error::Error> {
+  // add uuids to zknotes table.
+
+  let conn = Connection::open(dbfile)?;
+  conn.execute("PRAGMA foreign_keys = false;", params![])?;
+
+  let mut m1 = Migration::new();
+
+  m1.create_table("zknotetemp", |t| {
+    t.add_column(
+      "id",
+      types::integer()
+        .primary(true)
+        .increments(true)
+        .nullable(false),
+    );
+    t.add_column("title", types::text().nullable(false));
+    t.add_column("content", types::text().nullable(false));
+    t.add_column("sysdata", types::text().nullable(true));
+    t.add_column("pubid", types::text().nullable(true).unique(true));
+    t.add_column(
+      "user",
+      types::foreign(
+        "orgauth_user",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column("editable", types::boolean());
+    t.add_column("showtitle", types::boolean());
+    t.add_column("deleted", types::boolean());
+    t.add_column(
+      "file",
+      types::foreign(
+        "file",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(true),
+    );
+    t.add_column("uuid", types::text().nullable(true));
+    t.add_column("createdate", types::integer().nullable(false));
+    t.add_column("changeddate", types::integer().nullable(false));
+  });
+
+  conn.execute_batch(m1.make::<Sqlite>().as_str())?;
+
+  // copy everything from zknote.
+  conn.execute(
+    "insert into zknotetemp (id, title, content, sysdata, pubid, user, editable, showtitle, deleted, file, createdate, changeddate)
+        select id, title, content, sysdata, pubid, user, editable, showtitle, deleted, file, createdate, changeddate from zknote",
+    params![],
+  )?;
+
+  // now generate a uuid for every note.
+  let mut pstmt = conn.prepare("select id from zknote")?;
+  let ids: Vec<i64> = pstmt
+    .query_map(params![], |row| Ok(row.get(0)?))?
+    .filter_map(|x| x.ok())
+    .collect();
+
+  // this is horrifically slow
+  for id in ids {
+    let snow = nowms()?;
+    let uuid = uuid::Uuid::new_v4();
+    let unow = nowms()?;
+    println!("uuid duration: {}", unow - snow);
+
+    conn.execute(
+      "update zknotetemp set uuid = ?1 where id = ?2",
+      params![uuid.to_string(), id],
+    )?;
+    let upnow = nowms()?;
+    println!("update duration: {}", upnow - unow);
+
+    println!("updated {} {}", id, uuid);
+  }
+
+  let mut m2 = Migration::new();
+
+  m2.drop_table("zknote");
+
+  // new zknote with showtitle column
+  m2.create_table("zknote", |t| {
+    t.add_column(
+      "id",
+      types::integer()
+        .primary(true)
+        .increments(true)
+        .nullable(false),
+    );
+    t.add_column("title", types::text().nullable(false));
+    t.add_column("content", types::text().nullable(false));
+    t.add_column("sysdata", types::text().nullable(true));
+    t.add_column("pubid", types::text().nullable(true).unique(true));
+    t.add_column(
+      "user",
+      types::foreign(
+        "orgauth_user",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column("editable", types::boolean());
+    t.add_column("showtitle", types::boolean());
+    t.add_column("deleted", types::boolean());
+    t.add_column(
+      "file",
+      types::foreign(
+        "file",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(true),
+    );
+    t.add_column("uuid", types::text().nullable(false));
+    t.add_column("createdate", types::integer().nullable(false));
+    t.add_column("changeddate", types::integer().nullable(false));
+    t.add_index("unq_uuid", types::index(vec!["uuid"]).unique(true));
+  });
+
+  conn.execute_batch(m2.make::<Sqlite>().as_str())?;
+
+  // copy everything from zknotetemp.
+  conn.execute(
+    "insert into zknote (id, title, content, sysdata, pubid, user, editable, showtitle, deleted, file, uuid, createdate, changeddate)
+        select id, title, content, sysdata, pubid, user, editable, showtitle, deleted, file, uuid, createdate, changeddate from zknotetemp",
+    params![],
+  )?;
+
+  let mut m3 = Migration::new();
+
+  m3.drop_table("zknotetemp");
+
+  conn.execute_batch(m3.make::<Sqlite>().as_str())?;
+
+  Ok(())
+}
+
+pub fn udpate28(dbfile: &Path) -> Result<(), orgauth::error::Error> {
+  // db connection without foreign key checking.
+  let conn = Connection::open(dbfile)?;
+  conn.execute("PRAGMA foreign_keys = false;", params![])?;
+  let mut m1 = Migration::new();
+
+  m1.create_table("zklinktemp", |t| {
+    t.add_column(
+      "fromid",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "toid",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "user",
+      types::foreign(
+        "orgauth_user",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "linkzknote",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(true),
+    );
+    t.add_index(
+      "unqtemp",
+      types::index(vec!["fromid", "toid", "user"]).unique(true),
+    );
+  });
+
+  conn.execute_batch(m1.make::<Sqlite>().as_str())?;
+
+  // copy everything from zklink.
+  conn.execute(
+    "insert into zklinktemp (fromid, toid, user, linkzknote)
+        select fromid, toid, user, linkzknote from zklink",
+    params![],
+  )?;
+
+  let mut m2 = Migration::new();
+  // drop zknote.
+  m2.drop_table("zklink");
+
+  // new zklink with column 'user' instead of 'zk'.
+  m2.create_table("zklink", |t| {
+    t.add_column(
+      "fromid",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "toid",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "user",
+      types::foreign(
+        "orgauth_user",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "linkzknote",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(true),
+    );
+    t.add_column("createdate", types::integer().nullable(false));
+    t.add_index(
+      "zklinkunq",
+      types::index(vec!["fromid", "toid", "user"]).unique(true),
+    );
+  });
+
+  // archive table.  each time a link is deleted, create a record containing the
+  // original link create date, and the link delete date.
+  m2.create_table("zklinkarchive", |t| {
+    t.add_column(
+      "id",
+      types::integer()
+        .primary(true)
+        .increments(true)
+        .nullable(false),
+    );
+    t.add_column(
+      "fromid",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "toid",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "user",
+      types::foreign(
+        "orgauth_user",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "linkzknote",
+      types::foreign(
+        "zknote",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(true),
+    );
+    t.add_column("createdate", types::integer().nullable(false));
+    t.add_column("deletedate", types::integer().nullable(false));
+  });
+
+  conn.execute_batch(m2.make::<Sqlite>().as_str())?;
+
+  let now = now()?;
+
+  // copy everything from zklinktemp, adding dates.
+  conn.execute(
+    "insert into zklink (fromid, toid, user, linkzknote, createdate)
+        select fromid, toid, user, linkzknote, ?1 from zklinktemp",
+    params![now],
+  )?;
+
+  let mut m3 = Migration::new();
+  m3.drop_table("zklinktemp");
+
+  conn.execute_batch(m3.make::<Sqlite>().as_str())?;
+
+  Ok(())
+}
+
+pub fn udpate29(dbfile: &Path) -> Result<(), orgauth::error::Error> {
+  orgauth::migrations::udpate8(dbfile)?;
+  Ok(())
+}
+
+pub fn udpate30(dbfile: &Path) -> Result<(), orgauth::error::Error> {
+  // db connection without foreign key checking.
+  let conn = Connection::open(dbfile)?;
+  conn.execute("PRAGMA foreign_keys = false;", params![])?;
+
+  // update system notes with specific uuids.
+  let archiveid: i64 = conn.query_row(
+    "select zknote.id from
+      zknote, orgauth_user
+      where zknote.title = ?2
+      and orgauth_user.name = ?1
+      and zknote.user = orgauth_user.id",
+    params!["system", "archive"],
+    |row| Ok(row.get(0)?),
+  )?;
+
+  let update_note_id = |title, uuid| {
+    conn.execute(
+      "update zknote set uuid = ?1
+      where zknote.title = ?2
+        and not exists (select * from zklink where fromid = zknote.id and toid = ?3)
+        and user in (select id from orgauth_user where name = 'system')",
+      params![uuid, title, archiveid],
+    )
+  };
+
+  update_note_id("public", SpecialUuids::Public.str())?;
+  update_note_id("share", SpecialUuids::Share.str())?;
+  update_note_id("search", SpecialUuids::Search.str())?;
+  update_note_id("user", SpecialUuids::User.str())?;
+  update_note_id("archive", SpecialUuids::Archive.str())?;
+  update_note_id("comment", SpecialUuids::Comment.str())?;
+
+  // update system user uuid.
+  conn.execute(
+    "update orgauth_user set uuid = ?1
+      where name= 'system'",
+    params![SpecialUuids::System.str()],
+  )?;
+
+  Ok(())
+}
+
+fn replace_all<E>(
+  re: &Regex,
+  haystack: &str,
+  replacement: impl Fn(&Captures) -> Result<String, E>,
+) -> Result<String, E> {
+  let mut new = String::with_capacity(haystack.len());
+  let mut last_match = 0;
+  for caps in re.captures_iter(haystack) {
+    let m = caps.get(1).unwrap();
+    new.push_str(&haystack[last_match..m.start()]);
+    new.push_str(&replacement(&caps)?);
+    last_match = m.end();
+  }
+
+  new.push_str(&haystack[last_match..]);
+  Ok(new)
+}
+
+#[test]
+fn testreplaceall() {
+  let meh = r#"<panel noteid="16340"/>
+### the old nix-channels way
+
+I'm used to having multiple nix channels in my system, like this:
+
+```
+[bburdette@HOSS:/etc/nixos]$ sudo nix-channel --list
+nixos https://nixos.org/channels/nixos-22.11
+nixos-unstable https://nixos.org/channels/nixos-unstable
+```
+
+And then in my configuration.nix I typically do
+
+```
+{ config, pkgs, ... }:
+
+let"#;
+  let replaceid = |caps: &Captures| {
+    if let Ok(id) = caps[1].parse::<i64>() {
+      assert!(id == 16340);
+      println!("id == 16340");
+    } else {
+      // bad id.  leave it.
+      println!("bad: {}", String::from(&caps[1]));
+      assert!(false);
+    }
+    Ok::<String, zkerr::Error>("replaced".to_string())
+  };
+
+  let panelstyle = Regex::new(r#"\<panel noteid=\"([0-9]+)\"/>"#).unwrap();
+  let replaced = replace_all(&panelstyle, meh, replaceid).unwrap();
+  println!("{}", replaced);
+  assert!(replaced.find(r#"<panel noteid="replaced""#) != None);
+}
+
+// replace note ids with uuids in hyperlinks.
+pub fn udpate31(dbfile: &Path) -> Result<(), zkerr::Error> {
+  let conn = Connection::open(dbfile)?;
+  conn.execute("PRAGMA foreign_keys = false;", params![])?;
+
+  let mut stmt = conn.prepare("select zknote.id, zknote.content from zknote")?;
+
+  let notes = stmt
+    .query_map(params![], |row| {
+      Ok((row.get::<usize, i64>(0)?, row.get::<usize, String>(1)?))
+    })?
+    .filter_map(|x| x.ok());
+
+  let idconn = Connection::open(dbfile)?;
+  let replaceid = |caps: &Captures| {
+    if let Ok(id) = caps[1].parse::<i64>() {
+      let rt = idconn.query_row("select uuid from zknote where id=?1", params![id], |row| {
+        row.get::<usize, String>(0)
+      });
+      match rt {
+        Ok(rt) => Ok::<String, zkerr::Error>(rt),
+        Err(_) => Ok(String::from(&caps[1])), // note id not found.  leave it.
+      }
+    } else {
+      // bad id.  leave it.
+      Ok(String::from(&caps[1]))
+    }
+  };
+
+  let oldstyle = Regex::new(r#"\[.+\]\(\/note\/([0-9]+)\)"#)?;
+  let newstyle = Regex::new(r#"\<note id=\"([0-9]+)\"/>"#)?;
+  let panelstyle = Regex::new(r#"\<panel noteid=\"([0-9]+)\"/>"#)?;
+
+  for (id, text) in notes {
+    // search and replace the three note styles:
+    // `<note id="20050"/>`
+    // `[this kind](/note/20077).`
+    // '<panel noteid=\"16340\"/>'
+
+    let r = replace_all(&oldstyle, text.as_str(), replaceid)?;
+    let r = replace_all(&newstyle, r.as_str(), replaceid)?;
+    let r = replace_all(&panelstyle, r.as_str(), replaceid)?;
+
+    if r != text {
+      conn.execute("update zknote set content=?1 where id = ?2", params![r, id])?;
+    }
+  }
+
+  Ok(())
+}
+
+// add 'sync' system note.
+pub fn udpate32(dbfile: &Path) -> Result<(), orgauth::error::Error> {
+  let conn = Connection::open(dbfile)?;
+
+  let sysid: i64 = conn.query_row(
+    "select id from orgauth_user
+      where orgauth_user.name = ?1",
+    params!["system"],
+    |row| Ok(row.get(0)?),
+  )?;
+  let now = now()?;
+
+  let publicid: i64 = conn.query_row(
+    "select zknote.id from
+      zknote where uuid = ?1",
+    params![SpecialUuids::Public.str()],
+    |row| Ok(row.get(0)?),
+  )?;
+
+  conn.execute(
+    "insert into zknote (title, content, showtitle, editable, deleted, user, uuid, createdate, changeddate)
+      values ('sync', '', 0, 0, 0, ?1, ?2, ?3, ?4)",
+    params![sysid, SpecialUuids::Sync.str(), now, now],
+  )?;
+
+  let id = conn.last_insert_rowid();
+
+  conn.execute(
+    "insert into zklink (fromid, toid, user, createdate) 
+    values (?1, ?2, ?3, ?4)",
+    params![id, publicid, sysid, now],
+  )?;
+
+  Ok(())
+}
+
+// default system notes get 0 dates so they won't generate archive notes on first sync.
+pub fn udpate33(dbfile: &Path) -> Result<(), orgauth::error::Error> {
+  let conn = Connection::open(dbfile)?;
+
+  let mut ids = Vec::new();
+
+  ids.push(format!("'{}'", SpecialUuids::Public.str()).to_string());
+  ids.push(format!("'{}'", SpecialUuids::Comment.str()).to_string());
+  ids.push(format!("'{}'", SpecialUuids::Share.str()).to_string());
+  ids.push(format!("'{}'", SpecialUuids::Search.str()).to_string());
+  ids.push(format!("'{}'", SpecialUuids::User.str()).to_string());
+  ids.push(format!("'{}'", SpecialUuids::Archive.str()).to_string());
+  ids.push(format!("'{}'", SpecialUuids::Sync.str()).to_string());
+
+  conn.execute(
+    format!(
+      "update zknote set createdate = 0, changeddate = 0 where uuid in ({})",
+      ids.join(",").as_str()
+    )
+    .as_str(),
+    params![],
+  )?;
+
+  Ok(())
+}
+
+// add unique server id in singlevalue table.
+pub fn udpate34(dbfile: &Path) -> Result<(), orgauth::error::Error> {
+  let conn = Connection::open(dbfile)?;
+
+  let sid = Uuid::new_v4();
+
+  conn.execute(
+    "insert into singlevalue (name, value) values (?1, ?2)",
+    params!["server_id", sid.to_string()],
+  )?;
+
+  // sync id for unique sync work table name
+  conn.execute(
+    "insert into singlevalue (name, value) values (?1, ?2)",
+    params!["sync_id", 0],
+  )?;
+
+  Ok(())
+}
+
+// file_source table
+pub fn udpate35(dbfile: &Path) -> Result<(), orgauth::error::Error> {
+  let conn = Connection::open(dbfile)?;
+  conn.execute("PRAGMA foreign_keys = false;", params![])?;
+  let mut m = Migration::new();
+
+  m.create_table("file_source", |t| {
+    t.add_column(
+      "file_id",
+      types::foreign(
+        "file",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_column(
+      "user_id",
+      types::foreign(
+        "orgauth_user",
+        "id",
+        types::ReferentialAction::Restrict,
+        types::ReferentialAction::Restrict,
+      )
+      .nullable(false),
+    );
+    t.add_index(
+      "file_source_unq",
+      types::index(vec!["file_id", "user_id"]).unique(true),
+    );
+  });
+
+  conn.execute_batch(m.make::<Sqlite>().as_str())?;
 
   Ok(())
 }

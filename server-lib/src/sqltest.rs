@@ -1,9 +1,7 @@
 #[cfg(test)]
 mod tests {
-  use crate::interfaces::*;
   use crate::search::*;
   use crate::sqldata::*;
-  use either::Either;
   use orgauth::data::RegistrationData;
   use orgauth::dbfun::{new_user, user_id};
   use std::error::Error;
@@ -37,7 +35,9 @@ mod tests {
     }
     let mut cb = zknotes_callbacks();
 
-    dbinit(dbp, 1000000)?;
+    let filesdir = Path::new("");
+
+    dbinit(dbp, None)?;
 
     let conn = connection_open(dbp)?;
 
@@ -49,7 +49,13 @@ mod tests {
         uid: "user1".to_string(),
         pwd: "".to_string(),
         email: "".to_string(),
+        remote_url: "".to_string(),
       },
+      None,
+      None,
+      false,
+      None,
+      None,
       None,
       None,
       None,
@@ -61,7 +67,13 @@ mod tests {
         uid: "user2".to_string(),
         pwd: "".to_string(),
         email: "".to_string(),
+        remote_url: "".to_string(),
       },
+      None,
+      None,
+      false,
+      None,
+      None,
       None,
       None,
       None,
@@ -96,7 +108,7 @@ mod tests {
     )?;
 
     // user 1 note 2 - share
-    let szn1_2_share = save_zknote(
+    let (szn1_2_share_id, szn1_2_share) = save_zknote(
       &conn,
       uid1,
       &SaveZkNote {
@@ -110,12 +122,12 @@ mod tests {
       },
     )?;
 
-    save_zklink(&conn, szn1_2_share.id, shareid, uid1, None)?;
+    save_zklink(&conn, szn1_2_share_id, shareid, uid1, None)?;
 
     println!("4");
 
     // user 1 note 3 - share
-    let szn1_3_share = save_zknote(
+    let (szn1_3_share_id, _szn1_3_share) = save_zknote(
       &conn,
       uid1,
       &SaveZkNote {
@@ -129,17 +141,17 @@ mod tests {
       },
     )?;
 
-    save_zklink(&conn, szn1_3_share.id, shareid, uid1, None)?;
+    save_zklink(&conn, szn1_3_share_id, shareid, uid1, None)?;
 
     println!("5");
 
     // user1 adds user 2 to user 1 share '2'.
-    save_zklink(&conn, unid2, szn1_2_share.id, uid1, None)?;
+    save_zklink(&conn, unid2, szn1_2_share_id, uid1, None)?;
 
     println!("6");
 
     // user2 adds user 2 to user1 share '3'.  should fail
-    match save_zklink(&conn, unid2, szn1_3_share.id, uid2, None) {
+    match save_zklink(&conn, unid2, szn1_3_share_id, uid2, None) {
       Ok(_) => panic!("test failed"),
       // Ok(_) => (),
       Err(_) => (),
@@ -148,7 +160,7 @@ mod tests {
     println!("7");
 
     // user 1 note 4 - on share '2'.
-    let szn1_4 = save_zknote(
+    let (szn1_4_id, szn1_4) = save_zknote(
       &conn,
       uid1,
       &SaveZkNote {
@@ -161,12 +173,12 @@ mod tests {
         deleted: false,
       },
     )?;
-    save_zklink(&conn, szn1_4.id, szn1_2_share.id, uid1, None)?;
+    save_zklink(&conn, szn1_4_id, szn1_2_share_id, uid1, None)?;
 
     println!("8");
 
     // user 1 note 5 - on share '3'.
-    let szn1_5 = save_zknote(
+    let (szn1_5_id, szn1_5) = save_zknote(
       &conn,
       uid1,
       &SaveZkNote {
@@ -179,10 +191,10 @@ mod tests {
         deleted: false,
       },
     )?;
-    save_zklink(&conn, szn1_5.id, szn1_3_share.id, uid1, None)?;
+    save_zklink(&conn, szn1_5_id, szn1_3_share_id, uid1, None)?;
 
     // user 1 note 6 - shared w user link
-    let szn1_6 = save_zknote(
+    let (szn1_6_id, _szn1_6) = save_zknote(
       &conn,
       uid1,
       &SaveZkNote {
@@ -195,12 +207,12 @@ mod tests {
         deleted: false,
       },
     )?;
-    save_zklink(&conn, szn1_6.id, unid2, uid1, None)?;
+    save_zklink(&conn, szn1_6_id, unid2, uid1, None)?;
 
     println!("9");
 
     // user 1 note 7 - shared w reversed user link
-    let szn1_7 = save_zknote(
+    let (szn1_7_id, _szn1_7) = save_zknote(
       &conn,
       uid1,
       &SaveZkNote {
@@ -213,7 +225,7 @@ mod tests {
         deleted: false,
       },
     )?;
-    save_zklink(&conn, unid2, szn1_7.id, uid1, None)?;
+    save_zklink(&conn, unid2, szn1_7_id, uid1, None)?;
 
     println!("10");
 
@@ -260,7 +272,7 @@ mod tests {
 
     println!("12");
 
-    let szn2_1 = save_zknote(
+    let (szn2_1_id, _szn2_1) = save_zknote(
       &conn,
       uid2,
       &SaveZkNote {
@@ -277,10 +289,10 @@ mod tests {
     println!("13");
 
     // Ok to link to share 2, because am a member.
-    save_zklink(&conn, szn2_1.id, szn1_2_share.id, uid2, None)?;
+    save_zklink(&conn, szn2_1_id, szn1_2_share_id, uid2, None)?;
     // not ok to link to share 3, because not a member.
     // should fail!
-    match save_zklink(&conn, szn1_4.id, szn1_3_share.id, uid2, None) {
+    match save_zklink(&conn, szn1_4_id, szn1_3_share_id, uid2, None) {
       Ok(_) => panic!("wat"),
       Err(_e) => (),
     };
@@ -305,14 +317,14 @@ mod tests {
     println!("14");
 
     // despite public id, shouldn't be able to read. because doesn't link to 'public'
-    match read_zknotepubid(&conn, None, "publicid1") {
+    match read_zknotepubid(&conn, filesdir, None, "publicid1") {
       Ok(_) => panic!("wat"),
       Err(_e) => (),
     };
 
     println!("15");
 
-    let pubzn2 = save_zknote(
+    let (pubzn2_id, _pubzn2) = save_zknote(
       &conn,
       uid1,
       &SaveZkNote {
@@ -325,9 +337,12 @@ mod tests {
         deleted: false,
       },
     )?;
-    save_zklink(&conn, pubzn2.id, publicid, uid1, None)?;
+    println!("15.1");
+    save_zklink(&conn, pubzn2_id, publicid, uid1, None)?;
+    println!("15.2");
     // should be able to read because links to 'public'.
-    read_zknotepubid(&conn, None, "publicid2")?;
+    read_zknotepubid(&conn, filesdir, None, "publicid2")?;
+    println!("15.3");
 
     // should be able to save changes to a share note without error.
     save_zknote(
@@ -344,10 +359,12 @@ mod tests {
       },
     )?;
 
+    println!("16");
+
     // TODO test that 'public' is not treated as a share.
 
     // test notes linked with user BY CREATOR are editable.
-    let szn1_6 = save_zknote(
+    let (_szn1_6_id, _szn1_6) = save_zknote(
       &conn,
       uid2,
       &SaveZkNote {
@@ -361,11 +378,13 @@ mod tests {
       },
     )?;
 
+    println!("16");
+
     // ---------------------------------------------------------------
     // test searches.
     // ---------------------------------------------------------------
 
-    // user A can their own public note.
+    // user A can see their own public note.
     let u1pubnote2_search = ZkNoteSearch {
       tagsearch: TagSearch::SearchTerm {
         mods: Vec::new(),
@@ -374,11 +393,14 @@ mod tests {
       offset: 0,
       limit: None,
       what: "test".to_string(),
-      list: true,
+      resulttype: ResultType::RtListNote,
+      ordering: None,
+      archives: false,
+      deleted: false,
     };
 
-    match search_zknotes(&conn, uid1, &u1pubnote2_search)? {
-      Either::Left(zklr) => {
+    match search_zknotes(&conn, filesdir, uid1, &u1pubnote2_search)? {
+      SearchResult::SrListNote(zklr) => {
         if zklr.notes.len() == 1 {
           ()
         } else {
@@ -386,12 +408,14 @@ mod tests {
           panic!("test failed")
         }
       }
-      Either::Right(_zknr) => panic!("test failed"),
+      _ => panic!("test failed"),
     }
 
+    println!("17");
+
     // u2 can see the note too.
-    match search_zknotes(&conn, uid2, &u1pubnote2_search)? {
-      Either::Left(zklr) => {
+    match search_zknotes(&conn, filesdir, uid2, &u1pubnote2_search)? {
+      SearchResult::SrListNote(zklr) => {
         if zklr.notes.len() == 1 {
           ()
         } else {
@@ -399,7 +423,7 @@ mod tests {
           panic!("test failed")
         }
       }
-      Either::Right(_zknr) => panic!("test failed"),
+      _ => panic!("test failed"),
     }
 
     let u1note1_search = ZkNoteSearch {
@@ -410,12 +434,15 @@ mod tests {
       offset: 0,
       limit: None,
       what: "test".to_string(),
-      list: true,
+      resulttype: ResultType::RtListNote,
+      ordering: None,
+      archives: false,
+      deleted: false,
     };
 
     // u2 can't see u1's private note..
-    match search_zknotes(&conn, uid2, &u1note1_search)? {
-      Either::Left(zklr) => {
+    match search_zknotes(&conn, filesdir, uid2, &u1note1_search)? {
+      SearchResult::SrListNote(zklr) => {
         if zklr.notes.len() > 0 {
           // not supposed to see it!
           panic!("test failed")
@@ -423,12 +450,13 @@ mod tests {
           ()
         }
       }
-      Either::Right(_zknr) => panic!("test failed"),
+      _ => panic!("test failed"),
     }
+    println!("18");
 
     // u1 can see their own private note..
-    match search_zknotes(&conn, uid1, &u1note1_search)? {
-      Either::Left(zklr) => {
+    match search_zknotes(&conn, filesdir, uid1, &u1note1_search)? {
+      SearchResult::SrListNote(zklr) => {
         if zklr.notes.len() > 0 {
           ()
         } else {
@@ -436,9 +464,10 @@ mod tests {
           panic!("test failed")
         }
       }
-      Either::Right(_zknr) => panic!("test failed"),
+      _ => panic!("test failed"),
     }
 
+    println!("19");
     let u1note6_search = ZkNoteSearch {
       tagsearch: TagSearch::SearchTerm {
         mods: Vec::new(),
@@ -447,12 +476,15 @@ mod tests {
       offset: 0,
       limit: None,
       what: "test".to_string(),
-      list: true,
+      resulttype: ResultType::RtListNote,
+      ordering: None,
+      archives: false,
+      deleted: false,
     };
 
     // u2 can see a note shared directly with them.
-    match search_zknotes(&conn, uid2, &u1note6_search)? {
-      Either::Left(zklr) => {
+    match search_zknotes(&conn, filesdir, uid2, &u1note6_search)? {
+      SearchResult::SrListNote(zklr) => {
         if zklr.notes.len() > 0 {
           ()
         } else {
@@ -460,9 +492,10 @@ mod tests {
           panic!("test failed")
         }
       }
-      Either::Right(_zknr) => panic!("test failed"),
+      _ => panic!("test failed"),
     }
 
+    println!("20");
     let u1note7_search = ZkNoteSearch {
       tagsearch: TagSearch::SearchTerm {
         mods: Vec::new(),
@@ -471,20 +504,24 @@ mod tests {
       offset: 0,
       limit: None,
       what: "test".to_string(),
-      list: true,
+      resulttype: ResultType::RtListNote,
+      ordering: None,
+      archives: false,
+      deleted: false,
     };
 
     // u2 can see a note shared directly with them, reversed link.
-    match search_zknotes(&conn, uid2, &u1note7_search)? {
-      Either::Left(zklr) => {
+    match search_zknotes(&conn, filesdir, uid2, &u1note7_search)? {
+      SearchResult::SrListNote(zklr) => {
         if zklr.notes.len() > 0 {
           ()
         } else {
           panic!("test failed")
         }
       }
-      Either::Right(_zknr) => panic!("test failed"),
+      _ => panic!("test failed"),
     }
+    println!("21");
 
     // u2 can see a note on a share they're a member of.
     let u1note4_search = ZkNoteSearch {
@@ -495,11 +532,14 @@ mod tests {
       offset: 0,
       limit: None,
       what: "test".to_string(),
-      list: true,
+      resulttype: ResultType::RtListNote,
+      ordering: None,
+      archives: false,
+      deleted: false,
     };
 
-    match search_zknotes(&conn, uid2, &u1note4_search)? {
-      Either::Left(zklr) => {
+    match search_zknotes(&conn, filesdir, uid2, &u1note4_search)? {
+      SearchResult::SrListNote(zklr) => {
         if zklr.notes.len() > 0 {
           ()
         } else {
@@ -507,8 +547,9 @@ mod tests {
           panic!("test failed")
         }
       }
-      Either::Right(_zknr) => panic!("test failed"),
+      _ => panic!("test failed"),
     }
+    println!("22");
 
     // u2 can't see a note on a share they're not a member of.
     let u1note5_search = ZkNoteSearch {
@@ -519,11 +560,14 @@ mod tests {
       offset: 0,
       limit: None,
       what: "test".to_string(),
-      list: true,
+      resulttype: ResultType::RtListNote,
+      ordering: None,
+      archives: false,
+      deleted: false,
     };
 
-    match search_zknotes(&conn, uid2, &u1note5_search)? {
-      Either::Left(zklr) => {
+    match search_zknotes(&conn, filesdir, uid2, &u1note5_search)? {
+      SearchResult::SrListNote(zklr) => {
         if zklr.notes.len() > 0 {
           // not supposed to see it!
           panic!("test failed")
@@ -531,8 +575,9 @@ mod tests {
           ()
         }
       }
-      Either::Right(_zknr) => panic!("test failed"),
+      _ => panic!("test failed"),
     }
+    println!("23");
 
     // u2 can't see note4 archive note.
     let u1note4_archive_search = ZkNoteSearch {
@@ -543,11 +588,14 @@ mod tests {
       offset: 0,
       limit: None,
       what: "u2nran test".to_string(),
-      list: true,
+      resulttype: ResultType::RtListNote,
+      ordering: None,
+      archives: false,
+      deleted: false,
     };
 
-    match search_zknotes(&conn, uid2, &u1note4_archive_search)? {
-      Either::Left(zklr) => {
+    match search_zknotes(&conn, filesdir, uid2, &u1note4_archive_search)? {
+      SearchResult::SrListNote(zklr) => {
         if zklr.notes.len() > 0 {
           // not supposed to see it!
           println!("u1note4_srearch {:?}", zklr);
@@ -556,13 +604,14 @@ mod tests {
           ()
         }
       }
-      Either::Right(_zknr) => panic!("test failed"),
+      _ => panic!("test failed"),
     }
+    println!("24");
 
     // system user can see the archive note
     let systemid = user_id(&conn, "system")?;
-    match search_zknotes(&conn, systemid, &u1note4_archive_search)? {
-      Either::Left(zklr) => {
+    match search_zknotes(&conn, filesdir, systemid, &u1note4_archive_search)? {
+      SearchResult::SrListNote(zklr) => {
         if zklr.notes.len() > 0 {
           ()
         } else {
@@ -571,7 +620,7 @@ mod tests {
           panic!("test failed")
         }
       }
-      Either::Right(_zknr) => panic!("test failed"),
+      _ => panic!("test failed"),
     }
 
     // can save changes to a share note, without error.
@@ -591,19 +640,23 @@ mod tests {
       offset: 0,
       limit: None,
       what: "test".to_string(),
-      list: true,
+      resulttype: ResultType::RtListNote,
+      ordering: None,
+      archives: false,
+      deleted: false,
     };
 
-    match search_zknotes(&conn, uid1, &u1pubnote2_exact_search)? {
-      Either::Left(zklr) => {
+    match search_zknotes(&conn, filesdir, uid1, &u1pubnote2_exact_search)? {
+      SearchResult::SrListNote(zklr) => {
         if zklr.notes.len() == 1 {
           panic!("test failed")
         } else {
           ()
         }
       }
-      Either::Right(_zknr) => panic!("test failed"),
+      _ => panic!("test failed"),
     }
+    println!("25");
 
     // should be 4 notes tagged with et'user' - 3 users and 1 'system'.
     let u1pubnote2_exact_search = ZkNoteSearch {
@@ -614,19 +667,23 @@ mod tests {
       offset: 0,
       limit: None,
       what: "test".to_string(),
-      list: true,
+      resulttype: ResultType::RtListNote,
+      ordering: None,
+      archives: false,
+      deleted: false,
     };
 
-    match search_zknotes(&conn, uid1, &u1pubnote2_exact_search)? {
-      Either::Left(zklr) => {
+    match search_zknotes(&conn, filesdir, uid1, &u1pubnote2_exact_search)? {
+      SearchResult::SrListNote(zklr) => {
         if zklr.notes.len() == 4 {
           ()
         } else {
           panic!("test failed")
         }
       }
-      Either::Right(_zknr) => panic!("test failed"),
+      _ => panic!("test failed"),
     }
+    println!("26");
 
     // should be 9 notes for 'user1'
     let u1pubnote2_exact_search = ZkNoteSearch {
@@ -637,19 +694,24 @@ mod tests {
       offset: 0,
       limit: None,
       what: "test".to_string(),
-      list: true,
+      resulttype: ResultType::RtListNote,
+      ordering: None,
+      archives: false,
+      deleted: false,
     };
 
-    match search_zknotes(&conn, uid1, &u1pubnote2_exact_search)? {
-      Either::Left(zklr) => {
+    match search_zknotes(&conn, filesdir, uid1, &u1pubnote2_exact_search)? {
+      SearchResult::SrListNote(zklr) => {
         if zklr.notes.len() == 9 {
           ()
         } else {
           panic!("test failed")
         }
       }
-      Either::Right(_zknr) => panic!("test failed"),
+      _ => panic!("test failed"),
     }
+    println!("27");
+
     // should be 1 notes for 'ote1-4'
     let u1pubnote2_exact_search = ZkNoteSearch {
       tagsearch: TagSearch::SearchTerm {
@@ -659,18 +721,21 @@ mod tests {
       offset: 0,
       limit: None,
       what: "test".to_string(),
-      list: true,
+      resulttype: ResultType::RtListNote,
+      ordering: None,
+      archives: false,
+      deleted: false,
     };
 
-    match search_zknotes(&conn, uid1, &u1pubnote2_exact_search)? {
-      Either::Left(zklr) => {
+    match search_zknotes(&conn, filesdir, uid1, &u1pubnote2_exact_search)? {
+      SearchResult::SrListNote(zklr) => {
         if zklr.notes.len() == 1 {
           ()
         } else {
           panic!("test failed")
         }
       }
-      Either::Right(_zknr) => panic!("test failed"),
+      _ => panic!("test failed"),
     }
     //
     Ok(())

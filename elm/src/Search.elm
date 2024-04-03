@@ -1,6 +1,7 @@
 module Search exposing
     ( AndOr(..)
     , FieldText(..)
+    , ResultType(..)
     , SearchMod(..)
     , TSText(..)
     , TagSearch(..)
@@ -70,16 +71,31 @@ type alias ZkNoteSearch =
     , offset : Int
     , limit : Maybe Int
     , what : String
-    , list : Bool
+    , resultType : ResultType
+    , archives : Bool
+    , deleted : Bool
+    , unsynced : Bool
     }
+
+
+type ResultType
+    = RtId
+    | RtListNote
+    | RtNote
+    | RtNoteAndLinks
 
 
 type SearchMod
     = ExactMatch
+    | ZkNoteId
     | Tag
     | Note
     | User
     | File
+    | Before
+    | After
+    | Create
+    | Mod
 
 
 type TagSearch
@@ -124,8 +140,27 @@ defaultSearch =
     , offset = 0
     , limit = Just defaultSearchLimit
     , what = ""
-    , list = True
+    , resultType = RtListNote
+    , archives = False
+    , deleted = False
+    , unsynced = False
     }
+
+
+encodeResultType : ResultType -> JE.Value
+encodeResultType smod =
+    case smod of
+        RtId ->
+            JE.string "RtId"
+
+        RtListNote ->
+            JE.string "RtListNote"
+
+        RtNote ->
+            JE.string "RtNote"
+
+        RtNoteAndLinks ->
+            JE.string "RtNoteAndLinks"
 
 
 encodeSearchMod : SearchMod -> JE.Value
@@ -133,6 +168,9 @@ encodeSearchMod smod =
     case smod of
         ExactMatch ->
             JE.string "ExactMatch"
+
+        ZkNoteId ->
+            JE.string "ZkNoteId"
 
         Tag ->
             JE.string "Tag"
@@ -146,6 +184,18 @@ encodeSearchMod smod =
         File ->
             JE.string "File"
 
+        Before ->
+            JE.string "Before"
+
+        After ->
+            JE.string "After"
+
+        Create ->
+            JE.string "Create"
+
+        Mod ->
+            JE.string "Mod"
+
 
 decodeSearchMod : JD.Decoder SearchMod
 decodeSearchMod =
@@ -155,6 +205,9 @@ decodeSearchMod =
                 case s of
                     "ExactMatch" ->
                         JD.succeed ExactMatch
+
+                    "ZkNoteId" ->
+                        JD.succeed ZkNoteId
 
                     "Tag" ->
                         JD.succeed Tag
@@ -167,6 +220,18 @@ decodeSearchMod =
 
                     "File" ->
                         JD.succeed File
+
+                    "Before" ->
+                        JD.succeed Before
+
+                    "After" ->
+                        JD.succeed After
+
+                    "Create" ->
+                        JD.succeed Create
+
+                    "Mod" ->
+                        JD.succeed Mod
 
                     wat ->
                         JD.fail <| "invalid search mod: " ++ wat
@@ -270,18 +335,25 @@ decodeAndOr =
             )
 
 
+encodeMaybe : String -> Maybe a -> (a -> JE.Value) -> Maybe ( String, JE.Value )
+encodeMaybe name mb toval =
+    Maybe.map (\a -> ( name, toval a )) mb
+
+
 encodeZkNoteSearch : ZkNoteSearch -> JE.Value
 encodeZkNoteSearch zns =
     JE.object <|
         [ ( "tagsearch", encodeTagSearch (andifySearches zns.tagSearch) )
         , ( "offset", JE.int zns.offset )
         , ( "what", JE.string zns.what )
-        , ( "list", JE.bool zns.list )
+        , ( "resulttype", encodeResultType zns.resultType )
+        , ( "archives", JE.bool zns.archives )
+        , ( "deleted", JE.bool zns.deleted )
+        , ( "unsynced", JE.bool zns.unsynced )
         ]
-            ++ (zns.limit
-                    |> Maybe.map (\i -> [ ( "limit", JE.int i ) ])
-                    |> Maybe.withDefault []
-               )
+            ++ List.filterMap identity
+                [ encodeMaybe "limit" zns.limit JE.int
+                ]
 
 
 showSearchMod : SearchMod -> String
@@ -289,6 +361,9 @@ showSearchMod mod =
     case mod of
         ExactMatch ->
             "ExactMatch"
+
+        ZkNoteId ->
+            "ZkNoteId"
 
         Tag ->
             "Tag"
@@ -301,6 +376,18 @@ showSearchMod mod =
 
         File ->
             "File"
+
+        Before ->
+            "Before"
+
+        After ->
+            "After"
+
+        Create ->
+            "Create"
+
+        Mod ->
+            "Mod"
 
 
 showAndOr : AndOr -> String
@@ -332,6 +419,9 @@ printSearchMod mod =
         ExactMatch ->
             "e"
 
+        ZkNoteId ->
+            "z"
+
         Tag ->
             "t"
 
@@ -343,6 +433,18 @@ printSearchMod mod =
 
         File ->
             "f"
+
+        Before ->
+            "b"
+
+        After ->
+            "a"
+
+        Create ->
+            "c"
+
+        Mod ->
+            "m"
 
 
 printAndOr : AndOr -> String
@@ -373,6 +475,8 @@ searchMod =
     oneOf
         [ succeed ExactMatch
             |. symbol "e"
+        , succeed ZkNoteId
+            |. symbol "z"
         , succeed Tag
             |. symbol "t"
         , succeed Note
@@ -381,6 +485,16 @@ searchMod =
             |. symbol "u"
         , succeed File
             |. symbol "f"
+        , succeed File
+            |. symbol "f"
+        , succeed Before
+            |. symbol "b"
+        , succeed After
+            |. symbol "a"
+        , succeed Create
+            |. symbol "c"
+        , succeed Mod
+            |. symbol "m"
         ]
 
 

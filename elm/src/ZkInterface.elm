@@ -1,6 +1,6 @@
 module ZkInterface exposing (SendMsg(..), ServerResponse(..), encodeEmail, encodeSendMsg, serverResponseDecoder, showServerResponse)
 
-import Data
+import Data exposing (ZkNoteId)
 import Json.Decode as JD
 import Json.Encode as JE
 import Search as S
@@ -8,29 +8,32 @@ import Util
 
 
 type SendMsg
-    = GetZkNote Int
+    = GetZkNote ZkNoteId
     | GetZkNoteAndLinks Data.GetZkNoteAndLinks
     | GetZnlIfChanged Data.GetZnlIfChanged
     | GetZkNoteComments Data.GetZkNoteComments
     | GetZkNoteArchives Data.GetZkNoteArchives
     | GetArchiveZkNote Data.GetArchiveZkNote
-    | DeleteZkNote Int
+    | DeleteZkNote ZkNoteId
     | SaveZkNote Data.SaveZkNote
     | SaveZkLinks Data.ZkLinks
-    | SaveZkNotePlusLinks Data.SaveZkNotePlusLinks
+    | SaveZkNoteAndLinks Data.SaveZkNoteAndLinks
     | SearchZkNotes S.ZkNoteSearch
     | SaveImportZkNotes (List Data.ImportZkNote)
     | PowerDelete S.TagSearch
-    | SetHomeNote Int
+    | SetHomeNote ZkNoteId
+    | SyncRemote
+    | SyncFiles S.ZkNoteSearch
 
 
 type ServerResponse
     = ZkNoteSearchResult Data.ZkNoteSearchResult
     | ZkListNoteSearchResult Data.ZkListNoteSearchResult
-    | ArchiveList Data.ZkNoteArchives
-    | SavedZkNotePlusLinks Data.SavedZkNote
+    | ZkIdSearchResult Data.ZkIdSearchResult
+    | ZkNoteArchives Data.ZkNoteArchives
+    | SavedZkNoteAndLinks Data.SavedZkNote
     | SavedZkNote Data.SavedZkNote
-    | DeletedZkNote Int
+    | DeletedZkNote ZkNoteId
     | ZkNote Data.ZkNote
     | ZkNoteAndLinksWhat Data.ZkNoteAndLinksWhat
     | ZkNoteComments (List Data.ZkNote)
@@ -39,9 +42,13 @@ type ServerResponse
     | ZkLinks Data.ZkLinks
     | SavedImportZkNotes
     | PowerDeleteComplete Int
-    | HomeNoteSet Int
+    | HomeNoteSet ZkNoteId
     | FilesUploaded (List Data.ZkListNote)
+    | SyncComplete
+    | FileSyncComplete
     | Noop
+    | NotLoggedIn
+    | LoginError
 
 
 showServerResponse : ServerResponse -> String
@@ -50,11 +57,14 @@ showServerResponse sr =
         ZkNoteSearchResult _ ->
             "ZkNoteSearchResult"
 
+        ZkIdSearchResult _ ->
+            "ZkIdSearchResult"
+
         ZkListNoteSearchResult _ ->
             "ZkListNoteSearchResult"
 
-        ArchiveList _ ->
-            "ArchiveList"
+        ZkNoteArchives _ ->
+            "ZkNoteArchives"
 
         SavedZkNote _ ->
             "SavedZkNote"
@@ -77,8 +87,8 @@ showServerResponse sr =
         SavedZkLinks ->
             "SavedZkLinks"
 
-        SavedZkNotePlusLinks _ ->
-            "SavedZkNotePlusLinks"
+        SavedZkNoteAndLinks _ ->
+            "SavedZkNoteAndLinks"
 
         SavedImportZkNotes ->
             "SavedImportZkNotes"
@@ -95,8 +105,20 @@ showServerResponse sr =
         FilesUploaded _ ->
             "FilesUploaded"
 
+        SyncComplete ->
+            "SyncComplete"
+
+        FileSyncComplete ->
+            "FileSyncComplete"
+
         Noop ->
             "Noop"
+
+        NotLoggedIn ->
+            "NotLoggedIn"
+
+        LoginError ->
+            "LoginError"
 
 
 encodeSendMsg : SendMsg -> JE.Value
@@ -104,86 +126,98 @@ encodeSendMsg sm =
     case sm of
         GetZkNote id ->
             JE.object
-                [ ( "what", JE.string "getzknote" )
-                , ( "data", JE.int id )
+                [ ( "what", JE.string "GetZkNote" )
+                , ( "data", Data.encodeZkNoteId id )
                 ]
 
         GetZkNoteAndLinks zkne ->
             JE.object
-                [ ( "what", JE.string "getzknoteedit" )
+                [ ( "what", JE.string "GetZkNoteAndLinks" )
                 , ( "data", Data.encodeGetZkNoteEdit zkne )
                 ]
 
         GetZnlIfChanged x ->
             JE.object
-                [ ( "what", JE.string "getzneifchanged" )
-                , ( "data", Data.encodeGetZneIfChanged x )
+                [ ( "what", JE.string "GetZnlIfChanged" )
+                , ( "data", Data.encodeGetZnlIfChanged x )
                 ]
 
         GetZkNoteComments msg ->
             JE.object
-                [ ( "what", JE.string "getzknotecomments" )
+                [ ( "what", JE.string "GetZkNoteComments" )
                 , ( "data", Data.encodeGetZkNoteComments msg )
                 ]
 
         GetZkNoteArchives msg ->
             JE.object
-                [ ( "what", JE.string "getzknotearchives" )
+                [ ( "what", JE.string "GetZkNoteArchives" )
                 , ( "data", Data.encodeGetZkNoteArchives msg )
                 ]
 
         GetArchiveZkNote msg ->
             JE.object
-                [ ( "what", JE.string "getarchivezknote" )
+                [ ( "what", JE.string "GetArchiveZkNote" )
                 , ( "data", Data.encodeGetArchiveZkNote msg )
                 ]
 
         DeleteZkNote id ->
             JE.object
-                [ ( "what", JE.string "deletezknote" )
-                , ( "data", JE.int id )
+                [ ( "what", JE.string "DeleteZkNote" )
+                , ( "data", Data.encodeZkNoteId id )
                 ]
 
         SaveZkNote x ->
             JE.object
-                [ ( "what", JE.string "savezknote" )
+                [ ( "what", JE.string "SaveZkNote" )
                 , ( "data", Data.encodeSaveZkNote x )
                 ]
 
-        SaveZkNotePlusLinks s ->
+        SaveZkNoteAndLinks s ->
             JE.object
-                [ ( "what", JE.string "savezknotepluslinks" )
-                , ( "data", Data.encodeSaveZkNotePlusLinks s )
+                [ ( "what", JE.string "SaveZkNoteAndLinks" )
+                , ( "data", Data.encodeSaveZkNoteAndLinks s )
                 ]
 
         SaveZkLinks zklinks ->
             JE.object
-                [ ( "what", JE.string "savezklinks" )
+                [ ( "what", JE.string "SaveZkLinks" )
                 , ( "data", Data.encodeZkLinks zklinks )
                 ]
 
         SearchZkNotes s ->
             JE.object
-                [ ( "what", JE.string "searchzknotes" )
+                [ ( "what", JE.string "SearchZkNotes" )
                 , ( "data", S.encodeZkNoteSearch s )
                 ]
 
         SaveImportZkNotes n ->
             JE.object
-                [ ( "what", JE.string "saveimportzknotes" )
+                [ ( "what", JE.string "SaveImportZkNotes" )
                 , ( "data", JE.list Data.encodeImportZkNote n )
                 ]
 
         PowerDelete s ->
             JE.object
-                [ ( "what", JE.string "powerdelete" )
+                [ ( "what", JE.string "PowerDelete" )
                 , ( "data", S.encodeTagSearch s )
                 ]
 
         SetHomeNote id ->
             JE.object
-                [ ( "what", JE.string "sethomenote" )
-                , ( "data", JE.int id )
+                [ ( "what", JE.string "SetHomeNote" )
+                , ( "data", Data.encodeZkNoteId id )
+                ]
+
+        SyncRemote ->
+            JE.object
+                [ ( "what", JE.string "SyncRemote" )
+                , ( "data", JE.null )
+                ]
+
+        SyncFiles s ->
+            JE.object
+                [ ( "what", JE.string "SyncFiles" )
+                , ( "data", S.encodeZkNoteSearch s )
                 ]
 
 
@@ -201,56 +235,71 @@ serverResponseDecoder =
         |> JD.andThen
             (\what ->
                 case what of
-                    "server error" ->
+                    "ServerError" ->
                         JD.map ServerError (JD.at [ "content" ] JD.string)
 
-                    "zknotesearchresult" ->
+                    "ZkNoteSearchResult" ->
                         JD.map ZkNoteSearchResult (JD.at [ "content" ] <| Data.decodeZkNoteSearchResult)
 
-                    "zklistnotesearchresult" ->
+                    "ZkListNoteSearchResult" ->
                         JD.map ZkListNoteSearchResult (JD.at [ "content" ] <| Data.decodeZkListNoteSearchResult)
 
-                    "zknotearchives" ->
-                        JD.map ArchiveList (JD.at [ "content" ] <| Data.decodeZkNoteArchives)
+                    "ZkIdSearchResult" ->
+                        JD.map ZkIdSearchResult (JD.at [ "content" ] <| Data.decodeZkIdSearchResult)
 
-                    "savedzknote" ->
+                    "ZkNoteArchives" ->
+                        JD.map ZkNoteArchives (JD.at [ "content" ] <| Data.decodeZkNoteArchives)
+
+                    "SavedZkNote" ->
                         JD.map SavedZkNote (JD.at [ "content" ] <| Data.decodeSavedZkNote)
 
-                    "savedzknotepluslinks" ->
-                        JD.map SavedZkNotePlusLinks (JD.at [ "content" ] <| Data.decodeSavedZkNote)
+                    "SavedZkNoteAndLinks" ->
+                        JD.map SavedZkNoteAndLinks (JD.at [ "content" ] <| Data.decodeSavedZkNote)
 
-                    "deletedzknote" ->
-                        JD.map DeletedZkNote (JD.at [ "content" ] <| JD.int)
+                    "DeletedZkNote" ->
+                        JD.map DeletedZkNote (JD.at [ "content" ] <| Data.decodeZkNoteId)
 
-                    "zknote" ->
+                    "ZkNote" ->
                         JD.map ZkNote (JD.at [ "content" ] <| Data.decodeZkNote)
 
-                    "zknoteedit" ->
+                    "ZkNoteAndLinksWhat" ->
                         JD.map ZkNoteAndLinksWhat (JD.at [ "content" ] <| Data.decodeZkNoteEditWhat)
 
-                    "zknotecomments" ->
+                    "ZkNoteComments" ->
                         JD.map ZkNoteComments (JD.at [ "content" ] <| JD.list Data.decodeZkNote)
 
-                    "savedzklinks" ->
+                    "SavedZkLinks" ->
                         JD.succeed SavedZkLinks
 
-                    "savedimportzknotes" ->
+                    "SavedImportZkNotes" ->
                         JD.succeed SavedImportZkNotes
 
-                    "zklinks" ->
+                    "ZkLinks" ->
                         JD.map ZkLinks (JD.field "content" Data.decodeZkLinks)
 
-                    "powerdeletecomplete" ->
+                    "PowerDeleteComplete" ->
                         JD.map PowerDeleteComplete (JD.field "content" JD.int)
 
-                    "homenoteset" ->
-                        JD.map HomeNoteSet (JD.field "content" JD.int)
+                    "HomeNoteSet" ->
+                        JD.map HomeNoteSet (JD.field "content" Data.decodeZkNoteId)
 
-                    "savedfiles" ->
+                    "FilesUploaded" ->
                         JD.map FilesUploaded (JD.field "content" <| JD.list Data.decodeZkListNote)
 
-                    "noop" ->
+                    "SyncComplete" ->
+                        JD.succeed SyncComplete
+
+                    "FileSyncComplete" ->
+                        JD.succeed FileSyncComplete
+
+                    "Noop" ->
                         JD.succeed Noop
+
+                    "NotLoggedIn" ->
+                        JD.succeed NotLoggedIn
+
+                    "LoginError" ->
+                        JD.succeed LoginError
 
                     wat ->
                         JD.succeed
