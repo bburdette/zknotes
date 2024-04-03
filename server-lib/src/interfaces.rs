@@ -76,6 +76,7 @@ pub async fn user_interface(
       tokener,
       &config.orgauth_config,
       &mut sqldata::zknotes_callbacks(),
+      Some("user".to_string()),
       msg,
     )
     .await?,
@@ -142,7 +143,6 @@ pub async fn zk_interface_loggedin(
   uid: i64,
   msg: &PrivateMessage,
 ) -> Result<PrivateReplyMessage, Box<dyn Error>> {
-  // match PrivateRequests::fromstr(msg.what.as_str()) {
   match msg.what {
     PrivateRequests::GetZkNote => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
