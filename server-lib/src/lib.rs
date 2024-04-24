@@ -27,7 +27,7 @@ use futures_util::TryStreamExt as _;
 use log::{error, info};
 pub use orgauth;
 use orgauth::util;
-use orgauth::{
+pub use orgauth::{
   data::{AdminResponse, UserResponse, UserResponseMessage},
   endpoints::ActixTokener,
 };

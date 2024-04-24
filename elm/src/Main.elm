@@ -149,7 +149,7 @@ decodeFlags =
         |> andMap (JD.field "height" JD.int)
         |> andMap (JD.field "errorid" (JD.maybe Data.decodeZkNoteId))
         |> andMap (JD.field "login" (JD.maybe Data.decodeLoginData))
-        |> andMap (JD.field "sysids" Data.decodeSysids)
+        |> andMap (JD.succeed Data.sysids)
         |> andMap (JD.field "adminsettings" OD.decodeAdminSettings)
         |> andMap (JD.field "tauri" JD.bool)
 

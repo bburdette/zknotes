@@ -86,6 +86,20 @@ type alias Sysids =
     }
 
 
+sysids : Sysids
+sysids =
+    { publicid = ZkNoteId "f596bc2c-a882-4c1c-b739-8c4e25f34eb2"
+    , commentid = ZkNoteId "e82fefee-bcd3-4e2e-b350-9963863e516d"
+    , shareid = ZkNoteId "466d39ec-2ea7-4d43-b44c-1d3d083f8a9d"
+    , searchid = ZkNoteId "84f72fd0-8836-43a3-ac66-89e0ab49dd87"
+
+    -- , userid = ZkNoteId "4fb37d76-6fc8-4869-8ee4-8e05fa5077f7"
+    -- , archiveid = ZkNoteId "ad6a4ca8-0446-4ecc-b047-46282ced0d84"
+    -- , systemid = ZkNoteId "0efcc98f-dffd-40e5-af07-90da26b1d469"
+    -- , syncid = ZkNoteId "528ccfc2-8488-41e0-a4e1-cbab6406674e"
+    }
+
+
 type alias ZkInviteData =
     List SaveZkLink
 
