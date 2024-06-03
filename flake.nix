@@ -48,6 +48,7 @@
               openssl.dev 
               ];
           };
+        module = import "module.nix";
       in
         rec {
           inherit pname;
@@ -74,6 +75,8 @@
             drv = packages.${pname};
           };
           defaultApp = apps.${pname};
+
+          nixosModules.default = module;
 
           # `nix develop`
           devShell = pkgs.mkShell {

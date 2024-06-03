@@ -54,11 +54,11 @@ in
       after = [ "network.target" ];
       wantedBy = [ "multi-user.target" ];
 
-      serviceConfig.User = "grc";
+      serviceConfig.User = "bburdette";
 
       script = ''
-          cd /home/grc/zknotes
-          RUST_LOG=info /home/grc/.nix-profile/bin/zknotes-server
+          cd /home/bburdette/zknotes
+          RUST_LOG=info /home/bburdette/.nix-profile/bin/zknotes-server
           '';
     };
   };
