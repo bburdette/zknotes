@@ -75,9 +75,6 @@
           };
           defaultApp = apps.${pname};
 
-          # nixosModules.zknotes = import ./module.nix;
-          nixosModules = { zknotes = import ./module.nix; };
-
           # `nix develop`
           devShell = pkgs.mkShell {
             nativeBuildInputs = with pkgs; [
@@ -105,6 +102,8 @@
             ];
           };
         }
-    );
+    ) // {
+      nixosModules = { zknotes = import ./module.nix; };
+    };
 }
 
