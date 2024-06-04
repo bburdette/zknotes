@@ -76,7 +76,7 @@
           };
           defaultApp = apps.${pname};
 
-          nixosModules.default = module;
+          nixosModules.${system}.default = module;
 
           # `nix develop`
           devShell = pkgs.mkShell {
