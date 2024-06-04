@@ -48,7 +48,7 @@
               openssl.dev 
               ];
           };
-        module = import "module.nix";
+        module = import ./module.nix;
       in
         rec {
           inherit pname;
