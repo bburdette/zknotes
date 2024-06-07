@@ -1,10 +1,11 @@
-{ config, lib, pkgs, ... }:
+{ config, options, lib, pkgs, ... }:
 
 with lib;
 
 let
 
   cfg = config.services.zknotes;
+  opt = options.services.zknotes;
 
   # Command line arguments for the zknotes daemon
   # data dir.  zknotes.db, config.
@@ -20,7 +21,20 @@ in
 
   options = {
     services.zknotes = {
-      enable = mkEnableOption "zknotes";
+      enable = mkEnableOption (lib.mdDoc "zknotes; markdown based multi user zettelkasten");
+
+      user = mkOption {
+        type = types.str;
+        default = "zknotes";
+        example = "zknotes-user";
+        description = "User account in which to run zknotes.";
+      };
+      group = lib.mkOption {
+        type = lib.types.str;
+        default = "zknotes";
+        description = lib.mdDoc "Group under which zknotes runs.";
+      };
+
 
       # dataDir = mkOption {
       #   type = types.path;
@@ -54,12 +68,42 @@ in
       after = [ "network.target" ];
       wantedBy = [ "multi-user.target" ];
 
-      serviceConfig.User = "bburdette";
+      serviceConfig.User = cfg.user; # "${opt.user}";
+      serviceConfig.Group = cfg.group;
 
       script = ''
-          cd /home/bburdette/zknotes
-          RUST_LOG=info /home/bburdette/.nix-profile/bin/zknotes-server
+          cd ~
+          mkdir -p zknotes
+          cd zknotes
+          if [ ! -f config.toml ]; then
+            mkdir -p files
+            mkdir -p temp
+            zknotes-server --write-config config.toml
+          fi
+          RUST_LOG=info zknotes-server -c config.toml
           '';
     };
+
+    users.groups = {
+      ${cfg.group} = { };
+    };
+
+    users.users = lib.mkMerge [
+      (lib.mkIf (cfg.user == "zknotes") {
+        zknotes = {
+          isSystemUser = true;
+          group = cfg.group;
+          home = "/home/${opt.user}";
+        };
+      })
+    ];
+
+        # members = "${opt.user}";
+        # members = lib.optional cfg.configureNginx config.services.nginx.user;
+        # members = [ config.services.nginx.user ];
+      # };
+    # };
+
+    # environment.systemPackages = [ zknotes ];
   };
 }
