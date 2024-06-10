@@ -72,7 +72,7 @@ in
       serviceConfig.Group = cfg.group;
 
       script = ''
-          cd ~
+          cd "/home/${cfg.user}"
           mkdir -p zknotes
           cd zknotes
           if [ ! -f config.toml ]; then
@@ -93,7 +93,7 @@ in
         zknotes = {
           isSystemUser = true;
           group = cfg.group;
-          home = "/home/${opt.user}";
+          home = "/home/${cfg.user}";
         };
       })
     ];
