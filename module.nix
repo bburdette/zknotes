@@ -90,12 +90,14 @@ in
 
     users.users = lib.mkMerge [
       (lib.mkIf (cfg.user == "zknotes") {
-        zknotes = {
+        ${cfg.user} = {
           isSystemUser = true;
           group = cfg.group;
           home = "/home/${cfg.user}";
+          createHome = true;
         };
-      })
+      }
+      )
     ];
 
         # members = "${opt.user}";
