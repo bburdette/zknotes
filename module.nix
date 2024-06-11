@@ -7,18 +7,11 @@ let
   cfg = config.services.zknotes;
   opt = options.services.zknotes;
 
-  # Command line arguments for the zknotes daemon
-  # data dir.  zknotes.db, config.
-  # user to run as.
-  # port, I guess.
-  # pdf docs directory
-
 in
 
 {
 
   ###### interface
-
   options = {
     services.zknotes = {
       enable = mkEnableOption (lib.mdDoc "zknotes; markdown based multi user zettelkasten");
