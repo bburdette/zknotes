@@ -68,21 +68,21 @@ in
       after = [ "network.target" ];
       wantedBy = [ "multi-user.target" ];
 
-      serviceConfig.User = cfg.user; # "${opt.user}";
+      serviceConfig.User = cfg.user;
       serviceConfig.Group = cfg.group;
 
       script = ''
-          cd "/home/${cfg.user}"
-          mkdir -p zknotes
-          cd zknotes
-          if [ ! -f config.toml ]; then
-            mkdir -p files
-            mkdir -p temp
-            zknotes-server --write-config config.toml
-          fi
-          RUST_LOG=info ${pkgs.zknotes}/bin/zknotes-server -c config.toml
-          # RUST_LOG=info zknotes-server -c config.toml
-          '';
+        cd "/home/${cfg.user}"
+        mkdir -p zknotes
+        cd zknotes
+        if [ ! -f config.toml ]; then
+          mkdir -p files
+          mkdir -p temp
+          ${pkgs.zknotes}/bin/zknotes-server --write-config config.toml
+        fi
+        RUST_LOG=info ${pkgs.zknotes}/bin/zknotes-server -c config.toml
+        # RUST_LOG=info zknotes-server -c config.toml
+        '';
     };
 
     users.groups = {
@@ -97,8 +97,7 @@ in
           home = "/home/${cfg.user}";
           createHome = true;
         };
-      }
-      )
+      })
     ];
 
         # members = "${opt.user}";
