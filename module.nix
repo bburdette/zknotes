@@ -78,7 +78,7 @@ in
         if [ ! -f config.toml ]; then
           mkdir -p files
           mkdir -p temp
-          ${pkgs.zknotes}/bin/zknotes-server --write-config config.toml
+          ${pkgs.zknotes}/bin/zknotes-server --write_config config.toml
         fi
         RUST_LOG=info ${pkgs.zknotes}/bin/zknotes-server -c config.toml
         # RUST_LOG=info zknotes-server -c config.toml
