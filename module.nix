@@ -81,7 +81,6 @@ in
           ${pkgs.zknotes}/bin/zknotes-server --write_config config.toml
         fi
         RUST_LOG=info ${pkgs.zknotes}/bin/zknotes-server -c config.toml
-        # RUST_LOG=info zknotes-server -c config.toml
         '';
     };
 
@@ -99,13 +98,5 @@ in
         };
       })
     ];
-
-        # members = "${opt.user}";
-        # members = lib.optional cfg.configureNginx config.services.nginx.user;
-        # members = [ config.services.nginx.user ];
-      # };
-    # };
-
-    # environment.systemPackages = [ zknotes ];
   };
 }
