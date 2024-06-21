@@ -55,39 +55,41 @@ Then add this to your modules:
           inputs.zknotes.nixosModules.zknotes
 
 Then in configuration.nix add:
-
+```
   nixpkgs.overlays = [ (final: prev: { zknotes = inputs.zknotes.packages.${pkgs.system}.zknotes; })];
   services.zknotes.enable = true;
-
+```
 You can use custom settings:
 
-  nixpkgs.overlays = [ (final: prev: { zknotes = inputs.zknotes.packages.${pkgs.system}.zknotes; })];
-  services.zknotes = {
-    enable = true;
-    settings = ''
-        ip = '127.0.0.1'
-        port = 8010
-        createdirs = true
-        altmainsite = []
-        file_tmp_path = './temp'
-        file_path = './files'
-
-        [orgauth_config]
-        mainsite = 'http://localhost:8010'
-        appname = 'zknotes'
-        emaildomain = 'zknotes.com'
-        db = './zknotes.db'
-        admin_email = 'admin@admin.admin'
-        regen_login_tokens = true
-        email_token_expiration_ms = 86400000
-        reset_token_expiration_ms = 86400000
-        invite_token_expiration_ms = 604800000
-        open_registration = false
-        send_emails = false
-        non_admin_invite = true
-        remote_registration = true
-      '';
-  };
+```
+   nixpkgs.overlays = [ (final: prev: { zknotes = inputs.zknotes.packages.${pkgs.system}.zknotes; })];
+   services.zknotes = {
+     enable = true;
+     settings = ''
+         ip = '127.0.0.1'
+         port = 8010
+         createdirs = true
+         altmainsite = []
+         file_tmp_path = './temp'
+         file_path = './files'
+ 
+         [orgauth_config]
+         mainsite = 'http://localhost:8010'
+         appname = 'zknotes'
+         emaildomain = 'zknotes.com'
+         db = './zknotes.db'
+         admin_email = 'admin@admin.admin'
+         regen_login_tokens = true
+         email_token_expiration_ms = 86400000
+         reset_token_expiration_ms = 86400000
+         invite_token_expiration_ms = 604800000
+         open_registration = false
+         send_emails = false
+         non_admin_invite = true
+         remote_registration = true
+       '';
+   };
+```
 
 The default here is to run zknotes in its own user account, 'zknotes', and store data in /home/zknotes/zknotes.  
 
