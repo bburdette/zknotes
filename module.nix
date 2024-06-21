@@ -21,28 +21,13 @@ in
         type = types.str;
         default = "zknotes";
         example = "zknotes-user";
-        description = "User account in which to run zknotes.";
+        description = "linux user account in which to run zknotes.";
       };
       group = lib.mkOption {
         type = lib.types.str;
         default = "zknotes";
-        description = lib.mdDoc "Group under which zknotes runs.";
+        description = lib.mdDoc "linux group under which zknotes runs.";
       };
-
-
-      # dataDir = mkOption {
-      #   type = types.path;
-      #   default = null;
-      #   example = "/home/bburdette/zknotes";
-      #   description = "Location where zknotes runs and stores data.";
-      # };
-
-      # listenAddress = mkOption {
-      #   type = types.nullOr types.str;
-      #   default = null;
-      #   example = "127.0.0.1";
-      #   description = "Listen on a specific IP address.";
-      # };
 
     settings = lib.mkOption {
       inherit (settingsFormat) type;
@@ -84,11 +69,6 @@ in
     };
   };
 
-# ${pkgs.zknotes}/bin/zknotes-server --write_config config.toml
-# if [ ! -f config.toml ]; then
-#   mkdir -p files
-#   mkdir -p temp
-# fi
   ###### implementation
   config = mkIf cfg.enable {
 
