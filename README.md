@@ -16,7 +16,7 @@ zknotes has some multi-user features.
  - Notes can be designated as read-only or editable.  
  - There's also a comment system.  Notes that link to the 'comment' system note and to another note show up as comments in the web UI.
 
-## install notes
+## install locally to try it out:
 
 If you want to compile and run this on your own machine, without bothering with development tools:
 
@@ -27,22 +27,79 @@ If you want to compile and run this on your own machine, without bothering with 
   nix build "git+http://github.com/bburdette/zknotes?submodules=1"
   ```
 
-- Make a config.toml file with `zknotes-server -w myconfig.toml`, then edit as needed.
-
-## first login
+- Make a config.toml file with `./result/bin/zknotes-server -w myconfig.toml`, then edit as needed.
 
 To create the first zknotes admin account, use the -a option, like so:
 
-`../target/debug/zknotes-server -c myconfig.toml -a the-admin`
-
-By default zknotes uses 'invite links' for new users.  To onboard a new user, an admin gets an invite link from the admin panel, and sends that to the new user via email, signal, slack, etc.  Whoever uses the invite link can set their username and password to get an account.
-
-## run zknotes
+`./result/bin/zknotes-server -c myconfig.toml -a the-admin`
 
 After finishing the above setup, run it with:
   ```
   ./result/bin/zknotes-server -c myconfig.toml
   ```
+
+## as a nix service (nixos)
+
+If you have a flake.nix and configuration.nix, then in the flake.nix this line to your inputs:
+
+checked out locally:
+
+    zknotes = { url = "git+file:/home/bburdette/code/zknotes/zknotes?submodules=1"; };
+
+from the github repo:
+
+    zknotes = { url = "github:bburdette/zknotes?submodules=1"; };
+
+Then add this to your modules:
+
+          inputs.zknotes.nixosModules.zknotes
+
+Then in configuration.nix add:
+```
+  nixpkgs.overlays = [ (final: prev: { zknotes = inputs.zknotes.packages.${pkgs.system}.zknotes; })];
+  services.zknotes.enable = true;
+```
+You can use custom settings:
+
+```
+   nixpkgs.overlays = [ (final: prev: { zknotes = inputs.zknotes.packages.${pkgs.system}.zknotes; })];
+   services.zknotes = {
+     enable = true;
+     settings = ''
+         ip = '127.0.0.1'
+         port = 8010
+         createdirs = true
+         altmainsite = []
+         file_tmp_path = './temp'
+         file_path = './files'
+ 
+         [orgauth_config]
+         mainsite = 'http://localhost:8010'
+         appname = 'zknotes'
+         emaildomain = 'zknotes.com'
+         db = './zknotes.db'
+         admin_email = 'admin@admin.admin'
+         regen_login_tokens = true
+         email_token_expiration_ms = 86400000
+         reset_token_expiration_ms = 86400000
+         invite_token_expiration_ms = 604800000
+         open_registration = false
+         send_emails = false
+         non_admin_invite = true
+         remote_registration = true
+       '';
+   };
+```
+
+The default here is to run zknotes in its own user account, 'zknotes', and store data in /home/zknotes/zknotes.  
+
+To create the first user with zknotes, so you can log in:
+
+`sudo zknotes-server -c /home/zknotes/zknotes/config.toml -a my-admin-uid`
+
+## invite users
+
+By default zknotes uses 'invite links' for new users.  To onboard a new user, an admin gets an invite link from the admin panel, and sends that to the new user via email, signal, slack, etc.  Whoever uses the invite link can set their username and password to get an account.
 
 ## developing
 
