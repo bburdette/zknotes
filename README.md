@@ -29,6 +29,24 @@ If you want to compile and run this on your own machine, without bothering with 
 
 - Make a config.toml file with `zknotes-server -w myconfig.toml`, then edit as needed.
 
+## as a nix service
+
+If you have a flake.nix and configuration.nix, then in the flake.nix this line to your inputs:
+
+    zknotes = { url = "git+file:/home/bburdette/code/zknotes/zknotes?submodules=1"; };
+
+Then add this to your modules:
+
+          inputs.zknotes.nixosModules.zknotes
+
+Then in configuration.nix add:
+
+  nixpkgs.overlays = [ (final: prev: { zknotes = inputs.zknotes.packages.${pkgs.system}.zknotes; })];
+
+and
+
+  services.zknotes.enable = true;
+
 ## first login
 
 To create the first zknotes admin account, use the -a option, like so:

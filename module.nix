@@ -7,18 +7,11 @@ let
   cfg = config.services.zknotes;
   opt = options.services.zknotes;
 
-  # Command line arguments for the zknotes daemon
-  # data dir.  zknotes.db, config.
-  # user to run as.
-  # port, I guess.
-  # pdf docs directory
-
 in
 
 {
 
   ###### interface
-
   options = {
     services.zknotes = {
       enable = mkEnableOption (lib.mdDoc "zknotes; markdown based multi user zettelkasten");
@@ -68,20 +61,20 @@ in
       after = [ "network.target" ];
       wantedBy = [ "multi-user.target" ];
 
-      serviceConfig.User = cfg.user; # "${opt.user}";
+      serviceConfig.User = cfg.user;
       serviceConfig.Group = cfg.group;
 
       script = ''
-          cd ~
-          mkdir -p zknotes
-          cd zknotes
-          if [ ! -f config.toml ]; then
-            mkdir -p files
-            mkdir -p temp
-            zknotes-server --write-config config.toml
-          fi
-          RUST_LOG=info zknotes-server -c config.toml
-          '';
+        cd "/home/${cfg.user}"
+        mkdir -p zknotes
+        cd zknotes
+        if [ ! -f config.toml ]; then
+          mkdir -p files
+          mkdir -p temp
+          ${pkgs.zknotes}/bin/zknotes-server --write_config config.toml
+        fi
+        RUST_LOG=info ${pkgs.zknotes}/bin/zknotes-server -c config.toml
+        '';
     };
 
     users.groups = {
@@ -90,20 +83,13 @@ in
 
     users.users = lib.mkMerge [
       (lib.mkIf (cfg.user == "zknotes") {
-        zknotes = {
+        ${cfg.user} = {
           isSystemUser = true;
           group = cfg.group;
-          home = "/home/${opt.user}";
+          home = "/home/${cfg.user}";
+          createHome = true;
         };
       })
     ];
-
-        # members = "${opt.user}";
-        # members = lib.optional cfg.configureNginx config.services.nginx.user;
-        # members = [ config.services.nginx.user ];
-      # };
-    # };
-
-    # environment.systemPackages = [ zknotes ];
   };
 }
