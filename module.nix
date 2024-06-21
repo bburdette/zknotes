@@ -105,7 +105,7 @@ in
           mkdir -p files
           mkdir -p temp
         fi
-        echo ${cfg.settings} >> config.toml
+        echo "${cfg.settings}" >> config.toml
         RUST_LOG=info ${pkgs.zknotes}/bin/zknotes-server -c config.toml
         '';
     };
