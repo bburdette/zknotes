@@ -49,7 +49,7 @@ in
       default = ''
         ip = '127.0.0.1'
         port = 8000
-        createdirs = false
+        createdirs = true
         altmainsite = []
         file_tmp_path = './temp'
         file_path = './files'
@@ -67,11 +67,10 @@ in
         open_registration = false
         send_emails = false
         non_admin_invite = true
-        remote_registration = true '';
+        remote_registration = true
+      '';
       description = ''
-        Configuration included in `starship.toml`.
-
-        See https://starship.rs/config/#prompt for documentation.
+        zknotes config.toml file.
       '';
     };
 
@@ -85,7 +84,11 @@ in
     };
   };
 
-          # ${pkgs.zknotes}/bin/zknotes-server --write_config config.toml
+# ${pkgs.zknotes}/bin/zknotes-server --write_config config.toml
+# if [ ! -f config.toml ]; then
+#   mkdir -p files
+#   mkdir -p temp
+# fi
   ###### implementation
   config = mkIf cfg.enable {
 
@@ -101,11 +104,7 @@ in
         cd "/home/${cfg.user}"
         mkdir -p zknotes
         cd zknotes
-        if [ ! -f config.toml ]; then
-          mkdir -p files
-          mkdir -p temp
-        fi
-        echo "${cfg.settings}" >> config.toml
+        echo "${cfg.settings}" > config.toml
         RUST_LOG=info ${pkgs.zknotes}/bin/zknotes-server -c config.toml
         '';
     };
