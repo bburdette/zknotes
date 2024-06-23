@@ -42,13 +42,7 @@ After finishing the above setup, run it with:
 
 If you have a flake.nix and configuration.nix, then in the flake.nix this line to your inputs:
 
-checked out locally:
-
-    zknotes = { url = "git+file:/home/bburdette/code/zknotes/zknotes?submodules=1"; };
-
-from the github repo:
-
-    zknotes = { url = "github:bburdette/zknotes?submodules=1"; };
+    zknotes = { url = "git+https://github.com/bburdette/zknotes?submodules=1"; };
 
 Then add this to your modules:
 
