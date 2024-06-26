@@ -89,7 +89,11 @@ The default here is to run zknotes in its own user account, 'zknotes', and store
 
 To create the first user with zknotes, so you can log in:
 
-`sudo zknotes-server -c /home/zknotes/zknotes/config.toml -a my-admin-uid`
+```
+su
+cd /home/zknotes/zknotes
+zknotes-server -c config.toml -a my-admin-uid
+```
 
 ## invite users
 
