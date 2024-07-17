@@ -102,6 +102,8 @@
             ];
           };
         }
-    );
+    ) // {
+      nixosModules = { zknotes = import ./module.nix; };
+    };
 }
 
