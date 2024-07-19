@@ -259,6 +259,7 @@ pub enum DownloadResult {
 pub async fn download_file(
   conn: &Connection,
   user: &User,
+  tmp_files_dir: &Path,
   files_dir: &Path,
   note_id: i64,
 ) -> Result<DownloadResult, zkerr::Error> {
@@ -281,10 +282,11 @@ pub async fn download_file(
     return Ok(DownloadResult::NoSource);
   }
 
-  let hashpath = files_dir.join(Path::new(hash.as_str()));
+  let temphashpath = tmp_files_dir.join(Path::new(hash.as_str()));
+  let finalhashpath = files_dir.join(Path::new(hash.as_str()));
 
   // file exists?
-  if hashpath.exists() {
+  if finalhashpath.exists() {
     // file already exists.
     return Ok(DownloadResult::AlreadyDownloaded);
   }
@@ -309,11 +311,11 @@ pub async fn download_file(
   let mut file = tokio::fs::OpenOptions::new()
     .write(true)
     .create(true)
-    .open(hash.clone()) // temporary filename
+    .open(temphashpath.clone()) // temporary filename
     .await
     .map_err(|e| {
       zkerr::annotate_string(
-        format!("error saving downloaded file: {:?}", hash),
+        format!("error saving downloaded file: {:?}", temphashpath),
         e.into(),
       )
     })?;
@@ -326,26 +328,23 @@ pub async fn download_file(
     .await
     .map_err(|e| zkerr::Error::String(e.to_string()))?;
 
-  let fpath = Path::new(hash.as_str());
-  let fh = sha256::try_digest(fpath)?;
+  let fh = sha256::try_digest(&temphashpath)?;
 
   // does the hash match?
   if fh != hash {
+    std::fs::remove_file(temphashpath)?;
     return Err(zkerr::Error::String(
       "downloaded file hash doesn't match!".to_string(),
     ));
   }
 
-  // let size = std::fs::metadata(fpath)?.len();
-  let hashpath = files_dir.join(Path::new(fh.as_str()));
-
-  // file exists?
-  if hashpath.exists() {
+  // again, file exists?
+  if finalhashpath.exists() {
     // new file already exists.
-    std::fs::remove_file(fpath)?;
+    std::fs::remove_file(temphashpath)?;
   } else {
     // move into hashed-files dir.
-    std::fs::rename(fpath, hashpath)?;
+    std::fs::rename(temphashpath, finalhashpath)?;
   }
 
   // TODO: remove source records??
@@ -467,6 +466,7 @@ pub async fn upload_file(
 
 pub async fn sync_files_down(
   conn: &Connection,
+  temp_file_path: &Path,
   file_path: &Path,
   uid: i64,
   search: &ZkNoteSearch,
@@ -486,7 +486,7 @@ pub async fn sync_files_down(
   for rec in rec_iter {
     match rec {
       Ok(id) => {
-        match download_file(&conn, &user, file_path, id).await? {
+        match download_file(&conn, &user, temp_file_path, file_path, id).await? {
           DownloadResult::Downloaded => resvec.push(DownloadResult::Downloaded),
           DownloadResult::AlreadyDownloaded => (), // resvec.push(DownloadResult::AlreadyDownloaded),
           DownloadResult::NoSource => resvec.push(DownloadResult::NoSource),

@@ -1603,7 +1603,7 @@ actualupdate msg model =
                     actualupdate (ZkReplyData (Ok ( td.utc, td.data ))) model
 
                 Err e ->
-                    ( displayMessageDialog model <| JD.errorToString e
+                    ( displayMessageDialog model <| JD.errorToString e ++ "\n" ++ JE.encode 2 jd
                     , Cmd.none
                     )
 
