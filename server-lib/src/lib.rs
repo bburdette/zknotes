@@ -256,21 +256,17 @@ async fn file(session: Session, config: web::Data<Config>, req: HttpRequest) -> 
 
   let uid = suser.map(|user| user.id);
 
-  match req
-    .match_info()
-    .get("id")
-    // .and_then(|s| s.parse::<i64>().ok())
-  {
+  match req.match_info().get("id") {
     Some(noteid) => {
       let uuid = match Uuid::parse_str(noteid) {
         Ok(id) => id,
-        Err(e) => return HttpResponse::BadRequest().body(e.to_string())
-       };
+        Err(e) => return HttpResponse::BadRequest().body(e.to_string()),
+      };
       let nid = match sqldata::note_id_for_uuid(&conn, &uuid) {
         Ok(id) => id,
-        Err(e) => return HttpResponse::NotFound().body(e.to_string())
-       };
-        let hash = match sqldata::read_zknote_filehash(&conn, uid, nid) {
+        Err(e) => return HttpResponse::NotFound().body(e.to_string()),
+      };
+      let hash = match sqldata::read_zknote_filehash(&conn, uid, nid) {
         Ok(Some(hash)) => hash,
         Ok(None) => return HttpResponse::NotFound().body("not found"),
         Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
