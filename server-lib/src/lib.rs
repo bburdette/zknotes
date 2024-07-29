@@ -248,11 +248,15 @@ async fn file(session: Session, config: web::Data<Config>, req: HttpRequest) -> 
     Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
   };
 
+  println!("session: {:?}", session.entries());
+
   let suser = match session_user(&conn, session, &config) {
     Ok(Either::Left(user)) => Some(user),
     Ok(Either::Right(_sr)) => None,
     Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
   };
+
+  println!("suser: {:?}", suser);
 
   let uid = suser.map(|user| user.id);
 
@@ -268,7 +272,10 @@ async fn file(session: Session, config: web::Data<Config>, req: HttpRequest) -> 
       };
       let hash = match sqldata::read_zknote_filehash(&conn, uid, nid) {
         Ok(Some(hash)) => hash,
-        Ok(None) => return HttpResponse::NotFound().body("not found"),
+        Ok(None) => {
+          return HttpResponse::NotFound().body(format!("hash not found for note {}", nid))
+        }
+
         Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
       };
 
@@ -628,7 +635,7 @@ async fn new_email(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
 }
 
 #[actix_web::main]
-pub async fn err_main() -> Result<(), Box<dyn Error>> {
+pub async fn err_main(oconfig: Option<Config>) -> Result<(), Box<dyn Error>> {
   env_logger::init();
 
   let matches = clap::App::new("zknotes server")
@@ -685,9 +692,13 @@ pub async fn err_main() -> Result<(), Box<dyn Error>> {
   }
 
   // specifying a config file?  otherwise try to load the default.
-  let config = match matches.value_of("config") {
-    Some(filename) => load_config(filename)?,
-    None => load_config("config.toml")?,
+  let config = match oconfig {
+    // passed in config gets priority
+    Some(c) => c, // load_config(c.as_str())?,
+    None => match matches.value_of("config") {
+      Some(filename) => load_config(filename)?,
+      None => load_config("config.toml")?,
+    },
   };
 
   // verify/create file directories.
