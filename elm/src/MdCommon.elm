@@ -367,6 +367,7 @@ imageNoteView zknote =
     in
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
         [ link (Just zknote.title) ("/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
+        , E.paragraph [] [ E.text fileurl ]
         , imageView zknote.title fileurl Nothing []
         ]
 
