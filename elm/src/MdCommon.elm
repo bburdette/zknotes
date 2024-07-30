@@ -329,8 +329,9 @@ audioNoteView si zkn =
         [ link (Just zkn.title) ("/note/" ++ zkNoteIdToString zkn.id) [ E.text zkn.title ]
         , E.row [ E.spacing 20 ]
             -- [ htmlAudioView ("zkfile://files/" ++ zkNoteIdToString zkn.id) zkn.title
-            -- [ htmlAudioView ("http://localhost:8000/file/" ++ zkNoteIdToString zkn.id) zkn.title
-            [ htmlAudioView ("http://localhost:8000/file/" ++ zkNoteIdToString zkn.id) ("http://localhost:8000/file/" ++ zkNoteIdToString zkn.id)
+            [ htmlAudioView ("http://localhost:8000/file/" ++ zkNoteIdToString zkn.id) zkn.title
+
+            -- [ htmlAudioView ("http://localhost:8000/file/" ++ zkNoteIdToString zkn.id) ("http://localhost:8000/file/" ++ zkNoteIdToString zkn.id)
             , E.text ("http://localhost:8000/file/" ++ zkNoteIdToString zkn.id)
 
             -- TODO pass in url instead of hardcoded
@@ -357,9 +358,9 @@ videoNoteView zknote =
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
         [ link (Just zknote.title) ("/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
         , E.text fileurl
+        , videoView 500 fileurl (Just zknote.title) Nothing Nothing []
 
-        -- , videoView 500 fileurl (Just zknote.title) Nothing Nothing []
-        , videoView 500 fileurl (Just fileurl) Nothing Nothing []
+        -- , videoView 500 fileurl (Just fileurl) Nothing Nothing []
         ]
 
 
@@ -373,9 +374,9 @@ imageNoteView zknote =
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
         [ link (Just zknote.title) ("/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
         , E.text fileurl
+        , imageView zknote.title fileurl Nothing []
 
-        -- , imageView zknote.title fileurl Nothing []
-        , imageView fileurl fileurl Nothing []
+        -- , imageView fileurl fileurl Nothing []
         ]
 
 
