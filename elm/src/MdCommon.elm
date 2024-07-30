@@ -331,9 +331,6 @@ audioNoteView si zkn =
             -- [ htmlAudioView ("zkfile://files/" ++ zkNoteIdToString zkn.id) zkn.title
             [ htmlAudioView ("http://localhost:8000/file/" ++ zkNoteIdToString zkn.id) zkn.title
 
-            -- [ htmlAudioView ("http://localhost:8000/file/" ++ zkNoteIdToString zkn.id) ("http://localhost:8000/file/" ++ zkNoteIdToString zkn.id)
-            , E.text ("http://localhost:8000/file/" ++ zkNoteIdToString zkn.id)
-
             -- TODO pass in url instead of hardcoded
             , if List.filter (\i -> i == si.publicid) zkn.sysids /= [] then
                 link
@@ -357,10 +354,7 @@ videoNoteView zknote =
     in
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
         [ link (Just zknote.title) ("/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
-        , E.text fileurl
         , videoView 500 fileurl (Just zknote.title) Nothing Nothing []
-
-        -- , videoView 500 fileurl (Just fileurl) Nothing Nothing []
         ]
 
 
@@ -373,10 +367,7 @@ imageNoteView zknote =
     in
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
         [ link (Just zknote.title) ("/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
-        , E.text fileurl
         , imageView zknote.title fileurl Nothing []
-
-        -- , imageView fileurl fileurl Nothing []
         ]
 
 
