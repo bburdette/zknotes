@@ -2258,6 +2258,8 @@ pub fn make_file_note(
   let size = std::fs::metadata(fpath)?.len();
   let hashpath = files_dir.join(Path::new(fh.as_str()));
 
+  info!("saving file: {:?}", hashpath);
+
   // file exists?
   if hashpath.exists() {
     // file already exists.  don't need the new one.
