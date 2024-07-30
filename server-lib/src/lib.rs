@@ -635,8 +635,31 @@ async fn new_email(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
 }
 
 #[actix_web::main]
-pub async fn err_main(oconfig: Option<Config>) -> Result<(), Box<dyn Error>> {
-  env_logger::init();
+pub async fn err_main(
+  oconfig: Option<Config>,
+  logfile: Option<PathBuf>,
+) -> Result<(), Box<dyn Error>> {
+  match logfile {
+    Some(lf) => {
+      let target = Box::new(File::create(lf).expect("Can't create file"));
+      env_logger::Builder::new()
+        .target(env_logger::Target::Pipe(target))
+        .filter(None, log::LevelFilter::Debug)
+        // .format(|buf, record| {
+        //   writeln!(
+        //     buf,
+        //     "[{} {} {}:{}] {}",
+        //     Local::now().format("%Y-%m-%d %H:%M:%S%.3f"),
+        //     record.level(),
+        //     record.file().unwrap_or("unknown"),
+        //     record.line().unwrap_or(0),
+        //     record.args()
+        //   )
+        // })
+        .init();
+    }
+    None => env_logger::init(),
+  };
 
   let matches = clap::App::new("zknotes server")
     .version("1.0")
