@@ -261,6 +261,9 @@ mkRenderer si viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged not
                 |> Markdown.Html.withOptionalAttribute "text"
                 |> Markdown.Html.withOptionalAttribute "width"
                 |> Markdown.Html.withOptionalAttribute "height"
+            , Markdown.Html.tag "audio" audioView
+                |> Markdown.Html.withAttribute "text"
+                |> Markdown.Html.withAttribute "src"
             , Markdown.Html.tag "note" (noteView si noteCache)
                 |> Markdown.Html.withAttribute "id"
             ]
@@ -316,6 +319,11 @@ imageView text url mbwidth renderedChildren =
         Nothing ->
             E.image [ E.width E.fill ]
                 { src = url, description = text }
+
+
+audioView : String -> String -> List (Element a) -> Element a
+audioView text url renderedChildren =
+    htmlAudioView url text
 
 
 htmlAudioView : String -> String -> Element a
