@@ -261,6 +261,9 @@ mkRenderer si viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged not
                 |> Markdown.Html.withOptionalAttribute "text"
                 |> Markdown.Html.withOptionalAttribute "width"
                 |> Markdown.Html.withOptionalAttribute "height"
+            , Markdown.Html.tag "audio" audioView
+                |> Markdown.Html.withAttribute "text"
+                |> Markdown.Html.withAttribute "src"
             , Markdown.Html.tag "note" (noteView si noteCache)
                 |> Markdown.Html.withAttribute "id"
             ]
@@ -318,6 +321,11 @@ imageView text url mbwidth renderedChildren =
                 { src = url, description = text }
 
 
+audioView : String -> String -> List (Element a) -> Element a
+audioView text url renderedChildren =
+    htmlAudioView url text
+
+
 htmlAudioView : String -> String -> Element a
 htmlAudioView url text =
     E.html (Html.audio [ HA.controls True, HA.src url ] [ Html.text text ])
@@ -328,7 +336,8 @@ audioNoteView si zkn =
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
         [ link (Just zkn.title) ("/note/" ++ zkNoteIdToString zkn.id) [ E.text zkn.title ]
         , E.row [ E.spacing 20 ]
-            [ htmlAudioView ("/file/" ++ zkNoteIdToString zkn.id) zkn.title
+            -- [ htmlAudioView ("zkfile://files/" ++ zkNoteIdToString zkn.id) zkn.title
+            [ htmlAudioView ("http://localhost:8000/file/" ++ zkNoteIdToString zkn.id) zkn.title
 
             -- TODO pass in url instead of hardcoded
             , if List.filter (\i -> i == si.publicid) zkn.sysids /= [] then
@@ -348,7 +357,8 @@ videoNoteView : Data.ZkNote -> Element a
 videoNoteView zknote =
     let
         fileurl =
-            "/file/" ++ zkNoteIdToString zknote.id
+            -- "zkfile://files/" ++ zkNoteIdToString zknote.id
+            "http://localhost:8000/file/" ++ zkNoteIdToString zknote.id
     in
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
         [ link (Just zknote.title) ("/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
@@ -360,10 +370,12 @@ imageNoteView : Data.ZkNote -> Element a
 imageNoteView zknote =
     let
         fileurl =
-            "/file/" ++ zkNoteIdToString zknote.id
+            -- "zkfile://files/" ++ zkNoteIdToString zknote.id
+            "http://localhost:8000/file/" ++ zkNoteIdToString zknote.id
     in
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
         [ link (Just zknote.title) ("/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
+        , E.paragraph [] [ E.text fileurl ]
         , imageView zknote.title fileurl Nothing []
         ]
 
