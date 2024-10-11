@@ -3,7 +3,6 @@ module Data exposing (..)
 import Json.Decode as JD
 import Json.Encode as JE
 import Orgauth.Data exposing (UserId, decodeUserId, encodeUserId)
-import Search as S
 import TDict
 import TSet exposing (TSet)
 import UUID exposing (UUID)
