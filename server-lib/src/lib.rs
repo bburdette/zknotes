@@ -243,9 +243,6 @@ fn session_user(
 }
 
 async fn file(session: Session, config: web::Data<Config>, req: HttpRequest) -> HttpResponse {
-  println!("file");
-  info!("file");
-
   let conn = match sqldata::connection_open(config.orgauth_config.db.as_path()) {
     Ok(c) => c,
     Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
@@ -259,23 +256,18 @@ async fn file(session: Session, config: web::Data<Config>, req: HttpRequest) -> 
     Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
   };
 
-  info!("suser: {:?}", suser);
-
   let uid = suser.map(|user| user.id);
 
   match req.match_info().get("id") {
     Some(noteid) => {
-      info!("noteid: {:?}", noteid);
       let uuid = match Uuid::parse_str(noteid) {
         Ok(id) => id,
         Err(e) => return HttpResponse::BadRequest().body(e.to_string()),
       };
-      info!("uuid: {:?}", uuid);
       let nid = match sqldata::note_id_for_uuid(&conn, &uuid) {
         Ok(id) => id,
         Err(e) => return HttpResponse::NotFound().body(e.to_string()),
       };
-      info!("nid: {:?}", nid);
       let hash = match sqldata::read_zknote_filehash(&conn, uid, nid) {
         Ok(Some(hash)) => hash,
         Ok(None) => {
@@ -284,7 +276,6 @@ async fn file(session: Session, config: web::Data<Config>, req: HttpRequest) -> 
 
         Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
       };
-      info!("hash: {:?}", hash);
 
       let zkln = match sqldata::read_zklistnote(&conn, &config.file_path, uid, nid) {
         Ok(zkln) => zkln,
@@ -292,19 +283,12 @@ async fn file(session: Session, config: web::Data<Config>, req: HttpRequest) -> 
       };
 
       let stpath = config.file_path.join(hash);
-      info!("stpath: {:?}", stpath);
 
       match File::open(stpath.clone())
         .and_then(|f| NamedFile::from_file(f, Path::new(zkln.title.as_str())))
       {
-        Ok(f) => {
-          info!("Ok: {:?}", stpath);
-          f.into_response(&req)
-        }
-        Err(e) => {
-          info!("Err: {}", e);
-          HttpResponse::NotFound().body(format!("{:?}", e))
-        }
+        Ok(f) => f.into_response(&req),
+        Err(e) => HttpResponse::NotFound().body(format!("{:?}", e)),
       }
     }
     None => HttpResponse::BadRequest().body("file id required: /file/<id>"),
@@ -350,10 +334,6 @@ async fn make_file_notes(
 
     // return zknoteedit.
     let listnote = sqldata::read_zklistnote(&conn, &config.file_path, Some(userdata.id), nid64)?;
-    info!(
-      "user#filer_uploaded-zknote: {} - {}",
-      listnote.id, listnote.title
-    );
 
     zklns.push(listnote);
   }
