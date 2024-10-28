@@ -156,8 +156,8 @@ link title destination body =
         }
 
 
-mkRenderer : Data.Sysids -> ViewMode -> (String -> a) -> Int -> CellDict -> Bool -> (String -> String -> a) -> NoteCache -> Markdown.Renderer.Renderer (Element a)
-mkRenderer si viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged noteCache =
+mkRenderer : String -> ViewMode -> (String -> a) -> Int -> CellDict -> Bool -> (String -> String -> a) -> NoteCache -> Markdown.Renderer.Renderer (Element a)
+mkRenderer fileprefix viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged noteCache =
     { heading = heading
     , paragraph =
         E.paragraph
@@ -261,7 +261,10 @@ mkRenderer si viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged not
                 |> Markdown.Html.withOptionalAttribute "text"
                 |> Markdown.Html.withOptionalAttribute "width"
                 |> Markdown.Html.withOptionalAttribute "height"
-            , Markdown.Html.tag "note" (noteView si noteCache)
+            , Markdown.Html.tag "audio" audioView
+                |> Markdown.Html.withAttribute "text"
+                |> Markdown.Html.withAttribute "src"
+            , Markdown.Html.tag "note" (noteView fileprefix noteCache)
                 |> Markdown.Html.withAttribute "id"
             ]
     , table = E.column [ E.width <| E.fill ]
@@ -318,20 +321,29 @@ imageView text url mbwidth renderedChildren =
                 { src = url, description = text }
 
 
+audioView : String -> String -> List (Element a) -> Element a
+audioView text url renderedChildren =
+    htmlAudioView url text
+
+
 htmlAudioView : String -> String -> Element a
 htmlAudioView url text =
     E.html (Html.audio [ HA.controls True, HA.src url ] [ Html.text text ])
 
 
-audioNoteView : Data.Sysids -> Data.ZkNote -> Element a
-audioNoteView si zkn =
+audioNoteView : String -> Data.ZkNote -> Element a
+audioNoteView fileprefix zkn =
+    let
+        fileurl =
+            fileprefix ++ "/file/" ++ zkNoteIdToString zkn.id
+    in
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
         [ link (Just zkn.title) ("/note/" ++ zkNoteIdToString zkn.id) [ E.text zkn.title ]
         , E.row [ E.spacing 20 ]
-            [ htmlAudioView ("/file/" ++ zkNoteIdToString zkn.id) zkn.title
+            [ htmlAudioView fileurl zkn.title
 
             -- TODO pass in url instead of hardcoded
-            , if List.filter (\i -> i == si.publicid) zkn.sysids /= [] then
+            , if List.filter (\i -> i == Data.sysids.publicid) zkn.sysids /= [] then
                 link
                     (Just "ts↗")
                     ("https://29a.ch/timestretch/#a=https://www.zknotes.com/file/" ++ zkNoteIdToString zkn.id)
@@ -344,11 +356,11 @@ audioNoteView si zkn =
         ]
 
 
-videoNoteView : Data.ZkNote -> Element a
-videoNoteView zknote =
+videoNoteView : String -> Data.ZkNote -> Element a
+videoNoteView fileprefix zknote =
     let
         fileurl =
-            "/file/" ++ zkNoteIdToString zknote.id
+            fileprefix ++ "/file/" ++ zkNoteIdToString zknote.id
     in
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
         [ link (Just zknote.title) ("/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
@@ -356,20 +368,21 @@ videoNoteView zknote =
         ]
 
 
-imageNoteView : Data.ZkNote -> Element a
-imageNoteView zknote =
+imageNoteView : String -> Data.ZkNote -> Element a
+imageNoteView fileprefix zknote =
     let
         fileurl =
-            "/file/" ++ zkNoteIdToString zknote.id
+            fileprefix ++ "/file/" ++ zkNoteIdToString zknote.id
     in
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
         [ link (Just zknote.title) ("/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
+        , E.paragraph [] [ E.text fileurl ]
         , imageView zknote.title fileurl Nothing []
         ]
 
 
-noteFile : Data.Sysids -> String -> Data.ZkNote -> Element a
-noteFile si filename zknote =
+noteFile : String -> String -> Data.ZkNote -> Element a
+noteFile fileprefix filename zknote =
     let
         suffix =
             String.split "." filename
@@ -384,59 +397,63 @@ noteFile si filename zknote =
         Just s ->
             case String.toLower s of
                 "mp3" ->
-                    audioNoteView si zknote
+                    audioNoteView fileprefix zknote
 
                 "m4a" ->
-                    audioNoteView si zknote
+                    audioNoteView fileprefix zknote
 
                 "opus" ->
-                    audioNoteView si zknote
+                    audioNoteView fileprefix zknote
 
                 "mp4" ->
-                    videoNoteView zknote
+                    videoNoteView fileprefix zknote
 
                 "webm" ->
-                    videoNoteView zknote
+                    videoNoteView fileprefix zknote
 
                 "mkv" ->
-                    videoNoteView zknote
+                    videoNoteView fileprefix zknote
 
                 "jpg" ->
-                    imageNoteView zknote
+                    imageNoteView fileprefix zknote
 
                 "gif" ->
-                    imageNoteView zknote
+                    imageNoteView fileprefix zknote
 
                 "png" ->
-                    imageNoteView zknote
+                    imageNoteView fileprefix zknote
 
                 _ ->
-                    link (Just zknote.title) ("/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
+                    link (Just zknote.title) (fileprefix ++ "/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
 
 
-noteView : Data.Sysids -> NoteCache -> String -> List (Element a) -> Element a
-noteView si noteCache id _ =
+noteView : String -> NoteCache -> String -> List (Element a) -> Element a
+noteView fileprefix noteCache id _ =
     case
         zkNoteIdFromString id
             |> Result.toMaybe
             |> Maybe.andThen (NC.getNote noteCache)
     of
         Just zne ->
-            if zne.zknote.filestatus /= Data.NotAFile then
-                noteFile si zne.zknote.title zne.zknote
+            case zne.zknote.filestatus of
+                Data.FilePresent ->
+                    noteFile fileprefix zne.zknote.title zne.zknote
 
-            else
-                E.link
-                    [ E.htmlAttribute (HA.style "display" "inline-flex") ]
-                    { url = "/note/" ++ id
-                    , label =
-                        E.paragraph
-                            [ EF.color (E.rgb255 0 0 255)
-                            , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
-                            , E.htmlAttribute (HA.style "word-break" "break-word")
-                            ]
-                            [ E.text zne.zknote.title ]
-                    }
+                Data.FileMissing ->
+                    E.text <| zne.zknote.title ++ " missing"
+
+                Data.NotAFile ->
+                    E.link
+                        [ E.htmlAttribute (HA.style "display" "inline-flex") ]
+                        { url = "/note/" ++ id -- don't use prefix here!
+                        , label =
+                            E.paragraph
+                                [ EF.color (E.rgb255 0 0 255)
+                                , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
+                                , E.htmlAttribute (HA.style "word-break" "break-word")
+                                ]
+                                [ E.text zne.zknote.title ]
+                        }
 
         -- , E.column [] (List.map (.othername >> Maybe.withDefault "" >> E.text) zne.links)
         Nothing ->

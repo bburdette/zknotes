@@ -143,6 +143,7 @@ decodeFlags =
     JD.succeed Flags
         |> andMap (JD.field "seed" JD.int)
         |> andMap (JD.field "location" JD.string)
+        |> andMap (JD.field "filelocation" JD.string)
         |> andMap (JD.field "useragent" JD.string)
         |> andMap (JD.field "debugstring" JD.string)
         |> andMap (JD.field "width" JD.int)
@@ -157,6 +158,7 @@ decodeFlags =
 type alias Flags =
     { seed : Int
     , location : String
+    , filelocation : String
     , useragent : String
     , debugstring : String
     , width : Int
@@ -184,6 +186,7 @@ type alias Model =
     { state : State
     , size : Util.Size
     , location : String
+    , filelocation : String
     , navkey : Browser.Navigation.Key
     , seed : Seed
     , timezone : Time.Zone
@@ -194,7 +197,8 @@ type alias Model =
     , errorNotes : Dict String String
     , fontsize : Int
     , stylePalette : StylePalette
-    , sysids : Data.Sysids
+
+    -- , sysids : Data.Sysids
     , adminSettings : OD.AdminSettings
     , trackedRequests : TRequests
     , noteCache : NoteCache
@@ -342,13 +346,13 @@ routeStateInternal model route =
                     ( nm.state, cmd )
 
                 EditZkNoteListing st login ->
-                    ( EditZkNote (EditZkNote.initNew model.sysids login st.notes st.spmodel []) login, Cmd.none )
+                    ( EditZkNote (EditZkNote.initNew model.filelocation login st.notes st.spmodel []) login, Cmd.none )
 
                 st ->
                     case stateLogin st of
                         Just login ->
                             ( EditZkNote
-                                (EditZkNote.initNew model.sysids
+                                (EditZkNote.initNew model.filelocation
                                     login
                                     { notes = []
                                     , offset = 0
@@ -475,7 +479,7 @@ routeStateInternal model route =
 
                         Nothing ->
                             ( EditZkNote
-                                (EditZkNote.initNew model.sysids
+                                (EditZkNote.initNew model.filelocation
                                     login
                                     { notes = []
                                     , offset = 0
@@ -849,10 +853,10 @@ viewState size state model =
             E.map EditZkNoteMsg <| EditZkNote.view model.timezone size model.recentNotes model.trackedRequests model.noteCache em
 
         EditZkNoteListing em ld ->
-            E.map EditZkNoteListingMsg <| EditZkNoteListing.view model.sysids ld size em
+            E.map EditZkNoteListingMsg <| EditZkNoteListing.view model.filelocation ld size em
 
         ArchiveListing em ld ->
-            E.map ArchiveListingMsg <| ArchiveListing.view model.sysids ld model.timezone size em
+            E.map ArchiveListingMsg <| ArchiveListing.view ld model.timezone size em
 
         ShowMessage em _ _ ->
             E.map ShowMessageMsg <| ShowMessage.view em
@@ -1158,7 +1162,7 @@ sendSearch model search =
                         , deleted = False
                         }
                     , links =
-                        [ { otherid = model.sysids.searchid
+                        [ { otherid = Data.sysids.searchid
                           , direction = Data.To
                           , user = ldata.userid
                           , zknote = Nothing
@@ -1521,7 +1525,7 @@ onZkNoteEditWhat model pt znew =
                             |> Maybe.withDefault ( SP.initModel, { notes = [], offset = 0, what = "" } )
 
                     ( nst, c ) =
-                        EditZkNote.initFull model.sysids
+                        EditZkNote.initFull model.filelocation
                             login
                             sres
                             znew.znl.zknote
@@ -1836,7 +1840,6 @@ actualupdate msg model =
                                     model.recentNotes
                                     []
                                     login
-                                    model.sysids
                                 )
                                 login
                                 (UserListing numod login s)
@@ -2014,13 +2017,13 @@ actualupdate msg model =
                                             Just _ ->
                                                 EView
                                                     (View.initFull
-                                                        model.sysids
+                                                        model.filelocation
                                                         fbe.znl
                                                     )
                                                     state
 
                                             Nothing ->
-                                                View (View.initFull model.sysids fbe.znl)
+                                                View (View.initFull model.filelocation fbe.znl)
 
                                     ngets =
                                         makePubNoteCacheGets model fbe.znl.zknote.content
@@ -2363,7 +2366,7 @@ actualupdate msg model =
                         ZI.PowerDeleteComplete count ->
                             case model.state of
                                 EditZkNoteListing mod li ->
-                                    ( { model | state = EditZkNoteListing (EditZkNoteListing.onPowerDeleteComplete count model.sysids li mod) li }, Cmd.none )
+                                    ( { model | state = EditZkNoteListing (EditZkNoteListing.onPowerDeleteComplete count li mod) li }, Cmd.none )
 
                                 _ ->
                                     ( model, Cmd.none )
@@ -2652,7 +2655,7 @@ actualupdate msg model =
             handleEditZkNoteCmd model login (EditZkNote.update em es)
 
         ( EditZkNoteListingMsg em, EditZkNoteListing es login ) ->
-            handleEditZkNoteListing model login (EditZkNoteListing.update em es model.sysids login)
+            handleEditZkNoteListing model login (EditZkNoteListing.update em es login)
 
         ( ImportMsg em, Import es login ) ->
             let
@@ -2925,7 +2928,6 @@ actualupdate msg model =
                                                     model.recentNotes
                                                     []
                                                     login
-                                                    model.sysids
                                                 )
                                                 login
                                                 prevstate
@@ -3192,7 +3194,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     ( { model
                         | state =
                             EView
-                                (View.initSzn model.sysids
+                                (View.initSzn model.filelocation
                                     v.note
                                     v.createdate
                                     v.changeddate
@@ -3295,7 +3297,7 @@ handleEditZkNoteListing model login ( emod, ecmd ) =
             ( { model | state = EditZkNoteListing emod login }, Cmd.none )
 
         EditZkNoteListing.New ->
-            ( { model | state = EditZkNote (EditZkNote.initNew model.sysids login emod.notes emod.spmodel []) login }, Cmd.none )
+            ( { model | state = EditZkNote (EditZkNote.initNew model.filelocation login emod.notes emod.spmodel []) login }, Cmd.none )
 
         EditZkNoteListing.Done ->
             ( { model | state = UserSettings (UserSettings.init login model.fontsize) login (EditZkNoteListing emod login) }
@@ -3609,6 +3611,7 @@ init flags url key zone fontsize =
                         ShowMessage { message = "loading..." } l Nothing
             , size = { width = flags.width, height = flags.height }
             , location = flags.location
+            , filelocation = flags.filelocation
             , navkey = key
             , seed = seed
             , timezone = zone
@@ -3619,7 +3622,6 @@ init flags url key zone fontsize =
             , errorNotes = Dict.empty
             , fontsize = fontsize
             , stylePalette = { defaultSpacing = 10 }
-            , sysids = flags.sysids
             , adminSettings = flags.adminsettings
             , trackedRequests = { requestCount = 0, requests = Dict.empty }
             , noteCache = NC.empty maxCacheNotes

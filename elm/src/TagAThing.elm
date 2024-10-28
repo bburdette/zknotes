@@ -50,7 +50,6 @@ type alias Thing tmod tmsg tcmd =
 type alias Model tmod tmsg tcmd =
     { thing : Thing tmod tmsg tcmd
     , ld : Data.LoginData
-    , sysids : Data.Sysids
     , spmodel : SP.Model
     , zklDict : Dict String Data.EditLink
     , zknSearchResult : Data.ZkListNoteSearchResult
@@ -92,12 +91,10 @@ init :
     -> List Data.ZkListNote
     -> List Data.EditLink
     -> Data.LoginData
-    -> Data.Sysids
     -> Model tmod tmsg tcmd
-init thing spmodel spresult recentZkns links loginData sysids =
+init thing spmodel spresult recentZkns links loginData =
     { thing = thing
     , ld = loginData
-    , sysids = sysids
     , spmodel = spmodel
     , zklDict =
         Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) links)
@@ -125,7 +122,7 @@ showSr model zkln =
             zkln.user /= model.ld.userid
 
         sysColor =
-            ZC.systemColor model.sysids zkln.sysids
+            ZC.systemColor Data.sysids zkln.sysids
 
         mbTo =
             Dict.get (zklKey { direction = To, otherid = zkln.id })
@@ -387,7 +384,7 @@ view stylePalette recentZkns mbsize model =
                             |> List.map
                                 (\l ->
                                     ( l
-                                    , ZC.systemColor model.sysids l.sysids
+                                    , ZC.systemColor Data.sysids l.sysids
                                     )
                                 )
                             |> List.sortWith
@@ -507,7 +504,7 @@ update msg model =
                 spmod =
                     model.spmodel
             in
-            if List.any ((==) model.sysids.searchid) zkln.sysids then
+            if List.any ((==) Data.sysids.searchid) zkln.sysids then
                 ( { model
                     | spmodel = SP.setSearchString model.spmodel zkln.title
                   }

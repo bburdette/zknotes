@@ -53,15 +53,15 @@ type Command
     | SearchHistory
 
 
-onPowerDeleteComplete : Int -> Data.Sysids -> Data.LoginData -> Model -> Model
-onPowerDeleteComplete count si ld model =
+onPowerDeleteComplete : Int -> Data.LoginData -> Model -> Model
+onPowerDeleteComplete count ld model =
     { model
         | dialog =
             Just <|
                 ( D.init
                     ("deleted " ++ String.fromInt count ++ " notes")
                     False
-                    (\size -> E.map (\_ -> ()) (listview si ld size model))
+                    (\size -> E.map (\_ -> ()) (listview ld size model))
                 , DeleteComplete
                 )
     }
@@ -105,18 +105,18 @@ onWkKeyPress key model =
             ( model, None )
 
 
-view : Data.Sysids -> Data.LoginData -> Util.Size -> Model -> Element Msg
-view si ld size model =
+view : String -> Data.LoginData -> Util.Size -> Model -> Element Msg
+view fileprefix ld size model =
     case model.dialog of
         Just ( dialog, _ ) ->
             D.view size dialog |> E.map DialogMsg
 
         Nothing ->
-            listview si ld size model
+            listview ld size model
 
 
-listview : Data.Sysids -> Data.LoginData -> Util.Size -> Model -> Element Msg
-listview si ld size model =
+listview : Data.LoginData -> Util.Size -> Model -> Element Msg
+listview ld size model =
     let
         maxwidth =
             700
@@ -186,7 +186,7 @@ listview si ld size model =
                                          , E.clipX
                                          , E.width E.fill
                                          ]
-                                            ++ (ZC.systemColor si n.sysids
+                                            ++ (ZC.systemColor Data.sysids n.sysids
                                                     |> Maybe.map (\c -> [ EF.color c ])
                                                     |> Maybe.withDefault []
                                                )
@@ -210,8 +210,8 @@ listview si ld size model =
             ]
 
 
-update : Msg -> Model -> Data.Sysids -> Data.LoginData -> ( Model, Command )
-update msg model si ld =
+update : Msg -> Model -> Data.LoginData -> ( Model, Command )
+update msg model ld =
     case msg of
         NewPress ->
             ( model, New )
@@ -239,7 +239,7 @@ update msg model si ld =
                                         ++ String.concat (List.map S.showTagSearch s.tagSearch)
                                     )
                                     True
-                                    (\size -> E.map (\_ -> ()) (listview si ld size model))
+                                    (\size -> E.map (\_ -> ()) (listview ld size model))
                                 , DeleteAll
                                 )
                       }

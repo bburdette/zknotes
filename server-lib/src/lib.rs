@@ -248,6 +248,8 @@ async fn file(session: Session, config: web::Data<Config>, req: HttpRequest) -> 
     Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
   };
 
+  println!("session: {:?}", session.entries());
+
   let suser = match session_user(&conn, session, &config) {
     Ok(Either::Left(user)) => Some(user),
     Ok(Either::Right(_sr)) => None,
@@ -268,7 +270,10 @@ async fn file(session: Session, config: web::Data<Config>, req: HttpRequest) -> 
       };
       let hash = match sqldata::read_zknote_filehash(&conn, uid, nid) {
         Ok(Some(hash)) => hash,
-        Ok(None) => return HttpResponse::NotFound().body("not found"),
+        Ok(None) => {
+          return HttpResponse::NotFound().body(format!("hash not found for note {}", nid))
+        }
+
         Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
       };
 
@@ -279,7 +284,8 @@ async fn file(session: Session, config: web::Data<Config>, req: HttpRequest) -> 
 
       let stpath = config.file_path.join(hash);
 
-      match File::open(stpath).and_then(|f| NamedFile::from_file(f, Path::new(zkln.title.as_str())))
+      match File::open(stpath.clone())
+        .and_then(|f| NamedFile::from_file(f, Path::new(zkln.title.as_str())))
       {
         Ok(f) => f.into_response(&req),
         Err(e) => HttpResponse::NotFound().body(format!("{:?}", e)),
@@ -328,10 +334,6 @@ async fn make_file_notes(
 
     // return zknoteedit.
     let listnote = sqldata::read_zklistnote(&conn, &config.file_path, Some(userdata.id), nid64)?;
-    info!(
-      "user#filer_uploaded-zknote: {} - {}",
-      listnote.id, listnote.title
-    );
 
     zklns.push(listnote);
   }
@@ -628,8 +630,31 @@ async fn new_email(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
 }
 
 #[actix_web::main]
-pub async fn err_main() -> Result<(), Box<dyn Error>> {
-  env_logger::init();
+pub async fn err_main(
+  oconfig: Option<Config>,
+  logfile: Option<PathBuf>,
+) -> Result<(), Box<dyn Error>> {
+  match logfile {
+    Some(lf) => {
+      let target = Box::new(File::create(lf).expect("Can't create file"));
+      env_logger::Builder::new()
+        .target(env_logger::Target::Pipe(target))
+        .filter(None, log::LevelFilter::Debug)
+        // .format(|buf, record| {
+        //   writeln!(
+        //     buf,
+        //     "[{} {} {}:{}] {}",
+        //     Local::now().format("%Y-%m-%d %H:%M:%S%.3f"),
+        //     record.level(),
+        //     record.file().unwrap_or("unknown"),
+        //     record.line().unwrap_or(0),
+        //     record.args()
+        //   )
+        // })
+        .init();
+    }
+    None => env_logger::init(),
+  };
 
   let matches = clap::App::new("zknotes server")
     .version("1.0")
@@ -685,9 +710,13 @@ pub async fn err_main() -> Result<(), Box<dyn Error>> {
   }
 
   // specifying a config file?  otherwise try to load the default.
-  let config = match matches.value_of("config") {
-    Some(filename) => load_config(filename)?,
-    None => load_config("config.toml")?,
+  let config = match oconfig {
+    // passed in config gets priority
+    Some(c) => c, // load_config(c.as_str())?,
+    None => match matches.value_of("config") {
+      Some(filename) => load_config(filename)?,
+      None => load_config("config.toml")?,
+    },
   };
 
   // verify/create file directories.

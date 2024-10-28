@@ -65,15 +65,15 @@ updateSearchResult zsr model =
     }
 
 
-view : Data.Sysids -> Data.LoginData -> Time.Zone -> Util.Size -> Model -> Element Msg
-view si ld zone size model =
+view : Data.LoginData -> Time.Zone -> Util.Size -> Model -> Element Msg
+view ld zone size model =
     (if size.width > 1400 then
         E.row [ E.centerX ]
 
      else
         E.column [ E.centerX ]
     )
-        [ listview si ld zone size model
+        [ listview ld zone size model
         , model.selected
             |> Maybe.andThen (\id -> TDict.get id model.fullnotes)
             |> Maybe.map (\zkn -> E.column [ E.width (E.maximum 700 E.fill), E.scrollbarX ] <| [ E.text zkn.content ])
@@ -81,8 +81,8 @@ view si ld zone size model =
         ]
 
 
-listview : Data.Sysids -> Data.LoginData -> Time.Zone -> Util.Size -> Model -> Element Msg
-listview si ld zone size model =
+listview : Data.LoginData -> Time.Zone -> Util.Size -> Model -> Element Msg
+listview ld zone size model =
     let
         maxwidth =
             700
@@ -152,7 +152,7 @@ listview si ld zone size model =
                                          , E.clipX
                                          , E.width E.fill
                                          ]
-                                            ++ (ZC.systemColor si n.sysids
+                                            ++ (ZC.systemColor Data.sysids n.sysids
                                                     |> Maybe.map (\c -> [ EF.color c ])
                                                     |> Maybe.withDefault []
                                                )

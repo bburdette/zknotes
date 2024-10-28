@@ -328,7 +328,7 @@ pub async fn download_file(
     .await
     .map_err(|e| zkerr::Error::String(e.to_string()))?;
 
-  let fh = sha256::try_digest(&temphashpath)?;
+  let fh = sha256::try_digest(temphashpath.as_path())?;
 
   // does the hash match?
   if fh != hash {
