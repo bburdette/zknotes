@@ -340,7 +340,6 @@ audioNoteView fileprefix zkn =
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
         [ link (Just zkn.title) ("/note/" ++ zkNoteIdToString zkn.id) [ E.text zkn.title ]
         , E.row [ E.spacing 20 ]
-            -- [ htmlAudioView ("zkfile://files/" ++ zkNoteIdToString zkn.id) zkn.title
             [ htmlAudioView fileurl zkn.title
 
             -- TODO pass in url instead of hardcoded
@@ -362,9 +361,6 @@ videoNoteView fileprefix zknote =
     let
         fileurl =
             fileprefix ++ "/file/" ++ zkNoteIdToString zknote.id
-
-        -- "zkfile://files/" ++ zkNoteIdToString zknote.id
-        -- "http://localhost:8000/file/" ++ zkNoteIdToString zknote.id
     in
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
         [ link (Just zknote.title) ("/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
@@ -377,10 +373,6 @@ imageNoteView fileprefix zknote =
     let
         fileurl =
             fileprefix ++ "/file/" ++ zkNoteIdToString zknote.id
-
-        -- fileurl =
-        -- "zkfile://files/" ++ zkNoteIdToString zknote.id
-        -- "http://localhost:8000/file/" ++ zkNoteIdToString zknote.id
     in
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
         [ link (Just zknote.title) ("/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
