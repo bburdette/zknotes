@@ -1313,7 +1313,13 @@ zknview zone size recentZkns trqs noteCache model =
                         ( Data.FilePresent, Just zkn ) ->
                             MC.noteFile model.fileprefix model.title zkn
 
-                        _ ->
+                        ( Data.FileMissing, Just zkn ) ->
+                            E.text <| "file for \"" ++ zkn.title ++ "\" missing"
+
+                        ( Data.NotAFile, Just zkn ) ->
+                            E.none
+
+                        ( _, Nothing ) ->
                             E.none
                     , renderMd model.fileprefix model.cells noteCache model.md mdw
                     ]

@@ -158,7 +158,7 @@ link title destination body =
 
 mkRenderer : String -> ViewMode -> (String -> a) -> Int -> CellDict -> Bool -> (String -> String -> a) -> NoteCache -> Markdown.Renderer.Renderer (Element a)
 mkRenderer fileprefix viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged noteCache =
-    { heading = Debug.log "heading" heading
+    { heading = heading
     , paragraph =
         E.paragraph
             [ E.spacing 8 ]
@@ -443,7 +443,7 @@ noteView fileprefix noteCache id _ =
             |> Maybe.andThen (NC.getNote noteCache)
     of
         Just zne ->
-            case Debug.log "filestatus " zne.zknote.filestatus of
+            case zne.zknote.filestatus of
                 Data.FilePresent ->
                     noteFile fileprefix zne.zknote.title zne.zknote
 
