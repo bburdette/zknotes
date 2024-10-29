@@ -5,7 +5,9 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
     flake-utils.url = "github:numtide/flake-utils";
     naersk.url = "github:nix-community/naersk";
+    naersk.inputs.nixpkgs.follows = "nixpkgs";
   };
+
 
   outputs = { self, nixpkgs, flake-utils, naersk }:
     let
@@ -39,7 +41,6 @@
         naersk-lib = naersk.lib."${system}";
         elm-stuff = makeElmPkg { inherit pkgs; };
         rust-stuff = naersk-lib.buildPackage {
-            naersk.inputs.nixpkgs.follows = "nixpkgs";
             pname = pname;
             root = ./.;
             buildInputs = with pkgs; [
