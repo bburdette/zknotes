@@ -2,6 +2,7 @@
   description = "zknotes, a web based zettelkasten";
 
   inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
     flake-utils.url = "github:numtide/flake-utils";
     naersk.url = "github:nmattia/naersk";
   };
@@ -44,7 +45,7 @@
               cargo
               rustc
               sqlite
-              pkgconfig
+              pkg-config
               openssl.dev 
               ];
           };
@@ -84,7 +85,7 @@
               rustfmt
               rust-analyzer
               sqlite
-              pkgconfig
+              pkg-config
               openssl.dev
               elm2nix
               elmPackages.elm

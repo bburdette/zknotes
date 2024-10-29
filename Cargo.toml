@@ -7,3 +7,5 @@ members = [
     "server-lib",
     "orgauth/rustlib"
 ]
+
+resolver="2"
