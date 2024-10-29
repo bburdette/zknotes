@@ -39,6 +39,7 @@
         naersk-lib = naersk.lib."${system}";
         elm-stuff = makeElmPkg { inherit pkgs; };
         rust-stuff = naersk-lib.buildPackage {
+            naersk.inputs.nixpkgs.follows = "nixpkgs";
             pname = pname;
             root = ./.;
             buildInputs = with pkgs; [
