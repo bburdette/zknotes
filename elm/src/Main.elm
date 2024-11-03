@@ -150,7 +150,6 @@ decodeFlags =
         |> andMap (JD.field "height" JD.int)
         |> andMap (JD.field "errorid" (JD.maybe Data.decodeZkNoteId))
         |> andMap (JD.field "login" (JD.maybe Data.decodeLoginData))
-        |> andMap (JD.succeed Data.sysids)
         |> andMap (JD.field "adminsettings" OD.decodeAdminSettings)
         |> andMap (JD.field "tauri" JD.bool)
 
@@ -165,7 +164,6 @@ type alias Flags =
     , height : Int
     , errorid : Maybe ZkNoteId
     , login : Maybe Data.LoginData
-    , sysids : Data.Sysids
     , adminsettings : OD.AdminSettings
     , tauri : Bool
     }
@@ -197,8 +195,6 @@ type alias Model =
     , errorNotes : Dict String String
     , fontsize : Int
     , stylePalette : StylePalette
-
-    -- , sysids : Data.Sysids
     , adminSettings : OD.AdminSettings
     , trackedRequests : TRequests
     , noteCache : NoteCache
