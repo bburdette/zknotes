@@ -46,7 +46,6 @@
       }
 
       login = {{logindata}};
-      sysids = {{sysids}};
       errorid = {{errorid}};
       adminsettings = {{adminsettings}};
 
@@ -62,7 +61,6 @@
                  errorid : errorid,
                  login : login,
                  tauri : false,
-                 sysids : sysids,
                  adminsettings : adminsettings}});
       // local storage
       app.ports.storeLocalVal.subscribe(storeVal);

@@ -77,11 +77,6 @@ async fn favicon(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
 async fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
   info!("remote ip: {:?}, request:{:?}", req.connection_info(), req);
 
-  let sysids = match sqldata::sysids() {
-    Ok(si) => serde_json::to_value(si).unwrap_or(serde_json::Value::Null),
-    Err(e) => return HttpResponse::InternalServerError().body(e.to_string()),
-  };
-
   // logged in?
   let logindata = match interfaces::login_data_for_token(session, &data) {
     Ok(optld) => match optld {
@@ -110,7 +105,6 @@ async fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -
           .content_type("text/html; charset=utf-8")
           .body(
             s.replace("{{logindata}}", logindata.to_string().as_str())
-              .replace("{{sysids}}", sysids.to_string().as_str())
               .replace("{{errorid}}", errorid.to_string().as_str())
               .replace("{{adminsettings}}", adminsettings.to_string().as_str()),
           )
