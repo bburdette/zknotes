@@ -5,9 +5,10 @@ mod migrations;
 mod search;
 pub mod sqldata;
 mod sqltest;
+pub mod state;
 mod sync;
 mod synctest;
-use crate::error as zkerr;
+use crate::{error as zkerr, state::State};
 use actix_cors::Cors;
 use actix_files::NamedFile;
 use actix_multipart::Multipart;
@@ -24,6 +25,7 @@ use clap::Arg;
 use config::Config;
 use either::Either;
 use futures_util::TryStreamExt as _;
+use girlboss::Girlboss;
 use log::{error, info};
 pub use orgauth;
 use orgauth::util;
@@ -387,10 +389,11 @@ async fn save_files(
 async fn private(
   session: Session,
   data: web::Data<Config>,
+  girlboss: web::Data<&Girlboss<String>>,
   item: web::Json<PrivateMessage>,
   _req: HttpRequest,
 ) -> HttpResponse {
-  match zk_interface_check(&session, &data, item.into_inner()).await {
+  match zk_interface_check(&session, &data, &girlboss, item.into_inner()).await {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'private' err: {:?}", e);
@@ -425,6 +428,7 @@ async fn private_streaming(
 async fn zk_interface_check(
   session: &Session,
   config: &Config,
+  girlboss: &Girlboss<String>,
   msg: PrivateMessage,
 ) -> Result<PrivateReplyMessage, Box<dyn Error>> {
   match session.get::<Uuid>("token")? {
@@ -450,7 +454,7 @@ async fn zk_interface_check(
         }
         Ok(userdata) => {
           // finally!  processing messages as logged in user.
-          interfaces::zk_interface_loggedin(&config, userdata.id, &msg).await
+          interfaces::zk_interface_loggedin(&config, &girlboss, userdata.id, &msg).await
         }
       }
     }
@@ -865,7 +869,10 @@ pub fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
       .max_age(3600);
 
     App::new()
-      .app_data(web::Data::new(c.clone())) // <- create app with shared state
+      .app_data(web::Data::new(State {
+        config: c.clone(),
+        girlboss: Girlboss::new(),
+      })) // <- create app with shared state
       .wrap(cors)
       .wrap(TracingLogger::default())
       .wrap(

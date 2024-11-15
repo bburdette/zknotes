@@ -5,7 +5,10 @@ use crate::sqldata::zknotes_callbacks;
 use crate::sync;
 use actix_session::Session;
 use actix_web::HttpResponse;
+use futures::executor::block_on;
 use futures_util::StreamExt;
+use girlboss::Girlboss;
+use girlboss::Job;
 use log::info;
 use orgauth;
 use orgauth::endpoints::Tokener;
@@ -140,6 +143,7 @@ pub async fn zk_interface_loggedin_streaming(
 
 pub async fn zk_interface_loggedin(
   config: &Config,
+  girlboss: &Girlboss<String>,
   uid: i64,
   msg: &PrivateMessage,
 ) -> Result<PrivateReplyMessage, Box<dyn Error>> {
@@ -354,15 +358,38 @@ pub async fn zk_interface_loggedin(
         content: serde_json::to_value(hn)?,
       })
     }
-    PrivateRequests::SyncRemote => Ok(
-      sync::sync(
-        &config.orgauth_config.db.as_path(),
-        &config.file_path.as_path(),
-        uid,
-        &mut zknotes_callbacks(),
-      )
-      .await?,
-    ),
+    PrivateRequests::SyncRemote => {
+      let dbpath: PathBuf = config.orgauth_config.db.to_path_buf();
+      let file_path: PathBuf = config.file_path.to_path_buf();
+      let uid: i64 = uid;
+      // std::thread::spawn(move || {
+      //   block_on(sync::sync(&dbpath, &file_path, uid)).unwrap();
+      // });
+      // tokio::spawn(async {
+      //   sync::sync(&dbpath, &file_path, uid)
+      // });
+      let job = Job::start(move |mon| async move {
+        writeln!(mon, "starting!");
+        tokio::task::spawn_blocking(move || {
+          writeln!(mon, "starting!");
+          sync::sync(&dbpath, &file_path, uid);
+          writeln!(mon, "done!");
+        })
+        .await;
+        // writeln!(mon, "done!");
+      });
+
+      // let job = Job::start(move |mon| async move {
+      //   writeln!(mon, "starting!");
+      //   sync::sync(&dbpath, &file_path, uid).await.unwrap();
+      //   writeln!(mon, "done!");
+      // });
+
+      Ok(PrivateReplyMessage {
+        what: PrivateReplies::SyncStarted,
+        content: serde_json::to_value("meh".to_string())?,
+      })
+    }
     PrivateRequests::SyncFiles => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let zns: ZkNoteSearch = serde_json::from_value(msgdata.clone())?;

@@ -2,14 +2,20 @@
   description = "zknotes, a web based zettelkasten";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
     flake-utils.url = "github:numtide/flake-utils";
-    naersk.url = "github:nix-community/naersk";
-    naersk.inputs.nixpkgs.follows = "nixpkgs";
+    naersk = { 
+      url = "github:nix-community/naersk";
+      inputs.nixpkgs.follows = "nixpkgs"; 
+    };
+    fenix = {
+      url = "github:nix-community/fenix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
   };
 
 
-  outputs = { self, nixpkgs, flake-utils, naersk }:
+  outputs = { self, nixpkgs, flake-utils, naersk, fenix }:
     let
       makeElmPkg = { pkgs, additionalInputs ? [ ], pythonPackages ? (ps: [ ]) }:
         pkgs.stdenv.mkDerivation {
@@ -36,6 +42,10 @@
     in
     flake-utils.lib.eachDefaultSystem (
       system: let
+        toolchain = fenix.packages.${system}.stable;
+
+        rs_compiler = (with toolchain; [ rustc cargo ]);
+
         pname = "zknotes";
         pkgs = nixpkgs.legacyPackages."${system}";
         naersk-lib = naersk.lib."${system}";
@@ -44,11 +54,10 @@
             pname = pname;
             root = ./.;
             buildInputs = with pkgs; [
-              cargo
-              rustc
+              rs_compiler
               sqlite
               pkg-config
-              openssl.dev 
+              openssl.dev
               ];
           };
       in
@@ -81,9 +90,10 @@
           # `nix develop`
           devShell = pkgs.mkShell {
             nativeBuildInputs = with pkgs; [
-              cargo
+              rs_compiler
+              # cargo
+              # rustc
               cargo-watch
-              rustc
               rustfmt
               rust-analyzer
               sqlite

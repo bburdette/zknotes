@@ -94,6 +94,7 @@ pub enum PrivateReplies {
   SavedZkNoteAndLinks,
   SavedImportZkNotes,
   HomeNoteSet,
+  SyncStarted,
   SyncComplete,
   FileSyncComplete,
   NotLoggedIn,

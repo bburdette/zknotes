@@ -1,7 +1,9 @@
 use crate::error as zkerr;
 use crate::search::build_sql;
 use crate::search::{search_zknotes, search_zknotes_stream, sync_users, system_user, SearchResult};
-use crate::sqldata::{self, note_id_for_uuid, save_zklink, save_zknote, user_note_id};
+use crate::sqldata::{
+  self, note_id_for_uuid, save_zklink, save_zknote, user_note_id, zknotes_callbacks,
+};
 use crate::util::now;
 use actix_multipart_rfc7578 as multipart;
 use actix_web::error::PayloadError;
@@ -9,10 +11,11 @@ use async_stream::try_stream;
 use awc;
 use bytes::Bytes;
 use futures::executor::block_on;
-use futures::future;
 use futures::Stream;
+use futures::{future, Future};
 use futures_util::TryStreamExt;
 use futures_util::{StreamExt, TryFutureExt};
+use girlboss::JobReturnStatus;
 use log::error;
 use orgauth;
 use orgauth::data::User;
@@ -195,11 +198,12 @@ pub async fn sync(
   dbpath: &Path,
   file_path: &Path,
   uid: i64,
-  callbacks: &mut Callbacks,
+  // callbacks: &mut Callbacks,
 ) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>> {
   let conn = Arc::new(sqldata::connection_open(dbpath)?);
   let user = orgauth::dbfun::read_user_by_id(&conn, uid)?; // TODO pass this in from calling ftn?
   let extra_login_data = sqldata::read_extra_login_data(&conn, user.id)?;
+  let mut callbacks = &mut zknotes_callbacks();
 
   // get previous sync.
   let after = prev_sync(&conn, &file_path, &extra_login_data.zknote)
