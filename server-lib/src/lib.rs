@@ -66,8 +66,12 @@ fn sitemap(_req: &HttpRequest) -> Result<NamedFile> {
 }
 */
 
-async fn favicon(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
-  let staticpath = data.static_path.clone().unwrap_or(PathBuf::from("static/"));
+async fn favicon(data: web::Data<State>, req: HttpRequest) -> HttpResponse {
+  let staticpath = data
+    .config
+    .static_path
+    .clone()
+    .unwrap_or(PathBuf::from("static/"));
   let icopath = staticpath.join("favicon.ico");
   match NamedFile::open(&icopath) {
     Ok(f) => f.into_response(&req),
@@ -76,11 +80,11 @@ async fn favicon(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
 }
 
 // simple index handler
-async fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
+async fn mainpage(session: Session, data: web::Data<State>, req: HttpRequest) -> HttpResponse {
   info!("remote ip: {:?}, request:{:?}", req.connection_info(), req);
 
   // logged in?
-  let logindata = match interfaces::login_data_for_token(session, &data) {
+  let logindata = match interfaces::login_data_for_token(session, &data.config) {
     Ok(optld) => match optld {
       Some(logindata) => serde_json::to_value(logindata).unwrap_or(serde_json::Value::Null),
       _ => serde_json::Value::Null,
@@ -89,15 +93,20 @@ async fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -
   };
 
   // TODO: hardcode the UUID of this?
-  let errorid = match data.error_index_note {
+  let errorid = match data.config.error_index_note {
     Some(eid) => serde_json::to_value(eid).unwrap_or(serde_json::Value::Null),
     None => serde_json::Value::Null,
   };
 
-  let adminsettings = serde_json::to_value(orgauth::data::admin_settings(&data.orgauth_config))
-    .unwrap_or(serde_json::Value::Null);
+  let adminsettings =
+    serde_json::to_value(orgauth::data::admin_settings(&data.config.orgauth_config))
+      .unwrap_or(serde_json::Value::Null);
 
-  let mut staticpath = data.static_path.clone().unwrap_or(PathBuf::from("static/"));
+  let mut staticpath = data
+    .config
+    .static_path
+    .clone()
+    .unwrap_or(PathBuf::from("static/"));
   staticpath.push("index.html");
   match staticpath.to_str() {
     Some(path) => match util::load_string(path) {
@@ -118,7 +127,7 @@ async fn mainpage(session: Session, data: web::Data<Config>, req: HttpRequest) -
 }
 
 async fn public(
-  data: web::Data<Config>,
+  data: web::Data<State>,
   item: web::Json<PublicMessage>,
   req: HttpRequest,
 ) -> HttpResponse {
@@ -129,7 +138,7 @@ async fn public(
   );
 
   match interfaces::public_interface(
-    &data,
+    &data.config,
     item.into_inner(),
     req.connection_info().realip_remote_addr(),
   ) {
@@ -147,7 +156,7 @@ async fn public(
 
 async fn user(
   session: Session,
-  data: web::Data<Config>,
+  data: web::Data<State>,
   item: web::Json<orgauth::data::UserRequestMessage>,
   req: HttpRequest,
 ) -> HttpResponse {
@@ -159,7 +168,7 @@ async fn user(
   );
   match interfaces::user_interface(
     &mut ActixTokener { session: &session },
-    &data,
+    &data.config,
     item.into_inner(),
   )
   .await
@@ -178,7 +187,7 @@ async fn user(
 
 async fn admin(
   session: Session,
-  data: web::Data<Config>,
+  data: web::Data<State>,
   item: web::Json<orgauth::data::AdminRequestMessage>,
   req: HttpRequest,
 ) -> HttpResponse {
@@ -191,7 +200,7 @@ async fn admin(
   let mut cb = sqldata::zknotes_callbacks();
   match orgauth::endpoints::admin_interface_check(
     &mut ActixTokener { session: &session },
-    &data.orgauth_config,
+    &data.config.orgauth_config,
     &mut cb,
     item.into_inner(),
   ) {
@@ -388,12 +397,11 @@ async fn save_files(
 
 async fn private(
   session: Session,
-  data: web::Data<Config>,
-  girlboss: web::Data<&Girlboss<String>>,
+  data: web::Data<State>,
   item: web::Json<PrivateMessage>,
   _req: HttpRequest,
 ) -> HttpResponse {
-  match zk_interface_check(&session, &data, &girlboss, item.into_inner()).await {
+  match zk_interface_check(&session, &data.config, &data.girlboss, item.into_inner()).await {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'private' err: {:?}", e);
@@ -408,11 +416,11 @@ async fn private(
 
 async fn private_streaming(
   session: Session,
-  data: web::Data<Config>,
+  data: web::Data<State>,
   item: web::Json<PrivateStreamingMessage>,
   _req: HttpRequest,
 ) -> HttpResponse {
-  match zk_interface_check_streaming(&session, &data, item.into_inner()).await {
+  match zk_interface_check_streaming(&session, &data.config, item.into_inner()).await {
     Ok(hr) => hr,
     Err(e) => {
       error!("'private_streaming err: {:?}", e);
@@ -499,10 +507,10 @@ async fn zk_interface_check_streaming(
 
 async fn private_upstreaming(
   session: Session,
-  data: web::Data<Config>,
+  data: web::Data<State>,
   body: web::Payload,
 ) -> HttpResponse {
-  match zk_interface_check_upstreaming(&session, &data, body).await {
+  match zk_interface_check_upstreaming(&session, &data.config, body).await {
     Ok(hr) => hr,
     Err(e) => {
       error!("'private' err: {:?}", e);
@@ -620,11 +628,11 @@ pub fn load_config(filename: &str) -> Result<Config, Box<dyn Error>> {
   Ok(c)
 }
 
-async fn register(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
-  orgauth::endpoints::register(&data.orgauth_config, req)
+async fn register(data: web::Data<State>, req: HttpRequest) -> HttpResponse {
+  orgauth::endpoints::register(&data.config.orgauth_config, req)
 }
-async fn new_email(data: web::Data<Config>, req: HttpRequest) -> HttpResponse {
-  orgauth::endpoints::new_email(&data.orgauth_config, req)
+async fn new_email(data: web::Data<State>, req: HttpRequest) -> HttpResponse {
+  orgauth::endpoints::new_email(&data.config.orgauth_config, req)
 }
 
 #[actix_web::main]

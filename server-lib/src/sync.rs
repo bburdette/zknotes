@@ -198,12 +198,12 @@ pub async fn sync(
   dbpath: &Path,
   file_path: &Path,
   uid: i64,
-  // callbacks: &mut Callbacks,
+  callbacks: &mut Callbacks,
 ) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>> {
   let conn = Arc::new(sqldata::connection_open(dbpath)?);
   let user = orgauth::dbfun::read_user_by_id(&conn, uid)?; // TODO pass this in from calling ftn?
   let extra_login_data = sqldata::read_extra_login_data(&conn, user.id)?;
-  let mut callbacks = &mut zknotes_callbacks();
+  // let mut callbacks = &mut zknotes_callbacks();
 
   // get previous sync.
   let after = prev_sync(&conn, &file_path, &extra_login_data.zknote)

@@ -16,6 +16,8 @@ use std::error::Error;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::runtime::Runtime;
+use tokio::task::LocalSet;
 use zkprotocol::constants::PrivateReplies;
 use zkprotocol::constants::PublicReplies;
 use zkprotocol::constants::{PrivateRequests, PrivateStreamingRequests, PublicRequests};
@@ -362,22 +364,70 @@ pub async fn zk_interface_loggedin(
       let dbpath: PathBuf = config.orgauth_config.db.to_path_buf();
       let file_path: PathBuf = config.file_path.to_path_buf();
       let uid: i64 = uid;
-      // std::thread::spawn(move || {
-      //   block_on(sync::sync(&dbpath, &file_path, uid)).unwrap();
+
+      // no can do, future is not send.
+      // tokio::spawn(async move {
+      //   let mut callbacks = &mut zknotes_callbacks();
+      //   let r = sync::sync(&dbpath, &file_path, uid, &mut callbacks).await;
+      //   r.map_err(|e| e.to_string())
+      // })
+      // .await;
+
+      // just a block_on without a runtime will fail.
+      // let job = Job::start(move |mon| async move {
+      //   writeln!(mon, "starting!");
+      //   // spawn thread.  panics with:
+      //   // there is no reactor running, must be called from the context of a Tokio 1.x runtime
+      //   std::thread::spawn(move || {
+      //     let mut callbacks = &mut zknotes_callbacks();
+      //     writeln!(mon, "starting!");
+      //     println!("starting sync!");
+      //     let r = block_on(sync::sync(&dbpath, &file_path, uid, &mut callbacks));
+      //     println!("sycn result: {:?}", r);
+      //     writeln!(mon, "done!");
+      //     println!("sync done!");
+      //   });
       // });
-      // tokio::spawn(async {
-      //   sync::sync(&dbpath, &file_path, uid)
-      // });
+
+      // -----------------------------
+      // create a runtime and localset for each run of the task.  it does work.
       let job = Job::start(move |mon| async move {
         writeln!(mon, "starting!");
-        tokio::task::spawn_blocking(move || {
+        // spawn thread, local runtime.  success.
+        std::thread::spawn(move || {
+          let rt = Runtime::new().unwrap();
+          let local = LocalSet::new();
+          let mut callbacks = &mut zknotes_callbacks();
           writeln!(mon, "starting!");
-          sync::sync(&dbpath, &file_path, uid);
+          println!("starting sync!");
+          let r = local.block_on(&rt, sync::sync(&dbpath, &file_path, uid, &mut callbacks));
+          println!("sycn result: {:?}", r);
           writeln!(mon, "done!");
-        })
-        .await;
-        // writeln!(mon, "done!");
+          println!("sync done!");
+        });
       });
+
+      // -----------------------------
+      // spawn_blocking doesn't execute async tasks.  Might as well use a regular thread!
+      // let job = Job::start(move |mon| async move {
+      //   writeln!(mon, "starting!");
+      //   tokio::task::spawn_blocking(move || {
+      //     let dbpath = dbpath;
+      //     let file_path = file_path;
+      //     let uid = uid;
+      //     let mut callbacks = &mut zknotes_callbacks();
+      //     writeln!(mon, "starting!");
+      //     println!("starting sync!");
+      //     // let localset = make localset ?
+      //     // let rt = make runtime ?
+
+      //     let r = sync::sync(&dbpath, &file_path, uid, &mut callbacks);
+      //     println!("sycn result: {:?}", r);
+      //     writeln!(mon, "done!");
+      //     println!("sync done!");
+      //   }).await;
+      //   // writeln!(mon, "done!");
+      // });
 
       // let job = Job::start(move |mon| async move {
       //   writeln!(mon, "starting!");
