@@ -1,6 +1,7 @@
 pub mod config;
 pub mod error;
 pub mod interfaces;
+mod jobs;
 mod migrations;
 mod search;
 pub mod sqldata;
@@ -26,6 +27,7 @@ use config::Config;
 use either::Either;
 use futures_util::TryStreamExt as _;
 use girlboss::Girlboss;
+use jobs::JobId;
 use log::{error, info};
 pub use orgauth;
 use orgauth::util;
@@ -36,13 +38,13 @@ pub use orgauth::{
 use rusqlite::Connection;
 use serde_json;
 use simple_error::simple_error;
-use std::env;
 use std::error::Error;
 use std::fs::File;
 use std::io::{stdin, Write};
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::{env, sync::RwLock};
 use timer;
 use tokio_util::io::StreamReader;
 use tracing_actix_web::TracingLogger;
@@ -401,7 +403,7 @@ async fn private(
   item: web::Json<PrivateMessage>,
   _req: HttpRequest,
 ) -> HttpResponse {
-  match zk_interface_check(&session, &data.config, &data.girlboss, item.into_inner()).await {
+  match zk_interface_check(&session, &data, item.into_inner()).await {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'private' err: {:?}", e);
@@ -435,8 +437,9 @@ async fn private_streaming(
 
 async fn zk_interface_check(
   session: &Session,
-  config: &Config,
-  girlboss: &Girlboss<String>,
+  state: &State,
+  // config: &Config,
+  // girlboss: &Girlboss<JobId>,
   msg: PrivateMessage,
 ) -> Result<PrivateReplyMessage, Box<dyn Error>> {
   match session.get::<Uuid>("token")? {
@@ -445,12 +448,12 @@ async fn zk_interface_check(
       content: serde_json::Value::Null,
     }),
     Some(token) => {
-      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+      let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
       match orgauth::dbfun::read_user_by_token_api(
         &conn,
         token,
-        config.orgauth_config.login_token_expiration_ms,
-        config.orgauth_config.regen_login_tokens,
+        state.config.orgauth_config.login_token_expiration_ms,
+        state.config.orgauth_config.regen_login_tokens,
       ) {
         Err(e) => {
           info!("read_user_by_token_api error2: {:?}, {:?}", token, e);
@@ -462,7 +465,7 @@ async fn zk_interface_check(
         }
         Ok(userdata) => {
           // finally!  processing messages as logged in user.
-          interfaces::zk_interface_loggedin(&config, &girlboss, userdata.id, &msg).await
+          interfaces::zk_interface_loggedin(&state, userdata.id, &msg).await
         }
       }
     }
@@ -880,6 +883,7 @@ pub fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
       .app_data(web::Data::new(State {
         config: c.clone(),
         girlboss: Girlboss::new(),
+        jobcounter: RwLock::new(0),
       })) // <- create app with shared state
       .wrap(cors)
       .wrap(TracingLogger::default())

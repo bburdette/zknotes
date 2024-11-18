@@ -48,6 +48,7 @@ pub enum PrivateRequests {
   SetHomeNote,
   SyncRemote,
   SyncFiles,
+  GetSyncStatus,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -94,8 +95,9 @@ pub enum PrivateReplies {
   SavedZkNoteAndLinks,
   SavedImportZkNotes,
   HomeNoteSet,
-  SyncStarted,
-  SyncComplete,
+  JobStarted,
+  JobStatus,
+  JobComplete,
   FileSyncComplete,
   NotLoggedIn,
   LoginError,
