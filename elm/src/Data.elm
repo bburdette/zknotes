@@ -349,6 +349,12 @@ type alias GetArchiveZkNote =
     }
 
 
+type alias JobStatus =
+    { jobno : Int
+    , status : String
+    }
+
+
 
 ----------------------------------------
 -- Utility ftns
@@ -702,6 +708,13 @@ decodeZkNoteEdit =
     JD.map2 ZkNoteAndLinks
         (JD.field "zknote" decodeZkNote)
         (JD.field "links" (JD.list decodeEditLink))
+
+
+decodeJobStatus : JD.Decoder JobStatus
+decodeJobStatus =
+    JD.map2 JobStatus
+        (JD.field "jobno" JD.int)
+        (JD.field "status" JD.string)
 
 
 decodeZkNoteEditWhat : JD.Decoder ZkNoteAndLinksWhat

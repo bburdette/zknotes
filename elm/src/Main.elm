@@ -2584,8 +2584,8 @@ actualupdate msg model =
                         ZI.JobStarted jobno ->
                             ( displayMessageDialog model <| "job " ++ String.fromInt jobno ++ " started", Cmd.none )
 
-                        ZI.JobStatus jobno jobmsg ->
-                            ( displayMessageDialog model <| "job " ++ String.fromInt jobno ++ " status: " ++ jobmsg, Cmd.none )
+                        ZI.JobStatus jobstatus ->
+                            ( displayMessageDialog model <| "job " ++ String.fromInt jobstatus.jobno ++ " status: " ++ jobstatus.status, Cmd.none )
 
                         ZI.JobComplete jobno ->
                             ( displayMessageDialog model <| "job " ++ String.fromInt jobno ++ " completed", Cmd.none )

@@ -51,7 +51,7 @@ type ServerResponse
     | HomeNoteSet ZkNoteId
     | FilesUploaded (List Data.ZkListNote)
     | JobStarted Int
-    | JobStatus Int String
+    | JobStatus Data.JobStatus
     | JobComplete Int
     | FileSyncComplete
     | Noop
@@ -116,7 +116,7 @@ showServerResponse sr =
         JobComplete _ ->
             "JobComplete"
 
-        JobStatus _ _ ->
+        JobStatus _ ->
             "JobStatus"
 
         JobStarted _ ->
@@ -300,7 +300,13 @@ serverResponseDecoder =
                     "FilesUploaded" ->
                         JD.map FilesUploaded (JD.field "content" <| JD.list Data.decodeZkListNote)
 
-                    "SyncComplete" ->
+                    "JobStarted" ->
+                        JD.map JobStarted (JD.field "content" <| JD.int)
+
+                    "JobStatus" ->
+                        JD.map JobStatus (JD.field "content" <| Data.decodeJobStatus)
+
+                    "JobComplete" ->
                         JD.map JobComplete (JD.field "content" <| JD.int)
 
                     "FileSyncComplete" ->
