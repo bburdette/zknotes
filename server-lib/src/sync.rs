@@ -1418,7 +1418,7 @@ pub fn sync_stream(
     search_zknotes_stream(conn.clone(), files_dir, uid, ans, exclude_notes).map(bytesify);
 
   // if there's a new share, just get all links since the beginning of time.
-  let linkafter = if new_shares { after } else { None };
+  let linkafter = if new_shares { None } else { after };
 
   let als =
     sqldata::read_archivezklinks_stream(conn.clone(), uid, linkafter, exclude_archivelinks.clone())
