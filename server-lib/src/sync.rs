@@ -16,7 +16,7 @@ use futures::{future, Future};
 use futures_util::TryStreamExt;
 use futures_util::{StreamExt, TryFutureExt};
 use girlboss::JobReturnStatus;
-use log::error;
+use log::{debug, error};
 use orgauth;
 use orgauth::data::User;
 use orgauth::dbfun::user_id;
@@ -602,6 +602,7 @@ where
     );
   }
   let sm = serde_json::from_str(line.trim())?;
+  debug!("syncmessage : {:?}", sm);
   Ok(sm)
 }
 
@@ -935,6 +936,7 @@ where
       Err(rusqlite::Error::SqliteFailure(e, s)) => {
         if e.code == rusqlite::ErrorCode::ConstraintViolation {
           // if duplicate record, just ignore and go on.
+          debug!("duplicate archivelink: {:?}", l);
           None
         } else {
           return Err(rusqlite::Error::SqliteFailure(e, s).into());
@@ -1422,7 +1424,8 @@ pub fn sync_stream(
     search_zknotes_stream(conn.clone(), files_dir, uid, ans, exclude_notes).map(bytesify);
 
   // if there's a new share, just get all links since the beginning of time.
-  let linkafter = if new_shares { after } else { None };
+  let linkafter = if new_shares { None } else { after };
+  debug!("linkafter: {:?}", linkafter);
 
   let als =
     sqldata::read_archivezklinks_stream(conn.clone(), uid, linkafter, exclude_archivelinks.clone())
