@@ -20,6 +20,7 @@ import Http
 import HttpJsonTask as HE
 import Import
 import InviteUser
+import JobsDialog
 import Json.Decode as JD
 import Json.Encode as JE
 import LocalStorage as LS
