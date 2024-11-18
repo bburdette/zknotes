@@ -1,10 +1,16 @@
-module ZkInterface exposing (SendMsg(..), ServerResponse(..), encodeEmail, encodeSendMsg, serverResponseDecoder, showServerResponse)
+module ZkInterface exposing
+    ( SendMsg(..)
+    , ServerResponse(..)
+    , encodeEmail
+    , encodeSendMsg
+    , serverResponseDecoder
+    , showServerResponse
+    )
 
 import Data exposing (ZkNoteId)
 import Json.Decode as JD
 import Json.Encode as JE
 import Search as S
-import Util
 
 
 type SendMsg
@@ -44,7 +50,9 @@ type ServerResponse
     | PowerDeleteComplete Int
     | HomeNoteSet ZkNoteId
     | FilesUploaded (List Data.ZkListNote)
-    | SyncComplete
+    | JobStarted Int
+    | JobStatus Int String
+    | JobComplete Int
     | FileSyncComplete
     | Noop
     | NotLoggedIn
@@ -105,8 +113,14 @@ showServerResponse sr =
         FilesUploaded _ ->
             "FilesUploaded"
 
-        SyncComplete ->
-            "SyncComplete"
+        JobComplete _ ->
+            "JobComplete"
+
+        JobStatus _ _ ->
+            "JobStatus"
+
+        JobStarted _ ->
+            "JobStarted"
 
         FileSyncComplete ->
             "FileSyncComplete"
@@ -287,7 +301,7 @@ serverResponseDecoder =
                         JD.map FilesUploaded (JD.field "content" <| JD.list Data.decodeZkListNote)
 
                     "SyncComplete" ->
-                        JD.succeed SyncComplete
+                        JD.map JobComplete (JD.field "content" <| JD.int)
 
                     "FileSyncComplete" ->
                         JD.succeed FileSyncComplete

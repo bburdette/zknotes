@@ -44,7 +44,6 @@ import Route exposing (Route(..), parseUrl, routeTitle, routeUrl)
 import Search as S
 import SearchStackPanel as SP
 import SelectString as SS
-import Set
 import ShowMessage
 import TSet
 import TagAThing
@@ -1957,7 +1956,7 @@ actualupdate msg model =
                             let
                                 prevstate =
                                     case stateLogin state of
-                                        Just login ->
+                                        Just _ ->
                                             state
 
                                         Nothing ->
@@ -2112,7 +2111,7 @@ actualupdate msg model =
                                             }
                                     in
                                     case state of
-                                        Login _ route ->
+                                        Login _ _ ->
                                             -- we're logged in!
                                             initToRoute lgmod lgmod.initialRoute
 
@@ -2582,8 +2581,14 @@ actualupdate msg model =
                             , Cmd.none
                             )
 
-                        ZI.SyncComplete ->
-                            ( displayMessageDialog model <| "remote sync complete", Cmd.none )
+                        ZI.JobStarted jobno ->
+                            ( displayMessageDialog model <| "job " ++ String.fromInt jobno ++ " started", Cmd.none )
+
+                        ZI.JobStatus jobno jobmsg ->
+                            ( displayMessageDialog model <| "job " ++ String.fromInt jobno ++ " status: " ++ jobmsg, Cmd.none )
+
+                        ZI.JobComplete jobno ->
+                            ( displayMessageDialog model <| "job " ++ String.fromInt jobno ++ " completed", Cmd.none )
 
                         ZI.FileSyncComplete ->
                             ( displayMessageDialog model <| "file sync complete", Cmd.none )
