@@ -48,8 +48,8 @@ module EditZkNote exposing
     )
 
 import Browser.Dom as BD
-import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
-import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
+import Cellme.Cellme exposing (CellContainer(..), RunState(..), evalCellsFully)
+import Cellme.DictCellme exposing (CellDict(..), getCd, mkCc)
 import Common
 import Data exposing (Direction(..), EditLink, ZkNoteId, zkNoteIdToString, zklKey, zniCompare, zniEq)
 import Dialog as D
@@ -60,27 +60,20 @@ import Element.Border as EBd
 import Element.Events as EE
 import Element.Font as EF
 import Element.Input as EI
-import Element.Region as ER
-import Html exposing (Attribute, Html)
 import Html.Attributes
 import Json.Decode as JD
-import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..), inlineFoldl)
-import Markdown.Html
-import Markdown.Parser
-import Markdown.Renderer
+import Markdown.Block exposing (ListItem(..), Task(..))
 import Maybe.Extra as ME
 import MdCommon as MC
 import NoteCache as NC exposing (NoteCache)
 import Orgauth.Data exposing (UserId)
 import RequestsDialog exposing (TRequests)
-import Schelme.Show exposing (showTerm)
 import Search as S
 import SearchStackPanel as SP
 import TangoColors as TC
 import Task
 import Time
 import Toop
-import UUID exposing (UUID)
 import Url as U
 import Url.Builder as UB
 import Url.Parser as UP exposing ((</>))
@@ -462,7 +455,7 @@ revert model =
 
 
 showZkl : E.Color -> Bool -> Bool -> Maybe EditLink -> Data.LoginData -> Maybe ZkNoteId -> Maybe E.Color -> Bool -> EditLink -> Element Msg
-showZkl bkcolor isDirty editable focusLink ld id sysColor showflip zkl =
+showZkl bkcolor isDirty editable focusLink ld _ sysColor showflip zkl =
     let
         ( dir, otherid ) =
             case zkl.direction of
