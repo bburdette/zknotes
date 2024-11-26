@@ -61,6 +61,7 @@ import Element.Events as EE
 import Element.Font as EF
 import Element.Input as EI
 import Html.Attributes
+import JobsDialog exposing (TJobs)
 import Json.Decode as JD
 import Markdown.Block exposing (ListItem(..), Task(..))
 import Maybe.Extra as ME
@@ -126,6 +127,7 @@ type Msg
     | SettingsPress
     | AdminPress
     | RequestsPress
+    | JobsPress
     | FlipLink EditLink
     | ShowArchivesPress
     | Noop
@@ -219,6 +221,7 @@ type Command
     | Settings
     | Admin
     | Requests
+    | Jobs
     | SetHomeNote ZkNoteId
     | AddToRecent Data.ZkListNote
     | ShowMessage String
@@ -595,14 +598,14 @@ pageLink model =
             )
 
 
-view : Time.Zone -> Util.Size -> List Data.ZkListNote -> TRequests -> NoteCache -> Model -> Element Msg
-view zone size recentZkns trqs noteCache model =
+view : Time.Zone -> Util.Size -> List Data.ZkListNote -> TRequests -> TJobs -> NoteCache -> Model -> Element Msg
+view zone size recentZkns trqs tjobs noteCache model =
     case model.dialog of
         Just dialog ->
             D.view size dialog |> E.map DialogMsg
 
         Nothing ->
-            zknview zone size recentZkns trqs noteCache model
+            zknview zone size recentZkns trqs tjobs noteCache model
 
 
 commonButtonStyle : Bool -> List (E.Attribute msg)
@@ -878,8 +881,8 @@ renderMd fileprefix cd noteCache md mdw =
             E.text errors
 
 
-zknview : Time.Zone -> Util.Size -> List Data.ZkListNote -> TRequests -> NoteCache -> Model -> Element Msg
-zknview zone size recentZkns trqs noteCache model =
+zknview : Time.Zone -> Util.Size -> List Data.ZkListNote -> TRequests -> TJobs -> NoteCache -> Model -> Element Msg
+zknview zone size recentZkns trqs tjobs noteCache model =
     let
         wclass =
             if size.width < 800 then
@@ -1483,6 +1486,13 @@ zknview zone size recentZkns trqs noteCache model =
                 EI.button
                     (E.alignRight :: Common.buttonStyle ++ [ EBk.color TC.darkGreen ])
                     { onPress = Just RequestsPress, label = E.text "uploads" }
+
+              else
+                E.none
+            , if tjobs.jobs /= Dict.empty then
+                EI.button
+                    (E.alignRight :: Common.buttonStyle ++ [ EBk.color TC.darkGreen ])
+                    { onPress = Just JobsPress, label = E.text "jobs" }
 
               else
                 E.none
@@ -2405,6 +2415,7 @@ update msg model =
                                         size
                                         []
                                         (TRequests 0 Dict.empty)
+                                        (TJobs Dict.empty)
                                         (NC.empty 0)
                                         model
                                     )
@@ -2705,6 +2716,9 @@ update msg model =
 
         AdminPress ->
             ( model, Admin )
+
+        JobsPress ->
+            ( model, Jobs )
 
         RequestsPress ->
             ( model, Requests )

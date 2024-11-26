@@ -48,7 +48,7 @@ pub enum PrivateRequests {
   SetHomeNote,
   SyncRemote,
   SyncFiles,
-  GetSyncStatus,
+  GetJobStatus,
 }
 
 #[derive(Deserialize, Serialize, Debug)]

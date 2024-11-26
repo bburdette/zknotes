@@ -471,7 +471,7 @@ pub async fn zk_interface_loggedin(
         content: serde_json::to_value((dv, uv))?,
       })
     }
-    PrivateRequests::GetSyncStatus => {
+    PrivateRequests::GetJobStatus => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let jobno: i64 = serde_json::from_value(msgdata.clone())?;
 

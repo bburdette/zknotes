@@ -29,6 +29,8 @@ type SendMsg
     | PowerDelete S.TagSearch
     | SetHomeNote ZkNoteId
     | SyncRemote
+    | GetJobStatus Int
+      -- | GetJobs
     | SyncFiles S.ZkNoteSearch
 
 
@@ -53,6 +55,7 @@ type ServerResponse
     | JobStarted Int
     | JobStatus Data.JobStatus
     | JobComplete Int
+    | JobNotFound Int
     | FileSyncComplete
     | Noop
     | NotLoggedIn
@@ -121,6 +124,9 @@ showServerResponse sr =
 
         JobStarted _ ->
             "JobStarted"
+
+        JobNotFound _ ->
+            "JobNotFound"
 
         FileSyncComplete ->
             "FileSyncComplete"
@@ -234,6 +240,12 @@ encodeSendMsg sm =
                 , ( "data", S.encodeZkNoteSearch s )
                 ]
 
+        GetJobStatus jobno ->
+            JE.object
+                [ ( "what", JE.string "GetJobStatus" )
+                , ( "data", JE.int jobno )
+                ]
+
 
 encodeEmail : String -> JE.Value
 encodeEmail email =
@@ -308,6 +320,9 @@ serverResponseDecoder =
 
                     "JobComplete" ->
                         JD.map JobComplete (JD.field "content" <| JD.int)
+
+                    "JobNotFound" ->
+                        JD.map JobNotFound (JD.field "content" <| JD.int)
 
                     "FileSyncComplete" ->
                         JD.succeed FileSyncComplete

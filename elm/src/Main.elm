@@ -38,6 +38,7 @@ import Orgauth.ShowUrl as ShowUrl
 import Orgauth.UserEdit as UserEdit
 import Orgauth.UserInterface as UI
 import Orgauth.UserListing as UserListing
+import Platform.Cmd as Cmd
 import PublicInterface as PI
 import Random exposing (Seed, initialSeed)
 import RequestsDialog exposing (TRequest(..), TRequests)
@@ -108,6 +109,7 @@ type Msg
     | JobsDialogMsg (GD.Msg JobsDialog.Msg)
     | TagFilesMsg (TagAThing.Msg TagFiles.Msg)
     | InviteUserMsg (TagAThing.Msg InviteUser.Msg)
+    | JobsPollTick Time.Posix
     | Noop
 
 
@@ -751,6 +753,9 @@ showMessage msg =
         InviteUserMsg _ ->
             "InviteUserMsg"
 
+        JobsPollTick _ ->
+            "JobsPollTick"
+
 
 showState : State -> String
 showState state =
@@ -855,7 +860,7 @@ viewState size state model =
             E.map InvitedMsg <| Invited.view model.stylePalette size em
 
         EditZkNote em _ ->
-            E.map EditZkNoteMsg <| EditZkNote.view model.timezone size model.recentNotes model.trackedRequests model.noteCache em
+            E.map EditZkNoteMsg <| EditZkNote.view model.timezone size model.recentNotes model.trackedRequests model.jobs model.noteCache em
 
         EditZkNoteListing em ld ->
             E.map EditZkNoteListingMsg <| EditZkNoteListing.view model.filelocation ld size em
@@ -1298,6 +1303,13 @@ view model =
                     GD.layout
                         (Just { width = min 600 model.size.width, height = min 200 model.size.height })
                         cdm
+
+            JobsDialog dm _ ->
+                Html.map JobsDialogMsg <|
+                    GD.layout
+                        (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                        -- use the live-updated model
+                        { dm | model = model.jobs }
 
             RequestsDialog dm _ ->
                 Html.map RequestsDialogMsg <|
@@ -2606,7 +2618,7 @@ actualupdate msg model =
                                 nm =
                                     { model | jobs = { jobs = Dict.insert jobno { jobno = jobno, status = "started" } model.jobs.jobs } }
                             in
-                            ( { model
+                            ( { nm
                                 | state =
                                     JobsDialog
                                         (JobsDialog.init
@@ -2614,25 +2626,31 @@ actualupdate msg model =
                                             Common.buttonStyle
                                             (E.map (\_ -> ()) (viewState model.size model.state model))
                                         )
-                                        model.state
+                                        nm.state
                               }
                             , Cmd.none
                             )
 
-                        -- ( displayMessageDialog nm <| "job " ++ String.fromInt jobno ++ " started", Cmd.none )
                         ZI.JobStatus jobstatus ->
                             let
                                 nm =
                                     { model | jobs = { jobs = Dict.insert jobstatus.jobno jobstatus model.jobs.jobs } }
                             in
-                            ( displayMessageDialog nm <| "job " ++ String.fromInt jobstatus.jobno ++ " status: " ++ jobstatus.status, Cmd.none )
+                            ( nm, Cmd.none )
 
                         ZI.JobComplete jobno ->
                             let
                                 nm =
                                     { model | jobs = { jobs = Dict.insert jobno { jobno = jobno, status = "completed" } model.jobs.jobs } }
                             in
-                            ( displayMessageDialog model <| "job " ++ String.fromInt jobno ++ " completed", Cmd.none )
+                            ( nm, Cmd.none )
+
+                        ZI.JobNotFound jobno ->
+                            let
+                                nm =
+                                    { model | jobs = { jobs = Dict.insert jobno { jobno = jobno, status = "job not found" } model.jobs.jobs } }
+                            in
+                            ( nm, Cmd.none )
 
                         ZI.FileSyncComplete ->
                             ( displayMessageDialog model <| "file sync complete", Cmd.none )
@@ -2985,6 +3003,22 @@ actualupdate msg model =
 
                 GD.Cancel ->
                     ( { model | state = prevstate }, Cmd.none )
+
+        ( JobsDialogMsg _, _ ) ->
+            ( model, Cmd.none )
+
+        ( JobsPollTick _, _ ) ->
+            ( model
+            , model.jobs.jobs
+                |> Dict.keys
+                |> List.map
+                    (\jobno ->
+                        sendZIMsg model.tauri
+                            model.location
+                            (ZI.GetJobStatus jobno)
+                    )
+                |> Cmd.batch
+            )
 
         ( RequestsDialogMsg bm, RequestsDialog bs prevstate ) ->
             -- TODO address this hack!
@@ -3361,6 +3395,20 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                             RequestsDialog
                                 (RequestsDialog.init
                                     model.trackedRequests
+                                    Common.buttonStyle
+                                    (E.map (\_ -> ()) (viewState model.size model.state model))
+                                )
+                                model.state
+                      }
+                    , Cmd.none
+                    )
+
+                EditZkNote.Jobs ->
+                    ( { model
+                        | state =
+                            JobsDialog
+                                (JobsDialog.init
+                                    model.jobs
                                     Common.buttonStyle
                                     (E.map (\_ -> ()) (viewState model.size model.state model))
                                 )
@@ -3770,6 +3818,23 @@ main =
 
                             InitError _ ->
                                 []
+
+                    jobtick : List (Sub Msg)
+                    jobtick =
+                        case model of
+                            Ready rmd ->
+                                if Dict.size rmd.jobs.jobs > 0 then
+                                    [ Time.every 1000 JobsPollTick
+                                    ]
+
+                                else
+                                    []
+
+                            PreInit _ ->
+                                []
+
+                            InitError _ ->
+                                []
                 in
                 Sub.batch <|
                     [ receiveTASelection TASelection
@@ -3782,6 +3847,7 @@ main =
                     , receiveUITauriResponse TauriUserReplyData
                     , receivePITauriResponse TauriPublicReplyData
                     ]
+                        ++ jobtick
                         ++ tracks
         , onUrlRequest = urlRequest
         , onUrlChange = UrlChanged
