@@ -1426,7 +1426,6 @@ pub fn sync_stream(
 
   // if there's a new share, just get all links since the beginning of time.
   let linkafter = if new_shares { None } else { after };
-  debug!("linkafter: {:?}", linkafter);
 
   let als =
     sqldata::read_archivezklinks_stream(conn.clone(), uid, linkafter, exclude_archivelinks.clone())
