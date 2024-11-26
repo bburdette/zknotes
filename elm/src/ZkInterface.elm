@@ -52,9 +52,7 @@ type ServerResponse
     | PowerDeleteComplete Int
     | HomeNoteSet ZkNoteId
     | FilesUploaded (List Data.ZkListNote)
-    | JobStarted Int
     | JobStatus Data.JobStatus
-    | JobComplete Int
     | JobNotFound Int
     | FileSyncComplete
     | Noop
@@ -116,14 +114,8 @@ showServerResponse sr =
         FilesUploaded _ ->
             "FilesUploaded"
 
-        JobComplete _ ->
-            "JobComplete"
-
         JobStatus _ ->
             "JobStatus"
-
-        JobStarted _ ->
-            "JobStarted"
 
         JobNotFound _ ->
             "JobNotFound"
@@ -312,14 +304,8 @@ serverResponseDecoder =
                     "FilesUploaded" ->
                         JD.map FilesUploaded (JD.field "content" <| JD.list Data.decodeZkListNote)
 
-                    "JobStarted" ->
-                        JD.map JobStarted (JD.field "content" <| JD.int)
-
                     "JobStatus" ->
                         JD.map JobStatus (JD.field "content" <| Data.decodeJobStatus)
-
-                    "JobComplete" ->
-                        JD.map JobComplete (JD.field "content" <| JD.int)
 
                     "JobNotFound" ->
                         JD.map JobNotFound (JD.field "content" <| JD.int)

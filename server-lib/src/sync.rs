@@ -228,7 +228,8 @@ pub async fn sync(
     callbacks,
   )
   .await?;
-  if res.what != PrivateReplies::JobComplete {
+
+  if res.what != PrivateReplies::SyncComplete {
     Ok(res)
   } else {
     let remres = sync_to_remote(
@@ -1052,7 +1053,7 @@ where
   )?;
 
   Ok(PrivateReplyMessage {
-    what: PrivateReplies::JobComplete,
+    what: PrivateReplies::SyncComplete,
     content: serde_json::Value::Null,
   })
 }
@@ -1129,7 +1130,7 @@ pub async fn sync_to_remote(
   // TODO: send back Sync results... how many records and etc.
 
   Ok(PrivateReplyMessage {
-    what: PrivateReplies::JobComplete,
+    what: PrivateReplies::SyncComplete,
     content: serde_json::Value::Null,
   })
 }

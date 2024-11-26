@@ -2613,42 +2613,39 @@ actualupdate msg model =
                             , Cmd.none
                             )
 
-                        ZI.JobStarted jobno ->
-                            let
-                                nm =
-                                    { model | jobs = { jobs = Dict.insert jobno { jobno = jobno, status = "started" } model.jobs.jobs } }
-                            in
-                            ( { nm
-                                | state =
-                                    JobsDialog
-                                        (JobsDialog.init
-                                            nm.jobs
-                                            Common.buttonStyle
-                                            (E.map (\_ -> ()) (viewState model.size model.state model))
-                                        )
-                                        nm.state
-                              }
-                            , Cmd.none
-                            )
-
                         ZI.JobStatus jobstatus ->
                             let
                                 nm =
                                     { model | jobs = { jobs = Dict.insert jobstatus.jobno jobstatus model.jobs.jobs } }
                             in
-                            ( nm, Cmd.none )
+                            ( if jobstatus.state == Data.Started then
+                                { nm
+                                    | state =
+                                        JobsDialog
+                                            (JobsDialog.init
+                                                nm.jobs
+                                                Common.buttonStyle
+                                                (E.map (\_ -> ()) (viewState model.size model.state model))
+                                            )
+                                            nm.state
+                                }
 
-                        ZI.JobComplete jobno ->
-                            let
-                                nm =
-                                    { model | jobs = { jobs = Dict.insert jobno { jobno = jobno, status = "completed" } model.jobs.jobs } }
-                            in
-                            ( nm, Cmd.none )
+                              else
+                                nm
+                            , Cmd.none
+                            )
 
                         ZI.JobNotFound jobno ->
                             let
                                 nm =
-                                    { model | jobs = { jobs = Dict.insert jobno { jobno = jobno, status = "job not found" } model.jobs.jobs } }
+                                    { model
+                                        | jobs =
+                                            { jobs =
+                                                Dict.insert jobno
+                                                    { jobno = jobno, state = Data.Failed, message = "job not found" }
+                                                    model.jobs.jobs
+                                            }
+                                    }
                             in
                             ( nm, Cmd.none )
 
@@ -3823,7 +3820,26 @@ main =
                     jobtick =
                         case model of
                             Ready rmd ->
-                                if Dict.size rmd.jobs.jobs > 0 then
+                                if
+                                    Dict.values rmd.jobs.jobs
+                                        |> List.filter
+                                            (\j ->
+                                                case j.state of
+                                                    Data.Started ->
+                                                        True
+
+                                                    Data.Running ->
+                                                        True
+
+                                                    Data.Completed ->
+                                                        False
+
+                                                    Data.Failed ->
+                                                        False
+                                            )
+                                        |> List.isEmpty
+                                        |> not
+                                then
                                     [ Time.every 1000 JobsPollTick
                                     ]
 

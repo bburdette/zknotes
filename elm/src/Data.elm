@@ -349,9 +349,17 @@ type alias GetArchiveZkNote =
     }
 
 
+type JobState
+    = Started
+    | Running
+    | Completed
+    | Failed
+
+
 type alias JobStatus =
     { jobno : Int
-    , status : String
+    , state : JobState
+    , message : String
     }
 
 
@@ -633,6 +641,29 @@ decodeFileStatus =
             )
 
 
+decodeJobState : JD.Decoder JobState
+decodeJobState =
+    JD.string
+        |> JD.andThen
+            (\s ->
+                case s of
+                    "Started" ->
+                        JD.succeed Started
+
+                    "Running" ->
+                        JD.succeed Running
+
+                    "Completed" ->
+                        JD.succeed Completed
+
+                    "Failed" ->
+                        JD.succeed Failed
+
+                    wup ->
+                        JD.fail <| "invalid JobState: " ++ wup
+            )
+
+
 decodeZkListNote : JD.Decoder ZkListNote
 decodeZkListNote =
     JD.succeed ZkListNote
@@ -712,9 +743,10 @@ decodeZkNoteEdit =
 
 decodeJobStatus : JD.Decoder JobStatus
 decodeJobStatus =
-    JD.map2 JobStatus
+    JD.map3 JobStatus
         (JD.field "jobno" JD.int)
-        (JD.field "status" JD.string)
+        (JD.field "state" decodeJobState)
+        (JD.field "message" JD.string)
 
 
 decodeZkNoteEditWhat : JD.Decoder ZkNoteAndLinksWhat

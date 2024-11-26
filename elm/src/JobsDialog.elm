@@ -73,7 +73,7 @@ view buttonStyle mbsize trqs =
                 |> Dict.toList
                 |> List.reverse
                 |> List.map
-                    (\( jobno, fu ) ->
+                    (\( jobno, js ) ->
                         let
                             complete =
                                 False
@@ -87,11 +87,18 @@ view buttonStyle mbsize trqs =
                             , E.padding 10
                             , E.spacing 8
                             ]
-                            [ if complete then
-                                E.el [ E.centerX, EF.bold ] <| E.text "job complete"
+                            [ case js.state of
+                                Data.Started ->
+                                    E.el [ E.centerX, EF.bold ] <| E.text "started..."
 
-                              else
-                                E.el [ E.centerX, EF.bold ] <| E.text "running..."
+                                Data.Running ->
+                                    E.el [ E.centerX, EF.bold ] <| E.text "running..."
+
+                                Data.Completed ->
+                                    E.el [ E.centerX, EF.bold ] <| E.text "completed..."
+
+                                Data.Failed ->
+                                    E.el [ E.centerX, EF.bold ] <| E.text "failed..."
                             , E.row [ E.width E.fill ]
                                 [ E.column
                                     [ EBd.width 3
@@ -100,7 +107,7 @@ view buttonStyle mbsize trqs =
                                     , E.height <| E.maximum 200 E.fill
                                     , E.scrollbarY
                                     ]
-                                    [ E.paragraph [] [ E.text fu.status ] ]
+                                    [ E.paragraph [] [ E.text js.message ] ]
                                 ]
                             , if complete then
                                 E.row [ E.width E.fill ]

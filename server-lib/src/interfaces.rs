@@ -24,6 +24,7 @@ use tokio::task::LocalSet;
 use zkprotocol::constants::PrivateReplies;
 use zkprotocol::constants::PublicReplies;
 use zkprotocol::constants::{PrivateRequests, PrivateStreamingRequests, PublicRequests};
+use zkprotocol::content::JobState;
 use zkprotocol::content::JobStatus;
 use zkprotocol::content::{
   GetArchiveZkLinks, GetArchiveZkNote, GetZkLinksSince, GetZkNoteAndLinks, GetZkNoteArchives,
@@ -449,8 +450,12 @@ pub async fn zk_interface_loggedin(
       // });
 
       Ok(PrivateReplyMessage {
-        what: PrivateReplies::JobStarted,
-        content: serde_json::to_value(jid.jobno)?,
+        what: PrivateReplies::JobStatus,
+        content: serde_json::to_value(JobStatus {
+          jobno: jid.jobno,
+          state: JobState::Started,
+          message: "".to_string(),
+        })?,
       })
     }
     PrivateRequests::SyncFiles => {
@@ -482,9 +487,20 @@ pub async fn zk_interface_loggedin(
 
       match state.girlboss.get(&jid).await {
         Some(job) => {
+          let state = if job.is_finished() {
+            if job.succeeded() {
+              JobState::Completed
+            } else {
+              JobState::Failed
+            }
+          } else {
+            JobState::Running
+          };
+
           let js = JobStatus {
             jobno: jobno,
-            status: job.status().message().to_string(),
+            state: state,
+            message: job.status().message().to_string(),
           };
 
           Ok(PrivateReplyMessage {
@@ -493,12 +509,9 @@ pub async fn zk_interface_loggedin(
           })
         }
         None => {
-          let js = JobStatus {
-            jobno: jobno,
-            status: "job not found".to_string(),
-          };
+          let js = jobno;
           Ok(PrivateReplyMessage {
-            what: PrivateReplies::JobStatus,
+            what: PrivateReplies::JobNotFound,
             content: serde_json::to_value(js)?,
           })
         }
