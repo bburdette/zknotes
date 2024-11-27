@@ -1,5 +1,8 @@
 use crate::config::Config;
+use crate::jobs::GirlbossMonitor;
 use crate::jobs::JobId;
+use crate::jobs::JobMonitor;
+use crate::jobs::LogMonitor;
 use crate::search;
 use crate::sqldata;
 use crate::sqldata::zknotes_callbacks;
@@ -130,6 +133,7 @@ pub async fn zk_interface_loggedin_streaming(
         config.orgauth_config.db.as_path(),
       )?);
       let rq: SyncSince = serde_json::from_value(msgdata.clone())?;
+      let jl = LogMonitor {};
       let ss = sync::sync_stream(
         conn,
         PathBuf::from(&config.file_path),
@@ -139,6 +143,7 @@ pub async fn zk_interface_loggedin_streaming(
         None,
         rq.after,
         &mut zknotes_callbacks(),
+        &jl,
       );
       Ok(HttpResponse::Ok().streaming(ss))
     }
@@ -371,12 +376,21 @@ pub async fn zk_interface_loggedin(
       let _job = state
         .girlboss
         .start(jid, move |mon| async move {
+          let gbm = GirlbossMonitor { monitor: mon };
           // spawn thread, local runtime.  success.
           std::thread::spawn(move || {
             let rt = Runtime::new().unwrap();
             let local = LocalSet::new();
             let mut callbacks = &mut zknotes_callbacks();
-            let _r = local.block_on(&rt, sync::sync(&dbpath, &file_path, uid, &mut callbacks));
+            write!(gbm, "starting sync");
+            let r = local.block_on(
+              &rt,
+              sync::sync(&dbpath, &file_path, uid, &mut callbacks, &gbm),
+            );
+            match r {
+              Ok(_) => write!(gbm, "sync completed"),
+              Err(e) => write!(gbm, "sync err: {:?}", e),
+            }
           });
         })
         .await?;
@@ -431,6 +445,7 @@ pub async fn zk_interface_loggedin(
             state,
             message: job.status().message().to_string(),
           };
+          info!("job status: {:?}", js);
 
           Ok(PrivateReplyMessage {
             what: PrivateReplies::JobStatus,
