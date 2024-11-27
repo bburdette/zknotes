@@ -3,9 +3,9 @@
 
   inputs = {
     flake-utils.url = "github:numtide/flake-utils";
-    naersk = { 
+    naersk = {
       url = "github:nix-community/naersk";
-      inputs.nixpkgs.follows = "nixpkgs"; 
+      inputs.nixpkgs.follows = "nixpkgs";
     };
     fenix = {
       url = "github:nix-community/fenix";
@@ -21,47 +21,51 @@
         pkgs.stdenv.mkDerivation {
           name = "zknotes-elm";
           src = ./.;
-          buildPhase = pkgs.elmPackages.fetchElmDeps {
-            elmPackages = import ./elm/elm-srcs.nix;
-            elmVersion = "0.19.1";
-            registryDat = ./elm/registry.dat;
-          } + ''
+          buildPhase = pkgs.elmPackages.fetchElmDeps
+            {
+              elmPackages = import ./elm/elm-srcs.nix;
+              elmVersion = "0.19.1";
+              registryDat = ./elm/registry.dat;
+            } + ''
             cd elm
-           	elm-optimize-level-2 src/Main.elm --output=dist/main.js
+            elm-optimize-level-2 src/Main.elm --output=dist/main.js
           '';
           installPhase = ''
             mkdir $out
             cp -r dist/* $out
           '';
           buildInputs = with pkgs;
-             [
+            [
               elmPackages.elm
               elmPackages.elm-optimize-level-2
             ] ++ additionalInputs;
         };
     in
-    flake-utils.lib.eachDefaultSystem (
-      system: let
-        toolchain = fenix.packages.${system}.stable;
-        rs_compiler = (with toolchain; [ rustc cargo ]);
+    flake-utils.lib.eachDefaultSystem
+      (
+        system:
+        let
+          toolchain = fenix.packages.${system}.stable;
+          rs_compiler = (with toolchain; [ rustc cargo ]);
 
-        pname = "zknotes";
-        pkgs = nixpkgs.legacyPackages."${system}";
-        elm-stuff = makeElmPkg { inherit pkgs; };
-        naersk-lib = naersk.lib."${system}";
-        rust-stuff = naersk-lib.buildPackage {
-            pname = pname;
+          pname = "zknotes";
+          pkgs = nixpkgs.legacyPackages."${system}";
+          elm-stuff = makeElmPkg { inherit pkgs; };
+          naersk-lib = naersk.lib."${system}";
+          rust-stuff = (naersk-lib.override {
             rustc = toolchain.rustc;
             cargo = toolchain.cargo;
+          }).buildPackage {
+            pname = pname;
             root = ./.;
             buildInputs = with pkgs; [
-              rs_compiler
+              # rs_compiler
               sqlite
               pkg-config
               openssl.dev
-              ];
+            ];
           };
-      in
+        in
         rec {
           inherit pname;
           # `nix build`
@@ -78,7 +82,7 @@
               cp -r ${rust-stuff}/bin $out
               mv $out/bin/zknotes-server $out/bin/.zknotes-server
               makeWrapper $out/bin/.zknotes-server $out/bin/zknotes-server --set ZKNOTES_STATIC_PATH $out/share/zknotes/static;
-              '';
+            '';
           };
           defaultPackage = packages.${pname};
 
@@ -116,7 +120,7 @@
             ];
           };
         }
-    ) // {
+      ) // {
       nixosModules = { zknotes = import ./module.nix; };
     };
 }
