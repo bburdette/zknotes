@@ -356,6 +356,22 @@ type JobState
     | Failed
 
 
+jobComplete : JobState -> Bool
+jobComplete js =
+    case js of
+        Started ->
+            False
+
+        Running ->
+            False
+
+        Completed ->
+            True
+
+        Failed ->
+            True
+
+
 type alias JobStatus =
     { jobno : Int
     , state : JobState

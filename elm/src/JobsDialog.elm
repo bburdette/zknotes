@@ -74,12 +74,6 @@ view buttonStyle mbsize trqs =
                 |> List.reverse
                 |> List.map
                     (\( jobno, js ) ->
-                        let
-                            complete =
-                                False
-
-                            -- TODO: somthing
-                        in
                         E.column
                             [ E.width E.fill
                             , EBk.color (Common.navbarColor 2)
@@ -109,7 +103,7 @@ view buttonStyle mbsize trqs =
                                     ]
                                     [ E.paragraph [] [ E.text js.message ] ]
                                 ]
-                            , if complete then
+                            , if Data.jobComplete js.state then
                                 E.row [ E.width E.fill ]
                                     [ EI.button (E.alignRight :: buttonStyle)
                                         { onPress = Just (ClearClick jobno), label = E.text "clear" }
