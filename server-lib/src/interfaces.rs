@@ -1,7 +1,10 @@
 use crate::config::Config;
+use crate::jobs::JobId;
 use crate::search;
 use crate::sqldata;
 use crate::sqldata::zknotes_callbacks;
+use crate::state::new_jobid;
+use crate::state::State;
 use crate::sync;
 use actix_session::Session;
 use actix_web::HttpResponse;
@@ -13,9 +16,13 @@ use std::error::Error;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::runtime::Runtime;
+use tokio::task::LocalSet;
 use zkprotocol::constants::PrivateReplies;
 use zkprotocol::constants::PublicReplies;
 use zkprotocol::constants::{PrivateRequests, PrivateStreamingRequests, PublicRequests};
+use zkprotocol::content::JobState;
+use zkprotocol::content::JobStatus;
 use zkprotocol::content::{
   GetArchiveZkLinks, GetArchiveZkNote, GetZkLinksSince, GetZkNoteAndLinks, GetZkNoteArchives,
   GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkNote, SaveZkNoteAndLinks, SyncSince,
@@ -117,7 +124,7 @@ pub async fn zk_interface_loggedin_streaming(
       let bstream = sqldata::read_zklinks_since_stream(conn, uid, rq.createddate_after, None)
         .map(sync::bytesify);
       Ok(HttpResponse::Ok().streaming(bstream))
-    } // wat => Err(format!("invalid 'what' code:'{}'", wat).into()),
+    }
     PrivateStreamingRequests::Sync => {
       let conn = Arc::new(sqldata::connection_open(
         config.orgauth_config.db.as_path(),
@@ -139,7 +146,7 @@ pub async fn zk_interface_loggedin_streaming(
 }
 
 pub async fn zk_interface_loggedin(
-  config: &Config,
+  state: &State,
   uid: i64,
   msg: &PrivateMessage,
 ) -> Result<PrivateReplyMessage, Box<dyn Error>> {
@@ -147,8 +154,8 @@ pub async fn zk_interface_loggedin(
     PrivateRequests::GetZkNote => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let id: ZkNoteId = serde_json::from_value(msgdata.clone())?;
-      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-      let (_nid, note) = sqldata::read_zknote(&conn, &config.file_path, Some(uid), &id)?;
+      let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
+      let (_nid, note) = sqldata::read_zknote(&conn, &state.config.file_path, Some(uid), &id)?;
       info!("user#getzknote: {:?} - {}", id, note.title);
       Ok(PrivateReplyMessage {
         what: PrivateReplies::ZkNote,
@@ -158,8 +165,9 @@ pub async fn zk_interface_loggedin(
     PrivateRequests::GetZkNoteAndLinks => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let gzne: GetZkNoteAndLinks = serde_json::from_value(msgdata.clone())?;
-      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-      let note = sqldata::read_zknoteandlinks(&conn, &config.file_path, Some(uid), &gzne.zknote)?;
+      let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
+      let note =
+        sqldata::read_zknoteandlinks(&conn, &state.config.file_path, Some(uid), &gzne.zknote)?;
       info!(
         "user#getzknoteedit: {:?} - {}",
         gzne.zknote, note.zknote.title
@@ -182,8 +190,8 @@ pub async fn zk_interface_loggedin(
         "user#getzneifchanged: {:?} - {}",
         gzic.zknote, gzic.changeddate
       );
-      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-      let ozkne = sqldata::read_zneifchanged(&conn, &config.file_path, Some(uid), &gzic)?;
+      let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
+      let ozkne = sqldata::read_zneifchanged(&conn, &state.config.file_path, Some(uid), &gzic)?;
 
       match ozkne {
         Some(zkne) => Ok(PrivateReplyMessage {
@@ -202,8 +210,8 @@ pub async fn zk_interface_loggedin(
     PrivateRequests::GetZkNoteComments => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let gzne: GetZkNoteComments = serde_json::from_value(msgdata.clone())?;
-      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-      let notes = sqldata::read_zknotecomments(&conn, &config.file_path, uid, &gzne)?;
+      let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
+      let notes = sqldata::read_zknotecomments(&conn, &state.config.file_path, uid, &gzne)?;
       Ok(PrivateReplyMessage {
         what: PrivateReplies::ZkNoteComments,
         content: serde_json::to_value(notes)?,
@@ -212,8 +220,8 @@ pub async fn zk_interface_loggedin(
     PrivateRequests::GetZkNoteArchives => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let gzne: GetZkNoteArchives = serde_json::from_value(msgdata.clone())?;
-      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-      let notes = sqldata::read_zknotearchives(&conn, &config.file_path, uid, &gzne)?;
+      let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
+      let notes = sqldata::read_zknotearchives(&conn, &state.config.file_path, uid, &gzne)?;
       let zlnsr = ZkListNoteSearchResult {
         notes,
         offset: gzne.offset,
@@ -231,8 +239,8 @@ pub async fn zk_interface_loggedin(
     PrivateRequests::GetArchiveZkNote => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let rq: GetArchiveZkNote = serde_json::from_value(msgdata.clone())?;
-      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-      let (_nid, note) = sqldata::read_archivezknote(&conn, &config.file_path, uid, &rq)?;
+      let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
+      let (_nid, note) = sqldata::read_archivezknote(&conn, &state.config.file_path, uid, &rq)?;
       info!("user#getarchivezknote: {} - {}", note.id, note.title);
       Ok(PrivateReplyMessage {
         what: PrivateReplies::ZkNote,
@@ -242,7 +250,7 @@ pub async fn zk_interface_loggedin(
     PrivateRequests::GetArchiveZklinks => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let rq: GetArchiveZkLinks = serde_json::from_value(msgdata.clone())?;
-      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+      let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
       let links = sqldata::read_archivezklinks(&conn, uid, rq.createddate_after)?;
       Ok(PrivateReplyMessage {
         what: PrivateReplies::ArchiveZkLinks,
@@ -252,7 +260,7 @@ pub async fn zk_interface_loggedin(
     PrivateRequests::GetZkLinksSince => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let rq: GetZkLinksSince = serde_json::from_value(msgdata.clone())?;
-      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+      let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
       let links = sqldata::read_zklinks_since(&conn, uid, rq.createddate_after)?;
       Ok(PrivateReplyMessage {
         what: PrivateReplies::ZkLinks,
@@ -262,9 +270,8 @@ pub async fn zk_interface_loggedin(
     PrivateRequests::SearchZkNotes => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let search: ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
-      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-      // let res = search::search_zknotes_simple(&conn, uid, &search)?;
-      let res = search::search_zknotes(&conn, &config.file_path, uid, &search)?;
+      let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
+      let res = search::search_zknotes(&conn, &state.config.file_path, uid, &search)?;
       match res {
         search::SearchResult::SrId(res) => Ok(PrivateReplyMessage {
           what: PrivateReplies::ZkNoteIdSearchResult,
@@ -287,8 +294,8 @@ pub async fn zk_interface_loggedin(
     PrivateRequests::PowerDelete => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let search: TagSearch = serde_json::from_value(msgdata.clone())?;
-      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-      let res = search::power_delete_zknotes(&conn, config.file_path.clone(), uid, &search)?;
+      let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
+      let res = search::power_delete_zknotes(&conn, state.config.file_path.clone(), uid, &search)?;
       Ok(PrivateReplyMessage {
         what: PrivateReplies::PowerDeleteComplete,
         content: serde_json::to_value(res)?,
@@ -297,8 +304,8 @@ pub async fn zk_interface_loggedin(
     PrivateRequests::DeleteZkNote => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let id: ZkNoteId = serde_json::from_value(msgdata.clone())?;
-      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-      sqldata::delete_zknote(&conn, config.file_path.clone(), uid, &id)?;
+      let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
+      sqldata::delete_zknote(&conn, state.config.file_path.clone(), uid, &id)?;
       Ok(PrivateReplyMessage {
         what: PrivateReplies::DeletedZkNote,
         content: serde_json::to_value(id)?,
@@ -307,7 +314,7 @@ pub async fn zk_interface_loggedin(
     PrivateRequests::SaveZkNote => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let sbe: SaveZkNote = serde_json::from_value(msgdata.clone())?;
-      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+      let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
       let s = sqldata::save_zknote(&conn, uid, &sbe)?;
       Ok(PrivateReplyMessage {
         what: PrivateReplies::SavedZkNote,
@@ -317,7 +324,7 @@ pub async fn zk_interface_loggedin(
     PrivateRequests::SaveZkLinks => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let msg: ZkLinks = serde_json::from_value(msgdata.clone())?;
-      let s = sqldata::save_zklinks(&config.orgauth_config.db.as_path(), uid, msg.links)?;
+      let s = sqldata::save_zklinks(&state.config.orgauth_config.db.as_path(), uid, msg.links)?;
       Ok(PrivateReplyMessage {
         what: PrivateReplies::SavedZkLinks,
         content: serde_json::to_value(s)?,
@@ -326,7 +333,7 @@ pub async fn zk_interface_loggedin(
     PrivateRequests::SaveZkNoteAndLinks => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let sznpl: SaveZkNoteAndLinks = serde_json::from_value(msgdata.clone())?;
-      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+      let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
       let (_, szkn) = sqldata::save_zknote(&conn, uid, &sznpl.note)?;
       let _s = sqldata::save_savezklinks(&conn, uid, szkn.id, sznpl.links)?;
       Ok(PrivateReplyMessage {
@@ -337,7 +344,7 @@ pub async fn zk_interface_loggedin(
     PrivateRequests::SaveImportZkNotes => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let gzl: Vec<ImportZkNote> = serde_json::from_value(msgdata.clone())?;
-      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+      let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
       sqldata::save_importzknotes(&conn, uid, gzl)?;
       Ok(PrivateReplyMessage {
         what: PrivateReplies::SavedImportZkNotes,
@@ -347,39 +354,97 @@ pub async fn zk_interface_loggedin(
     PrivateRequests::SetHomeNote => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let hn: ZkNoteId = serde_json::from_value(msgdata.clone())?;
-      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+      let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
       sqldata::set_homenote(&conn, uid, hn)?;
       Ok(PrivateReplyMessage {
         what: PrivateReplies::HomeNoteSet,
         content: serde_json::to_value(hn)?,
       })
     }
-    PrivateRequests::SyncRemote => Ok(
-      sync::sync(
-        &config.orgauth_config.db.as_path(),
-        &config.file_path.as_path(),
-        uid,
-        &mut zknotes_callbacks(),
-      )
-      .await?,
-    ),
+    PrivateRequests::SyncRemote => {
+      let dbpath: PathBuf = state.config.orgauth_config.db.to_path_buf();
+      let file_path: PathBuf = state.config.file_path.to_path_buf();
+      let uid: i64 = uid;
+
+      let jid = new_jobid(state, uid);
+
+      let _job = state
+        .girlboss
+        .start(jid, move |mon| async move {
+          // spawn thread, local runtime.  success.
+          std::thread::spawn(move || {
+            let rt = Runtime::new().unwrap();
+            let local = LocalSet::new();
+            let mut callbacks = &mut zknotes_callbacks();
+            let _r = local.block_on(&rt, sync::sync(&dbpath, &file_path, uid, &mut callbacks));
+          });
+        })
+        .await?;
+
+      Ok(PrivateReplyMessage {
+        what: PrivateReplies::JobStatus,
+        content: serde_json::to_value(JobStatus {
+          jobno: jid.jobno,
+          state: JobState::Started,
+          message: "".to_string(),
+        })?,
+      })
+    }
     PrivateRequests::SyncFiles => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let zns: ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
-      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+      let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
       let dv = sync::sync_files_down(
         &conn,
-        &config.file_tmp_path.as_path(),
-        &config.file_path.as_path(),
+        &state.config.file_tmp_path.as_path(),
+        &state.config.file_path.as_path(),
         uid,
         &zns,
       )
       .await?;
-      let uv = sync::sync_files_up(&conn, &config.file_path.as_path(), uid, &zns).await?;
+      let uv = sync::sync_files_up(&conn, &state.config.file_path.as_path(), uid, &zns).await?;
       Ok(PrivateReplyMessage {
         what: PrivateReplies::FileSyncComplete,
         content: serde_json::to_value((dv, uv))?,
       })
+    }
+    PrivateRequests::GetJobStatus => {
+      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      let jobno: i64 = serde_json::from_value(msgdata.clone())?;
+
+      let jid = JobId { uid, jobno };
+
+      match state.girlboss.get(&jid).await {
+        Some(job) => {
+          let state = if job.is_finished() {
+            if job.succeeded() {
+              JobState::Completed
+            } else {
+              JobState::Failed
+            }
+          } else {
+            JobState::Running
+          };
+
+          let js = JobStatus {
+            jobno,
+            state,
+            message: job.status().message().to_string(),
+          };
+
+          Ok(PrivateReplyMessage {
+            what: PrivateReplies::JobStatus,
+            content: serde_json::to_value(js)?,
+          })
+        }
+        None => {
+          let js = jobno;
+          Ok(PrivateReplyMessage {
+            what: PrivateReplies::JobNotFound,
+            content: serde_json::to_value(js)?,
+          })
+        }
+      }
     }
   }
 }

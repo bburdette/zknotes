@@ -5,7 +5,7 @@ import Browser
 import Browser.Events
 import Browser.Navigation
 import Common
-import Data exposing (ZkNoteId, zniEq)
+import Data exposing (ZkNoteId, jobComplete, zniEq)
 import Dict exposing (Dict)
 import DisplayMessage
 import EditZkNote
@@ -20,6 +20,7 @@ import Http
 import HttpJsonTask as HE
 import Import
 import InviteUser
+import JobsDialog exposing (TJobs)
 import Json.Decode as JD
 import Json.Encode as JE
 import LocalStorage as LS
@@ -37,6 +38,7 @@ import Orgauth.ShowUrl as ShowUrl
 import Orgauth.UserEdit as UserEdit
 import Orgauth.UserInterface as UI
 import Orgauth.UserListing as UserListing
+import Platform.Cmd as Cmd
 import PublicInterface as PI
 import Random exposing (Seed, initialSeed)
 import RequestsDialog exposing (TRequest(..), TRequests)
@@ -44,7 +46,6 @@ import Route exposing (Route(..), parseUrl, routeTitle, routeUrl)
 import Search as S
 import SearchStackPanel as SP
 import SelectString as SS
-import Set
 import ShowMessage
 import TSet
 import TagAThing
@@ -105,8 +106,10 @@ type Msg
     | FileUploaded String (Result Http.Error ( Time.Posix, ZI.ServerResponse ))
     | RequestProgress String Http.Progress
     | RequestsDialogMsg (GD.Msg RequestsDialog.Msg)
+    | JobsDialogMsg (GD.Msg JobsDialog.Msg)
     | TagFilesMsg (TagAThing.Msg TagFiles.Msg)
     | InviteUserMsg (TagAThing.Msg InviteUser.Msg)
+    | JobsPollTick Time.Posix
     | Noop
 
 
@@ -133,6 +136,7 @@ type State
     | DisplayMessage DisplayMessage.GDModel State
     | MessageNLink MessageNLink.GDModel State
     | RequestsDialog RequestsDialog.GDModel State
+    | JobsDialog JobsDialog.GDModel State
     | TagFiles (TagAThing.Model TagFiles.Model TagFiles.Msg TagFiles.Command) Data.LoginData State
     | InviteUser (TagAThing.Model InviteUser.Model InviteUser.Msg InviteUser.Command) Data.LoginData State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
@@ -197,6 +201,7 @@ type alias Model =
     , stylePalette : StylePalette
     , adminSettings : OD.AdminSettings
     , trackedRequests : TRequests
+    , jobs : TJobs
     , noteCache : NoteCache
     , tauri : Bool
     }
@@ -733,6 +738,9 @@ showMessage msg =
         FileUploaded _ _ ->
             "FileUploaded"
 
+        JobsDialogMsg _ ->
+            "JobsDialogMsg"
+
         RequestsDialogMsg _ ->
             "RequestsDialogMsg"
 
@@ -744,6 +752,9 @@ showMessage msg =
 
         InviteUserMsg _ ->
             "InviteUserMsg"
+
+        JobsPollTick _ ->
+            "JobsPollTick"
 
 
 showState : State -> String
@@ -815,6 +826,9 @@ showState state =
         ShowUrl _ _ ->
             "ShowUrl"
 
+        JobsDialog _ _ ->
+            "JobsDialog"
+
         RequestsDialog _ _ ->
             "RequestsDialog"
 
@@ -846,7 +860,7 @@ viewState size state model =
             E.map InvitedMsg <| Invited.view model.stylePalette size em
 
         EditZkNote em _ ->
-            E.map EditZkNoteMsg <| EditZkNote.view model.timezone size model.recentNotes model.trackedRequests model.noteCache em
+            E.map EditZkNoteMsg <| EditZkNote.view model.timezone size model.recentNotes model.trackedRequests model.jobs model.noteCache em
 
         EditZkNoteListing em ld ->
             E.map EditZkNoteListingMsg <| EditZkNoteListing.view model.filelocation ld size em
@@ -912,6 +926,10 @@ viewState size state model =
             E.map
                 ShowUrlMsg
                 (ShowUrl.view Common.buttonStyle st)
+
+        JobsDialog _ _ ->
+            -- render is at the layout level, not here.
+            E.none
 
         RequestsDialog _ _ ->
             -- render is at the layout level, not here.
@@ -999,6 +1017,9 @@ stateSearch state =
         ShowUrl _ _ ->
             Nothing
 
+        JobsDialog _ st ->
+            stateSearch st
+
         RequestsDialog _ st ->
             stateSearch st
 
@@ -1077,6 +1098,9 @@ stateLogin state =
 
         ShowUrl _ login ->
             Just login
+
+        JobsDialog _ instate ->
+            stateLogin instate
 
         RequestsDialog _ instate ->
             stateLogin instate
@@ -1279,6 +1303,13 @@ view model =
                     GD.layout
                         (Just { width = min 600 model.size.width, height = min 200 model.size.height })
                         cdm
+
+            JobsDialog dm _ ->
+                Html.map JobsDialogMsg <|
+                    GD.layout
+                        (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                        -- use the live-updated model
+                        { dm | model = model.jobs }
 
             RequestsDialog dm _ ->
                 Html.map RequestsDialogMsg <|
@@ -1957,7 +1988,7 @@ actualupdate msg model =
                             let
                                 prevstate =
                                     case stateLogin state of
-                                        Just login ->
+                                        Just _ ->
                                             state
 
                                         Nothing ->
@@ -2112,7 +2143,7 @@ actualupdate msg model =
                                             }
                                     in
                                     case state of
-                                        Login _ route ->
+                                        Login _ _ ->
                                             -- we're logged in!
                                             initToRoute lgmod lgmod.initialRoute
 
@@ -2406,7 +2437,7 @@ actualupdate msg model =
                             else
                                 ( model, Cmd.none )
 
-                        ZI.ZkIdSearchResult sr ->
+                        ZI.ZkIdSearchResult _ ->
                             ( model, Cmd.none )
 
                         ZI.ZkListNoteSearchResult sr ->
@@ -2577,13 +2608,46 @@ actualupdate msg model =
                                 _ ->
                                     ( model, Cmd.none )
 
-                        ZI.FilesUploaded files ->
+                        ZI.FilesUploaded _ ->
                             ( unexpectedMessage model (ZI.showServerResponse ziresponse)
                             , Cmd.none
                             )
 
-                        ZI.SyncComplete ->
-                            ( displayMessageDialog model <| "remote sync complete", Cmd.none )
+                        ZI.JobStatus jobstatus ->
+                            let
+                                nm =
+                                    { model | jobs = { jobs = Dict.insert jobstatus.jobno jobstatus model.jobs.jobs } }
+                            in
+                            ( if jobstatus.state == Data.Started then
+                                { nm
+                                    | state =
+                                        JobsDialog
+                                            (JobsDialog.init
+                                                nm.jobs
+                                                Common.buttonStyle
+                                                (E.map (\_ -> ()) (viewState model.size model.state model))
+                                            )
+                                            nm.state
+                                }
+
+                              else
+                                nm
+                            , Cmd.none
+                            )
+
+                        ZI.JobNotFound jobno ->
+                            let
+                                nm =
+                                    { model
+                                        | jobs =
+                                            { jobs =
+                                                Dict.insert jobno
+                                                    { jobno = jobno, state = Data.Failed, message = "job not found" }
+                                                    model.jobs.jobs
+                                            }
+                                    }
+                            in
+                            ( nm, Cmd.none )
 
                         ZI.FileSyncComplete ->
                             ( displayMessageDialog model <| "file sync complete", Cmd.none )
@@ -2724,7 +2788,7 @@ actualupdate msg model =
                 GD.Dialog nmod ->
                     ( { model | state = DisplayMessage nmod prevstate }, Cmd.none )
 
-                GD.Ok return ->
+                GD.Ok _ ->
                     case prevstate of
                         ShowMessage _ _ (Just ps) ->
                             ( { model | state = ps }, Cmd.none )
@@ -2743,7 +2807,7 @@ actualupdate msg model =
                 GD.Dialog nmod ->
                     ( { model | state = MessageNLink nmod prevstate }, Cmd.none )
 
-                GD.Ok return ->
+                GD.Ok _ ->
                     case prevstate of
                         ShowMessage _ _ (Just ps) ->
                             ( { model | state = ps }, Cmd.none )
@@ -2835,7 +2899,7 @@ actualupdate msg model =
                 |> Task.perform (\pt -> FileUploaded what (Result.map (\zi -> ( pt, zi )) zrd))
             )
 
-        ( FileUploaded what zrd, state ) ->
+        ( FileUploaded what zrd, _ ) ->
             case zrd of
                 Err e ->
                     ( displayMessageDialog model <| Util.httpErrorString e, Cmd.none )
@@ -2894,6 +2958,64 @@ actualupdate msg model =
 
                 Nothing ->
                     ( model, Cmd.none )
+
+        ( JobsDialogMsg bm, JobsDialog bs prevstate ) ->
+            -- TODO address this hack!
+            case GD.update bm { bs | model = model.jobs } of
+                GD.Dialog nmod ->
+                    ( { model
+                        | state = JobsDialog nmod prevstate
+                        , jobs = nmod.model
+                      }
+                    , Cmd.none
+                    )
+
+                GD.Ok return ->
+                    case return of
+                        JobsDialog.Close ->
+                            ( { model | state = prevstate }, Cmd.none )
+
+                        JobsDialog.Tag s ->
+                            case ( stateLogin prevstate, stateSearch prevstate ) of
+                                ( Just login, Just ( spm, sr ) ) ->
+                                    ( { model
+                                        | state =
+                                            TagFiles
+                                                (TagAThing.init
+                                                    (TagFiles.initThing s)
+                                                    spm
+                                                    sr
+                                                    model.recentNotes
+                                                    []
+                                                    login
+                                                )
+                                                login
+                                                prevstate
+                                      }
+                                    , Cmd.none
+                                    )
+
+                                _ ->
+                                    ( { model | state = prevstate }, Cmd.none )
+
+                GD.Cancel ->
+                    ( { model | state = prevstate }, Cmd.none )
+
+        ( JobsDialogMsg _, _ ) ->
+            ( model, Cmd.none )
+
+        ( JobsPollTick _, _ ) ->
+            ( model
+            , model.jobs.jobs
+                |> Dict.keys
+                |> List.map
+                    (\jobno ->
+                        sendZIMsg model.tauri
+                            model.location
+                            (ZI.GetJobStatus jobno)
+                    )
+                |> Cmd.batch
+            )
 
         ( RequestsDialogMsg bm, RequestsDialog bs prevstate ) ->
             -- TODO address this hack!
@@ -3026,7 +3148,7 @@ makeNewNoteCacheGets md model =
         |> List.filterMap
             (\id ->
                 case NC.getNote model.noteCache id of
-                    Just zkn ->
+                    Just _ ->
                         Nothing
 
                     Nothing ->
@@ -3270,6 +3392,20 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                             RequestsDialog
                                 (RequestsDialog.init
                                     model.trackedRequests
+                                    Common.buttonStyle
+                                    (E.map (\_ -> ()) (viewState model.size model.state model))
+                                )
+                                model.state
+                      }
+                    , Cmd.none
+                    )
+
+                EditZkNote.Jobs ->
+                    ( { model
+                        | state =
+                            JobsDialog
+                                (JobsDialog.init
+                                    model.jobs
                                     Common.buttonStyle
                                     (E.map (\_ -> ()) (viewState model.size model.state model))
                                 )
@@ -3620,6 +3756,7 @@ init flags url key zone fontsize =
             , stylePalette = { defaultSpacing = 10 }
             , adminSettings = flags.adminsettings
             , trackedRequests = { requestCount = 0, requests = Dict.empty }
+            , jobs = { jobs = Dict.empty }
             , noteCache = NC.empty maxCacheNotes
             , tauri = flags.tauri
             }
@@ -3678,6 +3815,31 @@ main =
 
                             InitError _ ->
                                 []
+
+                    jobtick : List (Sub Msg)
+                    jobtick =
+                        case model of
+                            Ready rmd ->
+                                if
+                                    Dict.values rmd.jobs.jobs
+                                        |> List.filter
+                                            (\j ->
+                                                not <| jobComplete j.state
+                                            )
+                                        |> List.isEmpty
+                                        |> not
+                                then
+                                    [ Time.every 1000 JobsPollTick
+                                    ]
+
+                                else
+                                    []
+
+                            PreInit _ ->
+                                []
+
+                            InitError _ ->
+                                []
                 in
                 Sub.batch <|
                     [ receiveTASelection TASelection
@@ -3690,6 +3852,7 @@ main =
                     , receiveUITauriResponse TauriUserReplyData
                     , receivePITauriResponse TauriPublicReplyData
                     ]
+                        ++ jobtick
                         ++ tracks
         , onUrlRequest = urlRequest
         , onUrlChange = UrlChanged

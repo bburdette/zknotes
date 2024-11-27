@@ -1,10 +1,16 @@
-module ZkInterface exposing (SendMsg(..), ServerResponse(..), encodeEmail, encodeSendMsg, serverResponseDecoder, showServerResponse)
+module ZkInterface exposing
+    ( SendMsg(..)
+    , ServerResponse(..)
+    , encodeEmail
+    , encodeSendMsg
+    , serverResponseDecoder
+    , showServerResponse
+    )
 
 import Data exposing (ZkNoteId)
 import Json.Decode as JD
 import Json.Encode as JE
 import Search as S
-import Util
 
 
 type SendMsg
@@ -23,6 +29,8 @@ type SendMsg
     | PowerDelete S.TagSearch
     | SetHomeNote ZkNoteId
     | SyncRemote
+    | GetJobStatus Int
+      -- | GetJobs
     | SyncFiles S.ZkNoteSearch
 
 
@@ -44,7 +52,8 @@ type ServerResponse
     | PowerDeleteComplete Int
     | HomeNoteSet ZkNoteId
     | FilesUploaded (List Data.ZkListNote)
-    | SyncComplete
+    | JobStatus Data.JobStatus
+    | JobNotFound Int
     | FileSyncComplete
     | Noop
     | NotLoggedIn
@@ -105,8 +114,11 @@ showServerResponse sr =
         FilesUploaded _ ->
             "FilesUploaded"
 
-        SyncComplete ->
-            "SyncComplete"
+        JobStatus _ ->
+            "JobStatus"
+
+        JobNotFound _ ->
+            "JobNotFound"
 
         FileSyncComplete ->
             "FileSyncComplete"
@@ -220,6 +232,12 @@ encodeSendMsg sm =
                 , ( "data", S.encodeZkNoteSearch s )
                 ]
 
+        GetJobStatus jobno ->
+            JE.object
+                [ ( "what", JE.string "GetJobStatus" )
+                , ( "data", JE.int jobno )
+                ]
+
 
 encodeEmail : String -> JE.Value
 encodeEmail email =
@@ -286,8 +304,11 @@ serverResponseDecoder =
                     "FilesUploaded" ->
                         JD.map FilesUploaded (JD.field "content" <| JD.list Data.decodeZkListNote)
 
-                    "SyncComplete" ->
-                        JD.succeed SyncComplete
+                    "JobStatus" ->
+                        JD.map JobStatus (JD.field "content" <| Data.decodeJobStatus)
+
+                    "JobNotFound" ->
+                        JD.map JobNotFound (JD.field "content" <| JD.int)
 
                     "FileSyncComplete" ->
                         JD.succeed FileSyncComplete

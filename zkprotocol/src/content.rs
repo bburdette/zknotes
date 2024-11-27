@@ -284,3 +284,18 @@ impl From<UuidZkLink> for SyncMessage {
     SyncMessage::UuidZkLink(a)
   }
 }
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub enum JobState {
+  Started,
+  Running,
+  Completed,
+  Failed,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct JobStatus {
+  pub jobno: i64,
+  pub state: JobState,
+  pub message: String,
+}

@@ -13,7 +13,7 @@ use futures::future;
 use futures::Stream;
 use futures_util::TryStreamExt;
 use futures_util::{StreamExt, TryFutureExt};
-use log::error;
+use log::{debug, error};
 use orgauth;
 use orgauth::data::User;
 use orgauth::dbfun::user_id;
@@ -200,6 +200,7 @@ pub async fn sync(
   let conn = Arc::new(sqldata::connection_open(dbpath)?);
   let user = orgauth::dbfun::read_user_by_id(&conn, uid)?; // TODO pass this in from calling ftn?
   let extra_login_data = sqldata::read_extra_login_data(&conn, user.id)?;
+  // let mut callbacks = &mut zknotes_callbacks();
 
   // get previous sync.
   let after = prev_sync(&conn, &file_path, &extra_login_data.zknote)
@@ -224,6 +225,7 @@ pub async fn sync(
     callbacks,
   )
   .await?;
+
   if res.what != PrivateReplies::SyncComplete {
     Ok(res)
   } else {
@@ -598,6 +600,7 @@ where
     );
   }
   let sm = serde_json::from_str(line.trim())?;
+  debug!("syncmessage : {:?}", sm);
   Ok(sm)
 }
 
@@ -931,6 +934,7 @@ where
       Err(rusqlite::Error::SqliteFailure(e, s)) => {
         if e.code == rusqlite::ErrorCode::ConstraintViolation {
           // if duplicate record, just ignore and go on.
+          debug!("duplicate archivelink: {:?}", l);
           None
         } else {
           return Err(rusqlite::Error::SqliteFailure(e, s).into());

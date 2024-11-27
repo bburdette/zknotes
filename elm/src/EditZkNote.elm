@@ -48,8 +48,8 @@ module EditZkNote exposing
     )
 
 import Browser.Dom as BD
-import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
-import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
+import Cellme.Cellme exposing (CellContainer(..), RunState(..), evalCellsFully)
+import Cellme.DictCellme exposing (CellDict(..), getCd, mkCc)
 import Common
 import Data exposing (Direction(..), EditLink, ZkNoteId, zkNoteIdToString, zklKey, zniCompare, zniEq)
 import Dialog as D
@@ -60,27 +60,21 @@ import Element.Border as EBd
 import Element.Events as EE
 import Element.Font as EF
 import Element.Input as EI
-import Element.Region as ER
-import Html exposing (Attribute, Html)
 import Html.Attributes
+import JobsDialog exposing (TJobs)
 import Json.Decode as JD
-import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..), inlineFoldl)
-import Markdown.Html
-import Markdown.Parser
-import Markdown.Renderer
+import Markdown.Block exposing (ListItem(..), Task(..))
 import Maybe.Extra as ME
 import MdCommon as MC
 import NoteCache as NC exposing (NoteCache)
 import Orgauth.Data exposing (UserId)
 import RequestsDialog exposing (TRequests)
-import Schelme.Show exposing (showTerm)
 import Search as S
 import SearchStackPanel as SP
 import TangoColors as TC
 import Task
 import Time
 import Toop
-import UUID exposing (UUID)
 import Url as U
 import Url.Builder as UB
 import Url.Parser as UP exposing ((</>))
@@ -133,6 +127,7 @@ type Msg
     | SettingsPress
     | AdminPress
     | RequestsPress
+    | JobsPress
     | FlipLink EditLink
     | ShowArchivesPress
     | Noop
@@ -226,6 +221,7 @@ type Command
     | Settings
     | Admin
     | Requests
+    | Jobs
     | SetHomeNote ZkNoteId
     | AddToRecent Data.ZkListNote
     | ShowMessage String
@@ -462,7 +458,7 @@ revert model =
 
 
 showZkl : E.Color -> Bool -> Bool -> Maybe EditLink -> Data.LoginData -> Maybe ZkNoteId -> Maybe E.Color -> Bool -> EditLink -> Element Msg
-showZkl bkcolor isDirty editable focusLink ld id sysColor showflip zkl =
+showZkl bkcolor isDirty editable focusLink ld _ sysColor showflip zkl =
     let
         ( dir, otherid ) =
             case zkl.direction of
@@ -602,14 +598,14 @@ pageLink model =
             )
 
 
-view : Time.Zone -> Util.Size -> List Data.ZkListNote -> TRequests -> NoteCache -> Model -> Element Msg
-view zone size recentZkns trqs noteCache model =
+view : Time.Zone -> Util.Size -> List Data.ZkListNote -> TRequests -> TJobs -> NoteCache -> Model -> Element Msg
+view zone size recentZkns trqs tjobs noteCache model =
     case model.dialog of
         Just dialog ->
             D.view size dialog |> E.map DialogMsg
 
         Nothing ->
-            zknview zone size recentZkns trqs noteCache model
+            zknview zone size recentZkns trqs tjobs noteCache model
 
 
 commonButtonStyle : Bool -> List (E.Attribute msg)
@@ -885,8 +881,8 @@ renderMd fileprefix cd noteCache md mdw =
             E.text errors
 
 
-zknview : Time.Zone -> Util.Size -> List Data.ZkListNote -> TRequests -> NoteCache -> Model -> Element Msg
-zknview zone size recentZkns trqs noteCache model =
+zknview : Time.Zone -> Util.Size -> List Data.ZkListNote -> TRequests -> TJobs -> NoteCache -> Model -> Element Msg
+zknview zone size recentZkns trqs tjobs noteCache model =
     let
         wclass =
             if size.width < 800 then
@@ -1490,6 +1486,13 @@ zknview zone size recentZkns trqs noteCache model =
                 EI.button
                     (E.alignRight :: Common.buttonStyle ++ [ EBk.color TC.darkGreen ])
                     { onPress = Just RequestsPress, label = E.text "uploads" }
+
+              else
+                E.none
+            , if tjobs.jobs /= Dict.empty then
+                EI.button
+                    (E.alignRight :: Common.buttonStyle ++ [ EBk.color TC.darkGreen ])
+                    { onPress = Just JobsPress, label = E.text "jobs" }
 
               else
                 E.none
@@ -2412,6 +2415,7 @@ update msg model =
                                         size
                                         []
                                         (TRequests 0 Dict.empty)
+                                        (TJobs Dict.empty)
                                         (NC.empty 0)
                                         model
                                     )
@@ -2712,6 +2716,9 @@ update msg model =
 
         AdminPress ->
             ( model, Admin )
+
+        JobsPress ->
+            ( model, Jobs )
 
         RequestsPress ->
             ( model, Requests )
