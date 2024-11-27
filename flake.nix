@@ -43,15 +43,16 @@
     flake-utils.lib.eachDefaultSystem (
       system: let
         toolchain = fenix.packages.${system}.stable;
-
         rs_compiler = (with toolchain; [ rustc cargo ]);
 
         pname = "zknotes";
         pkgs = nixpkgs.legacyPackages."${system}";
-        naersk-lib = naersk.lib."${system}";
         elm-stuff = makeElmPkg { inherit pkgs; };
+        naersk-lib = naersk.lib."${system}";
         rust-stuff = naersk-lib.buildPackage {
             pname = pname;
+            rustc = toolchain.rustc;
+            cargo = toolchain.cargo;
             root = ./.;
             buildInputs = with pkgs; [
               rs_compiler
