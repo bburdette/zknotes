@@ -5,7 +5,7 @@ import Browser
 import Browser.Events
 import Browser.Navigation
 import Common
-import Data exposing (ZkNoteId, zniEq)
+import Data exposing (ZkNoteId, jobComplete, zniEq)
 import Dict exposing (Dict)
 import DisplayMessage
 import EditZkNote
@@ -3824,18 +3824,7 @@ main =
                                     Dict.values rmd.jobs.jobs
                                         |> List.filter
                                             (\j ->
-                                                case j.state of
-                                                    Data.Started ->
-                                                        True
-
-                                                    Data.Running ->
-                                                        True
-
-                                                    Data.Completed ->
-                                                        False
-
-                                                    Data.Failed ->
-                                                        False
+                                                not <| jobComplete j.state
                                             )
                                         |> List.isEmpty
                                         |> not

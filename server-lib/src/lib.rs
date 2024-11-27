@@ -254,8 +254,6 @@ async fn file(session: Session, state: web::Data<State>, req: HttpRequest) -> Ht
     Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
   };
 
-  println!("session: {:?}", session.entries());
-
   let suser = match session_user(&conn, session, &state) {
     Ok(Either::Left(user)) => Some(user),
     Ok(Either::Right(_sr)) => None,
@@ -784,8 +782,6 @@ pub async fn err_main(
       remote_url: "".to_string(),
     };
 
-    println!("rd: {:?}", rd);
-
     orgauth::dbfun::new_user(
       &conn,
       &rd,
@@ -859,10 +855,7 @@ pub fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
   let state = web::Data::new(State {
     config: config.clone(),
     girlboss: Girlboss::new(),
-    jobcounter: {
-      println!("new jobcounter");
-      RwLock::new(0 as i64)
-    },
+    jobcounter: { RwLock::new(0 as i64) },
   });
 
   let c = config.clone();

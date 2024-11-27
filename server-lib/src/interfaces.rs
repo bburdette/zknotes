@@ -371,18 +371,12 @@ pub async fn zk_interface_loggedin(
       let _job = state
         .girlboss
         .start(jid, move |mon| async move {
-          writeln!(mon, "starting!");
           // spawn thread, local runtime.  success.
           std::thread::spawn(move || {
             let rt = Runtime::new().unwrap();
             let local = LocalSet::new();
             let mut callbacks = &mut zknotes_callbacks();
-            writeln!(mon, "starting!");
-            println!("starting sync!");
-            let r = local.block_on(&rt, sync::sync(&dbpath, &file_path, uid, &mut callbacks));
-            println!("sycn result: {:?}", r);
-            writeln!(mon, "done!");
-            println!("sync done!");
+            let _r = local.block_on(&rt, sync::sync(&dbpath, &file_path, uid, &mut callbacks));
           });
         })
         .await?;
