@@ -1,7 +1,7 @@
 pub mod config;
 pub mod error;
 pub mod interfaces;
-mod jobs;
+pub mod jobs;
 mod migrations;
 mod search;
 pub mod sqldata;
