@@ -1,9 +1,7 @@
 use crate::error as zkerr;
 use crate::search::build_sql;
 use crate::search::{search_zknotes, search_zknotes_stream, sync_users, system_user, SearchResult};
-use crate::sqldata::{
-  self, note_id_for_uuid, save_zklink, save_zknote, user_note_id, zknotes_callbacks,
-};
+use crate::sqldata::{self, note_id_for_uuid, save_zklink, save_zknote, user_note_id};
 use crate::util::now;
 use actix_multipart_rfc7578 as multipart;
 use actix_web::error::PayloadError;
@@ -11,11 +9,10 @@ use async_stream::try_stream;
 use awc;
 use bytes::Bytes;
 use futures::executor::block_on;
+use futures::future;
 use futures::Stream;
-use futures::{future, Future};
 use futures_util::TryStreamExt;
 use futures_util::{StreamExt, TryFutureExt};
-use girlboss::JobReturnStatus;
 use log::{debug, error};
 use orgauth;
 use orgauth::data::User;

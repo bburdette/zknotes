@@ -8,10 +8,8 @@ use crate::state::State;
 use crate::sync;
 use actix_session::Session;
 use actix_web::HttpResponse;
-use futures::executor::block_on;
 use futures_util::StreamExt;
-use girlboss::Girlboss;
-use girlboss::Job;
+use log::debug;
 use log::info;
 use orgauth;
 use orgauth::endpoints::Tokener;
@@ -398,11 +396,9 @@ pub async fn zk_interface_loggedin(
       // create a runtime and localset for each run of the task.  it does work.
       // let job = Job::start(move |mon| async move {
 
-      // let jno =
-
       let jid = new_jobid(state, uid);
 
-      let job = state
+      let _job = state
         .girlboss
         .start(jid, move |mon| async move {
           writeln!(mon, "starting!");

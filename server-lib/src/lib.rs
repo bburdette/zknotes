@@ -27,7 +27,6 @@ use config::Config;
 use either::Either;
 use futures_util::TryStreamExt as _;
 use girlboss::Girlboss;
-use jobs::JobId;
 use log::{error, info};
 pub use orgauth;
 use orgauth::util;
@@ -221,7 +220,7 @@ async fn admin(
 fn session_user(
   conn: &Connection,
   session: Session,
-  config: &web::Data<Config>,
+  state: &web::Data<State>,
 ) -> Result<Either<orgauth::data::User, PrivateReplyMessage>, Box<dyn Error>> {
   match session.get::<Uuid>("token")? {
     None => Ok(Either::Right(PrivateReplyMessage {
@@ -232,8 +231,8 @@ fn session_user(
       match orgauth::dbfun::read_user_by_token_api(
         &conn,
         token,
-        config.orgauth_config.login_token_expiration_ms,
-        config.orgauth_config.regen_login_tokens,
+        state.config.orgauth_config.login_token_expiration_ms,
+        state.config.orgauth_config.regen_login_tokens,
       ) {
         Err(e) => {
           info!("read_user_by_token_api error: {:?}", e);
@@ -249,15 +248,15 @@ fn session_user(
   }
 }
 
-async fn file(session: Session, config: web::Data<Config>, req: HttpRequest) -> HttpResponse {
-  let conn = match sqldata::connection_open(config.orgauth_config.db.as_path()) {
+async fn file(session: Session, state: web::Data<State>, req: HttpRequest) -> HttpResponse {
+  let conn = match sqldata::connection_open(state.config.orgauth_config.db.as_path()) {
     Ok(c) => c,
     Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
   };
 
   println!("session: {:?}", session.entries());
 
-  let suser = match session_user(&conn, session, &config) {
+  let suser = match session_user(&conn, session, &state) {
     Ok(Either::Left(user)) => Some(user),
     Ok(Either::Right(_sr)) => None,
     Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
@@ -284,12 +283,12 @@ async fn file(session: Session, config: web::Data<Config>, req: HttpRequest) -> 
         Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
       };
 
-      let zkln = match sqldata::read_zklistnote(&conn, &config.file_path, uid, nid) {
+      let zkln = match sqldata::read_zklistnote(&conn, &state.config.file_path, uid, nid) {
         Ok(zkln) => zkln,
         Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
       };
 
-      let stpath = config.file_path.join(hash);
+      let stpath = state.config.file_path.join(hash);
 
       match File::open(stpath.clone())
         .and_then(|f| NamedFile::from_file(f, Path::new(zkln.title.as_str())))
@@ -304,7 +303,7 @@ async fn file(session: Session, config: web::Data<Config>, req: HttpRequest) -> 
 
 async fn receive_files(
   session: Session,
-  config: web::Data<Config>,
+  config: web::Data<State>,
   mut payload: Multipart,
 ) -> HttpResponse {
   match make_file_notes(session, config, &mut payload).await {
@@ -315,17 +314,17 @@ async fn receive_files(
 
 async fn make_file_notes(
   session: Session,
-  config: web::Data<Config>,
+  state: web::Data<State>,
   payload: &mut Multipart,
 ) -> Result<PrivateReplyMessage, Box<dyn Error>> {
-  let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-  let userdata = match session_user(&conn, session, &config)? {
+  let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
+  let userdata = match session_user(&conn, session, &state)? {
     Either::Left(ud) => ud,
     Either::Right(sr) => return Ok(sr),
   };
 
   // Save the files to our temp path.
-  let tp = config.file_tmp_path.clone();
+  let tp = state.config.file_tmp_path.clone();
   let saved_files_res = save_files(&tp, payload).await;
   let saved_files = saved_files_res?;
   // let saved_files = save_files(&tp, payload).await?;
@@ -337,10 +336,11 @@ async fn make_file_notes(
     let fpath = Path::new(&fp);
 
     let (nid64, _noteid, _fid) =
-      sqldata::make_file_note(&conn, &config.file_path, userdata.id, &name, fpath)?;
+      sqldata::make_file_note(&conn, &state.config.file_path, userdata.id, &name, fpath)?;
 
     // return zknoteedit.
-    let listnote = sqldata::read_zklistnote(&conn, &config.file_path, Some(userdata.id), nid64)?;
+    let listnote =
+      sqldata::read_zklistnote(&conn, &state.config.file_path, Some(userdata.id), nid64)?;
 
     zklns.push(listnote);
   }
@@ -854,6 +854,17 @@ pub fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
       },
     );
 
+  // create here, not in the HttpServer::new() call,
+  // to prevent multiple copies of jobcounter etc.
+  let state = web::Data::new(State {
+    config: config.clone(),
+    girlboss: Girlboss::new(),
+    jobcounter: {
+      println!("new jobcounter");
+      RwLock::new(0 as i64)
+    },
+  });
+
   let c = config.clone();
   let server = HttpServer::new(move || {
     let staticpath = c.static_path.clone().unwrap_or(PathBuf::from("static/"));
@@ -880,11 +891,7 @@ pub fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
       .max_age(3600);
 
     App::new()
-      .app_data(web::Data::new(State {
-        config: c.clone(),
-        girlboss: Girlboss::new(),
-        jobcounter: RwLock::new(0),
-      })) // <- create app with shared state
+      .app_data(state.clone()) // <- create app with shared state
       .wrap(cors)
       .wrap(TracingLogger::default())
       .wrap(

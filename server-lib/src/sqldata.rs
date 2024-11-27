@@ -4,7 +4,6 @@ use crate::migrations as zkm;
 use async_stream::try_stream;
 use barrel::backend::Sqlite;
 use log::info;
-use log::{debug, error};
 use orgauth::data::RegistrationData;
 use orgauth::dbfun::user_id;
 use orgauth::endpoints::Callbacks;
