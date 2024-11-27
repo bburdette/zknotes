@@ -9,7 +9,6 @@ use crate::sync;
 use actix_session::Session;
 use actix_web::HttpResponse;
 use futures_util::StreamExt;
-use log::debug;
 use log::info;
 use orgauth;
 use orgauth::endpoints::Tokener;
@@ -125,7 +124,7 @@ pub async fn zk_interface_loggedin_streaming(
       let bstream = sqldata::read_zklinks_since_stream(conn, uid, rq.createddate_after, None)
         .map(sync::bytesify);
       Ok(HttpResponse::Ok().streaming(bstream))
-    } // wat => Err(format!("invalid 'what' code:'{}'", wat).into()),
+    }
     PrivateStreamingRequests::Sync => {
       let conn = Arc::new(sqldata::connection_open(
         config.orgauth_config.db.as_path(),
@@ -272,7 +271,6 @@ pub async fn zk_interface_loggedin(
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let search: ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
-      // let res = search::search_zknotes_simple(&conn, uid, &search)?;
       let res = search::search_zknotes(&conn, &state.config.file_path, uid, &search)?;
       match res {
         search::SearchResult::SrId(res) => Ok(PrivateReplyMessage {
@@ -368,34 +366,6 @@ pub async fn zk_interface_loggedin(
       let file_path: PathBuf = state.config.file_path.to_path_buf();
       let uid: i64 = uid;
 
-      // no can do, future is not send.
-      // tokio::spawn(async move {
-      //   let mut callbacks = &mut zknotes_callbacks();
-      //   let r = sync::sync(&dbpath, &file_path, uid, &mut callbacks).await;
-      //   r.map_err(|e| e.to_string())
-      // })
-      // .await;
-
-      // just a block_on without a runtime will fail.
-      // let job = Job::start(move |mon| async move {
-      //   writeln!(mon, "starting!");
-      //   // spawn thread.  panics with:
-      //   // there is no reactor running, must be called from the context of a Tokio 1.x runtime
-      //   std::thread::spawn(move || {
-      //     let mut callbacks = &mut zknotes_callbacks();
-      //     writeln!(mon, "starting!");
-      //     println!("starting sync!");
-      //     let r = block_on(sync::sync(&dbpath, &file_path, uid, &mut callbacks));
-      //     println!("sycn result: {:?}", r);
-      //     writeln!(mon, "done!");
-      //     println!("sync done!");
-      //   });
-      // });
-
-      // -----------------------------
-      // create a runtime and localset for each run of the task.  it does work.
-      // let job = Job::start(move |mon| async move {
-
       let jid = new_jobid(state, uid);
 
       let _job = state
@@ -416,34 +386,6 @@ pub async fn zk_interface_loggedin(
           });
         })
         .await?;
-
-      // -----------------------------
-      // spawn_blocking doesn't execute async tasks.  Might as well use a regular thread!
-      // let job = Job::start(move |mon| async move {
-      //   writeln!(mon, "starting!");
-      //   tokio::task::spawn_blocking(move || {
-      //     let dbpath = dbpath;
-      //     let file_path = file_path;
-      //     let uid = uid;
-      //     let mut callbacks = &mut zknotes_callbacks();
-      //     writeln!(mon, "starting!");
-      //     println!("starting sync!");
-      //     // let localset = make localset ?
-      //     // let rt = make runtime ?
-
-      //     let r = sync::sync(&dbpath, &file_path, uid, &mut callbacks);
-      //     println!("sycn result: {:?}", r);
-      //     writeln!(mon, "done!");
-      //     println!("sync done!");
-      //   }).await;
-      //   // writeln!(mon, "done!");
-      // });
-
-      // let job = Job::start(move |mon| async move {
-      //   writeln!(mon, "starting!");
-      //   sync::sync(&dbpath, &file_path, uid).await.unwrap();
-      //   writeln!(mon, "done!");
-      // });
 
       Ok(PrivateReplyMessage {
         what: PrivateReplies::JobStatus,
@@ -476,10 +418,7 @@ pub async fn zk_interface_loggedin(
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let jobno: i64 = serde_json::from_value(msgdata.clone())?;
 
-      let jid = JobId {
-        uid: uid,
-        jobno: jobno,
-      };
+      let jid = JobId { uid, jobno };
 
       match state.girlboss.get(&jid).await {
         Some(job) => {
@@ -494,8 +433,8 @@ pub async fn zk_interface_loggedin(
           };
 
           let js = JobStatus {
-            jobno: jobno,
-            state: state,
+            jobno,
+            state,
             message: job.status().message().to_string(),
           };
 
