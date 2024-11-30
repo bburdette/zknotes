@@ -155,6 +155,7 @@ pub async fn zk_interface_loggedin(
   uid: i64,
   msg: &PrivateMessage,
 ) -> Result<PrivateReplyMessage, Box<dyn Error>> {
+  info!("zk_interface_loggedin msg: {:?}", msg);
   match msg.what {
     PrivateRequests::GetZkNote => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
@@ -367,18 +368,22 @@ pub async fn zk_interface_loggedin(
       })
     }
     PrivateRequests::SyncRemote => {
+      info!("PrivateRequests::SyncRemote");
       let dbpath: PathBuf = state.config.orgauth_config.db.to_path_buf();
       let file_path: PathBuf = state.config.file_path.to_path_buf();
       let uid: i64 = uid;
 
       let jid = new_jobid(state, uid);
+      info!("SyncRemote jobid: {:?}", jid);
 
-      let _job = state
+      let job = state
         .girlboss
         .start(jid, move |mon| async move {
+          println!("gb thread");
           let gbm = GirlbossMonitor { monitor: mon };
           // spawn thread, local runtime.  success.
           std::thread::spawn(move || {
+            println!("sync thread");
             let rt = Runtime::new().unwrap();
             let local = LocalSet::new();
             let mut callbacks = &mut zknotes_callbacks();
@@ -394,6 +399,8 @@ pub async fn zk_interface_loggedin(
           });
         })
         .await?;
+
+      info!("job: {:?}", job);
 
       Ok(PrivateReplyMessage {
         what: PrivateReplies::JobStatus,
