@@ -376,6 +376,12 @@ pub async fn zk_interface_loggedin(
       let jid = new_jobid(state, uid);
       info!("SyncRemote jobid: {:?}", jid);
 
+      // println!("right here");
+      // let jh = tokio::spawn(async {
+      //   println!("I'm in the spawn");
+      // });
+      // println!("await: {:?} ", jh.await);
+
       let job = state
         .girlboss
         .start(jid, move |mon| async move {
@@ -400,7 +406,9 @@ pub async fn zk_interface_loggedin(
         })
         .await?;
 
-      info!("job: {:?}", job);
+      tokio::time::sleep(Duration::from_millis(100)).await;
+
+      // info!("job: {:?}", job);
 
       Ok(PrivateReplyMessage {
         what: PrivateReplies::JobStatus,
