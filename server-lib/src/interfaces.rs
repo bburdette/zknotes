@@ -376,20 +376,12 @@ pub async fn zk_interface_loggedin(
       let jid = new_jobid(state, uid);
       info!("SyncRemote jobid: {:?}", jid);
 
-      // println!("right here");
-      // let jh = tokio::spawn(async {
-      //   println!("I'm in the spawn");
-      // });
-      // println!("await: {:?} ", jh.await);
-
       let job = state
         .girlboss
         .start(jid, move |mon| async move {
-          println!("gb thread");
           let gbm = GirlbossMonitor { monitor: mon };
           // spawn thread, local runtime.  success.
           std::thread::spawn(move || {
-            println!("sync thread");
             let rt = Runtime::new().unwrap();
             let local = LocalSet::new();
             let mut callbacks = &mut zknotes_callbacks();
@@ -406,9 +398,7 @@ pub async fn zk_interface_loggedin(
         })
         .await?;
 
-      tokio::time::sleep(Duration::from_millis(100)).await;
-
-      // info!("job: {:?}", job);
+      // tokio::time::sleep(Duration::from_millis(100)).await;
 
       Ok(PrivateReplyMessage {
         what: PrivateReplies::JobStatus,
