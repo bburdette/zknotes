@@ -1,4 +1,5 @@
 use crate::config::Config;
+use crate::error as zkerr;
 use crate::jobs::GirlbossMonitor;
 use crate::jobs::JobId;
 use crate::jobs::JobMonitor;
@@ -154,7 +155,7 @@ pub async fn zk_interface_loggedin(
   state: &State,
   uid: i64,
   msg: &PrivateMessage,
-) -> Result<PrivateReplyMessage, Box<dyn Error>> {
+) -> Result<PrivateReplyMessage, zkerr::Error> {
   info!("zk_interface_loggedin msg: {:?}", msg);
   match msg.what {
     PrivateRequests::GetZkNote => {

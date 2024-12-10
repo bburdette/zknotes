@@ -478,7 +478,7 @@ pub async fn sync_files_down(
   file_path: &Path,
   uid: i64,
   search: &ZkNoteSearch,
-) -> Result<Vec<DownloadResult>, Box<dyn std::error::Error>> {
+) -> Result<Vec<DownloadResult>, zkerr::Error> {
   // TODO pass this in from calling ftn?
   let user = orgauth::dbfun::read_user_by_id(&conn, uid)?;
 
@@ -512,7 +512,7 @@ pub async fn sync_files_up(
   file_path: &Path,
   uid: i64,
   search: &ZkNoteSearch,
-) -> Result<Vec<UploadResult>, Box<dyn std::error::Error>> {
+) -> Result<Vec<UploadResult>, zkerr::Error> {
   // TODO pass this in from calling ftn?
   let user = orgauth::dbfun::read_user_by_id(&conn, uid)?;
 

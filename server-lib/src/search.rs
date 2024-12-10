@@ -6,7 +6,6 @@ use futures::Stream;
 use orgauth::dbfun::user_id;
 use rusqlite::Connection;
 use std::convert::TryInto;
-use std::error::Error;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -25,7 +24,7 @@ pub fn power_delete_zknotes(
   file_path: PathBuf,
   user: i64,
   search: &TagSearch,
-) -> Result<i64, Box<dyn Error>> {
+) -> Result<i64, zkerr::Error> {
   // get all, and delete all.  Maybe not a good idea for a big database, but ours is small
   // and soon to be replaced with indradb, perhaps.
 
@@ -42,7 +41,11 @@ pub fn power_delete_zknotes(
   let znsr = search_zknotes(conn, &file_path, user, &nolimsearch)?;
   match znsr {
     SearchResult::SrId(znsr) => {
-      let c = znsr.notes.len().try_into()?;
+      let c = znsr
+        .notes
+        .len()
+        .try_into()
+        .map_err(|_| zkerr::Error::String("int conversion error".to_string()))?;
 
       for n in znsr.notes {
         delete_zknote(&conn, file_path.clone(), user, &n)?;
@@ -50,7 +53,11 @@ pub fn power_delete_zknotes(
       Ok(c)
     }
     SearchResult::SrListNote(znsr) => {
-      let c = znsr.notes.len().try_into()?;
+      let c = znsr
+        .notes
+        .len()
+        .try_into()
+        .map_err(|_| zkerr::Error::String("int conversion error".to_string()))?;
 
       for n in znsr.notes {
         delete_zknote(&conn, file_path.clone(), user, &n.id)?;
@@ -58,7 +65,11 @@ pub fn power_delete_zknotes(
       Ok(c)
     }
     SearchResult::SrNote(znsr) => {
-      let c = znsr.notes.len().try_into()?;
+      let c = znsr
+        .notes
+        .len()
+        .try_into()
+        .map_err(|_| zkerr::Error::String("int conversion error".to_string()))?;
 
       for n in znsr.notes {
         delete_zknote(&conn, file_path.clone(), user, &n.id)?;
@@ -66,7 +77,11 @@ pub fn power_delete_zknotes(
       Ok(c)
     }
     SearchResult::SrNoteAndLink(znsr) => {
-      let c = znsr.notes.len().try_into()?;
+      let c = znsr
+        .notes
+        .len()
+        .try_into()
+        .map_err(|_| zkerr::Error::String("int conversion error".to_string()))?;
 
       for n in znsr.notes {
         delete_zknote(&conn, file_path.clone(), user, &n.zknote.id)?;
