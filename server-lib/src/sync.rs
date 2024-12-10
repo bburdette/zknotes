@@ -233,7 +233,7 @@ pub async fn sync(
   if res.what != PrivateReplies::SyncComplete {
     Ok(res)
   } else {
-    write!(monitor, "starting sync to:remote");
+    write!(monitor, "starting sync to remote");
     let remres = sync_to_remote(
       conn.clone(),
       file_path,
@@ -251,6 +251,8 @@ pub async fn sync(
     save_sync(&conn, user.id, unote, CompletedSync { after, now }).await?;
 
     tr.commit()?;
+
+    write!(monitor, "sync completed");
 
     Ok(remres)
   }

@@ -377,7 +377,7 @@ pub async fn zk_interface_loggedin(
       let jid = new_jobid(state, uid);
       info!("SyncRemote jobid: {:?}", jid);
 
-      let job = state
+      let _job = state
         .girlboss
         .start(jid, move |mon| async move {
           let gbm = GirlbossMonitor { monitor: mon };

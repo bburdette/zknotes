@@ -352,7 +352,7 @@ type alias GetArchiveZkNote =
 type JobState
     = Started
     | Running
-    | Completed
+    | Completed Int
     | Failed
 
 
@@ -365,8 +365,8 @@ jobComplete js =
         Running ->
             False
 
-        Completed ->
-            True
+        Completed n ->
+            n > 3
 
         Failed ->
             True
@@ -670,7 +670,7 @@ decodeJobState =
                         JD.succeed Running
 
                     "Completed" ->
-                        JD.succeed Completed
+                        JD.succeed <| Completed 0
 
                     "Failed" ->
                         JD.succeed Failed

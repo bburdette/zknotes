@@ -30,7 +30,6 @@ type SendMsg
     | SetHomeNote ZkNoteId
     | SyncRemote
     | GetJobStatus Int
-      -- | GetJobs
     | SyncFiles S.ZkNoteSearch
 
 
