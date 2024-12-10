@@ -202,6 +202,7 @@ pub async fn sync(
   let conn = Arc::new(sqldata::connection_open(dbpath)?);
   let user = orgauth::dbfun::read_user_by_id(&conn, uid)?; // TODO pass this in from calling ftn?
   let extra_login_data = sqldata::read_extra_login_data(&conn, user.id)?;
+  // let mut callbacks = &mut zknotes_callbacks();
 
   info!("sync for user: {:?}", user);
   // get previous sync.

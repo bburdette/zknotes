@@ -9,7 +9,6 @@ pub struct JobId {
   pub jobno: i64,
 }
 
-// #[derive(Clone, Debug)]
 pub trait JobMonitor {
   // pub fn report(&self, status: impl Into<JobStatus>) {
   //     self.0.set_status(status.into());
