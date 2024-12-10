@@ -1,4 +1,5 @@
 use crate::error as zkerr;
+use crate::jobs::JobMonitor;
 use crate::search::build_sql;
 use crate::search::{search_zknotes, search_zknotes_stream, sync_users, system_user, SearchResult};
 use crate::sqldata::{self, note_id_for_uuid, save_zklink, save_zknote, user_note_id};
@@ -13,7 +14,7 @@ use futures::future;
 use futures::Stream;
 use futures_util::TryStreamExt;
 use futures_util::{StreamExt, TryFutureExt};
-use log::{debug, error};
+use log::{debug, error, info};
 use orgauth;
 use orgauth::data::User;
 use orgauth::dbfun::user_id;
@@ -196,12 +197,14 @@ pub async fn sync(
   file_path: &Path,
   uid: i64,
   callbacks: &mut Callbacks,
+  monitor: &dyn JobMonitor,
 ) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>> {
   let conn = Arc::new(sqldata::connection_open(dbpath)?);
   let user = orgauth::dbfun::read_user_by_id(&conn, uid)?; // TODO pass this in from calling ftn?
   let extra_login_data = sqldata::read_extra_login_data(&conn, user.id)?;
   // let mut callbacks = &mut zknotes_callbacks();
 
+  info!("sync for user: {:?}", user);
   // get previous sync.
   let after = prev_sync(&conn, &file_path, &extra_login_data.zknote)
     .await?
@@ -213,6 +216,7 @@ pub async fn sync(
 
   let ttn = temp_tables(&conn)?;
 
+  write!(monitor, "starting sync from remote");
   // TODO: pass in 'now'?
   let res = sync_from_remote(
     &conn,
@@ -223,12 +227,14 @@ pub async fn sync(
     &ttn.linktemp,
     &ttn.archivelinktemp,
     callbacks,
+    monitor,
   )
   .await?;
 
   if res.what != PrivateReplies::SyncComplete {
     Ok(res)
   } else {
+    write!(monitor, "starting sync to remote");
     let remres = sync_to_remote(
       conn.clone(),
       file_path,
@@ -238,6 +244,7 @@ pub async fn sync(
       Some(ttn.archivelinktemp.clone()),
       after,
       callbacks,
+      monitor,
     )
     .await?;
 
@@ -245,6 +252,8 @@ pub async fn sync(
     save_sync(&conn, user.id, unote, CompletedSync { after, now }).await?;
 
     tr.commit()?;
+
+    write!(monitor, "sync completed");
 
     Ok(remres)
   }
@@ -472,7 +481,7 @@ pub async fn sync_files_down(
   file_path: &Path,
   uid: i64,
   search: &ZkNoteSearch,
-) -> Result<Vec<DownloadResult>, Box<dyn std::error::Error>> {
+) -> Result<Vec<DownloadResult>, zkerr::Error> {
   // TODO pass this in from calling ftn?
   let user = orgauth::dbfun::read_user_by_id(&conn, uid)?;
 
@@ -506,7 +515,7 @@ pub async fn sync_files_up(
   file_path: &Path,
   uid: i64,
   search: &ZkNoteSearch,
-) -> Result<Vec<UploadResult>, Box<dyn std::error::Error>> {
+) -> Result<Vec<UploadResult>, zkerr::Error> {
   // TODO pass this in from calling ftn?
   let user = orgauth::dbfun::read_user_by_id(&conn, uid)?;
 
@@ -547,6 +556,7 @@ pub async fn sync_from_remote(
   linktemp: &String,
   archivelinktemp: &String,
   callbacks: &mut Callbacks,
+  monitor: &dyn JobMonitor,
 ) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>> {
   let (c, url) = match (user.cookie.clone(), user.remote_url.clone()) {
     (Some(c), Some(url)) => (c, url),
@@ -559,6 +569,8 @@ pub async fn sync_from_remote(
   parts.authority = user_url.authority().cloned();
   parts.path_and_query = Some(awc::http::uri::PathAndQuery::from_static("/stream"));
   let uri = awc::http::Uri::from_parts(parts).map_err(|x| zkerr::Error::String(x.to_string()))?;
+
+  info!("syncing to uri: {}", uri);
 
   let cookie = cookie::Cookie::parse_encoded(c)?;
   let res = awc::Client::new()
@@ -1065,6 +1077,7 @@ pub async fn sync_to_remote(
   exclude_archivelinks: Option<String>,
   after: Option<i64>,
   callbacks: &mut Callbacks,
+  monitor: &dyn JobMonitor,
 ) -> Result<PrivateReplyMessage, zkerr::Error> {
   // TODO: get time on remote system, bail if too far out.
 
@@ -1091,6 +1104,7 @@ pub async fn sync_to_remote(
     exclude_archivelinks,
     after,
     callbacks,
+    monitor,
   );
 
   // -----------------------------------
@@ -1199,6 +1213,7 @@ pub fn sync_stream(
   exclude_archivelinks: Option<String>,
   after: Option<i64>,
   _callbacks: &mut Callbacks,
+  monitor: &dyn JobMonitor,
 ) -> impl Stream<Item = Result<Bytes, Box<dyn std::error::Error + 'static>>> {
   let start = try_stream! { yield SyncMessage::SyncStart(after, now()?); }.map(bytesify);
 

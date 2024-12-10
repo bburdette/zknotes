@@ -88,11 +88,11 @@ view buttonStyle mbsize trqs =
                                 Data.Running ->
                                     E.el [ E.centerX, EF.bold ] <| E.text "running..."
 
-                                Data.Completed ->
-                                    E.el [ E.centerX, EF.bold ] <| E.text "completed..."
+                                Data.Completed n ->
+                                    E.el [ E.centerX, EF.bold ] <| E.text <| "completed"
 
                                 Data.Failed ->
-                                    E.el [ E.centerX, EF.bold ] <| E.text "failed..."
+                                    E.el [ E.centerX, EF.bold ] <| E.text "failed"
                             , E.row [ E.width E.fill ]
                                 [ E.column
                                     [ EBd.width 3

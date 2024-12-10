@@ -34,6 +34,7 @@ pub use orgauth::{
   data::{AdminResponse, UserResponse, UserResponseMessage},
   endpoints::ActixTokener,
 };
+pub use rusqlite;
 use rusqlite::Connection;
 use serde_json;
 use simple_error::simple_error;
@@ -439,7 +440,7 @@ async fn zk_interface_check(
   // config: &Config,
   // girlboss: &Girlboss<JobId>,
   msg: PrivateMessage,
-) -> Result<PrivateReplyMessage, Box<dyn Error>> {
+) -> Result<PrivateReplyMessage, zkerr::Error> {
   match session.get::<Uuid>("token")? {
     None => Ok(PrivateReplyMessage {
       what: PrivateReplies::NotLoggedIn,

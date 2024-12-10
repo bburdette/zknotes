@@ -2615,8 +2615,21 @@ actualupdate msg model =
 
                         ZI.JobStatus jobstatus ->
                             let
+                                js =
+                                    case Dict.get jobstatus.jobno model.jobs.jobs of
+                                        Just j ->
+                                            case j.state of
+                                                Data.Completed n ->
+                                                    { jobstatus | state = Data.Completed (n + 1) }
+
+                                                _ ->
+                                                    jobstatus
+
+                                        _ ->
+                                            jobstatus
+
                                 nm =
-                                    { model | jobs = { jobs = Dict.insert jobstatus.jobno jobstatus model.jobs.jobs } }
+                                    { model | jobs = { jobs = Dict.insert jobstatus.jobno js model.jobs.jobs } }
                             in
                             ( if jobstatus.state == Data.Started then
                                 { nm

@@ -1,6 +1,7 @@
 use actix_session;
 use actix_web::error as awe;
 use cookie;
+use girlboss;
 use regex;
 use reqwest;
 use rusqlite;
@@ -20,6 +21,7 @@ pub enum Error {
   Regex(regex::Error),
   Cookie(cookie::ParseError),
   Annotated(AnnotatedE),
+  Girlboss(girlboss::Error),
 }
 
 pub struct AnnotatedE {
@@ -58,6 +60,7 @@ pub fn to_orgauth_error(e: Error) -> orgauth::error::Error {
     Error::Regex(ze) => orgauth::error::Error::String(ze.to_string()),
     Error::Cookie(ze) => orgauth::error::Error::String(ze.to_string()),
     Error::Annotated(e) => orgauth::error::Error::String(e.to_string()),
+    Error::Girlboss(e) => orgauth::error::Error::String(e.to_string()),
   }
 }
 
@@ -82,6 +85,7 @@ impl fmt::Display for Error {
       Error::Regex(e) => write!(f, "{}", e),
       Error::Cookie(e) => write!(f, "{}", e),
       Error::Annotated(e) => write!(f, "{}", e),
+      Error::Girlboss(e) => write!(f, "{}", e),
     }
   }
 }
@@ -101,6 +105,7 @@ impl fmt::Debug for Error {
       Error::Regex(e) => write!(f, "{}", e),
       Error::Cookie(e) => write!(f, "{}", e),
       Error::Annotated(e) => write!(f, "{}", e),
+      Error::Girlboss(e) => write!(f, "{}", e),
     }
   }
 }
@@ -186,5 +191,10 @@ impl From<regex::Error> for Error {
 impl From<cookie::ParseError> for Error {
   fn from(e: cookie::ParseError) -> Self {
     Error::String(e.to_string())
+  }
+}
+impl From<girlboss::Error> for Error {
+  fn from(e: girlboss::Error) -> Self {
+    Error::Girlboss(e)
   }
 }
