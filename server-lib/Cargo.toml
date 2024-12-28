@@ -45,4 +45,4 @@ awc = { version = "3.3.0", features = ["cookies", "rustls"] }
 cookie = "0.16.2"
 actix-multipart-rfc7578 = "0.10.0"
 mime = "0.3.17"
-girlboss = "0.3.0"
+girlboss = {version = "1.0.0-alpha.3", features = ["actix-rt"]}

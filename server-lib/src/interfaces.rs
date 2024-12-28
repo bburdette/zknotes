@@ -379,25 +379,26 @@ pub async fn zk_interface_loggedin(
 
       let _job = state
         .girlboss
+        .write()
+        .unwrap()
         .start(jid, move |mon| async move {
           let gbm = GirlbossMonitor { monitor: mon };
           // spawn thread, local runtime.  success.
-          std::thread::spawn(move || {
-            let rt = Runtime::new().unwrap();
-            let local = LocalSet::new();
-            let mut callbacks = &mut zknotes_callbacks();
-            write!(gbm, "starting sync");
-            let r = local.block_on(
-              &rt,
-              sync::sync(&dbpath, &file_path, uid, &mut callbacks, &gbm),
-            );
-            match r {
-              Ok(_) => write!(gbm, "sync completed"),
-              Err(e) => write!(gbm, "sync err: {:?}", e),
-            }
-          });
-        })
-        .await?;
+          // std::thread::spawn(move || {
+          // let rt = Runtime::new().unwrap();
+          // let local = LocalSet::new();
+          let mut callbacks = &mut zknotes_callbacks();
+          write!(gbm, "starting sync");
+          // let r = local.block_on(
+          //   &rt,
+          let r = sync::sync(&dbpath, &file_path, uid, &mut callbacks, &gbm).await;
+          // );
+          match r {
+            Ok(_) => write!(gbm, "sync completed"),
+            Err(e) => write!(gbm, "sync err: {:?}", e),
+          }
+          // });
+        });
 
       // tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -434,7 +435,7 @@ pub async fn zk_interface_loggedin(
 
       let jid = JobId { uid, jobno };
 
-      match state.girlboss.get(&jid).await {
+      match state.girlboss.read().unwrap().get(&jid) {
         Some(job) => {
           let state = if job.is_finished() {
             if job.succeeded() {

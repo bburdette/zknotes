@@ -1,11 +1,11 @@
 use crate::config::Config;
 use crate::jobs::JobId;
-use girlboss::Girlboss;
+use girlboss::actix_rt::Girlboss;
 use std::sync::RwLock;
 
 pub struct State {
   pub config: Config,
-  pub girlboss: Girlboss<JobId>,
+  pub girlboss: RwLock<Girlboss<JobId>>,
   pub jobcounter: RwLock<i64>,
 }
 

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use girlboss::Monitor;
+use girlboss::actix_rt::Monitor;
 use log::{logger, Record};
 
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, Debug)]

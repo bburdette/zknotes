@@ -26,7 +26,7 @@ use clap::Arg;
 use config::Config;
 use either::Either;
 use futures_util::TryStreamExt as _;
-use girlboss::Girlboss;
+use girlboss::actix_rt::Girlboss;
 use log::{error, info};
 pub use orgauth;
 use orgauth::util;
@@ -402,7 +402,8 @@ async fn private(
   item: web::Json<PrivateMessage>,
   _req: HttpRequest,
 ) -> HttpResponse {
-  match zk_interface_check(&session, &data, item.into_inner()).await {
+  let mut state = data.clone();
+  match zk_interface_check(&session, &mut state, item.into_inner()).await {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'private' err: {:?}", e);
@@ -464,7 +465,7 @@ async fn zk_interface_check(
         }
         Ok(userdata) => {
           // finally!  processing messages as logged in user.
-          interfaces::zk_interface_loggedin(&state, userdata.id, &msg).await
+          interfaces::zk_interface_loggedin(state, userdata.id, &msg).await
         }
       }
     }
@@ -855,7 +856,7 @@ pub fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
   // to prevent multiple copies of jobcounter etc.
   let state = web::Data::new(State {
     config: config.clone(),
-    girlboss: Girlboss::new(),
+    girlboss: { RwLock::new(Girlboss::new()) },
     jobcounter: { RwLock::new(0 as i64) },
   });
 
