@@ -26,7 +26,7 @@ use clap::Arg;
 use config::Config;
 use either::Either;
 use futures_util::TryStreamExt as _;
-use girlboss::actix_rt::Girlboss;
+use girlboss::tokio::Girlboss;
 use log::{error, info};
 pub use orgauth;
 use orgauth::util;
@@ -38,13 +38,13 @@ pub use rusqlite;
 use rusqlite::Connection;
 use serde_json;
 use simple_error::simple_error;
-use std::error::Error;
 use std::fs::File;
 use std::io::{stdin, Write};
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::{env, sync::RwLock};
+use std::{error::Error, sync::Arc};
 use timer;
 use tokio_util::io::StreamReader;
 use tracing_actix_web::TracingLogger;
@@ -856,7 +856,7 @@ pub fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
   // to prevent multiple copies of jobcounter etc.
   let state = web::Data::new(State {
     config: config.clone(),
-    girlboss: { RwLock::new(Girlboss::new()) },
+    girlboss: { Arc::new(RwLock::new(Girlboss::new())) },
     jobcounter: { RwLock::new(0 as i64) },
   });
 
