@@ -13,6 +13,8 @@ use crate::sync;
 use actix_session::Session;
 use actix_web::HttpResponse;
 use futures_util::StreamExt;
+use girlboss::actix_rt::Girlboss;
+use girlboss::runtime::ActixRt;
 use log::info;
 use orgauth;
 use orgauth::endpoints::Tokener;
@@ -383,21 +385,13 @@ pub async fn zk_interface_loggedin(
         .unwrap()
         .start(jid, move |mon| async move {
           let gbm = GirlbossMonitor { monitor: mon };
-          // spawn thread, local runtime.  success.
-          // std::thread::spawn(move || {
-          // let rt = Runtime::new().unwrap();
-          // let local = LocalSet::new();
           let mut callbacks = &mut zknotes_callbacks();
           write!(gbm, "starting sync");
-          // let r = local.block_on(
-          //   &rt,
           let r = sync::sync(&dbpath, &file_path, uid, &mut callbacks, &gbm).await;
-          // );
           match r {
             Ok(_) => write!(gbm, "sync completed"),
             Err(e) => write!(gbm, "sync err: {:?}", e),
           }
-          // });
         });
 
       // tokio::time::sleep(Duration::from_millis(100)).await;
@@ -467,6 +461,10 @@ pub async fn zk_interface_loggedin(
           })
         }
       }
+      // Ok(PrivateReplyMessage {
+      //   what: PrivateReplies::JobNotFound,
+      //   content: serde_json::to_value(jobno)?,
+      // })
     }
   }
 }

@@ -26,7 +26,7 @@ use clap::Arg;
 use config::Config;
 use either::Either;
 use futures_util::TryStreamExt as _;
-use girlboss::actix_rt::Girlboss;
+use girlboss::Girlboss;
 use log::{error, info};
 pub use orgauth;
 use orgauth::util;
