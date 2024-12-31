@@ -53,11 +53,12 @@ init : List MB.Block -> Model
 init blocks =
     let
         ba =
-            blocks
-                |> List.map mbToMe
-                |> List.concat
-                |> List.indexedMap (\i b -> { editid = i, block = b })
-                |> Array.fromList
+            Debug.log "blocks" 
+                (blocks
+                    |> List.map mbToMe
+                    |> List.concat
+                    |> List.indexedMap (\i b -> { editid = i, block = b })
+                    |> Array.fromList)
     in
     { blocks = ba
     , focusMdElement = Nothing

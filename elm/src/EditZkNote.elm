@@ -73,6 +73,7 @@ import Markdown.Parser
 import Markdown.Renderer
 import Maybe.Extra as ME
 import MdCommon as MC
+import MdList as ML
 import MdText as MT
 import NoteCache as NC exposing (NoteCache)
 import Orgauth.Data exposing (UserId)
@@ -139,12 +140,14 @@ type Msg
     | FlipLink EditLink
     | ShowArchivesPress
     | VLMMsg VLM.Msg
+    | MLMsg ML.Msg
     | Noop
 
 
 type NavChoice
     = NcEdit
     | NcList
+    | NcMdList
     | NcView
     | NcSearch
     | NcRecent
@@ -158,6 +161,7 @@ type SearchOrRecent
 type EditOrView
     = EditView
     | ListView
+    | MdListView
     | ViewView
 
 
@@ -207,6 +211,7 @@ type alias Model =
     , panelNote : Maybe Data.ZkNote
     , mbReplaceString : Maybe String
     , mlModel : VLM.Model
+    , mdlModel : ML.Model
     }
 
 
@@ -1086,6 +1091,9 @@ zknview zone size recentZkns trqs noteCache model =
         listview =
             E.map VLMMsg <| VLM.view model.mlModel
 
+        mdlistview =
+            E.map MLMsg <| ML.view model.mdlModel
+
         editview linkbkc =
             let
                 titleed =
@@ -1537,9 +1545,10 @@ zknview zone size recentZkns trqs noteCache model =
                     ]
                     [ headingPanel "edit" [ E.width E.fill ] (editview TC.white)
                     , headingPanel "view" [ E.width E.fill ] (mdview TC.white)
+                    , headingPanel "list" [ E.width E.fill ] listview
+                    , headingPanel "mdlist" [ E.width E.fill ] mdlistview
 
-                    -- , headingPanel "list" [ E.width E.fill ] listview
-                    , headingPanel "list" [ E.width E.fill ] blocksToStringView
+                    -- , headingPanel "list" [ E.width E.fill ] blocksToStringView
                     , searchOrRecentPanel
                     ]
 
@@ -1567,6 +1576,9 @@ zknview zone size recentZkns trqs noteCache model =
                                 ListView ->
                                     NcList
 
+                                MdListView ->
+                                    NcMdList
+
                                 ViewView ->
                                     NcView
                             )
@@ -1587,6 +1599,9 @@ zknview zone size recentZkns trqs noteCache model =
 
                             ListView ->
                                 listview
+
+                            MdListView ->
+                                mdlistview
 
                             ViewView ->
                                 mdview TC.white
@@ -1617,6 +1632,9 @@ zknview zone size recentZkns trqs noteCache model =
 
                         NcList ->
                             listview
+
+                        NcMdList ->
+                            mdlistview
 
                         NcView ->
                             mdview TC.lightGray
@@ -1666,6 +1684,9 @@ tabsOnLoad model =
 
                 ListView ->
                     NcList
+
+                MdListView ->
+                    NcMdList
 
                 ViewView ->
                     NcView
@@ -1740,6 +1761,7 @@ initFull ld zkl zknote dtlinks spm =
       , panelNote = Nothing
       , mbReplaceString = Nothing
       , mlModel = VLM.init blocks
+      , mdlModel = ML.init blocks
       }
     , { zknote = zknote.id, offset = 0, limit = Nothing }
     )
@@ -1793,6 +1815,7 @@ initNew ld zkl spm links =
     , panelNote = Nothing
     , mbReplaceString = Nothing
     , mlModel = VLM.init []
+    , mdlModel = ML.init []
     }
         |> (\m1 ->
                 -- for new EMPTY notes, the 'revert' should be the same as the model, so that you aren't
@@ -2756,6 +2779,16 @@ update msg model =
             ( { model | mlModel = mlModel }
             , Cmd (Cmd.map VLMMsg cmd)
             )
+
+        MLMsg vmsg ->
+            -- let
+            --     ( mdlModel, cmd ) =
+            --         ML.update model.mdlModel vmsg
+            -- in
+            -- ( { model | mdlModel = mdlModel }
+            -- , Cmd (Cmd.map MLMsg cmd)
+            -- )
+            ( model, None )
 
         Noop ->
             ( model, None )
