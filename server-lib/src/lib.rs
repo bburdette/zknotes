@@ -465,7 +465,7 @@ async fn zk_interface_check(
         }
         Ok(userdata) => {
           // finally!  processing messages as logged in user.
-          interfaces::zk_interface_loggedin(state, userdata.id, &msg).await
+          interfaces::zk_interface_loggedin(state, &conn, userdata.id, &msg).await
         }
       }
     }
