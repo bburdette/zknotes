@@ -13,16 +13,19 @@ use crate::sync;
 use actix_session::Session;
 use actix_web::HttpResponse;
 use futures_util::StreamExt;
+// use girlboss::actix_rt;
 use girlboss::actix_rt::Girlboss;
 use girlboss::runtime::ActixRt;
 use log::info;
 use orgauth;
 use orgauth::endpoints::Tokener;
+use rusqlite::ffi::sqlite3_expanded_sql;
 use std::error::Error;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::runtime::Runtime;
+use tokio::task;
 use tokio::task::LocalSet;
 use zkprotocol::constants::PrivateReplies;
 use zkprotocol::constants::PublicReplies;
@@ -379,20 +382,44 @@ pub async fn zk_interface_loggedin(
       let jid = new_jobid(state, uid);
       info!("SyncRemote jobid: {:?}", jid);
 
-      let _job = state
-        .girlboss
-        .write()
-        .unwrap()
-        .start(jid, move |mon| async move {
-          let gbm = GirlbossMonitor { monitor: mon };
-          let mut callbacks = &mut zknotes_callbacks();
-          write!(gbm, "starting sync");
-          let r = sync::sync(&dbpath, &file_path, uid, &mut callbacks, &gbm).await;
-          match r {
-            Ok(_) => write!(gbm, "sync completed"),
-            Err(e) => write!(gbm, "sync err: {:?}", e),
-          }
-        });
+      let lgb = state.girlboss.clone();
+
+      let res = std::thread::spawn(move || {
+        println!("in the new thread");
+        // let rt = Arc::new(actix_rt::System::new());
+        let rt = actix_rt::System::new();
+
+        async fn startit(
+          lgb: Arc<std::sync::RwLock<girlboss::Girlboss<JobId, girlboss::Monitor>>>,
+          dbpath: PathBuf,
+          file_path: PathBuf,
+          uid: i64,
+          jid: JobId,
+        ) -> () {
+          lgb.write().unwrap().start(jid, move |mon| async move {
+            info!("starting!!");
+            let gbm = GirlbossMonitor { monitor: mon };
+            let mut callbacks = &mut zknotes_callbacks();
+            write!(gbm, "starting sync");
+            let r = sync::sync(&dbpath, &file_path, uid, &mut callbacks, &gbm).await;
+            match r {
+              Ok(_) => write!(gbm, "sync completed"),
+              Err(e) => write!(gbm, "sync err: {:?}", e),
+            };
+            // rt.stop();
+            // actix_rt::System::stop();
+            actix_rt::System::current().stop();
+          });
+          ()
+        }
+
+        rt.block_on(startit(lgb, dbpath, file_path, uid, jid));
+        rt.run();
+      });
+
+      // wait on the job to start??
+      // std::thread::sleep(Duration::from_millis(1000));
+      // };
 
       // tokio::time::sleep(Duration::from_millis(100)).await;
 

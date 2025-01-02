@@ -2,11 +2,12 @@ use crate::config::Config;
 use crate::jobs::JobId;
 use girlboss::Girlboss;
 use girlboss::Monitor;
+use std::sync::Arc;
 use std::sync::RwLock;
 
 pub struct State {
   pub config: Config,
-  pub girlboss: RwLock<Girlboss<JobId, Monitor>>,
+  pub girlboss: Arc<RwLock<Girlboss<JobId, Monitor>>>,
   pub jobcounter: RwLock<i64>,
 }
 

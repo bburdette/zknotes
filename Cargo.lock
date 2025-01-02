@@ -3275,6 +3275,7 @@ dependencies = [
  "actix-files",
  "actix-multipart",
  "actix-multipart-rfc7578",
+ "actix-rt",
  "actix-session",
  "actix-web",
  "async-stream",
