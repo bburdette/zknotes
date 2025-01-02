@@ -374,7 +374,6 @@ pub async fn zk_interface_loggedin(
       })
     }
     PrivateRequests::SyncRemote => {
-      info!("PrivateRequests::SyncRemote");
       let dbpath: PathBuf = state.config.orgauth_config.db.to_path_buf();
       let file_path: PathBuf = state.config.file_path.to_path_buf();
       let uid: i64 = uid;
@@ -385,8 +384,6 @@ pub async fn zk_interface_loggedin(
       let lgb = state.girlboss.clone();
 
       let res = std::thread::spawn(move || {
-        println!("in the new thread");
-        // let rt = Arc::new(actix_rt::System::new());
         let rt = actix_rt::System::new();
 
         async fn startit(
@@ -406,8 +403,6 @@ pub async fn zk_interface_loggedin(
               Ok(_) => write!(gbm, "sync completed"),
               Err(e) => write!(gbm, "sync err: {:?}", e),
             };
-            // rt.stop();
-            // actix_rt::System::stop();
             actix_rt::System::current().stop();
           });
           ()
@@ -416,12 +411,6 @@ pub async fn zk_interface_loggedin(
         rt.block_on(startit(lgb, dbpath, file_path, uid, jid));
         rt.run();
       });
-
-      // wait on the job to start??
-      // std::thread::sleep(Duration::from_millis(1000));
-      // };
-
-      // tokio::time::sleep(Duration::from_millis(100)).await;
 
       Ok(PrivateReplyMessage {
         what: PrivateReplies::JobStatus,
@@ -488,10 +477,6 @@ pub async fn zk_interface_loggedin(
           })
         }
       }
-      // Ok(PrivateReplyMessage {
-      //   what: PrivateReplies::JobNotFound,
-      //   content: serde_json::to_value(jobno)?,
-      // })
     }
   }
 }
