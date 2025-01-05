@@ -445,12 +445,11 @@ pub async fn zk_interface_loggedin(
             .unwrap()
             .start(jid, move |mon| async move {
               let gbm = GirlbossMonitor { monitor: mon };
-              let callbacks = &mut zknotes_callbacks();
               write!(gbm, "starting file sync");
 
               let r = async {
                 let conn = sqldata::connection_open(&dbpath.as_path())?;
-                let dv = sync::sync_files_down(
+                let _dv = sync::sync_files_down(
                   &conn,
                   &file_tmp_path.as_path(),
                   &file_path.as_path(),
@@ -458,13 +457,11 @@ pub async fn zk_interface_loggedin(
                   &zns,
                 )
                 .await?;
-                let uv = sync::sync_files_up(&conn, &file_path.as_path(), uid, &zns).await?;
+                let _uv = sync::sync_files_up(&conn, &file_path.as_path(), uid, &zns).await?;
 
                 // TODO: send a result with a list of synced files.
                 Ok::<(), zkerr::Error>(())
               };
-
-              // let r = sync::sync(&dbpath, &file_path, uid, &mut callbacks, &gbm).await;
               match r.await {
                 Ok(_) => write!(gbm, "file sync completed"),
                 Err(e) => write!(gbm, "file sync err: {:?}", e),

@@ -570,7 +570,8 @@ pub async fn sync_from_remote(
   parts.path_and_query = Some(awc::http::uri::PathAndQuery::from_static("/stream"));
   let uri = awc::http::Uri::from_parts(parts).map_err(|x| zkerr::Error::String(x.to_string()))?;
 
-  info!("syncing to uri: {}", uri);
+  info!("syncing from uri: {}", uri);
+  write!(monitor, "syncing from uri: {}", uri);
 
   let cookie = cookie::Cookie::parse_encoded(c)?;
   let res = awc::Client::new()
