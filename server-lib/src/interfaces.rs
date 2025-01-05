@@ -417,11 +417,6 @@ pub async fn zk_interface_loggedin(
     PrivateRequests::SyncFiles => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let zns: ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
-      // Ok(PrivateReplyMessage {
-      //   what: PrivateReplies::FileSyncComplete,
-      //   content: serde_json::to_value((dv, uv))?,
-      // })
-
       let dbpath: PathBuf = state.config.orgauth_config.db.to_path_buf();
       let file_path: PathBuf = state.config.file_path.to_path_buf();
       let file_tmp_path: PathBuf = state.config.file_tmp_path.to_path_buf();
@@ -450,13 +445,11 @@ pub async fn zk_interface_loggedin(
             .unwrap()
             .start(jid, move |mon| async move {
               let gbm = GirlbossMonitor { monitor: mon };
-              let mut callbacks = &mut zknotes_callbacks();
+              let callbacks = &mut zknotes_callbacks();
               write!(gbm, "starting file sync");
 
               let r = async {
                 let conn = sqldata::connection_open(&dbpath.as_path())?;
-                // THTE ACTUAL ACTION.  abstract this??
-
                 let dv = sync::sync_files_down(
                   &conn,
                   &file_tmp_path.as_path(),
@@ -466,13 +459,15 @@ pub async fn zk_interface_loggedin(
                 )
                 .await?;
                 let uv = sync::sync_files_up(&conn, &file_path.as_path(), uid, &zns).await?;
+
+                // TODO: send a result with a list of synced files.
                 Ok::<(), zkerr::Error>(())
               };
 
               // let r = sync::sync(&dbpath, &file_path, uid, &mut callbacks, &gbm).await;
               match r.await {
-                Ok(_) => write!(gbm, "sync completed"),
-                Err(e) => write!(gbm, "sync err: {:?}", e),
+                Ok(_) => write!(gbm, "file sync completed"),
+                Err(e) => write!(gbm, "file sync err: {:?}", e),
               };
               actix_rt::System::current().stop();
             })
@@ -510,23 +505,7 @@ pub async fn zk_interface_loggedin(
         })?,
       })
     }
-    // {
-    //   let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-    //   let zns: ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
-    //   let dv = sync::sync_files_down(
-    //     &conn,
-    //     &state.config.file_tmp_path.as_path(),
-    //     &state.config.file_path.as_path(),
-    //     uid,
-    //     &zns,
-    //   )
-    //   .await?;
-    //   let uv = sync::sync_files_up(&conn, &state.config.file_path.as_path(), uid, &zns).await?;
-    //   Ok(PrivateReplyMessage {
-    //     what: PrivateReplies::FileSyncComplete,
-    //     content: serde_json::to_value((dv, uv))?,
-    //   })
-    // }
+
     PrivateRequests::GetJobStatus => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let jobno: i64 = serde_json::from_value(msgdata.clone())?;
