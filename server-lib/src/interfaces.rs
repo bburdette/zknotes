@@ -417,20 +417,116 @@ pub async fn zk_interface_loggedin(
     PrivateRequests::SyncFiles => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let zns: ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
-      let dv = sync::sync_files_down(
-        &conn,
-        &state.config.file_tmp_path.as_path(),
-        &state.config.file_path.as_path(),
-        uid,
-        &zns,
-      )
-      .await?;
-      let uv = sync::sync_files_up(&conn, &state.config.file_path.as_path(), uid, &zns).await?;
+      // Ok(PrivateReplyMessage {
+      //   what: PrivateReplies::FileSyncComplete,
+      //   content: serde_json::to_value((dv, uv))?,
+      // })
+
+      let dbpath: PathBuf = state.config.orgauth_config.db.to_path_buf();
+      let file_path: PathBuf = state.config.file_path.to_path_buf();
+      let file_tmp_path: PathBuf = state.config.file_tmp_path.to_path_buf();
+      let uid: i64 = uid;
+      let jid = new_jobid(state, uid);
+      let lgb = state.girlboss.clone();
+
+      std::thread::spawn(move || {
+        let rt = actix_rt::System::new();
+
+        async fn startit(
+          lgb: Arc<std::sync::RwLock<girlboss::Girlboss<JobId, girlboss::Monitor>>>,
+          dbpath: PathBuf,
+          file_path: PathBuf,
+          file_tmp_path: PathBuf,
+          uid: i64,
+          zns: ZkNoteSearch,
+          jid: JobId,
+        ) -> () {
+          lgb
+            .write()
+            .map_err(|e| {
+              info!("rwlock error: {}", e);
+              e
+            })
+            .unwrap()
+            .start(jid, move |mon| async move {
+              let gbm = GirlbossMonitor { monitor: mon };
+              let mut callbacks = &mut zknotes_callbacks();
+              write!(gbm, "starting file sync");
+
+              let r = async {
+                let conn = sqldata::connection_open(&dbpath.as_path())?;
+                // THTE ACTUAL ACTION.  abstract this??
+
+                let dv = sync::sync_files_down(
+                  &conn,
+                  &file_tmp_path.as_path(),
+                  &file_path.as_path(),
+                  uid,
+                  &zns,
+                )
+                .await?;
+                let uv = sync::sync_files_up(&conn, &file_path.as_path(), uid, &zns).await?;
+                Ok::<(), zkerr::Error>(())
+              };
+
+              // let r = sync::sync(&dbpath, &file_path, uid, &mut callbacks, &gbm).await;
+              match r.await {
+                Ok(_) => write!(gbm, "sync completed"),
+                Err(e) => write!(gbm, "sync err: {:?}", e),
+              };
+              actix_rt::System::current().stop();
+            })
+            .map_err(|e| {
+              info!("girlboss start error: {}", e);
+              e
+            })
+            .unwrap();
+          ()
+        }
+
+        rt.block_on(startit(
+          lgb,
+          dbpath,
+          file_path,
+          file_tmp_path,
+          uid,
+          zns,
+          jid,
+        ));
+        rt.run()
+          .map_err(|e| {
+            info!("rt.run error: {}", e);
+            e
+          })
+          .unwrap()
+      });
+
       Ok(PrivateReplyMessage {
-        what: PrivateReplies::FileSyncComplete,
-        content: serde_json::to_value((dv, uv))?,
+        what: PrivateReplies::JobStatus,
+        content: serde_json::to_value(JobStatus {
+          jobno: jid.jobno,
+          state: JobState::Started,
+          message: "".to_string(),
+        })?,
       })
     }
+    // {
+    //   let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+    //   let zns: ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
+    //   let dv = sync::sync_files_down(
+    //     &conn,
+    //     &state.config.file_tmp_path.as_path(),
+    //     &state.config.file_path.as_path(),
+    //     uid,
+    //     &zns,
+    //   )
+    //   .await?;
+    //   let uv = sync::sync_files_up(&conn, &state.config.file_path.as_path(), uid, &zns).await?;
+    //   Ok(PrivateReplyMessage {
+    //     what: PrivateReplies::FileSyncComplete,
+    //     content: serde_json::to_value((dv, uv))?,
+    //   })
+    // }
     PrivateRequests::GetJobStatus => {
       let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       let jobno: i64 = serde_json::from_value(msgdata.clone())?;
