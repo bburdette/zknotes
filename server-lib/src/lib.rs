@@ -38,6 +38,7 @@ pub use rusqlite;
 use rusqlite::Connection;
 use serde_json;
 use simple_error::simple_error;
+use sqldata::get_single_value;
 use std::fs::File;
 use std::io::{stdin, Write};
 use std::path::Path;
@@ -255,13 +256,25 @@ async fn file(session: Session, state: web::Data<State>, req: HttpRequest) -> Ht
     Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
   };
 
-  let suser = match session_user(&conn, session, &state) {
-    Ok(Either::Left(user)) => Some(user),
-    Ok(Either::Right(_sr)) => None,
-    Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
-  };
+  let uid = if state.config.tauri_mode == true && state.config.ip == "127.0.0.1" {
+    let rs = {
+      get_single_value(&conn, "last_login")
+        .and_then(|x| Ok(x.and_then(|s| serde_json::from_str::<i64>(s.as_str()).ok())))
+    };
 
-  let uid = suser.map(|user| user.id);
+    match rs {
+      Ok(uid) => uid,
+      Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
+    }
+  } else {
+    let suser = match session_user(&conn, session, &state) {
+      Ok(Either::Left(user)) => Some(user),
+      Ok(Either::Right(_sr)) => None,
+      Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
+    };
+
+    suser.map(|user| user.id)
+  };
 
   match req.match_info().get("id") {
     Some(noteid) => {
@@ -612,6 +625,7 @@ pub fn defcon() -> Config {
     file_tmp_path: Path::new("./temp").to_path_buf(),
     file_path: Path::new("./files").to_path_buf(),
     error_index_note: None,
+    tauri_mode: false,
     orgauth_config: oc,
   }
 }

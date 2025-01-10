@@ -3,7 +3,7 @@ module View exposing (Command(..), Model, Msg(..), initFull, initSzn, update, vi
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
 import Common
-import Data exposing (ZkNoteId, zkNoteIdToString, zniEq)
+import Data exposing (FileUrlInfo, ZkNoteId, zkNoteIdToString, zniEq)
 import Dict exposing (Dict)
 import Element as E exposing (Element)
 import Element.Background as EBk
@@ -35,7 +35,7 @@ type Msg
 
 type alias Model =
     { id : Maybe ZkNoteId
-    , fileprefix : String
+    , fui : FileUrlInfo
     , pubid : Maybe String
     , title : String
     , showtitle : Bool
@@ -126,7 +126,7 @@ view zone maxw noteCache model loggedin =
                             ]
                             (case
                                 MC.markdownView
-                                    (MC.mkRenderer model.fileprefix MC.PublicView (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged noteCache)
+                                    (MC.mkRenderer model.fui MC.PublicView (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged noteCache)
                                     pn.zknote.content
                              of
                                 Ok rendered ->
@@ -150,7 +150,7 @@ view zone maxw noteCache model loggedin =
                   else
                     E.none
                 , E.row [ E.width E.fill ]
-                    [ case MC.markdownView (MC.mkRenderer model.fileprefix MC.PublicView (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged noteCache) model.md of
+                    [ case MC.markdownView (MC.mkRenderer model.fui MC.PublicView (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged noteCache) model.md of
                         Ok rendered ->
                             E.column
                                 [ E.spacing 30
@@ -197,8 +197,8 @@ view zone maxw noteCache model loggedin =
         ]
 
 
-initFull : String -> Data.ZkNoteAndLinks -> Model
-initFull fileprefix zknaa =
+initFull : FileUrlInfo -> Data.ZkNoteAndLinks -> Model
+initFull fui zknaa =
     let
         zknote =
             zknaa.zknote
@@ -213,7 +213,7 @@ initFull fileprefix zknaa =
                 (mkCc cells)
     in
     { id = Just zknote.id
-    , fileprefix = fileprefix
+    , fui = fui
     , pubid = zknote.pubid
     , title = zknote.title
     , showtitle = zknote.showtitle
@@ -226,8 +226,8 @@ initFull fileprefix zknaa =
     }
 
 
-initSzn : String -> Data.SaveZkNote -> Maybe Int -> Maybe Int -> List Data.EditLink -> Maybe ZkNoteId -> Model
-initSzn fileprefix zknote mbcreatedate mbchangeddate links mbpanelid =
+initSzn : FileUrlInfo -> Data.SaveZkNote -> Maybe Int -> Maybe Int -> List Data.EditLink -> Maybe ZkNoteId -> Model
+initSzn fui zknote mbcreatedate mbchangeddate links mbpanelid =
     let
         cells =
             zknote.content
@@ -244,7 +244,7 @@ initSzn fileprefix zknote mbcreatedate mbchangeddate links mbpanelid =
                 (mkCc cells)
     in
     { id = zknote.id
-    , fileprefix = fileprefix
+    , fui = fui
     , pubid = zknote.pubid
     , title = zknote.title
     , showtitle = zknote.showtitle

@@ -12,5 +12,6 @@ pub struct Config {
   pub file_tmp_path: PathBuf,
   pub file_path: PathBuf,
   pub error_index_note: Option<i64>,
+  pub tauri_mode: bool,
   pub orgauth_config: orgauth_data::Config,
 }
