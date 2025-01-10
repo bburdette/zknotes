@@ -256,12 +256,6 @@ async fn file(session: Session, state: web::Data<State>, req: HttpRequest) -> Ht
     Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
   };
 
-  println!("req {:?}", req);
-  println!("req.uri() {:?}", req.uri());
-  println!("req.uri().host() {:?}", req.uri().host());
-  println!("state.config.tauri_mode {}", state.config.tauri_mode);
-
-  // let uid = if req.uri().host() == Some("localhost") && state.config.tauri_mode == true {
   let uid = if state.config.tauri_mode == true && state.config.ip == "127.0.0.1" {
     let rs = {
       get_single_value(&conn, "last_login")
@@ -269,10 +263,7 @@ async fn file(session: Session, state: web::Data<State>, req: HttpRequest) -> Ht
     };
 
     match rs {
-      Ok(uid) => {
-        println!("tarui uid {:?}", uid);
-        uid
-      }
+      Ok(uid) => uid,
       Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
     }
   } else {
