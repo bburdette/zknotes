@@ -156,8 +156,8 @@ link title destination body =
         }
 
 
-mkRenderer : String -> ViewMode -> (String -> a) -> Int -> CellDict -> Bool -> (String -> String -> a) -> NoteCache -> Markdown.Renderer.Renderer (Element a)
-mkRenderer fileprefix viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged noteCache =
+mkRenderer : String -> String -> ViewMode -> (String -> a) -> Int -> CellDict -> Bool -> (String -> String -> a) -> NoteCache -> Markdown.Renderer.Renderer (Element a)
+mkRenderer location fileprefix viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged noteCache =
     { heading = heading
     , paragraph =
         E.paragraph
@@ -264,7 +264,7 @@ mkRenderer fileprefix viewMode restoreSearchMsg maxw cellDict showPanelElt oncha
             , Markdown.Html.tag "audio" audioView
                 |> Markdown.Html.withAttribute "text"
                 |> Markdown.Html.withAttribute "src"
-            , Markdown.Html.tag "note" (noteView fileprefix noteCache)
+            , Markdown.Html.tag "note" (noteView location fileprefix noteCache)
                 |> Markdown.Html.withAttribute "id"
             ]
     , table = E.column [ E.width <| E.fill ]
@@ -331,8 +331,8 @@ htmlAudioView url text =
     E.html (Html.audio [ HA.controls True, HA.src url ] [ Html.text text ])
 
 
-audioNoteView : String -> Data.ZkNote -> Element a
-audioNoteView fileprefix zkn =
+audioNoteView : String -> String -> Data.ZkNote -> Element a
+audioNoteView location fileprefix zkn =
     let
         fileurl =
             fileprefix ++ "/file/" ++ zkNoteIdToString zkn.id
@@ -341,12 +341,10 @@ audioNoteView fileprefix zkn =
         [ link (Just zkn.title) ("/note/" ++ zkNoteIdToString zkn.id) [ E.text zkn.title ]
         , E.row [ E.spacing 20 ]
             [ htmlAudioView fileurl zkn.title
-
-            -- TODO pass in url instead of hardcoded
             , if List.filter (\i -> i == Data.sysids.publicid) zkn.sysids /= [] then
                 link
                     (Just "ts↗")
-                    ("https://29a.ch/timestretch/#a=https://www.zknotes.com/file/" ++ zkNoteIdToString zkn.id)
+                    ("https://29a.ch/timestretch/#a=" ++ location ++ "/file/" ++ zkNoteIdToString zkn.id)
                     [ E.text "ts↗" ]
 
               else
@@ -381,8 +379,8 @@ imageNoteView fileprefix zknote =
         ]
 
 
-noteFile : String -> String -> Data.ZkNote -> Element a
-noteFile fileprefix filename zknote =
+noteFile : String -> String -> String -> Data.ZkNote -> Element a
+noteFile location fileprefix filename zknote =
     let
         suffix =
             String.split "." filename
@@ -397,13 +395,13 @@ noteFile fileprefix filename zknote =
         Just s ->
             case String.toLower s of
                 "mp3" ->
-                    audioNoteView fileprefix zknote
+                    audioNoteView location fileprefix zknote
 
                 "m4a" ->
-                    audioNoteView fileprefix zknote
+                    audioNoteView location fileprefix zknote
 
                 "opus" ->
-                    audioNoteView fileprefix zknote
+                    audioNoteView location fileprefix zknote
 
                 "mp4" ->
                     videoNoteView fileprefix zknote
@@ -427,8 +425,8 @@ noteFile fileprefix filename zknote =
                     link (Just zknote.title) (fileprefix ++ "/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
 
 
-noteView : String -> NoteCache -> String -> List (Element a) -> Element a
-noteView fileprefix noteCache id _ =
+noteView : String -> String -> NoteCache -> String -> List (Element a) -> Element a
+noteView location fileprefix noteCache id _ =
     case
         zkNoteIdFromString id
             |> Result.toMaybe
@@ -437,7 +435,7 @@ noteView fileprefix noteCache id _ =
         Just zne ->
             case zne.zknote.filestatus of
                 Data.FilePresent ->
-                    noteFile fileprefix zne.zknote.title zne.zknote
+                    noteFile location fileprefix zne.zknote.title zne.zknote
 
                 Data.FileMissing ->
                     E.text <| zne.zknote.title ++ " missing"

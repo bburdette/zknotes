@@ -35,6 +35,7 @@ type Msg
 
 type alias Model =
     { id : Maybe ZkNoteId
+    , location : String
     , fileprefix : String
     , pubid : Maybe String
     , title : String
@@ -126,7 +127,7 @@ view zone maxw noteCache model loggedin =
                             ]
                             (case
                                 MC.markdownView
-                                    (MC.mkRenderer model.fileprefix MC.PublicView (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged noteCache)
+                                    (MC.mkRenderer model.location model.fileprefix MC.PublicView (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged noteCache)
                                     pn.zknote.content
                              of
                                 Ok rendered ->
@@ -150,7 +151,7 @@ view zone maxw noteCache model loggedin =
                   else
                     E.none
                 , E.row [ E.width E.fill ]
-                    [ case MC.markdownView (MC.mkRenderer model.fileprefix MC.PublicView (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged noteCache) model.md of
+                    [ case MC.markdownView (MC.mkRenderer model.location model.fileprefix MC.PublicView (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged noteCache) model.md of
                         Ok rendered ->
                             E.column
                                 [ E.spacing 30
@@ -197,8 +198,8 @@ view zone maxw noteCache model loggedin =
         ]
 
 
-initFull : String -> Data.ZkNoteAndLinks -> Model
-initFull fileprefix zknaa =
+initFull : String -> String -> Data.ZkNoteAndLinks -> Model
+initFull location fileprefix zknaa =
     let
         zknote =
             zknaa.zknote
@@ -213,6 +214,7 @@ initFull fileprefix zknaa =
                 (mkCc cells)
     in
     { id = Just zknote.id
+    , location = location
     , fileprefix = fileprefix
     , pubid = zknote.pubid
     , title = zknote.title
@@ -226,8 +228,8 @@ initFull fileprefix zknaa =
     }
 
 
-initSzn : String -> Data.SaveZkNote -> Maybe Int -> Maybe Int -> List Data.EditLink -> Maybe ZkNoteId -> Model
-initSzn fileprefix zknote mbcreatedate mbchangeddate links mbpanelid =
+initSzn : String -> String -> Data.SaveZkNote -> Maybe Int -> Maybe Int -> List Data.EditLink -> Maybe ZkNoteId -> Model
+initSzn location fileprefix zknote mbcreatedate mbchangeddate links mbpanelid =
     let
         cells =
             zknote.content
@@ -244,6 +246,7 @@ initSzn fileprefix zknote mbcreatedate mbchangeddate links mbpanelid =
                 (mkCc cells)
     in
     { id = zknote.id
+    , location = location
     , fileprefix = fileprefix
     , pubid = zknote.pubid
     , title = zknote.title

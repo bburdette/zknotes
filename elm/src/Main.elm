@@ -347,13 +347,14 @@ routeStateInternal model route =
                     ( nm.state, cmd )
 
                 EditZkNoteListing st login ->
-                    ( EditZkNote (EditZkNote.initNew model.filelocation login st.notes st.spmodel []) login, Cmd.none )
+                    ( EditZkNote (EditZkNote.initNew model.location model.filelocation login st.notes st.spmodel []) login, Cmd.none )
 
                 st ->
                     case stateLogin st of
                         Just login ->
                             ( EditZkNote
-                                (EditZkNote.initNew model.filelocation
+                                (EditZkNote.initNew model.location
+                                    model.filelocation
                                     login
                                     { notes = []
                                     , offset = 0
@@ -480,7 +481,8 @@ routeStateInternal model route =
 
                         Nothing ->
                             ( EditZkNote
-                                (EditZkNote.initNew model.filelocation
+                                (EditZkNote.initNew model.location
+                                    model.filelocation
                                     login
                                     { notes = []
                                     , offset = 0
@@ -1552,7 +1554,8 @@ onZkNoteEditWhat model pt znew =
                             |> Maybe.withDefault ( SP.initModel, { notes = [], offset = 0, what = "" } )
 
                     ( nst, c ) =
-                        EditZkNote.initFull model.filelocation
+                        EditZkNote.initFull model.location
+                            model.filelocation
                             login
                             sres
                             znew.znl.zknote
@@ -2044,13 +2047,14 @@ actualupdate msg model =
                                             Just _ ->
                                                 EView
                                                     (View.initFull
+                                                        model.location
                                                         model.filelocation
                                                         fbe.znl
                                                     )
                                                     state
 
                                             Nothing ->
-                                                View (View.initFull model.filelocation fbe.znl)
+                                                View (View.initFull model.location model.filelocation fbe.znl)
 
                                     ngets =
                                         makePubNoteCacheGets model fbe.znl.zknote.content
@@ -3325,7 +3329,8 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     ( { model
                         | state =
                             EView
-                                (View.initSzn model.filelocation
+                                (View.initSzn model.location
+                                    model.filelocation
                                     v.note
                                     v.createdate
                                     v.changeddate
@@ -3442,7 +3447,7 @@ handleEditZkNoteListing model login ( emod, ecmd ) =
             ( { model | state = EditZkNoteListing emod login }, Cmd.none )
 
         EditZkNoteListing.New ->
-            ( { model | state = EditZkNote (EditZkNote.initNew model.filelocation login emod.notes emod.spmodel []) login }, Cmd.none )
+            ( { model | state = EditZkNote (EditZkNote.initNew model.location model.filelocation login emod.notes emod.spmodel []) login }, Cmd.none )
 
         EditZkNoteListing.Done ->
             ( { model | state = UserSettings (UserSettings.init login model.fontsize) login (EditZkNoteListing emod login) }

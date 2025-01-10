@@ -1202,6 +1202,13 @@ pub fn read_zknote_filehash(
 
     Ok(Some(hash))
   } else {
+    println!(
+      "uid {:?}, noteid {}, access: {:?}",
+      uid,
+      noteid,
+      zknote_access_id(&conn, uid, noteid)
+    );
+
     Ok(None)
   }
 }

@@ -10,6 +10,13 @@ import Url.Builder as UB
 import Util exposing (andMap)
 
 
+type alias FileUrlInfo =
+    { location : String
+    , filelocation : String
+    , tauriMode : Bool
+    }
+
+
 
 ------------------------------------------------------------
 -- getting, setting text selections in text edit areas.
