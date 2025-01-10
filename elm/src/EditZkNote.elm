@@ -51,7 +51,7 @@ import Browser.Dom as BD
 import Cellme.Cellme exposing (CellContainer(..), RunState(..), evalCellsFully)
 import Cellme.DictCellme exposing (CellDict(..), getCd, mkCc)
 import Common
-import Data exposing (Direction(..), EditLink, ZkNoteId, zkNoteIdToString, zklKey, zniCompare, zniEq)
+import Data exposing (Direction(..), EditLink, FileUrlInfo, ZkNoteId, zkNoteIdToString, zklKey, zniCompare, zniEq)
 import Dialog as D
 import Dict exposing (Dict)
 import Element as E exposing (Element)
@@ -164,8 +164,7 @@ type alias NewCommentState =
 
 type alias Model =
     { id : Maybe ZkNoteId
-    , location : String
-    , fileprefix : String
+    , fui : FileUrlInfo
     , ld : Data.LoginData
     , noteUser : UserId
     , noteUserName : String
@@ -237,7 +236,7 @@ newWithSave : Model -> ( Model, Command )
 newWithSave model =
     let
         nmod =
-            initNew model.location model.fileprefix model.ld model.zknSearchResult model.spmodel (shareLinks model)
+            initNew model.fui model.ld model.zknSearchResult model.spmodel (shareLinks model)
     in
     ( nmod
     , if dirty model then
@@ -455,7 +454,7 @@ revert model =
                 }
             )
         |> Maybe.withDefault
-            (initNew model.location model.fileprefix model.ld model.zknSearchResult model.spmodel (Dict.values model.initialZklDict))
+            (initNew model.fui model.ld model.zknSearchResult model.spmodel (Dict.values model.initialZklDict))
 
 
 showZkl : E.Color -> Bool -> Bool -> Maybe EditLink -> Data.LoginData -> Maybe ZkNoteId -> Maybe E.Color -> Bool -> EditLink -> Element Msg
@@ -862,9 +861,9 @@ addComment ncs =
         ]
 
 
-renderMd : String -> String -> CellDict -> NoteCache -> String -> Int -> Element Msg
-renderMd location fileprefix cd noteCache md mdw =
-    case MC.markdownView (MC.mkRenderer location fileprefix MC.EditView RestoreSearch mdw cd True OnSchelmeCodeChanged noteCache) md of
+renderMd : FileUrlInfo -> CellDict -> NoteCache -> String -> Int -> Element Msg
+renderMd fui cd noteCache md mdw =
+    case MC.markdownView (MC.mkRenderer fui MC.EditView RestoreSearch mdw cd True OnSchelmeCodeChanged noteCache) md of
         Ok rendered ->
             E.column
                 [ E.spacing 30
@@ -938,7 +937,7 @@ zknview zone size recentZkns trqs tjobs noteCache model =
                 , columns =
                     [ { header = E.none
                       , width = E.fill
-                      , view = \zkn -> renderMd model.location model.fileprefix model.cells noteCache zkn.content mdw
+                      , view = \zkn -> renderMd model.fui model.cells noteCache zkn.content mdw
                       }
                     , { header = E.none
                       , width = E.shrink
@@ -1308,7 +1307,7 @@ zknview zone size recentZkns trqs tjobs noteCache model =
                         ]
                     , case ( model.filestatus, toZkNote model ) of
                         ( Data.FilePresent, Just zkn ) ->
-                            MC.noteFile model.location model.fileprefix model.title zkn
+                            MC.noteFile model.fui model.title zkn
 
                         ( Data.FileMissing, Just zkn ) ->
                             E.text <| "file for \"" ++ zkn.title ++ "\" missing"
@@ -1318,7 +1317,7 @@ zknview zone size recentZkns trqs tjobs noteCache model =
 
                         ( _, Nothing ) ->
                             E.none
-                    , renderMd model.location model.fileprefix model.cells noteCache model.md mdw
+                    , renderMd model.fui model.cells noteCache model.md mdw
                     ]
                     :: (if wclass == Wide then
                             []
@@ -1643,8 +1642,8 @@ tabsOnLoad model =
     }
 
 
-initFull : String -> String -> Data.LoginData -> Data.ZkListNoteSearchResult -> Data.ZkNote -> List Data.EditLink -> SP.Model -> ( Model, Data.GetZkNoteComments )
-initFull location fileprefix ld zkl zknote dtlinks spm =
+initFull : FileUrlInfo -> Data.LoginData -> Data.ZkListNoteSearchResult -> Data.ZkNote -> List Data.EditLink -> SP.Model -> ( Model, Data.GetZkNoteComments )
+initFull fui ld zkl zknote dtlinks spm =
     let
         cells =
             zknote.content
@@ -1670,8 +1669,7 @@ initFull location fileprefix ld zkl zknote dtlinks spm =
                 dtlinks
     in
     ( { id = Just zknote.id
-      , location = location
-      , fileprefix = fileprefix
+      , fui = fui
       , ld = ld
       , noteUser = zknote.user
       , noteUserName = zknote.username
@@ -1713,8 +1711,8 @@ initFull location fileprefix ld zkl zknote dtlinks spm =
     )
 
 
-initNew : String -> String -> Data.LoginData -> Data.ZkListNoteSearchResult -> SP.Model -> List EditLink -> Model
-initNew location fileprefix ld zkl spm links =
+initNew : FileUrlInfo -> Data.LoginData -> Data.ZkListNoteSearchResult -> SP.Model -> List EditLink -> Model
+initNew fui ld zkl spm links =
     let
         cells =
             ""
@@ -1729,8 +1727,7 @@ initNew location fileprefix ld zkl spm links =
                 (mkCc cells)
     in
     { id = Nothing
-    , location = location
-    , fileprefix = fileprefix
+    , fui = fui
     , ld = ld
     , noteUser = ld.userid
     , noteUserName = ld.name
@@ -1854,8 +1851,7 @@ initLinkBackNote model title =
         Just id ->
             let
                 m1 =
-                    initNew model.location
-                        model.fileprefix
+                    initNew model.fui
                         model.ld
                         model.zknSearchResult
                         model.spmodel

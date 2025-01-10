@@ -105,8 +105,8 @@ onWkKeyPress key model =
             ( model, None )
 
 
-view : String -> Data.LoginData -> Util.Size -> Model -> Element Msg
-view fileprefix ld size model =
+view : Data.LoginData -> Util.Size -> Model -> Element Msg
+view ld size model =
     case model.dialog of
         Just ( dialog, _ ) ->
             D.view size dialog |> E.map DialogMsg
