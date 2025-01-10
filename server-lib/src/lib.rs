@@ -38,13 +38,13 @@ pub use rusqlite;
 use rusqlite::Connection;
 use serde_json;
 use simple_error::simple_error;
-use std::error::Error;
 use std::fs::File;
 use std::io::{stdin, Write};
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::{env, sync::RwLock};
+use std::{error::Error, sync::Arc};
 use timer;
 use tokio_util::io::StreamReader;
 use tracing_actix_web::TracingLogger;
@@ -402,7 +402,8 @@ async fn private(
   item: web::Json<PrivateMessage>,
   _req: HttpRequest,
 ) -> HttpResponse {
-  match zk_interface_check(&session, &data, item.into_inner()).await {
+  let mut state = data.clone();
+  match zk_interface_check(&session, &mut state, item.into_inner()).await {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'private' err: {:?}", e);
@@ -464,7 +465,7 @@ async fn zk_interface_check(
         }
         Ok(userdata) => {
           // finally!  processing messages as logged in user.
-          interfaces::zk_interface_loggedin(&state, userdata.id, &msg).await
+          interfaces::zk_interface_loggedin(state, &conn, userdata.id, &msg).await
         }
       }
     }
@@ -855,7 +856,7 @@ pub fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
   // to prevent multiple copies of jobcounter etc.
   let state = web::Data::new(State {
     config: config.clone(),
-    girlboss: Girlboss::new(),
+    girlboss: { Arc::new(RwLock::new(Girlboss::new())) },
     jobcounter: { RwLock::new(0 as i64) },
   });
 
