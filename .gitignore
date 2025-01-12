@@ -9,6 +9,7 @@ zkprotocol/target
 nixpkg/result
 server/static/main.js
 server/target/
+server/temp/
 server/indra/
 server/*.db*
 server/config.toml
