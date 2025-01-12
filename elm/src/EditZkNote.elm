@@ -795,7 +795,7 @@ shareLinks model =
         |> List.filterMap
             (\l ->
                 if
-                    List.any ((==) Data.sysids.shareid) l.sysids
+                    (List.any ((==) Data.sysids.shareid) l.sysids && l.direction == To)
                         || (l.otherid == Data.sysids.publicid)
                 then
                     Just
