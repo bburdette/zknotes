@@ -54,6 +54,7 @@ import Common
 import Data exposing (Direction(..), EditLink, FileUrlInfo, ZkNoteId, zkNoteIdToString, zklKey, zniCompare, zniEq)
 import Dialog as D
 import Dict exposing (Dict)
+import Either exposing (Either(..))
 import Element as E exposing (Element)
 import Element.Background as EBk
 import Element.Border as EBd
@@ -205,7 +206,7 @@ type Command
     | SaveExit Data.SaveZkNoteAndLinks
     | Revert
     | View
-        { note : Data.SaveZkNote
+        { note : Either Data.SaveZkNote Data.ZkNoteAndLinks
         , createdate : Maybe Int
         , changeddate : Maybe Int
         , panelnote : Maybe ZkNoteId
@@ -2195,7 +2196,16 @@ update msg model =
                     (\panel ->
                         ( model
                         , View
-                            { note = sznFromModel model
+                            { note =
+                                case toZkNote model of
+                                    Just zkn ->
+                                        Right
+                                            { zknote = zkn
+                                            , links = model.zklDict |> Dict.values |> List.filterMap elToDel
+                                            }
+
+                                    Nothing ->
+                                        Left <| sznFromModel model
                             , createdate = model.createdate
                             , changeddate = model.changeddate
                             , panelnote = Just panel.noteid
@@ -2206,7 +2216,16 @@ update msg model =
                 |> Maybe.withDefault
                     ( model
                     , View
-                        { note = sznFromModel model
+                        { note =
+                            case toZkNote model of
+                                Just zkn ->
+                                    Right
+                                        { zknote = zkn
+                                        , links = model.zklDict |> Dict.values |> List.filterMap elToDel
+                                        }
+
+                                Nothing ->
+                                    Left <| sznFromModel model
                         , createdate = model.createdate
                         , changeddate = model.changeddate
                         , panelnote = Nothing

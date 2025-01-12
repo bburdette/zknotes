@@ -438,7 +438,20 @@ noteView fui noteCache id _ =
                     noteFile fui zne.zknote.title zne.zknote
 
                 Data.FileMissing ->
-                    E.text <| zne.zknote.title ++ " missing"
+                    E.paragraph []
+                        [ E.link
+                            [ E.htmlAttribute (HA.style "display" "inline-flex") ]
+                            { url = "/note/" ++ id -- don't use prefix here!
+                            , label =
+                                E.paragraph
+                                    [ EF.color (E.rgb255 0 0 255)
+                                    , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
+                                    , E.htmlAttribute (HA.style "word-break" "break-word")
+                                    ]
+                                    [ E.text zne.zknote.title ]
+                            }
+                        , E.text " file missing"
+                        ]
 
                 Data.NotAFile ->
                     E.link

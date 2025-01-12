@@ -10,6 +10,7 @@ import Dict exposing (Dict)
 import DisplayMessage
 import EditZkNote
 import EditZkNoteListing
+import Either exposing (Either(..))
 import Element as E exposing (Element)
 import Element.Font as EF
 import File as F
@@ -3133,7 +3134,7 @@ makePubNoteCacheGet model id =
                 (PI.GetZnlIfChanged { zknote = id, what = "cache", changeddate = zkn.zknote.changeddate })
 
         Nothing ->
-            sendPIMsg 
+            sendPIMsg
                 model.fui
                 (PI.GetZkNoteAndLinks { zknote = id, what = "cache" })
 
@@ -3305,16 +3306,30 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     ( { model
                         | state =
                             EView
-                                (View.initSzn model.fui
-                                    v.note
-                                    v.createdate
-                                    v.changeddate
-                                    v.links
-                                    v.panelnote
+                                (case v.note of
+                                    Left szn ->
+                                        View.initSzn model.fui
+                                            szn
+                                            v.createdate
+                                            v.changeddate
+                                            v.links
+                                            v.panelnote
+
+                                    Right zknal ->
+                                        View.initFull model.fui zknal
                                 )
                                 (EditZkNote emod login)
                       }
-                    , Cmd.batch <| makeNoteCacheGets v.note.content model
+                    , Cmd.batch <|
+                        makeNoteCacheGets
+                            (case v.note of
+                                Left szn ->
+                                    szn.content
+
+                                Right zknal ->
+                                    zknal.zknote.content
+                            )
+                            model
                     )
 
                 EditZkNote.GetTASelection id what ->

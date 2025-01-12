@@ -3,7 +3,7 @@ module View exposing (Command(..), Model, Msg(..), initFull, initSzn, update, vi
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
 import Common
-import Data exposing (FileUrlInfo, ZkNoteId, zkNoteIdToString, zniEq)
+import Data exposing (FileUrlInfo, ZkNote, ZkNoteId, zkNoteIdToString, zniEq)
 import Dict exposing (Dict)
 import Element as E exposing (Element)
 import Element.Background as EBk
@@ -45,6 +45,7 @@ type alias Model =
     , zklinks : List Data.EditLink
     , createdate : Maybe Int
     , changeddate : Maybe Int
+    , zknote : Maybe ZkNote
     }
 
 
@@ -149,6 +150,22 @@ view zone maxw noteCache model loggedin =
 
                   else
                     E.none
+
+                -- if has a file, show file view
+                , model.zknote
+                    |> Maybe.map
+                        (\zkn ->
+                            case zkn.filestatus of
+                                Data.FilePresent ->
+                                    MC.noteFile model.fui model.title zkn
+
+                                Data.FileMissing ->
+                                    E.text <| "file missing"
+
+                                Data.NotAFile ->
+                                    E.none
+                        )
+                    |> Maybe.withDefault E.none
                 , E.row [ E.width E.fill ]
                     [ case MC.markdownView (MC.mkRenderer model.fui MC.PublicView (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged noteCache) model.md of
                         Ok rendered ->
@@ -223,6 +240,7 @@ initFull fui zknaa =
     , zklinks = zknaa.links
     , createdate = Just zknote.createdate
     , changeddate = Just zknote.changeddate
+    , zknote = Just zknote
     }
 
 
@@ -254,6 +272,7 @@ initSzn fui zknote mbcreatedate mbchangeddate links mbpanelid =
     , zklinks = links
     , createdate = mbcreatedate
     , changeddate = mbchangeddate
+    , zknote = Nothing
     }
 
 
