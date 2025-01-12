@@ -1310,7 +1310,7 @@ zknview zone size recentZkns trqs tjobs noteCache model =
                             MC.noteFile model.fui model.title zkn
 
                         ( Data.FileMissing, Just zkn ) ->
-                            E.text <| "file for \"" ++ zkn.title ++ "\" missing"
+                            E.text <| "file missing"
 
                         ( Data.NotAFile, Just zkn ) ->
                             E.none
