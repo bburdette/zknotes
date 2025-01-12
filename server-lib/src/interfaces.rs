@@ -77,12 +77,14 @@ pub fn login_data_for_token(
 
 // Just like orgauth::endpoints::user_interface, except adds in extra user data.
 pub async fn user_interface(
+  conn: &Connection,
   tokener: &mut dyn Tokener,
   config: &Config,
   msg: orgauth::data::UserRequestMessage,
-) -> Result<orgauth::data::UserResponseMessage, Box<dyn Error>> {
+) -> Result<orgauth::data::UserResponseMessage, zkerr::Error> {
   Ok(
     orgauth::endpoints::user_interface(
+      conn,
       tokener,
       &config.orgauth_config,
       &mut sqldata::zknotes_callbacks(),

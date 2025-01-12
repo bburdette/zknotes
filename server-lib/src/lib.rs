@@ -169,11 +169,17 @@ async fn user(
     &item.data,
     req.connection_info()
   );
-  match interfaces::user_interface(
-    &mut ActixTokener { session: &session },
-    &data.config,
-    item.into_inner(),
-  )
+  match async {
+    let conn = sqldata::connection_open(data.config.orgauth_config.db.as_path())?;
+
+    interfaces::user_interface(
+      &conn,
+      &mut ActixTokener { session: &session },
+      &data.config,
+      item.into_inner(),
+    )
+    .await
+  }
   .await
   {
     Ok(sr) => HttpResponse::Ok().json(sr),
