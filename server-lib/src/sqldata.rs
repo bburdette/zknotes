@@ -510,12 +510,12 @@ pub fn save_zklink(
   };
 
   // yeesh.  doing this to exit with ? instead of having a big if-then to the end.
-  let orwat: Result<(), zkerr::Error> = if authed {
+  (if authed {
     Ok(())
   } else {
-    Err("link not allowed".into())
-  };
-  let _wat = orwat?;
+    Err(zkerr::Error::String("link not allowed".into()))
+  })?;
+  // let _wat = orwat?;
 
   let now = now()?;
 

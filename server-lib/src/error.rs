@@ -7,6 +7,7 @@ use reqwest;
 use rusqlite;
 use serde_json;
 use std::fmt;
+use zkprotocol::content::ZkNoteId;
 
 pub enum Error {
   Rusqlite(rusqlite::Error),
@@ -22,6 +23,11 @@ pub enum Error {
   Cookie(cookie::ParseError),
   Annotated(AnnotatedE),
   Girlboss(girlboss::Error),
+}
+
+pub enum ZkError {
+  NoteNotFound(ZkNoteId),
+  NoteIsPrivate(ZkNoteId),
 }
 
 pub struct AnnotatedE {

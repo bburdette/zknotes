@@ -432,7 +432,10 @@ noteView fui noteCache id _ =
             |> Result.toMaybe
             |> Maybe.andThen (NC.getNote noteCache)
     of
-        Just zne ->
+        Just NC.Private ->
+            E.text "private note"
+
+        Just (NC.ZNAL zne) ->
             case zne.zknote.filestatus of
                 Data.FilePresent ->
                     noteFile fui zne.zknote.title zne.zknote

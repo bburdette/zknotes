@@ -1,4 +1,4 @@
-module NoteCache exposing (NoteCache, addNote, empty, getNote, purgeNotes, setKeeps)
+module NoteCache exposing (CacheEntry(..), NoteCache, addNote, empty, getNote, purgeNotes, setKeeps)
 
 import Data exposing (ZkNoteAndLinks, ZkNoteId, ZniSet)
 import Dict exposing (Dict)
@@ -10,7 +10,12 @@ import Util
 
 
 type alias ZneEntry =
-    { receivetime : Int, zne : ZkNoteAndLinks }
+    { receivetime : Int, ce : CacheEntry }
+
+
+type CacheEntry
+    = ZNAL ZkNoteAndLinks
+    | Private
 
 
 type alias NoteCache =
@@ -46,7 +51,7 @@ addNote pt zne nc =
     in
     { byId =
         TDict.insert id
-            { receivetime = ms, zne = zne }
+            { receivetime = ms, ce = ZNAL zne }
             nc.byId
     , byReceipt =
         case Dict.get ms nc.byReceipt of
@@ -62,10 +67,10 @@ addNote pt zne nc =
     }
 
 
-getNote : NoteCache -> ZkNoteId -> Maybe ZkNoteAndLinks
+getNote : NoteCache -> ZkNoteId -> Maybe CacheEntry
 getNote nc id =
     TDict.get id nc.byId
-        |> Maybe.map .zne
+        |> Maybe.map .ce
 
 
 removeNote : NoteCache -> ZkNoteId -> NoteCache

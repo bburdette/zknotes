@@ -18,7 +18,7 @@ import Markdown.Html
 import Markdown.Parser
 import Markdown.Renderer
 import MdCommon as MC
-import NoteCache as NC exposing (NoteCache)
+import NoteCache as NC exposing (CacheEntry(..), NoteCache)
 import Schelme.Show exposing (showTerm)
 import TangoColors as TC
 import Time
@@ -114,33 +114,38 @@ view zone maxw noteCache model loggedin =
             [ model.panelNote
                 |> Maybe.andThen (NC.getNote noteCache)
                 |> Maybe.map
-                    (\pn ->
-                        E.el
-                            [ if narrow then
-                                E.width E.fill
+                    (\ce ->
+                        case ce of
+                            ZNAL pn ->
+                                E.el
+                                    [ if narrow then
+                                        E.width E.fill
 
-                              else
-                                E.width <| E.px 300
-                            , E.alignTop
-                            , EBk.color TC.darkGrey
-                            , E.padding 10
-                            ]
-                            (case
-                                MC.markdownView
-                                    (MC.mkRenderer model.fui MC.PublicView (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged noteCache)
-                                    pn.zknote.content
-                             of
-                                Ok rendered ->
-                                    E.column
-                                        [ E.spacing 30
-                                        , E.width E.fill
-                                        , E.centerX
-                                        ]
-                                        rendered
+                                      else
+                                        E.width <| E.px 300
+                                    , E.alignTop
+                                    , EBk.color TC.darkGrey
+                                    , E.padding 10
+                                    ]
+                                    (case
+                                        MC.markdownView
+                                            (MC.mkRenderer model.fui MC.PublicView (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged noteCache)
+                                            pn.zknote.content
+                                     of
+                                        Ok rendered ->
+                                            E.column
+                                                [ E.spacing 30
+                                                , E.width E.fill
+                                                , E.centerX
+                                                ]
+                                                rendered
 
-                                Err errors ->
-                                    E.text errors
-                            )
+                                        Err errors ->
+                                            E.text errors
+                                    )
+
+                            Private ->
+                                E.text "private note"
                     )
                 |> Maybe.withDefault E.none
             , E.column

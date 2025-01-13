@@ -1976,6 +1976,8 @@ actualupdate msg model =
                     case piresponse of
                         PI.ServerError e ->
                             let
+                                -- TODO this assumes the error was login.
+                                -- 'if prev state is loading', else ignore?
                                 prevstate =
                                     case stateLogin state of
                                         Just _ ->
@@ -3107,9 +3109,13 @@ makeNoteCacheGets md model =
         |> List.map
             (\id ->
                 case NC.getNote model.noteCache id of
-                    Just zkn ->
+                    Just (NC.ZNAL zkn) ->
                         sendZIMsg model.fui
                             (ZI.GetZnlIfChanged { zknote = id, what = "cache", changeddate = zkn.zknote.changeddate })
+
+                    Just NC.Private ->
+                        sendZIMsg model.fui
+                            (ZI.GetZkNoteAndLinks { zknote = id, what = "cache" })
 
                     Nothing ->
                         sendZIMsg model.fui
@@ -3128,10 +3134,15 @@ makePubNoteCacheGets model md =
 makePubNoteCacheGet : Model -> ZkNoteId -> Cmd Msg
 makePubNoteCacheGet model id =
     case NC.getNote model.noteCache id of
-        Just zkn ->
+        Just (NC.ZNAL zkn) ->
             sendPIMsg
                 model.fui
                 (PI.GetZnlIfChanged { zknote = id, what = "cache", changeddate = zkn.zknote.changeddate })
+
+        Just NC.Private ->
+            sendPIMsg
+                model.fui
+                (PI.GetZkNoteAndLinks { zknote = id, what = "cache" })
 
         Nothing ->
             sendPIMsg
