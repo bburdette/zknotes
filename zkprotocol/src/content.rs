@@ -1,6 +1,7 @@
 #![allow(non_snake_case)]
 
 use crate::search::{ZkListNoteSearchResult, ZkSearchResultHeader};
+use elm_rs::{Elm, ElmDecode, ElmEncode};
 use uuid::Uuid;
 
 pub type ZkNoteId = Uuid;
@@ -23,7 +24,7 @@ pub struct Sysids {
   pub systemid: ZkNoteId,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug, Clone)]
 pub struct ZkNote {
   pub id: ZkNoteId,
   pub title: String,
@@ -42,7 +43,7 @@ pub struct ZkNote {
   pub sysids: Vec<ZkNoteId>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
+#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
 pub enum FileStatus {
   NotAFile,
   FileMissing,
@@ -77,7 +78,7 @@ pub struct SaveZkNote {
   pub deleted: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug, Clone)]
 pub enum Direction {
   From,
   To,
@@ -109,7 +110,7 @@ pub struct ZkLink {
   pub toname: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug, Clone)]
 pub struct EditLink {
   pub otherid: ZkNoteId,
   pub direction: Direction,
@@ -137,13 +138,13 @@ pub struct GetZkLinks {
   pub zknote: ZkNoteId,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]
 pub struct GetZkNoteAndLinks {
   pub zknote: ZkNoteId,
   pub what: String,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug, Clone)]
 pub struct GetZnlIfChanged {
   pub zknote: ZkNoteId,
   pub changeddate: i64,
@@ -216,13 +217,13 @@ pub struct GetZkNoteComments {
   pub limit: Option<i64>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
 pub struct ZkNoteAndLinks {
   pub zknote: ZkNote,
   pub links: Vec<EditLink>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug)]
 pub struct ZkNoteAndLinksWhat {
   pub what: String,
   pub znl: ZkNoteAndLinks,
@@ -298,4 +299,26 @@ pub struct JobStatus {
   pub jobno: i64,
   pub state: JobState,
   pub message: String,
+}
+
+#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]
+pub enum PublicRequest {
+  GetZkNoteAndLinks(GetZkNoteAndLinks),
+  GetZnlIfChanged(GetZnlIfChanged),
+  GetZkNotePubId(String),
+}
+
+#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]
+pub enum PublicReply {
+  ServerError(PublicError),
+  ZkNoteAndLinks(ZkNoteAndLinks),
+  ZkNoteAndLinksWhat(ZkNoteAndLinksWhat),
+  Noop,
+}
+
+#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]
+pub enum PublicError {
+  String(String),
+  NoteNotFound(PublicRequest),
+  NoteIsPrivate(PublicRequest),
 }

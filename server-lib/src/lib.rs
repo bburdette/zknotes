@@ -51,12 +51,11 @@ use tokio_util::io::StreamReader;
 use tracing_actix_web::TracingLogger;
 use uuid::Uuid;
 pub use zkprotocol;
-pub use zkprotocol::messages::{
-  PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage, PublicMessage,
-};
+pub use zkprotocol::content as zc;
+pub use zkprotocol::messages::{PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage};
 use zkprotocol::{
-  constants::{PrivateReplies, PublicReplies},
-  messages::PublicReplyMessage,
+  constants::PrivateReplies,
+  content::{PublicError, PublicReply, PublicRequest},
 };
 
 /*
@@ -129,9 +128,17 @@ async fn mainpage(session: Session, data: web::Data<State>, req: HttpRequest) ->
   }
 }
 
+pub fn to_public_error(zke: zkerr::Error, pr: PublicRequest) -> PublicError {
+  match zke {
+    error::Error::NoteNotFound => PublicError::NoteNotFound(pr),
+    error::Error::NoteIsPrivate => PublicError::NoteIsPrivate(pr),
+    _ => PublicError::String(zke.to_string()),
+  }
+}
+
 async fn public(
   data: web::Data<State>,
-  item: web::Json<PublicMessage>,
+  item: web::Json<PublicRequest>,
   req: HttpRequest,
 ) -> HttpResponse {
   info!(
@@ -140,18 +147,17 @@ async fn public(
     req.connection_info()
   );
 
+  let public_request = item.into_inner();
+
   match interfaces::public_interface(
     &data.config,
-    item.into_inner(),
+    &public_request,
     req.connection_info().realip_remote_addr(),
   ) {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'public' err: {:?}", e);
-      let se = PublicReplyMessage {
-        what: PublicReplies::ServerError,
-        content: serde_json::Value::String(e.to_string()),
-      };
+      let se = PublicReply::ServerError(to_public_error(e, public_request));
       HttpResponse::Ok().json(se)
     }
   }
@@ -729,7 +735,69 @@ pub async fn err_main(
         .help("create new admin user")
         .takes_value(true),
     )
+    .arg(
+      Arg::with_name("writeelmbindings")
+        .long("writeelmbindings")
+        .value_name("DIR")
+        .help("Write elmbindings directory")
+        .takes_value(true),
+    )
     .get_matches();
+
+  match matches.value_of("writeelmbindings") {
+    Some(exportdir) => {
+      let ed = Path::new(exportdir);
+      {
+        let mut target = vec![];
+        // elm_rs provides a macro for conveniently creating an Elm module with everything needed
+        elm_rs::export!(
+            "Content",
+            &mut target,
+            {        // generates types and encoders for types implementing ElmEncoder
+            encoders: [zc::ZkNote,
+                        zc::FileStatus,
+                        zc::Direction,
+                        zc::EditLink,
+                        zc::GetZkNoteAndLinks,
+                        zc::GetZnlIfChanged,
+                        zc::ZkNoteAndLinks,
+                        zc::PublicRequest ,
+                        zc::PublicReply ,
+                        zc::PublicError],
+            // generates types and decoders for types implementing ElmDecoder
+            decoders: [zc::ZkNote,
+                        zc::FileStatus,
+                        zc::Direction,
+                        zc::EditLink,
+                        zc::GetZkNoteAndLinks,
+                        zc::GetZnlIfChanged,
+                        zc::ZkNoteAndLinks,
+                        zc::PublicRequest ,
+                        zc::PublicReply ,
+                        zc::PublicError],
+            // generates types and functions for forming queries for types implementing ElmQuery
+            queries: [],
+            // generates types and functions for forming queries for types implementing ElmQueryField
+            query_fields: [],
+            }
+        )
+        .unwrap();
+        let output = String::from_utf8(target).unwrap();
+        let outf = ed
+          .join("Content.elm")
+          .to_str()
+          .ok_or(simple_error!("bad path"))?
+          .to_string();
+        util::write_string(outf.as_str(), output.as_str())?;
+
+        println!("wrote file: {}", outf);
+      }
+
+      return Ok(());
+    }
+
+    None => (),
+  }
 
   // writing a config file?
   if let Some(filename) = matches.value_of("write_config") {

@@ -972,6 +972,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7fcaabb2fef8c910e7f4c7ce9f67a1283a1715879a7c230ca9d6d1ae31f16d91"
 
 [[package]]
+name = "elm_rs"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "043b06877e194324cabd54e3f0eef99b0131d80b6b6073cb22697bed97862aa3"
+dependencies = [
+ "elm_rs_derive",
+ "uuid",
+]
+
+[[package]]
+name = "elm_rs_derive"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b3e657caae2215ca5380ae58302ec2ff1b6c87a55aa9137444972cd9b3540bf"
+dependencies = [
+ "heck",
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
 name = "email-encoding"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1280,6 +1302,12 @@ checksum = "312f66718a2d7789ffef4f4b7b213138ed9f1eb3aa1d0d82fc99f88fb3ffd26f"
 dependencies = [
  "hashbrown 0.14.0",
 ]
+
+[[package]]
+name = "heck"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
 
 [[package]]
 name = "hermit-abi"
@@ -3292,6 +3320,7 @@ dependencies = [
  "clap",
  "cookie",
  "either",
+ "elm_rs",
  "env_logger",
  "futures 0.3.31",
  "futures-util",
@@ -3324,6 +3353,7 @@ dependencies = [
 name = "zkprotocol"
 version = "0.1.0"
 dependencies = [
+ "elm_rs",
  "serde",
  "serde_derive",
  "serde_json",

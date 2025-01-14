@@ -22,19 +22,17 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use zkprotocol::constants::PrivateReplies;
-use zkprotocol::constants::PublicReplies;
-use zkprotocol::constants::{PrivateRequests, PrivateStreamingRequests, PublicRequests};
+use zkprotocol::constants::{PrivateRequests, PrivateStreamingRequests};
 use zkprotocol::content::JobState;
 use zkprotocol::content::JobStatus;
+use zkprotocol::content::PublicReply;
+use zkprotocol::content::PublicRequest;
 use zkprotocol::content::{
   GetArchiveZkLinks, GetArchiveZkNote, GetZkLinksSince, GetZkNoteAndLinks, GetZkNoteArchives,
   GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkNote, SaveZkNoteAndLinks, SyncSince,
   ZkLinks, ZkNoteAndLinks, ZkNoteAndLinksWhat, ZkNoteArchives, ZkNoteId,
 };
-use zkprotocol::messages::PublicReplyMessage;
-use zkprotocol::messages::{
-  PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage, PublicMessage,
-};
+use zkprotocol::messages::{PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage};
 use zkprotocol::search::{TagSearch, ZkListNoteSearchResult, ZkNoteSearch};
 pub fn login_data_for_token(
   session: Session,
@@ -550,33 +548,28 @@ pub async fn zk_interface_loggedin(
 // public json msgs don't require login.
 pub fn public_interface(
   config: &Config,
-  msg: PublicMessage,
+  msg: &PublicRequest,
   ipaddr: Option<&str>,
-) -> Result<PublicReplyMessage, Box<dyn Error>> {
-  match msg.what {
-    PublicRequests::GetZkNoteAndLinks => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let gzne: GetZkNoteAndLinks = serde_json::from_value(msgdata.clone())?;
+) -> Result<PublicReply, zkerr::Error> {
+  match msg {
+    PublicRequest::GetZkNoteAndLinks(gzne) => {
+      // let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      // let gzne: GetZkNoteAndLinks = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       let (_, note) = sqldata::read_zknote(&conn, &config.file_path, None, &gzne.zknote)?;
       info!(
         "public#getzknote: {:?} - {} - {:?}",
         gzne.zknote, note.title, ipaddr
       );
-      Ok(PublicReplyMessage {
-        what: PublicReplies::ZkNoteAndLinks,
-        content: serde_json::to_value(ZkNoteAndLinksWhat {
-          what: gzne.what,
-          znl: ZkNoteAndLinks {
-            links: sqldata::read_public_zklinks(&conn, &note.id)?,
-            zknote: note,
-          },
-        })?,
-      })
+      Ok(PublicReply::ZkNoteAndLinksWhat(ZkNoteAndLinksWhat {
+        what: gzne.what.clone(),
+        znl: ZkNoteAndLinks {
+          links: sqldata::read_public_zklinks(&conn, &note.id)?,
+          zknote: note,
+        },
+      }))
     }
-    PublicRequests::GetZnlIfChanged => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let gzic: GetZnlIfChanged = serde_json::from_value(msgdata.clone())?;
+    PublicRequest::GetZnlIfChanged(gzic) => {
       info!(
         "user#getzneifchanged: {:?} - {}",
         gzic.zknote, gzic.changeddate
@@ -585,38 +578,24 @@ pub fn public_interface(
       let ozkne = sqldata::read_zneifchanged(&conn, &config.file_path, None, &gzic)?;
 
       match ozkne {
-        Some(zkne) => Ok(PublicReplyMessage {
-          what: PublicReplies::ZkNoteAndLinks,
-          content: serde_json::to_value(ZkNoteAndLinksWhat {
-            what: gzic.what,
-            znl: zkne,
-          })?,
-        }),
-        None => Ok(PublicReplyMessage {
-          what: PublicReplies::Noop,
-          content: serde_json::Value::Null,
-        }),
+        Some(zkne) => Ok(PublicReply::ZkNoteAndLinksWhat(ZkNoteAndLinksWhat {
+          what: gzic.what.clone(),
+          znl: zkne,
+        })),
+        None => Ok(PublicReply::Noop),
       }
     }
-    PublicRequests::GetZkNotePubId => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let pubid: String = serde_json::from_value(msgdata.clone())?;
+    PublicRequest::GetZkNotePubId(pubid) => {
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       let note = sqldata::read_zknotepubid(&conn, &config.file_path, None, pubid.as_str())?;
       info!(
         "public#getzknotepubid: {} - {} - {:?}",
         pubid, note.title, ipaddr,
       );
-      Ok(PublicReplyMessage {
-        what: PublicReplies::ZkNoteAndLinks,
-        content: serde_json::to_value(ZkNoteAndLinksWhat {
-          what: "".to_string(),
-          znl: ZkNoteAndLinks {
-            links: sqldata::read_public_zklinks(&conn, &note.id)?,
-            zknote: note,
-          },
-        })?,
-      })
+      Ok(PublicReply::ZkNoteAndLinks(ZkNoteAndLinks {
+        links: sqldata::read_public_zklinks(&conn, &note.id)?,
+        zknote: note,
+      }))
     }
   }
 }

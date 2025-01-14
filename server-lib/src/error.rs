@@ -7,7 +7,6 @@ use reqwest;
 use rusqlite;
 use serde_json;
 use std::fmt;
-use zkprotocol::content::ZkNoteId;
 
 pub enum Error {
   Rusqlite(rusqlite::Error),
@@ -23,11 +22,8 @@ pub enum Error {
   Cookie(cookie::ParseError),
   Annotated(AnnotatedE),
   Girlboss(girlboss::Error),
-}
-
-pub enum ZkError {
-  NoteNotFound(ZkNoteId),
-  NoteIsPrivate(ZkNoteId),
+  NoteNotFound,
+  NoteIsPrivate,
 }
 
 pub struct AnnotatedE {
@@ -67,6 +63,8 @@ pub fn to_orgauth_error(e: Error) -> orgauth::error::Error {
     Error::Cookie(ze) => orgauth::error::Error::String(ze.to_string()),
     Error::Annotated(e) => orgauth::error::Error::String(e.to_string()),
     Error::Girlboss(e) => orgauth::error::Error::String(e.to_string()),
+    Error::NoteNotFound => orgauth::error::Error::String("note not found".to_string()),
+    Error::NoteIsPrivate => orgauth::error::Error::String("note is private".to_string()),
   }
 }
 
@@ -92,6 +90,8 @@ impl fmt::Display for Error {
       Error::Cookie(e) => write!(f, "{}", e),
       Error::Annotated(e) => write!(f, "{}", e),
       Error::Girlboss(e) => write!(f, "{}", e),
+      Error::NoteNotFound => write!(f, "{}", "note not found"),
+      Error::NoteIsPrivate => write!(f, "{}", "note is private"),
     }
   }
 }
@@ -112,6 +112,8 @@ impl fmt::Debug for Error {
       Error::Cookie(e) => write!(f, "{}", e),
       Error::Annotated(e) => write!(f, "{}", e),
       Error::Girlboss(e) => write!(f, "{}", e),
+      Error::NoteNotFound => write!(f, "{}", "note not found"),
+      Error::NoteIsPrivate => write!(f, "{}", "note is private"),
     }
   }
 }

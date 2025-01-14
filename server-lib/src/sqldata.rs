@@ -515,7 +515,6 @@ pub fn save_zklink(
   } else {
     Err(zkerr::Error::String("link not allowed".into()))
   })?;
-  // let _wat = orwat?;
 
   let now = now()?;
 

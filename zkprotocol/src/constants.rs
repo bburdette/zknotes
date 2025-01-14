@@ -59,19 +59,19 @@ pub enum PrivateStreamingRequests {
   Sync,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
-pub enum PublicRequests {
-  GetZkNoteAndLinks,
-  GetZnlIfChanged,
-  GetZkNotePubId,
-}
+// #[derive(Deserialize, Serialize, Debug)]
+// pub enum PublicRequests {
+//   GetZkNoteAndLinks,
+//   GetZnlIfChanged,
+//   GetZkNotePubId,
+// }
 
-#[derive(Deserialize, Serialize, Debug)]
-pub enum PublicReplies {
-  ServerError,
-  ZkNoteAndLinks,
-  Noop,
-}
+// #[derive(Deserialize, Serialize, Debug)]
+// pub enum PublicReplies {
+//   ServerError,
+//   ZkNoteAndLinks,
+//   Noop,
+// }
 
 #[derive(Deserialize, Serialize, Debug, PartialEq)]
 pub enum PrivateReplies {
