@@ -157,7 +157,7 @@ async fn public(
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'public' err: {:?}", e);
-      let se = PublicReply::ServerError(to_public_error(e, public_request));
+      let se = PublicReply::PrServerError(to_public_error(e, public_request));
       HttpResponse::Ok().json(se)
     }
   }
@@ -755,21 +755,25 @@ pub async fn err_main(
             &mut target,
             {        // generates types and encoders for types implementing ElmEncoder
             encoders: [zc::ZkNote,
+                        zc::ZkNoteId,
                         zc::FileStatus,
                         zc::Direction,
                         zc::EditLink,
                         zc::GetZkNoteAndLinks,
                         zc::GetZnlIfChanged,
                         zc::ZkNoteAndLinks,
+                        zc::ZkNoteAndLinksWhat,
                         zc::PublicRequest ,
                         zc::PublicReply ,
                         zc::PublicError],
             // generates types and decoders for types implementing ElmDecoder
             decoders: [zc::ZkNote,
+                        zc::ZkNoteId,
                         zc::FileStatus,
                         zc::Direction,
                         zc::EditLink,
                         zc::GetZkNoteAndLinks,
+                        zc::ZkNoteAndLinksWhat,
                         zc::GetZnlIfChanged,
                         zc::ZkNoteAndLinks,
                         zc::PublicRequest ,

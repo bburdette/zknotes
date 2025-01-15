@@ -1,5 +1,6 @@
 module Data exposing (..)
 
+import Content exposing (..)
 import Json.Decode as JD
 import Json.Encode as JE
 import Orgauth.Data exposing (UserId, decodeUserId, encodeUserId)

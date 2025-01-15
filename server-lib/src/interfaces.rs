@@ -552,7 +552,7 @@ pub fn public_interface(
   ipaddr: Option<&str>,
 ) -> Result<PublicReply, zkerr::Error> {
   match msg {
-    PublicRequest::GetZkNoteAndLinks(gzne) => {
+    PublicRequest::PrGetZkNoteAndLinks(gzne) => {
       // let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
       // let gzne: GetZkNoteAndLinks = serde_json::from_value(msgdata.clone())?;
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
@@ -561,7 +561,7 @@ pub fn public_interface(
         "public#getzknote: {:?} - {} - {:?}",
         gzne.zknote, note.title, ipaddr
       );
-      Ok(PublicReply::ZkNoteAndLinksWhat(ZkNoteAndLinksWhat {
+      Ok(PublicReply::PrZkNoteAndLinksWhat(ZkNoteAndLinksWhat {
         what: gzne.what.clone(),
         znl: ZkNoteAndLinks {
           links: sqldata::read_public_zklinks(&conn, &note.id)?,
@@ -569,7 +569,7 @@ pub fn public_interface(
         },
       }))
     }
-    PublicRequest::GetZnlIfChanged(gzic) => {
+    PublicRequest::PrGetZnlIfChanged(gzic) => {
       info!(
         "user#getzneifchanged: {:?} - {}",
         gzic.zknote, gzic.changeddate
@@ -578,21 +578,21 @@ pub fn public_interface(
       let ozkne = sqldata::read_zneifchanged(&conn, &config.file_path, None, &gzic)?;
 
       match ozkne {
-        Some(zkne) => Ok(PublicReply::ZkNoteAndLinksWhat(ZkNoteAndLinksWhat {
+        Some(zkne) => Ok(PublicReply::PrZkNoteAndLinksWhat(ZkNoteAndLinksWhat {
           what: gzic.what.clone(),
           znl: zkne,
         })),
-        None => Ok(PublicReply::Noop),
+        None => Ok(PublicReply::PrNoop),
       }
     }
-    PublicRequest::GetZkNotePubId(pubid) => {
+    PublicRequest::PrGetZkNotePubId(pubid) => {
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       let note = sqldata::read_zknotepubid(&conn, &config.file_path, None, pubid.as_str())?;
       info!(
         "public#getzknotepubid: {} - {} - {:?}",
         pubid, note.title, ipaddr,
       );
-      Ok(PublicReply::ZkNoteAndLinks(ZkNoteAndLinks {
+      Ok(PublicReply::PrZkNoteAndLinks(ZkNoteAndLinks {
         links: sqldata::read_public_zklinks(&conn, &note.id)?,
         zknote: note,
       }))

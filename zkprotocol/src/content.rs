@@ -1,10 +1,30 @@
 #![allow(non_snake_case)]
 
+use std::fmt::Display;
+
 use crate::search::{ZkListNoteSearchResult, ZkSearchResultHeader};
 use elm_rs::{Elm, ElmDecode, ElmEncode};
 use uuid::Uuid;
 
-pub type ZkNoteId = Uuid;
+// pub type ZkNoteId = Uuid;
+#[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum ZkNoteId {
+  Zni(Uuid),
+}
+
+impl From<Uuid> for ZkNoteId {
+  fn from(a: Uuid) -> Self {
+    ZkNoteId::Zni(a)
+  }
+}
+
+impl Display for ZkNoteId {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      ZkNoteId::Zni(uuid) => write!(f, "{}", uuid),
+    }
+  }
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ExtraLoginData {
@@ -303,17 +323,17 @@ pub struct JobStatus {
 
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]
 pub enum PublicRequest {
-  GetZkNoteAndLinks(GetZkNoteAndLinks),
-  GetZnlIfChanged(GetZnlIfChanged),
-  GetZkNotePubId(String),
+  PrGetZkNoteAndLinks(GetZkNoteAndLinks),
+  PrGetZnlIfChanged(GetZnlIfChanged),
+  PrGetZkNotePubId(String),
 }
 
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]
 pub enum PublicReply {
-  ServerError(PublicError),
-  ZkNoteAndLinks(ZkNoteAndLinks),
-  ZkNoteAndLinksWhat(ZkNoteAndLinksWhat),
-  Noop,
+  PrServerError(PublicError),
+  PrZkNoteAndLinks(ZkNoteAndLinks),
+  PrZkNoteAndLinksWhat(ZkNoteAndLinksWhat),
+  PrNoop,
 }
 
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]

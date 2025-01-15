@@ -1195,10 +1195,10 @@ pub fn new_shares(
     let id = row.get(1)?;
     Ok((id, uuid))
   })?;
-  let res: Result<Vec<(i64, Uuid)>, zkerr::Error> = rec_iter
+  let res: Result<Vec<(i64, ZkNoteId)>, zkerr::Error> = rec_iter
     .map(|i| {
       i.map_err(|e| e.into())
-        .and_then(|(id, uuid)| Ok((id, Uuid::parse_str(uuid.as_str())?)))
+        .and_then(|(id, uuid)| Ok((id, Uuid::parse_str(uuid.as_str())?.into())))
     })
     .collect();
   res

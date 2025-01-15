@@ -52,7 +52,7 @@ pub fn on_new_user(
       let remd: ExtraLoginData = serde_json::from_value(remote_data)?;
       remd.zknote
     }
-    None => uuid::Uuid::new_v4(),
+    None => uuid::Uuid::new_v4().into(),
   };
 
   // make a corresponding note,
@@ -117,13 +117,13 @@ pub fn on_delete_user(conn: &Connection, uid: i64) -> Result<bool, orgauth::erro
 
 pub fn sysids() -> Result<Sysids, zkerr::Error> {
   Ok(Sysids {
-    publicid: Uuid::parse_str(SpecialUuids::Public.str())?,
-    commentid: Uuid::parse_str(SpecialUuids::Comment.str())?,
-    shareid: Uuid::parse_str(SpecialUuids::Share.str())?,
-    searchid: Uuid::parse_str(SpecialUuids::Search.str())?,
-    userid: Uuid::parse_str(SpecialUuids::User.str())?,
-    archiveid: Uuid::parse_str(SpecialUuids::Archive.str())?,
-    systemid: Uuid::parse_str(SpecialUuids::System.str())?,
+    publicid: Uuid::parse_str(SpecialUuids::Public.str())?.into(),
+    commentid: Uuid::parse_str(SpecialUuids::Comment.str())?.into(),
+    shareid: Uuid::parse_str(SpecialUuids::Share.str())?.into(),
+    searchid: Uuid::parse_str(SpecialUuids::Search.str())?.into(),
+    userid: Uuid::parse_str(SpecialUuids::User.str())?.into(),
+    archiveid: Uuid::parse_str(SpecialUuids::Archive.str())?.into(),
+    systemid: Uuid::parse_str(SpecialUuids::System.str())?.into(),
   })
 }
 
@@ -567,9 +567,9 @@ pub fn note_id2(conn: &Connection, uid: i64, title: &str) -> Result<Option<i64>,
   }
 }
 
-pub fn note_id_for_zknoteid(conn: &Connection, zknoteid: &ZkNoteId) -> Result<i64, zkerr::Error> {
-  note_id_for_uuid(&conn, &zknoteid)
-}
+// pub fn note_id_for_zknoteid(conn: &Connection, zknoteid: &ZkNoteId) -> Result<i64, zkerr::Error> {
+//   note_id_for_uuid(&conn, &zknoteid)
+// }
 
 pub fn uuid_for_note_id(conn: &Connection, id: i64) -> Result<Uuid, zkerr::Error> {
   let s: String = conn.query_row(
@@ -579,6 +579,12 @@ pub fn uuid_for_note_id(conn: &Connection, id: i64) -> Result<Uuid, zkerr::Error
     |row| Ok(row.get(0)?),
   )?;
   Ok(Uuid::parse_str(s.as_str())?)
+}
+
+pub fn note_id_for_zknoteid(conn: &Connection, zknoteid: &ZkNoteId) -> Result<i64, zkerr::Error> {
+  match zknoteid {
+    ZkNoteId::Zni(uuid) => note_id_for_uuid(conn, uuid),
+  }
 }
 
 pub fn note_id_for_uuid(conn: &Connection, uuid: &Uuid) -> Result<i64, zkerr::Error> {
@@ -755,7 +761,7 @@ pub fn archive_zknote_i64(conn: &Connection, noteid: i64) -> Result<SavedZkNote,
   save_zklink(&conn, archive_note_id, noteid, sysid, Some(aid))?;
 
   Ok(SavedZkNote {
-    id: uuid,
+    id: uuid.into(),
     changeddate: now,
   })
 }
@@ -797,7 +803,7 @@ pub fn archive_zknote(
   Ok((
     archive_note_id,
     SavedZkNote {
-      id: uuid,
+      id: uuid.into(),
       changeddate: note.changeddate,
     },
   ))
@@ -821,7 +827,7 @@ pub fn save_zknote(
 
   match note.id {
     Some(uuid) => {
-      let id = note_id_for_uuid(conn, &uuid)?;
+      let id = note_id_for_zknoteid(conn, &uuid)?;
       archive_zknote_i64(&conn, id)?;
       // existing note.  update IF mine.
       match conn.execute(
@@ -892,7 +898,7 @@ pub fn save_zknote(
       Ok((
         id,
         SavedZkNote {
-          id: uuid,
+          id: uuid.into(),
           changeddate: now,
         },
       ))
@@ -918,7 +924,7 @@ pub fn get_sysids(
       .query_map(params![noteid, sysid], |row| Ok(row.get(0)?))?
       .filter_map(|x| {
         x.ok()
-          .and_then(|s: String| Uuid::parse_str(s.as_str()).ok())
+          .and_then(|s: String| Uuid::parse_str(s.as_str()).ok().map(|x| x.into()))
       })
       .collect(),
   );
@@ -947,8 +953,8 @@ pub fn read_extra_login_data(conn: &Connection, id: i64) -> Result<ExtraLoginDat
   };
   let eld = ExtraLoginData {
     userid: uid,
-    zknote: Uuid::parse_str(noteid.as_str())?,
-    homenote: hnid,
+    zknote: Uuid::parse_str(noteid.as_str())?.into(),
+    homenote: hnid.map(|x| x.into()),
   };
 
   Ok(eld)
@@ -960,7 +966,7 @@ pub fn read_zknote_i64(
   uid: Option<i64>,
   id: i64,
 ) -> Result<ZkNote, zkerr::Error> {
-  read_zknote(&conn, &files_dir, uid, &uuid_for_note_id(&conn, id)?).map(|x| x.1)
+  read_zknote(&conn, &files_dir, uid, &uuid_for_note_id(&conn, id)?.into()).map(|x| x.1)
 }
 
 pub fn file_status(
@@ -990,12 +996,12 @@ pub fn read_zknote_unchecked(
     Ok::<_, zkerr::Error>((
       row.get(0)?,
       ZkNote {
-        id: Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?,
+        id: Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?.into(),
         title: row.get(2)?,
         content: row.get(3)?,
         user: row.get(4)?,
         username: row.get(5)?,
-        usernote: Uuid::parse_str(row.get::<usize, String>(6)?.as_str())?,
+        usernote: Uuid::parse_str(row.get::<usize, String>(6)?.as_str())?.into(),
         pubid: row.get(7)?,
         editable: row.get(8)?,      // editable same as editableValue!
         editableValue: row.get(8)?, // <--- same index.
@@ -1088,7 +1094,7 @@ pub fn read_zklistnote(
     params![id],
     |row| {
       let zln = ZkListNote {
-        id:  Uuid::parse_str(row.get::<usize,String>(0)?.as_str())?,
+        id:  Uuid::parse_str(row.get::<usize,String>(0)?.as_str())?.into(),
         title: row.get(1)?,
         filestatus: file_status(&conn, &files_dir, row.get(2)?)?,
         user: row.get(3)?,
@@ -1236,12 +1242,12 @@ pub fn read_zknotepubid(
     params![pubid, publicid],
     |row| {
       Ok::<_, zkerr::Error>((row.get(0)?, ZkNote {
-        id: Uuid::parse_str(row.get::<usize,String>(1)?.as_str())?,
+        id: Uuid::parse_str(row.get::<usize,String>(1)?.as_str())?.into(),
         title: row.get(2)?,
         content: row.get(3)?,
         user: row.get(4)?,
         username: row.get(5)?,
-        usernote:  Uuid::parse_str(row.get::<usize,String>(6)?.as_str())?,
+        usernote:  Uuid::parse_str(row.get::<usize,String>(6)?.as_str())?.into(),
         pubid: row.get(7)?,
         editable: false,
         editableValue: row.get(8)?,
@@ -1285,7 +1291,7 @@ pub fn delete_zknote(
   uid: i64,
   noteid: &ZkNoteId,
 ) -> Result<(), zkerr::Error> {
-  let nid = note_id_for_uuid(&conn, &noteid)?;
+  let nid = note_id_for_zknoteid(&conn, &noteid)?;
   match zknote_access_id(&conn, Some(uid), nid)? {
     Access::ReadWrite => Ok::<_, zkerr::Error>(()),
     _ => Err("can't delete zknote; write permission denied.".into()),
@@ -1345,8 +1351,8 @@ pub fn save_zklinks(dbfile: &Path, uid: i64, zklinks: Vec<ZkLink>) -> Result<(),
 
   for zklink in zklinks.iter() {
     // TODO: integrate into sql instead of separate queries.
-    let to = note_id_for_uuid(&conn, &zklink.to)?;
-    let from = note_id_for_uuid(&conn, &zklink.from)?;
+    let to = note_id_for_zknoteid(&conn, &zklink.to)?;
+    let from = note_id_for_zknoteid(&conn, &zklink.from)?;
     if zklink.user == uid {
       if zklink.delete == Some(true) {
         // create archive record.
@@ -1366,7 +1372,7 @@ pub fn save_zklinks(dbfile: &Path, uid: i64, zklinks: Vec<ZkLink>) -> Result<(),
       } else {
         let linkzknote = zklink
           .linkzknote
-          .and_then(|lzn| note_id_for_uuid(&conn, &lzn).ok());
+          .and_then(|lzn| note_id_for_zknoteid(&conn, &lzn).ok());
         save_zklink(&conn, from, to, uid, linkzknote)?;
       }
     }
@@ -1387,8 +1393,8 @@ pub fn save_savezklinks(
       Direction::To => (zknid, link.otherid),
     };
     // TODO: integrate into sql instead of separate queries.
-    let to = note_id_for_uuid(&conn, &uuto)?;
-    let from = note_id_for_uuid(&conn, &uufrom)?;
+    let to = note_id_for_zknoteid(&conn, &uuto)?;
+    let from = note_id_for_zknoteid(&conn, &uufrom)?;
     if link.user == uid {
       if link.delete == Some(true) {
         // create archive record.
@@ -1407,7 +1413,7 @@ pub fn save_savezklinks(
       } else {
         let linkzknote = link
           .zknote
-          .and_then(|lzn| note_id_for_uuid(&conn, &lzn).ok());
+          .and_then(|lzn| note_id_for_zknoteid(&conn, &lzn).ok());
         save_zklink(&conn, from, to, uid, linkzknote)?;
       }
     }
@@ -1518,10 +1524,10 @@ pub fn read_zklinks(
         None => None,
       };
       Ok::<_, zkerr::Error>(EditLink {
-        otherid: Uuid::parse_str(otheruuid.as_str())?,
+        otherid: Uuid::parse_str(otheruuid.as_str())?.into(),
         direction,
         user: row.get(2)?,
-        zknote,
+        zknote: zknote.map(|x| x.into()),
         othername,
         sysids,
       })
@@ -1586,10 +1592,10 @@ pub fn read_public_zklinks(
       .and_then(|s| Uuid::parse_str(s.as_str()).ok());
 
     Ok::<_, zkerr::Error>(EditLink {
-      otherid: otheruuid,
+      otherid: otheruuid.into(),
       direction,
       user: row.get(2)?,
-      zknote,
+      zknote: zknote.map(|x| x.into()),
       othername,
       sysids: get_sysids(&conn, sysid, otherid)?,
     })
@@ -1707,7 +1713,7 @@ pub fn read_archivezknote(
   let auid = Uuid::parse_str(SpecialUuids::Archive.str())?;
   let archiveid = note_id_for_uuid(&conn, &auid)?;
 
-  if gazn.parentnote == auid {
+  if gazn.parentnote == auid.into() {
     bail!("query not allowed!");
   }
 
@@ -1935,8 +1941,8 @@ pub fn read_zklinks_since_stream(
 
     let systemid = user_id(&conn, "system")?;
     // archive note id.
-    let auid = Uuid::parse_str(SpecialUuids::Archive.str())?;
-    let archiveid = note_id_for_uuid(&conn, &auid)?;
+    let auid = Uuid::parse_str(SpecialUuids::Archive.str())?.into();
+    let archiveid = note_id_for_zknoteid(&conn, &auid)?;
 
     // also insert archive notes into accessible notes!
     conn.execute(
@@ -2285,7 +2291,7 @@ pub fn make_file_note(
         params![fid, uid],
         |row| Ok((row.get(0)?, row.get::<usize, String>(1)?)),
       ) {
-        Ok((id, uuid)) => return Ok((id, Uuid::parse_str(uuid.as_str())?, fid)),
+        Ok((id, uuid)) => return Ok((id, Uuid::parse_str(uuid.as_str())?.into(), fid)),
         Err(rusqlite::Error::QueryReturnedNoRows) => fid,
         Err(e) => Err(e)?,
       }

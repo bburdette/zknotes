@@ -115,7 +115,7 @@ pub fn search_zknotes(
     let uuid = Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?;
     let sysids = get_sysids(conn, sysid, id)?;
     Ok::<ZkListNote, zkerr::Error>(ZkListNote {
-      id: uuid,
+      id: uuid.into(),
       title: row.get(2)?,
       filestatus: {
         let wat: Option<i64> = row.get(3)?;

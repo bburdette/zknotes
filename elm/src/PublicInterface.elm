@@ -1,5 +1,7 @@
 module PublicInterface exposing (SendMsg(..), ServerResponse(..), encodeSendMsg, getErrorIndexNote, serverResponseDecoder)
 
+-- import Content
+
 import Data exposing (ZkNoteId)
 import Http
 import Http.Tasks as HT
