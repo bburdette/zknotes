@@ -5,7 +5,8 @@ import Browser
 import Browser.Events
 import Browser.Navigation
 import Common
-import Data exposing (FileUrlInfo, ZkNoteId, jobComplete, zniEq)
+import Data exposing (ZkNoteId)
+import DataUtil exposing (FileUrlInfo, LoginData, jobComplete, zniEq)
 import Dict exposing (Dict)
 import DisplayMessage
 import EditZkNote
@@ -31,7 +32,7 @@ import NoteCache as NC exposing (NoteCache)
 import Orgauth.AdminInterface as AI
 import Orgauth.ChangeEmail as CE
 import Orgauth.ChangePassword as CP
-import Orgauth.Data as OD
+import Orgauth.Data as OD exposing (getUserIdVal)
 import Orgauth.Invited as Invited
 import Orgauth.Login as Login
 import Orgauth.ResetPassword as ResetPassword
@@ -79,7 +80,7 @@ type Msg
     | AdminReplyData (Result Http.Error AI.ServerResponse)
     | ZkReplyData (Result Http.Error ( Time.Posix, ZI.ServerResponse ))
     | ZkReplyDataSeq (Result Http.Error ( Time.Posix, ZI.ServerResponse ) -> Maybe (Cmd Msg)) (Result Http.Error ( Time.Posix, ZI.ServerResponse ))
-    | TAReplyData Data.TASelection (Result Http.Error ( Time.Posix, ZI.ServerResponse ))
+    | TAReplyData DataUtil.TASelection (Result Http.Error ( Time.Posix, ZI.ServerResponse ))
     | PublicReplyData (Result Http.Error ( Time.Posix, PI.ServerResponse ))
     | ErrorIndexNote (Result Http.Error PI.ServerResponse)
     | TauriZkReplyData JD.Value
@@ -117,29 +118,29 @@ type Msg
 type State
     = Login Login.Model Route
     | Invited Invited.Model
-    | EditZkNote EditZkNote.Model Data.LoginData
-    | EditZkNoteListing EditZkNoteListing.Model Data.LoginData
-    | ArchiveListing ArchiveListing.Model Data.LoginData
+    | EditZkNote EditZkNote.Model LoginData
+    | EditZkNoteListing EditZkNoteListing.Model LoginData
+    | ArchiveListing ArchiveListing.Model LoginData
     | View View.Model
     | EView View.Model State
-    | Import Import.Model Data.LoginData
-    | UserSettings UserSettings.Model Data.LoginData State
-    | ShowMessage ShowMessage.Model Data.LoginData (Maybe State)
+    | Import Import.Model LoginData
+    | UserSettings UserSettings.Model LoginData State
+    | ShowMessage ShowMessage.Model LoginData (Maybe State)
     | PubShowMessage ShowMessage.Model (Maybe State)
-    | LoginShowMessage ShowMessage.Model Data.LoginData Url
+    | LoginShowMessage ShowMessage.Model LoginData Url
     | SelectDialog (SS.GDModel Int) State
     | ChangePasswordDialog CP.GDModel State
     | ChangeEmailDialog CE.GDModel State
     | ResetPassword ResetPassword.Model
-    | UserListing UserListing.Model Data.LoginData (Maybe ( SP.Model, Data.ZkListNoteSearchResult ))
-    | UserEdit UserEdit.Model Data.LoginData
-    | ShowUrl ShowUrl.Model Data.LoginData
+    | UserListing UserListing.Model LoginData (Maybe ( SP.Model, Data.ZkListNoteSearchResult ))
+    | UserEdit UserEdit.Model LoginData
+    | ShowUrl ShowUrl.Model LoginData
     | DisplayMessage DisplayMessage.GDModel State
     | MessageNLink MessageNLink.GDModel State
     | RequestsDialog RequestsDialog.GDModel State
     | JobsDialog JobsDialog.GDModel State
-    | TagFiles (TagAThing.Model TagFiles.Model TagFiles.Msg TagFiles.Command) Data.LoginData State
-    | InviteUser (TagAThing.Model InviteUser.Model InviteUser.Msg InviteUser.Command) Data.LoginData State
+    | TagFiles (TagAThing.Model TagFiles.Model TagFiles.Msg TagFiles.Command) LoginData State
+    | InviteUser (TagAThing.Model InviteUser.Model InviteUser.Msg InviteUser.Command) LoginData State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
 
 
@@ -153,8 +154,8 @@ decodeFlags =
         |> andMap (JD.field "debugstring" JD.string)
         |> andMap (JD.field "width" JD.int)
         |> andMap (JD.field "height" JD.int)
-        |> andMap (JD.field "errorid" (JD.maybe Data.decodeZkNoteId))
-        |> andMap (JD.field "login" (JD.maybe Data.decodeLoginData))
+        |> andMap (JD.field "errorid" (JD.maybe Data.zkNoteIdDecoder))
+        |> andMap (JD.field "login" (JD.maybe DataUtil.decodeLoginData))
         |> andMap (JD.field "adminsettings" OD.decodeAdminSettings)
         |> andMap (JD.field "tauri" JD.bool)
 
@@ -168,7 +169,7 @@ type alias Flags =
     , width : Int
     , height : Int
     , errorid : Maybe ZkNoteId
-    , login : Maybe Data.LoginData
+    , login : Maybe DataUtil.LoginData
     , adminsettings : OD.AdminSettings
     , tauri : Bool
     }
@@ -1023,7 +1024,7 @@ stateSearch state =
             Just ( model.spmodel, model.zknSearchResult )
 
 
-stateLogin : State -> Maybe Data.LoginData
+stateLogin : State -> Maybe LoginData
 stateLogin state =
     case state of
         Login _ _ ->
@@ -1175,9 +1176,9 @@ sendSearch model search =
                         , deleted = False
                         }
                     , links =
-                        [ { otherid = Data.sysids.searchid
+                        [ { otherid = DataUtil.sysids.searchid
                           , direction = Data.To
-                          , user = ldata.userid
+                          , user = getUserIdVal ldata.userid
                           , zknote = Nothing
                           , delete = Nothing
                           }
@@ -1751,7 +1752,7 @@ actualupdate msg model =
                     ( { model | state = ResetPassword nst }, Cmd.none )
 
         ( TASelection jv, state ) ->
-            case JD.decodeValue Data.decodeTASelection jv of
+            case JD.decodeValue DataUtil.decodeTASelection jv of
                 Ok tas ->
                     case state of
                         EditZkNote emod login ->
@@ -1764,7 +1765,7 @@ actualupdate msg model =
                     ( displayMessageDialog model <| JD.errorToString e, Cmd.none )
 
         ( TAError jv, state ) ->
-            case JD.decodeValue Data.decodeTAError jv of
+            case JD.decodeValue DataUtil.decodeTAError jv of
                 Ok tae ->
                     case state of
                         EditZkNote emod login ->
@@ -2123,7 +2124,7 @@ actualupdate msg model =
                                     ( model, Cmd.none )
 
                         UI.LoggedIn oalogin ->
-                            case Data.fromOaLd oalogin of
+                            case DataUtil.fromOaLd oalogin of
                                 Ok login ->
                                     let
                                         lgmod =
@@ -2611,8 +2612,9 @@ actualupdate msg model =
                                     case Dict.get jobstatus.jobno model.jobs.jobs of
                                         Just j ->
                                             case j.state of
-                                                Data.Completed n ->
-                                                    { jobstatus | state = Data.Completed (n + 1) }
+                                                Data.Completed ->
+                                                    -- TODO fix , do counter
+                                                    { jobstatus | state = Data.Completed }
 
                                                 _ ->
                                                     jobstatus
@@ -3071,7 +3073,7 @@ actualupdate msg model =
             )
 
 
-handleTASelection : Model -> EditZkNote.Model -> Data.LoginData -> Data.TASelection -> ( Model, Cmd Msg )
+handleTASelection : Model -> EditZkNote.Model -> LoginData -> DataUtil.TASelection -> ( Model, Cmd Msg )
 handleTASelection model emod login tas =
     case EditZkNote.onTASelection emod model.recentNotes tas of
         EditZkNote.TAError e ->
@@ -3089,7 +3091,7 @@ handleTASelection model emod login tas =
             , Cmd.batch
                 ((case s of
                     Just sel ->
-                        setTASelection (Data.encodeSetSelection sel)
+                        setTASelection (DataUtil.encodeSetSelection sel)
 
                     Nothing ->
                         Cmd.none
@@ -3168,7 +3170,7 @@ makeNewNoteCacheGets md model =
             )
 
 
-handleEditZkNoteCmd : Model -> Data.LoginData -> ( EditZkNote.Model, EditZkNote.Command ) -> ( Model, Cmd Msg )
+handleEditZkNoteCmd : Model -> LoginData -> ( EditZkNote.Model, EditZkNote.Command ) -> ( Model, Cmd Msg )
 handleEditZkNoteCmd model login ( emod, ecmd ) =
     let
         backtolisting =
@@ -3441,7 +3443,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
     ( rm, Cmd.batch (rcmd :: ngets) )
 
 
-handleEditZkNoteListing : Model -> Data.LoginData -> ( EditZkNoteListing.Model, EditZkNoteListing.Command ) -> ( Model, Cmd Msg )
+handleEditZkNoteListing : Model -> LoginData -> ( EditZkNoteListing.Model, EditZkNoteListing.Command ) -> ( Model, Cmd Msg )
 handleEditZkNoteListing model login ( emod, ecmd ) =
     case ecmd of
         EditZkNoteListing.None ->
@@ -3480,7 +3482,7 @@ handleEditZkNoteListing model login ( emod, ecmd ) =
             )
 
 
-handleArchiveListing : Model -> Data.LoginData -> ( ArchiveListing.Model, ArchiveListing.Command ) -> ( Model, Cmd Msg )
+handleArchiveListing : Model -> LoginData -> ( ArchiveListing.Model, ArchiveListing.Command ) -> ( Model, Cmd Msg )
 handleArchiveListing model login ( emod, ecmd ) =
     case ecmd of
         ArchiveListing.None ->
@@ -3560,7 +3562,7 @@ handleInvited model ( lmod, lcmd ) =
 handleTagFiles :
     Model
     -> ( TagAThing.Model TagFiles.Model TagFiles.Msg TagFiles.Command, TagAThing.Command TagFiles.Command )
-    -> Data.LoginData
+    -> LoginData
     -> State
     -> ( Model, Cmd Msg )
 handleTagFiles model ( lmod, lcmd ) login st =
@@ -3601,7 +3603,7 @@ handleTagFiles model ( lmod, lcmd ) login st =
                             zklns
                                 |> List.foldl
                                     (\zkln links ->
-                                        List.map (\el -> Data.toZkLink zkln.id login.userid el) zkls
+                                        List.map (\el -> DataUtil.toZkLink zkln.id login.userid el) zkls
                                             ++ links
                                     )
                                     []
@@ -3621,7 +3623,7 @@ handleTagFiles model ( lmod, lcmd ) login st =
 handleInviteUser :
     Model
     -> ( TagAThing.Model InviteUser.Model InviteUser.Msg InviteUser.Command, TagAThing.Command InviteUser.Command )
-    -> Data.LoginData
+    -> LoginData
     -> State
     -> ( Model, Cmd Msg )
 handleInviteUser model ( lmod, lcmd ) login st =
@@ -3660,7 +3662,7 @@ handleInviteUser model ( lmod, lcmd ) login st =
                                 else
                                     Nothing
                             , data =
-                                Data.encodeZkInviteData (List.map Data.elToSzl (Dict.values lmod.zklDict))
+                                DataUtil.encodeZkInviteData (List.map DataUtil.elToSzl (Dict.values lmod.zklDict))
                                     |> JE.encode 2
                                     |> Just
                             }
@@ -3674,7 +3676,7 @@ handleInviteUser model ( lmod, lcmd ) login st =
                     ( { model | state = updstate }, Cmd.none )
 
 
-prevSearchQuery : Data.LoginData -> S.ZkNoteSearch
+prevSearchQuery : LoginData -> S.ZkNoteSearch
 prevSearchQuery login =
     let
         ts : S.TagSearch

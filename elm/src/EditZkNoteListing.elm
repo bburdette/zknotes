@@ -2,6 +2,7 @@ module EditZkNoteListing exposing (..)
 
 import Common
 import Data
+import DataUtil exposing (LoginData)
 import Dialog as D
 import Element as E exposing (Element)
 import Element.Background as EBk
@@ -53,7 +54,7 @@ type Command
     | SearchHistory
 
 
-onPowerDeleteComplete : Int -> Data.LoginData -> Model -> Model
+onPowerDeleteComplete : Int -> LoginData -> Model -> Model
 onPowerDeleteComplete count ld model =
     { model
         | dialog =
@@ -105,7 +106,7 @@ onWkKeyPress key model =
             ( model, None )
 
 
-view : Data.LoginData -> Util.Size -> Model -> Element Msg
+view : LoginData -> Util.Size -> Model -> Element Msg
 view ld size model =
     case model.dialog of
         Just ( dialog, _ ) ->
@@ -115,7 +116,7 @@ view ld size model =
             listview ld size model
 
 
-listview : Data.LoginData -> Util.Size -> Model -> Element Msg
+listview : LoginData -> Util.Size -> Model -> Element Msg
 listview ld size model =
     let
         maxwidth =
@@ -142,7 +143,7 @@ listview ld size model =
                         (\id ->
                             E.link
                                 Common.buttonStyle
-                                { url = Data.editNoteLink id
+                                { url = DataUtil.editNoteLink id
                                 , label = E.text "⌂"
                                 }
                         )
@@ -186,14 +187,14 @@ listview ld size model =
                                          , E.clipX
                                          , E.width E.fill
                                          ]
-                                            ++ (ZC.systemColor Data.sysids n.sysids
+                                            ++ (ZC.systemColor DataUtil.sysids n.sysids
                                                     |> Maybe.map (\c -> [ EF.color c ])
                                                     |> Maybe.withDefault []
                                                )
                                         )
                                         [ E.link
                                             [ E.height <| E.px 30 ]
-                                            { url = Data.editNoteLink n.id
+                                            { url = DataUtil.editNoteLink n.id
                                             , label = E.text n.title
                                             }
                                         ]
@@ -210,7 +211,7 @@ listview ld size model =
             ]
 
 
-update : Msg -> Model -> Data.LoginData -> ( Model, Command )
+update : Msg -> Model -> LoginData -> ( Model, Command )
 update msg model ld =
     case msg of
         NewPress ->

@@ -2,6 +2,7 @@ module JobsDialog exposing (..)
 
 import Common
 import Data
+import DataUtil
 import Dict exposing (Dict)
 import Element as E exposing (Element)
 import Element.Background as EBk
@@ -88,7 +89,7 @@ view buttonStyle mbsize trqs =
                                 Data.Running ->
                                     E.el [ E.centerX, EF.bold ] <| E.text "running..."
 
-                                Data.Completed n ->
+                                Data.Completed ->
                                     E.el [ E.centerX, EF.bold ] <| E.text <| "completed"
 
                                 Data.Failed ->
@@ -103,7 +104,7 @@ view buttonStyle mbsize trqs =
                                     ]
                                     [ E.paragraph [] [ E.text js.message ] ]
                                 ]
-                            , if Data.jobComplete js.state then
+                            , if DataUtil.jobComplete js.state then
                                 E.row [ E.width E.fill ]
                                     [ EI.button (E.alignRight :: buttonStyle)
                                         { onPress = Just (ClearClick jobno), label = E.text "clear" }

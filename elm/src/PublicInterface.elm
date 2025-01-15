@@ -30,7 +30,7 @@ encodeSendMsg sm =
         GetZkNoteAndLinks x ->
             JE.object
                 [ ( "what", JE.string "GetZkNoteAndLinks" )
-                , ( "data", Data.encodeGetZkNoteEdit x )
+                , ( "data", Data.getZkNoteAndLinksEncoder x )
                 ]
 
         GetZkNotePubId pubid ->
@@ -42,7 +42,7 @@ encodeSendMsg sm =
         GetZnlIfChanged x ->
             JE.object
                 [ ( "what", JE.string "GetZnlIfChanged" )
-                , ( "data", Data.encodeGetZnlIfChanged x )
+                , ( "data", Data.getZnlIfChangedEncoder x )
                 ]
 
 
@@ -53,7 +53,7 @@ serverResponseDecoder =
             case what of
                 "ZkNoteAndLinks" ->
                     JD.map ZkNoteAndLinks
-                        (JD.at [ "content" ] <| Data.decodeZkNoteEditWhat)
+                        (JD.at [ "content" ] <| Data.zkNoteAndLinksWhatDecoder)
 
                 "ServerError" ->
                     JD.map ServerError (JD.at [ "content" ] JD.string)

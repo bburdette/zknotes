@@ -12,12 +12,13 @@ use std::sync::Arc;
 use uuid::Uuid;
 use zkprotocol::constants::SpecialUuids;
 use zkprotocol::content::FileStatus;
-use zkprotocol::content::{SyncMessage, ZkListNote, ZkPhantomUser};
+use zkprotocol::content::ZkListNote;
 use zkprotocol::search::{
   AndOr, OrderDirection, OrderField, ResultType, SearchMod, TagSearch, ZkIdSearchResult,
   ZkListNoteSearchResult, ZkNoteAndLinksSearchResult, ZkNoteSearch, ZkNoteSearchResult,
   ZkSearchResultHeader,
 };
+use zkprotocol::sync_data::{SyncMessage, ZkPhantomUser};
 
 pub fn power_delete_zknotes(
   conn: &Connection,
@@ -314,7 +315,7 @@ pub fn sync_users(
           Ok(uuid) => Ok(ZkPhantomUser {
             id: row.get(0)?,
             uuid: uuid,
-            data: serde_json::Value::Null,
+            data: serde_json::Value::Null.to_string(),
             name: row.get(2)?,
             active: row.get(3)?,
           }),
@@ -329,7 +330,7 @@ pub fn sync_users(
     for rec in rec_iter {
       if let Ok(mut r) = rec {
         let ed = serde_json::to_value(sqldata::read_extra_login_data(&conn, r.id)?)?;
-        r.data = ed;
+        r.data = ed.to_string();
         yield SyncMessage::from(r);
       }
     }
@@ -347,7 +348,7 @@ pub fn system_user(
       id: sysid,
       uuid: Uuid::parse_str(&SpecialUuids::System.str())?,
       name: "system".to_string(),
-      data: serde_json::to_value(sqldata::read_extra_login_data(&conn, sysid)?)?,
+      data: serde_json::to_value(sqldata::read_extra_login_data(&conn, sysid)?)?.to_string(),
       active: true,
     });
   }

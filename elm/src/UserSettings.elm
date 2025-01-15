@@ -2,6 +2,7 @@ module UserSettings exposing (..)
 
 import Common exposing (buttonStyle)
 import Data
+import DataUtil
 import Element as E exposing (Element)
 import Element.Background as EBk
 import Element.Border as EBd
@@ -30,12 +31,12 @@ type Command
 
 
 type alias Model =
-    { login : Data.LoginData
+    { login : DataUtil.LoginData
     , fontsize : Int
     }
 
 
-init : Data.LoginData -> Int -> Model
+init : DataUtil.LoginData -> Int -> Model
 init login fontsize =
     { login = login, fontsize = fontsize }
 

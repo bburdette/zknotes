@@ -26,7 +26,7 @@ impl Display for ZkNoteId {
   }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug, Clone)]
 pub struct ExtraLoginData {
   pub userid: i64,
   pub zknote: ZkNoteId,
@@ -70,7 +70,7 @@ pub enum FileStatus {
   FilePresent,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
+#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
 pub struct ZkListNote {
   pub id: ZkNoteId,
   pub title: String,
@@ -81,13 +81,13 @@ pub struct ZkListNote {
   pub sysids: Vec<ZkNoteId>,
 }
 
-#[derive(Serialize, Debug, Clone)]
+#[derive(Elm, ElmDecode, ElmEncode, Serialize, Debug, Clone)]
 pub struct SavedZkNote {
   pub id: ZkNoteId,
   pub changeddate: i64,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Debug, Clone)]
 pub struct SaveZkNote {
   pub id: Option<ZkNoteId>,
   pub title: String,
@@ -104,7 +104,7 @@ pub enum Direction {
   To,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Debug, Clone)]
 pub struct SaveZkLink {
   pub otherid: ZkNoteId,
   pub direction: Direction,
@@ -113,13 +113,13 @@ pub struct SaveZkLink {
   pub delete: Option<bool>,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Debug, Clone)]
 pub struct SaveZkNoteAndLinks {
   pub note: SaveZkNote,
   pub links: Vec<SaveZkLink>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug, Clone)]
 pub struct ZkLink {
   pub from: ZkNoteId,
   pub to: ZkNoteId,
@@ -137,15 +137,16 @@ pub struct EditLink {
   pub user: i64,
   pub zknote: Option<ZkNoteId>,
   pub othername: Option<String>,
+  pub delete: Option<bool>,
   pub sysids: Vec<ZkNoteId>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug, Clone)]
 pub struct ZkLinks {
   pub links: Vec<ZkLink>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug, Clone)]
 pub struct ImportZkNote {
   pub title: String,
   pub content: String,
@@ -153,7 +154,7 @@ pub struct ImportZkNote {
   pub toLinks: Vec<String>,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]
 pub struct GetZkLinks {
   pub zknote: ZkNoteId,
 }
@@ -171,31 +172,31 @@ pub struct GetZnlIfChanged {
   pub what: String,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]
 pub struct GetZkNoteArchives {
   pub zknote: ZkNoteId,
   pub offset: i64,
   pub limit: Option<i64>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Elm, ElmDecode, ElmEncode, Serialize, Debug)]
 pub struct ZkNoteArchives {
   pub zknote: ZkNoteId,
   pub results: ZkListNoteSearchResult,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]
 pub struct GetArchiveZkNote {
   pub parentnote: ZkNoteId,
   pub noteid: ZkNoteId,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]
 pub struct GetArchiveZkLinks {
   pub createddate_after: Option<i64>,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]
 pub struct GetZkLinksSince {
   pub createddate_after: Option<i64>,
 }
@@ -205,13 +206,13 @@ pub struct SyncSince {
   pub after: Option<i64>,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]
 pub struct FileInfo {
   pub hash: String,
   pub size: u64,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]
 pub struct ArchiveZkLink {
   pub userUuid: String, // uuid too!
   pub fromUuid: String,
@@ -221,7 +222,7 @@ pub struct ArchiveZkLink {
   pub deletedate: i64,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]
 pub struct UuidZkLink {
   pub userUuid: String, // uuid too!
   pub fromUuid: String,
@@ -230,7 +231,7 @@ pub struct UuidZkLink {
   pub createdate: i64,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]
 pub struct GetZkNoteComments {
   pub zknote: ZkNoteId,
   pub offset: i64,
@@ -249,64 +250,7 @@ pub struct ZkNoteAndLinksWhat {
   pub znl: ZkNoteAndLinks,
 }
 
-// Represents a remote user that is not registered on this server.
-#[derive(Clone, Deserialize, Serialize, Debug)]
-pub struct ZkPhantomUser {
-  pub id: i64,
-  pub uuid: Uuid,              // uuid in orgauth_user record.
-  pub data: serde_json::Value, // uuid in user note.
-  pub name: String,
-  pub active: bool,
-}
-
-// TODO: add time on first msg.
-#[derive(Deserialize, Serialize, Debug)]
-pub enum SyncMessage {
-  SyncStart(Option<i64>, i64),
-  PhantomUserHeader,
-  PhantomUser(ZkPhantomUser),
-  ZkSearchResultHeader(ZkSearchResultHeader),
-  ZkNoteId(String),
-  ZkNote(ZkNote, Option<FileInfo>),
-  ArchiveZkLinkHeader,
-  ArchiveZkLink(ArchiveZkLink),
-  UuidZkLinkHeader,
-  UuidZkLink(UuidZkLink),
-  SyncError(String),
-  SyncEnd,
-}
-
-impl From<ZkPhantomUser> for SyncMessage {
-  fn from(a: ZkPhantomUser) -> Self {
-    SyncMessage::PhantomUser(a)
-  }
-}
-
-impl From<ZkSearchResultHeader> for SyncMessage {
-  fn from(a: ZkSearchResultHeader) -> Self {
-    SyncMessage::ZkSearchResultHeader(a)
-  }
-}
-
-impl From<(ZkNote, Option<FileInfo>)> for SyncMessage {
-  fn from(a: (ZkNote, Option<FileInfo>)) -> Self {
-    SyncMessage::ZkNote(a.0, a.1)
-  }
-}
-
-impl From<ArchiveZkLink> for SyncMessage {
-  fn from(a: ArchiveZkLink) -> Self {
-    SyncMessage::ArchiveZkLink(a)
-  }
-}
-
-impl From<UuidZkLink> for SyncMessage {
-  fn from(a: UuidZkLink) -> Self {
-    SyncMessage::UuidZkLink(a)
-  }
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
 pub enum JobState {
   Started,
   Running,
@@ -314,7 +258,7 @@ pub enum JobState {
   Failed,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
 pub struct JobStatus {
   pub jobno: i64,
   pub state: JobState,

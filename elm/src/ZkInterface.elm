@@ -138,61 +138,61 @@ encodeSendMsg sm =
         GetZkNote id ->
             JE.object
                 [ ( "what", JE.string "GetZkNote" )
-                , ( "data", Data.encodeZkNoteId id )
+                , ( "data", Data.zkNoteIdEncoder id )
                 ]
 
         GetZkNoteAndLinks zkne ->
             JE.object
                 [ ( "what", JE.string "GetZkNoteAndLinks" )
-                , ( "data", Data.encodeGetZkNoteEdit zkne )
+                , ( "data", Data.getZkNoteAndLinksEncoder zkne )
                 ]
 
         GetZnlIfChanged x ->
             JE.object
                 [ ( "what", JE.string "GetZnlIfChanged" )
-                , ( "data", Data.encodeGetZnlIfChanged x )
+                , ( "data", Data.getZnlIfChangedEncoder x )
                 ]
 
         GetZkNoteComments msg ->
             JE.object
                 [ ( "what", JE.string "GetZkNoteComments" )
-                , ( "data", Data.encodeGetZkNoteComments msg )
+                , ( "data", Data.getZkNoteCommentsEncoder msg )
                 ]
 
         GetZkNoteArchives msg ->
             JE.object
                 [ ( "what", JE.string "GetZkNoteArchives" )
-                , ( "data", Data.encodeGetZkNoteArchives msg )
+                , ( "data", Data.getZkNoteArchivesEncoder msg )
                 ]
 
         GetArchiveZkNote msg ->
             JE.object
                 [ ( "what", JE.string "GetArchiveZkNote" )
-                , ( "data", Data.encodeGetArchiveZkNote msg )
+                , ( "data", Data.getArchiveZkNoteEncoder msg )
                 ]
 
         DeleteZkNote id ->
             JE.object
                 [ ( "what", JE.string "DeleteZkNote" )
-                , ( "data", Data.encodeZkNoteId id )
+                , ( "data", Data.zkNoteIdEncoder id )
                 ]
 
         SaveZkNote x ->
             JE.object
                 [ ( "what", JE.string "SaveZkNote" )
-                , ( "data", Data.encodeSaveZkNote x )
+                , ( "data", Data.saveZkNoteEncoder x )
                 ]
 
         SaveZkNoteAndLinks s ->
             JE.object
                 [ ( "what", JE.string "SaveZkNoteAndLinks" )
-                , ( "data", Data.encodeSaveZkNoteAndLinks s )
+                , ( "data", Data.saveZkNoteAndLinksEncoder s )
                 ]
 
         SaveZkLinks zklinks ->
             JE.object
                 [ ( "what", JE.string "SaveZkLinks" )
-                , ( "data", Data.encodeZkLinks zklinks )
+                , ( "data", Data.zkLinksEncoder zklinks )
                 ]
 
         SearchZkNotes s ->
@@ -204,7 +204,7 @@ encodeSendMsg sm =
         SaveImportZkNotes n ->
             JE.object
                 [ ( "what", JE.string "SaveImportZkNotes" )
-                , ( "data", JE.list Data.encodeImportZkNote n )
+                , ( "data", JE.list Data.importZkNoteEncoder n )
                 ]
 
         PowerDelete s ->
@@ -216,7 +216,7 @@ encodeSendMsg sm =
         SetHomeNote id ->
             JE.object
                 [ ( "what", JE.string "SetHomeNote" )
-                , ( "data", Data.encodeZkNoteId id )
+                , ( "data", Data.zkNoteIdEncoder id )
                 ]
 
         SyncRemote ->
@@ -256,34 +256,34 @@ serverResponseDecoder =
                         JD.map ServerError (JD.at [ "content" ] JD.string)
 
                     "ZkNoteSearchResult" ->
-                        JD.map ZkNoteSearchResult (JD.at [ "content" ] <| Data.decodeZkNoteSearchResult)
+                        JD.map ZkNoteSearchResult (JD.at [ "content" ] <| Data.zkNoteSearchResultDecoder)
 
                     "ZkListNoteSearchResult" ->
-                        JD.map ZkListNoteSearchResult (JD.at [ "content" ] <| Data.decodeZkListNoteSearchResult)
+                        JD.map ZkListNoteSearchResult (JD.at [ "content" ] <| Data.zkListNoteSearchResultDecoder)
 
                     "ZkIdSearchResult" ->
-                        JD.map ZkIdSearchResult (JD.at [ "content" ] <| Data.decodeZkIdSearchResult)
+                        JD.map ZkIdSearchResult (JD.at [ "content" ] <| Data.zkIdSearchResultDecoder)
 
                     "ZkNoteArchives" ->
-                        JD.map ZkNoteArchives (JD.at [ "content" ] <| Data.decodeZkNoteArchives)
+                        JD.map ZkNoteArchives (JD.at [ "content" ] <| Data.zkNoteArchivesDecoder)
 
                     "SavedZkNote" ->
-                        JD.map SavedZkNote (JD.at [ "content" ] <| Data.decodeSavedZkNote)
+                        JD.map SavedZkNote (JD.at [ "content" ] <| Data.savedZkNoteDecoder)
 
                     "SavedZkNoteAndLinks" ->
-                        JD.map SavedZkNoteAndLinks (JD.at [ "content" ] <| Data.decodeSavedZkNote)
+                        JD.map SavedZkNoteAndLinks (JD.at [ "content" ] <| Data.savedZkNoteDecoder)
 
                     "DeletedZkNote" ->
-                        JD.map DeletedZkNote (JD.at [ "content" ] <| Data.decodeZkNoteId)
+                        JD.map DeletedZkNote (JD.at [ "content" ] <| Data.zkNoteIdDecoder)
 
                     "ZkNote" ->
-                        JD.map ZkNote (JD.at [ "content" ] <| Data.decodeZkNote)
+                        JD.map ZkNote (JD.at [ "content" ] <| Data.zkNoteDecoder)
 
                     "ZkNoteAndLinksWhat" ->
-                        JD.map ZkNoteAndLinksWhat (JD.at [ "content" ] <| Data.decodeZkNoteEditWhat)
+                        JD.map ZkNoteAndLinksWhat (JD.at [ "content" ] <| Data.zkNoteAndLinksWhatDecoder)
 
                     "ZkNoteComments" ->
-                        JD.map ZkNoteComments (JD.at [ "content" ] <| JD.list Data.decodeZkNote)
+                        JD.map ZkNoteComments (JD.at [ "content" ] <| JD.list Data.zkNoteDecoder)
 
                     "SavedZkLinks" ->
                         JD.succeed SavedZkLinks
@@ -292,19 +292,19 @@ serverResponseDecoder =
                         JD.succeed SavedImportZkNotes
 
                     "ZkLinks" ->
-                        JD.map ZkLinks (JD.field "content" Data.decodeZkLinks)
+                        JD.map ZkLinks (JD.field "content" Data.zkLinksDecoder)
 
                     "PowerDeleteComplete" ->
                         JD.map PowerDeleteComplete (JD.field "content" JD.int)
 
                     "HomeNoteSet" ->
-                        JD.map HomeNoteSet (JD.field "content" Data.decodeZkNoteId)
+                        JD.map HomeNoteSet (JD.field "content" Data.zkNoteIdDecoder)
 
                     "FilesUploaded" ->
-                        JD.map FilesUploaded (JD.field "content" <| JD.list Data.decodeZkListNote)
+                        JD.map FilesUploaded (JD.field "content" <| JD.list Data.zkListNoteDecoder)
 
                     "JobStatus" ->
-                        JD.map JobStatus (JD.field "content" <| Data.decodeJobStatus)
+                        JD.map JobStatus (JD.field "content" <| Data.jobStatusDecoder)
 
                     "JobNotFound" ->
                         JD.map JobNotFound (JD.field "content" <| JD.int)

@@ -21,9 +21,9 @@ use zkprotocol::constants::SpecialUuids;
 use zkprotocol::content::{
   ArchiveZkLink, Direction, EditLink, ExtraLoginData, FileInfo, FileStatus, GetArchiveZkNote,
   GetZkNoteArchives, GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkLink, SaveZkNote,
-  SavedZkNote, SyncMessage, Sysids, UuidZkLink, ZkLink, ZkListNote, ZkNote, ZkNoteAndLinks,
-  ZkNoteId,
+  SavedZkNote, Sysids, UuidZkLink, ZkLink, ZkListNote, ZkNote, ZkNoteAndLinks, ZkNoteId,
 };
+use zkprotocol::sync_data::SyncMessage;
 
 pub fn zknotes_callbacks() -> Callbacks {
   Callbacks {
@@ -37,7 +37,7 @@ pub fn on_new_user(
   conn: &Connection,
   rd: &RegistrationData,
   data: Option<String>,
-  remote_data: Option<serde_json::Value>,
+  remote_data: Option<String>,
   creator: Option<i64>,
   uid: i64,
 ) -> Result<(), orgauth::error::Error> {
@@ -49,7 +49,7 @@ pub fn on_new_user(
 
   let user_note_uuid = match remote_data {
     Some(remote_data) => {
-      let remd: ExtraLoginData = serde_json::from_value(remote_data)?;
+      let remd: ExtraLoginData = serde_json::from_str(remote_data.as_str())?;
       remd.zknote
     }
     None => uuid::Uuid::new_v4().into(),
@@ -1530,6 +1530,7 @@ pub fn read_zklinks(
         zknote: zknote.map(|x| x.into()),
         othername,
         sysids,
+        delete: None,
       })
     })?,
   );
@@ -1598,6 +1599,7 @@ pub fn read_public_zklinks(
       zknote: zknote.map(|x| x.into()),
       othername,
       sysids: get_sysids(&conn, sysid, otherid)?,
+      delete: None,
     })
   })?);
 

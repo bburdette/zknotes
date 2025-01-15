@@ -3,7 +3,8 @@ module View exposing (Command(..), Model, Msg(..), initFull, initSzn, update, vi
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
 import Common
-import Data exposing (FileUrlInfo, ZkNote, ZkNoteId, zkNoteIdToString, zniEq)
+import Data exposing (ZkNote, ZkNoteId)
+import DataUtil exposing (FileUrlInfo, zkNoteIdToString, zniEq)
 import Dict exposing (Dict)
 import Element as E exposing (Element)
 import Element.Background as EBk

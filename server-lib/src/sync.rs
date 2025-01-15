@@ -32,11 +32,12 @@ use tokio::io::AsyncWriteExt;
 use tokio_util::io::StreamReader;
 use uuid::Uuid;
 use zkprotocol::constants::{PrivateReplies, PrivateStreamingRequests, SpecialUuids};
-use zkprotocol::content::{FileStatus, SaveZkNote, SyncMessage, SyncSince, ZkNote, ZkNoteId};
+use zkprotocol::content::{FileStatus, SaveZkNote, SyncSince, ZkNote, ZkNoteId};
 use zkprotocol::messages::{PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage};
 use zkprotocol::search::{
   AndOr, OrderDirection, OrderField, Ordering, ResultType, SearchMod, TagSearch, ZkNoteSearch,
 };
+use zkprotocol::sync_data::SyncMessage;
 
 fn convert_payloaderr(err: PayloadError) -> std::io::Error {
   error!("convert_err {:?}", err);

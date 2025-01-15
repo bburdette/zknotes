@@ -1,10 +1,13 @@
 module NoteCache exposing (CacheEntry(..), NoteCache, addNote, empty, getNote, purgeNotes, setKeeps)
 
-import Data exposing (ZkNoteAndLinks, ZkNoteId, ZniSet)
+-- import Set exposing (Set)
+-- import TSet exposing (TSet)
+
+import Data exposing (ZkNoteAndLinks, ZkNoteId)
+import DataUtil exposing (ZniSet)
 import Dict exposing (Dict)
-import Set exposing (Set)
 import TDict exposing (TDict)
-import TSet exposing (TSet)
+import TSet
 import Time
 import Util
 
@@ -32,7 +35,7 @@ type alias ZneDict =
 
 emptyZneDict : ZneDict
 emptyZneDict =
-    TDict.empty Data.zkNoteIdToString Data.trustedZkNoteIdFromString
+    TDict.empty DataUtil.zkNoteIdToString DataUtil.trustedZkNoteIdFromString
 
 
 setKeeps : ZniSet -> NoteCache -> NoteCache
@@ -59,7 +62,7 @@ addNote pt zne nc =
                 Dict.insert ms (TSet.insert id set) nc.byReceipt
 
             Nothing ->
-                Dict.insert ms (TSet.insert id Data.emptyZniSet) nc.byReceipt
+                Dict.insert ms (TSet.insert id DataUtil.emptyZniSet) nc.byReceipt
 
     -- (TODO?) add new notes to keeps!  assuming they belong in the current note.
     , keep = TSet.insert id nc.keep
@@ -140,6 +143,6 @@ empty : Int -> NoteCache
 empty max =
     { byId = emptyZneDict
     , byReceipt = Dict.empty
-    , keep = Data.emptyZniSet
+    , keep = DataUtil.emptyZniSet
     , max = max
     }

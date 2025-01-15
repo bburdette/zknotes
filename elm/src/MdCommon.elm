@@ -3,7 +3,8 @@ module MdCommon exposing (Panel, ViewMode(..), blockCells, blockPanels, cellView
 import Cellme.Cellme exposing (CellContainer(..), RunState(..))
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr)
 import Common exposing (buttonStyle)
-import Data exposing (FileUrlInfo, ZkNoteId, ZniSet, emptyZniSet, zkNoteIdFromString, zkNoteIdToString)
+import Data exposing (ZkNoteId)
+import DataUtil exposing (FileUrlInfo, ZniSet, emptyZniSet, zkNoteIdFromString, zkNoteIdToString)
 import Dict exposing (Dict)
 import Element as E exposing (Element)
 import Element.Background as EBk
@@ -341,7 +342,7 @@ audioNoteView fui zkn =
         [ link (Just zkn.title) ("/note/" ++ zkNoteIdToString zkn.id) [ E.text zkn.title ]
         , E.row [ E.spacing 20 ]
             [ htmlAudioView fileurl zkn.title
-            , if fui.tauri || List.filter (\i -> i == Data.sysids.publicid) zkn.sysids /= [] then
+            , if fui.tauri || List.filter (\i -> i == DataUtil.sysids.publicid) zkn.sysids /= [] then
                 link
                     (Just "ts↗")
                     ("https://29a.ch/timestretch/#a=" ++ fui.location ++ "/file/" ++ zkNoteIdToString zkn.id)

@@ -1,6 +1,7 @@
 module Route exposing (Route(..), parseUrl, routeTitle, routeUrl)
 
-import Data exposing (ZkNoteId, zkNoteIdFromString, zkNoteIdToString)
+import Data exposing (ZkNoteId)
+import DataUtil exposing (zkNoteIdFromString, zkNoteIdToString)
 import UUID exposing (UUID)
 import Url exposing (Url)
 import Url.Builder as UB
