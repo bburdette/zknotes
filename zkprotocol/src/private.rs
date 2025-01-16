@@ -2,7 +2,7 @@ use crate::{
   content::{
     ArchiveZkLink, GetArchiveZkLinks, GetArchiveZkNote, GetZkLinksSince, GetZkNoteAndLinks,
     GetZkNoteArchives, GetZkNoteComments, GetZnlIfChanged, ImportZkNote, JobStatus, SaveZkNote,
-    SaveZkNoteAndLinks, SavedZkNote, ZkLinks, ZkListNote, ZkNote, ZkNoteAndLinksWhat,
+    SaveZkNoteAndLinks, SavedZkNote, UuidZkLink, ZkLinks, ZkListNote, ZkNote, ZkNoteAndLinksWhat,
     ZkNoteArchives, ZkNoteId,
   },
   search::{
@@ -47,7 +47,7 @@ pub enum PrivateReply {
   PvyArchives(Vec<ZkListNote>),
   PvyZkNoteArchives(ZkNoteArchives),
   PvyArchiveZkLinks(Vec<ArchiveZkLink>),
-  PvyZkLinks(ZkLinks),
+  PvyZkLinks(Vec<UuidZkLink>),
   PvyZkListNoteSearchResult(ZkListNoteSearchResult),
   PvyZkNoteSearchResult(ZkNoteSearchResult),
   PvyZkNoteIdSearchResult(ZkIdSearchResult),
@@ -56,7 +56,7 @@ pub enum PrivateReply {
   PvyDeletedZkNote(ZkNoteId),
   PvySavedZkNote(SavedZkNote),
   PvySavedZkLinks,
-  PvySavedZkNoteAndLinks,
+  PvySavedZkNoteAndLinks(SavedZkNote),
   PvySavedImportZkNotes,
   PvyHomeNoteSet(ZkNoteId),
   PvyJobStatus(JobStatus),
@@ -71,7 +71,9 @@ pub struct ZkNoteRq {
 
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]
 pub enum PrivateError {
-  String(String),
-  NoteNotFound(ZkNoteRq),
-  NoteIsPrivate(ZkNoteRq),
+  PveString(String),
+  PveNoteNotFound(ZkNoteRq),
+  PveNoteIsPrivate(ZkNoteRq),
+  PveNotLoggedIn,
+  PveLoginError(String),
 }

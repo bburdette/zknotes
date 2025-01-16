@@ -595,22 +595,252 @@ publicReplyEncoder enum =
 
 
 type PublicError
-    = String String
-    | NoteNotFound PublicRequest
-    | NoteIsPrivate PublicRequest
+    = PbeString String
+    | PbeNoteNotFound PublicRequest
+    | PbeNoteIsPrivate PublicRequest
 
 
 publicErrorEncoder : PublicError -> Json.Encode.Value
 publicErrorEncoder enum =
     case enum of
-        String inner ->
-            Json.Encode.object [ ( "String", Json.Encode.string inner ) ]
+        PbeString inner ->
+            Json.Encode.object [ ( "PbeString", Json.Encode.string inner ) ]
 
-        NoteNotFound inner ->
-            Json.Encode.object [ ( "NoteNotFound", publicRequestEncoder inner ) ]
+        PbeNoteNotFound inner ->
+            Json.Encode.object [ ( "PbeNoteNotFound", publicRequestEncoder inner ) ]
 
-        NoteIsPrivate inner ->
-            Json.Encode.object [ ( "NoteIsPrivate", publicRequestEncoder inner ) ]
+        PbeNoteIsPrivate inner ->
+            Json.Encode.object [ ( "PbeNoteIsPrivate", publicRequestEncoder inner ) ]
+
+
+type PrivateRequest
+    = PvqGetZkNote ZkNoteId
+    | PvqGetZkNoteAndLinks GetZkNoteAndLinks
+    | PvqGetZnlIfChanged GetZnlIfChanged
+    | PvqGetZkNoteComments GetZkNoteComments
+    | PvqGetZkNoteArchives GetZkNoteArchives
+    | PvqGetArchiveZkNote GetArchiveZkNote
+    | PvqGetArchiveZklinks GetArchiveZkLinks
+    | PvqGetZkLinksSince GetZkLinksSince
+    | PvqSearchZkNotes ZkNoteSearch
+    | PvqPowerDelete TagSearch
+    | PvqDeleteZkNote ZkNoteId
+    | PvqSaveZkNote SaveZkNote
+    | PvqSaveZkLinks ZkLinks
+    | PvqSaveZkNoteAndLinks SaveZkNoteAndLinks
+    | PvqSaveImportZkNotes (List ImportZkNote)
+    | PvqSetHomeNote ZkNoteId
+    | PvqSyncRemote
+    | PvqSyncFiles ZkNoteSearch
+    | PvqGetJobStatus Int
+
+
+privateRequestEncoder : PrivateRequest -> Json.Encode.Value
+privateRequestEncoder enum =
+    case enum of
+        PvqGetZkNote inner ->
+            Json.Encode.object [ ( "PvqGetZkNote", zkNoteIdEncoder inner ) ]
+
+        PvqGetZkNoteAndLinks inner ->
+            Json.Encode.object [ ( "PvqGetZkNoteAndLinks", getZkNoteAndLinksEncoder inner ) ]
+
+        PvqGetZnlIfChanged inner ->
+            Json.Encode.object [ ( "PvqGetZnlIfChanged", getZnlIfChangedEncoder inner ) ]
+
+        PvqGetZkNoteComments inner ->
+            Json.Encode.object [ ( "PvqGetZkNoteComments", getZkNoteCommentsEncoder inner ) ]
+
+        PvqGetZkNoteArchives inner ->
+            Json.Encode.object [ ( "PvqGetZkNoteArchives", getZkNoteArchivesEncoder inner ) ]
+
+        PvqGetArchiveZkNote inner ->
+            Json.Encode.object [ ( "PvqGetArchiveZkNote", getArchiveZkNoteEncoder inner ) ]
+
+        PvqGetArchiveZklinks inner ->
+            Json.Encode.object [ ( "PvqGetArchiveZklinks", getArchiveZkLinksEncoder inner ) ]
+
+        PvqGetZkLinksSince inner ->
+            Json.Encode.object [ ( "PvqGetZkLinksSince", getZkLinksSinceEncoder inner ) ]
+
+        PvqSearchZkNotes inner ->
+            Json.Encode.object [ ( "PvqSearchZkNotes", zkNoteSearchEncoder inner ) ]
+
+        PvqPowerDelete inner ->
+            Json.Encode.object [ ( "PvqPowerDelete", tagSearchEncoder inner ) ]
+
+        PvqDeleteZkNote inner ->
+            Json.Encode.object [ ( "PvqDeleteZkNote", zkNoteIdEncoder inner ) ]
+
+        PvqSaveZkNote inner ->
+            Json.Encode.object [ ( "PvqSaveZkNote", saveZkNoteEncoder inner ) ]
+
+        PvqSaveZkLinks inner ->
+            Json.Encode.object [ ( "PvqSaveZkLinks", zkLinksEncoder inner ) ]
+
+        PvqSaveZkNoteAndLinks inner ->
+            Json.Encode.object [ ( "PvqSaveZkNoteAndLinks", saveZkNoteAndLinksEncoder inner ) ]
+
+        PvqSaveImportZkNotes inner ->
+            Json.Encode.object [ ( "PvqSaveImportZkNotes", Json.Encode.list importZkNoteEncoder inner ) ]
+
+        PvqSetHomeNote inner ->
+            Json.Encode.object [ ( "PvqSetHomeNote", zkNoteIdEncoder inner ) ]
+
+        PvqSyncRemote ->
+            Json.Encode.string "PvqSyncRemote"
+
+        PvqSyncFiles inner ->
+            Json.Encode.object [ ( "PvqSyncFiles", zkNoteSearchEncoder inner ) ]
+
+        PvqGetJobStatus inner ->
+            Json.Encode.object [ ( "PvqGetJobStatus", Json.Encode.int inner ) ]
+
+
+type PrivateReply
+    = PvyServerError PrivateError
+    | PvyZkNote ZkNote
+    | PvyZkNoteAndLinksWhat ZkNoteAndLinksWhat
+    | PvyNoop
+    | PvyZkNoteComments (List ZkNote)
+    | PvyArchives (List ZkListNote)
+    | PvyZkNoteArchives ZkNoteArchives
+    | PvyArchiveZkLinks (List ArchiveZkLink)
+    | PvyZkLinks (List UuidZkLink)
+    | PvyZkListNoteSearchResult ZkListNoteSearchResult
+    | PvyZkNoteSearchResult ZkNoteSearchResult
+    | PvyZkNoteIdSearchResult ZkIdSearchResult
+    | PvyZkNoteAndLinksSearchResult ZkNoteAndLinksSearchResult
+    | PvyPowerDeleteComplete Int
+    | PvyDeletedZkNote ZkNoteId
+    | PvySavedZkNote SavedZkNote
+    | PvySavedZkLinks
+    | PvySavedZkNoteAndLinks SavedZkNote
+    | PvySavedImportZkNotes
+    | PvyHomeNoteSet ZkNoteId
+    | PvyJobStatus JobStatus
+    | PvyJobNotFound Int
+
+
+privateReplyEncoder : PrivateReply -> Json.Encode.Value
+privateReplyEncoder enum =
+    case enum of
+        PvyServerError inner ->
+            Json.Encode.object [ ( "PvyServerError", privateErrorEncoder inner ) ]
+
+        PvyZkNote inner ->
+            Json.Encode.object [ ( "PvyZkNote", zkNoteEncoder inner ) ]
+
+        PvyZkNoteAndLinksWhat inner ->
+            Json.Encode.object [ ( "PvyZkNoteAndLinksWhat", zkNoteAndLinksWhatEncoder inner ) ]
+
+        PvyNoop ->
+            Json.Encode.string "PvyNoop"
+
+        PvyZkNoteComments inner ->
+            Json.Encode.object [ ( "PvyZkNoteComments", Json.Encode.list zkNoteEncoder inner ) ]
+
+        PvyArchives inner ->
+            Json.Encode.object [ ( "PvyArchives", Json.Encode.list zkListNoteEncoder inner ) ]
+
+        PvyZkNoteArchives inner ->
+            Json.Encode.object [ ( "PvyZkNoteArchives", zkNoteArchivesEncoder inner ) ]
+
+        PvyArchiveZkLinks inner ->
+            Json.Encode.object [ ( "PvyArchiveZkLinks", Json.Encode.list archiveZkLinkEncoder inner ) ]
+
+        PvyZkLinks inner ->
+            Json.Encode.object [ ( "PvyZkLinks", Json.Encode.list uuidZkLinkEncoder inner ) ]
+
+        PvyZkListNoteSearchResult inner ->
+            Json.Encode.object [ ( "PvyZkListNoteSearchResult", zkListNoteSearchResultEncoder inner ) ]
+
+        PvyZkNoteSearchResult inner ->
+            Json.Encode.object [ ( "PvyZkNoteSearchResult", zkNoteSearchResultEncoder inner ) ]
+
+        PvyZkNoteIdSearchResult inner ->
+            Json.Encode.object [ ( "PvyZkNoteIdSearchResult", zkIdSearchResultEncoder inner ) ]
+
+        PvyZkNoteAndLinksSearchResult inner ->
+            Json.Encode.object [ ( "PvyZkNoteAndLinksSearchResult", zkNoteAndLinksSearchResultEncoder inner ) ]
+
+        PvyPowerDeleteComplete inner ->
+            Json.Encode.object [ ( "PvyPowerDeleteComplete", Json.Encode.int inner ) ]
+
+        PvyDeletedZkNote inner ->
+            Json.Encode.object [ ( "PvyDeletedZkNote", zkNoteIdEncoder inner ) ]
+
+        PvySavedZkNote inner ->
+            Json.Encode.object [ ( "PvySavedZkNote", savedZkNoteEncoder inner ) ]
+
+        PvySavedZkLinks ->
+            Json.Encode.string "PvySavedZkLinks"
+
+        PvySavedZkNoteAndLinks inner ->
+            Json.Encode.object [ ( "PvySavedZkNoteAndLinks", savedZkNoteEncoder inner ) ]
+
+        PvySavedImportZkNotes ->
+            Json.Encode.string "PvySavedImportZkNotes"
+
+        PvyHomeNoteSet inner ->
+            Json.Encode.object [ ( "PvyHomeNoteSet", zkNoteIdEncoder inner ) ]
+
+        PvyJobStatus inner ->
+            Json.Encode.object [ ( "PvyJobStatus", jobStatusEncoder inner ) ]
+
+        PvyJobNotFound inner ->
+            Json.Encode.object [ ( "PvyJobNotFound", Json.Encode.int inner ) ]
+
+
+type PrivateError
+    = PveString String
+    | PveNoteNotFound ZkNoteRq
+    | PveNoteIsPrivate ZkNoteRq
+    | PveNotLoggedIn
+    | PveLoginError String
+
+
+privateErrorEncoder : PrivateError -> Json.Encode.Value
+privateErrorEncoder enum =
+    case enum of
+        PveString inner ->
+            Json.Encode.object [ ( "PveString", Json.Encode.string inner ) ]
+
+        PveNoteNotFound inner ->
+            Json.Encode.object [ ( "PveNoteNotFound", zkNoteRqEncoder inner ) ]
+
+        PveNoteIsPrivate inner ->
+            Json.Encode.object [ ( "PveNoteIsPrivate", zkNoteRqEncoder inner ) ]
+
+        PveNotLoggedIn ->
+            Json.Encode.string "PveNotLoggedIn"
+
+        PveLoginError inner ->
+            Json.Encode.object [ ( "PveLoginError", Json.Encode.string inner ) ]
+
+
+type alias ZkNoteRq =
+    { zknoteid : ZkNoteId
+    , what : Maybe String
+    }
+
+
+zkNoteRqEncoder : ZkNoteRq -> Json.Encode.Value
+zkNoteRqEncoder struct =
+    Json.Encode.object
+        [ ( "zknoteid", zkNoteIdEncoder struct.zknoteid )
+        , ( "what", (Maybe.withDefault Json.Encode.null << Maybe.map Json.Encode.string) struct.what )
+        ]
+
+
+type UploadReply
+    = UrFilesUploaded (List ZkListNote)
+
+
+uploadReplyEncoder : UploadReply -> Json.Encode.Value
+uploadReplyEncoder enum =
+    case enum of
+        UrFilesUploaded inner ->
+            Json.Encode.object [ ( "UrFilesUploaded", Json.Encode.list zkListNoteEncoder inner ) ]
 
 
 type alias ZkNoteSearch =
@@ -1245,9 +1475,132 @@ publicReplyDecoder =
 publicErrorDecoder : Json.Decode.Decoder PublicError
 publicErrorDecoder =
     Json.Decode.oneOf
-        [ Json.Decode.map String (Json.Decode.field "String" Json.Decode.string)
-        , Json.Decode.map NoteNotFound (Json.Decode.field "NoteNotFound" publicRequestDecoder)
-        , Json.Decode.map NoteIsPrivate (Json.Decode.field "NoteIsPrivate" publicRequestDecoder)
+        [ Json.Decode.map PbeString (Json.Decode.field "PbeString" Json.Decode.string)
+        , Json.Decode.map PbeNoteNotFound (Json.Decode.field "PbeNoteNotFound" publicRequestDecoder)
+        , Json.Decode.map PbeNoteIsPrivate (Json.Decode.field "PbeNoteIsPrivate" publicRequestDecoder)
+        ]
+
+
+privateRequestDecoder : Json.Decode.Decoder PrivateRequest
+privateRequestDecoder =
+    Json.Decode.oneOf
+        [ Json.Decode.map PvqGetZkNote (Json.Decode.field "PvqGetZkNote" zkNoteIdDecoder)
+        , Json.Decode.map PvqGetZkNoteAndLinks (Json.Decode.field "PvqGetZkNoteAndLinks" getZkNoteAndLinksDecoder)
+        , Json.Decode.map PvqGetZnlIfChanged (Json.Decode.field "PvqGetZnlIfChanged" getZnlIfChangedDecoder)
+        , Json.Decode.map PvqGetZkNoteComments (Json.Decode.field "PvqGetZkNoteComments" getZkNoteCommentsDecoder)
+        , Json.Decode.map PvqGetZkNoteArchives (Json.Decode.field "PvqGetZkNoteArchives" getZkNoteArchivesDecoder)
+        , Json.Decode.map PvqGetArchiveZkNote (Json.Decode.field "PvqGetArchiveZkNote" getArchiveZkNoteDecoder)
+        , Json.Decode.map PvqGetArchiveZklinks (Json.Decode.field "PvqGetArchiveZklinks" getArchiveZkLinksDecoder)
+        , Json.Decode.map PvqGetZkLinksSince (Json.Decode.field "PvqGetZkLinksSince" getZkLinksSinceDecoder)
+        , Json.Decode.map PvqSearchZkNotes (Json.Decode.field "PvqSearchZkNotes" zkNoteSearchDecoder)
+        , Json.Decode.map PvqPowerDelete (Json.Decode.field "PvqPowerDelete" tagSearchDecoder)
+        , Json.Decode.map PvqDeleteZkNote (Json.Decode.field "PvqDeleteZkNote" zkNoteIdDecoder)
+        , Json.Decode.map PvqSaveZkNote (Json.Decode.field "PvqSaveZkNote" saveZkNoteDecoder)
+        , Json.Decode.map PvqSaveZkLinks (Json.Decode.field "PvqSaveZkLinks" zkLinksDecoder)
+        , Json.Decode.map PvqSaveZkNoteAndLinks (Json.Decode.field "PvqSaveZkNoteAndLinks" saveZkNoteAndLinksDecoder)
+        , Json.Decode.map PvqSaveImportZkNotes (Json.Decode.field "PvqSaveImportZkNotes" (Json.Decode.list importZkNoteDecoder))
+        , Json.Decode.map PvqSetHomeNote (Json.Decode.field "PvqSetHomeNote" zkNoteIdDecoder)
+        , Json.Decode.string
+            |> Json.Decode.andThen
+                (\x ->
+                    case x of
+                        "PvqSyncRemote" ->
+                            Json.Decode.succeed PvqSyncRemote
+
+                        unexpected ->
+                            Json.Decode.fail <| "Unexpected variant " ++ unexpected
+                )
+        , Json.Decode.map PvqSyncFiles (Json.Decode.field "PvqSyncFiles" zkNoteSearchDecoder)
+        , Json.Decode.map PvqGetJobStatus (Json.Decode.field "PvqGetJobStatus" Json.Decode.int)
+        ]
+
+
+privateReplyDecoder : Json.Decode.Decoder PrivateReply
+privateReplyDecoder =
+    Json.Decode.oneOf
+        [ Json.Decode.map PvyServerError (Json.Decode.field "PvyServerError" privateErrorDecoder)
+        , Json.Decode.map PvyZkNote (Json.Decode.field "PvyZkNote" zkNoteDecoder)
+        , Json.Decode.map PvyZkNoteAndLinksWhat (Json.Decode.field "PvyZkNoteAndLinksWhat" zkNoteAndLinksWhatDecoder)
+        , Json.Decode.string
+            |> Json.Decode.andThen
+                (\x ->
+                    case x of
+                        "PvyNoop" ->
+                            Json.Decode.succeed PvyNoop
+
+                        unexpected ->
+                            Json.Decode.fail <| "Unexpected variant " ++ unexpected
+                )
+        , Json.Decode.map PvyZkNoteComments (Json.Decode.field "PvyZkNoteComments" (Json.Decode.list zkNoteDecoder))
+        , Json.Decode.map PvyArchives (Json.Decode.field "PvyArchives" (Json.Decode.list zkListNoteDecoder))
+        , Json.Decode.map PvyZkNoteArchives (Json.Decode.field "PvyZkNoteArchives" zkNoteArchivesDecoder)
+        , Json.Decode.map PvyArchiveZkLinks (Json.Decode.field "PvyArchiveZkLinks" (Json.Decode.list archiveZkLinkDecoder))
+        , Json.Decode.map PvyZkLinks (Json.Decode.field "PvyZkLinks" (Json.Decode.list uuidZkLinkDecoder))
+        , Json.Decode.map PvyZkListNoteSearchResult (Json.Decode.field "PvyZkListNoteSearchResult" zkListNoteSearchResultDecoder)
+        , Json.Decode.map PvyZkNoteSearchResult (Json.Decode.field "PvyZkNoteSearchResult" zkNoteSearchResultDecoder)
+        , Json.Decode.map PvyZkNoteIdSearchResult (Json.Decode.field "PvyZkNoteIdSearchResult" zkIdSearchResultDecoder)
+        , Json.Decode.map PvyZkNoteAndLinksSearchResult (Json.Decode.field "PvyZkNoteAndLinksSearchResult" zkNoteAndLinksSearchResultDecoder)
+        , Json.Decode.map PvyPowerDeleteComplete (Json.Decode.field "PvyPowerDeleteComplete" Json.Decode.int)
+        , Json.Decode.map PvyDeletedZkNote (Json.Decode.field "PvyDeletedZkNote" zkNoteIdDecoder)
+        , Json.Decode.map PvySavedZkNote (Json.Decode.field "PvySavedZkNote" savedZkNoteDecoder)
+        , Json.Decode.string
+            |> Json.Decode.andThen
+                (\x ->
+                    case x of
+                        "PvySavedZkLinks" ->
+                            Json.Decode.succeed PvySavedZkLinks
+
+                        unexpected ->
+                            Json.Decode.fail <| "Unexpected variant " ++ unexpected
+                )
+        , Json.Decode.map PvySavedZkNoteAndLinks (Json.Decode.field "PvySavedZkNoteAndLinks" savedZkNoteDecoder)
+        , Json.Decode.string
+            |> Json.Decode.andThen
+                (\x ->
+                    case x of
+                        "PvySavedImportZkNotes" ->
+                            Json.Decode.succeed PvySavedImportZkNotes
+
+                        unexpected ->
+                            Json.Decode.fail <| "Unexpected variant " ++ unexpected
+                )
+        , Json.Decode.map PvyHomeNoteSet (Json.Decode.field "PvyHomeNoteSet" zkNoteIdDecoder)
+        , Json.Decode.map PvyJobStatus (Json.Decode.field "PvyJobStatus" jobStatusDecoder)
+        , Json.Decode.map PvyJobNotFound (Json.Decode.field "PvyJobNotFound" Json.Decode.int)
+        ]
+
+
+privateErrorDecoder : Json.Decode.Decoder PrivateError
+privateErrorDecoder =
+    Json.Decode.oneOf
+        [ Json.Decode.map PveString (Json.Decode.field "PveString" Json.Decode.string)
+        , Json.Decode.map PveNoteNotFound (Json.Decode.field "PveNoteNotFound" zkNoteRqDecoder)
+        , Json.Decode.map PveNoteIsPrivate (Json.Decode.field "PveNoteIsPrivate" zkNoteRqDecoder)
+        , Json.Decode.string
+            |> Json.Decode.andThen
+                (\x ->
+                    case x of
+                        "PveNotLoggedIn" ->
+                            Json.Decode.succeed PveNotLoggedIn
+
+                        unexpected ->
+                            Json.Decode.fail <| "Unexpected variant " ++ unexpected
+                )
+        , Json.Decode.map PveLoginError (Json.Decode.field "PveLoginError" Json.Decode.string)
+        ]
+
+
+zkNoteRqDecoder : Json.Decode.Decoder ZkNoteRq
+zkNoteRqDecoder =
+    Json.Decode.succeed ZkNoteRq
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "zknoteid" zkNoteIdDecoder))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "what" (Json.Decode.nullable Json.Decode.string)))
+
+
+uploadReplyDecoder : Json.Decode.Decoder UploadReply
+uploadReplyDecoder =
+    Json.Decode.oneOf
+        [ Json.Decode.map UrFilesUploaded (Json.Decode.field "UrFilesUploaded" (Json.Decode.list zkListNoteDecoder))
         ]
 
 

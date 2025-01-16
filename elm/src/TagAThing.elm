@@ -1,5 +1,7 @@
 module TagAThing exposing (..)
 
+-- import Search as S
+
 import Common
 import Data exposing (Direction(..), ZkNoteId)
 import DataUtil exposing (zklKey, zniCompare)
@@ -13,8 +15,8 @@ import Element.Input as EI
 import Element.Region
 import Json.Encode as JE
 import Orgauth.Data as OD
-import Search as S
 import SearchStackPanel as SP
+import SearchUtil as SU
 import TangoColors as TC
 import Time exposing (Zone)
 import Toop
@@ -79,8 +81,8 @@ type Msg tmsg
 type Command tcmd
     = None
     | SearchHistory
-    | Search S.ZkNoteSearch
-    | SyncFiles S.ZkNoteSearch
+    | Search Data.ZkNoteSearch
+    | SyncFiles Data.ZkNoteSearch
     | AddToRecent Data.ZkListNote
     | ThingCommand tcmd
 
@@ -516,7 +518,7 @@ update msg model =
                 ( { model
                     | spmodel =
                         SP.addToSearch model.spmodel
-                            [ S.ExactMatch ]
+                            [ Data.ExactMatch ]
                             zkln.title
                   }
                 , None
@@ -530,7 +532,7 @@ update msg model =
             ( { model
                 | spmodel =
                     SP.addToSearch model.spmodel
-                        [ S.ExactMatch, S.Tag ]
+                        [ Data.ExactMatch, Data.Tag ]
                         title
               }
             , None

@@ -8,3 +8,4 @@ pub mod private;
 pub mod public;
 pub mod search;
 pub mod sync_data;
+pub mod upload;

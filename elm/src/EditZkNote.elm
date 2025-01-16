@@ -47,6 +47,8 @@ module EditZkNote exposing
     , zknview
     )
 
+-- import Search as S
+
 import Browser.Dom as BD
 import Cellme.Cellme exposing (CellContainer(..), RunState(..), evalCellsFully)
 import Cellme.DictCellme exposing (CellDict(..), getCd, mkCc)
@@ -71,8 +73,9 @@ import MdCommon as MC
 import NoteCache as NC exposing (NoteCache)
 import Orgauth.Data exposing (UserId, getUserIdVal)
 import RequestsDialog exposing (TRequests)
-import Search as S
+import Search exposing (decodeTagSearch)
 import SearchStackPanel as SP
+import SearchUtil as SU
 import TangoColors as TC
 import Task
 import Time
@@ -124,7 +127,7 @@ type Msg
     | AddToSearch Data.ZkListNote
     | AddToSearchAsTag String
     | SetSearchString String
-    | SetSearch (List S.TagSearch)
+    | SetSearch Data.TagSearch
     | BigSearchPress
     | SettingsPress
     | AdminPress
@@ -217,7 +220,7 @@ type Command
     | Switch ZkNoteId
     | SaveSwitch Data.SaveZkNoteAndLinks ZkNoteId
     | GetTASelection String String
-    | Search S.ZkNoteSearch
+    | Search Data.ZkNoteSearch
     | SearchHistory
     | BigSearch
     | Settings
@@ -230,7 +233,7 @@ type Command
     | ShowArchives ZkNoteId
     | FileUpload
     | Sync
-    | SyncFiles S.ZkNoteSearch
+    | SyncFiles Data.ZkNoteSearch
     | Cmd (Cmd Msg)
 
 
@@ -382,7 +385,7 @@ updateSearchResult zsr model =
     }
 
 
-updateSearch : List S.TagSearch -> Model -> ( Model, Command )
+updateSearch : List Data.TagSearch -> Model -> ( Model, Command )
 updateSearch ts model =
     ( { model
         | spmodel = SP.setSearch model.spmodel ts
@@ -391,7 +394,7 @@ updateSearch ts model =
     )
 
 
-updateSearchStack : List S.TagSearch -> Model -> Model
+updateSearchStack : List Data.TagSearch -> Model -> Model
 updateSearchStack tsl model =
     let
         spm =
@@ -1293,7 +1296,7 @@ zknview zone size recentZkns trqs tjobs noteCache model =
                         , if search then
                             EI.button (E.alignRight :: Common.buttonStyle)
                                 (case
-                                    JD.decodeString S.decodeTsl model.md
+                                    JD.decodeString Data.tagSearchDecoder model.md
                                         |> Result.toMaybe
                                  of
                                     Just s ->
@@ -2677,7 +2680,7 @@ update msg model =
                 ( { model
                     | spmodel =
                         SP.addToSearch model.spmodel
-                            [ S.ExactMatch ]
+                            [ Data.ExactMatch ]
                             zkln.title
                   }
                 , None
@@ -2702,7 +2705,7 @@ update msg model =
             in
             ( { model
                 | spmodel =
-                    SP.setSearch model.spmodel search
+                    SP.setSearch model.spmodel [ search ]
               }
             , None
             )
@@ -2715,7 +2718,7 @@ update msg model =
             ( { model
                 | spmodel =
                     SP.addToSearch model.spmodel
-                        [ S.ExactMatch, S.Tag ]
+                        [ Data.ExactMatch, Data.Tag ]
                         title
               }
             , None

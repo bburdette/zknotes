@@ -13,6 +13,7 @@ import Element.Region
 import Import
 import Search as S exposing (TagSearch(..))
 import SearchStackPanel as SP
+import SearchUtil exposing (getTagSearch, showTagSearch)
 import TagSearchPanel as TSP
 import TangoColors as TC
 import Toop
@@ -48,9 +49,9 @@ type Command
     | Done
     | Import
     | None
-    | Search S.ZkNoteSearch
-    | SyncFiles S.ZkNoteSearch
-    | PowerDelete S.TagSearch
+    | Search Data.ZkNoteSearch
+    | SyncFiles Data.ZkNoteSearch
+    | PowerDelete Data.TagSearch
     | SearchHistory
 
 
@@ -76,7 +77,7 @@ updateSearchResult zsr model =
     }
 
 
-updateSearchStack : List S.TagSearch -> Model -> Model
+updateSearchStack : List Data.TagSearch -> Model -> Model
 updateSearchStack tsl model =
     let
         spm =
@@ -87,7 +88,7 @@ updateSearchStack tsl model =
     }
 
 
-updateSearch : List S.TagSearch -> Model -> ( Model, Command )
+updateSearch : List Data.TagSearch -> Model -> ( Model, Command )
 updateSearch ts model =
     ( { model
         | spmodel = SP.setSearch model.spmodel ts
@@ -237,7 +238,7 @@ update msg model ld =
                             Just <|
                                 ( D.init
                                     ("delete all notes matching this search?\n"
-                                        ++ String.concat (List.map S.showTagSearch s.tagSearch)
+                                        ++ showTagSearch s.tagsearch
                                     )
                                     True
                                     (\size -> E.map (\_ -> ()) (listview ld size model))
@@ -257,7 +258,7 @@ update msg model ld =
                         ( D.Ok, DeleteAll ) ->
                             case SP.getSearch model.spmodel of
                                 Just s ->
-                                    ( { model | dialog = Nothing }, PowerDelete (S.getTagSearch s) )
+                                    ( { model | dialog = Nothing }, PowerDelete (getTagSearch s) )
 
                                 Nothing ->
                                     ( { model | dialog = Nothing }, None )

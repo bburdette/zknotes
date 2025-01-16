@@ -15,8 +15,10 @@ module SearchPanel exposing
     , view
     )
 
+-- import Search as S exposing (AndOr(..), SearchMod(..), TSText, TagSearch(..), tagSearchParser)
+
 import Common exposing (buttonStyle)
-import Data
+import Data exposing (AndOr(..), SearchMod(..), TagSearch(..))
 import Element as E exposing (..)
 import Element.Background as Background
 import Element.Border as Border
@@ -25,8 +27,8 @@ import Element.Font as Font
 import Element.Input as EI
 import PaginationPanel as PP
 import Parser
-import Search as S exposing (AndOr(..), SearchMod(..), TSText, TagSearch(..), tagSearchParser)
 import SearchHelpPanel
+import SearchUtil as SU exposing (TSText, tagSearchParser)
 import TDict exposing (TDict)
 import TagSearchPanel as TSP
 import TangoColors as Color
@@ -56,19 +58,19 @@ showDeleted =
     False
 
 
-getSearch : Model -> Maybe S.ZkNoteSearch
+getSearch : Model -> Maybe Data.ZkNoteSearch
 getSearch model =
     TSP.getSearch model.tagSearchModel
         |> Maybe.map
             (\s ->
-                { tagSearch = [ s ]
+                { tagsearch = s
                 , offset = model.paginationModel.offset
                 , limit = Just model.paginationModel.increment
                 , what = ""
-                , resultType = S.RtListNote
+                , resulttype = Data.RtListNote
                 , archives = False
                 , deleted = showDeleted
-                , unsynced = False
+                , ordering = Nothing
                 }
             )
 
@@ -114,8 +116,8 @@ type Msg
 type Command
     = None
     | Save
-    | Search S.ZkNoteSearch
-    | SyncFiles S.ZkNoteSearch
+    | Search Data.ZkNoteSearch
+    | SyncFiles Data.ZkNoteSearch
     | Copy String
     | And TagSearch
 
@@ -158,28 +160,28 @@ handleTspUpdate model ( nm, cmd ) =
         TSP.Search ts ->
             ( { model | tagSearchModel = nm, paginationModel = PP.initModel }
             , Search <|
-                { tagSearch = [ ts ]
+                { tagsearch = ts
                 , offset = 0
                 , limit = Just model.paginationModel.increment
                 , what = ""
-                , resultType = S.RtListNote
+                , resulttype = Data.RtListNote
                 , archives = False
                 , deleted = showDeleted
-                , unsynced = False
+                , ordering = Nothing
                 }
             )
 
         TSP.SyncFiles ts ->
             ( { model | tagSearchModel = nm, paginationModel = PP.initModel }
             , SyncFiles <|
-                { tagSearch = [ ts ]
+                { tagsearch = ts
                 , offset = 0
                 , limit = Nothing
                 , what = ""
-                , resultType = S.RtListNote
+                , resulttype = Data.RtListNote
                 , archives = False
                 , deleted = showDeleted
-                , unsynced = False
+                , ordering = Nothing
                 }
             )
 
@@ -215,14 +217,14 @@ update msg model =
                         Just ts ->
                             ( { model | paginationModel = nm }
                             , Search
-                                { tagSearch = [ ts ]
+                                { tagsearch = ts
                                 , offset = nm.offset
                                 , limit = Just nm.increment
                                 , what = ""
-                                , resultType = S.RtListNote
+                                , resulttype = Data.RtListNote
                                 , archives = False
                                 , deleted = showDeleted
-                                , unsynced = False
+                                , ordering = Nothing
                                 }
                             )
 

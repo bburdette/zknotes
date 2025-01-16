@@ -85,7 +85,7 @@ pub fn on_new_user(
   match (&data, creator) {
     (Some(data), Some(creator)) => {
       let extra_links: Vec<SaveZkLink> = serde_json::from_str(data.as_str())?;
-      save_savezklinks(&conn, creator, user_note_uuid, extra_links)
+      save_savezklinks(&conn, creator, user_note_uuid, &extra_links)
         .map_err(zkerr::to_orgauth_error)?;
     }
     _ => (),
@@ -128,7 +128,7 @@ pub fn sysids() -> Result<Sysids, zkerr::Error> {
 }
 
 // will this work??
-pub fn set_homenote(conn: &Connection, uid: i64, homenote: ZkNoteId) -> Result<(), zkerr::Error> {
+pub fn set_homenote(conn: &Connection, uid: i64, homenote: &ZkNoteId) -> Result<(), zkerr::Error> {
   conn.execute(
     "update user set homenote = zknote.id
         from zknote
@@ -1346,7 +1346,7 @@ pub fn delete_zknote(
   Ok(())
 }
 
-pub fn save_zklinks(dbfile: &Path, uid: i64, zklinks: Vec<ZkLink>) -> Result<(), zkerr::Error> {
+pub fn save_zklinks(dbfile: &Path, uid: i64, zklinks: &Vec<ZkLink>) -> Result<(), zkerr::Error> {
   let conn = connection_open(dbfile)?;
 
   for zklink in zklinks.iter() {
@@ -1385,7 +1385,7 @@ pub fn save_savezklinks(
   conn: &Connection,
   uid: i64,
   zknid: ZkNoteId,
-  zklinks: Vec<SaveZkLink>,
+  zklinks: &Vec<SaveZkLink>,
 ) -> Result<(), zkerr::Error> {
   for link in zklinks.iter() {
     let (uufrom, uuto) = match link.direction {
@@ -2162,7 +2162,7 @@ pub fn read_zneifchanged(
 pub fn save_importzknotes(
   conn: &Connection,
   uid: i64,
-  izns: Vec<ImportZkNote>,
+  izns: &Vec<ImportZkNote>,
 ) -> Result<(), zkerr::Error> {
   for izn in izns.iter() {
     // create the note if it doesn't exist.

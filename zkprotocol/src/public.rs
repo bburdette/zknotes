@@ -19,7 +19,7 @@ pub enum PublicReply {
 
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]
 pub enum PublicError {
-  String(String),
-  NoteNotFound(PublicRequest),
-  NoteIsPrivate(PublicRequest),
+  PbeString(String),
+  PbeNoteNotFound(PublicRequest),
+  PbeNoteIsPrivate(PublicRequest),
 }

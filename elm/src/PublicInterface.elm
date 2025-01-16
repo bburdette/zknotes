@@ -2,7 +2,7 @@ module PublicInterface exposing (SendMsg(..), ServerResponse(..), encodeSendMsg,
 
 -- import Content
 
-import Data exposing (ZkNoteId)
+import Data exposing (PublicReply, ZkNoteId, publicReplyDecoder)
 import Http
 import Http.Tasks as HT
 import Json.Decode as JD
@@ -70,7 +70,7 @@ serverResponseDecoder =
         )
 
 
-getErrorIndexNote : String -> ZkNoteId -> (Result Http.Error ServerResponse -> msg) -> Cmd msg
+getErrorIndexNote : String -> ZkNoteId -> (Result Http.Error PublicReply -> msg) -> Cmd msg
 getErrorIndexNote location noteid tomsg =
     HT.post
         { url = location ++ "/public"
@@ -84,6 +84,6 @@ getErrorIndexNote location noteid tomsg =
                     )
         , resolver =
             HT.resolveJson
-                serverResponseDecoder
+                publicReplyDecoder
         }
         |> Task.attempt tomsg

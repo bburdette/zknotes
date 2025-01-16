@@ -2,7 +2,7 @@
 
 use std::fmt::Display;
 
-use crate::search::{ZkListNoteSearchResult, ZkSearchResultHeader};
+use crate::search::ZkListNoteSearchResult;
 use elm_rs::{Elm, ElmDecode, ElmEncode};
 use uuid::Uuid;
 

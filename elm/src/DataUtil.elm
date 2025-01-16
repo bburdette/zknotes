@@ -23,14 +23,14 @@ getPrNoteInfo pr =
     case pr of
         PrServerError publicError ->
             case publicError of
-                String _ ->
+                PbeString _ ->
                     Nothing
 
-                NoteNotFound publicRequest ->
+                PbeNoteNotFound publicRequest ->
                     getPrqNoteInfo publicRequest
                         |> Maybe.map (\( l, r ) -> ( l, Just r ))
 
-                NoteIsPrivate publicRequest ->
+                PbeNoteIsPrivate publicRequest ->
                     getPrqNoteInfo publicRequest
                         |> Maybe.map (\( l, r ) -> ( l, Just r ))
 
@@ -348,3 +348,48 @@ type alias ZkInviteData =
 encodeZkInviteData : ZkInviteData -> JE.Value
 encodeZkInviteData zid =
     JE.list saveZkLinkEncoder zid
+
+
+showPrivateReply : PrivateReply -> String
+showPrivateReply pr =
+    privateReplyEncoder pr
+        |> JE.encode 2
+
+
+showPrivateError : PrivateError -> String
+showPrivateError pe =
+    case pe of
+        PveString s ->
+            s
+
+        PveNoteNotFound _ ->
+            "note not found"
+
+        PveNoteIsPrivate _ ->
+            "note is private"
+
+        PveNotLoggedIn ->
+            "not logged in"
+
+        PveLoginError e ->
+            "login error: " ++ e
+
+
+
+-- type PublicError
+--     = PbeString String
+--     | PbeNoteNotFound PublicRequest
+--     | PbeNoteIsPrivate PublicRequest
+
+
+showPublicError : PublicError -> String
+showPublicError pe =
+    case pe of
+        PbeString s ->
+            s
+
+        PbeNoteNotFound _ ->
+            "note not found"
+
+        PbeNoteIsPrivate _ ->
+            "note is private"

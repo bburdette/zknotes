@@ -83,7 +83,7 @@ type alias Model =
 type Command
     = None
     | SaveExit (List Data.ImportZkNote)
-    | Search S.ZkNoteSearch
+    | Search Data.ZkNoteSearch
     | SelectFiles
     | Cancel
     | Command (Cmd Msg)

@@ -31,6 +31,8 @@ use zkprotocol::content::{
   ZkLinks, ZkNoteAndLinks, ZkNoteAndLinksWhat, ZkNoteArchives, ZkNoteId,
 };
 use zkprotocol::messages::{PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage};
+use zkprotocol::private::PrivateReply;
+use zkprotocol::private::PrivateRequest;
 use zkprotocol::public::{PublicReply, PublicRequest};
 use zkprotocol::search::{TagSearch, ZkListNoteSearchResult, ZkNoteSearch};
 pub fn login_data_for_token(
@@ -153,23 +155,20 @@ pub async fn zk_interface_loggedin(
   state: &State,
   conn: &Connection,
   uid: i64,
-  msg: &PrivateMessage,
-) -> Result<PrivateReplyMessage, zkerr::Error> {
+  msg: &PrivateRequest,
+) -> Result<PrivateReply, zkerr::Error> {
   info!("zk_interface_loggedin msg: {:?}", msg);
-  match msg.what {
-    PrivateRequests::GetZkNote => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let id: ZkNoteId = serde_json::from_value(msgdata.clone())?;
+  match msg {
+    PrivateRequest::PvqGetZkNote(id) => {
+      // let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      // let id: ZkNoteId = serde_json::from_value(msgdata.clone())?;
       let (_nid, note) = sqldata::read_zknote(&conn, &state.config.file_path, Some(uid), &id)?;
       info!("user#getzknote: {:?} - {}", id, note.title);
-      Ok(PrivateReplyMessage {
-        what: PrivateReplies::ZkNote,
-        content: serde_json::to_value(note)?,
-      })
+      Ok(PrivateReply::PvyZkNote(note))
     }
-    PrivateRequests::GetZkNoteAndLinks => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let gzne: GetZkNoteAndLinks = serde_json::from_value(msgdata.clone())?;
+    PrivateRequest::PvqGetZkNoteAndLinks(gzne) => {
+      // let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      // let gzne: GetZkNoteAndLinks = serde_json::from_value(msgdata.clone())?;
       let note =
         sqldata::read_zknoteandlinks(&conn, &state.config.file_path, Some(uid), &gzne.zknote)?;
       info!(
@@ -178,18 +177,15 @@ pub async fn zk_interface_loggedin(
       );
 
       let znew = ZkNoteAndLinksWhat {
-        what: gzne.what,
+        what: gzne.what.clone(),
         znl: note,
       };
 
-      Ok(PrivateReplyMessage {
-        what: PrivateReplies::ZkNoteAndLinksWhat,
-        content: serde_json::to_value(znew)?,
-      })
+      Ok(PrivateReply::PvyZkNoteAndLinksWhat(znew))
     }
-    PrivateRequests::GetZnlIfChanged => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let gzic: GetZnlIfChanged = serde_json::from_value(msgdata.clone())?;
+    PrivateRequest::PvqGetZnlIfChanged(gzic) => {
+      // let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      // let gzic: GetZnlIfChanged = serde_json::from_value(msgdata.clone())?;
       info!(
         "user#getzneifchanged: {:?} - {}",
         gzic.zknote, gzic.changeddate
@@ -197,31 +193,22 @@ pub async fn zk_interface_loggedin(
       let ozkne = sqldata::read_zneifchanged(&conn, &state.config.file_path, Some(uid), &gzic)?;
 
       match ozkne {
-        Some(zkne) => Ok(PrivateReplyMessage {
-          what: PrivateReplies::ZkNoteAndLinksWhat,
-          content: serde_json::to_value(ZkNoteAndLinksWhat {
-            what: gzic.what,
-            znl: zkne,
-          })?,
-        }),
-        None => Ok(PrivateReplyMessage {
-          what: PrivateReplies::Noop,
-          content: serde_json::Value::Null,
-        }),
+        Some(zkne) => Ok(PrivateReply::PvyZkNoteAndLinksWhat(ZkNoteAndLinksWhat {
+          what: gzic.what.clone(),
+          znl: zkne,
+        })),
+        None => Ok(PrivateReply::PvyNoop),
       }
     }
-    PrivateRequests::GetZkNoteComments => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let gzne: GetZkNoteComments = serde_json::from_value(msgdata.clone())?;
+    PrivateRequest::PvqGetZkNoteComments(gzne) => {
+      // let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      // let gzne: GetZkNoteComments = serde_json::from_value(msgdata.clone())?;
       let notes = sqldata::read_zknotecomments(&conn, &state.config.file_path, uid, &gzne)?;
-      Ok(PrivateReplyMessage {
-        what: PrivateReplies::ZkNoteComments,
-        content: serde_json::to_value(notes)?,
-      })
+      Ok(PrivateReply::PvyZkNoteComments(notes))
     }
-    PrivateRequests::GetZkNoteArchives => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let gzne: GetZkNoteArchives = serde_json::from_value(msgdata.clone())?;
+    PrivateRequest::PvqGetZkNoteArchives(gzne) => {
+      // let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      // let gzne: GetZkNoteArchives = serde_json::from_value(msgdata.clone())?;
       let notes = sqldata::read_zknotearchives(&conn, &state.config.file_path, uid, &gzne)?;
       let zlnsr = ZkListNoteSearchResult {
         notes,
@@ -232,127 +219,84 @@ pub async fn zk_interface_loggedin(
         zknote: gzne.zknote,
         results: zlnsr,
       };
-      Ok(PrivateReplyMessage {
-        what: PrivateReplies::ZkNoteArchives,
-        content: serde_json::to_value(zka)?,
-      })
+      Ok(PrivateReply::PvyZkNoteArchives(zka))
     }
-    PrivateRequests::GetArchiveZkNote => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let rq: GetArchiveZkNote = serde_json::from_value(msgdata.clone())?;
+    PrivateRequest::PvqGetArchiveZkNote(rq) => {
+      // let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      // let rq: GetArchiveZkNote = serde_json::from_value(msgdata.clone())?;
       let (_nid, note) = sqldata::read_archivezknote(&conn, &state.config.file_path, uid, &rq)?;
       info!("user#getarchivezknote: {} - {}", note.id, note.title);
-      Ok(PrivateReplyMessage {
-        what: PrivateReplies::ZkNote,
-        content: serde_json::to_value(note)?,
-      })
+      Ok(PrivateReply::PvyZkNote(note))
     }
-    PrivateRequests::GetArchiveZklinks => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let rq: GetArchiveZkLinks = serde_json::from_value(msgdata.clone())?;
+    PrivateRequest::PvqGetArchiveZklinks(rq) => {
+      // let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      // let rq: GetArchiveZkLinks = serde_json::from_value(msgdata.clone())?;
       let links = sqldata::read_archivezklinks(&conn, uid, rq.createddate_after)?;
-      Ok(PrivateReplyMessage {
-        what: PrivateReplies::ArchiveZkLinks,
-        content: serde_json::to_value(links)?,
-      })
+      Ok(PrivateReply::PvyArchiveZkLinks(links))
     }
-    PrivateRequests::GetZkLinksSince => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let rq: GetZkLinksSince = serde_json::from_value(msgdata.clone())?;
+    PrivateRequest::PvqGetZkLinksSince(rq) => {
+      // let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      // let rq: GetZkLinksSince = serde_json::from_value(msgdata.clone())?;
       let links = sqldata::read_zklinks_since(&conn, uid, rq.createddate_after)?;
-      Ok(PrivateReplyMessage {
-        what: PrivateReplies::ZkLinks,
-        content: serde_json::to_value(links)?,
-      })
+      Ok(PrivateReply::PvyZkLinks(links))
     }
-    PrivateRequests::SearchZkNotes => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let search: ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
+    PrivateRequest::PvqSearchZkNotes(search) => {
+      // let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      // let search: ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
       let res = search::search_zknotes(&conn, &state.config.file_path, uid, &search)?;
       match res {
-        search::SearchResult::SrId(res) => Ok(PrivateReplyMessage {
-          what: PrivateReplies::ZkNoteIdSearchResult,
-          content: serde_json::to_value(res)?,
-        }),
-        search::SearchResult::SrListNote(res) => Ok(PrivateReplyMessage {
-          what: PrivateReplies::ZkListNoteSearchResult,
-          content: serde_json::to_value(res)?,
-        }),
-        search::SearchResult::SrNote(res) => Ok(PrivateReplyMessage {
-          what: PrivateReplies::ZkNoteSearchResult,
-          content: serde_json::to_value(res)?,
-        }),
-        search::SearchResult::SrNoteAndLink(res) => Ok(PrivateReplyMessage {
-          what: PrivateReplies::ZkNoteAndLinksSearchResult,
-          content: serde_json::to_value(res)?,
-        }),
+        search::SearchResult::SrId(res) => Ok(PrivateReply::PvyZkNoteIdSearchResult(res)),
+        search::SearchResult::SrListNote(res) => Ok(PrivateReply::PvyZkListNoteSearchResult(res)),
+        search::SearchResult::SrNote(res) => Ok(PrivateReply::PvyZkNoteSearchResult(res)),
+        search::SearchResult::SrNoteAndLink(res) => {
+          Ok(PrivateReply::PvyZkNoteAndLinksSearchResult(res))
+        }
       }
     }
-    PrivateRequests::PowerDelete => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let search: TagSearch = serde_json::from_value(msgdata.clone())?;
+    PrivateRequest::PvqPowerDelete(search) => {
+      // let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      // let search: TagSearch = serde_json::from_value(msgdata.clone())?;
       let res = search::power_delete_zknotes(&conn, state.config.file_path.clone(), uid, &search)?;
-      Ok(PrivateReplyMessage {
-        what: PrivateReplies::PowerDeleteComplete,
-        content: serde_json::to_value(res)?,
-      })
+      Ok(PrivateReply::PvyPowerDeleteComplete(res))
     }
-    PrivateRequests::DeleteZkNote => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let id: ZkNoteId = serde_json::from_value(msgdata.clone())?;
+    PrivateRequest::PvqDeleteZkNote(id) => {
+      // let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      // let id: ZkNoteId = serde_json::from_value(msgdata.clone())?;
       sqldata::delete_zknote(&conn, state.config.file_path.clone(), uid, &id)?;
-      Ok(PrivateReplyMessage {
-        what: PrivateReplies::DeletedZkNote,
-        content: serde_json::to_value(id)?,
-      })
+      Ok(PrivateReply::PvyDeletedZkNote(id.clone()))
     }
-    PrivateRequests::SaveZkNote => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let sbe: SaveZkNote = serde_json::from_value(msgdata.clone())?;
-      let s = sqldata::save_zknote(&conn, uid, &sbe)?;
-      Ok(PrivateReplyMessage {
-        what: PrivateReplies::SavedZkNote,
-        content: serde_json::to_value(s)?,
-      })
+    PrivateRequest::PvqSaveZkNote(sbe) => {
+      // let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      // let sbe: SaveZkNote = serde_json::from_value(msgdata.clone())?;
+      let (_id, s) = sqldata::save_zknote(&conn, uid, &sbe)?;
+      Ok(PrivateReply::PvySavedZkNote(s))
     }
-    PrivateRequests::SaveZkLinks => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let msg: ZkLinks = serde_json::from_value(msgdata.clone())?;
-      let s = sqldata::save_zklinks(&state.config.orgauth_config.db.as_path(), uid, msg.links)?;
-      Ok(PrivateReplyMessage {
-        what: PrivateReplies::SavedZkLinks,
-        content: serde_json::to_value(s)?,
-      })
+    PrivateRequest::PvqSaveZkLinks(msg) => {
+      // let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      // let msg: ZkLinks = serde_json::from_value(msgdata.clone())?;
+      let _ = sqldata::save_zklinks(&state.config.orgauth_config.db.as_path(), uid, &msg.links)?;
+      Ok(PrivateReply::PvySavedZkLinks)
     }
-    PrivateRequests::SaveZkNoteAndLinks => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let sznpl: SaveZkNoteAndLinks = serde_json::from_value(msgdata.clone())?;
+    PrivateRequest::PvqSaveZkNoteAndLinks(sznpl) => {
+      // let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      // let sznpl: SaveZkNoteAndLinks = serde_json::from_value(msgdata.clone())?;
       let (_, szkn) = sqldata::save_zknote(&conn, uid, &sznpl.note)?;
-      let _s = sqldata::save_savezklinks(&conn, uid, szkn.id, sznpl.links)?;
-      Ok(PrivateReplyMessage {
-        what: PrivateReplies::SavedZkNoteAndLinks,
-        content: serde_json::to_value(szkn)?,
-      })
+      let _s = sqldata::save_savezklinks(&conn, uid, szkn.id, &sznpl.links)?;
+      Ok(PrivateReply::PvySavedZkNoteAndLinks(szkn))
     }
-    PrivateRequests::SaveImportZkNotes => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let gzl: Vec<ImportZkNote> = serde_json::from_value(msgdata.clone())?;
+    PrivateRequest::PvqSaveImportZkNotes(gzl) => {
+      // let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      // let gzl: Vec<ImportZkNote> = serde_json::from_value(msgdata.clone())?;
       sqldata::save_importzknotes(&conn, uid, gzl)?;
-      Ok(PrivateReplyMessage {
-        what: PrivateReplies::SavedImportZkNotes,
-        content: serde_json::to_value(())?,
-      })
+      Ok(PrivateReply::PvySavedImportZkNotes)
     }
-    PrivateRequests::SetHomeNote => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let hn: ZkNoteId = serde_json::from_value(msgdata.clone())?;
+    PrivateRequest::PvqSetHomeNote(hn) => {
+      // let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      // let hn: ZkNoteId = serde_json::from_value(msgdata.clone())?;
       sqldata::set_homenote(&conn, uid, hn)?;
-      Ok(PrivateReplyMessage {
-        what: PrivateReplies::HomeNoteSet,
-        content: serde_json::to_value(hn)?,
-      })
+      Ok(PrivateReply::PvyHomeNoteSet(hn.clone()))
     }
-    PrivateRequests::SyncRemote => {
+    PrivateRequest::PvqSyncRemote => {
       let dbpath: PathBuf = state.config.orgauth_config.db.to_path_buf();
       let file_path: PathBuf = state.config.file_path.to_path_buf();
       let uid: i64 = uid;
@@ -404,24 +348,22 @@ pub async fn zk_interface_loggedin(
           .unwrap()
       });
 
-      Ok(PrivateReplyMessage {
-        what: PrivateReplies::JobStatus,
-        content: serde_json::to_value(JobStatus {
-          jobno: jid.jobno,
-          state: JobState::Started,
-          message: "".to_string(),
-        })?,
-      })
+      Ok(PrivateReply::PvyJobStatus(JobStatus {
+        jobno: jid.jobno,
+        state: JobState::Started,
+        message: "".to_string(),
+      }))
     }
-    PrivateRequests::SyncFiles => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let zns: ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
+    PrivateRequest::PvqSyncFiles(znsrq) => {
+      // let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      // let zns: ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
       let dbpath: PathBuf = state.config.orgauth_config.db.to_path_buf();
       let file_path: PathBuf = state.config.file_path.to_path_buf();
       let file_tmp_path: PathBuf = state.config.file_tmp_path.to_path_buf();
       let uid: i64 = uid;
       let jid = new_jobid(state, uid);
       let lgb = state.girlboss.clone();
+      let zns = znsrq.clone();
 
       std::thread::spawn(move || {
         let rt = actix_rt::System::new();
@@ -475,13 +417,15 @@ pub async fn zk_interface_loggedin(
           ()
         }
 
+        let znsclone = zns.clone();
+
         rt.block_on(startit(
           lgb,
           dbpath,
           file_path,
           file_tmp_path,
           uid,
-          zns,
+          znsclone,
           jid,
         ));
         rt.run()
@@ -492,21 +436,21 @@ pub async fn zk_interface_loggedin(
           .unwrap()
       });
 
-      Ok(PrivateReplyMessage {
-        what: PrivateReplies::JobStatus,
-        content: serde_json::to_value(JobStatus {
-          jobno: jid.jobno,
-          state: JobState::Started,
-          message: "".to_string(),
-        })?,
-      })
+      Ok(PrivateReply::PvyJobStatus(JobStatus {
+        jobno: jid.jobno,
+        state: JobState::Started,
+        message: "".to_string(),
+      }))
     }
 
-    PrivateRequests::GetJobStatus => {
-      let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
-      let jobno: i64 = serde_json::from_value(msgdata.clone())?;
+    PrivateRequest::PvqGetJobStatus(jobno) => {
+      // let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
+      // let jobno: i64 = serde_json::from_value(msgdata.clone())?;
 
-      let jid = JobId { uid, jobno };
+      let jid = JobId {
+        uid,
+        jobno: jobno.clone(),
+      };
 
       match state.girlboss.read().unwrap().get(&jid) {
         Some(job) => {
@@ -521,24 +465,15 @@ pub async fn zk_interface_loggedin(
           };
 
           let js = JobStatus {
-            jobno,
+            jobno: jobno.clone(),
             state,
             message: job.status().message().to_string(),
           };
           info!("job status: {:?}", js);
 
-          Ok(PrivateReplyMessage {
-            what: PrivateReplies::JobStatus,
-            content: serde_json::to_value(js)?,
-          })
+          Ok(PrivateReply::PvyJobStatus(js))
         }
-        None => {
-          let js = jobno;
-          Ok(PrivateReplyMessage {
-            what: PrivateReplies::JobNotFound,
-            content: serde_json::to_value(js)?,
-          })
-        }
+        None => Ok(PrivateReply::PvyJobNotFound(jobno.clone())),
       }
     }
   }

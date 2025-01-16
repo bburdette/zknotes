@@ -57,7 +57,9 @@ pub use zkprotocol::search as zs;
 pub use zkprotocol::messages::{PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage};
 use zkprotocol::{
   constants::PrivateReplies,
+  private::{PrivateError, PrivateReply, PrivateRequest, ZkNoteRq},
   public::{PublicError, PublicReply, PublicRequest},
+  upload::UploadReply,
 };
 
 /*
@@ -132,9 +134,9 @@ async fn mainpage(session: Session, data: web::Data<State>, req: HttpRequest) ->
 
 pub fn to_public_error(zke: zkerr::Error, pr: PublicRequest) -> PublicError {
   match zke {
-    error::Error::NoteNotFound => PublicError::NoteNotFound(pr),
-    error::Error::NoteIsPrivate => PublicError::NoteIsPrivate(pr),
-    _ => PublicError::String(zke.to_string()),
+    error::Error::NoteNotFound => PublicError::PbeNoteNotFound(pr),
+    error::Error::NoteIsPrivate => PublicError::PbeNoteIsPrivate(pr),
+    _ => PublicError::PbeString(zke.to_string()),
   }
 }
 
@@ -237,30 +239,16 @@ fn session_user(
   conn: &Connection,
   session: Session,
   state: &web::Data<State>,
-) -> Result<Either<orgauth::data::User, PrivateReplyMessage>, Box<dyn Error>> {
+) -> Result<orgauth::data::User, zkerr::Error> {
   match session.get::<Uuid>("token")? {
-    None => Ok(Either::Right(PrivateReplyMessage {
-      what: PrivateReplies::NotLoggedIn,
-      content: serde_json::Value::Null,
-    })),
-    Some(token) => {
-      match orgauth::dbfun::read_user_by_token_api(
-        &conn,
-        token,
-        state.config.orgauth_config.login_token_expiration_ms,
-        state.config.orgauth_config.regen_login_tokens,
-      ) {
-        Err(e) => {
-          info!("read_user_by_token_api error: {:?}", e);
-
-          Ok(Either::Right(PrivateReplyMessage {
-            what: PrivateReplies::LoginError,
-            content: serde_json::to_value(format!("{:?}", e).as_str())?,
-          }))
-        }
-        Ok(userdata) => Ok(Either::Left(userdata)),
-      }
-    }
+    None => Err(zkerr::Error::NotLoggedIn)?,
+    Some(token) => orgauth::dbfun::read_user_by_token_api(
+      &conn,
+      token,
+      state.config.orgauth_config.login_token_expiration_ms,
+      state.config.orgauth_config.regen_login_tokens,
+    )
+    .map_err(|e| zkerr::Error::Orgauth(e)),
   }
 }
 
@@ -281,13 +269,11 @@ async fn file(session: Session, state: web::Data<State>, req: HttpRequest) -> Ht
       Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
     }
   } else {
-    let suser = match session_user(&conn, session, &state) {
-      Ok(Either::Left(user)) => Some(user),
-      Ok(Either::Right(_sr)) => None,
-      Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
-    };
+    match session_user(&conn, session, &state) {
+      Ok(u) => Some(u.id),
 
-    suser.map(|user| user.id)
+      Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
+    }
   };
 
   match req.match_info().get("id") {
@@ -342,12 +328,9 @@ async fn make_file_notes(
   session: Session,
   state: web::Data<State>,
   payload: &mut Multipart,
-) -> Result<PrivateReplyMessage, Box<dyn Error>> {
+) -> Result<UploadReply, Box<dyn Error>> {
   let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
-  let userdata = match session_user(&conn, session, &state)? {
-    Either::Left(ud) => ud,
-    Either::Right(sr) => return Ok(sr),
-  };
+  let userdata = session_user(&conn, session, &state)?;
 
   // Save the files to our temp path.
   let tp = state.config.file_tmp_path.clone();
@@ -370,10 +353,7 @@ async fn make_file_notes(
 
     zklns.push(listnote);
   }
-  Ok(PrivateReplyMessage {
-    what: PrivateReplies::FilesUploaded,
-    content: serde_json::to_value(zklns)?,
-  })
+  Ok(UploadReply::UrFilesUploaded(zklns))
 }
 
 async fn save_files(
@@ -426,7 +406,7 @@ async fn save_files(
 async fn private(
   session: Session,
   data: web::Data<State>,
-  item: web::Json<PrivateMessage>,
+  item: web::Json<PrivateRequest>,
   _req: HttpRequest,
 ) -> HttpResponse {
   let mut state = data.clone();
@@ -467,13 +447,10 @@ async fn zk_interface_check(
   state: &State,
   // config: &Config,
   // girlboss: &Girlboss<JobId>,
-  msg: PrivateMessage,
-) -> Result<PrivateReplyMessage, zkerr::Error> {
+  msg: PrivateRequest,
+) -> Result<PrivateReply, zkerr::Error> {
   match session.get::<Uuid>("token")? {
-    None => Ok(PrivateReplyMessage {
-      what: PrivateReplies::NotLoggedIn,
-      content: serde_json::Value::Null,
-    }),
+    None => Ok(PrivateReply::PvyServerError(PrivateError::PveNotLoggedIn)),
     Some(token) => {
       let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
       match orgauth::dbfun::read_user_by_token_api(
@@ -485,10 +462,9 @@ async fn zk_interface_check(
         Err(e) => {
           info!("read_user_by_token_api error2: {:?}, {:?}", token, e);
 
-          Ok(PrivateReplyMessage {
-            what: PrivateReplies::LoginError,
-            content: serde_json::to_value(format!("{:?}", e).as_str())?,
-          })
+          Ok(PrivateReply::PvyServerError(PrivateError::PveLoginError(
+            e.to_string(),
+          )))
         }
         Ok(userdata) => {
           // finally!  processing messages as logged in user.
@@ -789,6 +765,11 @@ pub async fn err_main(
                         PublicRequest,
                         PublicReply,
                         PublicError,
+                        PrivateRequest,
+                        PrivateReply,
+                        PrivateError,
+                        ZkNoteRq,
+                        UploadReply,
                         zs::ZkNoteSearch,
                         zs::Ordering,
                         zs::OrderDirection,
@@ -836,6 +817,11 @@ pub async fn err_main(
                         PublicRequest,
                         PublicReply,
                         PublicError,
+                        PrivateRequest,
+                        PrivateReply,
+                        PrivateError,
+                        ZkNoteRq,
+                        UploadReply,
                         zs::ZkNoteSearch,
                         zs::Ordering,
                         zs::OrderDirection,
