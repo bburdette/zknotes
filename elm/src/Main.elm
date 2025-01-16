@@ -81,7 +81,7 @@ type Msg
     | ZkReplyData (Result Http.Error ( Time.Posix, ZI.ServerResponse ))
     | ZkReplyDataSeq (Result Http.Error ( Time.Posix, ZI.ServerResponse ) -> Maybe (Cmd Msg)) (Result Http.Error ( Time.Posix, ZI.ServerResponse ))
     | TAReplyData DataUtil.TASelection (Result Http.Error ( Time.Posix, ZI.ServerResponse ))
-    | PublicReplyData (Result Http.Error ( Time.Posix, PI.ServerResponse ))
+    | PublicReplyData (Result Http.Error ( Time.Posix, Data.PublicReply ))
     | ErrorIndexNote (Result Http.Error PI.ServerResponse)
     | TauriZkReplyData JD.Value
     | TauriUserReplyData JD.Value
@@ -273,7 +273,7 @@ routeStateInternal model route =
                     , case model.state of
                         EView _ _ ->
                             -- if we're in "EView" then do this request to stay in EView.
-                            sendPIMsg model.fui (PI.GetZkNoteAndLinks { zknote = id, what = "" })
+                            sendPIMsg model.fui (Data.PrGetZkNoteAndLinks { zknote = id, what = "" })
 
                         _ ->
                             sendZIMsg model.fui (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
@@ -284,7 +284,7 @@ routeStateInternal model route =
                         { message = "loading article"
                         }
                         (Just model.state)
-                    , sendPIMsg model.fui (PI.GetZkNoteAndLinks { zknote = id, what = "" })
+                    , sendPIMsg model.fui (Data.PrGetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
         PublicZkPubId pubid ->
@@ -301,7 +301,7 @@ routeStateInternal model route =
                         { message = "loading article"
                         }
                         (Just model.state)
-            , sendPIMsg model.fui (PI.GetZkNotePubId pubid)
+            , sendPIMsg model.fui (Data.PrGetZkNotePubId pubid)
             )
 
         EditZkNoteR id ->
@@ -318,7 +318,7 @@ routeStateInternal model route =
 
                 EView st login ->
                     ( EView st login
-                    , sendPIMsg model.fui (PI.GetZkNoteAndLinks { zknote = id, what = "" })
+                    , sendPIMsg model.fui (Data.PrGetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
                 st ->
@@ -333,7 +333,7 @@ routeStateInternal model route =
                         Nothing ->
                             ( PubShowMessage { message = "loading note..." }
                                 (Just model.state)
-                            , sendPIMsg model.fui (PI.GetZkNoteAndLinks { zknote = id, what = "" })
+                            , sendPIMsg model.fui (Data.PrGetZkNoteAndLinks { zknote = id, what = "" })
                             )
 
         EditZkNoteNew ->
@@ -1213,21 +1213,21 @@ sendSearch model search =
             )
 
 
-sendPIMsg : FileUrlInfo -> PI.SendMsg -> Cmd Msg
+sendPIMsg : FileUrlInfo -> Data.PublicRequest -> Cmd Msg
 sendPIMsg fui msg =
     sendPIMsgExp fui msg PublicReplyData
 
 
-sendPIMsgExp : FileUrlInfo -> PI.SendMsg -> (Result Http.Error ( Time.Posix, PI.ServerResponse ) -> Msg) -> Cmd Msg
+sendPIMsgExp : FileUrlInfo -> Data.PublicRequest -> (Result Http.Error ( Time.Posix, Data.PublicReply ) -> Msg) -> Cmd Msg
 sendPIMsgExp fui msg tomsg =
     if fui.tauri then
-        sendPIValueTauri <| PI.encodeSendMsg msg
+        sendPIValueTauri <| Data.publicRequestEncoder msg
 
     else
         HE.postJsonTask
             { url = fui.location ++ "/public"
-            , body = Http.jsonBody (PI.encodeSendMsg msg)
-            , decoder = PI.serverResponseDecoder
+            , body = Http.jsonBody (Data.publicRequestEncoder msg)
+            , decoder = Data.publicReplyDecoder
             }
             |> Task.andThen (\x -> Task.map (\posix -> ( posix, x )) Time.now)
             |> Task.attempt tomsg
@@ -1530,7 +1530,7 @@ onZkNoteEditWhat model pt znew =
     if znew.what == "cache" then
         ( { model
             | noteCache =
-                NC.addNote pt znew.znl model.noteCache
+                NC.addNote pt znew.znl.zknote.id (NC.ZNAL znew.znl) model.noteCache
                     |> NC.purgeNotes
           }
         , Cmd.none
@@ -1652,7 +1652,7 @@ actualupdate msg model =
                     )
 
         ( TauriPublicReplyData jd, _ ) ->
-            case JD.decodeValue (makeTDDecoder PI.serverResponseDecoder) jd of
+            case JD.decodeValue (makeTDDecoder Data.publicReplyDecoder) jd of
                 Ok td ->
                     actualupdate (PublicReplyData (Ok ( td.utc, td.data ))) model
 
@@ -1973,31 +1973,111 @@ actualupdate msg model =
                     , Cmd.none
                     )
 
+                -- = PrServerError PublicError
+                -- | PrZkNoteAndLinks ZkNoteAndLinks
+                -- | PrZkNoteAndLinksWhat ZkNoteAndLinksWhat
+                -- | PrNoop
                 Ok ( pt, piresponse ) ->
                     case piresponse of
-                        PI.ServerError e ->
-                            let
-                                -- TODO this assumes the error was login.
-                                -- 'if prev state is loading', else ignore?
-                                prevstate =
-                                    case stateLogin state of
-                                        Just _ ->
-                                            state
+                        Data.PrServerError e ->
+                            case e of
+                                Data.NoteNotFound publicrequest ->
+                                    -- let
+                                    --     ( zknoteid, what ) =
+                                    --         DataUtil.getPrqNoteInfo publicrequest
+                                    -- in
+                                    case DataUtil.getPrqNoteInfo publicrequest of
+                                        Just ( zknoteid, "cache" ) ->
+                                            ( { model
+                                                | noteCache =
+                                                    NC.addNote pt zknoteid NC.NotFound model.noteCache
+                                                        |> NC.purgeNotes
+                                              }
+                                            , Cmd.none
+                                            )
+
+                                        _ ->
+                                            let
+                                                prevstate =
+                                                    case stateLogin state of
+                                                        Just _ ->
+                                                            state
+
+                                                        Nothing ->
+                                                            initLoginState model model.initialRoute
+                                            in
+                                            ( displayMessageDialog { model | state = prevstate } "note not found", Cmd.none )
+
+                                Data.NoteIsPrivate publicrequest ->
+                                    let
+                                        _ =
+                                            Debug.log "Data.NoteIsPrivate publicrequest" publicrequest
+                                    in
+                                    case DataUtil.getPrqNoteInfo publicrequest of
+                                        Just ( zknoteid, "cache" ) ->
+                                            ( { model
+                                                | noteCache =
+                                                    NC.addNote pt zknoteid NC.Private model.noteCache
+                                                        |> NC.purgeNotes
+                                              }
+                                            , Cmd.none
+                                            )
+
+                                        _ ->
+                                            let
+                                                prevstate =
+                                                    case stateLogin state of
+                                                        Just _ ->
+                                                            state
+
+                                                        Nothing ->
+                                                            initLoginState model model.initialRoute
+                                            in
+                                            ( displayMessageDialog { model | state = prevstate } "note is private", Cmd.none )
+
+                                Data.String estr ->
+                                    let
+                                        prevstate =
+                                            case stateLogin state of
+                                                Just _ ->
+                                                    state
+
+                                                Nothing ->
+                                                    initLoginState model model.initialRoute
+                                    in
+                                    case Dict.get estr model.errorNotes of
+                                        Just url ->
+                                            ( displayMessageNLinkDialog { model | state = prevstate } estr url "more info"
+                                            , Cmd.none
+                                            )
 
                                         Nothing ->
-                                            initLoginState model model.initialRoute
+                                            ( displayMessageDialog { model | state = prevstate } estr, Cmd.none )
+
+                        Data.PrZkNoteAndLinks znl ->
+                            let
+                                vstate =
+                                    case stateLogin state of
+                                        Just _ ->
+                                            EView
+                                                (View.initFull
+                                                    model.fui
+                                                    znl
+                                                )
+                                                state
+
+                                        Nothing ->
+                                            View (View.initFull model.fui znl)
+
+                                ngets =
+                                    makePubNoteCacheGets model znl.zknote.content
                             in
-                            case Dict.get e model.errorNotes of
-                                Just url ->
-                                    ( displayMessageNLinkDialog { model | state = prevstate } e url "more info"
-                                    , Cmd.none
-                                    )
+                            ( { model | state = vstate }
+                            , Cmd.batch ngets
+                            )
 
-                                Nothing ->
-                                    ( displayMessageDialog { model | state = prevstate } e, Cmd.none )
-
-                        PI.ZkNoteAndLinks fbe ->
-                            if fbe.what == "cache" then
+                        Data.PrZkNoteAndLinksWhat znlw ->
+                            if znlw.what == "cache" then
                                 let
                                     gets =
                                         (case state of
@@ -2013,8 +2093,8 @@ actualupdate msg model =
                                             |> Maybe.andThen .panelNote
                                             |> Maybe.andThen
                                                 (\pn ->
-                                                    if pn == fbe.znl.zknote.id then
-                                                        Just fbe.znl.zknote.content
+                                                    if pn == znlw.znl.zknote.id then
+                                                        Just znlw.znl.zknote.content
 
                                                     else
                                                         Nothing
@@ -2024,7 +2104,7 @@ actualupdate msg model =
                                 in
                                 ( { model
                                     | noteCache =
-                                        NC.addNote pt fbe.znl model.noteCache
+                                        NC.addNote pt znlw.znl.zknote.id (NC.ZNAL znlw.znl) model.noteCache
                                             |> NC.purgeNotes
                                   }
                                 , gets
@@ -2038,21 +2118,21 @@ actualupdate msg model =
                                                 EView
                                                     (View.initFull
                                                         model.fui
-                                                        fbe.znl
+                                                        znlw.znl
                                                     )
                                                     state
 
                                             Nothing ->
-                                                View (View.initFull model.fui fbe.znl)
+                                                View (View.initFull model.fui znlw.znl)
 
                                     ngets =
-                                        makePubNoteCacheGets model fbe.znl.zknote.content
+                                        makePubNoteCacheGets model znlw.znl.zknote.content
                                 in
                                 ( { model | state = vstate }
                                 , Cmd.batch ngets
                                 )
 
-                        PI.Noop ->
+                        Data.PrNoop ->
                             ( model, Cmd.none )
 
         ( ErrorIndexNote rsein, _ ) ->
@@ -2683,7 +2763,7 @@ actualupdate msg model =
                                 }
                                 (Just model.state)
                       }
-                    , sendPIMsg model.fui (PI.GetZkNoteAndLinks { zknote = id, what = "" })
+                    , sendPIMsg model.fui (Data.PrGetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
         ( ViewMsg em, EView es state ) ->
@@ -2715,7 +2795,7 @@ actualupdate msg model =
 
                 View.Switch id ->
                     ( model
-                    , sendPIMsg model.fui (PI.GetZkNoteAndLinks { zknote = id, what = "" })
+                    , sendPIMsg model.fui (Data.PrGetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
         ( EditZkNoteMsg em, EditZkNote es login ) ->
@@ -3119,6 +3199,10 @@ makeNoteCacheGets md model =
                         sendZIMsg model.fui
                             (ZI.GetZkNoteAndLinks { zknote = id, what = "cache" })
 
+                    Just NC.NotFound ->
+                        sendZIMsg model.fui
+                            (ZI.GetZkNoteAndLinks { zknote = id, what = "cache" })
+
                     Nothing ->
                         sendZIMsg model.fui
                             (ZI.GetZkNoteAndLinks { zknote = id, what = "cache" })
@@ -3139,17 +3223,22 @@ makePubNoteCacheGet model id =
         Just (NC.ZNAL zkn) ->
             sendPIMsg
                 model.fui
-                (PI.GetZnlIfChanged { zknote = id, what = "cache", changeddate = zkn.zknote.changeddate })
+                (Data.PrGetZnlIfChanged { zknote = id, what = "cache", changeddate = zkn.zknote.changeddate })
+
+        Just NC.NotFound ->
+            sendPIMsg
+                model.fui
+                (Data.PrGetZkNoteAndLinks { zknote = id, what = "cache" })
 
         Just NC.Private ->
             sendPIMsg
                 model.fui
-                (PI.GetZkNoteAndLinks { zknote = id, what = "cache" })
+                (Data.PrGetZkNoteAndLinks { zknote = id, what = "cache" })
 
         Nothing ->
             sendPIMsg
                 model.fui
-                (PI.GetZkNoteAndLinks { zknote = id, what = "cache" })
+                (Data.PrGetZkNoteAndLinks { zknote = id, what = "cache" })
 
 
 makeNewNoteCacheGets : String -> Model -> List (Cmd Msg)

@@ -147,6 +147,9 @@ view zone maxw noteCache model loggedin =
 
                             Private ->
                                 E.text "private note"
+
+                            NotFound ->
+                                E.text "note not found"
                     )
                 |> Maybe.withDefault E.none
             , E.column

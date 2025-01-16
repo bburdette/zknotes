@@ -18,6 +18,45 @@ type alias FileUrlInfo =
     }
 
 
+getPrNoteInfo : PublicReply -> Maybe ( ZkNoteId, Maybe String )
+getPrNoteInfo pr =
+    case pr of
+        PrServerError publicError ->
+            case publicError of
+                String _ ->
+                    Nothing
+
+                NoteNotFound publicRequest ->
+                    getPrqNoteInfo publicRequest
+                        |> Maybe.map (\( l, r ) -> ( l, Just r ))
+
+                NoteIsPrivate publicRequest ->
+                    getPrqNoteInfo publicRequest
+                        |> Maybe.map (\( l, r ) -> ( l, Just r ))
+
+        PrZkNoteAndLinks zkNoteAndLinks ->
+            Just ( zkNoteAndLinks.zknote.id, Nothing )
+
+        PrZkNoteAndLinksWhat zkNoteAndLinksWhat ->
+            Just ( zkNoteAndLinksWhat.znl.zknote.id, Just zkNoteAndLinksWhat.what )
+
+        PrNoop ->
+            Nothing
+
+
+getPrqNoteInfo : PublicRequest -> Maybe ( ZkNoteId, String )
+getPrqNoteInfo pr =
+    case pr of
+        PrGetZkNoteAndLinks getZkNoteAndLinks ->
+            Just ( getZkNoteAndLinks.zknote, getZkNoteAndLinks.what )
+
+        PrGetZnlIfChanged getZnlIfChanged ->
+            Just ( getZnlIfChanged.zknote, getZnlIfChanged.what )
+
+        PrGetZkNotePubId _ ->
+            Nothing
+
+
 zkNoteIdToString : ZkNoteId -> String
 zkNoteIdToString (Zni zni) =
     zni

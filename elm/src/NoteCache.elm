@@ -19,6 +19,7 @@ type alias ZneEntry =
 type CacheEntry
     = ZNAL ZkNoteAndLinks
     | Private
+    | NotFound
 
 
 type alias NoteCache =
@@ -43,18 +44,15 @@ setKeeps keep nc =
     { nc | keep = keep }
 
 
-addNote : Time.Posix -> ZkNoteAndLinks -> NoteCache -> NoteCache
-addNote pt zne nc =
+addNote : Time.Posix -> ZkNoteId -> CacheEntry -> NoteCache -> NoteCache
+addNote pt id ce nc =
     let
         ms =
             Time.posixToMillis pt
-
-        id =
-            zne.zknote.id
     in
     { byId =
         TDict.insert id
-            { receivetime = ms, ce = ZNAL zne }
+            { receivetime = ms, ce = ce }
             nc.byId
     , byReceipt =
         case Dict.get ms nc.byReceipt of

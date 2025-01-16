@@ -1066,7 +1066,7 @@ pub fn read_zknote(
         note.editable = false;
         Ok((id, note))
       }
-      Access::Private => Err("can't read zknote; note is private".into()),
+      Access::Private => Err(zkerr::Error::NoteIsPrivate),
     },
     Err(e) => Err(e),
   }
@@ -1084,7 +1084,7 @@ pub fn read_zklistnote(
   // access check
   let zna = zknote_access_id(conn, uid, id)?;
   match zna {
-    Access::Private => Err::<_, zkerr::Error>("can't read zknote; note is private".into()),
+    Access::Private => Err::<_, zkerr::Error>(zkerr::Error::NoteIsPrivate),
     _ => Ok(()),
   }?;
 
@@ -1279,7 +1279,7 @@ pub fn read_zknotepubid(
         note.editable = false;
         Ok(note)
       }
-      Access::Private => Err("can't read zknote; note is private".into()),
+      Access::Private => Err(zkerr::Error::NoteIsPrivate),
     },
     Err(e) => Err(e),
   }

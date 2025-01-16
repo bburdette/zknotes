@@ -436,6 +436,9 @@ noteView fui noteCache id _ =
         Just NC.Private ->
             E.text "private note"
 
+        Just NC.NotFound ->
+            E.text "note not found"
+
         Just (NC.ZNAL zne) ->
             case zne.zknote.filestatus of
                 Data.FilePresent ->
