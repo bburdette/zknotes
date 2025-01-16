@@ -87,7 +87,7 @@ pub struct SavedZkNote {
   pub changeddate: i64,
 }
 
-#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Debug, Clone)]
+#[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug, Clone)]
 pub struct SaveZkNote {
   pub id: Option<ZkNoteId>,
   pub title: String,
@@ -263,26 +263,4 @@ pub struct JobStatus {
   pub jobno: i64,
   pub state: JobState,
   pub message: String,
-}
-
-#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]
-pub enum PublicRequest {
-  PrGetZkNoteAndLinks(GetZkNoteAndLinks),
-  PrGetZnlIfChanged(GetZnlIfChanged),
-  PrGetZkNotePubId(String),
-}
-
-#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]
-pub enum PublicReply {
-  PrServerError(PublicError),
-  PrZkNoteAndLinks(ZkNoteAndLinks),
-  PrZkNoteAndLinksWhat(ZkNoteAndLinksWhat),
-  PrNoop,
-}
-
-#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]
-pub enum PublicError {
-  String(String),
-  NoteNotFound(PublicRequest),
-  NoteIsPrivate(PublicRequest),
 }

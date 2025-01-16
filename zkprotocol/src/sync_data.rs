@@ -4,6 +4,7 @@ use crate::{
   content::{ArchiveZkLink, FileInfo, UuidZkLink, ZkNote},
   search::ZkSearchResultHeader,
 };
+
 // Represents a remote user that is not registered on this server.
 #[derive(Clone, Deserialize, Serialize, Debug)]
 pub struct ZkPhantomUser {

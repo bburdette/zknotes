@@ -25,14 +25,13 @@ use zkprotocol::constants::PrivateReplies;
 use zkprotocol::constants::{PrivateRequests, PrivateStreamingRequests};
 use zkprotocol::content::JobState;
 use zkprotocol::content::JobStatus;
-use zkprotocol::content::PublicReply;
-use zkprotocol::content::PublicRequest;
 use zkprotocol::content::{
   GetArchiveZkLinks, GetArchiveZkNote, GetZkLinksSince, GetZkNoteAndLinks, GetZkNoteArchives,
   GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkNote, SaveZkNoteAndLinks, SyncSince,
   ZkLinks, ZkNoteAndLinks, ZkNoteAndLinksWhat, ZkNoteArchives, ZkNoteId,
 };
 use zkprotocol::messages::{PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage};
+use zkprotocol::public::{PublicReply, PublicRequest};
 use zkprotocol::search::{TagSearch, ZkListNoteSearchResult, ZkNoteSearch};
 pub fn login_data_for_token(
   session: Session,

@@ -57,7 +57,7 @@ pub use zkprotocol::search as zs;
 pub use zkprotocol::messages::{PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage};
 use zkprotocol::{
   constants::PrivateReplies,
-  content::{PublicError, PublicReply, PublicRequest},
+  public::{PublicError, PublicReply, PublicRequest},
 };
 
 /*
@@ -786,9 +786,9 @@ pub async fn err_main(
                         zc::ZkNoteAndLinksWhat,
                         zc::JobState,
                         zc::JobStatus,
-                        zc::PublicRequest,
-                        zc::PublicReply,
-                        zc::PublicError,
+                        PublicRequest,
+                        PublicReply,
+                        PublicError,
                         zs::ZkNoteSearch,
                         zs::Ordering,
                         zs::OrderDirection,
@@ -833,9 +833,9 @@ pub async fn err_main(
                         zc::ZkNoteAndLinksWhat,
                         zc::JobState,
                         zc::JobStatus,
-                        zc::PublicRequest,
-                        zc::PublicReply,
-                        zc::PublicError,
+                        PublicRequest,
+                        PublicReply,
+                        PublicError,
                         zs::ZkNoteSearch,
                         zs::Ordering,
                         zs::OrderDirection,
