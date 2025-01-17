@@ -2,6 +2,7 @@
 mod tests {
   use crate::error as zkerr;
   use crate::init_server;
+  use crate::jobs::LogMonitor;
   use crate::load_config;
   use crate::sqldata;
   use crate::sqldata::*;
@@ -59,6 +60,7 @@ mod tests {
     otheruser: i64,
     filenote: i64,
     filepath: PathBuf,
+    tempfilepath: PathBuf,
   }
 
   fn idin(id: &Uuid, szns: &Vec<(i64, Uuid)>) -> bool {
@@ -104,6 +106,7 @@ mod tests {
     let shareid = note_id(&conn, "system", "share")?;
 
     let filesdir = format!("{}_files", basename);
+    let tempfilesdir = format!("{}_tempfiles", basename);
     let fdpath = Path::new(filesdir.as_str());
 
     if !fdpath.exists() {
@@ -131,7 +134,7 @@ mod tests {
     )?;
 
     let (syncuuid, synced) = match syncuser {
-      Some((l, r)) => (Some(l), Some(serde_json::to_value(r)?)),
+      Some((l, r)) => (Some(l), Some(serde_json::to_value(r)?.to_string())),
       None => (None, None),
     };
 
@@ -195,14 +198,14 @@ mod tests {
       // visible but not synced.
       let ozkn = read_zknote_i64(conn, fdpath, None, otheruser_note)?;
       let szkn = read_zknote_i64(conn, fdpath, None, syncuser_note)?;
-      visible_notes.push((otheruser_note, ozkn.id));
-      visible_notes.push((syncuser_note, szkn.id));
+      visible_notes.push((otheruser_note, ozkn.id.into()));
+      visible_notes.push((syncuser_note, szkn.id.into()));
     }
 
     // private note for sync user
     let (private_note_id, private_notesd) =
       makenote(&conn, syncuser, format!("{} syncuser private", basename))?;
-    visible_notes.push((private_note_id, private_notesd.id));
+    visible_notes.push((private_note_id, private_notesd.id.into()));
 
     // share note, syncuser and otheruser both connected.
     let (share_note_id, share_notesd) = makenote(
@@ -210,8 +213,8 @@ mod tests {
       otheruser,
       format!("{} otheruser, syncuser share", basename),
     )?;
-    visible_notes.push((share_note_id, share_notesd.id));
-    synced_notes.push((share_note_id, share_notesd.id));
+    visible_notes.push((share_note_id, share_notesd.id.into()));
+    synced_notes.push((share_note_id, share_notesd.id.into()));
     savelink(share_note_id, shareid, otheruser, &mut savedlinks)?;
     savelink(syncuser_note, share_note_id, otheruser, &mut savedlinks)?;
     savelink(otheruser_note, share_note_id, otheruser, &mut savedlinks)?;
@@ -228,8 +231,8 @@ mod tests {
         basename
       ),
     )?;
-    visible_notes.push((shared_note_id, shared_notesd.id));
-    synced_notes.push((shared_note_id, shared_notesd.id));
+    visible_notes.push((shared_note_id, shared_notesd.id.into()));
+    synced_notes.push((shared_note_id, shared_notesd.id.into()));
     savelink(shared_note_id, share_note_id, otheruser, &mut savedlinks)?;
 
     // public note owned by otheruser.
@@ -238,8 +241,8 @@ mod tests {
       otheruser,
       format!("{} otheruser public note", basename),
     )?;
-    visible_notes.push((publid_note_id, publid_notesd.id));
-    synced_notes.push((publid_note_id, publid_notesd.id));
+    visible_notes.push((publid_note_id, publid_notesd.id.into()));
+    synced_notes.push((publid_note_id, publid_notesd.id.into()));
     savelink(publid_note_id, publicid, otheruser, &mut savedlinks)?;
 
     // public note owned by syncuser, with a public id
@@ -258,8 +261,8 @@ mod tests {
       },
     )?;
 
-    visible_notes.push((public_note_id, public_notesd.id));
-    synced_notes.push((public_note_id, public_notesd.id));
+    visible_notes.push((public_note_id, public_notesd.id.into()));
+    synced_notes.push((public_note_id, public_notesd.id.into()));
     savelink(public_note_id, publicid, syncuser, &mut savedlinks)?; // should be visible, and get synced!
     println!(
       "visible link: {:?} ",
@@ -272,7 +275,7 @@ mod tests {
       otheruser,
       format!("{} otheruser note linked to syncuser", basename),
     )?;
-    visible_notes.push((user_linked_note_id, user_linked_notesd.id));
+    visible_notes.push((user_linked_note_id, user_linked_notesd.id.into()));
     savelink(
       user_linked_note_id,
       syncuser_note,
@@ -306,7 +309,10 @@ mod tests {
     // otheruser private note NOT visible to user
     let (otheruser_private_note_id, otheruser_private_notesd) =
       makenote(&conn, otheruser, format!("{} otheruser private", basename))?;
-    unvisible_notes.push((otheruser_private_note_id, otheruser_private_notesd.id));
+    unvisible_notes.push((
+      otheruser_private_note_id,
+      otheruser_private_notesd.id.into(),
+    ));
 
     // share note, only otheruser connected.
     let (othershare_note_id, othershare_notesd) = makenote(
@@ -314,7 +320,7 @@ mod tests {
       otheruser,
       format!("{} otheruser othershare, not visible to syncuser", basename),
     )?;
-    unvisible_notes.push((othershare_note_id, othershare_notesd.id));
+    unvisible_notes.push((othershare_note_id, othershare_notesd.id.into()));
     savelink(othershare_note_id, shareid, otheruser, &mut savedlinks)?;
     savelink(
       otheruser_note,
@@ -332,7 +338,7 @@ mod tests {
         basename
       ),
     )?;
-    unvisible_notes.push((othershared_note_id, othershared_notesd.id));
+    unvisible_notes.push((othershared_note_id, othershared_notesd.id.into()));
     savelink(
       othershared_note_id,
       othershare_note_id,
@@ -347,14 +353,15 @@ mod tests {
       visible_notes,
       unvisible_notes,
       savedlinks,
-      otherusershare: (othershare_note_id, othershare_notesd.id),
-      otherusersharenote: (othershared_note_id, othershared_notesd.id),
+      otherusershare: (othershare_note_id, othershare_notesd.id.into()),
+      otherusersharenote: (othershared_note_id, othershared_notesd.id.into()),
       syncuser,
       syncusernote: syncuser_note,
       syncusertoken,
       otheruser,
       filenote,
       filepath: Path::new(&filesdir).to_path_buf(),
+      tempfilepath: Path::new(&tempfilesdir).to_path_buf(),
     };
 
     Ok(ts)
@@ -455,6 +462,7 @@ mod tests {
 
     // initial sync, testing duplicate public ids.
     {
+      let lm = LogMonitor {};
       let server_stream = sync_stream(
         saconn.clone(),
         server_ts.filepath.clone(),
@@ -464,6 +472,7 @@ mod tests {
         None,
         None,
         &mut cb,
+        &lm,
       );
 
       let ctr = caconn.unchecked_transaction()?;
@@ -529,6 +538,7 @@ mod tests {
     assert!(cpub2.id == spc2.id);
 
     {
+      let lm = LogMonitor {};
       let server_stream = sync_stream(
         saconn.clone(),
         server_ts.filepath.clone(),
@@ -538,6 +548,7 @@ mod tests {
         None,
         None,
         &mut cb,
+        &lm,
       );
       // -----------------------------------
       // Writing the stream to a file
@@ -563,6 +574,7 @@ mod tests {
         .await?;
     }
     {
+      let lm = LogMonitor {};
       let client_stream = sync_stream(
         caconn.clone(),
         client_ts.filepath.clone(),
@@ -575,6 +587,7 @@ mod tests {
         None,
         None,
         &mut cb,
+        &lm,
       );
       // -----------------------------------
       // Writing the stream to a file
@@ -602,6 +615,7 @@ mod tests {
     // ------------------------------------------------------------
     // sync from server to client.
     // ------------------------------------------------------------
+    let lm = LogMonitor {};
     let server_stream = sync_stream(
       saconn.clone(),
       server_ts.filepath.clone(),
@@ -611,6 +625,7 @@ mod tests {
       None,
       None,
       &mut cb,
+      &lm,
     );
 
     // let ctr = caconn.unchecked_transaction()?;
@@ -639,6 +654,7 @@ mod tests {
     // ------------------------------------------------------------
     // sync from client to server.
     // ------------------------------------------------------------
+    let lm = LogMonitor {};
     let client_stream = sync_stream(
       caconn.clone(),
       client_ts.filepath.clone(),
@@ -648,6 +664,7 @@ mod tests {
       Some(ttn.archivelinktemp),
       None,
       &mut cb,
+      &lm,
     );
 
     let cs = client_stream.map_err(convert_err);
@@ -762,8 +779,13 @@ mod tests {
 
     // Visible notes from client are in server?
     for (_, szn) in &client_ts.synced_notes {
-      println!("checking clieint syned: {:?}", szn);
-      match sqldata::read_zknote(&saconn, &server_ts.filepath, Some(ssyncuser), &szn) {
+      println!("checking client synced: {:?}", szn);
+      match sqldata::read_zknote(
+        &saconn,
+        &server_ts.filepath,
+        Some(ssyncuser),
+        &szn.clone().into(),
+      ) {
         Err(zkerr::Error::Rusqlite(rusqlite::Error::QueryReturnedNoRows)) => {
           Err(format!("not found: {:?}", szn).into())
         }
@@ -774,14 +796,24 @@ mod tests {
 
     // Visible notes from server are in client?
     for (_, szn) in &server_ts.synced_notes {
-      println!("checking server syned: {:?}", szn);
-      sqldata::read_zknote(&caconn, &client_ts.filepath, Some(csyncuser), &szn)?;
+      println!("checking server synced: {:?}", szn);
+      sqldata::read_zknote(
+        &caconn,
+        &client_ts.filepath,
+        Some(csyncuser),
+        &szn.clone().into(),
+      )?;
     }
 
     // non-visible notes from client are not in server?
     for (_, szn) in client_ts.unvisible_notes {
       println!("checking client unvis: {:?}", szn);
-      match sqldata::read_zknote(&saconn, &server_ts.filepath, Some(ssyncuser), &szn) {
+      match sqldata::read_zknote(
+        &saconn,
+        &server_ts.filepath,
+        Some(ssyncuser),
+        &szn.clone().into(),
+      ) {
         Ok(_) => Err(format!(
           "client note was not supposed to sync to server: {}",
           szn
@@ -792,7 +824,12 @@ mod tests {
 
     for (_, szn) in server_ts.unvisible_notes {
       println!("checking server unvis: {:?}", szn);
-      match sqldata::read_zknote(&caconn, &client_ts.filepath, Some(csyncuser), &szn) {
+      match sqldata::read_zknote(
+        &caconn,
+        &client_ts.filepath,
+        Some(csyncuser),
+        &szn.clone().into(),
+      ) {
         Ok(_) => Err(format!(
           "server note was not supposed to sync to client: {}",
           szn
@@ -866,7 +903,7 @@ mod tests {
       &saconn,
       &server_ts.filepath,
       Some(server_ts.otheruser),
-      &server_ts.otherusersharenote.1,
+      &server_ts.otherusersharenote.1.into(),
     )
     .map_err(|e| {
       zkerr::annotate_string(
@@ -880,7 +917,7 @@ mod tests {
       &saconn,
       &server_ts.filepath,
       Some(server_ts.syncuser),
-      &server_ts.otherusersharenote.1,
+      &server_ts.otherusersharenote.1.into(),
     )
     .map_err(|e| {
       zkerr::annotate_string(
@@ -891,13 +928,19 @@ mod tests {
 
     // new shares, does it work?
     let ns = sync::new_shares(&saconn, server_ts.syncuser, postsync_time)?;
-    assert!(ns == vec![server_ts.otherusershare]);
+    assert!(
+      ns.iter()
+        .map(|(l, r)| (l.clone(), Into::<Uuid>::into(r.clone())))
+        .collect::<Vec<(i64, Uuid)>>()
+        == vec![server_ts.otherusershare]
+    );
 
     // TODO: tweak a file on the server, and on the client.
     // check that those files synced.
 
     // ------------------------------------------------------------
     // sync from server to client.
+    let lm = LogMonitor {};
     let server_stream = sync_stream(
       saconn.clone(),
       server_ts.filepath.clone(),
@@ -907,6 +950,7 @@ mod tests {
       None,
       None,
       &mut cb,
+      &lm,
     );
 
     let ttn = temp_tables(&caconn)?;
@@ -936,6 +980,7 @@ mod tests {
       Some(ttn.archivelinktemp),
       None,
       &mut cb,
+      &lm,
     );
 
     let cs = client_stream.map_err(convert_err);
@@ -958,7 +1003,7 @@ mod tests {
       &caconn,
       &client_ts.filepath,
       Some(client_ts.syncuser),
-      &server_ts.otherusersharenote.1,
+      &server_ts.otherusersharenote.1.into(),
     )
     .map_err(|e| {
       zkerr::annotate_string(
@@ -1022,6 +1067,7 @@ mod tests {
 
     let reply = sync_files_down(
       &caconn,
+      client_ts.tempfilepath.as_path(),
       client_ts.filepath.as_path(),
       client_ts.syncuser,
       &fssearch,

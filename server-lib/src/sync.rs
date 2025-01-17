@@ -39,6 +39,7 @@ use zkprotocol::search::{
   AndOr, OrderDirection, OrderField, Ordering, ResultType, SearchMod, TagSearch, ZkNoteSearch,
 };
 use zkprotocol::sync_data::SyncMessage;
+use zkprotocol::upload::UploadReply;
 
 fn convert_payloaderr(err: PayloadError) -> std::io::Error {
   error!("convert_err {:?}", err);
@@ -468,7 +469,7 @@ pub async fn upload_file(
     .await
     .map_err(|e| zkerr::Error::String(e.to_string()))?;
 
-  let prm: PrivateReply = serde_json::from_slice(
+  let prm: UploadReply = serde_json::from_slice(
     rq.body()
       .map_err(|e| zkerr::Error::String(e.to_string()))
       .await?
@@ -476,8 +477,7 @@ pub async fn upload_file(
   )?;
 
   match prm {
-    PrivateReply::PvyFileSyncComplete => Ok(UploadResult::Uploaded),
-    _ => Ok(UploadResult::UploadFailed),
+    UploadReply::UrFilesUploaded(_) => Ok(UploadResult::Uploaded),
   }
   // if prm.what == PrivateReplies::FileSyncComplete {
   // } else {

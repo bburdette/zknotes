@@ -4,6 +4,7 @@ createdirs = false
 altmainsite = [ "http://localhost:8010"]
 file_tmp_path = "./temp"
 file_path = 'server_files'
+tauri_mode = false
 
 [orgauth_config]
 mainsite = 'http://localhost:8010'

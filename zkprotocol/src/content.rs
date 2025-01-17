@@ -12,6 +12,14 @@ pub enum ZkNoteId {
   Zni(Uuid),
 }
 
+impl Into<Uuid> for ZkNoteId {
+  fn into(self) -> Uuid {
+    match self {
+      ZkNoteId::Zni(uuid) => uuid,
+    }
+  }
+}
+
 impl From<Uuid> for ZkNoteId {
   fn from(a: Uuid) -> Self {
     ZkNoteId::Zni(a)
