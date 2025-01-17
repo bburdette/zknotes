@@ -14,7 +14,7 @@ use elm_rs::{Elm, ElmDecode, ElmEncode};
 use serde_derive::{Deserialize, Serialize};
 // use uuid::Uuid;
 
-#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Debug)]
+#[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug)]
 pub enum PrivateRequest {
   PvqGetZkNote(ZkNoteId),
   PvqGetZkNoteAndLinks(GetZkNoteAndLinks),
@@ -37,7 +37,7 @@ pub enum PrivateRequest {
   PvqGetJobStatus(i64),
 }
 
-#[derive(Elm, ElmDecode, ElmEncode, Serialize, Debug)]
+#[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug)]
 pub enum PrivateReply {
   PvyServerError(PrivateError),
   PvyZkNote(ZkNote),
@@ -61,6 +61,8 @@ pub enum PrivateReply {
   PvyHomeNoteSet(ZkNoteId),
   PvyJobStatus(JobStatus),
   PvyJobNotFound(i64),
+  PvyFileSyncComplete,
+  PvySyncComplete,
 }
 
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]

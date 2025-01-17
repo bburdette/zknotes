@@ -81,7 +81,7 @@ pub struct ZkListNote {
   pub sysids: Vec<ZkNoteId>,
 }
 
-#[derive(Elm, ElmDecode, ElmEncode, Serialize, Debug, Clone)]
+#[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug, Clone)]
 pub struct SavedZkNote {
   pub id: ZkNoteId,
   pub changeddate: i64,
@@ -104,7 +104,7 @@ pub enum Direction {
   To,
 }
 
-#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Debug, Clone)]
+#[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug, Clone)]
 pub struct SaveZkLink {
   pub otherid: ZkNoteId,
   pub direction: Direction,
@@ -113,7 +113,7 @@ pub struct SaveZkLink {
   pub delete: Option<bool>,
 }
 
-#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Debug, Clone)]
+#[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug, Clone)]
 pub struct SaveZkNoteAndLinks {
   pub note: SaveZkNote,
   pub links: Vec<SaveZkLink>,
@@ -179,7 +179,7 @@ pub struct GetZkNoteArchives {
   pub limit: Option<i64>,
 }
 
-#[derive(Elm, ElmDecode, ElmEncode, Serialize, Debug)]
+#[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug)]
 pub struct ZkNoteArchives {
   pub zknote: ZkNoteId,
   pub results: ZkListNoteSearchResult,

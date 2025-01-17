@@ -1,7 +1,5 @@
 port module Main exposing (main)
 
--- import Search as S
-
 import ArchiveListing
 import Browser
 import Browser.Events
@@ -43,7 +41,6 @@ import Orgauth.UserEdit as UserEdit
 import Orgauth.UserInterface as UI
 import Orgauth.UserListing as UserListing
 import Platform.Cmd as Cmd
-import PublicInterface as PI
 import Random exposing (Seed, initialSeed)
 import RequestsDialog exposing (TRequest(..), TRequests)
 import Route exposing (Route(..), parseUrl, routeTitle, routeUrl)
@@ -3887,7 +3884,7 @@ init flags url key zone fontsize =
             flags.errorid
                 |> Maybe.map
                     (\id ->
-                        PI.getErrorIndexNote flags.location id ErrorIndexNote
+                        DataUtil.getErrorIndexNote flags.location id ErrorIndexNote
                     )
                 |> Maybe.withDefault Cmd.none
 

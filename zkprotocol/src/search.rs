@@ -82,7 +82,7 @@ pub struct ZkIdSearchResult {
   pub what: String,
 }
 
-#[derive(Elm, ElmDecode, ElmEncode, Serialize, Debug, Clone)]
+#[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug, Clone)]
 pub struct ZkListNoteSearchResult {
   pub notes: Vec<ZkListNote>,
   pub offset: i64,
@@ -103,7 +103,7 @@ pub struct ZkSearchResultHeader {
   pub offset: i64,
 }
 
-#[derive(Elm, ElmDecode, ElmEncode, Serialize, Debug, Clone)]
+#[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug, Clone)]
 pub struct ZkNoteAndLinksSearchResult {
   pub notes: Vec<ZkNoteAndLinks>,
   pub offset: i64,

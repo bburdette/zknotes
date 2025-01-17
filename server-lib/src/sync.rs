@@ -31,9 +31,10 @@ use tokio::io::AsyncBufReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio_util::io::StreamReader;
 use uuid::Uuid;
-use zkprotocol::constants::{PrivateReplies, PrivateStreamingRequests, SpecialUuids};
-use zkprotocol::content::{FileStatus, SaveZkNote, SyncSince, ZkNote, ZkNoteId};
-use zkprotocol::messages::{PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage};
+use zkprotocol::constants::{PrivateStreamingRequests, SpecialUuids};
+use zkprotocol::content::{FileStatus, SaveZkNote, SyncSince, ZkNoteId};
+use zkprotocol::messages::PrivateStreamingMessage;
+use zkprotocol::private::{PrivateReply, PrivateRequest};
 use zkprotocol::search::{
   AndOr, OrderDirection, OrderField, Ordering, ResultType, SearchMod, TagSearch, ZkNoteSearch,
 };
@@ -199,7 +200,7 @@ pub async fn sync(
   uid: i64,
   callbacks: &mut Callbacks,
   monitor: &dyn JobMonitor,
-) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>> {
+) -> Result<PrivateReply, Box<dyn std::error::Error>> {
   let conn = Arc::new(sqldata::connection_open(dbpath)?);
   let user = orgauth::dbfun::read_user_by_id(&conn, uid)?; // TODO pass this in from calling ftn?
   let extra_login_data = sqldata::read_extra_login_data(&conn, user.id)?;
@@ -232,31 +233,36 @@ pub async fn sync(
   )
   .await?;
 
-  if res.what != PrivateReplies::SyncComplete {
-    Ok(res)
-  } else {
-    write!(monitor, "starting sync to remote");
-    let remres = sync_to_remote(
-      conn.clone(),
-      file_path,
-      &user,
-      Some(ttn.notetemp.clone()),
-      Some(ttn.linktemp.clone()),
-      Some(ttn.archivelinktemp.clone()),
-      after,
-      callbacks,
-      monitor,
-    )
-    .await?;
+  // ifee res.what != PrivateReplies::SyncComplete {
+  //   Ok(res)
+  // } else i
 
-    let unote = user_note_id(&conn, user.id)?;
-    save_sync(&conn, user.id, unote, CompletedSync { after, now }).await?;
+  match res {
+    PrivateReply::PvySyncComplete => Ok(res),
+    _ => {
+      write!(monitor, "starting sync to remote");
+      let remres = sync_to_remote(
+        conn.clone(),
+        file_path,
+        &user,
+        Some(ttn.notetemp.clone()),
+        Some(ttn.linktemp.clone()),
+        Some(ttn.archivelinktemp.clone()),
+        after,
+        callbacks,
+        monitor,
+      )
+      .await?;
 
-    tr.commit()?;
+      let unote = user_note_id(&conn, user.id)?;
+      save_sync(&conn, user.id, unote, CompletedSync { after, now }).await?;
 
-    write!(monitor, "sync completed");
+      tr.commit()?;
 
-    Ok(remres)
+      write!(monitor, "sync completed");
+
+      Ok(remres)
+    }
   }
 }
 
@@ -413,10 +419,7 @@ pub async fn upload_file(
   let private_uri = awc::http::Uri::try_from(format!("{}/private", url).as_str())
     .map_err(|x| zkerr::Error::String(x.to_string()))?;
 
-  let getzknote = PrivateMessage {
-    what: zkprotocol::constants::PrivateRequests::GetZkNote,
-    data: Some(serde_json::to_value(Uuid::from_str(uuid.as_str())?)?),
-  };
+  let getzknote = PrivateRequest::PvqGetZkNote(ZkNoteId::Zni(Uuid::from_str(uuid.as_str())?));
   let gj = serde_json::to_value(getzknote)?;
 
   let client = awc::Client::new();
@@ -436,10 +439,13 @@ pub async fn upload_file(
 
   let j = serde_json::from_slice(b.as_ref())?;
 
-  let msg: PrivateReplyMessage = serde_json::from_value(j)?;
-  assert!(msg.what == PrivateReplies::ZkNote);
+  let msg: PrivateReply = serde_json::from_value(j)?;
+  let zkn = match msg {
+    PrivateReply::PvyZkNote(zkn) => zkn,
+    _ => panic!("expected zknote"),
+  };
 
-  let zkn: ZkNote = serde_json::from_value(msg.content)?;
+  // let zkn: ZkNote = serde_json::from_value(msg.content)?;
 
   match zkn.filestatus {
     FileStatus::NotAFile => return Ok(UploadResult::NotAFile),
@@ -462,18 +468,20 @@ pub async fn upload_file(
     .await
     .map_err(|e| zkerr::Error::String(e.to_string()))?;
 
-  let prm: PrivateReplyMessage = serde_json::from_slice(
+  let prm: PrivateReply = serde_json::from_slice(
     rq.body()
       .map_err(|e| zkerr::Error::String(e.to_string()))
       .await?
       .as_ref(),
   )?;
 
-  if prm.what == PrivateReplies::FileSyncComplete {
-    Ok(UploadResult::Uploaded)
-  } else {
-    Ok(UploadResult::UploadFailed)
+  match prm {
+    PrivateReply::PvyFileSyncComplete => Ok(UploadResult::Uploaded),
+    _ => Ok(UploadResult::UploadFailed),
   }
+  // if prm.what == PrivateReplies::FileSyncComplete {
+  // } else {
+  // }
 }
 
 pub async fn sync_files_down(
@@ -558,7 +566,7 @@ pub async fn sync_from_remote(
   archivelinktemp: &String,
   callbacks: &mut Callbacks,
   monitor: &dyn JobMonitor,
-) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>> {
+) -> Result<PrivateReply, Box<dyn std::error::Error>> {
   let (c, url) = match (user.cookie.clone(), user.remote_url.clone()) {
     (Some(c), Some(url)) => (c, url),
     _ => return Err("can't remote sync - not a remote user".into()),
@@ -626,7 +634,7 @@ pub async fn sync_from_stream<S>(
   archivelinktemp: Option<&str>,
   callbacks: &mut Callbacks,
   br: &mut StreamReader<S, bytes::Bytes>,
-) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>>
+) -> Result<PrivateReply, Box<dyn std::error::Error>>
 where
   S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin,
 {
@@ -1063,10 +1071,7 @@ where
     params![],
   )?;
 
-  Ok(PrivateReplyMessage {
-    what: PrivateReplies::SyncComplete,
-    content: serde_json::Value::Null,
-  })
+  Ok(PrivateReply::PvySyncComplete)
 }
 
 // Make a stream of all the records needed to sync the remote.
@@ -1080,7 +1085,7 @@ pub async fn sync_to_remote(
   after: Option<i64>,
   callbacks: &mut Callbacks,
   monitor: &dyn JobMonitor,
-) -> Result<PrivateReplyMessage, zkerr::Error> {
+) -> Result<PrivateReply, zkerr::Error> {
   // TODO: get time on remote system, bail if too far out.
 
   let (c, url) = match (user.cookie.clone(), user.remote_url.clone()) {
@@ -1142,10 +1147,7 @@ pub async fn sync_to_remote(
 
   // TODO: send back Sync results... how many records and etc.
 
-  Ok(PrivateReplyMessage {
-    what: PrivateReplies::SyncComplete,
-    content: serde_json::Value::Null,
-  })
+  Ok(PrivateReply::PvySyncComplete)
 }
 
 pub fn bytesify(

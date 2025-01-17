@@ -1,11 +1,14 @@
 module DataUtil exposing (..)
 
 import Data exposing (..)
+import Http
+import Http.Tasks as HT
 import Json.Decode as JD
 import Json.Encode as JE
 import Orgauth.Data exposing (UserId(..), decodeUserId, getUserIdVal)
 import TDict exposing (TDict)
 import TSet exposing (TSet)
+import Task
 import UUID exposing (UUID)
 import Url.Builder as UB
 import Util exposing (andMap)
@@ -393,3 +396,22 @@ showPublicError pe =
 
         PbeNoteIsPrivate _ ->
             "note is private"
+
+
+getErrorIndexNote : String -> ZkNoteId -> (Result Http.Error PublicReply -> msg) -> Cmd msg
+getErrorIndexNote location noteid tomsg =
+    HT.post
+        { url = location ++ "/public"
+        , body =
+            Http.jsonBody <|
+                Data.publicRequestEncoder
+                    (PrGetZkNoteAndLinks
+                        { zknote = noteid
+                        , what = ""
+                        }
+                    )
+        , resolver =
+            HT.resolveJson
+                publicReplyDecoder
+        }
+        |> Task.attempt tomsg

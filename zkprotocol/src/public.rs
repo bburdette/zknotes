@@ -9,6 +9,7 @@ pub enum PublicRequest {
   PrGetZkNotePubId(String),
 }
 
+// TODO: rename to Pbr
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]
 pub enum PublicReply {
   PrServerError(PublicError),

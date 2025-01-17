@@ -24,7 +24,6 @@ use actix_web::{
 use chrono;
 use clap::Arg;
 use config::Config;
-use either::Either;
 use futures_util::TryStreamExt as _;
 use girlboss::Girlboss;
 use log::{error, info};
@@ -54,9 +53,8 @@ pub use zkprotocol;
 pub use zkprotocol::content as zc;
 pub use zkprotocol::search as zs;
 
-pub use zkprotocol::messages::{PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage};
+pub use zkprotocol::messages::PrivateStreamingMessage;
 use zkprotocol::{
-  constants::PrivateReplies,
   private::{PrivateError, PrivateReply, PrivateRequest, ZkNoteRq},
   public::{PublicError, PublicReply, PublicRequest},
   upload::UploadReply,
@@ -414,10 +412,7 @@ async fn private(
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'private' err: {:?}", e);
-      let se = PrivateReplyMessage {
-        what: PrivateReplies::ServerError,
-        content: serde_json::Value::String(e.to_string()),
-      };
+      let se = PrivateReply::PvyServerError(PrivateError::PveString(e.to_string()));
       HttpResponse::Ok().json(se)
     }
   }
@@ -433,10 +428,7 @@ async fn private_streaming(
     Ok(hr) => hr,
     Err(e) => {
       error!("'private_streaming err: {:?}", e);
-      let se = PrivateReplyMessage {
-        what: PrivateReplies::ServerError,
-        content: serde_json::Value::String(e.to_string()),
-      };
+      let se = PrivateReply::PvyServerError(PrivateError::PveString(e.to_string()));
       HttpResponse::Ok().json(se)
     }
   }
@@ -481,10 +473,7 @@ async fn zk_interface_check_streaming(
   msg: PrivateStreamingMessage,
 ) -> Result<HttpResponse, Box<dyn Error>> {
   match session.get::<Uuid>("token")? {
-    None => Ok(HttpResponse::Ok().json(PrivateReplyMessage {
-      what: PrivateReplies::NotLoggedIn,
-      content: serde_json::Value::Null,
-    })),
+    None => Ok(HttpResponse::Ok().json(PrivateReply::PvyServerError(PrivateError::PveNotLoggedIn))),
 
     Some(token) => {
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
@@ -496,11 +485,11 @@ async fn zk_interface_check_streaming(
       ) {
         Err(e) => {
           info!("read_user_by_token_api error2: {:?}, {:?}", token, e);
-
-          Ok(HttpResponse::Ok().json(PrivateReplyMessage {
-            what: PrivateReplies::LoginError,
-            content: serde_json::to_value(format!("{:?}", e).as_str())?,
-          }))
+          Ok(
+            HttpResponse::Ok().json(PrivateReply::PvyServerError(PrivateError::PveLoginError(
+              format!("{:?}", e),
+            ))),
+          )
         }
         Ok(userdata) => {
           // finally!  processing messages as logged in user.
@@ -520,10 +509,7 @@ async fn private_upstreaming(
     Ok(hr) => hr,
     Err(e) => {
       error!("'private' err: {:?}", e);
-      let se = PrivateReplyMessage {
-        what: PrivateReplies::ServerError,
-        content: serde_json::Value::String(e.to_string()),
-      };
+      let se = PrivateReply::PvyServerError(PrivateError::PveString(e.to_string()));
       HttpResponse::Ok().json(se)
     }
   }
@@ -540,10 +526,7 @@ async fn zk_interface_check_upstreaming(
   body: web::Payload,
 ) -> Result<HttpResponse, Box<dyn Error>> {
   match session.get::<Uuid>("token")? {
-    None => Ok(HttpResponse::Ok().json(PrivateReplyMessage {
-      what: PrivateReplies::NotLoggedIn,
-      content: serde_json::Value::Null,
-    })),
+    None => Ok(HttpResponse::Ok().json(PrivateReply::PvyServerError(PrivateError::PveNotLoggedIn))),
 
     Some(token) => {
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
@@ -556,10 +539,11 @@ async fn zk_interface_check_upstreaming(
         Err(e) => {
           info!("read_user_by_token_api error2: {:?}, {:?}", token, e);
 
-          Ok(HttpResponse::Ok().json(PrivateReplyMessage {
-            what: PrivateReplies::LoginError,
-            content: serde_json::to_value(format!("{:?}", e).as_str())?,
-          }))
+          Ok(
+            HttpResponse::Ok().json(PrivateReply::PvyServerError(PrivateError::PveLoginError(
+              format!("{:?}", e),
+            ))),
+          )
         }
         Ok(_userdata) => {
           // finally!  processing messages as logged in user.

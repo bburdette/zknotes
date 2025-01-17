@@ -30,7 +30,7 @@ use zkprotocol::content::{
   GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkNote, SaveZkNoteAndLinks, SyncSince,
   ZkLinks, ZkNoteAndLinks, ZkNoteAndLinksWhat, ZkNoteArchives, ZkNoteId,
 };
-use zkprotocol::messages::{PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage};
+use zkprotocol::messages::PrivateStreamingMessage;
 use zkprotocol::private::PrivateReply;
 use zkprotocol::private::PrivateRequest;
 use zkprotocol::public::{PublicReply, PublicRequest};

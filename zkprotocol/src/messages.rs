@@ -1,17 +1,17 @@
 pub use crate::constants::{PrivateReplies, PrivateRequests, PrivateStreamingRequests};
 use serde_json::Value;
 
-#[derive(Deserialize, Serialize, Debug)]
-pub struct PrivateMessage {
-  pub what: PrivateRequests,
-  pub data: Option<Value>,
-}
+// #[derive(Deserialize, Serialize, Debug)]
+// pub struct PrivateMessage {
+//   pub what: PrivateRequests,
+//   pub data: Option<Value>,
+// }
 
-#[derive(Deserialize, Serialize, Debug)]
-pub struct PrivateReplyMessage {
-  pub what: PrivateReplies,
-  pub content: Value,
-}
+// #[derive(Deserialize, Serialize, Debug)]
+// pub struct PrivateReplyMessage {
+//   pub what: PrivateReplies,
+//   pub content: Value,
+// }
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct PrivateStreamingMessage {
