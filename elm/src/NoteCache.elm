@@ -1,8 +1,5 @@
 module NoteCache exposing (CacheEntry(..), NoteCache, addNote, empty, getNote, purgeNotes, setKeeps)
 
--- import Set exposing (Set)
--- import TSet exposing (TSet)
-
 import Data exposing (ZkNoteAndLinks, ZkNoteId)
 import DataUtil exposing (ZniSet)
 import Dict exposing (Dict)

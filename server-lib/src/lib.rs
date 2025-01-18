@@ -437,8 +437,6 @@ async fn private_streaming(
 async fn zk_interface_check(
   session: &Session,
   state: &State,
-  // config: &Config,
-  // girlboss: &Girlboss<JobId>,
   msg: PrivateRequest,
 ) -> Result<PrivateReply, zkerr::Error> {
   match session.get::<Uuid>("token")? {
