@@ -475,9 +475,6 @@ pub async fn upload_file(
   match prm {
     UploadReply::UrFilesUploaded(_) => Ok(UploadResult::Uploaded),
   }
-  // if prm.what == PrivateReplies::FileSyncComplete {
-  // } else {
-  // }
 }
 
 pub async fn sync_files_down(

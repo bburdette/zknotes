@@ -567,10 +567,6 @@ pub fn note_id2(conn: &Connection, uid: i64, title: &str) -> Result<Option<i64>,
   }
 }
 
-// pub fn note_id_for_zknoteid(conn: &Connection, zknoteid: &ZkNoteId) -> Result<i64, zkerr::Error> {
-//   note_id_for_uuid(&conn, &zknoteid)
-// }
-
 pub fn uuid_for_note_id(conn: &Connection, id: i64) -> Result<Uuid, zkerr::Error> {
   let s: String = conn.query_row(
     "select zknote.uuid from zknote

@@ -4,18 +4,17 @@ use serde_derive::{Deserialize, Serialize};
 
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]
 pub enum PublicRequest {
-  PrGetZkNoteAndLinks(GetZkNoteAndLinks),
-  PrGetZnlIfChanged(GetZnlIfChanged),
-  PrGetZkNotePubId(String),
+  PbrGetZkNoteAndLinks(GetZkNoteAndLinks),
+  PbrGetZnlIfChanged(GetZnlIfChanged),
+  PbrGetZkNotePubId(String),
 }
 
-// TODO: rename to Pbr
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]
 pub enum PublicReply {
-  PrServerError(PublicError),
-  PrZkNoteAndLinks(ZkNoteAndLinks),
-  PrZkNoteAndLinksWhat(ZkNoteAndLinksWhat),
-  PrNoop,
+  PbyServerError(PublicError),
+  PbyZkNoteAndLinks(ZkNoteAndLinks),
+  PbyZkNoteAndLinksWhat(ZkNoteAndLinksWhat),
+  PbyNoop,
 }
 
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]

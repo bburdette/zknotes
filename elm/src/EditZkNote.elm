@@ -73,9 +73,7 @@ import MdCommon as MC
 import NoteCache as NC exposing (NoteCache)
 import Orgauth.Data exposing (UserId, getUserIdVal)
 import RequestsDialog exposing (TRequests)
-import Search exposing (decodeTagSearch)
 import SearchStackPanel as SP
-import SearchUtil as SU
 import TangoColors as TC
 import Task
 import Time
@@ -627,10 +625,12 @@ mkButtonStyle style isdirty =
         style
 
 
+linkButtonStyle : List (E.Attribute msg)
 linkButtonStyle =
     Common.buttonStyle
 
 
+disabledLinkButtonStyle : List (E.Attribute msg)
 disabledLinkButtonStyle =
     Common.disabledButtonStyle
 
@@ -2665,10 +2665,6 @@ update msg model =
             )
 
         AddToSearch zkln ->
-            let
-                spmod =
-                    model.spmodel
-            in
             if List.any ((==) DataUtil.sysids.searchid) zkln.sysids then
                 ( { model
                     | spmodel = SP.setSearchString model.spmodel zkln.title
@@ -2687,10 +2683,6 @@ update msg model =
                 )
 
         SetSearchString text ->
-            let
-                spmod =
-                    model.spmodel
-            in
             ( { model
                 | spmodel =
                     SP.setSearchString model.spmodel text
@@ -2699,10 +2691,6 @@ update msg model =
             )
 
         SetSearch search ->
-            let
-                spmod =
-                    model.spmodel
-            in
             ( { model
                 | spmodel =
                     SP.setSearch model.spmodel [ search ]
@@ -2711,10 +2699,6 @@ update msg model =
             )
 
         AddToSearchAsTag title ->
-            let
-                spmod =
-                    model.spmodel
-            in
             ( { model
                 | spmodel =
                     SP.addToSearch model.spmodel

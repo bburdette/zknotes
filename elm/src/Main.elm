@@ -62,10 +62,6 @@ import WindowKeys
 import ZkCommon exposing (StylePalette)
 
 
-
--- import ZkInterface as ZI
-
-
 type Msg
     = LoginMsg Login.Msg
     | InvitedMsg Invited.Msg
@@ -1975,19 +1971,11 @@ actualupdate msg model =
                     , Cmd.none
                     )
 
-                -- = PrServerError PublicError
-                -- | PrZkNoteAndLinks ZkNoteAndLinks
-                -- | PrZkNoteAndLinksWhat ZkNoteAndLinksWhat
-                -- | PrNoop
                 Ok ( pt, piresponse ) ->
                     case piresponse of
                         Data.PrServerError e ->
                             case e of
                                 Data.PbeNoteNotFound publicrequest ->
-                                    -- let
-                                    --     ( zknoteid, what ) =
-                                    --         DataUtil.getPrqNoteInfo publicrequest
-                                    -- in
                                     case DataUtil.getPrqNoteInfo publicrequest of
                                         Just ( zknoteid, "cache" ) ->
                                             ( { model
@@ -2464,10 +2452,6 @@ actualupdate msg model =
                         Data.PvyServerError e ->
                             ( displayMessageDialog model <| DataUtil.showPrivateError e, Cmd.none )
 
-                        -- Data.PvyNotLoggedIn ->
-                        --     ( displayMessageDialog model <| "not logged in", Cmd.none )
-                        -- Data.PvyLoginError ->
-                        --     ( displayMessageDialog model <| "login error", Cmd.none )
                         Data.PvyPowerDeleteComplete count ->
                             case model.state of
                                 EditZkNoteListing mod li ->
@@ -2519,8 +2503,6 @@ actualupdate msg model =
                             else
                                 ( model, Cmd.none )
 
-                        -- Data.PvyZkIdSearchResult _ ->
-                        --     ( model, Cmd.none )
                         Data.PvyZkListNoteSearchResult sr ->
                             case state of
                                 EditZkNoteListing znlstate login_ ->
@@ -2689,10 +2671,6 @@ actualupdate msg model =
                                 _ ->
                                     ( model, Cmd.none )
 
-                        -- Data.PvyFilesUploaded _ ->
-                        --     ( unexpectedMessage model (showPrivateReply ziresponse)
-                        --     , Cmd.none
-                        --     )
                         Data.PvyJobStatus jobstatus ->
                             let
                                 js =
@@ -3007,7 +2985,7 @@ actualupdate msg model =
                 Err e ->
                     ( displayMessageDialog model <| Util.httpErrorString e, Cmd.none )
 
-                Ok ( pt, ziresponse ) ->
+                Ok ( _, ziresponse ) ->
                     case ziresponse of
                         Data.UrFilesUploaded files ->
                             ( { model

@@ -159,7 +159,7 @@ async fn public(
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'public' err: {:?}", e);
-      let se = PublicReply::PrServerError(to_public_error(e, public_request));
+      let se = PublicReply::PbyServerError(to_public_error(e, public_request));
       HttpResponse::Ok().json(se)
     }
   }

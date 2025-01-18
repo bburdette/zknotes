@@ -15,25 +15,15 @@ module SearchStackPanel exposing
     , view
     )
 
--- import Search as S exposing (AndOr(..), SearchMod(..), TSText, TagSearch(..), tagSearchParser)
-
 import Common exposing (buttonStyle)
 import Data exposing (AndOr(..), SearchMod(..), TagSearch(..))
 import Element as E exposing (..)
 import Element.Background as EBk
-import Element.Border as EBd
-import Element.Events exposing (onClick)
 import Element.Font as Font
 import Element.Input as EI
-import PaginationPanel as PP
-import Parser
-import SearchHelpPanel
 import SearchPanel as SP
-import SearchUtil as SU exposing (TSText, andifySearches, tagSearchParser)
-import TDict exposing (TDict)
-import TagSearchPanel as TSP
+import SearchUtil as SU exposing (andifySearches)
 import TangoColors as TC
-import Util exposing (Size)
 
 
 
@@ -57,11 +47,6 @@ initModel =
 searchResultUpdated : Data.ZkListNoteSearchResult -> Model -> Model
 searchResultUpdated zsr model =
     { model | spmodel = SP.searchResultUpdated zsr model.spmodel }
-
-
-andifySearch : List TagSearch -> TagSearch -> TagSearch
-andifySearch searches search =
-    List.foldr (\sl sr -> Boolex { ts1 = sl, ao = And, ts2 = sr }) search searches
 
 
 getSearch : Model -> Maybe Data.ZkNoteSearch

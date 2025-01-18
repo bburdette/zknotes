@@ -200,29 +200,6 @@ toZkLink noteid user el =
     }
 
 
-
--- toZkLink : ZkNoteId -> UserId -> EditLink -> ZkLink
--- toZkLink noteid (UserId user) el =
---     { from =
---         case el.direction of
---             From ->
---                 el.otherid
---             To ->
---                 noteid
---     , to =
---         case el.direction of
---             From ->
---                 noteid
---             To ->
---                 el.otherid
---     , user = user
---     , zknote = Nothing
---     , fromname = Nothing
---     , toname = Nothing
---     , delete = Nothing
---     }
-
-
 zklKey : { a | otherid : ZkNoteId, direction : Direction } -> String
 zklKey zkl =
     zkNoteIdToString zkl.otherid
@@ -376,13 +353,6 @@ showPrivateError pe =
 
         PveLoginError e ->
             "login error: " ++ e
-
-
-
--- type PublicError
---     = PbeString String
---     | PbeNoteNotFound PublicRequest
---     | PbeNoteIsPrivate PublicRequest
 
 
 showPublicError : PublicError -> String

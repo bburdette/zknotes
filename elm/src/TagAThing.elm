@@ -1,7 +1,5 @@
 module TagAThing exposing (..)
 
--- import Search as S
-
 import Common
 import Data exposing (Direction(..), ZkNoteId)
 import DataUtil exposing (zklKey, zniCompare)
@@ -12,13 +10,9 @@ import Element.Border as EBd
 import Element.Events as EE
 import Element.Font as EF
 import Element.Input as EI
-import Element.Region
-import Json.Encode as JE
 import Orgauth.Data as OD
 import SearchStackPanel as SP
-import SearchUtil as SU
 import TangoColors as TC
-import Time exposing (Zone)
 import Toop
 import Util
 import WindowKeys as WK
@@ -503,10 +497,6 @@ update msg model =
             ( model, SearchHistory )
 
         AddToSearch zkln ->
-            let
-                spmod =
-                    model.spmodel
-            in
             if List.any ((==) DataUtil.sysids.searchid) zkln.sysids then
                 ( { model
                     | spmodel = SP.setSearchString model.spmodel zkln.title
@@ -525,10 +515,6 @@ update msg model =
                 )
 
         AddToSearchAsTag title ->
-            let
-                spmod =
-                    model.spmodel
-            in
             ( { model
                 | spmodel =
                     SP.addToSearch model.spmodel
@@ -538,14 +524,6 @@ update msg model =
             , None
             )
 
-        -- { otherid : ZkNoteId
-        -- , direction : Direction
-        -- , user : Int
-        -- , zknote : Maybe ZkNoteId
-        -- , othername : Maybe String
-        -- , delete : Maybe Bool
-        -- , sysids : List ZkNoteId
-        -- }
         ToLinkPress zkln ->
             let
                 nzkl =

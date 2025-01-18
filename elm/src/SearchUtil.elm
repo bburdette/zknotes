@@ -19,14 +19,12 @@ import Parser
         , loop
         , map
         , oneOf
-        , run
         , succeed
         , symbol
         , token
         )
 import Search exposing (TSText)
-import TDict exposing (TDict)
-import Util exposing (first, rest)
+import Util exposing (rest)
 
 
 getTagSearch : ZkNoteSearch -> TagSearch
@@ -60,18 +58,6 @@ defaultSearch =
     , deleted = False
     , ordering = Nothing
     }
-
-
-
--- { tagsearch : TagSearch
--- , offset : Int
--- , limit : Maybe (Int)
--- , what : String
--- , resulttype : ResultType
--- , archives : Bool
--- , deleted : Bool
--- , ordering : Maybe (Ordering)
--- }
 
 
 encodeResultType : ResultType -> JE.Value
