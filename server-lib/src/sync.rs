@@ -234,13 +234,8 @@ pub async fn sync(
   )
   .await?;
 
-  // ifee res.what != PrivateReplies::SyncComplete {
-  //   Ok(res)
-  // } else i
-
   match res {
-    PrivateReply::PvySyncComplete => Ok(res),
-    _ => {
+    PrivateReply::PvySyncComplete => {
       write!(monitor, "starting sync to remote");
       let remres = sync_to_remote(
         conn.clone(),
@@ -264,6 +259,7 @@ pub async fn sync(
 
       Ok(remres)
     }
+    _ => Ok(res),
   }
 }
 
@@ -797,7 +793,10 @@ where
       ]
       );
     let id: i64 = match ex {
-      Ok(_) => Ok(conn.last_insert_rowid()),
+      Ok(_) => {
+        debug!("wrote zknote {}", conn.last_insert_rowid());
+        Ok(conn.last_insert_rowid())
+      }
       Err(rusqlite::Error::SqliteFailure(e, Some(s))) => {
         if e.code == rusqlite::ErrorCode::ConstraintViolation {
           if s.contains("uuid") {
