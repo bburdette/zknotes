@@ -15,24 +15,10 @@ module SearchPanel exposing
     , view
     )
 
--- import Search as S exposing (AndOr(..), SearchMod(..), TSText, TagSearch(..), tagSearchParser)
-
-import Common exposing (buttonStyle)
 import Data exposing (AndOr(..), SearchMod(..), TagSearch(..))
 import Element as E exposing (..)
-import Element.Background as Background
-import Element.Border as Border
-import Element.Events exposing (onClick)
-import Element.Font as Font
-import Element.Input as EI
 import PaginationPanel as PP
-import Parser
-import SearchHelpPanel
-import SearchUtil as SU exposing (TSText, tagSearchParser)
-import TDict exposing (TDict)
 import TagSearchPanel as TSP
-import TangoColors as Color
-import Util exposing (Size)
 
 
 type alias Model =

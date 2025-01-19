@@ -2,7 +2,6 @@ module SearchLocTest exposing (..)
 
 import Expect exposing (Expectation)
 import Fuzz exposing (Fuzzer, int, list, string)
-import Search as S
 import SearchLoc exposing (RTRes(..), TSLoc(..), getTerm, removeTerm, setTerm, swapLast)
 import Test exposing (..)
 

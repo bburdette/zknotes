@@ -23,7 +23,6 @@ import Parser
         , symbol
         , token
         )
-import Search exposing (TSText)
 import Util exposing (rest)
 
 

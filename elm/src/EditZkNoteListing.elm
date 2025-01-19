@@ -9,12 +9,8 @@ import Element.Background as EBk
 import Element.Border as EBd
 import Element.Font as EF
 import Element.Input as EI
-import Element.Region
-import Import
-import Search as S exposing (TagSearch(..))
 import SearchStackPanel as SP
 import SearchUtil exposing (getTagSearch, showTagSearch)
-import TagSearchPanel as TSP
 import TangoColors as TC
 import Toop
 import Util

@@ -11,7 +11,6 @@ import Element.Font as EF
 import Element.Input as EI
 import PaginationPanel as PP
 import Route as R
-import Search exposing (TagSearch(..))
 import TDict exposing (TDict)
 import TangoColors as TC
 import Time

@@ -34,7 +34,6 @@ import File as F
 import Json.Decode as JD
 import Markdown.Block exposing (ListItem(..), Task(..))
 import MdCommon exposing (..)
-import Search as S
 import SearchStackPanel as SP
 import TDict exposing (TDict)
 import TangoColors as TC
