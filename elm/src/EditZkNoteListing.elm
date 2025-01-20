@@ -10,7 +10,7 @@ import Element.Border as EBd
 import Element.Font as EF
 import Element.Input as EI
 import SearchStackPanel as SP
-import SearchUtil exposing (getTagSearch, showTagSearch)
+import SearchUtil exposing (showTagSearch)
 import TangoColors as TC
 import Toop
 import Util
@@ -47,7 +47,7 @@ type Command
     | None
     | Search Data.ZkNoteSearch
     | SyncFiles Data.ZkNoteSearch
-    | PowerDelete Data.TagSearch
+    | PowerDelete (List Data.TagSearch)
     | SearchHistory
 
 
@@ -118,9 +118,6 @@ listview ld size model =
     let
         maxwidth =
             700
-
-        titlemaxconst =
-            85
     in
     E.el
         [ E.width E.fill
@@ -234,7 +231,15 @@ update msg model ld =
                             Just <|
                                 ( D.init
                                     ("delete all notes matching this search?\n"
-                                        ++ showTagSearch s.tagsearch
+                                        ++ showTagSearch
+                                            (s.tagsearch
+                                                |> List.reverse
+                                                |> List.head
+                                                |> Maybe.withDefault
+                                                    (Data.SearchTerm
+                                                        { mods = [], term = "" }
+                                                    )
+                                            )
                                     )
                                     True
                                     (\size -> E.map (\_ -> ()) (listview ld size model))
@@ -254,7 +259,7 @@ update msg model ld =
                         ( D.Ok, DeleteAll ) ->
                             case SP.getSearch model.spmodel of
                                 Just s ->
-                                    ( { model | dialog = Nothing }, PowerDelete (getTagSearch s) )
+                                    ( { model | dialog = Nothing }, PowerDelete s.tagsearch )
 
                                 Nothing ->
                                     ( { model | dialog = Nothing }, None )

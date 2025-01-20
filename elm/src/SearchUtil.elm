@@ -26,11 +26,6 @@ import Parser
 import Util exposing (rest)
 
 
-getTagSearch : ZkNoteSearch -> TagSearch
-getTagSearch zkn =
-    andifySearches [ zkn.tagsearch ]
-
-
 andifySearches : List TagSearch -> TagSearch
 andifySearches tsl =
     case tsl of
@@ -48,7 +43,7 @@ defaultSearchLimit =
 
 defaultSearch : ZkNoteSearch
 defaultSearch =
-    { tagsearch = SearchTerm { mods = [], term = "" }
+    { tagsearch = [ SearchTerm { mods = [], term = "" } ]
     , offset = 0
     , limit = Just defaultSearchLimit
     , what = ""

@@ -24,7 +24,7 @@ type alias FileUrlInfo =
 getPrNoteInfo : PublicReply -> Maybe ( ZkNoteId, Maybe String )
 getPrNoteInfo pr =
     case pr of
-        PrServerError publicError ->
+        PbyServerError publicError ->
             case publicError of
                 PbeString _ ->
                     Nothing
@@ -37,26 +37,26 @@ getPrNoteInfo pr =
                     getPrqNoteInfo publicRequest
                         |> Maybe.map (\( l, r ) -> ( l, Just r ))
 
-        PrZkNoteAndLinks zkNoteAndLinks ->
+        PbyZkNoteAndLinks zkNoteAndLinks ->
             Just ( zkNoteAndLinks.zknote.id, Nothing )
 
-        PrZkNoteAndLinksWhat zkNoteAndLinksWhat ->
+        PbyZkNoteAndLinksWhat zkNoteAndLinksWhat ->
             Just ( zkNoteAndLinksWhat.znl.zknote.id, Just zkNoteAndLinksWhat.what )
 
-        PrNoop ->
+        PbyNoop ->
             Nothing
 
 
 getPrqNoteInfo : PublicRequest -> Maybe ( ZkNoteId, String )
 getPrqNoteInfo pr =
     case pr of
-        PrGetZkNoteAndLinks getZkNoteAndLinks ->
+        PbrGetZkNoteAndLinks getZkNoteAndLinks ->
             Just ( getZkNoteAndLinks.zknote, getZkNoteAndLinks.what )
 
-        PrGetZnlIfChanged getZnlIfChanged ->
+        PbrGetZnlIfChanged getZnlIfChanged ->
             Just ( getZnlIfChanged.zknote, getZnlIfChanged.what )
 
-        PrGetZkNotePubId _ ->
+        PbrGetZkNotePubId _ ->
             Nothing
 
 
@@ -375,7 +375,7 @@ getErrorIndexNote location noteid tomsg =
         , body =
             Http.jsonBody <|
                 Data.publicRequestEncoder
-                    (PrGetZkNoteAndLinks
+                    (PbrGetZkNoteAndLinks
                         { zknote = noteid
                         , what = ""
                         }

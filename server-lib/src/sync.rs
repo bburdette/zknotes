@@ -59,7 +59,7 @@ pub async fn prev_sync(
 ) -> Result<Option<CompletedSync>, zkerr::Error> {
   let sysid = user_id(&conn, "system")?;
   let zns = ZkNoteSearch {
-    tagsearch: TagSearch::Boolex {
+    tagsearch: vec![TagSearch::Boolex {
       ts1: Box::new(TagSearch::SearchTerm {
         mods: vec![SearchMod::Tag, SearchMod::ZkNoteId],
         term: SpecialUuids::Sync.str().to_string(),
@@ -69,7 +69,7 @@ pub async fn prev_sync(
         mods: vec![SearchMod::Tag, SearchMod::ZkNoteId],
         term: usernoteid.to_string(),
       }),
-    },
+    }],
     offset: 0,
     limit: Some(1),
     what: "".to_string(),
@@ -1372,7 +1372,7 @@ pub fn sync_stream(
 
   // get new notes, and old notes that are attached to shares.
   let zns = ZkNoteSearch {
-    tagsearch: ts.clone(),
+    tagsearch: vec![ts.clone()],
     offset: 0,
     limit: None,
     what: "".to_string(),
@@ -1403,7 +1403,7 @@ pub fn sync_stream(
   };
 
   let zns = ZkNoteSearch {
-    tagsearch: full_excl,
+    tagsearch: vec![full_excl],
     offset: 0,
     limit: None,
     what: "".to_string(),
@@ -1423,7 +1423,7 @@ pub fn sync_stream(
   .map(bytesify);
 
   let ans = ZkNoteSearch {
-    tagsearch: ts,
+    tagsearch: vec![ts],
     offset: 0,
     limit: None,
     what: "".to_string(),

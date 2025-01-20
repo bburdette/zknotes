@@ -24,7 +24,7 @@ pub fn power_delete_zknotes(
   conn: &Connection,
   file_path: PathBuf,
   user: i64,
-  search: &TagSearch,
+  search: &Vec<TagSearch>,
 ) -> Result<i64, zkerr::Error> {
   // get all, and delete all.  Maybe not a good idea for a big database, but ours is small
   // and soon to be replaced with indradb, perhaps.
@@ -378,12 +378,29 @@ pub fn build_sql(
   }
 }
 
+pub fn andify_search(search: &Vec<TagSearch>) -> TagSearch {
+  let mut it = search.iter();
+  match it.next() {
+    Some(head) => it.fold(head.clone(), |acc, elt| TagSearch::Boolex {
+      ts1: Box::new(acc.clone()),
+      ao: AndOr::And,
+      ts2: Box::new(elt.clone()),
+    }),
+    None => TagSearch::SearchTerm {
+      mods: Vec::new(),
+      term: "".to_string(),
+    },
+  }
+}
+
 pub fn build_base_sql(
   conn: &Connection,
   uid: i64,
   search: &ZkNoteSearch,
 ) -> Result<(String, Vec<String>), zkerr::Error> {
-  let (cls, clsargs) = build_tagsearch_clause(&conn, uid, false, &search.tagsearch)?;
+  let ts = andify_search(&search.tagsearch);
+
+  let (cls, clsargs) = build_tagsearch_clause(&conn, uid, false, &ts)?;
 
   let publicid = note_id(&conn, "system", "public")?;
   let archiveid = note_id(&conn, "system", "archive")?;

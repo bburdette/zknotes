@@ -25,7 +25,7 @@ pub enum PrivateRequest {
   PvqGetArchiveZklinks(GetArchiveZkLinks),
   PvqGetZkLinksSince(GetZkLinksSince),
   PvqSearchZkNotes(ZkNoteSearch),
-  PvqPowerDelete(TagSearch),
+  PvqPowerDelete(Vec<TagSearch>),
   PvqDeleteZkNote(ZkNoteId),
   PvqSaveZkNote(SaveZkNote),
   PvqSaveZkLinks(ZkLinks),

@@ -47,8 +47,6 @@ module EditZkNote exposing
     , zknview
     )
 
--- import Search as S
-
 import Browser.Dom as BD
 import Cellme.Cellme exposing (CellContainer(..), RunState(..), evalCellsFully)
 import Cellme.DictCellme exposing (CellDict(..), getCd, mkCc)

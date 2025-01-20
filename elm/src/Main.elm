@@ -193,7 +193,7 @@ type alias Model =
     , timezone : Time.Zone
     , savedRoute : SavedRoute
     , initialRoute : Route
-    , prevSearches : List Data.TagSearch
+    , prevSearches : List (List Data.TagSearch)
     , recentNotes : List Data.ZkListNote
     , errorNotes : Dict String String
     , fontsize : Int
@@ -271,7 +271,7 @@ routeStateInternal model route =
                     , case model.state of
                         EView _ _ ->
                             -- if we're in "EView" then do this request to stay in EView.
-                            sendPIMsg model.fui (Data.PrGetZkNoteAndLinks { zknote = id, what = "" })
+                            sendPIMsg model.fui (Data.PbrGetZkNoteAndLinks { zknote = id, what = "" })
 
                         _ ->
                             sendZIMsg model.fui (Data.PvqGetZkNoteAndLinks { zknote = id, what = "" })
@@ -282,7 +282,7 @@ routeStateInternal model route =
                         { message = "loading article"
                         }
                         (Just model.state)
-                    , sendPIMsg model.fui (Data.PrGetZkNoteAndLinks { zknote = id, what = "" })
+                    , sendPIMsg model.fui (Data.PbrGetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
         PublicZkPubId pubid ->
@@ -299,7 +299,7 @@ routeStateInternal model route =
                         { message = "loading article"
                         }
                         (Just model.state)
-            , sendPIMsg model.fui (Data.PrGetZkNotePubId pubid)
+            , sendPIMsg model.fui (Data.PbrGetZkNotePubId pubid)
             )
 
         EditZkNoteR id ->
@@ -316,7 +316,7 @@ routeStateInternal model route =
 
                 EView st login ->
                     ( EView st login
-                    , sendPIMsg model.fui (Data.PrGetZkNoteAndLinks { zknote = id, what = "" })
+                    , sendPIMsg model.fui (Data.PbrGetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
                 st ->
@@ -331,7 +331,7 @@ routeStateInternal model route =
                         Nothing ->
                             ( PubShowMessage { message = "loading note..." }
                                 (Just model.state)
-                            , sendPIMsg model.fui (Data.PrGetZkNoteAndLinks { zknote = id, what = "" })
+                            , sendPIMsg model.fui (Data.PbrGetZkNoteAndLinks { zknote = id, what = "" })
                             )
 
         EditZkNoteNew ->
@@ -1167,8 +1167,8 @@ sendSearch model search =
                     { note =
                         { id = Nothing
                         , pubid = Nothing
-                        , title = SU.printTagSearch (SU.getTagSearch search)
-                        , content = Data.tagSearchEncoder search.tagsearch |> JE.encode 2
+                        , title = SU.printTagSearch (SU.andifySearches search.tagsearch)
+                        , content = JE.list Data.tagSearchEncoder search.tagsearch |> JE.encode 2
                         , editable = False
                         , showtitle = True
                         , deleted = False
@@ -1186,7 +1186,7 @@ sendSearch model search =
             -- if this is the same search as last time, don't save.
             if
                 (List.head model.prevSearches == Just search.tagsearch)
-                    || (search.tagsearch == Data.SearchTerm { mods = [], term = "" })
+                    || (search.tagsearch == [ Data.SearchTerm { mods = [], term = "" } ])
             then
                 ( model
                 , sendZIMsg model.fui (Data.PvqSearchZkNotes search)
@@ -1480,7 +1480,10 @@ shDialog model =
         | state =
             SelectDialog
                 (SS.init
-                    { choices = List.indexedMap (\i ps -> ( i, SU.printTagSearch ps )) model.prevSearches
+                    { choices =
+                        List.indexedMap
+                            (\i ps -> ( i, SU.printTagSearch (SU.andifySearches ps) ))
+                            model.prevSearches
                     , selected = Nothing
                     , search = ""
                     }
@@ -1688,12 +1691,12 @@ actualupdate msg model =
                                 ( ns, cmd ) =
                                     case instate of
                                         EditZkNote ezn login ->
-                                            ( EditZkNote (Tuple.first <| EditZkNote.updateSearch [ ts ] ezn) login
+                                            ( EditZkNote (Tuple.first <| EditZkNote.updateSearch ts ezn) login
                                             , sendsearch
                                             )
 
                                         EditZkNoteListing ezn login ->
-                                            ( EditZkNoteListing (Tuple.first <| EditZkNoteListing.updateSearch [ ts ] ezn) login
+                                            ( EditZkNoteListing (Tuple.first <| EditZkNoteListing.updateSearch ts ezn) login
                                             , sendsearch
                                             )
 
@@ -1973,7 +1976,7 @@ actualupdate msg model =
 
                 Ok ( pt, piresponse ) ->
                     case piresponse of
-                        Data.PrServerError e ->
+                        Data.PbyServerError e ->
                             case e of
                                 Data.PbeNoteNotFound publicrequest ->
                                     case DataUtil.getPrqNoteInfo publicrequest of
@@ -2044,7 +2047,7 @@ actualupdate msg model =
                                         Nothing ->
                                             ( displayMessageDialog { model | state = prevstate } estr, Cmd.none )
 
-                        Data.PrZkNoteAndLinks znl ->
+                        Data.PbyZkNoteAndLinks znl ->
                             let
                                 vstate =
                                     case stateLogin state of
@@ -2066,7 +2069,7 @@ actualupdate msg model =
                             , Cmd.batch ngets
                             )
 
-                        Data.PrZkNoteAndLinksWhat znlw ->
+                        Data.PbyZkNoteAndLinksWhat znlw ->
                             if znlw.what == "cache" then
                                 let
                                     gets =
@@ -2122,7 +2125,7 @@ actualupdate msg model =
                                 , Cmd.batch ngets
                                 )
 
-                        Data.PrNoop ->
+                        Data.PbyNoop ->
                             ( model, Cmd.none )
 
         ( ErrorIndexNote rsein, _ ) ->
@@ -2134,21 +2137,21 @@ actualupdate msg model =
 
                 Ok resp ->
                     case resp of
-                        Data.PrServerError e ->
+                        Data.PbyServerError e ->
                             -- if there's an error on getting the error index note, just display it.
                             ( displayMessageDialog model <| DataUtil.showPublicError e, Cmd.none )
 
-                        Data.PrZkNoteAndLinks fbe ->
+                        Data.PbyZkNoteAndLinks fbe ->
                             ( { model | errorNotes = MC.linkDict fbe.zknote.content }
                             , Cmd.none
                             )
 
-                        Data.PrZkNoteAndLinksWhat fbe ->
+                        Data.PbyZkNoteAndLinksWhat fbe ->
                             ( { model | errorNotes = MC.linkDict fbe.znl.zknote.content }
                             , Cmd.none
                             )
 
-                        Data.PrNoop ->
+                        Data.PbyNoop ->
                             ( model, Cmd.none )
 
         ( TAReplyData tas urd, state ) ->
@@ -2466,23 +2469,20 @@ actualupdate msg model =
                                     pses =
                                         List.filterMap
                                             (\zknote ->
-                                                JD.decodeString Data.tagSearchDecoder zknote.content
+                                                JD.decodeString (JD.list Data.tagSearchDecoder) zknote.content
                                                     |> Result.toMaybe
                                             )
                                             sr.notes
 
-                                    laststack =
-                                        []
-
                                     -- TODO: fix
-                                    -- laststack =
-                                    --     pses
-                                    --         |> List.filter (\l -> List.length l > 1)
-                                    --         |> List.head
-                                    --         |> Maybe.withDefault []
-                                    --         |> List.reverse
-                                    --         |> List.drop 1
-                                    --         |> List.reverse
+                                    laststack =
+                                        pses
+                                            |> List.filter (\l -> List.length l > 1)
+                                            |> List.head
+                                            |> Maybe.withDefault []
+                                            |> List.reverse
+                                            |> List.drop 1
+                                            |> List.reverse
                                 in
                                 ( { model
                                     | prevSearches = pses
@@ -2738,6 +2738,14 @@ actualupdate msg model =
                         Data.PvyZkNoteAndLinksSearchResult _ ->
                             ( model, Cmd.none )
 
+                        -- TODO: still used?
+                        Data.PvyFileSyncComplete ->
+                            ( model, Cmd.none )
+
+                        -- TODO: still used?
+                        Data.PvySyncComplete ->
+                            ( model, Cmd.none )
+
         ( ViewMsg em, View es ) ->
             let
                 ( emod, ecmd ) =
@@ -2758,7 +2766,7 @@ actualupdate msg model =
                                 }
                                 (Just model.state)
                       }
-                    , sendPIMsg model.fui (Data.PrGetZkNoteAndLinks { zknote = id, what = "" })
+                    , sendPIMsg model.fui (Data.PbrGetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
         ( ViewMsg em, EView es state ) ->
@@ -2790,7 +2798,7 @@ actualupdate msg model =
 
                 View.Switch id ->
                     ( model
-                    , sendPIMsg model.fui (Data.PrGetZkNoteAndLinks { zknote = id, what = "" })
+                    , sendPIMsg model.fui (Data.PbrGetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
         ( EditZkNoteMsg em, EditZkNote es login ) ->
@@ -3209,22 +3217,22 @@ makePubNoteCacheGet model id =
         Just (NC.ZNAL zkn) ->
             sendPIMsg
                 model.fui
-                (Data.PrGetZnlIfChanged { zknote = id, what = "cache", changeddate = zkn.zknote.changeddate })
+                (Data.PbrGetZnlIfChanged { zknote = id, what = "cache", changeddate = zkn.zknote.changeddate })
 
         Just NC.NotFound ->
             sendPIMsg
                 model.fui
-                (Data.PrGetZkNoteAndLinks { zknote = id, what = "cache" })
+                (Data.PbrGetZkNoteAndLinks { zknote = id, what = "cache" })
 
         Just NC.Private ->
             sendPIMsg
                 model.fui
-                (Data.PrGetZkNoteAndLinks { zknote = id, what = "cache" })
+                (Data.PbrGetZkNoteAndLinks { zknote = id, what = "cache" })
 
         Nothing ->
             sendPIMsg
                 model.fui
-                (Data.PrGetZkNoteAndLinks { zknote = id, what = "cache" })
+                (Data.PbrGetZkNoteAndLinks { zknote = id, what = "cache" })
 
 
 makeNewNoteCacheGets : String -> Model -> List (Cmd Msg)
@@ -3763,7 +3771,7 @@ prevSearchQuery login =
                     Data.SearchTerm { mods = [ Data.User ], term = login.name }
                 }
     in
-    { tagsearch = ts
+    { tagsearch = [ ts ]
     , offset = 0
     , limit = Just 50
     , what = "prevSearches"

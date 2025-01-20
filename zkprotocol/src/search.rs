@@ -3,7 +3,7 @@ use elm_rs::{Elm, ElmDecode, ElmEncode};
 
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
 pub struct ZkNoteSearch {
-  pub tagsearch: TagSearch,
+  pub tagsearch: Vec<TagSearch>,
   pub offset: i64,
   pub limit: Option<i64>,
   pub what: String,

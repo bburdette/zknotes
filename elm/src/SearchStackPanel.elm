@@ -54,7 +54,10 @@ getSearch model =
     SP.getSearch model.spmodel
         |> Maybe.map
             (\s ->
-                { s | tagsearch = andifySearches <| model.searchStack ++ [ s.tagsearch ] }
+                { s
+                    | tagsearch =
+                        model.searchStack
+                }
             )
 
 
@@ -114,7 +117,7 @@ handleSpUpdate model ( nm, cmd ) =
             , Search <|
                 { ts
                     | tagsearch =
-                        andifySearches <| model.searchStack ++ [ ts.tagsearch ]
+                        model.searchStack ++ ts.tagsearch
                 }
             )
 
@@ -123,7 +126,7 @@ handleSpUpdate model ( nm, cmd ) =
             , SyncFiles <|
                 { ts
                     | tagsearch =
-                        andifySearches <| model.searchStack ++ [ ts.tagsearch ]
+                        model.searchStack ++ ts.tagsearch
                 }
             )
 
@@ -160,10 +163,10 @@ type Command
 view : Bool -> Bool -> Int -> Model -> Element Msg
 view showCopy narrow nblevel model =
     E.column [ E.width E.fill, E.spacing 3 ] <|
-        (if List.isEmpty model.searchStack then
+        [ if List.isEmpty model.searchStack then
             E.none
 
-         else
+          else
             E.column [ E.width E.fill, E.spacing 3, E.padding 3, EBk.color TC.lightGrey ] <|
                 List.indexedMap
                     (\i ts ->
@@ -178,9 +181,8 @@ view showCopy narrow nblevel model =
                             ]
                     )
                     model.searchStack
-        )
-            :: [ E.map SPMsg <| SP.view showCopy narrow nblevel model.spmodel
-               ]
+        , E.map SPMsg <| SP.view showCopy narrow nblevel model.spmodel
+        ]
 
 
 update : Msg -> Model -> ( Model, Command )

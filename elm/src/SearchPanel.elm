@@ -49,7 +49,7 @@ getSearch model =
     TSP.getSearch model.tagSearchModel
         |> Maybe.map
             (\s ->
-                { tagsearch = s
+                { tagsearch = [ s ]
                 , offset = model.paginationModel.offset
                 , limit = Just model.paginationModel.increment
                 , what = ""
@@ -146,7 +146,7 @@ handleTspUpdate model ( nm, cmd ) =
         TSP.Search ts ->
             ( { model | tagSearchModel = nm, paginationModel = PP.initModel }
             , Search <|
-                { tagsearch = ts
+                { tagsearch = [ ts ]
                 , offset = 0
                 , limit = Just model.paginationModel.increment
                 , what = ""
@@ -160,7 +160,7 @@ handleTspUpdate model ( nm, cmd ) =
         TSP.SyncFiles ts ->
             ( { model | tagSearchModel = nm, paginationModel = PP.initModel }
             , SyncFiles <|
-                { tagsearch = ts
+                { tagsearch = [ ts ]
                 , offset = 0
                 , limit = Nothing
                 , what = ""
@@ -203,7 +203,7 @@ update msg model =
                         Just ts ->
                             ( { model | paginationModel = nm }
                             , Search
-                                { tagsearch = ts
+                                { tagsearch = [ ts ]
                                 , offset = nm.offset
                                 , limit = Just nm.increment
                                 , what = ""

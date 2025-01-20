@@ -553,45 +553,45 @@ jobStatusEncoder struct =
 
 
 type PublicRequest
-    = PrGetZkNoteAndLinks GetZkNoteAndLinks
-    | PrGetZnlIfChanged GetZnlIfChanged
-    | PrGetZkNotePubId String
+    = PbrGetZkNoteAndLinks GetZkNoteAndLinks
+    | PbrGetZnlIfChanged GetZnlIfChanged
+    | PbrGetZkNotePubId String
 
 
 publicRequestEncoder : PublicRequest -> Json.Encode.Value
 publicRequestEncoder enum =
     case enum of
-        PrGetZkNoteAndLinks inner ->
-            Json.Encode.object [ ( "PrGetZkNoteAndLinks", getZkNoteAndLinksEncoder inner ) ]
+        PbrGetZkNoteAndLinks inner ->
+            Json.Encode.object [ ( "PbrGetZkNoteAndLinks", getZkNoteAndLinksEncoder inner ) ]
 
-        PrGetZnlIfChanged inner ->
-            Json.Encode.object [ ( "PrGetZnlIfChanged", getZnlIfChangedEncoder inner ) ]
+        PbrGetZnlIfChanged inner ->
+            Json.Encode.object [ ( "PbrGetZnlIfChanged", getZnlIfChangedEncoder inner ) ]
 
-        PrGetZkNotePubId inner ->
-            Json.Encode.object [ ( "PrGetZkNotePubId", Json.Encode.string inner ) ]
+        PbrGetZkNotePubId inner ->
+            Json.Encode.object [ ( "PbrGetZkNotePubId", Json.Encode.string inner ) ]
 
 
 type PublicReply
-    = PrServerError PublicError
-    | PrZkNoteAndLinks ZkNoteAndLinks
-    | PrZkNoteAndLinksWhat ZkNoteAndLinksWhat
-    | PrNoop
+    = PbyServerError PublicError
+    | PbyZkNoteAndLinks ZkNoteAndLinks
+    | PbyZkNoteAndLinksWhat ZkNoteAndLinksWhat
+    | PbyNoop
 
 
 publicReplyEncoder : PublicReply -> Json.Encode.Value
 publicReplyEncoder enum =
     case enum of
-        PrServerError inner ->
-            Json.Encode.object [ ( "PrServerError", publicErrorEncoder inner ) ]
+        PbyServerError inner ->
+            Json.Encode.object [ ( "PbyServerError", publicErrorEncoder inner ) ]
 
-        PrZkNoteAndLinks inner ->
-            Json.Encode.object [ ( "PrZkNoteAndLinks", zkNoteAndLinksEncoder inner ) ]
+        PbyZkNoteAndLinks inner ->
+            Json.Encode.object [ ( "PbyZkNoteAndLinks", zkNoteAndLinksEncoder inner ) ]
 
-        PrZkNoteAndLinksWhat inner ->
-            Json.Encode.object [ ( "PrZkNoteAndLinksWhat", zkNoteAndLinksWhatEncoder inner ) ]
+        PbyZkNoteAndLinksWhat inner ->
+            Json.Encode.object [ ( "PbyZkNoteAndLinksWhat", zkNoteAndLinksWhatEncoder inner ) ]
 
-        PrNoop ->
-            Json.Encode.string "PrNoop"
+        PbyNoop ->
+            Json.Encode.string "PbyNoop"
 
 
 type PublicError
@@ -623,7 +623,7 @@ type PrivateRequest
     | PvqGetArchiveZklinks GetArchiveZkLinks
     | PvqGetZkLinksSince GetZkLinksSince
     | PvqSearchZkNotes ZkNoteSearch
-    | PvqPowerDelete TagSearch
+    | PvqPowerDelete (List TagSearch)
     | PvqDeleteZkNote ZkNoteId
     | PvqSaveZkNote SaveZkNote
     | PvqSaveZkLinks ZkLinks
@@ -666,7 +666,7 @@ privateRequestEncoder enum =
             Json.Encode.object [ ( "PvqSearchZkNotes", zkNoteSearchEncoder inner ) ]
 
         PvqPowerDelete inner ->
-            Json.Encode.object [ ( "PvqPowerDelete", tagSearchEncoder inner ) ]
+            Json.Encode.object [ ( "PvqPowerDelete", Json.Encode.list tagSearchEncoder inner ) ]
 
         PvqDeleteZkNote inner ->
             Json.Encode.object [ ( "PvqDeleteZkNote", zkNoteIdEncoder inner ) ]
@@ -719,6 +719,8 @@ type PrivateReply
     | PvyHomeNoteSet ZkNoteId
     | PvyJobStatus JobStatus
     | PvyJobNotFound Int
+    | PvyFileSyncComplete
+    | PvySyncComplete
 
 
 privateReplyEncoder : PrivateReply -> Json.Encode.Value
@@ -790,6 +792,12 @@ privateReplyEncoder enum =
         PvyJobNotFound inner ->
             Json.Encode.object [ ( "PvyJobNotFound", Json.Encode.int inner ) ]
 
+        PvyFileSyncComplete ->
+            Json.Encode.string "PvyFileSyncComplete"
+
+        PvySyncComplete ->
+            Json.Encode.string "PvySyncComplete"
+
 
 type PrivateError
     = PveString String
@@ -844,7 +852,7 @@ uploadReplyEncoder enum =
 
 
 type alias ZkNoteSearch =
-    { tagsearch : TagSearch
+    { tagsearch : List TagSearch
     , offset : Int
     , limit : Maybe Int
     , what : String
@@ -858,7 +866,7 @@ type alias ZkNoteSearch =
 zkNoteSearchEncoder : ZkNoteSearch -> Json.Encode.Value
 zkNoteSearchEncoder struct =
     Json.Encode.object
-        [ ( "tagsearch", tagSearchEncoder struct.tagsearch )
+        [ ( "tagsearch", Json.Encode.list tagSearchEncoder struct.tagsearch )
         , ( "offset", Json.Encode.int struct.offset )
         , ( "limit", (Maybe.withDefault Json.Encode.null << Maybe.map Json.Encode.int) struct.limit )
         , ( "what", Json.Encode.string struct.what )
@@ -1447,24 +1455,24 @@ jobStatusDecoder =
 publicRequestDecoder : Json.Decode.Decoder PublicRequest
 publicRequestDecoder =
     Json.Decode.oneOf
-        [ Json.Decode.map PrGetZkNoteAndLinks (Json.Decode.field "PrGetZkNoteAndLinks" getZkNoteAndLinksDecoder)
-        , Json.Decode.map PrGetZnlIfChanged (Json.Decode.field "PrGetZnlIfChanged" getZnlIfChangedDecoder)
-        , Json.Decode.map PrGetZkNotePubId (Json.Decode.field "PrGetZkNotePubId" Json.Decode.string)
+        [ Json.Decode.map PbrGetZkNoteAndLinks (Json.Decode.field "PbrGetZkNoteAndLinks" getZkNoteAndLinksDecoder)
+        , Json.Decode.map PbrGetZnlIfChanged (Json.Decode.field "PbrGetZnlIfChanged" getZnlIfChangedDecoder)
+        , Json.Decode.map PbrGetZkNotePubId (Json.Decode.field "PbrGetZkNotePubId" Json.Decode.string)
         ]
 
 
 publicReplyDecoder : Json.Decode.Decoder PublicReply
 publicReplyDecoder =
     Json.Decode.oneOf
-        [ Json.Decode.map PrServerError (Json.Decode.field "PrServerError" publicErrorDecoder)
-        , Json.Decode.map PrZkNoteAndLinks (Json.Decode.field "PrZkNoteAndLinks" zkNoteAndLinksDecoder)
-        , Json.Decode.map PrZkNoteAndLinksWhat (Json.Decode.field "PrZkNoteAndLinksWhat" zkNoteAndLinksWhatDecoder)
+        [ Json.Decode.map PbyServerError (Json.Decode.field "PbyServerError" publicErrorDecoder)
+        , Json.Decode.map PbyZkNoteAndLinks (Json.Decode.field "PbyZkNoteAndLinks" zkNoteAndLinksDecoder)
+        , Json.Decode.map PbyZkNoteAndLinksWhat (Json.Decode.field "PbyZkNoteAndLinksWhat" zkNoteAndLinksWhatDecoder)
         , Json.Decode.string
             |> Json.Decode.andThen
                 (\x ->
                     case x of
-                        "PrNoop" ->
-                            Json.Decode.succeed PrNoop
+                        "PbyNoop" ->
+                            Json.Decode.succeed PbyNoop
 
                         unexpected ->
                             Json.Decode.fail <| "Unexpected variant " ++ unexpected
@@ -1493,7 +1501,7 @@ privateRequestDecoder =
         , Json.Decode.map PvqGetArchiveZklinks (Json.Decode.field "PvqGetArchiveZklinks" getArchiveZkLinksDecoder)
         , Json.Decode.map PvqGetZkLinksSince (Json.Decode.field "PvqGetZkLinksSince" getZkLinksSinceDecoder)
         , Json.Decode.map PvqSearchZkNotes (Json.Decode.field "PvqSearchZkNotes" zkNoteSearchDecoder)
-        , Json.Decode.map PvqPowerDelete (Json.Decode.field "PvqPowerDelete" tagSearchDecoder)
+        , Json.Decode.map PvqPowerDelete (Json.Decode.field "PvqPowerDelete" (Json.Decode.list tagSearchDecoder))
         , Json.Decode.map PvqDeleteZkNote (Json.Decode.field "PvqDeleteZkNote" zkNoteIdDecoder)
         , Json.Decode.map PvqSaveZkNote (Json.Decode.field "PvqSaveZkNote" saveZkNoteDecoder)
         , Json.Decode.map PvqSaveZkLinks (Json.Decode.field "PvqSaveZkLinks" zkLinksDecoder)
@@ -1567,6 +1575,26 @@ privateReplyDecoder =
         , Json.Decode.map PvyHomeNoteSet (Json.Decode.field "PvyHomeNoteSet" zkNoteIdDecoder)
         , Json.Decode.map PvyJobStatus (Json.Decode.field "PvyJobStatus" jobStatusDecoder)
         , Json.Decode.map PvyJobNotFound (Json.Decode.field "PvyJobNotFound" Json.Decode.int)
+        , Json.Decode.string
+            |> Json.Decode.andThen
+                (\x ->
+                    case x of
+                        "PvyFileSyncComplete" ->
+                            Json.Decode.succeed PvyFileSyncComplete
+
+                        unexpected ->
+                            Json.Decode.fail <| "Unexpected variant " ++ unexpected
+                )
+        , Json.Decode.string
+            |> Json.Decode.andThen
+                (\x ->
+                    case x of
+                        "PvySyncComplete" ->
+                            Json.Decode.succeed PvySyncComplete
+
+                        unexpected ->
+                            Json.Decode.fail <| "Unexpected variant " ++ unexpected
+                )
         ]
 
 
@@ -1607,7 +1635,7 @@ uploadReplyDecoder =
 zkNoteSearchDecoder : Json.Decode.Decoder ZkNoteSearch
 zkNoteSearchDecoder =
     Json.Decode.succeed ZkNoteSearch
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "tagsearch" tagSearchDecoder))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "tagsearch" (Json.Decode.list tagSearchDecoder)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "offset" Json.Decode.int))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "limit" (Json.Decode.nullable Json.Decode.int)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "what" Json.Decode.string))
