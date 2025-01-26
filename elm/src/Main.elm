@@ -29,16 +29,16 @@ import LocalStorage as LS
 import MdCommon as MC
 import MessageNLink
 import NoteCache as NC exposing (NoteCache)
-import Orgauth.AdminInterface as AI
 import Orgauth.ChangeEmail as CE
 import Orgauth.ChangePassword as CP
-import Orgauth.Data as OD exposing (getUserIdVal)
+import Orgauth.Data as OD
+import Orgauth.DataUtil as ODU
 import Orgauth.Invited as Invited
 import Orgauth.Login as Login
 import Orgauth.ResetPassword as ResetPassword
 import Orgauth.ShowUrl as ShowUrl
 import Orgauth.UserEdit as UserEdit
-import Orgauth.UserInterface as UI
+import Orgauth.UserId exposing (getUserIdVal)
 import Orgauth.UserListing as UserListing
 import Platform.Cmd as Cmd
 import Random exposing (Seed, initialSeed)
@@ -54,6 +54,7 @@ import TagFiles
 import Task
 import Time
 import Toop
+import UUID
 import Url exposing (Url)
 import UserSettings
 import Util exposing (andMap)
@@ -74,8 +75,8 @@ type Msg
     | UserEditMsg UserEdit.Msg
     | ImportMsg Import.Msg
     | ShowMessageMsg ShowMessage.Msg
-    | UserReplyData (Result Http.Error UI.ServerResponse)
-    | AdminReplyData (Result Http.Error AI.ServerResponse)
+    | UserReplyData (Result Http.Error OD.UserResponse)
+    | AdminReplyData (Result Http.Error OD.AdminResponse)
     | ZkReplyData (Result Http.Error ( Time.Posix, Data.PrivateReply ))
     | ZkReplyDataSeq (Result Http.Error ( Time.Posix, Data.PrivateReply ) -> Maybe (Cmd Msg)) (Result Http.Error ( Time.Posix, Data.PrivateReply ))
     | TAReplyData DataUtil.TASelection (Result Http.Error ( Time.Posix, Data.PrivateReply ))
@@ -154,7 +155,7 @@ decodeFlags =
         |> andMap (JD.field "height" JD.int)
         |> andMap (JD.field "errorid" (JD.maybe Data.zkNoteIdDecoder))
         |> andMap (JD.field "login" (JD.maybe DataUtil.decodeLoginData))
-        |> andMap (JD.field "adminsettings" OD.decodeAdminSettings)
+        |> andMap (JD.field "adminsettings" OD.adminSettingsDecoder)
         |> andMap (JD.field "tauri" JD.bool)
 
 
@@ -455,7 +456,7 @@ routeStateInternal model route =
 
         Invite token ->
             ( PubShowMessage { message = "retrieving invite" } Nothing
-            , sendUIMsg model.fui (UI.ReadInvite token)
+            , sendUIMsg model.fui (OD.UrqReadInvite token)
             )
 
         Top ->
@@ -596,7 +597,7 @@ showMessage msg =
 
         UserReplyData urd ->
             "UserReplyData: "
-                ++ (Result.map UI.showServerResponse urd
+                ++ (Result.map ODU.showUserResponse urd
                         |> Result.mapError Util.httpErrorString
                         |> (\r ->
                                 case r of
@@ -610,7 +611,7 @@ showMessage msg =
 
         AdminReplyData urd ->
             "AdminReplyData: "
-                ++ (Result.map AI.showServerResponse urd
+                ++ (Result.map ODU.showAdminResponse urd
                         |> Result.mapError Util.httpErrorString
                         |> (\r ->
                                 case r of
@@ -1104,30 +1105,30 @@ stateLogin state =
             Just login
 
 
-sendUIMsg : FileUrlInfo -> UI.SendMsg -> Cmd Msg
+sendUIMsg : FileUrlInfo -> OD.UserRequest -> Cmd Msg
 sendUIMsg fui msg =
     if fui.tauri then
-        sendUIValueTauri (UI.encodeSendMsg msg)
+        sendUIValueTauri (OD.userRequestEncoder msg)
 
     else
         Http.post
             { url = fui.location ++ "/user"
-            , body = Http.jsonBody (UI.encodeSendMsg msg)
-            , expect = Http.expectJson UserReplyData UI.serverResponseDecoder
+            , body = Http.jsonBody (OD.userRequestEncoder msg)
+            , expect = Http.expectJson UserReplyData OD.userResponseDecoder
             }
 
 
-sendAIMsg : String -> AI.SendMsg -> Cmd Msg
+sendAIMsg : String -> OD.AdminRequest -> Cmd Msg
 sendAIMsg location msg =
     sendAIMsgExp location msg AdminReplyData
 
 
-sendAIMsgExp : String -> AI.SendMsg -> (Result Http.Error AI.ServerResponse -> Msg) -> Cmd Msg
+sendAIMsgExp : String -> OD.AdminRequest -> (Result Http.Error OD.AdminResponse -> Msg) -> Cmd Msg
 sendAIMsgExp location msg tomsg =
     Http.post
         { url = location ++ "/admin"
-        , body = Http.jsonBody (AI.encodeSendMsg msg)
-        , expect = Http.expectJson tomsg AI.serverResponseDecoder
+        , body = Http.jsonBody (OD.adminRequestEncoder msg)
+        , expect = Http.expectJson tomsg OD.adminResponseDecoder
         }
 
 
@@ -1176,7 +1177,7 @@ sendSearch model search =
                     , links =
                         [ { otherid = DataUtil.sysids.searchid
                           , direction = Data.To
-                          , user = getUserIdVal ldata.userid
+                          , user = ldata.userid
                           , zknote = Nothing
                           , delete = Nothing
                           }
@@ -1633,7 +1634,7 @@ actualupdate msg model =
                     )
 
         ( TauriUserReplyData jd, _ ) ->
-            case JD.decodeValue UI.serverResponseDecoder jd of
+            case JD.decodeValue OD.userResponseDecoder jd of
                 Ok d ->
                     actualupdate (UserReplyData (Ok d)) model
 
@@ -1643,7 +1644,7 @@ actualupdate msg model =
                     )
 
         ( TauriAdminReplyData jd, _ ) ->
-            case JD.decodeValue AI.serverResponseDecoder jd of
+            case JD.decodeValue OD.adminResponseDecoder jd of
                 Ok d ->
                     actualupdate (AdminReplyData (Ok d)) model
 
@@ -1718,7 +1719,7 @@ actualupdate msg model =
 
                 GD.Ok return ->
                     ( { model | state = instate }
-                    , sendUIMsg model.fui <| UI.ChangePassword return
+                    , sendUIMsg model.fui <| OD.UrqAuthedRequest <| OD.AthChangePassword return
                     )
 
                 GD.Cancel ->
@@ -1731,7 +1732,7 @@ actualupdate msg model =
 
                 GD.Ok return ->
                     ( { model | state = instate }
-                    , sendUIMsg model.fui <| UI.ChangeEmail return
+                    , sendUIMsg model.fui <| OD.UrqAuthedRequest <| OD.AthChangeEmail return
                     )
 
                 GD.Cancel ->
@@ -1746,7 +1747,7 @@ actualupdate msg model =
                 ResetPassword.Ok ->
                     ( { model | state = ResetPassword nst }
                     , sendUIMsg model.fui
-                        (UI.SetPassword { uid = nst.userId, newpwd = nst.password, reset_key = nst.reset_key })
+                        (OD.UrqSetPassword { uid = nst.userId, newpwd = nst.password, resetKey = UUID.toString nst.reset_key })
                     )
 
                 ResetPassword.None ->
@@ -1795,13 +1796,13 @@ actualupdate msg model =
 
                 UserSettings.LogOut ->
                     ( { model | state = initLoginState model Top }
-                    , sendUIMsg model.fui UI.Logout
+                    , sendUIMsg model.fui OD.UrqLogout
                     )
 
                 UserSettings.ChangePassword ->
                     ( { model
                         | state =
-                            ChangePasswordDialog (CP.init (OD.toLd login) Common.buttonStyle (UserSettings.view numod |> E.map (always ())))
+                            ChangePasswordDialog (CP.init (DataUtil.toOaLd login) Common.buttonStyle (UserSettings.view numod |> E.map (always ())))
                                 (UserSettings numod login prevstate)
                       }
                     , Cmd.none
@@ -1811,7 +1812,7 @@ actualupdate msg model =
                     ( { model
                         | state =
                             ChangeEmailDialog
-                                (CE.init (OD.toLd login) Common.buttonStyle (UserSettings.view numod |> E.map (always ())))
+                                (CE.init (DataUtil.toOaLd login) Common.buttonStyle (UserSettings.view numod |> E.map (always ())))
                                 (UserSettings numod login prevstate)
                       }
                     , Cmd.none
@@ -1880,22 +1881,22 @@ actualupdate msg model =
             case c of
                 UserEdit.Done ->
                     ( model
-                    , sendAIMsg model.fui.location AI.GetUsers
+                    , sendAIMsg model.fui.location OD.ArqGetUsers
                     )
 
                 UserEdit.Delete id ->
                     ( model
-                    , sendAIMsg model.fui.location <| AI.DeleteUser id
+                    , sendAIMsg model.fui.location <| OD.ArqDeleteUser id
                     )
 
                 UserEdit.Save ld ->
                     ( model
-                    , sendAIMsg model.fui.location <| AI.UpdateUser ld
+                    , sendAIMsg model.fui.location <| OD.ArqUpdateUser ld
                     )
 
                 UserEdit.ResetPwd id ->
                     ( model
-                    , sendAIMsg model.fui.location <| AI.GetPwdReset id
+                    , sendAIMsg model.fui.location <| OD.ArqGetPwdReset id
                     )
 
                 UserEdit.None ->
@@ -1910,7 +1911,7 @@ actualupdate msg model =
                 ShowUrl.Done ->
                     if login.admin then
                         ( model
-                        , sendAIMsg model.fui.location AI.GetUsers
+                        , sendAIMsg model.fui.location OD.ArqGetUsers
                         )
 
                     else
@@ -2190,10 +2191,10 @@ actualupdate msg model =
 
                 Ok uiresponse ->
                     case uiresponse of
-                        UI.ServerError e ->
+                        OD.UrpServerError e ->
                             ( displayMessageDialog model <| e, Cmd.none )
 
-                        UI.RegistrationSent ->
+                        OD.UrpRegistrationSent ->
                             case model.state of
                                 Login lgst url ->
                                     ( { model | state = Login (Login.registrationSent lgst) url }, Cmd.none )
@@ -2201,7 +2202,7 @@ actualupdate msg model =
                                 _ ->
                                     ( model, Cmd.none )
 
-                        UI.LoggedIn oalogin ->
+                        OD.UrpLoggedIn oalogin ->
                             case DataUtil.fromOaLd oalogin of
                                 Ok login ->
                                     let
@@ -2253,10 +2254,10 @@ actualupdate msg model =
                                     , Cmd.none
                                     )
 
-                        UI.LoggedOut ->
+                        OD.UrpLoggedOut ->
                             ( model, Cmd.none )
 
-                        UI.ResetPasswordAck ->
+                        OD.UrpResetPasswordAck ->
                             let
                                 nmod =
                                     { model
@@ -2267,7 +2268,7 @@ actualupdate msg model =
                             , Cmd.none
                             )
 
-                        UI.SetPasswordAck ->
+                        OD.UrpSetPasswordAck ->
                             let
                                 nmod =
                                     { model
@@ -2278,37 +2279,37 @@ actualupdate msg model =
                             , Cmd.none
                             )
 
-                        UI.ChangedPassword ->
+                        OD.UrpChangedPassword ->
                             ( displayMessageDialog model "password changed"
                             , Cmd.none
                             )
 
-                        UI.ChangedEmail ->
+                        OD.UrpChangedEmail ->
                             ( displayMessageDialog model "email change confirmation sent!  check your inbox (or spam folder) for an email with title 'change zknotes email', and follow the enclosed link to change to the new address."
                             , Cmd.none
                             )
 
-                        UI.UserExists ->
+                        OD.UrpUserExists ->
                             case state of
                                 Login lmod route ->
                                     ( { model | state = Login (Login.userExists lmod) route }, Cmd.none )
 
                                 _ ->
-                                    ( unexpectedMessage model (UI.showServerResponse uiresponse)
+                                    ( unexpectedMessage model (ODU.showUserResponse uiresponse)
                                     , Cmd.none
                                     )
 
-                        UI.UnregisteredUser ->
+                        OD.UrpUnregisteredUser ->
                             case state of
                                 Login lmod route ->
                                     ( { model | state = Login (Login.unregisteredUser lmod) route }, Cmd.none )
 
                                 _ ->
-                                    ( unexpectedMessage model (UI.showServerResponse uiresponse)
+                                    ( unexpectedMessage model (ODU.showUserResponse uiresponse)
                                     , Cmd.none
                                     )
 
-                        UI.NotLoggedIn ->
+                        OD.UrpNotLoggedIn ->
                             case state of
                                 Login lmod route ->
                                     ( { model | state = Login lmod route }, Cmd.none )
@@ -2316,18 +2317,43 @@ actualupdate msg model =
                                 _ ->
                                     ( { model | state = initLoginState model Top }, Cmd.none )
 
-                        UI.InvalidUserOrPwd ->
+                        OD.UrpInvalidUserOrPwd ->
                             case state of
                                 Login lmod route ->
                                     ( { model | state = Login (Login.invalidUserOrPwd lmod) route }, Cmd.none )
 
                                 _ ->
                                     ( unexpectedMessage { model | state = initLoginState model Top }
-                                        (UI.showServerResponse uiresponse)
+                                        (ODU.showUserResponse uiresponse)
                                     , Cmd.none
                                     )
 
-                        UI.BlankUserName ->
+                        OD.UrpInvalidUserId ->
+                            ( displayMessageDialog model "invalid user id!"
+                            , Cmd.none
+                            )
+
+                        OD.UrpAccountDeactivated ->
+                            ( displayMessageDialog model "account deactivated!"
+                            , Cmd.none
+                            )
+
+                        OD.UrpRemoteRegistrationFailed ->
+                            ( displayMessageDialog model "remote registration failed!"
+                            , Cmd.none
+                            )
+
+                        OD.UrpRemoteUser ru ->
+                            ( displayMessageDialog model <| "remote user: " ++ ru.name
+                            , Cmd.none
+                            )
+
+                        OD.UrpNoData ->
+                            ( displayMessageDialog model <| "no data!"
+                            , Cmd.none
+                            )
+
+                        OD.UrpBlankUserName ->
                             case state of
                                 Invited lmod ->
                                     ( { model | state = Invited <| Invited.blankUserName lmod }, Cmd.none )
@@ -2337,11 +2363,11 @@ actualupdate msg model =
 
                                 _ ->
                                     ( unexpectedMessage { model | state = initLoginState model Top }
-                                        (UI.showServerResponse uiresponse)
+                                        (ODU.showUserResponse uiresponse)
                                     , Cmd.none
                                     )
 
-                        UI.BlankPassword ->
+                        OD.UrpBlankPassword ->
                             case state of
                                 Invited lmod ->
                                     ( { model | state = Invited <| Invited.blankPassword lmod }, Cmd.none )
@@ -2351,11 +2377,11 @@ actualupdate msg model =
 
                                 _ ->
                                     ( unexpectedMessage { model | state = initLoginState model Top }
-                                        (UI.showServerResponse uiresponse)
+                                        (ODU.showUserResponse uiresponse)
                                     , Cmd.none
                                     )
 
-                        UI.Invite invite ->
+                        OD.UrpInvite invite ->
                             ( { model | state = Invited (Invited.initialModel invite model.adminSettings "zknotes") }
                             , Cmd.none
                             )
@@ -2367,7 +2393,7 @@ actualupdate msg model =
 
                 Ok airesponse ->
                     case airesponse of
-                        AI.NotLoggedIn ->
+                        OD.ArpNotLoggedIn ->
                             case state of
                                 Login lmod route ->
                                     ( { model | state = Login lmod route }, Cmd.none )
@@ -2375,7 +2401,7 @@ actualupdate msg model =
                                 _ ->
                                     ( { model | state = initLoginState model Top }, Cmd.none )
 
-                        AI.Users users ->
+                        OD.ArpUsers users ->
                             case stateLogin model.state of
                                 Just login ->
                                     ( { model | state = UserListing (UserListing.init users) login (stateSearch state) }, Cmd.none )
@@ -2383,12 +2409,12 @@ actualupdate msg model =
                                 Nothing ->
                                     ( displayMessageDialog model "not logged in", Cmd.none )
 
-                        AI.UserDeleted _ ->
+                        OD.ArpUserDeleted _ ->
                             ( displayMessageDialog model "user deleted!"
-                            , sendAIMsg model.fui.location AI.GetUsers
+                            , sendAIMsg model.fui.location OD.ArqGetUsers
                             )
 
-                        AI.UserUpdated ld ->
+                        OD.ArpUserUpdated ld ->
                             case model.state of
                                 UserEdit ue login ->
                                     ( displayMessageDialog { model | state = UserEdit (UserEdit.onUserUpdated ue ld) login } "user updated"
@@ -2398,7 +2424,7 @@ actualupdate msg model =
                                 _ ->
                                     ( model, Cmd.none )
 
-                        AI.UserInvite ui ->
+                        OD.ArpUserInvite ui ->
                             case stateLogin model.state of
                                 Just login ->
                                     ( { model
@@ -2415,7 +2441,7 @@ actualupdate msg model =
                                     , Cmd.none
                                     )
 
-                        AI.PwdReset pr ->
+                        OD.ArpPwdReset pr ->
                             case state of
                                 UserEdit _ login ->
                                     ( { model
@@ -2430,8 +2456,23 @@ actualupdate msg model =
                                 _ ->
                                     ( model, Cmd.none )
 
-                        AI.ServerError e ->
+                        OD.ArpServerError e ->
                             ( displayMessageDialog model <| e, Cmd.none )
+
+                        OD.ArpUserNotDeleted _ ->
+                            ( displayMessageDialog model <| ODU.showAdminResponse airesponse, Cmd.none )
+
+                        OD.ArpNoUserId ->
+                            ( displayMessageDialog model <| ODU.showAdminResponse airesponse, Cmd.none )
+
+                        OD.ArpNoData ->
+                            ( displayMessageDialog model <| ODU.showAdminResponse airesponse, Cmd.none )
+
+                        OD.ArpInvalidUserOrPassword ->
+                            ( displayMessageDialog model <| ODU.showAdminResponse airesponse, Cmd.none )
+
+                        OD.ArpAccessDenied ->
+                            ( displayMessageDialog model <| ODU.showAdminResponse airesponse, Cmd.none )
 
         ( ZkReplyDataSeq f zrd, _ ) ->
             let
@@ -3456,7 +3497,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
 
                 EditZkNote.Admin ->
                     ( model
-                    , sendAIMsg model.fui.location AI.GetUsers
+                    , sendAIMsg model.fui.location OD.ArqGetUsers
                     )
 
                 EditZkNote.SetHomeNote id ->
@@ -3596,7 +3637,7 @@ handleLogin model route ( lmod, lcmd ) =
         Login.Register ->
             ( { model | state = Login lmod route }
             , sendUIMsg model.fui
-                (UI.Register
+                (OD.UrqRegister
                     { uid = lmod.userId
                     , pwd = lmod.password
                     , email = lmod.email
@@ -3608,7 +3649,7 @@ handleLogin model route ( lmod, lcmd ) =
         Login.Login ->
             ( { model | state = Login lmod route }
             , sendUIMsg model.fui <|
-                UI.Login
+                OD.UrqLogin
                     { uid = lmod.userId
                     , pwd = lmod.password
                     }
@@ -3617,7 +3658,7 @@ handleLogin model route ( lmod, lcmd ) =
         Login.Reset ->
             ( { model | state = Login lmod route }
             , sendUIMsg model.fui <|
-                UI.ResetPassword
+                OD.UrqResetPassword
                     { uid = lmod.userId
                     }
             )
@@ -3632,7 +3673,7 @@ handleInvited model ( lmod, lcmd ) =
         Invited.RSVP ->
             ( { model | state = Invited lmod }
             , sendUIMsg model.fui
-                (UI.RSVP
+                (OD.UrqRsvp
                     { uid = lmod.userId
                     , pwd = lmod.password
                     , email = lmod.email
@@ -3737,7 +3778,7 @@ handleInviteUser model ( lmod, lcmd ) login st =
                 InviteUser.Ok ->
                     ( { model | state = updstate }
                     , sendAIMsg model.fui.location
-                        (AI.GetInvite
+                        (OD.ArqGetInvite
                             { email =
                                 if lmod.thing.model.email /= "" then
                                     Just lmod.thing.model.email

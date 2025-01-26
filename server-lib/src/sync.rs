@@ -16,7 +16,7 @@ use futures_util::TryStreamExt;
 use futures_util::{StreamExt, TryFutureExt};
 use log::{debug, error, info};
 use orgauth;
-use orgauth::data::User;
+use orgauth::data::{User, UserId};
 use orgauth::dbfun::user_id;
 use orgauth::endpoints::Callbacks;
 use rusqlite::{params, Connection};
@@ -100,7 +100,7 @@ pub async fn prev_sync(
 
 pub async fn save_sync(
   conn: &Connection,
-  _uid: i64,
+  _uid: UserId,
   usernoteid: i64,
   sync: CompletedSync,
 ) -> Result<i64, Box<dyn std::error::Error>> {
@@ -198,7 +198,7 @@ pub fn temp_tables(conn: &Connection) -> Result<TempTableNames, zkerr::Error> {
 pub async fn sync(
   dbpath: &Path,
   file_path: &Path,
-  uid: i64,
+  uid: UserId,
   callbacks: &mut Callbacks,
   monitor: &dyn JobMonitor,
 ) -> Result<PrivateReply, Box<dyn std::error::Error>> {
@@ -284,7 +284,7 @@ pub async fn download_file(
       left join file F on N.file = F.id 
       left join file_source FS on F.id == FS.file_id and FS.user_id = ?2
       where N.id = ?1",
-    params![note_id, user.id],
+    params![note_id, user.id.to_i64()],
     |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
   )?;
 
@@ -481,7 +481,7 @@ pub async fn sync_files_down(
   conn: &Connection,
   temp_file_path: &Path,
   file_path: &Path,
-  uid: i64,
+  uid: UserId,
   search: &ZkNoteSearch,
 ) -> Result<Vec<DownloadResult>, zkerr::Error> {
   // TODO pass this in from calling ftn?
@@ -515,7 +515,7 @@ pub async fn sync_files_down(
 pub async fn sync_files_up(
   conn: &Connection,
   file_path: &Path,
-  uid: i64,
+  uid: UserId,
   search: &ZkNoteSearch,
 ) -> Result<Vec<UploadResult>, zkerr::Error> {
   // TODO pass this in from calling ftn?
@@ -676,12 +676,12 @@ where
   let mut userhash = HashMap::<i64, i64>::new();
 
   while let SyncMessage::PhantomUser(ref pu) = sm {
-    match userhash.get(&pu.id) {
+    match userhash.get(&pu.id.to_i64()) {
       Some(_) => (),
       None => {
         match orgauth::dbfun::read_user_by_uuid(&conn, &pu.uuid) {
           Ok(user) => {
-            userhash.insert(pu.id, user.id);
+            userhash.insert(*pu.id.to_i64(), *user.id.to_i64());
           }
           _ => {
             let localpuid = orgauth::dbfun::phantom_user(
@@ -692,7 +692,7 @@ where
               pu.active,
               &mut callbacks.on_new_user,
             )?;
-            userhash.insert(pu.id, localpuid);
+            userhash.insert(*pu.id.to_i64(), *localpuid.to_i64());
           }
         };
       }
@@ -718,9 +718,11 @@ where
   sm = read_sync_message(&mut line, br).await?;
 
   while let SyncMessage::ZkNote(ref note, ref mbf) = sm {
-    let uid = userhash
-      .get(&note.user)
-      .ok_or_else(|| zkerr::Error::String("user not found".to_string()))?;
+    let uid = UserId::Uid(
+      *userhash
+        .get(note.user.to_i64())
+        .ok_or_else(|| zkerr::Error::String("user not found".to_string()))?,
+    );
 
     let file_id: Option<i64> = match mbf {
       None => None,
@@ -748,7 +750,7 @@ where
             conn.execute(
               "insert into file_source (file_id, user_id) values (?1, ?2)
                  on conflict do nothing",
-              params![file_id, uid],
+              params![file_id, uid.to_i64()],
             )?;
             Some(file_id)
           }
@@ -762,7 +764,7 @@ where
               conn.execute(
                 "insert into file_source (file_id, user_id) values (?1, ?2)
                  on conflict do nothing",
-                params![file_id, uid],
+                params![file_id, uid.to_i64()],
               )?;
               Some(file_id)
             }
@@ -778,11 +780,11 @@ where
       params![
         note.title,
         note.content,
-     uid,
+        uid.to_i64(),
         note.pubid,
         note.editable,
         note.showtitle,
-       note.deleted,
+        note.deleted,
         note.id.to_string(),
         file_id,
         note.createdate,
@@ -804,7 +806,7 @@ where
               // note is newer.  archive the old and replace.
               sqldata::save_zknote(
                 &conn,
-                *uid,
+                uid,
                 &SaveZkNote {
                   id: Some(note.id),
                   title: note.title.clone(),
@@ -871,17 +873,19 @@ where
   while let SyncMessage::ZkNote(ref note, ref _mbf) = sm {
     // TODO: make file source record (?)
 
-    let uid = userhash
-      .get(&note.user)
-      .ok_or_else(|| zkerr::Error::String("user not found".to_string()))?;
-    assert!(*uid == sysid);
+    let uid = UserId::Uid(
+      *userhash
+        .get(note.user.to_i64())
+        .ok_or_else(|| zkerr::Error::String("user not found".to_string()))?,
+    );
+    assert!(uid == sysid);
     let mbid = match conn.execute(
       "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate)
        values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
         params![
           note.title,
           note.content,
-          sysid,    // archivenotes all owned by system.
+          sysid.to_i64(),    // archivenotes all owned by system.
           note.pubid,
           note.editable,
           note.showtitle,
@@ -1169,7 +1173,7 @@ pub fn bytesify(
 
 pub fn new_shares(
   conn: &Connection,
-  uid: i64,
+  uid: UserId,
   after: i64,
 ) -> Result<Vec<(i64, ZkNoteId)>, zkerr::Error> {
   // Are there zklinks created since last sync, that go from our user to a share?
@@ -1207,7 +1211,7 @@ pub fn new_shares(
 pub fn sync_stream(
   conn: Arc<Connection>,
   files_dir: PathBuf,
-  uid: i64,
+  uid: UserId,
   exclude_notes: Option<String>,
   exclude_links: Option<String>,
   exclude_archivelinks: Option<String>,

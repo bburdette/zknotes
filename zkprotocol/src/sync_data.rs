@@ -1,3 +1,4 @@
+use orgauth::data::UserId;
 use uuid::Uuid;
 
 use crate::{
@@ -8,7 +9,7 @@ use crate::{
 // Represents a remote user that is not registered on this server.
 #[derive(Clone, Deserialize, Serialize, Debug)]
 pub struct ZkPhantomUser {
-  pub id: i64,
+  pub id: UserId,
   pub uuid: Uuid,   // uuid in orgauth_user record.
   pub data: String, // uuid in user note.
   pub name: String,

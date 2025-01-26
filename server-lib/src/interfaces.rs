@@ -15,6 +15,7 @@ use actix_web::HttpResponse;
 use futures_util::StreamExt;
 use log::info;
 use orgauth;
+use orgauth::data::UserId;
 use orgauth::endpoints::Tokener;
 use rusqlite::Connection;
 use std::error::Error;
@@ -76,8 +77,8 @@ pub async fn user_interface(
   conn: &Connection,
   tokener: &mut dyn Tokener,
   config: &Config,
-  msg: orgauth::data::UserRequestMessage,
-) -> Result<orgauth::data::UserResponseMessage, zkerr::Error> {
+  msg: orgauth::data::UserRequest,
+) -> Result<orgauth::data::UserResponse, zkerr::Error> {
   Ok(
     orgauth::endpoints::user_interface(
       conn,
@@ -93,7 +94,7 @@ pub async fn user_interface(
 
 pub async fn zk_interface_loggedin_streaming(
   config: &Config,
-  uid: i64,
+  uid: UserId,
   msg: &PrivateStreamingMessage,
 ) -> Result<HttpResponse, Box<dyn Error>> {
   let msgdata = Option::ok_or(msg.data.as_ref(), "malformed json data")?;
@@ -151,7 +152,7 @@ pub async fn zk_interface_loggedin_streaming(
 pub async fn zk_interface_loggedin(
   state: &State,
   conn: &Connection,
-  uid: i64,
+  uid: UserId,
   msg: &PrivateRequest,
 ) -> Result<PrivateReply, zkerr::Error> {
   info!("zk_interface_loggedin msg: {:?}", msg);
@@ -264,7 +265,7 @@ pub async fn zk_interface_loggedin(
     PrivateRequest::PvqSyncRemote => {
       let dbpath: PathBuf = state.config.orgauth_config.db.to_path_buf();
       let file_path: PathBuf = state.config.file_path.to_path_buf();
-      let uid: i64 = uid;
+      let uid: UserId = uid;
       let jid = new_jobid(state, uid);
       let lgb = state.girlboss.clone();
 
@@ -275,7 +276,7 @@ pub async fn zk_interface_loggedin(
           lgb: Arc<std::sync::RwLock<girlboss::Girlboss<JobId, girlboss::Monitor>>>,
           dbpath: PathBuf,
           file_path: PathBuf,
-          uid: i64,
+          uid: UserId,
           jid: JobId,
         ) -> () {
           lgb
@@ -323,7 +324,7 @@ pub async fn zk_interface_loggedin(
       let dbpath: PathBuf = state.config.orgauth_config.db.to_path_buf();
       let file_path: PathBuf = state.config.file_path.to_path_buf();
       let file_tmp_path: PathBuf = state.config.file_tmp_path.to_path_buf();
-      let uid: i64 = uid;
+      let uid: UserId = uid;
       let jid = new_jobid(state, uid);
       let lgb = state.girlboss.clone();
       let zns = znsrq.clone();
@@ -336,7 +337,7 @@ pub async fn zk_interface_loggedin(
           dbpath: PathBuf,
           file_path: PathBuf,
           file_tmp_path: PathBuf,
-          uid: i64,
+          uid: UserId,
           zns: ZkNoteSearch,
           jid: JobId,
         ) -> () {
@@ -408,7 +409,7 @@ pub async fn zk_interface_loggedin(
 
     PrivateRequest::PvqGetJobStatus(jobno) => {
       let jid = JobId {
-        uid,
+        uid: *uid.to_i64(),
         jobno: jobno.clone(),
       };
 

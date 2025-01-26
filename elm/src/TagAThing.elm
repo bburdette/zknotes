@@ -11,6 +11,7 @@ import Element.Events as EE
 import Element.Font as EF
 import Element.Input as EI
 import Orgauth.Data as OD
+import Orgauth.UserId exposing (UserId(..))
 import SearchStackPanel as SP
 import TangoColors as TC
 import Toop
@@ -116,7 +117,7 @@ showSr : Model tmod tmsg tcmd -> Data.ZkListNote -> Element (Msg tmsg)
 showSr model zkln =
     let
         lnnonme =
-            OD.UserId zkln.user /= model.ld.userid
+            zkln.user /= model.ld.userid
 
         sysColor =
             ZC.systemColor DataUtil.sysids zkln.sysids
@@ -265,7 +266,7 @@ showZkl focusLink ld id sysColor showflip zkl =
             ]
             [ E.row [ E.spacing 8, E.width E.fill ] display
             , E.row [ E.spacing 8 ]
-                [ if ld.userid == OD.UserId zkl.user then
+                [ if ld.userid == zkl.user then
                     EI.button (linkButtonStyle ++ [ E.alignLeft ])
                         { onPress = Just (RemoveLink zkl)
                         , label = E.text "X"
@@ -529,7 +530,7 @@ update msg model =
                 nzkl =
                     { direction = To
                     , otherid = zkln.id
-                    , user = OD.getUserIdVal model.ld.userid
+                    , user = model.ld.userid
                     , zknote = Nothing
                     , othername = Just zkln.title
                     , sysids = zkln.sysids
@@ -547,7 +548,7 @@ update msg model =
                 nzkl =
                     { direction = From
                     , otherid = zkln.id
-                    , user = OD.getUserIdVal model.ld.userid
+                    , user = model.ld.userid
                     , zknote = Nothing
                     , othername = Just zkln.title
                     , sysids = zkln.sysids

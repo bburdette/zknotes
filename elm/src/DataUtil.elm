@@ -5,7 +5,8 @@ import Http
 import Http.Tasks as HT
 import Json.Decode as JD
 import Json.Encode as JE
-import Orgauth.Data exposing (UserId(..), decodeUserId, getUserIdVal)
+import Orgauth.Data
+import Orgauth.UserId exposing (UserId(..), getUserIdVal, userIdDecoder)
 import TDict exposing (TDict)
 import TSet exposing (TSet)
 import Task
@@ -112,7 +113,7 @@ zniCompare (Zni l) (Zni r) =
 
 type alias LoginData =
     { userid : UserId
-    , uuid : UUID
+    , uuid : String
     , name : String
     , email : String
     , admin : Bool
@@ -125,8 +126,8 @@ type alias LoginData =
 decodeLoginData : JD.Decoder LoginData
 decodeLoginData =
     JD.succeed LoginData
-        |> andMap (JD.field "userid" decodeUserId)
-        |> andMap (JD.field "uuid" UUID.jsonDecoder)
+        |> andMap (JD.field "userid" userIdDecoder)
+        |> andMap (JD.field "uuid" JD.string)
         |> andMap (JD.field "name" JD.string)
         |> andMap (JD.field "email" JD.string)
         |> andMap (JD.field "admin" JD.bool)
@@ -159,12 +160,34 @@ sysids =
 
 fromOaLd : Orgauth.Data.LoginData -> Result JD.Error LoginData
 fromOaLd oald =
-    JD.decodeValue
-        (JD.succeed (LoginData oald.userid oald.uuid oald.name oald.email oald.admin oald.active)
-            |> andMap (JD.field "zknote" Data.zkNoteIdDecoder)
-            |> andMap (JD.field "homenote" (JD.maybe Data.zkNoteIdDecoder))
-        )
-        oald.data
+    oald.data
+        |> Result.fromMaybe (JD.Failure "no login data" JE.null)
+        |> Result.andThen
+            (JD.decodeString
+                (JD.succeed (LoginData oald.userid oald.uuid oald.name oald.email oald.admin oald.active)
+                    |> andMap (JD.field "zknote" Data.zkNoteIdDecoder)
+                    |> andMap (JD.field "homenote" (JD.maybe Data.zkNoteIdDecoder))
+                )
+            )
+
+
+toOaLd : LoginData -> Orgauth.Data.LoginData
+toOaLd ld =
+    { userid = ld.userid
+    , uuid = ld.uuid
+    , name = ld.name
+    , email = ld.email
+    , admin = ld.admin
+    , active = ld.active
+    , data =
+        Just <|
+            JE.encode 2
+                (JE.object
+                    [ ( "zknote", zkNoteIdEncoder ld.zknote )
+                    , ( "homenote", (Maybe.withDefault JE.null << Maybe.map zkNoteIdEncoder) ld.homenote )
+                    ]
+                )
+    }
 
 
 decodeSysids : JD.Decoder Sysids
@@ -192,7 +215,7 @@ toZkLink noteid user el =
 
             To ->
                 el.otherid
-    , user = getUserIdVal user
+    , user = user
     , linkzknote = Nothing
     , fromname = Nothing
     , toname = Nothing
@@ -333,6 +356,12 @@ encodeZkInviteData zid =
 showPrivateReply : PrivateReply -> String
 showPrivateReply pr =
     privateReplyEncoder pr
+        |> JE.encode 2
+
+
+showAdminResponse : Orgauth.Data.AdminResponse -> String
+showAdminResponse pr =
+    Orgauth.Data.adminResponseEncoder pr
         |> JE.encode 2
 
 

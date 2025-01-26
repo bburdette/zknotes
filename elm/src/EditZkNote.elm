@@ -69,7 +69,7 @@ import Markdown.Block exposing (ListItem(..), Task(..))
 import Maybe.Extra as ME
 import MdCommon as MC
 import NoteCache as NC exposing (NoteCache)
-import Orgauth.Data exposing (UserId, getUserIdVal)
+import Orgauth.UserId exposing (UserId(..))
 import RequestsDialog exposing (TRequests)
 import SearchStackPanel as SP
 import TangoColors as TC
@@ -296,7 +296,7 @@ toZkListNote model =
         Toop.T3 (Just id) (Just createdate) (Just changeddate) ->
             Just
                 { id = id
-                , user = getUserIdVal model.noteUser
+                , user = model.noteUser
                 , title = model.title
                 , filestatus = model.filestatus
                 , createdate = createdate
@@ -314,7 +314,7 @@ toZkNote model =
         Toop.T3 (Just id) (Just createdate) (Just changeddate) ->
             Just
                 { id = id
-                , user = getUserIdVal model.noteUser
+                , user = model.noteUser
                 , username = model.noteUserName
                 , usernote = model.usernote
                 , title = model.title
@@ -533,7 +533,7 @@ showZkl bkcolor isDirty editable focusLink ld _ sysColor showflip zkl =
             ]
             [ E.row [ E.spacing 8, E.width E.fill ] display
             , E.row [ E.spacing 8 ]
-                [ if ld.userid == Orgauth.Data.UserId zkl.user then
+                [ if ld.userid == zkl.user then
                     EI.button (linkButtonStyle ++ [ E.alignLeft ])
                         { onPress = Just (RemoveLink zkl)
                         , label = E.text "X"
@@ -637,7 +637,7 @@ showSr : E.Color -> Model -> Bool -> Data.ZkListNote -> Element Msg
 showSr bkcolor model isdirty zkln =
     let
         lnnonme =
-            Orgauth.Data.UserId zkln.user /= model.ld.userid
+            zkln.user /= model.ld.userid
 
         sysColor =
             ZC.systemColor DataUtil.sysids zkln.sysids
@@ -778,7 +778,7 @@ makeNewCommentState model =
             else
                 [ ( { otherid = model.usernote
                     , direction = Data.To
-                    , user = getUserIdVal model.ld.userid
+                    , user = model.ld.userid
                     , zknote = Nothing
                     , delete = Nothing
                     , othername = Just model.noteUserName
@@ -804,7 +804,7 @@ shareLinks model =
                     Just
                         { otherid = l.otherid
                         , direction = l.direction
-                        , user = getUserIdVal model.ld.userid
+                        , user = model.ld.userid
                         , zknote = Nothing
                         , delete = Nothing
                         , othername = l.othername
@@ -1660,7 +1660,7 @@ initFull fui ld zkl zknote dtlinks spm =
                 |> MC.mdCells
                 |> Result.withDefault (CellDict Dict.empty)
 
-        ( cc, result ) =
+        ( cc, _ ) =
             evalCellsFully
                 (mkCc cells)
 
@@ -1681,7 +1681,7 @@ initFull fui ld zkl zknote dtlinks spm =
     ( { id = Just zknote.id
       , fui = fui
       , ld = ld
-      , noteUser = Orgauth.Data.UserId zknote.user
+      , noteUser = zknote.user
       , noteUserName = zknote.username
       , usernote = zknote.usernote
       , zknSearchResult = zkl
@@ -1732,7 +1732,7 @@ initNew fui ld zkl spm links =
         zklDict =
             Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) links)
 
-        ( cc, result ) =
+        ( cc, _ ) =
             evalCellsFully
                 (mkCc cells)
     in
@@ -1794,7 +1794,7 @@ replaceOrAdd items replacement compare mergef =
 sznToZkn : UserId -> String -> ZkNoteId -> List ZkNoteId -> Data.SavedZkNote -> Data.SaveZkNote -> Data.ZkNote
 sznToZkn uid uname unote sysids sdzn szn =
     { id = sdzn.id
-    , user = getUserIdVal uid
+    , user = uid
     , username = uname
     , usernote = unote
     , title = szn.title
@@ -1867,7 +1867,7 @@ initLinkBackNote model title =
                         model.spmodel
                         ({ otherid = id
                          , direction = To
-                         , user = getUserIdVal model.ld.userid
+                         , user = model.ld.userid
                          , zknote = Nothing
                          , othername = Just model.title
                          , sysids = []
@@ -1888,7 +1888,7 @@ initLinkBackNote model title =
 onTASelection : Model -> List Data.ZkListNote -> DataUtil.TASelection -> TACommand
 onTASelection model recentZkns tas =
     let
-        addLink title id =
+        addLink _ id =
             let
                 linktext =
                     if tas.text == "" then
@@ -2010,7 +2010,7 @@ onLinkBackSaved model mbtas szn =
                     linkback =
                         { otherid = szn.id
                         , direction = From
-                        , user = getUserIdVal model.ld.userid
+                        , user = model.ld.userid
                         , zknote = Nothing
                         , othername = Just tas.text
                         , sysids = []
@@ -2072,7 +2072,7 @@ onWkKeyPress key model =
     case Toop.T4 key.key key.ctrl key.alt key.shift of
         Toop.T4 "e" True True False ->
             let
-                ( m, c ) =
+                ( m, _ ) =
                     update (NavChoiceChanged NcEdit) model
             in
             ( m, Cmd (BD.focus "mdtext" |> Task.attempt (\_ -> Noop)) )
@@ -2082,7 +2082,7 @@ onWkKeyPress key model =
 
         Toop.T4 "s" True True False ->
             let
-                ( m, c ) =
+                ( m, _ ) =
                     update (NavChoiceChanged NcSearch) model
             in
             ( m, Cmd (BD.focus "searchtext" |> Task.attempt (\_ -> Noop)) )
@@ -2314,7 +2314,7 @@ update msg model =
                 nzkl =
                     { direction = To
                     , otherid = zkln.id
-                    , user = getUserIdVal model.ld.userid
+                    , user = model.ld.userid
                     , zknote = Nothing
                     , othername = Just zkln.title
                     , sysids = zkln.sysids
@@ -2332,7 +2332,7 @@ update msg model =
                 nzkl =
                     { direction = From
                     , otherid = zkln.id
-                    , user = getUserIdVal model.ld.userid
+                    , user = model.ld.userid
                     , zknote = Nothing
                     , othername = Just zkln.title
                     , sysids = zkln.sysids
@@ -2374,7 +2374,7 @@ update msg model =
             , None
             )
 
-        MdLink zkln what ->
+        MdLink _ what ->
             ( model
             , GetTASelection "mdtext" what
             )
@@ -2399,7 +2399,7 @@ update msg model =
                 Nothing ->
                     ( model, None )
 
-                Just id ->
+                Just _ ->
                     if isPublic model then
                         ( { model
                             | zklDict =
@@ -2415,7 +2415,7 @@ update msg model =
                             nzkl =
                                 { direction = To
                                 , otherid = DataUtil.sysids.publicid
-                                , user = getUserIdVal model.ld.userid
+                                , user = model.ld.userid
                                 , zknote = Nothing
                                 , othername = Just "public"
                                 , sysids = []
@@ -2539,13 +2539,13 @@ update msg model =
                         , links =
                             [ { otherid = DataUtil.sysids.commentid
                               , direction = To
-                              , user = getUserIdVal model.ld.userid
+                              , user = model.ld.userid
                               , zknote = Nothing
                               , delete = Nothing
                               }
                             , { otherid = id
                               , direction = To
-                              , user = getUserIdVal model.ld.userid
+                              , user = model.ld.userid
                               , zknote = Nothing
                               , delete = Nothing
                               }
@@ -2556,7 +2556,7 @@ update msg model =
                                             Just
                                                 { otherid = l.otherid
                                                 , direction = l.direction
-                                                , user = getUserIdVal model.ld.userid
+                                                , user = model.ld.userid
                                                 , zknote = Nothing
                                                 , delete = Nothing
                                                 }
@@ -2578,7 +2578,7 @@ update msg model =
                         |> MC.mdCells
                         |> Result.withDefault (CellDict Dict.empty)
 
-                ( cc, result ) =
+                ( cc, _ ) =
                     evalCellsFully
                         (mkCc cells)
             in
@@ -2594,7 +2594,7 @@ update msg model =
                 (CellDict cd) =
                     model.cells
 
-                ( cc, result ) =
+                ( cc, _ ) =
                     evalCellsFully
                         (mkCc
                             (Dict.insert name (MC.defCell string) cd

@@ -4,6 +4,7 @@ use std::fmt::Display;
 
 use crate::search::ZkListNoteSearchResult;
 use elm_rs::{Elm, ElmDecode, ElmEncode};
+use orgauth::data::UserId;
 use uuid::Uuid;
 
 // pub type ZkNoteId = Uuid;
@@ -36,7 +37,7 @@ impl Display for ZkNoteId {
 
 #[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug, Clone)]
 pub struct ExtraLoginData {
-  pub userid: i64,
+  pub userid: UserId,
   pub zknote: ZkNoteId,
   pub homenote: Option<ZkNoteId>,
 }
@@ -57,7 +58,7 @@ pub struct ZkNote {
   pub id: ZkNoteId,
   pub title: String,
   pub content: String,
-  pub user: i64,
+  pub user: UserId,
   pub username: String,
   pub usernote: ZkNoteId,
   pub editable: bool,
@@ -83,7 +84,7 @@ pub struct ZkListNote {
   pub id: ZkNoteId,
   pub title: String,
   pub filestatus: FileStatus,
-  pub user: i64,
+  pub user: UserId,
   pub createdate: i64,
   pub changeddate: i64,
   pub sysids: Vec<ZkNoteId>,
@@ -116,7 +117,7 @@ pub enum Direction {
 pub struct SaveZkLink {
   pub otherid: ZkNoteId,
   pub direction: Direction,
-  pub user: i64,
+  pub user: UserId,
   pub zknote: Option<ZkNoteId>,
   pub delete: Option<bool>,
 }
@@ -131,7 +132,7 @@ pub struct SaveZkNoteAndLinks {
 pub struct ZkLink {
   pub from: ZkNoteId,
   pub to: ZkNoteId,
-  pub user: i64,
+  pub user: UserId,
   pub linkzknote: Option<ZkNoteId>,
   pub delete: Option<bool>,
   pub fromname: Option<String>,
@@ -142,7 +143,7 @@ pub struct ZkLink {
 pub struct EditLink {
   pub otherid: ZkNoteId,
   pub direction: Direction,
-  pub user: i64,
+  pub user: UserId,
   pub zknote: Option<ZkNoteId>,
   pub othername: Option<String>,
   pub delete: Option<bool>,

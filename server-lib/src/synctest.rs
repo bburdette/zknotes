@@ -1024,7 +1024,7 @@ mod tests {
     // log in the server-syncuser so they get a cookie.
     let client = reqwest::Client::new();
     let l = UserRequestMessage {
-      what: orgauth::data::UserRequest::Login,
+      what: orgauth::data::UserRequest::UrqLogin,
       data: Some(serde_json::to_value(Login {
         uid: "server-syncuser".to_string(),
         pwd: "".to_string(),

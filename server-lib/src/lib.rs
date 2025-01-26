@@ -28,9 +28,9 @@ use futures_util::TryStreamExt as _;
 use girlboss::Girlboss;
 use log::{error, info};
 pub use orgauth;
-use orgauth::util;
+use orgauth::{data::UserId, util};
 pub use orgauth::{
-  data::{AdminResponse, UserResponse, UserResponseMessage},
+  data::{AdminResponse, UserResponse},
   endpoints::ActixTokener,
 };
 pub use rusqlite;
@@ -168,13 +168,12 @@ async fn public(
 async fn user(
   session: Session,
   data: web::Data<State>,
-  item: web::Json<orgauth::data::UserRequestMessage>,
+  item: web::Json<orgauth::data::UserRequest>,
   req: HttpRequest,
 ) -> HttpResponse {
   info!(
-    "user msg: {:?}, {:?}  \n connection_info: {:?}",
-    &item.what,
-    &item.data,
+    "user msg: {:?}  \n connection_info: {:?}",
+    &item,
     req.connection_info()
   );
   match async {
@@ -193,10 +192,7 @@ async fn user(
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'user' err: {:?}", e);
-      let se = UserResponseMessage {
-        what: UserResponse::ServerError,
-        data: Some(serde_json::Value::String(e.to_string())),
-      };
+      let se = UserResponse::UrpServerError(e.to_string());
       HttpResponse::Ok().json(se)
     }
   }
@@ -205,13 +201,12 @@ async fn user(
 async fn admin(
   session: Session,
   data: web::Data<State>,
-  item: web::Json<orgauth::data::AdminRequestMessage>,
+  item: web::Json<orgauth::data::AdminRequest>,
   req: HttpRequest,
 ) -> HttpResponse {
   info!(
-    "admin msg: {:?}, {:?}  \n connection_info: {:?}",
-    &item.what,
-    &item.data,
+    "admin msg: {:?}  \n connection_info: {:?}",
+    &item,
     req.connection_info()
   );
   let mut cb = sqldata::zknotes_callbacks();
@@ -224,10 +219,7 @@ async fn admin(
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'user' err: {:?}", e);
-      let se = orgauth::data::AdminResponseMessage {
-        what: AdminResponse::ServerError,
-        data: Some(serde_json::Value::String(e.to_string())),
-      };
+      let se = AdminResponse::ArpServerError(e.to_string());
       HttpResponse::Ok().json(se)
     }
   }
@@ -263,7 +255,7 @@ async fn file(session: Session, state: web::Data<State>, req: HttpRequest) -> Ht
     };
 
     match rs {
-      Ok(uid) => uid,
+      Ok(uid) => uid.map(|id| UserId::Uid(id)),
       Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
     }
   } else {
