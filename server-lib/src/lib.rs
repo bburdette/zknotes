@@ -24,14 +24,13 @@ use actix_web::{
 use chrono;
 use clap::Arg;
 use config::Config;
-use either::Either;
 use futures_util::TryStreamExt as _;
 use girlboss::Girlboss;
 use log::{error, info};
 pub use orgauth;
-use orgauth::util;
+use orgauth::{data::UserId, util};
 pub use orgauth::{
-  data::{AdminResponse, UserResponse, UserResponseMessage},
+  data::{AdminResponse, UserResponse},
   endpoints::ActixTokener,
 };
 pub use rusqlite;
@@ -51,12 +50,14 @@ use tokio_util::io::StreamReader;
 use tracing_actix_web::TracingLogger;
 use uuid::Uuid;
 pub use zkprotocol;
-pub use zkprotocol::messages::{
-  PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage, PublicMessage,
-};
+pub use zkprotocol::content as zc;
+pub use zkprotocol::search as zs;
+
+pub use zkprotocol::messages::PrivateStreamingMessage;
 use zkprotocol::{
-  constants::{PrivateReplies, PublicReplies},
-  messages::PublicReplyMessage,
+  private::{PrivateError, PrivateReply, PrivateRequest, ZkNoteRq},
+  public::{PublicError, PublicReply, PublicRequest},
+  upload::UploadReply,
 };
 
 /*
@@ -129,9 +130,17 @@ async fn mainpage(session: Session, data: web::Data<State>, req: HttpRequest) ->
   }
 }
 
+pub fn to_public_error(zke: zkerr::Error, pr: PublicRequest) -> PublicError {
+  match zke {
+    error::Error::NoteNotFound => PublicError::PbeNoteNotFound(pr),
+    error::Error::NoteIsPrivate => PublicError::PbeNoteIsPrivate(pr),
+    _ => PublicError::PbeString(zke.to_string()),
+  }
+}
+
 async fn public(
   data: web::Data<State>,
-  item: web::Json<PublicMessage>,
+  item: web::Json<PublicRequest>,
   req: HttpRequest,
 ) -> HttpResponse {
   info!(
@@ -140,18 +149,17 @@ async fn public(
     req.connection_info()
   );
 
+  let public_request = item.into_inner();
+
   match interfaces::public_interface(
     &data.config,
-    item.into_inner(),
+    &public_request,
     req.connection_info().realip_remote_addr(),
   ) {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'public' err: {:?}", e);
-      let se = PublicReplyMessage {
-        what: PublicReplies::ServerError,
-        content: serde_json::Value::String(e.to_string()),
-      };
+      let se = PublicReply::PbyServerError(to_public_error(e, public_request));
       HttpResponse::Ok().json(se)
     }
   }
@@ -160,13 +168,12 @@ async fn public(
 async fn user(
   session: Session,
   data: web::Data<State>,
-  item: web::Json<orgauth::data::UserRequestMessage>,
+  item: web::Json<orgauth::data::UserRequest>,
   req: HttpRequest,
 ) -> HttpResponse {
   info!(
-    "user msg: {:?}, {:?}  \n connection_info: {:?}",
-    &item.what,
-    &item.data,
+    "user msg: {:?}  \n connection_info: {:?}",
+    &item,
     req.connection_info()
   );
   match async {
@@ -185,10 +192,7 @@ async fn user(
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'user' err: {:?}", e);
-      let se = UserResponseMessage {
-        what: UserResponse::ServerError,
-        data: Some(serde_json::Value::String(e.to_string())),
-      };
+      let se = UserResponse::UrpServerError(e.to_string());
       HttpResponse::Ok().json(se)
     }
   }
@@ -197,13 +201,12 @@ async fn user(
 async fn admin(
   session: Session,
   data: web::Data<State>,
-  item: web::Json<orgauth::data::AdminRequestMessage>,
+  item: web::Json<orgauth::data::AdminRequest>,
   req: HttpRequest,
 ) -> HttpResponse {
   info!(
-    "admin msg: {:?}, {:?}  \n connection_info: {:?}",
-    &item.what,
-    &item.data,
+    "admin msg: {:?}  \n connection_info: {:?}",
+    &item,
     req.connection_info()
   );
   let mut cb = sqldata::zknotes_callbacks();
@@ -216,10 +219,7 @@ async fn admin(
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'user' err: {:?}", e);
-      let se = orgauth::data::AdminResponseMessage {
-        what: AdminResponse::ServerError,
-        data: Some(serde_json::Value::String(e.to_string())),
-      };
+      let se = AdminResponse::ArpServerError(e.to_string());
       HttpResponse::Ok().json(se)
     }
   }
@@ -229,30 +229,16 @@ fn session_user(
   conn: &Connection,
   session: Session,
   state: &web::Data<State>,
-) -> Result<Either<orgauth::data::User, PrivateReplyMessage>, Box<dyn Error>> {
+) -> Result<orgauth::data::User, zkerr::Error> {
   match session.get::<Uuid>("token")? {
-    None => Ok(Either::Right(PrivateReplyMessage {
-      what: PrivateReplies::NotLoggedIn,
-      content: serde_json::Value::Null,
-    })),
-    Some(token) => {
-      match orgauth::dbfun::read_user_by_token_api(
-        &conn,
-        token,
-        state.config.orgauth_config.login_token_expiration_ms,
-        state.config.orgauth_config.regen_login_tokens,
-      ) {
-        Err(e) => {
-          info!("read_user_by_token_api error: {:?}", e);
-
-          Ok(Either::Right(PrivateReplyMessage {
-            what: PrivateReplies::LoginError,
-            content: serde_json::to_value(format!("{:?}", e).as_str())?,
-          }))
-        }
-        Ok(userdata) => Ok(Either::Left(userdata)),
-      }
-    }
+    None => Err(zkerr::Error::NotLoggedIn)?,
+    Some(token) => orgauth::dbfun::read_user_by_token_api(
+      &conn,
+      token,
+      state.config.orgauth_config.login_token_expiration_ms,
+      state.config.orgauth_config.regen_login_tokens,
+    )
+    .map_err(|e| zkerr::Error::Orgauth(e)),
   }
 }
 
@@ -269,17 +255,15 @@ async fn file(session: Session, state: web::Data<State>, req: HttpRequest) -> Ht
     };
 
     match rs {
-      Ok(uid) => uid,
+      Ok(uid) => uid.map(|id| UserId::Uid(id)),
       Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
     }
   } else {
-    let suser = match session_user(&conn, session, &state) {
-      Ok(Either::Left(user)) => Some(user),
-      Ok(Either::Right(_sr)) => None,
-      Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
-    };
+    match session_user(&conn, session, &state) {
+      Ok(u) => Some(u.id),
 
-    suser.map(|user| user.id)
+      Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
+    }
   };
 
   match req.match_info().get("id") {
@@ -334,12 +318,9 @@ async fn make_file_notes(
   session: Session,
   state: web::Data<State>,
   payload: &mut Multipart,
-) -> Result<PrivateReplyMessage, Box<dyn Error>> {
+) -> Result<UploadReply, Box<dyn Error>> {
   let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
-  let userdata = match session_user(&conn, session, &state)? {
-    Either::Left(ud) => ud,
-    Either::Right(sr) => return Ok(sr),
-  };
+  let userdata = session_user(&conn, session, &state)?;
 
   // Save the files to our temp path.
   let tp = state.config.file_tmp_path.clone();
@@ -362,10 +343,7 @@ async fn make_file_notes(
 
     zklns.push(listnote);
   }
-  Ok(PrivateReplyMessage {
-    what: PrivateReplies::FilesUploaded,
-    content: serde_json::to_value(zklns)?,
-  })
+  Ok(UploadReply::UrFilesUploaded(zklns))
 }
 
 async fn save_files(
@@ -418,7 +396,7 @@ async fn save_files(
 async fn private(
   session: Session,
   data: web::Data<State>,
-  item: web::Json<PrivateMessage>,
+  item: web::Json<PrivateRequest>,
   _req: HttpRequest,
 ) -> HttpResponse {
   let mut state = data.clone();
@@ -426,10 +404,7 @@ async fn private(
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'private' err: {:?}", e);
-      let se = PrivateReplyMessage {
-        what: PrivateReplies::ServerError,
-        content: serde_json::Value::String(e.to_string()),
-      };
+      let se = PrivateReply::PvyServerError(PrivateError::PveString(e.to_string()));
       HttpResponse::Ok().json(se)
     }
   }
@@ -445,10 +420,7 @@ async fn private_streaming(
     Ok(hr) => hr,
     Err(e) => {
       error!("'private_streaming err: {:?}", e);
-      let se = PrivateReplyMessage {
-        what: PrivateReplies::ServerError,
-        content: serde_json::Value::String(e.to_string()),
-      };
+      let se = PrivateReply::PvyServerError(PrivateError::PveString(e.to_string()));
       HttpResponse::Ok().json(se)
     }
   }
@@ -457,15 +429,10 @@ async fn private_streaming(
 async fn zk_interface_check(
   session: &Session,
   state: &State,
-  // config: &Config,
-  // girlboss: &Girlboss<JobId>,
-  msg: PrivateMessage,
-) -> Result<PrivateReplyMessage, zkerr::Error> {
+  msg: PrivateRequest,
+) -> Result<PrivateReply, zkerr::Error> {
   match session.get::<Uuid>("token")? {
-    None => Ok(PrivateReplyMessage {
-      what: PrivateReplies::NotLoggedIn,
-      content: serde_json::Value::Null,
-    }),
+    None => Ok(PrivateReply::PvyServerError(PrivateError::PveNotLoggedIn)),
     Some(token) => {
       let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
       match orgauth::dbfun::read_user_by_token_api(
@@ -477,10 +444,9 @@ async fn zk_interface_check(
         Err(e) => {
           info!("read_user_by_token_api error2: {:?}, {:?}", token, e);
 
-          Ok(PrivateReplyMessage {
-            what: PrivateReplies::LoginError,
-            content: serde_json::to_value(format!("{:?}", e).as_str())?,
-          })
+          Ok(PrivateReply::PvyServerError(PrivateError::PveLoginError(
+            e.to_string(),
+          )))
         }
         Ok(userdata) => {
           // finally!  processing messages as logged in user.
@@ -497,10 +463,7 @@ async fn zk_interface_check_streaming(
   msg: PrivateStreamingMessage,
 ) -> Result<HttpResponse, Box<dyn Error>> {
   match session.get::<Uuid>("token")? {
-    None => Ok(HttpResponse::Ok().json(PrivateReplyMessage {
-      what: PrivateReplies::NotLoggedIn,
-      content: serde_json::Value::Null,
-    })),
+    None => Ok(HttpResponse::Ok().json(PrivateReply::PvyServerError(PrivateError::PveNotLoggedIn))),
 
     Some(token) => {
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
@@ -512,11 +475,11 @@ async fn zk_interface_check_streaming(
       ) {
         Err(e) => {
           info!("read_user_by_token_api error2: {:?}, {:?}", token, e);
-
-          Ok(HttpResponse::Ok().json(PrivateReplyMessage {
-            what: PrivateReplies::LoginError,
-            content: serde_json::to_value(format!("{:?}", e).as_str())?,
-          }))
+          Ok(
+            HttpResponse::Ok().json(PrivateReply::PvyServerError(PrivateError::PveLoginError(
+              format!("{:?}", e),
+            ))),
+          )
         }
         Ok(userdata) => {
           // finally!  processing messages as logged in user.
@@ -536,10 +499,7 @@ async fn private_upstreaming(
     Ok(hr) => hr,
     Err(e) => {
       error!("'private' err: {:?}", e);
-      let se = PrivateReplyMessage {
-        what: PrivateReplies::ServerError,
-        content: serde_json::Value::String(e.to_string()),
-      };
+      let se = PrivateReply::PvyServerError(PrivateError::PveString(e.to_string()));
       HttpResponse::Ok().json(se)
     }
   }
@@ -556,10 +516,7 @@ async fn zk_interface_check_upstreaming(
   body: web::Payload,
 ) -> Result<HttpResponse, Box<dyn Error>> {
   match session.get::<Uuid>("token")? {
-    None => Ok(HttpResponse::Ok().json(PrivateReplyMessage {
-      what: PrivateReplies::NotLoggedIn,
-      content: serde_json::Value::Null,
-    })),
+    None => Ok(HttpResponse::Ok().json(PrivateReply::PvyServerError(PrivateError::PveNotLoggedIn))),
 
     Some(token) => {
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
@@ -572,10 +529,11 @@ async fn zk_interface_check_upstreaming(
         Err(e) => {
           info!("read_user_by_token_api error2: {:?}, {:?}", token, e);
 
-          Ok(HttpResponse::Ok().json(PrivateReplyMessage {
-            what: PrivateReplies::LoginError,
-            content: serde_json::to_value(format!("{:?}", e).as_str())?,
-          }))
+          Ok(
+            HttpResponse::Ok().json(PrivateReply::PvyServerError(PrivateError::PveLoginError(
+              format!("{:?}", e),
+            ))),
+          )
         }
         Ok(_userdata) => {
           // finally!  processing messages as logged in user.
@@ -729,7 +687,151 @@ pub async fn err_main(
         .help("create new admin user")
         .takes_value(true),
     )
+    .arg(
+      Arg::with_name("writeelmbindings")
+        .long("writeelmbindings")
+        .value_name("DIR")
+        .help("Write elmbindings directory")
+        .takes_value(true),
+    )
     .get_matches();
+
+  match matches.value_of("writeelmbindings") {
+    Some(exportdir) => {
+      let ed = Path::new(exportdir);
+      {
+        let mut target = vec![];
+        // elm_rs provides a macro for conveniently creating an Elm module with everything needed
+        elm_rs::export!(
+            "Data",
+            &mut target,
+            {        // generates types and encoders for types implementing ElmEncoder
+            encoders: [zc::ZkNoteId,
+                        zc::ExtraLoginData,
+                        zc::ZkNote,
+                        zc::FileStatus,
+                        zc::ZkListNote,
+                        zc::SavedZkNote,
+                        zc::SaveZkNote,
+                        zc::Direction,
+                        zc::SaveZkLink,
+                        zc::SaveZkNoteAndLinks,
+                        zc::ZkLink,
+                        zc::EditLink,
+                        zc::ZkLinks,
+                        zc::ImportZkNote,
+                        zc::GetZkLinks,
+                        zc::GetZkNoteAndLinks,
+                        zc::GetZnlIfChanged,
+                        zc::GetZkNoteArchives,
+                        zc::ZkNoteArchives,
+                        zc::GetArchiveZkNote,
+                        zc::GetArchiveZkLinks,
+                        zc::GetZkLinksSince,
+                        zc::FileInfo,
+                        zc::ArchiveZkLink,
+                        zc::UuidZkLink,
+                        zc::GetZkNoteComments,
+                        zc::ZkNoteAndLinks,
+                        zc::ZkNoteAndLinksWhat,
+                        zc::JobState,
+                        zc::JobStatus,
+                        PublicRequest,
+                        PublicReply,
+                        PublicError,
+                        PrivateRequest,
+                        PrivateReply,
+                        PrivateError,
+                        ZkNoteRq,
+                        UploadReply,
+                        zs::ZkNoteSearch,
+                        zs::Ordering,
+                        zs::OrderDirection,
+                        zs::OrderField,
+                        zs::ResultType,
+                        zs::TagSearch,
+                        zs::SearchMod,
+                        zs::AndOr,
+                        zs::ZkIdSearchResult,
+                        zs::ZkListNoteSearchResult,
+                        zs::ZkNoteSearchResult,
+                        zs::ZkSearchResultHeader,
+                        zs::ZkNoteAndLinksSearchResult,]
+            // generates types and decoders for types implementing ElmDecoder
+            decoders: [zc::ZkNoteId,
+                        zc::ExtraLoginData,
+                        zc::ZkNote,
+                        zc::FileStatus,
+                        zc::ZkListNote,
+                        zc::SavedZkNote,
+                        zc::SaveZkNote,
+                        zc::Direction,
+                        zc::SaveZkLink,
+                        zc::SaveZkNoteAndLinks,
+                        zc::ZkLink,
+                        zc::EditLink,
+                        zc::ZkLinks,
+                        zc::ImportZkNote,
+                        zc::GetZkLinks,
+                        zc::GetZkNoteAndLinks,
+                        zc::GetZnlIfChanged,
+                        zc::GetZkNoteArchives,
+                        zc::ZkNoteArchives,
+                        zc::GetArchiveZkNote,
+                        zc::GetArchiveZkLinks,
+                        zc::GetZkLinksSince,
+                        zc::FileInfo,
+                        zc::ArchiveZkLink,
+                        zc::UuidZkLink,
+                        zc::GetZkNoteComments,
+                        zc::ZkNoteAndLinks,
+                        zc::ZkNoteAndLinksWhat,
+                        zc::JobState,
+                        zc::JobStatus,
+                        PublicRequest,
+                        PublicReply,
+                        PublicError,
+                        PrivateRequest,
+                        PrivateReply,
+                        PrivateError,
+                        ZkNoteRq,
+                        UploadReply,
+                        zs::ZkNoteSearch,
+                        zs::Ordering,
+                        zs::OrderDirection,
+                        zs::OrderField,
+                        zs::ResultType,
+                        zs::TagSearch,
+                        zs::SearchMod,
+                        zs::AndOr,
+                        zs::ZkIdSearchResult,
+                        zs::ZkListNoteSearchResult,
+                        zs::ZkNoteSearchResult,
+                        zs::ZkSearchResultHeader,
+                        zs::ZkNoteAndLinksSearchResult,],
+            // generates types and functions for forming queries for types implementing ElmQuery
+            queries: [],
+            // generates types and functions for forming queries for types implementing ElmQueryField
+            query_fields: [],
+            }
+        )
+        .unwrap();
+        let output = String::from_utf8(target).unwrap();
+        let outf = ed
+          .join("Data.elm")
+          .to_str()
+          .ok_or(simple_error!("bad path"))?
+          .to_string();
+        util::write_string(outf.as_str(), output.as_str())?;
+
+        println!("wrote file: {}", outf);
+      }
+
+      return Ok(());
+    }
+
+    None => (),
+  }
 
   // writing a config file?
   if let Some(filename) = matches.value_of("write_config") {

@@ -16,7 +16,7 @@ use futures_util::TryStreamExt;
 use futures_util::{StreamExt, TryFutureExt};
 use log::{debug, error, info};
 use orgauth;
-use orgauth::data::User;
+use orgauth::data::{User, UserId};
 use orgauth::dbfun::user_id;
 use orgauth::endpoints::Callbacks;
 use rusqlite::{params, Connection};
@@ -31,12 +31,15 @@ use tokio::io::AsyncBufReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio_util::io::StreamReader;
 use uuid::Uuid;
-use zkprotocol::constants::{PrivateReplies, PrivateStreamingRequests, SpecialUuids};
-use zkprotocol::content::{FileStatus, SaveZkNote, SyncMessage, SyncSince, ZkNote, ZkNoteId};
-use zkprotocol::messages::{PrivateMessage, PrivateReplyMessage, PrivateStreamingMessage};
+use zkprotocol::constants::{PrivateStreamingRequests, SpecialUuids};
+use zkprotocol::content::{FileStatus, SaveZkNote, SyncSince, ZkNoteId};
+use zkprotocol::messages::PrivateStreamingMessage;
+use zkprotocol::private::{PrivateReply, PrivateRequest};
 use zkprotocol::search::{
   AndOr, OrderDirection, OrderField, Ordering, ResultType, SearchMod, TagSearch, ZkNoteSearch,
 };
+use zkprotocol::sync_data::SyncMessage;
+use zkprotocol::upload::UploadReply;
 
 fn convert_payloaderr(err: PayloadError) -> std::io::Error {
   error!("convert_err {:?}", err);
@@ -56,7 +59,7 @@ pub async fn prev_sync(
 ) -> Result<Option<CompletedSync>, zkerr::Error> {
   let sysid = user_id(&conn, "system")?;
   let zns = ZkNoteSearch {
-    tagsearch: TagSearch::Boolex {
+    tagsearch: vec![TagSearch::Boolex {
       ts1: Box::new(TagSearch::SearchTerm {
         mods: vec![SearchMod::Tag, SearchMod::ZkNoteId],
         term: SpecialUuids::Sync.str().to_string(),
@@ -66,7 +69,7 @@ pub async fn prev_sync(
         mods: vec![SearchMod::Tag, SearchMod::ZkNoteId],
         term: usernoteid.to_string(),
       }),
-    },
+    }],
     offset: 0,
     limit: Some(1),
     what: "".to_string(),
@@ -97,7 +100,7 @@ pub async fn prev_sync(
 
 pub async fn save_sync(
   conn: &Connection,
-  _uid: i64,
+  _uid: UserId,
   usernoteid: i64,
   sync: CompletedSync,
 ) -> Result<i64, Box<dyn std::error::Error>> {
@@ -195,10 +198,10 @@ pub fn temp_tables(conn: &Connection) -> Result<TempTableNames, zkerr::Error> {
 pub async fn sync(
   dbpath: &Path,
   file_path: &Path,
-  uid: i64,
+  uid: UserId,
   callbacks: &mut Callbacks,
   monitor: &dyn JobMonitor,
-) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>> {
+) -> Result<PrivateReply, Box<dyn std::error::Error>> {
   let conn = Arc::new(sqldata::connection_open(dbpath)?);
   let user = orgauth::dbfun::read_user_by_id(&conn, uid)?; // TODO pass this in from calling ftn?
   let extra_login_data = sqldata::read_extra_login_data(&conn, user.id)?;
@@ -231,31 +234,32 @@ pub async fn sync(
   )
   .await?;
 
-  if res.what != PrivateReplies::SyncComplete {
-    Ok(res)
-  } else {
-    write!(monitor, "starting sync to remote");
-    let remres = sync_to_remote(
-      conn.clone(),
-      file_path,
-      &user,
-      Some(ttn.notetemp.clone()),
-      Some(ttn.linktemp.clone()),
-      Some(ttn.archivelinktemp.clone()),
-      after,
-      callbacks,
-      monitor,
-    )
-    .await?;
+  match res {
+    PrivateReply::PvySyncComplete => {
+      write!(monitor, "starting sync to remote");
+      let remres = sync_to_remote(
+        conn.clone(),
+        file_path,
+        &user,
+        Some(ttn.notetemp.clone()),
+        Some(ttn.linktemp.clone()),
+        Some(ttn.archivelinktemp.clone()),
+        after,
+        callbacks,
+        monitor,
+      )
+      .await?;
 
-    let unote = user_note_id(&conn, user.id)?;
-    save_sync(&conn, user.id, unote, CompletedSync { after, now }).await?;
+      let unote = user_note_id(&conn, user.id)?;
+      save_sync(&conn, user.id, unote, CompletedSync { after, now }).await?;
 
-    tr.commit()?;
+      tr.commit()?;
 
-    write!(monitor, "sync completed");
+      write!(monitor, "sync completed");
 
-    Ok(remres)
+      Ok(remres)
+    }
+    _ => Ok(res),
   }
 }
 
@@ -280,7 +284,7 @@ pub async fn download_file(
       left join file F on N.file = F.id 
       left join file_source FS on F.id == FS.file_id and FS.user_id = ?2
       where N.id = ?1",
-    params![note_id, user.id],
+    params![note_id, user.id.to_i64()],
     |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
   )?;
 
@@ -412,10 +416,7 @@ pub async fn upload_file(
   let private_uri = awc::http::Uri::try_from(format!("{}/private", url).as_str())
     .map_err(|x| zkerr::Error::String(x.to_string()))?;
 
-  let getzknote = PrivateMessage {
-    what: zkprotocol::constants::PrivateRequests::GetZkNote,
-    data: Some(serde_json::to_value(Uuid::from_str(uuid.as_str())?)?),
-  };
+  let getzknote = PrivateRequest::PvqGetZkNote(ZkNoteId::Zni(Uuid::from_str(uuid.as_str())?));
   let gj = serde_json::to_value(getzknote)?;
 
   let client = awc::Client::new();
@@ -435,10 +436,13 @@ pub async fn upload_file(
 
   let j = serde_json::from_slice(b.as_ref())?;
 
-  let msg: PrivateReplyMessage = serde_json::from_value(j)?;
-  assert!(msg.what == PrivateReplies::ZkNote);
+  let msg: PrivateReply = serde_json::from_value(j)?;
+  let zkn = match msg {
+    PrivateReply::PvyZkNote(zkn) => zkn,
+    _ => panic!("expected zknote"),
+  };
 
-  let zkn: ZkNote = serde_json::from_value(msg.content)?;
+  // let zkn: ZkNote = serde_json::from_value(msg.content)?;
 
   match zkn.filestatus {
     FileStatus::NotAFile => return Ok(UploadResult::NotAFile),
@@ -461,17 +465,15 @@ pub async fn upload_file(
     .await
     .map_err(|e| zkerr::Error::String(e.to_string()))?;
 
-  let prm: PrivateReplyMessage = serde_json::from_slice(
+  let prm: UploadReply = serde_json::from_slice(
     rq.body()
       .map_err(|e| zkerr::Error::String(e.to_string()))
       .await?
       .as_ref(),
   )?;
 
-  if prm.what == PrivateReplies::FileSyncComplete {
-    Ok(UploadResult::Uploaded)
-  } else {
-    Ok(UploadResult::UploadFailed)
+  match prm {
+    UploadReply::UrFilesUploaded(_) => Ok(UploadResult::Uploaded),
   }
 }
 
@@ -479,7 +481,7 @@ pub async fn sync_files_down(
   conn: &Connection,
   temp_file_path: &Path,
   file_path: &Path,
-  uid: i64,
+  uid: UserId,
   search: &ZkNoteSearch,
 ) -> Result<Vec<DownloadResult>, zkerr::Error> {
   // TODO pass this in from calling ftn?
@@ -513,7 +515,7 @@ pub async fn sync_files_down(
 pub async fn sync_files_up(
   conn: &Connection,
   file_path: &Path,
-  uid: i64,
+  uid: UserId,
   search: &ZkNoteSearch,
 ) -> Result<Vec<UploadResult>, zkerr::Error> {
   // TODO pass this in from calling ftn?
@@ -557,7 +559,7 @@ pub async fn sync_from_remote(
   archivelinktemp: &String,
   callbacks: &mut Callbacks,
   monitor: &dyn JobMonitor,
-) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>> {
+) -> Result<PrivateReply, Box<dyn std::error::Error>> {
   let (c, url) = match (user.cookie.clone(), user.remote_url.clone()) {
     (Some(c), Some(url)) => (c, url),
     _ => return Err("can't remote sync - not a remote user".into()),
@@ -625,7 +627,7 @@ pub async fn sync_from_stream<S>(
   archivelinktemp: Option<&str>,
   callbacks: &mut Callbacks,
   br: &mut StreamReader<S, bytes::Bytes>,
-) -> Result<PrivateReplyMessage, Box<dyn std::error::Error>>
+) -> Result<PrivateReply, Box<dyn std::error::Error>>
 where
   S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin,
 {
@@ -674,12 +676,12 @@ where
   let mut userhash = HashMap::<i64, i64>::new();
 
   while let SyncMessage::PhantomUser(ref pu) = sm {
-    match userhash.get(&pu.id) {
+    match userhash.get(&pu.id.to_i64()) {
       Some(_) => (),
       None => {
         match orgauth::dbfun::read_user_by_uuid(&conn, &pu.uuid) {
           Ok(user) => {
-            userhash.insert(pu.id, user.id);
+            userhash.insert(*pu.id.to_i64(), *user.id.to_i64());
           }
           _ => {
             let localpuid = orgauth::dbfun::phantom_user(
@@ -690,7 +692,7 @@ where
               pu.active,
               &mut callbacks.on_new_user,
             )?;
-            userhash.insert(pu.id, localpuid);
+            userhash.insert(*pu.id.to_i64(), *localpuid.to_i64());
           }
         };
       }
@@ -716,9 +718,11 @@ where
   sm = read_sync_message(&mut line, br).await?;
 
   while let SyncMessage::ZkNote(ref note, ref mbf) = sm {
-    let uid = userhash
-      .get(&note.user)
-      .ok_or_else(|| zkerr::Error::String("user not found".to_string()))?;
+    let uid = UserId::Uid(
+      *userhash
+        .get(note.user.to_i64())
+        .ok_or_else(|| zkerr::Error::String("user not found".to_string()))?,
+    );
 
     let file_id: Option<i64> = match mbf {
       None => None,
@@ -746,7 +750,7 @@ where
             conn.execute(
               "insert into file_source (file_id, user_id) values (?1, ?2)
                  on conflict do nothing",
-              params![file_id, uid],
+              params![file_id, uid.to_i64()],
             )?;
             Some(file_id)
           }
@@ -760,7 +764,7 @@ where
               conn.execute(
                 "insert into file_source (file_id, user_id) values (?1, ?2)
                  on conflict do nothing",
-                params![file_id, uid],
+                params![file_id, uid.to_i64()],
               )?;
               Some(file_id)
             }
@@ -776,11 +780,11 @@ where
       params![
         note.title,
         note.content,
-     uid,
+        uid.to_i64(),
         note.pubid,
         note.editable,
         note.showtitle,
-       note.deleted,
+        note.deleted,
         note.id.to_string(),
         file_id,
         note.createdate,
@@ -788,7 +792,10 @@ where
       ]
       );
     let id: i64 = match ex {
-      Ok(_) => Ok(conn.last_insert_rowid()),
+      Ok(_) => {
+        debug!("wrote zknote {}", conn.last_insert_rowid());
+        Ok(conn.last_insert_rowid())
+      }
       Err(rusqlite::Error::SqliteFailure(e, Some(s))) => {
         if e.code == rusqlite::ErrorCode::ConstraintViolation {
           if s.contains("uuid") {
@@ -799,7 +806,7 @@ where
               // note is newer.  archive the old and replace.
               sqldata::save_zknote(
                 &conn,
-                *uid,
+                uid,
                 &SaveZkNote {
                   id: Some(note.id),
                   title: note.title.clone(),
@@ -866,17 +873,19 @@ where
   while let SyncMessage::ZkNote(ref note, ref _mbf) = sm {
     // TODO: make file source record (?)
 
-    let uid = userhash
-      .get(&note.user)
-      .ok_or_else(|| zkerr::Error::String("user not found".to_string()))?;
-    assert!(*uid == sysid);
+    let uid = UserId::Uid(
+      *userhash
+        .get(note.user.to_i64())
+        .ok_or_else(|| zkerr::Error::String("user not found".to_string()))?,
+    );
+    assert!(uid == sysid);
     let mbid = match conn.execute(
       "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate)
        values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
         params![
           note.title,
           note.content,
-          sysid,    // archivenotes all owned by system.
+          sysid.to_i64(),    // archivenotes all owned by system.
           note.pubid,
           note.editable,
           note.showtitle,
@@ -1062,10 +1071,7 @@ where
     params![],
   )?;
 
-  Ok(PrivateReplyMessage {
-    what: PrivateReplies::SyncComplete,
-    content: serde_json::Value::Null,
-  })
+  Ok(PrivateReply::PvySyncComplete)
 }
 
 // Make a stream of all the records needed to sync the remote.
@@ -1079,7 +1085,7 @@ pub async fn sync_to_remote(
   after: Option<i64>,
   callbacks: &mut Callbacks,
   monitor: &dyn JobMonitor,
-) -> Result<PrivateReplyMessage, zkerr::Error> {
+) -> Result<PrivateReply, zkerr::Error> {
   // TODO: get time on remote system, bail if too far out.
 
   let (c, url) = match (user.cookie.clone(), user.remote_url.clone()) {
@@ -1141,10 +1147,7 @@ pub async fn sync_to_remote(
 
   // TODO: send back Sync results... how many records and etc.
 
-  Ok(PrivateReplyMessage {
-    what: PrivateReplies::SyncComplete,
-    content: serde_json::Value::Null,
-  })
+  Ok(PrivateReply::PvySyncComplete)
 }
 
 pub fn bytesify(
@@ -1170,7 +1173,7 @@ pub fn bytesify(
 
 pub fn new_shares(
   conn: &Connection,
-  uid: i64,
+  uid: UserId,
   after: i64,
 ) -> Result<Vec<(i64, ZkNoteId)>, zkerr::Error> {
   // Are there zklinks created since last sync, that go from our user to a share?
@@ -1195,10 +1198,10 @@ pub fn new_shares(
     let id = row.get(1)?;
     Ok((id, uuid))
   })?;
-  let res: Result<Vec<(i64, Uuid)>, zkerr::Error> = rec_iter
+  let res: Result<Vec<(i64, ZkNoteId)>, zkerr::Error> = rec_iter
     .map(|i| {
       i.map_err(|e| e.into())
-        .and_then(|(id, uuid)| Ok((id, Uuid::parse_str(uuid.as_str())?)))
+        .and_then(|(id, uuid)| Ok((id, Uuid::parse_str(uuid.as_str())?.into())))
     })
     .collect();
   res
@@ -1208,7 +1211,7 @@ pub fn new_shares(
 pub fn sync_stream(
   conn: Arc<Connection>,
   files_dir: PathBuf,
-  uid: i64,
+  uid: UserId,
   exclude_notes: Option<String>,
   exclude_links: Option<String>,
   exclude_archivelinks: Option<String>,
@@ -1373,7 +1376,7 @@ pub fn sync_stream(
 
   // get new notes, and old notes that are attached to shares.
   let zns = ZkNoteSearch {
-    tagsearch: ts.clone(),
+    tagsearch: vec![ts.clone()],
     offset: 0,
     limit: None,
     what: "".to_string(),
@@ -1404,7 +1407,7 @@ pub fn sync_stream(
   };
 
   let zns = ZkNoteSearch {
-    tagsearch: full_excl,
+    tagsearch: vec![full_excl],
     offset: 0,
     limit: None,
     what: "".to_string(),
@@ -1424,7 +1427,7 @@ pub fn sync_stream(
   .map(bytesify);
 
   let ans = ZkNoteSearch {
-    tagsearch: ts,
+    tagsearch: vec![ts],
     offset: 0,
     limit: None,
     what: "".to_string(),

@@ -1,16 +1,22 @@
-module NoteCache exposing (NoteCache, addNote, empty, getNote, purgeNotes, setKeeps)
+module NoteCache exposing (CacheEntry(..), NoteCache, addNote, empty, getNote, purgeNotes, setKeeps)
 
-import Data exposing (ZkNoteAndLinks, ZkNoteId, ZniSet)
+import Data exposing (ZkNoteAndLinks, ZkNoteId)
+import DataUtil exposing (ZniSet)
 import Dict exposing (Dict)
-import Set exposing (Set)
 import TDict exposing (TDict)
-import TSet exposing (TSet)
+import TSet
 import Time
 import Util
 
 
 type alias ZneEntry =
-    { receivetime : Int, zne : ZkNoteAndLinks }
+    { receivetime : Int, ce : CacheEntry }
+
+
+type CacheEntry
+    = ZNAL ZkNoteAndLinks
+    | Private
+    | NotFound
 
 
 type alias NoteCache =
@@ -27,7 +33,7 @@ type alias ZneDict =
 
 emptyZneDict : ZneDict
 emptyZneDict =
-    TDict.empty Data.zkNoteIdToString Data.trustedZkNoteIdFromString
+    TDict.empty DataUtil.zkNoteIdToString DataUtil.trustedZkNoteIdFromString
 
 
 setKeeps : ZniSet -> NoteCache -> NoteCache
@@ -35,18 +41,15 @@ setKeeps keep nc =
     { nc | keep = keep }
 
 
-addNote : Time.Posix -> ZkNoteAndLinks -> NoteCache -> NoteCache
-addNote pt zne nc =
+addNote : Time.Posix -> ZkNoteId -> CacheEntry -> NoteCache -> NoteCache
+addNote pt id ce nc =
     let
         ms =
             Time.posixToMillis pt
-
-        id =
-            zne.zknote.id
     in
     { byId =
         TDict.insert id
-            { receivetime = ms, zne = zne }
+            { receivetime = ms, ce = ce }
             nc.byId
     , byReceipt =
         case Dict.get ms nc.byReceipt of
@@ -54,7 +57,7 @@ addNote pt zne nc =
                 Dict.insert ms (TSet.insert id set) nc.byReceipt
 
             Nothing ->
-                Dict.insert ms (TSet.insert id Data.emptyZniSet) nc.byReceipt
+                Dict.insert ms (TSet.insert id DataUtil.emptyZniSet) nc.byReceipt
 
     -- (TODO?) add new notes to keeps!  assuming they belong in the current note.
     , keep = TSet.insert id nc.keep
@@ -62,10 +65,10 @@ addNote pt zne nc =
     }
 
 
-getNote : NoteCache -> ZkNoteId -> Maybe ZkNoteAndLinks
+getNote : NoteCache -> ZkNoteId -> Maybe CacheEntry
 getNote nc id =
     TDict.get id nc.byId
-        |> Maybe.map .zne
+        |> Maybe.map .ce
 
 
 removeNote : NoteCache -> ZkNoteId -> NoteCache
@@ -135,6 +138,6 @@ empty : Int -> NoteCache
 empty max =
     { byId = emptyZneDict
     , byReceipt = Dict.empty
-    , keep = Data.emptyZniSet
+    , keep = DataUtil.emptyZniSet
     , max = max
     }

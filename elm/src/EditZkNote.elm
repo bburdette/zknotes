@@ -51,7 +51,8 @@ import Browser.Dom as BD
 import Cellme.Cellme exposing (CellContainer(..), RunState(..), evalCellsFully)
 import Cellme.DictCellme exposing (CellDict(..), getCd, mkCc)
 import Common
-import Data exposing (Direction(..), EditLink, FileUrlInfo, ZkNoteId, zkNoteIdToString, zklKey, zniCompare, zniEq)
+import Data exposing (Direction(..), EditLink, ZkNoteId)
+import DataUtil exposing (FileUrlInfo, zkNoteIdToString, zklKey, zniCompare, zniEq)
 import Dialog as D
 import Dict exposing (Dict)
 import Either exposing (Either(..))
@@ -68,9 +69,8 @@ import Markdown.Block exposing (ListItem(..), Task(..))
 import Maybe.Extra as ME
 import MdCommon as MC
 import NoteCache as NC exposing (NoteCache)
-import Orgauth.Data exposing (UserId)
+import Orgauth.UserId exposing (UserId(..))
 import RequestsDialog exposing (TRequests)
-import Search as S
 import SearchStackPanel as SP
 import TangoColors as TC
 import Task
@@ -123,7 +123,7 @@ type Msg
     | AddToSearch Data.ZkListNote
     | AddToSearchAsTag String
     | SetSearchString String
-    | SetSearch (List S.TagSearch)
+    | SetSearch Data.TagSearch
     | BigSearchPress
     | SettingsPress
     | AdminPress
@@ -166,7 +166,7 @@ type alias NewCommentState =
 type alias Model =
     { id : Maybe ZkNoteId
     , fui : FileUrlInfo
-    , ld : Data.LoginData
+    , ld : DataUtil.LoginData
     , noteUser : UserId
     , noteUserName : String
     , usernote : ZkNoteId
@@ -216,7 +216,7 @@ type Command
     | Switch ZkNoteId
     | SaveSwitch Data.SaveZkNoteAndLinks ZkNoteId
     | GetTASelection String String
-    | Search S.ZkNoteSearch
+    | Search Data.ZkNoteSearch
     | SearchHistory
     | BigSearch
     | Settings
@@ -229,7 +229,7 @@ type Command
     | ShowArchives ZkNoteId
     | FileUpload
     | Sync
-    | SyncFiles S.ZkNoteSearch
+    | SyncFiles Data.ZkNoteSearch
     | Cmd (Cmd Msg)
 
 
@@ -274,10 +274,10 @@ getSysids model =
         (\el ->
             if
                 List.any ((==) el.otherid)
-                    [ Data.sysids.publicid
-                    , Data.sysids.shareid
-                    , Data.sysids.searchid
-                    , Data.sysids.commentid
+                    [ DataUtil.sysids.publicid
+                    , DataUtil.sysids.shareid
+                    , DataUtil.sysids.searchid
+                    , DataUtil.sysids.commentid
                     ]
                     && el.direction
                     == To
@@ -362,10 +362,10 @@ saveZkLinkList : Model -> List Data.SaveZkLink
 saveZkLinkList model =
     List.map
         (\zkl -> { zkl | delete = Nothing })
-        (List.map Data.elToSzl (Dict.values (Dict.diff model.zklDict model.initialZklDict)))
+        (List.map DataUtil.elToSzl (Dict.values (Dict.diff model.zklDict model.initialZklDict)))
         ++ List.map
             (\zkl -> { zkl | delete = Just True })
-            (List.map Data.elToSzl (Dict.values (Dict.diff model.initialZklDict model.zklDict)))
+            (List.map DataUtil.elToSzl (Dict.values (Dict.diff model.initialZklDict model.zklDict)))
 
 
 commentsRecieved : List Data.ZkNote -> Model -> Model
@@ -381,7 +381,7 @@ updateSearchResult zsr model =
     }
 
 
-updateSearch : List S.TagSearch -> Model -> ( Model, Command )
+updateSearch : List Data.TagSearch -> Model -> ( Model, Command )
 updateSearch ts model =
     ( { model
         | spmodel = SP.setSearch model.spmodel ts
@@ -390,7 +390,7 @@ updateSearch ts model =
     )
 
 
-updateSearchStack : List S.TagSearch -> Model -> Model
+updateSearchStack : List Data.TagSearch -> Model -> Model
 updateSearchStack tsl model =
     let
         spm =
@@ -458,7 +458,7 @@ revert model =
             (initNew model.fui model.ld model.zknSearchResult model.spmodel (Dict.values model.initialZklDict))
 
 
-showZkl : E.Color -> Bool -> Bool -> Maybe EditLink -> Data.LoginData -> Maybe ZkNoteId -> Maybe E.Color -> Bool -> EditLink -> Element Msg
+showZkl : E.Color -> Bool -> Bool -> Maybe EditLink -> DataUtil.LoginData -> Maybe ZkNoteId -> Maybe E.Color -> Bool -> EditLink -> Element Msg
 showZkl bkcolor isDirty editable focusLink ld _ sysColor showflip zkl =
     let
         ( dir, otherid ) =
@@ -623,10 +623,12 @@ mkButtonStyle style isdirty =
         style
 
 
+linkButtonStyle : List (E.Attribute msg)
 linkButtonStyle =
     Common.buttonStyle
 
 
+disabledLinkButtonStyle : List (E.Attribute msg)
 disabledLinkButtonStyle =
     Common.disabledButtonStyle
 
@@ -638,7 +640,7 @@ showSr bkcolor model isdirty zkln =
             zkln.user /= model.ld.userid
 
         sysColor =
-            ZC.systemColor Data.sysids zkln.sysids
+            ZC.systemColor DataUtil.sysids zkln.sysids
 
         mbTo =
             Dict.get (zklKey { direction = To, otherid = zkln.id })
@@ -796,8 +798,8 @@ shareLinks model =
         |> List.filterMap
             (\l ->
                 if
-                    (List.any ((==) Data.sysids.shareid) l.sysids && l.direction == To)
-                        || (l.otherid == Data.sysids.publicid)
+                    (List.any ((==) DataUtil.sysids.shareid) l.sysids && l.direction == To)
+                        || (l.otherid == DataUtil.sysids.publicid)
                 then
                     Just
                         { otherid = l.otherid
@@ -1020,7 +1022,7 @@ zknview zone size recentZkns trqs tjobs noteCache model =
                         |> List.map
                             (\l ->
                                 ( l
-                                , ZC.systemColor Data.sysids l.sysids
+                                , ZC.systemColor DataUtil.sysids l.sysids
                                 )
                             )
                         |> List.sortWith
@@ -1292,7 +1294,7 @@ zknview zone size recentZkns trqs tjobs noteCache model =
                         , if search then
                             EI.button (E.alignRight :: Common.buttonStyle)
                                 (case
-                                    JD.decodeString S.decodeTsl model.md
+                                    JD.decodeString Data.tagSearchDecoder model.md
                                         |> Result.toMaybe
                                  of
                                     Just s ->
@@ -1470,14 +1472,14 @@ zknview zone size recentZkns trqs tjobs noteCache model =
                     (\id ->
                         if Just id == model.id then
                             E.link Common.disabledButtonStyle
-                                { url = Data.editNoteLink id
+                                { url = DataUtil.editNoteLink id
                                 , label = E.text "⌂"
                                 }
 
                         else
                             E.link
                                 perhapsdirtybutton
-                                { url = Data.editNoteLink id
+                                { url = DataUtil.editNoteLink id
                                 , label = E.text "⌂"
                                 }
                     )
@@ -1611,12 +1613,12 @@ linksWith links linkid =
 
 isPublic : Model -> Bool
 isPublic model =
-    linksWith (Dict.values model.zklDict) Data.sysids.publicid
+    linksWith (Dict.values model.zklDict) DataUtil.sysids.publicid
 
 
 isSearch : Model -> Bool
 isSearch model =
-    linksWith (Dict.values model.zklDict) Data.sysids.searchid
+    linksWith (Dict.values model.zklDict) DataUtil.sysids.searchid
 
 
 copyTabs : Model -> Model -> Model
@@ -1643,7 +1645,14 @@ tabsOnLoad model =
     }
 
 
-initFull : FileUrlInfo -> Data.LoginData -> Data.ZkListNoteSearchResult -> Data.ZkNote -> List Data.EditLink -> SP.Model -> ( Model, Data.GetZkNoteComments )
+initFull :
+    FileUrlInfo
+    -> DataUtil.LoginData
+    -> Data.ZkListNoteSearchResult
+    -> Data.ZkNote
+    -> List Data.EditLink
+    -> SP.Model
+    -> ( Model, Data.GetZkNoteComments )
 initFull fui ld zkl zknote dtlinks spm =
     let
         cells =
@@ -1651,7 +1660,7 @@ initFull fui ld zkl zknote dtlinks spm =
                 |> MC.mdCells
                 |> Result.withDefault (CellDict Dict.empty)
 
-        ( cc, result ) =
+        ( cc, _ ) =
             evalCellsFully
                 (mkCc cells)
 
@@ -1699,7 +1708,7 @@ initFull fui ld zkl zknote dtlinks spm =
       , createdate = Just zknote.createdate
       , changeddate = Just zknote.changeddate
       , cells = getCd cc
-      , revert = Just (Data.saveZkNote zknote)
+      , revert = Just (DataUtil.saveZkNote zknote)
       , spmodel = SP.searchResultUpdated zkl spm
       , navchoice = NcView
       , searchOrRecent = SearchView
@@ -1708,11 +1717,11 @@ initFull fui ld zkl zknote dtlinks spm =
       , panelNote = Nothing
       , mbReplaceString = Nothing
       }
-    , { zknote = zknote.id, offset = 0 }
+    , { zknote = zknote.id, offset = 0, limit = Nothing }
     )
 
 
-initNew : FileUrlInfo -> Data.LoginData -> Data.ZkListNoteSearchResult -> SP.Model -> List EditLink -> Model
+initNew : FileUrlInfo -> DataUtil.LoginData -> Data.ZkListNoteSearchResult -> SP.Model -> List EditLink -> Model
 initNew fui ld zkl spm links =
     let
         cells =
@@ -1723,7 +1732,7 @@ initNew fui ld zkl spm links =
         zklDict =
             Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) links)
 
-        ( cc, result ) =
+        ( cc, _ ) =
             evalCellsFully
                 (mkCc cells)
     in
@@ -1820,7 +1829,7 @@ onSaved oldmodel szn =
                                 model.ld.userid
                                 model.ld.name
                                 model.ld.zknote
-                                [ Data.sysids.commentid ]
+                                [ DataUtil.sysids.commentid ]
                                 szn
                                 pc
                            ]
@@ -1842,7 +1851,7 @@ onSaved oldmodel szn =
 type TACommand
     = TASave Data.SaveZkNoteAndLinks
     | TAError String
-    | TAUpdated Model (Maybe Data.SetSelection)
+    | TAUpdated Model (Maybe DataUtil.SetSelection)
     | TANoop
 
 
@@ -1876,10 +1885,10 @@ initLinkBackNote model title =
             Err "new note!  save this note before creating a linkback note to it"
 
 
-onTASelection : Model -> List Data.ZkListNote -> Data.TASelection -> TACommand
+onTASelection : Model -> List Data.ZkListNote -> DataUtil.TASelection -> TACommand
 onTASelection model recentZkns tas =
     let
-        addLink title id =
+        addLink _ id =
             let
                 linktext =
                     if tas.text == "" then
@@ -1984,7 +1993,7 @@ onTASelection model recentZkns tas =
         TAError <| "invalid 'what' code: " ++ tas.what
 
 
-onLinkBackSaved : Model -> Maybe Data.TASelection -> Data.SavedZkNote -> ( Model, Command )
+onLinkBackSaved : Model -> Maybe DataUtil.TASelection -> Data.SavedZkNote -> ( Model, Command )
 onLinkBackSaved model mbtas szn =
     case mbtas of
         Just tas ->
@@ -2063,7 +2072,7 @@ onWkKeyPress key model =
     case Toop.T4 key.key key.ctrl key.alt key.shift of
         Toop.T4 "e" True True False ->
             let
-                ( m, c ) =
+                ( m, _ ) =
                     update (NavChoiceChanged NcEdit) model
             in
             ( m, Cmd (BD.focus "mdtext" |> Task.attempt (\_ -> Noop)) )
@@ -2073,7 +2082,7 @@ onWkKeyPress key model =
 
         Toop.T4 "s" True True False ->
             let
-                ( m, c ) =
+                ( m, _ ) =
                     update (NavChoiceChanged NcSearch) model
             in
             ( m, Cmd (BD.focus "searchtext" |> Task.attempt (\_ -> Noop)) )
@@ -2179,8 +2188,8 @@ update msg model =
                 , pendingcomment = Nothing
                 , zklDict =
                     model.zklDict
-                        |> Dict.remove (zklKey { otherid = Data.sysids.publicid, direction = To })
-                        |> Dict.remove (zklKey { otherid = Data.sysids.publicid, direction = From })
+                        |> Dict.remove (zklKey { otherid = DataUtil.sysids.publicid, direction = To })
+                        |> Dict.remove (zklKey { otherid = DataUtil.sysids.publicid, direction = From })
                 , initialZklDict = Dict.empty
                 , createdate = Nothing
                 , changeddate = Nothing
@@ -2346,7 +2355,7 @@ update msg model =
         FlipLink zkl ->
             let
                 zklf =
-                    { zkl | direction = Data.flipDirection zkl.direction }
+                    { zkl | direction = DataUtil.flipDirection zkl.direction }
             in
             ( { model
                 | zklDict =
@@ -2365,7 +2374,7 @@ update msg model =
             , None
             )
 
-        MdLink zkln what ->
+        MdLink _ what ->
             ( model
             , GetTASelection "mdtext" what
             )
@@ -2390,13 +2399,13 @@ update msg model =
                 Nothing ->
                     ( model, None )
 
-                Just id ->
+                Just _ ->
                     if isPublic model then
                         ( { model
                             | zklDict =
                                 model.zklDict
-                                    |> Dict.remove (zklKey { direction = From, otherid = Data.sysids.publicid })
-                                    |> Dict.remove (zklKey { direction = To, otherid = Data.sysids.publicid })
+                                    |> Dict.remove (zklKey { direction = From, otherid = DataUtil.sysids.publicid })
+                                    |> Dict.remove (zklKey { direction = To, otherid = DataUtil.sysids.publicid })
                           }
                         , None
                         )
@@ -2405,7 +2414,7 @@ update msg model =
                         let
                             nzkl =
                                 { direction = To
-                                , otherid = Data.sysids.publicid
+                                , otherid = DataUtil.sysids.publicid
                                 , user = model.ld.userid
                                 , zknote = Nothing
                                 , othername = Just "public"
@@ -2528,7 +2537,7 @@ update msg model =
                         { note =
                             nc
                         , links =
-                            [ { otherid = Data.sysids.commentid
+                            [ { otherid = DataUtil.sysids.commentid
                               , direction = To
                               , user = model.ld.userid
                               , zknote = Nothing
@@ -2569,7 +2578,7 @@ update msg model =
                         |> MC.mdCells
                         |> Result.withDefault (CellDict Dict.empty)
 
-                ( cc, result ) =
+                ( cc, _ ) =
                     evalCellsFully
                         (mkCc cells)
             in
@@ -2585,7 +2594,7 @@ update msg model =
                 (CellDict cd) =
                     model.cells
 
-                ( cc, result ) =
+                ( cc, _ ) =
                     evalCellsFully
                         (mkCc
                             (Dict.insert name (MC.defCell string) cd
@@ -2654,11 +2663,7 @@ update msg model =
             )
 
         AddToSearch zkln ->
-            let
-                spmod =
-                    model.spmodel
-            in
-            if List.any ((==) Data.sysids.searchid) zkln.sysids then
+            if List.any ((==) DataUtil.sysids.searchid) zkln.sysids then
                 ( { model
                     | spmodel = SP.setSearchString model.spmodel zkln.title
                   }
@@ -2669,17 +2674,13 @@ update msg model =
                 ( { model
                     | spmodel =
                         SP.addToSearch model.spmodel
-                            [ S.ExactMatch ]
+                            [ Data.ExactMatch ]
                             zkln.title
                   }
                 , None
                 )
 
         SetSearchString text ->
-            let
-                spmod =
-                    model.spmodel
-            in
             ( { model
                 | spmodel =
                     SP.setSearchString model.spmodel text
@@ -2688,26 +2689,18 @@ update msg model =
             )
 
         SetSearch search ->
-            let
-                spmod =
-                    model.spmodel
-            in
             ( { model
                 | spmodel =
-                    SP.setSearch model.spmodel search
+                    SP.setSearch model.spmodel [ search ]
               }
             , None
             )
 
         AddToSearchAsTag title ->
-            let
-                spmod =
-                    model.spmodel
-            in
             ( { model
                 | spmodel =
                     SP.addToSearch model.spmodel
-                        [ S.ExactMatch, S.Tag ]
+                        [ Data.ExactMatch, Data.Tag ]
                         title
               }
             , None

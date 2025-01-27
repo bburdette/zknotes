@@ -23,7 +23,8 @@ module Import exposing
 import Cellme.Cellme exposing (CellContainer(..), RunState(..))
 import Cellme.DictCellme exposing (CellDict(..))
 import Common
-import Data exposing (ZkNoteId, zniEq)
+import Data exposing (ZkNoteId)
+import DataUtil exposing (zniEq)
 import Dialog as D
 import Element as E exposing (Element)
 import Element.Background as EBk
@@ -33,7 +34,6 @@ import File as F
 import Json.Decode as JD
 import Markdown.Block exposing (ListItem(..), Task(..))
 import MdCommon exposing (..)
-import Search as S
 import SearchStackPanel as SP
 import TDict exposing (TDict)
 import TangoColors as TC
@@ -70,7 +70,7 @@ type alias Links =
 
 
 type alias Model =
-    { ld : Data.LoginData
+    { ld : DataUtil.LoginData
     , notes : List Data.ImportZkNote
     , zknSearchResult : Data.ZkListNoteSearchResult
     , globlinks : TDict ZkNoteId String LinkHalf
@@ -82,7 +82,7 @@ type alias Model =
 type Command
     = None
     | SaveExit (List Data.ImportZkNote)
-    | Search S.ZkNoteSearch
+    | Search Data.ZkNoteSearch
     | SelectFiles
     | Cancel
     | Command (Cmd Msg)
@@ -124,10 +124,10 @@ addLinks izn lh =
 zkLinkName : Data.ZkLink -> ZkNoteId -> String
 zkLinkName zklink noteid =
     if zniEq noteid zklink.from then
-        zklink.toname |> Maybe.withDefault (Data.zkNoteIdToString zklink.to)
+        zklink.toname |> Maybe.withDefault (DataUtil.zkNoteIdToString zklink.to)
 
     else if zniEq noteid zklink.to then
-        zklink.fromname |> Maybe.withDefault (Data.zkNoteIdToString zklink.from)
+        zklink.fromname |> Maybe.withDefault (DataUtil.zkNoteIdToString zklink.from)
 
     else
         "link error"
@@ -306,12 +306,12 @@ zklKey zkl =
     String.fromInt zkl.from ++ ":" ++ String.fromInt zkl.to
 
 
-init : Data.LoginData -> Data.ZkListNoteSearchResult -> SP.Model -> Model
+init : DataUtil.LoginData -> Data.ZkListNoteSearchResult -> SP.Model -> Model
 init ld zkl spm =
     { ld = ld
     , zknSearchResult = zkl
     , notes = []
-    , globlinks = TDict.empty Data.zkNoteIdToString Data.trustedZkNoteIdFromString
+    , globlinks = TDict.empty DataUtil.zkNoteIdToString DataUtil.trustedZkNoteIdFromString
     , spmodel = SP.searchResultUpdated zkl spm
     , dialog = Nothing
     }

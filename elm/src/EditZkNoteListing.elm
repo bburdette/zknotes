@@ -2,17 +2,15 @@ module EditZkNoteListing exposing (..)
 
 import Common
 import Data
+import DataUtil exposing (LoginData)
 import Dialog as D
 import Element as E exposing (Element)
 import Element.Background as EBk
 import Element.Border as EBd
 import Element.Font as EF
 import Element.Input as EI
-import Element.Region
-import Import
-import Search as S exposing (TagSearch(..))
 import SearchStackPanel as SP
-import TagSearchPanel as TSP
+import SearchUtil exposing (showTagSearch)
 import TangoColors as TC
 import Toop
 import Util
@@ -47,13 +45,13 @@ type Command
     | Done
     | Import
     | None
-    | Search S.ZkNoteSearch
-    | SyncFiles S.ZkNoteSearch
-    | PowerDelete S.TagSearch
+    | Search Data.ZkNoteSearch
+    | SyncFiles Data.ZkNoteSearch
+    | PowerDelete (List Data.TagSearch)
     | SearchHistory
 
 
-onPowerDeleteComplete : Int -> Data.LoginData -> Model -> Model
+onPowerDeleteComplete : Int -> LoginData -> Model -> Model
 onPowerDeleteComplete count ld model =
     { model
         | dialog =
@@ -75,7 +73,7 @@ updateSearchResult zsr model =
     }
 
 
-updateSearchStack : List S.TagSearch -> Model -> Model
+updateSearchStack : List Data.TagSearch -> Model -> Model
 updateSearchStack tsl model =
     let
         spm =
@@ -86,7 +84,7 @@ updateSearchStack tsl model =
     }
 
 
-updateSearch : List S.TagSearch -> Model -> ( Model, Command )
+updateSearch : List Data.TagSearch -> Model -> ( Model, Command )
 updateSearch ts model =
     ( { model
         | spmodel = SP.setSearch model.spmodel ts
@@ -105,7 +103,7 @@ onWkKeyPress key model =
             ( model, None )
 
 
-view : Data.LoginData -> Util.Size -> Model -> Element Msg
+view : LoginData -> Util.Size -> Model -> Element Msg
 view ld size model =
     case model.dialog of
         Just ( dialog, _ ) ->
@@ -115,14 +113,11 @@ view ld size model =
             listview ld size model
 
 
-listview : Data.LoginData -> Util.Size -> Model -> Element Msg
+listview : LoginData -> Util.Size -> Model -> Element Msg
 listview ld size model =
     let
         maxwidth =
             700
-
-        titlemaxconst =
-            85
     in
     E.el
         [ E.width E.fill
@@ -142,7 +137,7 @@ listview ld size model =
                         (\id ->
                             E.link
                                 Common.buttonStyle
-                                { url = Data.editNoteLink id
+                                { url = DataUtil.editNoteLink id
                                 , label = E.text "⌂"
                                 }
                         )
@@ -186,14 +181,14 @@ listview ld size model =
                                          , E.clipX
                                          , E.width E.fill
                                          ]
-                                            ++ (ZC.systemColor Data.sysids n.sysids
+                                            ++ (ZC.systemColor DataUtil.sysids n.sysids
                                                     |> Maybe.map (\c -> [ EF.color c ])
                                                     |> Maybe.withDefault []
                                                )
                                         )
                                         [ E.link
                                             [ E.height <| E.px 30 ]
-                                            { url = Data.editNoteLink n.id
+                                            { url = DataUtil.editNoteLink n.id
                                             , label = E.text n.title
                                             }
                                         ]
@@ -210,7 +205,7 @@ listview ld size model =
             ]
 
 
-update : Msg -> Model -> Data.LoginData -> ( Model, Command )
+update : Msg -> Model -> LoginData -> ( Model, Command )
 update msg model ld =
     case msg of
         NewPress ->
@@ -236,7 +231,7 @@ update msg model ld =
                             Just <|
                                 ( D.init
                                     ("delete all notes matching this search?\n"
-                                        ++ String.concat (List.map S.showTagSearch s.tagSearch)
+                                        ++ String.concat (List.map showTagSearch s.tagsearch)
                                     )
                                     True
                                     (\size -> E.map (\_ -> ()) (listview ld size model))
@@ -256,7 +251,7 @@ update msg model ld =
                         ( D.Ok, DeleteAll ) ->
                             case SP.getSearch model.spmodel of
                                 Just s ->
-                                    ( { model | dialog = Nothing }, PowerDelete (S.getTagSearch s) )
+                                    ( { model | dialog = Nothing }, PowerDelete s.tagsearch )
 
                                 Nothing ->
                                     ( { model | dialog = Nothing }, None )

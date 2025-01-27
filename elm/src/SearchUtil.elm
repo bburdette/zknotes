@@ -1,44 +1,6 @@
-module Search exposing
-    ( AndOr(..)
-    , FieldText(..)
-    , ResultType(..)
-    , SearchMod(..)
-    , TSText(..)
-    , TagSearch(..)
-    , ZkNoteSearch
-    , andifySearches
-    , andor
-    , decodeAndOr
-    , decodeSearchMod
-    , decodeTagSearch
-    , decodeTsl
-    , defaultSearch
-    , defaultSearchLimit
-    , encodeAndOr
-    , encodeSearchMod
-    , encodeTagSearch
-    , encodeTsl
-    , encodeZkNoteSearch
-    , extractTagSearches
-    , fieldString
-    , fieldText
-    , fields
-    , getTagSearch
-    , oplistParser
-    , printAndOr
-    , printSearchMod
-    , printTagSearch
-    , searchMod
-    , searchMods
-    , searchTerm
-    , showAndOr
-    , showSearchMod
-    , showTagSearch
-    , singleTerm
-    , spaces
-    , tagSearchParser
-    )
+module SearchUtil exposing (..)
 
+import Data exposing (AndOr(..), ResultType(..), SearchMod(..), TagSearch(..), ZkNoteSearch)
 import Json.Decode as JD
 import Json.Encode as JE
 import ParseHelp exposing (listOf)
@@ -57,76 +19,21 @@ import Parser
         , loop
         , map
         , oneOf
-        , run
         , succeed
         , symbol
         , token
         )
-import TDict exposing (TDict)
-import Util exposing (first, rest)
-
-
-type alias ZkNoteSearch =
-    { tagSearch : List TagSearch
-    , offset : Int
-    , limit : Maybe Int
-    , what : String
-    , resultType : ResultType
-    , archives : Bool
-    , deleted : Bool
-    , unsynced : Bool
-    }
-
-
-type ResultType
-    = RtId
-    | RtListNote
-    | RtNote
-    | RtNoteAndLinks
-
-
-type SearchMod
-    = ExactMatch
-    | ZkNoteId
-    | Tag
-    | Note
-    | User
-    | File
-    | Before
-    | After
-    | Create
-    | Mod
-
-
-type TagSearch
-    = SearchTerm (List SearchMod) String
-    | Not TagSearch
-    | Boolex TagSearch AndOr TagSearch
-
-
-type AndOr
-    = And
-    | Or
-
-
-type TSText
-    = Text String
-    | Search TagSearch
-
-
-getTagSearch : ZkNoteSearch -> TagSearch
-getTagSearch zkn =
-    andifySearches zkn.tagSearch
+import Util exposing (rest)
 
 
 andifySearches : List TagSearch -> TagSearch
 andifySearches tsl =
     case tsl of
         s :: rest ->
-            List.foldr (\sl sr -> Boolex sl And sr) s rest
+            List.foldr (\sl sr -> Boolex { ts1 = sl, ao = And, ts2 = sr }) s rest
 
         [] ->
-            SearchTerm [] ""
+            SearchTerm { mods = [], term = "" }
 
 
 defaultSearchLimit : Int
@@ -136,14 +43,14 @@ defaultSearchLimit =
 
 defaultSearch : ZkNoteSearch
 defaultSearch =
-    { tagSearch = [ SearchTerm [] "" ]
+    { tagsearch = [ SearchTerm { mods = [], term = "" } ]
     , offset = 0
     , limit = Just defaultSearchLimit
     , what = ""
-    , resultType = RtListNote
+    , resulttype = RtListNote
     , archives = False
     , deleted = False
-    , unsynced = False
+    , ordering = Nothing
     }
 
 
@@ -238,124 +145,6 @@ decodeSearchMod =
             )
 
 
-decodeTagSearch : JD.Decoder TagSearch
-decodeTagSearch =
-    JD.oneOf
-        [ JD.field "Not" (JD.map Not (JD.field "ts" (JD.lazy (\_ -> decodeTagSearch))))
-        , JD.field "Boolex"
-            (JD.map3 Boolex
-                (JD.field "ts1" (JD.lazy (\_ -> decodeTagSearch)))
-                (JD.field "ao" decodeAndOr)
-                (JD.field "ts2" (JD.lazy (\_ -> decodeTagSearch)))
-            )
-        , JD.field "SearchTerm"
-            (JD.map2 SearchTerm
-                (JD.field "mods" (JD.list decodeSearchMod))
-                (JD.field "term" JD.string)
-            )
-        ]
-
-
-encodeTsl : List TagSearch -> JE.Value
-encodeTsl ts =
-    JE.object
-        [ ( "searches", JE.list encodeTagSearch ts ) ]
-
-
-decodeTsl : JD.Decoder (List TagSearch)
-decodeTsl =
-    JD.oneOf
-        [ JD.field "searches" (JD.list decodeTagSearch)
-        , decodeTagSearch |> JD.map List.singleton
-        ]
-
-
-encodeTagSearch : TagSearch -> JE.Value
-encodeTagSearch ts =
-    case ts of
-        SearchTerm smods termstr ->
-            JE.object
-                [ ( "SearchTerm"
-                  , JE.object
-                        [ ( "mods", JE.list encodeSearchMod smods )
-                        , ( "term", JE.string termstr )
-                        ]
-                  )
-                ]
-
-        Not nts ->
-            JE.object
-                [ ( "Not"
-                  , JE.object
-                        [ ( "ts", encodeTagSearch nts )
-                        ]
-                  )
-                ]
-
-        Boolex ts1 ao ts2 ->
-            JE.object
-                [ ( "Boolex"
-                  , JE.object
-                        [ ( "ts1", encodeTagSearch ts1 )
-                        , ( "ao"
-                          , encodeAndOr ao
-                          )
-                        , ( "ts2", encodeTagSearch ts2 )
-                        ]
-                  )
-                ]
-
-
-encodeAndOr : AndOr -> JE.Value
-encodeAndOr ao =
-    JE.string
-        (case ao of
-            And ->
-                "And"
-
-            Or ->
-                "Or"
-        )
-
-
-decodeAndOr : JD.Decoder AndOr
-decodeAndOr =
-    JD.string
-        |> JD.andThen
-            (\s ->
-                case s of
-                    "And" ->
-                        JD.succeed And
-
-                    "Or" ->
-                        JD.succeed Or
-
-                    wat ->
-                        JD.fail <| "invalid and/or: " ++ wat
-            )
-
-
-encodeMaybe : String -> Maybe a -> (a -> JE.Value) -> Maybe ( String, JE.Value )
-encodeMaybe name mb toval =
-    Maybe.map (\a -> ( name, toval a )) mb
-
-
-encodeZkNoteSearch : ZkNoteSearch -> JE.Value
-encodeZkNoteSearch zns =
-    JE.object <|
-        [ ( "tagsearch", encodeTagSearch (andifySearches zns.tagSearch) )
-        , ( "offset", JE.int zns.offset )
-        , ( "what", JE.string zns.what )
-        , ( "resulttype", encodeResultType zns.resultType )
-        , ( "archives", JE.bool zns.archives )
-        , ( "deleted", JE.bool zns.deleted )
-        , ( "unsynced", JE.bool zns.unsynced )
-        ]
-            ++ List.filterMap identity
-                [ encodeMaybe "limit" zns.limit JE.int
-                ]
-
-
 showSearchMod : SearchMod -> String
 showSearchMod mod =
     case mod of
@@ -403,13 +192,13 @@ showAndOr ao =
 showTagSearch : TagSearch -> String
 showTagSearch ts =
     case ts of
-        SearchTerm modset s ->
-            "(searchterm " ++ String.concat (List.intersperse " " (List.map showSearchMod modset)) ++ " '" ++ s ++ "')"
+        SearchTerm st ->
+            "(searchterm " ++ String.concat (List.intersperse " " (List.map showSearchMod st.mods)) ++ " '" ++ st.term ++ "')"
 
         Not ts1 ->
-            "not " ++ showTagSearch ts1
+            "not " ++ showTagSearch ts1.ts
 
-        Boolex ts1 ao ts2 ->
+        Boolex { ts1, ao, ts2 } ->
             " ( " ++ showTagSearch ts1 ++ " " ++ showAndOr ao ++ " " ++ showTagSearch ts2 ++ " ) "
 
 
@@ -460,13 +249,13 @@ printAndOr ao =
 printTagSearch : TagSearch -> String
 printTagSearch ts =
     case ts of
-        SearchTerm modset s ->
-            String.concat (List.map printSearchMod modset) ++ "'" ++ s ++ "'"
+        SearchTerm { mods, term } ->
+            String.concat (List.map printSearchMod mods) ++ "'" ++ term ++ "'"
 
         Not ts1 ->
-            "!" ++ printTagSearch ts1
+            "!" ++ printTagSearch ts1.ts
 
-        Boolex ts1 ao ts2 ->
+        Boolex { ts1, ao, ts2 } ->
             "(" ++ printTagSearch ts1 ++ " " ++ printAndOr ao ++ " " ++ printTagSearch ts2 ++ ")"
 
 
@@ -556,7 +345,7 @@ tagSearchParser =
     singleTerm
         |> andThen
             (\initterm ->
-                succeed (\opterms -> List.foldl (\( op, term ) exp -> Boolex exp op term) initterm opterms)
+                succeed (\opterms -> List.foldl (\( op, term ) exp -> Boolex { ts1 = exp, ao = op, ts2 = term }) initterm opterms)
                     |= oplistParser
             )
 
@@ -574,10 +363,10 @@ oplistParser =
 singleTerm : Parser TagSearch
 singleTerm =
     oneOf
-        [ succeed SearchTerm
+        [ succeed (\m t -> SearchTerm { mods = m, term = t })
             |= searchMods
             |= searchTerm
-        , succeed Not
+        , succeed (\t -> Not { ts = t })
             |. symbol "!"
             |. spaces
             |= lazy (\_ -> singleTerm)
@@ -621,6 +410,11 @@ fields =
     listOf (oneOf [ fieldText, fieldString ])
 
 
+type TSText
+    = Text String
+    | Search TagSearch
+
+
 extractTagSearches : String -> Result (List DeadEnd) (List TSText)
 extractTagSearches text =
     case Parser.run fields text of
@@ -636,7 +430,7 @@ extractTagSearches text =
                             case i of
                                 Field s ->
                                     if s == "" then
-                                        Ok (Search (SearchTerm [] "")) :: l
+                                        Ok (Search (SearchTerm { mods = [], term = "" })) :: l
 
                                     else
                                         case Parser.run tagSearchParser s of

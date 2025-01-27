@@ -29,77 +29,9 @@ impl SpecialUuids {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-pub enum PrivateRequests {
-  GetZkNote,
-  GetZkNoteAndLinks,
-  GetZnlIfChanged,
-  GetZkNoteComments,
-  GetZkNoteArchives,
-  GetArchiveZkNote,
-  GetArchiveZklinks,
-  GetZkLinksSince,
-  SearchZkNotes,
-  PowerDelete,
-  DeleteZkNote,
-  SaveZkNote,
-  SaveZkLinks,
-  SaveZkNoteAndLinks,
-  SaveImportZkNotes,
-  SetHomeNote,
-  SyncRemote,
-  SyncFiles,
-  GetJobStatus,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
 pub enum PrivateStreamingRequests {
   SearchZkNotes,
   GetArchiveZkLinks,
   GetZkLinksSince,
   Sync,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub enum PublicRequests {
-  GetZkNoteAndLinks,
-  GetZnlIfChanged,
-  GetZkNotePubId,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub enum PublicReplies {
-  ServerError,
-  ZkNoteAndLinks,
-  Noop,
-}
-
-#[derive(Deserialize, Serialize, Debug, PartialEq)]
-pub enum PrivateReplies {
-  ServerError,
-  ZkNote,
-  ZkNoteAndLinksWhat,
-  Noop,
-  ZkNoteComments,
-  Archives,
-  ZkNoteArchives,
-  ArchiveZkLinks,
-  ZkLinks,
-  ZkListNoteSearchResult,
-  ZkNoteSearchResult,
-  ZkNoteIdSearchResult,
-  ZkNoteAndLinksSearchResult,
-  PowerDeleteComplete,
-  DeletedZkNote,
-  SavedZkNote,
-  SavedZkLinks,
-  SavedZkNoteAndLinks,
-  SavedImportZkNotes,
-  HomeNoteSet,
-  JobStatus,
-  JobNotFound,
-  SyncComplete,
-  FileSyncComplete,
-  NotLoggedIn,
-  LoginError,
-  FilesUploaded,
 }

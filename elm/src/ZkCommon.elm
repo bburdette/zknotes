@@ -1,6 +1,7 @@
 module ZkCommon exposing (..)
 
-import Data as D exposing (ZkNoteId, zniEq)
+import Data as D exposing (ZkNoteId)
+import DataUtil as DU exposing (zniEq)
 import Element as E exposing (Element)
 import Element.Background as EBk
 import Element.Border as EBd
@@ -41,7 +42,7 @@ shareColor =
     TC.darkBrown
 
 
-systemColor : D.Sysids -> List ZkNoteId -> Maybe E.Color
+systemColor : DU.Sysids -> List ZkNoteId -> Maybe E.Color
 systemColor ld ids =
     let
         sysColor : ZkNoteId -> Maybe E.Color
@@ -121,7 +122,7 @@ fullScreen =
 golink zknid color =
     E.link
         [ EF.color color ]
-        { url = D.editNoteLink zknid
+        { url = DU.editNoteLink zknid
         , label =
             E.el
                 [ E.inFront (E.el [ EF.size 50 ] <| E.text "↗")

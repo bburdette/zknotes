@@ -22,6 +22,9 @@ pub enum Error {
   Cookie(cookie::ParseError),
   Annotated(AnnotatedE),
   Girlboss(girlboss::Error),
+  NoteNotFound,
+  NoteIsPrivate,
+  NotLoggedIn,
 }
 
 pub struct AnnotatedE {
@@ -61,6 +64,9 @@ pub fn to_orgauth_error(e: Error) -> orgauth::error::Error {
     Error::Cookie(ze) => orgauth::error::Error::String(ze.to_string()),
     Error::Annotated(e) => orgauth::error::Error::String(e.to_string()),
     Error::Girlboss(e) => orgauth::error::Error::String(e.to_string()),
+    Error::NoteNotFound => orgauth::error::Error::String("note not found".to_string()),
+    Error::NoteIsPrivate => orgauth::error::Error::String("note is private".to_string()),
+    Error::NotLoggedIn => orgauth::error::Error::String("not logged in".to_string()),
   }
 }
 
@@ -86,6 +92,9 @@ impl fmt::Display for Error {
       Error::Cookie(e) => write!(f, "{}", e),
       Error::Annotated(e) => write!(f, "{}", e),
       Error::Girlboss(e) => write!(f, "{}", e),
+      Error::NoteNotFound => write!(f, "{}", "note not found"),
+      Error::NoteIsPrivate => write!(f, "{}", "note is private"),
+      Error::NotLoggedIn => write!(f, "{}", "not logged in"),
     }
   }
 }
@@ -106,6 +115,9 @@ impl fmt::Debug for Error {
       Error::Cookie(e) => write!(f, "{}", e),
       Error::Annotated(e) => write!(f, "{}", e),
       Error::Girlboss(e) => write!(f, "{}", e),
+      Error::NoteNotFound => write!(f, "{}", "note not found"),
+      Error::NoteIsPrivate => write!(f, "{}", "note is private"),
+      Error::NotLoggedIn => write!(f, "{}", "not logged in"),
     }
   }
 }

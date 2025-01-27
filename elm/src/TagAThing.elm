@@ -1,7 +1,8 @@
 module TagAThing exposing (..)
 
 import Common
-import Data exposing (Direction(..), ZkNoteId, zklKey, zniCompare)
+import Data exposing (Direction(..), ZkNoteId)
+import DataUtil exposing (zklKey, zniCompare)
 import Dict exposing (Dict(..))
 import Element as E exposing (Element)
 import Element.Background as EBk
@@ -9,13 +10,10 @@ import Element.Border as EBd
 import Element.Events as EE
 import Element.Font as EF
 import Element.Input as EI
-import Element.Region
-import Json.Encode as JE
 import Orgauth.Data as OD
-import Search as S
+import Orgauth.UserId exposing (UserId(..))
 import SearchStackPanel as SP
 import TangoColors as TC
-import Time exposing (Zone)
 import Toop
 import Util
 import WindowKeys as WK
@@ -49,7 +47,7 @@ type alias Thing tmod tmsg tcmd =
 
 type alias Model tmod tmsg tcmd =
     { thing : Thing tmod tmsg tcmd
-    , ld : Data.LoginData
+    , ld : DataUtil.LoginData
     , spmodel : SP.Model
     , zklDict : Dict String Data.EditLink
     , zknSearchResult : Data.ZkListNoteSearchResult
@@ -78,8 +76,8 @@ type Msg tmsg
 type Command tcmd
     = None
     | SearchHistory
-    | Search S.ZkNoteSearch
-    | SyncFiles S.ZkNoteSearch
+    | Search Data.ZkNoteSearch
+    | SyncFiles Data.ZkNoteSearch
     | AddToRecent Data.ZkListNote
     | ThingCommand tcmd
 
@@ -90,7 +88,7 @@ init :
     -> Data.ZkListNoteSearchResult
     -> List Data.ZkListNote
     -> List Data.EditLink
-    -> Data.LoginData
+    -> DataUtil.LoginData
     -> Model tmod tmsg tcmd
 init thing spmodel spresult recentZkns links loginData =
     { thing = thing
@@ -122,7 +120,7 @@ showSr model zkln =
             zkln.user /= model.ld.userid
 
         sysColor =
-            ZC.systemColor Data.sysids zkln.sysids
+            ZC.systemColor DataUtil.sysids zkln.sysids
 
         mbTo =
             Dict.get (zklKey { direction = To, otherid = zkln.id })
@@ -210,7 +208,7 @@ showSr model zkln =
         listingrow
 
 
-showZkl : Maybe Data.EditLink -> Data.LoginData -> Maybe ZkNoteId -> Maybe E.Color -> Bool -> Data.EditLink -> Element (Msg tmsg)
+showZkl : Maybe Data.EditLink -> DataUtil.LoginData -> Maybe ZkNoteId -> Maybe E.Color -> Bool -> Data.EditLink -> Element (Msg tmsg)
 showZkl focusLink ld id sysColor showflip zkl =
     let
         ( dir, otherid ) =
@@ -384,7 +382,7 @@ view stylePalette recentZkns mbsize model =
                             |> List.map
                                 (\l ->
                                     ( l
-                                    , ZC.systemColor Data.sysids l.sysids
+                                    , ZC.systemColor DataUtil.sysids l.sysids
                                     )
                                 )
                             |> List.sortWith
@@ -500,11 +498,7 @@ update msg model =
             ( model, SearchHistory )
 
         AddToSearch zkln ->
-            let
-                spmod =
-                    model.spmodel
-            in
-            if List.any ((==) Data.sysids.searchid) zkln.sysids then
+            if List.any ((==) DataUtil.sysids.searchid) zkln.sysids then
                 ( { model
                     | spmodel = SP.setSearchString model.spmodel zkln.title
                   }
@@ -515,21 +509,17 @@ update msg model =
                 ( { model
                     | spmodel =
                         SP.addToSearch model.spmodel
-                            [ S.ExactMatch ]
+                            [ Data.ExactMatch ]
                             zkln.title
                   }
                 , None
                 )
 
         AddToSearchAsTag title ->
-            let
-                spmod =
-                    model.spmodel
-            in
             ( { model
                 | spmodel =
                     SP.addToSearch model.spmodel
-                        [ S.ExactMatch, S.Tag ]
+                        [ Data.ExactMatch, Data.Tag ]
                         title
               }
             , None
@@ -598,7 +588,7 @@ update msg model =
         FlipLink zkl ->
             let
                 zklf =
-                    { zkl | direction = Data.flipDirection zkl.direction }
+                    { zkl | direction = DataUtil.flipDirection zkl.direction }
             in
             ( { model
                 | zklDict =

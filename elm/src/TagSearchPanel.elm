@@ -18,7 +18,10 @@ module TagSearchPanel exposing
     , view
     )
 
+-- import Search exposing (AndOr(..), SearchMod(..), TSText, TagSearch(..), showSearchMod, tagSearchParser)
+
 import Common exposing (buttonStyle)
+import Data exposing (AndOr(..), SearchMod(..), TagSearch(..))
 import Element as E exposing (..)
 import Element.Background as EBk
 import Element.Border as EBd
@@ -28,9 +31,9 @@ import Element.Input as EI
 import Element.Keyed as EK
 import Html.Attributes as HA
 import Parser
-import Search exposing (AndOr(..), SearchMod(..), TSText, TagSearch(..), showSearchMod, tagSearchParser)
 import SearchHelpPanel
 import SearchLoc as SL exposing (TSLoc(..))
+import SearchUtil exposing (TSText, printTagSearch, showSearchMod, tagSearchParser)
 import TDict exposing (TDict)
 import TangoColors as TC
 import Util exposing (Size)
@@ -107,7 +110,7 @@ getSearch model =
             Just s
 
         NoSearch ->
-            Just <| SearchTerm [] ""
+            Just <| SearchTerm { mods = [], term = "" }
 
         TagSearch (Err _) ->
             Nothing
@@ -118,9 +121,9 @@ addToSearch mbtsloc searchmods name search =
     let
         term =
             SearchTerm
-                searchmods
-                -- escape single quotes
-                (String.replace "'" "\\'" name)
+                { mods = searchmods
+                , term = String.replace "'" "\\'" name
+                }
     in
     case search of
         NoSearch ->
@@ -136,14 +139,14 @@ addToSearch mbtsloc searchmods name search =
                         |> SL.getTerm tsloc
                         |> Maybe.andThen
                             (\tm ->
-                                SL.setTerm tsloc (Boolex tm And term) s
+                                SL.setTerm tsloc (Boolex { ts1 = tm, ao = And, ts2 = term }) s
                             )
                         |> Maybe.map (\ts -> TagSearch (Ok ts))
                         |> Maybe.withDefault
-                            (TagSearch (Ok (Boolex s And term)))
+                            (TagSearch (Ok (Boolex { ts1 = s, ao = And, ts2 = term })))
 
                 Nothing ->
-                    TagSearch (Ok (Boolex s And term))
+                    TagSearch (Ok (Boolex { ts1 = s, ao = And, ts2 = term }))
 
 
 addSearch : Search -> Search -> Search
@@ -164,7 +167,7 @@ addSearch ls rs =
                     ls
 
                 TagSearch (Ok sr) ->
-                    TagSearch (Ok (Boolex sl And sr))
+                    TagSearch (Ok (Boolex { ts1 = sl, ao = And, ts2 = sr }))
 
 
 setSearch : Model -> Search -> Model
@@ -173,7 +176,7 @@ setSearch model s =
         TagSearch (Ok ts) ->
             { model
                 | search = s
-                , searchText = Search.printTagSearch ts
+                , searchText = printTagSearch ts
             }
 
         NoSearch ->
@@ -196,7 +199,7 @@ addToSearchPanel model searchmods name =
         TagSearch (Ok ts) ->
             { model
                 | search = s
-                , searchText = Search.printTagSearch ts
+                , searchText = printTagSearch ts
             }
 
         _ ->
@@ -230,14 +233,14 @@ updateSearchText model txt =
                     (Ok
                         (txt
                             |> String.split " "
-                            |> List.map (Search.SearchTerm [])
+                            |> List.map (\t -> Data.SearchTerm { mods = [], term = t })
                             |> (\terms ->
                                     case terms of
                                         first :: rest ->
-                                            List.foldr (\t s -> Search.Boolex t Search.And s) first rest
+                                            List.foldr (\t s -> Data.Boolex { ts1 = t, ao = Data.And, ts2 = s }) first rest
 
                                         [] ->
-                                            Search.SearchTerm [] ""
+                                            Data.SearchTerm { mods = [], term = "" }
                                )
                         )
                     )
@@ -252,7 +255,7 @@ addSearchText model txt =
                 TagSearch <| Parser.run tagSearchParser txt
 
             else
-                TagSearch <| Ok <| Search.SearchTerm [] txt
+                TagSearch <| Ok <| Data.SearchTerm { mods = [], term = txt }
 
         nsearch =
             addSearch addsearch model.search
@@ -260,7 +263,7 @@ addSearchText model txt =
     case nsearch of
         TagSearch (Ok ts) ->
             { model
-                | searchText = Search.printTagSearch ts
+                | searchText = printTagSearch ts
                 , search = nsearch
             }
 
@@ -321,7 +324,7 @@ viewSearchHelper mbfocusloc indent lts ts =
                     EF.color TC.black
     in
     case ts of
-        SearchTerm searchmods term ->
+        SearchTerm { mods, term } ->
             let
                 tloc =
                     toLoc lts LThis
@@ -332,7 +335,7 @@ viewSearchHelper mbfocusloc indent lts ts =
                 modbutton =
                     \mod label ->
                         EI.button
-                            (if List.member mod searchmods then
+                            (if List.member mod mods then
                                 downButtonStyle
 
                              else
@@ -422,7 +425,7 @@ viewSearchHelper mbfocusloc indent lts ts =
                            <|
                             E.text term
                          ]
-                            ++ List.map modindicator searchmods
+                            ++ List.map modindicator mods
                         )
                 ]
             ]
@@ -465,9 +468,9 @@ viewSearchHelper mbfocusloc indent lts ts =
                         ]
                 ]
             ]
-                ++ viewSearchHelper mbfocusloc (indent + 1) (LNot :: lts) nts
+                ++ viewSearchHelper mbfocusloc (indent + 1) (LNot :: lts) nts.ts
 
-        Boolex ts1 andor ts2 ->
+        Boolex { ts1, ao, ts2 } ->
             let
                 tloc =
                     toLoc lts LThis
@@ -483,7 +486,7 @@ viewSearchHelper mbfocusloc indent lts ts =
                                     ]
                                   <|
                                     E.text
-                                        (case andor of
+                                        (case ao of
                                             And ->
                                                 "and"
 
@@ -495,7 +498,7 @@ viewSearchHelper mbfocusloc indent lts ts =
                                     { onPress = Just (ToggleAndOr tloc)
                                     , label =
                                         text
-                                            (case andor of
+                                            (case ao of
                                                 And ->
                                                     "or"
 
@@ -530,7 +533,7 @@ viewSearchHelper mbfocusloc indent lts ts =
                                 ]
                                 [ E.el [ color tloc ] <|
                                     E.text
-                                        (case andor of
+                                        (case ao of
                                             And ->
                                                 "and"
 
@@ -726,7 +729,7 @@ view showCopy narrow nblevel model =
                                             column [ width fill ]
                                                 [ paragraph [ spacing 3, width fill ]
                                                     [ text "search expression:"
-                                                    , paragraph [] [ text <| Search.printTagSearch ts ]
+                                                    , paragraph [] [ text <| printTagSearch ts ]
                                                     , el [ alignRight ] <| toggleHelpButton model.showHelp
                                                     ]
                                                 , if model.showHelp then
@@ -856,17 +859,20 @@ update msg model =
                                 |> Maybe.andThen
                                     (\term ->
                                         case term of
-                                            Boolex ts1 andor ts2 ->
+                                            Boolex { ts1, ao, ts2 } ->
                                                 SL.setTerm tsl
-                                                    (Boolex ts1
-                                                        (case andor of
-                                                            And ->
-                                                                Or
+                                                    (Boolex
+                                                        { ts1 = ts1
+                                                        , ao =
+                                                            case ao of
+                                                                And ->
+                                                                    Or
 
-                                                            Or ->
-                                                                And
-                                                        )
-                                                        ts2
+                                                                Or ->
+                                                                    And
+                                                        , ts2 =
+                                                            ts2
+                                                        }
                                                     )
                                                     search
                                                     |> Maybe.map (TagSearch << Ok)
@@ -892,7 +898,7 @@ update msg model =
                                 |> SL.getTerm tsl
                                 |> Maybe.andThen
                                     (\term ->
-                                        SL.setTerm tsl (Not term) search
+                                        SL.setTerm tsl (Not { ts = term }) search
                                             |> Maybe.map (TagSearch << Ok)
                                     )
                                 |> Maybe.withDefault model.search
@@ -948,16 +954,16 @@ update msg model =
                                 |> Maybe.andThen
                                     (\term ->
                                         case term of
-                                            SearchTerm mods str ->
+                                            SearchTerm st ->
                                                 let
                                                     nmods =
-                                                        if List.member mod mods then
-                                                            List.filter (\i -> i /= mod) mods
+                                                        if List.member mod st.mods then
+                                                            List.filter (\i -> i /= mod) st.mods
 
                                                         else
-                                                            mod :: mods
+                                                            mod :: st.mods
                                                 in
-                                                SL.setTerm tsl (SearchTerm nmods str) search
+                                                SL.setTerm tsl (SearchTerm { mods = nmods, term = st.term }) search
                                                     |> Maybe.map (\s -> TagSearch (Ok s))
 
                                             _ ->
@@ -982,8 +988,8 @@ update msg model =
                                 |> Maybe.andThen
                                     (\term ->
                                         case term of
-                                            SearchTerm mods str ->
-                                                SL.setTerm tsl (SearchTerm mods nstr) search
+                                            SearchTerm { mods } ->
+                                                SL.setTerm tsl (SearchTerm { mods = mods, term = nstr }) search
                                                     |> Maybe.map (\s -> TagSearch (Ok s))
 
                                             _ ->

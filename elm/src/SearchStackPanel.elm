@@ -16,22 +16,14 @@ module SearchStackPanel exposing
     )
 
 import Common exposing (buttonStyle)
-import Data
+import Data exposing (AndOr(..), SearchMod(..), TagSearch(..))
 import Element as E exposing (..)
 import Element.Background as EBk
-import Element.Border as EBd
-import Element.Events exposing (onClick)
 import Element.Font as Font
 import Element.Input as EI
-import PaginationPanel as PP
-import Parser
-import Search as S exposing (AndOr(..), SearchMod(..), TSText, TagSearch(..), tagSearchParser)
-import SearchHelpPanel
 import SearchPanel as SP
-import TDict exposing (TDict)
-import TagSearchPanel as TSP
+import SearchUtil as SU exposing (andifySearches)
 import TangoColors as TC
-import Util exposing (Size)
 
 
 
@@ -57,17 +49,15 @@ searchResultUpdated zsr model =
     { model | spmodel = SP.searchResultUpdated zsr model.spmodel }
 
 
-andifySearch : List TagSearch -> TagSearch -> TagSearch
-andifySearch searches search =
-    List.foldr (\sl sr -> Boolex sl And sr) search searches
-
-
-getSearch : Model -> Maybe S.ZkNoteSearch
+getSearch : Model -> Maybe Data.ZkNoteSearch
 getSearch model =
     SP.getSearch model.spmodel
         |> Maybe.map
             (\s ->
-                { s | tagSearch = model.searchStack ++ s.tagSearch }
+                { s
+                    | tagsearch =
+                        model.searchStack
+                }
             )
 
 
@@ -86,7 +76,7 @@ setSearch model tsl =
             }
 
         [] ->
-            { model | spmodel = SP.setSearch model.spmodel (S.SearchTerm [] "") }
+            { model | spmodel = SP.setSearch model.spmodel (Data.SearchTerm { mods = [], term = "" }) }
 
 
 setSearchString : Model -> String -> Model
@@ -126,8 +116,8 @@ handleSpUpdate model ( nm, cmd ) =
             ( { model | spmodel = nm }
             , Search <|
                 { ts
-                    | tagSearch =
-                        model.searchStack ++ ts.tagSearch
+                    | tagsearch =
+                        model.searchStack ++ ts.tagsearch
                 }
             )
 
@@ -135,8 +125,8 @@ handleSpUpdate model ( nm, cmd ) =
             ( { model | spmodel = nm }
             , SyncFiles <|
                 { ts
-                    | tagSearch =
-                        model.searchStack ++ ts.tagSearch
+                    | tagsearch =
+                        model.searchStack ++ ts.tagsearch
                 }
             )
 
@@ -165,23 +155,23 @@ type Msg
 type Command
     = None
     | Save
-    | Search S.ZkNoteSearch
-    | SyncFiles S.ZkNoteSearch
+    | Search Data.ZkNoteSearch
+    | SyncFiles Data.ZkNoteSearch
     | Copy String
 
 
 view : Bool -> Bool -> Int -> Model -> Element Msg
 view showCopy narrow nblevel model =
     E.column [ E.width E.fill, E.spacing 3 ] <|
-        (if List.isEmpty model.searchStack then
+        [ if List.isEmpty model.searchStack then
             E.none
 
-         else
+          else
             E.column [ E.width E.fill, E.spacing 3, E.padding 3, EBk.color TC.lightGrey ] <|
                 List.indexedMap
                     (\i ts ->
                         E.row [ E.width E.fill, E.centerY ]
-                            [ E.el [ E.width E.fill, E.clipX, E.height E.fill ] <| E.text <| S.printTagSearch ts
+                            [ E.el [ E.width E.fill, E.clipX, E.height E.fill ] <| E.text <| SU.printTagSearch ts
                             , EI.button (buttonStyle ++ [ E.alignRight ])
                                 { label =
                                     E.el [ Font.family [ Font.monospace ] ] <|
@@ -191,9 +181,8 @@ view showCopy narrow nblevel model =
                             ]
                     )
                     model.searchStack
-        )
-            :: [ E.map SPMsg <| SP.view showCopy narrow nblevel model.spmodel
-               ]
+        , E.map SPMsg <| SP.view showCopy narrow nblevel model.spmodel
+        ]
 
 
 update : Msg -> Model -> ( Model, Command )

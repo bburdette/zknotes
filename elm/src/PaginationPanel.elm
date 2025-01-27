@@ -1,10 +1,10 @@
 module PaginationPanel exposing (Command(..), Model, Msg(..), initModel, searchResultUpdated, update, view)
 
 import Common exposing (buttonStyle)
-import Data
+import Data exposing (AndOr(..), SearchMod(..), TagSearch(..))
 import Element as E exposing (Element)
 import Element.Input as Input
-import Search as S exposing (AndOr(..), SearchMod(..), TagSearch(..))
+import SearchUtil exposing (defaultSearchLimit)
 
 
 type alias Model =
@@ -16,7 +16,7 @@ type alias Model =
 
 initModel : Model
 initModel =
-    { increment = S.defaultSearchLimit
+    { increment = defaultSearchLimit
     , offset = 0
     , end = False
     }

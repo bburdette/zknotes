@@ -5,7 +5,8 @@ import Browser
 import Browser.Events
 import Browser.Navigation
 import Common
-import Data exposing (FileUrlInfo, ZkNoteId, jobComplete, zniEq)
+import Data exposing (ZkNoteId)
+import DataUtil exposing (FileUrlInfo, LoginData, jobComplete, showPrivateReply, zniEq)
 import Dict exposing (Dict)
 import DisplayMessage
 import EditZkNote
@@ -28,24 +29,23 @@ import LocalStorage as LS
 import MdCommon as MC
 import MessageNLink
 import NoteCache as NC exposing (NoteCache)
-import Orgauth.AdminInterface as AI
 import Orgauth.ChangeEmail as CE
 import Orgauth.ChangePassword as CP
 import Orgauth.Data as OD
+import Orgauth.DataUtil as ODU
 import Orgauth.Invited as Invited
 import Orgauth.Login as Login
 import Orgauth.ResetPassword as ResetPassword
 import Orgauth.ShowUrl as ShowUrl
 import Orgauth.UserEdit as UserEdit
-import Orgauth.UserInterface as UI
+import Orgauth.UserId exposing (getUserIdVal)
 import Orgauth.UserListing as UserListing
 import Platform.Cmd as Cmd
-import PublicInterface as PI
 import Random exposing (Seed, initialSeed)
 import RequestsDialog exposing (TRequest(..), TRequests)
 import Route exposing (Route(..), parseUrl, routeTitle, routeUrl)
-import Search as S
 import SearchStackPanel as SP
+import SearchUtil as SU
 import SelectString as SS
 import ShowMessage
 import TSet
@@ -54,13 +54,13 @@ import TagFiles
 import Task
 import Time
 import Toop
+import UUID
 import Url exposing (Url)
 import UserSettings
 import Util exposing (andMap)
 import View
 import WindowKeys
 import ZkCommon exposing (StylePalette)
-import ZkInterface as ZI
 
 
 type Msg
@@ -75,13 +75,13 @@ type Msg
     | UserEditMsg UserEdit.Msg
     | ImportMsg Import.Msg
     | ShowMessageMsg ShowMessage.Msg
-    | UserReplyData (Result Http.Error UI.ServerResponse)
-    | AdminReplyData (Result Http.Error AI.ServerResponse)
-    | ZkReplyData (Result Http.Error ( Time.Posix, ZI.ServerResponse ))
-    | ZkReplyDataSeq (Result Http.Error ( Time.Posix, ZI.ServerResponse ) -> Maybe (Cmd Msg)) (Result Http.Error ( Time.Posix, ZI.ServerResponse ))
-    | TAReplyData Data.TASelection (Result Http.Error ( Time.Posix, ZI.ServerResponse ))
-    | PublicReplyData (Result Http.Error ( Time.Posix, PI.ServerResponse ))
-    | ErrorIndexNote (Result Http.Error PI.ServerResponse)
+    | UserReplyData (Result Http.Error OD.UserResponse)
+    | AdminReplyData (Result Http.Error OD.AdminResponse)
+    | ZkReplyData (Result Http.Error ( Time.Posix, Data.PrivateReply ))
+    | ZkReplyDataSeq (Result Http.Error ( Time.Posix, Data.PrivateReply ) -> Maybe (Cmd Msg)) (Result Http.Error ( Time.Posix, Data.PrivateReply ))
+    | TAReplyData DataUtil.TASelection (Result Http.Error ( Time.Posix, Data.PrivateReply ))
+    | PublicReplyData (Result Http.Error ( Time.Posix, Data.PublicReply ))
+    | ErrorIndexNote (Result Http.Error Data.PublicReply)
     | TauriZkReplyData JD.Value
     | TauriUserReplyData JD.Value
     | TauriAdminReplyData JD.Value
@@ -103,8 +103,8 @@ type Msg
     | WkMsg (Result JD.Error WindowKeys.Key)
     | ReceiveLocalVal { for : String, name : String, value : Maybe String }
     | OnFileSelected F.File (List F.File)
-    | FileUploadedButGetTime String (Result Http.Error ZI.ServerResponse)
-    | FileUploaded String (Result Http.Error ( Time.Posix, ZI.ServerResponse ))
+    | FileUploadedButGetTime String (Result Http.Error Data.UploadReply)
+    | FileUploaded String (Result Http.Error ( Time.Posix, Data.UploadReply ))
     | RequestProgress String Http.Progress
     | RequestsDialogMsg (GD.Msg RequestsDialog.Msg)
     | JobsDialogMsg (GD.Msg JobsDialog.Msg)
@@ -117,29 +117,29 @@ type Msg
 type State
     = Login Login.Model Route
     | Invited Invited.Model
-    | EditZkNote EditZkNote.Model Data.LoginData
-    | EditZkNoteListing EditZkNoteListing.Model Data.LoginData
-    | ArchiveListing ArchiveListing.Model Data.LoginData
+    | EditZkNote EditZkNote.Model LoginData
+    | EditZkNoteListing EditZkNoteListing.Model LoginData
+    | ArchiveListing ArchiveListing.Model LoginData
     | View View.Model
     | EView View.Model State
-    | Import Import.Model Data.LoginData
-    | UserSettings UserSettings.Model Data.LoginData State
-    | ShowMessage ShowMessage.Model Data.LoginData (Maybe State)
+    | Import Import.Model LoginData
+    | UserSettings UserSettings.Model LoginData State
+    | ShowMessage ShowMessage.Model LoginData (Maybe State)
     | PubShowMessage ShowMessage.Model (Maybe State)
-    | LoginShowMessage ShowMessage.Model Data.LoginData Url
+    | LoginShowMessage ShowMessage.Model LoginData Url
     | SelectDialog (SS.GDModel Int) State
     | ChangePasswordDialog CP.GDModel State
     | ChangeEmailDialog CE.GDModel State
     | ResetPassword ResetPassword.Model
-    | UserListing UserListing.Model Data.LoginData (Maybe ( SP.Model, Data.ZkListNoteSearchResult ))
-    | UserEdit UserEdit.Model Data.LoginData
-    | ShowUrl ShowUrl.Model Data.LoginData
+    | UserListing UserListing.Model LoginData (Maybe ( SP.Model, Data.ZkListNoteSearchResult ))
+    | UserEdit UserEdit.Model LoginData
+    | ShowUrl ShowUrl.Model LoginData
     | DisplayMessage DisplayMessage.GDModel State
     | MessageNLink MessageNLink.GDModel State
     | RequestsDialog RequestsDialog.GDModel State
     | JobsDialog JobsDialog.GDModel State
-    | TagFiles (TagAThing.Model TagFiles.Model TagFiles.Msg TagFiles.Command) Data.LoginData State
-    | InviteUser (TagAThing.Model InviteUser.Model InviteUser.Msg InviteUser.Command) Data.LoginData State
+    | TagFiles (TagAThing.Model TagFiles.Model TagFiles.Msg TagFiles.Command) LoginData State
+    | InviteUser (TagAThing.Model InviteUser.Model InviteUser.Msg InviteUser.Command) LoginData State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
 
 
@@ -153,9 +153,9 @@ decodeFlags =
         |> andMap (JD.field "debugstring" JD.string)
         |> andMap (JD.field "width" JD.int)
         |> andMap (JD.field "height" JD.int)
-        |> andMap (JD.field "errorid" (JD.maybe Data.decodeZkNoteId))
-        |> andMap (JD.field "login" (JD.maybe Data.decodeLoginData))
-        |> andMap (JD.field "adminsettings" OD.decodeAdminSettings)
+        |> andMap (JD.field "errorid" (JD.maybe Data.zkNoteIdDecoder))
+        |> andMap (JD.field "login" (JD.maybe DataUtil.decodeLoginData))
+        |> andMap (JD.field "adminsettings" OD.adminSettingsDecoder)
         |> andMap (JD.field "tauri" JD.bool)
 
 
@@ -168,7 +168,7 @@ type alias Flags =
     , width : Int
     , height : Int
     , errorid : Maybe ZkNoteId
-    , login : Maybe Data.LoginData
+    , login : Maybe DataUtil.LoginData
     , adminsettings : OD.AdminSettings
     , tauri : Bool
     }
@@ -194,7 +194,7 @@ type alias Model =
     , timezone : Time.Zone
     , savedRoute : SavedRoute
     , initialRoute : Route
-    , prevSearches : List (List S.TagSearch)
+    , prevSearches : List (List Data.TagSearch)
     , recentNotes : List Data.ZkListNote
     , errorNotes : Dict String String
     , fontsize : Int
@@ -247,7 +247,7 @@ routeState model route =
             ( st
             , Cmd.batch
                 [ cmds
-                , sendZIMsg model.fui (ZI.SearchZkNotes <| prevSearchQuery login)
+                , sendZIMsg model.fui (Data.PvqSearchZkNotes <| prevSearchQuery login)
                 ]
             )
 
@@ -272,10 +272,10 @@ routeStateInternal model route =
                     , case model.state of
                         EView _ _ ->
                             -- if we're in "EView" then do this request to stay in EView.
-                            sendPIMsg model.fui (PI.GetZkNoteAndLinks { zknote = id, what = "" })
+                            sendPIMsg model.fui (Data.PbrGetZkNoteAndLinks { zknote = id, what = "" })
 
                         _ ->
-                            sendZIMsg model.fui (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
+                            sendZIMsg model.fui (Data.PvqGetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
                 Nothing ->
@@ -283,7 +283,7 @@ routeStateInternal model route =
                         { message = "loading article"
                         }
                         (Just model.state)
-                    , sendPIMsg model.fui (PI.GetZkNoteAndLinks { zknote = id, what = "" })
+                    , sendPIMsg model.fui (Data.PbrGetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
         PublicZkPubId pubid ->
@@ -300,24 +300,24 @@ routeStateInternal model route =
                         { message = "loading article"
                         }
                         (Just model.state)
-            , sendPIMsg model.fui (PI.GetZkNotePubId pubid)
+            , sendPIMsg model.fui (Data.PbrGetZkNotePubId pubid)
             )
 
         EditZkNoteR id ->
             case model.state of
                 EditZkNote st login ->
                     ( EditZkNote st login
-                    , sendZIMsg model.fui (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
+                    , sendZIMsg model.fui (Data.PvqGetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
                 EditZkNoteListing st login ->
                     ( EditZkNoteListing st login
-                    , sendZIMsg model.fui (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
+                    , sendZIMsg model.fui (Data.PvqGetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
                 EView st login ->
                     ( EView st login
-                    , sendPIMsg model.fui (PI.GetZkNoteAndLinks { zknote = id, what = "" })
+                    , sendPIMsg model.fui (Data.PbrGetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
                 st ->
@@ -326,13 +326,13 @@ routeStateInternal model route =
                             ( ShowMessage { message = "loading note..." }
                                 login
                                 (Just model.state)
-                            , sendZIMsg model.fui (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
+                            , sendZIMsg model.fui (Data.PvqGetZkNoteAndLinks { zknote = id, what = "" })
                             )
 
                         Nothing ->
                             ( PubShowMessage { message = "loading note..." }
                                 (Just model.state)
-                            , sendPIMsg model.fui (PI.GetZkNoteAndLinks { zknote = id, what = "" })
+                            , sendPIMsg model.fui (Data.PbrGetZkNoteAndLinks { zknote = id, what = "" })
                             )
 
         EditZkNoteNew ->
@@ -374,10 +374,10 @@ routeStateInternal model route =
                 ArchiveListing st login ->
                     ( ArchiveListing st login
                     , sendZIMsg model.fui
-                        (ZI.GetZkNoteArchives
+                        (Data.PvqGetZkNoteArchives
                             { zknote = id
                             , offset = 0
-                            , limit = Just S.defaultSearchLimit
+                            , limit = Just SU.defaultSearchLimit
                             }
                         )
                     )
@@ -389,10 +389,10 @@ routeStateInternal model route =
                                 login
                                 (Just model.state)
                             , sendZIMsg model.fui
-                                (ZI.GetZkNoteArchives
+                                (Data.PvqGetZkNoteArchives
                                     { zknote = id
                                     , offset = 0
-                                    , limit = Just S.defaultSearchLimit
+                                    , limit = Just SU.defaultSearchLimit
                                     }
                                 )
                             )
@@ -404,17 +404,17 @@ routeStateInternal model route =
             let
                 getboth =
                     sendZIMsgExp model.fui.location
-                        (ZI.GetZkNoteArchives
+                        (Data.PvqGetZkNoteArchives
                             { zknote = id
                             , offset = 0
-                            , limit = Just S.defaultSearchLimit
+                            , limit = Just SU.defaultSearchLimit
                             }
                         )
                         (ZkReplyDataSeq
                             (\_ ->
                                 Just <|
                                     sendZIMsg model.fui
-                                        (ZI.GetArchiveZkNote { parentnote = id, noteid = aid })
+                                        (Data.PvqGetArchiveZkNote { parentnote = id, noteid = aid })
                             )
                         )
             in
@@ -423,7 +423,7 @@ routeStateInternal model route =
                     if zniEq st.noteid id then
                         ( ArchiveListing st login
                         , sendZIMsg model.fui
-                            (ZI.GetArchiveZkNote { parentnote = id, noteid = aid })
+                            (Data.PvqGetArchiveZkNote { parentnote = id, noteid = aid })
                         )
 
                     else
@@ -456,7 +456,7 @@ routeStateInternal model route =
 
         Invite token ->
             ( PubShowMessage { message = "retrieving invite" } Nothing
-            , sendUIMsg model.fui (UI.ReadInvite token)
+            , sendUIMsg model.fui (OD.UrqReadInvite token)
             )
 
         Top ->
@@ -467,8 +467,8 @@ routeStateInternal model route =
                             ( model.state
                             , Cmd.batch
                                 [ sendZIMsg model.fui
-                                    (ZI.SearchZkNotes <| prevSearchQuery login)
-                                , sendZIMsg model.fui (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
+                                    (Data.PvqSearchZkNotes <| prevSearchQuery login)
+                                , sendZIMsg model.fui (Data.PvqGetZkNoteAndLinks { zknote = id, what = "" })
                                 ]
                             )
 
@@ -485,7 +485,7 @@ routeStateInternal model route =
                                 )
                                 login
                             , sendZIMsg model.fui
-                                (ZI.SearchZkNotes <| prevSearchQuery login)
+                                (Data.PvqSearchZkNotes <| prevSearchQuery login)
                             )
 
                 Nothing ->
@@ -597,7 +597,7 @@ showMessage msg =
 
         UserReplyData urd ->
             "UserReplyData: "
-                ++ (Result.map UI.showServerResponse urd
+                ++ (Result.map ODU.showUserResponse urd
                         |> Result.mapError Util.httpErrorString
                         |> (\r ->
                                 case r of
@@ -611,7 +611,7 @@ showMessage msg =
 
         AdminReplyData urd ->
             "AdminReplyData: "
-                ++ (Result.map AI.showServerResponse urd
+                ++ (Result.map ODU.showAdminResponse urd
                         |> Result.mapError Util.httpErrorString
                         |> (\r ->
                                 case r of
@@ -627,7 +627,7 @@ showMessage msg =
             "ZkReplyData: "
                 ++ (case urd of
                         Ok ( _, m ) ->
-                            "message: " ++ ZI.showServerResponse m
+                            "message: " ++ showPrivateReply m
 
                         Err e ->
                             "error: " ++ Util.httpErrorString e
@@ -637,7 +637,7 @@ showMessage msg =
             "ZkReplyDataSeq : "
                 ++ (case urd of
                         Ok ( _, m ) ->
-                            "message: " ++ ZI.showServerResponse m
+                            "message: " ++ showPrivateReply m
 
                         Err e ->
                             "error: " ++ Util.httpErrorString e
@@ -647,7 +647,7 @@ showMessage msg =
             "TAReplyData: "
                 ++ (case urd of
                         Ok ( _, m ) ->
-                            "message: " ++ ZI.showServerResponse m
+                            "message: " ++ showPrivateReply m
 
                         Err e ->
                             "error: " ++ Util.httpErrorString e
@@ -1023,7 +1023,7 @@ stateSearch state =
             Just ( model.spmodel, model.zknSearchResult )
 
 
-stateLogin : State -> Maybe Data.LoginData
+stateLogin : State -> Maybe LoginData
 stateLogin state =
     case state of
         Login _ _ ->
@@ -1105,34 +1105,34 @@ stateLogin state =
             Just login
 
 
-sendUIMsg : FileUrlInfo -> UI.SendMsg -> Cmd Msg
+sendUIMsg : FileUrlInfo -> OD.UserRequest -> Cmd Msg
 sendUIMsg fui msg =
     if fui.tauri then
-        sendUIValueTauri (UI.encodeSendMsg msg)
+        sendUIValueTauri (OD.userRequestEncoder msg)
 
     else
         Http.post
             { url = fui.location ++ "/user"
-            , body = Http.jsonBody (UI.encodeSendMsg msg)
-            , expect = Http.expectJson UserReplyData UI.serverResponseDecoder
+            , body = Http.jsonBody (OD.userRequestEncoder msg)
+            , expect = Http.expectJson UserReplyData OD.userResponseDecoder
             }
 
 
-sendAIMsg : String -> AI.SendMsg -> Cmd Msg
+sendAIMsg : String -> OD.AdminRequest -> Cmd Msg
 sendAIMsg location msg =
     sendAIMsgExp location msg AdminReplyData
 
 
-sendAIMsgExp : String -> AI.SendMsg -> (Result Http.Error AI.ServerResponse -> Msg) -> Cmd Msg
+sendAIMsgExp : String -> OD.AdminRequest -> (Result Http.Error OD.AdminResponse -> Msg) -> Cmd Msg
 sendAIMsgExp location msg tomsg =
     Http.post
         { url = location ++ "/admin"
-        , body = Http.jsonBody (AI.encodeSendMsg msg)
-        , expect = Http.expectJson tomsg AI.serverResponseDecoder
+        , body = Http.jsonBody (OD.adminRequestEncoder msg)
+        , expect = Http.expectJson tomsg OD.adminResponseDecoder
         }
 
 
-sendZIMsg : FileUrlInfo -> ZI.SendMsg -> Cmd Msg
+sendZIMsg : FileUrlInfo -> Data.PrivateRequest -> Cmd Msg
 sendZIMsg fui msg =
     if fui.tauri then
         sendZIMsgTauri msg
@@ -1141,17 +1141,17 @@ sendZIMsg fui msg =
         sendZIMsgExp fui.location msg ZkReplyData
 
 
-sendZIMsgTauri : ZI.SendMsg -> Cmd Msg
+sendZIMsgTauri : Data.PrivateRequest -> Cmd Msg
 sendZIMsgTauri msg =
-    sendZIValueTauri <| ZI.encodeSendMsg msg
+    sendZIValueTauri <| Data.privateRequestEncoder msg
 
 
-sendZIMsgExp : String -> ZI.SendMsg -> (Result Http.Error ( Time.Posix, ZI.ServerResponse ) -> Msg) -> Cmd Msg
+sendZIMsgExp : String -> Data.PrivateRequest -> (Result Http.Error ( Time.Posix, Data.PrivateReply ) -> Msg) -> Cmd Msg
 sendZIMsgExp location msg tomsg =
     HE.postJsonTask
         { url = location ++ "/private"
-        , body = Http.jsonBody (ZI.encodeSendMsg msg)
-        , decoder = ZI.serverResponseDecoder
+        , body = Http.jsonBody (Data.privateRequestEncoder msg)
+        , decoder = Data.privateReplyDecoder
         }
         |> Task.andThen (\x -> Task.map (\posix -> ( posix, x )) Time.now)
         |> Task.attempt tomsg
@@ -1159,7 +1159,7 @@ sendZIMsgExp location msg tomsg =
 
 {-| send search AND save search in db as a zknote
 -}
-sendSearch : Model -> S.ZkNoteSearch -> ( Model, Cmd Msg )
+sendSearch : Model -> Data.ZkNoteSearch -> ( Model, Cmd Msg )
 sendSearch model search =
     case stateLogin model.state of
         Just ldata ->
@@ -1168,14 +1168,14 @@ sendSearch model search =
                     { note =
                         { id = Nothing
                         , pubid = Nothing
-                        , title = S.printTagSearch (S.getTagSearch search)
-                        , content = S.encodeTsl search.tagSearch |> JE.encode 2
+                        , title = SU.printTagSearch (SU.andifySearches search.tagsearch)
+                        , content = JE.list Data.tagSearchEncoder search.tagsearch |> JE.encode 2
                         , editable = False
                         , showtitle = True
                         , deleted = False
                         }
                     , links =
-                        [ { otherid = Data.sysids.searchid
+                        [ { otherid = DataUtil.sysids.searchid
                           , direction = Data.To
                           , user = ldata.userid
                           , zknote = Nothing
@@ -1186,19 +1186,19 @@ sendSearch model search =
             in
             -- if this is the same search as last time, don't save.
             if
-                (List.head model.prevSearches == Just search.tagSearch)
-                    || (search.tagSearch == [ S.SearchTerm [] "" ])
+                (List.head model.prevSearches == Just search.tagsearch)
+                    || (search.tagsearch == [ Data.SearchTerm { mods = [], term = "" } ])
             then
                 ( model
-                , sendZIMsg model.fui (ZI.SearchZkNotes search)
+                , sendZIMsg model.fui (Data.PvqSearchZkNotes search)
                 )
 
             else
-                ( { model | prevSearches = search.tagSearch :: model.prevSearches }
+                ( { model | prevSearches = search.tagsearch :: model.prevSearches }
                 , Cmd.batch
-                    [ sendZIMsg model.fui (ZI.SearchZkNotes search)
+                    [ sendZIMsg model.fui (Data.PvqSearchZkNotes search)
                     , sendZIMsgExp model.fui.location
-                        (ZI.SaveZkNoteAndLinks searchnote)
+                        (Data.PvqSaveZkNoteAndLinks searchnote)
                         -- ignore the reply!  otherwise if you search while
                         -- creating a new note, that new note gets the search note
                         -- id.
@@ -1212,21 +1212,21 @@ sendSearch model search =
             )
 
 
-sendPIMsg : FileUrlInfo -> PI.SendMsg -> Cmd Msg
+sendPIMsg : FileUrlInfo -> Data.PublicRequest -> Cmd Msg
 sendPIMsg fui msg =
     sendPIMsgExp fui msg PublicReplyData
 
 
-sendPIMsgExp : FileUrlInfo -> PI.SendMsg -> (Result Http.Error ( Time.Posix, PI.ServerResponse ) -> Msg) -> Cmd Msg
+sendPIMsgExp : FileUrlInfo -> Data.PublicRequest -> (Result Http.Error ( Time.Posix, Data.PublicReply ) -> Msg) -> Cmd Msg
 sendPIMsgExp fui msg tomsg =
     if fui.tauri then
-        sendPIValueTauri <| PI.encodeSendMsg msg
+        sendPIValueTauri <| Data.publicRequestEncoder msg
 
     else
         HE.postJsonTask
             { url = fui.location ++ "/public"
-            , body = Http.jsonBody (PI.encodeSendMsg msg)
-            , decoder = PI.serverResponseDecoder
+            , body = Http.jsonBody (Data.publicRequestEncoder msg)
+            , decoder = Data.publicReplyDecoder
             }
             |> Task.andThen (\x -> Task.map (\posix -> ( posix, x )) Time.now)
             |> Task.attempt tomsg
@@ -1397,7 +1397,7 @@ urlupdate msg model =
                                         Cmd.batch
                                             [ icmd
                                             , sendZIMsg model.fui
-                                                (ZI.SaveZkNoteAndLinks <| EditZkNote.fullSave s)
+                                                (Data.PvqSaveZkNoteAndLinks <| EditZkNote.fullSave s)
                                             ]
 
                                     else
@@ -1481,7 +1481,10 @@ shDialog model =
         | state =
             SelectDialog
                 (SS.init
-                    { choices = List.indexedMap (\i ps -> ( i, S.printTagSearch (S.andifySearches ps) )) model.prevSearches
+                    { choices =
+                        List.indexedMap
+                            (\i ps -> ( i, SU.printTagSearch (SU.andifySearches ps) ))
+                            model.prevSearches
                     , selected = Nothing
                     , search = ""
                     }
@@ -1529,7 +1532,7 @@ onZkNoteEditWhat model pt znew =
     if znew.what == "cache" then
         ( { model
             | noteCache =
-                NC.addNote pt znew.znl model.noteCache
+                NC.addNote pt znew.znl.zknote.id (NC.ZNAL znew.znl) model.noteCache
                     |> NC.purgeNotes
           }
         , Cmd.none
@@ -1584,7 +1587,7 @@ onZkNoteEditWhat model pt znew =
                             }
                     , noteCache = NC.setKeeps (MC.noteIds nst.md) model.noteCache
                   }
-                , Cmd.batch ((sendZIMsg model.fui <| ZI.GetZkNoteComments c) :: ngets)
+                , Cmd.batch ((sendZIMsg model.fui <| Data.PvqGetZkNoteComments c) :: ngets)
                 )
 
             _ ->
@@ -1621,7 +1624,7 @@ actualupdate msg model =
             ( model, Cmd.none )
 
         ( TauriZkReplyData jd, _ ) ->
-            case JD.decodeValue (makeTDDecoder ZI.serverResponseDecoder) jd of
+            case JD.decodeValue (makeTDDecoder Data.privateReplyDecoder) jd of
                 Ok td ->
                     actualupdate (ZkReplyData (Ok ( td.utc, td.data ))) model
 
@@ -1631,7 +1634,7 @@ actualupdate msg model =
                     )
 
         ( TauriUserReplyData jd, _ ) ->
-            case JD.decodeValue UI.serverResponseDecoder jd of
+            case JD.decodeValue OD.userResponseDecoder jd of
                 Ok d ->
                     actualupdate (UserReplyData (Ok d)) model
 
@@ -1641,7 +1644,7 @@ actualupdate msg model =
                     )
 
         ( TauriAdminReplyData jd, _ ) ->
-            case JD.decodeValue AI.serverResponseDecoder jd of
+            case JD.decodeValue OD.adminResponseDecoder jd of
                 Ok d ->
                     actualupdate (AdminReplyData (Ok d)) model
 
@@ -1651,7 +1654,7 @@ actualupdate msg model =
                     )
 
         ( TauriPublicReplyData jd, _ ) ->
-            case JD.decodeValue (makeTDDecoder PI.serverResponseDecoder) jd of
+            case JD.decodeValue (makeTDDecoder Data.publicReplyDecoder) jd of
                 Ok td ->
                     actualupdate (PublicReplyData (Ok ( td.utc, td.data ))) model
 
@@ -1674,15 +1677,15 @@ actualupdate msg model =
                             let
                                 sendsearch =
                                     sendZIMsg model.fui
-                                        (ZI.SearchZkNotes
-                                            { tagSearch = ts
+                                        (Data.PvqSearchZkNotes
+                                            { tagsearch = ts
                                             , offset = 0
                                             , limit = Nothing
                                             , what = ""
-                                            , resultType = S.RtListNote
+                                            , resulttype = Data.RtListNote
                                             , archives = False
                                             , deleted = False
-                                            , unsynced = False
+                                            , ordering = Nothing
                                             }
                                         )
 
@@ -1716,7 +1719,7 @@ actualupdate msg model =
 
                 GD.Ok return ->
                     ( { model | state = instate }
-                    , sendUIMsg model.fui <| UI.ChangePassword return
+                    , sendUIMsg model.fui <| OD.UrqAuthedRequest <| OD.AthChangePassword return
                     )
 
                 GD.Cancel ->
@@ -1729,7 +1732,7 @@ actualupdate msg model =
 
                 GD.Ok return ->
                     ( { model | state = instate }
-                    , sendUIMsg model.fui <| UI.ChangeEmail return
+                    , sendUIMsg model.fui <| OD.UrqAuthedRequest <| OD.AthChangeEmail return
                     )
 
                 GD.Cancel ->
@@ -1744,14 +1747,14 @@ actualupdate msg model =
                 ResetPassword.Ok ->
                     ( { model | state = ResetPassword nst }
                     , sendUIMsg model.fui
-                        (UI.SetPassword { uid = nst.userId, newpwd = nst.password, reset_key = nst.reset_key })
+                        (OD.UrqSetPassword { uid = nst.userId, newpwd = nst.password, resetKey = UUID.toString nst.reset_key })
                     )
 
                 ResetPassword.None ->
                     ( { model | state = ResetPassword nst }, Cmd.none )
 
         ( TASelection jv, state ) ->
-            case JD.decodeValue Data.decodeTASelection jv of
+            case JD.decodeValue DataUtil.decodeTASelection jv of
                 Ok tas ->
                     case state of
                         EditZkNote emod login ->
@@ -1764,7 +1767,7 @@ actualupdate msg model =
                     ( displayMessageDialog model <| JD.errorToString e, Cmd.none )
 
         ( TAError jv, state ) ->
-            case JD.decodeValue Data.decodeTAError jv of
+            case JD.decodeValue DataUtil.decodeTAError jv of
                 Ok tae ->
                     case state of
                         EditZkNote emod login ->
@@ -1793,13 +1796,13 @@ actualupdate msg model =
 
                 UserSettings.LogOut ->
                     ( { model | state = initLoginState model Top }
-                    , sendUIMsg model.fui UI.Logout
+                    , sendUIMsg model.fui OD.UrqLogout
                     )
 
                 UserSettings.ChangePassword ->
                     ( { model
                         | state =
-                            ChangePasswordDialog (CP.init (OD.toLd login) Common.buttonStyle (UserSettings.view numod |> E.map (always ())))
+                            ChangePasswordDialog (CP.init (DataUtil.toOaLd login) Common.buttonStyle (UserSettings.view numod |> E.map (always ())))
                                 (UserSettings numod login prevstate)
                       }
                     , Cmd.none
@@ -1809,7 +1812,7 @@ actualupdate msg model =
                     ( { model
                         | state =
                             ChangeEmailDialog
-                                (CE.init (OD.toLd login) Common.buttonStyle (UserSettings.view numod |> E.map (always ())))
+                                (CE.init (DataUtil.toOaLd login) Common.buttonStyle (UserSettings.view numod |> E.map (always ())))
                                 (UserSettings numod login prevstate)
                       }
                     , Cmd.none
@@ -1878,22 +1881,22 @@ actualupdate msg model =
             case c of
                 UserEdit.Done ->
                     ( model
-                    , sendAIMsg model.fui.location AI.GetUsers
+                    , sendAIMsg model.fui.location OD.ArqGetUsers
                     )
 
                 UserEdit.Delete id ->
                     ( model
-                    , sendAIMsg model.fui.location <| AI.DeleteUser id
+                    , sendAIMsg model.fui.location <| OD.ArqDeleteUser id
                     )
 
                 UserEdit.Save ld ->
                     ( model
-                    , sendAIMsg model.fui.location <| AI.UpdateUser ld
+                    , sendAIMsg model.fui.location <| OD.ArqUpdateUser ld
                     )
 
                 UserEdit.ResetPwd id ->
                     ( model
-                    , sendAIMsg model.fui.location <| AI.GetPwdReset id
+                    , sendAIMsg model.fui.location <| OD.ArqGetPwdReset id
                     )
 
                 UserEdit.None ->
@@ -1908,7 +1911,7 @@ actualupdate msg model =
                 ShowUrl.Done ->
                     if login.admin then
                         ( model
-                        , sendAIMsg model.fui.location AI.GetUsers
+                        , sendAIMsg model.fui.location OD.ArqGetUsers
                         )
 
                     else
@@ -1974,27 +1977,97 @@ actualupdate msg model =
 
                 Ok ( pt, piresponse ) ->
                     case piresponse of
-                        PI.ServerError e ->
-                            let
-                                prevstate =
-                                    case stateLogin state of
-                                        Just _ ->
-                                            state
+                        Data.PbyServerError e ->
+                            case e of
+                                Data.PbeNoteNotFound publicrequest ->
+                                    case DataUtil.getPrqNoteInfo publicrequest of
+                                        Just ( zknoteid, "cache" ) ->
+                                            ( { model
+                                                | noteCache =
+                                                    NC.addNote pt zknoteid NC.NotFound model.noteCache
+                                                        |> NC.purgeNotes
+                                              }
+                                            , Cmd.none
+                                            )
+
+                                        _ ->
+                                            let
+                                                prevstate =
+                                                    case stateLogin state of
+                                                        Just _ ->
+                                                            state
+
+                                                        Nothing ->
+                                                            initLoginState model model.initialRoute
+                                            in
+                                            ( displayMessageDialog { model | state = prevstate } "note not found", Cmd.none )
+
+                                Data.PbeNoteIsPrivate publicrequest ->
+                                    case DataUtil.getPrqNoteInfo publicrequest of
+                                        Just ( zknoteid, "cache" ) ->
+                                            ( { model
+                                                | noteCache =
+                                                    NC.addNote pt zknoteid NC.Private model.noteCache
+                                                        |> NC.purgeNotes
+                                              }
+                                            , Cmd.none
+                                            )
+
+                                        _ ->
+                                            let
+                                                prevstate =
+                                                    case stateLogin state of
+                                                        Just _ ->
+                                                            state
+
+                                                        Nothing ->
+                                                            initLoginState model model.initialRoute
+                                            in
+                                            ( displayMessageDialog { model | state = prevstate } "note is private", Cmd.none )
+
+                                Data.PbeString estr ->
+                                    let
+                                        prevstate =
+                                            case stateLogin state of
+                                                Just _ ->
+                                                    state
+
+                                                Nothing ->
+                                                    initLoginState model model.initialRoute
+                                    in
+                                    case Dict.get estr model.errorNotes of
+                                        Just url ->
+                                            ( displayMessageNLinkDialog { model | state = prevstate } estr url "more info"
+                                            , Cmd.none
+                                            )
 
                                         Nothing ->
-                                            initLoginState model model.initialRoute
+                                            ( displayMessageDialog { model | state = prevstate } estr, Cmd.none )
+
+                        Data.PbyZkNoteAndLinks znl ->
+                            let
+                                vstate =
+                                    case stateLogin state of
+                                        Just _ ->
+                                            EView
+                                                (View.initFull
+                                                    model.fui
+                                                    znl
+                                                )
+                                                state
+
+                                        Nothing ->
+                                            View (View.initFull model.fui znl)
+
+                                ngets =
+                                    makePubNoteCacheGets model znl.zknote.content
                             in
-                            case Dict.get e model.errorNotes of
-                                Just url ->
-                                    ( displayMessageNLinkDialog { model | state = prevstate } e url "more info"
-                                    , Cmd.none
-                                    )
+                            ( { model | state = vstate }
+                            , Cmd.batch ngets
+                            )
 
-                                Nothing ->
-                                    ( displayMessageDialog { model | state = prevstate } e, Cmd.none )
-
-                        PI.ZkNoteAndLinks fbe ->
-                            if fbe.what == "cache" then
+                        Data.PbyZkNoteAndLinksWhat znlw ->
+                            if znlw.what == "cache" then
                                 let
                                     gets =
                                         (case state of
@@ -2010,8 +2083,8 @@ actualupdate msg model =
                                             |> Maybe.andThen .panelNote
                                             |> Maybe.andThen
                                                 (\pn ->
-                                                    if pn == fbe.znl.zknote.id then
-                                                        Just fbe.znl.zknote.content
+                                                    if pn == znlw.znl.zknote.id then
+                                                        Just znlw.znl.zknote.content
 
                                                     else
                                                         Nothing
@@ -2021,7 +2094,7 @@ actualupdate msg model =
                                 in
                                 ( { model
                                     | noteCache =
-                                        NC.addNote pt fbe.znl model.noteCache
+                                        NC.addNote pt znlw.znl.zknote.id (NC.ZNAL znlw.znl) model.noteCache
                                             |> NC.purgeNotes
                                   }
                                 , gets
@@ -2035,21 +2108,21 @@ actualupdate msg model =
                                                 EView
                                                     (View.initFull
                                                         model.fui
-                                                        fbe.znl
+                                                        znlw.znl
                                                     )
                                                     state
 
                                             Nothing ->
-                                                View (View.initFull model.fui fbe.znl)
+                                                View (View.initFull model.fui znlw.znl)
 
                                     ngets =
-                                        makePubNoteCacheGets model fbe.znl.zknote.content
+                                        makePubNoteCacheGets model znlw.znl.zknote.content
                                 in
                                 ( { model | state = vstate }
                                 , Cmd.batch ngets
                                 )
 
-                        PI.Noop ->
+                        Data.PbyNoop ->
                             ( model, Cmd.none )
 
         ( ErrorIndexNote rsein, _ ) ->
@@ -2061,16 +2134,21 @@ actualupdate msg model =
 
                 Ok resp ->
                     case resp of
-                        PI.ServerError e ->
+                        Data.PbyServerError e ->
                             -- if there's an error on getting the error index note, just display it.
-                            ( displayMessageDialog model <| e, Cmd.none )
+                            ( displayMessageDialog model <| DataUtil.showPublicError e, Cmd.none )
 
-                        PI.ZkNoteAndLinks fbe ->
+                        Data.PbyZkNoteAndLinks fbe ->
+                            ( { model | errorNotes = MC.linkDict fbe.zknote.content }
+                            , Cmd.none
+                            )
+
+                        Data.PbyZkNoteAndLinksWhat fbe ->
                             ( { model | errorNotes = MC.linkDict fbe.znl.zknote.content }
                             , Cmd.none
                             )
 
-                        PI.Noop ->
+                        Data.PbyNoop ->
                             ( model, Cmd.none )
 
         ( TAReplyData tas urd, state ) ->
@@ -2080,10 +2158,10 @@ actualupdate msg model =
 
                 Ok ( _, uiresponse ) ->
                     case uiresponse of
-                        ZI.ServerError e ->
-                            ( displayMessageDialog model <| e, Cmd.none )
+                        Data.PvyServerError e ->
+                            ( displayMessageDialog model <| DataUtil.showPrivateError e, Cmd.none )
 
-                        ZI.SavedZkNoteAndLinks szkn ->
+                        Data.PvySavedZkNoteAndLinks szkn ->
                             case state of
                                 EditZkNote emod login ->
                                     let
@@ -2109,10 +2187,10 @@ actualupdate msg model =
 
                 Ok uiresponse ->
                     case uiresponse of
-                        UI.ServerError e ->
+                        OD.UrpServerError e ->
                             ( displayMessageDialog model <| e, Cmd.none )
 
-                        UI.RegistrationSent ->
+                        OD.UrpRegistrationSent ->
                             case model.state of
                                 Login lgst url ->
                                     ( { model | state = Login (Login.registrationSent lgst) url }, Cmd.none )
@@ -2120,8 +2198,8 @@ actualupdate msg model =
                                 _ ->
                                     ( model, Cmd.none )
 
-                        UI.LoggedIn oalogin ->
-                            case Data.fromOaLd oalogin of
+                        OD.UrpLoggedIn oalogin ->
+                            case DataUtil.fromOaLd oalogin of
                                 Ok login ->
                                     let
                                         lgmod =
@@ -2172,10 +2250,10 @@ actualupdate msg model =
                                     , Cmd.none
                                     )
 
-                        UI.LoggedOut ->
+                        OD.UrpLoggedOut ->
                             ( model, Cmd.none )
 
-                        UI.ResetPasswordAck ->
+                        OD.UrpResetPasswordAck ->
                             let
                                 nmod =
                                     { model
@@ -2186,7 +2264,7 @@ actualupdate msg model =
                             , Cmd.none
                             )
 
-                        UI.SetPasswordAck ->
+                        OD.UrpSetPasswordAck ->
                             let
                                 nmod =
                                     { model
@@ -2197,37 +2275,37 @@ actualupdate msg model =
                             , Cmd.none
                             )
 
-                        UI.ChangedPassword ->
+                        OD.UrpChangedPassword ->
                             ( displayMessageDialog model "password changed"
                             , Cmd.none
                             )
 
-                        UI.ChangedEmail ->
+                        OD.UrpChangedEmail ->
                             ( displayMessageDialog model "email change confirmation sent!  check your inbox (or spam folder) for an email with title 'change zknotes email', and follow the enclosed link to change to the new address."
                             , Cmd.none
                             )
 
-                        UI.UserExists ->
+                        OD.UrpUserExists ->
                             case state of
                                 Login lmod route ->
                                     ( { model | state = Login (Login.userExists lmod) route }, Cmd.none )
 
                                 _ ->
-                                    ( unexpectedMessage model (UI.showServerResponse uiresponse)
+                                    ( unexpectedMessage model (ODU.showUserResponse uiresponse)
                                     , Cmd.none
                                     )
 
-                        UI.UnregisteredUser ->
+                        OD.UrpUnregisteredUser ->
                             case state of
                                 Login lmod route ->
                                     ( { model | state = Login (Login.unregisteredUser lmod) route }, Cmd.none )
 
                                 _ ->
-                                    ( unexpectedMessage model (UI.showServerResponse uiresponse)
+                                    ( unexpectedMessage model (ODU.showUserResponse uiresponse)
                                     , Cmd.none
                                     )
 
-                        UI.NotLoggedIn ->
+                        OD.UrpNotLoggedIn ->
                             case state of
                                 Login lmod route ->
                                     ( { model | state = Login lmod route }, Cmd.none )
@@ -2235,18 +2313,43 @@ actualupdate msg model =
                                 _ ->
                                     ( { model | state = initLoginState model Top }, Cmd.none )
 
-                        UI.InvalidUserOrPwd ->
+                        OD.UrpInvalidUserOrPwd ->
                             case state of
                                 Login lmod route ->
                                     ( { model | state = Login (Login.invalidUserOrPwd lmod) route }, Cmd.none )
 
                                 _ ->
                                     ( unexpectedMessage { model | state = initLoginState model Top }
-                                        (UI.showServerResponse uiresponse)
+                                        (ODU.showUserResponse uiresponse)
                                     , Cmd.none
                                     )
 
-                        UI.BlankUserName ->
+                        OD.UrpInvalidUserId ->
+                            ( displayMessageDialog model "invalid user id!"
+                            , Cmd.none
+                            )
+
+                        OD.UrpAccountDeactivated ->
+                            ( displayMessageDialog model "account deactivated!"
+                            , Cmd.none
+                            )
+
+                        OD.UrpRemoteRegistrationFailed ->
+                            ( displayMessageDialog model "remote registration failed!"
+                            , Cmd.none
+                            )
+
+                        OD.UrpRemoteUser ru ->
+                            ( displayMessageDialog model <| "remote user: " ++ ru.name
+                            , Cmd.none
+                            )
+
+                        OD.UrpNoData ->
+                            ( displayMessageDialog model <| "no data!"
+                            , Cmd.none
+                            )
+
+                        OD.UrpBlankUserName ->
                             case state of
                                 Invited lmod ->
                                     ( { model | state = Invited <| Invited.blankUserName lmod }, Cmd.none )
@@ -2256,11 +2359,11 @@ actualupdate msg model =
 
                                 _ ->
                                     ( unexpectedMessage { model | state = initLoginState model Top }
-                                        (UI.showServerResponse uiresponse)
+                                        (ODU.showUserResponse uiresponse)
                                     , Cmd.none
                                     )
 
-                        UI.BlankPassword ->
+                        OD.UrpBlankPassword ->
                             case state of
                                 Invited lmod ->
                                     ( { model | state = Invited <| Invited.blankPassword lmod }, Cmd.none )
@@ -2270,11 +2373,11 @@ actualupdate msg model =
 
                                 _ ->
                                     ( unexpectedMessage { model | state = initLoginState model Top }
-                                        (UI.showServerResponse uiresponse)
+                                        (ODU.showUserResponse uiresponse)
                                     , Cmd.none
                                     )
 
-                        UI.Invite invite ->
+                        OD.UrpInvite invite ->
                             ( { model | state = Invited (Invited.initialModel invite model.adminSettings "zknotes") }
                             , Cmd.none
                             )
@@ -2286,7 +2389,7 @@ actualupdate msg model =
 
                 Ok airesponse ->
                     case airesponse of
-                        AI.NotLoggedIn ->
+                        OD.ArpNotLoggedIn ->
                             case state of
                                 Login lmod route ->
                                     ( { model | state = Login lmod route }, Cmd.none )
@@ -2294,7 +2397,7 @@ actualupdate msg model =
                                 _ ->
                                     ( { model | state = initLoginState model Top }, Cmd.none )
 
-                        AI.Users users ->
+                        OD.ArpUsers users ->
                             case stateLogin model.state of
                                 Just login ->
                                     ( { model | state = UserListing (UserListing.init users) login (stateSearch state) }, Cmd.none )
@@ -2302,12 +2405,12 @@ actualupdate msg model =
                                 Nothing ->
                                     ( displayMessageDialog model "not logged in", Cmd.none )
 
-                        AI.UserDeleted _ ->
+                        OD.ArpUserDeleted _ ->
                             ( displayMessageDialog model "user deleted!"
-                            , sendAIMsg model.fui.location AI.GetUsers
+                            , sendAIMsg model.fui.location OD.ArqGetUsers
                             )
 
-                        AI.UserUpdated ld ->
+                        OD.ArpUserUpdated ld ->
                             case model.state of
                                 UserEdit ue login ->
                                     ( displayMessageDialog { model | state = UserEdit (UserEdit.onUserUpdated ue ld) login } "user updated"
@@ -2317,7 +2420,7 @@ actualupdate msg model =
                                 _ ->
                                     ( model, Cmd.none )
 
-                        AI.UserInvite ui ->
+                        OD.ArpUserInvite ui ->
                             case stateLogin model.state of
                                 Just login ->
                                     ( { model
@@ -2334,7 +2437,7 @@ actualupdate msg model =
                                     , Cmd.none
                                     )
 
-                        AI.PwdReset pr ->
+                        OD.ArpPwdReset pr ->
                             case state of
                                 UserEdit _ login ->
                                     ( { model
@@ -2349,8 +2452,23 @@ actualupdate msg model =
                                 _ ->
                                     ( model, Cmd.none )
 
-                        AI.ServerError e ->
+                        OD.ArpServerError e ->
                             ( displayMessageDialog model <| e, Cmd.none )
+
+                        OD.ArpUserNotDeleted _ ->
+                            ( displayMessageDialog model <| ODU.showAdminResponse airesponse, Cmd.none )
+
+                        OD.ArpNoUserId ->
+                            ( displayMessageDialog model <| ODU.showAdminResponse airesponse, Cmd.none )
+
+                        OD.ArpNoData ->
+                            ( displayMessageDialog model <| ODU.showAdminResponse airesponse, Cmd.none )
+
+                        OD.ArpInvalidUserOrPassword ->
+                            ( displayMessageDialog model <| ODU.showAdminResponse airesponse, Cmd.none )
+
+                        OD.ArpAccessDenied ->
+                            ( displayMessageDialog model <| ODU.showAdminResponse airesponse, Cmd.none )
 
         ( ZkReplyDataSeq f zrd, _ ) ->
             let
@@ -2371,16 +2489,10 @@ actualupdate msg model =
 
                 Ok ( pt, ziresponse ) ->
                     case ziresponse of
-                        ZI.ServerError e ->
-                            ( displayMessageDialog model <| e, Cmd.none )
+                        Data.PvyServerError e ->
+                            ( displayMessageDialog model <| DataUtil.showPrivateError e, Cmd.none )
 
-                        ZI.NotLoggedIn ->
-                            ( displayMessageDialog model <| "not logged in", Cmd.none )
-
-                        ZI.LoginError ->
-                            ( displayMessageDialog model <| "login error", Cmd.none )
-
-                        ZI.PowerDeleteComplete count ->
+                        Data.PvyPowerDeleteComplete count ->
                             case model.state of
                                 EditZkNoteListing mod li ->
                                     ( { model | state = EditZkNoteListing (EditZkNoteListing.onPowerDeleteComplete count li mod) li }, Cmd.none )
@@ -2388,17 +2500,18 @@ actualupdate msg model =
                                 _ ->
                                     ( model, Cmd.none )
 
-                        ZI.ZkNoteSearchResult sr ->
+                        Data.PvyZkNoteSearchResult sr ->
                             if sr.what == "prevSearches" then
                                 let
                                     pses =
                                         List.filterMap
                                             (\zknote ->
-                                                JD.decodeString S.decodeTsl zknote.content
+                                                JD.decodeString (JD.list Data.tagSearchDecoder) zknote.content
                                                     |> Result.toMaybe
                                             )
                                             sr.notes
 
+                                    -- TODO: fix
                                     laststack =
                                         pses
                                             |> List.filter (\l -> List.length l > 1)
@@ -2427,10 +2540,7 @@ actualupdate msg model =
                             else
                                 ( model, Cmd.none )
 
-                        ZI.ZkIdSearchResult _ ->
-                            ( model, Cmd.none )
-
-                        ZI.ZkListNoteSearchResult sr ->
+                        Data.PvyZkListNoteSearchResult sr ->
                             case state of
                                 EditZkNoteListing znlstate login_ ->
                                     ( { model | state = EditZkNoteListing (EditZkNoteListing.updateSearchResult sr znlstate) login_ }
@@ -2463,11 +2573,11 @@ actualupdate msg model =
                                     )
 
                                 _ ->
-                                    ( unexpectedMessage model (ZI.showServerResponse ziresponse)
+                                    ( unexpectedMessage model (showPrivateReply ziresponse)
                                     , Cmd.none
                                     )
 
-                        ZI.ZkNoteArchives ar ->
+                        Data.PvyZkNoteArchives ar ->
                             case model.state of
                                 ArchiveListing al login ->
                                     ( { model | state = ArchiveListing (ArchiveListing.updateSearchResult ar.results al) login }
@@ -2488,20 +2598,20 @@ actualupdate msg model =
                                             , Cmd.none
                                             )
 
-                        ZI.ZkNote zkn ->
+                        Data.PvyZkNote zkn ->
                             case state of
                                 ArchiveListing st login ->
                                     handleArchiveListing model login (ArchiveListing.onZkNote zkn st)
 
                                 _ ->
-                                    ( unexpectedMessage model (ZI.showServerResponse ziresponse)
+                                    ( unexpectedMessage model (showPrivateReply ziresponse)
                                     , Cmd.none
                                     )
 
-                        ZI.ZkNoteAndLinksWhat znew ->
+                        Data.PvyZkNoteAndLinksWhat znew ->
                             onZkNoteEditWhat model pt znew
 
-                        ZI.ZkNoteComments zc ->
+                        Data.PvyZkNoteComments zc ->
                             case state of
                                 EditZkNote s login ->
                                     ( { model | state = EditZkNote (EditZkNote.commentsRecieved zc s) login }
@@ -2509,11 +2619,11 @@ actualupdate msg model =
                                     )
 
                                 _ ->
-                                    ( unexpectedMessage model (ZI.showServerResponse ziresponse)
+                                    ( unexpectedMessage model (showPrivateReply ziresponse)
                                     , Cmd.none
                                     )
 
-                        ZI.SavedZkNote szkn ->
+                        Data.PvySavedZkNote szkn ->
                             case state of
                                 EditZkNote emod login ->
                                     let
@@ -2541,7 +2651,7 @@ actualupdate msg model =
                                     -- just ignore if we're not editing a new note.
                                     ( model, Cmd.none )
 
-                        ZI.SavedZkNoteAndLinks szkn ->
+                        Data.PvySavedZkNoteAndLinks szkn ->
                             case state of
                                 EditZkNote emod login ->
                                     let
@@ -2569,19 +2679,19 @@ actualupdate msg model =
                                     -- just ignore if we're not editing a new note.
                                     ( model, Cmd.none )
 
-                        ZI.DeletedZkNote _ ->
+                        Data.PvyDeletedZkNote _ ->
                             ( model, Cmd.none )
 
-                        ZI.SavedZkLinks ->
+                        Data.PvySavedZkLinks ->
                             ( model, Cmd.none )
 
-                        ZI.ZkLinks _ ->
+                        Data.PvyZkLinks _ ->
                             ( model, Cmd.none )
 
-                        ZI.SavedImportZkNotes ->
+                        Data.PvySavedImportZkNotes ->
                             ( model, Cmd.none )
 
-                        ZI.HomeNoteSet id ->
+                        Data.PvyHomeNoteSet id ->
                             case model.state of
                                 EditZkNote eznstate login ->
                                     let
@@ -2598,19 +2708,15 @@ actualupdate msg model =
                                 _ ->
                                     ( model, Cmd.none )
 
-                        ZI.FilesUploaded _ ->
-                            ( unexpectedMessage model (ZI.showServerResponse ziresponse)
-                            , Cmd.none
-                            )
-
-                        ZI.JobStatus jobstatus ->
+                        Data.PvyJobStatus jobstatus ->
                             let
                                 js =
                                     case Dict.get jobstatus.jobno model.jobs.jobs of
                                         Just j ->
                                             case j.state of
-                                                Data.Completed n ->
-                                                    { jobstatus | state = Data.Completed (n + 1) }
+                                                Data.Completed ->
+                                                    -- TODO fix , do counter
+                                                    { jobstatus | state = Data.Completed }
 
                                                 _ ->
                                                     jobstatus
@@ -2638,7 +2744,7 @@ actualupdate msg model =
                             , Cmd.none
                             )
 
-                        ZI.JobNotFound jobno ->
+                        Data.PvyJobNotFound jobno ->
                             let
                                 nm =
                                     { model
@@ -2652,11 +2758,29 @@ actualupdate msg model =
                             in
                             ( nm, Cmd.none )
 
-                        ZI.FileSyncComplete ->
-                            ( displayMessageDialog model <| "file sync complete", Cmd.none )
-
-                        ZI.Noop ->
+                        Data.PvyNoop ->
                             -- just ignore these.
+                            ( model, Cmd.none )
+
+                        -- unused messages!  remove?
+                        Data.PvyArchives _ ->
+                            ( model, Cmd.none )
+
+                        Data.PvyArchiveZkLinks _ ->
+                            ( model, Cmd.none )
+
+                        Data.PvyZkNoteIdSearchResult _ ->
+                            ( model, Cmd.none )
+
+                        Data.PvyZkNoteAndLinksSearchResult _ ->
+                            ( model, Cmd.none )
+
+                        -- TODO: still used?
+                        Data.PvyFileSyncComplete ->
+                            ( model, Cmd.none )
+
+                        -- TODO: still used?
+                        Data.PvySyncComplete ->
                             ( model, Cmd.none )
 
         ( ViewMsg em, View es ) ->
@@ -2679,7 +2803,7 @@ actualupdate msg model =
                                 }
                                 (Just model.state)
                       }
-                    , sendPIMsg model.fui (PI.GetZkNoteAndLinks { zknote = id, what = "" })
+                    , sendPIMsg model.fui (Data.PbrGetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
         ( ViewMsg em, EView es state ) ->
@@ -2701,7 +2825,7 @@ actualupdate msg model =
                             case es.id of
                                 Just id ->
                                     ( { model | state = state }
-                                    , sendZIMsg model.fui (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
+                                    , sendZIMsg model.fui (Data.PvqGetZkNoteAndLinks { zknote = id, what = "" })
                                     )
 
                                 Nothing ->
@@ -2711,7 +2835,7 @@ actualupdate msg model =
 
                 View.Switch id ->
                     ( model
-                    , sendPIMsg model.fui (PI.GetZkNoteAndLinks { zknote = id, what = "" })
+                    , sendPIMsg model.fui (Data.PbrGetZkNoteAndLinks { zknote = id, what = "" })
                     )
 
         ( EditZkNoteMsg em, EditZkNote es login ) ->
@@ -2759,7 +2883,7 @@ actualupdate msg model =
                             List.map
                                 (\n ->
                                     sendZIMsg model.fui
-                                        (ZI.SaveImportZkNotes [ n ])
+                                        (Data.PvqSaveImportZkNotes [ n ])
                                 )
                                 notes
                     in
@@ -2889,7 +3013,7 @@ actualupdate msg model =
                         :: files
                         |> List.map (\f -> Http.filePart (F.name f) f)
                         |> Http.multipartBody
-                , expect = Http.expectJson (FileUploadedButGetTime nrid) ZI.serverResponseDecoder
+                , expect = Http.expectJson (FileUploadedButGetTime nrid) Data.uploadReplyDecoder
                 , timeout = Nothing
                 , tracker = Just nrid
                 }
@@ -2906,15 +3030,9 @@ actualupdate msg model =
                 Err e ->
                     ( displayMessageDialog model <| Util.httpErrorString e, Cmd.none )
 
-                Ok ( pt, ziresponse ) ->
+                Ok ( _, ziresponse ) ->
                     case ziresponse of
-                        ZI.ServerError e ->
-                            ( displayMessageDialog model <| e, Cmd.none )
-
-                        ZI.ZkNoteAndLinksWhat znew ->
-                            onZkNoteEditWhat model pt znew
-
-                        ZI.FilesUploaded files ->
+                        Data.UrFilesUploaded files ->
                             ( { model
                                 | trackedRequests =
                                     case Dict.get what model.trackedRequests.requests of
@@ -2940,9 +3058,6 @@ actualupdate msg model =
                               }
                             , Cmd.none
                             )
-
-                        _ ->
-                            ( displayMessageDialog model (ZI.showServerResponse ziresponse), Cmd.none )
 
         ( RequestProgress a b, _ ) ->
             let
@@ -3013,7 +3128,7 @@ actualupdate msg model =
                 |> List.map
                     (\jobno ->
                         sendZIMsg model.fui
-                            (ZI.GetJobStatus jobno)
+                            (Data.PvqGetJobStatus jobno)
                     )
                 |> Cmd.batch
             )
@@ -3069,7 +3184,7 @@ actualupdate msg model =
             )
 
 
-handleTASelection : Model -> EditZkNote.Model -> Data.LoginData -> Data.TASelection -> ( Model, Cmd Msg )
+handleTASelection : Model -> EditZkNote.Model -> LoginData -> DataUtil.TASelection -> ( Model, Cmd Msg )
 handleTASelection model emod login tas =
     case EditZkNote.onTASelection emod model.recentNotes tas of
         EditZkNote.TAError e ->
@@ -3078,7 +3193,7 @@ handleTASelection model emod login tas =
         EditZkNote.TASave s ->
             ( model
             , sendZIMsgExp model.fui.location
-                (ZI.SaveZkNoteAndLinks s)
+                (Data.PvqSaveZkNoteAndLinks s)
                 (TAReplyData tas)
             )
 
@@ -3087,7 +3202,7 @@ handleTASelection model emod login tas =
             , Cmd.batch
                 ((case s of
                     Just sel ->
-                        setTASelection (Data.encodeSetSelection sel)
+                        setTASelection (DataUtil.encodeSetSelection sel)
 
                     Nothing ->
                         Cmd.none
@@ -3107,13 +3222,21 @@ makeNoteCacheGets md model =
         |> List.map
             (\id ->
                 case NC.getNote model.noteCache id of
-                    Just zkn ->
+                    Just (NC.ZNAL zkn) ->
                         sendZIMsg model.fui
-                            (ZI.GetZnlIfChanged { zknote = id, what = "cache", changeddate = zkn.zknote.changeddate })
+                            (Data.PvqGetZnlIfChanged { zknote = id, what = "cache", changeddate = zkn.zknote.changeddate })
+
+                    Just NC.Private ->
+                        sendZIMsg model.fui
+                            (Data.PvqGetZkNoteAndLinks { zknote = id, what = "cache" })
+
+                    Just NC.NotFound ->
+                        sendZIMsg model.fui
+                            (Data.PvqGetZkNoteAndLinks { zknote = id, what = "cache" })
 
                     Nothing ->
                         sendZIMsg model.fui
-                            (ZI.GetZkNoteAndLinks { zknote = id, what = "cache" })
+                            (Data.PvqGetZkNoteAndLinks { zknote = id, what = "cache" })
             )
 
 
@@ -3128,15 +3251,25 @@ makePubNoteCacheGets model md =
 makePubNoteCacheGet : Model -> ZkNoteId -> Cmd Msg
 makePubNoteCacheGet model id =
     case NC.getNote model.noteCache id of
-        Just zkn ->
+        Just (NC.ZNAL zkn) ->
             sendPIMsg
                 model.fui
-                (PI.GetZnlIfChanged { zknote = id, what = "cache", changeddate = zkn.zknote.changeddate })
+                (Data.PbrGetZnlIfChanged { zknote = id, what = "cache", changeddate = zkn.zknote.changeddate })
+
+        Just NC.NotFound ->
+            sendPIMsg
+                model.fui
+                (Data.PbrGetZkNoteAndLinks { zknote = id, what = "cache" })
+
+        Just NC.Private ->
+            sendPIMsg
+                model.fui
+                (Data.PbrGetZkNoteAndLinks { zknote = id, what = "cache" })
 
         Nothing ->
             sendPIMsg
                 model.fui
-                (PI.GetZkNoteAndLinks { zknote = id, what = "cache" })
+                (Data.PbrGetZkNoteAndLinks { zknote = id, what = "cache" })
 
 
 makeNewNoteCacheGets : String -> Model -> List (Cmd Msg)
@@ -3153,11 +3286,11 @@ makeNewNoteCacheGets md model =
                     Nothing ->
                         Just <|
                             sendZIMsg model.fui
-                                (ZI.GetZkNoteAndLinks { zknote = id, what = "cache" })
+                                (Data.PvqGetZkNoteAndLinks { zknote = id, what = "cache" })
             )
 
 
-handleEditZkNoteCmd : Model -> Data.LoginData -> ( EditZkNote.Model, EditZkNote.Command ) -> ( Model, Cmd Msg )
+handleEditZkNoteCmd : Model -> LoginData -> ( EditZkNote.Model, EditZkNote.Command ) -> ( Model, Cmd Msg )
 handleEditZkNoteCmd model login ( emod, ecmd ) =
     let
         backtolisting =
@@ -3210,11 +3343,11 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                         onmsg : Model -> Msg -> ( Model, Cmd Msg )
                         onmsg _ ms =
                             case ms of
-                                ZkReplyData (Ok ( _, ZI.SavedZkNoteAndLinks _ )) ->
+                                ZkReplyData (Ok ( _, Data.PvySavedZkNoteAndLinks _ )) ->
                                     gotres
 
-                                ZkReplyData (Ok ( _, ZI.ServerError e )) ->
-                                    ( displayMessageDialog model e
+                                ZkReplyData (Ok ( _, Data.PvyServerError e )) ->
+                                    ( displayMessageDialog model (DataUtil.showPrivateError e)
                                     , Cmd.none
                                     )
 
@@ -3235,7 +3368,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                                 onmsg
                       }
                     , sendZIMsg model.fui
-                        (ZI.SaveZkNoteAndLinks snpl)
+                        (Data.PvqSaveZkNoteAndLinks snpl)
                     )
 
                 EditZkNote.Save snpl ->
@@ -3246,7 +3379,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                         , noteCache = NC.setKeeps (MC.noteIds emod.md) model.noteCache
                       }
                     , sendZIMsg model.fui
-                        (ZI.SaveZkNoteAndLinks snpl)
+                        (Data.PvqSaveZkNoteAndLinks snpl)
                     )
 
                 EditZkNote.None ->
@@ -3271,7 +3404,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                                 )
                       }
                     , sendZIMsg model.fui
-                        (ZI.DeleteZkNote id)
+                        (Data.PvqDeleteZkNote id)
                     )
 
                 EditZkNote.Switch id ->
@@ -3280,7 +3413,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                             ( ShowMessage { message = "loading note..." }
                                 login
                                 (Just model.state)
-                            , sendZIMsg model.fui (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
+                            , sendZIMsg model.fui (Data.PvqGetZkNoteAndLinks { zknote = id, what = "" })
                             )
                     in
                     ( { model | state = st }, cmd )
@@ -3291,14 +3424,14 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                             ( ShowMessage { message = "loading note..." }
                                 login
                                 (Just model.state)
-                            , sendZIMsg model.fui (ZI.GetZkNoteAndLinks { zknote = id, what = "" })
+                            , sendZIMsg model.fui (Data.PvqGetZkNoteAndLinks { zknote = id, what = "" })
                             )
                     in
                     ( { model | state = st }
                     , Cmd.batch
                         [ cmd
                         , sendZIMsg model.fui
-                            (ZI.SaveZkNoteAndLinks s)
+                            (Data.PvqSaveZkNoteAndLinks s)
                         ]
                     )
 
@@ -3342,7 +3475,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
 
                 EditZkNote.SyncFiles s ->
                     ( { model | state = EditZkNote emod login }
-                    , sendZIMsg model.fui (ZI.SyncFiles s)
+                    , sendZIMsg model.fui (Data.PvqSyncFiles s)
                     )
 
                 EditZkNote.SearchHistory ->
@@ -3360,12 +3493,12 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
 
                 EditZkNote.Admin ->
                     ( model
-                    , sendAIMsg model.fui.location AI.GetUsers
+                    , sendAIMsg model.fui.location OD.ArqGetUsers
                     )
 
                 EditZkNote.SetHomeNote id ->
                     ( { model | state = EditZkNote emod login }
-                    , sendZIMsg model.fui (ZI.SetHomeNote id)
+                    , sendZIMsg model.fui (Data.PvqSetHomeNote id)
                     )
 
                 EditZkNote.AddToRecent zkln ->
@@ -3381,7 +3514,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
 
                 EditZkNote.ShowArchives id ->
                     ( model
-                    , sendZIMsg model.fui (ZI.GetZkNoteArchives { zknote = id, offset = 0, limit = Just S.defaultSearchLimit })
+                    , sendZIMsg model.fui (Data.PvqGetZkNoteArchives { zknote = id, offset = 0, limit = Just SU.defaultSearchLimit })
                     )
 
                 EditZkNote.FileUpload ->
@@ -3391,7 +3524,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
 
                 EditZkNote.Sync ->
                     ( model
-                    , sendZIMsg model.fui ZI.SyncRemote
+                    , sendZIMsg model.fui Data.PvqSyncRemote
                     )
 
                 EditZkNote.Requests ->
@@ -3430,7 +3563,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
     ( rm, Cmd.batch (rcmd :: ngets) )
 
 
-handleEditZkNoteListing : Model -> Data.LoginData -> ( EditZkNoteListing.Model, EditZkNoteListing.Command ) -> ( Model, Cmd Msg )
+handleEditZkNoteListing : Model -> LoginData -> ( EditZkNoteListing.Model, EditZkNoteListing.Command ) -> ( Model, Cmd Msg )
 handleEditZkNoteListing model login ( emod, ecmd ) =
     case ecmd of
         EditZkNoteListing.None ->
@@ -3454,13 +3587,13 @@ handleEditZkNoteListing model login ( emod, ecmd ) =
 
         EditZkNoteListing.SyncFiles s ->
             ( { model | state = EditZkNoteListing emod login }
-            , sendZIMsg model.fui (ZI.SyncFiles s)
+            , sendZIMsg model.fui (Data.PvqSyncFiles s)
             )
 
         EditZkNoteListing.PowerDelete s ->
             ( { model | state = EditZkNoteListing emod login }
             , sendZIMsg model.fui
-                (ZI.PowerDelete s)
+                (Data.PvqPowerDelete s)
             )
 
         EditZkNoteListing.SearchHistory ->
@@ -3469,7 +3602,7 @@ handleEditZkNoteListing model login ( emod, ecmd ) =
             )
 
 
-handleArchiveListing : Model -> Data.LoginData -> ( ArchiveListing.Model, ArchiveListing.Command ) -> ( Model, Cmd Msg )
+handleArchiveListing : Model -> LoginData -> ( ArchiveListing.Model, ArchiveListing.Command ) -> ( Model, Cmd Msg )
 handleArchiveListing model login ( emod, ecmd ) =
     case ecmd of
         ArchiveListing.None ->
@@ -3477,7 +3610,7 @@ handleArchiveListing model login ( emod, ecmd ) =
 
         ArchiveListing.Selected id ->
             ( { model | state = ArchiveListing emod login }
-            , sendZIMsg model.fui (ZI.GetZkNote id)
+            , sendZIMsg model.fui (Data.PvqGetZkNote id)
             )
 
         ArchiveListing.Done ->
@@ -3487,7 +3620,7 @@ handleArchiveListing model login ( emod, ecmd ) =
 
         ArchiveListing.GetArchives msg ->
             ( { model | state = ArchiveListing emod login }
-            , sendZIMsg model.fui <| ZI.GetZkNoteArchives msg
+            , sendZIMsg model.fui <| Data.PvqGetZkNoteArchives msg
             )
 
 
@@ -3500,7 +3633,7 @@ handleLogin model route ( lmod, lcmd ) =
         Login.Register ->
             ( { model | state = Login lmod route }
             , sendUIMsg model.fui
-                (UI.Register
+                (OD.UrqRegister
                     { uid = lmod.userId
                     , pwd = lmod.password
                     , email = lmod.email
@@ -3512,7 +3645,7 @@ handleLogin model route ( lmod, lcmd ) =
         Login.Login ->
             ( { model | state = Login lmod route }
             , sendUIMsg model.fui <|
-                UI.Login
+                OD.UrqLogin
                     { uid = lmod.userId
                     , pwd = lmod.password
                     }
@@ -3521,7 +3654,7 @@ handleLogin model route ( lmod, lcmd ) =
         Login.Reset ->
             ( { model | state = Login lmod route }
             , sendUIMsg model.fui <|
-                UI.ResetPassword
+                OD.UrqResetPassword
                     { uid = lmod.userId
                     }
             )
@@ -3536,7 +3669,7 @@ handleInvited model ( lmod, lcmd ) =
         Invited.RSVP ->
             ( { model | state = Invited lmod }
             , sendUIMsg model.fui
-                (UI.RSVP
+                (OD.UrqRsvp
                     { uid = lmod.userId
                     , pwd = lmod.password
                     , email = lmod.email
@@ -3549,7 +3682,7 @@ handleInvited model ( lmod, lcmd ) =
 handleTagFiles :
     Model
     -> ( TagAThing.Model TagFiles.Model TagFiles.Msg TagFiles.Command, TagAThing.Command TagFiles.Command )
-    -> Data.LoginData
+    -> LoginData
     -> State
     -> ( Model, Cmd Msg )
 handleTagFiles model ( lmod, lcmd ) login st =
@@ -3563,7 +3696,7 @@ handleTagFiles model ( lmod, lcmd ) login st =
 
         TagAThing.SyncFiles s ->
             ( { model | state = updstate }
-            , sendZIMsg model.fui (ZI.SyncFiles s)
+            , sendZIMsg model.fui (Data.PvqSyncFiles s)
             )
 
         TagAThing.SearchHistory ->
@@ -3590,14 +3723,14 @@ handleTagFiles model ( lmod, lcmd ) login st =
                             zklns
                                 |> List.foldl
                                     (\zkln links ->
-                                        List.map (\el -> Data.toZkLink zkln.id login.userid el) zkls
+                                        List.map (\el -> DataUtil.toZkLink zkln.id login.userid el) zkls
                                             ++ links
                                     )
                                     []
                     in
                     ( { model | state = st }
                     , sendZIMsg model.fui
-                        (ZI.SaveZkLinks { links = zklinks })
+                        (Data.PvqSaveZkLinks { links = zklinks })
                     )
 
                 TagFiles.Cancel ->
@@ -3610,7 +3743,7 @@ handleTagFiles model ( lmod, lcmd ) login st =
 handleInviteUser :
     Model
     -> ( TagAThing.Model InviteUser.Model InviteUser.Msg InviteUser.Command, TagAThing.Command InviteUser.Command )
-    -> Data.LoginData
+    -> LoginData
     -> State
     -> ( Model, Cmd Msg )
 handleInviteUser model ( lmod, lcmd ) login st =
@@ -3624,7 +3757,7 @@ handleInviteUser model ( lmod, lcmd ) login st =
 
         TagAThing.SyncFiles s ->
             ( { model | state = updstate }
-            , sendZIMsg model.fui (ZI.SyncFiles s)
+            , sendZIMsg model.fui (Data.PvqSyncFiles s)
             )
 
         TagAThing.SearchHistory ->
@@ -3641,7 +3774,7 @@ handleInviteUser model ( lmod, lcmd ) login st =
                 InviteUser.Ok ->
                     ( { model | state = updstate }
                     , sendAIMsg model.fui.location
-                        (AI.GetInvite
+                        (OD.ArqGetInvite
                             { email =
                                 if lmod.thing.model.email /= "" then
                                     Just lmod.thing.model.email
@@ -3649,7 +3782,7 @@ handleInviteUser model ( lmod, lcmd ) login st =
                                 else
                                     Nothing
                             , data =
-                                Data.encodeZkInviteData (List.map Data.elToSzl (Dict.values lmod.zklDict))
+                                DataUtil.encodeZkInviteData (List.map DataUtil.elToSzl (Dict.values lmod.zklDict))
                                     |> JE.encode 2
                                     |> Just
                             }
@@ -3663,23 +3796,26 @@ handleInviteUser model ( lmod, lcmd ) login st =
                     ( { model | state = updstate }, Cmd.none )
 
 
-prevSearchQuery : Data.LoginData -> S.ZkNoteSearch
+prevSearchQuery : LoginData -> Data.ZkNoteSearch
 prevSearchQuery login =
     let
-        ts : S.TagSearch
+        ts : Data.TagSearch
         ts =
-            S.Boolex (S.SearchTerm [ S.ExactMatch, S.Tag ] "search")
-                S.And
-                (S.SearchTerm [ S.User ] login.name)
+            Data.Boolex
+                { ts1 = Data.SearchTerm { mods = [ Data.ExactMatch, Data.Tag ], term = "search" }
+                , ao = Data.And
+                , ts2 =
+                    Data.SearchTerm { mods = [ Data.User ], term = login.name }
+                }
     in
-    { tagSearch = [ ts ]
+    { tagsearch = [ ts ]
     , offset = 0
     , limit = Just 50
     , what = "prevSearches"
-    , resultType = S.RtNote
+    , resulttype = Data.RtNote
     , archives = False
     , deleted = False
-    , unsynced = False
+    , ordering = Nothing
     }
 
 
@@ -3771,7 +3907,7 @@ init flags url key zone fontsize =
             flags.errorid
                 |> Maybe.map
                     (\id ->
-                        PI.getErrorIndexNote flags.location id ErrorIndexNote
+                        DataUtil.getErrorIndexNote flags.location id ErrorIndexNote
                     )
                 |> Maybe.withDefault Cmd.none
 

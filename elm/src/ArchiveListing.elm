@@ -2,6 +2,7 @@ module ArchiveListing exposing (..)
 
 import Common
 import Data exposing (ZkNoteId(..))
+import DataUtil
 import Dict exposing (Dict(..))
 import Element as E exposing (Element)
 import Element.Background as EBk
@@ -10,7 +11,6 @@ import Element.Font as EF
 import Element.Input as EI
 import PaginationPanel as PP
 import Route as R
-import Search exposing (TagSearch(..))
 import TDict exposing (TDict)
 import TangoColors as TC
 import Time
@@ -45,7 +45,7 @@ init zna =
     { noteid = zna.zknote
     , notes = zna.results.notes
     , selected = Nothing
-    , fullnotes = Data.emptyZniDict
+    , fullnotes = DataUtil.emptyZniDict
     , ppmodel = PP.searchResultUpdated zna.results PP.initModel
     }
 
@@ -65,7 +65,7 @@ updateSearchResult zsr model =
     }
 
 
-view : Data.LoginData -> Time.Zone -> Util.Size -> Model -> Element Msg
+view : DataUtil.LoginData -> Time.Zone -> Util.Size -> Model -> Element Msg
 view ld zone size model =
     (if size.width > 1400 then
         E.row [ E.centerX ]
@@ -81,7 +81,7 @@ view ld zone size model =
         ]
 
 
-listview : Data.LoginData -> Time.Zone -> Util.Size -> Model -> Element Msg
+listview : DataUtil.LoginData -> Time.Zone -> Util.Size -> Model -> Element Msg
 listview ld zone size model =
     let
         maxwidth =
@@ -106,7 +106,7 @@ listview ld zone size model =
                         (\id ->
                             E.link
                                 Common.buttonStyle
-                                { url = Data.editNoteLink id
+                                { url = DataUtil.editNoteLink id
                                 , label = E.text "⌂"
                                 }
                         )
@@ -152,7 +152,7 @@ listview ld zone size model =
                                          , E.clipX
                                          , E.width E.fill
                                          ]
-                                            ++ (ZC.systemColor Data.sysids n.sysids
+                                            ++ (ZC.systemColor DataUtil.sysids n.sysids
                                                     |> Maybe.map (\c -> [ EF.color c ])
                                                     |> Maybe.withDefault []
                                                )
@@ -165,7 +165,7 @@ listview ld zone size model =
                                         )
                                         [ E.link
                                             [ E.height <| E.px 30 ]
-                                            { url = Data.archiveNoteLink model.noteid n.id
+                                            { url = DataUtil.archiveNoteLink model.noteid n.id
                                             , label =
                                                 E.row [ E.spacing 10 ]
                                                     [ E.text (Util.showDateTime zone (Time.millisToPosix n.changeddate))
@@ -180,7 +180,7 @@ listview ld zone size model =
             ]
 
 
-update : Msg -> Model -> Data.LoginData -> ( Model, Command )
+update : Msg -> Model -> DataUtil.LoginData -> ( Model, Command )
 update msg model _ =
     case msg of
         SelectPress id ->

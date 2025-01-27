@@ -1,6 +1,6 @@
 module SearchLoc exposing (RTRes(..), TSLoc(..), getTerm, removeTerm, setTerm, swapLast)
 
-import Search exposing (..)
+import Data exposing (..)
 
 
 type TSLoc
@@ -35,47 +35,47 @@ swapLast tsl subst =
 removeTerm : TSLoc -> TagSearch -> RTRes
 removeTerm tsl ts =
     case ( ts, tsl ) of
-        ( SearchTerm _ _, LThis ) ->
+        ( SearchTerm _, LThis ) ->
             Matched
 
         ( Not nt, LThis ) ->
-            Removed nt
+            Removed nt.ts
 
         ( Not _, LNot LThis ) ->
             Matched
 
         ( Not nt, LNot nts ) ->
-            case removeTerm nts nt of
+            case removeTerm nts nt.ts of
                 Matched ->
                     Matched
 
                 Removed rts ->
-                    Removed (Not rts)
+                    Removed (Not { ts = rts })
 
                 Unmatched ->
                     Unmatched
 
-        ( Boolex _ _ _, LThis ) ->
+        ( Boolex _, LThis ) ->
             Matched
 
-        ( Boolex ts1 ao ts2, LBT1 bxts ) ->
+        ( Boolex { ts1, ao, ts2 }, LBT1 bxts ) ->
             case removeTerm bxts ts1 of
                 Matched ->
                     Removed ts2
 
                 Removed nt1 ->
-                    Removed <| Boolex nt1 ao ts2
+                    Removed <| Boolex { ts1 = nt1, ao = ao, ts2 = ts2 }
 
                 Unmatched ->
                     Unmatched
 
-        ( Boolex ts1 ao ts2, LBT2 bxts ) ->
+        ( Boolex { ts1, ao, ts2 }, LBT2 bxts ) ->
             case removeTerm bxts ts2 of
                 Matched ->
                     Removed ts1
 
                 Removed nt2 ->
-                    Removed <| Boolex ts1 ao nt2
+                    Removed <| Boolex { ts1 = ts1, ao = ao, ts2 = nt2 }
 
                 Unmatched ->
                     Unmatched
@@ -91,12 +91,12 @@ getTerm tsl ts =
             Just ts
 
         ( Not nt, LNot nts ) ->
-            getTerm nts nt
+            getTerm nts nt.ts
 
-        ( Boolex ts1 _ _, LBT1 bxts ) ->
+        ( Boolex { ts1 }, LBT1 bxts ) ->
             getTerm bxts ts1
 
-        ( Boolex _ _ ts2, LBT2 bxts ) ->
+        ( Boolex { ts2 }, LBT2 bxts ) ->
             getTerm bxts ts2
 
         _ ->
@@ -106,32 +106,28 @@ getTerm tsl ts =
 setTerm : TSLoc -> TagSearch -> TagSearch -> Maybe TagSearch
 setTerm tsl rts ts =
     case ( ts, tsl ) of
-        ( SearchTerm _ _, LThis ) ->
+        ( SearchTerm _, LThis ) ->
             Just rts
 
         ( _, LThis ) ->
             Just rts
 
         ( Not nt, LNot nts ) ->
-            setTerm nts rts nt
-                |> Maybe.map (\t -> Not t)
+            setTerm nts rts nt.ts
+                |> Maybe.map (\t -> Not { ts = t })
 
-        ( Boolex ts1 andor ts2, LBT1 bxts ) ->
+        ( Boolex { ts1, ao, ts2 }, LBT1 bxts ) ->
             setTerm bxts rts ts1
                 |> Maybe.map
                     (\t1 ->
-                        Boolex t1
-                            andor
-                            ts2
+                        Boolex { ts1 = t1, ao = ao, ts2 = ts2 }
                     )
 
-        ( Boolex ts1 andor ts2, LBT2 bxts ) ->
+        ( Boolex { ts1, ao, ts2 }, LBT2 bxts ) ->
             setTerm bxts rts ts2
                 |> Maybe.map
                     (\t2 ->
-                        Boolex ts1
-                            andor
-                            t2
+                        Boolex { ts1 = ts1, ao = ao, ts2 = t2 }
                     )
 
         _ ->

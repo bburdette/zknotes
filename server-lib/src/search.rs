@@ -3,6 +3,7 @@ use crate::sqldata;
 use crate::sqldata::{delete_zknote, get_sysids, note_id};
 use async_stream::try_stream;
 use futures::Stream;
+use orgauth::data::UserId;
 use orgauth::dbfun::user_id;
 use rusqlite::Connection;
 use std::convert::TryInto;
@@ -12,18 +13,19 @@ use std::sync::Arc;
 use uuid::Uuid;
 use zkprotocol::constants::SpecialUuids;
 use zkprotocol::content::FileStatus;
-use zkprotocol::content::{SyncMessage, ZkListNote, ZkPhantomUser};
+use zkprotocol::content::ZkListNote;
 use zkprotocol::search::{
   AndOr, OrderDirection, OrderField, ResultType, SearchMod, TagSearch, ZkIdSearchResult,
   ZkListNoteSearchResult, ZkNoteAndLinksSearchResult, ZkNoteSearch, ZkNoteSearchResult,
   ZkSearchResultHeader,
 };
+use zkprotocol::sync_data::{SyncMessage, ZkPhantomUser};
 
 pub fn power_delete_zknotes(
   conn: &Connection,
   file_path: PathBuf,
-  user: i64,
-  search: &TagSearch,
+  user: UserId,
+  search: &Vec<TagSearch>,
 ) -> Result<i64, zkerr::Error> {
   // get all, and delete all.  Maybe not a good idea for a big database, but ours is small
   // and soon to be replaced with indradb, perhaps.
@@ -101,7 +103,7 @@ pub enum SearchResult {
 pub fn search_zknotes(
   conn: &Connection,
   filedir: &Path,
-  user: i64,
+  user: UserId,
   search: &ZkNoteSearch,
 ) -> Result<SearchResult, zkerr::Error> {
   let (sql, args) = build_sql(&conn, user, &search, None)?;
@@ -115,7 +117,7 @@ pub fn search_zknotes(
     let uuid = Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?;
     let sysids = get_sysids(conn, sysid, id)?;
     Ok::<ZkListNote, zkerr::Error>(ZkListNote {
-      id: uuid,
+      id: uuid.into(),
       title: row.get(2)?,
       filestatus: {
         let wat: Option<i64> = row.get(3)?;
@@ -130,7 +132,7 @@ pub fn search_zknotes(
           None => FileStatus::NotAFile,
         }
       },
-      user: row.get(4)?,
+      user: UserId::Uid(row.get(4)?),
       createdate: row.get(5)?,
       changeddate: row.get(6)?,
       sysids,
@@ -221,7 +223,7 @@ pub fn search_zknotes(
 pub fn search_zknotes_stream(
   conn: Arc<Connection>,
   files_dir: PathBuf,
-  user: i64,
+  user: UserId,
   search: ZkNoteSearch,
   exclude_notes: Option<String>,
 ) -> impl Stream<Item = Result<SyncMessage, Box<dyn std::error::Error + 'static>>> {
@@ -284,7 +286,7 @@ pub fn search_zknotes_stream(
 
 pub fn sync_users(
   conn: Arc<Connection>,
-  uid: i64,
+  uid: UserId,
   _after: Option<i64>,
   zkns: &ZkNoteSearch,
 ) -> impl futures_util::Stream<Item = Result<SyncMessage, Box<dyn std::error::Error>>> {
@@ -312,9 +314,9 @@ pub fn sync_users(
         rusqlite::params_from_iter(args.iter()),
         |row| match Uuid::parse_str(row.get::<usize, String>(1)?.as_str()) {
           Ok(uuid) => Ok(ZkPhantomUser {
-            id: row.get(0)?,
+            id: UserId::Uid(row.get(0)?),
             uuid: uuid,
-            data: serde_json::Value::Null,
+            data: serde_json::Value::Null.to_string(),
             name: row.get(2)?,
             active: row.get(3)?,
           }),
@@ -329,7 +331,7 @@ pub fn sync_users(
     for rec in rec_iter {
       if let Ok(mut r) = rec {
         let ed = serde_json::to_value(sqldata::read_extra_login_data(&conn, r.id)?)?;
-        r.data = ed;
+        r.data = ed.to_string();
         yield SyncMessage::from(r);
       }
     }
@@ -347,7 +349,7 @@ pub fn system_user(
       id: sysid,
       uuid: Uuid::parse_str(&SpecialUuids::System.str())?,
       name: "system".to_string(),
-      data: serde_json::to_value(sqldata::read_extra_login_data(&conn, sysid)?)?,
+      data: serde_json::to_value(sqldata::read_extra_login_data(&conn, sysid)?)?.to_string(),
       active: true,
     });
   }
@@ -355,7 +357,7 @@ pub fn system_user(
 
 pub fn build_sql(
   conn: &Connection,
-  uid: i64,
+  uid: UserId,
   search: &ZkNoteSearch,
   exclude_notes: Option<String>,
 ) -> Result<(String, Vec<String>), zkerr::Error> {
@@ -377,12 +379,29 @@ pub fn build_sql(
   }
 }
 
+pub fn andify_search(search: &Vec<TagSearch>) -> TagSearch {
+  let mut it = search.iter();
+  match it.next() {
+    Some(head) => it.fold(head.clone(), |acc, elt| TagSearch::Boolex {
+      ts1: Box::new(acc.clone()),
+      ao: AndOr::And,
+      ts2: Box::new(elt.clone()),
+    }),
+    None => TagSearch::SearchTerm {
+      mods: Vec::new(),
+      term: "".to_string(),
+    },
+  }
+}
+
 pub fn build_base_sql(
   conn: &Connection,
-  uid: i64,
+  uid: UserId,
   search: &ZkNoteSearch,
 ) -> Result<(String, Vec<String>), zkerr::Error> {
-  let (cls, clsargs) = build_tagsearch_clause(&conn, uid, false, &search.tagsearch)?;
+  let ts = andify_search(&search.tagsearch);
+
+  let (cls, clsargs) = build_tagsearch_clause(&conn, uid, false, &ts)?;
 
   let publicid = note_id(&conn, "system", "public")?;
   let archiveid = note_id(&conn, "system", "archive")?;
@@ -614,7 +633,7 @@ pub fn build_base_sql(
 
 fn build_tagsearch_clause(
   conn: &Connection,
-  uid: i64,
+  uid: UserId,
   not: bool,
   search: &TagSearch,
 ) -> Result<(String, Vec<String>), zkerr::Error> {
