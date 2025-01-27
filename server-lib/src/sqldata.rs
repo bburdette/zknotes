@@ -1605,9 +1605,11 @@ pub fn read_public_zklinks(
         )
       };
 
-      let zknote = row
-        .get::<usize, Option<String>>(3)?
-        .and_then(|s| Uuid::parse_str(s.as_str()).ok());
+      let zknotei64 = row.get::<usize, Option<i64>>(3)?;
+      let zknote = match zknotei64 {
+        Some(i) => Some(uuid_for_note_id(&conn, i)?),
+        None => None,
+      };
 
       Ok::<_, zkerr::Error>(EditLink {
         otherid: otheruuid.into(),
