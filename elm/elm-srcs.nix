@@ -115,6 +115,11 @@
         version = "1.0.0";
       };
 
+      "toastal/either" = {
+        sha256 = "1yfgvw81szsipibafnllik65vhki9n1lxdylbyy6fsmj6406g1yv";
+        version = "3.6.3";
+      };
+
       "TSFoster/elm-bytes-extra" = {
         sha256 = "1ip5br0kszhr8kmk19jsqqqhgna89drn3cwb6zn8ncwfrxc8xvs9";
         version = "1.3.0";
