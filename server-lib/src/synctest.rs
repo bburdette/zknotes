@@ -13,7 +13,8 @@ mod tests {
   use futures_util::TryStreamExt;
   use orgauth::data::Login;
   use orgauth::data::RegistrationData;
-  use orgauth::data::UserRequestMessage;
+  use orgauth::data::UserId;
+  use orgauth::data::UserRequest;
   use orgauth::dbfun::read_user_by_id;
   use orgauth::dbfun::update_user;
   use orgauth::dbfun::{new_user, user_id};
@@ -54,10 +55,10 @@ mod tests {
     savedlinks: Vec<UuidZkLink>,
     otherusershare: (i64, Uuid),
     otherusersharenote: (i64, Uuid),
-    syncuser: i64,
+    syncuser: UserId,
     syncusernote: i64,
     syncusertoken: Uuid,
-    otheruser: i64,
+    otheruser: UserId,
     filenote: i64,
     filepath: PathBuf,
     tempfilepath: PathBuf,
@@ -75,7 +76,7 @@ mod tests {
 
   fn makenote(
     conn: &Connection,
-    uid: i64,
+    uid: UserId,
     title: String,
   ) -> Result<(i64, SavedZkNote), zkerr::Error> {
     save_zknote(
@@ -1023,13 +1024,10 @@ mod tests {
 
     // log in the server-syncuser so they get a cookie.
     let client = reqwest::Client::new();
-    let l = UserRequestMessage {
-      what: orgauth::data::UserRequest::UrqLogin,
-      data: Some(serde_json::to_value(Login {
-        uid: "server-syncuser".to_string(),
-        pwd: "".to_string(),
-      })?),
-    };
+    let l = UserRequest::UrqLogin(Login {
+      uid: "server-syncuser".to_string(),
+      pwd: "".to_string(),
+    });
     let res = client
       .post(format!("http://{}:{}/user", config.ip, config.port).as_str())
       .json(&l)
@@ -1054,7 +1052,7 @@ mod tests {
     };
 
     let fssearch = ZkNoteSearch {
-      tagsearch: fsts,
+      tagsearch: vec![fsts],
       offset: 0,
       limit: None,
       what: "".to_string(),

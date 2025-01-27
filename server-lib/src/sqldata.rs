@@ -422,7 +422,7 @@ pub fn read_uuidzklink(
   conn: &Connection,
   fromid: i64,
   toid: i64,
-  user: i64,
+  user: UserId,
 ) -> Result<UuidZkLink, zkerr::Error> {
   conn
     .query_row(
@@ -435,7 +435,7 @@ pub fn read_uuidzklink(
        and T.id = ?2
        and zklink.user = OU.id
        and OU.id = ?3",
-      params![fromid, toid, user],
+      params![fromid, toid, user.to_i64()],
       |row| {
         Ok(UuidZkLink {
           fromUuid: row.get(0)?,

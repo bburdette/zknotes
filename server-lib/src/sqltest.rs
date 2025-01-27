@@ -386,10 +386,10 @@ mod tests {
 
     // user A can see their own public note.
     let u1pubnote2_search = ZkNoteSearch {
-      tagsearch: TagSearch::SearchTerm {
+      tagsearch: vec![TagSearch::SearchTerm {
         mods: Vec::new(),
         term: "u1 public note2".to_string(),
-      },
+      }],
       offset: 0,
       limit: None,
       what: "test".to_string(),
@@ -427,10 +427,10 @@ mod tests {
     }
 
     let u1note1_search = ZkNoteSearch {
-      tagsearch: TagSearch::SearchTerm {
+      tagsearch: vec![TagSearch::SearchTerm {
         mods: Vec::new(),
         term: "u1 note1".to_string(),
-      },
+      }],
       offset: 0,
       limit: None,
       what: "test".to_string(),
@@ -469,10 +469,10 @@ mod tests {
 
     println!("19");
     let u1note6_search = ZkNoteSearch {
-      tagsearch: TagSearch::SearchTerm {
+      tagsearch: vec![TagSearch::SearchTerm {
         mods: Vec::new(),
         term: "u1 note6 - direct share".to_string(),
-      },
+      }],
       offset: 0,
       limit: None,
       what: "test".to_string(),
@@ -497,10 +497,10 @@ mod tests {
 
     println!("20");
     let u1note7_search = ZkNoteSearch {
-      tagsearch: TagSearch::SearchTerm {
+      tagsearch: vec![TagSearch::SearchTerm {
         mods: Vec::new(),
         term: "u1 note7 - reversed direct share".to_string(),
-      },
+      }],
       offset: 0,
       limit: None,
       what: "test".to_string(),
@@ -525,10 +525,10 @@ mod tests {
 
     // u2 can see a note on a share they're a member of.
     let u1note4_search = ZkNoteSearch {
-      tagsearch: TagSearch::SearchTerm {
+      tagsearch: vec![TagSearch::SearchTerm {
         mods: Vec::new(),
         term: "u1 note4 - rshare".to_string(),
-      },
+      }],
       offset: 0,
       limit: None,
       what: "test".to_string(),
@@ -553,10 +553,10 @@ mod tests {
 
     // u2 can't see a note on a share they're not a member of.
     let u1note5_search = ZkNoteSearch {
-      tagsearch: TagSearch::SearchTerm {
+      tagsearch: vec![TagSearch::SearchTerm {
         mods: Vec::new(),
         term: "u1 note5 - share".to_string(),
-      },
+      }],
       offset: 0,
       limit: None,
       what: "test".to_string(),
@@ -581,10 +581,10 @@ mod tests {
 
     // u2 can't see note4 archive note.
     let u1note4_archive_search = ZkNoteSearch {
-      tagsearch: TagSearch::SearchTerm {
+      tagsearch: vec![TagSearch::SearchTerm {
         mods: vec![SearchMod::ExactMatch],
         term: "u1 note4 - share".to_string(),
-      },
+      }],
       offset: 0,
       limit: None,
       what: "u2nran test".to_string(),
@@ -633,10 +633,10 @@ mod tests {
 
     //	 ExactMatch with bad case fails.
     let u1pubnote2_exact_search = ZkNoteSearch {
-      tagsearch: TagSearch::SearchTerm {
+      tagsearch: vec![TagSearch::SearchTerm {
         mods: vec![SearchMod::ExactMatch],
         term: "u1 Public note2".to_string(),
-      },
+      }],
       offset: 0,
       limit: None,
       what: "test".to_string(),
@@ -660,10 +660,10 @@ mod tests {
 
     // should be 4 notes tagged with et'user' - 3 users and 1 'system'.
     let u1pubnote2_exact_search = ZkNoteSearch {
-      tagsearch: TagSearch::SearchTerm {
+      tagsearch: vec![TagSearch::SearchTerm {
         mods: vec![SearchMod::ExactMatch, SearchMod::Tag],
         term: "user".to_string(),
-      },
+      }],
       offset: 0,
       limit: None,
       what: "test".to_string(),
@@ -687,10 +687,10 @@ mod tests {
 
     // should be 9 notes for 'user1'
     let u1pubnote2_exact_search = ZkNoteSearch {
-      tagsearch: TagSearch::SearchTerm {
+      tagsearch: vec![TagSearch::SearchTerm {
         mods: vec![SearchMod::ExactMatch, SearchMod::Tag, SearchMod::User],
         term: "user1".to_string(),
-      },
+      }],
       offset: 0,
       limit: None,
       what: "test".to_string(),
@@ -714,10 +714,10 @@ mod tests {
 
     // should be 1 notes for 'ote1-4'
     let u1pubnote2_exact_search = ZkNoteSearch {
-      tagsearch: TagSearch::SearchTerm {
+      tagsearch: vec![TagSearch::SearchTerm {
         mods: vec![SearchMod::Note],
         term: "ote1-4".to_string(),
-      },
+      }],
       offset: 0,
       limit: None,
       what: "test".to_string(),
