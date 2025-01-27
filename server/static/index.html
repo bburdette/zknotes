@@ -49,6 +49,11 @@
       errorid = {{errorid}};
       adminsettings = {{adminsettings}};
 
+      if (login && login.data)
+      {
+        login.data = JSON.parse(login.data);
+      }
+
       app = Elm.Main.init({
         node: document.getElementById('elm'),
         flags: { seed : Math.floor(Math.random()*0x0FFFFFFF), 
