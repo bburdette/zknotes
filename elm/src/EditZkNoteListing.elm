@@ -231,15 +231,7 @@ update msg model ld =
                             Just <|
                                 ( D.init
                                     ("delete all notes matching this search?\n"
-                                        ++ showTagSearch
-                                            (s.tagsearch
-                                                |> List.reverse
-                                                |> List.head
-                                                |> Maybe.withDefault
-                                                    (Data.SearchTerm
-                                                        { mods = [], term = "" }
-                                                    )
-                                            )
+                                        ++ String.concat (List.map showTagSearch s.tagsearch)
                                     )
                                     True
                                     (\size -> E.map (\_ -> ()) (listview ld size model))

@@ -2003,10 +2003,6 @@ actualupdate msg model =
                                             ( displayMessageDialog { model | state = prevstate } "note not found", Cmd.none )
 
                                 Data.PbeNoteIsPrivate publicrequest ->
-                                    let
-                                        _ =
-                                            Debug.log "Data.NoteIsPrivate publicrequest" publicrequest
-                                    in
                                     case DataUtil.getPrqNoteInfo publicrequest of
                                         Just ( zknoteid, "cache" ) ->
                                             ( { model
