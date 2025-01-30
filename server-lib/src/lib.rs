@@ -399,23 +399,17 @@ async fn save_files(
 async fn private(
   session: Session,
   data: web::Data<State>,
-  item: web::Json<PrivateClosureRequest>,
+  item: web::Json<PrivateRequest>,
   _req: HttpRequest,
 ) -> HttpResponse {
   let mut state = data.clone();
-  let pcr = item.into_inner();
-  match zk_interface_check(&session, &mut state, pcr.request).await {
-    Ok(sr) => HttpResponse::Ok().json(PrivateClosureReply {
-      closure_id: pcr.closure_id,
-      reply: sr,
-    }),
+  match zk_interface_check(&session, &mut state, item.into_inner()).await {
+    Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'private' err: {:?}", e);
-      let se = PrivateReply::PvyServerError(PrivateError::PveString(e.to_string()));
-      HttpResponse::Ok().json(PrivateClosureReply {
-        closure_id: pcr.closure_id,
-        reply: se,
-      })
+      HttpResponse::Ok().json(PrivateReply::PvyServerError(PrivateError::PveString(
+        e.to_string(),
+      )))
     }
   }
 }
