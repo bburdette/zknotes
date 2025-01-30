@@ -55,7 +55,10 @@ pub use zkprotocol::search as zs;
 
 pub use zkprotocol::messages::PrivateStreamingMessage;
 use zkprotocol::{
-  private::{PrivateError, PrivateReply, PrivateRequest, ZkNoteRq},
+  private::{
+    PrivateClosureReply, PrivateClosureRequest, PrivateError, PrivateReply, PrivateRequest,
+    ZkNoteRq,
+  },
   public::{PublicError, PublicReply, PublicRequest},
   upload::UploadReply,
 };
@@ -396,16 +399,23 @@ async fn save_files(
 async fn private(
   session: Session,
   data: web::Data<State>,
-  item: web::Json<PrivateRequest>,
+  item: web::Json<PrivateClosureRequest>,
   _req: HttpRequest,
 ) -> HttpResponse {
   let mut state = data.clone();
-  match zk_interface_check(&session, &mut state, item.into_inner()).await {
-    Ok(sr) => HttpResponse::Ok().json(sr),
+  let pcr = item.into_inner();
+  match zk_interface_check(&session, &mut state, pcr.request).await {
+    Ok(sr) => HttpResponse::Ok().json(PrivateClosureReply {
+      closure_id: pcr.closure_id,
+      reply: sr,
+    }),
     Err(e) => {
       error!("'private' err: {:?}", e);
       let se = PrivateReply::PvyServerError(PrivateError::PveString(e.to_string()));
-      HttpResponse::Ok().json(se)
+      HttpResponse::Ok().json(PrivateClosureReply {
+        closure_id: pcr.closure_id,
+        reply: se,
+      })
     }
   }
 }
@@ -742,6 +752,8 @@ pub async fn err_main(
                         PrivateRequest,
                         PrivateReply,
                         PrivateError,
+                        PrivateClosureRequest,
+                        PrivateClosureReply,
                         ZkNoteRq,
                         UploadReply,
                         zs::ZkNoteSearch,
@@ -794,6 +806,8 @@ pub async fn err_main(
                         PrivateRequest,
                         PrivateReply,
                         PrivateError,
+                        PrivateClosureRequest,
+                        PrivateClosureReply,
                         ZkNoteRq,
                         UploadReply,
                         zs::ZkNoteSearch,

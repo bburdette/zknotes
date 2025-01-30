@@ -15,6 +15,17 @@ use serde_derive::{Deserialize, Serialize};
 // use uuid::Uuid;
 
 #[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug)]
+pub struct PrivateClosureRequest {
+  pub closure_id: Option<i64>,
+  pub request: PrivateRequest,
+}
+#[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug)]
+pub struct PrivateClosureReply {
+  pub closure_id: Option<i64>,
+  pub reply: PrivateReply,
+}
+
+#[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug)]
 pub enum PrivateRequest {
   PvqGetZkNote(ZkNoteId),
   PvqGetZkNoteAndLinks(GetZkNoteAndLinks),

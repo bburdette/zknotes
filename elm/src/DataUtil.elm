@@ -359,6 +359,12 @@ showPrivateReply pr =
         |> JE.encode 2
 
 
+showPrivateClosureReply : PrivateClosureReply -> String
+showPrivateClosureReply pr =
+    privateClosureReplyEncoder pr
+        |> JE.encode 2
+
+
 showAdminResponse : Orgauth.Data.AdminResponse -> String
 showAdminResponse pr =
     Orgauth.Data.adminResponseEncoder pr

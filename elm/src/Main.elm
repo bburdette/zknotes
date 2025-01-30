@@ -5,7 +5,7 @@ import Browser
 import Browser.Events
 import Browser.Navigation
 import Common
-import Data exposing (ZkNoteId)
+import Data exposing (PrivateClosureRequest, ZkNoteId)
 import DataUtil exposing (FileUrlInfo, LoginData, jobComplete, showPrivateReply, zniEq)
 import Dict exposing (Dict)
 import DisplayMessage
@@ -203,6 +203,8 @@ type alias Model =
     , trackedRequests : TRequests
     , jobs : TJobs
     , noteCache : NoteCache
+    , ziClosureId : Int
+    , ziClosures : Dict Int (Result Http.Error ( Time.Posix, Data.PrivateReply ) -> Msg)
     }
 
 
@@ -402,8 +404,9 @@ routeStateInternal model route =
 
         ArchiveNoteR id aid ->
             let
-                getboth =
-                    sendZIMsgExp model.fui.location
+                ( nm, getboth ) =
+                    sendZIMsgExp model
+                        model.fui
                         (Data.PvqGetZkNoteArchives
                             { zknote = id
                             , offset = 0
@@ -418,7 +421,7 @@ routeStateInternal model route =
                             )
                         )
             in
-            case model.state of
+            case nm.state of
                 ArchiveListing st login ->
                     if zniEq st.noteid id then
                         ( ArchiveListing st login
@@ -1135,26 +1138,47 @@ sendAIMsgExp location msg tomsg =
 sendZIMsg : FileUrlInfo -> Data.PrivateRequest -> Cmd Msg
 sendZIMsg fui msg =
     if fui.tauri then
-        sendZIMsgTauri msg
+        sendZIMsgTauri <| PrivateClosureRequest Nothing msg
 
     else
-        sendZIMsgExp fui.location msg ZkReplyData
+        HE.postJsonTask
+            { url = fui.location ++ "/private"
+            , body = Http.jsonBody (Data.privateRequestEncoder msg)
+            , decoder = Data.privateReplyDecoder
+            }
+            |> Task.andThen (\x -> Task.map (\posix -> ( posix, x )) Time.now)
+            |> Task.attempt ZkReplyData
 
 
-sendZIMsgTauri : Data.PrivateRequest -> Cmd Msg
+
+-- sendZIMsgExp fui.location msg ZkReplyData
+
+
+sendZIMsgTauri : Data.PrivateClosureRequest -> Cmd Msg
 sendZIMsgTauri msg =
-    sendZIValueTauri <| Data.privateRequestEncoder msg
+    sendZIValueTauri <| Data.privateClosureRequestEncoder msg
 
 
-sendZIMsgExp : String -> Data.PrivateRequest -> (Result Http.Error ( Time.Posix, Data.PrivateReply ) -> Msg) -> Cmd Msg
-sendZIMsgExp location msg tomsg =
-    HE.postJsonTask
-        { url = location ++ "/private"
-        , body = Http.jsonBody (Data.privateRequestEncoder msg)
-        , decoder = Data.privateReplyDecoder
-        }
-        |> Task.andThen (\x -> Task.map (\posix -> ( posix, x )) Time.now)
-        |> Task.attempt tomsg
+sendZIMsgExp : Model -> FileUrlInfo -> Data.PrivateRequest -> (Result Http.Error ( Time.Posix, Data.PrivateReply ) -> Msg) -> ( Model, Cmd Msg )
+sendZIMsgExp model fui msg tomsg =
+    if fui.tauri then
+        ( { model
+            | ziClosureId = model.ziClosureId + 1
+            , ziClosures = Dict.insert model.ziClosureId tomsg model.ziClosures
+          }
+        , sendZIValueTauri <| Data.privateRequestEncoder msg
+        )
+
+    else
+        ( model
+        , HE.postJsonTask
+            { url = fui.location ++ "/private"
+            , body = Http.jsonBody (Data.privateRequestEncoder msg)
+            , decoder = Data.privateReplyDecoder
+            }
+            |> Task.andThen (\x -> Task.map (\posix -> ( posix, x )) Time.now)
+            |> Task.attempt tomsg
+        )
 
 
 {-| send search AND save search in db as a zknote
@@ -1194,15 +1218,20 @@ sendSearch model search =
                 )
 
             else
-                ( { model | prevSearches = search.tagsearch :: model.prevSearches }
+                let
+                    ( nm, cmd ) =
+                        sendZIMsgExp model
+                            model.fui
+                            (Data.PvqSaveZkNoteAndLinks searchnote)
+                            -- ignore the reply!  otherwise if you search while
+                            -- creating a new note, that new note gets the search note
+                            -- id.
+                            (\_ -> Noop)
+                in
+                ( { nm | prevSearches = search.tagsearch :: model.prevSearches }
                 , Cmd.batch
                     [ sendZIMsg model.fui (Data.PvqSearchZkNotes search)
-                    , sendZIMsgExp model.fui.location
-                        (Data.PvqSaveZkNoteAndLinks searchnote)
-                        -- ignore the reply!  otherwise if you search while
-                        -- creating a new note, that new note gets the search note
-                        -- id.
-                        (\_ -> Noop)
+                    , cmd
                     ]
                 )
 
@@ -1624,9 +1653,23 @@ actualupdate msg model =
             ( model, Cmd.none )
 
         ( TauriZkReplyData jd, _ ) ->
-            case JD.decodeValue (makeTDDecoder Data.privateReplyDecoder) jd of
+            case JD.decodeValue (makeTDDecoder Data.privateClosureReplyDecoder) jd of
                 Ok td ->
-                    actualupdate (ZkReplyData (Ok ( td.utc, td.data ))) model
+                    case td.data.closureId of
+                        Just id ->
+                            case Dict.get id model.ziClosures of
+                                Just closure ->
+                                    let
+                                        cmsg =
+                                            closure (Ok ( td.utc, td.data.reply ))
+                                    in
+                                    actualupdate cmsg model
+
+                                Nothing ->
+                                    actualupdate (ZkReplyData (Ok ( td.utc, td.data.reply ))) model
+
+                        Nothing ->
+                            actualupdate (ZkReplyData (Ok ( td.utc, td.data.reply ))) model
 
                 Err e ->
                     ( displayMessageDialog model <| JD.errorToString e ++ "\n" ++ JE.encode 2 jd
@@ -3191,11 +3234,10 @@ handleTASelection model emod login tas =
             ( displayMessageDialog model e, Cmd.none )
 
         EditZkNote.TASave s ->
-            ( model
-            , sendZIMsgExp model.fui.location
+            sendZIMsgExp model
+                model.fui
                 (Data.PvqSaveZkNoteAndLinks s)
                 (TAReplyData tas)
-            )
 
         EditZkNote.TAUpdated nemod s ->
             ( { model | state = EditZkNote nemod login }
@@ -3901,6 +3943,8 @@ init flags url key zone fontsize =
             , trackedRequests = { requestCount = 0, requests = Dict.empty }
             , jobs = { jobs = Dict.empty }
             , noteCache = NC.empty maxCacheNotes
+            , ziClosureId = 0
+            , ziClosures = Dict.empty
             }
 
         geterrornote =
