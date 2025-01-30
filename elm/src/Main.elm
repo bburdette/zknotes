@@ -1166,7 +1166,11 @@ sendZIMsgExp model fui msg tomsg =
             | ziClosureId = model.ziClosureId + 1
             , ziClosures = Dict.insert model.ziClosureId tomsg model.ziClosures
           }
-        , sendZIValueTauri <| Data.privateRequestEncoder msg
+        , sendZIValueTauri <|
+            Data.privateClosureRequestEncoder
+                { closureId = Just model.ziClosureId
+                , request = msg
+                }
         )
 
     else
