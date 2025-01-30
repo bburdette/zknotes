@@ -119,6 +119,7 @@ type State
     | Invited Invited.Model
     | EditZkNote EditZkNote.Model LoginData
     | EditZkNoteListing EditZkNoteListing.Model LoginData
+    | ArchiveAwait ZkNoteId ZkNoteId LoginData
     | ArchiveListing ArchiveListing.Model LoginData
     | View View.Model
     | EView View.Model State
@@ -403,9 +404,10 @@ routeStateInternal model route =
                             ( model.state, Cmd.none )
 
         ArchiveNoteR id aid ->
-            let
-                ( nm, getboth ) =
-                    sendZIMsgExp model
+            case stateLogin model.state of
+                Just login ->
+                    ( ArchiveAwait id aid login
+                    , sendZIMsg
                         model.fui
                         (Data.PvqGetZkNoteArchives
                             { zknote = id
@@ -413,38 +415,10 @@ routeStateInternal model route =
                             , limit = Just SU.defaultSearchLimit
                             }
                         )
-                        (ZkReplyDataSeq
-                            (\_ ->
-                                Just <|
-                                    sendZIMsg model.fui
-                                        (Data.PvqGetArchiveZkNote { parentnote = id, noteid = aid })
-                            )
-                        )
-            in
-            case nm.state of
-                ArchiveListing st login ->
-                    if zniEq st.noteid id then
-                        ( ArchiveListing st login
-                        , sendZIMsg model.fui
-                            (Data.PvqGetArchiveZkNote { parentnote = id, noteid = aid })
-                        )
+                    )
 
-                    else
-                        ( ArchiveListing st login
-                        , getboth
-                        )
-
-                st ->
-                    case stateLogin st of
-                        Just login ->
-                            ( ShowMessage { message = "loading archives..." }
-                                login
-                                (Just model.state)
-                            , getboth
-                            )
-
-                        Nothing ->
-                            ( model.state, Cmd.none )
+                Nothing ->
+                    ( model.state, Cmd.none )
 
         ResetPasswordR username key ->
             ( ResetPassword <| ResetPassword.initialModel username key "zknotes", Cmd.none )
@@ -771,6 +745,9 @@ showState state =
         ArchiveListing _ _ ->
             "ArchiveListing"
 
+        ArchiveAwait _ _ _ ->
+            "ArchiveAwait"
+
         View _ ->
             "View"
 
@@ -864,6 +841,9 @@ viewState size state model =
         ArchiveListing em ld ->
             E.map ArchiveListingMsg <| ArchiveListing.view ld model.timezone size em
 
+        ArchiveAwait _ _ _ ->
+            E.text "loading archive..."
+
         ShowMessage em _ _ ->
             E.map ShowMessageMsg <| ShowMessage.view em
 
@@ -956,6 +936,9 @@ stateSearch state =
         ArchiveListing _ _ ->
             Nothing
 
+        ArchiveAwait _ _ _ ->
+            Nothing
+
         ShowMessage _ _ (Just st) ->
             stateSearch st
 
@@ -1042,6 +1025,9 @@ stateLogin state =
             Just login
 
         ArchiveListing _ login ->
+            Just login
+
+        ArchiveAwait _ _ login ->
             Just login
 
         Import _ login ->
@@ -2014,6 +2000,12 @@ actualupdate msg model =
 
         ( ArchiveListingMsg lm, ArchiveListing mod ld ) ->
             handleArchiveListing model ld (ArchiveListing.update lm mod ld)
+
+        ( ZkReplyData (Ok ( _, Data.PvyZkNoteArchives lm )), ArchiveAwait id aid ld ) ->
+            ( { model | state = ArchiveListing (ArchiveListing.init lm) ld }
+            , sendZIMsg model.fui
+                (Data.PvqGetArchiveZkNote { parentnote = id, noteid = aid })
+            )
 
         ( PublicReplyData prd, state ) ->
             case prd of
