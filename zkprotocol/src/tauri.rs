@@ -17,9 +17,10 @@ pub enum TauriRequest {
 #[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
 pub enum TauriReply {
   TyUploadedFiles(UploadedFiles),
+  TyServerError(String),
 }
 
 #[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
 pub struct UploadedFiles {
-  pub paths: Vec<ZkListNote>,
+  pub notes: Vec<ZkListNote>,
 }

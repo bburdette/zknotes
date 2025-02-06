@@ -338,8 +338,14 @@ async fn make_file_notes(
     // compute hash.
     let fpath = Path::new(&fp);
 
-    let (nid64, _noteid, _fid) =
-      sqldata::make_file_note(&conn, &state.config.file_path, userdata.id, &name, fpath)?;
+    let (nid64, _noteid, _fid) = sqldata::make_file_note(
+      &conn,
+      &state.config.file_path,
+      userdata.id,
+      &name,
+      fpath,
+      false,
+    )?;
 
     // return zknoteedit.
     let listnote =

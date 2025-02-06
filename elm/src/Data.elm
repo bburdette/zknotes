@@ -1158,14 +1158,14 @@ tauriReplyEncoder enum =
 
 
 type alias UploadedFiles =
-    { paths : List ZkListNote
+    { notes : List ZkListNote
     }
 
 
 uploadedFilesEncoder : UploadedFiles -> Json.Encode.Value
 uploadedFilesEncoder struct =
     Json.Encode.object
-        [ ( "paths", Json.Encode.list zkListNoteEncoder struct.paths )
+        [ ( "notes", Json.Encode.list zkListNoteEncoder struct.notes )
         ]
 
 
@@ -2051,4 +2051,4 @@ tauriReplyDecoder =
 uploadedFilesDecoder : Json.Decode.Decoder UploadedFiles
 uploadedFilesDecoder =
     Json.Decode.succeed UploadedFiles
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "paths" (Json.Decode.list zkListNoteDecoder)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "notes" (Json.Decode.list zkListNoteDecoder)))

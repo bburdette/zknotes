@@ -1705,6 +1705,10 @@ actualupdate msg model =
                 Ok td ->
                     case td of
                         Data.TyUploadedFiles upl ->
+                            let
+                                _ =
+                                    Debug.log "TyUploadedFiles " upl
+                            in
                             ( model, Cmd.none )
 
                 -- actualupdate (PublicReplyData (Ok ( td.utc, td.data ))) model
@@ -4065,7 +4069,7 @@ main =
                     , receiveAITauriResponse TauriAdminReplyData
                     , receiveUITauriResponse TauriUserReplyData
                     , receivePITauriResponse TauriPublicReplyData
-                    , receiveTITauriResponse TauriPublicReplyData
+                    , receiveTITauriResponse TauriTauriReplyData
                     ]
                         ++ jobtick
                         ++ tracks
