@@ -3,9 +3,12 @@
 
 module Data exposing (..)
 
+import Dict exposing (Dict)
+import Http
 import Json.Decode
 import Json.Encode
 import Orgauth.UserId exposing (..)
+import Url.Builder
 
 
 resultEncoder : (e -> Json.Encode.Value) -> (t -> Json.Encode.Value) -> (Result e t -> Json.Encode.Value)
@@ -1148,6 +1151,7 @@ tauriRequestEncoder enum =
 
 type TauriReply
     = TyUploadedFiles UploadedFiles
+    | TyServerError String
 
 
 tauriReplyEncoder : TauriReply -> Json.Encode.Value
@@ -1155,6 +1159,9 @@ tauriReplyEncoder enum =
     case enum of
         TyUploadedFiles inner ->
             Json.Encode.object [ ( "TyUploadedFiles", uploadedFilesEncoder inner ) ]
+
+        TyServerError inner ->
+            Json.Encode.object [ ( "TyServerError", Json.Encode.string inner ) ]
 
 
 type alias UploadedFiles =
@@ -2045,6 +2052,7 @@ tauriReplyDecoder : Json.Decode.Decoder TauriReply
 tauriReplyDecoder =
     Json.Decode.oneOf
         [ Json.Decode.map TyUploadedFiles (Json.Decode.field "TyUploadedFiles" uploadedFilesDecoder)
+        , Json.Decode.map TyServerError (Json.Decode.field "TyServerError" Json.Decode.string)
         ]
 
 

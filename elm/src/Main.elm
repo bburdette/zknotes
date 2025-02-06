@@ -5,7 +5,7 @@ import Browser
 import Browser.Events
 import Browser.Navigation
 import Common
-import Data exposing (PrivateClosureRequest, ZkNoteId)
+import Data exposing (PrivateClosureRequest, UploadedFiles, ZkNoteId)
 import DataUtil exposing (FileUrlInfo, LoginData, jobComplete, showPrivateReply, zniEq)
 import Dict exposing (Dict)
 import DisplayMessage
@@ -1704,12 +1704,55 @@ actualupdate msg model =
             case JD.decodeValue Data.tauriReplyDecoder jd of
                 Ok td ->
                     case td of
-                        Data.TyUploadedFiles upl ->
+                        Data.TyUploadedFiles uf ->
                             let
-                                _ =
-                                    Debug.log "TyUploadedFiles " upl
+                                fc =
+                                    1 + List.length uf.notes
+
+                                tr =
+                                    model.trackedRequests
+
+                                nrid =
+                                    String.fromInt (model.trackedRequests.requestCount + 1)
+
+                                nrq =
+                                    uf.notes
+                                        |> List.map (\n -> n.title)
+                                        |> (\names ->
+                                                FileUpload
+                                                    { filenames = names
+                                                    , progress = Just (Http.Sending { sent = fc, size = fc })
+                                                    , files = Just uf.notes
+                                                    }
+                                           )
+
+                                ntr =
+                                    { tr
+                                        | requestCount = tr.requestCount + fc
+                                        , requests =
+                                            Dict.insert nrid
+                                                nrq
+                                                tr.requests
+                                    }
                             in
-                            ( model, Cmd.none )
+                            ( { model
+                                | trackedRequests = ntr
+                                , state =
+                                    RequestsDialog
+                                        (RequestsDialog.init
+                                            -- dummy state we won't use
+                                            { requestCount = 1, requests = Dict.fromList [ ( nrid, nrq ) ] }
+                                            Common.buttonStyle
+                                            (E.map (\_ -> ()) (viewState model.size model.state model))
+                                        )
+                                        model.state
+                              }
+                            , Cmd.none
+                            )
+
+                        -- ( model, Cmd.none )
+                        Data.TyServerError e ->
+                            ( displayMessageDialog model <| e, Cmd.none )
 
                 -- actualupdate (PublicReplyData (Ok ( td.utc, td.data ))) model
                 Err e ->
@@ -3064,28 +3107,19 @@ actualupdate msg model =
                         )
                         model.state
               }
-            , if model.fui.tauri then
-                sendTIValueTauri <|
-                    Data.tauriRequestEncoder
-                        (Debug.log "blah" <|
-                            Data.TrqUploadFiles
-                        )
-                -- Data.UploadFiles (List.map F.name files))
-
-              else
-                Http.request
-                    { method = "POST"
-                    , headers = []
-                    , url = model.fui.location ++ "/upload"
-                    , body =
-                        file
-                            :: files
-                            |> List.map (\f -> Http.filePart (F.name f) f)
-                            |> Http.multipartBody
-                    , expect = Http.expectJson (FileUploadedButGetTime nrid) Data.uploadReplyDecoder
-                    , timeout = Nothing
-                    , tracker = Just nrid
-                    }
+            , Http.request
+                { method = "POST"
+                , headers = []
+                , url = model.fui.location ++ "/upload"
+                , body =
+                    file
+                        :: files
+                        |> List.map (\f -> Http.filePart (F.name f) f)
+                        |> Http.multipartBody
+                , expect = Http.expectJson (FileUploadedButGetTime nrid) Data.uploadReplyDecoder
+                , timeout = Nothing
+                , tracker = Just nrid
+                }
             )
 
         ( FileUploadedButGetTime what zrd, state ) ->
