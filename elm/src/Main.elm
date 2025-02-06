@@ -86,6 +86,7 @@ type Msg
     | TauriUserReplyData JD.Value
     | TauriAdminReplyData JD.Value
     | TauriPublicReplyData JD.Value
+    | TauriTauriReplyData JD.Value
     | LoadUrl String
     | InternalUrl Url
     | TASelection JD.Value
@@ -674,6 +675,9 @@ showMessage msg =
 
         TauriPublicReplyData _ ->
             "TauriPublicReplyData"
+
+        TauriTauriReplyData _ ->
+            "TauriTauriReplyData"
 
         SelectDialogMsg _ ->
             "SelectDialogMsg"
@@ -1691,6 +1695,19 @@ actualupdate msg model =
                 Ok td ->
                     actualupdate (PublicReplyData (Ok ( td.utc, td.data ))) model
 
+                Err e ->
+                    ( displayMessageDialog model <| JD.errorToString e
+                    , Cmd.none
+                    )
+
+        ( TauriTauriReplyData jd, _ ) ->
+            case JD.decodeValue Data.tauriReplyDecoder jd of
+                Ok td ->
+                    case td of
+                        Data.TyUploadedFiles upl ->
+                            ( model, Cmd.none )
+
+                -- actualupdate (PublicReplyData (Ok ( td.utc, td.data ))) model
                 Err e ->
                     ( displayMessageDialog model <| JD.errorToString e
                     , Cmd.none
@@ -3043,19 +3060,28 @@ actualupdate msg model =
                         )
                         model.state
               }
-            , Http.request
-                { method = "POST"
-                , headers = []
-                , url = model.fui.location ++ "/upload"
-                , body =
-                    file
-                        :: files
-                        |> List.map (\f -> Http.filePart (F.name f) f)
-                        |> Http.multipartBody
-                , expect = Http.expectJson (FileUploadedButGetTime nrid) Data.uploadReplyDecoder
-                , timeout = Nothing
-                , tracker = Just nrid
-                }
+            , if model.fui.tauri then
+                sendTIValueTauri <|
+                    Data.tauriRequestEncoder
+                        (Debug.log "blah" <|
+                            Data.TrqUploadFiles
+                        )
+                -- Data.UploadFiles (List.map F.name files))
+
+              else
+                Http.request
+                    { method = "POST"
+                    , headers = []
+                    , url = model.fui.location ++ "/upload"
+                    , body =
+                        file
+                            :: files
+                            |> List.map (\f -> Http.filePart (F.name f) f)
+                            |> Http.multipartBody
+                    , expect = Http.expectJson (FileUploadedButGetTime nrid) Data.uploadReplyDecoder
+                    , timeout = Nothing
+                    , tracker = Just nrid
+                    }
             )
 
         ( FileUploadedButGetTime what zrd, state ) ->
@@ -3557,7 +3583,13 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
 
                 EditZkNote.FileUpload ->
                     ( model
-                    , FS.files [] OnFileSelected
+                    , if model.fui.tauri then
+                        sendTIValueTauri <|
+                            Data.tauriRequestEncoder
+                                Data.TrqUploadFiles
+
+                      else
+                        FS.files [] OnFileSelected
                     )
 
                 EditZkNote.Sync ->
@@ -4033,6 +4065,7 @@ main =
                     , receiveAITauriResponse TauriAdminReplyData
                     , receiveUITauriResponse TauriUserReplyData
                     , receivePITauriResponse TauriPublicReplyData
+                    , receiveTITauriResponse TauriPublicReplyData
                     ]
                         ++ jobtick
                         ++ tracks
@@ -4078,6 +4111,12 @@ port sendPIValueTauri : JD.Value -> Cmd msg
 
 
 port receivePITauriResponse : (JD.Value -> msg) -> Sub msg
+
+
+port sendTIValueTauri : JD.Value -> Cmd msg
+
+
+port receiveTITauriResponse : (JD.Value -> msg) -> Sub msg
 
 
 keyreceive : Sub Msg

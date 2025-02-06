@@ -1136,14 +1136,14 @@ zkNoteAndLinksSearchResultEncoder struct =
 
 
 type TauriRequest
-    = TrqUploadFiles UploadFiles
+    = TrqUploadFiles
 
 
 tauriRequestEncoder : TauriRequest -> Json.Encode.Value
 tauriRequestEncoder enum =
     case enum of
-        TrqUploadFiles inner ->
-            Json.Encode.object [ ( "TrqUploadFiles", uploadFilesEncoder inner ) ]
+        TrqUploadFiles ->
+            Json.Encode.string "TrqUploadFiles"
 
 
 type TauriReply
@@ -1155,18 +1155,6 @@ tauriReplyEncoder enum =
     case enum of
         TyUploadedFiles inner ->
             Json.Encode.object [ ( "TyUploadedFiles", uploadedFilesEncoder inner ) ]
-
-
-type alias UploadFiles =
-    { paths : List String
-    }
-
-
-uploadFilesEncoder : UploadFiles -> Json.Encode.Value
-uploadFilesEncoder struct =
-    Json.Encode.object
-        [ ( "paths", Json.Encode.list Json.Encode.string struct.paths )
-        ]
 
 
 type alias UploadedFiles =
@@ -2040,7 +2028,16 @@ zkNoteAndLinksSearchResultDecoder =
 tauriRequestDecoder : Json.Decode.Decoder TauriRequest
 tauriRequestDecoder =
     Json.Decode.oneOf
-        [ Json.Decode.map TrqUploadFiles (Json.Decode.field "TrqUploadFiles" uploadFilesDecoder)
+        [ Json.Decode.string
+            |> Json.Decode.andThen
+                (\x ->
+                    case x of
+                        "TrqUploadFiles" ->
+                            Json.Decode.succeed TrqUploadFiles
+
+                        unexpected ->
+                            Json.Decode.fail <| "Unexpected variant " ++ unexpected
+                )
         ]
 
 
@@ -2049,12 +2046,6 @@ tauriReplyDecoder =
     Json.Decode.oneOf
         [ Json.Decode.map TyUploadedFiles (Json.Decode.field "TyUploadedFiles" uploadedFilesDecoder)
         ]
-
-
-uploadFilesDecoder : Json.Decode.Decoder UploadFiles
-uploadFilesDecoder =
-    Json.Decode.succeed UploadFiles
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "paths" (Json.Decode.list Json.Decode.string)))
 
 
 uploadedFilesDecoder : Json.Decode.Decoder UploadedFiles

@@ -71,7 +71,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                   zs::ZkNoteAndLinksSearchResult,
                   tauri::TauriRequest,
                   tauri::TauriReply,
-                  tauri::UploadFiles,
                   tauri::UploadedFiles,
       ]
       // generates types and decoders for types implementing ElmDecoder
@@ -130,7 +129,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                   zs::ZkNoteAndLinksSearchResult,
                   tauri::TauriRequest,
                   tauri::TauriReply,
-                  tauri::UploadFiles,
                   tauri::UploadedFiles,
       ]
       // generates types and functions for forming queries for types implementing ElmQuery
