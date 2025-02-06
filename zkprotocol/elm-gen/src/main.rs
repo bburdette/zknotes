@@ -140,8 +140,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   .unwrap();
 
   let output = String::from_utf8(target).unwrap();
+  // search and replace
+
+  let uidout = output.replace(
+    "import Json.Encode",
+    r#"import Json.Encode
+import Orgauth.UserId exposing (..)"#,
+  );
+
   let outf = ed.join("Data.elm").to_str().expect("bad path").to_string();
-  util::write_string(outf.as_str(), output.as_str())?;
+  util::write_string(outf.as_str(), uidout.as_str())?;
 
   println!("wrote file: {}", outf);
 
