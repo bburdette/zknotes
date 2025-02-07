@@ -114,6 +114,11 @@ mod tests {
       std::fs::create_dir_all(&fdpath)?;
     }
 
+    let tfpath = Path::new(tempfilesdir.as_str());
+    if !tfpath.exists() {
+      std::fs::create_dir_all(&tfpath)?;
+    }
+
     // test users.
     let otheruser = new_user(
       &conn,
@@ -295,14 +300,20 @@ mod tests {
     orgauth::util::write_string(fname.as_str(), format!("{} tesssst", basename).as_str())
       .map_err(|e| zkerr::annotate_string("write_string error".to_string(), e.into()))?;
     let fpath = Path::new(&fname);
-    let (filenote, _noteid, _fid) =
-      sqldata::make_file_note(&conn, Path::new(filesdir.as_str()), syncuser, &fname, fpath)
-        .map_err(|e| {
-          zkerr::annotate_string(
-            format!("make_file_note error: {}", fpath.display()),
-            e.into(),
-          )
-        })?;
+    let (filenote, _noteid, _fid) = sqldata::make_file_note(
+      &conn,
+      Path::new(filesdir.as_str()),
+      syncuser,
+      &fname,
+      fpath,
+      false,
+    )
+    .map_err(|e| {
+      zkerr::annotate_string(
+        format!("make_file_note error: {}", fpath.display()),
+        e.into(),
+      )
+    })?;
 
     // ------------------------------------------------------------------
     // notes not visible to syncuser.
