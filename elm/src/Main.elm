@@ -5,7 +5,7 @@ import Browser
 import Browser.Events
 import Browser.Navigation
 import Common
-import Data exposing (PrivateClosureRequest, ZkNoteId)
+import Data exposing (PrivateClosureRequest, UploadedFiles, ZkNoteId)
 import DataUtil exposing (FileUrlInfo, LoginData, jobComplete, showPrivateReply, zniEq)
 import Dict exposing (Dict)
 import DisplayMessage
@@ -86,6 +86,7 @@ type Msg
     | TauriUserReplyData JD.Value
     | TauriAdminReplyData JD.Value
     | TauriPublicReplyData JD.Value
+    | TauriTauriReplyData JD.Value
     | LoadUrl String
     | InternalUrl Url
     | TASelection JD.Value
@@ -674,6 +675,9 @@ showMessage msg =
 
         TauriPublicReplyData _ ->
             "TauriPublicReplyData"
+
+        TauriTauriReplyData _ ->
+            "TauriTauriReplyData"
 
         SelectDialogMsg _ ->
             "SelectDialogMsg"
@@ -1690,6 +1694,63 @@ actualupdate msg model =
             case JD.decodeValue (makeTDDecoder Data.publicReplyDecoder) jd of
                 Ok td ->
                     actualupdate (PublicReplyData (Ok ( td.utc, td.data ))) model
+
+                Err e ->
+                    ( displayMessageDialog model <| JD.errorToString e
+                    , Cmd.none
+                    )
+
+        ( TauriTauriReplyData jd, _ ) ->
+            case JD.decodeValue Data.tauriReplyDecoder jd of
+                Ok td ->
+                    case td of
+                        Data.TyUploadedFiles uf ->
+                            let
+                                fc =
+                                    1 + List.length uf.notes
+
+                                tr =
+                                    model.trackedRequests
+
+                                nrid =
+                                    String.fromInt (model.trackedRequests.requestCount + 1)
+
+                                nrq =
+                                    uf.notes
+                                        |> List.map (\n -> n.title)
+                                        |> (\names ->
+                                                FileUpload
+                                                    { filenames = names
+                                                    , progress = Just (Http.Sending { sent = fc, size = fc })
+                                                    , files = Just uf.notes
+                                                    }
+                                           )
+
+                                ntr =
+                                    { tr
+                                        | requestCount = tr.requestCount + fc
+                                        , requests =
+                                            Dict.insert nrid
+                                                nrq
+                                                tr.requests
+                                    }
+                            in
+                            ( { model
+                                | trackedRequests = ntr
+                                , state =
+                                    RequestsDialog
+                                        (RequestsDialog.init
+                                            { requestCount = 1, requests = Dict.fromList [ ( nrid, nrq ) ] }
+                                            Common.buttonStyle
+                                            (E.map (\_ -> ()) (viewState model.size model.state model))
+                                        )
+                                        model.state
+                              }
+                            , Cmd.none
+                            )
+
+                        Data.TyServerError e ->
+                            ( displayMessageDialog model <| e, Cmd.none )
 
                 Err e ->
                     ( displayMessageDialog model <| JD.errorToString e
@@ -3557,6 +3618,18 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
 
                 EditZkNote.FileUpload ->
                     ( model
+
+                    -- can use rust open dialog on tauri desktop, but panics on android.
+                    {-
+                    , if model.fui.tauri then
+                        sendTIValueTauri <|
+                            Data.tauriRequestEncoder
+                                Data.TrqUploadFiles
+
+                      else
+                    -}
+
+                    -- using normal http upload.
                     , FS.files [] OnFileSelected
                     )
 
@@ -4033,6 +4106,7 @@ main =
                     , receiveAITauriResponse TauriAdminReplyData
                     , receiveUITauriResponse TauriUserReplyData
                     , receivePITauriResponse TauriPublicReplyData
+                    , receiveTITauriResponse TauriTauriReplyData
                     ]
                         ++ jobtick
                         ++ tracks
@@ -4078,6 +4152,12 @@ port sendPIValueTauri : JD.Value -> Cmd msg
 
 
 port receivePITauriResponse : (JD.Value -> msg) -> Sub msg
+
+
+port sendTIValueTauri : JD.Value -> Cmd msg
+
+
+port receiveTITauriResponse : (JD.Value -> msg) -> Sub msg
 
 
 keyreceive : Sub Msg

@@ -2279,6 +2279,7 @@ pub fn make_file_note(
   uid: UserId,
   name: &String,
   fpath: &Path,
+  copy: bool,
 ) -> Result<(i64, ZkNoteId, i64), zkerr::Error> {
   // compute hash.
   let fh = sha256::try_digest(fpath)?;
@@ -2290,8 +2291,13 @@ pub fn make_file_note(
     // file already exists.  don't need the new one.
     std::fs::remove_file(fpath)?;
   } else {
-    // move into hashed-files dir.
-    std::fs::rename(fpath, hashpath)?;
+    if copy {
+      // move into hashed-files dir.
+      std::fs::copy(fpath, hashpath)?;
+    } else {
+      // move into hashed-files dir.
+      std::fs::rename(fpath, hashpath)?;
+    }
   }
 
   // table entry exists?

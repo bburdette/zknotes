@@ -245,6 +245,16 @@ fn session_user(
   }
 }
 
+pub fn get_tauri_uid(conn: &Connection) -> Result<Option<UserId>, zkerr::Error> {
+  get_single_value(&conn, "last_login").and_then(|x| {
+    Ok(x.and_then(|s| {
+      serde_json::from_str::<i64>(s.as_str())
+        .ok()
+        .map(|x| UserId::Uid(x))
+    }))
+  })
+}
+
 async fn file(session: Session, state: web::Data<State>, req: HttpRequest) -> HttpResponse {
   let conn = match sqldata::connection_open(state.config.orgauth_config.db.as_path()) {
     Ok(c) => c,
@@ -323,7 +333,11 @@ async fn make_file_notes(
   payload: &mut Multipart,
 ) -> Result<UploadReply, Box<dyn Error>> {
   let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
-  let userdata = session_user(&conn, session, &state)?;
+  let uid = if state.config.tauri_mode {
+    get_tauri_uid(&conn)?.ok_or(zkerr::Error::NotLoggedIn)?
+  } else {
+    session_user(&conn, session, &state)?.id
+  };
 
   // Save the files to our temp path.
   let tp = state.config.file_tmp_path.clone();
@@ -338,11 +352,10 @@ async fn make_file_notes(
     let fpath = Path::new(&fp);
 
     let (nid64, _noteid, _fid) =
-      sqldata::make_file_note(&conn, &state.config.file_path, userdata.id, &name, fpath)?;
+      sqldata::make_file_note(&conn, &state.config.file_path, uid, &name, fpath, false)?;
 
     // return zknoteedit.
-    let listnote =
-      sqldata::read_zklistnote(&conn, &state.config.file_path, Some(userdata.id), nid64)?;
+    let listnote = sqldata::read_zklistnote(&conn, &state.config.file_path, Some(uid), nid64)?;
 
     zklns.push(listnote);
   }
@@ -691,155 +704,7 @@ pub async fn err_main(
         .help("create new admin user")
         .takes_value(true),
     )
-    .arg(
-      Arg::with_name("writeelmbindings")
-        .long("writeelmbindings")
-        .value_name("DIR")
-        .help("Write elmbindings directory")
-        .takes_value(true),
-    )
     .get_matches();
-
-  match matches.value_of("writeelmbindings") {
-    Some(exportdir) => {
-      let ed = Path::new(exportdir);
-      {
-        let mut target = vec![];
-        // elm_rs provides a macro for conveniently creating an Elm module with everything needed
-        elm_rs::export!(
-            "Data",
-            &mut target,
-            {        // generates types and encoders for types implementing ElmEncoder
-            encoders: [zc::ZkNoteId,
-                        zc::ExtraLoginData,
-                        zc::ZkNote,
-                        zc::FileStatus,
-                        zc::ZkListNote,
-                        zc::SavedZkNote,
-                        zc::SaveZkNote,
-                        zc::Direction,
-                        zc::SaveZkLink,
-                        zc::SaveZkNoteAndLinks,
-                        zc::ZkLink,
-                        zc::EditLink,
-                        zc::ZkLinks,
-                        zc::ImportZkNote,
-                        zc::GetZkLinks,
-                        zc::GetZkNoteAndLinks,
-                        zc::GetZnlIfChanged,
-                        zc::GetZkNoteArchives,
-                        zc::ZkNoteArchives,
-                        zc::GetArchiveZkNote,
-                        zc::GetArchiveZkLinks,
-                        zc::GetZkLinksSince,
-                        zc::FileInfo,
-                        zc::ArchiveZkLink,
-                        zc::UuidZkLink,
-                        zc::GetZkNoteComments,
-                        zc::ZkNoteAndLinks,
-                        zc::ZkNoteAndLinksWhat,
-                        zc::JobState,
-                        zc::JobStatus,
-                        PublicRequest,
-                        PublicReply,
-                        PublicError,
-                        PrivateRequest,
-                        PrivateReply,
-                        PrivateError,
-                        PrivateClosureRequest,
-                        PrivateClosureReply,
-                        ZkNoteRq,
-                        UploadReply,
-                        zs::ZkNoteSearch,
-                        zs::Ordering,
-                        zs::OrderDirection,
-                        zs::OrderField,
-                        zs::ResultType,
-                        zs::TagSearch,
-                        zs::SearchMod,
-                        zs::AndOr,
-                        zs::ZkIdSearchResult,
-                        zs::ZkListNoteSearchResult,
-                        zs::ZkNoteSearchResult,
-                        zs::ZkSearchResultHeader,
-                        zs::ZkNoteAndLinksSearchResult,]
-            // generates types and decoders for types implementing ElmDecoder
-            decoders: [zc::ZkNoteId,
-                        zc::ExtraLoginData,
-                        zc::ZkNote,
-                        zc::FileStatus,
-                        zc::ZkListNote,
-                        zc::SavedZkNote,
-                        zc::SaveZkNote,
-                        zc::Direction,
-                        zc::SaveZkLink,
-                        zc::SaveZkNoteAndLinks,
-                        zc::ZkLink,
-                        zc::EditLink,
-                        zc::ZkLinks,
-                        zc::ImportZkNote,
-                        zc::GetZkLinks,
-                        zc::GetZkNoteAndLinks,
-                        zc::GetZnlIfChanged,
-                        zc::GetZkNoteArchives,
-                        zc::ZkNoteArchives,
-                        zc::GetArchiveZkNote,
-                        zc::GetArchiveZkLinks,
-                        zc::GetZkLinksSince,
-                        zc::FileInfo,
-                        zc::ArchiveZkLink,
-                        zc::UuidZkLink,
-                        zc::GetZkNoteComments,
-                        zc::ZkNoteAndLinks,
-                        zc::ZkNoteAndLinksWhat,
-                        zc::JobState,
-                        zc::JobStatus,
-                        PublicRequest,
-                        PublicReply,
-                        PublicError,
-                        PrivateRequest,
-                        PrivateReply,
-                        PrivateError,
-                        PrivateClosureRequest,
-                        PrivateClosureReply,
-                        ZkNoteRq,
-                        UploadReply,
-                        zs::ZkNoteSearch,
-                        zs::Ordering,
-                        zs::OrderDirection,
-                        zs::OrderField,
-                        zs::ResultType,
-                        zs::TagSearch,
-                        zs::SearchMod,
-                        zs::AndOr,
-                        zs::ZkIdSearchResult,
-                        zs::ZkListNoteSearchResult,
-                        zs::ZkNoteSearchResult,
-                        zs::ZkSearchResultHeader,
-                        zs::ZkNoteAndLinksSearchResult,],
-            // generates types and functions for forming queries for types implementing ElmQuery
-            queries: [],
-            // generates types and functions for forming queries for types implementing ElmQueryField
-            query_fields: [],
-            }
-        )
-        .unwrap();
-        let output = String::from_utf8(target).unwrap();
-        let outf = ed
-          .join("Data.elm")
-          .to_str()
-          .ok_or(simple_error!("bad path"))?
-          .to_string();
-        util::write_string(outf.as_str(), output.as_str())?;
-
-        println!("wrote file: {}", outf);
-      }
-
-      return Ok(());
-    }
-
-    None => (),
-  }
 
   // writing a config file?
   if let Some(filename) = matches.value_of("write_config") {
@@ -1007,8 +872,16 @@ pub fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
         {
           true
         } else {
-          info!("cors denied: {:?}, {:?}", rv, rh);
-          false
+          // tauri all allowed!
+          if d.tauri_mode {
+            info!("cors allowed {:?}, {:?}", rv, rh);
+
+            true
+          } else {
+            info!("cors denied: {:?}, {:?}", rv, rh);
+
+            false
+          }
         }
       })
       .allow_any_header()

@@ -1,0 +1,9 @@
+[package]
+name = "elm-gen-zkp"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+elm_rs = { version = "0.2.2", features = ["uuid"] }
+orgauth = { path = "../../orgauth/rustlib" }
+zkprotocol = { path = "../" }
