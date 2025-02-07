@@ -604,7 +604,7 @@ codeSpan snippet =
         ]
         [ E.paragraph
             [ HA.style "word-break" "break-all" |> E.htmlAttribute
-            , E.paddingXY 10 5
+            , E.paddingXY 3 10
             ]
             [ E.text snippet ]
         ]
