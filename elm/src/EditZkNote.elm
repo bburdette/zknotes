@@ -1466,7 +1466,7 @@ zknview zone size recentZkns trqs tjobs noteCache model =
         , E.padding 8
         , EBk.color TC.lightGray
         ]
-        [ E.row [ E.width E.fill, E.spacing 8 ]
+        [ E.wrappedRow [ E.width E.fill, E.spacing 8 ]
             [ model.ld.homenote
                 |> Maybe.map
                     (\id ->
@@ -1485,38 +1485,44 @@ zknview zone size recentZkns trqs tjobs noteCache model =
                     )
                 |> Maybe.withDefault E.none
             , E.el [ EF.bold ] (E.text model.ld.name)
-            , if trqs.requests /= Dict.empty then
-                EI.button
-                    (E.alignRight :: Common.buttonStyle ++ [ EBk.color TC.darkGreen ])
-                    { onPress = Just RequestsPress, label = E.text "uploads" }
+            , E.column [ E.width E.fill, E.spacing 8 ]
+                [ E.row [ E.width E.fill, E.spacing 8 ]
+                    [ EI.button (E.alignRight :: Common.buttonStyle)
+                        { onPress = Just SyncPress
+                        , label = E.text "sync"
+                        }
+                    , EI.button (E.alignRight :: Common.buttonStyle)
+                        { onPress = Just UploadPress
+                        , label = E.text "upload"
+                        }
+                    , if model.ld.admin then
+                        EI.button
+                            (E.alignRight :: Common.buttonStyle)
+                            { onPress = Just AdminPress, label = E.text "admin" }
 
-              else
-                E.none
-            , if tjobs.jobs /= Dict.empty then
-                EI.button
-                    (E.alignRight :: Common.buttonStyle ++ [ EBk.color TC.darkGreen ])
-                    { onPress = Just JobsPress, label = E.text "jobs" }
+                      else
+                        E.none
+                    , EI.button
+                        (E.alignRight :: Common.buttonStyle)
+                        { onPress = Just SettingsPress, label = E.text "settings" }
+                    ]
+                , E.row [ E.width E.fill, E.spacing 8 ]
+                    [ if trqs.requests /= Dict.empty then
+                        EI.button
+                            (E.alignRight :: Common.buttonStyle ++ [ EBk.color TC.darkGreen ])
+                            { onPress = Just RequestsPress, label = E.text "uploads" }
 
-              else
-                E.none
-            , EI.button (E.alignRight :: Common.buttonStyle)
-                { onPress = Just SyncPress
-                , label = E.text "sync"
-                }
-            , EI.button (E.alignRight :: Common.buttonStyle)
-                { onPress = Just UploadPress
-                , label = E.text "upload"
-                }
-            , if model.ld.admin then
-                EI.button
-                    (E.alignRight :: Common.buttonStyle)
-                    { onPress = Just AdminPress, label = E.text "admin" }
+                      else
+                        E.none
+                    , if tjobs.jobs /= Dict.empty then
+                        EI.button
+                            (E.alignRight :: Common.buttonStyle ++ [ EBk.color TC.darkGreen ])
+                            { onPress = Just JobsPress, label = E.text "jobs" }
 
-              else
-                E.none
-            , EI.button
-                (E.alignRight :: Common.buttonStyle)
-                { onPress = Just SettingsPress, label = E.text "settings" }
+                      else
+                        E.none
+                    ]
+                ]
             ]
         , case wclass of
             Wide ->

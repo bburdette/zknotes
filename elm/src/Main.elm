@@ -1275,7 +1275,7 @@ piview pimodel =
 
         InitError e ->
             { title = "zknotes: init error!"
-            , body = [ E.layout [ E.width E.fill ] (E.column [] [ E.text "zknotes init error! ", E.text e ]) ]
+            , body = [ E.layout [ E.explain Debug.todo, E.width E.fill ] (E.column [] [ E.text "zknotes init error! ", E.text e ]) ]
             }
 
 
@@ -3618,18 +3618,16 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
 
                 EditZkNote.FileUpload ->
                     ( model
+                      -- can use rust open dialog on tauri desktop, but panics on android.
+                      {-
+                         , if model.fui.tauri then
+                             sendTIValueTauri <|
+                                 Data.tauriRequestEncoder
+                                     Data.TrqUploadFiles
 
-                    -- can use rust open dialog on tauri desktop, but panics on android.
-                    {-
-                    , if model.fui.tauri then
-                        sendTIValueTauri <|
-                            Data.tauriRequestEncoder
-                                Data.TrqUploadFiles
-
-                      else
-                    -}
-
-                    -- using normal http upload.
+                           else
+                      -}
+                      -- using normal http upload.
                     , FS.files [] OnFileSelected
                     )
 
