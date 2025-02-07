@@ -9,11 +9,6 @@ pub enum TauriRequest {
   TrqUploadFiles,
 }
 
-// #[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
-// pub struct UploadFiles {
-//   pub paths: Vec<String>,
-// }
-
 #[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
 pub enum TauriReply {
   TyUploadedFiles(UploadedFiles),

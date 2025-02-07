@@ -332,7 +332,6 @@ async fn make_file_notes(
   state: web::Data<State>,
   payload: &mut Multipart,
 ) -> Result<UploadReply, Box<dyn Error>> {
-  info!("make_file_notes");
   let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
   let uid = if state.config.tauri_mode {
     get_tauri_uid(&conn)?.ok_or(zkerr::Error::NotLoggedIn)?

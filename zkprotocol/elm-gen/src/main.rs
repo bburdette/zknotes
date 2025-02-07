@@ -140,8 +140,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   .unwrap();
 
   let output = String::from_utf8(target).unwrap();
-  // search and replace
 
+  // add line importing Orgauth.Userid
   let uidout = output.replace(
     "import Json.Encode",
     r#"import Json.Encode

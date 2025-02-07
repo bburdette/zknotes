@@ -1740,7 +1740,6 @@ actualupdate msg model =
                                 , state =
                                     RequestsDialog
                                         (RequestsDialog.init
-                                            -- dummy state we won't use
                                             { requestCount = 1, requests = Dict.fromList [ ( nrid, nrq ) ] }
                                             Common.buttonStyle
                                             (E.map (\_ -> ()) (viewState model.size model.state model))
@@ -1750,11 +1749,9 @@ actualupdate msg model =
                             , Cmd.none
                             )
 
-                        -- ( model, Cmd.none )
                         Data.TyServerError e ->
                             ( displayMessageDialog model <| e, Cmd.none )
 
-                -- actualupdate (PublicReplyData (Ok ( td.utc, td.data ))) model
                 Err e ->
                     ( displayMessageDialog model <| JD.errorToString e
                     , Cmd.none
@@ -3623,12 +3620,14 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     ( model
 
                     -- can use rust open dialog on tauri desktop, but panics on android.
-                    -- , if model.fui.tauri then
-                    --     sendTIValueTauri <|
-                    --         Data.tauriRequestEncoder
-                    --             Data.TrqUploadFiles
+                    {-
+                    , if model.fui.tauri then
+                        sendTIValueTauri <|
+                            Data.tauriRequestEncoder
+                                Data.TrqUploadFiles
 
-                    --   else
+                      else
+                    -}
 
                     -- using normal http upload.
                     , FS.files [] OnFileSelected
