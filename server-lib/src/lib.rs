@@ -245,6 +245,16 @@ fn session_user(
   }
 }
 
+pub fn get_tauri_uid(conn: &Connection) -> Result<Option<UserId>, zkerr::Error> {
+  get_single_value(&conn, "last_login").and_then(|x| {
+    Ok(x.and_then(|s| {
+      serde_json::from_str::<i64>(s.as_str())
+        .ok()
+        .map(|x| UserId::Uid(x))
+    }))
+  })
+}
+
 async fn file(session: Session, state: web::Data<State>, req: HttpRequest) -> HttpResponse {
   let conn = match sqldata::connection_open(state.config.orgauth_config.db.as_path()) {
     Ok(c) => c,
@@ -324,7 +334,11 @@ async fn make_file_notes(
 ) -> Result<UploadReply, Box<dyn Error>> {
   info!("make_file_notes");
   let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
-  let userdata = session_user(&conn, session, &state)?;
+  let uid = if state.config.tauri_mode {
+    get_tauri_uid(&conn)?.ok_or(zkerr::Error::NotLoggedIn)?
+  } else {
+    session_user(&conn, session, &state)?.id
+  };
 
   // Save the files to our temp path.
   let tp = state.config.file_tmp_path.clone();
@@ -338,18 +352,11 @@ async fn make_file_notes(
     // compute hash.
     let fpath = Path::new(&fp);
 
-    let (nid64, _noteid, _fid) = sqldata::make_file_note(
-      &conn,
-      &state.config.file_path,
-      userdata.id,
-      &name,
-      fpath,
-      false,
-    )?;
+    let (nid64, _noteid, _fid) =
+      sqldata::make_file_note(&conn, &state.config.file_path, uid, &name, fpath, false)?;
 
     // return zknoteedit.
-    let listnote =
-      sqldata::read_zklistnote(&conn, &state.config.file_path, Some(userdata.id), nid64)?;
+    let listnote = sqldata::read_zklistnote(&conn, &state.config.file_path, Some(uid), nid64)?;
 
     zklns.push(listnote);
   }
