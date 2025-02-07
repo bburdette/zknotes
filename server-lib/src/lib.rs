@@ -866,8 +866,16 @@ pub fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
         {
           true
         } else {
-          info!("cors denied: {:?}, {:?}", rv, rh);
-          false
+          // tauri all allowed!
+          if d.tauri_mode {
+            info!("cors allowed {:?}, {:?}", rv, rh);
+
+            true
+          } else {
+            info!("cors denied: {:?}, {:?}", rv, rh);
+
+            false
+          }
         }
       })
       .allow_any_header()

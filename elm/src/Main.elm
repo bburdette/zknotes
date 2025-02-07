@@ -3621,13 +3621,17 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
 
                 EditZkNote.FileUpload ->
                     ( model
-                    , if model.fui.tauri then
-                        sendTIValueTauri <|
-                            Data.tauriRequestEncoder
-                                Data.TrqUploadFiles
 
-                      else
-                        FS.files [] OnFileSelected
+                    -- can use rust open dialog on tauri desktop, but panics on android.
+                    -- , if model.fui.tauri then
+                    --     sendTIValueTauri <|
+                    --         Data.tauriRequestEncoder
+                    --             Data.TrqUploadFiles
+
+                    --   else
+
+                    -- using normal http upload.
+                    , FS.files [] OnFileSelected
                     )
 
                 EditZkNote.Sync ->
