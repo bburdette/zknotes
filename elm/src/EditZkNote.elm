@@ -1485,7 +1485,29 @@ zknview zone size recentZkns trqs tjobs noteCache model =
                     )
                 |> Maybe.withDefault E.none
             , E.el [ EF.bold ] (E.text model.ld.name)
-            , if trqs.requests /= Dict.empty then
+            , E.wrappedRow [ E.alignRight, E.width E.fill, E.spacing 8 ]
+                [ EI.button Common.buttonStyle
+                    { onPress = Just SyncPress
+                    , label = E.text "sync"
+                    }
+                , EI.button Common.buttonStyle
+                    { onPress = Just UploadPress
+                    , label = E.text "upload"
+                    }
+                , if model.ld.admin then
+                    EI.button
+                        Common.buttonStyle
+                        { onPress = Just AdminPress, label = E.text "admin" }
+
+                  else
+                    E.none
+                , EI.button
+                    Common.buttonStyle
+                    { onPress = Just SettingsPress, label = E.text "settings" }
+                ]
+            ]
+        , E.row [ E.width E.fill, E.spacing 8 ]
+            [ if trqs.requests /= Dict.empty then
                 EI.button
                     (E.alignRight :: Common.buttonStyle ++ [ EBk.color TC.darkGreen ])
                     { onPress = Just RequestsPress, label = E.text "uploads" }
@@ -1499,24 +1521,6 @@ zknview zone size recentZkns trqs tjobs noteCache model =
 
               else
                 E.none
-            , EI.button (E.alignRight :: Common.buttonStyle)
-                { onPress = Just SyncPress
-                , label = E.text "sync"
-                }
-            , EI.button (E.alignRight :: Common.buttonStyle)
-                { onPress = Just UploadPress
-                , label = E.text "upload"
-                }
-            , if model.ld.admin then
-                EI.button
-                    (E.alignRight :: Common.buttonStyle)
-                    { onPress = Just AdminPress, label = E.text "admin" }
-
-              else
-                E.none
-            , EI.button
-                (E.alignRight :: Common.buttonStyle)
-                { onPress = Just SettingsPress, label = E.text "settings" }
             ]
         , case wclass of
             Wide ->
