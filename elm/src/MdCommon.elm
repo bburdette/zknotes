@@ -597,14 +597,17 @@ heading { level, rawText, children } =
 
 codeSpan : String -> Element msg
 codeSpan snippet =
-    E.el
-        [ EBk.color
+    E.row
+        [ E.width E.fill
+        , EBk.color
             (E.rgba 0 0 0 0.13)
-        , EBd.rounded 2
-        , E.paddingXY 5 3
-        , EF.family [ EF.monospace ]
         ]
-        (E.text snippet)
+        [ E.paragraph
+            [ HA.style "word-break" "break-all" |> E.htmlAttribute
+            , E.paddingXY 10 5
+            ]
+            [ E.text snippet ]
+        ]
 
 
 codeBlock : { body : String, language : Maybe String } -> Element msg
