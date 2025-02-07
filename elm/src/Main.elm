@@ -1275,7 +1275,7 @@ piview pimodel =
 
         InitError e ->
             { title = "zknotes: init error!"
-            , body = [ E.layout [ E.explain Debug.todo, E.width E.fill ] (E.column [] [ E.text "zknotes init error! ", E.text e ]) ]
+            , body = [ E.layout [ E.width E.fill ] (E.column [] [ E.text "zknotes init error! ", E.text e ]) ]
             }
 
 
