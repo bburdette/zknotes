@@ -26,6 +26,7 @@ use clap::Arg;
 use config::Config;
 use futures_util::TryStreamExt as _;
 use girlboss::Girlboss;
+use jobs::LogMonitor;
 use log::{error, info};
 pub use orgauth;
 use orgauth::{data::UserId, util};
@@ -559,6 +560,10 @@ async fn zk_interface_check_upstreaming(
 
           let mut br = StreamReader::new(rstream);
 
+          let lm = LogMonitor {};
+
+          // TODO: make a sync note?
+
           Ok(
             HttpResponse::Ok().json(
               sync::sync_from_stream(
@@ -569,6 +574,7 @@ async fn zk_interface_check_upstreaming(
                 None,
                 &mut sqldata::zknotes_callbacks(),
                 &mut br,
+                &lm,
               )
               .await?,
             ),

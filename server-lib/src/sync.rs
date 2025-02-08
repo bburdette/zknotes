@@ -196,13 +196,12 @@ pub fn temp_tables(conn: &Connection) -> Result<TempTableNames, zkerr::Error> {
 }
 
 pub async fn sync(
-  dbpath: &Path,
+  conn: &Arc<Connection>,
   file_path: &Path,
   uid: UserId,
   callbacks: &mut Callbacks,
   monitor: &dyn JobMonitor,
-) -> Result<PrivateReply, Box<dyn std::error::Error>> {
-  let conn = Arc::new(sqldata::connection_open(dbpath)?);
+) -> Result<i64, Box<dyn std::error::Error>> {
   let user = orgauth::dbfun::read_user_by_id(&conn, uid)?; // TODO pass this in from calling ftn?
   let extra_login_data = sqldata::read_extra_login_data(&conn, user.id)?;
   // let mut callbacks = &mut zknotes_callbacks();
@@ -221,7 +220,7 @@ pub async fn sync(
 
   write!(monitor, "starting sync from remote");
   // TODO: pass in 'now'?
-  let res = sync_from_remote(
+  sync_from_remote(
     &conn,
     &user,
     after,
@@ -234,33 +233,28 @@ pub async fn sync(
   )
   .await?;
 
-  match res {
-    PrivateReply::PvySyncComplete => {
-      write!(monitor, "starting sync to remote");
-      let remres = sync_to_remote(
-        conn.clone(),
-        file_path,
-        &user,
-        Some(ttn.notetemp.clone()),
-        Some(ttn.linktemp.clone()),
-        Some(ttn.archivelinktemp.clone()),
-        after,
-        callbacks,
-        monitor,
-      )
-      .await?;
+  write!(monitor, "starting sync to remote");
+  sync_to_remote(
+    conn.clone(),
+    file_path,
+    &user,
+    Some(ttn.notetemp.clone()),
+    Some(ttn.linktemp.clone()),
+    Some(ttn.archivelinktemp.clone()),
+    after,
+    callbacks,
+    monitor,
+  )
+  .await?;
 
-      let unote = user_note_id(&conn, user.id)?;
-      save_sync(&conn, user.id, unote, CompletedSync { after, now }).await?;
+  let unote = user_note_id(&conn, user.id)?;
+  let syncnoteid = save_sync(&conn, user.id, unote, CompletedSync { after, now }).await?;
 
-      tr.commit()?;
+  tr.commit()?;
 
-      write!(monitor, "sync completed");
+  write!(monitor, "sync completed");
 
-      Ok(remres)
-    }
-    _ => Ok(res),
-  }
+  Ok(syncnoteid)
 }
 
 #[derive(Deserialize, Serialize, Debug, PartialEq)]
@@ -559,7 +553,7 @@ pub async fn sync_from_remote(
   archivelinktemp: &String,
   callbacks: &mut Callbacks,
   monitor: &dyn JobMonitor,
-) -> Result<PrivateReply, Box<dyn std::error::Error>> {
+) -> Result<(), Box<dyn std::error::Error>> {
   let (c, url) = match (user.cookie.clone(), user.remote_url.clone()) {
     (Some(c), Some(url)) => (c, url),
     _ => return Err("can't remote sync - not a remote user".into()),
@@ -596,14 +590,17 @@ pub async fn sync_from_remote(
     Some(archivelinktemp),
     callbacks,
     &mut sr,
+    monitor,
   )
   .await?;
+
   Ok(reply)
 }
 
 pub async fn read_sync_message<S>(
   line: &mut String,
   br: &mut StreamReader<S, bytes::Bytes>,
+  monitor: &dyn JobMonitor,
 ) -> Result<SyncMessage, Box<dyn std::error::Error>>
 where
   S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin,
@@ -616,6 +613,7 @@ where
   }
   let sm = serde_json::from_str(line.trim())?;
   debug!("syncmessage : {:?}", sm);
+  write!(monitor, "{:?}", sm);
   Ok(sm)
 }
 
@@ -627,7 +625,8 @@ pub async fn sync_from_stream<S>(
   archivelinktemp: Option<&str>,
   callbacks: &mut Callbacks,
   br: &mut StreamReader<S, bytes::Bytes>,
-) -> Result<PrivateReply, Box<dyn std::error::Error>>
+  monitor: &dyn JobMonitor,
+) -> Result<(), Box<dyn std::error::Error>>
 where
   S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin,
 {
@@ -639,7 +638,7 @@ where
 
   let mut sm;
 
-  sm = read_sync_message(&mut line, br).await?;
+  sm = read_sync_message(&mut line, br, monitor).await?;
 
   let (_after, remotenow) = match sm {
     SyncMessage::SyncStart(after, rn) => (after, rn),
@@ -657,7 +656,7 @@ where
     );
   }
 
-  sm = read_sync_message(&mut line, br).await?;
+  sm = read_sync_message(&mut line, br, monitor).await?;
 
   match sm {
     SyncMessage::PhantomUserHeader => (),
@@ -672,7 +671,7 @@ where
     }
   }
 
-  sm = read_sync_message(&mut line, br).await?;
+  sm = read_sync_message(&mut line, br, monitor).await?;
   let mut userhash = HashMap::<i64, i64>::new();
 
   while let SyncMessage::PhantomUser(ref pu) = sm {
@@ -697,7 +696,7 @@ where
         };
       }
     };
-    sm = read_sync_message(&mut line, br).await?;
+    sm = read_sync_message(&mut line, br, monitor).await?;
   }
 
   // ----------------------------------------------------------------------------------
@@ -715,7 +714,7 @@ where
     );
   }
 
-  sm = read_sync_message(&mut line, br).await?;
+  sm = read_sync_message(&mut line, br, monitor).await?;
 
   while let SyncMessage::ZkNote(ref note, ref mbf) = sm {
     let uid = UserId::Uid(
@@ -851,7 +850,7 @@ where
       )?;
     }
 
-    sm = read_sync_message(&mut line, br).await?;
+    sm = read_sync_message(&mut line, br, monitor).await?;
   }
 
   // ----------------------------------------------------------------------------------
@@ -869,7 +868,7 @@ where
     );
   }
 
-  sm = read_sync_message(&mut line, br).await?;
+  sm = read_sync_message(&mut line, br, monitor).await?;
   while let SyncMessage::ZkNote(ref note, ref _mbf) = sm {
     // TODO: make file source record (?)
 
@@ -911,7 +910,7 @@ where
         params![id],
       )?;
     }
-    sm = read_sync_message(&mut line, br).await?;
+    sm = read_sync_message(&mut line, br, monitor).await?;
   }
 
   if let SyncMessage::ArchiveZkLinkHeader = sm {
@@ -928,7 +927,7 @@ where
   // ----------------------------------------------------------------------------------
   // archive links
   // ----------------------------------------------------------------------------------
-  sm = read_sync_message(&mut line, br).await?;
+  sm = read_sync_message(&mut line, br, monitor).await?;
 
   let mut count = 0;
   let mut saved = 0;
@@ -973,7 +972,7 @@ where
     count = count + 1;
     saved = saved + mbid.map_or(0, |_| 1);
     // bytes = bytes + nc;
-    sm = read_sync_message(&mut line, br).await?;
+    sm = read_sync_message(&mut line, br, monitor).await?;
   }
 
   // ----------------------------------------------------------------------------------
@@ -992,7 +991,7 @@ where
   count = 0;
   saved = 0;
 
-  sm = read_sync_message(&mut line, br).await?;
+  sm = read_sync_message(&mut line, br, monitor).await?;
 
   while let SyncMessage::UuidZkLink(ref l) = sm {
     let ins = match conn.execute(
@@ -1057,7 +1056,7 @@ where
     count = count + 1;
     saved = saved + ins;
     // bytes = bytes + nc;
-    sm = read_sync_message(&mut line, br).await?;
+    sm = read_sync_message(&mut line, br, monitor).await?;
   }
   // drop zklinks which have a zklinkarchive with newer deletedate
   let _dropped = conn.execute(
@@ -1071,7 +1070,7 @@ where
     params![],
   )?;
 
-  Ok(PrivateReply::PvySyncComplete)
+  Ok(())
 }
 
 // Make a stream of all the records needed to sync the remote.
@@ -1085,7 +1084,7 @@ pub async fn sync_to_remote(
   after: Option<i64>,
   callbacks: &mut Callbacks,
   monitor: &dyn JobMonitor,
-) -> Result<PrivateReply, zkerr::Error> {
+) -> Result<(), zkerr::Error> {
   // TODO: get time on remote system, bail if too far out.
 
   let (c, url) = match (user.cookie.clone(), user.remote_url.clone()) {
@@ -1147,7 +1146,7 @@ pub async fn sync_to_remote(
 
   // TODO: send back Sync results... how many records and etc.
 
-  Ok(PrivateReply::PvySyncComplete)
+  Ok(())
 }
 
 pub fn bytesify(
