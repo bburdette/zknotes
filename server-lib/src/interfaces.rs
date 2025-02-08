@@ -321,7 +321,7 @@ pub async fn zk_interface_loggedin(
                 let c = sqldata::connection_open(dbpath.as_path())?;
                 let conn = Arc::new(c);
                 let snid = sync::sync(&conn, &file_path, uid, &mut callbacks, &gbm).await?;
-                write!(gbm, "sync completed");
+
                 let fid = make_file_entry(
                   &*conn,
                   file_path.as_path(),
@@ -330,11 +330,9 @@ pub async fn zk_interface_loggedin(
                   lfn.as_path(),
                   false,
                 )?;
-                // PrivateReply::PvySyncComplete
 
                 set_zknote_file(&*conn, snid, fid)?;
 
-                // conn.commit()?;
                 Ok(())
               }
               .await;
@@ -343,28 +341,6 @@ pub async fn zk_interface_loggedin(
                 Ok(()) => (),
                 Err(e) => write!(gbm, "sync err: {:?}", e),
               }
-              // add the log to the sync note.
-
-              // match sqldata::connection_open(dbpath.as_path()) {
-              //   Err(e) => write!(gbm, "sync err: {:?}", e),
-              //   Ok(c) => {
-              //     let conn = Arc::new(c);
-              //     match sync::sync(&conn, &file_path, uid, &mut callbacks, &gbm).await {
-              //       Err(e) => write!(gbm, "sync err: {:?}", e),
-              //       Ok(snid) =>
-              //       {
-              //         write!(gbm, "sync completed");
-              //         let fid = make_file_entry(&*conn, file_path.as_path(), uid, nam, lfn.as_path(), false)?;
-              //         // PrivateReply::PvySyncComplete
-
-              //         set_zknote_file(&*conn, snid, fid)
-              //         // let syncnoteid = save_sync(&conn, user.id, unote, CompletedSync { after, now }).await?;
-
-              //         conn.commit()?;
-              //       }
-              //     };
-
-              //     // add the log to the sync note.
 
               actix_rt::System::current().stop();
             })

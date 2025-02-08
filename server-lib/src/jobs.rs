@@ -10,7 +10,7 @@ pub struct JobId {
 }
 
 pub trait JobMonitor {
-  /// Implementation to allow use with [`write!`].
+  // Implementation to allow use with [`write!`].
   fn write_fmt(&self, args: fmt::Arguments<'_>);
 }
 
@@ -44,6 +44,7 @@ pub struct ReportFileMonitor {
 impl JobMonitor for ReportFileMonitor {
   fn write_fmt(&self, args: fmt::Arguments<'_>) {
     if let Ok(mut f) = self.outf.lock() {
+      // block returning Result.  Works better in async!
       let mut r = || {
         f.write_fmt(args)?;
         write!(f, "\n")?;
