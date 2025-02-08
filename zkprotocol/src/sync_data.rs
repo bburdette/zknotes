@@ -1,4 +1,4 @@
-use orgauth::data::UserId;
+use orgauth::{data::UserId, util::show_time};
 use uuid::Uuid;
 
 use crate::{
@@ -60,5 +60,59 @@ impl From<ArchiveZkLink> for SyncMessage {
 impl From<UuidZkLink> for SyncMessage {
   fn from(a: UuidZkLink) -> Self {
     SyncMessage::UuidZkLink(a)
+  }
+}
+
+pub fn show_syncmsg_logformat(sm: &SyncMessage) -> String {
+  // TODO: add time on first msg.
+  match sm {
+    SyncMessage::SyncStart(from, to) => {
+      format!(
+        "SyncStart from {}, to {}",
+        from
+          .and_then(|x| show_time(x / 1000))
+          .unwrap_or("<no date>".to_string()),
+        show_time(*to / 1000).unwrap_or("".to_string())
+      )
+    }
+    SyncMessage::PhantomUserHeader => {
+      format!("PhantomUserHeader")
+    }
+    SyncMessage::PhantomUser(zpu) => {
+      format!("PhantomUser {} {}", zpu.uuid, zpu.name)
+    }
+    SyncMessage::ZkSearchResultHeader(_zksearchresultheader) => {
+      format!("ZkSearchResultHeader")
+    }
+    SyncMessage::ZkNoteId(str) => {
+      format!("ZkNoteId {}", str)
+    }
+    SyncMessage::ZkNote(zknote, _mbfileinfo) => {
+      format!("ZkNote {}, {}", zknote.title, zknote.id)
+    }
+    SyncMessage::ArchiveZkLinkHeader => {
+      format!("ArchiveZkLinkHeader")
+    }
+    SyncMessage::ArchiveZkLink(archivezklink) => {
+      format!(
+        "ArchiveZkLink from {}, to {}",
+        archivezklink.fromUuid, archivezklink.toUuid
+      )
+    }
+    SyncMessage::UuidZkLinkHeader => {
+      format!("UuidZkLinkHeader")
+    }
+    SyncMessage::UuidZkLink(uuidzklink) => {
+      format!(
+        "UuidZkLink from {}, to {}",
+        uuidzklink.fromUuid, uuidzklink.toUuid
+      )
+    }
+    SyncMessage::SyncError(string) => {
+      format!("SyncError: {}", string)
+    }
+    SyncMessage::SyncEnd => {
+      format!("SyncEnd")
+    }
   }
 }

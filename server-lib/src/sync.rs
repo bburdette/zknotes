@@ -38,7 +38,7 @@ use zkprotocol::private::{PrivateReply, PrivateRequest};
 use zkprotocol::search::{
   AndOr, OrderDirection, OrderField, Ordering, ResultType, SearchMod, TagSearch, ZkNoteSearch,
 };
-use zkprotocol::sync_data::SyncMessage;
+use zkprotocol::sync_data::{show_syncmsg_logformat, SyncMessage};
 use zkprotocol::upload::UploadReply;
 
 fn convert_payloaderr(err: PayloadError) -> std::io::Error {
@@ -613,7 +613,7 @@ where
   }
   let sm = serde_json::from_str(line.trim())?;
   debug!("syncmessage : {:?}", sm);
-  write!(monitor, "{:?}", sm);
+  write!(monitor, "{:?}", show_syncmsg_logformat(&sm));
   Ok(sm)
 }
 
