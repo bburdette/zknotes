@@ -157,6 +157,19 @@ link title destination body =
         }
 
 
+renderText : String -> Element msg
+renderText str =
+    E.row
+        [ E.width E.fill
+        ]
+        [ E.paragraph
+            [ HA.style "overflow-wrap" "anywhere" |> E.htmlAttribute
+            , E.paddingXY 3 10
+            ]
+            [ E.text str ]
+        ]
+
+
 mkRenderer : FileUrlInfo -> ViewMode -> (String -> a) -> Int -> CellDict -> Bool -> (String -> String -> a) -> NoteCache -> Markdown.Renderer.Renderer (Element a)
 mkRenderer fui viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged noteCache =
     { heading = heading
@@ -164,7 +177,7 @@ mkRenderer fui viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged no
         E.paragraph
             [ E.spacing 8 ]
     , thematicBreak = E.none
-    , text = E.text
+    , text = renderText
     , strong = \content -> E.paragraph [ EF.bold ] content
     , emphasis = \content -> E.paragraph [ EF.italic ] content
     , strikethrough = \content -> E.paragraph [ EF.strike ] content
