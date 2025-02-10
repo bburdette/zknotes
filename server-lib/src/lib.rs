@@ -261,7 +261,7 @@ async fn file(session: Session, state: web::Data<State>, req: HttpRequest) -> Ht
     Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
   };
 
-  let uid = if state.config.tauri_mode == true && state.config.ip == "127.0.0.1" {
+  let uid: Option<UserId> = if state.config.tauri_mode == true && state.config.ip == "127.0.0.1" {
     let rs = {
       get_single_value(&conn, "last_login")
         .and_then(|x| Ok(x.and_then(|s| serde_json::from_str::<i64>(s.as_str()).ok())))
@@ -275,7 +275,10 @@ async fn file(session: Session, state: web::Data<State>, req: HttpRequest) -> Ht
     match session_user(&conn, session, &state) {
       Ok(u) => Some(u.id),
 
-      Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
+      Err(e) => match e {
+        zkerr::Error::NotLoggedIn => None,
+        _ => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
+      },
     }
   };
 
@@ -292,7 +295,7 @@ async fn file(session: Session, state: web::Data<State>, req: HttpRequest) -> Ht
       let hash = match sqldata::read_zknote_filehash(&conn, uid, nid) {
         Ok(Some(hash)) => hash,
         Ok(None) => {
-          return HttpResponse::NotFound().body(format!("hash not found for note {}", nid))
+          return HttpResponse::NotFound().body(format!("note {} not found, or private", uuid))
         }
 
         Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
