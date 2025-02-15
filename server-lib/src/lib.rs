@@ -801,7 +801,6 @@ pub async fn err_main(
   }
 
   let server = init_server(config)?;
-  // let server = init_server(config)?;
   server.await?;
 
   Ok(())
