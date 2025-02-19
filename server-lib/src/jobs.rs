@@ -1,7 +1,7 @@
-use std::fmt;
+use std::{fmt, fs::File, io::Write, sync::Mutex};
 
 use girlboss::Monitor;
-use log::{logger, Record};
+use log::{error, logger, Record};
 
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, Debug)]
 pub struct JobId {
@@ -10,11 +10,7 @@ pub struct JobId {
 }
 
 pub trait JobMonitor {
-  // pub fn report(&self, status: impl Into<JobStatus>) {
-  //     self.0.set_status(status.into());
-  // }
-
-  /// Implementation to allow use with [`write!`].
+  // Implementation to allow use with [`write!`].
   fn write_fmt(&self, args: fmt::Arguments<'_>);
 }
 
@@ -32,7 +28,33 @@ pub struct LogMonitor {}
 
 impl JobMonitor for LogMonitor {
   fn write_fmt(&self, args: fmt::Arguments<'_>) {
-    let r = Record::builder().args(args).level(log::Level::Info).build();
+    let r = Record::builder()
+      .args(args)
+      .level(log::Level::Debug)
+      .build();
     logger().log(&r);
+  }
+}
+
+pub struct ReportFileMonitor {
+  pub monitor: Monitor,
+  pub outf: Mutex<File>,
+}
+
+impl JobMonitor for ReportFileMonitor {
+  fn write_fmt(&self, args: fmt::Arguments<'_>) {
+    if let Ok(mut f) = self.outf.lock() {
+      // block returning Result.  Works better in async!
+      let mut r = || {
+        f.write_fmt(args)?;
+        write!(f, "\n")?;
+        Ok::<(), Box<dyn std::error::Error>>(())
+      };
+      match r() {
+        Ok(_) => (),
+        Err(e) => error!("{}", e.to_string()),
+      }
+    }
+    self.monitor.write_fmt(args);
   }
 }

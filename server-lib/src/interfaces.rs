@@ -4,8 +4,12 @@ use crate::jobs::GirlbossMonitor;
 use crate::jobs::JobId;
 use crate::jobs::JobMonitor;
 use crate::jobs::LogMonitor;
+use crate::jobs::ReportFileMonitor;
 use crate::search;
 use crate::sqldata;
+use crate::sqldata::make_file_entry;
+use crate::sqldata::make_file_note;
+use crate::sqldata::set_zknote_file;
 use crate::sqldata::zknotes_callbacks;
 use crate::state::new_jobid;
 use crate::state::State;
@@ -13,15 +17,19 @@ use crate::sync;
 use actix_session::Session;
 use actix_web::HttpResponse;
 use futures_util::StreamExt;
-use log::info;
+use log::{error, info};
 use orgauth;
 use orgauth::data::UserId;
 use orgauth::endpoints::Tokener;
 use rusqlite::Connection;
+use std::env;
 use std::error::Error;
+use std::fs::File;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::time::Duration;
+use uuid::Uuid;
 use zkprotocol::constants::PrivateStreamingRequests;
 use zkprotocol::content::JobState;
 use zkprotocol::content::JobStatus;
@@ -287,14 +295,53 @@ pub async fn zk_interface_loggedin(
             })
             .unwrap()
             .start(jid, move |mon| async move {
-              let gbm = GirlbossMonitor { monitor: mon };
+              // job log file.
+              let mut lfn = env::temp_dir();
+              let uuidname = Uuid::new_v4().to_string();
+              lfn.push(uuidname.clone());
+              let jlf = match File::create_new(lfn.clone()) {
+                Ok(f) => {
+                  info!("sync log file: {:?}", lfn);
+                  f
+                }
+                Err(e) => {
+                  error!("err creating sync log file: {:?}", e);
+                  actix_rt::System::current().stop();
+                  return;
+                }
+              };
+              let gbm = ReportFileMonitor {
+                monitor: mon,
+                outf: Mutex::new(jlf),
+              };
               let mut callbacks = &mut zknotes_callbacks();
               write!(gbm, "starting sync");
-              let r = sync::sync(&dbpath, &file_path, uid, &mut callbacks, &gbm).await;
+
+              let r: Result<(), Box<dyn std::error::Error>> = async {
+                let c = sqldata::connection_open(dbpath.as_path())?;
+                let conn = Arc::new(c);
+                let snid = sync::sync(&conn, &file_path, uid, &mut callbacks, &gbm).await?;
+
+                let fid = make_file_entry(
+                  &*conn,
+                  file_path.as_path(),
+                  uid,
+                  &uuidname,
+                  lfn.as_path(),
+                  false,
+                )?;
+
+                set_zknote_file(&*conn, snid, fid)?;
+
+                Ok(())
+              }
+              .await;
+
               match r {
-                Ok(_) => write!(gbm, "sync completed"),
+                Ok(()) => (),
                 Err(e) => write!(gbm, "sync err: {:?}", e),
-              };
+              }
+
               actix_rt::System::current().stop();
             })
             .map_err(|e| {

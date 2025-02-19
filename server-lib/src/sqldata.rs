@@ -2273,14 +2273,14 @@ pub fn save_importzknotes(
   Ok(())
 }
 
-pub fn make_file_note(
+pub fn make_file_entry(
   conn: &Connection,
   files_dir: &Path,
   uid: UserId,
   name: &String,
   fpath: &Path,
   copy: bool,
-) -> Result<(i64, ZkNoteId, i64), zkerr::Error> {
+) -> Result<i64, zkerr::Error> {
   // compute hash.
   let fh = sha256::try_digest(fpath)?;
   let size = std::fs::metadata(fpath)?.len();
@@ -2312,18 +2312,7 @@ pub fn make_file_note(
 
   // use existing file.id, or create new
   let fid = match oid {
-    Some(fid) => {
-      // note exists too, for this user?
-      match conn.query_row_and_then(
-        "select id, uuid from zknote where file = ?1 and user = ?2",
-        params![fid, uid.to_i64()],
-        |row| Ok((row.get(0)?, row.get::<usize, String>(1)?)),
-      ) {
-        Ok((id, uuid)) => return Ok((id, Uuid::parse_str(uuid.as_str())?.into(), fid)),
-        Err(rusqlite::Error::QueryReturnedNoRows) => fid,
-        Err(e) => Err(e)?,
-      }
-    }
+    Some(fid) => fid,
     None => {
       let now = now()?;
       // add table entry
@@ -2335,6 +2324,33 @@ pub fn make_file_note(
       conn.last_insert_rowid()
     }
   };
+
+  Ok(fid)
+}
+
+pub fn make_file_note(
+  conn: &Connection,
+  files_dir: &Path,
+  uid: UserId,
+  name: &String,
+  fpath: &Path,
+  copy: bool,
+) -> Result<(i64, ZkNoteId, i64), zkerr::Error> {
+  let fid = make_file_entry(conn, files_dir, uid, name, fpath, copy)?;
+
+  // note already exists, for this user?
+  match conn.query_row_and_then(
+    "select id, uuid from zknote where file = ?1 and user = ?2",
+    params![fid, uid.to_i64()],
+    |row| Ok((row.get(0)?, row.get::<usize, String>(1)?)),
+  ) {
+    Ok((id, uuid)) => {
+      // return existing note.
+      return Ok((id, Uuid::parse_str(uuid.as_str())?.into(), fid));
+    }
+    Err(rusqlite::Error::QueryReturnedNoRows) => (),
+    Err(e) => Err(e)?,
+  }
 
   // make a new note.
   let (id, sn) = save_zknote(
