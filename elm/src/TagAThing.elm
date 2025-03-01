@@ -10,8 +10,7 @@ import Element.Border as EBd
 import Element.Events as EE
 import Element.Font as EF
 import Element.Input as EI
-import Orgauth.Data as OD
-import Orgauth.UserId exposing (UserId(..))
+import Orgauth.Data as OD exposing (UserId(..))
 import SearchStackPanel as SP
 import TangoColors as TC
 import Toop

@@ -69,7 +69,7 @@ import Markdown.Block exposing (ListItem(..), Task(..))
 import Maybe.Extra as ME
 import MdCommon as MC
 import NoteCache as NC exposing (NoteCache)
-import Orgauth.UserId exposing (UserId(..))
+import Orgauth.Data exposing (UserId(..))
 import RequestsDialog exposing (TRequests)
 import SearchStackPanel as SP
 import TangoColors as TC

@@ -5,8 +5,7 @@ import Http
 import Http.Tasks as HT
 import Json.Decode as JD
 import Json.Encode as JE
-import Orgauth.Data
-import Orgauth.UserId exposing (UserId(..), getUserIdVal, userIdDecoder)
+import Orgauth.Data exposing (UserId(..), userIdDecoder)
 import TDict exposing (TDict)
 import TSet exposing (TSet)
 import Task
