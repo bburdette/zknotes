@@ -3,11 +3,13 @@
 
 module Data exposing (..)
 
+-- import Orgauth.UserId exposing (..)
+
 import Dict exposing (Dict)
 import Http
 import Json.Decode
 import Json.Encode
-import Orgauth.UserId exposing (..)
+import Orgauth.Data exposing (UserId(..), userIdDecoder, userIdEncoder)
 import Url.Builder
 
 
