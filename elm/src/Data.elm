@@ -3,8 +3,6 @@
 
 module Data exposing (..)
 
--- import Orgauth.UserId exposing (..)
-
 import Dict exposing (Dict)
 import Http
 import Json.Decode
