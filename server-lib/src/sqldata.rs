@@ -774,6 +774,7 @@ pub fn archive_zknote_i64(conn: &Connection, noteid: i64) -> Result<SavedZkNote,
   Ok(SavedZkNote {
     id: uuid.into(),
     changeddate: now,
+    what: None,
   })
 }
 
@@ -816,6 +817,7 @@ pub fn archive_zknote(
     SavedZkNote {
       id: uuid.into(),
       changeddate: note.changeddate,
+      what: None,
     },
   ))
 }
@@ -860,6 +862,7 @@ pub fn save_zknote(
           Ok((id, SavedZkNote {
           id: uuid,
           changeddate: now,
+          what: note.what.clone(),
         }))}
         Ok(0) => {
           match zknote_access_id(conn, Some(uid), id)? {
@@ -874,6 +877,7 @@ pub fn save_zknote(
                 1 => Ok((id, SavedZkNote {
                     id: uuid,
                     changeddate: now,
+                    what: note.what.clone(),
                   })),
                 _ => bail!("unexpected update success!"),
               }
@@ -911,6 +915,7 @@ pub fn save_zknote(
         SavedZkNote {
           id: uuid.into(),
           changeddate: now,
+          what: note.what.clone(),
         },
       ))
     }
@@ -2210,6 +2215,7 @@ pub fn save_importzknotes(
             editable: false,
             showtitle: true,
             deleted: false,
+            what: None,
           },
         )?
         .0
@@ -2233,6 +2239,7 @@ pub fn save_importzknotes(
               editable: false,
               showtitle: true,
               deleted: false,
+              what: None,
             },
           )?
           .0
@@ -2259,6 +2266,7 @@ pub fn save_importzknotes(
               editable: false,
               showtitle: true,
               deleted: false,
+              what: None,
             },
           )?
           .0
@@ -2348,6 +2356,7 @@ pub fn make_file_note(
       editable: false,
       showtitle: false,
       deleted: false,
+      what: None,
     },
   )?;
 
