@@ -157,13 +157,12 @@ link title destination body =
         }
 
 
-
 renderText : String -> Element msg
 renderText str =
-     E.paragraph
-            [ HA.style "overflow-wrap" "anywhere" |> E.htmlAttribute
-            ]
-            [ E.text str ]
+    E.paragraph
+        [ HA.style "overflow-wrap" "anywhere" |> E.htmlAttribute
+        ]
+        [ E.text str ]
 
 
 mkRenderer : FileUrlInfo -> ViewMode -> (String -> a) -> Int -> CellDict -> Bool -> (String -> String -> a) -> NoteCache -> Markdown.Renderer.Renderer (Element a)
@@ -313,7 +312,7 @@ searchView viewMode restoreSearchMsg search renderedChildren =
 panelView : ZkNoteId -> List (Element a) -> Element a
 panelView noteid renderedChildren =
     E.el [ E.padding 5, EBk.color TC.darkGray ] <|
-        E.text ("Side panel note :" ++ zkNoteIdToString noteid)
+        renderText ("Side panel note :" ++ zkNoteIdToString noteid)
 
 
 imageView : String -> String -> Maybe String -> List (Element a) -> Element a
