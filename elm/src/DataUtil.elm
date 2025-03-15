@@ -254,6 +254,7 @@ saveZkNote fzn =
     , editable = fzn.editableValue
     , showtitle = fzn.showtitle
     , deleted = fzn.deleted
+    , what = Nothing
     }
 
 
