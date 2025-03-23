@@ -16,7 +16,7 @@ import Util
 
 
 type alias TRequests =
-    { requestCount : Int, requests : Dict String TRequest }
+    { requestCount : Int, mobile : Bool, requests : Dict String TRequest }
 
 
 type TRequest
@@ -129,11 +129,15 @@ view buttonStyle mbsize trqs =
                                     ]
                     )
             )
-        , E.row [ E.width E.fill, E.spacing 10 ]
-            [ EI.button
-                (E.centerX :: buttonStyle)
-                { onPress = Just CancelClick, label = E.text "close" }
-            ]
+        , if trqs.mobile then
+            E.none
+
+          else
+            E.row [ E.width E.fill, E.spacing 10 ]
+                [ EI.button
+                    (E.centerX :: buttonStyle)
+                    { onPress = Just CancelClick, label = E.text "close" }
+                ]
         ]
 
 

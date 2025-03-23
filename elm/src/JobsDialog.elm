@@ -17,7 +17,7 @@ import Util
 
 
 type alias TJobs =
-    { jobs : Dict Int Data.JobStatus }
+    { mobile : Bool, jobs : Dict Int Data.JobStatus }
 
 
 type Msg
@@ -115,11 +115,15 @@ view buttonStyle mbsize trqs =
                             ]
                     )
             )
-        , E.row [ E.width E.fill, E.spacing 10 ]
-            [ EI.button
-                (E.centerX :: buttonStyle)
-                { onPress = Just CancelClick, label = E.text "close" }
-            ]
+        , if trqs.mobile then
+            E.none
+
+          else
+            E.row [ E.width E.fill, E.spacing 10 ]
+                [ EI.button
+                    (E.centerX :: buttonStyle)
+                    { onPress = Just CancelClick, label = E.text "close" }
+                ]
         ]
 
 

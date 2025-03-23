@@ -197,6 +197,7 @@ type alias Model =
     , dialog : Maybe D.Model
     , panelNote : Maybe Data.ZkNote
     , mbReplaceString : Maybe String
+    , mobile : Bool
     }
 
 
@@ -237,7 +238,7 @@ newWithSave : Model -> ( Model, Command )
 newWithSave model =
     let
         nmod =
-            initNew model.fui model.ld model.zknSearchResult model.spmodel (shareLinks model)
+            initNew model.fui model.ld model.zknSearchResult model.spmodel (shareLinks model) model.mobile
     in
     ( nmod
     , if dirty model then
@@ -455,7 +456,7 @@ revert model =
                 }
             )
         |> Maybe.withDefault
-            (initNew model.fui model.ld model.zknSearchResult model.spmodel (Dict.values model.initialZklDict))
+            (initNew model.fui model.ld model.zknSearchResult model.spmodel (Dict.values model.initialZklDict) model.mobile)
 
 
 showZkl : E.Color -> Bool -> Bool -> Maybe EditLink -> DataUtil.LoginData -> Maybe ZkNoteId -> Maybe E.Color -> Bool -> EditLink -> Element Msg
@@ -1134,12 +1135,11 @@ zknview zone size recentZkns trqs tjobs noteCache model =
                                 enb
 
                         -- , EI.button parabuttonstyle { onPress = Just LinksPress, label = E.text"links" }
-                        , case isdirty of
-                            True ->
-                                EI.button perhapsdirtyparabuttonstyle { onPress = Just SavePress, label = E.text "save" }
+                        , if isdirty then
+                            EI.button perhapsdirtyparabuttonstyle { onPress = Just SavePress, label = E.text "save" }
 
-                            False ->
-                                E.none
+                          else
+                            E.none
                         , case model.id of
                             Just _ ->
                                 EI.button perhapsdirtyparabuttonstyle { onPress = Just LinkBackPress, label = E.text "linkback" }
@@ -1312,10 +1312,10 @@ zknview zone size recentZkns trqs tjobs noteCache model =
                         ( Data.FilePresent, Just zkn ) ->
                             MC.noteFile model.fui model.title zkn
 
-                        ( Data.FileMissing, Just zkn ) ->
+                        ( Data.FileMissing, Just _ ) ->
                             E.text <| "file missing"
 
-                        ( Data.NotAFile, Just zkn ) ->
+                        ( Data.NotAFile, Just _ ) ->
                             E.none
 
                         ( _, Nothing ) ->
@@ -1658,8 +1658,9 @@ initFull :
     -> Data.ZkNote
     -> List Data.EditLink
     -> SP.Model
+    -> Bool
     -> ( Model, Data.GetZkNoteComments )
-initFull fui ld zkl zknote dtlinks spm =
+initFull fui ld zkl zknote dtlinks spm mobile =
     let
         cells =
             zknote.content
@@ -1722,13 +1723,14 @@ initFull fui ld zkl zknote dtlinks spm =
       , dialog = Nothing
       , panelNote = Nothing
       , mbReplaceString = Nothing
+      , mobile = mobile
       }
     , { zknote = zknote.id, offset = 0, limit = Nothing }
     )
 
 
-initNew : FileUrlInfo -> DataUtil.LoginData -> Data.ZkListNoteSearchResult -> SP.Model -> List EditLink -> Model
-initNew fui ld zkl spm links =
+initNew : FileUrlInfo -> DataUtil.LoginData -> Data.ZkListNoteSearchResult -> SP.Model -> List EditLink -> Bool -> Model
+initNew fui ld zkl spm links mobile =
     let
         cells =
             ""
@@ -1775,6 +1777,7 @@ initNew fui ld zkl spm links =
     , dialog = Nothing
     , panelNote = Nothing
     , mbReplaceString = Nothing
+    , mobile = mobile
     }
         |> (\m1 ->
                 -- for new EMPTY notes, the 'revert' should be the same as the model, so that you aren't
@@ -1881,6 +1884,7 @@ initLinkBackNote model title =
                          }
                             :: shareLinks model
                         )
+                        model.mobile
             in
             Ok
                 { m1
@@ -2448,8 +2452,8 @@ update msg model =
                                     (view zone
                                         size
                                         []
-                                        (TRequests 0 Dict.empty)
-                                        (TJobs Dict.empty)
+                                        (TRequests 0 model.mobile Dict.empty)
+                                        (TJobs model.mobile Dict.empty)
                                         (NC.empty 0)
                                         model
                                     )
