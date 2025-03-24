@@ -1830,7 +1830,7 @@ sznToZkn uid uname unote sysids sdzn szn =
 onSaved : Model -> Data.SavedZkNote -> Model
 onSaved oldmodel szn =
     if szn.what == Just "and-new" then
-        initNew oldmodel.fui oldmodel.ld oldmodel.zknSearchResult oldmodel.spmodel (shareLinks oldmodel)
+        initNew oldmodel.fui oldmodel.ld oldmodel.zknSearchResult oldmodel.spmodel (shareLinks oldmodel) oldmodel.mobile
 
     else
         let
