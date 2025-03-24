@@ -159,6 +159,7 @@ decodeFlags =
         |> andMap (JD.field "login" (JD.maybe DataUtil.decodeLoginData))
         |> andMap (JD.field "adminsettings" OD.adminSettingsDecoder)
         |> andMap (JD.field "tauri" JD.bool)
+        |> andMap (JD.field "mobile" JD.bool)
 
 
 type alias Flags =
@@ -173,6 +174,7 @@ type alias Flags =
     , login : Maybe DataUtil.LoginData
     , adminsettings : OD.AdminSettings
     , tauri : Bool
+    , mobile : Bool
     }
 
 
@@ -207,6 +209,7 @@ type alias Model =
     , noteCache : NoteCache
     , ziClosureId : Int
     , ziClosures : Dict Int (Result Http.Error ( Time.Posix, Data.PrivateReply ) -> Msg)
+    , mobile : Bool
     }
 
 
@@ -350,7 +353,7 @@ routeStateInternal model route =
                     ( nm.state, cmd )
 
                 EditZkNoteListing st login ->
-                    ( EditZkNote (EditZkNote.initNew model.fui login st.notes st.spmodel []) login, Cmd.none )
+                    ( EditZkNote (EditZkNote.initNew model.fui login st.notes st.spmodel [] model.mobile) login, Cmd.none )
 
                 st ->
                     case stateLogin st of
@@ -364,6 +367,7 @@ routeStateInternal model route =
                                     }
                                     SP.initModel
                                     []
+                                    model.mobile
                                 )
                                 login
                             , Cmd.none
@@ -460,6 +464,7 @@ routeStateInternal model route =
                                     }
                                     SP.initModel
                                     []
+                                    model.mobile
                                 )
                                 login
                             , sendZIMsg model.fui
@@ -1304,10 +1309,16 @@ view model =
                         dm
 
             SelectDialog sdm _ ->
-                Html.map SelectDialogMsg <|
-                    GD.layout
-                        (Just { width = min 600 model.size.width, height = min 500 model.size.height })
-                        sdm
+                if model.mobile then
+                    E.layout [] <|
+                        E.map SelectDialogMsg <|
+                            GD.dialogView Nothing sdm
+
+                else
+                    Html.map SelectDialogMsg <|
+                        GD.layout
+                            (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                            sdm
 
             ChangePasswordDialog cdm _ ->
                 Html.map ChangePasswordDialogMsg <|
@@ -1322,18 +1333,29 @@ view model =
                         cdm
 
             JobsDialog dm _ ->
-                Html.map JobsDialogMsg <|
-                    GD.layout
-                        (Just { width = min 600 model.size.width, height = min 500 model.size.height })
-                        -- use the live-updated model
-                        { dm | model = model.jobs }
+                if model.mobile then
+                    E.layout [] <|
+                        E.map JobsDialogMsg <|
+                            GD.dialogView Nothing { dm | model = model.jobs }
+
+                else
+                    Html.map JobsDialogMsg <|
+                        GD.layout
+                            (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                            { dm | model = model.jobs }
 
             RequestsDialog dm _ ->
-                Html.map RequestsDialogMsg <|
-                    GD.layout
-                        (Just { width = min 600 model.size.width, height = min 500 model.size.height })
-                        -- use the live-updated model
-                        { dm | model = model.trackedRequests }
+                if model.mobile then
+                    E.layout [] <|
+                        E.map RequestsDialogMsg <|
+                            GD.dialogView Nothing { dm | model = model.trackedRequests }
+
+                else
+                    Html.map RequestsDialogMsg <|
+                        GD.layout
+                            (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                            -- use the live-updated model
+                            { dm | model = model.trackedRequests }
 
             _ ->
                 E.layout [ EF.size model.fontsize, E.width E.fill ] <| viewState model.size model.state model
@@ -1511,6 +1533,7 @@ shDialog model =
                             model.prevSearches
                     , selected = Nothing
                     , search = ""
+                    , mobile = model.mobile
                     }
                     Common.buttonStyle
                     (E.map (\_ -> ()) (viewState model.size model.state model))
@@ -1577,6 +1600,7 @@ onZkNoteEditWhat model pt znew =
                             znew.znl.zknote
                             znew.znl.links
                             spmod
+                            model.mobile
 
                     ngets =
                         makeNoteCacheGets nst.md model
@@ -1741,7 +1765,7 @@ actualupdate msg model =
                                 , state =
                                     RequestsDialog
                                         (RequestsDialog.init
-                                            { requestCount = 1, requests = Dict.fromList [ ( nrid, nrq ) ] }
+                                            { requestCount = 1, mobile = model.mobile, requests = Dict.fromList [ ( nrid, nrq ) ] }
                                             Common.buttonStyle
                                             (E.map (\_ -> ()) (viewState model.size model.state model))
                                         )
@@ -2826,7 +2850,7 @@ actualupdate msg model =
                                             jobstatus
 
                                 nm =
-                                    { model | jobs = { jobs = Dict.insert jobstatus.jobno js model.jobs.jobs } }
+                                    { model | jobs = { mobile = model.mobile, jobs = Dict.insert jobstatus.jobno js model.jobs.jobs } }
                             in
                             ( if jobstatus.state == Data.Started then
                                 { nm
@@ -2850,7 +2874,8 @@ actualupdate msg model =
                                 nm =
                                     { model
                                         | jobs =
-                                            { jobs =
+                                            { mobile = model.mobile
+                                            , jobs =
                                                 Dict.insert jobno
                                                     { jobno = jobno, state = Data.Failed, message = "job not found" }
                                                     model.jobs.jobs
@@ -3099,7 +3124,7 @@ actualupdate msg model =
                     RequestsDialog
                         (RequestsDialog.init
                             -- dummy state we won't use
-                            { requestCount = 0, requests = Dict.empty }
+                            { requestCount = 0, mobile = model.mobile, requests = Dict.empty }
                             Common.buttonStyle
                             (E.map (\_ -> ()) (viewState model.size model.state model))
                         )
@@ -3680,7 +3705,7 @@ handleEditZkNoteListing model login ( emod, ecmd ) =
             ( { model | state = EditZkNoteListing emod login }, Cmd.none )
 
         EditZkNoteListing.New ->
-            ( { model | state = EditZkNote (EditZkNote.initNew model.fui login emod.notes emod.spmodel []) login }, Cmd.none )
+            ( { model | state = EditZkNote (EditZkNote.initNew model.fui login emod.notes emod.spmodel [] model.mobile) login }, Cmd.none )
 
         EditZkNoteListing.Done ->
             ( { model | state = UserSettings (UserSettings.init login model.fontsize) login (EditZkNoteListing emod login) }
@@ -3983,6 +4008,7 @@ init flags url key zone fontsize =
                             r
                    )
 
+        imodel : Model
         imodel =
             { state =
                 case flags.login of
@@ -4008,11 +4034,12 @@ init flags url key zone fontsize =
             , fontsize = fontsize
             , stylePalette = { defaultSpacing = 10 }
             , adminSettings = flags.adminsettings
-            , trackedRequests = { requestCount = 0, requests = Dict.empty }
-            , jobs = { jobs = Dict.empty }
+            , trackedRequests = { requestCount = 0, mobile = flags.mobile, requests = Dict.empty }
+            , jobs = { mobile = flags.mobile, jobs = Dict.empty }
             , noteCache = NC.empty maxCacheNotes
             , ziClosureId = 0
             , ziClosures = Dict.empty
+            , mobile = flags.mobile
             }
 
         geterrornote =

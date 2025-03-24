@@ -9,6 +9,7 @@ import Element.Border as EBd
 import Element.Font as EF
 import Element.Input as EI
 import GenDialog as GD
+import Html.Attributes as HA
 import Http
 import Orgauth.Data as Data
 import TangoColors as TC
@@ -16,7 +17,7 @@ import Util
 
 
 type alias TRequests =
-    { requestCount : Int, requests : Dict String TRequest }
+    { requestCount : Int, mobile : Bool, requests : Dict String TRequest }
 
 
 type TRequest
@@ -72,7 +73,7 @@ renderProgress p =
 view : List (E.Attribute Msg) -> Maybe Util.Size -> TRequests -> Element Msg
 view buttonStyle mbsize trqs =
     E.column
-        [ E.width (mbsize |> Maybe.map .width |> Maybe.withDefault 500 |> E.px)
+        [ E.width (mbsize |> Maybe.map .width |> Maybe.map E.px |> Maybe.withDefault E.fill)
         , E.height E.fill
         , E.spacing 15
         ]
@@ -110,7 +111,14 @@ view buttonStyle mbsize trqs =
                                             , E.scrollbarY
                                             ]
                                             (fu.filenames
-                                                |> List.map (\fn -> E.paragraph [] [ E.text fn ])
+                                                |> List.map
+                                                    (\fn ->
+                                                        E.paragraph
+                                                            [ E.htmlAttribute (HA.style "overflow-wrap" "break-word")
+                                                            , E.htmlAttribute (HA.style "word-break" "break-word")
+                                                            ]
+                                                            [ E.text fn ]
+                                                    )
                                             )
                                         , fu.progress
                                             |> Maybe.map renderProgress
@@ -129,11 +137,15 @@ view buttonStyle mbsize trqs =
                                     ]
                     )
             )
-        , E.row [ E.width E.fill, E.spacing 10 ]
-            [ EI.button
-                (E.centerX :: buttonStyle)
-                { onPress = Just CancelClick, label = E.text "close" }
-            ]
+        , if trqs.mobile then
+            E.none
+
+          else
+            E.row [ E.width E.fill, E.spacing 10 ]
+                [ EI.button
+                    (E.centerX :: buttonStyle)
+                    { onPress = Just CancelClick, label = E.text "close" }
+                ]
         ]
 
 
