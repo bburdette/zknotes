@@ -10,6 +10,7 @@ import Element.Border as EBd
 import Element.Font as EF
 import Element.Input as EI
 import GenDialog as GD
+import Html.Attributes as HA
 import Http
 import Orgauth.Data as Data
 import TangoColors as TC
