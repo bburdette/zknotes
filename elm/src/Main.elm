@@ -47,7 +47,6 @@ import Route exposing (Route(..), parseUrl, routeTitle, routeUrl)
 import SearchStackPanel as SP
 import SearchUtil as SU
 import SelectString as SS
-import SelectStringMobile as SSM
 import ShowMessage
 import TSet
 import TagAThing
@@ -97,7 +96,6 @@ type Msg
     | DisplayMessageMsg (GD.Msg DisplayMessage.Msg)
     | MessageNLinkMsg (GD.Msg MessageNLink.Msg)
     | SelectDialogMsg (GD.Msg (SS.Msg Int))
-    | SelectDialogMobileMsg (GD.Msg (SSM.Msg Int))
     | ChangePasswordDialogMsg (GD.Msg CP.Msg)
     | ChangeEmailDialogMsg (GD.Msg CE.Msg)
     | ResetPasswordMsg ResetPassword.Msg
@@ -132,7 +130,6 @@ type State
     | PubShowMessage ShowMessage.Model (Maybe State)
     | LoginShowMessage ShowMessage.Model LoginData Url
     | SelectDialog (SS.GDModel Int) State
-    | SelectDialogMobile (SSM.GDModel Int) State
     | ChangePasswordDialog CP.GDModel State
     | ChangeEmailDialog CE.GDModel State
     | ResetPassword ResetPassword.Model
@@ -690,9 +687,6 @@ showMessage msg =
         SelectDialogMsg _ ->
             "SelectDialogMsg"
 
-        SelectDialogMobileMsg _ ->
-            "SelectDialogMobileMsg"
-
         ChangePasswordDialogMsg _ ->
             "ChangePasswordDialogMsg"
 
@@ -796,9 +790,6 @@ showState state =
         SelectDialog _ _ ->
             "SelectDialog"
 
-        SelectDialogMobile _ _ ->
-            "SelectDialogMobile"
-
         ChangePasswordDialog _ _ ->
             "ChangePasswordDialog"
 
@@ -899,10 +890,6 @@ viewState size state model =
             -- render is at the layout level, not here.
             E.none
 
-        SelectDialogMobile _ _ ->
-            -- render is at the layout level, not here.
-            E.none
-
         ChangePasswordDialog _ _ ->
             -- render is at the layout level, not here.
             E.none
@@ -989,9 +976,6 @@ stateSearch state =
             Nothing
 
         SelectDialog _ st ->
-            stateSearch st
-
-        SelectDialogMobile _ st ->
             stateSearch st
 
         ChangePasswordDialog _ st ->
@@ -1086,9 +1070,6 @@ stateLogin state =
             stateLogin wstate
 
         SelectDialog _ instate ->
-            stateLogin instate
-
-        SelectDialogMobile _ instate ->
             stateLogin instate
 
         ChangePasswordDialog _ instate ->
@@ -1327,15 +1308,16 @@ view model =
                         dm
 
             SelectDialog sdm _ ->
-                Html.map SelectDialogMsg <|
-                    GD.layout
-                        (Just { width = min 600 model.size.width, height = min 500 model.size.height })
-                        sdm
+                if model.mobile then
+                    E.layout [] <|
+                        E.map SelectDialogMsg <|
+                            GD.dialogView Nothing sdm
 
-            SelectDialogMobile sdm _ ->
-                E.layout [] <|
-                    E.map SelectDialogMobileMsg <|
-                        GD.dialogView Nothing sdm
+                else
+                    Html.map SelectDialogMsg <|
+                        GD.layout
+                            (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                            sdm
 
             ChangePasswordDialog cdm _ ->
                 Html.map ChangePasswordDialogMsg <|
@@ -1542,35 +1524,20 @@ shDialog : Model -> Model
 shDialog model =
     { model
         | state =
-            if model.mobile then
-                SelectDialogMobile
-                    (SSM.init
-                        { choices =
-                            List.indexedMap
-                                (\i ps -> ( i, SU.printTagSearch (SU.andifySearches ps) ))
-                                model.prevSearches
-                        , selected = Nothing
-                        , search = ""
-                        }
-                        Common.buttonStyle
-                        (E.map (\_ -> ()) (viewState model.size model.state model))
-                    )
-                    model.state
-
-            else
-                SelectDialog
-                    (SS.init
-                        { choices =
-                            List.indexedMap
-                                (\i ps -> ( i, SU.printTagSearch (SU.andifySearches ps) ))
-                                model.prevSearches
-                        , selected = Nothing
-                        , search = ""
-                        }
-                        Common.buttonStyle
-                        (E.map (\_ -> ()) (viewState model.size model.state model))
-                    )
-                    model.state
+            SelectDialog
+                (SS.init
+                    { choices =
+                        List.indexedMap
+                            (\i ps -> ( i, SU.printTagSearch (SU.andifySearches ps) ))
+                            model.prevSearches
+                    , selected = Nothing
+                    , search = ""
+                    , mobile = model.mobile
+                    }
+                    Common.buttonStyle
+                    (E.map (\_ -> ()) (viewState model.size model.state model))
+                )
+                model.state
     }
 
 
@@ -1821,52 +1788,6 @@ actualupdate msg model =
             case GD.update sdmsg sdmod of
                 GD.Dialog nmod ->
                     ( { model | state = SelectDialog nmod instate }, Cmd.none )
-
-                GD.Ok return ->
-                    case List.head (List.drop return model.prevSearches) of
-                        Just ts ->
-                            let
-                                sendsearch =
-                                    sendZIMsg model.fui
-                                        (Data.PvqSearchZkNotes
-                                            { tagsearch = ts
-                                            , offset = 0
-                                            , limit = Nothing
-                                            , what = ""
-                                            , resulttype = Data.RtListNote
-                                            , archives = False
-                                            , deleted = False
-                                            , ordering = Nothing
-                                            }
-                                        )
-
-                                ( ns, cmd ) =
-                                    case instate of
-                                        EditZkNote ezn login ->
-                                            ( EditZkNote (Tuple.first <| EditZkNote.updateSearch ts ezn) login
-                                            , sendsearch
-                                            )
-
-                                        EditZkNoteListing ezn login ->
-                                            ( EditZkNoteListing (Tuple.first <| EditZkNoteListing.updateSearch ts ezn) login
-                                            , sendsearch
-                                            )
-
-                                        _ ->
-                                            ( instate, Cmd.none )
-                            in
-                            ( { model | state = ns }, cmd )
-
-                        Nothing ->
-                            ( { model | state = instate }, Cmd.none )
-
-                GD.Cancel ->
-                    ( { model | state = instate }, Cmd.none )
-
-        ( SelectDialogMobileMsg sdmsg, SelectDialogMobile sdmod instate ) ->
-            case GD.update sdmsg sdmod of
-                GD.Dialog nmod ->
-                    ( { model | state = SelectDialogMobile nmod instate }, Cmd.none )
 
                 GD.Ok return ->
                     case List.head (List.drop return model.prevSearches) of
@@ -3164,9 +3085,6 @@ actualupdate msg model =
             ( model, Cmd.none )
 
         ( SelectDialogMsg GD.Noop, _ ) ->
-            ( model, Cmd.none )
-
-        ( SelectDialogMobileMsg GD.Noop, _ ) ->
             ( model, Cmd.none )
 
         ( DisplayMessageMsg GD.Noop, _ ) ->

@@ -64,7 +64,7 @@ renderProgress p =
 view : List (E.Attribute Msg) -> Maybe Util.Size -> TJobs -> Element Msg
 view buttonStyle mbsize trqs =
     E.column
-        [ E.width (mbsize |> Maybe.map .width |> Maybe.withDefault 500 |> E.px)
+        [ E.width (mbsize |> Maybe.map .width |> Maybe.map E.px |> Maybe.withDefault E.fill)
         , E.height E.fill
         , E.spacing 15
         ]
@@ -102,7 +102,12 @@ view buttonStyle mbsize trqs =
                                     , E.height <| E.maximum 200 E.fill
                                     , E.scrollbarY
                                     ]
-                                    [ E.paragraph [] [ E.text js.message ] ]
+                                    [ E.paragraph
+                                        [ E.htmlAttribute (HA.style "overflow-wrap" "break-word")
+                                        , E.htmlAttribute (HA.style "word-break" "break-word")
+                                        ]
+                                        [ E.text js.message ]
+                                    ]
                                 ]
                             , if DataUtil.jobComplete js.state then
                                 E.row [ E.width E.fill ]
