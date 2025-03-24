@@ -1196,6 +1196,7 @@ sendSearch model search =
                         , editable = False
                         , showtitle = True
                         , deleted = False
+                        , what = Nothing
                         }
                     , links =
                         [ { otherid = DataUtil.sysids.searchid

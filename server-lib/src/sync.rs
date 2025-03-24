@@ -118,6 +118,7 @@ pub async fn save_sync(
       editable: false,
       showtitle: false,
       deleted: false,
+      what: None,
     },
   )?;
 
@@ -815,6 +816,7 @@ where
                   editable: note.editable,
                   showtitle: note.showtitle,
                   deleted: note.deleted,
+                  what: None,
                 },
               )
               .map(|x| x.0)

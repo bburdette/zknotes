@@ -94,6 +94,7 @@ pub struct ZkListNote {
 pub struct SavedZkNote {
   pub id: ZkNoteId,
   pub changeddate: i64,
+  pub what: Option<String>,
 }
 
 #[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug, Clone)]
@@ -105,6 +106,7 @@ pub struct SaveZkNote {
   pub editable: bool,
   pub showtitle: bool,
   pub deleted: bool,
+  pub what: Option<String>,
 }
 
 #[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug, Clone)]

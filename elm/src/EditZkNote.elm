@@ -236,18 +236,24 @@ type Command
 
 newWithSave : Model -> ( Model, Command )
 newWithSave model =
-    let
-        nmod =
-            initNew model.fui model.ld model.zknSearchResult model.spmodel (shareLinks model) model.mobile
-    in
-    ( nmod
-    , if dirty model then
-        Save
-            (fullSave model)
+    if dirty model then
+        ( model
+        , Save
+            (fullSave model
+                |> (\fs ->
+                        let
+                            n =
+                                fs.note
+                        in
+                        { fs | note = { n | what = Just "and-new" } }
+                   )
+            )
+        )
 
-      else
-        None
-    )
+    else
+        ( initNew model.fui model.ld model.zknSearchResult model.spmodel (shareLinks model) model.mobile
+        , None
+        )
 
 
 setHomeNote : Model -> ZkNoteId -> Model
@@ -349,6 +355,7 @@ sznFromModel model =
     , editable = model.editableValue
     , showtitle = model.showtitle
     , deleted = model.deleted
+    , what = Nothing
     }
 
 
@@ -1822,39 +1829,43 @@ sznToZkn uid uname unote sysids sdzn szn =
 
 onSaved : Model -> Data.SavedZkNote -> Model
 onSaved oldmodel szn =
-    let
-        model =
-            { oldmodel
-                | revert = Just <| sznFromModel oldmodel
-                , initialZklDict = oldmodel.zklDict
-            }
-    in
-    case model.pendingcomment of
-        Just pc ->
-            { model
-                | comments =
-                    model.comments
-                        ++ [ sznToZkn
-                                model.ld.userid
-                                model.ld.name
-                                model.ld.zknote
-                                [ DataUtil.sysids.commentid ]
-                                szn
-                                pc
-                           ]
-            }
+    if szn.what == Just "and-new" then
+        initNew oldmodel.fui oldmodel.ld oldmodel.zknSearchResult oldmodel.spmodel (shareLinks oldmodel)
 
-        Nothing ->
-            let
-                -- if we already have an ID, keep it.
-                m1 =
-                    { model
-                        | id = Just (model.id |> Maybe.withDefault szn.id)
-                        , createdate = model.createdate |> Util.mapNothing szn.changeddate
-                        , changeddate = Just szn.changeddate
-                    }
-            in
-            { m1 | revert = Just <| sznFromModel m1 }
+    else
+        let
+            model =
+                { oldmodel
+                    | revert = Just <| sznFromModel oldmodel
+                    , initialZklDict = oldmodel.zklDict
+                }
+        in
+        case model.pendingcomment of
+            Just pc ->
+                { model
+                    | comments =
+                        model.comments
+                            ++ [ sznToZkn
+                                    model.ld.userid
+                                    model.ld.name
+                                    model.ld.zknote
+                                    [ DataUtil.sysids.commentid ]
+                                    szn
+                                    pc
+                               ]
+                }
+
+            Nothing ->
+                let
+                    -- if we already have an ID, keep it.
+                    m1 =
+                        { model
+                            | id = Just (model.id |> Maybe.withDefault szn.id)
+                            , createdate = model.createdate |> Util.mapNothing szn.changeddate
+                            , changeddate = Just szn.changeddate
+                        }
+                in
+                { m1 | revert = Just <| sznFromModel m1 }
 
 
 type TACommand
@@ -2540,6 +2551,7 @@ update msg model =
                             , editable = False
                             , showtitle = True
                             , deleted = False
+                            , what = Nothing
                             }
                     in
                     ( { model | newcomment = Nothing, pendingcomment = Just nc }
