@@ -1465,6 +1465,8 @@ pub fn read_zklinks(
   // good old fashioned string templating here, since I can't figure out how to
   // do array parameters.
   //
+  // should be ok because the strings are built from vec<i64> returned by user_shares().
+  //
   // zklinks that are mine.
   // +
   // not-mine zklinks with from = this note and toid = note that ISA public.
