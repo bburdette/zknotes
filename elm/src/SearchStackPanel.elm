@@ -56,7 +56,7 @@ getSearch model =
             (\s ->
                 { s
                     | tagsearch =
-                        model.searchStack
+                        model.searchStack ++ s.tagsearch
                 }
             )
 
