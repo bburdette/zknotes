@@ -10,10 +10,10 @@ import Url.Parser.Query as UPQ
 
 
 type EditTab
-    = NcView
-    | NcEdit
-    | NcSearch
-    | NcRecent
+    = EtView
+    | EtEdit
+    | EtSearch
+    | EtRecent
 
 
 type Route
@@ -164,16 +164,16 @@ routeUrl route =
 editTabString : EditTab -> String
 editTabString et =
     case et of
-        NcView ->
+        EtView ->
             "View"
 
-        NcEdit ->
+        EtEdit ->
             "Edit"
 
-        NcSearch ->
+        EtSearch ->
             "Search"
 
-        NcRecent ->
+        EtRecent ->
             "Recent"
 
 
@@ -181,16 +181,16 @@ stringEditTab : String -> Maybe EditTab
 stringEditTab et =
     case et of
         "View" ->
-            Just NcView
+            Just EtView
 
         "Edit" ->
-            Just NcEdit
+            Just EtEdit
 
         "Search" ->
-            Just NcSearch
+            Just EtSearch
 
         "Recent" ->
-            Just NcRecent
+            Just EtRecent
 
         _ ->
             Nothing

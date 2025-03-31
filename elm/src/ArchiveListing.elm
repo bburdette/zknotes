@@ -127,7 +127,7 @@ listview ld zone size model =
                 [ E.row [ E.width E.fill ]
                     [ E.link
                         Common.linkStyle
-                        { url = R.routeUrl <| R.EditZkNoteR model.noteid (Just R.NcView)
+                        { url = R.routeUrl <| R.EditZkNoteR model.noteid (Just R.EtView)
                         , label = E.text "back"
                         }
                     , E.el [ E.centerX ] <|
