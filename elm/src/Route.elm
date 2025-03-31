@@ -1,19 +1,28 @@
-module Route exposing (Route(..), parseUrl, routeTitle, routeUrl)
+module Route exposing (EditTab(..), Route(..), parseUrl, routeTitle, routeUrl)
 
 import Data exposing (ZkNoteId)
 import DataUtil exposing (zkNoteIdFromString, zkNoteIdToString)
 import UUID exposing (UUID)
 import Url exposing (Url)
 import Url.Builder as UB
-import Url.Parser as UP exposing ((</>))
+import Url.Parser as UP exposing ((</>), (<?>))
+import Url.Parser.Query as UPQ
+
+
+type EditTab
+    = NcView
+    | NcEdit
+    | NcSearch
+    | NcRecent
 
 
 type Route
     = LoginR
     | PublicZkNote ZkNoteId
     | PublicZkPubId String
-    | EditZkNoteR ZkNoteId
+    | EditZkNoteR ZkNoteId (Maybe EditTab)
     | EditZkNoteNew
+      -- | SearchListing
     | ArchiveNoteListingR ZkNoteId
     | ArchiveNoteR ZkNoteId ZkNoteId
     | ResetPasswordR String UUID
@@ -34,7 +43,7 @@ routeTitle route =
         PublicZkPubId id ->
             id ++ " - zknotes"
 
-        EditZkNoteR id ->
+        EditZkNoteR id _ ->
             "zknote " ++ zkNoteIdToString id
 
         EditZkNoteNew ->
@@ -87,6 +96,7 @@ parseUrl url =
                 UP.s
                     "editnote"
                     </> UP.custom "ZkNoteId" (zkNoteIdFromString >> Result.toMaybe)
+                    <?> UPQ.map (Maybe.andThen stringEditTab) (UPQ.string "tab")
             , UP.map EditZkNoteNew <|
                 UP.s
                     "editnote"
@@ -121,8 +131,13 @@ routeUrl route =
         PublicZkPubId pubid ->
             UB.absolute [ "page", pubid ] []
 
-        EditZkNoteR uuid ->
-            UB.absolute [ "editnote", zkNoteIdToString uuid ] []
+        EditZkNoteR uuid mbedittab ->
+            UB.absolute [ "editnote", zkNoteIdToString uuid ]
+                (mbedittab
+                    |> Maybe.map
+                        (\x -> [ UB.string "tab" (editTabString x) ])
+                    |> Maybe.withDefault []
+                )
 
         EditZkNoteNew ->
             UB.absolute [ "editnote", "new" ] []
@@ -144,3 +159,38 @@ routeUrl route =
 
         Top ->
             UB.absolute [] []
+
+
+editTabString : EditTab -> String
+editTabString et =
+    case et of
+        NcView ->
+            "View"
+
+        NcEdit ->
+            "Edit"
+
+        NcSearch ->
+            "Search"
+
+        NcRecent ->
+            "Recent"
+
+
+stringEditTab : String -> Maybe EditTab
+stringEditTab et =
+    case et of
+        "View" ->
+            Just NcView
+
+        "Edit" ->
+            Just NcEdit
+
+        "Search" ->
+            Just NcSearch
+
+        "Recent" ->
+            Just NcRecent
+
+        _ ->
+            Nothing

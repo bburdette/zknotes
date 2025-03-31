@@ -5,8 +5,8 @@ import Browser
 import Browser.Events
 import Browser.Navigation
 import Common
-import Data exposing (PrivateClosureRequest, UploadedFiles, ZkNoteId)
-import DataUtil exposing (FileUrlInfo, LoginData, jobComplete, showPrivateReply, zniEq)
+import Data exposing (PrivateClosureRequest, ZkNoteId)
+import DataUtil exposing (FileUrlInfo, LoginData, jobComplete, showPrivateReply)
 import Dict exposing (Dict)
 import DisplayMessage
 import EditZkNote
@@ -43,7 +43,7 @@ import Orgauth.UserListing as UserListing
 import Platform.Cmd as Cmd
 import Random exposing (Seed, initialSeed)
 import RequestsDialog exposing (TRequest(..), TRequests)
-import Route exposing (Route(..), parseUrl, routeTitle, routeUrl)
+import Route exposing (EditTab(..), Route(..), parseUrl, routeTitle, routeUrl)
 import SearchStackPanel as SP
 import SearchUtil as SU
 import SelectString as SS
@@ -310,7 +310,7 @@ routeStateInternal model route =
             , sendPIMsg model.fui (Data.PbrGetZkNotePubId pubid)
             )
 
-        EditZkNoteR id ->
+        EditZkNoteR id mbtab ->
             case model.state of
                 EditZkNote st login ->
                     ( EditZkNote st login
@@ -518,7 +518,7 @@ stateRoute state =
 
         EditZkNote st _ ->
             st.id
-                |> Maybe.map (\id -> { route = EditZkNoteR id, save = True })
+                |> Maybe.map (\id -> { route = EditZkNoteR id (Just st.navchoice), save = True })
                 |> Maybe.withDefault { route = EditZkNoteNew, save = False }
 
         ArchiveListing almod _ ->

@@ -2,7 +2,6 @@ module EditZkNote exposing
     ( Command(..)
     , Model
     , Msg(..)
-    , NavChoice(..)
     , SearchOrRecent(..)
     , TACommand(..)
     , WClass(..)
@@ -71,6 +70,7 @@ import MdCommon as MC
 import NoteCache as NC exposing (NoteCache)
 import Orgauth.Data exposing (UserId(..))
 import RequestsDialog exposing (TRequests)
+import Route exposing (EditTab(..))
 import SearchStackPanel as SP
 import TangoColors as TC
 import Task
@@ -115,7 +115,7 @@ type Msg
     | RemoveLink EditLink
     | MdLink EditLink String
     | SPMsg SP.Msg
-    | NavChoiceChanged NavChoice
+    | NavChoiceChanged EditTab
     | DialogMsg D.Msg
     | RestoreSearch String
     | SrFocusPress ZkNoteId
@@ -132,13 +132,6 @@ type Msg
     | FlipLink EditLink
     | ShowArchivesPress
     | Noop
-
-
-type NavChoice
-    = NcEdit
-    | NcView
-    | NcSearch
-    | NcRecent
 
 
 type SearchOrRecent
@@ -191,7 +184,7 @@ type alias Model =
     , revert : Maybe Data.SaveZkNote
     , initialZklDict : Dict String EditLink
     , spmodel : SP.Model
-    , navchoice : NavChoice
+    , navchoice : EditTab
     , searchOrRecent : SearchOrRecent
     , editOrView : EditOrView
     , dialog : Maybe D.Model
