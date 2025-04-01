@@ -31,6 +31,7 @@ module EditZkNote exposing
     , replaceOrAdd
     , saveZkLinkList
     , setHomeNote
+    , setNavChoice
     , showSr
     , showZkl
     , sznFromModel

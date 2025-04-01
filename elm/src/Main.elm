@@ -330,16 +330,22 @@ routeStateInternal model route =
 
         EditZkNoteR id mbtab ->
             case model.state of
+                -- if the id is the same but the edit tab has changed, just change the edit tab.
                 EditZkNote st login ->
-                    ( EditZkNote st login
-                    , sendZIMsg model.fui
-                        (Data.PvqGetZkNoteAndLinks
-                            { zknote = id
-                            , what = ""
-                            , edittab = mbtab
-                            }
-                        )
-                    )
+                    case ( mbtab, st.id == Just id ) of
+                        ( Just et, True ) ->
+                            ( EditZkNote (EditZkNote.setNavChoice et st) login, Cmd.none )
+
+                        _ ->
+                            ( EditZkNote st login
+                            , sendZIMsg model.fui
+                                (Data.PvqGetZkNoteAndLinks
+                                    { zknote = id
+                                    , what = ""
+                                    , edittab = mbtab
+                                    }
+                                )
+                            )
 
                 EditZkNoteListing st login ->
                     ( EditZkNoteListing st login
