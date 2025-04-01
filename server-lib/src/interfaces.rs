@@ -186,11 +186,7 @@ pub async fn zk_interface_loggedin(
       let ozkne = sqldata::read_zneifchanged(&conn, &state.config.file_path, Some(uid), &gzic)?;
 
       match ozkne {
-        Some(zkne) => Ok(PrivateReply::PvyZkNoteAndLinksWhat(ZkNoteAndLinksWhat {
-          what: gzic.what.clone(),
-          edittab: None,
-          znl: zkne,
-        })),
+        Some(zkne) => Ok(PrivateReply::PvyZkNoteAndLinksWhat(zkne)),
         None => Ok(PrivateReply::PvyNoop),
       }
     }
@@ -474,11 +470,7 @@ pub fn public_interface(
       let ozkne = sqldata::read_zneifchanged(&conn, &config.file_path, None, &gzic)?;
 
       match ozkne {
-        Some(zkne) => Ok(PublicReply::PbyZkNoteAndLinksWhat(ZkNoteAndLinksWhat {
-          what: gzic.what.clone(),
-          edittab: None,
-          znl: zkne,
-        })),
+        Some(zkne) => Ok(PublicReply::PbyZkNoteAndLinksWhat(zkne)),
         None => Ok(PublicReply::PbyNoop),
       }
     }

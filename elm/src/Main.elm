@@ -1665,20 +1665,11 @@ onZkNoteEditWhat model pt znew =
 
                     ngets =
                         makeNoteCacheGets nst.md model
-
-                    s =
-                        case state of
-                            EditZkNote eznst _ ->
-                                EditZkNote.copyTabs eznst nst
-                                    |> EditZkNote.tabsOnLoad
-
-                            _ ->
-                                nst
                 in
                 ( { model
                     | state =
                         EditZkNote
-                            s
+                            nst
                             login
                     , recentNotes =
                         let
@@ -3428,7 +3419,13 @@ makeNoteCacheGets md model =
                 case NC.getNote model.noteCache id of
                     Just (NC.ZNAL zkn) ->
                         sendZIMsg model.fui
-                            (Data.PvqGetZnlIfChanged { zknote = id, what = "cache", changeddate = zkn.zknote.changeddate })
+                            (Data.PvqGetZnlIfChanged
+                                { zknote = id
+                                , what = "cache"
+                                , edittab = Nothing
+                                , changeddate = zkn.zknote.changeddate
+                                }
+                            )
 
                     Just NC.Private ->
                         sendZIMsg model.fui
@@ -3473,7 +3470,13 @@ makePubNoteCacheGet model id =
         Just (NC.ZNAL zkn) ->
             sendPIMsg
                 model.fui
-                (Data.PbrGetZnlIfChanged { zknote = id, what = "cache", changeddate = zkn.zknote.changeddate })
+                (Data.PbrGetZnlIfChanged
+                    { zknote = id
+                    , what = "cache"
+                    , edittab = Nothing
+                    , changeddate = zkn.zknote.changeddate
+                    }
+                )
 
         Just NC.NotFound ->
             sendPIMsg

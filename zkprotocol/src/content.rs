@@ -190,6 +190,7 @@ pub struct GetZnlIfChanged {
   pub zknote: ZkNoteId,
   pub changeddate: i64,
   pub what: String,
+  pub edittab: Option<EditTab>,
 }
 
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]
