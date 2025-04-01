@@ -172,6 +172,7 @@ pub async fn zk_interface_loggedin(
 
       let znew = ZkNoteAndLinksWhat {
         what: gzne.what.clone(),
+        edittab: gzne.edittab.clone(),
         znl: note,
       };
 
@@ -187,6 +188,7 @@ pub async fn zk_interface_loggedin(
       match ozkne {
         Some(zkne) => Ok(PrivateReply::PvyZkNoteAndLinksWhat(ZkNoteAndLinksWhat {
           what: gzic.what.clone(),
+          edittab: None,
           znl: zkne,
         })),
         None => Ok(PrivateReply::PvyNoop),
@@ -456,6 +458,7 @@ pub fn public_interface(
       );
       Ok(PublicReply::PbyZkNoteAndLinksWhat(ZkNoteAndLinksWhat {
         what: gzne.what.clone(),
+        edittab: gzne.edittab.clone(),
         znl: ZkNoteAndLinks {
           links: sqldata::read_public_zklinks(&conn, &note.id)?,
           zknote: note,
@@ -473,6 +476,7 @@ pub fn public_interface(
       match ozkne {
         Some(zkne) => Ok(PublicReply::PbyZkNoteAndLinksWhat(ZkNoteAndLinksWhat {
           what: gzic.what.clone(),
+          edittab: None,
           znl: zkne,
         })),
         None => Ok(PublicReply::PbyNoop),

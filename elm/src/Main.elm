@@ -5,7 +5,7 @@ import Browser
 import Browser.Events
 import Browser.Navigation
 import Common
-import Data exposing (PrivateClosureRequest, ZkNoteId)
+import Data exposing (EditTab(..), PrivateClosureRequest, ZkNoteId)
 import DataUtil exposing (FileUrlInfo, LoginData, jobComplete, showPrivateReply)
 import Dict exposing (Dict)
 import DisplayMessage
@@ -43,7 +43,7 @@ import Orgauth.UserListing as UserListing
 import Platform.Cmd as Cmd
 import Random exposing (Seed, initialSeed)
 import RequestsDialog exposing (TRequest(..), TRequests)
-import Route exposing (EditTab(..), Route(..), parseUrl, routeTitle, routeUrl)
+import Route exposing (Route(..), parseUrl, routeTitle, routeUrl)
 import SearchStackPanel as SP
 import SearchUtil as SU
 import SelectString as SS
@@ -279,10 +279,22 @@ routeStateInternal model route =
                     , case model.state of
                         EView _ _ ->
                             -- if we're in "EView" then do this request to stay in EView.
-                            sendPIMsg model.fui (Data.PbrGetZkNoteAndLinks { zknote = id, what = "" })
+                            sendPIMsg model.fui
+                                (Data.PbrGetZkNoteAndLinks
+                                    { zknote = id
+                                    , what = ""
+                                    , edittab = Nothing
+                                    }
+                                )
 
                         _ ->
-                            sendZIMsg model.fui (Data.PvqGetZkNoteAndLinks { zknote = id, what = "" })
+                            sendZIMsg model.fui
+                                (Data.PvqGetZkNoteAndLinks
+                                    { zknote = id
+                                    , what = ""
+                                    , edittab = Nothing
+                                    }
+                                )
                     )
 
                 Nothing ->
@@ -290,7 +302,13 @@ routeStateInternal model route =
                         { message = "loading article"
                         }
                         (Just model.state)
-                    , sendPIMsg model.fui (Data.PbrGetZkNoteAndLinks { zknote = id, what = "" })
+                    , sendPIMsg model.fui
+                        (Data.PbrGetZkNoteAndLinks
+                            { zknote = id
+                            , what = ""
+                            , edittab = Nothing
+                            }
+                        )
                     )
 
         PublicZkPubId pubid ->
@@ -314,17 +332,35 @@ routeStateInternal model route =
             case model.state of
                 EditZkNote st login ->
                     ( EditZkNote st login
-                    , sendZIMsg model.fui (Data.PvqGetZkNoteAndLinks { zknote = id, what = "" })
+                    , sendZIMsg model.fui
+                        (Data.PvqGetZkNoteAndLinks
+                            { zknote = id
+                            , what = ""
+                            , edittab = mbtab
+                            }
+                        )
                     )
 
                 EditZkNoteListing st login ->
                     ( EditZkNoteListing st login
-                    , sendZIMsg model.fui (Data.PvqGetZkNoteAndLinks { zknote = id, what = "" })
+                    , sendZIMsg model.fui
+                        (Data.PvqGetZkNoteAndLinks
+                            { zknote = id
+                            , what = ""
+                            , edittab = mbtab
+                            }
+                        )
                     )
 
                 EView st login ->
                     ( EView st login
-                    , sendPIMsg model.fui (Data.PbrGetZkNoteAndLinks { zknote = id, what = "" })
+                    , sendPIMsg model.fui
+                        (Data.PbrGetZkNoteAndLinks
+                            { zknote = id
+                            , what = ""
+                            , edittab = mbtab
+                            }
+                        )
                     )
 
                 st ->
@@ -333,13 +369,25 @@ routeStateInternal model route =
                             ( ShowMessage { message = "loading note..." }
                                 login
                                 (Just model.state)
-                            , sendZIMsg model.fui (Data.PvqGetZkNoteAndLinks { zknote = id, what = "" })
+                            , sendZIMsg model.fui
+                                (Data.PvqGetZkNoteAndLinks
+                                    { zknote = id
+                                    , what = ""
+                                    , edittab = mbtab
+                                    }
+                                )
                             )
 
                         Nothing ->
                             ( PubShowMessage { message = "loading note..." }
                                 (Just model.state)
-                            , sendPIMsg model.fui (Data.PbrGetZkNoteAndLinks { zknote = id, what = "" })
+                            , sendPIMsg model.fui
+                                (Data.PbrGetZkNoteAndLinks
+                                    { zknote = id
+                                    , what = ""
+                                    , edittab = mbtab
+                                    }
+                                )
                             )
 
         EditZkNoteNew ->
@@ -450,7 +498,13 @@ routeStateInternal model route =
                             , Cmd.batch
                                 [ sendZIMsg model.fui
                                     (Data.PvqSearchZkNotes <| prevSearchQuery login)
-                                , sendZIMsg model.fui (Data.PvqGetZkNoteAndLinks { zknote = id, what = "" })
+                                , sendZIMsg model.fui
+                                    (Data.PvqGetZkNoteAndLinks
+                                        { zknote = id
+                                        , what = ""
+                                        , edittab = Nothing
+                                        }
+                                    )
                                 ]
                             )
 
@@ -1600,6 +1654,7 @@ onZkNoteEditWhat model pt znew =
                             znew.znl.zknote
                             znew.znl.links
                             spmod
+                            znew.edittab
                             model.mobile
 
                     ngets =
@@ -2929,7 +2984,13 @@ actualupdate msg model =
                                 }
                                 (Just model.state)
                       }
-                    , sendPIMsg model.fui (Data.PbrGetZkNoteAndLinks { zknote = id, what = "" })
+                    , sendPIMsg model.fui
+                        (Data.PbrGetZkNoteAndLinks
+                            { zknote = id
+                            , what = ""
+                            , edittab = Nothing
+                            }
+                        )
                     )
 
         ( ViewMsg em, EView es state ) ->
@@ -2951,7 +3012,13 @@ actualupdate msg model =
                             case es.id of
                                 Just id ->
                                     ( { model | state = state }
-                                    , sendZIMsg model.fui (Data.PvqGetZkNoteAndLinks { zknote = id, what = "" })
+                                    , sendZIMsg model.fui
+                                        (Data.PvqGetZkNoteAndLinks
+                                            { zknote = id
+                                            , what = ""
+                                            , edittab = Nothing
+                                            }
+                                        )
                                     )
 
                                 Nothing ->
@@ -2961,7 +3028,13 @@ actualupdate msg model =
 
                 View.Switch id ->
                     ( model
-                    , sendPIMsg model.fui (Data.PbrGetZkNoteAndLinks { zknote = id, what = "" })
+                    , sendPIMsg model.fui
+                        (Data.PbrGetZkNoteAndLinks
+                            { zknote = id
+                            , what = ""
+                            , edittab = Nothing
+                            }
+                        )
                     )
 
         ( EditZkNoteMsg em, EditZkNote es login ) ->
@@ -3353,15 +3426,30 @@ makeNoteCacheGets md model =
 
                     Just NC.Private ->
                         sendZIMsg model.fui
-                            (Data.PvqGetZkNoteAndLinks { zknote = id, what = "cache" })
+                            (Data.PvqGetZkNoteAndLinks
+                                { zknote = id
+                                , what = "cache"
+                                , edittab = Nothing
+                                }
+                            )
 
                     Just NC.NotFound ->
                         sendZIMsg model.fui
-                            (Data.PvqGetZkNoteAndLinks { zknote = id, what = "cache" })
+                            (Data.PvqGetZkNoteAndLinks
+                                { zknote = id
+                                , what = "cache"
+                                , edittab = Nothing
+                                }
+                            )
 
                     Nothing ->
                         sendZIMsg model.fui
-                            (Data.PvqGetZkNoteAndLinks { zknote = id, what = "cache" })
+                            (Data.PvqGetZkNoteAndLinks
+                                { zknote = id
+                                , what = "cache"
+                                , edittab = Nothing
+                                }
+                            )
             )
 
 
@@ -3384,17 +3472,32 @@ makePubNoteCacheGet model id =
         Just NC.NotFound ->
             sendPIMsg
                 model.fui
-                (Data.PbrGetZkNoteAndLinks { zknote = id, what = "cache" })
+                (Data.PbrGetZkNoteAndLinks
+                    { zknote = id
+                    , what = "cache"
+                    , edittab = Nothing
+                    }
+                )
 
         Just NC.Private ->
             sendPIMsg
                 model.fui
-                (Data.PbrGetZkNoteAndLinks { zknote = id, what = "cache" })
+                (Data.PbrGetZkNoteAndLinks
+                    { zknote = id
+                    , what = "cache"
+                    , edittab = Nothing
+                    }
+                )
 
         Nothing ->
             sendPIMsg
                 model.fui
-                (Data.PbrGetZkNoteAndLinks { zknote = id, what = "cache" })
+                (Data.PbrGetZkNoteAndLinks
+                    { zknote = id
+                    , what = "cache"
+                    , edittab = Nothing
+                    }
+                )
 
 
 makeNewNoteCacheGets : String -> Model -> List (Cmd Msg)
@@ -3411,7 +3514,12 @@ makeNewNoteCacheGets md model =
                     Nothing ->
                         Just <|
                             sendZIMsg model.fui
-                                (Data.PvqGetZkNoteAndLinks { zknote = id, what = "cache" })
+                                (Data.PvqGetZkNoteAndLinks
+                                    { zknote = id
+                                    , what = "cache"
+                                    , edittab = Nothing
+                                    }
+                                )
             )
 
 
@@ -3538,7 +3646,13 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                             ( ShowMessage { message = "loading note..." }
                                 login
                                 (Just model.state)
-                            , sendZIMsg model.fui (Data.PvqGetZkNoteAndLinks { zknote = id, what = "" })
+                            , sendZIMsg model.fui
+                                (Data.PvqGetZkNoteAndLinks
+                                    { zknote = id
+                                    , what = ""
+                                    , edittab = Nothing
+                                    }
+                                )
                             )
                     in
                     ( { model | state = st }, cmd )
@@ -3549,7 +3663,13 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                             ( ShowMessage { message = "loading note..." }
                                 login
                                 (Just model.state)
-                            , sendZIMsg model.fui (Data.PvqGetZkNoteAndLinks { zknote = id, what = "" })
+                            , sendZIMsg model.fui
+                                (Data.PvqGetZkNoteAndLinks
+                                    { zknote = id
+                                    , what = ""
+                                    , edittab = Nothing
+                                    }
+                                )
                             )
                     in
                     ( { model | state = st }

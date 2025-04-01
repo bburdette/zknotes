@@ -413,6 +413,7 @@ getErrorIndexNote location noteid tomsg =
                     (PbrGetZkNoteAndLinks
                         { zknote = noteid
                         , what = ""
+                        , edittab = Nothing
                         }
                     )
         , resolver =

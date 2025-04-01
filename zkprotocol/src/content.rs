@@ -170,10 +170,19 @@ pub struct GetZkLinks {
   pub zknote: ZkNoteId,
 }
 
+#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
+pub enum EditTab {
+  EtEdit,
+  EtView,
+  EtSearch,
+  EtRecent,
+}
+
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]
 pub struct GetZkNoteAndLinks {
   pub zknote: ZkNoteId,
   pub what: String,
+  pub edittab: Option<EditTab>,
 }
 
 #[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug, Clone)]
@@ -258,6 +267,7 @@ pub struct ZkNoteAndLinks {
 #[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug)]
 pub struct ZkNoteAndLinksWhat {
   pub what: String,
+  pub edittab: Option<EditTab>,
   pub znl: ZkNoteAndLinks,
 }
 

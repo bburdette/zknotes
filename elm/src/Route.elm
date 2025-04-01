@@ -1,19 +1,12 @@
-module Route exposing (EditTab(..), Route(..), parseUrl, routeTitle, routeUrl)
+module Route exposing (Route(..), parseUrl, routeTitle, routeUrl)
 
-import Data exposing (ZkNoteId)
+import Data exposing (EditTab(..), ZkNoteId)
 import DataUtil exposing (zkNoteIdFromString, zkNoteIdToString)
 import UUID exposing (UUID)
 import Url exposing (Url)
 import Url.Builder as UB
 import Url.Parser as UP exposing ((</>), (<?>))
 import Url.Parser.Query as UPQ
-
-
-type EditTab
-    = EtView
-    | EtEdit
-    | EtSearch
-    | EtRecent
 
 
 type Route

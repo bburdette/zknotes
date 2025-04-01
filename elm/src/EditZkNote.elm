@@ -50,7 +50,7 @@ import Browser.Dom as BD
 import Cellme.Cellme exposing (CellContainer(..), RunState(..), evalCellsFully)
 import Cellme.DictCellme exposing (CellDict(..), getCd, mkCc)
 import Common
-import Data exposing (Direction(..), EditLink, ZkNoteId)
+import Data exposing (Direction(..), EditLink, EditTab(..), ZkNoteId)
 import DataUtil exposing (FileUrlInfo, zkNoteIdToString, zklKey, zniCompare, zniEq)
 import Dialog as D
 import Dict exposing (Dict)
@@ -70,7 +70,6 @@ import MdCommon as MC
 import NoteCache as NC exposing (NoteCache)
 import Orgauth.Data exposing (UserId(..))
 import RequestsDialog exposing (TRequests)
-import Route exposing (EditTab(..))
 import SearchStackPanel as SP
 import TangoColors as TC
 import Task
@@ -225,6 +224,33 @@ type Command
     | Sync
     | SyncFiles Data.ZkNoteSearch
     | Cmd (Cmd Msg)
+
+
+setNavChoice : EditTab -> Model -> Model
+setNavChoice nc model =
+    { model
+        | navchoice = nc
+        , searchOrRecent =
+            case nc of
+                EtSearch ->
+                    SearchView
+
+                EtRecent ->
+                    RecentView
+
+                _ ->
+                    model.searchOrRecent
+        , editOrView =
+            case nc of
+                EtEdit ->
+                    EditView
+
+                EtView ->
+                    ViewView
+
+                _ ->
+                    model.editOrView
+    }
 
 
 newWithSave : Model -> ( Model, Command )
@@ -1658,9 +1684,10 @@ initFull :
     -> Data.ZkNote
     -> List Data.EditLink
     -> SP.Model
+    -> Maybe EditTab
     -> Bool
     -> ( Model, Data.GetZkNoteComments )
-initFull fui ld zkl zknote dtlinks spm mobile =
+initFull fui ld zkl zknote dtlinks spm mbedittab mobile =
     let
         cells =
             zknote.content
@@ -1725,6 +1752,10 @@ initFull fui ld zkl zknote dtlinks spm mobile =
       , mbReplaceString = Nothing
       , mobile = mobile
       }
+        |> (\m ->
+                Maybe.map (\nc -> setNavChoice nc m) mbedittab
+                    |> Maybe.withDefault m
+           )
     , { zknote = zknote.id, offset = 0, limit = Nothing }
     )
 
@@ -2627,29 +2658,7 @@ update msg model =
             handleSPUpdate model (SP.update m model.spmodel)
 
         NavChoiceChanged nc ->
-            ( { model
-                | navchoice = nc
-                , searchOrRecent =
-                    case nc of
-                        EtSearch ->
-                            SearchView
-
-                        EtRecent ->
-                            RecentView
-
-                        _ ->
-                            model.searchOrRecent
-                , editOrView =
-                    case nc of
-                        EtEdit ->
-                            EditView
-
-                        EtView ->
-                            ViewView
-
-                        _ ->
-                            model.editOrView
-              }
+            ( setNavChoice nc model
             , None
             )
 
