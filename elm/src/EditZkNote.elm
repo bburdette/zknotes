@@ -2,7 +2,6 @@ module EditZkNote exposing
     ( Command(..)
     , Model
     , Msg(..)
-    , NavChoice(..)
     , SearchOrRecent(..)
     , TACommand(..)
     , WClass(..)
@@ -32,6 +31,7 @@ module EditZkNote exposing
     , replaceOrAdd
     , saveZkLinkList
     , setHomeNote
+    , setTab
     , showSr
     , showZkl
     , sznFromModel
@@ -51,7 +51,7 @@ import Browser.Dom as BD
 import Cellme.Cellme exposing (CellContainer(..), RunState(..), evalCellsFully)
 import Cellme.DictCellme exposing (CellDict(..), getCd, mkCc)
 import Common
-import Data exposing (Direction(..), EditLink, ZkNoteId)
+import Data exposing (Direction(..), EditLink, EditTab(..), ZkNoteId)
 import DataUtil exposing (FileUrlInfo, zkNoteIdToString, zklKey, zniCompare, zniEq)
 import Dialog as D
 import Dict exposing (Dict)
@@ -115,7 +115,7 @@ type Msg
     | RemoveLink EditLink
     | MdLink EditLink String
     | SPMsg SP.Msg
-    | NavChoiceChanged NavChoice
+    | TabChanged EditTab
     | DialogMsg D.Msg
     | RestoreSearch String
     | SrFocusPress ZkNoteId
@@ -132,13 +132,6 @@ type Msg
     | FlipLink EditLink
     | ShowArchivesPress
     | Noop
-
-
-type NavChoice
-    = NcEdit
-    | NcView
-    | NcSearch
-    | NcRecent
 
 
 type SearchOrRecent
@@ -191,7 +184,7 @@ type alias Model =
     , revert : Maybe Data.SaveZkNote
     , initialZklDict : Dict String EditLink
     , spmodel : SP.Model
-    , navchoice : NavChoice
+    , tab : EditTab
     , searchOrRecent : SearchOrRecent
     , editOrView : EditOrView
     , dialog : Maybe D.Model
@@ -232,6 +225,33 @@ type Command
     | Sync
     | SyncFiles Data.ZkNoteSearch
     | Cmd (Cmd Msg)
+
+
+setTab : EditTab -> Model -> Model
+setTab nc model =
+    { model
+        | tab = nc
+        , searchOrRecent =
+            case nc of
+                EtSearch ->
+                    SearchView
+
+                EtRecent ->
+                    RecentView
+
+                _ ->
+                    model.searchOrRecent
+        , editOrView =
+            case nc of
+                EtEdit ->
+                    EditView
+
+                EtView ->
+                    ViewView
+
+                _ ->
+                    model.editOrView
+    }
 
 
 newWithSave : Model -> ( Model, Command )
@@ -1374,14 +1394,14 @@ zknview zone size recentZkns trqs tjobs noteCache model =
                 (Common.navbar 2
                     (case model.searchOrRecent of
                         SearchView ->
-                            NcSearch
+                            EtSearch
 
                         RecentView ->
-                            NcRecent
+                            EtRecent
                     )
-                    NavChoiceChanged
-                    [ ( NcSearch, "search" )
-                    , ( NcRecent, "recent" )
+                    TabChanged
+                    [ ( EtSearch, "search" )
+                    , ( EtRecent, "recent" )
                     ]
                     :: [ case model.searchOrRecent of
                             SearchView ->
@@ -1562,14 +1582,14 @@ zknview zone size recentZkns trqs tjobs noteCache model =
                         [ Common.navbar 2
                             (case model.editOrView of
                                 EditView ->
-                                    NcEdit
+                                    EtEdit
 
                                 ViewView ->
-                                    NcView
+                                    EtView
                             )
-                            NavChoiceChanged
-                            [ ( NcView, "view" )
-                            , ( NcEdit
+                            TabChanged
+                            [ ( EtView, "view" )
+                            , ( EtEdit
                               , if editable then
                                     "edit"
 
@@ -1590,30 +1610,30 @@ zknview zone size recentZkns trqs tjobs noteCache model =
             Narrow ->
                 E.column [ E.width E.fill ]
                     [ Common.navbar 2
-                        model.navchoice
-                        NavChoiceChanged
-                        [ ( NcView, "view" )
-                        , ( NcEdit
+                        model.tab
+                        TabChanged
+                        [ ( EtView, "view" )
+                        , ( EtEdit
                           , if editable then
                                 "edit"
 
                             else
                                 "markdown"
                           )
-                        , ( NcSearch, "search" )
-                        , ( NcRecent, "recent" )
+                        , ( EtSearch, "search" )
+                        , ( EtRecent, "recent" )
                         ]
-                    , case model.navchoice of
-                        NcEdit ->
+                    , case model.tab of
+                        EtEdit ->
                             editview TC.lightGray
 
-                        NcView ->
+                        EtView ->
                             mdview TC.lightGray
 
-                        NcSearch ->
+                        EtSearch ->
                             searchPanel TC.lightGray
 
-                        NcRecent ->
+                        EtRecent ->
                             recentPanel TC.lightGray
                     ]
         ]
@@ -1639,7 +1659,7 @@ copyTabs from to =
     { to
         | searchOrRecent = from.searchOrRecent
         , editOrView = from.editOrView
-        , navchoice = from.navchoice
+        , tab = from.tab
     }
 
 
@@ -1648,13 +1668,13 @@ tabsOnLoad model =
     { model
         | searchOrRecent = model.searchOrRecent
         , editOrView = model.editOrView
-        , navchoice =
+        , tab =
             case model.editOrView of
                 EditView ->
-                    NcEdit
+                    EtEdit
 
                 ViewView ->
-                    NcView
+                    EtView
     }
 
 
@@ -1665,9 +1685,10 @@ initFull :
     -> Data.ZkNote
     -> List Data.EditLink
     -> SP.Model
+    -> Maybe EditTab
     -> Bool
     -> ( Model, Data.GetZkNoteComments )
-initFull fui ld zkl zknote dtlinks spm mobile =
+initFull fui ld zkl zknote dtlinks spm mbedittab mobile =
     let
         cells =
             zknote.content
@@ -1724,7 +1745,7 @@ initFull fui ld zkl zknote dtlinks spm mobile =
       , cells = getCd cc
       , revert = Just (DataUtil.saveZkNote zknote)
       , spmodel = SP.searchResultUpdated zkl spm
-      , navchoice = NcView
+      , tab = EtView
       , searchOrRecent = SearchView
       , editOrView = ViewView
       , dialog = Nothing
@@ -1732,6 +1753,10 @@ initFull fui ld zkl zknote dtlinks spm mobile =
       , mbReplaceString = Nothing
       , mobile = mobile
       }
+        |> (\m ->
+                Maybe.map (\nc -> setTab nc m) mbedittab
+                    |> Maybe.withDefault m
+           )
     , { zknote = zknote.id, offset = 0, limit = Nothing }
     )
 
@@ -1778,7 +1803,7 @@ initNew fui ld zkl spm links mobile =
     , cells = getCd cc
     , revert = Nothing
     , spmodel = SP.searchResultUpdated zkl spm
-    , navchoice = NcEdit
+    , tab = EtEdit
     , searchOrRecent = SearchView
     , editOrView = EditView
     , dialog = Nothing
@@ -2094,22 +2119,22 @@ onWkKeyPress key model =
         Toop.T4 "e" True True False ->
             let
                 ( m, _ ) =
-                    update (NavChoiceChanged NcEdit) model
+                    update (TabChanged EtEdit) model
             in
             ( m, Cmd (BD.focus "mdtext" |> Task.attempt (\_ -> Noop)) )
 
         Toop.T4 "v" True True False ->
-            update (NavChoiceChanged NcView) model
+            update (TabChanged EtView) model
 
         Toop.T4 "s" True True False ->
             let
                 ( m, _ ) =
-                    update (NavChoiceChanged NcSearch) model
+                    update (TabChanged EtSearch) model
             in
             ( m, Cmd (BD.focus "searchtext" |> Task.attempt (\_ -> Noop)) )
 
         Toop.T4 "r" True True False ->
-            update (NavChoiceChanged NcRecent) model
+            update (TabChanged EtRecent) model
 
         Toop.T4 "l" True True False ->
             update LinkBackPress model
@@ -2633,30 +2658,8 @@ update msg model =
         SPMsg m ->
             handleSPUpdate model (SP.update m model.spmodel)
 
-        NavChoiceChanged nc ->
-            ( { model
-                | navchoice = nc
-                , searchOrRecent =
-                    case nc of
-                        NcSearch ->
-                            SearchView
-
-                        NcRecent ->
-                            RecentView
-
-                        _ ->
-                            model.searchOrRecent
-                , editOrView =
-                    case nc of
-                        NcEdit ->
-                            EditView
-
-                        NcView ->
-                            ViewView
-
-                        _ ->
-                            model.editOrView
-              }
+        TabChanged nc ->
+            ( setTab nc model
             , None
             )
 

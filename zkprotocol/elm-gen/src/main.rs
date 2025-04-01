@@ -44,6 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                   zc::GetZkNoteComments,
                   zc::ZkNoteAndLinks,
                   zc::ZkNoteAndLinksWhat,
+                  zc::EditTab,
                   zc::JobState,
                   zc::JobStatus,
                   zpub::PublicRequest,
@@ -102,6 +103,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                   zc::GetZkNoteComments,
                   zc::ZkNoteAndLinks,
                   zc::ZkNoteAndLinksWhat,
+                  zc::EditTab,
                   zc::JobState,
                   zc::JobStatus,
                   zpub::PublicRequest,
@@ -145,7 +147,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   let uidout = output.replace(
     "import Json.Encode",
     r#"import Json.Encode
-import Orgauth.UserId exposing (..)"#,
+import Orgauth.Data exposing (UserId(..), userIdDecoder, userIdEncoder)"#,
   );
 
   let outf = ed.join("Data.elm").to_str().expect("bad path").to_string();

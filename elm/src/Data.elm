@@ -317,6 +317,7 @@ getZkLinksEncoder struct =
 type alias GetZkNoteAndLinks =
     { zknote : ZkNoteId
     , what : String
+    , edittab : Maybe (EditTab)
     }
 
 
@@ -325,6 +326,7 @@ getZkNoteAndLinksEncoder struct =
     Json.Encode.object
         [ ( "zknote", (zkNoteIdEncoder) struct.zknote )
         , ( "what", (Json.Encode.string) struct.what )
+        , ( "edittab", (Maybe.withDefault Json.Encode.null << Maybe.map (editTabEncoder)) struct.edittab )
         ]
 
 
@@ -332,6 +334,7 @@ type alias GetZnlIfChanged =
     { zknote : ZkNoteId
     , changeddate : Int
     , what : String
+    , edittab : Maybe (EditTab)
     }
 
 
@@ -341,6 +344,7 @@ getZnlIfChangedEncoder struct =
         [ ( "zknote", (zkNoteIdEncoder) struct.zknote )
         , ( "changeddate", (Json.Encode.int) struct.changeddate )
         , ( "what", (Json.Encode.string) struct.what )
+        , ( "edittab", (Maybe.withDefault Json.Encode.null << Maybe.map (editTabEncoder)) struct.edittab )
         ]
 
 
@@ -500,6 +504,7 @@ zkNoteAndLinksEncoder struct =
 
 type alias ZkNoteAndLinksWhat =
     { what : String
+    , edittab : Maybe (EditTab)
     , znl : ZkNoteAndLinks
     }
 
@@ -508,9 +513,29 @@ zkNoteAndLinksWhatEncoder : ZkNoteAndLinksWhat -> Json.Encode.Value
 zkNoteAndLinksWhatEncoder struct =
     Json.Encode.object
         [ ( "what", (Json.Encode.string) struct.what )
+        , ( "edittab", (Maybe.withDefault Json.Encode.null << Maybe.map (editTabEncoder)) struct.edittab )
         , ( "znl", (zkNoteAndLinksEncoder) struct.znl )
         ]
 
+
+type EditTab
+    = EtEdit
+    | EtView
+    | EtSearch
+    | EtRecent
+
+
+editTabEncoder : EditTab -> Json.Encode.Value
+editTabEncoder enum =
+    case enum of
+        EtEdit ->
+            Json.Encode.string "EtEdit"
+        EtView ->
+            Json.Encode.string "EtView"
+        EtSearch ->
+            Json.Encode.string "EtSearch"
+        EtRecent ->
+            Json.Encode.string "EtRecent"
 
 type JobState
     = Started
@@ -1273,6 +1298,7 @@ getZkNoteAndLinksDecoder =
     Json.Decode.succeed GetZkNoteAndLinks
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "zknote" (zkNoteIdDecoder)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "what" (Json.Decode.string)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "edittab" (Json.Decode.nullable (editTabDecoder))))
 
 
 getZnlIfChangedDecoder : Json.Decode.Decoder GetZnlIfChanged
@@ -1281,6 +1307,7 @@ getZnlIfChangedDecoder =
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "zknote" (zkNoteIdDecoder)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "changeddate" (Json.Decode.int)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "what" (Json.Decode.string)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "edittab" (Json.Decode.nullable (editTabDecoder))))
 
 
 getZkNoteArchivesDecoder : Json.Decode.Decoder GetZkNoteArchives
@@ -1364,8 +1391,50 @@ zkNoteAndLinksWhatDecoder : Json.Decode.Decoder ZkNoteAndLinksWhat
 zkNoteAndLinksWhatDecoder =
     Json.Decode.succeed ZkNoteAndLinksWhat
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "what" (Json.Decode.string)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "edittab" (Json.Decode.nullable (editTabDecoder))))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "znl" (zkNoteAndLinksDecoder)))
 
+
+editTabDecoder : Json.Decode.Decoder EditTab
+editTabDecoder = 
+    Json.Decode.oneOf
+        [ Json.Decode.string
+            |> Json.Decode.andThen
+                (\x ->
+                    case x of
+                        "EtEdit" ->
+                            Json.Decode.succeed EtEdit
+                        unexpected ->
+                            Json.Decode.fail <| "Unexpected variant " ++ unexpected
+                )
+        , Json.Decode.string
+            |> Json.Decode.andThen
+                (\x ->
+                    case x of
+                        "EtView" ->
+                            Json.Decode.succeed EtView
+                        unexpected ->
+                            Json.Decode.fail <| "Unexpected variant " ++ unexpected
+                )
+        , Json.Decode.string
+            |> Json.Decode.andThen
+                (\x ->
+                    case x of
+                        "EtSearch" ->
+                            Json.Decode.succeed EtSearch
+                        unexpected ->
+                            Json.Decode.fail <| "Unexpected variant " ++ unexpected
+                )
+        , Json.Decode.string
+            |> Json.Decode.andThen
+                (\x ->
+                    case x of
+                        "EtRecent" ->
+                            Json.Decode.succeed EtRecent
+                        unexpected ->
+                            Json.Decode.fail <| "Unexpected variant " ++ unexpected
+                )
+        ]
 
 jobStateDecoder : Json.Decode.Decoder JobState
 jobStateDecoder = 

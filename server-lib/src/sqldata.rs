@@ -21,7 +21,8 @@ use zkprotocol::constants::SpecialUuids;
 use zkprotocol::content::{
   ArchiveZkLink, Direction, EditLink, ExtraLoginData, FileInfo, FileStatus, GetArchiveZkNote,
   GetZkNoteArchives, GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkLink, SaveZkNote,
-  SavedZkNote, Sysids, UuidZkLink, ZkLink, ZkListNote, ZkNote, ZkNoteAndLinks, ZkNoteId,
+  SavedZkNote, Sysids, UuidZkLink, ZkLink, ZkListNote, ZkNote, ZkNoteAndLinks, ZkNoteAndLinksWhat,
+  ZkNoteId,
 };
 use zkprotocol::sync_data::SyncMessage;
 
@@ -2170,7 +2171,7 @@ pub fn read_zneifchanged(
   files_dir: &Path,
   uid: Option<UserId>,
   gzic: &GetZnlIfChanged,
-) -> Result<Option<ZkNoteAndLinks>, zkerr::Error> {
+) -> Result<Option<ZkNoteAndLinksWhat>, zkerr::Error> {
   let id = note_id_for_zknoteid(&conn, &gzic.zknote)?;
   let changeddate: i64 = conn.query_row(
     "select changeddate from zknote N
@@ -2180,7 +2181,15 @@ pub fn read_zneifchanged(
   )?;
 
   if changeddate > gzic.changeddate {
-    return read_zknoteandlinks(conn, files_dir, uid, &gzic.zknote).map(Some);
+    return read_zknoteandlinks(conn, files_dir, uid, &gzic.zknote)
+      .map(Some)
+      .map(|opt| {
+        opt.map(|znl| ZkNoteAndLinksWhat {
+          what: gzic.what.clone(),
+          edittab: gzic.edittab.clone(),
+          znl,
+        })
+      });
   } else {
     Ok(None)
   }
