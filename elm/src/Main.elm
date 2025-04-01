@@ -334,7 +334,7 @@ routeStateInternal model route =
                 EditZkNote st login ->
                     case ( mbtab, st.id == Just id ) of
                         ( Just et, True ) ->
-                            ( EditZkNote (EditZkNote.setNavChoice et st) login, Cmd.none )
+                            ( EditZkNote (EditZkNote.setTab et st) login, Cmd.none )
 
                         _ ->
                             ( EditZkNote st login
@@ -578,7 +578,7 @@ stateRoute state =
 
         EditZkNote st _ ->
             st.id
-                |> Maybe.map (\id -> { route = EditZkNoteR id (Just st.navchoice), save = True })
+                |> Maybe.map (\id -> { route = EditZkNoteR id (Just st.tab), save = True })
                 |> Maybe.withDefault { route = EditZkNoteNew, save = False }
 
         ArchiveListing almod _ ->
