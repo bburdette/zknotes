@@ -23,6 +23,7 @@ import Parser
         , symbol
         , token
         )
+import Time
 import Util exposing (rest)
 
 
@@ -96,6 +97,87 @@ showAndOr ao =
 
         Or ->
             "or"
+
+
+type DateError
+    = InvalidFormat
+
+
+tagSearchDates : Time.Zone -> TagSearch -> Result DateError TagSearch
+tagSearchDates tz ts =
+    case ts of
+        SearchTerm x ->
+            tagSearchDatesTerm tz x
+                |> Result.map
+                    SearchTerm
+
+        Not x ->
+            case tagSearchDates tz x.ts of
+                Ok tsd ->
+                    Ok <| Not { ts = tsd }
+
+                Err de ->
+                    Err de
+
+        Boolex x ->
+            case ( tagSearchDates tz x.ts1, tagSearchDates tz x.ts2 ) of
+                ( Ok t1, Ok t2 ) ->
+                    Ok <| Boolex { ts1 = t1, ao = x.ao, ts2 = t2 }
+
+                ( Err e1, _ ) ->
+                    Err e1
+
+                ( _, Err e2 ) ->
+                    Err e2
+
+
+type alias ST =
+    { mods : List SearchMod, term : String }
+
+
+tagSearchDatesTerm : Time.Zone -> ST -> Result DateError ST
+tagSearchDatesTerm tz st =
+    let
+        isdateterm =
+            Util.trueforany
+                (\m ->
+                    case m of
+                        Before ->
+                            True
+
+                        After ->
+                            True
+
+                        Create ->
+                            True
+
+                        Mod ->
+                            True
+
+                        _ ->
+                            False
+                )
+                st.mods
+    in
+    if isdateterm then
+        -- either term should be a number string, or a standard datetime.
+        case String.toInt st.term of
+            Just _ ->
+                Ok st
+
+            Nothing ->
+                Err InvalidFormat
+
+    else
+        case Util.parseTime tz st.term of
+            Ok (Just t) ->
+                Ok { mods = st.mods, term = String.fromInt (Time.posixToMillis t) }
+
+            Ok Nothing ->
+                Err InvalidFormat
+
+            Err e ->
+                Err InvalidFormat
 
 
 showTagSearch : TagSearch -> String
