@@ -1267,33 +1267,46 @@ sendSearch model search =
                           }
                         ]
                     }
-            in
-            -- if this is the same search as last time, don't save.
-            if
-                (List.head model.prevSearches == Just search.tagsearch)
-                    || (search.tagsearch == [ Data.SearchTerm { mods = [], term = "" } ])
-            then
-                ( model
-                , sendZIMsg model.fui (Data.PvqSearchZkNotes search)
-                )
 
-            else
-                let
-                    ( nm, cmd ) =
-                        sendZIMsgExp model
-                            model.fui
-                            (Data.PvqSaveZkNoteAndLinks searchnote)
-                            -- ignore the reply!  otherwise if you search while
-                            -- creating a new note, that new note gets the search note
-                            -- id.
-                            (\_ -> Noop)
-                in
-                ( { nm | prevSearches = search.tagsearch :: model.prevSearches }
-                , Cmd.batch
-                    [ sendZIMsg model.fui (Data.PvqSearchZkNotes search)
-                    , cmd
-                    ]
-                )
+                datesearch =
+                    List.map (SU.tagSearchDates model.timezone) search.tagsearch
+                        |> Util.rslist
+                        |> Result.map
+                            (\tsl ->
+                                { search | tagsearch = tsl }
+                            )
+            in
+            case datesearch of
+                Err e ->
+                    ( displayMessageDialog model "invalid date in search", Cmd.none )
+
+                Ok dsearch ->
+                    -- if this is the same search as last time, don't save.
+                    if
+                        (List.head model.prevSearches == Just dsearch.tagsearch)
+                            || (dsearch.tagsearch == [ Data.SearchTerm { mods = [], term = "" } ])
+                    then
+                        ( model
+                        , sendZIMsg model.fui (Data.PvqSearchZkNotes dsearch)
+                        )
+
+                    else
+                        let
+                            ( nm, cmd ) =
+                                sendZIMsgExp model
+                                    model.fui
+                                    (Data.PvqSaveZkNoteAndLinks searchnote)
+                                    -- ignore the reply!  otherwise if you search while
+                                    -- creating a new note, that new note gets the search note
+                                    -- id.
+                                    (\_ -> Noop)
+                        in
+                        ( { nm | prevSearches = dsearch.tagsearch :: model.prevSearches }
+                        , Cmd.batch
+                            [ sendZIMsg model.fui (Data.PvqSearchZkNotes dsearch)
+                            , cmd
+                            ]
+                        )
 
         Nothing ->
             ( model

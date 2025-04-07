@@ -1,8 +1,6 @@
 module SearchUtil exposing (..)
 
 import Data exposing (AndOr(..), ResultType(..), SearchMod(..), TagSearch(..), ZkNoteSearch)
-import Json.Decode as JD
-import Json.Encode as JE
 import ParseHelp exposing (listOf)
 import Parser
     exposing
@@ -23,6 +21,7 @@ import Parser
         , symbol
         , token
         )
+import Time
 import Util exposing (rest)
 
 
@@ -52,97 +51,6 @@ defaultSearch =
     , deleted = False
     , ordering = Nothing
     }
-
-
-encodeResultType : ResultType -> JE.Value
-encodeResultType smod =
-    case smod of
-        RtId ->
-            JE.string "RtId"
-
-        RtListNote ->
-            JE.string "RtListNote"
-
-        RtNote ->
-            JE.string "RtNote"
-
-        RtNoteAndLinks ->
-            JE.string "RtNoteAndLinks"
-
-
-encodeSearchMod : SearchMod -> JE.Value
-encodeSearchMod smod =
-    case smod of
-        ExactMatch ->
-            JE.string "ExactMatch"
-
-        ZkNoteId ->
-            JE.string "ZkNoteId"
-
-        Tag ->
-            JE.string "Tag"
-
-        Note ->
-            JE.string "Note"
-
-        User ->
-            JE.string "User"
-
-        File ->
-            JE.string "File"
-
-        Before ->
-            JE.string "Before"
-
-        After ->
-            JE.string "After"
-
-        Create ->
-            JE.string "Create"
-
-        Mod ->
-            JE.string "Mod"
-
-
-decodeSearchMod : JD.Decoder SearchMod
-decodeSearchMod =
-    JD.string
-        |> JD.andThen
-            (\s ->
-                case s of
-                    "ExactMatch" ->
-                        JD.succeed ExactMatch
-
-                    "ZkNoteId" ->
-                        JD.succeed ZkNoteId
-
-                    "Tag" ->
-                        JD.succeed Tag
-
-                    "Note" ->
-                        JD.succeed Note
-
-                    "User" ->
-                        JD.succeed User
-
-                    "File" ->
-                        JD.succeed File
-
-                    "Before" ->
-                        JD.succeed Before
-
-                    "After" ->
-                        JD.succeed After
-
-                    "Create" ->
-                        JD.succeed Create
-
-                    "Mod" ->
-                        JD.succeed Mod
-
-                    wat ->
-                        JD.fail <| "invalid search mod: " ++ wat
-            )
 
 
 showSearchMod : SearchMod -> String
@@ -187,6 +95,95 @@ showAndOr ao =
 
         Or ->
             "or"
+
+
+type DateError
+    = InvalidFormat
+
+
+tagSearchDates : Time.Zone -> TagSearch -> Result DateError TagSearch
+tagSearchDates tz ts =
+    case ts of
+        SearchTerm x ->
+            tagSearchDatesTerm tz x
+                |> Result.map
+                    SearchTerm
+
+        Not x ->
+            case tagSearchDates tz x.ts of
+                Ok tsd ->
+                    Ok <| Not { ts = tsd }
+
+                Err de ->
+                    Err de
+
+        Boolex x ->
+            case ( tagSearchDates tz x.ts1, tagSearchDates tz x.ts2 ) of
+                ( Ok t1, Ok t2 ) ->
+                    Ok <| Boolex { ts1 = t1, ao = x.ao, ts2 = t2 }
+
+                ( Err e1, _ ) ->
+                    Err e1
+
+                ( _, Err e2 ) ->
+                    Err e2
+
+
+type alias ST =
+    { mods : List SearchMod, term : String }
+
+
+tagSearchDatesTerm : Time.Zone -> ST -> Result DateError ST
+tagSearchDatesTerm tz st =
+    let
+        isdateterm =
+            Util.trueforany
+                (\m ->
+                    case m of
+                        Before ->
+                            True
+
+                        After ->
+                            True
+
+                        Create ->
+                            True
+
+                        Mod ->
+                            True
+
+                        _ ->
+                            False
+                )
+                st.mods
+    in
+    if isdateterm then
+        -- either term should be a number string, or a standard datetime.
+        case String.toInt st.term of
+            Just _ ->
+                Ok st
+
+            Nothing ->
+                case Util.parseTime tz st.term of
+                    Ok (Just t) ->
+                        Ok { mods = st.mods, term = String.fromInt (Time.posixToMillis t) }
+
+                    Ok Nothing ->
+                        Err InvalidFormat
+
+                    Err e ->
+                        case Util.parseDate tz st.term of
+                            Ok (Just t) ->
+                                Ok { mods = st.mods, term = String.fromInt (Time.posixToMillis t) }
+
+                            Ok Nothing ->
+                                Err InvalidFormat
+
+                            Err _ ->
+                                Err InvalidFormat
+
+    else
+        Ok st
 
 
 showTagSearch : TagSearch -> String
