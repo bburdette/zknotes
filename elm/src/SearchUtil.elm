@@ -1,8 +1,6 @@
 module SearchUtil exposing (..)
 
 import Data exposing (AndOr(..), ResultType(..), SearchMod(..), TagSearch(..), ZkNoteSearch)
-import Json.Decode as JD
-import Json.Encode as JE
 import ParseHelp exposing (listOf)
 import Parser
     exposing
@@ -168,13 +166,21 @@ tagSearchDatesTerm tz st =
             Nothing ->
                 case Util.parseTime tz st.term of
                     Ok (Just t) ->
-                        Ok { mods = st.mods, term = Debug.log "p2m" <| String.fromInt (Time.posixToMillis t) }
+                        Ok { mods = st.mods, term = String.fromInt (Time.posixToMillis t) }
 
                     Ok Nothing ->
                         Err InvalidFormat
 
                     Err e ->
-                        Err InvalidFormat
+                        case Util.parseDate tz st.term of
+                            Ok (Just t) ->
+                                Ok { mods = st.mods, term = String.fromInt (Time.posixToMillis t) }
+
+                            Ok Nothing ->
+                                Err InvalidFormat
+
+                            Err _ ->
+                                Err InvalidFormat
 
     else
         Ok st
