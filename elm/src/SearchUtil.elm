@@ -99,7 +99,7 @@ showAndOr ao =
 
 type SemanticError
     = InvalidDateFormat String
-    | NoDateSpecified String
+    | InvalidDateMods String
 
 
 tagSearchDates : Time.Zone -> TagSearch -> Result SemanticError TagSearch
@@ -157,8 +157,51 @@ tagSearchDatesTerm tz st =
                             False
                 )
                 st.mods
+
+        isvaliddateterm =
+            isdateterm
+                && List.length
+                    (List.filter
+                        (\m ->
+                            case m of
+                                Before ->
+                                    True
+
+                                After ->
+                                    True
+
+                                _ ->
+                                    False
+                        )
+                        st.mods
+                    )
+                == 1
+                && List.length
+                    (List.filter
+                        (\m ->
+                            case m of
+                                Create ->
+                                    True
+
+                                Mod ->
+                                    True
+
+                                _ ->
+                                    False
+                        )
+                        st.mods
+                    )
+                == 1
     in
-    if isdateterm then
+    if not isvaliddateterm then
+        Err <|
+            InvalidDateMods <|
+                String.concat (List.map printSearchMod st.mods)
+                    ++ "'"
+                    ++ st.term
+                    ++ "'"
+
+    else if isdateterm then
         -- either term should be a number string, or a standard datetime.
         case String.toInt st.term of
             Just _ ->
@@ -170,7 +213,7 @@ tagSearchDatesTerm tz st =
                         Ok { mods = st.mods, term = String.fromInt (Time.posixToMillis t) }
 
                     Ok Nothing ->
-                        Err InvalidDateFormat st.term
+                        Err <| InvalidDateFormat st.term
 
                     Err e ->
                         case Util.parseDate tz st.term of
@@ -178,10 +221,10 @@ tagSearchDatesTerm tz st =
                                 Ok { mods = st.mods, term = String.fromInt (Time.posixToMillis t) }
 
                             Ok Nothing ->
-                                Err InvalidDateFormat st.term
+                                Err <| InvalidDateFormat st.term
 
                             Err _ ->
-                                Err InvalidDateFormat st.term
+                                Err <| InvalidDateFormat st.term
 
     else
         Ok st

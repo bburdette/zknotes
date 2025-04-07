@@ -1277,8 +1277,29 @@ sendSearch model search =
                             )
             in
             case datesearch of
-                Err e ->
-                    ( displayMessageDialog model "invalid date in search", Cmd.none )
+                Err (SU.InvalidDateFormat d) ->
+                    ( displayMessageDialog model
+                        ("invalid date in search: "
+                            ++ d
+                            ++ "\nvalid format examples:"
+                            ++ "\n ac'1756706400000' - milliseconds from jan 1 1970"
+                            ++ "\n bm'2025/09/01' - created before date"
+                            ++ "\n bm'2025/09/01 12:30:01' - created before datetime"
+                        )
+                    , Cmd.none
+                    )
+
+                Err (SU.InvalidDateMods d) ->
+                    ( displayMessageDialog model
+                        ("invalid date search in term: "
+                            ++ d
+                            ++ "\ndate searches must include: : "
+                            ++ "\na or b : before or after"
+                            ++ "\nc or m : create or modification date"
+                            ++ "\nfor example: ma'2025/01/01': Modified After indicated date."
+                        )
+                    , Cmd.none
+                    )
 
                 Ok dsearch ->
                     -- if this is the same search as last time, don't save.
