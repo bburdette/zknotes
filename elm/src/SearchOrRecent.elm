@@ -1,14 +1,8 @@
 module SearchOrRecent exposing (Model, Msg(..), SearchOrRecent(..))
 
-import Data exposing (Direction(..), EditLink, zklKey)
+import Data exposing (Direction(..), EditLink)
 import Dialog as D
-import Dict exposing (Dict)
-import Element as E exposing (Element)
-import Html exposing (Attribute, Html)
-import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..), inlineFoldl)
-import Schelme.Show exposing (showTerm)
 import SearchStackPanel as SP
-import Url.Parser as UP exposing ((</>))
 
 
 type Msg

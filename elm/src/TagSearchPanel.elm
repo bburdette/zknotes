@@ -25,7 +25,7 @@ import Data exposing (AndOr(..), SearchMod(..), TagSearch(..))
 import Element as E exposing (..)
 import Element.Background as EBk
 import Element.Border as EBd
-import Element.Events as EE exposing (onClick, onFocus, onLoseFocus)
+import Element.Events exposing (onClick, onFocus, onLoseFocus)
 import Element.Font as EF
 import Element.Input as EI
 import Element.Keyed as EK
@@ -33,10 +33,9 @@ import Html.Attributes as HA
 import Parser
 import SearchHelpPanel
 import SearchLoc as SL exposing (TSLoc(..))
-import SearchUtil exposing (TSText, printTagSearch, showSearchMod, tagSearchParser)
-import TDict exposing (TDict)
+import SearchUtil exposing (printTagSearch, showSearchMod, tagSearchParser)
 import TangoColors as TC
-import Util exposing (Size)
+import Util
 
 
 type Search

@@ -2,12 +2,8 @@ module SearchHelpPanel exposing (..)
 
 import Common
 import Element exposing (..)
-import Element.Background as Background
-import Element.Border as Border
 import Element.Events exposing (onClick)
 import Element.Font as Font
-import Element.Input as Input
-import TangoColors as Color
 
 
 type alias Model =
