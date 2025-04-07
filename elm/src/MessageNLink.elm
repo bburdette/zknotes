@@ -2,15 +2,9 @@ module MessageNLink exposing (..)
 
 import Common exposing (buttonStyle)
 import Element exposing (..)
-import Element.Background as Background
-import Element.Border as Border
-import Element.Events exposing (onClick)
-import Element.Font as Font
 import Element.Input as Input
 import GenDialog as GD
-import Html exposing (Html)
-import TangoColors as Color
-import Util exposing (httpErrorString)
+import Util
 import ZkCommon
 
 

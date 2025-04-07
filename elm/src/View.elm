@@ -1,29 +1,20 @@
 module View exposing (Command(..), Model, Msg(..), initFull, initSzn, update, view)
 
-import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
-import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
+import Cellme.Cellme exposing (CellContainer(..), RunState(..), evalCellsFully)
+import Cellme.DictCellme exposing (CellDict(..), getCd, mkCc)
 import Common
 import Data exposing (ZkNote, ZkNoteId)
 import DataUtil exposing (FileUrlInfo, zkNoteIdToString, zniEq)
-import Dict exposing (Dict)
+import Dict
 import Element as E exposing (Element)
 import Element.Background as EBk
-import Element.Border as EBd
 import Element.Font as Font
 import Element.Input as EI
-import Element.Region as ER
-import Html exposing (Attribute, Html)
-import Html.Attributes
-import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..))
-import Markdown.Html
-import Markdown.Parser
-import Markdown.Renderer
+import Markdown.Block exposing (ListItem(..), Task(..))
 import MdCommon as MC
 import NoteCache as NC exposing (CacheEntry(..), NoteCache)
-import Schelme.Show exposing (showTerm)
 import TangoColors as TC
 import Time
-import UUID exposing (UUID)
 import Util
 
 

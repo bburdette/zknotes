@@ -22,7 +22,7 @@ import Element.Background as EBk
 import Element.Font as Font
 import Element.Input as EI
 import SearchPanel as SP
-import SearchUtil as SU exposing (andifySearches)
+import SearchUtil as SU
 import TangoColors as TC
 
 

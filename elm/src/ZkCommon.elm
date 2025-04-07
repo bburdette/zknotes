@@ -1,12 +1,11 @@
 module ZkCommon exposing (..)
 
-import Data as D exposing (ZkNoteId)
+import Data exposing (ZkNoteId)
 import DataUtil as DU exposing (zniEq)
-import Element as E exposing (Element)
+import Element as E
 import Element.Background as EBk
 import Element.Border as EBd
 import Element.Font as EF
-import Element.Input as EI
 import TangoColors as TC
 import Util as U
 
