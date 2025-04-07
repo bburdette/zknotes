@@ -166,18 +166,18 @@ tagSearchDatesTerm tz st =
                 Ok st
 
             Nothing ->
-                Err InvalidFormat
+                case Util.parseTime tz st.term of
+                    Ok (Just t) ->
+                        Ok { mods = st.mods, term = Debug.log "p2m" <| String.fromInt (Time.posixToMillis t) }
+
+                    Ok Nothing ->
+                        Err InvalidFormat
+
+                    Err e ->
+                        Err InvalidFormat
 
     else
-        case Util.parseTime tz st.term of
-            Ok (Just t) ->
-                Ok { mods = st.mods, term = String.fromInt (Time.posixToMillis t) }
-
-            Ok Nothing ->
-                Err InvalidFormat
-
-            Err e ->
-                Err InvalidFormat
+        Ok st
 
 
 showTagSearch : TagSearch -> String
