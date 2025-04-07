@@ -97,11 +97,12 @@ showAndOr ao =
             "or"
 
 
-type DateError
-    = InvalidFormat
+type SemanticError
+    = InvalidDateFormat String
+    | NoDateSpecified String
 
 
-tagSearchDates : Time.Zone -> TagSearch -> Result DateError TagSearch
+tagSearchDates : Time.Zone -> TagSearch -> Result SemanticError TagSearch
 tagSearchDates tz ts =
     case ts of
         SearchTerm x ->
@@ -133,7 +134,7 @@ type alias ST =
     { mods : List SearchMod, term : String }
 
 
-tagSearchDatesTerm : Time.Zone -> ST -> Result DateError ST
+tagSearchDatesTerm : Time.Zone -> ST -> Result SemanticError ST
 tagSearchDatesTerm tz st =
     let
         isdateterm =
@@ -169,7 +170,7 @@ tagSearchDatesTerm tz st =
                         Ok { mods = st.mods, term = String.fromInt (Time.posixToMillis t) }
 
                     Ok Nothing ->
-                        Err InvalidFormat
+                        Err InvalidDateFormat st.term
 
                     Err e ->
                         case Util.parseDate tz st.term of
@@ -177,10 +178,10 @@ tagSearchDatesTerm tz st =
                                 Ok { mods = st.mods, term = String.fromInt (Time.posixToMillis t) }
 
                             Ok Nothing ->
-                                Err InvalidFormat
+                                Err InvalidDateFormat st.term
 
                             Err _ ->
-                                Err InvalidFormat
+                                Err InvalidDateFormat st.term
 
     else
         Ok st
