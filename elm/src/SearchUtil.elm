@@ -193,38 +193,39 @@ tagSearchDatesTerm tz st =
                     )
                 == 1
     in
-    if not isvaliddateterm then
-        Err <|
-            InvalidDateMods <|
-                String.concat (List.map printSearchMod st.mods)
-                    ++ "'"
-                    ++ st.term
-                    ++ "'"
+    if isdateterm then
+        if not isvaliddateterm then
+            Err <|
+                InvalidDateMods <|
+                    String.concat (List.map printSearchMod st.mods)
+                        ++ "'"
+                        ++ st.term
+                        ++ "'"
 
-    else if isdateterm then
-        -- either term should be a number string, or a standard datetime.
-        case String.toInt st.term of
-            Just _ ->
-                Ok st
+        else
+            -- either term should be a number string, or a standard datetime.
+            case String.toInt st.term of
+                Just _ ->
+                    Ok st
 
-            Nothing ->
-                case Util.parseTime tz st.term of
-                    Ok (Just t) ->
-                        Ok { mods = st.mods, term = String.fromInt (Time.posixToMillis t) }
+                Nothing ->
+                    case Util.parseTime tz st.term of
+                        Ok (Just t) ->
+                            Ok { mods = st.mods, term = String.fromInt (Time.posixToMillis t) }
 
-                    Ok Nothing ->
-                        Err <| InvalidDateFormat st.term
+                        Ok Nothing ->
+                            Err <| InvalidDateFormat st.term
 
-                    Err e ->
-                        case Util.parseDate tz st.term of
-                            Ok (Just t) ->
-                                Ok { mods = st.mods, term = String.fromInt (Time.posixToMillis t) }
+                        Err e ->
+                            case Util.parseDate tz st.term of
+                                Ok (Just t) ->
+                                    Ok { mods = st.mods, term = String.fromInt (Time.posixToMillis t) }
 
-                            Ok Nothing ->
-                                Err <| InvalidDateFormat st.term
+                                Ok Nothing ->
+                                    Err <| InvalidDateFormat st.term
 
-                            Err _ ->
-                                Err <| InvalidDateFormat st.term
+                                Err _ ->
+                                    Err <| InvalidDateFormat st.term
 
     else
         Ok st
