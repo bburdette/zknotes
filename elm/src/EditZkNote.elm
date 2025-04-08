@@ -678,8 +678,8 @@ showSr bkcolor model isdirty zkln =
             Dict.get (zklKey { direction = From, otherid = zkln.id })
                 model.zklDict
 
-        controlrow =
-            E.row [ E.spacing 8, E.width E.fill ]
+        controlrows =
+            [ E.row [ E.spacing 8, E.width E.fill ]
                 [ mbTo
                     |> Maybe.map
                         (\zkl ->
@@ -731,7 +731,11 @@ showSr bkcolor model isdirty zkln =
 
                     Nothing ->
                         E.none
-                , EI.button linkButtonStyle
+                , E.row [] [ E.text <| "link: ", E.el [ EF.italic ] <| E.text model.title ]
+                ]
+            , E.row
+                [ E.spacing 8, E.width E.fill ]
+                [ EI.button linkButtonStyle
                     { onPress = Just (AddToSearch zkln)
                     , label = E.text "^"
                     }
@@ -739,7 +743,9 @@ showSr bkcolor model isdirty zkln =
                     { onPress = Just (AddToSearchAsTag zkln.title)
                     , label = E.text "t"
                     }
+                , E.text "add to search"
                 ]
+            ]
 
         listingrow =
             E.el
@@ -764,6 +770,7 @@ showSr bkcolor model isdirty zkln =
             , EBd.rounded 3
             , EBd.color TC.darkGrey
             , E.width E.fill
+            , E.spacing 8
             , E.inFront
                 (E.row [ E.height E.fill, E.alignRight, EBk.color bkcolor ]
                     [ if lnnonme then
@@ -786,7 +793,7 @@ showSr bkcolor model isdirty zkln =
                     ]
                 )
             ]
-            [ listingrow, controlrow ]
+            (listingrow :: controlrows)
 
     else
         listingrow
