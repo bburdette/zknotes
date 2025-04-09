@@ -1884,26 +1884,7 @@ actualupdate msg model =
                                             , ordering = Nothing
                                             }
                                         )
-
-                                -- ( ns, cmd ) =
-                                --     case instate of
-                                --         -- EditZkNote ezn login ->
-                                --         --     ( EditZkNote (Tuple.first <| EditZkNote.updateSearch ts ezn) login
-                                --         --     , sendsearch
-                                --         --     )
-                                --         EditZkNoteListing ezn login ->
-                                --             ( EditZkNoteListing (Tuple.first <| EditZkNoteListing.updateSearch ts ezn) login
-                                --             , sendsearch
-                                --             )
-                                --         _ ->
-                                --             ( instate, Cmd.none )
                             in
-                            -- case instate of
-                            --     EditZkNoteListing ezn login ->
-                            --         ( { model | state = EditZkNoteListing (Tuple.first <| EditZkNoteListing.updateSearch ts ezn) login }
-                            --         , sendsearch
-                            --         )
-                            --     _ ->
                             ( updateSearch ts model, sendsearch )
 
                         Nothing ->
@@ -3095,33 +3076,7 @@ actualupdate msg model =
                     ( model, Cmd.map ImportMsg cmd )
 
                 Import.SPMod fn ->
-                    let
-                        ( nspm, spcmd ) =
-                            fn model.spmodel
-                    in
-                    case spcmd of
-                        SP.None ->
-                            ( { model | spmodel = nspm }
-                            , Cmd.none
-                            )
-
-                        SP.Save ->
-                            ( { model | spmodel = nspm }
-                            , Cmd.none
-                            )
-
-                        SP.Copy _ ->
-                            ( { model | spmodel = nspm }
-                            , Cmd.none
-                            )
-
-                        SP.Search ts ->
-                            sendSearch { model | spmodel = nspm } ts
-
-                        SP.SyncFiles ts ->
-                            ( { model | spmodel = nspm }
-                            , sendZIMsg model.fui (Data.PvqSyncFiles ts)
-                            )
+                    handleSPMod model fn
 
         ( DisplayMessageMsg bm, DisplayMessage bs prevstate ) ->
             case GD.update bm bs of
@@ -3424,38 +3379,41 @@ updateSearchStack tsl model =
     }
 
 
+handleSPMod : Model -> (SP.Model -> ( SP.Model, SP.Command )) -> ( Model, Cmd Msg )
+handleSPMod model fn =
+    let
+        ( nspm, spcmd ) =
+            fn model.spmodel
+    in
+    case spcmd of
+        SP.None ->
+            ( { model | spmodel = nspm }
+            , Cmd.none
+            )
 
-{-
-   handleSPUpdate : Model -> ( SP.Model, SP.Command ) -> ( SP.Model, Command )
-   handleSPUpdate model ( nm, cmd ) =
-       let
-           mod =
-               { model | spmodel = nm }
-       in
-       case cmd of
-           SP.None ->
-               ( mod, None )
+        SP.Save ->
+            ( { model | spmodel = nspm }
+            , Cmd.none
+            )
 
-           SP.Save ->
-               ( mod, None )
+        SP.Copy _ ->
+            -- TODO
+            ( { model | spmodel = nspm }
+            , Cmd.none
+            )
 
-           SP.Copy s ->
-               ( mod, None )
+        SP.Search ts ->
+            -- clear search result on new search
+            let
+                zsr =
+                    model.zknSearchResult
+            in
+            sendSearch { model | spmodel = nspm, zknSearchResult = { zsr | notes = [] } } ts
 
-           SP.Search ts ->
-               let
-                   zsr =
-                       mod.zknSearchResult
-               in
-               ( { mod | zknSearchResult = { zsr | notes = [] } }, Search ts )
-
-           SP.SyncFiles ts ->
-               let
-                   zsr =
-                       mod.zknSearchResult
-               in
-               ( { mod | zknSearchResult = { zsr | notes = [] } }, SyncFiles ts )i
--}
+        SP.SyncFiles ts ->
+            ( { model | spmodel = nspm }
+            , sendZIMsg model.fui (Data.PvqSyncFiles ts)
+            )
 
 
 handleTASelection : Model -> EditZkNote.Model -> LoginData -> DataUtil.TASelection -> ( Model, Cmd Msg )
@@ -3953,33 +3911,7 @@ handleEditZkNoteListing model login ( emod, ecmd ) =
             )
 
         EditZkNoteListing.SPMod fn ->
-            let
-                ( nspm, spcmd ) =
-                    fn model.spmodel
-            in
-            case spcmd of
-                SP.None ->
-                    ( { model | spmodel = nspm }
-                    , Cmd.none
-                    )
-
-                SP.Save ->
-                    ( { model | spmodel = nspm }
-                    , Cmd.none
-                    )
-
-                SP.Copy _ ->
-                    ( { model | spmodel = nspm }
-                    , Cmd.none
-                    )
-
-                SP.Search ts ->
-                    sendSearch { model | spmodel = nspm } ts
-
-                SP.SyncFiles ts ->
-                    ( { model | spmodel = nspm }
-                    , sendZIMsg model.fui (Data.PvqSyncFiles ts)
-                    )
+            handleSPMod model fn
 
 
 handleArchiveListing : Model -> LoginData -> ( ArchiveListing.Model, ArchiveListing.Command ) -> ( Model, Cmd Msg )
@@ -4120,33 +4052,7 @@ handleTagFiles model ( lmod, lcmd ) login st =
                     ( { model | state = updstate }, Cmd.none )
 
         TagAThing.SPMod fn ->
-            let
-                ( nspm, spcmd ) =
-                    fn model.spmodel
-            in
-            case spcmd of
-                SP.None ->
-                    ( { model | spmodel = nspm }
-                    , Cmd.none
-                    )
-
-                SP.Save ->
-                    ( { model | spmodel = nspm }
-                    , Cmd.none
-                    )
-
-                SP.Copy _ ->
-                    ( { model | spmodel = nspm }
-                    , Cmd.none
-                    )
-
-                SP.Search ts ->
-                    sendSearch { model | spmodel = nspm } ts
-
-                SP.SyncFiles ts ->
-                    ( { model | spmodel = nspm }
-                    , sendZIMsg model.fui (Data.PvqSyncFiles ts)
-                    )
+            handleSPMod model fn
 
 
 handleInviteUser :
@@ -4205,33 +4111,7 @@ handleInviteUser model ( lmod, lcmd ) login st =
                     ( { model | state = updstate }, Cmd.none )
 
         TagAThing.SPMod fn ->
-            let
-                ( nspm, spcmd ) =
-                    fn model.spmodel
-            in
-            case spcmd of
-                SP.None ->
-                    ( { model | spmodel = nspm }
-                    , Cmd.none
-                    )
-
-                SP.Save ->
-                    ( { model | spmodel = nspm }
-                    , Cmd.none
-                    )
-
-                SP.Copy _ ->
-                    ( { model | spmodel = nspm }
-                    , Cmd.none
-                    )
-
-                SP.Search ts ->
-                    sendSearch { model | spmodel = nspm } ts
-
-                SP.SyncFiles ts ->
-                    ( { model | spmodel = nspm }
-                    , sendZIMsg model.fui (Data.PvqSyncFiles ts)
-                    )
+            handleSPMod model fn
 
 
 prevSearchQuery : LoginData -> Data.ZkNoteSearch

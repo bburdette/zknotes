@@ -396,31 +396,6 @@ commentsRecieved comments model =
     { model | comments = comments }
 
 
-
--- updateSearchResult : Data.ZkListNoteSearchResult -> Model -> Model
--- updateSearchResult zsr model =
---     { model
---         | zknSearchResult = zsr
---         , spmodel = SP.searchResultUpdated zsr model.spmodel
---     }
--- updateSearch : List Data.TagSearch -> Model -> ( Model, Command )
--- updateSearch ts model =
---     ( { model
---         | spmodel = SP.setSearch model.spmodel ts
---       }
---     , None
---     )
--- updateSearchStack : List Data.TagSearch -> Model -> Model
--- updateSearchStack tsl model =
---     let
---         spm =
---             model.spmodel
---     in
---     { model
---         | spmodel = { spm | searchStack = tsl }
---     }
-
-
 toPubId : Bool -> String -> Maybe String
 toPubId public pubidtxt =
     if public && pubidtxt /= "" then
@@ -2203,18 +2178,6 @@ update msg model =
         RestoreSearch s ->
             ( model, SPMod (\spm -> ( SP.addSearchString spm s, SP.None )) )
 
-        -- let
-        --     spmodel =
-        --         SP.addSearchString model.spmodel s
-        -- in
-        -- ( { model | spmodel = spmodel }
-        --   -- DON'T automatically search.  To allow building searches
-        --   -- from components.
-        --   -- , SP.getSearch spmodel
-        --   --     |> Maybe.map Search
-        --   --     |> Maybe.withDefault None
-        -- , None
-        -- )
         SavePress ->
             ( model
             , Save

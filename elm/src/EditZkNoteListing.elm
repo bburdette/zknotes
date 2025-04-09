@@ -62,31 +62,6 @@ onPowerDeleteComplete count ld model spmodel notes =
     }
 
 
-
--- updateSearchResult : Data.ZkListNoteSearchResult -> Model -> Model
--- updateSearchResult zsr model =
---     { model
---         | notes = zsr
---         , spmodel = SP.searchResultUpdated zsr model.spmodel
---     }
--- updateSearchStack : List Data.TagSearch -> Model -> Model
--- updateSearchStack tsl model =
---     let
---         spm =
---             model.spmodel
---     in
---     { model
---         | spmodel = { spm | searchStack = tsl }
---     }
--- updateSearch : List Data.TagSearch -> Model -> ( Model, Command )
--- updateSearch ts model =
---     ( { model
---         | spmodel = SP.setSearch model.spmodel ts
---       }
---     , None
---     )
-
-
 onWkKeyPress : WK.Key -> Model -> ( Model, Command )
 onWkKeyPress key model =
     case Toop.T4 key.key key.ctrl key.alt key.shift of
@@ -95,7 +70,6 @@ onWkKeyPress key model =
             , SPMod SP.onEnter
             )
 
-        -- handleSPUpdate model (SP.onEnter model.spmodel)
         _ ->
             ( model, None )
 
