@@ -3848,29 +3848,31 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                             fn model.spmodel
                     in
                     case spcmd of
-                        SP.None ->
-                            ( { model | spmodel = nspm }
-                            , Cmd.none
+                        SP.Copy s ->
+                            -- kind of messed up to have this here and not in the EditZkNote file
+                            ( { model
+                                | state =
+                                    EditZkNote
+                                        { emod
+                                            | mbReplaceString =
+                                                Just <|
+                                                    (if emod.md == "" then
+                                                        "<search query=\""
+
+                                                     else
+                                                        "<search query=\""
+                                                    )
+                                                        ++ String.replace "&" "&amp;" s
+                                                        ++ "\"/>"
+                                        }
+                                        login
+                              }
+                            , getTASelection (JE.object [ ( "id", JE.string "mdtext" ), ( "what", JE.string "replacestring" ) ])
                             )
 
-                        SP.Save ->
-                            ( { model | spmodel = nspm }
-                            , Cmd.none
-                            )
-
-                        SP.Copy _ ->
-                            -- TODO
-                            ( { model | spmodel = nspm }
-                            , Cmd.none
-                            )
-
-                        SP.Search ts ->
-                            sendSearch { model | spmodel = nspm } ts
-
-                        SP.SyncFiles ts ->
-                            ( { model | spmodel = nspm }
-                            , sendZIMsg model.fui (Data.PvqSyncFiles ts)
-                            )
+                        _ ->
+                            -- otherwise its all the usual stuff.
+                            handleSPMod model fn
 
                 EditZkNote.Cmd cmd ->
                     ( { model | state = EditZkNote emod login }
