@@ -14,7 +14,6 @@ module Import exposing
     , rbrak
     , showLh
     , update
-    , updateSearchResult
     , view
     , zkLinkName
     , zklKey
@@ -72,9 +71,7 @@ type alias Links =
 type alias Model =
     { ld : DataUtil.LoginData
     , notes : List Data.ImportZkNote
-    , zknSearchResult : Data.ZkListNoteSearchResult
     , globlinks : TDict ZkNoteId String LinkHalf
-    , spmodel : SP.Model
     , dialog : Maybe D.Model
     }
 
@@ -82,18 +79,10 @@ type alias Model =
 type Command
     = None
     | SaveExit (List Data.ImportZkNote)
-    | Search Data.ZkNoteSearch
     | SelectFiles
     | Cancel
     | Command (Cmd Msg)
-
-
-updateSearchResult : Data.ZkListNoteSearchResult -> Model -> Model
-updateSearchResult zsr model =
-    { model
-        | zknSearchResult = zsr
-        , spmodel = SP.searchResultUpdated zsr model.spmodel
-    }
+    | SPMod (SP.Model -> ( SP.Model, SP.Command ))
 
 
 decodeLinks : JD.Decoder Links
@@ -169,18 +158,18 @@ type WClass
     | Wide
 
 
-view : Util.Size -> Model -> Element Msg
-view size model =
+view : Util.Size -> Model -> SP.Model -> Data.ZkListNoteSearchResult -> Element Msg
+view size model spmodel zknSearchResult =
     case model.dialog of
         Just dialog ->
             D.view size dialog |> E.map DialogMsg
 
         Nothing ->
-            importview size model
+            importview size model spmodel zknSearchResult
 
 
-importview : Util.Size -> Model -> Element Msg
-importview size model =
+importview : Util.Size -> Model -> SP.Model -> Data.ZkListNoteSearchResult -> Element Msg
+importview size model spmodel zknSearchResult =
     let
         wclass =
             if size.width < 800 then
@@ -221,7 +210,7 @@ importview size model =
                 , E.width spwidth
                 ]
                 ((E.map SPMsg <|
-                    SP.view False (wclass == Narrow) 0 model.spmodel
+                    SP.view False (wclass == Narrow) 0 spmodel
                  )
                     :: (List.map
                             (\zkln ->
@@ -259,7 +248,7 @@ importview size model =
                                     ]
                             )
                         <|
-                            model.zknSearchResult.notes
+                            zknSearchResult.notes
                        )
                 )
     in
@@ -306,13 +295,11 @@ zklKey zkl =
     String.fromInt zkl.from ++ ":" ++ String.fromInt zkl.to
 
 
-init : DataUtil.LoginData -> Data.ZkListNoteSearchResult -> SP.Model -> Model
-init ld zkl spm =
+init : DataUtil.LoginData -> Model
+init ld =
     { ld = ld
-    , zknSearchResult = zkl
     , notes = []
     , globlinks = TDict.empty DataUtil.zkNoteIdToString DataUtil.trustedZkNoteIdFromString
-    , spmodel = SP.searchResultUpdated zkl spm
     , dialog = Nothing
     }
 
@@ -454,28 +441,9 @@ update msg model =
                     ( model, None )
 
         SPMsg m ->
-            let
-                ( nm, cm ) =
-                    SP.update m model.spmodel
-
-                mod =
-                    { model | spmodel = nm }
-            in
-            case cm of
-                SP.None ->
-                    ( mod, None )
-
-                SP.Save ->
-                    ( mod, None )
-
-                SP.Copy _ ->
-                    ( mod, None )
-
-                SP.Search ts ->
-                    ( mod, Search ts )
-
-                SP.SyncFiles ts ->
-                    ( mod, None )
+            ( model
+            , SPMod (SP.update m)
+            )
 
         Noop ->
             ( model, None )
