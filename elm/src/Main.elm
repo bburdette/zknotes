@@ -133,7 +133,7 @@ type State
     | ChangePasswordDialog CP.GDModel State
     | ChangeEmailDialog CE.GDModel State
     | ResetPassword ResetPassword.Model
-    | UserListing UserListing.Model LoginData (Maybe ( SP.Model, Data.ZkListNoteSearchResult ))
+    | UserListing UserListing.Model LoginData
     | UserEdit UserEdit.Model LoginData
     | ShowUrl ShowUrl.Model LoginData
     | DisplayMessage DisplayMessage.GDModel State
@@ -851,7 +851,7 @@ showState state =
         ResetPassword _ ->
             "ResetPassword"
 
-        UserListing _ _ _ ->
+        UserListing _ _ ->
             "UserListing"
 
         UserEdit _ _ ->
@@ -953,7 +953,7 @@ viewState size state model =
         ResetPassword st ->
             E.map ResetPasswordMsg (ResetPassword.view size st)
 
-        UserListing st _ _ ->
+        UserListing st _ ->
             E.map UserListingMsg (UserListing.view Common.buttonStyle st)
 
         UserEdit st _ ->
@@ -977,98 +977,6 @@ viewState size state model =
 
         InviteUser tfmod _ _ ->
             E.map InviteUserMsg <| TagAThing.view model.stylePalette model.recentNotes (Just size) model.spmodel model.zknSearchResult tfmod
-
-
-stateSearch : State -> Maybe ( SP.Model, Data.ZkListNoteSearchResult )
-stateSearch state =
-    case state of
-        Login _ _ ->
-            Nothing
-
-        Invited _ ->
-            Nothing
-
-        EditZkNote _ _ ->
-            -- Just ( emod.spmodel, emod.zknSearchResult )
-            Nothing
-
-        EditZkNoteListing emod _ ->
-            Nothing
-
-        ArchiveListing _ _ ->
-            Nothing
-
-        ArchiveAwait _ _ _ ->
-            Nothing
-
-        ShowMessage _ _ (Just st) ->
-            stateSearch st
-
-        ShowMessage _ _ Nothing ->
-            Nothing
-
-        PubShowMessage _ (Just st) ->
-            stateSearch st
-
-        PubShowMessage _ Nothing ->
-            Nothing
-
-        View _ ->
-            Nothing
-
-        EView _ st ->
-            stateSearch st
-
-        Import _ _ ->
-            Nothing
-
-        UserSettings _ _ st ->
-            stateSearch st
-
-        LoginShowMessage _ _ _ ->
-            Nothing
-
-        SelectDialog _ st ->
-            stateSearch st
-
-        ChangePasswordDialog _ st ->
-            stateSearch st
-
-        ChangeEmailDialog _ st ->
-            stateSearch st
-
-        ResetPassword _ ->
-            Nothing
-
-        DisplayMessage _ st ->
-            stateSearch st
-
-        MessageNLink _ st ->
-            stateSearch st
-
-        Wait st _ ->
-            stateSearch st
-
-        UserListing _ _ s ->
-            s
-
-        UserEdit _ _ ->
-            Nothing
-
-        ShowUrl _ _ ->
-            Nothing
-
-        JobsDialog _ st ->
-            stateSearch st
-
-        RequestsDialog _ st ->
-            stateSearch st
-
-        TagFiles model _ _ ->
-            Nothing
-
-        InviteUser model _ _ ->
-            Nothing
 
 
 stateLogin : State -> Maybe LoginData
@@ -1134,7 +1042,7 @@ stateLogin state =
         ResetPassword _ ->
             Nothing
 
-        UserListing _ login _ ->
+        UserListing _ login ->
             Just login
 
         UserEdit _ login ->
@@ -1196,10 +1104,6 @@ sendZIMsg fui msg =
             }
             |> Task.andThen (\x -> Task.map (\posix -> ( posix, x )) Time.now)
             |> Task.attempt ZkReplyData
-
-
-
--- sendZIMsgExp fui.location msg ZkReplyData
 
 
 sendZIMsgTauri : Data.PrivateClosureRequest -> Cmd Msg
@@ -1676,10 +1580,6 @@ onZkNoteEditWhat model pt znew =
         case stateLogin state of
             Just login ->
                 let
-                    ( spmod, sres ) =
-                        stateSearch state
-                            |> Maybe.withDefault ( model.spmodel, model.zknSearchResult )
-
                     ( nst, c ) =
                         EditZkNote.initFull model.fui
                             login
@@ -2010,7 +1910,7 @@ actualupdate msg model =
                 UserSettings.None ->
                     ( { model | state = UserSettings numod login prevstate }, Cmd.none )
 
-        ( UserListingMsg umsg, UserListing umod login s ) ->
+        ( UserListingMsg umsg, UserListing umod login ) ->
             let
                 ( numod, c ) =
                     UserListing.update umsg umod
@@ -2020,30 +1920,17 @@ actualupdate msg model =
                     initToRoute model Top
 
                 UserListing.InviteUser ->
-                    let
-                        ( sp, sr ) =
-                            s
-                                |> Maybe.withDefault
-                                    ( SP.initModel
-                                    , { notes = []
-                                      , offset = 0
-                                      , what = ""
-                                      }
-                                    )
-                    in
                     ( { model
                         | state =
                             InviteUser
                                 (TagAThing.init
                                     (InviteUser.initThing "")
-                                    sp
-                                    sr
                                     model.recentNotes
                                     []
                                     login
                                 )
                                 login
-                                (UserListing numod login s)
+                                (UserListing numod login)
                       }
                     , Cmd.none
                     )
@@ -2052,7 +1939,7 @@ actualupdate msg model =
                     ( { model | state = UserEdit (UserEdit.init ld) login }, Cmd.none )
 
                 UserListing.None ->
-                    ( { model | state = UserListing numod login s }, Cmd.none )
+                    ( { model | state = UserListing numod login }, Cmd.none )
 
         ( UserEditMsg umsg, UserEdit umod login ) ->
             let
@@ -2587,7 +2474,7 @@ actualupdate msg model =
                         OD.ArpUsers users ->
                             case stateLogin model.state of
                                 Just login ->
-                                    ( { model | state = UserListing (UserListing.init users) login (stateSearch state) }, Cmd.none )
+                                    ( { model | state = UserListing (UserListing.init users) login }, Cmd.none )
 
                                 Nothing ->
                                     ( displayMessageDialog model "not logged in", Cmd.none )
@@ -3262,15 +3149,13 @@ actualupdate msg model =
                             ( { model | state = prevstate }, Cmd.none )
 
                         JobsDialog.Tag s ->
-                            case ( stateLogin prevstate, stateSearch prevstate ) of
-                                ( Just login, Just ( spm, sr ) ) ->
+                            case stateLogin prevstate of
+                                Just login ->
                                     ( { model
                                         | state =
                                             TagFiles
                                                 (TagAThing.init
                                                     (TagFiles.initThing s)
-                                                    spm
-                                                    sr
                                                     model.recentNotes
                                                     []
                                                     login
@@ -3319,15 +3204,13 @@ actualupdate msg model =
                             ( { model | state = prevstate }, Cmd.none )
 
                         RequestsDialog.Tag s ->
-                            case ( stateLogin prevstate, stateSearch prevstate ) of
-                                ( Just login, Just ( spm, sr ) ) ->
+                            case stateLogin prevstate of
+                                Just login ->
                                     ( { model
                                         | state =
                                             TagFiles
                                                 (TagAThing.init
                                                     (TagFiles.initThing s)
-                                                    spm
-                                                    sr
                                                     model.recentNotes
                                                     []
                                                     login

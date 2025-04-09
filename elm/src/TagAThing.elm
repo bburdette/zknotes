@@ -82,13 +82,11 @@ type Command tcmd
 
 init :
     Thing tmod tmsg tcmd
-    -> SP.Model
-    -> Data.ZkListNoteSearchResult
     -> List Data.ZkListNote
     -> List Data.EditLink
     -> DataUtil.LoginData
     -> Model tmod tmsg tcmd
-init thing spmodel spresult recentZkns links loginData =
+init thing recentZkns links loginData =
     { thing = thing
     , ld = loginData
     , zklDict =
