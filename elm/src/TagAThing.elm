@@ -47,9 +47,7 @@ type alias Thing tmod tmsg tcmd =
 type alias Model tmod tmsg tcmd =
     { thing : Thing tmod tmsg tcmd
     , ld : DataUtil.LoginData
-    , spmodel : SP.Model
     , zklDict : Dict String Data.EditLink
-    , zknSearchResult : Data.ZkListNoteSearchResult
     , searchOrRecent : SearchOrRecent
     , focusSr : Maybe ZkNoteId -- note id in search result.
     , focusLink : Maybe Data.EditLink
@@ -79,6 +77,7 @@ type Command tcmd
     | SyncFiles Data.ZkNoteSearch
     | AddToRecent Data.ZkListNote
     | ThingCommand tcmd
+    | SPMod (SP.Model -> ( SP.Model, SP.Command ))
 
 
 init :
@@ -92,10 +91,8 @@ init :
 init thing spmodel spresult recentZkns links loginData =
     { thing = thing
     , ld = loginData
-    , spmodel = spmodel
     , zklDict =
         Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) links)
-    , zknSearchResult = spresult
     , searchOrRecent = SearchView
     , focusSr = Nothing
     , focusLink = Nothing
@@ -106,7 +103,7 @@ onWkKeyPress : WK.Key -> Model tmod tmsg tcmd -> ( Model tmod tmsg tcmd, Command
 onWkKeyPress key model =
     case Toop.T4 key.key key.ctrl key.alt key.shift of
         Toop.T4 "Enter" False False False ->
-            handleSPUpdate model (SP.onEnter model.spmodel)
+            ( model, SPMod SP.onEnter )
 
         _ ->
             ( model, None )
@@ -300,47 +297,15 @@ showZkl focusLink ld id sysColor showflip zkl =
         E.row [ E.spacing 8, E.width E.fill, E.height <| E.px 30 ] display
 
 
-handleSPUpdate : Model tmod tmsg tcmd -> ( SP.Model, SP.Command ) -> ( Model tmod tmsg tcmd, Command tcmd )
-handleSPUpdate model ( nm, cmd ) =
-    let
-        mod =
-            { model | spmodel = nm }
-    in
-    case cmd of
-        SP.None ->
-            ( mod, None )
-
-        SP.Save ->
-            ( mod, None )
-
-        SP.Copy s ->
-            ( mod, None )
-
-        SP.Search ts ->
-            let
-                zsr =
-                    mod.zknSearchResult
-            in
-            ( { mod | zknSearchResult = { zsr | notes = [] } }, Search ts )
-
-        SP.SyncFiles ts ->
-            let
-                zsr =
-                    mod.zknSearchResult
-            in
-            ( { mod | zknSearchResult = { zsr | notes = [] } }, SyncFiles ts )
-
-
-updateSearchResult : Data.ZkListNoteSearchResult -> Model tmod tmsg tcmd -> Model tmod tmsg tcmd
-updateSearchResult zsr model =
-    { model
-        | zknSearchResult = zsr
-        , spmodel = SP.searchResultUpdated zsr model.spmodel
-    }
-
-
-view : ZC.StylePalette -> List Data.ZkListNote -> Maybe Util.Size -> Model tmod tmsg tcmd -> Element (Msg tmsg)
-view stylePalette recentZkns mbsize model =
+view :
+    ZC.StylePalette
+    -> List Data.ZkListNote
+    -> Maybe Util.Size
+    -> SP.Model
+    -> Data.ZkListNoteSearchResult
+    -> Model tmod tmsg tcmd
+    -> Element (Msg tmsg)
+view stylePalette recentZkns mbsize spmodel zknSearchResult model =
     let
         sppad =
             [ E.padding 5 ]
@@ -417,19 +382,19 @@ view stylePalette recentZkns mbsize model =
                         }
                     ]
                     :: (E.map SPMsg <|
-                            SP.view True True 0 model.spmodel
+                            SP.view True True 0 spmodel
                        )
                     :: (List.map
                             (showSr model)
                         <|
-                            model.zknSearchResult.notes
+                            zknSearchResult.notes
                        )
-                    ++ (if List.length model.zknSearchResult.notes < 15 then
+                    ++ (if List.length zknSearchResult.notes < 15 then
                             []
 
                         else
                             [ E.map SPMsg <|
-                                SP.paginationView model.spmodel
+                                SP.paginationView spmodel
                             ]
                        )
                 )
@@ -498,31 +463,13 @@ update msg model =
 
         AddToSearch zkln ->
             if List.any ((==) DataUtil.sysids.searchid) zkln.sysids then
-                ( { model
-                    | spmodel = SP.setSearchString model.spmodel zkln.title
-                  }
-                , None
-                )
+                ( model, SPMod (\m -> ( SP.setSearchString m zkln.title, SP.None )) )
 
             else
-                ( { model
-                    | spmodel =
-                        SP.addToSearch model.spmodel
-                            [ Data.ExactMatch ]
-                            zkln.title
-                  }
-                , None
-                )
+                ( model, SPMod (\m -> ( SP.addToSearch m [ Data.ExactMatch ] zkln.title, SP.None )) )
 
         AddToSearchAsTag title ->
-            ( { model
-                | spmodel =
-                    SP.addToSearch model.spmodel
-                        [ Data.ExactMatch, Data.Tag ]
-                        title
-              }
-            , None
-            )
+            ( model, SPMod (\m -> ( SP.addToSearch m [ Data.ExactMatch, Data.Tag ] title, SP.None )) )
 
         ToLinkPress zkln ->
             let
@@ -614,7 +561,7 @@ update msg model =
             )
 
         SPMsg m ->
-            handleSPUpdate model (SP.update m model.spmodel)
+            ( model, SPMod (SP.update m) )
 
         ThingMsg tmsg ->
             let

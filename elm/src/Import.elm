@@ -85,15 +85,6 @@ type Command
     | SPMod (SP.Model -> ( SP.Model, SP.Command ))
 
 
-
--- updateSearchResult : Data.ZkListNoteSearchResult -> Model -> Model
--- updateSearchResult zsr model =
---     { model
---         | zknSearchResult = zsr
---         , spmodel = SP.searchResultUpdated zsr model.spmodel
---     }
-
-
 decodeLinks : JD.Decoder Links
 decodeLinks =
     JD.map2 Links

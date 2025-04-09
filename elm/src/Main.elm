@@ -973,10 +973,10 @@ viewState size state model =
             E.none
 
         TagFiles tfmod _ _ ->
-            E.map TagFilesMsg <| TagAThing.view model.stylePalette model.recentNotes (Just size) tfmod
+            E.map TagFilesMsg <| TagAThing.view model.stylePalette model.recentNotes (Just size) model.spmodel model.zknSearchResult tfmod
 
         InviteUser tfmod _ _ ->
-            E.map InviteUserMsg <| TagAThing.view model.stylePalette model.recentNotes (Just size) tfmod
+            E.map InviteUserMsg <| TagAThing.view model.stylePalette model.recentNotes (Just size) model.spmodel model.zknSearchResult tfmod
 
 
 stateSearch : State -> Maybe ( SP.Model, Data.ZkListNoteSearchResult )
@@ -1065,10 +1065,10 @@ stateSearch state =
             stateSearch st
 
         TagFiles model _ _ ->
-            Just ( model.spmodel, model.zknSearchResult )
+            Nothing
 
         InviteUser model _ _ ->
-            Just ( model.spmodel, model.zknSearchResult )
+            Nothing
 
 
 stateLogin : State -> Maybe LoginData
@@ -2743,16 +2743,6 @@ actualupdate msg model =
 
                         Data.PvyZkListNoteSearchResult sr ->
                             case state of
-                                TagFiles iu login ps ->
-                                    ( { model | state = TagFiles (TagAThing.updateSearchResult sr iu) login ps }
-                                    , Cmd.none
-                                    )
-
-                                InviteUser iu login ps ->
-                                    ( { model | state = InviteUser (TagAThing.updateSearchResult sr iu) login ps }
-                                    , Cmd.none
-                                    )
-
                                 ShowMessage _ login _ ->
                                     ( { model | state = EditZkNoteListing { dialog = Nothing } login }
                                     , Cmd.none
@@ -4129,6 +4119,35 @@ handleTagFiles model ( lmod, lcmd ) login st =
                 TagFiles.None ->
                     ( { model | state = updstate }, Cmd.none )
 
+        TagAThing.SPMod fn ->
+            let
+                ( nspm, spcmd ) =
+                    fn model.spmodel
+            in
+            case spcmd of
+                SP.None ->
+                    ( { model | spmodel = nspm }
+                    , Cmd.none
+                    )
+
+                SP.Save ->
+                    ( { model | spmodel = nspm }
+                    , Cmd.none
+                    )
+
+                SP.Copy _ ->
+                    ( { model | spmodel = nspm }
+                    , Cmd.none
+                    )
+
+                SP.Search ts ->
+                    sendSearch { model | spmodel = nspm } ts
+
+                SP.SyncFiles ts ->
+                    ( { model | spmodel = nspm }
+                    , sendZIMsg model.fui (Data.PvqSyncFiles ts)
+                    )
+
 
 handleInviteUser :
     Model
@@ -4184,6 +4203,35 @@ handleInviteUser model ( lmod, lcmd ) login st =
 
                 InviteUser.None ->
                     ( { model | state = updstate }, Cmd.none )
+
+        TagAThing.SPMod fn ->
+            let
+                ( nspm, spcmd ) =
+                    fn model.spmodel
+            in
+            case spcmd of
+                SP.None ->
+                    ( { model | spmodel = nspm }
+                    , Cmd.none
+                    )
+
+                SP.Save ->
+                    ( { model | spmodel = nspm }
+                    , Cmd.none
+                    )
+
+                SP.Copy _ ->
+                    ( { model | spmodel = nspm }
+                    , Cmd.none
+                    )
+
+                SP.Search ts ->
+                    sendSearch { model | spmodel = nspm } ts
+
+                SP.SyncFiles ts ->
+                    ( { model | spmodel = nspm }
+                    , sendZIMsg model.fui (Data.PvqSyncFiles ts)
+                    )
 
 
 prevSearchQuery : LoginData -> Data.ZkNoteSearch
