@@ -166,7 +166,7 @@ renderText str =
 
 
 mkRenderer : FileUrlInfo -> ViewMode -> (String -> a) -> Int -> CellDict -> Bool -> (String -> String -> a) -> NoteCache -> Markdown.Renderer.Renderer (Element a)
-mkRenderer fui viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged noteCache =
+mkRenderer fui viewMode addToSearchMsg maxw cellDict showPanelElt onchanged noteCache =
     { heading = heading
     , paragraph =
         E.paragraph
@@ -244,7 +244,7 @@ mkRenderer fui viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged no
                 |> Markdown.Html.withAttribute "schelmecode"
             , Markdown.Html.tag "search"
                 (\search renderedChildren ->
-                    searchView viewMode restoreSearchMsg search renderedChildren
+                    searchView viewMode addToSearchMsg search renderedChildren
                 )
                 |> Markdown.Html.withAttribute "query"
             , Markdown.Html.tag "panel"
@@ -290,7 +290,7 @@ mkRenderer fui viewMode restoreSearchMsg maxw cellDict showPanelElt onchanged no
 
 
 searchView : ViewMode -> (String -> a) -> String -> List (Element a) -> Element a
-searchView viewMode restoreSearchMsg search renderedChildren =
+searchView viewMode addToSearchMsg search renderedChildren =
     E.row [ EBk.color TC.darkGray, E.padding 3, E.spacing 3 ]
         (E.el [ EF.italic ] (E.text "search: ")
             :: E.paragraph [] [ E.text search ]
@@ -302,7 +302,7 @@ searchView viewMode restoreSearchMsg search renderedChildren =
                         EI.button
                             (buttonStyle ++ [ EBk.color TC.darkGray ])
                             { label = E.el [ E.centerY, EF.color TC.blue, EF.bold ] <| E.text ">"
-                            , onPress = Just <| restoreSearchMsg search
+                            , onPress = Just <| addToSearchMsg search
                             }
                )
             :: renderedChildren

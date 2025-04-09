@@ -210,6 +210,8 @@ type alias Model =
     , ziClosureId : Int
     , ziClosures : Dict Int (Result Http.Error ( Time.Posix, Data.PrivateReply ) -> Msg)
     , mobile : Bool
+    , spmodel : SP.Model
+    , zknSearchResult : Data.ZkListNoteSearchResult
     }
 
 
@@ -407,7 +409,7 @@ routeStateInternal model route =
                     ( nm.state, cmd )
 
                 EditZkNoteListing st login ->
-                    ( EditZkNote (EditZkNote.initNew model.fui login st.notes st.spmodel [] model.mobile) login, Cmd.none )
+                    ( EditZkNote (EditZkNote.initNew model.fui login [] model.mobile) login, Cmd.none )
 
                 st ->
                     case stateLogin st of
@@ -415,11 +417,6 @@ routeStateInternal model route =
                             ( EditZkNote
                                 (EditZkNote.initNew model.fui
                                     login
-                                    { notes = []
-                                    , offset = 0
-                                    , what = ""
-                                    }
-                                    SP.initModel
                                     []
                                     model.mobile
                                 )
@@ -518,11 +515,6 @@ routeStateInternal model route =
                             ( EditZkNote
                                 (EditZkNote.initNew model.fui
                                     login
-                                    { notes = []
-                                    , offset = 0
-                                    , what = ""
-                                    }
-                                    SP.initModel
                                     []
                                     model.mobile
                                 )
@@ -902,7 +894,7 @@ viewState size state model =
             E.map InvitedMsg <| Invited.view model.stylePalette size em
 
         EditZkNote em _ ->
-            E.map EditZkNoteMsg <| EditZkNote.view model.timezone size model.recentNotes model.trackedRequests model.jobs model.noteCache em
+            E.map EditZkNoteMsg <| EditZkNote.view model.timezone size model.spmodel model.zknSearchResult model.recentNotes model.trackedRequests model.jobs model.noteCache em
 
         EditZkNoteListing em ld ->
             E.map EditZkNoteListingMsg <| EditZkNoteListing.view ld size em
@@ -996,8 +988,9 @@ stateSearch state =
         Invited _ ->
             Nothing
 
-        EditZkNote emod _ ->
-            Just ( emod.spmodel, emod.zknSearchResult )
+        EditZkNote _ _ ->
+            -- Just ( emod.spmodel, emod.zknSearchResult )
+            Nothing
 
         EditZkNoteListing emod _ ->
             Just ( emod.spmodel, emod.notes )
@@ -1685,15 +1678,13 @@ onZkNoteEditWhat model pt znew =
                 let
                     ( spmod, sres ) =
                         stateSearch state
-                            |> Maybe.withDefault ( SP.initModel, { notes = [], offset = 0, what = "" } )
+                            |> Maybe.withDefault ( model.spmodel, model.zknSearchResult )
 
                     ( nst, c ) =
                         EditZkNote.initFull model.fui
                             login
-                            sres
                             znew.znl.zknote
                             znew.znl.links
-                            spmod
                             znew.edittab
                             model.mobile
 
@@ -1894,22 +1885,27 @@ actualupdate msg model =
                                             }
                                         )
 
-                                ( ns, cmd ) =
-                                    case instate of
-                                        EditZkNote ezn login ->
-                                            ( EditZkNote (Tuple.first <| EditZkNote.updateSearch ts ezn) login
-                                            , sendsearch
-                                            )
-
-                                        EditZkNoteListing ezn login ->
-                                            ( EditZkNoteListing (Tuple.first <| EditZkNoteListing.updateSearch ts ezn) login
-                                            , sendsearch
-                                            )
-
-                                        _ ->
-                                            ( instate, Cmd.none )
+                                -- ( ns, cmd ) =
+                                --     case instate of
+                                --         -- EditZkNote ezn login ->
+                                --         --     ( EditZkNote (Tuple.first <| EditZkNote.updateSearch ts ezn) login
+                                --         --     , sendsearch
+                                --         --     )
+                                --         EditZkNoteListing ezn login ->
+                                --             ( EditZkNoteListing (Tuple.first <| EditZkNoteListing.updateSearch ts ezn) login
+                                --             , sendsearch
+                                --             )
+                                --         _ ->
+                                --             ( instate, Cmd.none )
                             in
-                            ( { model | state = ns }, cmd )
+                            case instate of
+                                EditZkNoteListing ezn login ->
+                                    ( { model | state = EditZkNoteListing (Tuple.first <| EditZkNoteListing.updateSearch ts ezn) login }
+                                    , sendsearch
+                                    )
+
+                                _ ->
+                                    ( updateSearch ts model, sendsearch )
 
                         Nothing ->
                             ( { model | state = instate }, Cmd.none )
@@ -2714,6 +2710,9 @@ actualupdate msg model =
                         Data.PvyZkNoteSearchResult sr ->
                             if sr.what == "prevSearches" then
                                 let
+                                    _ =
+                                        Debug.log "prevsearches: " sr
+
                                     pses =
                                         List.filterMap
                                             (\zknote ->
@@ -2731,22 +2730,21 @@ actualupdate msg model =
                                             |> List.reverse
                                             |> List.drop 1
                                             |> List.reverse
+
+                                    _ =
+                                        Debug.log "laststack" laststack
+
+                                    _ =
+                                        Debug.log "state" <| showState model.state
                                 in
-                                ( { model
-                                    | prevSearches = pses
-                                    , state =
-                                        case model.state of
-                                            EditZkNoteListing znlstate login_ ->
-                                                EditZkNoteListing (EditZkNoteListing.updateSearchStack laststack znlstate) login_
+                                case model.state of
+                                    EditZkNoteListing znlstate login_ ->
+                                        ( { model | state = EditZkNoteListing (EditZkNoteListing.updateSearchStack laststack znlstate) login_ }
+                                        , Cmd.none
+                                        )
 
-                                            EditZkNote znstate login_ ->
-                                                EditZkNote (EditZkNote.updateSearchStack laststack znstate) login_
-
-                                            _ ->
-                                                model.state
-                                  }
-                                , Cmd.none
-                                )
+                                    _ ->
+                                        ( updateSearchStack laststack model, Cmd.none )
 
                             else
                                 ( model, Cmd.none )
@@ -2758,11 +2756,10 @@ actualupdate msg model =
                                     , Cmd.none
                                     )
 
-                                EditZkNote znstate login_ ->
-                                    ( { model | state = EditZkNote (EditZkNote.updateSearchResult sr znstate) login_ }
-                                    , Cmd.none
-                                    )
-
+                                -- EditZkNote znstate login_ ->
+                                --     ( { model | state = EditZkNote (EditZkNote.updateSearchResult sr znstate) login_ }
+                                --     , Cmd.none
+                                --     )
                                 Import istate login_ ->
                                     ( { model | state = Import (Import.updateSearchResult sr istate) login_ }
                                     , Cmd.none
@@ -2784,7 +2781,8 @@ actualupdate msg model =
                                     )
 
                                 _ ->
-                                    ( unexpectedMessage model (showPrivateReply ziresponse)
+                                    ( updateSearchResult sr model
+                                      -- ( unexpectedMessage model (showPrivateReply ziresponse)
                                     , Cmd.none
                                     )
 
@@ -3414,9 +3412,69 @@ actualupdate msg model =
             )
 
 
+updateSearchResult : Data.ZkListNoteSearchResult -> Model -> Model
+updateSearchResult zsr model =
+    { model
+        | zknSearchResult = zsr
+        , spmodel = SP.searchResultUpdated zsr model.spmodel
+    }
+
+
+updateSearch : List Data.TagSearch -> Model -> Model
+updateSearch ts model =
+    { model
+        | spmodel = SP.setSearch model.spmodel ts
+    }
+
+
+updateSearchStack : List Data.TagSearch -> Model -> Model
+updateSearchStack tsl model =
+    let
+        spm =
+            model.spmodel
+    in
+    { model
+        | spmodel = { spm | searchStack = tsl }
+    }
+
+
+
+{-
+   handleSPUpdate : Model -> ( SP.Model, SP.Command ) -> ( SP.Model, Command )
+   handleSPUpdate model ( nm, cmd ) =
+       let
+           mod =
+               { model | spmodel = nm }
+       in
+       case cmd of
+           SP.None ->
+               ( mod, None )
+
+           SP.Save ->
+               ( mod, None )
+
+           SP.Copy s ->
+               ( mod, None )
+
+           SP.Search ts ->
+               let
+                   zsr =
+                       mod.zknSearchResult
+               in
+               ( { mod | zknSearchResult = { zsr | notes = [] } }, Search ts )
+
+           SP.SyncFiles ts ->
+               let
+                   zsr =
+                       mod.zknSearchResult
+               in
+               ( { mod | zknSearchResult = { zsr | notes = [] } }, SyncFiles ts )i
+-}
+
+
 handleTASelection : Model -> EditZkNote.Model -> LoginData -> DataUtil.TASelection -> ( Model, Cmd Msg )
 handleTASelection model emod login tas =
-    case EditZkNote.onTASelection emod model.recentNotes tas of
+    case EditZkNote.onTASelection emod model.zknSearchResult model.recentNotes tas of
         EditZkNote.TAError e ->
             ( displayMessageDialog model e, Cmd.none )
 
@@ -3575,14 +3633,14 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     { model
                         | state =
                             EditZkNoteListing
-                                { notes = emod.zknSearchResult
-                                , spmodel = emod.spmodel
+                                { notes = model.zknSearchResult
+                                , spmodel = model.spmodel
                                 , dialog = Nothing
                                 }
                                 login
                     }
             in
-            case SP.getSearch emod.spmodel of
+            case SP.getSearch model.spmodel of
                 Just s ->
                     sendSearch nm s
 
@@ -3602,14 +3660,14 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                                     { model
                                         | state =
                                             EditZkNoteListing
-                                                { notes = emod.zknSearchResult
-                                                , spmodel = emod.spmodel
+                                                { notes = model.zknSearchResult
+                                                , spmodel = model.spmodel
                                                 , dialog = Nothing
                                                 }
                                                 login
                                     }
                             in
-                            case SP.getSearch emod.spmodel of
+                            case SP.getSearch model.spmodel of
                                 Just s ->
                                     sendSearch nm s
 
@@ -3853,6 +3911,51 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     , Cmd.none
                     )
 
+                EditZkNote.SPMod fn ->
+                    let
+                        ( nspm, spcmd ) =
+                            fn model.spmodel
+                    in
+                    case spcmd of
+                        SP.None ->
+                            ( { model | spmodel = nspm }
+                            , Cmd.none
+                            )
+
+                        SP.Save ->
+                            ( { model | spmodel = nspm }
+                            , Cmd.none
+                            )
+
+                        SP.Copy _ ->
+                            ( { model | spmodel = nspm }
+                            , Cmd.none
+                            )
+
+                        SP.Search ts ->
+                            sendSearch { model | spmodel = nspm } ts
+
+                        -- let
+                        --     zsr =
+                        --         mod.zknSearchResult
+                        -- in
+                        -- ( { mod | zknSearchResult = { zsr | notes = [] } }, Search ts )
+                        SP.SyncFiles ts ->
+                            ( { model | spmodel = nspm }
+                            , sendZIMsg model.fui (Data.PvqSyncFiles ts)
+                            )
+
+                -- let
+                --     zsr =
+                --         mod.zknSearchResult
+                -- in
+                -- ( { mod | zknSearchResult = { zsr | notes = [] } }, SyncFiles ts )i
+                -- EditZkNote.Search s ->
+                --     sendSearch { model | state = EditZkNote emod login } s
+                -- EditZkNote.SyncFiles s ->
+                --     ( { model | state = EditZkNote emod login }
+                --     , sendZIMsg model.fui (Data.PvqSyncFiles s)
+                --     )
                 EditZkNote.Cmd cmd ->
                     ( { model | state = EditZkNote emod login }
                     , Cmd.map EditZkNoteMsg cmd
@@ -3868,7 +3971,7 @@ handleEditZkNoteListing model login ( emod, ecmd ) =
             ( { model | state = EditZkNoteListing emod login }, Cmd.none )
 
         EditZkNoteListing.New ->
-            ( { model | state = EditZkNote (EditZkNote.initNew model.fui login emod.notes emod.spmodel [] model.mobile) login }, Cmd.none )
+            ( { model | state = EditZkNote (EditZkNote.initNew model.fui login [] model.mobile) login }, Cmd.none )
 
         EditZkNoteListing.Done ->
             ( { model | state = UserSettings (UserSettings.init login model.fontsize) login (EditZkNoteListing emod login) }
@@ -4203,6 +4306,12 @@ init flags url key zone fontsize =
             , ziClosureId = 0
             , ziClosures = Dict.empty
             , mobile = flags.mobile
+            , spmodel = SP.initModel
+            , zknSearchResult =
+                { notes = []
+                , offset = 0
+                , what = ""
+                }
             }
 
         geterrornote =

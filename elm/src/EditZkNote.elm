@@ -39,9 +39,6 @@ module EditZkNote exposing
     , toPubId
     , toZkListNote
     , update
-    , updateSearch
-    , updateSearchResult
-    , updateSearchStack
     , view
     , zkLinkName
     , zknview
@@ -163,7 +160,6 @@ type alias Model =
     , noteUser : UserId
     , noteUserName : String
     , usernote : ZkNoteId
-    , zknSearchResult : Data.ZkListNoteSearchResult
     , focusSr : Maybe ZkNoteId -- note id in search result.
     , zklDict : Dict String EditLink
     , focusLink : Maybe EditLink
@@ -183,7 +179,6 @@ type alias Model =
     , cells : CellDict
     , revert : Maybe Data.SaveZkNote
     , initialZklDict : Dict String EditLink
-    , spmodel : SP.Model
     , tab : EditTab
     , searchOrRecent : SearchOrRecent
     , editOrView : EditOrView
@@ -224,6 +219,7 @@ type Command
     | FileUpload
     | Sync
     | SyncFiles Data.ZkNoteSearch
+    | SPMod (SP.Model -> ( SP.Model, SP.Command ))
     | Cmd (Cmd Msg)
 
 
@@ -271,7 +267,7 @@ newWithSave model =
         )
 
     else
-        ( initNew model.fui model.ld model.zknSearchResult model.spmodel (shareLinks model) model.mobile
+        ( initNew model.fui model.ld (shareLinks model) model.mobile
         , None
         )
 
@@ -401,32 +397,29 @@ commentsRecieved comments model =
     { model | comments = comments }
 
 
-updateSearchResult : Data.ZkListNoteSearchResult -> Model -> Model
-updateSearchResult zsr model =
-    { model
-        | zknSearchResult = zsr
-        , spmodel = SP.searchResultUpdated zsr model.spmodel
-    }
 
-
-updateSearch : List Data.TagSearch -> Model -> ( Model, Command )
-updateSearch ts model =
-    ( { model
-        | spmodel = SP.setSearch model.spmodel ts
-      }
-    , None
-    )
-
-
-updateSearchStack : List Data.TagSearch -> Model -> Model
-updateSearchStack tsl model =
-    let
-        spm =
-            model.spmodel
-    in
-    { model
-        | spmodel = { spm | searchStack = tsl }
-    }
+-- updateSearchResult : Data.ZkListNoteSearchResult -> Model -> Model
+-- updateSearchResult zsr model =
+--     { model
+--         | zknSearchResult = zsr
+--         , spmodel = SP.searchResultUpdated zsr model.spmodel
+--     }
+-- updateSearch : List Data.TagSearch -> Model -> ( Model, Command )
+-- updateSearch ts model =
+--     ( { model
+--         | spmodel = SP.setSearch model.spmodel ts
+--       }
+--     , None
+--     )
+-- updateSearchStack : List Data.TagSearch -> Model -> Model
+-- updateSearchStack tsl model =
+--     let
+--         spm =
+--             model.spmodel
+--     in
+--     { model
+--         | spmodel = { spm | searchStack = tsl }
+--     }
 
 
 toPubId : Bool -> String -> Maybe String
@@ -483,7 +476,7 @@ revert model =
                 }
             )
         |> Maybe.withDefault
-            (initNew model.fui model.ld model.zknSearchResult model.spmodel (Dict.values model.initialZklDict) model.mobile)
+            (initNew model.fui model.ld (Dict.values model.initialZklDict) model.mobile)
 
 
 showZkl : E.Color -> Bool -> Bool -> Maybe EditLink -> DataUtil.LoginData -> Maybe ZkNoteId -> Maybe E.Color -> Bool -> EditLink -> Element Msg
@@ -627,14 +620,24 @@ pageLink model =
             )
 
 
-view : Time.Zone -> Util.Size -> List Data.ZkListNote -> TRequests -> TJobs -> NoteCache -> Model -> Element Msg
-view zone size recentZkns trqs tjobs noteCache model =
+view :
+    Time.Zone
+    -> Util.Size
+    -> SP.Model
+    -> Data.ZkListNoteSearchResult
+    -> List Data.ZkListNote
+    -> TRequests
+    -> TJobs
+    -> NoteCache
+    -> Model
+    -> Element Msg
+view zone size spmodel zknSearchResult recentZkns trqs tjobs noteCache model =
     case model.dialog of
         Just dialog ->
             D.view size dialog |> E.map DialogMsg
 
         Nothing ->
-            zknview zone size recentZkns trqs tjobs noteCache model
+            zknview zone size spmodel zknSearchResult recentZkns trqs tjobs noteCache model
 
 
 commonButtonStyle : Bool -> List (E.Attribute msg)
@@ -678,8 +681,8 @@ showSr bkcolor model isdirty zkln =
             Dict.get (zklKey { direction = From, otherid = zkln.id })
                 model.zklDict
 
-        controlrow =
-            E.row [ E.spacing 8, E.width E.fill ]
+        controlrows =
+            [ E.row [ E.spacing 8, E.width E.fill ]
                 [ mbTo
                     |> Maybe.map
                         (\zkl ->
@@ -731,7 +734,11 @@ showSr bkcolor model isdirty zkln =
 
                     Nothing ->
                         E.none
-                , EI.button linkButtonStyle
+                , E.row [] [ E.text <| "link: ", E.el [ EF.italic ] <| E.text model.title ]
+                ]
+            , E.row
+                [ E.spacing 8, E.width E.fill ]
+                [ EI.button linkButtonStyle
                     { onPress = Just (AddToSearch zkln)
                     , label = E.text "^"
                     }
@@ -739,7 +746,9 @@ showSr bkcolor model isdirty zkln =
                     { onPress = Just (AddToSearchAsTag zkln.title)
                     , label = E.text "t"
                     }
+                , E.text "add to search"
                 ]
+            ]
 
         listingrow =
             E.el
@@ -764,6 +773,7 @@ showSr bkcolor model isdirty zkln =
             , EBd.rounded 3
             , EBd.color TC.darkGrey
             , E.width E.fill
+            , E.spacing 8
             , E.inFront
                 (E.row [ E.height E.fill, E.alignRight, EBk.color bkcolor ]
                     [ if lnnonme then
@@ -786,7 +796,7 @@ showSr bkcolor model isdirty zkln =
                     ]
                 )
             ]
-            [ listingrow, controlrow ]
+            (listingrow :: controlrows)
 
     else
         listingrow
@@ -912,8 +922,18 @@ renderMd fui cd noteCache md mdw =
             E.text errors
 
 
-zknview : Time.Zone -> Util.Size -> List Data.ZkListNote -> TRequests -> TJobs -> NoteCache -> Model -> Element Msg
-zknview zone size recentZkns trqs tjobs noteCache model =
+zknview :
+    Time.Zone
+    -> Util.Size
+    -> SP.Model
+    -> Data.ZkListNoteSearchResult
+    -> List Data.ZkListNote
+    -> TRequests
+    -> TJobs
+    -> NoteCache
+    -> Model
+    -> Element Msg
+zknview zone size spmodel zknSearchResult recentZkns trqs tjobs noteCache model =
     let
         wclass =
             if size.width < 800 then
@@ -1426,24 +1446,24 @@ zknview zone size recentZkns trqs tjobs noteCache model =
                         }
                     ]
                     :: (E.map SPMsg <|
-                            SP.view True (size.width < 500 || wclass /= Narrow) 0 model.spmodel
+                            SP.view True (size.width < 500 || wclass /= Narrow) 0 spmodel
                        )
                     :: (List.map
                             (showSr bkcolor model isdirty)
                         <|
                             case model.id of
                                 Just id ->
-                                    List.filter (\zkl -> zkl.id /= id) model.zknSearchResult.notes
+                                    List.filter (\zkl -> zkl.id /= id) zknSearchResult.notes
 
                                 Nothing ->
-                                    model.zknSearchResult.notes
+                                    zknSearchResult.notes
                        )
-                    ++ (if List.length model.zknSearchResult.notes < 15 then
+                    ++ (if List.length zknSearchResult.notes < 15 then
                             []
 
                         else
                             [ E.map SPMsg <|
-                                SP.paginationView model.spmodel
+                                SP.paginationView spmodel
                             ]
                        )
                 )
@@ -1681,14 +1701,12 @@ tabsOnLoad model =
 initFull :
     FileUrlInfo
     -> DataUtil.LoginData
-    -> Data.ZkListNoteSearchResult
     -> Data.ZkNote
     -> List Data.EditLink
-    -> SP.Model
     -> Maybe EditTab
     -> Bool
     -> ( Model, Data.GetZkNoteComments )
-initFull fui ld zkl zknote dtlinks spm mbedittab mobile =
+initFull fui ld zknote dtlinks mbedittab mobile =
     let
         cells =
             zknote.content
@@ -1719,7 +1737,6 @@ initFull fui ld zkl zknote dtlinks spm mbedittab mobile =
       , noteUser = zknote.user
       , noteUserName = zknote.username
       , usernote = zknote.usernote
-      , zknSearchResult = zkl
       , focusSr = Nothing
       , zklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) links)
       , initialZklDict =
@@ -1744,7 +1761,6 @@ initFull fui ld zkl zknote dtlinks spm mbedittab mobile =
       , changeddate = Just zknote.changeddate
       , cells = getCd cc
       , revert = Just (DataUtil.saveZkNote zknote)
-      , spmodel = SP.searchResultUpdated zkl spm
       , tab = EtView
       , searchOrRecent = SearchView
       , editOrView = ViewView
@@ -1761,8 +1777,8 @@ initFull fui ld zkl zknote dtlinks spm mbedittab mobile =
     )
 
 
-initNew : FileUrlInfo -> DataUtil.LoginData -> Data.ZkListNoteSearchResult -> SP.Model -> List EditLink -> Bool -> Model
-initNew fui ld zkl spm links mobile =
+initNew : FileUrlInfo -> DataUtil.LoginData -> List EditLink -> Bool -> Model
+initNew fui ld links mobile =
     let
         cells =
             ""
@@ -1782,7 +1798,6 @@ initNew fui ld zkl spm links mobile =
     , noteUser = ld.userid
     , noteUserName = ld.name
     , usernote = ld.zknote
-    , zknSearchResult = zkl
     , focusSr = Nothing
     , zklDict = zklDict
     , initialZklDict = Dict.empty
@@ -1802,7 +1817,6 @@ initNew fui ld zkl spm links mobile =
     , md = ""
     , cells = getCd cc
     , revert = Nothing
-    , spmodel = SP.searchResultUpdated zkl spm
     , tab = EtEdit
     , searchOrRecent = SearchView
     , editOrView = EditView
@@ -1855,7 +1869,7 @@ sznToZkn uid uname unote sysids sdzn szn =
 onSaved : Model -> Data.SavedZkNote -> Model
 onSaved oldmodel szn =
     if szn.what == Just "and-new" then
-        initNew oldmodel.fui oldmodel.ld oldmodel.zknSearchResult oldmodel.spmodel (shareLinks oldmodel) oldmodel.mobile
+        initNew oldmodel.fui oldmodel.ld (shareLinks oldmodel) oldmodel.mobile
 
     else
         let
@@ -1908,8 +1922,6 @@ initLinkBackNote model title =
                 m1 =
                     initNew model.fui
                         model.ld
-                        model.zknSearchResult
-                        model.spmodel
                         ({ otherid = id
                          , direction = To
                          , user = model.ld.userid
@@ -1931,8 +1943,8 @@ initLinkBackNote model title =
             Err "new note!  save this note before creating a linkback note to it"
 
 
-onTASelection : Model -> List Data.ZkListNote -> DataUtil.TASelection -> TACommand
-onTASelection model recentZkns tas =
+onTASelection : Model -> Data.ZkListNoteSearchResult -> List Data.ZkListNote -> DataUtil.TASelection -> TACommand
+onTASelection model zknSearchResult recentZkns tas =
     let
         addLink _ id =
             let
@@ -1996,7 +2008,7 @@ onTASelection model recentZkns tas =
             model.focusSr
                 |> Maybe.andThen
                     (\id ->
-                        model.zknSearchResult.notes
+                        zknSearchResult.notes
                             |> List.filter (\zkln -> id == zkln.id)
                             |> List.head
                             |> ME.orElse
@@ -2147,7 +2159,8 @@ onWkKeyPress key model =
                 ( model, None )
 
         Toop.T4 "Enter" False False False ->
-            handleSPUpdate model (SP.onEnter model.spmodel)
+            -- handleSPUpdate model (SP.onEnter model.spmodel)
+            ( model, SPMod SP.onEnter )
 
         _ ->
             ( model, None )
@@ -2155,19 +2168,15 @@ onWkKeyPress key model =
 
 handleSPUpdate : Model -> ( SP.Model, SP.Command ) -> ( Model, Command )
 handleSPUpdate model ( nm, cmd ) =
-    let
-        mod =
-            { model | spmodel = nm }
-    in
     case cmd of
         SP.None ->
-            ( mod, None )
+            ( model, None )
 
         SP.Save ->
-            ( mod, None )
+            ( model, None )
 
         SP.Copy s ->
-            ( { mod
+            ( { model
                 | mbReplaceString =
                     Just <|
                         (if model.md == "" then
@@ -2182,38 +2191,31 @@ handleSPUpdate model ( nm, cmd ) =
             , GetTASelection "mdtext" "replacestring"
             )
 
-        SP.Search ts ->
-            let
-                zsr =
-                    mod.zknSearchResult
-            in
-            ( { mod | zknSearchResult = { zsr | notes = [] } }, Search ts )
+        SP.Search _ ->
+            ( model, None )
 
-        SP.SyncFiles ts ->
-            let
-                zsr =
-                    mod.zknSearchResult
-            in
-            ( { mod | zknSearchResult = { zsr | notes = [] } }, SyncFiles ts )
+        SP.SyncFiles _ ->
+            ( model, None )
 
 
 update : Msg -> Model -> ( Model, Command )
 update msg model =
     case msg of
         RestoreSearch s ->
-            let
-                spmodel =
-                    SP.addSearchString model.spmodel s
-            in
-            ( { model | spmodel = spmodel }
-              -- DON'T automatically search.  To allow building searches
-              -- from components.
-              -- , SP.getSearch spmodel
-              --     |> Maybe.map Search
-              --     |> Maybe.withDefault None
-            , None
-            )
+            ( model, SPMod (\spm -> ( SP.addSearchString spm s, SP.None )) )
 
+        -- let
+        --     spmodel =
+        --         SP.addSearchString model.spmodel s
+        -- in
+        -- ( { model | spmodel = spmodel }
+        --   -- DON'T automatically search.  To allow building searches
+        --   -- from components.
+        --   -- , SP.getSearch spmodel
+        --   --     |> Maybe.map Search
+        --   --     |> Maybe.withDefault None
+        -- , None
+        -- )
         SavePress ->
             ( model
             , Save
@@ -2487,6 +2489,8 @@ update msg model =
                                 E.map (\_ -> ())
                                     (view zone
                                         size
+                                        SP.initModel
+                                        { notes = [], offset = 0, what = "" }
                                         []
                                         (TRequests 0 model.mobile Dict.empty)
                                         (TJobs model.mobile Dict.empty)
@@ -2656,7 +2660,7 @@ update msg model =
             )
 
         SPMsg m ->
-            handleSPUpdate model (SP.update m model.spmodel)
+            ( model, SPMod (SP.update m) )
 
         TabChanged nc ->
             ( setTab nc model
@@ -2689,46 +2693,57 @@ update msg model =
 
         AddToSearch zkln ->
             if List.any ((==) DataUtil.sysids.searchid) zkln.sysids then
-                ( { model
-                    | spmodel = SP.setSearchString model.spmodel zkln.title
-                  }
-                , None
+                ( model
+                , SPMod
+                    (\spm ->
+                        ( SP.setSearchString spm zkln.title
+                        , SP.None
+                        )
+                    )
                 )
 
             else
-                ( { model
-                    | spmodel =
-                        SP.addToSearch model.spmodel
+                ( model
+                , SPMod
+                    (\spm ->
+                        ( SP.addToSearch spm
                             [ Data.ExactMatch ]
                             zkln.title
-                  }
-                , None
+                        , SP.None
+                        )
+                    )
                 )
 
         SetSearchString text ->
-            ( { model
-                | spmodel =
-                    SP.setSearchString model.spmodel text
-              }
-            , None
+            ( model
+            , SPMod
+                (\spm ->
+                    ( SP.setSearchString spm text
+                    , SP.None
+                    )
+                )
             )
 
         SetSearch search ->
-            ( { model
-                | spmodel =
-                    SP.setSearch model.spmodel [ search ]
-              }
-            , None
+            ( model
+            , SPMod
+                (\spm ->
+                    ( SP.setSearch spm [ search ]
+                    , SP.None
+                    )
+                )
             )
 
         AddToSearchAsTag title ->
-            ( { model
-                | spmodel =
-                    SP.addToSearch model.spmodel
+            ( model
+            , SPMod
+                (\spm ->
+                    ( SP.addToSearch spm
                         [ Data.ExactMatch, Data.Tag ]
                         title
-              }
-            , None
+                    , SP.None
+                    )
+                )
             )
 
         GoHomeNotePress ->
