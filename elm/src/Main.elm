@@ -2577,9 +2577,6 @@ actualupdate msg model =
                         Data.PvyZkNoteSearchResult sr ->
                             if sr.what == "prevSearches" then
                                 let
-                                    _ =
-                                        Debug.log "prevsearches: " sr
-
                                     pses =
                                         List.filterMap
                                             (\zknote ->
@@ -2597,12 +2594,6 @@ actualupdate msg model =
                                             |> List.reverse
                                             |> List.drop 1
                                             |> List.reverse
-
-                                    _ =
-                                        Debug.log "laststack" laststack
-
-                                    _ =
-                                        Debug.log "state" <| showState model.state
                                 in
                                 ( updateSearchStack laststack model, Cmd.none )
 
