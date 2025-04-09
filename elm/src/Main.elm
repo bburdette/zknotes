@@ -915,7 +915,7 @@ viewState size state model =
             E.map ShowMessageMsg <| ShowMessage.view em
 
         Import em _ ->
-            E.map ImportMsg <| Import.view size em
+            E.map ImportMsg <| Import.view size em model.spmodel model.zknSearchResult
 
         View em ->
             E.map ViewMsg <| View.view model.timezone size.width model.noteCache em False
@@ -2743,11 +2743,6 @@ actualupdate msg model =
 
                         Data.PvyZkListNoteSearchResult sr ->
                             case state of
-                                Import istate login_ ->
-                                    ( { model | state = Import (Import.updateSearchResult sr istate) login_ }
-                                    , Cmd.none
-                                    )
-
                                 TagFiles iu login ps ->
                                     ( { model | state = TagFiles (TagAThing.updateSearchResult sr iu) login ps }
                                     , Cmd.none
@@ -3066,7 +3061,7 @@ actualupdate msg model =
                                         EditZkNoteListing { dialog = Nothing } login
                                 }
                         in
-                        case SP.getSearch imod.spmodel of
+                        case SP.getSearch model.spmodel of
                             Just s ->
                                 sendSearch nm s
 
@@ -3097,9 +3092,6 @@ actualupdate msg model =
                         )
                     )
 
-                Import.Search s ->
-                    sendSearch { model | state = Import emod login } s
-
                 Import.SelectFiles ->
                     ( { model | state = Import emod login }
                     , FS.files []
@@ -3111,6 +3103,35 @@ actualupdate msg model =
 
                 Import.Command cmd ->
                     ( model, Cmd.map ImportMsg cmd )
+
+                Import.SPMod fn ->
+                    let
+                        ( nspm, spcmd ) =
+                            fn model.spmodel
+                    in
+                    case spcmd of
+                        SP.None ->
+                            ( { model | spmodel = nspm }
+                            , Cmd.none
+                            )
+
+                        SP.Save ->
+                            ( { model | spmodel = nspm }
+                            , Cmd.none
+                            )
+
+                        SP.Copy _ ->
+                            ( { model | spmodel = nspm }
+                            , Cmd.none
+                            )
+
+                        SP.Search ts ->
+                            sendSearch { model | spmodel = nspm } ts
+
+                        SP.SyncFiles ts ->
+                            ( { model | spmodel = nspm }
+                            , sendZIMsg model.fui (Data.PvqSyncFiles ts)
+                            )
 
         ( DisplayMessageMsg bm, DisplayMessage bs prevstate ) ->
             case GD.update bm bs of
@@ -3926,7 +3947,7 @@ handleEditZkNoteListing model login ( emod, ecmd ) =
             )
 
         EditZkNoteListing.Import ->
-            ( { model | state = Import (Import.init login model.zknSearchResult model.spmodel) login }
+            ( { model | state = Import (Import.init login) login }
             , Cmd.none
             )
 
