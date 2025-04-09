@@ -205,7 +205,6 @@ type Command
     | Switch ZkNoteId
     | SaveSwitch Data.SaveZkNoteAndLinks ZkNoteId
     | GetTASelection String String
-    | Search Data.ZkNoteSearch
     | SearchHistory
     | BigSearch
     | Settings

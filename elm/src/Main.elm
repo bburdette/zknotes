@@ -3816,9 +3816,6 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     , getTASelection (JE.object [ ( "id", JE.string id ), ( "what", JE.string what ) ])
                     )
 
-                EditZkNote.Search s ->
-                    sendSearch { model | state = EditZkNote emod login } s
-
                 EditZkNote.SyncFiles s ->
                     ( { model | state = EditZkNote emod login }
                     , sendZIMsg model.fui (Data.PvqSyncFiles s)
