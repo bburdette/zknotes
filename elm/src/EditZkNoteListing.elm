@@ -34,9 +34,7 @@ type DWhich
 
 
 type alias Model =
-    { notes : Data.ZkListNoteSearchResult
-    , spmodel : SP.Model
-    , dialog : Maybe ( D.Model, DWhich )
+    { dialog : Maybe ( D.Model, DWhich )
     }
 
 
@@ -45,76 +43,75 @@ type Command
     | Done
     | Import
     | None
-    | Search Data.ZkNoteSearch
-    | SyncFiles Data.ZkNoteSearch
     | PowerDelete (List Data.TagSearch)
+    | SPMod (SP.Model -> ( SP.Model, SP.Command ))
     | SearchHistory
 
 
-onPowerDeleteComplete : Int -> LoginData -> Model -> Model
-onPowerDeleteComplete count ld model =
+onPowerDeleteComplete : Int -> LoginData -> Model -> SP.Model -> Data.ZkListNoteSearchResult -> Model
+onPowerDeleteComplete count ld model spmodel notes =
     { model
         | dialog =
             Just <|
                 ( D.init
                     ("deleted " ++ String.fromInt count ++ " notes")
                     False
-                    (\size -> E.map (\_ -> ()) (listview ld size model))
+                    (\size -> E.map (\_ -> ()) (listview ld size model spmodel notes))
                 , DeleteComplete
                 )
     }
 
 
-updateSearchResult : Data.ZkListNoteSearchResult -> Model -> Model
-updateSearchResult zsr model =
-    { model
-        | notes = zsr
-        , spmodel = SP.searchResultUpdated zsr model.spmodel
-    }
 
-
-updateSearchStack : List Data.TagSearch -> Model -> Model
-updateSearchStack tsl model =
-    let
-        spm =
-            model.spmodel
-    in
-    { model
-        | spmodel = { spm | searchStack = tsl }
-    }
-
-
-updateSearch : List Data.TagSearch -> Model -> ( Model, Command )
-updateSearch ts model =
-    ( { model
-        | spmodel = SP.setSearch model.spmodel ts
-      }
-    , None
-    )
+-- updateSearchResult : Data.ZkListNoteSearchResult -> Model -> Model
+-- updateSearchResult zsr model =
+--     { model
+--         | notes = zsr
+--         , spmodel = SP.searchResultUpdated zsr model.spmodel
+--     }
+-- updateSearchStack : List Data.TagSearch -> Model -> Model
+-- updateSearchStack tsl model =
+--     let
+--         spm =
+--             model.spmodel
+--     in
+--     { model
+--         | spmodel = { spm | searchStack = tsl }
+--     }
+-- updateSearch : List Data.TagSearch -> Model -> ( Model, Command )
+-- updateSearch ts model =
+--     ( { model
+--         | spmodel = SP.setSearch model.spmodel ts
+--       }
+--     , None
+--     )
 
 
 onWkKeyPress : WK.Key -> Model -> ( Model, Command )
 onWkKeyPress key model =
     case Toop.T4 key.key key.ctrl key.alt key.shift of
         Toop.T4 "Enter" False False False ->
-            handleSPUpdate model (SP.onEnter model.spmodel)
+            ( model
+            , SPMod SP.onEnter
+            )
 
+        -- handleSPUpdate model (SP.onEnter model.spmodel)
         _ ->
             ( model, None )
 
 
-view : LoginData -> Util.Size -> Model -> Element Msg
-view ld size model =
+view : LoginData -> Util.Size -> Model -> SP.Model -> Data.ZkListNoteSearchResult -> Element Msg
+view ld size model spmodel notes =
     case model.dialog of
         Just ( dialog, _ ) ->
             D.view size dialog |> E.map DialogMsg
 
         Nothing ->
-            listview ld size model
+            listview ld size model spmodel notes
 
 
-listview : LoginData -> Util.Size -> Model -> Element Msg
-listview ld size model =
+listview : LoginData -> Util.Size -> Model -> SP.Model -> Data.ZkListNoteSearchResult -> Element Msg
+listview ld size model spmodel notes =
     let
         maxwidth =
             700
@@ -164,9 +161,9 @@ listview ld size model =
                     { onPress = Just <| SearchHistoryPress
                     , label = E.el [ E.centerY ] <| E.text "history"
                     }
-                , E.map SPMsg <| SP.view False (size.width < maxwidth) 0 model.spmodel
+                , E.map SPMsg <| SP.view False (size.width < maxwidth) 0 spmodel
                 , E.table [ E.spacing 5, E.width E.fill, E.centerX ]
-                    { data = model.notes.notes
+                    { data = notes.notes
                     , columns =
                         [ { header = E.none
                           , width =
@@ -196,17 +193,17 @@ listview ld size model =
                         ]
                     }
                 ]
-            , if List.length model.notes.notes < 15 then
+            , if List.length notes.notes < 15 then
                 E.none
 
               else
                 E.map SPMsg <|
-                    SP.paginationView model.spmodel
+                    SP.paginationView spmodel
             ]
 
 
-update : Msg -> Model -> LoginData -> ( Model, Command )
-update msg model ld =
+update : Msg -> Model -> SP.Model -> Data.ZkListNoteSearchResult -> LoginData -> ( Model, Command )
+update msg model spmodel notes ld =
     case msg of
         NewPress ->
             ( model, New )
@@ -221,7 +218,7 @@ update msg model ld =
             ( model, SearchHistory )
 
         PowerDeletePress ->
-            case SP.getSearch model.spmodel of
+            case SP.getSearch spmodel of
                 Nothing ->
                     ( model, None )
 
@@ -234,7 +231,7 @@ update msg model ld =
                                         ++ String.concat (List.map showTagSearch s.tagsearch)
                                     )
                                     True
-                                    (\size -> E.map (\_ -> ()) (listview ld size model))
+                                    (\size -> E.map (\_ -> ()) (listview ld size model spmodel notes))
                                 , DeleteAll
                                 )
                       }
@@ -249,7 +246,7 @@ update msg model ld =
                             ( { model | dialog = Nothing }, None )
 
                         ( D.Ok, DeleteAll ) ->
-                            case SP.getSearch model.spmodel of
+                            case SP.getSearch spmodel of
                                 Just s ->
                                     ( { model | dialog = Nothing }, PowerDelete s.tagsearch )
 
@@ -266,27 +263,6 @@ update msg model ld =
                     ( model, None )
 
         SPMsg m ->
-            handleSPUpdate model (SP.update m model.spmodel)
-
-
-handleSPUpdate : Model -> ( SP.Model, SP.Command ) -> ( Model, Command )
-handleSPUpdate model ( nm, cm ) =
-    let
-        mod =
-            { model | spmodel = nm }
-    in
-    case cm of
-        SP.None ->
-            ( mod, None )
-
-        SP.Save ->
-            ( mod, None )
-
-        SP.Copy _ ->
-            ( mod, None )
-
-        SP.Search ts ->
-            ( mod, Search ts )
-
-        SP.SyncFiles ts ->
-            ( mod, SyncFiles ts )
+            ( model
+            , SPMod (SP.update m)
+            )
