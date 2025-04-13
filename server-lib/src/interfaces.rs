@@ -7,6 +7,7 @@ use crate::jobs::LogMonitor;
 use crate::search;
 use crate::sqldata;
 use crate::sqldata::zknotes_callbacks;
+use crate::sqldata::Server;
 use crate::state::new_jobid;
 use crate::state::State;
 use crate::sync;
@@ -240,7 +241,7 @@ pub async fn zk_interface_loggedin(
       Ok(PrivateReply::PvyDeletedZkNote(id.clone()))
     }
     PrivateRequest::PvqSaveZkNote(sbe) => {
-      let (_id, s) = sqldata::save_zknote(&conn, uid, &sbe)?;
+      let (_id, s) = sqldata::save_zknote(&conn, uid, &state.server, &sbe)?;
       Ok(PrivateReply::PvySavedZkNote(s))
     }
     PrivateRequest::PvqSaveZkLinks(msg) => {
@@ -248,12 +249,12 @@ pub async fn zk_interface_loggedin(
       Ok(PrivateReply::PvySavedZkLinks)
     }
     PrivateRequest::PvqSaveZkNoteAndLinks(sznpl) => {
-      let (_, szkn) = sqldata::save_zknote(&conn, uid, &sznpl.note)?;
+      let (_, szkn) = sqldata::save_zknote(&conn, uid, &state.server, &sznpl.note)?;
       let _s = sqldata::save_savezklinks(&conn, uid, szkn.id, &sznpl.links)?;
       Ok(PrivateReply::PvySavedZkNoteAndLinks(szkn))
     }
     PrivateRequest::PvqSaveImportZkNotes(gzl) => {
-      sqldata::save_importzknotes(&conn, uid, gzl)?;
+      sqldata::save_importzknotes(&conn, uid, &state.server, gzl)?;
       Ok(PrivateReply::PvySavedImportZkNotes)
     }
     PrivateRequest::PvqSetHomeNote(hn) => {
@@ -266,6 +267,7 @@ pub async fn zk_interface_loggedin(
       let uid: UserId = uid;
       let jid = new_jobid(state, uid);
       let lgb = state.girlboss.clone();
+      let server = state.server.clone();
 
       std::thread::spawn(move || {
         let rt = actix_rt::System::new();
@@ -276,6 +278,7 @@ pub async fn zk_interface_loggedin(
           file_path: PathBuf,
           uid: UserId,
           jid: JobId,
+          server: Server,
         ) -> () {
           lgb
             .write()
@@ -287,8 +290,9 @@ pub async fn zk_interface_loggedin(
             .start(jid, move |mon| async move {
               let gbm = GirlbossMonitor { monitor: mon };
               let mut callbacks = &mut zknotes_callbacks();
+              let server = server.clone();
               write!(gbm, "starting sync");
-              let r = sync::sync(&dbpath, &file_path, uid, &mut callbacks, &gbm).await;
+              let r = sync::sync(&dbpath, &file_path, uid, &server, &mut callbacks, &gbm).await;
               match r {
                 Ok(_) => write!(gbm, "sync completed"),
                 Err(e) => write!(gbm, "sync err: {:?}", e),
@@ -303,7 +307,7 @@ pub async fn zk_interface_loggedin(
           ()
         }
 
-        rt.block_on(startit(lgb, dbpath, file_path, uid, jid));
+        rt.block_on(startit(lgb, dbpath, file_path, uid, jid, server));
         rt.run()
           .map_err(|e| {
             info!("rt.run error: {}", e);

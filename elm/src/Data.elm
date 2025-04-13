@@ -43,6 +43,7 @@ type alias ExtraLoginData =
     { userid : UserId
     , zknote : ZkNoteId
     , homenote : Maybe (ZkNoteId)
+    , server : String
     }
 
 
@@ -52,6 +53,7 @@ extraLoginDataEncoder struct =
         [ ( "userid", (userIdEncoder) struct.userid )
         , ( "zknote", (zkNoteIdEncoder) struct.zknote )
         , ( "homenote", (Maybe.withDefault Json.Encode.null << Maybe.map (zkNoteIdEncoder)) struct.homenote )
+        , ( "server", (Json.Encode.string) struct.server )
         ]
 
 
@@ -70,6 +72,7 @@ type alias ZkNote =
     , changeddate : Int
     , deleted : Bool
     , filestatus : FileStatus
+    , server : String
     , sysids : List (ZkNoteId)
     }
 
@@ -91,6 +94,7 @@ zkNoteEncoder struct =
         , ( "changeddate", (Json.Encode.int) struct.changeddate )
         , ( "deleted", (Json.Encode.bool) struct.deleted )
         , ( "filestatus", (fileStatusEncoder) struct.filestatus )
+        , ( "server", (Json.Encode.string) struct.server )
         , ( "sysids", (Json.Encode.list (zkNoteIdEncoder)) struct.sysids )
         ]
 
@@ -138,6 +142,7 @@ zkListNoteEncoder struct =
 type alias SavedZkNote =
     { id : ZkNoteId
     , changeddate : Int
+    , server : String
     , what : Maybe (String)
     }
 
@@ -147,6 +152,7 @@ savedZkNoteEncoder struct =
     Json.Encode.object
         [ ( "id", (zkNoteIdEncoder) struct.id )
         , ( "changeddate", (Json.Encode.int) struct.changeddate )
+        , ( "server", (Json.Encode.string) struct.server )
         , ( "what", (Maybe.withDefault Json.Encode.null << Maybe.map (Json.Encode.string)) struct.what )
         ]
 
@@ -955,6 +961,7 @@ type SearchMod
     | After
     | Create
     | Mod
+    | Server
 
 
 searchModEncoder : SearchMod -> Json.Encode.Value
@@ -980,6 +987,8 @@ searchModEncoder enum =
             Json.Encode.string "Create"
         Mod ->
             Json.Encode.string "Mod"
+        Server ->
+            Json.Encode.string "Server"
 
 type AndOr
     = And
@@ -1121,6 +1130,7 @@ extraLoginDataDecoder =
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "userid" (userIdDecoder)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "zknote" (zkNoteIdDecoder)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "homenote" (Json.Decode.nullable (zkNoteIdDecoder))))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "server" (Json.Decode.string)))
 
 
 zkNoteDecoder : Json.Decode.Decoder ZkNote
@@ -1140,6 +1150,7 @@ zkNoteDecoder =
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "changeddate" (Json.Decode.int)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "deleted" (Json.Decode.bool)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "filestatus" (fileStatusDecoder)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "server" (Json.Decode.string)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "sysids" (Json.Decode.list (zkNoteIdDecoder))))
 
 
@@ -1192,6 +1203,7 @@ savedZkNoteDecoder =
     Json.Decode.succeed SavedZkNote
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "id" (zkNoteIdDecoder)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "changeddate" (Json.Decode.int)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "server" (Json.Decode.string)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "what" (Json.Decode.nullable (Json.Decode.string))))
 
 
@@ -1886,6 +1898,15 @@ searchModDecoder =
                     case x of
                         "Mod" ->
                             Json.Decode.succeed Mod
+                        unexpected ->
+                            Json.Decode.fail <| "Unexpected variant " ++ unexpected
+                )
+        , Json.Decode.string
+            |> Json.Decode.andThen
+                (\x ->
+                    case x of
+                        "Server" ->
+                            Json.Decode.succeed Server
                         unexpected ->
                             Json.Decode.fail <| "Unexpected variant " ++ unexpected
                 )

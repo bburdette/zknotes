@@ -37,7 +37,7 @@ pub use rusqlite;
 use rusqlite::Connection;
 use serde_json;
 use simple_error::simple_error;
-use sqldata::get_single_value;
+use sqldata::{get_server_id, get_single_value};
 use std::fs::File;
 use std::io::{stdin, Write};
 use std::path::Path;
@@ -55,10 +55,7 @@ pub use zkprotocol::search as zs;
 
 pub use zkprotocol::messages::PrivateStreamingMessage;
 use zkprotocol::{
-  private::{
-    PrivateClosureReply, PrivateClosureRequest, PrivateError, PrivateReply, PrivateRequest,
-    ZkNoteRq,
-  },
+  private::{PrivateError, PrivateReply, PrivateRequest},
   public::{PublicError, PublicReply, PublicRequest},
   upload::UploadReply,
 };
@@ -342,6 +339,8 @@ async fn make_file_notes(
     session_user(&conn, session, &state)?.id
   };
 
+  let server = get_server_id(&conn)?;
+
   // Save the files to our temp path.
   let tp = state.config.file_tmp_path.clone();
   let saved_files_res = save_files(&tp, payload).await;
@@ -354,8 +353,15 @@ async fn make_file_notes(
     // compute hash.
     let fpath = Path::new(&fp);
 
-    let (nid64, _noteid, _fid) =
-      sqldata::make_file_note(&conn, &state.config.file_path, uid, &name, fpath, false)?;
+    let (nid64, _noteid, _fid) = sqldata::make_file_note(
+      &conn,
+      &server,
+      &state.config.file_path,
+      uid,
+      &name,
+      fpath,
+      false,
+    )?;
 
     // return zknoteedit.
     let listnote = sqldata::read_zklistnote(&conn, &state.config.file_path, Some(uid), nid64)?;
@@ -540,6 +546,9 @@ async fn zk_interface_check_upstreaming(
 
     Some(token) => {
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+
+      let server = sqldata::get_server_id(&conn)?;
+
       match orgauth::dbfun::read_user_by_token_api(
         &conn,
         token,
@@ -566,6 +575,7 @@ async fn zk_interface_check_upstreaming(
             HttpResponse::Ok().json(
               sync::sync_from_stream(
                 &conn,
+                &server,
                 &config.file_path,
                 None,
                 None,
@@ -831,7 +841,7 @@ pub fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
 
   info!("config parameters:\n\n{}", toml::to_string_pretty(&config)?);
 
-  sqldata::dbinit(
+  let server = sqldata::dbinit(
     config.orgauth_config.db.as_path(),
     config.orgauth_config.login_token_expiration_ms,
   )?;
@@ -855,6 +865,7 @@ pub fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
     config: config.clone(),
     girlboss: { Arc::new(RwLock::new(Girlboss::new())) },
     jobcounter: { RwLock::new(0 as i64) },
+    server,
   });
 
   let c = config.clone();

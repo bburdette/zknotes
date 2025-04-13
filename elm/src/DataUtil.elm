@@ -119,6 +119,7 @@ type alias LoginData =
     , active : Bool
     , zknote : ZkNoteId
     , homenote : Maybe ZkNoteId
+    , server : String
     }
 
 
@@ -133,6 +134,7 @@ decodeLoginData =
         |> andMap (JD.field "active" JD.bool)
         |> andMap (JD.field "data" (JD.field "zknote" zkNoteIdDecoder))
         |> andMap (JD.field "data" (JD.field "homenote" (JD.maybe zkNoteIdDecoder)))
+        |> andMap (JD.field "data" (JD.field "server" JD.string))
 
 
 type alias Sysids =
@@ -166,6 +168,7 @@ fromOaLd oald =
                 (JD.succeed (LoginData oald.userid oald.uuid oald.name oald.email oald.admin oald.active)
                     |> andMap (JD.field "zknote" Data.zkNoteIdDecoder)
                     |> andMap (JD.field "homenote" (JD.maybe Data.zkNoteIdDecoder))
+                    |> andMap (JD.field "server" JD.string)
                 )
             )
 

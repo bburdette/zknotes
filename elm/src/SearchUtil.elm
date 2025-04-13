@@ -86,6 +86,9 @@ showSearchMod mod =
         Mod ->
             "Mod"
 
+        Server ->
+            "Server"
+
 
 showAndOr : AndOr -> String
 showAndOr ao =
@@ -100,13 +103,14 @@ showAndOr ao =
 type SemanticError
     = InvalidDateFormat String
     | InvalidDateMods String
+    | InvalidServerMods String
 
 
 tagSearchDates : Time.Zone -> TagSearch -> Result SemanticError TagSearch
 tagSearchDates tz ts =
     case ts of
         SearchTerm x ->
-            tagSearchDatesTerm tz x
+            termSemanticCheck tz x
                 |> Result.map
                     SearchTerm
 
@@ -134,8 +138,8 @@ type alias ST =
     { mods : List SearchMod, term : String }
 
 
-tagSearchDatesTerm : Time.Zone -> ST -> Result SemanticError ST
-tagSearchDatesTerm tz st =
+termSemanticCheck : Time.Zone -> ST -> Result SemanticError ST
+termSemanticCheck tz st =
     let
         isdateterm =
             Util.trueforany
@@ -193,7 +197,10 @@ tagSearchDatesTerm tz st =
                     )
                 == 1
     in
-    if isdateterm then
+    if Util.trueforany ((==) Server) st.mods && List.length st.mods /= 1 then
+        Err <| InvalidServerMods <| "no mods other than ! allowed with (s)erver: " ++ (showTagSearch <| SearchTerm st)
+
+    else if isdateterm then
         if not isvaliddateterm then
             Err <|
                 InvalidDateMods <|
@@ -277,6 +284,9 @@ printSearchMod mod =
         Mod ->
             "m"
 
+        Server ->
+            "s"
+
 
 printAndOr : AndOr -> String
 printAndOr ao =
@@ -326,6 +336,8 @@ searchMod =
             |. symbol "c"
         , succeed Mod
             |. symbol "m"
+        , succeed Server
+            |. symbol "s"
         ]
 
 

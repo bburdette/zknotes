@@ -2,7 +2,7 @@ use crate::error as zkerr;
 use crate::jobs::JobMonitor;
 use crate::search::build_sql;
 use crate::search::{search_zknotes, search_zknotes_stream, sync_users, system_user, SearchResult};
-use crate::sqldata::{self, note_id_for_uuid, save_zklink, save_zknote, user_note_id};
+use crate::sqldata::{self, note_id_for_uuid, save_zklink, save_zknote, user_note_id, Server};
 use crate::util::now;
 use actix_multipart_rfc7578 as multipart;
 use actix_web::error::PayloadError;
@@ -101,6 +101,7 @@ pub async fn prev_sync(
 pub async fn save_sync(
   conn: &Connection,
   _uid: UserId,
+  server: &Server,
   usernoteid: i64,
   sync: CompletedSync,
 ) -> Result<i64, Box<dyn std::error::Error>> {
@@ -110,6 +111,7 @@ pub async fn save_sync(
   let (id, _szn) = save_zknote(
     conn,
     sysid, // save under system id.
+    &server,
     &SaveZkNote {
       id: None,
       title: "sync".to_string(),
@@ -200,6 +202,7 @@ pub async fn sync(
   dbpath: &Path,
   file_path: &Path,
   uid: UserId,
+  server: &Server,
   callbacks: &mut Callbacks,
   monitor: &dyn JobMonitor,
 ) -> Result<PrivateReply, Box<dyn std::error::Error>> {
@@ -224,6 +227,7 @@ pub async fn sync(
   // TODO: pass in 'now'?
   let res = sync_from_remote(
     &conn,
+    &server,
     &user,
     after,
     &file_path,
@@ -252,7 +256,7 @@ pub async fn sync(
       .await?;
 
       let unote = user_note_id(&conn, user.id)?;
-      save_sync(&conn, user.id, unote, CompletedSync { after, now }).await?;
+      save_sync(&conn, user.id, &server, unote, CompletedSync { after, now }).await?;
 
       tr.commit()?;
 
@@ -552,6 +556,7 @@ pub async fn sync_files_up(
 
 pub async fn sync_from_remote(
   conn: &Connection,
+  server: &Server,
   user: &User,
   after: Option<i64>,
   file_path: &Path,
@@ -591,6 +596,7 @@ pub async fn sync_from_remote(
 
   let reply = sync_from_stream(
     conn,
+    &server,
     file_path,
     Some(notetemp),
     Some(linktemp),
@@ -622,6 +628,7 @@ where
 
 pub async fn sync_from_stream<S>(
   conn: &Connection,
+  server: &Server,
   file_path: &Path,
   notetemp: Option<&str>,
   linktemp: Option<&str>,
@@ -808,6 +815,7 @@ where
               sqldata::save_zknote(
                 &conn,
                 uid,
+                &server,
                 &SaveZkNote {
                   id: Some(note.id),
                   title: note.title.clone(),

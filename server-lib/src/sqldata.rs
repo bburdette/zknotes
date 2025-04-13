@@ -34,6 +34,20 @@ pub fn zknotes_callbacks() -> Callbacks {
   }
 }
 
+#[derive(Clone)]
+pub struct Server {
+  pub id: i64,
+  pub uuid: String,
+}
+
+pub fn get_server_id(conn: &Connection) -> Result<Server, orgauth::error::Error> {
+  Ok(conn.query_row(
+    "select id, uuid from server where uuid = (select value from singlevalue where name = 'server_id')",
+    params![],
+    |row| Ok( Server { id: row.get(0)?, uuid: row.get(1)?}),
+  )?)
+}
+
 pub fn on_new_user(
   conn: &Connection,
   rd: &RegistrationData,
@@ -211,7 +225,7 @@ pub fn update_single_value(
   }
 }
 
-pub fn dbinit(dbfile: &Path, token_expiration_ms: Option<i64>) -> Result<(), zkerr::Error> {
+pub fn dbinit(dbfile: &Path, token_expiration_ms: Option<i64>) -> Result<Server, zkerr::Error> {
   let exists = dbfile.exists();
 
   let conn = connection_open(dbfile)?;
@@ -420,7 +434,9 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: Option<i64>) -> Result<(), zke
     orgauth::dbfun::purge_login_tokens(&conn, expms)?;
   }
 
-  Ok(())
+  let server = get_server_id(&conn)?;
+
+  Ok(server)
 }
 
 // read the uuidzklink.
@@ -756,16 +772,15 @@ pub fn are_notes_linked(conn: &Connection, nid1: i64, nid2: i64) -> Result<bool,
   }
 }
 
-pub fn archive_zknote_i64(conn: &Connection, noteid: i64) -> Result<SavedZkNote, zkerr::Error> {
-  let now = now()?;
+pub fn archive_zknote_i64(conn: &Connection, noteid: i64) -> Result<(), zkerr::Error> {
   let sysid = user_id(&conn, "system")?;
   let aid = note_id(&conn, "system", "archive")?;
   let uuid = uuid::Uuid::new_v4();
   // copy the note, with user 'system'.
   // exclude pubid, to avoid unique constraint problems.
   conn.execute(
-    "insert into zknote (title, content, user, editable, showtitle, deleted, uuid, createdate, changeddate)
-     select title, content, ?1, editable, showtitle, deleted, ?2, createdate, changeddate from
+    "insert into zknote (title, content, user, editable, showtitle, deleted, uuid, createdate, changeddate, server)
+     select title, content, ?1, editable, showtitle, deleted, ?2, createdate, changeddate, server from
          zknote where id = ?3",
     params![sysid.to_i64(), uuid.to_string(), noteid],
   )?;
@@ -777,11 +792,7 @@ pub fn archive_zknote_i64(conn: &Connection, noteid: i64) -> Result<SavedZkNote,
   // link the note to the original note, AND indicate this is an archive link.
   save_zklink(&conn, archive_note_id, noteid, sysid, Some(aid))?;
 
-  Ok(SavedZkNote {
-    id: uuid.into(),
-    changeddate: now,
-    what: None,
-  })
+  Ok(())
 }
 
 // write a zknote straight to archives.  should only happen during sync.
@@ -796,8 +807,8 @@ pub fn archive_zknote(
   // copy the note, with user 'system'.
   // exclude pubid, to avoid unique constraint problems.
   conn.execute(
-    "insert into zknote (title, content, user, editable, showtitle, deleted, uuid, createdate, changeddate)
-     values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+    "insert into zknote (title, content, user, editable, showtitle, deleted, uuid, createdate, changeddate, server)
+     values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, (select id from server where uuid = ?10))",
     params![
       note.title,
       note.content,
@@ -808,6 +819,7 @@ pub fn archive_zknote(
       uuid.to_string(),
       note.createdate,
       note.changeddate,
+      note.server
     ])?;
 
   let archive_note_id = conn.last_insert_rowid();
@@ -823,6 +835,7 @@ pub fn archive_zknote(
     SavedZkNote {
       id: uuid.into(),
       changeddate: note.changeddate,
+      server: note.server.clone(),
       what: None,
     },
   ))
@@ -840,6 +853,7 @@ pub fn set_zknote_file(conn: &Connection, noteid: i64, fileid: i64) -> Result<()
 pub fn save_zknote(
   conn: &Connection,
   uid: UserId,
+  server: &Server,
   note: &SaveZkNote,
 ) -> Result<(i64, SavedZkNote), zkerr::Error> {
   let now = now()?;
@@ -850,8 +864,15 @@ pub fn save_zknote(
       archive_zknote_i64(&conn, id)?;
       // existing note.  update IF mine.
       match conn.execute(
-        "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4, editable = ?5, showtitle = ?6, deleted = ?7
-         where id = ?8 and user = ?9 and deleted = 0",
+        "update zknote set title = ?1,
+           content = ?2,
+           changeddate = ?3,
+           pubid = ?4,
+           editable = ?5,
+           showtitle = ?6,
+           deleted = ?7,
+           server = ?8
+         where id = ?9 and user = ?10 and deleted = 0",
         params![
           note.title,
           note.content,
@@ -860,29 +881,34 @@ pub fn save_zknote(
           note.editable,
           note.showtitle,
           note.deleted,
+          server.id,
           id,
           uid.to_i64(),
         ],
       ) {
-        Ok(1) => {
-          Ok((id, SavedZkNote {
-          id: uuid,
-          changeddate: now,
-          what: note.what.clone(),
-        }))}
+        Ok(1) => Ok((
+          id,
+          SavedZkNote {
+            id: uuid,
+            changeddate: now,
+            server: server.uuid.clone(),
+            what: note.what.clone(),
+          },
+        )),
         Ok(0) => {
           match zknote_access_id(conn, Some(uid), id)? {
             Access::ReadWrite => {
               // update other user's record!  editable flag must be true.  can't modify delete flag.
               match conn.execute(
-                "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4, showtitle = ?5
-                 where id = ?6 and editable = 1 and deleted = 0",
-                params![note.title, note.content, now, note.pubid, note.showtitle, id],
+                "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4, showtitle = ?5, server = ?6
+                 where id = ?7 and editable = 1 and deleted = 0",
+                params![note.title, note.content, now, note.pubid, note.showtitle, server.id, id],
               )? {
                 0 => bail!("can't update; note is not writable"),
                 1 => Ok((id, SavedZkNote {
                     id: uuid,
                     changeddate: now,
+                    server: server.uuid.clone(),
                     what: note.what.clone(),
                   })),
                 _ => bail!("unexpected update success!"),
@@ -900,8 +926,8 @@ pub fn save_zknote(
 
       let uuid = uuid::Uuid::new_v4();
       conn.execute(
-        "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate)
-         values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+        "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate, server)
+         values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
         params![
           note.title,
           note.content,
@@ -913,6 +939,7 @@ pub fn save_zknote(
           uuid.to_string(),
           now,
           now,
+          server.id,
         ],
       )?;
       let id = conn.last_insert_rowid();
@@ -921,6 +948,7 @@ pub fn save_zknote(
         SavedZkNote {
           id: uuid.into(),
           changeddate: now,
+          server: server.uuid.clone(),
           what: note.what.clone(),
         },
       ))
@@ -958,6 +986,8 @@ pub fn read_extra_login_data(
   conn: &Connection,
   id: UserId,
 ) -> Result<ExtraLoginData, zkerr::Error> {
+  let server = get_server_id(conn)?;
+
   let (uid, noteid, hn) = conn.query_row(
     "select user.id, zknote.uuid, homenote
       from user, zknote where user.id = ?1
@@ -980,6 +1010,7 @@ pub fn read_extra_login_data(
     userid: uid,
     zknote: Uuid::parse_str(noteid.as_str())?.into(),
     homenote: hnid.map(|x| x.into()),
+    server: server.uuid.clone(),
   };
 
   Ok(eld)
@@ -1035,14 +1066,17 @@ pub fn read_zknote_unchecked(
         filestatus: file_status(&conn, &filedir, row.get(11)?)?,
         createdate: row.get(12)?,
         changeddate: row.get(13)?,
+        server: row.get(14)?,
         sysids: Vec::new(),
       },
     ))
   };
 
   conn.query_row_and_then(
-        "select ZN.id, ZN.uuid, ZN.title, ZN.content, ZN.user, OU.name, ZKN.uuid, ZN.pubid, ZN.editable, ZN.showtitle, ZN.deleted, ZN.file, ZN.createdate, ZN.changeddate
-          from zknote ZN, orgauth_user OU, user U, zknote ZKN where ZN.uuid = ?1 and U.id = ZN.user and OU.id = ZN.user and ZKN.id = U.zknote",
+        "select ZN.id, ZN.uuid, ZN.title, ZN.content, ZN.user, OU.name, ZKN.uuid,
+            ZN.pubid, ZN.editable, ZN.showtitle, ZN.deleted, ZN.file, ZN.createdate, ZN.changeddate, S.uuid
+          from zknote ZN, orgauth_user OU, user U, zknote ZKN, server S
+          where ZN.uuid = ?1 and U.id = ZN.user and OU.id = ZN.user and ZKN.id = U.zknote and S.id = ZN.server",
           params![id.to_string()],
         closure).map_err(|e| zkerr::annotate_string(format!("note not found: {}", id), e ))
 }
@@ -1255,38 +1289,46 @@ pub fn read_zknotepubid(
 ) -> Result<ZkNote, zkerr::Error> {
   let publicid = note_id(&conn, "system", "public")?;
   let (id, mut note) = match conn.query_row_and_then(
-    "select A.id, A.uuid, A.title, A.content, A.user, OU.name, ZU.uuid, A.pubid, A.editable, A.showtitle, A.deleted, A.file, A.createdate, A.changeddate
-      from zknote A, user U, orgauth_user OU, zklink L
+    "select A.id, A.uuid, A.title, A.content, A.user, OU.name, ZU.uuid,
+        A.pubid, A.editable, A.showtitle, A.deleted, A.file, A.createdate, A.changeddate, S.uuid
+      from zknote A, user U, orgauth_user OU, zklink L, server S
       left join zknote ZU on ZU.id = U.zknote
       where A.pubid = ?1
       and ((A.id = L.fromid
       and L.toid = ?2) or (A.id = L.toid
       and L.fromid = ?2))
       and U.id = A.user
-      and OU.id = A.user",
+      and OU.id = A.user
+      and S.id = A.server",
     params![pubid, publicid],
     |row| {
-      Ok::<_, zkerr::Error>((row.get(0)?, ZkNote {
-        id: Uuid::parse_str(row.get::<usize,String>(1)?.as_str())?.into(),
-        title: row.get(2)?,
-        content: row.get(3)?,
-        user: UserId::Uid(row.get(4)?),
-        username: row.get(5)?,
-        usernote:  Uuid::parse_str(row.get::<usize,String>(6)?.as_str())?.into(),
-        pubid: row.get(7)?,
-        editable: false,
-        editableValue: row.get(8)?,
-        showtitle: row.get(9)?,
-        deleted: row.get(10)?,
-        filestatus: file_status(&conn, &files_dir, row.get(11)?)?,
-        createdate: row.get(12)?,
-        changeddate: row.get(13)?,
-        sysids: Vec::new(),
-      }))
+      Ok::<_, zkerr::Error>((
+        row.get(0)?,
+        ZkNote {
+          id: Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?.into(),
+          title: row.get(2)?,
+          content: row.get(3)?,
+          user: UserId::Uid(row.get(4)?),
+          username: row.get(5)?,
+          usernote: Uuid::parse_str(row.get::<usize, String>(6)?.as_str())?.into(),
+          pubid: row.get(7)?,
+          editable: false,
+          editableValue: row.get(8)?,
+          showtitle: row.get(9)?,
+          deleted: row.get(10)?,
+          filestatus: file_status(&conn, &files_dir, row.get(11)?)?,
+          createdate: row.get(12)?,
+          changeddate: row.get(13)?,
+          server: row.get(14)?,
+          sysids: Vec::new(),
+        },
+      ))
     },
   ) {
     Ok(x) => Ok(x),
-    Err(zkerr::Error::Rusqlite(rusqlite::Error::QueryReturnedNoRows)) => Err(zkerr::Error::String(format!("note not found for public id: {}", pubid))),
+    Err(zkerr::Error::Rusqlite(rusqlite::Error::QueryReturnedNoRows)) => Err(zkerr::Error::String(
+      format!("note not found for public id: {}", pubid),
+    )),
     Err(e) => Err(e),
   }?;
   let sysid = user_id(&conn, "system")?;
@@ -2203,6 +2245,7 @@ pub fn read_zneifchanged(
 pub fn save_importzknotes(
   conn: &Connection,
   uid: UserId,
+  server: &Server,
   izns: &Vec<ImportZkNote>,
 ) -> Result<(), zkerr::Error> {
   for izn in izns.iter() {
@@ -2223,6 +2266,7 @@ pub fn save_importzknotes(
         save_zknote(
           &conn,
           uid,
+          server,
           &SaveZkNote {
             id: None,
             title: izn.title.clone(),
@@ -2247,6 +2291,7 @@ pub fn save_importzknotes(
           save_zknote(
             &conn,
             uid,
+            server,
             &SaveZkNote {
               id: None,
               title: title.clone(),
@@ -2274,6 +2319,7 @@ pub fn save_importzknotes(
           save_zknote(
             &conn,
             uid,
+            server,
             &SaveZkNote {
               id: None,
               title: title.clone(),
@@ -2299,6 +2345,7 @@ pub fn save_importzknotes(
 
 pub fn make_file_note(
   conn: &Connection,
+  server: &Server,
   files_dir: &Path,
   uid: UserId,
   name: &String,
@@ -2364,6 +2411,7 @@ pub fn make_file_note(
   let (id, sn) = save_zknote(
     &conn,
     uid,
+    server,
     &SaveZkNote {
       id: None,
       title: name.to_string(),

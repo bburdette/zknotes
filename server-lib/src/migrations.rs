@@ -2558,7 +2558,7 @@ pub fn udpate36(dbfile: &Path) -> Result<(), orgauth::error::Error> {
         .increments(true)
         .nullable(false),
     );
-    t.add_column("uuid", types::text().nullable(false));
+    t.add_column("uuid", types::text().nullable(false).unique(true));
     t.add_column("createdate", types::integer().nullable(false));
   });
 

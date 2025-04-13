@@ -4,6 +4,7 @@ use crate::sqldata::{delete_zknote, get_sysids, note_id};
 use async_stream::try_stream;
 use futures::Stream;
 use orgauth::data::UserId;
+use orgauth::dbfun::server_id;
 use orgauth::dbfun::user_id;
 use rusqlite::Connection;
 use std::convert::TryInto;
@@ -649,6 +650,7 @@ fn build_tagsearch_clause(
       let mut after = false;
       let mut create = false;
       let mut modd = false;
+      let mut server = false;
 
       for m in mods {
         match m {
@@ -665,12 +667,15 @@ fn build_tagsearch_clause(
             zknoteid = true;
             exact = true; // zknoteid implies exact.
           }
+          SearchMod::Server => server = true,
         }
       }
       let field = if zknoteid {
         "uuid"
       } else if desc {
         "content"
+      } else if server {
+        "server"
       } else {
         "title"
       };
@@ -695,6 +700,16 @@ fn build_tagsearch_clause(
           false => "",
         };
         (format!("N.user {}= ?", notstr), vec![format!("{}", userid)])
+      } else if server {
+        let serverid = server_id(conn, &term)?;
+        let notstr = match not {
+          true => "!",
+          false => "",
+        };
+        (
+          format!("N.server {}= ?", notstr),
+          vec![format!("{}", serverid)],
+        )
       } else {
         if tag {
           let fileclause = if file { "and zkn.file is not null" } else { "" };
