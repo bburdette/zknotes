@@ -37,7 +37,7 @@ pub use rusqlite;
 use rusqlite::Connection;
 use serde_json;
 use simple_error::simple_error;
-use sqldata::{get_server_id, get_single_value};
+use sqldata::{get_single_value, local_server_id};
 use std::fs::File;
 use std::io::{stdin, Write};
 use std::path::Path;
@@ -339,7 +339,7 @@ async fn make_file_notes(
     session_user(&conn, session, &state)?.id
   };
 
-  let server = get_server_id(&conn)?;
+  let server = local_server_id(&conn)?;
 
   // Save the files to our temp path.
   let tp = state.config.file_tmp_path.clone();
@@ -547,7 +547,7 @@ async fn zk_interface_check_upstreaming(
     Some(token) => {
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
 
-      let server = sqldata::get_server_id(&conn)?;
+      let server = sqldata::local_server_id(&conn)?;
 
       match orgauth::dbfun::read_user_by_token_api(
         &conn,

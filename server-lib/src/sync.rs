@@ -2,7 +2,9 @@ use crate::error as zkerr;
 use crate::jobs::JobMonitor;
 use crate::search::build_sql;
 use crate::search::{search_zknotes, search_zknotes_stream, sync_users, system_user, SearchResult};
-use crate::sqldata::{self, note_id_for_uuid, save_zklink, save_zknote, user_note_id, Server};
+use crate::sqldata::{
+  self, note_id_for_uuid, save_zklink, save_zknote, server_id, user_note_id, Server,
+};
 use crate::util::now;
 use actix_multipart_rfc7578 as multipart;
 use actix_web::error::PayloadError;
@@ -725,6 +727,8 @@ where
 
   sm = read_sync_message(&mut line, br).await?;
 
+  let mut serverhash = HashMap::<String, i64>::new();
+
   while let SyncMessage::ZkNote(ref note, ref mbf) = sm {
     let uid = UserId::Uid(
       *userhash
@@ -782,9 +786,26 @@ where
       }
     };
 
+    let server_id = match serverhash.get(&note.server).ok_or_else(|| {
+      match server_id(&conn, note.server.as_str()) {
+        Ok(id) => Ok(id),
+        Err(e) => conn
+          .execute(
+            "insert into server (uuid, createdate) values (?1, ?2)",
+            params![note.server, now],
+          )
+          .map(|x| conn.last_insert_rowid())
+          .map_err(|e| zkerr::Error::from(e)),
+      }
+    }) {
+      Ok(id) => Ok(id.clone()),
+      Err(Ok(id)) => Ok(id),
+      Err(Err(e)) => Err(e),
+    }?;
+
     let ex =  conn.execute(
-        "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, file, createdate, changeddate)
-         values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+        "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, file, server, createdate, changeddate)
+         values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
       params![
         note.title,
         note.content,
@@ -795,6 +816,7 @@ where
         note.deleted,
         note.id.to_string(),
         file_id,
+        server_id,
         note.createdate,
         note.changeddate,
       ]
@@ -890,8 +912,8 @@ where
     );
     assert!(uid == sysid);
     let mbid = match conn.execute(
-      "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate)
-       values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+      "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, server, createdate, changeddate)
+       values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
         params![
           note.title,
           note.content,
@@ -901,6 +923,7 @@ where
           note.showtitle,
           note.deleted,
           note.id.to_string(),
+          note.server,
           note.createdate,
           note.changeddate,
           ])

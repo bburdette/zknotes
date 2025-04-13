@@ -1,10 +1,10 @@
 use crate::error as zkerr;
 use crate::sqldata;
+use crate::sqldata::server_id;
 use crate::sqldata::{delete_zknote, get_sysids, note_id};
 use async_stream::try_stream;
 use futures::Stream;
 use orgauth::data::UserId;
-use orgauth::dbfun::server_id;
 use orgauth::dbfun::user_id;
 use rusqlite::Connection;
 use std::convert::TryInto;

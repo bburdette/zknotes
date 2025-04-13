@@ -40,12 +40,22 @@ pub struct Server {
   pub uuid: String,
 }
 
-pub fn get_server_id(conn: &Connection) -> Result<Server, orgauth::error::Error> {
+pub fn local_server_id(conn: &Connection) -> Result<Server, zkerr::Error> {
   Ok(conn.query_row(
     "select id, uuid from server where uuid = (select value from singlevalue where name = 'server_id')",
     params![],
     |row| Ok( Server { id: row.get(0)?, uuid: row.get(1)?}),
   )?)
+}
+
+pub fn server_id(conn: &Connection, uuid: &str) -> Result<i64, zkerr::Error> {
+  let id: i64 = conn.query_row(
+    "select id from server
+      where uuid = ?1",
+    params![uuid],
+    |row| Ok(row.get(0)?),
+  )?;
+  Ok(id)
 }
 
 pub fn on_new_user(
@@ -70,11 +80,13 @@ pub fn on_new_user(
     None => uuid::Uuid::new_v4().into(),
   };
 
+  let server = local_server_id(conn).map_err(zkerr::to_orgauth_error)?;
+
   // make a corresponding note,
   conn.execute(
-    "insert into zknote (title, content, user, editable, showtitle, deleted, uuid, createdate, changeddate)
-     values (?1, ?2, ?3, 0, 1, 0, ?4, ?5, ?6)",
-    params![rd.uid, "", systemid.to_i64(), user_note_uuid.to_string(), now, now],
+    "insert into zknote (title, content, user, editable, showtitle, deleted, uuid, server, createdate, changeddate)
+     values (?1, ?2, ?3, 0, 1, 0, ?4, ?5, ?6, ?7)",
+    params![rd.uid, "", systemid.to_i64(), user_note_uuid.to_string(), server.id, now, now],
   )?;
 
   let zknid = conn.last_insert_rowid();
@@ -434,7 +446,7 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: Option<i64>) -> Result<Server,
     orgauth::dbfun::purge_login_tokens(&conn, expms)?;
   }
 
-  let server = get_server_id(&conn)?;
+  let server = local_server_id(&conn)?;
 
   Ok(server)
 }
@@ -986,7 +998,7 @@ pub fn read_extra_login_data(
   conn: &Connection,
   id: UserId,
 ) -> Result<ExtraLoginData, zkerr::Error> {
-  let server = get_server_id(conn)?;
+  let server = local_server_id(conn)?;
 
   let (uid, noteid, hn) = conn.query_row(
     "select user.id, zknote.uuid, homenote
