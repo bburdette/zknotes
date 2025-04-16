@@ -1,5 +1,6 @@
 use crate::config::Config;
 use crate::jobs::JobId;
+use crate::sqldata::Server;
 use girlboss::Girlboss;
 use girlboss::Monitor;
 use orgauth::data::UserId;
@@ -10,6 +11,7 @@ pub struct State {
   pub config: Config,
   pub girlboss: Arc<RwLock<Girlboss<JobId, Monitor>>>,
   pub jobcounter: RwLock<i64>,
+  pub server: Server,
 }
 
 pub fn new_jobid(state: &State, uid: UserId) -> JobId {

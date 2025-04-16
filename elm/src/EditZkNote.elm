@@ -186,6 +186,7 @@ type alias Model =
     , panelNote : Maybe Data.ZkNote
     , mbReplaceString : Maybe String
     , mobile : Bool
+    , server : String
     }
 
 
@@ -355,6 +356,7 @@ toZkNote model =
                 , deleted = model.deleted
                 , filestatus = model.filestatus
                 , sysids = getSysids model
+                , server = model.server
                 }
 
         _ ->
@@ -1246,6 +1248,17 @@ zknview zone size spmodel zknSearchResult recentZkns trqs tjobs noteCache model 
                       else
                         E.none
                     ]
+                 , E.row [ E.spacing 8, E.width E.fill ]
+                    [ E.text "server: "
+                    , E.text model.server
+                    , E.text
+                        (if model.server == model.ld.server then
+                            "(local)"
+
+                         else
+                            "(remote)"
+                        )
+                    ]
                  , if wclass == Narrow then
                     showpagelink
 
@@ -1742,6 +1755,7 @@ initFull fui ld zknote dtlinks mbedittab mobile =
       , panelNote = Nothing
       , mbReplaceString = Nothing
       , mobile = mobile
+      , server = zknote.server
       }
         |> (\m ->
                 Maybe.map (\nc -> setTab nc m) mbedittab
@@ -1798,6 +1812,7 @@ initNew fui ld links mobile =
     , panelNote = Nothing
     , mbReplaceString = Nothing
     , mobile = mobile
+    , server = ld.server
     }
         |> (\m1 ->
                 -- for new EMPTY notes, the 'revert' should be the same as the model, so that you aren't
@@ -1837,6 +1852,7 @@ sznToZkn uid uname unote sysids sdzn szn =
     , deleted = szn.deleted
     , filestatus = Data.NotAFile
     , sysids = sysids
+    , server = sdzn.server
     }
 
 

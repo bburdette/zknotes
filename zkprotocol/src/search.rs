@@ -67,6 +67,7 @@ pub enum SearchMod {
   After,
   Create,
   Mod,
+  Server,
 }
 
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]

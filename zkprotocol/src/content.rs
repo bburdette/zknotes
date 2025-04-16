@@ -40,6 +40,7 @@ pub struct ExtraLoginData {
   pub userid: UserId,
   pub zknote: ZkNoteId,
   pub homenote: Option<ZkNoteId>,
+  pub server: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -69,6 +70,7 @@ pub struct ZkNote {
   pub changeddate: i64,
   pub deleted: bool,
   pub filestatus: FileStatus,
+  pub server: String,
   pub sysids: Vec<ZkNoteId>,
 }
 
@@ -94,6 +96,7 @@ pub struct ZkListNote {
 pub struct SavedZkNote {
   pub id: ZkNoteId,
   pub changeddate: i64,
+  pub server: String,
   pub what: Option<String>,
 }
 

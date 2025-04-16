@@ -2,7 +2,9 @@ use crate::error as zkerr;
 use crate::jobs::JobMonitor;
 use crate::search::build_sql;
 use crate::search::{search_zknotes, search_zknotes_stream, sync_users, system_user, SearchResult};
-use crate::sqldata::{self, note_id_for_uuid, save_zklink, save_zknote, user_note_id};
+use crate::sqldata::{
+  self, note_id_for_uuid, save_zklink, save_zknote, server_id, user_note_id, Server,
+};
 use crate::util::now;
 use actix_multipart_rfc7578 as multipart;
 use actix_web::error::PayloadError;
@@ -101,6 +103,7 @@ pub async fn prev_sync(
 pub async fn save_sync(
   conn: &Connection,
   _uid: UserId,
+  server: &Server,
   usernoteid: i64,
   sync: CompletedSync,
 ) -> Result<i64, Box<dyn std::error::Error>> {
@@ -110,6 +113,7 @@ pub async fn save_sync(
   let (id, _szn) = save_zknote(
     conn,
     sysid, // save under system id.
+    &server,
     &SaveZkNote {
       id: None,
       title: "sync".to_string(),
@@ -200,6 +204,7 @@ pub async fn sync(
   dbpath: &Path,
   file_path: &Path,
   uid: UserId,
+  server: &Server,
   callbacks: &mut Callbacks,
   monitor: &dyn JobMonitor,
 ) -> Result<PrivateReply, Box<dyn std::error::Error>> {
@@ -224,6 +229,7 @@ pub async fn sync(
   // TODO: pass in 'now'?
   let res = sync_from_remote(
     &conn,
+    &server,
     &user,
     after,
     &file_path,
@@ -252,7 +258,7 @@ pub async fn sync(
       .await?;
 
       let unote = user_note_id(&conn, user.id)?;
-      save_sync(&conn, user.id, unote, CompletedSync { after, now }).await?;
+      save_sync(&conn, user.id, &server, unote, CompletedSync { after, now }).await?;
 
       tr.commit()?;
 
@@ -552,6 +558,7 @@ pub async fn sync_files_up(
 
 pub async fn sync_from_remote(
   conn: &Connection,
+  server: &Server,
   user: &User,
   after: Option<i64>,
   file_path: &Path,
@@ -591,6 +598,7 @@ pub async fn sync_from_remote(
 
   let reply = sync_from_stream(
     conn,
+    &server,
     file_path,
     Some(notetemp),
     Some(linktemp),
@@ -622,6 +630,7 @@ where
 
 pub async fn sync_from_stream<S>(
   conn: &Connection,
+  server: &Server,
   file_path: &Path,
   notetemp: Option<&str>,
   linktemp: Option<&str>,
@@ -718,6 +727,8 @@ where
 
   sm = read_sync_message(&mut line, br).await?;
 
+  let mut serverhash = HashMap::<String, i64>::new();
+
   while let SyncMessage::ZkNote(ref note, ref mbf) = sm {
     let uid = UserId::Uid(
       *userhash
@@ -775,9 +786,26 @@ where
       }
     };
 
+    let server_id = match serverhash.get(&note.server).ok_or_else(|| {
+      match server_id(&conn, note.server.as_str()) {
+        Ok(id) => Ok(id),
+        Err(e) => conn
+          .execute(
+            "insert into server (uuid, createdate) values (?1, ?2)",
+            params![note.server, now],
+          )
+          .map(|x| conn.last_insert_rowid())
+          .map_err(|e| zkerr::Error::from(e)),
+      }
+    }) {
+      Ok(id) => Ok(id.clone()),
+      Err(Ok(id)) => Ok(id),
+      Err(Err(e)) => Err(e),
+    }?;
+
     let ex =  conn.execute(
-        "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, file, createdate, changeddate)
-         values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+        "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, file, server, createdate, changeddate)
+         values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
       params![
         note.title,
         note.content,
@@ -788,6 +816,7 @@ where
         note.deleted,
         note.id.to_string(),
         file_id,
+        server_id,
         note.createdate,
         note.changeddate,
       ]
@@ -808,6 +837,7 @@ where
               sqldata::save_zknote(
                 &conn,
                 uid,
+                &server,
                 &SaveZkNote {
                   id: Some(note.id),
                   title: note.title.clone(),
@@ -882,8 +912,8 @@ where
     );
     assert!(uid == sysid);
     let mbid = match conn.execute(
-      "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, createdate, changeddate)
-       values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+      "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, server, createdate, changeddate)
+       values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
         params![
           note.title,
           note.content,
@@ -893,6 +923,7 @@ where
           note.showtitle,
           note.deleted,
           note.id.to_string(),
+          note.server,
           note.createdate,
           note.changeddate,
           ])
