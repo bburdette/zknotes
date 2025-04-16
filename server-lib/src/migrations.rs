@@ -2544,7 +2544,7 @@ pub fn udpate36(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 
   let conn = Connection::open(dbfile)?;
   conn.execute("PRAGMA foreign_keys = false;", params![])?;
-  // let tr = conn.unchecked_transaction()?;
+  let tr = conn.unchecked_transaction()?;
 
   println!("migrate 1");
   let mut m1 = Migration::new();
@@ -2698,7 +2698,7 @@ pub fn udpate36(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   println!("migrate 11");
   conn.execute_batch(m3.make::<Sqlite>().as_str())?;
 
-  // tr.commit()?;
+  tr.commit()?;
 
   Ok(())
 }
