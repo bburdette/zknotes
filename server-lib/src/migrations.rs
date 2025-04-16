@@ -2546,10 +2546,8 @@ pub fn udpate36(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   conn.execute("PRAGMA foreign_keys = false;", params![])?;
   let tr = conn.unchecked_transaction()?;
 
-  println!("migrate 1");
   let mut m1 = Migration::new();
 
-  println!("migrate 2");
   m1.create_table("server", |t| {
     t.add_column(
       "id",
@@ -2563,7 +2561,6 @@ pub fn udpate36(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   });
 
   // new zknote with showtitle column
-  println!("migrate 3");
   m1.create_table("zknotetemp", |t| {
     t.add_column(
       "id",
@@ -2604,7 +2601,6 @@ pub fn udpate36(dbfile: &Path) -> Result<(), orgauth::error::Error> {
     t.add_column("changeddate", types::integer().nullable(false));
   });
 
-  println!("migrate 4");
   conn.execute_batch(m1.make::<Sqlite>().as_str())?;
 
   let now = now()?;
@@ -2621,14 +2617,11 @@ pub fn udpate36(dbfile: &Path) -> Result<(), orgauth::error::Error> {
     params![],
   )?;
 
-  println!("migrate 5");
   let mut m2 = Migration::new();
 
-  println!("migrate 6");
   m2.drop_table("zknote");
 
   // new zknote with new column
-  println!("migrate 7");
   m2.create_table("zknote", |t| {
     t.add_column(
       "id",
@@ -2679,7 +2672,6 @@ pub fn udpate36(dbfile: &Path) -> Result<(), orgauth::error::Error> {
     t.add_index("unq_uuid", types::index(vec!["uuid"]).unique(true));
   });
 
-  println!("migrate 8");
   conn.execute_batch(m2.make::<Sqlite>().as_str())?;
 
   // copy everything from zknotetemp, plus server id.
@@ -2689,13 +2681,10 @@ pub fn udpate36(dbfile: &Path) -> Result<(), orgauth::error::Error> {
     params![server_id],
   )?;
 
-  println!("migrate 9");
   let mut m3 = Migration::new();
 
-  println!("migrate 10");
   m3.drop_table("zknotetemp");
 
-  println!("migrate 11");
   conn.execute_batch(m3.make::<Sqlite>().as_str())?;
 
   tr.commit()?;
