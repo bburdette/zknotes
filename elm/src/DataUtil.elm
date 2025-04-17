@@ -298,6 +298,16 @@ flipDirection direction =
             To
 
 
+flipOrderDirection : OrderDirection -> OrderDirection
+flipOrderDirection od =
+    case od of
+        Ascending ->
+            Descending
+
+        Descending ->
+            Ascending
+
+
 
 ------------------------------------------------------------
 -- getting, setting text selections in text edit areas.

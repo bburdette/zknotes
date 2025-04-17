@@ -7,6 +7,7 @@ module SearchPanel exposing
     , getSearch
     , initModel
     , onEnter
+    , onOrdering
     , paginationView
     , searchResultUpdated
     , setSearch
@@ -90,6 +91,11 @@ addToSearch model searchmods name =
 onEnter : Model -> ( Model, Command )
 onEnter model =
     handleTspUpdate model (TSP.onEnter model.tagSearchModel)
+
+
+onOrdering : Maybe Data.Ordering -> Model -> ( Model, Command )
+onOrdering ordering model =
+    handleTspUpdate model (TSP.onOrdering ordering model.tagSearchModel)
 
 
 type Msg

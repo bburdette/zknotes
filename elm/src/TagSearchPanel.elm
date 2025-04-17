@@ -10,6 +10,7 @@ module TagSearchPanel exposing
     , getSearch
     , initModel
     , onEnter
+    , onOrdering
     , selectPrevSearch
     , setSearch
     , toggleHelpButton
@@ -21,7 +22,7 @@ module TagSearchPanel exposing
 -- import Search exposing (AndOr(..), SearchMod(..), TSText, TagSearch(..), showSearchMod, tagSearchParser)
 
 import Common exposing (buttonStyle)
-import Data exposing (AndOr(..), SearchMod(..), TagSearch(..))
+import Data exposing (AndOr(..), Ordering, SearchMod(..), TagSearch(..))
 import Element as E exposing (..)
 import Element.Background as EBk
 import Element.Border as EBd
@@ -53,6 +54,7 @@ type alias Model =
     , prevSearches : List String
     , searchOnEnter : Bool
     , searchTermFocus : Maybe TSLoc
+    , ordering : Maybe Ordering
     }
 
 
@@ -67,6 +69,7 @@ initModel =
     , prevSearches = []
     , searchOnEnter = False
     , searchTermFocus = Nothing
+    , ordering = Nothing
     }
 
 
@@ -605,6 +608,32 @@ view showCopy narrow nblevel model =
                     EI.labelHidden "search"
                 }
 
+        orderingRow =
+            model.ordering
+                |> Maybe.map
+                    (\o ->
+                        E.text <|
+                            (case o.field of
+                                Data.Title ->
+                                    "Title"
+
+                                Data.Created ->
+                                    "Created"
+
+                                Data.Changed ->
+                                    "Changed"
+                            )
+                                ++ " "
+                                ++ (case o.direction of
+                                        Data.Ascending ->
+                                            "Ascending"
+
+                                        Data.Descending ->
+                                            "Descending"
+                                   )
+                    )
+                |> Maybe.withDefault E.none
+
         ddbutton =
             none
 
@@ -698,55 +727,54 @@ view showCopy narrow nblevel model =
                     _ ->
                         E.none
                )
-            :: ([ ( "tinput"
-                  , row [ width fill, spacing 3 ]
-                        [ tinput
-                        ]
-                  )
-                , ( "tbuttons", row [ spacing 3, width fill ] buttons )
-                ]
-                    ++ ( "searchhelp"
-                       , if model.showParse then
-                            case model.search of
-                                TagSearch rts ->
-                                    case rts of
-                                        Err e ->
-                                            column [ width fill ]
-                                                [ row [ spacing 3, width fill ]
-                                                    [ text "Syntax error:"
-                                                    , paragraph [] [ text (Util.deadEndsToString e) ]
-                                                    , el [ alignRight ] <| toggleHelpButton model.showHelp
-                                                    ]
-                                                , if model.showHelp then
-                                                    E.map HelpMsg <| SearchHelpPanel.view nblevel model.helpPanel
-
-                                                  else
-                                                    E.none
-                                                ]
-
-                                        Ok ts ->
-                                            column [ width fill ]
-                                                [ paragraph [ spacing 3, width fill ]
-                                                    [ text "search expression:"
-                                                    , paragraph [] [ text <| printTagSearch ts ]
-                                                    , el [ alignRight ] <| toggleHelpButton model.showHelp
-                                                    ]
-                                                , if model.showHelp then
-                                                    E.map HelpMsg <| SearchHelpPanel.view nblevel model.helpPanel
-
-                                                  else
-                                                    E.none
-                                                ]
-
-                                NoSearch ->
-                                    E.map HelpMsg <|
-                                        SearchHelpPanel.view nblevel model.helpPanel
-
-                         else
-                            E.none
-                       )
-                    :: []
+            :: ( "tinput"
+               , row [ width fill, spacing 3 ]
+                    [ tinput
+                    ]
                )
+            :: ( "orderingRow", orderingRow )
+            :: ( "tbuttons", row [ spacing 3, width fill ] buttons )
+            :: ( "searchhelp"
+               , if model.showParse then
+                    case model.search of
+                        TagSearch rts ->
+                            case rts of
+                                Err e ->
+                                    column [ width fill ]
+                                        [ row [ spacing 3, width fill ]
+                                            [ text "Syntax error:"
+                                            , paragraph [] [ text (Util.deadEndsToString e) ]
+                                            , el [ alignRight ] <| toggleHelpButton model.showHelp
+                                            ]
+                                        , if model.showHelp then
+                                            E.map HelpMsg <| SearchHelpPanel.view nblevel model.helpPanel
+
+                                          else
+                                            E.none
+                                        ]
+
+                                Ok ts ->
+                                    column [ width fill ]
+                                        [ paragraph [ spacing 3, width fill ]
+                                            [ text "search expression:"
+                                            , paragraph [] [ text <| printTagSearch ts ]
+                                            , el [ alignRight ] <| toggleHelpButton model.showHelp
+                                            ]
+                                        , if model.showHelp then
+                                            E.map HelpMsg <| SearchHelpPanel.view nblevel model.helpPanel
+
+                                          else
+                                            E.none
+                                        ]
+
+                        NoSearch ->
+                            E.map HelpMsg <|
+                                SearchHelpPanel.view nblevel model.helpPanel
+
+                 else
+                    E.none
+               )
+            :: []
         )
 
 
@@ -771,6 +799,11 @@ onEnter model =
 
     else
         ( model, None )
+
+
+onOrdering : Maybe Ordering -> Model -> ( Model, Command )
+onOrdering ordering model =
+    ( { model | ordering = ordering }, None )
 
 
 doSearchClick : Model -> ( Model, Command )

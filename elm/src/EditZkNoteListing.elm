@@ -1,7 +1,7 @@
 module EditZkNoteListing exposing (..)
 
 import Common
-import Data
+import Data exposing (Ordering)
 import DataUtil exposing (LoginData)
 import Dialog as D
 import Element as E exposing (Element)
@@ -23,6 +23,9 @@ type Msg
     = NewPress
     | DonePress
     | ImportPress
+    | TitlePress
+    | CreatedPress
+    | ChangedPress
     | PowerDeletePress
     | SPMsg SP.Msg
     | DialogMsg D.Msg
@@ -141,7 +144,8 @@ listview ld size model spmodel notes =
                 , E.table [ E.spacing 5, E.width E.fill, E.centerX ]
                     { data = notes.notes
                     , columns =
-                        [ { header = E.el [ EF.underline ] <| E.text "title"
+                        [ { header =
+                                EI.button Common.buttonStyle { onPress = Just TitlePress, label = E.text "title" }
                           , width =
                                 -- E.fill
                                 -- clipX doesn't work unless max width is here in px, it seems.
@@ -201,13 +205,15 @@ listview ld size model spmodel notes =
                                         Data.FilePresent ->
                                             E.text "file"
                           }
-                        , { header = E.el [ EF.underline ] <| E.text "create"
+                        , { header =
+                                EI.button Common.buttonStyle { onPress = Just CreatedPress, label = E.text "create" }
                           , width = E.shrink
                           , view =
                                 \n ->
                                     E.text <| Util.showDate model.zone <| Time.millisToPosix n.createdate
                           }
-                        , { header = E.el [ EF.underline ] <| E.text "mod"
+                        , { header =
+                                EI.button Common.buttonStyle { onPress = Just ChangedPress, label = E.text "changed" }
                           , width = E.shrink
                           , view =
                                 \n ->
@@ -235,6 +241,16 @@ listview ld size model spmodel notes =
             ]
 
 
+newOrder : SP.Model -> Data.OrderField -> Data.Ordering
+newOrder model ofld =
+    case model.spmodel.tagSearchModel.ordering of
+        Nothing ->
+            { field = ofld, direction = Data.Ascending }
+
+        Just o ->
+            { o | field = ofld, direction = DataUtil.flipOrderDirection o.direction }
+
+
 update : Msg -> Model -> SP.Model -> Data.ZkListNoteSearchResult -> LoginData -> ( Model, Command )
 update msg model spmodel notes ld =
     case msg of
@@ -246,6 +262,15 @@ update msg model spmodel notes ld =
 
         ImportPress ->
             ( model, Import )
+
+        TitlePress ->
+            ( model, SPMod (SP.onOrdering (Just (newOrder spmodel Data.Title))) )
+
+        CreatedPress ->
+            ( model, SPMod (SP.onOrdering (Just (newOrder spmodel Data.Created))) )
+
+        ChangedPress ->
+            ( model, SPMod (SP.onOrdering (Just (newOrder spmodel Data.Changed))) )
 
         SearchHistoryPress ->
             ( model, SearchHistory )
