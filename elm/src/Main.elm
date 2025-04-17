@@ -2606,7 +2606,7 @@ actualupdate msg model =
                         Data.PvyZkListNoteSearchResult sr ->
                             case state of
                                 ShowMessage _ login _ ->
-                                    ( { model | state = EditZkNoteListing { dialog = Nothing } login }
+                                    ( { model | state = EditZkNoteListing { dialog = Nothing, zone = model.timezone } login }
                                     , Cmd.none
                                     )
 
@@ -2910,7 +2910,7 @@ actualupdate msg model =
                             nm =
                                 { model
                                     | state =
-                                        EditZkNoteListing { dialog = Nothing } login
+                                        EditZkNoteListing { dialog = Nothing, zone = model.timezone } login
                                 }
                         in
                         case SP.getSearch model.spmodel of
@@ -3453,7 +3453,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                 nm =
                     { model
                         | state =
-                            EditZkNoteListing { dialog = Nothing } login
+                            EditZkNoteListing { dialog = Nothing, zone = model.timezone } login
                     }
             in
             case SP.getSearch model.spmodel of
@@ -3475,7 +3475,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                                 nm =
                                     { model
                                         | state =
-                                            EditZkNoteListing { dialog = Nothing } login
+                                            EditZkNoteListing { dialog = Nothing, zone = model.timezone } login
                                     }
                             in
                             case SP.getSearch model.spmodel of

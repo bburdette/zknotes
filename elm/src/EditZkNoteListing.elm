@@ -12,6 +12,7 @@ import Element.Input as EI
 import SearchStackPanel as SP
 import SearchUtil exposing (showTagSearch)
 import TangoColors as TC
+import Time
 import Toop
 import Util
 import WindowKeys as WK
@@ -35,6 +36,7 @@ type DWhich
 
 type alias Model =
     { dialog : Maybe ( D.Model, DWhich )
+    , zone : Time.Zone
     }
 
 
@@ -139,7 +141,7 @@ listview ld size model spmodel notes =
                 , E.table [ E.spacing 5, E.width E.fill, E.centerX ]
                     { data = notes.notes
                     , columns =
-                        [ { header = E.none
+                        [ { header = E.el [ EF.underline ] <| E.text "title"
                           , width =
                                 -- E.fill
                                 -- clipX doesn't work unless max width is here in px, it seems.
@@ -147,22 +149,79 @@ listview ld size model spmodel notes =
                                 E.px <| min maxwidth size.width - 32
                           , view =
                                 \n ->
-                                    E.row
-                                        ([ E.centerY
-                                         , E.clipX
-                                         , E.width E.fill
-                                         ]
-                                            ++ (ZC.systemColor DataUtil.sysids n.sysids
-                                                    |> Maybe.map (\c -> [ EF.color c ])
-                                                    |> Maybe.withDefault []
-                                               )
-                                        )
-                                        [ E.link
+                                    let
+                                        lnnonme =
+                                            n.user /= ld.userid
+                                    in
+                                    -- E.row
+                                    --     ([ E.centerY
+                                    --      , E.clipX
+                                    --      , E.width E.fill
+                                    --      ]
+                                    --         ++ (ZC.systemColor DataUtil.sysids n.sysids
+                                    --                 |> Maybe.map (\c -> [ EF.color c ])
+                                    --                 |> Maybe.withDefault []
+                                    --            )
+                                    --     )
+                                    --     [
+                                    E.column []
+                                        [ if lnnonme then
+                                            ZC.golink n.id
+                                                ZC.otherLinkColor
+
+                                          else
+                                            ZC.golink n.id
+                                                ZC.myLinkColor
+                                        , E.el
+                                            -- [ E.height <| E.px 30, E.width (E.minimum (maxwidth - 32) E.fill) ]
                                             [ E.height <| E.px 30 ]
-                                            { url = DataUtil.editNoteLink n.id
-                                            , label = E.text n.title
-                                            }
+                                            (E.text n.title)
                                         ]
+
+                          -- { id : ZkNoteId
+                          -- , title : String
+                          -- , filestatus : FileStatus
+                          -- , user : UserId
+                          -- , createdate : Int
+                          -- , changeddate : Int
+                          -- , sysids : List (ZkNoteId)
+                          -- }
+                          }
+                        , { header = E.el [ EF.underline ] <| E.text "file"
+                          , width = E.shrink
+                          , view =
+                                \n ->
+                                    case n.filestatus of
+                                        Data.NotAFile ->
+                                            E.none
+
+                                        Data.FileMissing ->
+                                            E.text "missing"
+
+                                        Data.FilePresent ->
+                                            E.text "file"
+                          }
+                        , { header = E.el [ EF.underline ] <| E.text "create"
+                          , width = E.shrink
+                          , view =
+                                \n ->
+                                    E.text <| Util.showDate model.zone <| Time.millisToPosix n.createdate
+                          }
+                        , { header = E.el [ EF.underline ] <| E.text "mod"
+                          , width = E.shrink
+                          , view =
+                                \n ->
+                                    E.text <| Util.showDate model.zone <| Time.millisToPosix n.changeddate
+                          }
+                        , { header = E.el [ EF.underline ] <| E.text "mine"
+                          , width = E.shrink
+                          , view =
+                                \n ->
+                                    if n.user == ld.userid then
+                                        E.text "mine"
+
+                                    else
+                                        E.text ""
                           }
                         ]
                     }
