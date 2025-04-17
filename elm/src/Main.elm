@@ -1787,8 +1787,11 @@ actualupdate msg model =
                                             , ordering = Nothing
                                             }
                                         )
+
+                                nmod =
+                                    updateSearch ts model
                             in
-                            ( updateSearch ts model, sendsearch )
+                            ( { nmod | state = instate }, sendsearch )
 
                         Nothing ->
                             ( { model | state = instate }, Cmd.none )
@@ -2598,7 +2601,7 @@ actualupdate msg model =
                                             |> List.drop 1
                                             |> List.reverse
                                 in
-                                ( updateSearchStack laststack model, Cmd.none )
+                                ( updateSearchStack laststack { model | prevSearches = pses }, Cmd.none )
 
                             else
                                 ( model, Cmd.none )
