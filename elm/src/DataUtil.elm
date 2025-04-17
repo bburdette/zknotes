@@ -308,6 +308,12 @@ flipOrderDirection od =
             Ascending
 
 
+type alias OrderedTagSearch =
+    { ts : TagSearch
+    , ordering : Maybe Ordering
+    }
+
+
 
 ------------------------------------------------------------
 -- getting, setting text selections in text edit areas.

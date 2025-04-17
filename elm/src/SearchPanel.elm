@@ -50,14 +50,14 @@ getSearch model =
     TSP.getSearch model.tagSearchModel
         |> Maybe.map
             (\s ->
-                { tagsearch = [ s ]
+                { tagsearch = [ s.ts ]
                 , offset = model.paginationModel.offset
                 , limit = Just model.paginationModel.increment
                 , what = ""
                 , resulttype = Data.RtListNote
                 , archives = False
                 , deleted = showDeleted
-                , ordering = Nothing
+                , ordering = s.ordering
                 }
             )
 
@@ -149,17 +149,17 @@ handleTspUpdate model ( nm, cmd ) =
                 _ ->
                     ( model, None )
 
-        TSP.Search ts ->
+        TSP.Search s ->
             ( { model | tagSearchModel = nm, paginationModel = PP.initModel }
             , Search <|
-                { tagsearch = [ ts ]
+                { tagsearch = [ s.ts ]
                 , offset = 0
                 , limit = Just model.paginationModel.increment
                 , what = ""
                 , resulttype = Data.RtListNote
                 , archives = False
                 , deleted = showDeleted
-                , ordering = Nothing
+                , ordering = s.ordering
                 }
             )
 
@@ -206,17 +206,17 @@ update msg model =
 
                 PP.RangeChanged ->
                     case TSP.getSearch model.tagSearchModel of
-                        Just ts ->
+                        Just s ->
                             ( { model | paginationModel = nm }
                             , Search
-                                { tagsearch = [ ts ]
+                                { tagsearch = [ s.ts ]
                                 , offset = nm.offset
                                 , limit = Just nm.increment
                                 , what = ""
                                 , resulttype = Data.RtListNote
                                 , archives = False
                                 , deleted = showDeleted
-                                , ordering = Nothing
+                                , ordering = s.ordering
                                 }
                             )
 

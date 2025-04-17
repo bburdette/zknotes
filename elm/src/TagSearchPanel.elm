@@ -23,6 +23,7 @@ module TagSearchPanel exposing
 
 import Common exposing (buttonStyle)
 import Data exposing (AndOr(..), Ordering, SearchMod(..), TagSearch(..))
+import DataUtil exposing (OrderedTagSearch)
 import Element as E exposing (..)
 import Element.Background as EBk
 import Element.Border as EBd
@@ -99,20 +100,20 @@ type Msg
 type Command
     = None
     | Save
-    | Search TagSearch
+    | Search OrderedTagSearch
     | SyncFiles TagSearch
     | AddToStack
     | Copy String
 
 
-getSearch : Model -> Maybe TagSearch
+getSearch : Model -> Maybe OrderedTagSearch
 getSearch model =
     case model.search of
         TagSearch (Ok s) ->
-            Just s
+            Just { ts = s, ordering = model.ordering }
 
         NoSearch ->
-            Just <| SearchTerm { mods = [], term = "" }
+            Just { ts = SearchTerm { mods = [], term = "" }, ordering = model.ordering }
 
         TagSearch (Err _) ->
             Nothing
@@ -823,7 +824,7 @@ doFileSyncClick model =
     ( model
     , case getSearch model of
         Just s ->
-            SyncFiles s
+            SyncFiles s.ts
 
         Nothing ->
             None
