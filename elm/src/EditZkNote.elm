@@ -515,7 +515,8 @@ showZkl bkcolor isDirty editable focusLink ld _ sysColor showflip zkl =
                     [ case otherid of
                         Just zknoteid ->
                             E.el [ E.centerY ] <|
-                                ZC.golink zknoteid
+                                ZC.golink 25
+                                    zknoteid
                                     (if isDirty then
                                         ZC.saveColor
 
@@ -753,7 +754,8 @@ showSr bkcolor model isdirty zkln =
             , E.inFront
                 (E.row [ E.height E.fill, E.alignRight, EBk.color bkcolor ]
                     [ if lnnonme then
-                        ZC.golink zkln.id
+                        ZC.golink 25
+                            zkln.id
                             (if isdirty then
                                 ZC.saveColor
 
@@ -762,7 +764,8 @@ showSr bkcolor model isdirty zkln =
                             )
 
                       else
-                        ZC.golink zkln.id
+                        ZC.golink 25
+                            zkln.id
                             (if isdirty then
                                 ZC.saveColor
 
@@ -974,7 +977,8 @@ zknview zone size spmodel zknSearchResult recentZkns trqs tjobs noteCache model 
                       , width = E.shrink
                       , view =
                             \zkn ->
-                                ZC.golink zkn.id
+                                ZC.golink 25
+                                    zkn.id
                                     (if isdirty then
                                         ZC.saveColor
 

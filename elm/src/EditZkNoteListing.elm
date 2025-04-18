@@ -9,6 +9,7 @@ import Element.Background as EBk
 import Element.Border as EBd
 import Element.Font as EF
 import Element.Input as EI
+import Html.Attributes
 import SearchStackPanel as SP
 import SearchUtil exposing (showTagSearch)
 import TangoColors as TC
@@ -103,7 +104,9 @@ listview ld size model spmodel notes =
         E.column
             [ E.spacing 8
             , E.padding 8
-            , E.width (E.maximum maxwidth E.fill)
+
+            -- , E.width (E.maximum maxwidth E.fill)
+            , E.width E.fill
             , E.centerX
             , EBk.color TC.lightGrey
             ]
@@ -135,22 +138,26 @@ listview ld size model spmodel notes =
                 , EBd.color TC.darkGrey
                 , EBk.color TC.white
                 , E.spacing 8
+                , E.width E.fill
                 ]
                 [ EI.button Common.buttonStyle
                     { onPress = Just <| SearchHistoryPress
                     , label = E.el [ E.centerY ] <| E.text "history"
                     }
-                , E.map SPMsg <| SP.view False (size.width < maxwidth) 0 spmodel
+
+                -- , E.map SPMsg <| SP.view False (size.width < maxwidth) 0 spmodel
+                , E.map SPMsg <| SP.view False False 0 spmodel
                 , E.table [ E.spacing 5, E.width E.fill, E.centerX ]
                     { data = notes.notes
                     , columns =
                         [ { header =
                                 EI.button Common.buttonStyle { onPress = Just TitlePress, label = E.text "title" }
                           , width =
-                                -- E.fill
-                                -- clipX doesn't work unless max width is here in px, it seems.
-                                -- E.px <| min maxwidth size.width - titlemaxconst
-                                E.px <| min maxwidth size.width - 32
+                                E.fill
+
+                          -- clipX doesn't work unless max width is here in px, it seems.
+                          -- E.px <| min maxwidth size.width - titlemaxconst
+                          -- E.px <| min maxwidth size.width - 32
                           , view =
                                 \n ->
                                     let
@@ -168,20 +175,26 @@ listview ld size model spmodel notes =
                                     --            )
                                     --     )
                                     --     [
-                                    E.column []
+                                    E.row [ E.width E.fill ]
                                         [ if lnnonme then
-                                            ZC.golink n.id
+                                            ZC.golink 15
+                                                n.id
                                                 ZC.otherLinkColor
 
                                           else
-                                            ZC.golink n.id
+                                            ZC.golink 15
+                                                n.id
                                                 ZC.myLinkColor
-                                        , E.el
+                                        , E.paragraph
                                             -- [ E.height <| E.px 30, E.width (E.minimum (maxwidth - 32) E.fill) ]
-                                            [ E.height <| E.px 30 ]
-                                            (E.text n.title)
+                                            [ Html.Attributes.style "word-break" "break-all" |> E.htmlAttribute, E.width E.fill ]
+                                            [ E.text n.title ]
                                         ]
 
+                          -- E.paragraph
+                          --     -- [ E.height <| E.px 30, E.width (E.minimum (maxwidth - 32) E.fill) ]
+                          --     [ Html.Attributes.style "word-break" "break-all" |> E.htmlAttribute, E.width E.fill ]
+                          --     [ E.text n.title ]
                           -- { id : ZkNoteId
                           -- , title : String
                           -- , filestatus : FileStatus
