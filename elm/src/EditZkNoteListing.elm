@@ -175,21 +175,27 @@ listview ld size model spmodel notes =
                                     --            )
                                     --     )
                                     --     [
-                                    E.row [ E.width E.fill ]
-                                        [ if lnnonme then
-                                            ZC.golink 15
-                                                n.id
-                                                ZC.otherLinkColor
+                                    E.row [ E.width E.fill, E.spacing 8 ]
+                                        (let
+                                            lcolor =
+                                                if lnnonme then
+                                                    ZC.otherLinkColor
 
-                                          else
-                                            ZC.golink 15
-                                                n.id
-                                                ZC.myLinkColor
-                                        , E.paragraph
+                                                else
+                                                    ZC.myLinkColor
+                                         in
+                                         [ ZC.golink 15
+                                            n.id
+                                            lcolor
+                                         , E.paragraph
                                             -- [ E.height <| E.px 30, E.width (E.minimum (maxwidth - 32) E.fill) ]
-                                            [ Html.Attributes.style "word-break" "break-all" |> E.htmlAttribute, E.width E.fill ]
+                                            [ Html.Attributes.style "word-break" "break-all" |> E.htmlAttribute
+                                            , E.width E.fill
+                                            , EF.color lcolor
+                                            ]
                                             [ E.text n.title ]
-                                        ]
+                                         ]
+                                        )
 
                           -- E.paragraph
                           --     -- [ E.height <| E.px 30, E.width (E.minimum (maxwidth - 32) E.fill) ]
@@ -231,16 +237,6 @@ listview ld size model spmodel notes =
                           , view =
                                 \n ->
                                     E.text <| Util.showDate model.zone <| Time.millisToPosix n.changeddate
-                          }
-                        , { header = E.el [ EF.underline ] <| E.text "mine"
-                          , width = E.shrink
-                          , view =
-                                \n ->
-                                    if n.user == ld.userid then
-                                        E.text "mine"
-
-                                    else
-                                        E.text ""
                           }
                         ]
                     }
