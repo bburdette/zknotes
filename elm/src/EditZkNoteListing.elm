@@ -27,7 +27,7 @@ type Msg
     | TitlePress
     | CreatedPress
     | ChangedPress
-    | PowerDeletePress
+    | PowerDeletePress Int
     | SPMsg SP.Msg
     | DialogMsg D.Msg
     | SearchHistoryPress
@@ -54,15 +54,15 @@ type Command
     | SearchHistory
 
 
-onPowerDeleteComplete : Int -> LoginData -> Model -> SP.Model -> Data.ZkListNoteSearchResult -> Model
-onPowerDeleteComplete count ld model spmodel notes =
+onPowerDeleteComplete : Int -> Int -> LoginData -> Model -> SP.Model -> Data.ZkListNoteSearchResult -> Model
+onPowerDeleteComplete fontsize count ld model spmodel notes =
     { model
         | dialog =
             Just <|
                 ( D.init
                     ("deleted " ++ String.fromInt count ++ " notes")
                     False
-                    (\size -> E.map (\_ -> ()) (listview ld size model spmodel notes))
+                    (\size -> E.map (\_ -> ()) (listview fontsize ld size model spmodel notes))
                 , DeleteComplete
                 )
     }
@@ -80,18 +80,18 @@ onWkKeyPress key model =
             ( model, None )
 
 
-view : LoginData -> Util.Size -> Model -> SP.Model -> Data.ZkListNoteSearchResult -> Element Msg
-view ld size model spmodel notes =
+view : Int -> LoginData -> Util.Size -> Model -> SP.Model -> Data.ZkListNoteSearchResult -> Element Msg
+view fontsize ld size model spmodel notes =
     case model.dialog of
         Just ( dialog, _ ) ->
             D.view size dialog |> E.map DialogMsg
 
         Nothing ->
-            listview ld size model spmodel notes
+            listview fontsize ld size model spmodel notes
 
 
-listview : LoginData -> Util.Size -> Model -> SP.Model -> Data.ZkListNoteSearchResult -> Element Msg
-listview ld size model spmodel notes =
+listview : Int -> LoginData -> Util.Size -> Model -> SP.Model -> Data.ZkListNoteSearchResult -> Element Msg
+listview fontsize ld size model spmodel notes =
     let
         maxwidth =
             700
@@ -129,7 +129,7 @@ listview ld size model spmodel notes =
             , E.row [ E.spacing 8 ]
                 [ EI.button Common.buttonStyle { onPress = Just NewPress, label = E.text "new" }
                 , EI.button Common.buttonStyle { onPress = Just ImportPress, label = E.text "import" }
-                , EI.button Common.buttonStyle { onPress = Just PowerDeletePress, label = E.text "delete..." }
+                , EI.button Common.buttonStyle { onPress = Just (PowerDeletePress fontsize), label = E.text "delete..." }
                 ]
             , E.column
                 [ E.padding 8
@@ -181,7 +181,7 @@ listview ld size model spmodel notes =
                                                 ZC.systemColor DataUtil.sysids n.sysids
                                                     |> Maybe.withDefault ZC.myLinkColor
                                          in
-                                         [ ZC.golink 15
+                                         [ ZC.golink (round (toFloat fontsize * 1.2))
                                             n.id
                                             lcolor
                                          , E.paragraph
@@ -268,7 +268,7 @@ update msg model spmodel notes ld =
         SearchHistoryPress ->
             ( model, SearchHistory )
 
-        PowerDeletePress ->
+        PowerDeletePress fontsize ->
             case SP.getSearch spmodel of
                 Nothing ->
                     ( model, None )
@@ -282,7 +282,7 @@ update msg model spmodel notes ld =
                                         ++ String.concat (List.map showTagSearch s.tagsearch)
                                     )
                                     True
-                                    (\size -> E.map (\_ -> ()) (listview ld size model spmodel notes))
+                                    (\size -> E.map (\_ -> ()) (listview fontsize ld size model spmodel notes))
                                 , DeleteAll
                                 )
                       }
