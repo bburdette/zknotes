@@ -95,7 +95,7 @@ type Msg
     | OnPubidChanged String
     | SavePress
     | RevertPress
-    | DeletePress Time.Zone
+    | DeletePress Int Time.Zone
     | ViewPress
     | NewPress
     | UploadPress
@@ -455,8 +455,15 @@ revert model =
             (initNew model.fui model.ld (Dict.values model.initialZklDict) model.mobile)
 
 
-showZkl : E.Color -> Bool -> Bool -> Maybe EditLink -> DataUtil.LoginData -> Maybe ZkNoteId -> Maybe E.Color -> Bool -> EditLink -> Element Msg
-showZkl bkcolor isDirty editable focusLink ld _ sysColor showflip zkl =
+golinkSize : Int -> Int
+golinkSize fontsize =
+    toFloat fontsize
+        * 1.3
+        |> round
+
+
+showZkl : Int -> E.Color -> Bool -> Bool -> Maybe EditLink -> DataUtil.LoginData -> Maybe ZkNoteId -> Maybe E.Color -> Bool -> EditLink -> Element Msg
+showZkl fontsize bkcolor isDirty editable focusLink ld _ sysColor showflip zkl =
     let
         ( dir, otherid ) =
             case zkl.direction of
@@ -515,7 +522,7 @@ showZkl bkcolor isDirty editable focusLink ld _ sysColor showflip zkl =
                     [ case otherid of
                         Just zknoteid ->
                             E.el [ E.centerY ] <|
-                                ZC.golink 25
+                                ZC.golink (golinkSize fontsize)
                                     zknoteid
                                     (if isDirty then
                                         ZC.saveColor
@@ -598,7 +605,8 @@ pageLink model =
 
 
 view :
-    Time.Zone
+    Int
+    -> Time.Zone
     -> Util.Size
     -> SP.Model
     -> Data.ZkListNoteSearchResult
@@ -608,13 +616,13 @@ view :
     -> NoteCache
     -> Model
     -> Element Msg
-view zone size spmodel zknSearchResult recentZkns trqs tjobs noteCache model =
+view fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCache model =
     case model.dialog of
         Just dialog ->
             D.view size dialog |> E.map DialogMsg
 
         Nothing ->
-            zknview zone size spmodel zknSearchResult recentZkns trqs tjobs noteCache model
+            zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCache model
 
 
 commonButtonStyle : Bool -> List (E.Attribute msg)
@@ -641,8 +649,8 @@ disabledLinkButtonStyle =
     Common.disabledButtonStyle
 
 
-showSr : E.Color -> Model -> Bool -> Data.ZkListNote -> Element Msg
-showSr bkcolor model isdirty zkln =
+showSr : Int -> E.Color -> Model -> Bool -> Data.ZkListNote -> Element Msg
+showSr fontsize bkcolor model isdirty zkln =
     let
         lnnonme =
             zkln.user /= model.ld.userid
@@ -731,7 +739,7 @@ showSr bkcolor model isdirty zkln =
             E.el
                 ([ E.width E.fill
                  , EE.onClick (SrFocusPress zkln.id)
-                 , E.height <| E.px 20
+                 , E.height <| E.px <| round <| toFloat fontsize * 1.15
                  , E.clip
                  ]
                     ++ (sysColor
@@ -755,7 +763,7 @@ showSr bkcolor model isdirty zkln =
                 (E.row
                     [ E.alignRight, EBk.color bkcolor ]
                     [ if lnnonme then
-                        ZC.golink 40
+                        ZC.golink (golinkSize fontsize)
                             zkln.id
                             (if isdirty then
                                 ZC.saveColor
@@ -765,7 +773,7 @@ showSr bkcolor model isdirty zkln =
                             )
 
                       else
-                        ZC.golink 40
+                        ZC.golink (golinkSize fontsize)
                             zkln.id
                             (if isdirty then
                                 ZC.saveColor
@@ -903,7 +911,8 @@ renderMd fui cd noteCache md mdw =
 
 
 zknview :
-    Time.Zone
+    Int
+    -> Time.Zone
     -> Util.Size
     -> SP.Model
     -> Data.ZkListNoteSearchResult
@@ -913,7 +922,7 @@ zknview :
     -> NoteCache
     -> Model
     -> Element Msg
-zknview zone size spmodel zknSearchResult recentZkns trqs tjobs noteCache model =
+zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCache model =
     let
         wclass =
             if size.width < 800 then
@@ -978,7 +987,7 @@ zknview zone size spmodel zknSearchResult recentZkns trqs tjobs noteCache model 
                       , width = E.shrink
                       , view =
                             \zkn ->
-                                ZC.golink 25
+                                ZC.golink (golinkSize fontsize)
                                     zkn.id
                                     (if isdirty then
                                         ZC.saveColor
@@ -1022,7 +1031,8 @@ zknview zone size spmodel zknSearchResult recentZkns trqs tjobs noteCache model 
             E.row [ EF.bold ] [ E.text "links" ]
                 :: List.map
                     (\( l, c ) ->
-                        showZkl linkbkc
+                        showZkl fontsize
+                            linkbkc
                             isdirty
                             editable
                             model.focusLink
@@ -1180,7 +1190,7 @@ zknview zone size spmodel zknSearchResult recentZkns trqs tjobs noteCache model 
                             }
                         , EI.button perhapsdirtyparabuttonstyle { onPress = Just NewPress, label = E.text "new" }
                         , if mine && not model.deleted then
-                            EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just <| DeletePress zone, label = E.text "delete" }
+                            EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just <| DeletePress fontsize zone, label = E.text "delete" }
 
                           else
                             EI.button (E.alignRight :: Common.disabledButtonStyle) { onPress = Nothing, label = E.text "delete" }
@@ -1441,7 +1451,7 @@ zknview zone size spmodel zknSearchResult recentZkns trqs tjobs noteCache model 
                             SP.view True (size.width < 500 || wclass /= Narrow) 0 spmodel
                        )
                     :: (List.map
-                            (showSr bkcolor model isdirty)
+                            (showSr fontsize bkcolor model isdirty)
                         <|
                             case model.id of
                                 Just id ->
@@ -1463,7 +1473,7 @@ zknview zone size spmodel zknSearchResult recentZkns trqs tjobs noteCache model 
         recentPanel bkcolor =
             E.column (E.spacing 8 :: E.width E.fill :: sppad)
                 (List.map
-                    (showSr bkcolor model isdirty)
+                    (showSr fontsize bkcolor model isdirty)
                  <|
                     recentZkns
                 )
@@ -2462,7 +2472,7 @@ update msg model =
         RevertPress ->
             ( revert model, None )
 
-        DeletePress zone ->
+        DeletePress fontsize zone ->
             ( { model
                 | dialog =
                     Just <|
@@ -2470,7 +2480,8 @@ update msg model =
                             True
                             (\size ->
                                 E.map (\_ -> ())
-                                    (view zone
+                                    (view fontsize
+                                        zone
                                         size
                                         SP.initModel
                                         { notes = [], offset = 0, what = "" }
