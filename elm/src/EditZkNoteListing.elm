@@ -219,7 +219,7 @@ listview ld size model spmodel notes =
                                             E.text "file"
                           }
                         , { header =
-                                EI.button Common.buttonStyle { onPress = Just CreatedPress, label = E.text "create" }
+                                EI.button Common.buttonStyle { onPress = Just CreatedPress, label = E.text "created" }
                           , width = E.shrink
                           , view =
                                 \n ->
