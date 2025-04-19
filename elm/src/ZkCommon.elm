@@ -118,14 +118,14 @@ fullScreen =
         ]
 
 
-golink zknid color =
+golink size zknid color =
     E.link
         [ EF.color color ]
         { url = DU.editNoteLink zknid
         , label =
             E.el
-                [ E.inFront (E.el [ EF.size 50 ] <| E.text "↗")
-                , EF.size 50
+                [ E.inFront (E.el [ EF.size size ] <| E.text "↗")
+                , EF.size size
                 ]
             <|
                 E.text "☐"

@@ -7,6 +7,7 @@ module SearchStackPanel exposing
     , getSearch
     , initModel
     , onEnter
+    , onOrdering
     , paginationView
     , searchResultUpdated
     , setSearch
@@ -101,6 +102,11 @@ addToSearch model searchmods name =
 onEnter : Model -> ( Model, Command )
 onEnter model =
     handleSpUpdate model (SP.onEnter model.spmodel)
+
+
+onOrdering : Maybe Data.Ordering -> Model -> ( Model, Command )
+onOrdering ordering model =
+    handleSpUpdate model (SP.onOrdering ordering model.spmodel)
 
 
 handleSpUpdate : Model -> ( SP.Model, SP.Command ) -> ( Model, Command )

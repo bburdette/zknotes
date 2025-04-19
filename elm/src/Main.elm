@@ -894,10 +894,10 @@ viewState size state model =
             E.map InvitedMsg <| Invited.view model.stylePalette size em
 
         EditZkNote em _ ->
-            E.map EditZkNoteMsg <| EditZkNote.view model.timezone size model.spmodel model.zknSearchResult model.recentNotes model.trackedRequests model.jobs model.noteCache em
+            E.map EditZkNoteMsg <| EditZkNote.view model.fontsize model.timezone size model.spmodel model.zknSearchResult model.recentNotes model.trackedRequests model.jobs model.noteCache em
 
         EditZkNoteListing em ld ->
-            E.map EditZkNoteListingMsg <| EditZkNoteListing.view ld size em model.spmodel model.zknSearchResult
+            E.map EditZkNoteListingMsg <| EditZkNoteListing.view model.fontsize ld size em model.spmodel model.zknSearchResult
 
         ArchiveListing em ld ->
             E.map ArchiveListingMsg <| ArchiveListing.view ld model.timezone size em
@@ -2575,7 +2575,7 @@ actualupdate msg model =
                         Data.PvyPowerDeleteComplete count ->
                             case model.state of
                                 EditZkNoteListing mod li ->
-                                    ( { model | state = EditZkNoteListing (EditZkNoteListing.onPowerDeleteComplete count li mod model.spmodel model.zknSearchResult) li }, Cmd.none )
+                                    ( { model | state = EditZkNoteListing (EditZkNoteListing.onPowerDeleteComplete model.fontsize count li mod model.spmodel model.zknSearchResult) li }, Cmd.none )
 
                                 _ ->
                                     ( model, Cmd.none )
@@ -2609,7 +2609,7 @@ actualupdate msg model =
                         Data.PvyZkListNoteSearchResult sr ->
                             case state of
                                 ShowMessage _ login _ ->
-                                    ( { model | state = EditZkNoteListing { dialog = Nothing } login }
+                                    ( { model | state = EditZkNoteListing { dialog = Nothing, zone = model.timezone } login }
                                     , Cmd.none
                                     )
 
@@ -2913,7 +2913,7 @@ actualupdate msg model =
                             nm =
                                 { model
                                     | state =
-                                        EditZkNoteListing { dialog = Nothing } login
+                                        EditZkNoteListing { dialog = Nothing, zone = model.timezone } login
                                 }
                         in
                         case SP.getSearch model.spmodel of
@@ -3456,7 +3456,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                 nm =
                     { model
                         | state =
-                            EditZkNoteListing { dialog = Nothing } login
+                            EditZkNoteListing { dialog = Nothing, zone = model.timezone } login
                     }
             in
             case SP.getSearch model.spmodel of
@@ -3478,7 +3478,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                                 nm =
                                     { model
                                         | state =
-                                            EditZkNoteListing { dialog = Nothing } login
+                                            EditZkNoteListing { dialog = Nothing, zone = model.timezone } login
                                     }
                             in
                             case SP.getSearch model.spmodel of

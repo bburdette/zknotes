@@ -298,6 +298,22 @@ flipDirection direction =
             To
 
 
+flipOrderDirection : OrderDirection -> OrderDirection
+flipOrderDirection od =
+    case od of
+        Ascending ->
+            Descending
+
+        Descending ->
+            Ascending
+
+
+type alias OrderedTagSearch =
+    { ts : TagSearch
+    , ordering : Maybe Ordering
+    }
+
+
 
 ------------------------------------------------------------
 -- getting, setting text selections in text edit areas.

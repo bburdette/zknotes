@@ -7,6 +7,7 @@ module SearchPanel exposing
     , getSearch
     , initModel
     , onEnter
+    , onOrdering
     , paginationView
     , searchResultUpdated
     , setSearch
@@ -49,14 +50,14 @@ getSearch model =
     TSP.getSearch model.tagSearchModel
         |> Maybe.map
             (\s ->
-                { tagsearch = [ s ]
+                { tagsearch = [ s.ts ]
                 , offset = model.paginationModel.offset
                 , limit = Just model.paginationModel.increment
                 , what = ""
                 , resulttype = Data.RtListNote
                 , archives = False
                 , deleted = showDeleted
-                , ordering = Nothing
+                , ordering = s.ordering
                 }
             )
 
@@ -90,6 +91,11 @@ addToSearch model searchmods name =
 onEnter : Model -> ( Model, Command )
 onEnter model =
     handleTspUpdate model (TSP.onEnter model.tagSearchModel)
+
+
+onOrdering : Maybe Data.Ordering -> Model -> ( Model, Command )
+onOrdering ordering model =
+    handleTspUpdate model (TSP.onOrdering ordering model.tagSearchModel)
 
 
 type Msg
@@ -143,17 +149,17 @@ handleTspUpdate model ( nm, cmd ) =
                 _ ->
                     ( model, None )
 
-        TSP.Search ts ->
+        TSP.Search s ->
             ( { model | tagSearchModel = nm, paginationModel = PP.initModel }
             , Search <|
-                { tagsearch = [ ts ]
+                { tagsearch = [ s.ts ]
                 , offset = 0
                 , limit = Just model.paginationModel.increment
                 , what = ""
                 , resulttype = Data.RtListNote
                 , archives = False
                 , deleted = showDeleted
-                , ordering = Nothing
+                , ordering = s.ordering
                 }
             )
 
@@ -200,17 +206,17 @@ update msg model =
 
                 PP.RangeChanged ->
                     case TSP.getSearch model.tagSearchModel of
-                        Just ts ->
+                        Just s ->
                             ( { model | paginationModel = nm }
                             , Search
-                                { tagsearch = [ ts ]
+                                { tagsearch = [ s.ts ]
                                 , offset = nm.offset
                                 , limit = Just nm.increment
                                 , what = ""
                                 , resulttype = Data.RtListNote
                                 , archives = False
                                 , deleted = showDeleted
-                                , ordering = Nothing
+                                , ordering = s.ordering
                                 }
                             )
 
