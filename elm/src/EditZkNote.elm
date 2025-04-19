@@ -731,7 +731,7 @@ showSr bkcolor model isdirty zkln =
             E.el
                 ([ E.width E.fill
                  , EE.onClick (SrFocusPress zkln.id)
-                 , E.height <| E.px 30
+                 , E.height <| E.px 20
                  , E.clip
                  ]
                     ++ (sysColor
@@ -752,9 +752,10 @@ showSr bkcolor model isdirty zkln =
             , E.width E.fill
             , E.spacing 8
             , E.inFront
-                (E.row [ E.height E.fill, E.alignRight, EBk.color bkcolor ]
+                (E.row
+                    [ E.alignRight, EBk.color bkcolor ]
                     [ if lnnonme then
-                        ZC.golink 25
+                        ZC.golink 40
                             zkln.id
                             (if isdirty then
                                 ZC.saveColor
@@ -764,7 +765,7 @@ showSr bkcolor model isdirty zkln =
                             )
 
                       else
-                        ZC.golink 25
+                        ZC.golink 40
                             zkln.id
                             (if isdirty then
                                 ZC.saveColor
@@ -1425,7 +1426,7 @@ zknview zone size spmodel zknSearchResult recentZkns trqs tjobs noteCache model 
 
         searchPanel bkcolor =
             E.column
-                (E.spacing 8 :: E.width E.fill :: sppad)
+                (E.spacing 3 :: E.width E.fill :: sppad)
                 (E.row [ E.width E.fill ]
                     [ EI.button Common.buttonStyle
                         { onPress = Just <| SearchHistoryPress

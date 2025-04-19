@@ -178,11 +178,8 @@ listview ld size model spmodel notes =
                                     E.row [ E.width E.fill, E.spacing 8 ]
                                         (let
                                             lcolor =
-                                                if lnnonme then
-                                                    ZC.otherLinkColor
-
-                                                else
-                                                    ZC.myLinkColor
+                                                ZC.systemColor DataUtil.sysids n.sysids
+                                                    |> Maybe.withDefault ZC.myLinkColor
                                          in
                                          [ ZC.golink 15
                                             n.id
@@ -196,19 +193,6 @@ listview ld size model spmodel notes =
                                             [ E.text n.title ]
                                          ]
                                         )
-
-                          -- E.paragraph
-                          --     -- [ E.height <| E.px 30, E.width (E.minimum (maxwidth - 32) E.fill) ]
-                          --     [ Html.Attributes.style "word-break" "break-all" |> E.htmlAttribute, E.width E.fill ]
-                          --     [ E.text n.title ]
-                          -- { id : ZkNoteId
-                          -- , title : String
-                          -- , filestatus : FileStatus
-                          -- , user : UserId
-                          -- , createdate : Int
-                          -- , changeddate : Int
-                          -- , sysids : List (ZkNoteId)
-                          -- }
                           }
                         , { header = E.el [ EF.underline ] <| E.text "file"
                           , width = E.shrink
