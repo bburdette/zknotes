@@ -206,7 +206,7 @@ listview fontsize ld size model spmodel notes =
                                             E.text "missing"
 
                                         Data.FilePresent ->
-                                            E.text "file"
+                                            E.text "present"
                           }
                         , { header =
                                 EI.button Common.buttonStyle { onPress = Just CreatedPress, label = E.text "created" }

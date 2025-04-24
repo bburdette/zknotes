@@ -727,7 +727,7 @@ where
 
   sm = read_sync_message(&mut line, br).await?;
 
-  let mut serverhash = HashMap::<String, i64>::new();
+  let serverhash = HashMap::<String, i64>::new();
 
   while let SyncMessage::ZkNote(ref note, ref mbf) = sm {
     let uid = UserId::Uid(
@@ -789,12 +789,12 @@ where
     let server_id = match serverhash.get(&note.server).ok_or_else(|| {
       match server_id(&conn, note.server.as_str()) {
         Ok(id) => Ok(id),
-        Err(e) => conn
+        Err(_e) => conn
           .execute(
             "insert into server (uuid, createdate) values (?1, ?2)",
             params![note.server, now],
           )
-          .map(|x| conn.last_insert_rowid())
+          .map(|_| conn.last_insert_rowid())
           .map_err(|e| zkerr::Error::from(e)),
       }
     }) {
@@ -1133,6 +1133,9 @@ pub async fn sync_to_remote(
   parts.path_and_query = Some(awc::http::uri::PathAndQuery::from_static("/upstream"));
   let uri = awc::http::Uri::from_parts(parts).map_err(|x| zkerr::Error::String(x.to_string()))?;
 
+  info!("syncing to uri: {}", uri);
+  write!(monitor, "syncing to uri: {}", uri);
+
   let cookie = cookie::Cookie::parse_encoded(c)?;
 
   let ss = sync_stream(
@@ -1253,6 +1256,9 @@ pub fn sync_stream(
   monitor: &dyn JobMonitor,
 ) -> impl Stream<Item = Result<Bytes, Box<dyn std::error::Error + 'static>>> {
   let start = try_stream! { yield SyncMessage::SyncStart(after, now()?); }.map(bytesify);
+
+  info!("setting up sync_stream");
+  write!(monitor, "setting up sync_stream");
 
   // !(et'sync' & u'system')
   // !(et'user' & u'system')

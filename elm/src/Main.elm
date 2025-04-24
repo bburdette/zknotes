@@ -1201,6 +1201,9 @@ sendSearch model search =
                 Err (SU.InvalidServerMods d) ->
                     ( displayMessageDialog model d, Cmd.none )
 
+                Err (SU.InvalidUuid d) ->
+                    ( displayMessageDialog model d, Cmd.none )
+
                 Ok dsearch ->
                     -- if this is the same search as last time, don't save.
                     if
