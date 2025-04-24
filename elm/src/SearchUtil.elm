@@ -22,6 +22,7 @@ import Parser
         , token
         )
 import Time
+import UUID exposing (UUID)
 import Util exposing (rest)
 
 
@@ -104,6 +105,7 @@ type SemanticError
     = InvalidDateFormat String
     | InvalidDateMods String
     | InvalidServerMods String
+    | InvalidUuid String
 
 
 tagSearchDates : Time.Zone -> TagSearch -> Result SemanticError TagSearch
@@ -197,8 +199,20 @@ termSemanticCheck tz st =
                     )
                 == 1
     in
-    if Util.trueforany ((==) Server) st.mods && List.length st.mods /= 1 then
-        Err <| InvalidServerMods <| "no mods other than ! allowed with (s)erver: " ++ (showTagSearch <| SearchTerm st)
+    if Util.trueforany ((==) Server) st.mods then
+        if List.length st.mods /= 1 then
+            Err <| InvalidServerMods <| "no mods other than ! allowed with (s)erver: " ++ (showTagSearch <| SearchTerm st)
+
+        else if st.term == "local" then
+            Ok st
+
+        else
+            case UUID.fromString st.term of
+                Ok _ ->
+                    Ok st
+
+                Err _ ->
+                    Err <| InvalidUuid st.term
 
     else if isdateterm then
         if not isvaliddateterm then

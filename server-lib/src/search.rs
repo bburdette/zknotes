@@ -1,5 +1,6 @@
 use crate::error as zkerr;
 use crate::sqldata;
+use crate::sqldata::local_server_id;
 use crate::sqldata::server_id;
 use crate::sqldata::{delete_zknote, get_sysids, note_id};
 use async_stream::try_stream;
@@ -701,7 +702,11 @@ fn build_tagsearch_clause(
         };
         (format!("N.user {}= ?", notstr), vec![format!("{}", userid)])
       } else if server {
-        let serverid = server_id(conn, &term)?;
+        let serverid = if term == "local" {
+          local_server_id(conn)?.id
+        } else {
+          server_id(conn, &term)?
+        };
         let notstr = match not {
           true => "!",
           false => "",
