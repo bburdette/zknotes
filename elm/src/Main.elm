@@ -127,7 +127,6 @@ type State
     | View View.Model
     | EView View.Model State
     | Import Import.Model LoginData
-    | UserSettings UserSettings.Model LoginData State
     | ShowMessage ShowMessage.Model LoginData (Maybe State)
     | PubShowMessage ShowMessage.Model (Maybe State)
     | LoginShowMessage ShowMessage.Model LoginData Url
@@ -138,6 +137,7 @@ type State
     | ResetPassword ResetPassword.Model
     | UserListing UserListing.Model LoginData
     | UserEdit UserEdit.Model LoginData
+    | UserSettings UserSettings.Model LoginData State
     | ShowUrl ShowUrl.Model LoginData
     | DisplayMessage DisplayMessage.GDModel State
     | MessageNLink MessageNLink.GDModel State
@@ -2413,8 +2413,21 @@ actualupdate msg model =
                             , Cmd.none
                             )
 
-                        OD.UrpChangedRemoteUrl ->
-                            ( displayMessageDialog model "changed remote url"
+                        OD.UrpChangedRemoteUrl url ->
+                            let
+                                nmod =
+                                    case model.state of
+                                        UserSettings us lg ps ->
+                                            let
+                                                nlg =
+                                                    { lg | remoteUrl = Just url }
+                                            in
+                                            { model | state = UserSettings { us | login = nlg } nlg ps }
+
+                                        _ ->
+                                            model
+                            in
+                            ( displayMessageDialog nmod "changed remote url"
                             , Cmd.none
                             )
 
@@ -3068,6 +3081,9 @@ actualupdate msg model =
             ( model, Cmd.none )
 
         ( ChangeEmailDialogMsg GD.Noop, _ ) ->
+            ( model, Cmd.none )
+
+        ( ChangeRemoteUrlDialogMsg GD.Noop, _ ) ->
             ( model, Cmd.none )
 
         ( SelectDialogMsg GD.Noop, _ ) ->
