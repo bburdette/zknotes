@@ -15,6 +15,7 @@ type Msg
     | DonePress
     | ChangePassPress
     | ChangeEmailPress
+    | ChangeRemoteUrlPress
     | SetFontSize Int
     | LogOutPress
 
@@ -25,6 +26,7 @@ type Command
     | ChangePassword
     | ChangeEmail
     | ChangeFontSize Int
+    | ChangeRemoteUrl
     | None
 
 
@@ -69,6 +71,23 @@ view model =
                     ]
                 , EI.button (E.centerX :: buttonStyle) { onPress = Just ChangePassPress, label = E.text "change password" }
                 , EI.button (E.centerX :: buttonStyle) { onPress = Just ChangeEmailPress, label = E.text "change email" }
+                , case model.login.remoteUrl of
+                    Just ru ->
+                        E.column [ E.centerX, E.spacing 8 ]
+                            [ E.row [ E.width E.fill ]
+                                [ E.text "remote url: "
+                                , E.el [ EF.bold ] <| E.text ru
+                                ]
+                            , E.row [ E.centerX ]
+                                [ EI.button buttonStyle
+                                    { onPress = Just ChangeRemoteUrlPress
+                                    , label = E.text "change remote url"
+                                    }
+                                ]
+                            ]
+
+                    Nothing ->
+                        E.el [ E.centerX ] <| E.text "local user"
                 , EI.slider
                     [ E.height (E.px 30)
                     , E.behindContent
@@ -112,6 +131,9 @@ update msg model =
 
         ChangeEmailPress ->
             ( model, ChangeEmail )
+
+        ChangeRemoteUrlPress ->
+            ( model, ChangeRemoteUrl )
 
         SetFontSize size ->
             ( { model | fontsize = size }, ChangeFontSize size )

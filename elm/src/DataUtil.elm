@@ -117,6 +117,7 @@ type alias LoginData =
     , email : String
     , admin : Bool
     , active : Bool
+    , remoteUrl : Maybe String
     , zknote : ZkNoteId
     , homenote : Maybe ZkNoteId
     , server : String
@@ -132,6 +133,7 @@ decodeLoginData =
         |> andMap (JD.field "email" JD.string)
         |> andMap (JD.field "admin" JD.bool)
         |> andMap (JD.field "active" JD.bool)
+        |> andMap (JD.field "remote_url" (JD.maybe JD.string))
         |> andMap (JD.field "data" (JD.field "zknote" zkNoteIdDecoder))
         |> andMap (JD.field "data" (JD.field "homenote" (JD.maybe zkNoteIdDecoder)))
         |> andMap (JD.field "data" (JD.field "server" JD.string))
@@ -165,7 +167,7 @@ fromOaLd oald =
         |> Result.fromMaybe (JD.Failure "no login data" JE.null)
         |> Result.andThen
             (JD.decodeString
-                (JD.succeed (LoginData oald.userid oald.uuid oald.name oald.email oald.admin oald.active)
+                (JD.succeed (LoginData oald.userid oald.uuid oald.name oald.email oald.admin oald.active oald.remoteUrl)
                     |> andMap (JD.field "zknote" Data.zkNoteIdDecoder)
                     |> andMap (JD.field "homenote" (JD.maybe Data.zkNoteIdDecoder))
                     |> andMap (JD.field "server" JD.string)
@@ -181,6 +183,7 @@ toOaLd ld =
     , email = ld.email
     , admin = ld.admin
     , active = ld.active
+    , remoteUrl = ld.remoteUrl
     , data =
         Just <|
             JE.encode 2

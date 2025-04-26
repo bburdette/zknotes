@@ -31,6 +31,7 @@ import MessageNLink
 import NoteCache as NC exposing (NoteCache)
 import Orgauth.ChangeEmail as CE
 import Orgauth.ChangePassword as CP
+import Orgauth.ChangeRemoteUrl as CRU
 import Orgauth.Data as OD
 import Orgauth.DataUtil as ODU
 import Orgauth.Invited as Invited
@@ -98,6 +99,7 @@ type Msg
     | SelectDialogMsg (GD.Msg (SS.Msg Int))
     | ChangePasswordDialogMsg (GD.Msg CP.Msg)
     | ChangeEmailDialogMsg (GD.Msg CE.Msg)
+    | ChangeRemoteUrlDialogMsg (GD.Msg CRU.Msg)
     | ResetPasswordMsg ResetPassword.Msg
     | ShowUrlMsg ShowUrl.Msg
     | Zone Time.Zone
@@ -132,6 +134,7 @@ type State
     | SelectDialog (SS.GDModel Int) State
     | ChangePasswordDialog CP.GDModel State
     | ChangeEmailDialog CE.GDModel State
+    | ChangeRemoteUrlDialog CRU.GDModel State
     | ResetPassword ResetPassword.Model
     | UserListing UserListing.Model LoginData
     | UserEdit UserEdit.Model LoginData
@@ -745,6 +748,9 @@ showMessage msg =
         ChangeEmailDialogMsg _ ->
             "ChangeEmailDialogMsg"
 
+        ChangeRemoteUrlDialogMsg _ ->
+            "ChangeRemoteUrlDialogMsg"
+
         ResetPasswordMsg _ ->
             "ResetPasswordMsg"
 
@@ -848,6 +854,9 @@ showState state =
         ChangeEmailDialog _ _ ->
             "ChangeEmailDialog"
 
+        ChangeRemoteUrlDialog _ _ ->
+            "ChangeRemoteUrlDialog"
+
         ResetPassword _ ->
             "ResetPassword"
 
@@ -950,6 +959,10 @@ viewState size state model =
             -- render is at the layout level, not here.
             E.none
 
+        ChangeRemoteUrlDialog _ _ ->
+            -- render is at the layout level, not here.
+            E.none
+
         ResetPassword st ->
             E.map ResetPasswordMsg (ResetPassword.view size st)
 
@@ -1037,6 +1050,9 @@ stateLogin state =
             stateLogin instate
 
         ChangeEmailDialog _ instate ->
+            stateLogin instate
+
+        ChangeRemoteUrlDialog _ instate ->
             stateLogin instate
 
         ResetPassword _ ->
@@ -1325,6 +1341,12 @@ view model =
 
             ChangeEmailDialog cdm _ ->
                 Html.map ChangeEmailDialogMsg <|
+                    GD.layout
+                        (Just { width = min 600 model.size.width, height = min 200 model.size.height })
+                        cdm
+
+            ChangeRemoteUrlDialog cdm _ ->
+                Html.map ChangeRemoteUrlDialogMsg <|
                     GD.layout
                         (Just { width = min 600 model.size.width, height = min 200 model.size.height })
                         cdm
@@ -1828,6 +1850,19 @@ actualupdate msg model =
                 GD.Cancel ->
                     ( { model | state = instate }, Cmd.none )
 
+        ( ChangeRemoteUrlDialogMsg sdmsg, ChangeRemoteUrlDialog sdmod instate ) ->
+            case GD.update sdmsg sdmod of
+                GD.Dialog nmod ->
+                    ( { model | state = ChangeRemoteUrlDialog nmod instate }, Cmd.none )
+
+                GD.Ok return ->
+                    ( { model | state = instate }
+                    , sendUIMsg model.fui <| OD.UrqAuthedRequest <| OD.AthChangeRemoteUrl return
+                    )
+
+                GD.Cancel ->
+                    ( { model | state = instate }, Cmd.none )
+
         ( ResetPasswordMsg rmsg, ResetPassword rst ) ->
             let
                 ( nst, cmd ) =
@@ -1903,6 +1938,16 @@ actualupdate msg model =
                         | state =
                             ChangeEmailDialog
                                 (CE.init (DataUtil.toOaLd login) Common.buttonStyle (UserSettings.view numod |> E.map (always ())))
+                                (UserSettings numod login prevstate)
+                      }
+                    , Cmd.none
+                    )
+
+                UserSettings.ChangeRemoteUrl ->
+                    ( { model
+                        | state =
+                            ChangeRemoteUrlDialog
+                                (CRU.init (DataUtil.toOaLd login) Common.buttonStyle (UserSettings.view numod |> E.map (always ())))
                                 (UserSettings numod login prevstate)
                       }
                     , Cmd.none
@@ -2368,6 +2413,11 @@ actualupdate msg model =
                             , Cmd.none
                             )
 
+                        OD.UrpChangedRemoteUrl ->
+                            ( displayMessageDialog model "changed remote url"
+                            , Cmd.none
+                            )
+
                         OD.UrpUserExists ->
                             case state of
                                 Login lmod route ->
@@ -2406,6 +2456,11 @@ actualupdate msg model =
                                         (ODU.showUserResponse uiresponse)
                                     , Cmd.none
                                     )
+
+                        OD.UrpInvalidUserUuid ->
+                            ( displayMessageDialog model "user UUID on remote server doesn't match local user UUID!"
+                            , Cmd.none
+                            )
 
                         OD.UrpInvalidUserId ->
                             ( displayMessageDialog model "invalid user id!"
