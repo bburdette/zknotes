@@ -916,7 +916,8 @@ pub fn save_zknote(
                  where id = ?7 and editable = 1 and deleted = 0",
                 params![note.title, note.content, now, note.pubid, note.showtitle, server.id, id],
               )? {
-                0 => bail!("can't update; note is not writable"),
+                0 => Err( zkerr::Error::String(format!("can't update; note is not writable {} {}", note.title, id))),
+                // params![note.title, note.content, now, note.pubid, note.showtitle, server.id, id],
                 1 => Ok((id, SavedZkNote {
                     id: uuid,
                     changeddate: now,

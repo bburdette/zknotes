@@ -61,6 +61,7 @@ mod tests {
     otheruser: UserId,
     filenote: i64,
     filepath: PathBuf,
+    delnote: i64,
     tempfilepath: PathBuf,
   }
 
@@ -78,10 +79,12 @@ mod tests {
     conn: &Connection,
     uid: UserId,
     title: String,
+    server: &Server,
   ) -> Result<(i64, SavedZkNote), zkerr::Error> {
     save_zknote(
       &conn,
       uid,
+      &server,
       &SaveZkNote {
         id: None,
         title,
@@ -90,6 +93,7 @@ mod tests {
         content: "initial content".to_string(),
         editable: false,
         deleted: false,
+        what: None,
       },
     )
   }
@@ -109,6 +113,8 @@ mod tests {
     let filesdir = format!("{}_files", basename);
     let tempfilesdir = format!("{}_tempfiles", basename);
     let fdpath = Path::new(filesdir.as_str());
+
+    let server = local_server_id(&conn)?;
 
     if !fdpath.exists() {
       std::fs::create_dir_all(&fdpath)?;
@@ -209,8 +215,12 @@ mod tests {
     }
 
     // private note for sync user
-    let (private_note_id, private_notesd) =
-      makenote(&conn, syncuser, format!("{} syncuser private", basename))?;
+    let (private_note_id, private_notesd) = makenote(
+      &conn,
+      syncuser,
+      format!("{} syncuser private", basename),
+      &server,
+    )?;
     visible_notes.push((private_note_id, private_notesd.id.into()));
 
     // share note, syncuser and otheruser both connected.
@@ -218,12 +228,22 @@ mod tests {
       &conn,
       otheruser,
       format!("{} otheruser, syncuser share", basename),
+      &server,
     )?;
     visible_notes.push((share_note_id, share_notesd.id.into()));
     synced_notes.push((share_note_id, share_notesd.id.into()));
     savelink(share_note_id, shareid, otheruser, &mut savedlinks)?;
     savelink(syncuser_note, share_note_id, otheruser, &mut savedlinks)?;
     savelink(otheruser_note, share_note_id, otheruser, &mut savedlinks)?;
+
+    // private note for sync user, to be deleted.
+    let (del_note_id, _del_notesd) = makenote(
+      &conn,
+      syncuser,
+      format!("{} syncuser to delete", basename,),
+      &server,
+    )?;
+    visible_notes.push((private_note_id, private_notesd.id.into()));
 
     // ------------------------------------------------------------------
     // notes visible to syncuser.
@@ -236,6 +256,7 @@ mod tests {
         "{} otheruser shared through otheruser, syncuser share",
         basename
       ),
+      &server,
     )?;
     visible_notes.push((shared_note_id, shared_notesd.id.into()));
     synced_notes.push((shared_note_id, shared_notesd.id.into()));
@@ -246,16 +267,20 @@ mod tests {
       &conn,
       otheruser,
       format!("{} otheruser public note", basename),
+      &server,
     )?;
     visible_notes.push((publid_note_id, publid_notesd.id.into()));
     synced_notes.push((publid_note_id, publid_notesd.id.into()));
     savelink(publid_note_id, publicid, otheruser, &mut savedlinks)?;
+
+    let server = local_server_id(&conn)?;
 
     // public note owned by syncuser, with a public id
     // public id the same on client and server, so should conflict.
     let (public_note_id, public_notesd) = save_zknote(
       &conn,
       syncuser,
+      &server,
       &SaveZkNote {
         id: None,
         title: format!("{} syncuser public note", basename),
@@ -264,6 +289,7 @@ mod tests {
         content: "initial content".to_string(),
         editable: false,
         deleted: false,
+        what: None,
       },
     )?;
 
@@ -280,6 +306,7 @@ mod tests {
       &conn,
       otheruser,
       format!("{} otheruser note linked to syncuser", basename),
+      &server,
     )?;
     visible_notes.push((user_linked_note_id, user_linked_notesd.id.into()));
     savelink(
@@ -300,8 +327,10 @@ mod tests {
     orgauth::util::write_string(fname.as_str(), format!("{} tesssst", basename).as_str())
       .map_err(|e| zkerr::annotate_string("write_string error".to_string(), e.into()))?;
     let fpath = Path::new(&fname);
+
     let (filenote, _noteid, _fid) = sqldata::make_file_note(
       &conn,
+      &server,
       Path::new(filesdir.as_str()),
       syncuser,
       &fname,
@@ -319,8 +348,12 @@ mod tests {
     // notes not visible to syncuser.
 
     // otheruser private note NOT visible to user
-    let (otheruser_private_note_id, otheruser_private_notesd) =
-      makenote(&conn, otheruser, format!("{} otheruser private", basename))?;
+    let (otheruser_private_note_id, otheruser_private_notesd) = makenote(
+      &conn,
+      otheruser,
+      format!("{} otheruser private", basename),
+      &server,
+    )?;
     unvisible_notes.push((
       otheruser_private_note_id,
       otheruser_private_notesd.id.into(),
@@ -331,6 +364,7 @@ mod tests {
       &conn,
       otheruser,
       format!("{} otheruser othershare, not visible to syncuser", basename),
+      &server,
     )?;
     unvisible_notes.push((othershare_note_id, othershare_notesd.id.into()));
     savelink(othershare_note_id, shareid, otheruser, &mut savedlinks)?;
@@ -349,6 +383,7 @@ mod tests {
         "{} otheruser note shared with othershare, not visible to syncuser",
         basename
       ),
+      &server,
     )?;
     unvisible_notes.push((othershared_note_id, othershared_notesd.id.into()));
     savelink(
@@ -373,6 +408,7 @@ mod tests {
       otheruser,
       filenote,
       filepath: Path::new(&filesdir).to_path_buf(),
+      delnote: del_note_id,
       tempfilepath: Path::new(&tempfilesdir).to_path_buf(),
     };
 
@@ -472,6 +508,9 @@ mod tests {
     let caconn = Arc::new(client_conn);
     let saconn = Arc::new(server_conn);
 
+    let caserver = local_server_id(&caconn)?;
+    let saserver = local_server_id(&saconn)?;
+
     // initial sync, testing duplicate public ids.
     {
       let lm = LogMonitor {};
@@ -501,6 +540,7 @@ mod tests {
 
       match sync_from_stream(
         &caconn,
+        &caserver,
         &client_ts.filepath,
         Some(&ttn.notetemp),
         Some(&ttn.linktemp),
@@ -537,14 +577,16 @@ mod tests {
     let (_spc2_id, spc2) = save_zknote(
       &caconn,
       csyncuser,
+      &caserver,
       &SaveZkNote {
         id: Some(cpub2.id),
         title: "public-note 2".to_string(),
         showtitle: true,
         pubid: Some("public-note-client".to_string()), // test duplicate public notes!
-        content: cpub2.content,
+        content: cpub2.content.clone(),
         editable: false,
         deleted: false,
+        what: None,
       },
     )?;
     assert!(cpub2.id == spc2.id);
@@ -654,6 +696,7 @@ mod tests {
 
     sync_from_stream(
       &caconn,
+      &caserver,
       &client_ts.filepath,
       Some(&ttn.notetemp),
       Some(&ttn.linktemp),
@@ -685,6 +728,7 @@ mod tests {
 
     sync_from_stream(
       &saconn,
+      &saserver,
       &server_ts.filepath,
       None,
       None,
@@ -778,6 +822,11 @@ mod tests {
       )?;
 
       assert!(cpcarchs.len() > 0);
+
+      println!("cpub2: {:?}", &cpub2);
+
+      println!("cpcarchs {:?}", cpcarchs);
+      println!("spcarchs {:?}", spcarchs);
 
       assert!(cpcarchs == spcarchs);
     }
@@ -950,6 +999,9 @@ mod tests {
     // TODO: tweak a file on the server, and on the client.
     // check that those files synced.
 
+    // TODO: delete a note on client/server and then delete on server/client.
+    // currently produces an error.
+
     // ------------------------------------------------------------
     // sync from server to client.
     let lm = LogMonitor {};
@@ -972,6 +1024,7 @@ mod tests {
 
     sync_from_stream(
       &caconn,
+      &caserver,
       &client_ts.filepath,
       Some(&ttn.notetemp),
       Some(&ttn.linktemp),
@@ -1001,6 +1054,7 @@ mod tests {
 
     sync_from_stream(
       &saconn,
+      &saserver,
       &server_ts.filepath,
       None,
       None,

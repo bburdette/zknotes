@@ -41,6 +41,8 @@ mod tests {
 
     let conn = connection_open(dbp)?;
 
+    let server = local_server_id(&conn)?;
+
     println!("1");
 
     let uid1 = new_user(
@@ -96,6 +98,7 @@ mod tests {
     let _szn1_1 = save_zknote(
       &conn,
       uid1,
+      &server,
       &SaveZkNote {
         id: None,
         title: "u1 note1".to_string(),
@@ -104,6 +107,7 @@ mod tests {
         content: "note1 content".to_string(),
         editable: false,
         deleted: false,
+        what: None,
       },
     )?;
 
@@ -111,6 +115,7 @@ mod tests {
     let (szn1_2_share_id, szn1_2_share) = save_zknote(
       &conn,
       uid1,
+      &server,
       &SaveZkNote {
         id: None,
         title: "u1 note2 - share".to_string(),
@@ -119,6 +124,7 @@ mod tests {
         content: "note1-2 content".to_string(),
         editable: false,
         deleted: false,
+        what: None,
       },
     )?;
 
@@ -130,6 +136,7 @@ mod tests {
     let (szn1_3_share_id, _szn1_3_share) = save_zknote(
       &conn,
       uid1,
+      &server,
       &SaveZkNote {
         id: None,
         title: "u1 note3 - share".to_string(),
@@ -138,6 +145,7 @@ mod tests {
         content: "note1-3 content".to_string(),
         editable: false,
         deleted: false,
+        what: None,
       },
     )?;
 
@@ -163,6 +171,7 @@ mod tests {
     let (szn1_4_id, szn1_4) = save_zknote(
       &conn,
       uid1,
+      &server,
       &SaveZkNote {
         id: None,
         title: "u1 note4 - share".to_string(),
@@ -171,6 +180,7 @@ mod tests {
         content: "note1-4 content".to_string(),
         editable: true,
         deleted: false,
+        what: None,
       },
     )?;
     save_zklink(&conn, szn1_4_id, szn1_2_share_id, uid1, None)?;
@@ -181,6 +191,7 @@ mod tests {
     let (szn1_5_id, szn1_5) = save_zknote(
       &conn,
       uid1,
+      &server,
       &SaveZkNote {
         id: None,
         title: "u1 note5 - share".to_string(),
@@ -189,6 +200,7 @@ mod tests {
         content: "note1-5 content".to_string(),
         editable: false,
         deleted: false,
+        what: None,
       },
     )?;
     save_zklink(&conn, szn1_5_id, szn1_3_share_id, uid1, None)?;
@@ -197,6 +209,7 @@ mod tests {
     let (szn1_6_id, _szn1_6) = save_zknote(
       &conn,
       uid1,
+      &server,
       &SaveZkNote {
         id: None,
         title: "u1 note6 - direct share".to_string(),
@@ -205,6 +218,7 @@ mod tests {
         content: "note1-6 content".to_string(),
         editable: true,
         deleted: false,
+        what: None,
       },
     )?;
     save_zklink(&conn, szn1_6_id, unid2, uid1, None)?;
@@ -215,6 +229,7 @@ mod tests {
     let (szn1_7_id, _szn1_7) = save_zknote(
       &conn,
       uid1,
+      &server,
       &SaveZkNote {
         id: None,
         title: "u1 note7 - reversed direct share".to_string(),
@@ -223,6 +238,7 @@ mod tests {
         content: "note1-7 content".to_string(),
         editable: false,
         deleted: false,
+        what: None,
       },
     )?;
     save_zklink(&conn, unid2, szn1_7_id, uid1, None)?;
@@ -233,6 +249,7 @@ mod tests {
     match save_zknote(
       &conn,
       uid2,
+      &server,
       &SaveZkNote {
         id: Some(szn1_4.id),
         title: "u1 note4 - rshare".to_string(),
@@ -241,6 +258,7 @@ mod tests {
         content: "note1-4 content FROM USER 2".to_string(),
         editable: false,
         deleted: false,
+        what: None,
       },
     ) {
       Ok(_) => (),
@@ -256,6 +274,7 @@ mod tests {
     match save_zknote(
       &conn,
       uid2,
+      &server,
       &SaveZkNote {
         id: Some(szn1_5.id),
         title: "u1 note5 - share".to_string(),
@@ -264,6 +283,7 @@ mod tests {
         content: "note1-5 content FROM USER 2".to_string(),
         editable: false,
         deleted: false,
+        what: None,
       },
     ) {
       Ok(_) => panic!("test failed"),
@@ -275,6 +295,7 @@ mod tests {
     let (szn2_1_id, _szn2_1) = save_zknote(
       &conn,
       uid2,
+      &server,
       &SaveZkNote {
         id: None,
         title: "u2 note1".to_string(),
@@ -283,6 +304,7 @@ mod tests {
         content: "note2 content".to_string(),
         editable: false,
         deleted: false,
+        what: None,
       },
     )?;
 
@@ -303,6 +325,7 @@ mod tests {
     let _pubzn1 = save_zknote(
       &conn,
       uid1,
+      &server,
       &SaveZkNote {
         id: None,
         title: "u1 public note1".to_string(),
@@ -311,6 +334,7 @@ mod tests {
         content: "note1 content".to_string(),
         editable: false,
         deleted: false,
+        what: None,
       },
     )?;
 
@@ -327,6 +351,7 @@ mod tests {
     let (pubzn2_id, _pubzn2) = save_zknote(
       &conn,
       uid1,
+      &server,
       &SaveZkNote {
         id: None,
         title: "u1 public note2".to_string(),
@@ -335,6 +360,7 @@ mod tests {
         content: "note1 content".to_string(),
         editable: false,
         deleted: false,
+        what: None,
       },
     )?;
     println!("15.1");
@@ -348,6 +374,7 @@ mod tests {
     save_zknote(
       &conn,
       uid1,
+      &server,
       &SaveZkNote {
         id: Some(szn1_2_share.id),
         title: "u1 note2 - share".to_string(),
@@ -356,6 +383,7 @@ mod tests {
         content: "note1-2 content changed".to_string(),
         editable: false,
         deleted: false,
+        what: None,
       },
     )?;
 
@@ -367,6 +395,7 @@ mod tests {
     let (_szn1_6_id, _szn1_6) = save_zknote(
       &conn,
       uid2,
+      &server,
       &SaveZkNote {
         id: None,
         title: "u1 note6 - direct share".to_string(),
@@ -375,6 +404,7 @@ mod tests {
         content: "note1-6 content changed by user2".to_string(),
         editable: true,
         deleted: false,
+        what: None,
       },
     )?;
 
