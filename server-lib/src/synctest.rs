@@ -538,6 +538,7 @@ mod tests {
       pin_mut!(ss);
       let mut br = StreamReader::new(ss);
 
+      println!("ca sync_from_stream");
       match sync_from_stream(
         &caconn,
         &caserver,
@@ -694,6 +695,7 @@ mod tests {
     pin_mut!(ss);
     let mut br = StreamReader::new(ss);
 
+    println!("ca sync_from_stream 2");
     sync_from_stream(
       &caconn,
       &caserver,
@@ -726,6 +728,7 @@ mod tests {
     pin_mut!(cs);
     let mut cbr = StreamReader::new(cs);
 
+    println!("sa sync_from_stream");
     sync_from_stream(
       &saconn,
       &saserver,
@@ -999,7 +1002,7 @@ mod tests {
     // TODO: tweak a file on the server, and on the client.
     // check that those files synced.
 
-    // TODO: delete a note on client/server and then delete on server/client.
+    // TODO: delete a note on client/server and then modify on server/client.
     // currently produces an error.
 
     // ------------------------------------------------------------
@@ -1022,6 +1025,7 @@ mod tests {
     pin_mut!(ss);
     let mut br = StreamReader::new(ss);
 
+    println!("ca sync_from_stream 3");
     sync_from_stream(
       &caconn,
       &caserver,
@@ -1052,6 +1056,7 @@ mod tests {
     pin_mut!(cs);
     let mut cbr = StreamReader::new(cs);
 
+    println!("sa sync_from_stream 2");
     sync_from_stream(
       &saconn,
       &saserver,
