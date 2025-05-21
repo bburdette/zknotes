@@ -945,15 +945,21 @@ where
           ])
         {
           Ok(_x) => Ok::<_, zkerr::Error>(Some(conn.last_insert_rowid())),
-          Err(rusqlite::Error::SqliteFailure(e, s)) =>
-{            println!("sqlite failure: {}, {:?}", e, s);
+          Err(rusqlite::Error::SqliteFailure(e, s)) => {
             if e.code == rusqlite::ErrorCode::ConstraintViolation {
-              // if duplicate record, just ignore and go on.
-             Ok(None)
+              if s == Some("UNIQUE constraint failed: zknote.uuid".to_string()) {
+                // if duplicate record, just ignore and go on.
+                Ok(None)
+              }
+              else
+              {
+                return Err(e)?
+              }
             } else {
               return Err(rusqlite::Error::SqliteFailure(e, s).into())
             }
-}          Err(e) => return Err(e)?,
+          }
+          Err(e) => return Err(e)?,
         }?;
 
     if let (Some(id), Some(nt)) = (mbid, &notetemp) {
