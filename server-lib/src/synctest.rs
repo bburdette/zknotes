@@ -1233,7 +1233,8 @@ mod tests {
 
     println!("joinhandle: {:?}", joinhandle);
 
-    assert!(2 == 3);
+    // uncomment to get the println log during test testing.
+    // assert!(2 == 3);
 
     // ------------------------------------------------------------
     // archive link testing.
