@@ -873,6 +873,14 @@ pub fn save_zknote(
   match note.id {
     Some(uuid) => {
       let id = note_id_for_zknoteid(conn, &uuid)?;
+
+      // check access before creating the archive note.
+      match zknote_access_id(&conn, Some(uid), id)? {
+        Access::Private => return Err(zkerr::Error::NoteIsPrivate),
+        Access::Read => return Err(zkerr::Error::NoteIsReadOnly),
+        Access::ReadWrite => (),
+      };
+
       archive_zknote_i64(&conn, id)?;
       // existing note.  update IF mine.
       match conn.execute(
