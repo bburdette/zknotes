@@ -538,7 +538,6 @@ mod tests {
       pin_mut!(ss);
       let mut br = StreamReader::new(ss);
 
-      println!("ca sync_from_stream");
       match sync_from_stream(
         &caconn,
         &caserver,
@@ -683,30 +682,6 @@ mod tests {
       &lm,
     );
 
-    // {
-    //   let cdn = read_zknote_i64(
-    //     &caconn,
-    //     &client_ts.filepath,
-    //     Some(client_ts.syncuser),
-    //     client_ts.delnote,
-    //   )?;
-
-    //   delete_zknote(
-    //     &caconn,
-    //     client_ts.filepath.clone(),
-    //     client_ts.syncuser,
-    //     &cdn.id,
-    //   )?;
-    // }
-    // let sdn = read_zknote_i64(
-    //   &saconn,
-    //   &server_ts.filepath,
-    //   Some(server_ts.syncuser),
-    //   server_ts.delnote,
-    // )?;
-
-    // let ctr = caconn.unchecked_transaction()?;
-
     let ttn = temp_tables(&caconn)?;
     fn convert_err(err: Box<dyn Error>) -> std::io::Error {
       println!("convert_err {:?}", err);
@@ -717,7 +692,6 @@ mod tests {
     pin_mut!(ss);
     let mut br = StreamReader::new(ss);
 
-    println!("ca sync_from_stream 2");
     sync_from_stream(
       &caconn,
       &caserver,
@@ -750,7 +724,6 @@ mod tests {
     pin_mut!(cs);
     let mut cbr = StreamReader::new(cs);
 
-    println!("sa sync_from_stream");
     sync_from_stream(
       &saconn,
       &saserver,
@@ -847,11 +820,6 @@ mod tests {
       )?;
 
       assert!(cpcarchs.len() > 0);
-
-      println!("cpub2: {:?}", &cpub2);
-
-      println!("cpcarchs {:?}", cpcarchs);
-      println!("spcarchs {:?}", spcarchs);
 
       assert!(cpcarchs == spcarchs);
     }
@@ -1024,7 +992,7 @@ mod tests {
     // TODO: tweak a file on the server, and on the client.
     // check that those files synced.
 
-    // delete a note on both client and server.  error is
+    // delete a note on both client and server.  error was
     // Error: can't update; note is not writable <deleted> 13
     let cdn = read_zknote_i64(
       &caconn,
@@ -1067,7 +1035,6 @@ mod tests {
     pin_mut!(ss);
     let mut br = StreamReader::new(ss);
 
-    println!("ca sync_from_stream 3");
     sync_from_stream(
       &caconn,
       &caserver,
@@ -1098,7 +1065,6 @@ mod tests {
     pin_mut!(cs);
     let mut cbr = StreamReader::new(cs);
 
-    println!("sa sync_from_stream 2");
     sync_from_stream(
       &saconn,
       &saserver,

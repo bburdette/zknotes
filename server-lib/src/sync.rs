@@ -904,8 +904,6 @@ where
   sm = read_sync_message(&mut line, br).await?;
   while let SyncMessage::ZkNote(ref note, ref _mbf) = sm {
     // TODO: make file source record (?)
-    //
-    println!("archive note {:?} ", note);
 
     let uid = UserId::Uid(
       *userhash
@@ -957,8 +955,6 @@ where
             }
 }          Err(e) => return Err(e)?,
         }?;
-
-    println!("archivenote id {:?}", mbid);
 
     if let (Some(id), Some(nt)) = (mbid, &notetemp) {
       conn.execute(
