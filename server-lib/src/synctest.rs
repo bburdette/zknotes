@@ -237,13 +237,13 @@ mod tests {
     savelink(otheruser_note, share_note_id, otheruser, &mut savedlinks)?;
 
     // private note for sync user, to be deleted.
-    let (del_note_id, _del_notesd) = makenote(
+    let (del_note_id, del_notesd) = makenote(
       &conn,
       syncuser,
       format!("{} syncuser to delete", basename,),
       &server,
     )?;
-    visible_notes.push((private_note_id, private_notesd.id.into()));
+    visible_notes.push((del_note_id, del_notesd.id.into()));
 
     // ------------------------------------------------------------------
     // notes visible to syncuser.
@@ -286,7 +286,7 @@ mod tests {
         title: format!("{} syncuser public note", basename),
         showtitle: true,
         pubid: Some("public-note".to_string()), // test duplicate public notes!
-        content: "initial content".to_string(),
+        content: "public-note initial content".to_string(),
         editable: false,
         deleted: false,
         what: None,
@@ -683,6 +683,28 @@ mod tests {
       &lm,
     );
 
+    // {
+    //   let cdn = read_zknote_i64(
+    //     &caconn,
+    //     &client_ts.filepath,
+    //     Some(client_ts.syncuser),
+    //     client_ts.delnote,
+    //   )?;
+
+    //   delete_zknote(
+    //     &caconn,
+    //     client_ts.filepath.clone(),
+    //     client_ts.syncuser,
+    //     &cdn.id,
+    //   )?;
+    // }
+    // let sdn = read_zknote_i64(
+    //   &saconn,
+    //   &server_ts.filepath,
+    //   Some(server_ts.syncuser),
+    //   server_ts.delnote,
+    // )?;
+
     // let ctr = caconn.unchecked_transaction()?;
 
     let ttn = temp_tables(&caconn)?;
@@ -1002,8 +1024,28 @@ mod tests {
     // TODO: tweak a file on the server, and on the client.
     // check that those files synced.
 
-    // TODO: delete a note on client/server and then modify on server/client.
-    // currently produces an error.
+    // delete a note on both client and server.  error is
+    // Error: can't update; note is not writable <deleted> 13
+    let cdn = read_zknote_i64(
+      &caconn,
+      &client_ts.filepath,
+      Some(client_ts.syncuser),
+      client_ts.delnote,
+    )?;
+
+    delete_zknote(
+      &caconn,
+      client_ts.filepath.clone(),
+      client_ts.syncuser,
+      &cdn.id,
+    )?;
+
+    delete_zknote(
+      &saconn,
+      server_ts.filepath.clone(),
+      server_ts.syncuser,
+      &cdn.id, // use CLIENT delnote id, so its the same note.
+    )?;
 
     // ------------------------------------------------------------
     // sync from server to client.
@@ -1191,7 +1233,7 @@ mod tests {
 
     println!("joinhandle: {:?}", joinhandle);
 
-    // assert!(2 == 3);
+    assert!(2 == 3);
 
     // ------------------------------------------------------------
     // archive link testing.
