@@ -927,7 +927,8 @@ pub fn save_zknote(
                 _ => bail!("unexpected update success!"),
               }
             }
-            _ => bail!("can't update; note is not writable"),
+            Access::Read => Err(zkerr::Error::NoteIsReadOnly),
+            Access::Private => Err(zkerr::Error::NoteIsPrivate),
           }
         }
         Ok(_) => bail!("unexpected update success!"),
