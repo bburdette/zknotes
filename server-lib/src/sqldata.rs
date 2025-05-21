@@ -884,7 +884,7 @@ pub fn save_zknote(
            showtitle = ?6,
            deleted = ?7,
            server = ?8
-         where id = ?9 and user = ?10 and deleted = 0",
+         where id = ?9 and user = ?10",
         params![
           note.title,
           note.content,
@@ -913,7 +913,7 @@ pub fn save_zknote(
               // update other user's record!  editable flag must be true.  can't modify delete flag.
               match conn.execute(
                 "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4, showtitle = ?5, server = ?6
-                 where id = ?7 and editable = 1 and deleted = 0",
+                 where id = ?7 and editable = 1",
                 params![note.title, note.content, now, note.pubid, note.showtitle, server.id, id],
               )? {
                 0 => Err( zkerr::Error::String(format!("can't update; note is not writable {} {}", note.title, id))),
