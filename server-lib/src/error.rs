@@ -24,6 +24,7 @@ pub enum Error {
   Girlboss(girlboss::Error),
   NoteNotFound,
   NoteIsPrivate,
+  NoteIsReadOnly,
   NotLoggedIn,
 }
 
@@ -66,6 +67,7 @@ pub fn to_orgauth_error(e: Error) -> orgauth::error::Error {
     Error::Girlboss(e) => orgauth::error::Error::String(e.to_string()),
     Error::NoteNotFound => orgauth::error::Error::String("note not found".to_string()),
     Error::NoteIsPrivate => orgauth::error::Error::String("note is private".to_string()),
+    Error::NoteIsReadOnly => orgauth::error::Error::String("note is readonly".to_string()),
     Error::NotLoggedIn => orgauth::error::Error::String("not logged in".to_string()),
   }
 }
@@ -94,6 +96,7 @@ impl fmt::Display for Error {
       Error::Girlboss(e) => write!(f, "{}", e),
       Error::NoteNotFound => write!(f, "{}", "note not found"),
       Error::NoteIsPrivate => write!(f, "{}", "note is private"),
+      Error::NoteIsReadOnly => write!(f, "{}", "note is readonly"),
       Error::NotLoggedIn => write!(f, "{}", "not logged in"),
     }
   }
@@ -117,6 +120,7 @@ impl fmt::Debug for Error {
       Error::Girlboss(e) => write!(f, "{}", e),
       Error::NoteNotFound => write!(f, "{}", "note not found"),
       Error::NoteIsPrivate => write!(f, "{}", "note is private"),
+      Error::NoteIsReadOnly => write!(f, "{}", "note is readonly"),
       Error::NotLoggedIn => write!(f, "{}", "not logged in"),
     }
   }

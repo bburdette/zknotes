@@ -911,6 +911,22 @@ where
         .ok_or_else(|| zkerr::Error::String("user not found".to_string()))?,
     );
     assert!(uid == sysid);
+    let server_id = match serverhash.get(&note.server).ok_or_else(|| {
+      match server_id(&conn, note.server.as_str()) {
+        Ok(id) => Ok(id),
+        Err(_e) => conn
+          .execute(
+            "insert into server (uuid, createdate) values (?1, ?2)",
+            params![note.server, now],
+          )
+          .map(|_| conn.last_insert_rowid())
+          .map_err(|e| zkerr::Error::from(e)),
+      }
+    }) {
+      Ok(id) => Ok(id.clone()),
+      Err(Ok(id)) => Ok(id),
+      Err(Err(e)) => Err(e),
+    }?;
     let mbid = match conn.execute(
       "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, server, createdate, changeddate)
        values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
@@ -923,21 +939,29 @@ where
           note.showtitle,
           note.deleted,
           note.id.to_string(),
-          note.server,
+          server_id,
           note.createdate,
           note.changeddate,
           ])
         {
           Ok(_x) => Ok::<_, zkerr::Error>(Some(conn.last_insert_rowid())),
-          Err(rusqlite::Error::SqliteFailure(e, s)) =>
+          Err(rusqlite::Error::SqliteFailure(e, s)) => {
             if e.code == rusqlite::ErrorCode::ConstraintViolation {
-              // if duplicate record, just ignore and go on.
-             Ok(None)
+              if s == Some("UNIQUE constraint failed: zknote.uuid".to_string()) {
+                // if duplicate record, just ignore and go on.
+                Ok(None)
+              }
+              else
+              {
+                return Err(e)?
+              }
             } else {
               return Err(rusqlite::Error::SqliteFailure(e, s).into())
             }
+          }
           Err(e) => return Err(e)?,
         }?;
+
     if let (Some(id), Some(nt)) = (mbid, &notetemp) {
       conn.execute(
         format!("insert into {} values (?1)", nt).as_str(),
