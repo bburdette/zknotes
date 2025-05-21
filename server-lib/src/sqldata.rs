@@ -916,27 +916,21 @@ pub fn save_zknote(
           },
         )),
         Ok(0) => {
-          match zknote_access_id(conn, Some(uid), id)? {
-            Access::ReadWrite => {
-              // update other user's record!  editable flag must be true.  can't modify delete flag.
-              match conn.execute(
-                "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4, showtitle = ?5, server = ?6
-                 where id = ?7 and editable = 1",
-                params![note.title, note.content, now, note.pubid, note.showtitle, server.id, id],
-              )? {
-                0 => Err( zkerr::Error::String(format!("can't update; note is not writable {} {}", note.title, id))),
-                // params![note.title, note.content, now, note.pubid, note.showtitle, server.id, id],
-                1 => Ok((id, SavedZkNote {
-                    id: uuid,
-                    changeddate: now,
-                    server: server.uuid.clone(),
-                    what: note.what.clone(),
-                  })),
-                _ => bail!("unexpected update success!"),
-              }
-            }
-            Access::Read => Err(zkerr::Error::NoteIsReadOnly),
-            Access::Private => Err(zkerr::Error::NoteIsPrivate),
+          // editable flag must be true
+          match conn.execute(
+            "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4, showtitle = ?5, server = ?6
+             where id = ?7 and editable = 1",
+            params![note.title, note.content, now, note.pubid, note.showtitle, server.id, id],
+          )? {
+            0 => Err( zkerr::Error::String(format!("can't update; note is not writable {} {}", note.title, id))),
+            // params![note.title, note.content, now, note.pubid, note.showtitle, server.id, id],
+            1 => Ok((id, SavedZkNote {
+                id: uuid,
+                changeddate: now,
+                server: server.uuid.clone(),
+                what: note.what.clone(),
+              })),
+            _ => bail!("unexpected update success!"),
           }
         }
         Ok(_) => bail!("unexpected update success!"),
