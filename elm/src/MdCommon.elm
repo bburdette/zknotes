@@ -261,16 +261,16 @@ mkRenderer fui viewMode addToSearchMsg maxw cellDict showPanelElt onchanged note
                             E.text "error"
                 )
                 |> Markdown.Html.withAttribute "noteid"
-            , Markdown.Html.tag "image" imageView
+            , Markdown.Html.tag "image" (imageView fui)
                 |> Markdown.Html.withAttribute "text"
                 |> Markdown.Html.withAttribute "url"
                 |> Markdown.Html.withOptionalAttribute "width"
-            , Markdown.Html.tag "video" (videoView maxw)
+            , Markdown.Html.tag "video" (videoView fui maxw)
                 |> Markdown.Html.withAttribute "src"
                 |> Markdown.Html.withOptionalAttribute "text"
                 |> Markdown.Html.withOptionalAttribute "width"
                 |> Markdown.Html.withOptionalAttribute "height"
-            , Markdown.Html.tag "audio" audioView
+            , Markdown.Html.tag "audio" (audioView fui)
                 |> Markdown.Html.withAttribute "text"
                 |> Markdown.Html.withAttribute "src"
             , Markdown.Html.tag "note" (noteView fui noteCache)
@@ -315,24 +315,37 @@ panelView noteid renderedChildren =
         renderText ("Side panel note :" ++ zkNoteIdToString noteid)
 
 
-imageView : String -> String -> Maybe String -> List (Element a) -> Element a
-imageView text url mbwidth renderedChildren =
+fileUrl : FileUrlInfo -> String -> String
+fileUrl fui url =
+    if String.startsWith "/file/" url then
+        fui.filelocation ++ url
+
+    else
+        url
+
+
+imageView : FileUrlInfo -> String -> String -> Maybe String -> List (Element a) -> Element a
+imageView fui text url mbwidth renderedChildren =
+    let
+        furl =
+            fileUrl fui url
+    in
     case
         mbwidth
             |> Maybe.andThen (\s -> String.toInt s)
     of
         Just w ->
             E.image [ E.width <| E.maximum w E.fill, E.centerX ]
-                { src = url, description = text }
+                { src = furl, description = text }
 
         Nothing ->
             E.image [ E.width E.fill ]
-                { src = url, description = text }
+                { src = furl, description = text }
 
 
-audioView : String -> String -> List (Element a) -> Element a
-audioView text url renderedChildren =
-    htmlAudioView url text
+audioView : FileUrlInfo -> String -> String -> List (Element a) -> Element a
+audioView fui text url renderedChildren =
+    htmlAudioView (fileUrl fui url) text
 
 
 htmlAudioView : String -> String -> Element a
@@ -371,7 +384,7 @@ videoNoteView fui zknote =
     in
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
         [ link (Just zknote.title) ("/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
-        , videoView 500 fileurl (Just zknote.title) Nothing Nothing []
+        , videoView fui 500 fileurl (Just zknote.title) Nothing Nothing []
         ]
 
 
@@ -384,7 +397,7 @@ imageNoteView fui zknote =
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
         [ link (Just zknote.title) ("/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
         , E.paragraph [] [ E.text fileurl ]
-        , imageView zknote.title fileurl Nothing []
+        , imageView fui zknote.title fileurl Nothing []
         ]
 
 
@@ -486,8 +499,8 @@ noteView fui noteCache id _ =
             E.text <| "note " ++ id
 
 
-videoView : Int -> String -> Maybe String -> Maybe String -> Maybe String -> List (Element a) -> Element a
-videoView maxw url mbtext mbwidth mbheight renderedChildren =
+videoView : FileUrlInfo -> Int -> String -> Maybe String -> Maybe String -> Maybe String -> List (Element a) -> Element a
+videoView fui maxw url mbtext mbwidth mbheight renderedChildren =
     let
         attribs =
             List.filterMap identity
@@ -506,7 +519,7 @@ videoView maxw url mbtext mbwidth mbheight renderedChildren =
             Html.video
                 attribs
                 [ Html.source
-                    [ HA.attribute "src" url ]
+                    [ HA.attribute "src" (fileUrl fui url) ]
                     [ mbtext
                         |> Maybe.map (\s -> Html.text s)
                         |> Maybe.withDefault (Html.text "video")
