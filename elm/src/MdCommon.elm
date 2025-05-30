@@ -614,7 +614,6 @@ noteView zone fui noteCache id show text _ =
                     E.none
                 ]
 
-        -- , E.column [] (List.map (.othername >> Maybe.withDefault "" >> E.text) zne.links)
         Nothing ->
             E.text <| "note " ++ id
 
