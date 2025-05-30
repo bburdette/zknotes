@@ -121,7 +121,7 @@ view zone maxw noteCache model loggedin =
                                     ]
                                     (case
                                         MC.markdownView
-                                            (MC.mkRenderer model.fui MC.PublicView (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged noteCache)
+                                            (MC.mkRenderer zone model.fui MC.PublicView (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged noteCache)
                                             pn.zknote.content
                                      of
                                         Ok rendered ->
@@ -167,7 +167,7 @@ view zone maxw noteCache model loggedin =
                         )
                     |> Maybe.withDefault E.none
                 , E.row [ E.width E.fill ]
-                    [ case MC.markdownView (MC.mkRenderer model.fui MC.PublicView (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged noteCache) model.md of
+                    [ case MC.markdownView (MC.mkRenderer zone model.fui MC.PublicView (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged noteCache) model.md of
                         Ok rendered ->
                             E.column
                                 [ E.spacing 30
