@@ -1359,7 +1359,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                         ]
                     , case ( model.filestatus, toZkNote model ) of
                         ( Data.FilePresent, Just zkn ) ->
-                            MC.noteFile model.fui model.title zkn
+                            MC.noteFile model.fui Nothing model.title zkn
 
                         ( Data.FileMissing, Just _ ) ->
                             E.text <| "file missing"

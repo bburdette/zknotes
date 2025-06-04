@@ -36,6 +36,14 @@ markdownView renderer markdown =
         |> Result.andThen (Markdown.Renderer.render renderer)
 
 
+markdownEView : Markdown.Renderer.Renderer (Element a) -> String -> Result String (List (Element a))
+markdownEView renderer markdown =
+    markdown
+        |> Markdown.Parser.parse
+        |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
+        |> Result.andThen (Markdown.Renderer.render renderer)
+
+
 mdCells : String -> Result String CellDict
 mdCells markdown =
     markdown
@@ -275,8 +283,10 @@ mkRenderer fui viewMode addToSearchMsg maxw cellDict showPanelElt onchanged note
                 |> Markdown.Html.withAttribute "src"
             , Markdown.Html.tag "note" (noteView fui noteCache)
                 |> Markdown.Html.withAttribute "id"
+                |> Markdown.Html.withOptionalAttribute "show"
+                |> Markdown.Html.withOptionalAttribute "text"
             ]
-    , table = E.column [ E.width <| E.fill ]
+    , table = E.column [ E.width <| E.fill, EBk.color TC.lightGreen ]
     , tableHeader = E.column [ E.width <| E.fill, EF.bold, EF.underline, E.spacing 8 ]
     , tableBody = E.column [ E.width <| E.fill ]
     , tableRow = E.row [ E.width E.fill ]
@@ -401,8 +411,8 @@ imageNoteView fui zknote =
         ]
 
 
-noteFile : FileUrlInfo -> String -> Data.ZkNote -> Element a
-noteFile fui filename zknote =
+noteFile : FileUrlInfo -> Maybe NoteShow -> String -> Data.ZkNote -> Element a
+noteFile fui mbns filename zknote =
     let
         suffix =
             String.split "." filename
@@ -447,8 +457,31 @@ noteFile fui filename zknote =
                     link (Just zknote.title) (fui.filelocation ++ "/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
 
 
-noteView : FileUrlInfo -> NoteCache -> String -> List (Element a) -> Element a
-noteView fui noteCache id _ =
+type alias NoteShow =
+    { title : Bool
+    , contents : Bool
+    , media : Bool
+    , createdate : Bool
+    , moddate : Bool
+    }
+
+
+parseShow : String -> NoteShow
+parseShow s =
+    { title = String.contains "title" s
+    , contents = String.contains "contents" s
+    , media = String.contains "media" s
+    , createdate = String.contains "createdate" s
+    , moddate = String.contains "moddate" s
+    }
+
+
+noteView : FileUrlInfo -> NoteCache -> String -> Maybe String -> Maybe String -> List (Element a) -> Element a
+noteView fui noteCache id show text _ =
+    let
+        mbns =
+            Maybe.map parseShow show
+    in
     case
         zkNoteIdFromString id
             |> Result.toMaybe
@@ -463,7 +496,7 @@ noteView fui noteCache id _ =
         Just (NC.ZNAL zne) ->
             case zne.zknote.filestatus of
                 Data.FilePresent ->
-                    noteFile fui zne.zknote.title zne.zknote
+                    noteFile fui mbns zne.zknote.title zne.zknote
 
                 Data.FileMissing ->
                     E.paragraph []
@@ -491,7 +524,8 @@ noteView fui noteCache id _ =
                                 , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
                                 , E.htmlAttribute (HA.style "word-break" "break-word")
                                 ]
-                                [ E.text zne.zknote.title ]
+                                -- [ E.text zne.zknote.title ]
+                                [ E.text zne.zknote.content ]
                         }
 
         -- , E.column [] (List.map (.othername >> Maybe.withDefault "" >> E.text) zne.links)
@@ -594,7 +628,8 @@ rawTextToId rawText =
 heading : { level : Block.HeadingLevel, rawText : String, children : List (Element msg) } -> Element msg
 heading { level, rawText, children } =
     E.paragraph
-        [ EF.size
+        [ EBk.color TC.lightBrown
+        , EF.size
             (case level of
                 Block.H1 ->
                     36
