@@ -24,6 +24,7 @@ import Schelme.Show exposing (showTerm)
 import Set exposing (Set(..))
 import TSet
 import TangoColors as TC
+import Time
 import Util
 import ZkCommon
 
@@ -173,8 +174,8 @@ renderText str =
         [ E.text str ]
 
 
-mkRenderer : FileUrlInfo -> ViewMode -> (String -> a) -> Int -> CellDict -> Bool -> (String -> String -> a) -> NoteCache -> Markdown.Renderer.Renderer (Element a)
-mkRenderer fui viewMode addToSearchMsg maxw cellDict showPanelElt onchanged noteCache =
+mkRenderer : Time.Zone -> FileUrlInfo -> ViewMode -> (String -> a) -> Int -> CellDict -> Bool -> (String -> String -> a) -> NoteCache -> Markdown.Renderer.Renderer (Element a)
+mkRenderer zone fui viewMode addToSearchMsg maxw cellDict showPanelElt onchanged noteCache =
     { heading = heading
     , paragraph =
         E.paragraph
@@ -281,7 +282,7 @@ mkRenderer fui viewMode addToSearchMsg maxw cellDict showPanelElt onchanged note
             , Markdown.Html.tag "audio" (audioView fui)
                 |> Markdown.Html.withAttribute "text"
                 |> Markdown.Html.withAttribute "src"
-            , Markdown.Html.tag "note" (noteView fui noteCache)
+            , Markdown.Html.tag "note" (noteView zone fui noteCache)
                 |> Markdown.Html.withAttribute "id"
                 |> Markdown.Html.withOptionalAttribute "show"
                 |> Markdown.Html.withOptionalAttribute "text"
@@ -457,30 +458,50 @@ noteFile fui mbns filename zknote =
                     link (Just zknote.title) (fui.filelocation ++ "/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
 
 
+
+-- filesize and stuff.
+-- share status?
+-- drag handle
+
+
 type alias NoteShow =
     { title : Bool
     , contents : Bool
-    , media : Bool
+    , text : Bool
+    , file : Bool
     , createdate : Bool
-    , moddate : Bool
+    , changedate : Bool
+    , link : Bool
     }
 
 
-parseShow : String -> NoteShow
-parseShow s =
-    { title = String.contains "title" s
-    , contents = String.contains "contents" s
-    , media = String.contains "media" s
-    , createdate = String.contains "createdate" s
-    , moddate = String.contains "moddate" s
+parseNoteShow : String -> NoteShow
+parseNoteShow text =
+    { title = String.contains "title" text
+    , contents = String.contains "contents" text
+    , text = String.contains "text" text
+    , file = String.contains "file" text
+    , createdate = String.contains "createdate" text
+    , changedate = String.contains "changedate" text
+    , link = String.contains "link" text
     }
 
 
-noteView : FileUrlInfo -> NoteCache -> String -> Maybe String -> Maybe String -> List (Element a) -> Element a
-noteView fui noteCache id show text _ =
+noteView : Time.Zone -> FileUrlInfo -> NoteCache -> String -> Maybe String -> Maybe String -> List (Element a) -> Element a
+noteView zone fui noteCache id show text _ =
     let
-        mbns =
-            Maybe.map parseShow show
+        ns =
+            show
+                |> Maybe.map parseNoteShow
+                |> Maybe.withDefault
+                    { title = True
+                    , contents = False
+                    , text = False
+                    , file = False
+                    , createdate = False
+                    , changedate = False
+                    , link = True
+                    }
     in
     case
         zkNoteIdFromString id
@@ -494,27 +515,17 @@ noteView fui noteCache id show text _ =
             E.text "note not found"
 
         Just (NC.ZNAL zne) ->
-            case zne.zknote.filestatus of
-                Data.FilePresent ->
-                    noteFile fui mbns zne.zknote.title zne.zknote
+            E.column [ EBd.width 1, EBd.color TC.darkGray, E.padding 3 ]
+                [ if ns.link then
+                    let
+                        linktext =
+                            case text of
+                                Just t ->
+                                    t
 
-                Data.FileMissing ->
-                    E.paragraph []
-                        [ E.link
-                            [ E.htmlAttribute (HA.style "display" "inline-flex") ]
-                            { url = "/note/" ++ id -- don't use prefix here!
-                            , label =
-                                E.paragraph
-                                    [ EF.color (E.rgb255 0 0 255)
-                                    , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
-                                    , E.htmlAttribute (HA.style "word-break" "break-word")
-                                    ]
-                                    [ E.text zne.zknote.title ]
-                            }
-                        , E.text " file missing"
-                        ]
-
-                Data.NotAFile ->
+                                Nothing ->
+                                    zne.zknote.title
+                    in
                     E.link
                         [ E.htmlAttribute (HA.style "display" "inline-flex") ]
                         { url = "/note/" ++ id -- don't use prefix here!
@@ -524,11 +535,93 @@ noteView fui noteCache id show text _ =
                                 , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
                                 , E.htmlAttribute (HA.style "word-break" "break-word")
                                 ]
-                                -- [ E.text zne.zknote.title ]
-                                [ E.text zne.zknote.content ]
+                                [ E.text linktext ]
                         }
 
-        -- , E.column [] (List.map (.othername >> Maybe.withDefault "" >> E.text) zne.links)
+                  else
+                    E.none
+                , if ns.title && not ns.link then
+                    E.text zne.zknote.title
+
+                  else
+                    E.none
+                , if ns.text && not ns.link then
+                    text |> Maybe.map E.text |> Maybe.withDefault E.none
+
+                  else
+                    E.none
+                , if ns.createdate || ns.changedate then
+                    E.row []
+                        [ if ns.createdate then
+                            zne.zknote.createdate
+                                |> (\cd ->
+                                        E.row []
+                                            [ E.text "created: "
+                                            , E.text (Util.showDateTime zone (Time.millisToPosix cd))
+                                            , E.text " "
+                                            ]
+                                   )
+
+                          else
+                            E.none
+                        , if ns.changedate then
+                            zne.zknote.changeddate
+                                |> (\cd ->
+                                        E.row []
+                                            [ E.text "updated: "
+                                            , E.text (Util.showDateTime zone (Time.millisToPosix cd))
+                                            ]
+                                   )
+
+                          else
+                            E.none
+                        ]
+
+                  else
+                    E.none
+                , if ns.contents then
+                    E.text zne.zknote.content
+
+                  else
+                    E.none
+                , if ns.file then
+                    case zne.zknote.filestatus of
+                        Data.FilePresent ->
+                            noteFile fui zne.zknote.title zne.zknote
+
+                        Data.FileMissing ->
+                            E.paragraph []
+                                [ E.link
+                                    [ E.htmlAttribute (HA.style "display" "inline-flex") ]
+                                    { url = "/note/" ++ id -- don't use prefix here!
+                                    , label =
+                                        E.paragraph
+                                            [ EF.color (E.rgb255 0 0 255)
+                                            , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
+                                            , E.htmlAttribute (HA.style "word-break" "break-word")
+                                            ]
+                                            [ E.text zne.zknote.title ]
+                                    }
+                                , E.text " file missing"
+                                ]
+
+                        Data.NotAFile ->
+                            E.link
+                                [ E.htmlAttribute (HA.style "display" "inline-flex") ]
+                                { url = "/note/" ++ id -- don't use prefix here!
+                                , label =
+                                    E.paragraph
+                                        [ EF.color (E.rgb255 0 0 255)
+                                        , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
+                                        , E.htmlAttribute (HA.style "word-break" "break-word")
+                                        ]
+                                        [ E.text zne.zknote.title ]
+                                }
+
+                  else
+                    E.none
+                ]
+
         Nothing ->
             E.text <| "note " ++ id
 

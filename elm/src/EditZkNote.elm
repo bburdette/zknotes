@@ -890,9 +890,9 @@ addComment ncs =
         ]
 
 
-renderMd : FileUrlInfo -> CellDict -> NoteCache -> String -> Int -> Element Msg
-renderMd fui cd noteCache md mdw =
-    case MC.markdownView (MC.mkRenderer fui MC.EditView RestoreSearch mdw cd True OnSchelmeCodeChanged noteCache) md of
+renderMd : Time.Zone -> FileUrlInfo -> CellDict -> NoteCache -> String -> Int -> Element Msg
+renderMd zone fui cd noteCache md mdw =
+    case MC.markdownView (MC.mkRenderer zone fui MC.EditView RestoreSearch mdw cd True OnSchelmeCodeChanged noteCache) md of
         Ok rendered ->
             E.column
                 [ E.spacing 30
@@ -977,7 +977,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                 , columns =
                     [ { header = E.none
                       , width = E.fill
-                      , view = \zkn -> renderMd model.fui model.cells noteCache zkn.content mdw
+                      , view = \zkn -> renderMd zone model.fui model.cells noteCache zkn.content mdw
                       }
                     , { header = E.none
                       , width = E.shrink
@@ -1369,7 +1369,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
 
                         ( _, Nothing ) ->
                             E.none
-                    , renderMd model.fui model.cells noteCache model.md mdw
+                    , renderMd zone model.fui model.cells noteCache model.md mdw
                     ]
                     :: (if wclass == Wide then
                             []
