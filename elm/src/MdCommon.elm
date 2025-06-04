@@ -587,7 +587,7 @@ noteView zone fui noteCache id show text _ =
                 , if ns.file then
                     case zne.zknote.filestatus of
                         Data.FilePresent ->
-                            noteFile fui zne.zknote.title zne.zknote
+                            noteFile fui (Just ns) zne.zknote.title zne.zknote
 
                         Data.FileMissing ->
                             E.paragraph []
