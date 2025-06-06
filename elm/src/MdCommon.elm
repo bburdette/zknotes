@@ -168,8 +168,8 @@ renderText str =
 
 renderBlock : Element a -> Element a
 renderBlock e =
-    E.row [ EBd.width 1, E.width E.fill ]
-        [ E.el [ E.width (E.px 20), E.height (E.px 40), EBk.color TC.brown, E.alignBottom ] E.none
+    E.row [ EBd.width 1, E.width E.fill, E.height E.fill, E.padding 3 ]
+        [ E.el [ E.width (E.px 20), E.height E.fill, EBk.color TC.brown, E.alignBottom ] E.none
         , e
         ]
 
@@ -204,7 +204,7 @@ mkRenderer zone fui viewMode addToSearchMsg maxw cellDict showPanelElt onchanged
                 children
     , unorderedList =
         \items ->
-            E.column [ E.paddingXY 10 0 ]
+            E.column [ E.paddingXY 10 0, E.width E.fill ]
                 (items
                     |> List.map
                         (\(ListItem task children) ->
@@ -334,13 +334,19 @@ mkEditRenderer renderer =
     { heading = \a -> renderer.heading a |> renderBlock
     , paragraph = \a -> renderer.paragraph a |> renderBlock
     , thematicBreak = renderer.thematicBreak |> renderBlock
-    , text = \a -> renderer.text a |> renderBlock
+
+    -- , text = \a -> renderer.text a |> renderBlock
+    , text = renderer.text
     , strong = \a -> renderer.strong a |> renderBlock
     , emphasis = \a -> renderer.emphasis a |> renderBlock
     , strikethrough = \a -> renderer.strikethrough a |> renderBlock
     , codeSpan = \a -> renderer.codeSpan a |> renderBlock
-    , link = \a b -> renderer.link a b |> renderBlock
-    , hardLineBreak = renderer.hardLineBreak |> renderBlock
+
+    -- , link = \a b -> renderer.link a b |> renderBlock
+    , link = renderer.link
+
+    -- , hardLineBreak = renderer.hardLineBreak |> renderBlock
+    , hardLineBreak = renderer.hardLineBreak
     , image = \a -> renderer.image a |> renderBlock
     , blockQuote = \a -> renderer.blockQuote a |> renderBlock
     , unorderedList = \a -> renderer.unorderedList a |> renderBlock
@@ -571,83 +577,104 @@ noteView zone fui noteCache id show text _ =
             E.text "note not found"
 
         Just (NC.ZNAL zne) ->
-            E.column [ E.width E.fill ]
-                [ if ns.link then
-                    let
-                        linktext =
-                            case text of
-                                Just t ->
-                                    t
+            let
+                items =
+                    [ if ns.link then
+                        let
+                            linktext =
+                                case text of
+                                    Just t ->
+                                        t
 
-                                Nothing ->
-                                    zne.zknote.title
-                    in
-                    E.link
-                        [ E.htmlAttribute (HA.style "display" "inline-flex") ]
-                        { url = "/note/" ++ id -- don't use prefix here!
-                        , label =
-                            E.paragraph
-                                [ EF.color (E.rgb255 0 0 255)
-                                , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
-                                , E.htmlAttribute (HA.style "word-break" "break-word")
-                                ]
-                                [ E.text linktext ]
-                        }
+                                    Nothing ->
+                                        zne.zknote.title
+                        in
+                        E.link
+                            [ E.htmlAttribute (HA.style "display" "inline-flex") ]
+                            { url = "/note/" ++ id -- don't use prefix here!
+                            , label =
+                                E.paragraph
+                                    [ EF.color (E.rgb255 0 0 255)
+                                    , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
+                                    , E.htmlAttribute (HA.style "word-break" "break-word")
+                                    ]
+                                    [ E.text linktext ]
+                            }
 
-                  else
-                    E.none
-                , if ns.title && not ns.link then
-                    E.text zne.zknote.title
+                      else
+                        E.none
+                    , if ns.title && not ns.link then
+                        E.text zne.zknote.title
 
-                  else
-                    E.none
-                , if ns.text && not ns.link then
-                    text |> Maybe.map E.text |> Maybe.withDefault E.none
+                      else
+                        E.none
+                    , if ns.text && not ns.link then
+                        text |> Maybe.map E.text |> Maybe.withDefault E.none
 
-                  else
-                    E.none
-                , if ns.createdate || ns.changedate then
-                    E.row []
-                        [ if ns.createdate then
-                            zne.zknote.createdate
-                                |> (\cd ->
-                                        E.row []
-                                            [ E.text "created: "
-                                            , E.text (Util.showDateTime zone (Time.millisToPosix cd))
-                                            , E.text " "
-                                            ]
-                                   )
+                      else
+                        E.none
+                    , if ns.createdate || ns.changedate then
+                        E.row []
+                            [ if ns.createdate then
+                                zne.zknote.createdate
+                                    |> (\cd ->
+                                            E.row []
+                                                [ E.text "created: "
+                                                , E.text (Util.showDateTime zone (Time.millisToPosix cd))
+                                                , E.text " "
+                                                ]
+                                       )
 
-                          else
-                            E.none
-                        , if ns.changedate then
-                            zne.zknote.changeddate
-                                |> (\cd ->
-                                        E.row []
-                                            [ E.text "updated: "
-                                            , E.text (Util.showDateTime zone (Time.millisToPosix cd))
-                                            ]
-                                   )
+                              else
+                                E.none
+                            , if ns.changedate then
+                                zne.zknote.changeddate
+                                    |> (\cd ->
+                                            E.row []
+                                                [ E.text "updated: "
+                                                , E.text (Util.showDateTime zone (Time.millisToPosix cd))
+                                                ]
+                                       )
 
-                          else
-                            E.none
-                        ]
+                              else
+                                E.none
+                            ]
 
-                  else
-                    E.none
-                , if ns.contents then
-                    E.text zne.zknote.content
+                      else
+                        E.none
+                    , if ns.contents then
+                        E.paragraph
+                            [ E.htmlAttribute (HA.style "overflow-wrap" "break-word")
+                            , E.htmlAttribute (HA.style "word-break" "break-word")
+                            ]
+                            [ E.text zne.zknote.content
+                            ]
 
-                  else
-                    E.none
-                , if ns.file then
-                    case zne.zknote.filestatus of
-                        Data.FilePresent ->
-                            noteFile fui (Just ns) zne.zknote.title zne.zknote
+                      else
+                        E.none
+                    , if ns.file then
+                        case zne.zknote.filestatus of
+                            Data.FilePresent ->
+                                noteFile fui (Just ns) zne.zknote.title zne.zknote
 
-                        Data.FileMissing ->
-                            E.paragraph []
-                                [ E.link
+                            Data.FileMissing ->
+                                E.paragraph []
+                                    [ E.link
+                                        [ E.htmlAttribute (HA.style "display" "inline-flex") ]
+                                        { url = "/note/" ++ id -- don't use prefix here!
+                                        , label =
+                                            E.paragraph
+                                                [ EF.color (E.rgb255 0 0 255)
+                                                , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
+                                                , E.htmlAttribute (HA.style "word-break" "break-word")
+                                                ]
+                                                [ E.text zne.zknote.title ]
+                                        }
+                                    , E.text " file missing"
+                                    ]
+
+                            Data.NotAFile ->
+                                E.link
                                     [ E.htmlAttribute (HA.style "display" "inline-flex") ]
                                     { url = "/note/" ++ id -- don't use prefix here!
                                     , label =
@@ -658,25 +685,17 @@ noteView zone fui noteCache id show text _ =
                                             ]
                                             [ E.text zne.zknote.title ]
                                     }
-                                , E.text " file missing"
-                                ]
 
-                        Data.NotAFile ->
-                            E.link
-                                [ E.htmlAttribute (HA.style "display" "inline-flex") ]
-                                { url = "/note/" ++ id -- don't use prefix here!
-                                , label =
-                                    E.paragraph
-                                        [ EF.color (E.rgb255 0 0 255)
-                                        , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
-                                        , E.htmlAttribute (HA.style "word-break" "break-word")
-                                        ]
-                                        [ E.text zne.zknote.title ]
-                                }
+                      else
+                        E.none
+                    ]
+            in
+            case items of
+                [ a ] ->
+                    a
 
-                  else
-                    E.none
-                ]
+                x ->
+                    E.column [ E.width E.fill ] x
 
         Nothing ->
             E.text <| "note " ++ id
@@ -821,6 +840,7 @@ codeBlock details =
         [ EBk.color (E.rgba 0 0 0 0.13)
         , E.padding 5
         , EF.family [ EF.monospace ]
+        , E.width E.fill
         ]
         [ E.html <|
             Html.div
