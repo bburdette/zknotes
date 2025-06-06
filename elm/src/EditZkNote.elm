@@ -719,7 +719,7 @@ showSr fontsize bkcolor model isdirty zkln =
 
                     Nothing ->
                         E.none
-                , E.row [] [ E.text <| "link: ", E.el [ EF.italic ] <| E.text model.title ]
+                , E.column [] [ E.text <| "link to current note: ", E.el [ EF.italic ] <| E.text model.title ]
                 ]
             , E.row
                 [ E.spacing 8, E.width E.fill ]
