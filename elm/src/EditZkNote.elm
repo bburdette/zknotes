@@ -892,7 +892,7 @@ addComment ncs =
 
 renderMd : Time.Zone -> FileUrlInfo -> CellDict -> NoteCache -> String -> Int -> Element Msg
 renderMd zone fui cd noteCache md mdw =
-    case MC.markdownView (MC.mkRenderer zone fui MC.EditView RestoreSearch mdw cd True OnSchelmeCodeChanged noteCache) md of
+    case MC.markdownView (MC.mkEditRenderer (MC.mkRenderer zone fui MC.EditView RestoreSearch mdw cd True OnSchelmeCodeChanged noteCache)) md of
         Ok rendered ->
             E.column
                 [ E.spacing 30

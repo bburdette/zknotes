@@ -1,4 +1,4 @@
-module MdCommon exposing (Panel, ViewMode(..), blockCells, blockPanels, cellView, codeBlock, codeSpan, defCell, heading, imageView, linkDict, markdownView, mdCells, mdPanel, mdPanels, mkRenderer, noteFile, noteIds, panelView, rawTextToId, searchView, showRunState)
+module MdCommon exposing (Panel, ViewMode(..), blockCells, blockPanels, cellView, codeBlock, codeSpan, defCell, heading, imageView, linkDict, markdownView, mdCells, mdPanel, mdPanels, mkEditRenderer, mkRenderer, noteFile, noteIds, panelView, rawTextToId, searchView, showRunState)
 
 import Cellme.Cellme exposing (CellContainer(..), RunState(..))
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr)
@@ -31,14 +31,6 @@ import ZkCommon
 
 markdownView : Markdown.Renderer.Renderer (Element a) -> String -> Result String (List (Element a))
 markdownView renderer markdown =
-    markdown
-        |> Markdown.Parser.parse
-        |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
-        |> Result.andThen (Markdown.Renderer.render renderer)
-
-
-markdownEView : Markdown.Renderer.Renderer (Element a) -> String -> Result String (List (Element a))
-markdownEView renderer markdown =
     markdown
         |> Markdown.Parser.parse
         |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
@@ -174,6 +166,14 @@ renderText str =
         [ E.text str ]
 
 
+renderBlock : Element a -> Element a
+renderBlock e =
+    E.row [ EBd.width 1, E.width E.fill ]
+        [ E.el [ E.width (E.px 20), E.height (E.px 40), EBk.color TC.brown, E.alignBottom ] E.none
+        , e
+        ]
+
+
 mkRenderer : Time.Zone -> FileUrlInfo -> ViewMode -> (String -> a) -> Int -> CellDict -> Bool -> (String -> String -> a) -> NoteCache -> Markdown.Renderer.Renderer (Element a)
 mkRenderer zone fui viewMode addToSearchMsg maxw cellDict showPanelElt onchanged noteCache =
     { heading = heading
@@ -287,7 +287,7 @@ mkRenderer zone fui viewMode addToSearchMsg maxw cellDict showPanelElt onchanged
                 |> Markdown.Html.withOptionalAttribute "show"
                 |> Markdown.Html.withOptionalAttribute "text"
             ]
-    , table = E.column [ E.width <| E.fill, EBk.color TC.lightGreen ]
+    , table = E.column [ E.width <| E.fill ]
     , tableHeader = E.column [ E.width <| E.fill, EF.bold, EF.underline, E.spacing 8 ]
     , tableBody = E.column [ E.width <| E.fill ]
     , tableRow = E.row [ E.width E.fill ]
@@ -297,6 +297,62 @@ mkRenderer zone fui viewMode addToSearchMsg maxw cellDict showPanelElt onchanged
     , tableCell =
         \maybeAlignment children ->
             E.paragraph [] children
+    }
+
+
+
+{-
+   { heading : { level : Block.HeadingLevel, rawText : String, children : List view } -> view
+   , paragraph : List view -> view
+   , blockQuote : List view -> view
+   , html : Markdown.Html.Renderer (List view -> view)
+   , text : String -> view
+   , codeSpan : String -> view
+   , strong : List view -> view
+   , emphasis : List view -> view
+   , strikethrough : List view -> view
+   , hardLineBreak : view
+   , link : { title : Maybe String, destination : String } -> List view -> view
+   , image : { alt : String, src : String, title : Maybe String } -> view
+   , unorderedList : List (ListItem view) -> view
+   , orderedList : Int -> List (List view) -> view
+   , codeBlock : { body : String, language : Maybe String } -> view
+   , thematicBreak : view
+   , table : List view -> view
+   , tableHeader : List view -> view
+   , tableBody : List view -> view
+   , tableRow : List view -> view
+   , tableCell : Maybe Block.Alignment -> List view -> view
+   , tableHeaderCell : Maybe Block.Alignment -> List view -> view
+   }
+
+-}
+
+
+mkEditRenderer : Markdown.Renderer.Renderer (Element a) -> Markdown.Renderer.Renderer (Element a)
+mkEditRenderer renderer =
+    { heading = \a -> renderer.heading a |> renderBlock
+    , paragraph = \a -> renderer.paragraph a |> renderBlock
+    , thematicBreak = renderer.thematicBreak |> renderBlock
+    , text = \a -> renderer.text a |> renderBlock
+    , strong = \a -> renderer.strong a |> renderBlock
+    , emphasis = \a -> renderer.emphasis a |> renderBlock
+    , strikethrough = \a -> renderer.strikethrough a |> renderBlock
+    , codeSpan = \a -> renderer.codeSpan a |> renderBlock
+    , link = \a b -> renderer.link a b |> renderBlock
+    , hardLineBreak = renderer.hardLineBreak |> renderBlock
+    , image = \a -> renderer.image a |> renderBlock
+    , blockQuote = \a -> renderer.blockQuote a |> renderBlock
+    , unorderedList = \a -> renderer.unorderedList a |> renderBlock
+    , orderedList = \a b -> renderer.orderedList a b |> renderBlock
+    , codeBlock = \a -> renderer.codeBlock a |> renderBlock
+    , html = Markdown.Html.map (\l2a -> \a -> renderBlock (l2a a)) renderer.html
+    , table = \a -> renderer.table a |> renderBlock
+    , tableHeader = \a -> renderer.tableHeader a |> renderBlock
+    , tableBody = \a -> renderer.tableBody a |> renderBlock
+    , tableRow = \a -> renderer.tableRow a |> renderBlock
+    , tableHeaderCell = \a b -> renderer.tableHeaderCell a b |> renderBlock
+    , tableCell = \a b -> renderer.tableCell a b |> renderBlock
     }
 
 
@@ -515,7 +571,7 @@ noteView zone fui noteCache id show text _ =
             E.text "note not found"
 
         Just (NC.ZNAL zne) ->
-            E.column [ EBd.width 1, EBd.color TC.darkGray, E.padding 3 ]
+            E.column [ E.width E.fill ]
                 [ if ns.link then
                     let
                         linktext =
