@@ -313,35 +313,6 @@ mkRenderer args =
     }
 
 
-
-{-
-   { heading : { level : Block.HeadingLevel, rawText : String, children : List view } -> view
-   , paragraph : List view -> view
-   , blockQuote : List view -> view
-   , html : Markdown.Html.Renderer (List view -> view)
-   , text : String -> view
-   , codeSpan : String -> view
-   , strong : List view -> view
-   , emphasis : List view -> view
-   , strikethrough : List view -> view
-   , hardLineBreak : view
-   , link : { title : Maybe String, destination : String } -> List view -> view
-   , image : { alt : String, src : String, title : Maybe String } -> view
-   , unorderedList : List (ListItem view) -> view
-   , orderedList : Int -> List (List view) -> view
-   , codeBlock : { body : String, language : Maybe String } -> view
-   , thematicBreak : view
-   , table : List view -> view
-   , tableHeader : List view -> view
-   , tableBody : List view -> view
-   , tableRow : List view -> view
-   , tableCell : Maybe Block.Alignment -> List view -> view
-   , tableHeaderCell : Maybe Block.Alignment -> List view -> view
-   }
-
--}
-
-
 mkEditRenderer : Markdown.Renderer.Renderer (Element a) -> Markdown.Renderer.Renderer (Element a)
 mkEditRenderer renderer =
     { heading = \a -> renderer.heading a |> renderBlock
@@ -665,12 +636,6 @@ noteView args id show text _ =
 
                             Err s ->
                                 E.row [] [ E.text "markdown error: ", E.text s ]
-                        -- E.paragraph
-                        -- [ E.htmlAttribute (HA.style "overflow-wrap" "break-word")
-                        -- , E.htmlAttribute (HA.style "word-break" "break-word")
-                        -- ]
-                        -- [ E.text zne.zknote.content
-                        -- ]
 
                       else
                         E.none
@@ -818,8 +783,7 @@ rawTextToId rawText =
 heading : { level : Block.HeadingLevel, rawText : String, children : List (Element msg) } -> Element msg
 heading { level, rawText, children } =
     E.paragraph
-        [ EBk.color TC.lightBrown
-        , EF.size
+        [ EF.size
             (case level of
                 Block.H1 ->
                     36
