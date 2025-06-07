@@ -121,7 +121,18 @@ view zone maxw noteCache model loggedin =
                                     ]
                                     (case
                                         MC.markdownView
-                                            (MC.mkRenderer zone model.fui MC.PublicView (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged noteCache)
+                                            (MC.mkRenderer
+                                                { zone = zone
+                                                , fui = model.fui
+                                                , viewMode = MC.PublicView
+                                                , addToSearchMsg = \_ -> Noop
+                                                , maxw = mw
+                                                , cellDict = model.cells
+                                                , showPanelElt = False
+                                                , onchanged = OnSchelmeCodeChanged
+                                                , noteCache = noteCache
+                                                }
+                                            )
                                             pn.zknote.content
                                      of
                                         Ok rendered ->
@@ -167,10 +178,25 @@ view zone maxw noteCache model loggedin =
                         )
                     |> Maybe.withDefault E.none
                 , E.row [ E.width E.fill ]
-                    [ case MC.markdownView (MC.mkRenderer zone model.fui MC.PublicView (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged noteCache) model.md of
+                    [ case
+                        MC.markdownView
+                            (MC.mkRenderer
+                                { zone = zone
+                                , fui = model.fui
+                                , viewMode = MC.PublicView
+                                , addToSearchMsg = \_ -> Noop
+                                , maxw = mw
+                                , cellDict = model.cells
+                                , showPanelElt = False
+                                , onchanged = OnSchelmeCodeChanged
+                                , noteCache = noteCache
+                                }
+                            )
+                            model.md
+                      of
                         Ok rendered ->
                             E.column
-                                [ E.spacing 30
+                                [ E.spacing 3
                                 , E.width E.fill
                                 , E.centerX
                                 ]

@@ -174,8 +174,21 @@ renderBlock e =
         ]
 
 
-mkRenderer : Time.Zone -> FileUrlInfo -> ViewMode -> (String -> a) -> Int -> CellDict -> Bool -> (String -> String -> a) -> NoteCache -> Markdown.Renderer.Renderer (Element a)
-mkRenderer zone fui viewMode addToSearchMsg maxw cellDict showPanelElt onchanged noteCache =
+type alias MkrArgs a =
+    { zone : Time.Zone
+    , fui : FileUrlInfo
+    , viewMode : ViewMode
+    , addToSearchMsg : String -> a
+    , maxw : Int
+    , cellDict : CellDict
+    , showPanelElt : Bool
+    , onchanged : String -> String -> a
+    , noteCache : NoteCache
+    }
+
+
+mkRenderer : MkrArgs a -> Markdown.Renderer.Renderer (Element a)
+mkRenderer args =
     { heading = heading
     , paragraph =
         E.paragraph
@@ -247,20 +260,20 @@ mkRenderer zone fui viewMode addToSearchMsg maxw cellDict showPanelElt onchanged
         Markdown.Html.oneOf
             [ Markdown.Html.tag "cell"
                 (\name schelmeCode renderedChildren ->
-                    cellView cellDict renderedChildren name schelmeCode onchanged
+                    cellView args.cellDict renderedChildren name schelmeCode args.onchanged
                 )
                 |> Markdown.Html.withAttribute "name"
                 |> Markdown.Html.withAttribute "schelmecode"
             , Markdown.Html.tag "search"
                 (\search renderedChildren ->
-                    searchView viewMode addToSearchMsg search renderedChildren
+                    searchView args.viewMode args.addToSearchMsg search renderedChildren
                 )
                 |> Markdown.Html.withAttribute "query"
             , Markdown.Html.tag "panel"
                 (\noteid renderedChildren ->
                     case zkNoteIdFromString noteid of
                         Ok id ->
-                            if showPanelElt then
+                            if args.showPanelElt then
                                 panelView id renderedChildren
 
                             else
@@ -270,19 +283,19 @@ mkRenderer zone fui viewMode addToSearchMsg maxw cellDict showPanelElt onchanged
                             E.text "error"
                 )
                 |> Markdown.Html.withAttribute "noteid"
-            , Markdown.Html.tag "image" (imageView fui)
+            , Markdown.Html.tag "image" (imageView args.fui)
                 |> Markdown.Html.withAttribute "text"
                 |> Markdown.Html.withAttribute "url"
                 |> Markdown.Html.withOptionalAttribute "width"
-            , Markdown.Html.tag "video" (videoView fui maxw)
+            , Markdown.Html.tag "video" (videoView args.fui args.maxw)
                 |> Markdown.Html.withAttribute "src"
                 |> Markdown.Html.withOptionalAttribute "text"
                 |> Markdown.Html.withOptionalAttribute "width"
                 |> Markdown.Html.withOptionalAttribute "height"
-            , Markdown.Html.tag "audio" (audioView fui)
+            , Markdown.Html.tag "audio" (audioView args.fui)
                 |> Markdown.Html.withAttribute "text"
                 |> Markdown.Html.withAttribute "src"
-            , Markdown.Html.tag "note" (noteView zone fui noteCache)
+            , Markdown.Html.tag "note" (noteView args)
                 |> Markdown.Html.withAttribute "id"
                 |> Markdown.Html.withOptionalAttribute "show"
                 |> Markdown.Html.withOptionalAttribute "text"
@@ -549,8 +562,8 @@ parseNoteShow text =
     }
 
 
-noteView : Time.Zone -> FileUrlInfo -> NoteCache -> String -> Maybe String -> Maybe String -> List (Element a) -> Element a
-noteView zone fui noteCache id show text _ =
+noteView : MkrArgs a -> String -> Maybe String -> Maybe String -> List (Element a) -> Element a
+noteView args id show text _ =
     let
         ns =
             show
@@ -568,7 +581,7 @@ noteView zone fui noteCache id show text _ =
     case
         zkNoteIdFromString id
             |> Result.toMaybe
-            |> Maybe.andThen (NC.getNote noteCache)
+            |> Maybe.andThen (NC.getNote args.noteCache)
     of
         Just NC.Private ->
             E.text "private note"
@@ -620,7 +633,7 @@ noteView zone fui noteCache id show text _ =
                                     |> (\cd ->
                                             E.row []
                                                 [ E.text "created: "
-                                                , E.text (Util.showDateTime zone (Time.millisToPosix cd))
+                                                , E.text (Util.showDateTime args.zone (Time.millisToPosix cd))
                                                 , E.text " "
                                                 ]
                                        )
@@ -632,7 +645,7 @@ noteView zone fui noteCache id show text _ =
                                     |> (\cd ->
                                             E.row []
                                                 [ E.text "updated: "
-                                                , E.text (Util.showDateTime zone (Time.millisToPosix cd))
+                                                , E.text (Util.showDateTime args.zone (Time.millisToPosix cd))
                                                 ]
                                        )
 
@@ -643,19 +656,28 @@ noteView zone fui noteCache id show text _ =
                       else
                         E.none
                     , if ns.contents then
-                        E.paragraph
-                            [ E.htmlAttribute (HA.style "overflow-wrap" "break-word")
-                            , E.htmlAttribute (HA.style "word-break" "break-word")
-                            ]
-                            [ E.text zne.zknote.content
-                            ]
+                        case
+                            markdownView (mkRenderer args)
+                                zne.zknote.content
+                        of
+                            Ok le ->
+                                E.column [] le
+
+                            Err s ->
+                                E.row [] [ E.text "markdown error: ", E.text s ]
+                        -- E.paragraph
+                        -- [ E.htmlAttribute (HA.style "overflow-wrap" "break-word")
+                        -- , E.htmlAttribute (HA.style "word-break" "break-word")
+                        -- ]
+                        -- [ E.text zne.zknote.content
+                        -- ]
 
                       else
                         E.none
                     , if ns.file then
                         case zne.zknote.filestatus of
                             Data.FilePresent ->
-                                noteFile fui (Just ns) zne.zknote.title zne.zknote
+                                noteFile args.fui (Just ns) zne.zknote.title zne.zknote
 
                             Data.FileMissing ->
                                 E.paragraph []
