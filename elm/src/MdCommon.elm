@@ -1,4 +1,4 @@
-module MdCommon exposing (Panel, ViewMode(..), blockCells, blockPanels, cellView, codeBlock, codeSpan, defCell, heading, imageView, linkDict, markdownView, mdCells, mdPanel, mdPanels, mkEditRenderer, mkRenderer, noteFile, noteIds, panelView, rawTextToId, searchView, showRunState)
+module MdCommon exposing (Panel, ViewMode(..), blockCells, blockPanels, cellView, codeBlock, codeSpan, defCell, editBlock, heading, imageView, linkDict, markdownView, mdCells, mdPanel, mdPanels, mkRenderer, noteFile, noteIds, panelView, rawTextToId, searchView, showRunState)
 
 import Cellme.Cellme exposing (CellContainer(..), RunState(..))
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr)
@@ -6,6 +6,7 @@ import Common exposing (buttonStyle)
 import Data exposing (ZkNoteId)
 import DataUtil exposing (FileUrlInfo, ZniSet, emptyZniSet, zkNoteIdFromString, zkNoteIdToString)
 import Dict exposing (Dict)
+import DnDList
 import Element as E exposing (Element)
 import Element.Background as EBk
 import Element.Border as EBd
@@ -166,8 +167,8 @@ renderText str =
         [ E.text str ]
 
 
-renderBlock : Element a -> Element a
-renderBlock e =
+editBlock : Element a -> Element a
+editBlock e =
     E.row [ EBd.width 1, E.width E.fill, E.height E.fill, E.padding 3 ]
         [ E.el [ E.width (E.px 20), E.height E.fill, EBk.color TC.brown, E.alignBottom ] E.none
         , e
@@ -313,37 +314,40 @@ mkRenderer args =
     }
 
 
-mkEditRenderer : Markdown.Renderer.Renderer (Element a) -> Markdown.Renderer.Renderer (Element a)
-mkEditRenderer renderer =
-    { heading = \a -> renderer.heading a |> renderBlock
-    , paragraph = \a -> renderer.paragraph a |> renderBlock
-    , thematicBreak = renderer.thematicBreak |> renderBlock
 
-    -- , text = \a -> renderer.text a |> renderBlock
-    , text = renderer.text
-    , strong = \a -> renderer.strong a |> renderBlock
-    , emphasis = \a -> renderer.emphasis a |> renderBlock
-    , strikethrough = \a -> renderer.strikethrough a |> renderBlock
-    , codeSpan = \a -> renderer.codeSpan a |> renderBlock
+{-
+   mkEditRenderer : Markdown.Renderer.Renderer (Element a) -> Markdown.Renderer.Renderer (Element a)
+   mkEditRenderer renderer =
+       { heading = \a -> renderer.heading a |> editBlock
+       , paragraph = \a -> renderer.paragraph a |> editBlock
+       , thematicBreak = renderer.thematicBreak |> editBlock
 
-    -- , link = \a b -> renderer.link a b |> renderBlock
-    , link = renderer.link
+       -- , text = \a -> renderer.text a |> renderBlock
+       , text = renderer.text
+       , strong = \a -> renderer.strong a |> editBlock
+       , emphasis = \a -> renderer.emphasis a |> editBlock
+       , strikethrough = \a -> renderer.strikethrough a |> editBlock
+       , codeSpan = \a -> renderer.codeSpan a |> editBlock
 
-    -- , hardLineBreak = renderer.hardLineBreak |> renderBlock
-    , hardLineBreak = renderer.hardLineBreak
-    , image = \a -> renderer.image a |> renderBlock
-    , blockQuote = \a -> renderer.blockQuote a |> renderBlock
-    , unorderedList = \a -> renderer.unorderedList a |> renderBlock
-    , orderedList = \a b -> renderer.orderedList a b |> renderBlock
-    , codeBlock = \a -> renderer.codeBlock a |> renderBlock
-    , html = Markdown.Html.map (\l2a -> \a -> renderBlock (l2a a)) renderer.html
-    , table = \a -> renderer.table a |> renderBlock
-    , tableHeader = \a -> renderer.tableHeader a |> renderBlock
-    , tableBody = \a -> renderer.tableBody a |> renderBlock
-    , tableRow = \a -> renderer.tableRow a |> renderBlock
-    , tableHeaderCell = \a b -> renderer.tableHeaderCell a b |> renderBlock
-    , tableCell = \a b -> renderer.tableCell a b |> renderBlock
-    }
+       -- , link = \a b -> renderer.link a b |> renderBlock
+       , link = renderer.link
+
+       -- , hardLineBreak = renderer.hardLineBreak |> renderBlock
+       , hardLineBreak = renderer.hardLineBreak
+       , image = \a -> renderer.image a |> editBlock
+       , blockQuote = \a -> renderer.blockQuote a |> editBlock
+       , unorderedList = \a -> renderer.unorderedList a |> editBlock
+       , orderedList = \a b -> renderer.orderedList a b |> editBlock
+       , codeBlock = \a -> renderer.codeBlock a |> editBlock
+       , html = Markdown.Html.map (\l2a -> \a -> editBlock (l2a a)) renderer.html
+       , table = \a -> renderer.table a |> editBlock
+       , tableHeader = \a -> renderer.tableHeader a |> editBlock
+       , tableBody = \a -> renderer.tableBody a |> editBlock
+       , tableRow = \a -> renderer.tableRow a |> editBlock
+       , tableHeaderCell = \a b -> renderer.tableHeaderCell a b |> editBlock
+       , tableCell = \a b -> renderer.tableCell a b |> editBlock
+       }
+-}
 
 
 searchView : ViewMode -> (String -> a) -> String -> List (Element a) -> Element a

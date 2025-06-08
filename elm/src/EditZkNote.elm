@@ -52,6 +52,8 @@ import Data exposing (Direction(..), EditLink, EditTab(..), ZkNoteId)
 import DataUtil exposing (FileUrlInfo, zkNoteIdToString, zklKey, zniCompare, zniEq)
 import Dialog as D
 import Dict exposing (Dict)
+import DnDList
+import EdMarkdown as EM
 import Either exposing (Either(..))
 import Element as E exposing (Element)
 import Element.Background as EBk
@@ -128,6 +130,7 @@ type Msg
     | JobsPress
     | FlipLink EditLink
     | ShowArchivesPress
+    | DnDMsg DnDList.Msg
     | Noop
 
 
@@ -187,6 +190,8 @@ type alias Model =
     , mbReplaceString : Maybe String
     , mobile : Bool
     , server : String
+    , blockDnd : DnDList.Model
+    , blockElts : List (Element Msg)
     }
 
 
@@ -221,6 +226,54 @@ type Command
     | SyncFiles Data.ZkNoteSearch
     | SPMod (SP.Model -> ( SP.Model, SP.Command ))
     | Cmd (Cmd Msg)
+
+
+
+-------------------------------------------------------------------------
+-- Drag and Drop
+-------------------------------------------------------------------------
+
+
+dndIdentity : x -> x -> List a -> List a
+dndIdentity _ _ l =
+    l
+
+
+blockDndSystem : DnDList.System (Element Msg) Msg
+blockDndSystem =
+    DnDList.create
+        { beforeUpdate = dndIdentity
+        , movement = DnDList.Vertical
+        , listen = DnDList.OnDrop
+        , operation = DnDList.InsertAfter
+        }
+        DnDMsg
+
+
+blockDndSubscriptions : Model -> List (Sub Msg)
+blockDndSubscriptions model =
+    [ blockDndSystem.subscriptions model.blockDnd ]
+
+
+
+-- ghostView : Model -> Element Msg
+-- ghostView model =
+--     let
+--         maybeDragItem : Maybe (Element Msg)
+--         maybeDragItem =
+--             blockDndSystem.info model.blockDnd
+--                 |> Maybe.andThen (\{ dragIndex } -> Array.get dragIndex model.steps)
+--     in
+--     case maybeDragItem of
+--         Just item ->
+--             E.el
+--                 (List.map E.htmlAttribute (stepDndSystem.ghostStyles dnd))
+--                 (viewStep Ghost 0 (Just item.editid) item)
+--         Nothing ->
+--             E.none
+-------------------------------------------------------------------------
+-- END Drag and Drop
+-------------------------------------------------------------------------
 
 
 setTab : EditTab -> Model -> Model
@@ -894,20 +947,32 @@ renderMd : Time.Zone -> FileUrlInfo -> CellDict -> NoteCache -> String -> Int ->
 renderMd zone fui cd noteCache md mdw =
     case
         MC.markdownView
-            (MC.mkEditRenderer
-                (MC.mkRenderer
-                    { zone = zone
-                    , fui = fui
-                    , viewMode = MC.EditView
-                    , addToSearchMsg = RestoreSearch
-                    , maxw = mdw
-                    , cellDict = cd
-                    , showPanelElt = True
-                    , onchanged = OnSchelmeCodeChanged
-                    , noteCache = noteCache
-                    }
-                )
+            (MC.mkRenderer
+                { zone = zone
+                , fui = fui
+                , viewMode = MC.EditView
+                , addToSearchMsg = RestoreSearch
+                , maxw = mdw
+                , cellDict = cd
+                , showPanelElt = True
+                , onchanged = OnSchelmeCodeChanged
+                , noteCache = noteCache
+                }
             )
+            -- (MC.mkEditRenderer
+            --     (MC.mkRenderer
+            --         { zone = zone
+            --         , fui = fui
+            --         , viewMode = MC.EditView
+            --         , addToSearchMsg = RestoreSearch
+            --         , maxw = mdw
+            --         , cellDict = cd
+            --         , showPanelElt = True
+            --         , onchanged = OnSchelmeCodeChanged
+            --         , noteCache = noteCache
+            --         }
+            --     )
+            -- )
             md
     of
         Ok rendered ->
@@ -921,7 +986,7 @@ renderMd zone fui cd noteCache md mdw =
                 , EBd.color TC.darkGrey
                 , EBk.color TC.lightGrey
                 ]
-                rendered
+                (List.map MC.editBlock rendered)
 
         Err errors ->
             E.text errors
@@ -1788,6 +1853,8 @@ initFull fui ld zknote dtlinks mbedittab mobile =
       , mbReplaceString = Nothing
       , mobile = mobile
       , server = zknote.server
+      , blockDnd = blockDndSystem.model
+      , blockElts = []
       }
         |> (\m ->
                 Maybe.map (\nc -> setTab nc m) mbedittab
@@ -1845,6 +1912,8 @@ initNew fui ld links mobile =
     , mbReplaceString = Nothing
     , mobile = mobile
     , server = ld.server
+    , blockDnd = blockDndSystem.model
+    , blockElts = []
     }
         |> (\m1 ->
                 -- for new EMPTY notes, the 'revert' should be the same as the model, so that you aren't
@@ -2785,6 +2854,13 @@ update msg model =
 
         RequestsPress ->
             ( model, Requests )
+
+        DnDMsg dmsg ->
+            let
+                ( dnd, items ) =
+                    blockDndSystem.update dmsg model.blockDnd model.blockElts
+            in
+            ( model, None )
 
         Noop ->
             ( model, None )
