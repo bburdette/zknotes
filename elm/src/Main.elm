@@ -4228,13 +4228,36 @@ main =
         , subscriptions =
             \model ->
                 let
-                    tracks : List (Sub Msg)
-                    tracks =
+                    modsubs : List (Sub Msg)
+                    modsubs =
                         case model of
                             Ready rmd ->
-                                rmd.trackedRequests.requests
+                                (rmd.trackedRequests.requests
                                     |> Dict.keys
                                     |> List.map (\k -> Http.track k (RequestProgress k))
+                                )
+                                    ++ (if
+                                            Dict.values rmd.jobs.jobs
+                                                |> List.filter
+                                                    (\j ->
+                                                        not <| jobComplete j.state
+                                                    )
+                                                |> List.isEmpty
+                                                |> not
+                                        then
+                                            [ Time.every 1000 JobsPollTick
+                                            ]
+
+                                        else
+                                            []
+                                       )
+                                    ++ (case rmd.state of
+                                            EditZkNote st _ ->
+                                                [EditZkNote.sub]
+
+                                            _ ->
+                                                []
+                                       )
 
                             PreInit _ ->
                                 []
@@ -4242,30 +4265,27 @@ main =
                             InitError _ ->
                                 []
 
-                    jobtick : List (Sub Msg)
-                    jobtick =
-                        case model of
-                            Ready rmd ->
-                                if
-                                    Dict.values rmd.jobs.jobs
-                                        |> List.filter
-                                            (\j ->
-                                                not <| jobComplete j.state
-                                            )
-                                        |> List.isEmpty
-                                        |> not
-                                then
-                                    [ Time.every 1000 JobsPollTick
-                                    ]
-
-                                else
-                                    []
-
-                            PreInit _ ->
-                                []
-
-                            InitError _ ->
-                                []
+                    -- jobtick : List (Sub Msg)
+                    -- jobtick =
+                    --     case model of
+                    --         Ready rmd ->
+                    --             if
+                    --                 Dict.values rmd.jobs.jobs
+                    --                     |> List.filter
+                    --                         (\j ->
+                    --                             not <| jobComplete j.state
+                    --                         )
+                    --                     |> List.isEmpty
+                    --                     |> not
+                    --             then
+                    --                 [ Time.every 1000 JobsPollTick
+                    --                 ]
+                    --             else
+                    --                 []
+                    --         PreInit _ ->
+                    --             []
+                    --         InitError _ ->
+                    --             []
                 in
                 Sub.batch <|
                     [ receiveTASelection TASelection
@@ -4279,8 +4299,7 @@ main =
                     , receivePITauriResponse TauriPublicReplyData
                     , receiveTITauriResponse TauriTauriReplyData
                     ]
-                        ++ jobtick
-                        ++ tracks
+                        ++ modsubs
         , onUrlRequest = urlRequest
         , onUrlChange = UrlChanged
         }
