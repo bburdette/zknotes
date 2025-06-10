@@ -1301,6 +1301,21 @@ piview pimodel =
 
 view : Model -> { title : String, body : List (Html Msg) }
 view model =
+    let
+        dndif =
+            Debug.log "dndif" <|
+                ((case model.state of
+                    EditZkNote ezn _ ->
+                        Maybe.map (E.inFront << E.map EditZkNoteMsg) <|
+                            EditZkNote.ghostView ezn model.timezone model.noteCache MC.EditView 500
+
+                    _ ->
+                        Nothing
+                 )
+                    |> Maybe.map List.singleton
+                    |> Maybe.withDefault []
+                )
+    in
     { title =
         case model.state of
             EditZkNote ezn _ ->
@@ -1378,7 +1393,12 @@ view model =
                             { dm | model = model.trackedRequests }
 
             _ ->
-                E.layout [ EF.size model.fontsize, E.width E.fill ] <| viewState model.size model.state model
+                E.layout
+                    ([ EF.size model.fontsize, E.width E.fill ]
+                        ++ dndif
+                    )
+                <|
+                    viewState model.size model.state model
         ]
     }
 

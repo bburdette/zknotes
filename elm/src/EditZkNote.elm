@@ -14,6 +14,7 @@ module EditZkNote exposing
     , dirty
     , disabledLinkButtonStyle
     , fullSave
+    , ghostView
     , initFull
     , initNew
     , isPublic
@@ -28,7 +29,6 @@ module EditZkNote exposing
     , onTASelection
     , onWkKeyPress
     , pageLink
-    , renderMd
     , replaceOrAdd
     , saveZkLinkList
     , setHomeNote
@@ -256,52 +256,117 @@ blockDndSubscriptions model =
     [ blockDndSystem.subscriptions model.blockDnd ]
 
 
-ghostView : Model -> Time.Zone -> NoteCache -> MC.ViewMode -> Int -> Element Msg
+
+-- to be called from main.elm!
+
+
+ghostView : Model -> Time.Zone -> NoteCache -> MC.ViewMode -> Int -> Maybe (Element Msg)
 ghostView model zone nc viewMode mdw =
+    (Debug.log "info" <| blockDndSystem.info model.blockDnd)
+        |> Maybe.andThen
+            (\{ dragIndex } ->
+                EM.getBlocks model.edMarkdown
+                    |> Result.toMaybe
+                    |> Maybe.andThen (List.head << List.drop (Debug.log "dragIndex" dragIndex))
+                    |> Maybe.map (\b -> ( dragIndex, b ))
+            )
+        |> Maybe.map
+            (\( i, block ) ->
+                let
+                    ma =
+                        mkrargs model zone nc viewMode mdw
+                in
+                E.el
+                    (List.map E.htmlAttribute (blockDndSystem.ghostStyles model.blockDnd))
+                    (viewBlock ma Ghost 0 (Just i) block)
+            )
+
+
+
+-- TODO: alter to take DragDropWhat
+
+
+blockId : Int -> String
+blockId i =
+    "block-" ++ String.fromInt i
+
+
+editBlock : DragDropWhat -> Int -> Element Msg -> Element Msg
+editBlock ddw i e =
     let
-        maybeDragBlock : Maybe ( Int, Block )
-        maybeDragBlock =
-            blockDndSystem.info model.blockDnd
-                |> Maybe.andThen
-                    (\{ dragIndex } ->
-                        EM.getBlocks model.edMarkdown
-                            |> Result.toMaybe
-                            |> Maybe.andThen (List.head << List.take dragIndex)
-                            |> Maybe.map (\b -> ( dragIndex, b ))
+        bid =
+            blockId i
+    in
+    case ddw of
+        Drag ->
+            E.row
+                [ EBd.width 1
+                , E.width E.fill
+                , E.height E.fill
+                , E.padding 3
+                , E.htmlAttribute (Html.Attributes.id bid)
+                ]
+                [ E.el
+                    ([ E.width (E.px 20), E.height E.fill, EBk.color TC.brown, E.alignBottom ]
+                        ++ List.map E.htmlAttribute (blockDndSystem.dragEvents i bid)
                     )
+                    E.none
+                , e
+                ]
 
-        ma =
-            mkrargs model zone nc viewMode mdw
-    in
-    case maybeDragBlock of
-        Just ( i, block ) ->
-            E.el
-                (List.map E.htmlAttribute (blockDndSystem.ghostStyles model.blockDnd))
-                (viewBlock ma Ghost 0 (Just i) block)
+        Drop ->
+            E.row
+                [ EBk.color TC.darkBrown
+                , EBd.width 1
+                , E.width E.fill
+                , E.height E.fill
+                , E.padding 3
+                , E.htmlAttribute (Html.Attributes.id bid)
+                ]
+                [ E.el
+                    ([ E.width (E.px 20), E.height E.fill, EBk.color TC.brown, E.alignBottom ]
+                        ++ List.map E.htmlAttribute (blockDndSystem.dropEvents i bid)
+                    )
+                    E.none
+                , e
+                ]
 
-        Nothing ->
-            E.none
+        Ghost ->
+            E.row
+                [ EBk.color TC.darkGreen
+                , EBd.width 1
+                , E.width E.fill
+                , E.height E.fill
+                , E.padding 3
+                , E.htmlAttribute (Html.Attributes.id bid)
+                ]
+                [ E.el
+                    ([ E.width (E.px 20), E.height E.fill, EBk.color TC.brown, E.alignBottom ]
+                     -- ++ List.map E.htmlAttribute (blockDndSystem.dragEvents i (blockId i))
+                    )
+                    E.none
+                , e
+                ]
 
 
-viewBlockDnd : DnDList.Model -> MC.MkrArgs Msg -> Int -> Maybe Int -> Block -> Element Msg
-viewBlockDnd ddlmodel ma i focusid b =
-    let
-        ddw =
-            case
-                blockDndSystem.info ddlmodel
-                    |> Maybe.map .dragIndex
-            of
-                Just ix ->
-                    if ix == i then
-                        Ghost
 
-                    else
-                        Drop
-
-                Nothing ->
-                    Drag
-    in
-    viewBlock ma ddw i focusid b
+-- viewBlockDnd : DnDList.Model -> MC.MkrArgs Msg -> Int -> Maybe Int -> Block -> Element Msg
+-- viewBlockDnd ddlmodel ma i focusid b =
+--     let
+--         ddw =
+--             case
+--                 blockDndSystem.info ddlmodel
+--                     |> Maybe.map .dragIndex
+--             of
+--                 Just ix ->
+--                     if ix == i then
+--                         Ghost
+--                     else
+--                         Drop
+--                 Nothing ->
+--                     Drag
+--     in
+--     viewBlock ma ddw i focusid b
 
 
 viewBlock : MC.MkrArgs Msg -> DragDropWhat -> Int -> Maybe Int -> Block -> Element Msg
@@ -318,7 +383,7 @@ viewBlock ma ddw i focusid b =
                 , EBd.color TC.darkGrey
                 , EBk.color TC.lightGrey
                 ]
-                (List.map MC.editBlock rendered)
+                (List.map (editBlock ddw i) rendered)
 
         Err errors ->
             E.text errors
@@ -1017,10 +1082,45 @@ mkrargs model zone nc viewMode mdw =
     }
 
 
-renderMd : Time.Zone -> FileUrlInfo -> CellDict -> NoteCache -> MC.ViewMode -> String -> Int -> Element Msg
-renderMd zone fui cd noteCache vm md mdw =
+renderReadMd : Time.Zone -> FileUrlInfo -> CellDict -> NoteCache -> MC.ViewMode -> String -> Int -> Element Msg
+renderReadMd zone fui cd noteCache vm md mdw =
     case
         MC.markdownView
+            (MC.mkRenderer
+                { zone = zone
+                , fui = fui
+                , viewMode = vm
+                , addToSearchMsg = RestoreSearch
+                , maxw = mdw
+                , cellDict = cd
+                , showPanelElt = True
+                , onchanged = OnSchelmeCodeChanged
+                , noteCache = noteCache
+                }
+            )
+            md
+    of
+        Ok rendered ->
+            E.column
+                [ E.spacing 3
+                , E.padding 20
+                , E.width (E.fill |> E.maximum 1000)
+                , E.centerX
+                , E.alignTop
+                , EBd.width 2
+                , EBd.color TC.darkGrey
+                , EBk.color TC.lightGrey
+                ]
+                rendered
+
+        Err errors ->
+            E.text errors
+
+
+renderBlocks : Time.Zone -> FileUrlInfo -> CellDict -> NoteCache -> MC.ViewMode -> List Block -> Int -> Element Msg
+renderBlocks zone fui cd noteCache vm blocks mdw =
+    case
+        Markdown.Renderer.render
             (MC.mkRenderer
                 { zone = zone
                 , fui = fui
@@ -1047,7 +1147,7 @@ renderMd zone fui cd noteCache vm md mdw =
             --         }
             --     )
             -- )
-            md
+            blocks
     of
         Ok rendered ->
             E.column
@@ -1060,7 +1160,7 @@ renderMd zone fui cd noteCache vm md mdw =
                 , EBd.color TC.darkGrey
                 , EBk.color TC.lightGrey
                 ]
-                (List.map MC.editBlock rendered)
+                (List.indexedMap (editBlock Drag) rendered)
 
         Err errors ->
             E.text errors
@@ -1135,7 +1235,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                       , width = E.fill
 
                       -- TODO: render non editable
-                      , view = \zkn -> renderMd zone model.fui model.cells noteCache MC.PublicView zkn.content mdw
+                      , view = \zkn -> renderReadMd zone model.fui model.cells noteCache MC.PublicView zkn.content mdw
                       }
                     , { header = E.none
                       , width = E.shrink
@@ -1527,7 +1627,12 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
 
                         ( _, Nothing ) ->
                             E.none
-                    , renderMd zone model.fui model.cells noteCache MC.EditView (EM.getMd model.edMarkdown) mdw
+                    , case EM.getBlocks model.edMarkdown of
+                        Ok blocks ->
+                            renderBlocks zone model.fui model.cells noteCache MC.EditView blocks mdw
+
+                        Err e ->
+                            E.text e
                     ]
                     :: (if wclass == Wide then
                             []
@@ -2935,6 +3040,10 @@ update msg model =
             ( model, Requests )
 
         DnDMsg dmsg ->
+            let
+                _ =
+                    Debug.log "dmsg" dmsg
+            in
             case
                 EM.getBlocks model.edMarkdown
                     |> Result.map
@@ -2944,9 +3053,24 @@ update msg model =
                         )
             of
                 Ok ( dnd, items ) ->
-                    ( model, None )
+                    let
+                        em =
+                            Debug.log "em" <|
+                                EM.updateBlocks
+                                    items
+
+                        _ =
+                            Debug.log "dnd" dnd
+                    in
+                    ( { model | blockDnd = dnd, edMarkdown = Result.withDefault model.edMarkdown em }
+                    , Cmd <| blockDndSystem.commands dnd
+                    )
 
                 Err e ->
+                    let
+                        _ =
+                            Debug.log "err" e
+                    in
                     ( model, None )
 
         Noop ->
