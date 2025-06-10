@@ -4229,38 +4229,45 @@ main =
         , subscriptions =
             \model ->
                 let
-                    tracks : List (Sub Msg)
-                    tracks =
+                    rdysubs : List (Sub Msg)
+                    rdysubs =
                         case model of
                             Ready rmd ->
-                                rmd.trackedRequests.requests
-                                    |> Dict.keys
-                                    |> List.map (\k -> Http.track k (RequestProgress k))
+                                let
+                                    tracks : List (Sub Msg)
+                                    tracks =
+                                        rmd.trackedRequests.requests
+                                            |> Dict.keys
+                                            |> List.map (\k -> Http.track k (RequestProgress k))
 
-                            PreInit _ ->
-                                []
+                                    jobtick : List (Sub Msg)
+                                    jobtick =
+                                        if
+                                            Dict.values rmd.jobs.jobs
+                                                |> List.filter
+                                                    (\j ->
+                                                        not <| jobComplete j.state
+                                                    )
+                                                |> List.isEmpty
+                                                |> not
+                                        then
+                                            [ Time.every 1000 JobsPollTick
+                                            ]
 
-                            InitError _ ->
-                                []
+                                        else
+                                            []
 
-                    jobtick : List (Sub Msg)
-                    jobtick =
-                        case model of
-                            Ready rmd ->
-                                if
-                                    Dict.values rmd.jobs.jobs
-                                        |> List.filter
-                                            (\j ->
-                                                not <| jobComplete j.state
-                                            )
-                                        |> List.isEmpty
-                                        |> not
-                                then
-                                    [ Time.every 1000 JobsPollTick
-                                    ]
+                                    stsubs : List (Sub Msg)
+                                    stsubs =
+                                        case rmd.state of
+                                            EditZkNote st _ ->
+                                                List.map (Sub.map EditZkNoteMsg) <|
+                                                    EditZkNote.blockDndSubscriptions st
 
-                                else
-                                    []
+                                            _ ->
+                                                []
+                                in
+                                tracks ++ jobtick ++ stsubs
 
                             PreInit _ ->
                                 []
@@ -4280,8 +4287,7 @@ main =
                     , receivePITauriResponse TauriPublicReplyData
                     , receiveTITauriResponse TauriTauriReplyData
                     ]
-                        ++ jobtick
-                        ++ tracks
+                        ++ rdysubs
         , onUrlRequest = urlRequest
         , onUrlChange = UrlChanged
         }

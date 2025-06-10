@@ -6,6 +6,7 @@ module EditZkNote exposing
     , TACommand(..)
     , WClass(..)
     , addComment
+    , blockDndSubscriptions
     , commentsRecieved
     , commonButtonStyle
     , compareZklinks
