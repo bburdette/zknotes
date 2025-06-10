@@ -64,7 +64,8 @@ import Element.Input as EI
 import Html.Attributes
 import JobsDialog exposing (TJobs)
 import Json.Decode as JD
-import Markdown.Block exposing (ListItem(..), Task(..))
+import Markdown.Block exposing (Block, ListItem(..), Task(..))
+import Markdown.Renderer
 import Maybe.Extra as ME
 import MdCommon as MC
 import NoteCache as NC exposing (NoteCache)
@@ -178,7 +179,6 @@ type alias Model =
     , title : String
     , createdate : Maybe Int
     , changeddate : Maybe Int
-    , md : String
     , cells : CellDict
     , revert : Maybe Data.SaveZkNote
     , initialZklDict : Dict String EditLink
@@ -191,7 +191,7 @@ type alias Model =
     , mobile : Bool
     , server : String
     , blockDnd : DnDList.Model
-    , blockElts : List (Element Msg)
+    , edMarkdown : EM.EdMarkdown
     }
 
 
@@ -239,7 +239,7 @@ dndIdentity _ _ l =
     l
 
 
-blockDndSystem : DnDList.System (Element Msg) Msg
+blockDndSystem : DnDList.System Block Msg
 blockDndSystem =
     DnDList.create
         { beforeUpdate = dndIdentity
@@ -255,22 +255,81 @@ blockDndSubscriptions model =
     [ blockDndSystem.subscriptions model.blockDnd ]
 
 
+ghostView : Model -> Time.Zone -> NoteCache -> MC.ViewMode -> Int -> Element Msg
+ghostView model zone nc viewMode mdw =
+    let
+        maybeDragBlock : Maybe ( Int, Block )
+        maybeDragBlock =
+            blockDndSystem.info model.blockDnd
+                |> Maybe.andThen
+                    (\{ dragIndex } ->
+                        EM.getBlocks model.edMarkdown
+                            |> Result.toMaybe
+                            |> Maybe.andThen (List.head << List.take dragIndex)
+                            |> Maybe.map (\b -> ( dragIndex, b ))
+                    )
 
--- ghostView : Model -> Element Msg
--- ghostView model =
---     let
---         maybeDragItem : Maybe (Element Msg)
---         maybeDragItem =
---             blockDndSystem.info model.blockDnd
---                 |> Maybe.andThen (\{ dragIndex } -> Array.get dragIndex model.steps)
---     in
---     case maybeDragItem of
---         Just item ->
---             E.el
---                 (List.map E.htmlAttribute (stepDndSystem.ghostStyles dnd))
---                 (viewStep Ghost 0 (Just item.editid) item)
---         Nothing ->
---             E.none
+        ma =
+            mkrargs model zone nc viewMode mdw
+    in
+    case maybeDragBlock of
+        Just ( i, block ) ->
+            E.el
+                (List.map E.htmlAttribute (blockDndSystem.ghostStyles model.blockDnd))
+                (viewBlock ma Ghost 0 (Just i) block)
+
+        Nothing ->
+            E.none
+
+
+viewBlockDnd : DnDList.Model -> MC.MkrArgs Msg -> Int -> Maybe Int -> Block -> Element Msg
+viewBlockDnd ddlmodel ma i focusid b =
+    let
+        ddw =
+            case
+                blockDndSystem.info ddlmodel
+                    |> Maybe.map .dragIndex
+            of
+                Just ix ->
+                    if ix == i then
+                        Ghost
+
+                    else
+                        Drop
+
+                Nothing ->
+                    Drag
+    in
+    viewBlock ma ddw i focusid b
+
+
+viewBlock : MC.MkrArgs Msg -> DragDropWhat -> Int -> Maybe Int -> Block -> Element Msg
+viewBlock ma ddw i focusid b =
+    case Markdown.Renderer.render (MC.mkRenderer ma) [ b ] of
+        Ok rendered ->
+            E.column
+                [ E.spacing 3
+                , E.padding 20
+                , E.width (E.fill |> E.maximum 1000)
+                , E.centerX
+                , E.alignTop
+                , EBd.width 2
+                , EBd.color TC.darkGrey
+                , EBk.color TC.lightGrey
+                ]
+                (List.map MC.editBlock rendered)
+
+        Err errors ->
+            E.text errors
+
+
+type DragDropWhat
+    = Drag
+    | Drop
+    | Ghost
+
+
+
 -------------------------------------------------------------------------
 -- END Drag and Drop
 -------------------------------------------------------------------------
@@ -394,7 +453,7 @@ toZkNote model =
                 , username = model.noteUserName
                 , usernote = model.usernote
                 , title = model.title
-                , content = model.md
+                , content = EM.getMd model.edMarkdown
                 , pubid =
                     if model.pubidtxt /= "" then
                         Just model.pubidtxt
@@ -420,7 +479,7 @@ sznFromModel : Model -> Data.SaveZkNote
 sznFromModel model =
     { id = model.id
     , title = model.title
-    , content = model.md
+    , content = EM.getMd model.edMarkdown
     , pubid = toPubId (isPublic model) model.pubidtxt
     , editable = model.editableValue
     , showtitle = model.showtitle
@@ -481,7 +540,7 @@ dirty model =
                     (r.id == model.id)
                         && (r.pubid == toPubId (isPublic model) model.pubidtxt)
                         && (r.title == model.title)
-                        && (r.content == model.md)
+                        && (r.content == EM.getMd model.edMarkdown)
                         && (r.editable == model.editableValue)
                         && (r.showtitle == model.showtitle)
                         && (Dict.keys model.zklDict == Dict.keys model.initialZklDict)
@@ -498,7 +557,7 @@ revert model =
                     | id = r.id
                     , pubidtxt = r.pubid |> Maybe.withDefault ""
                     , title = r.title
-                    , md = r.content
+                    , edMarkdown = EM.init r.content
                     , editableValue = r.editable
                     , showtitle = r.showtitle
                     , zklDict = model.initialZklDict
@@ -943,14 +1002,28 @@ addComment ncs =
         ]
 
 
-renderMd : Time.Zone -> FileUrlInfo -> CellDict -> NoteCache -> String -> Int -> Element Msg
-renderMd zone fui cd noteCache md mdw =
+mkrargs : Model -> Time.Zone -> NoteCache -> MC.ViewMode -> Int -> MC.MkrArgs Msg
+mkrargs model zone nc viewMode mdw =
+    { zone = zone
+    , fui = model.fui
+    , viewMode = viewMode
+    , addToSearchMsg = RestoreSearch
+    , maxw = mdw
+    , cellDict = model.cells
+    , showPanelElt = True
+    , onchanged = OnSchelmeCodeChanged
+    , noteCache = nc
+    }
+
+
+renderMd : Time.Zone -> FileUrlInfo -> CellDict -> NoteCache -> MC.ViewMode -> String -> Int -> Element Msg
+renderMd zone fui cd noteCache vm md mdw =
     case
         MC.markdownView
             (MC.mkRenderer
                 { zone = zone
                 , fui = fui
-                , viewMode = MC.EditView
+                , viewMode = vm
                 , addToSearchMsg = RestoreSearch
                 , maxw = mdw
                 , cellDict = cd
@@ -1059,7 +1132,9 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                 , columns =
                     [ { header = E.none
                       , width = E.fill
-                      , view = \zkn -> renderMd zone model.fui model.cells noteCache zkn.content mdw
+
+                      -- TODO: render non editable
+                      , view = \zkn -> renderMd zone model.fui model.cells noteCache MC.PublicView zkn.content mdw
                       }
                     , { header = E.none
                       , width = E.shrink
@@ -1383,7 +1458,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
 
                         else
                             always Noop
-                    , text = model.md
+                    , text = EM.getMd model.edMarkdown
                     , placeholder = Nothing
                     , label = EI.labelHidden "markdown input"
                     , spellcheck = False
@@ -1425,7 +1500,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                         , if search then
                             EI.button (E.alignRight :: Common.buttonStyle)
                                 (case
-                                    JD.decodeString Data.tagSearchDecoder model.md
+                                    JD.decodeString Data.tagSearchDecoder (EM.getMd model.edMarkdown)
                                         |> Result.toMaybe
                                  of
                                     Just s ->
@@ -1451,7 +1526,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
 
                         ( _, Nothing ) ->
                             E.none
-                    , renderMd zone model.fui model.cells noteCache model.md mdw
+                    , renderMd zone model.fui model.cells noteCache MC.EditView (EM.getMd model.edMarkdown) mdw
                     ]
                     :: (if wclass == Wide then
                             []
@@ -1832,7 +1907,6 @@ initFull fui ld zknote dtlinks mbedittab mobile =
       , focusLink = Nothing
       , pubidtxt = zknote.pubid |> Maybe.withDefault ""
       , title = zknote.title
-      , md = zknote.content
       , comments = []
       , newcomment = Nothing
       , pendingcomment = Nothing
@@ -1854,7 +1928,7 @@ initFull fui ld zknote dtlinks mbedittab mobile =
       , mobile = mobile
       , server = zknote.server
       , blockDnd = blockDndSystem.model
-      , blockElts = []
+      , edMarkdown = EM.init zknote.content
       }
         |> (\m ->
                 Maybe.map (\nc -> setTab nc m) mbedittab
@@ -1901,7 +1975,6 @@ initNew fui ld links mobile =
     , showtitle = True
     , createdate = Nothing
     , changeddate = Nothing
-    , md = ""
     , cells = getCd cc
     , revert = Nothing
     , tab = EtEdit
@@ -1913,7 +1986,7 @@ initNew fui ld links mobile =
     , mobile = mobile
     , server = ld.server
     , blockDnd = blockDndSystem.model
-    , blockElts = []
+    , edMarkdown = EM.init ""
     }
         |> (\m1 ->
                 -- for new EMPTY notes, the 'revert' should be the same as the model, so that you aren't
@@ -2053,10 +2126,11 @@ onTASelection model zknSearchResult recentZkns tas =
             in
             TAUpdated
                 { model
-                    | md =
-                        String.left tas.offset model.md
-                            ++ linktext
-                            ++ String.dropLeft (tas.offset + String.length tas.text) model.md
+                    | edMarkdown =
+                        EM.init <|
+                            String.left tas.offset (EM.getMd model.edMarkdown)
+                                ++ linktext
+                                ++ String.dropLeft (tas.offset + String.length tas.text) (EM.getMd model.edMarkdown)
                 }
                 (Just
                     { id = "mdtext"
@@ -2123,10 +2197,11 @@ onTASelection model zknSearchResult recentZkns tas =
             Just s ->
                 TAUpdated
                     { model
-                        | md =
-                            String.left tas.offset model.md
-                                ++ s
-                                ++ String.dropLeft (tas.offset + String.length tas.text) model.md
+                        | edMarkdown =
+                            EM.init <|
+                                String.left tas.offset (EM.getMd model.edMarkdown)
+                                    ++ s
+                                    ++ String.dropLeft (tas.offset + String.length tas.text) (EM.getMd model.edMarkdown)
                     }
                     (Just
                         { id = "mdtext"
@@ -2168,15 +2243,16 @@ onLinkBackSaved model mbtas szn =
 
                     nmod =
                         { model
-                            | md =
-                                String.slice 0 tas.offset model.md
-                                    ++ "["
-                                    ++ tas.text
-                                    ++ "]("
-                                    ++ "/note/"
-                                    ++ zkNoteIdToString szn.id
-                                    ++ ")"
-                                    ++ String.dropLeft (tas.offset + String.length tas.text) model.md
+                            | edMarkdown =
+                                EM.updateMd <|
+                                    String.slice 0 tas.offset (EM.getMd model.edMarkdown)
+                                        ++ "["
+                                        ++ tas.text
+                                        ++ "]("
+                                        ++ "/note/"
+                                        ++ zkNoteIdToString szn.id
+                                        ++ ")"
+                                        ++ String.dropLeft (tas.offset + String.length tas.text) (EM.getMd model.edMarkdown)
                             , zklDict = Dict.insert (zklKey linkback) linkback model.zklDict
                         }
                 in
@@ -2270,7 +2346,7 @@ handleSPUpdate model ( nm, cmd ) =
             ( { model
                 | mbReplaceString =
                     Just <|
-                        (if model.md == "" then
+                        (if EM.getMd model.edMarkdown == "" then
                             "<search query=\""
 
                          else
@@ -2327,7 +2403,7 @@ update msg model =
             )
 
         ViewPress ->
-            MC.mdPanel model.md
+            MC.mdPanel (EM.getMd model.edMarkdown)
                 |> Maybe.map
                     (\panel ->
                         ( model
@@ -2714,7 +2790,9 @@ update msg model =
                         (mkCc cells)
             in
             ( { model
-                | md = newMarkdown
+                | edMarkdown =
+                    EM.init <|
+                        newMarkdown
                 , cells = getCd cc
               }
             , None
@@ -2856,11 +2934,19 @@ update msg model =
             ( model, Requests )
 
         DnDMsg dmsg ->
-            let
-                ( dnd, items ) =
-                    blockDndSystem.update dmsg model.blockDnd model.blockElts
-            in
-            ( model, None )
+            case
+                EM.getBlocks model.edMarkdown
+                    |> Result.map
+                        (blockDndSystem.update
+                            dmsg
+                            model.blockDnd
+                        )
+            of
+                Ok ( dnd, items ) ->
+                    ( model, None )
+
+                Err e ->
+                    ( model, None )
 
         Noop ->
             ( model, None )

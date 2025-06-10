@@ -1,4 +1,29 @@
-module MdCommon exposing (Panel, ViewMode(..), blockCells, blockPanels, cellView, codeBlock, codeSpan, defCell, editBlock, heading, imageView, linkDict, markdownView, mdCells, mdPanel, mdPanels, mkRenderer, noteFile, noteIds, panelView, rawTextToId, searchView, showRunState)
+module MdCommon exposing
+    ( MkrArgs
+    , Panel
+    , ViewMode(..)
+    , blockCells
+    , blockPanels
+    , cellView
+    , codeBlock
+    , codeSpan
+    , defCell
+    , editBlock
+    , heading
+    , imageView
+    , linkDict
+    , markdownView
+    , mdCells
+    , mdPanel
+    , mdPanels
+    , mkRenderer
+    , noteFile
+    , noteIds
+    , panelView
+    , rawTextToId
+    , searchView
+    , showRunState
+    )
 
 import Cellme.Cellme exposing (CellContainer(..), RunState(..))
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr)
