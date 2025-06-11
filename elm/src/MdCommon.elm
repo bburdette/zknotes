@@ -10,6 +10,7 @@ module MdCommon exposing
     , defCell
     , editBlock
     , heading
+    , htmlText
     , imageView
     , linkDict
     , markdownView
@@ -51,6 +52,7 @@ import Set exposing (Set(..))
 import TSet
 import TangoColors as TC
 import Time
+import Toop
 import Util
 import ZkCommon
 
@@ -282,50 +284,7 @@ mkRenderer args =
                         )
                 )
     , codeBlock = codeBlock
-    , html =
-        Markdown.Html.oneOf
-            [ Markdown.Html.tag "cell"
-                (\name schelmeCode renderedChildren ->
-                    cellView args.cellDict renderedChildren name schelmeCode args.onchanged
-                )
-                |> Markdown.Html.withAttribute "name"
-                |> Markdown.Html.withAttribute "schelmecode"
-            , Markdown.Html.tag "search"
-                (\search renderedChildren ->
-                    searchView args.viewMode args.addToSearchMsg search renderedChildren
-                )
-                |> Markdown.Html.withAttribute "query"
-            , Markdown.Html.tag "panel"
-                (\noteid renderedChildren ->
-                    case zkNoteIdFromString noteid of
-                        Ok id ->
-                            if args.showPanelElt then
-                                panelView id renderedChildren
-
-                            else
-                                E.none
-
-                        Err _ ->
-                            E.text "error"
-                )
-                |> Markdown.Html.withAttribute "noteid"
-            , Markdown.Html.tag "image" (imageView args.fui)
-                |> Markdown.Html.withAttribute "text"
-                |> Markdown.Html.withAttribute "url"
-                |> Markdown.Html.withOptionalAttribute "width"
-            , Markdown.Html.tag "video" (videoView args.fui args.maxw)
-                |> Markdown.Html.withAttribute "src"
-                |> Markdown.Html.withOptionalAttribute "text"
-                |> Markdown.Html.withOptionalAttribute "width"
-                |> Markdown.Html.withOptionalAttribute "height"
-            , Markdown.Html.tag "audio" (audioView args.fui)
-                |> Markdown.Html.withAttribute "text"
-                |> Markdown.Html.withAttribute "src"
-            , Markdown.Html.tag "note" (noteView args)
-                |> Markdown.Html.withAttribute "id"
-                |> Markdown.Html.withOptionalAttribute "show"
-                |> Markdown.Html.withOptionalAttribute "text"
-            ]
+    , html = html args
     , table = E.column [ E.width <| E.fill ]
     , tableHeader = E.column [ E.width <| E.fill, EF.bold, EF.underline, E.spacing 8 ]
     , tableBody = E.column [ E.width <| E.fill ]
@@ -337,6 +296,138 @@ mkRenderer args =
         \maybeAlignment children ->
             E.paragraph [] children
     }
+
+
+html : MkrArgs a -> Markdown.Html.Renderer (List (Element a) -> Element a)
+html args =
+    Markdown.Html.oneOf
+        [ Markdown.Html.tag "cell"
+            (\name schelmeCode renderedChildren ->
+                cellView args.cellDict renderedChildren name schelmeCode args.onchanged
+            )
+            |> Markdown.Html.withAttribute "name"
+            |> Markdown.Html.withAttribute "schelmecode"
+        , Markdown.Html.tag "search"
+            (\search renderedChildren ->
+                searchView args.viewMode args.addToSearchMsg search renderedChildren
+            )
+            |> Markdown.Html.withAttribute "query"
+        , Markdown.Html.tag "panel"
+            (\noteid renderedChildren ->
+                case zkNoteIdFromString noteid of
+                    Ok id ->
+                        if args.showPanelElt then
+                            panelView id renderedChildren
+
+                        else
+                            E.none
+
+                    Err _ ->
+                        E.text "error"
+            )
+            |> Markdown.Html.withAttribute "noteid"
+        , Markdown.Html.tag "image" (imageView args.fui)
+            |> Markdown.Html.withAttribute "text"
+            |> Markdown.Html.withAttribute "url"
+            |> Markdown.Html.withOptionalAttribute "width"
+        , Markdown.Html.tag "video" (videoView args.fui args.maxw)
+            |> Markdown.Html.withAttribute "src"
+            |> Markdown.Html.withOptionalAttribute "text"
+            |> Markdown.Html.withOptionalAttribute "width"
+            |> Markdown.Html.withOptionalAttribute "height"
+        , Markdown.Html.tag "audio" (audioView args.fui)
+            |> Markdown.Html.withAttribute "text"
+            |> Markdown.Html.withAttribute "src"
+        , Markdown.Html.tag "note" (noteView args)
+            |> Markdown.Html.withAttribute "id"
+            |> Markdown.Html.withOptionalAttribute "show"
+            |> Markdown.Html.withOptionalAttribute "text"
+        ]
+
+
+htmlTextTag : String -> List ( String, String ) -> String
+htmlTextTag tag attrs =
+    "<"
+        ++ tag
+        ++ " "
+        ++ (attrs
+                |> List.map (\( l, r ) -> l ++ "=\"" ++ r ++ "\"")
+                |> List.intersperse " "
+                |> String.concat
+           )
+        ++ "/>"
+
+
+htmlText : Markdown.Html.Renderer (List String -> String)
+htmlText =
+    Markdown.Html.oneOf
+        [ Markdown.Html.tag "cell"
+            (\name schelmeCode _ ->
+                htmlTextTag "cell" [ ( "name", name ), ( "schelmecode", schelmeCode ) ]
+            )
+            |> Markdown.Html.withAttribute "name"
+            |> Markdown.Html.withAttribute "schelmecode"
+        , Markdown.Html.tag "search"
+            (\query _ ->
+                htmlTextTag "search" [ ( "query", query ) ]
+            )
+            |> Markdown.Html.withAttribute "query"
+        , Markdown.Html.tag "panel"
+            (\noteid _ ->
+                htmlTextTag "panel" [ ( "noteid", noteid ) ]
+            )
+            |> Markdown.Html.withAttribute "noteid"
+        , Markdown.Html.tag "image"
+            (\text url width _ ->
+                htmlTextTag "image"
+                    ([ Just ( "text", text )
+                     , Just ( "url", url )
+                     , Maybe.map (\w -> ( "width", w )) width
+                     ]
+                        |> List.filterMap identity
+                    )
+            )
+            |> Markdown.Html.withAttribute "text"
+            |> Markdown.Html.withAttribute "url"
+            |> Markdown.Html.withOptionalAttribute "width"
+        , Markdown.Html.tag "video"
+            (\src text width height _ ->
+                htmlTextTag "image"
+                    ([ Just ( "src", src )
+                     , Maybe.map (\s -> ( "text", s )) text
+                     , Maybe.map (\s -> ( "height", s )) height
+                     , Maybe.map (\s -> ( "width", s )) width
+                     ]
+                        |> List.filterMap identity
+                    )
+            )
+            |> Markdown.Html.withAttribute "src"
+            |> Markdown.Html.withOptionalAttribute "text"
+            |> Markdown.Html.withOptionalAttribute "width"
+            |> Markdown.Html.withOptionalAttribute "height"
+        , Markdown.Html.tag "audio"
+            (\src text _ ->
+                htmlTextTag "audio"
+                    [ ( "src", src )
+                    , ( "text", text )
+                    ]
+            )
+            |> Markdown.Html.withAttribute "text"
+            |> Markdown.Html.withAttribute "src"
+        , Markdown.Html.tag "note"
+            (\id show text _ ->
+                htmlTextTag "note"
+                    ([ Just ( "id", id )
+                     , Maybe.map (\s -> ( "show", s )) show
+                     , Maybe.map (\s -> ( "text", s )) text
+                     ]
+                        |> List.filterMap identity
+                    )
+            )
+            |> Markdown.Html.withAttribute "id"
+            |> Markdown.Html.withOptionalAttribute "show"
+            |> Markdown.Html.withOptionalAttribute "text"
+        ]
 
 
 

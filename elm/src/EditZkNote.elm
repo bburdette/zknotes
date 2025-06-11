@@ -3090,8 +3090,9 @@ update msg model =
                 Ok ( dnd, items ) ->
                     let
                         em =
-                            EM.updateBlocks
-                                items
+                            Debug.log "em" <|
+                                EM.updateBlocks
+                                    items
 
                         -- _ =
                         --     Debug.log "dnd" dnd

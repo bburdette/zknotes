@@ -45,10 +45,10 @@ getBlocks (EdMarkdown emd) =
 
 updateBlocks : List Block -> Result String EdMarkdown
 updateBlocks blocks =
-    let
-        _ =
-            Debug.log "blocks" blocks
-    in
+    -- let
+    --     _ =
+    --         Debug.log "blocks" blocks
+    -- in
     -- render blocks to string!
     -- maybe get tweaky with it and remember the offsets into string to do a faster replacement, rather than re-render whole string.
     Markdown.Renderer.render defaultStringRenderer blocks
@@ -154,7 +154,7 @@ defaultStringRenderer =
             items
                 |> List.indexedMap (\i item -> String.fromInt (i + startingIndex) ++ ") " ++ String.concat item ++ "\n")
                 |> String.concat
-    , html = Markdown.Html.oneOf []
+    , html = MC.htmlText
     , codeBlock =
         \{ body, language } ->
             String.concat
