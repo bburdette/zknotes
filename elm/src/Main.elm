@@ -1303,18 +1303,17 @@ view : Model -> { title : String, body : List (Html Msg) }
 view model =
     let
         dndif =
-            Debug.log "dndif" <|
-                ((case model.state of
-                    EditZkNote ezn _ ->
-                        Maybe.map (E.inFront << E.map EditZkNoteMsg) <|
-                            EditZkNote.ghostView ezn model.timezone model.noteCache MC.EditView 500
+            -- Debug.log "dndif" <|
+            (case model.state of
+                EditZkNote ezn _ ->
+                    Maybe.map (E.inFront << E.map EditZkNoteMsg) <|
+                        EditZkNote.ghostView ezn model.timezone model.noteCache MC.EditView 500
 
-                    _ ->
-                        Nothing
-                 )
-                    |> Maybe.map List.singleton
-                    |> Maybe.withDefault []
-                )
+                _ ->
+                    Nothing
+            )
+                |> Maybe.map List.singleton
+                |> Maybe.withDefault []
     in
     { title =
         case model.state of

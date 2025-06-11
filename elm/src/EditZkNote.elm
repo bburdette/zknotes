@@ -262,12 +262,14 @@ blockDndSubscriptions model =
 
 ghostView : Model -> Time.Zone -> NoteCache -> MC.ViewMode -> Int -> Maybe (Element Msg)
 ghostView model zone nc viewMode mdw =
-    (Debug.log "info" <| blockDndSystem.info model.blockDnd)
+    -- (Debug.log "info" <| blockDndSystem.info model.blockDnd)
+    blockDndSystem.info model.blockDnd
         |> Maybe.andThen
             (\{ dragIndex } ->
                 EM.getBlocks model.edMarkdown
                     |> Result.toMaybe
-                    |> Maybe.andThen (List.head << List.drop (Debug.log "dragIndex" dragIndex))
+                    |> Maybe.andThen (List.head << List.drop dragIndex)
+                    -- |> Maybe.andThen (List.head << List.drop (Debug.log "dragIndex" dragIndex))
                     |> Maybe.map (\b -> ( dragIndex, b ))
             )
         |> Maybe.map
@@ -300,12 +302,14 @@ editBlock ddw i e =
     case ddw of
         Drag ->
             E.row
-                [ EBd.width 1
-                , E.width E.fill
-                , E.height E.fill
-                , E.padding 3
-                , E.htmlAttribute (Html.Attributes.id bid)
-                ]
+                ([ EBd.width 1
+                 , E.width E.fill
+                 , E.height E.fill
+                 , E.padding 3
+                 , E.htmlAttribute (Html.Attributes.id bid)
+                 ]
+                 -- ++ List.map E.htmlAttribute (blockDndSystem.dragEvents i bid)
+                )
                 [ E.el
                     ([ E.width (E.px 20), E.height E.fill, EBk.color TC.brown, E.alignBottom ]
                         ++ List.map E.htmlAttribute (blockDndSystem.dragEvents i bid)
@@ -315,17 +319,23 @@ editBlock ddw i e =
                 ]
 
         Drop ->
+            let
+                _ =
+                    Debug.log "drop" ""
+            in
             E.row
-                [ EBk.color TC.darkBrown
-                , EBd.width 1
-                , E.width E.fill
-                , E.height E.fill
-                , E.padding 3
-                , E.htmlAttribute (Html.Attributes.id bid)
-                ]
+                ([ EBk.color TC.darkBrown
+                 , EBd.width 1
+                 , E.width E.fill
+                 , E.height E.fill
+                 , E.padding 3
+                 , E.htmlAttribute (Html.Attributes.id bid)
+                 ]
+                    ++ List.map E.htmlAttribute (blockDndSystem.dropEvents i bid)
+                )
                 [ E.el
                     ([ E.width (E.px 20), E.height E.fill, EBk.color TC.brown, E.alignBottom ]
-                        ++ List.map E.htmlAttribute (blockDndSystem.dropEvents i bid)
+                     -- ++ List.map E.htmlAttribute (blockDndSystem.dropEvents i bid)
                     )
                     E.none
                 , e
@@ -333,13 +343,15 @@ editBlock ddw i e =
 
         Ghost ->
             E.row
-                [ EBk.color TC.darkGreen
-                , EBd.width 1
-                , E.width E.fill
-                , E.height E.fill
-                , E.padding 3
-                , E.htmlAttribute (Html.Attributes.id bid)
-                ]
+                ([ EBk.color TC.darkGreen
+                 , EBd.width 1
+                 , E.width E.fill
+                 , E.height E.fill
+                 , E.padding 0
+                 , E.htmlAttribute (Html.Attributes.id bid)
+                 ]
+                    ++ List.map E.htmlAttribute (blockDndSystem.dragEvents i (blockId i))
+                )
                 [ E.el
                     ([ E.width (E.px 20), E.height E.fill, EBk.color TC.brown, E.alignBottom ]
                      -- ++ List.map E.htmlAttribute (blockDndSystem.dragEvents i (blockId i))
@@ -1117,8 +1129,8 @@ renderReadMd zone fui cd noteCache vm md mdw =
             E.text errors
 
 
-renderBlocks : Time.Zone -> FileUrlInfo -> CellDict -> NoteCache -> MC.ViewMode -> List Block -> Int -> Element Msg
-renderBlocks zone fui cd noteCache vm blocks mdw =
+renderBlocks : Time.Zone -> FileUrlInfo -> CellDict -> NoteCache -> MC.ViewMode -> Int -> List Block -> Maybe Int -> Element Msg
+renderBlocks zone fui cd noteCache vm mdw blocks mbdi =
     case
         Markdown.Renderer.render
             (MC.mkRenderer
@@ -1160,7 +1172,25 @@ renderBlocks zone fui cd noteCache vm blocks mdw =
                 , EBd.color TC.darkGrey
                 , EBk.color TC.lightGrey
                 ]
-                (List.indexedMap (editBlock Drag) rendered)
+                (List.indexedMap
+                    (\i b ->
+                        editBlock
+                            (case mbdi of
+                                Nothing ->
+                                    Drag
+
+                                Just di ->
+                                    if i == di then
+                                        Ghost
+
+                                    else
+                                        Drop
+                            )
+                            i
+                            b
+                    )
+                    rendered
+                )
 
         Err errors ->
             E.text errors
@@ -1578,6 +1608,11 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                     ++ showLinks linkbkc
                 )
 
+        mbdi =
+            blockDndSystem.info model.blockDnd
+                |> Maybe.map
+                    (\{ dragIndex } -> dragIndex)
+
         mdview linkbkc =
             E.column
                 [ E.width E.fill
@@ -1629,7 +1664,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                             E.none
                     , case EM.getBlocks model.edMarkdown of
                         Ok blocks ->
-                            renderBlocks zone model.fui model.cells noteCache MC.EditView blocks mdw
+                            renderBlocks zone model.fui model.cells noteCache MC.EditView mdw blocks mbdi
 
                         Err e ->
                             E.text e
@@ -3055,12 +3090,11 @@ update msg model =
                 Ok ( dnd, items ) ->
                     let
                         em =
-                            Debug.log "em" <|
-                                EM.updateBlocks
-                                    items
+                            EM.updateBlocks
+                                items
 
-                        _ =
-                            Debug.log "dnd" dnd
+                        -- _ =
+                        --     Debug.log "dnd" dnd
                     in
                     ( { model | blockDnd = dnd, edMarkdown = Result.withDefault model.edMarkdown em }
                     , Cmd <| blockDndSystem.commands dnd
