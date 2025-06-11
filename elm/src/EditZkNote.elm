@@ -279,13 +279,12 @@ ghostView model zone nc viewMode mdw =
                         mkrargs model zone nc viewMode mdw
                 in
                 E.el
-                    (List.map E.htmlAttribute (blockDndSystem.ghostStyles model.blockDnd))
+                    (List.map E.htmlAttribute (blockDndSystem.ghostStyles model.blockDnd |> Debug.log "ghoststyles")
+                        ++ [ E.alpha 0.5 ]
+                    )
+                    -- [ E.alpha 0.5 ]
                     (viewBlock ma Ghost 0 (Just i) block)
             )
-
-
-
--- TODO: alter to take DragDropWhat
 
 
 blockId : Int -> String
@@ -319,10 +318,6 @@ editBlock ddw i e =
                 ]
 
         Drop ->
-            let
-                _ =
-                    Debug.log "drop" ""
-            in
             E.row
                 ([ EBk.color TC.darkBrown
                  , EBd.width 1
@@ -361,33 +356,13 @@ editBlock ddw i e =
                 ]
 
 
-
--- viewBlockDnd : DnDList.Model -> MC.MkrArgs Msg -> Int -> Maybe Int -> Block -> Element Msg
--- viewBlockDnd ddlmodel ma i focusid b =
---     let
---         ddw =
---             case
---                 blockDndSystem.info ddlmodel
---                     |> Maybe.map .dragIndex
---             of
---                 Just ix ->
---                     if ix == i then
---                         Ghost
---                     else
---                         Drop
---                 Nothing ->
---                     Drag
---     in
---     viewBlock ma ddw i focusid b
-
-
 viewBlock : MC.MkrArgs Msg -> DragDropWhat -> Int -> Maybe Int -> Block -> Element Msg
 viewBlock ma ddw i focusid b =
     case Markdown.Renderer.render (MC.mkRenderer ma) [ b ] of
         Ok rendered ->
             E.column
-                [ E.spacing 3
-                , E.padding 20
+                [ E.spacing 0
+                , E.padding 0
                 , E.width (E.fill |> E.maximum 1000)
                 , E.centerX
                 , E.alignTop
