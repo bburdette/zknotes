@@ -1131,20 +1131,6 @@ renderBlocks zone fui cd noteCache vm mdw blocks mbinfo =
                 , noteCache = noteCache
                 }
             )
-            -- (MC.mkEditRenderer
-            --     (MC.mkRenderer
-            --         { zone = zone
-            --         , fui = fui
-            --         , viewMode = MC.EditView
-            --         , addToSearchMsg = RestoreSearch
-            --         , maxw = mdw
-            --         , cellDict = cd
-            --         , showPanelElt = True
-            --         , onchanged = OnSchelmeCodeChanged
-            --         , noteCache = noteCache
-            --         }
-            --     )
-            -- )
             blocks
     of
         Ok rendered ->
@@ -1252,8 +1238,6 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                 , columns =
                     [ { header = E.none
                       , width = E.fill
-
-                      -- TODO: render non editable
                       , view = \zkn -> renderReadMd zone model.fui model.cells noteCache MC.PublicView zkn.content mdw
                       }
                     , { header = E.none
