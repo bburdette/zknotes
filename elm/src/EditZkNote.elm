@@ -133,6 +133,7 @@ type Msg
     | FlipLink EditLink
     | ShowArchivesPress
     | DnDMsg DnDList.Msg
+    | RemoveBlock Int
     | Noop
 
 
@@ -311,6 +312,12 @@ editBlock ddw i e =
                     )
                     E.none
                 , e
+                , E.column []
+                    [ EI.button (linkButtonStyle ++ [ E.alignLeft ])
+                        { onPress = Just (RemoveBlock i)
+                        , label = E.text "X"
+                        }
+                    ]
                 ]
 
         Drop ->
@@ -3066,6 +3073,19 @@ update msg model =
 
                 Err e ->
                     ( model, ShowMessage <| "markdown error: " ++ e )
+
+        RemoveBlock idx ->
+            EM.getBlocks model.edMarkdown
+                |> Result.andThen
+                    (\blocks ->
+                        let
+                            db =
+                                List.take idx blocks ++ List.drop (idx + 1) blocks
+                        in
+                        EM.updateBlocks db
+                    )
+                |> Result.map (\em -> ( { model | edMarkdown = em }, None ))
+                |> Result.withDefault ( model, None )
 
         Noop ->
             ( model, None )
