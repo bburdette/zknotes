@@ -246,7 +246,7 @@ blockDndSystem =
         { beforeUpdate = dndIdentity
         , movement = DnDList.Vertical
         , listen = DnDList.OnDrop
-        , operation = DnDList.InsertAfter
+        , operation = DnDList.Rotate
         }
         DnDMsg
 
@@ -301,14 +301,12 @@ editBlock ddw i e =
     case ddw of
         Drag ->
             E.row
-                ([ EBd.width 1
-                 , E.width E.fill
-                 , E.height E.fill
-                 , E.padding 3
-                 , E.htmlAttribute (Html.Attributes.id bid)
-                 ]
-                 -- ++ List.map E.htmlAttribute (blockDndSystem.dragEvents i bid)
-                )
+                [ EBd.width 1
+                , E.width E.fill
+                , E.height E.fill
+                , E.padding 3
+                , E.htmlAttribute (Html.Attributes.id bid)
+                ]
                 [ E.el
                     ([ E.width (E.px 20), E.height E.fill, EBk.color TC.brown, E.alignBottom ]
                         ++ List.map E.htmlAttribute (blockDndSystem.dragEvents i bid)
@@ -319,7 +317,23 @@ editBlock ddw i e =
 
         Drop ->
             E.row
-                ([ EBk.color TC.darkBrown
+                ([ EBd.width 1
+                 , E.width E.fill
+                 , E.height E.fill
+                 , E.padding 3
+                 , E.htmlAttribute (Html.Attributes.id bid)
+                 ]
+                    ++ List.map E.htmlAttribute (blockDndSystem.dropEvents i bid)
+                )
+                [ E.el
+                    [ E.width (E.px 20), E.height E.fill, EBk.color TC.brown, E.alignBottom ]
+                    E.none
+                , e
+                ]
+
+        DropH ->
+            E.row
+                ([ EBk.color TC.darkBlue
                  , EBd.width 1
                  , E.width E.fill
                  , E.height E.fill
@@ -329,9 +343,7 @@ editBlock ddw i e =
                     ++ List.map E.htmlAttribute (blockDndSystem.dropEvents i bid)
                 )
                 [ E.el
-                    ([ E.width (E.px 20), E.height E.fill, EBk.color TC.brown, E.alignBottom ]
-                     -- ++ List.map E.htmlAttribute (blockDndSystem.dropEvents i bid)
-                    )
+                    [ E.width (E.px 20), E.height E.fill, EBk.color TC.brown, E.alignBottom ]
                     E.none
                 , e
                 ]
@@ -379,6 +391,7 @@ viewBlock ma ddw i focusid b =
 type DragDropWhat
     = Drag
     | Drop
+    | DropH
     | Ghost
 
 
@@ -1104,8 +1117,8 @@ renderReadMd zone fui cd noteCache vm md mdw =
             E.text errors
 
 
-renderBlocks : Time.Zone -> FileUrlInfo -> CellDict -> NoteCache -> MC.ViewMode -> Int -> List Block -> Maybe Int -> Element Msg
-renderBlocks zone fui cd noteCache vm mdw blocks mbdi =
+renderBlocks : Time.Zone -> FileUrlInfo -> CellDict -> NoteCache -> MC.ViewMode -> Int -> List Block -> Maybe DnDList.Info -> Element Msg
+renderBlocks zone fui cd noteCache vm mdw blocks mbinfo =
     case
         Markdown.Renderer.render
             (MC.mkRenderer
@@ -1150,13 +1163,16 @@ renderBlocks zone fui cd noteCache vm mdw blocks mbdi =
                 (List.indexedMap
                     (\i b ->
                         editBlock
-                            (case mbdi of
+                            (case mbinfo of
                                 Nothing ->
                                     Drag
 
-                                Just di ->
-                                    if i == di then
+                                Just { dragIndex, dropIndex } ->
+                                    if i == dragIndex then
                                         Ghost
+
+                                    else if i == dropIndex then
+                                        DropH
 
                                     else
                                         Drop
@@ -1585,8 +1601,6 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
 
         mbdi =
             blockDndSystem.info model.blockDnd
-                |> Maybe.map
-                    (\{ dragIndex } -> dragIndex)
 
         mdview linkbkc =
             E.column
