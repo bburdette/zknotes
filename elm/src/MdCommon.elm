@@ -431,7 +431,7 @@ htmlTextTag tag attrs =
                 |> List.intersperse " "
                 |> String.concat
            )
-        ++ "/>"
+        ++ "/>\n\n"
 
 
 searchView : ViewMode -> (String -> a) -> String -> List (Element a) -> Element a
