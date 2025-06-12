@@ -32,7 +32,6 @@ import Common exposing (buttonStyle)
 import Data exposing (ZkNoteId)
 import DataUtil exposing (FileUrlInfo, ZniSet, emptyZniSet, zkNoteIdFromString, zkNoteIdToString)
 import Dict exposing (Dict)
-import DnDList
 import Element as E exposing (Element)
 import Element.Background as EBk
 import Element.Border as EBd
@@ -52,7 +51,6 @@ import Set exposing (Set(..))
 import TSet
 import TangoColors as TC
 import Time
-import Toop
 import Util
 import ZkCommon
 
@@ -298,51 +296,129 @@ mkRenderer args =
     }
 
 
-html : MkrArgs a -> Markdown.Html.Renderer (List (Element a) -> Element a)
-html args =
+type alias HtmlFns a =
+    { schelmeView : String -> String -> List a -> a
+    , searchView : String -> List a -> a
+    , panelView : String -> List a -> a
+    , imageView : String -> String -> Maybe String -> List a -> a
+    , videoView : String -> Maybe String -> Maybe String -> Maybe String -> List a -> a
+    , audioView : String -> String -> List a -> a
+    , noteView : String -> Maybe String -> Maybe String -> List a -> a
+    }
+
+
+elmUiHtml : MkrArgs a -> HtmlFns (Element a)
+elmUiHtml args =
+    { schelmeView =
+        \name schelmeCode renderedChildren ->
+            cellView args.cellDict renderedChildren name schelmeCode args.onchanged
+    , searchView =
+        \search renderedChildren ->
+            searchView args.viewMode args.addToSearchMsg search renderedChildren
+    , panelView =
+        \noteid renderedChildren ->
+            case zkNoteIdFromString noteid of
+                Ok id ->
+                    if args.showPanelElt then
+                        panelView id renderedChildren
+
+                    else
+                        E.none
+
+                Err _ ->
+                    E.text "error"
+    , imageView = imageView args.fui
+    , videoView = videoView args.fui args.maxw
+    , audioView = audioView args.fui
+    , noteView = noteView args
+    }
+
+
+textHtml : HtmlFns String
+textHtml =
+    { schelmeView =
+        \name schelmeCode _ ->
+            htmlTextTag "cell" [ ( "name", name ), ( "schelmecode", schelmeCode ) ]
+    , searchView =
+        \query _ ->
+            htmlTextTag "search" [ ( "query", query ) ]
+    , panelView =
+        \noteid _ ->
+            htmlTextTag "panel" [ ( "noteid", noteid ) ]
+    , imageView =
+        \text url width _ ->
+            htmlTextTag "image"
+                ([ Just ( "text", text )
+                 , Just ( "url", url )
+                 , Maybe.map (\w -> ( "width", w )) width
+                 ]
+                    |> List.filterMap identity
+                )
+    , videoView =
+        \src text width height _ ->
+            htmlTextTag "image"
+                ([ Just ( "src", src )
+                 , Maybe.map (\s -> ( "text", s )) text
+                 , Maybe.map (\s -> ( "height", s )) height
+                 , Maybe.map (\s -> ( "width", s )) width
+                 ]
+                    |> List.filterMap identity
+                )
+    , audioView =
+        \src text _ ->
+            htmlTextTag "audio"
+                [ ( "src", src )
+                , ( "text", text )
+                ]
+    , noteView =
+        \id show text _ ->
+            htmlTextTag "note"
+                ([ Just ( "id", id )
+                 , Maybe.map (\s -> ( "show", s )) show
+                 , Maybe.map (\s -> ( "text", s )) text
+                 ]
+                    |> List.filterMap identity
+                )
+    }
+
+
+htmlF : HtmlFns a -> Markdown.Html.Renderer (List a -> a)
+htmlF hf =
     Markdown.Html.oneOf
-        [ Markdown.Html.tag "cell"
-            (\name schelmeCode renderedChildren ->
-                cellView args.cellDict renderedChildren name schelmeCode args.onchanged
-            )
+        [ Markdown.Html.tag "cell" hf.schelmeView
             |> Markdown.Html.withAttribute "name"
             |> Markdown.Html.withAttribute "schelmecode"
-        , Markdown.Html.tag "search"
-            (\search renderedChildren ->
-                searchView args.viewMode args.addToSearchMsg search renderedChildren
-            )
+        , Markdown.Html.tag "search" hf.searchView
             |> Markdown.Html.withAttribute "query"
-        , Markdown.Html.tag "panel"
-            (\noteid renderedChildren ->
-                case zkNoteIdFromString noteid of
-                    Ok id ->
-                        if args.showPanelElt then
-                            panelView id renderedChildren
-
-                        else
-                            E.none
-
-                    Err _ ->
-                        E.text "error"
-            )
+        , Markdown.Html.tag "panel" hf.panelView
             |> Markdown.Html.withAttribute "noteid"
-        , Markdown.Html.tag "image" (imageView args.fui)
+        , Markdown.Html.tag "image" hf.imageView
             |> Markdown.Html.withAttribute "text"
             |> Markdown.Html.withAttribute "url"
             |> Markdown.Html.withOptionalAttribute "width"
-        , Markdown.Html.tag "video" (videoView args.fui args.maxw)
+        , Markdown.Html.tag "video" hf.videoView
             |> Markdown.Html.withAttribute "src"
             |> Markdown.Html.withOptionalAttribute "text"
             |> Markdown.Html.withOptionalAttribute "width"
             |> Markdown.Html.withOptionalAttribute "height"
-        , Markdown.Html.tag "audio" (audioView args.fui)
+        , Markdown.Html.tag "audio" hf.audioView
             |> Markdown.Html.withAttribute "text"
             |> Markdown.Html.withAttribute "src"
-        , Markdown.Html.tag "note" (noteView args)
+        , Markdown.Html.tag "note" hf.noteView
             |> Markdown.Html.withAttribute "id"
             |> Markdown.Html.withOptionalAttribute "show"
             |> Markdown.Html.withOptionalAttribute "text"
         ]
+
+
+html : MkrArgs a -> Markdown.Html.Renderer (List (Element a) -> Element a)
+html args =
+    htmlF (elmUiHtml args)
+
+
+htmlText : Markdown.Html.Renderer (List String -> String)
+htmlText =
+    htmlF textHtml
 
 
 htmlTextTag : String -> List ( String, String ) -> String
@@ -356,114 +432,6 @@ htmlTextTag tag attrs =
                 |> String.concat
            )
         ++ "/>"
-
-
-htmlText : Markdown.Html.Renderer (List String -> String)
-htmlText =
-    Markdown.Html.oneOf
-        [ Markdown.Html.tag "cell"
-            (\name schelmeCode _ ->
-                htmlTextTag "cell" [ ( "name", name ), ( "schelmecode", schelmeCode ) ]
-            )
-            |> Markdown.Html.withAttribute "name"
-            |> Markdown.Html.withAttribute "schelmecode"
-        , Markdown.Html.tag "search"
-            (\query _ ->
-                htmlTextTag "search" [ ( "query", query ) ]
-            )
-            |> Markdown.Html.withAttribute "query"
-        , Markdown.Html.tag "panel"
-            (\noteid _ ->
-                htmlTextTag "panel" [ ( "noteid", noteid ) ]
-            )
-            |> Markdown.Html.withAttribute "noteid"
-        , Markdown.Html.tag "image"
-            (\text url width _ ->
-                htmlTextTag "image"
-                    ([ Just ( "text", text )
-                     , Just ( "url", url )
-                     , Maybe.map (\w -> ( "width", w )) width
-                     ]
-                        |> List.filterMap identity
-                    )
-            )
-            |> Markdown.Html.withAttribute "text"
-            |> Markdown.Html.withAttribute "url"
-            |> Markdown.Html.withOptionalAttribute "width"
-        , Markdown.Html.tag "video"
-            (\src text width height _ ->
-                htmlTextTag "image"
-                    ([ Just ( "src", src )
-                     , Maybe.map (\s -> ( "text", s )) text
-                     , Maybe.map (\s -> ( "height", s )) height
-                     , Maybe.map (\s -> ( "width", s )) width
-                     ]
-                        |> List.filterMap identity
-                    )
-            )
-            |> Markdown.Html.withAttribute "src"
-            |> Markdown.Html.withOptionalAttribute "text"
-            |> Markdown.Html.withOptionalAttribute "width"
-            |> Markdown.Html.withOptionalAttribute "height"
-        , Markdown.Html.tag "audio"
-            (\src text _ ->
-                htmlTextTag "audio"
-                    [ ( "src", src )
-                    , ( "text", text )
-                    ]
-            )
-            |> Markdown.Html.withAttribute "text"
-            |> Markdown.Html.withAttribute "src"
-        , Markdown.Html.tag "note"
-            (\id show text _ ->
-                htmlTextTag "note"
-                    ([ Just ( "id", id )
-                     , Maybe.map (\s -> ( "show", s )) show
-                     , Maybe.map (\s -> ( "text", s )) text
-                     ]
-                        |> List.filterMap identity
-                    )
-            )
-            |> Markdown.Html.withAttribute "id"
-            |> Markdown.Html.withOptionalAttribute "show"
-            |> Markdown.Html.withOptionalAttribute "text"
-        ]
-
-
-
-{-
-   mkEditRenderer : Markdown.Renderer.Renderer (Element a) -> Markdown.Renderer.Renderer (Element a)
-   mkEditRenderer renderer =
-       { heading = \a -> renderer.heading a |> editBlock
-       , paragraph = \a -> renderer.paragraph a |> editBlock
-       , thematicBreak = renderer.thematicBreak |> editBlock
-
-       -- , text = \a -> renderer.text a |> renderBlock
-       , text = renderer.text
-       , strong = \a -> renderer.strong a |> editBlock
-       , emphasis = \a -> renderer.emphasis a |> editBlock
-       , strikethrough = \a -> renderer.strikethrough a |> editBlock
-       , codeSpan = \a -> renderer.codeSpan a |> editBlock
-
-       -- , link = \a b -> renderer.link a b |> renderBlock
-       , link = renderer.link
-
-       -- , hardLineBreak = renderer.hardLineBreak |> renderBlock
-       , hardLineBreak = renderer.hardLineBreak
-       , image = \a -> renderer.image a |> editBlock
-       , blockQuote = \a -> renderer.blockQuote a |> editBlock
-       , unorderedList = \a -> renderer.unorderedList a |> editBlock
-       , orderedList = \a b -> renderer.orderedList a b |> editBlock
-       , codeBlock = \a -> renderer.codeBlock a |> editBlock
-       , html = Markdown.Html.map (\l2a -> \a -> editBlock (l2a a)) renderer.html
-       , table = \a -> renderer.table a |> editBlock
-       , tableHeader = \a -> renderer.tableHeader a |> editBlock
-       , tableBody = \a -> renderer.tableBody a |> editBlock
-       , tableRow = \a -> renderer.tableRow a |> editBlock
-       , tableHeaderCell = \a b -> renderer.tableHeaderCell a b |> editBlock
-       , tableCell = \a b -> renderer.tableCell a b |> editBlock
-       }
--}
 
 
 searchView : ViewMode -> (String -> a) -> String -> List (Element a) -> Element a
