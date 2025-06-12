@@ -262,14 +262,12 @@ blockDndSubscriptions model =
 
 ghostView : Model -> Time.Zone -> NoteCache -> MC.ViewMode -> Int -> Maybe (Element Msg)
 ghostView model zone nc viewMode mdw =
-    -- (Debug.log "info" <| blockDndSystem.info model.blockDnd)
     blockDndSystem.info model.blockDnd
         |> Maybe.andThen
             (\{ dragIndex } ->
                 EM.getBlocks model.edMarkdown
                     |> Result.toMaybe
                     |> Maybe.andThen (List.head << List.drop dragIndex)
-                    -- |> Maybe.andThen (List.head << List.drop (Debug.log "dragIndex" dragIndex))
                     |> Maybe.map (\b -> ( dragIndex, b ))
             )
         |> Maybe.map
@@ -279,10 +277,10 @@ ghostView model zone nc viewMode mdw =
                         mkrargs model zone nc viewMode mdw
                 in
                 E.el
-                    (List.map E.htmlAttribute (blockDndSystem.ghostStyles model.blockDnd |> Debug.log "ghoststyles")
-                        ++ [ E.alpha 0.5 ]
+                    (E.alpha 0.5
+                        :: List.map E.htmlAttribute
+                            (blockDndSystem.ghostStyles model.blockDnd)
                     )
-                    -- [ E.alpha 0.5 ]
                     (viewBlock ma Ghost 0 (Just i) block)
             )
 
@@ -3064,10 +3062,6 @@ update msg model =
             ( model, Requests )
 
         DnDMsg dmsg ->
-            let
-                _ =
-                    Debug.log "dmsg" dmsg
-            in
             case
                 EM.getBlocks model.edMarkdown
                     |> Result.map
@@ -3079,23 +3073,15 @@ update msg model =
                 Ok ( dnd, items ) ->
                     let
                         em =
-                            Debug.log "em" <|
-                                EM.updateBlocks
-                                    items
-
-                        -- _ =
-                        --     Debug.log "dnd" dnd
+                            EM.updateBlocks
+                                items
                     in
                     ( { model | blockDnd = dnd, edMarkdown = Result.withDefault model.edMarkdown em }
                     , Cmd <| blockDndSystem.commands dnd
                     )
 
                 Err e ->
-                    let
-                        _ =
-                            Debug.log "err" e
-                    in
-                    ( model, None )
+                    ( model, ShowMessage <| "markdown error: " ++ e )
 
         Noop ->
             ( model, None )

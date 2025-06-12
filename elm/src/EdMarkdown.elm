@@ -45,10 +45,6 @@ getBlocks (EdMarkdown emd) =
 
 updateBlocks : List Block -> Result String EdMarkdown
 updateBlocks blocks =
-    -- let
-    --     _ =
-    --         Debug.log "blocks" blocks
-    -- in
     -- render blocks to string!
     -- maybe get tweaky with it and remember the offsets into string to do a faster replacement, rather than re-render whole string.
     Markdown.Renderer.render defaultStringRenderer blocks
