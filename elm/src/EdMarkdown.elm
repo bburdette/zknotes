@@ -1,4 +1,4 @@
-module EdMarkdown exposing (EdMarkdown, getBlocks, getMd, init, updateBlocks, updateMd)
+module EdMarkdown exposing (EdMarkdown, getBlocks, getMd, init, stringRenderer, updateBlocks, updateMd)
 
 import Markdown.Block as Block exposing (Block, ListItem(..), Task(..), foldl, inlineFoldl)
 import Markdown.Html
@@ -47,7 +47,7 @@ updateBlocks : List Block -> Result String EdMarkdown
 updateBlocks blocks =
     -- render blocks to string!
     -- maybe get tweaky with it and remember the offsets into string to do a faster replacement, rather than re-render whole string.
-    Markdown.Renderer.render defaultStringRenderer blocks
+    Markdown.Renderer.render stringRenderer blocks
         |> Result.map
             (\md ->
                 EdMarkdown
@@ -60,8 +60,8 @@ updateBlocks blocks =
 {-| This renders the parsed markdown structs to a string.
 TODO: use the one in Markdown lib when its published.
 -}
-defaultStringRenderer : Markdown.Renderer.Renderer String
-defaultStringRenderer =
+stringRenderer : Markdown.Renderer.Renderer String
+stringRenderer =
     { heading =
         \{ level, children } ->
             (case level of

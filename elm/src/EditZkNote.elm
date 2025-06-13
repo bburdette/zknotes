@@ -134,6 +134,8 @@ type Msg
     | ShowArchivesPress
     | DnDMsg DnDList.Msg
     | RemoveBlock Int
+    | EditBlock Int
+    | EditBlockInput String
     | Noop
 
 
@@ -194,7 +196,12 @@ type alias Model =
     , server : String
     , blockDnd : DnDList.Model
     , edMarkdown : EM.EdMarkdown
+    , blockEdit : Maybe BlockEdit
     }
+
+
+type BlockEdit
+    = Text { idx : Int, s : String }
 
 
 type Command
@@ -304,6 +311,7 @@ editBlock ddw i e =
                 , E.width E.fill
                 , E.height E.fill
                 , E.padding 3
+                , E.spacing 2
                 , E.htmlAttribute (Html.Attributes.id bid)
                 ]
                 [ E.el
@@ -312,12 +320,14 @@ editBlock ddw i e =
                     )
                     E.none
                 , e
-                , E.column []
-                    [ EI.button (linkButtonStyle ++ [ E.alignLeft ])
-                        { onPress = Just (RemoveBlock i)
-                        , label = E.text "X"
-                        }
-                    ]
+                , EI.button (linkButtonStyle ++ [ E.alignRight, EF.size 10, E.height <| E.px 15 ])
+                    { onPress = Just (RemoveBlock i)
+                    , label = E.text "X"
+                    }
+                , EI.button (linkButtonStyle ++ [ E.alignRight, EF.size 10, E.height <| E.px 15 ])
+                    { onPress = Just (EditBlock i)
+                    , label = E.text "ed"
+                    }
                 ]
 
         Drop ->
@@ -1122,8 +1132,8 @@ renderReadMd zone fui cd noteCache vm md mdw =
             E.text errors
 
 
-renderBlocks : Time.Zone -> FileUrlInfo -> CellDict -> NoteCache -> MC.ViewMode -> Int -> List Block -> Maybe DnDList.Info -> Element Msg
-renderBlocks zone fui cd noteCache vm mdw blocks mbinfo =
+renderBlocks : Time.Zone -> FileUrlInfo -> CellDict -> NoteCache -> MC.ViewMode -> Int -> Maybe BlockEdit -> Maybe DnDList.Info -> List Block -> Element Msg
+renderBlocks zone fui cd noteCache vm mdw mbblockedit mbinfo blocks =
     case
         Markdown.Renderer.render
             (MC.mkRenderer
@@ -1153,6 +1163,48 @@ renderBlocks zone fui cd noteCache vm mdw blocks mbinfo =
                 ]
                 (List.indexedMap
                     (\i b ->
+                        let
+                            eb =
+                                case mbblockedit of
+                                    Just (Text t) ->
+                                        if t.idx == i then
+                                            E.column
+                                                [ E.width E.fill
+                                                ]
+                                                [ b
+                                                , EI.multiline
+                                                    ([ --  if editable then
+                                                       --  EF.color TC.black
+                                                       -- else
+                                                       --  EF.color TC.darkGrey
+                                                       -- , E.htmlAttribute (Html.Attributes.id "mdtext")
+                                                       E.alignTop
+                                                     ]
+                                                     -- ++ (if isdirty then
+                                                     --         [ E.focused [ EBd.glow TC.darkYellow 3 ] ]
+                                                     --     else
+                                                     --         []
+                                                     --    )
+                                                    )
+                                                    { onChange = EditBlockInput
+
+                                                    -- if editable then
+                                                    --     OnMarkdownInput
+                                                    -- else
+                                                    --     always Noop
+                                                    , text = t.s -- EM.getMd model.edMarkdown
+                                                    , placeholder = Nothing
+                                                    , label = EI.labelHidden "markdown input"
+                                                    , spellcheck = False
+                                                    }
+                                                ]
+
+                                        else
+                                            b
+
+                                    Nothing ->
+                                        b
+                        in
                         editBlock
                             (case mbinfo of
                                 Nothing ->
@@ -1169,7 +1221,7 @@ renderBlocks zone fui cd noteCache vm mdw blocks mbinfo =
                                         Drop
                             )
                             i
-                            b
+                            eb
                     )
                     rendered
                 )
@@ -1642,7 +1694,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                             E.none
                     , case EM.getBlocks model.edMarkdown of
                         Ok blocks ->
-                            renderBlocks zone model.fui model.cells noteCache MC.EditView mdw blocks mbdi
+                            renderBlocks zone model.fui model.cells noteCache MC.EditView mdw model.blockEdit mbdi blocks
 
                         Err e ->
                             E.text e
@@ -2048,6 +2100,7 @@ initFull fui ld zknote dtlinks mbedittab mobile =
       , server = zknote.server
       , blockDnd = blockDndSystem.model
       , edMarkdown = EM.init zknote.content
+      , blockEdit = Nothing
       }
         |> (\m ->
                 Maybe.map (\nc -> setTab nc m) mbedittab
@@ -2106,6 +2159,7 @@ initNew fui ld links mobile =
     , server = ld.server
     , blockDnd = blockDndSystem.model
     , edMarkdown = EM.init ""
+    , blockEdit = Nothing
     }
         |> (\m1 ->
                 -- for new EMPTY notes, the 'revert' should be the same as the model, so that you aren't
@@ -3086,6 +3140,51 @@ update msg model =
                     )
                 |> Result.map (\em -> ( { model | edMarkdown = em }, None ))
                 |> Result.withDefault ( model, None )
+
+        EditBlock bidx ->
+            let
+                eblk : Int -> Maybe BlockEdit
+                eblk =
+                    \bi ->
+                        case
+                            EM.getBlocks model.edMarkdown
+                                |> Result.toMaybe
+                                |> Maybe.andThen (\blocks -> List.head (List.drop bidx blocks))
+                        of
+                            Just b ->
+                                Markdown.Renderer.render EM.stringRenderer [ b ]
+                                    |> Result.map
+                                        (\sl ->
+                                            Text { idx = bi, s = String.concat sl }
+                                        )
+                                    |> Result.toMaybe
+
+                            Nothing ->
+                                Nothing
+            in
+            ( { model
+                | blockEdit =
+                    case model.blockEdit of
+                        Just (Text { idx, s }) ->
+                            if bidx == idx then
+                                Nothing
+
+                            else
+                                eblk bidx
+
+                        Nothing ->
+                            eblk bidx
+              }
+            , None
+            )
+
+        EditBlockInput s ->
+            case model.blockEdit of
+                Just (Text t) ->
+                    ( { model | blockEdit = Just <| Text { t | s = s } }, None )
+
+                Nothing ->
+                    ( model, None )
 
         Noop ->
             ( model, None )
