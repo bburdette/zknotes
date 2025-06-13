@@ -298,6 +298,16 @@ blockId i =
     "block-" ++ String.fromInt i
 
 
+edButtonStyle =
+    [ EBk.color TC.blue
+    , EF.color TC.white
+    , EBd.color TC.darkBlue
+    , E.paddingXY 3 3
+
+    -- , EBd.rounded 2
+    ]
+
+
 editBlock : DragDropWhat -> Int -> Element Msg -> Element Msg
 editBlock ddw i e =
     let
@@ -313,6 +323,19 @@ editBlock ddw i e =
                 , E.padding 3
                 , E.spacing 2
                 , E.htmlAttribute (Html.Attributes.id bid)
+                , E.inFront
+                    (E.row [ E.alignRight, E.spacing 3, E.padding 0 ]
+                        [ -- TODO don't hardcode height, fontsize.  maybe render differently?  or overlay.
+                          EI.button (edButtonStyle ++ [ E.alignRight, EF.size 10, E.height <| E.px 15 ])
+                            { onPress = Just (EditBlock i)
+                            , label = E.el [ E.centerY ] <| E.text "ed"
+                            }
+                        , EI.button (edButtonStyle ++ [ E.alignRight, EF.size 10, E.height <| E.px 15 ])
+                            { onPress = Just (RemoveBlock i)
+                            , label = E.text "X"
+                            }
+                        ]
+                    )
                 ]
                 [ E.el
                     ([ E.width (E.px 20), E.height E.fill, EBk.color TC.brown, E.alignBottom ]
@@ -320,14 +343,6 @@ editBlock ddw i e =
                     )
                     E.none
                 , e
-                , EI.button (linkButtonStyle ++ [ E.alignRight, EF.size 10, E.height <| E.px 15 ])
-                    { onPress = Just (RemoveBlock i)
-                    , label = E.text "X"
-                    }
-                , EI.button (linkButtonStyle ++ [ E.alignRight, EF.size 10, E.height <| E.px 15 ])
-                    { onPress = Just (EditBlock i)
-                    , label = E.text "ed"
-                    }
                 ]
 
         Drop ->
@@ -336,6 +351,7 @@ editBlock ddw i e =
                  , E.width E.fill
                  , E.height E.fill
                  , E.padding 3
+                 , E.spacing 2
                  , E.htmlAttribute (Html.Attributes.id bid)
                  ]
                     ++ List.map E.htmlAttribute (blockDndSystem.dropEvents i bid)
@@ -353,6 +369,7 @@ editBlock ddw i e =
                  , E.width E.fill
                  , E.height E.fill
                  , E.padding 3
+                 , E.spacing 2
                  , E.htmlAttribute (Html.Attributes.id bid)
                  ]
                     ++ List.map E.htmlAttribute (blockDndSystem.dropEvents i bid)
@@ -369,7 +386,8 @@ editBlock ddw i e =
                  , EBd.width 1
                  , E.width E.fill
                  , E.height E.fill
-                 , E.padding 0
+                 , E.padding 3
+                 , E.spacing 2
                  , E.htmlAttribute (Html.Attributes.id bid)
                  ]
                     ++ List.map E.htmlAttribute (blockDndSystem.dragEvents i (blockId i))
@@ -389,7 +407,7 @@ viewBlock ma ddw i focusid b =
         Ok rendered ->
             E.column
                 [ E.spacing 0
-                , E.padding 0
+                , E.padding 3
                 , E.width (E.fill |> E.maximum 1000)
                 , E.centerX
                 , E.alignTop
