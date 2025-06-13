@@ -136,6 +136,7 @@ type Msg
     | RemoveBlock Int
     | EditBlock Int
     | EditBlockInput String
+    | EditBlockOk
     | Noop
 
 
@@ -1152,9 +1153,9 @@ renderReadMd zone fui cd noteCache vm md mdw =
 
 renderBlocks : Time.Zone -> FileUrlInfo -> CellDict -> NoteCache -> MC.ViewMode -> Int -> Maybe BlockEdit -> Maybe DnDList.Info -> List Block -> Element Msg
 renderBlocks zone fui cd noteCache vm mdw mbblockedit mbinfo blocks =
-    case
-        Markdown.Renderer.render
-            (MC.mkRenderer
+    let
+        renderer =
+            MC.mkRenderer
                 { zone = zone
                 , fui = fui
                 , viewMode = vm
@@ -1165,7 +1166,10 @@ renderBlocks zone fui cd noteCache vm mdw mbblockedit mbinfo blocks =
                 , onchanged = OnSchelmeCodeChanged
                 , noteCache = noteCache
                 }
-            )
+    in
+    case
+        Markdown.Renderer.render
+            renderer
             blocks
     of
         Ok rendered ->
@@ -1189,7 +1193,12 @@ renderBlocks zone fui cd noteCache vm mdw mbblockedit mbinfo blocks =
                                             E.column
                                                 [ E.width E.fill
                                                 ]
-                                                [ b
+                                                [ case MC.markdownView renderer t.s of
+                                                    Ok elts ->
+                                                        E.column [ E.width E.fill ] elts
+
+                                                    Err e ->
+                                                        E.text e
                                                 , EI.multiline
                                                     ([ --  if editable then
                                                        --  EF.color TC.black
@@ -1215,6 +1224,8 @@ renderBlocks zone fui cd noteCache vm mdw mbblockedit mbinfo blocks =
                                                     , label = EI.labelHidden "markdown input"
                                                     , spellcheck = False
                                                     }
+                                                , EI.button Common.buttonStyle
+                                                    { label = E.text "ok", onPress = Just EditBlockOk }
                                                 ]
 
                                         else
@@ -3200,6 +3211,33 @@ update msg model =
             case model.blockEdit of
                 Just (Text t) ->
                     ( { model | blockEdit = Just <| Text { t | s = s } }, None )
+
+                Nothing ->
+                    ( model, None )
+
+        EditBlockOk ->
+            case model.blockEdit of
+                Just (Text t) ->
+                    let
+                        nb =
+                            model.edMarkdown
+                                |> EM.getBlocks
+                                |> Result.andThen
+                                    (Markdown.Renderer.render EM.stringRenderer)
+                                |> Result.map
+                                    (List.indexedMap
+                                        (\i b ->
+                                            if i == t.idx then
+                                                t.s
+
+                                            else
+                                                b
+                                        )
+                                    )
+                                |> Result.map String.concat
+                                |> Result.withDefault (EM.getMd model.edMarkdown)
+                    in
+                    ( { model | edMarkdown = EM.updateMd nb, blockEdit = Nothing }, None )
 
                 Nothing ->
                     ( model, None )
