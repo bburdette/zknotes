@@ -315,7 +315,7 @@ editBlock ddw i e =
                 , E.htmlAttribute (Html.Attributes.id bid)
                 ]
                 [ E.el
-                    ([ E.width (E.px 20), E.height E.fill, EBk.color TC.brown, E.alignBottom ]
+                    ([ E.width (E.px 20), E.height E.fill, EBk.color TC.charcoal, E.alignBottom ]
                         ++ List.map E.htmlAttribute (blockDndSystem.dragEvents i bid)
                     )
                     E.none
@@ -341,7 +341,7 @@ editBlock ddw i e =
                     ++ List.map E.htmlAttribute (blockDndSystem.dropEvents i bid)
                 )
                 [ E.el
-                    [ E.width (E.px 20), E.height E.fill, EBk.color TC.brown, E.alignBottom ]
+                    [ E.width (E.px 20), E.height E.fill, EBk.color TC.charcoal, E.alignBottom ]
                     E.none
                 , e
                 ]
@@ -358,7 +358,7 @@ editBlock ddw i e =
                     ++ List.map E.htmlAttribute (blockDndSystem.dropEvents i bid)
                 )
                 [ E.el
-                    [ E.width (E.px 20), E.height E.fill, EBk.color TC.brown, E.alignBottom ]
+                    [ E.width (E.px 20), E.height E.fill, EBk.color TC.charcoal, E.alignBottom ]
                     E.none
                 , e
                 ]
@@ -375,9 +375,7 @@ editBlock ddw i e =
                     ++ List.map E.htmlAttribute (blockDndSystem.dragEvents i (blockId i))
                 )
                 [ E.el
-                    ([ E.width (E.px 20), E.height E.fill, EBk.color TC.brown, E.alignBottom ]
-                     -- ++ List.map E.htmlAttribute (blockDndSystem.dragEvents i (blockId i))
-                    )
+                    [ E.width (E.px 20), E.height E.fill, EBk.color TC.charcoal, E.alignBottom ]
                     E.none
                 , e
                 ]
