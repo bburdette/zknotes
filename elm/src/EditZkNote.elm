@@ -299,13 +299,13 @@ blockId i =
     "block-" ++ String.fromInt i
 
 
+edButtonStyle : List (E.Attribute a)
 edButtonStyle =
     [ EBk.color TC.blue
     , EF.color TC.white
     , EBd.color TC.darkBlue
     , E.paddingXY 3 3
-
-    -- , EBd.rounded 2
+    , EBd.rounded 2
     ]
 
 
@@ -394,9 +394,7 @@ editBlock ddw i e =
                     ++ List.map E.htmlAttribute (blockDndSystem.dragEvents i (blockId i))
                 )
                 [ E.el
-                    ([ E.width (E.px 20), E.height E.fill, EBk.color TC.brown, E.alignBottom ]
-                     -- ++ List.map E.htmlAttribute (blockDndSystem.dragEvents i (blockId i))
-                    )
+                    [ E.width (E.px 20), E.height E.fill, EBk.color TC.brown, E.alignBottom ]
                     E.none
                 , e
                 ]
@@ -1160,7 +1158,7 @@ renderBlocks zone fui cd noteCache vm mdw mbblockedit mbinfo blocks =
                 , fui = fui
                 , viewMode = vm
                 , addToSearchMsg = RestoreSearch
-                , maxw = mdw
+                , maxw = mdw - 20
                 , cellDict = cd
                 , showPanelElt = True
                 , onchanged = OnSchelmeCodeChanged
