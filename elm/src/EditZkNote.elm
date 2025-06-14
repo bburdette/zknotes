@@ -136,6 +136,7 @@ type Msg
     | RemoveBlock Int
     | EditBlock Int
     | EditBlockInput String
+    | EditBlockOk
     | Noop
 
 
@@ -298,84 +299,94 @@ blockId i =
     "block-" ++ String.fromInt i
 
 
+edButtonStyle : List (E.Attribute a)
+edButtonStyle =
+    [ EBk.color TC.blue
+    , EF.color TC.white
+    , EBd.color TC.darkBlue
+    , E.paddingXY 3 3
+    , EBd.rounded 2
+    ]
+
+
+dragHandleWidth =
+    20
+
+
 editBlock : DragDropWhat -> Int -> Element Msg -> Element Msg
 editBlock ddw i e =
     let
         bid =
             blockId i
+
+        baseAttr =
+            [ EBd.width 1
+            , E.width E.fill
+            , E.height E.fill
+            , E.padding 3
+            , E.spacing 2
+            , E.htmlAttribute (Html.Attributes.id bid)
+            ]
+
+        dragHandleAttrs =
+            [ E.width (E.px dragHandleWidth), E.height E.fill, EBk.color TC.charcoal, E.alignBottom ]
     in
     case ddw of
         Drag ->
             E.row
-                [ EBd.width 1
-                , E.width E.fill
-                , E.height E.fill
-                , E.padding 3
-                , E.spacing 2
-                , E.htmlAttribute (Html.Attributes.id bid)
-                ]
+                (baseAttr
+                    ++ [ E.inFront
+                            (E.row [ E.alignRight, E.spacing 3, E.padding 0 ]
+                                [ -- TODO don't hardcode height, fontsize.  maybe render differently?  or overlay.
+                                  EI.button (edButtonStyle ++ [ E.alignRight, EF.size 10, E.height <| E.px 15 ])
+                                    { onPress = Just (EditBlock i)
+                                    , label = E.el [ E.centerY ] <| E.text "ed"
+                                    }
+                                , EI.button (edButtonStyle ++ [ E.alignRight, EF.size 10, E.height <| E.px 15 ])
+                                    { onPress = Just (RemoveBlock i)
+                                    , label = E.text "X"
+                                    }
+                                ]
+                            )
+                       ]
+                )
                 [ E.el
-                    ([ E.width (E.px 20), E.height E.fill, EBk.color TC.charcoal, E.alignBottom ]
+                    (dragHandleAttrs
                         ++ List.map E.htmlAttribute (blockDndSystem.dragEvents i bid)
                     )
                     E.none
                 , e
-                , EI.button (linkButtonStyle ++ [ E.alignRight, EF.size 10, E.height <| E.px 15 ])
-                    { onPress = Just (RemoveBlock i)
-                    , label = E.text "X"
-                    }
-                , EI.button (linkButtonStyle ++ [ E.alignRight, EF.size 10, E.height <| E.px 15 ])
-                    { onPress = Just (EditBlock i)
-                    , label = E.text "ed"
-                    }
                 ]
 
         Drop ->
             E.row
-                ([ EBd.width 1
-                 , E.width E.fill
-                 , E.height E.fill
-                 , E.padding 3
-                 , E.htmlAttribute (Html.Attributes.id bid)
-                 ]
+                (baseAttr
                     ++ List.map E.htmlAttribute (blockDndSystem.dropEvents i bid)
                 )
                 [ E.el
-                    [ E.width (E.px 20), E.height E.fill, EBk.color TC.charcoal, E.alignBottom ]
+                    dragHandleAttrs
                     E.none
                 , e
                 ]
 
         DropH ->
             E.row
-                ([ EBk.color TC.darkBlue
-                 , EBd.width 1
-                 , E.width E.fill
-                 , E.height E.fill
-                 , E.padding 3
-                 , E.htmlAttribute (Html.Attributes.id bid)
-                 ]
+                ((EBk.color TC.darkBlue :: baseAttr)
                     ++ List.map E.htmlAttribute (blockDndSystem.dropEvents i bid)
                 )
                 [ E.el
-                    [ E.width (E.px 20), E.height E.fill, EBk.color TC.charcoal, E.alignBottom ]
+                    dragHandleAttrs
                     E.none
                 , e
                 ]
 
         Ghost ->
             E.row
-                ([ EBk.color TC.darkGreen
-                 , EBd.width 1
-                 , E.width E.fill
-                 , E.height E.fill
-                 , E.padding 0
-                 , E.htmlAttribute (Html.Attributes.id bid)
-                 ]
+                ((EBk.color TC.darkGreen :: baseAttr)
                     ++ List.map E.htmlAttribute (blockDndSystem.dragEvents i (blockId i))
                 )
                 [ E.el
-                    [ E.width (E.px 20), E.height E.fill, EBk.color TC.charcoal, E.alignBottom ]
+                    dragHandleAttrs
                     E.none
                 , e
                 ]
@@ -387,7 +398,7 @@ viewBlock ma ddw i focusid b =
         Ok rendered ->
             E.column
                 [ E.spacing 0
-                , E.padding 0
+                , E.padding 3
                 , E.width (E.fill |> E.maximum 1000)
                 , E.centerX
                 , E.alignTop
@@ -1132,20 +1143,23 @@ renderReadMd zone fui cd noteCache vm md mdw =
 
 renderBlocks : Time.Zone -> FileUrlInfo -> CellDict -> NoteCache -> MC.ViewMode -> Int -> Maybe BlockEdit -> Maybe DnDList.Info -> List Block -> Element Msg
 renderBlocks zone fui cd noteCache vm mdw mbblockedit mbinfo blocks =
-    case
-        Markdown.Renderer.render
-            (MC.mkRenderer
+    let
+        renderer =
+            MC.mkRenderer
                 { zone = zone
                 , fui = fui
                 , viewMode = vm
                 , addToSearchMsg = RestoreSearch
-                , maxw = mdw
+                , maxw = mdw - dragHandleWidth
                 , cellDict = cd
                 , showPanelElt = True
                 , onchanged = OnSchelmeCodeChanged
                 , noteCache = noteCache
                 }
-            )
+    in
+    case
+        Markdown.Renderer.render
+            renderer
             blocks
     of
         Ok rendered ->
@@ -1169,32 +1183,23 @@ renderBlocks zone fui cd noteCache vm mdw mbblockedit mbinfo blocks =
                                             E.column
                                                 [ E.width E.fill
                                                 ]
-                                                [ b
-                                                , EI.multiline
-                                                    ([ --  if editable then
-                                                       --  EF.color TC.black
-                                                       -- else
-                                                       --  EF.color TC.darkGrey
-                                                       -- , E.htmlAttribute (Html.Attributes.id "mdtext")
-                                                       E.alignTop
-                                                     ]
-                                                     -- ++ (if isdirty then
-                                                     --         [ E.focused [ EBd.glow TC.darkYellow 3 ] ]
-                                                     --     else
-                                                     --         []
-                                                     --    )
-                                                    )
-                                                    { onChange = EditBlockInput
+                                                [ case MC.markdownView renderer t.s of
+                                                    Ok elts ->
+                                                        E.column [ E.width E.fill ] elts
 
-                                                    -- if editable then
-                                                    --     OnMarkdownInput
-                                                    -- else
-                                                    --     always Noop
-                                                    , text = t.s -- EM.getMd model.edMarkdown
+                                                    Err e ->
+                                                        E.text e
+                                                , EI.multiline
+                                                    [ E.alignTop
+                                                    ]
+                                                    { onChange = EditBlockInput
+                                                    , text = t.s
                                                     , placeholder = Nothing
                                                     , label = EI.labelHidden "markdown input"
                                                     , spellcheck = False
                                                     }
+                                                , EI.button Common.buttonStyle
+                                                    { label = E.text "ok", onPress = Just EditBlockOk }
                                                 ]
 
                                         else
@@ -3180,6 +3185,33 @@ update msg model =
             case model.blockEdit of
                 Just (Text t) ->
                     ( { model | blockEdit = Just <| Text { t | s = s } }, None )
+
+                Nothing ->
+                    ( model, None )
+
+        EditBlockOk ->
+            case model.blockEdit of
+                Just (Text t) ->
+                    let
+                        nb =
+                            model.edMarkdown
+                                |> EM.getBlocks
+                                |> Result.andThen
+                                    (Markdown.Renderer.render EM.stringRenderer)
+                                |> Result.map
+                                    (List.indexedMap
+                                        (\i b ->
+                                            if i == t.idx then
+                                                t.s
+
+                                            else
+                                                b
+                                        )
+                                    )
+                                |> Result.map String.concat
+                                |> Result.withDefault (EM.getMd model.edMarkdown)
+                    in
+                    ( { model | edMarkdown = EM.updateMd nb, blockEdit = Nothing }, None )
 
                 Nothing ->
                     ( model, None )
