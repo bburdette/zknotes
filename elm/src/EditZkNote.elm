@@ -69,6 +69,7 @@ import Markdown.Block exposing (Block, ListItem(..), Task(..))
 import Markdown.Renderer
 import Maybe.Extra as ME
 import MdCommon as MC
+import MdGui as MG
 import NoteCache as NC exposing (NoteCache)
 import Orgauth.Data exposing (UserId(..))
 import RequestsDialog exposing (TRequests)
@@ -1200,6 +1201,11 @@ renderBlocks zone fui cd noteCache vm mdw mbblockedit mbinfo blocks =
                                                     }
                                                 , EI.button Common.buttonStyle
                                                     { label = E.text "ok", onPress = Just EditBlockOk }
+                                                , E.column []
+                                                    (List.map
+                                                        (\block -> E.map (always Noop) (MG.guiBlock block))
+                                                        blocks
+                                                    )
                                                 ]
 
                                         else
