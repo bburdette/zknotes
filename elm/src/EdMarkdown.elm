@@ -93,7 +93,7 @@ stringRenderer =
     , blockQuote =
         \strs ->
             strs
-                |> List.map (\s -> "  " ++ s ++ "\n")
+                |> List.map (\s -> "> " ++ s ++ "\n")
                 |> String.concat
     , strong =
         \s ->

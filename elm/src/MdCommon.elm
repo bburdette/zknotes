@@ -239,6 +239,7 @@ mkRenderer args =
                 , E.padding 10
                 , EBd.color (E.rgb255 145 145 145)
                 , EBk.color (E.rgb255 245 245 245)
+                , E.width <| E.fill
                 ]
                 children
     , unorderedList =
