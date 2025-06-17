@@ -320,8 +320,7 @@ editBlock ddw i e =
             blockId i
 
         baseAttr =
-            [ EBd.width 1
-            , E.width E.fill
+            [ E.width E.fill
             , E.height E.fill
             , E.padding 3
             , E.spacing 2
