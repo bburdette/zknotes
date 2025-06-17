@@ -137,6 +137,7 @@ type Msg
     | EditBlock Int
     | EditBlockInput String
     | EditBlockOk
+    | NewBlock
     | Noop
 
 
@@ -1662,6 +1663,10 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                     [ E.row [ E.width E.fill, E.spacing 8 ]
                         [ E.paragraph [ EF.bold ] [ E.text model.title ]
                         , EI.button Common.buttonStyle
+                            { onPress = Just NewBlock
+                            , label = E.text "+"
+                            }
+                        , EI.button Common.buttonStyle
                             { onPress = Just ViewPress
                             , label = ZC.fullScreen
                             }
@@ -1910,8 +1915,8 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                     , E.alignTop
                     , E.spacing 8
                     ]
-                    [ headingPanel "edit" [ E.width E.fill ] (editview TC.white)
-                    , headingPanel "view" [ E.width E.fill ] (mdview TC.white)
+                    [ headingPanel "raw" [ E.width E.fill ] (editview TC.white)
+                    , headingPanel "eview" [ E.width E.fill ] (mdview TC.white)
                     , searchOrRecentPanel
                     ]
 
@@ -1940,13 +1945,13 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                                     EtView
                             )
                             TabChanged
-                            [ ( EtView, "view" )
+                            [ ( EtView, "eview" )
                             , ( EtEdit
                               , if editable then
-                                    "edit"
+                                    "raw"
 
                                 else
-                                    "markdown"
+                                    "raw"
                               )
                             ]
                         , case model.editOrView of
@@ -1964,13 +1969,13 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                     [ Common.navbar 2
                         model.tab
                         TabChanged
-                        [ ( EtView, "view" )
+                        [ ( EtView, "eview" )
                         , ( EtEdit
                           , if editable then
-                                "edit"
+                                "raw"
 
                             else
-                                "markdown"
+                                "raw"
                           )
                         , ( EtSearch, "search" )
                         , ( EtRecent, "recent" )
@@ -3213,6 +3218,26 @@ update msg model =
                     ( { model | edMarkdown = EM.updateMd nb, blockEdit = Nothing }, None )
 
                 Nothing ->
+                    ( model, None )
+
+        NewBlock ->
+            case
+                EM.getBlocks model.edMarkdown
+                    |> Result.andThen
+                        (\blks ->
+                            EM.updateBlocks (blks ++ [ Markdown.Block.Paragraph [ Markdown.Block.Text "" ] ])
+                                |> Result.map (\em -> ( List.length blks, em ))
+                        )
+            of
+                Ok ( c, em ) ->
+                    ( { model
+                        | edMarkdown = em
+                        , blockEdit = Just <| Text { idx = c, s = "" }
+                      }
+                    , None
+                    )
+
+                Err _ ->
                     ( model, None )
 
         Noop ->
