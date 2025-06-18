@@ -90,6 +90,7 @@ type Msg
     | AudioText String
     | NoteSrc String
     | NoteText String
+    | NoteShowTitle Bool
     | NoteShowContents Bool
     | NoteShowText Bool
     | NoteShowFile Bool
@@ -336,6 +337,9 @@ updateHtmlElement msg tag attribs =
                 NoteText s ->
                     HtmlElement tag (updateAttrib "text" (Just s) attribs) []
 
+                NoteShowTitle b ->
+                    HtmlElement tag (updateShowAttrib "title" b attribs) []
+
                 NoteShowContents b ->
                     HtmlElement tag (updateShowAttrib "contents" b attribs) []
 
@@ -580,6 +584,12 @@ guiHtmlElement tag attribs =
                             }
                         , E.column [ EBd.width 1, E.padding 8, E.spacing 3 ]
                             [ E.el [ EF.bold ] <| E.text "show"
+                            , EI.checkbox []
+                                { onChange = NoteShowTitle
+                                , icon = EI.defaultCheckbox
+                                , checked = ns.title
+                                , label = EI.labelRight [] (E.text "title")
+                                }
                             , EI.checkbox []
                                 { onChange = NoteShowContents
                                 , icon = EI.defaultCheckbox
