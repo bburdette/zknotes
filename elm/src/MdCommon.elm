@@ -21,6 +21,7 @@ module MdCommon exposing
     , noteFile
     , noteIds
     , panelView
+    , parseNoteShow
     , rawTextToId
     , searchView
     , showRunState
