@@ -358,7 +358,7 @@ textHtml =
                 )
     , videoView =
         \src text width height _ ->
-            htmlTextTag "image"
+            htmlTextTag "video"
                 ([ Just ( "src", src )
                  , Maybe.map (\s -> ( "text", s )) text
                  , Maybe.map (\s -> ( "height", s )) height

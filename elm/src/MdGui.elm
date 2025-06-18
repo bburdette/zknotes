@@ -87,7 +87,6 @@ type Msg
     | AudioSrc String
     | AudioText String
     | NoteSrc String
-    | NoteShow String
     | NoteText String
     | NoteShowContents Bool
     | NoteShowText Bool

@@ -1175,7 +1175,7 @@ renderBlocks zone fui cd noteCache vm mdw mbblockedit mbinfo blocks =
                 , EBk.color TC.lightGrey
                 ]
                 (List.indexedMap
-                    (\i b ->
+                    (\i ( b, r ) ->
                         let
                             eb =
                                 case mbblockedit of
@@ -1201,18 +1201,14 @@ renderBlocks zone fui cd noteCache vm mdw mbblockedit mbinfo blocks =
                                                     }
                                                 , EI.button Common.buttonStyle
                                                     { label = E.text "ok", onPress = Just EditBlockOk }
-                                                , E.column []
-                                                    (List.map
-                                                        (\block -> E.map (always Noop) (MG.guiBlock block))
-                                                        blocks
-                                                    )
+                                                , E.map (always Noop) <| MG.guiBlock b
                                                 ]
 
                                         else
-                                            b
+                                            r
 
                                     Nothing ->
-                                        b
+                                        r
                         in
                         editBlock
                             (case mbinfo of
@@ -1232,7 +1228,7 @@ renderBlocks zone fui cd noteCache vm mdw mbblockedit mbinfo blocks =
                             i
                             eb
                     )
-                    rendered
+                    (List.map2 (\l r -> ( l, r )) blocks rendered)
                 )
 
         Err errors ->
