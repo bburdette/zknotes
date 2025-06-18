@@ -1,11 +1,13 @@
-module MdGui exposing (guiBlock)
+module MdGui exposing (Msg, guiBlock, updateBlock)
 
+import Either
 import Element as E
 import Element.Border as EBd
 import Element.Font as EF
 import Element.Input as EI
 import Markdown.Block as MB exposing (..)
 import MdCommon as MC
+import Set
 import Toop
 
 
@@ -141,6 +143,254 @@ guiBlock block =
             E.text "----------------------"
 
 
+updateBlock : Msg -> MB.Block -> List MB.Block
+updateBlock msg block =
+    case block of
+        CodeBlock cb ->
+            case msg of
+                CbLanguage s ->
+                    [ CodeBlock
+                        { cb
+                            | language =
+                                if s == "" then
+                                    Nothing
+
+                                else
+                                    Just s
+                        }
+                    ]
+
+                CbBody s ->
+                    [ CodeBlock { cb | body = s } ]
+
+                _ ->
+                    [ block ]
+
+        HtmlBlock htmlBlock ->
+            updateHtml msg htmlBlock
+                |> HtmlBlock
+                |> List.singleton
+
+        _ ->
+            [ block ]
+
+
+updateHtml : Msg -> Html a -> Html a
+updateHtml msg block =
+    case block of
+        HtmlElement tag attribs _ ->
+            updateHtmlElement msg tag attribs
+
+        HtmlComment _ ->
+            block
+
+        ProcessingInstruction _ ->
+            block
+
+        HtmlDeclaration _ _ ->
+            block
+
+        Cdata _ ->
+            block
+
+
+updateAttrib : String -> Maybe String -> List HtmlAttribute -> List HtmlAttribute
+updateAttrib name mbvalue attribs =
+    case mbvalue of
+        Nothing ->
+            List.filter (\l -> l.name == name) attribs
+
+        Just v ->
+            attribs
+                |> List.foldr
+                    (\a l ->
+                        case l of
+                            Either.Left found ->
+                                Either.Left (a :: found)
+
+                            Either.Right notfound ->
+                                if a.name == name then
+                                    Either.Left ({ a | value = v } :: notfound)
+
+                                else
+                                    Either.Right (a :: notfound)
+                    )
+                    (Either.Right [])
+                |> (\r ->
+                        case r of
+                            Either.Left list ->
+                                list
+
+                            Either.Right list ->
+                                { name = name, value = v } :: list
+                   )
+
+
+updateHtmlElement : Msg -> String -> List HtmlAttribute -> Html a
+updateHtmlElement msg tag attribs =
+    case tag of
+        "cell" ->
+            case msg of
+                CellName s ->
+                    HtmlElement tag (updateAttrib "name" (Just s) attribs) []
+
+                CellScript s ->
+                    HtmlElement tag (updateAttrib "script" (Just s) attribs) []
+
+                _ ->
+                    HtmlElement tag attribs []
+
+        "search" ->
+            case msg of
+                SearchText s ->
+                    HtmlElement tag (updateAttrib "search" (Just s) attribs) []
+
+                _ ->
+                    HtmlElement tag attribs []
+
+        "panel" ->
+            case msg of
+                NoteIdText s ->
+                    HtmlElement tag (updateAttrib "noteid" (Just s) attribs) []
+
+                _ ->
+                    HtmlElement tag attribs []
+
+        "image" ->
+            case msg of
+                ImageText s ->
+                    HtmlElement tag (updateAttrib "text" (Just s) attribs) []
+
+                ImageUrl s ->
+                    HtmlElement tag (updateAttrib "url" (Just s) attribs) []
+
+                ImageWidth s ->
+                    HtmlElement tag
+                        (updateAttrib "width"
+                            (if s == "" then
+                                Nothing
+
+                             else
+                                Just s
+                            )
+                            attribs
+                        )
+                        []
+
+                _ ->
+                    HtmlElement tag attribs []
+
+        "video" ->
+            case msg of
+                VideoText s ->
+                    HtmlElement tag (updateAttrib "text" (Just s) attribs) []
+
+                VideoSrc s ->
+                    HtmlElement tag (updateAttrib "src" (Just s) attribs) []
+
+                VideoWidth s ->
+                    HtmlElement tag
+                        (updateAttrib "width"
+                            (if s == "" then
+                                Nothing
+
+                             else
+                                Just s
+                            )
+                            attribs
+                        )
+                        []
+
+                VideoHeight s ->
+                    HtmlElement tag
+                        (updateAttrib "height"
+                            (if s == "" then
+                                Nothing
+
+                             else
+                                Just s
+                            )
+                            attribs
+                        )
+                        []
+
+                _ ->
+                    HtmlElement tag attribs []
+
+        "audio" ->
+            case msg of
+                AudioText s ->
+                    HtmlElement tag (updateAttrib "text" (Just s) attribs) []
+
+                AudioSrc s ->
+                    HtmlElement tag (updateAttrib "src" (Just s) attribs) []
+
+                _ ->
+                    HtmlElement tag attribs []
+
+        "note" ->
+            case msg of
+                NoteIdText s ->
+                    HtmlElement tag (updateAttrib "id" (Just s) attribs) []
+
+                NoteText s ->
+                    HtmlElement tag (updateAttrib "text" (Just s) attribs) []
+
+                NoteShowContents b ->
+                    HtmlElement tag (updateShowAttrib "contents" b attribs) []
+
+                NoteShowText b ->
+                    HtmlElement tag (updateShowAttrib "text" b attribs) []
+
+                NoteShowFile b ->
+                    HtmlElement tag (updateShowAttrib "file" b attribs) []
+
+                NoteShowCreatedate b ->
+                    HtmlElement tag (updateShowAttrib "createdate" b attribs) []
+
+                NoteShowChangedate b ->
+                    HtmlElement tag (updateShowAttrib "changedate" b attribs) []
+
+                NoteShowLink b ->
+                    HtmlElement tag (updateShowAttrib "link" b attribs) []
+
+                _ ->
+                    HtmlElement tag attribs []
+
+        _ ->
+            HtmlElement tag attribs []
+
+
+updateShowAttrib : String -> Bool -> List HtmlAttribute -> List HtmlAttribute
+updateShowAttrib which on attribs =
+    case findAttrib "show" attribs of
+        Just s ->
+            (if on then
+                s
+                    |> String.words
+                    |> Set.fromList
+                    |> Set.insert which
+                    |> Set.toList
+                    |> List.intersperse " "
+                    |> String.concat
+
+             else
+                s
+                    |> String.words
+                    |> List.filter (\w -> w /= which)
+                    |> List.intersperse " "
+                    |> String.concat
+            )
+                |> (\a -> updateAttrib "show" (Just a) attribs)
+
+        Nothing ->
+            if on then
+                updateAttrib "show" (Just which) attribs
+
+            else
+                attribs
+
+
 guiHtml : Html Block -> E.Element Msg
 guiHtml block =
     case block of
@@ -158,33 +408,6 @@ guiHtml block =
 
         Cdata _ ->
             E.none
-
-
-
--- [ Markdown.Html.tag "cell" hf.schelmeView
---     |> Markdown.Html.withAttribute "name"
---     |> Markdown.Html.withAttribute "schelmecode"
--- , Markdown.Html.tag "search" hf.searchView
---     |> Markdown.Html.withAttribute "query"
--- , Markdown.Html.tag "panel" hf.panelView
---     |> Markdown.Html.withAttribute "noteid"
--- , Markdown.Html.tag "image" hf.imageView
---     |> Markdown.Html.withAttribute "text"
---     |> Markdown.Html.withAttribute "url"
---     |> Markdown.Html.withOptionalAttribute "width"
--- , Markdown.Html.tag "video" hf.videoView
---     |> Markdown.Html.withAttribute "src"
---     |> Markdown.Html.withOptionalAttribute "text"
---     |> Markdown.Html.withOptionalAttribute "width"
---     |> Markdown.Html.withOptionalAttribute "height"
--- , Markdown.Html.tag "audio" hf.audioView
---     |> Markdown.Html.withAttribute "text"
---     |> Markdown.Html.withAttribute "src"
--- , Markdown.Html.tag "note" hf.noteView
---     |> Markdown.Html.withAttribute "id"
---     |> Markdown.Html.withOptionalAttribute "show"
---     |> Markdown.Html.withOptionalAttribute "text"
--- ]
 
 
 findAttrib : String -> List HtmlAttribute -> Maybe String
@@ -258,7 +481,7 @@ guiHtmlElement tag attribs =
                             { onChange = ImageText
                             , text = name
                             , placeholder = Nothing
-                            , label = EI.labelLeft [] (E.text "name")
+                            , label = EI.labelLeft [] (E.text "text")
                             }
                         , EI.text []
                             { onChange = ImageUrl
@@ -270,7 +493,7 @@ guiHtmlElement tag attribs =
                             { onChange = ImageWidth
                             , text = mbwidth |> Maybe.withDefault ""
                             , placeholder = Nothing
-                            , label = EI.labelLeft [] (E.text "mbwidth")
+                            , label = EI.labelLeft [] (E.text "width")
                             }
                         ]
 

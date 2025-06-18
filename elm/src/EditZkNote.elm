@@ -139,6 +139,7 @@ type Msg
     | EditBlockInput String
     | EditBlockOk
     | NewBlock
+    | EditBlockMsg Int MG.Msg
     | Noop
 
 
@@ -1201,7 +1202,7 @@ renderBlocks zone fui cd noteCache vm mdw mbblockedit mbinfo blocks =
                                                     }
                                                 , EI.button Common.buttonStyle
                                                     { label = E.text "ok", onPress = Just EditBlockOk }
-                                                , E.map (always Noop) <| MG.guiBlock b
+                                                , E.map (EditBlockMsg i) <| MG.guiBlock b
                                                 ]
 
                                         else
@@ -3238,6 +3239,33 @@ update msg model =
                       }
                     , None
                     )
+
+                Err _ ->
+                    ( model, None )
+
+        EditBlockMsg idx ebmsg ->
+            case EM.getBlocks model.edMarkdown of
+                Ok blocks ->
+                    let
+                        nbs : List Block
+                        nbs =
+                            blocks
+                                |> List.indexedMap
+                                    (\i b ->
+                                        if i == idx then
+                                            MG.updateBlock ebmsg b
+
+                                        else
+                                            [ b ]
+                                    )
+                                |> List.concat
+                    in
+                    case EM.updateBlocks nbs of
+                        Ok em ->
+                            ( { model | edMarkdown = em }, None )
+
+                        Err _ ->
+                            ( model, None )
 
                 Err _ ->
                     ( model, None )
