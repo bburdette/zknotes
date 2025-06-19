@@ -65,7 +65,8 @@ import Element.Input as EI
 import Html.Attributes
 import JobsDialog exposing (TJobs)
 import Json.Decode as JD
-import Markdown.Block exposing (Block, ListItem(..), Task(..))
+import Markdown.Block exposing (Block(..), ListItem(..), Task(..))
+import Markdown.Parser
 import Markdown.Renderer
 import Maybe.Extra as ME
 import MdCommon as MC
@@ -139,7 +140,7 @@ type Msg
     | EditBlockInput String
     | EditBlockOk
     | NewBlock
-    | EditBlockMsg Int MG.Msg
+    | EditBlockMsg MG.Msg
     | Noop
 
 
@@ -205,7 +206,7 @@ type alias Model =
 
 
 type BlockEdit
-    = Text { idx : Int, s : String }
+    = Text { idx : Int, s : String, b : Block }
 
 
 type Command
@@ -1202,7 +1203,7 @@ renderBlocks zone fui cd noteCache vm mdw mbblockedit mbinfo blocks =
                                                     }
                                                 , EI.button Common.buttonStyle
                                                     { label = E.text "ok", onPress = Just EditBlockOk }
-                                                , E.map (EditBlockMsg i) <| MG.guiBlock b
+                                                , E.map EditBlockMsg <| MG.guiBlock t.b
                                                 ]
 
                                         else
@@ -3165,7 +3166,7 @@ update msg model =
                                 Markdown.Renderer.render EM.stringRenderer [ b ]
                                     |> Result.map
                                         (\sl ->
-                                            Text { idx = bi, s = String.concat sl }
+                                            Text { idx = bi, s = String.concat sl, b = b }
                                         )
                                     |> Result.toMaybe
 
@@ -3191,7 +3192,15 @@ update msg model =
         EditBlockInput s ->
             case model.blockEdit of
                 Just (Text t) ->
-                    ( { model | blockEdit = Just <| Text { t | s = s } }, None )
+                    let
+                        b =
+                            s
+                                |> Markdown.Parser.parse
+                                |> Result.toMaybe
+                                |> Maybe.andThen (\r -> List.head r)
+                                |> Maybe.withDefault (Paragraph [])
+                    in
+                    ( { model | blockEdit = Just <| Text { t | s = s, b = b } }, None )
 
                 Nothing ->
                     ( model, None )
@@ -3235,7 +3244,7 @@ update msg model =
                 Ok ( c, em ) ->
                     ( { model
                         | edMarkdown = em
-                        , blockEdit = Just <| Text { idx = c, s = "" }
+                        , blockEdit = Just <| Text { idx = c, s = "", b = Paragraph [] }
                       }
                     , None
                     )
@@ -3243,31 +3252,26 @@ update msg model =
                 Err _ ->
                     ( model, None )
 
-        EditBlockMsg idx ebmsg ->
-            case EM.getBlocks model.edMarkdown of
-                Ok blocks ->
-                    let
-                        nbs : List Block
-                        nbs =
-                            blocks
-                                |> List.indexedMap
-                                    (\i b ->
-                                        if i == idx then
-                                            MG.updateBlock ebmsg b
+        EditBlockMsg ebmsg ->
+            case model.blockEdit of
+                Just (Text t) ->
+                    case MG.updateBlock ebmsg t.b of
+                        [ b ] ->
+                            let
+                                nbe =
+                                    Markdown.Renderer.render EM.stringRenderer [ b ]
+                                        |> Result.map
+                                            (\sl ->
+                                                Text { idx = t.idx, s = String.concat sl, b = b }
+                                            )
+                                        |> Result.toMaybe
+                            in
+                            ( { model | blockEdit = nbe }, None )
 
-                                        else
-                                            [ b ]
-                                    )
-                                |> List.concat
-                    in
-                    case EM.updateBlocks nbs of
-                        Ok em ->
-                            ( { model | edMarkdown = em }, None )
-
-                        Err _ ->
+                        _ ->
                             ( model, None )
 
-                Err _ ->
+                Nothing ->
                     ( model, None )
 
         Noop ->
