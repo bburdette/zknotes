@@ -317,19 +317,25 @@ dragHandleWidth =
     20
 
 
-editBlock : DragDropWhat -> Int -> Element Msg -> Element Msg
-editBlock ddw i e =
+editBlock : DragDropWhat -> Int -> Bool -> Element Msg -> Element Msg
+editBlock ddw i focus e =
     let
         bid =
             blockId i
 
         baseAttr =
-            [ E.width E.fill
-            , E.height E.fill
-            , E.padding 3
-            , E.spacing 2
-            , E.htmlAttribute (Html.Attributes.id bid)
-            ]
+            (if focus then
+                [ EBd.width 5 ]
+
+             else
+                []
+            )
+                ++ [ E.width E.fill
+                   , E.height E.fill
+                   , E.padding 3
+                   , E.spacing 2
+                   , E.htmlAttribute (Html.Attributes.id bid)
+                   ]
 
         dragHandleAttrs =
             [ E.width (E.px dragHandleWidth), E.height E.fill, EBk.color TC.charcoal, E.alignBottom ]
@@ -409,7 +415,7 @@ viewBlock ma ddw i focusid b =
                 , EBd.color TC.darkGrey
                 , EBk.color TC.lightGrey
                 ]
-                (List.map (editBlock ddw i) rendered)
+                (List.map (editBlock ddw i (Just i == focusid)) rendered)
 
         Err errors ->
             E.text errors
@@ -1159,6 +1165,10 @@ renderBlocks zone fui cd noteCache vm mdw mbblockedit mbinfo blocks =
                 , onchanged = OnSchelmeCodeChanged
                 , noteCache = noteCache
                 }
+
+        headingText : String -> Element Msg
+        headingText hs =
+            E.el [ EF.bold ] (E.text hs)
     in
     case
         Markdown.Renderer.render
@@ -1179,38 +1189,41 @@ renderBlocks zone fui cd noteCache vm mdw mbblockedit mbinfo blocks =
                 (List.indexedMap
                     (\i ( b, r ) ->
                         let
-                            eb =
+                            mbeb =
                                 case mbblockedit of
                                     Just (Text t) ->
                                         if t.idx == i then
-                                            E.column
-                                                [ E.width E.fill
-                                                ]
-                                                [ case MC.markdownView renderer t.s of
-                                                    Ok elts ->
-                                                        E.column [ E.width E.fill ] elts
-
-                                                    Err e ->
-                                                        E.text e
-                                                , EI.multiline
-                                                    [ E.alignTop
+                                            Just <|
+                                                E.column
+                                                    [ E.width E.fill
                                                     ]
-                                                    { onChange = EditBlockInput
-                                                    , text = t.s
-                                                    , placeholder = Nothing
-                                                    , label = EI.labelHidden "markdown input"
-                                                    , spellcheck = False
-                                                    }
-                                                , EI.button Common.buttonStyle
-                                                    { label = E.text "ok", onPress = Just EditBlockOk }
-                                                , E.map EditBlockMsg <| MG.guiBlock t.b
-                                                ]
+                                                    [ headingText "rendered: "
+                                                    , case MC.markdownView renderer t.s of
+                                                        Ok elts ->
+                                                            E.column [ E.width E.fill ] elts
+
+                                                        Err e ->
+                                                            E.text e
+                                                    , EI.multiline
+                                                        [ E.alignTop
+                                                        ]
+                                                        { onChange = EditBlockInput
+                                                        , text = t.s
+                                                        , placeholder = Nothing
+                                                        , label = EI.labelAbove [] (headingText "markdown edit")
+                                                        , spellcheck = False
+                                                        }
+                                                    , headingText "GUI edit: "
+                                                    , E.map EditBlockMsg <| MG.guiBlock t.b
+                                                    , EI.button Common.buttonStyle
+                                                        { label = E.text "ok", onPress = Just EditBlockOk }
+                                                    ]
 
                                         else
-                                            r
+                                            Nothing
 
                                     Nothing ->
-                                        r
+                                        Nothing
                         in
                         editBlock
                             (case mbinfo of
@@ -1228,7 +1241,8 @@ renderBlocks zone fui cd noteCache vm mdw mbblockedit mbinfo blocks =
                                         Drop
                             )
                             i
-                            eb
+                            (mbeb |> Maybe.map (always True) |> Maybe.withDefault False)
+                            (mbeb |> Maybe.withDefault r)
                     )
                     (List.map2 (\l r -> ( l, r )) blocks rendered)
                 )
