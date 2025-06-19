@@ -320,11 +320,11 @@ updateHtmlElement msg tag attribs =
 
         "audio" ->
             case msg of
-                AudioText s ->
-                    HtmlElement tag (updateAttrib "text" (Just s) attribs) []
-
                 AudioSrc s ->
                     HtmlElement tag (updateAttrib "src" (Just s) attribs) []
+
+                AudioText s ->
+                    HtmlElement tag (updateAttrib "text" (Just s) attribs) []
 
                 _ ->
                     HtmlElement tag attribs []

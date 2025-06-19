@@ -367,7 +367,7 @@ textHtml =
                     |> List.filterMap identity
                 )
     , audioView =
-        \src text _ ->
+        \text src _ ->
             htmlTextTag "audio"
                 [ ( "src", src )
                 , ( "text", text )
