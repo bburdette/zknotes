@@ -105,6 +105,14 @@ type Msg
     | TextStr String
 
 
+rowtrib =
+    [ E.spacing 3, E.width E.fill ]
+
+
+coltrib =
+    [ E.spacing 3, E.width E.fill ]
+
+
 guiBlock : MB.Block -> E.Element Msg
 guiBlock block =
     case block of
@@ -133,16 +141,23 @@ guiBlock block =
                     blockLists
 
         BlockQuote blocks ->
-            E.column [] <|
-                List.indexedMap (\i b -> E.map (ListItemMsg i) (guiBlock b)) blocks
+            E.row rowtrib
+                [ E.el [ E.alignTop ] <| E.text "blockquote"
+                , E.column coltrib <|
+                    List.indexedMap (\i b -> E.map (ListItemMsg i) (guiBlock b)) blocks
+                ]
 
         Heading headingLevel inlines ->
-            E.column [] <|
-                List.indexedMap (\i inline -> E.map (ListItemMsg i) (guiInline inline)) inlines
+            E.row rowtrib
+                [ E.el [ E.alignTop ] <| E.text "heading"
+                , E.column coltrib <| List.indexedMap (\i inline -> E.map (ListItemMsg i) (guiInline inline)) inlines
+                ]
 
         Paragraph inlines ->
-            E.column [] <|
-                List.indexedMap (\i inline -> E.map (ListItemMsg i) (guiInline inline)) inlines
+            E.row rowtrib
+                [ E.el [ E.alignTop ] <| E.text "paragraph"
+                , E.column coltrib <| List.indexedMap (\i inline -> E.map (ListItemMsg i) (guiInline inline)) inlines
+                ]
 
         Table headings inlines ->
             E.none
@@ -179,47 +194,62 @@ guiInline inline =
                 _ =
                     Debug.log "link" ( url, mbtitle, inlines )
             in
-            E.column []
-                [ EI.text []
-                    { onChange = LinkUrl
-                    , text = url
-                    , placeholder = Nothing
-                    , label = EI.labelLeft [] (E.text "url")
-                    }
-                , EI.text []
-                    { onChange = LinkTitle
-                    , text = mbtitle |> Maybe.withDefault ""
-                    , placeholder = Nothing
-                    , label = EI.labelLeft [] (E.text "link title")
-                    }
-                , E.column [] <| List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines
+            E.row rowtrib
+                [ E.el [ E.alignTop ] <| E.text "link"
+                , E.column coltrib <|
+                    [ EI.text []
+                        { onChange = LinkUrl
+                        , text = url
+                        , placeholder = Nothing
+                        , label = EI.labelLeft [] (E.text "url")
+                        }
+                    , EI.text []
+                        { onChange = LinkTitle
+                        , text = mbtitle |> Maybe.withDefault ""
+                        , placeholder = Nothing
+                        , label = EI.labelLeft [] (E.text "title")
+                        }
+                    , E.column [] <| List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines
+                    ]
                 ]
 
         Image src mbtitle inlines ->
-            E.column []
-                [ EI.text []
-                    { onChange = ImageUrl
-                    , text = src
-                    , placeholder = Nothing
-                    , label = EI.labelLeft [] (E.text "url")
-                    }
-                , EI.text []
-                    { onChange = ImageTitle
-                    , text = mbtitle |> Maybe.withDefault ""
-                    , placeholder = Nothing
-                    , label = EI.labelLeft [] (E.text "title")
-                    }
-                , E.column [] <| List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines
+            E.row rowtrib
+                [ E.el [ E.alignTop ] <| E.text "image"
+                , E.column coltrib <|
+                    [ EI.text []
+                        { onChange = ImageUrl
+                        , text = src
+                        , placeholder = Nothing
+                        , label = EI.labelLeft [] (E.text "url")
+                        }
+                    , EI.text []
+                        { onChange = ImageTitle
+                        , text = mbtitle |> Maybe.withDefault ""
+                        , placeholder = Nothing
+                        , label = EI.labelLeft [] (E.text "title")
+                        }
+                    , E.column [] <| List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines
+                    ]
                 ]
 
         Emphasis inlines ->
-            E.column [] (List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines)
+            E.row rowtrib
+                [ E.el [ E.alignTop ] <| E.text "emphasis"
+                , E.column [] (List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines)
+                ]
 
         Strong inlines ->
-            E.column [] (List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines)
+            E.row rowtrib
+                [ E.el [ E.alignTop ] <| E.text "strong"
+                , E.column [] (List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines)
+                ]
 
         Strikethrough inlines ->
-            E.column [] (List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines)
+            E.row rowtrib
+                [ E.el [ E.alignTop ] <| E.text "strikethrough"
+                , E.column [] (List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines)
+                ]
 
         CodeSpan s ->
             EI.text []
@@ -352,7 +382,7 @@ updateInline msg inline =
         Strong inlines ->
             case msg of
                 ListItemMsg idx lim ->
-                    [ Emphasis <| updateListInline idx lim inlines ]
+                    [ Strong <| updateListInline idx lim inlines ]
 
                 _ ->
                     [ inline ]
@@ -360,7 +390,7 @@ updateInline msg inline =
         Strikethrough inlines ->
             case msg of
                 ListItemMsg idx lim ->
-                    [ Emphasis <| updateListInline idx lim inlines ]
+                    [ Strikethrough <| updateListInline idx lim inlines ]
 
                 _ ->
                     [ inline ]
@@ -858,64 +888,67 @@ guiHtmlElement tag attribs =
                                     , link = False
                                     }
                     in
-                    E.column []
-                        [ EI.text []
-                            { onChange = NoteSrc
-                            , text = noteid
-                            , placeholder = Nothing
-                            , label = EI.labelLeft [] (E.text "noteid")
-                            }
-                        , E.column [ EBd.width 1, E.padding 8, E.spacing 3 ]
-                            [ E.el [ EF.bold ] <| E.text "show"
-                            , EI.checkbox []
-                                { onChange = NoteShowTitle
-                                , icon = EI.defaultCheckbox
-                                , checked = ns.title
-                                , label = EI.labelRight [] (E.text "title")
+                    E.row rowtrib
+                        [ E.el [ E.alignTop ] <| E.text "note"
+                        , E.column coltrib
+                            [ EI.text []
+                                { onChange = NoteSrc
+                                , text = noteid
+                                , placeholder = Nothing
+                                , label = EI.labelLeft [] (E.text "noteid")
                                 }
-                            , EI.checkbox []
-                                { onChange = NoteShowContents
-                                , icon = EI.defaultCheckbox
-                                , checked = ns.contents
-                                , label = EI.labelRight [] (E.text "contents")
-                                }
-                            , EI.checkbox []
-                                { onChange = NoteShowText
-                                , icon = EI.defaultCheckbox
-                                , checked = ns.text
-                                , label = EI.labelRight [] (E.text "text")
-                                }
-                            , EI.checkbox []
-                                { onChange = NoteShowFile
-                                , icon = EI.defaultCheckbox
-                                , checked = ns.file
-                                , label = EI.labelRight [] (E.text "file")
-                                }
-                            , EI.checkbox []
-                                { onChange = NoteShowCreatedate
-                                , icon = EI.defaultCheckbox
-                                , checked = ns.createdate
-                                , label = EI.labelRight [] (E.text "createdate")
-                                }
-                            , EI.checkbox []
-                                { onChange = NoteShowChangedate
-                                , icon = EI.defaultCheckbox
-                                , checked = ns.changedate
-                                , label = EI.labelRight [] (E.text "changedate")
-                                }
-                            , EI.checkbox []
-                                { onChange = NoteShowLink
-                                , icon = EI.defaultCheckbox
-                                , checked = ns.link
-                                , label = EI.labelRight [] (E.text "link")
+                            , E.column [ EBd.width 1, E.padding 8, E.spacing 3 ]
+                                [ E.el [ EF.bold ] <| E.text "show"
+                                , EI.checkbox []
+                                    { onChange = NoteShowTitle
+                                    , icon = EI.defaultCheckbox
+                                    , checked = ns.title
+                                    , label = EI.labelRight [] (E.text "title")
+                                    }
+                                , EI.checkbox []
+                                    { onChange = NoteShowContents
+                                    , icon = EI.defaultCheckbox
+                                    , checked = ns.contents
+                                    , label = EI.labelRight [] (E.text "contents")
+                                    }
+                                , EI.checkbox []
+                                    { onChange = NoteShowText
+                                    , icon = EI.defaultCheckbox
+                                    , checked = ns.text
+                                    , label = EI.labelRight [] (E.text "text")
+                                    }
+                                , EI.checkbox []
+                                    { onChange = NoteShowFile
+                                    , icon = EI.defaultCheckbox
+                                    , checked = ns.file
+                                    , label = EI.labelRight [] (E.text "file")
+                                    }
+                                , EI.checkbox []
+                                    { onChange = NoteShowCreatedate
+                                    , icon = EI.defaultCheckbox
+                                    , checked = ns.createdate
+                                    , label = EI.labelRight [] (E.text "createdate")
+                                    }
+                                , EI.checkbox []
+                                    { onChange = NoteShowChangedate
+                                    , icon = EI.defaultCheckbox
+                                    , checked = ns.changedate
+                                    , label = EI.labelRight [] (E.text "changedate")
+                                    }
+                                , EI.checkbox []
+                                    { onChange = NoteShowLink
+                                    , icon = EI.defaultCheckbox
+                                    , checked = ns.link
+                                    , label = EI.labelRight [] (E.text "link")
+                                    }
+                                ]
+                            , EI.text []
+                                { onChange = NoteText
+                                , text = mbtext |> Maybe.withDefault ""
+                                , placeholder = Nothing
+                                , label = EI.labelLeft [] (E.text "text")
                                 }
                             ]
-                        , EI.text []
-                            { onChange = NoteText
-                            , text = mbtext |> Maybe.withDefault ""
-                            , placeholder = Nothing
-                            , label = EI.labelLeft [] (E.text "text")
-                            }
                         ]
 
                 _ ->

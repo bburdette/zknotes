@@ -1196,6 +1196,7 @@ renderBlocks zone fui cd noteCache vm mdw mbblockedit mbinfo blocks =
                                             Just <|
                                                 E.column
                                                     [ E.width E.fill
+                                                    , E.spacing 8
                                                     ]
                                                     [ headingText "rendered: "
                                                     , case MC.markdownView renderer t.s of
