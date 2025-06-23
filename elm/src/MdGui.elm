@@ -97,6 +97,12 @@ type Msg
     | NoteShowCreatedate Bool
     | NoteShowChangedate Bool
     | NoteShowLink Bool
+    | ListItemMsg Int Msg
+    | LinkUrl String
+    | LinkTitle String
+    | ImageTitle String
+    | CodeSpanStr String
+    | TextStr String
 
 
 guiBlock : MB.Block -> E.Element Msg
@@ -106,19 +112,37 @@ guiBlock block =
             guiHtml htmlBlock
 
         UnorderedList listSpacing listItems ->
-            E.none
+            E.column [] <|
+                List.indexedMap
+                    (\i (ListItem t li) ->
+                        E.map (ListItemMsg i)
+                            (E.column [] <| List.indexedMap (\ii item -> E.map (ListItemMsg ii) (guiBlock item)) li)
+                    )
+                    listItems
 
+        -- E.none
         OrderedList listSpacing startIndex blockLists ->
-            E.none
+            E.column [] <|
+                List.indexedMap
+                    (\bli bl ->
+                        E.map (ListItemMsg bli)
+                            (List.indexedMap (\i b -> E.map (ListItemMsg i) (guiBlock b)) bl
+                                |> E.column []
+                            )
+                    )
+                    blockLists
 
         BlockQuote blocks ->
-            E.none
+            E.column [] <|
+                List.indexedMap (\i b -> E.map (ListItemMsg i) (guiBlock b)) blocks
 
         Heading headingLevel inlines ->
-            E.none
+            E.column [] <|
+                List.indexedMap (\i inline -> E.map (ListItemMsg i) (guiInline inline)) inlines
 
         Paragraph inlines ->
-            E.none
+            E.column [] <|
+                List.indexedMap (\i inline -> E.map (ListItemMsg i) (guiInline inline)) inlines
 
         Table headings inlines ->
             E.none
@@ -142,6 +166,79 @@ guiBlock block =
 
         ThematicBreak ->
             E.text "----------------------"
+
+
+guiInline : MB.Inline -> E.Element Msg
+guiInline inline =
+    case inline of
+        HtmlInline block ->
+            guiHtml block
+
+        Link url mbtitle inlines ->
+            let
+                _ =
+                    Debug.log "link" ( url, mbtitle, inlines )
+            in
+            E.column []
+                [ EI.text []
+                    { onChange = LinkUrl
+                    , text = url
+                    , placeholder = Nothing
+                    , label = EI.labelLeft [] (E.text "url")
+                    }
+                , EI.text []
+                    { onChange = LinkTitle
+                    , text = mbtitle |> Maybe.withDefault ""
+                    , placeholder = Nothing
+                    , label = EI.labelLeft [] (E.text "link title")
+                    }
+                , E.column [] <| List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines
+                ]
+
+        Image src mbtitle inlines ->
+            E.column []
+                [ EI.text []
+                    { onChange = ImageUrl
+                    , text = src
+                    , placeholder = Nothing
+                    , label = EI.labelLeft [] (E.text "url")
+                    }
+                , EI.text []
+                    { onChange = ImageTitle
+                    , text = mbtitle |> Maybe.withDefault ""
+                    , placeholder = Nothing
+                    , label = EI.labelLeft [] (E.text "title")
+                    }
+                , E.column [] <| List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines
+                ]
+
+        Emphasis inlines ->
+            E.column [] (List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines)
+
+        Strong inlines ->
+            E.column [] (List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines)
+
+        Strikethrough inlines ->
+            E.column [] (List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines)
+
+        CodeSpan s ->
+            EI.text []
+                { onChange = CodeSpanStr
+                , text = s
+                , placeholder = Nothing
+                , label = EI.labelLeft [] (E.text "code")
+                }
+
+        Text s ->
+            EI.text []
+                { onChange = TextStr
+                , text = s
+                , placeholder = Nothing
+                , label = EI.labelLeft [] (E.text "text")
+                }
+
+        HardLineBreak ->
+            E.none
 
 
 updateBlock : Msg -> MB.Block -> List MB.Block
@@ -639,35 +736,4 @@ guiHtmlElement tag attribs =
                     E.none
 
         _ ->
-            E.none
-
-
-guiInline : MB.Inline -> E.Element Msg
-guiInline inline =
-    case inline of
-        HtmlInline block ->
-            guiHtml block
-
-        Link url mbtitle inlines ->
-            E.none
-
-        Image src mbtitle inlines ->
-            E.none
-
-        Emphasis inlines ->
-            E.none
-
-        Strong inlines ->
-            E.none
-
-        Strikethrough inlines ->
-            E.none
-
-        CodeSpan s ->
-            E.none
-
-        Text s ->
-            E.none
-
-        HardLineBreak ->
             E.none
