@@ -241,9 +241,200 @@ guiInline inline =
             E.none
 
 
+updateListItem : Int -> Msg -> List (ListItem Block) -> List (ListItem Block)
+updateListItem idx msg listitems =
+    case List.head (List.drop idx listitems) of
+        Just (ListItem task blocks) ->
+            case msg of
+                ListItemMsg bi bmsg ->
+                    List.take idx listitems
+                        ++ [ ListItem task <| updateListBlock bi bmsg blocks ]
+                        ++ List.drop (idx + 1) listitems
+
+                _ ->
+                    listitems
+
+        _ ->
+            listitems
+
+
+updateListBlock : Int -> Msg -> List Block -> List Block
+updateListBlock idx msg blocks =
+    case List.head (List.drop idx blocks) of
+        Just block ->
+            List.take idx blocks
+                ++ updateBlock msg block
+                ++ List.drop (idx + 1) blocks
+
+        Nothing ->
+            blocks
+
+
+updateListInline : Int -> Msg -> List Inline -> List Inline
+updateListInline idx msg inlines =
+    case List.head (List.drop idx inlines) of
+        Just inline ->
+            let
+                a =
+                    List.take
+                        idx
+                        inlines
+                        ++ updateInline msg inline
+                        ++ List.drop (idx + 1) inlines
+
+                _ =
+                    Debug.log "updatelistinline" ( idx, inlines, a )
+            in
+            a
+
+        Nothing ->
+            inlines
+
+
+updateInline : Msg -> MB.Inline -> List MB.Inline
+updateInline msg inline =
+    case inline of
+        HtmlInline block ->
+            [ HtmlInline <| updateHtml msg block ]
+
+        Link url mbtitle inlines ->
+            case msg of
+                LinkUrl s ->
+                    [ Link s mbtitle inlines ]
+
+                LinkTitle s ->
+                    [ Link url
+                        (if String.isEmpty s then
+                            Nothing
+
+                         else
+                            Just s
+                        )
+                        inlines
+                    ]
+
+                ListItemMsg idx lim ->
+                    [ Link url mbtitle <| updateListInline idx lim inlines ]
+
+                _ ->
+                    [ inline ]
+
+        Image src mbtitle inlines ->
+            case msg of
+                ImageUrl s ->
+                    [ Image s mbtitle inlines ]
+
+                ImageTitle s ->
+                    [ Image src
+                        (if String.isEmpty s then
+                            Nothing
+
+                         else
+                            Just s
+                        )
+                        inlines
+                    ]
+
+                ListItemMsg idx lim ->
+                    [ Image src mbtitle <| updateListInline idx lim inlines ]
+
+                _ ->
+                    [ inline ]
+
+        Emphasis inlines ->
+            case msg of
+                ListItemMsg idx lim ->
+                    [ Emphasis <| updateListInline idx lim inlines ]
+
+                _ ->
+                    [ inline ]
+
+        Strong inlines ->
+            case msg of
+                ListItemMsg idx lim ->
+                    [ Emphasis <| updateListInline idx lim inlines ]
+
+                _ ->
+                    [ inline ]
+
+        Strikethrough inlines ->
+            case msg of
+                ListItemMsg idx lim ->
+                    [ Emphasis <| updateListInline idx lim inlines ]
+
+                _ ->
+                    [ inline ]
+
+        CodeSpan s ->
+            case msg of
+                CodeSpanStr str ->
+                    [ CodeSpan str ]
+
+                _ ->
+                    [ inline ]
+
+        Text s ->
+            case msg of
+                TextStr str ->
+                    [ Text str ]
+
+                _ ->
+                    [ inline ]
+
+        HardLineBreak ->
+            [ inline ]
+
+
 updateBlock : Msg -> MB.Block -> List MB.Block
 updateBlock msg block =
     case block of
+        HtmlBlock htmlBlock ->
+            updateHtml msg htmlBlock
+                |> HtmlBlock
+                |> List.singleton
+
+        UnorderedList listSpacing listItems ->
+            case msg of
+                ListItemMsg i ulmsg ->
+                    [ UnorderedList listSpacing (updateListItem i ulmsg listItems) ]
+
+                _ ->
+                    [ block ]
+
+        OrderedList listSpacing startIndex blockLists ->
+            [ block ]
+
+        -- case msg of
+        --    ListItemMsg i ulmsg ->
+        --        [ UnorderedList listSpacing (updateListItem i ulmsg listItems)]
+        --    _ -> [block]
+        BlockQuote blocks ->
+            case msg of
+                ListItemMsg i ulmsg ->
+                    [ BlockQuote (updateListBlock i ulmsg blocks) ]
+
+                _ ->
+                    [ block ]
+
+        Heading headingLevel inlines ->
+            case msg of
+                ListItemMsg i hmsg ->
+                    [ Heading headingLevel (updateListInline i hmsg inlines) ]
+
+                _ ->
+                    [ block ]
+
+        Paragraph inlines ->
+            case msg of
+                ListItemMsg i hmsg ->
+                    [ Paragraph (updateListInline i hmsg inlines) ]
+
+                _ ->
+                    [ block ]
+
+        Table headings inlines ->
+            [ block ]
+
         CodeBlock cb ->
             case msg of
                 CbLanguage s ->
@@ -264,12 +455,7 @@ updateBlock msg block =
                 _ ->
                     [ block ]
 
-        HtmlBlock htmlBlock ->
-            updateHtml msg htmlBlock
-                |> HtmlBlock
-                |> List.singleton
-
-        _ ->
+        ThematicBreak ->
             [ block ]
 
 
