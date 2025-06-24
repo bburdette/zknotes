@@ -314,7 +314,7 @@ edButtonStyle =
 
 
 dragHandleWidth =
-    20
+    10
 
 
 editBlock : DragDropWhat -> Int -> Bool -> Element Msg -> Element Msg
@@ -338,7 +338,10 @@ editBlock ddw i focus e =
                    ]
 
         dragHandleAttrs =
-            [ E.width (E.px dragHandleWidth), E.height E.fill, EBk.color TC.charcoal, E.alignBottom ]
+            [ E.width (E.px dragHandleWidth), E.height E.fill, EBk.color TC.gray, E.alignBottom ]
+
+        spacer =
+            E.el [ E.width (E.px dragHandleWidth), E.height E.fill ] E.none
     in
     case ddw of
         Drag ->
@@ -346,15 +349,15 @@ editBlock ddw i focus e =
                 (baseAttr
                     ++ [ E.inFront
                             (E.row [ E.alignRight, E.spacing 3, E.padding 0 ]
-                                [ -- TODO don't hardcode height, fontsize.  maybe render differently?  or overlay.
-                                  EI.button (edButtonStyle ++ [ E.alignRight, EF.size 10, E.height <| E.px 15 ])
-                                    { onPress = Just (EditBlock i)
-                                    , label = E.el [ E.centerY ] <| E.text "ed"
-                                    }
-                                , EI.button (edButtonStyle ++ [ E.alignRight, EF.size 10, E.height <| E.px 15 ])
-                                    { onPress = Just (RemoveBlock i)
-                                    , label = E.text "X"
-                                    }
+                                [-- TODO don't hardcode height, fontsize.  maybe render differently?  or overlay.
+                                 -- EI.button (edButtonStyle ++ [ E.alignRight, EF.size 10, E.height <| E.px 15 ])
+                                 --   { onPress = Just (EditBlock i)
+                                 --   , label = E.el [ E.centerY ] <| E.text "ed"
+                                 --   }
+                                 -- EI.button (edButtonStyle ++ [ E.alignRight, EF.size 10, E.height <| E.px 15 ])
+                                 --   { onPress = Just (RemoveBlock i)
+                                 --   , label = E.text "X"
+                                 --   }
                                 ]
                             )
                        ]
@@ -364,7 +367,12 @@ editBlock ddw i focus e =
                         ++ List.map E.htmlAttribute (blockDndSystem.dragEvents i bid)
                     )
                     E.none
-                , e
+                , spacer
+                , if focus then
+                    E.el [ E.width E.fill ] e
+
+                  else
+                    E.el [ EE.onClick (EditBlock i), E.width E.fill ] e
                 ]
 
         Drop ->
@@ -375,6 +383,7 @@ editBlock ddw i focus e =
                 [ E.el
                     dragHandleAttrs
                     E.none
+                , spacer
                 , e
                 ]
 
@@ -386,6 +395,7 @@ editBlock ddw i focus e =
                 [ E.el
                     dragHandleAttrs
                     E.none
+                , spacer
                 , e
                 ]
 
@@ -397,6 +407,7 @@ editBlock ddw i focus e =
                 [ E.el
                     dragHandleAttrs
                     E.none
+                , spacer
                 , e
                 ]
 
@@ -1178,7 +1189,7 @@ renderBlocks zone fui cd noteCache vm mdw mbblockedit mbinfo blocks =
         Ok rendered ->
             E.column
                 [ E.spacing 3
-                , E.padding 20
+                , E.paddingEach { top = 20, right = 20, bottom = 20, left = 2 }
                 , E.width (E.fill |> E.maximum 1000)
                 , E.centerX
                 , E.alignTop
@@ -1198,13 +1209,21 @@ renderBlocks zone fui cd noteCache vm mdw mbblockedit mbinfo blocks =
                                                     [ E.width E.fill
                                                     , E.spacing 8
                                                     ]
-                                                    [ headingText "rendered: "
-                                                    , case MC.markdownView renderer t.s of
-                                                        Ok elts ->
-                                                            E.column [ E.width E.fill ] elts
+                                                    [ E.column [ EE.onClick EditBlockOk, E.width E.fill, E.spacing 8 ]
+                                                        [ E.row MG.rowtrib
+                                                            [ headingText "rendered: "
+                                                            , EI.button (edButtonStyle ++ [ E.alignRight, EF.size 10, E.height <| E.px 15 ])
+                                                                { onPress = Just (RemoveBlock i)
+                                                                , label = E.text "X"
+                                                                }
+                                                            ]
+                                                        , case MC.markdownView renderer t.s of
+                                                            Ok elts ->
+                                                                E.column [ E.width E.fill ] elts
 
-                                                        Err e ->
-                                                            E.text e
+                                                            Err e ->
+                                                                E.text e
+                                                        ]
                                                     , EI.multiline
                                                         [ E.alignTop
                                                         ]
@@ -1216,8 +1235,9 @@ renderBlocks zone fui cd noteCache vm mdw mbblockedit mbinfo blocks =
                                                         }
                                                     , headingText "GUI edit: "
                                                     , E.map EditBlockMsg <| MG.guiBlock t.b
-                                                    , EI.button Common.buttonStyle
-                                                        { label = E.text "ok", onPress = Just EditBlockOk }
+
+                                                    -- , EI.button Common.buttonStyle
+                                                    --     { label = E.text "ok", onPress = Just EditBlockOk }
                                                     ]
 
                                         else
@@ -3164,7 +3184,25 @@ update msg model =
                         in
                         EM.updateBlocks db
                     )
-                |> Result.map (\em -> ( { model | edMarkdown = em }, None ))
+                |> Result.map
+                    (\em ->
+                        ( { model
+                            | edMarkdown = em
+                            , blockEdit =
+                                case model.blockEdit of
+                                    Just (Text t) ->
+                                        if t.idx == idx then
+                                            Nothing
+
+                                        else
+                                            model.blockEdit
+
+                                    Nothing ->
+                                        model.blockEdit
+                          }
+                        , None
+                        )
+                    )
                 |> Result.withDefault ( model, None )
 
         EditBlock bidx ->

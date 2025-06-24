@@ -1,4 +1,4 @@
-module MdGui exposing (Msg, guiBlock, updateBlock)
+module MdGui exposing (Msg, coltrib, guiBlock, rowtrib, updateBlock)
 
 import Either
 import Element as E
@@ -8,6 +8,7 @@ import Element.Input as EI
 import Markdown.Block as MB exposing (..)
 import MdCommon as MC
 import Set
+import TangoColors as TC
 import Toop
 
 
@@ -900,50 +901,52 @@ guiHtmlElement tag attribs =
                                 , placeholder = Nothing
                                 , label = EI.labelLeft [] (E.text "noteid")
                                 }
-                            , E.column [ EBd.width 1, E.padding 8, E.spacing 3 ]
-                                [ E.el [ EF.bold ] <| E.text "show"
-                                , EI.checkbox []
-                                    { onChange = NoteShowTitle
-                                    , icon = EI.defaultCheckbox
-                                    , checked = ns.title
-                                    , label = EI.labelRight [] (E.text "title")
-                                    }
-                                , EI.checkbox []
-                                    { onChange = NoteShowContents
-                                    , icon = EI.defaultCheckbox
-                                    , checked = ns.contents
-                                    , label = EI.labelRight [] (E.text "contents")
-                                    }
-                                , EI.checkbox []
-                                    { onChange = NoteShowText
-                                    , icon = EI.defaultCheckbox
-                                    , checked = ns.text
-                                    , label = EI.labelRight [] (E.text "text")
-                                    }
-                                , EI.checkbox []
-                                    { onChange = NoteShowFile
-                                    , icon = EI.defaultCheckbox
-                                    , checked = ns.file
-                                    , label = EI.labelRight [] (E.text "file")
-                                    }
-                                , EI.checkbox []
-                                    { onChange = NoteShowCreatedate
-                                    , icon = EI.defaultCheckbox
-                                    , checked = ns.createdate
-                                    , label = EI.labelRight [] (E.text "createdate")
-                                    }
-                                , EI.checkbox []
-                                    { onChange = NoteShowChangedate
-                                    , icon = EI.defaultCheckbox
-                                    , checked = ns.changedate
-                                    , label = EI.labelRight [] (E.text "changedate")
-                                    }
-                                , EI.checkbox []
-                                    { onChange = NoteShowLink
-                                    , icon = EI.defaultCheckbox
-                                    , checked = ns.link
-                                    , label = EI.labelRight [] (E.text "link")
-                                    }
+                            , E.row [ E.width E.fill, E.spacing 3 ]
+                                [ E.el [ E.alignTop ] <| E.text "show"
+                                , E.column [ EBd.color TC.grey, EBd.width 1, E.padding 8, E.spacing 3 ]
+                                    [ EI.checkbox []
+                                        { onChange = NoteShowTitle
+                                        , icon = EI.defaultCheckbox
+                                        , checked = ns.title
+                                        , label = EI.labelRight [] (E.text "title")
+                                        }
+                                    , EI.checkbox []
+                                        { onChange = NoteShowContents
+                                        , icon = EI.defaultCheckbox
+                                        , checked = ns.contents
+                                        , label = EI.labelRight [] (E.text "contents")
+                                        }
+                                    , EI.checkbox []
+                                        { onChange = NoteShowText
+                                        , icon = EI.defaultCheckbox
+                                        , checked = ns.text
+                                        , label = EI.labelRight [] (E.text "text")
+                                        }
+                                    , EI.checkbox []
+                                        { onChange = NoteShowFile
+                                        , icon = EI.defaultCheckbox
+                                        , checked = ns.file
+                                        , label = EI.labelRight [] (E.text "file")
+                                        }
+                                    , EI.checkbox []
+                                        { onChange = NoteShowCreatedate
+                                        , icon = EI.defaultCheckbox
+                                        , checked = ns.createdate
+                                        , label = EI.labelRight [] (E.text "createdate")
+                                        }
+                                    , EI.checkbox []
+                                        { onChange = NoteShowChangedate
+                                        , icon = EI.defaultCheckbox
+                                        , checked = ns.changedate
+                                        , label = EI.labelRight [] (E.text "changedate")
+                                        }
+                                    , EI.checkbox []
+                                        { onChange = NoteShowLink
+                                        , icon = EI.defaultCheckbox
+                                        , checked = ns.link
+                                        , label = EI.labelRight [] (E.text "link")
+                                        }
+                                    ]
                                 ]
                             , EI.text []
                                 { onChange = NoteText
