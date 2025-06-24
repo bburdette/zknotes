@@ -120,25 +120,28 @@ guiBlock block =
             guiHtml htmlBlock
 
         UnorderedList listSpacing listItems ->
-            E.column [] <|
-                List.indexedMap
-                    (\i (ListItem t li) ->
-                        E.map (ListItemMsg i)
-                            (E.column [] <| List.indexedMap (\ii item -> E.map (ListItemMsg ii) (guiBlock item)) li)
-                    )
-                    listItems
+            E.row rowtrib
+                [ E.el [ E.alignTop ] <| E.text "unordered list"
+                , E.column coltrib <|
+                    List.indexedMap
+                        (\i (ListItem t li) ->
+                            E.map (ListItemMsg i)
+                                (E.column coltrib <| List.indexedMap (\ii item -> E.map (ListItemMsg ii) (guiBlock item)) li)
+                        )
+                        listItems
+                ]
 
-        -- E.none
         OrderedList listSpacing startIndex blockLists ->
-            E.column [] <|
-                List.indexedMap
-                    (\bli bl ->
-                        E.map (ListItemMsg bli)
-                            (List.indexedMap (\i b -> E.map (ListItemMsg i) (guiBlock b)) bl
-                                |> E.column []
-                            )
-                    )
-                    blockLists
+            E.row rowtrib
+                [ E.el [ E.alignTop ] <| E.text "ordered list"
+                , E.column coltrib <|
+                    List.indexedMap
+                        (\bli bl ->
+                            E.map (ListItemMsg bli)
+                                (E.column coltrib <| List.indexedMap (\i b -> E.map (ListItemMsg i) (guiBlock b)) bl)
+                        )
+                        blockLists
+                ]
 
         BlockQuote blocks ->
             E.row rowtrib
@@ -209,7 +212,7 @@ guiInline inline =
                         , placeholder = Nothing
                         , label = EI.labelLeft [] (E.text "title")
                         }
-                    , E.column [] <| List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines
+                    , E.column coltrib <| List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines
                     ]
                 ]
 
@@ -229,26 +232,26 @@ guiInline inline =
                         , placeholder = Nothing
                         , label = EI.labelLeft [] (E.text "title")
                         }
-                    , E.column [] <| List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines
+                    , E.column coltrib <| List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines
                     ]
                 ]
 
         Emphasis inlines ->
             E.row rowtrib
                 [ E.el [ E.alignTop ] <| E.text "emphasis"
-                , E.column [] (List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines)
+                , E.column coltrib (List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines)
                 ]
 
         Strong inlines ->
             E.row rowtrib
                 [ E.el [ E.alignTop ] <| E.text "strong"
-                , E.column [] (List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines)
+                , E.column coltrib (List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines)
                 ]
 
         Strikethrough inlines ->
             E.row rowtrib
                 [ E.el [ E.alignTop ] <| E.text "strikethrough"
-                , E.column [] (List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines)
+                , E.column coltrib (List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines)
                 ]
 
         CodeSpan s ->
@@ -395,7 +398,7 @@ updateInline msg inline =
                 _ ->
                     [ inline ]
 
-        CodeSpan s ->
+        CodeSpan _ ->
             case msg of
                 CodeSpanStr str ->
                     [ CodeSpan str ]
@@ -403,7 +406,7 @@ updateInline msg inline =
                 _ ->
                     [ inline ]
 
-        Text s ->
+        Text _ ->
             case msg of
                 TextStr str ->
                     [ Text str ]
@@ -741,7 +744,7 @@ guiHtmlElement tag attribs =
         "cell" ->
             case ( findAttrib "name" attribs, findAttrib "script" attribs ) of
                 ( Just name, Just script ) ->
-                    E.column []
+                    E.column coltrib
                         [ EI.text []
                             { onChange = CellName
                             , text = name
@@ -763,7 +766,7 @@ guiHtmlElement tag attribs =
         "search" ->
             case findAttrib "search" attribs of
                 Just search ->
-                    E.column []
+                    E.column coltrib
                         [ EI.text []
                             { onChange = SearchText
                             , text = search
@@ -778,7 +781,7 @@ guiHtmlElement tag attribs =
         "panel" ->
             case findAttrib "noteid" attribs of
                 Just noteid ->
-                    E.column []
+                    E.column coltrib
                         [ EI.text []
                             { onChange = NoteIdText
                             , text = noteid
@@ -793,7 +796,7 @@ guiHtmlElement tag attribs =
         "image" ->
             case ( findAttrib "text" attribs, findAttrib "url" attribs, findAttrib "width" attribs ) of
                 ( Just name, Just url, mbwidth ) ->
-                    E.column []
+                    E.column coltrib
                         [ EI.text []
                             { onChange = ImageText
                             , text = name
@@ -820,7 +823,7 @@ guiHtmlElement tag attribs =
         "video" ->
             case Toop.T4 (findAttrib "src" attribs) (findAttrib "text" attribs) (findAttrib "width" attribs) (findAttrib "height" attribs) of
                 Toop.T4 (Just src) mbtext mbwidth mbheight ->
-                    E.column []
+                    E.column coltrib
                         [ EI.text []
                             { onChange = VideoSrc
                             , text = src
@@ -853,7 +856,7 @@ guiHtmlElement tag attribs =
         "audio" ->
             case Toop.T2 (findAttrib "src" attribs) (findAttrib "text" attribs) of
                 Toop.T2 (Just src) (Just text) ->
-                    E.column []
+                    E.column coltrib
                         [ EI.text []
                             { onChange = AudioSrc
                             , text = src
