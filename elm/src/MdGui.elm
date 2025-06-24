@@ -193,10 +193,6 @@ guiInline inline =
             guiHtml block
 
         Link url mbtitle inlines ->
-            let
-                _ =
-                    Debug.log "link" ( url, mbtitle, inlines )
-            in
             E.row rowtrib
                 [ E.el [ E.alignTop ] <| E.text "link"
                 , E.column coltrib <|
@@ -206,12 +202,14 @@ guiInline inline =
                         , placeholder = Nothing
                         , label = EI.labelLeft [] (E.text "url")
                         }
-                    , EI.text []
-                        { onChange = LinkTitle
-                        , text = mbtitle |> Maybe.withDefault ""
-                        , placeholder = Nothing
-                        , label = EI.labelLeft [] (E.text "title")
-                        }
+
+                    -- title is not used, so don't bother with editing it!
+                    -- , EI.text []
+                    --     { onChange = LinkTitle
+                    --     , text = mbtitle |> Maybe.withDefault ""
+                    --     , placeholder = Nothing
+                    --     , label = EI.labelLeft [] (E.text "title")
+                    --     }
                     , E.column coltrib <| List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines
                     ]
                 ]
@@ -226,12 +224,14 @@ guiInline inline =
                         , placeholder = Nothing
                         , label = EI.labelLeft [] (E.text "url")
                         }
-                    , EI.text []
-                        { onChange = ImageTitle
-                        , text = mbtitle |> Maybe.withDefault ""
-                        , placeholder = Nothing
-                        , label = EI.labelLeft [] (E.text "title")
-                        }
+
+                    -- title is not used, so don't bother with editing it!
+                    -- , EI.text []
+                    --     { onChange = ImageTitle
+                    --     , text = mbtitle |> Maybe.withDefault ""
+                    --     , placeholder = Nothing
+                    --     , label = EI.labelLeft [] (E.text "title")
+                    --     }
                     , E.column coltrib <| List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines
                     ]
                 ]
