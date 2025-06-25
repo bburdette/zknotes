@@ -3290,14 +3290,14 @@ update msg model =
                 EM.getBlocks model.edMarkdown
                     |> Result.andThen
                         (\blks ->
-                            EM.updateBlocks (blks ++ [ Markdown.Block.Paragraph [ Markdown.Block.Text "" ] ])
+                            EM.updateBlocks (Markdown.Block.Paragraph [ Markdown.Block.Text "" ] :: blks)
                                 |> Result.map (\em -> ( List.length blks, em ))
                         )
             of
                 Ok ( c, em ) ->
                     ( { model
                         | edMarkdown = em
-                        , blockEdit = Just <| Text { idx = c, s = "", b = Paragraph [] }
+                        , blockEdit = Just <| Text { idx = 0, s = "", b = Paragraph [] }
                       }
                     , None
                     )
