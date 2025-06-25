@@ -394,11 +394,9 @@ editBlock ddw i focus e =
                 (baseAttr
                     ++ List.map E.htmlAttribute (blockDndSystem.dropEvents i bid)
                 )
-                [ E.el
-                    dragHandleAttrs
-                    E.none
+                [ E.el dragHandleAttrs E.none
                 , spacer
-                , e
+                , E.el [ E.width E.fill ] e
                 ]
 
         DropH ->
@@ -406,11 +404,9 @@ editBlock ddw i focus e =
                 ((EBk.color TC.darkBlue :: baseAttr)
                     ++ List.map E.htmlAttribute (blockDndSystem.dropEvents i bid)
                 )
-                [ E.el
-                    dragHandleAttrs
-                    E.none
+                [ E.el dragHandleAttrs E.none
                 , spacer
-                , e
+                , E.el [ E.width E.fill ] e
                 ]
 
         Ghost ->
@@ -418,11 +414,9 @@ editBlock ddw i focus e =
                 ((EBk.color TC.darkGreen :: baseAttr)
                     ++ List.map E.htmlAttribute (blockDndSystem.dragEvents i (blockId i))
                 )
-                [ E.el
-                    dragHandleAttrs
-                    E.none
+                [ E.el dragHandleAttrs E.none
                 , spacer
-                , e
+                , E.el [ E.width E.fill ] e
                 ]
 
 
