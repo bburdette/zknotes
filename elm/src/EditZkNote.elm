@@ -1197,7 +1197,12 @@ renderBlocks zone fui cd noteCache vm mdw mbblockedit mbinfo blocks =
         Ok rendered ->
             E.column
                 [ E.spacing 3
-                , E.paddingEach { top = 20, right = 20, bottom = 20, left = 2 }
+                , case vm of
+                    MC.PublicView ->
+                        E.padding 20
+
+                    MC.EditView ->
+                        E.paddingEach { top = 20, right = 20, bottom = 20, left = 2 }
                 , E.width (E.fill |> E.maximum 1000)
                 , E.centerX
                 , E.alignTop
@@ -1207,79 +1212,84 @@ renderBlocks zone fui cd noteCache vm mdw mbblockedit mbinfo blocks =
                 ]
                 (List.indexedMap
                     (\i ( b, r ) ->
-                        let
-                            mbeb =
-                                case mbblockedit of
-                                    Just (Text t) ->
-                                        if t.idx == i then
-                                            Just <|
-                                                E.column
-                                                    [ E.width E.fill
-                                                    , E.spacing 8
-                                                    ]
-                                                    [ E.column [ EE.onClick EditBlockOk, E.width E.fill, E.spacing 8 ]
-                                                        [ E.row (E.height E.shrink :: MG.rowtrib)
-                                                            [ headingText "rendered: "
-                                                            , if t.original /= t.s then
-                                                                EI.button (edButtonStyle ++ [ E.alignRight ])
-                                                                    { onPress = Just RevertBlock
-                                                                    , label = E.text "revert"
-                                                                    }
+                        case vm of
+                            MC.PublicView ->
+                                r
 
-                                                              else
-                                                                E.none
-                                                            , EI.button (edButtonStyle ++ [ E.alignRight ])
-                                                                { onPress = Just (RemoveBlock i)
-                                                                , label = E.text "X"
-                                                                }
+                            MC.EditView ->
+                                let
+                                    mbeb =
+                                        case mbblockedit of
+                                            Just (Text t) ->
+                                                if t.idx == i then
+                                                    Just <|
+                                                        E.column
+                                                            [ E.width E.fill
+                                                            , E.spacing 8
                                                             ]
-                                                        , case MC.markdownView renderer t.s of
-                                                            Ok elts ->
-                                                                E.column [ E.width E.fill ] elts
+                                                            [ E.column [ EE.onClick EditBlockOk, E.width E.fill, E.spacing 8 ]
+                                                                [ E.row (E.height E.shrink :: MG.rowtrib)
+                                                                    [ headingText "rendered: "
+                                                                    , if t.original /= t.s then
+                                                                        EI.button (edButtonStyle ++ [ E.alignRight ])
+                                                                            { onPress = Just RevertBlock
+                                                                            , label = E.text "revert"
+                                                                            }
 
-                                                            Err e ->
-                                                                E.text e
-                                                        ]
-                                                    , EI.multiline
-                                                        [ E.alignTop
-                                                        ]
-                                                        { onChange = EditBlockInput
-                                                        , text = t.s
-                                                        , placeholder = Nothing
-                                                        , label = EI.labelAbove [] (headingText "markdown edit")
-                                                        , spellcheck = False
-                                                        }
-                                                    , headingText "GUI edit: "
-                                                    , E.map EditBlockMsg <| MG.guiBlock t.b
+                                                                      else
+                                                                        E.none
+                                                                    , EI.button (edButtonStyle ++ [ E.alignRight ])
+                                                                        { onPress = Just (RemoveBlock i)
+                                                                        , label = E.text "X"
+                                                                        }
+                                                                    ]
+                                                                , case MC.markdownView renderer t.s of
+                                                                    Ok elts ->
+                                                                        E.column [ E.width E.fill ] elts
 
-                                                    -- , EI.button Common.buttonStyle
-                                                    --     { label = E.text "ok", onPress = Just EditBlockOk }
-                                                    ]
+                                                                    Err e ->
+                                                                        E.text e
+                                                                ]
+                                                            , EI.multiline
+                                                                [ E.alignTop
+                                                                ]
+                                                                { onChange = EditBlockInput
+                                                                , text = t.s
+                                                                , placeholder = Nothing
+                                                                , label = EI.labelAbove [] (headingText "markdown edit")
+                                                                , spellcheck = False
+                                                                }
+                                                            , headingText "GUI edit: "
+                                                            , E.map EditBlockMsg <| MG.guiBlock t.b
 
-                                        else
-                                            Nothing
+                                                            -- , EI.button Common.buttonStyle
+                                                            --     { label = E.text "ok", onPress = Just EditBlockOk }
+                                                            ]
 
-                                    Nothing ->
-                                        Nothing
-                        in
-                        editBlock
-                            (case mbinfo of
-                                Nothing ->
-                                    Drag
+                                                else
+                                                    Nothing
 
-                                Just { dragIndex, dropIndex } ->
-                                    if i == dragIndex then
-                                        Ghost
+                                            Nothing ->
+                                                Nothing
+                                in
+                                editBlock
+                                    (case mbinfo of
+                                        Nothing ->
+                                            Drag
 
-                                    else if i == dropIndex then
-                                        DropH
+                                        Just { dragIndex, dropIndex } ->
+                                            if i == dragIndex then
+                                                Ghost
 
-                                    else
-                                        Drop
-                            )
-                            i
-                            (mbeb |> Maybe.map (always True) |> Maybe.withDefault False)
-                            (mbeb |> Maybe.withDefault r)
+                                            else if i == dropIndex then
+                                                DropH
+
+                                            else
+                                                Drop
+                                    )
+                                    i
+                                    (mbeb |> Maybe.map (always True) |> Maybe.withDefault False)
+                                    (mbeb |> Maybe.withDefault r)
                     )
                     (List.map2 (\l r -> ( l, r )) blocks rendered)
                 )
@@ -1756,7 +1766,20 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                             E.none
                     , case EM.getBlocks model.edMarkdown of
                         Ok blocks ->
-                            renderBlocks zone model.fui model.cells noteCache MC.EditView mdw model.blockEdit mbdi blocks
+                            renderBlocks zone
+                                model.fui
+                                model.cells
+                                noteCache
+                                (if editable then
+                                    MC.EditView
+
+                                 else
+                                    MC.PublicView
+                                )
+                                mdw
+                                model.blockEdit
+                                mbdi
+                                blocks
 
                         Err e ->
                             E.text e
