@@ -174,7 +174,7 @@ guiBlock block =
                     , placeholder = Nothing
                     , label = EI.labelLeft [] (E.text "language")
                     }
-                , EI.multiline []
+                , EI.multiline [ E.width E.fill ]
                     { onChange = CbBody
                     , text = cb.body
                     , placeholder = Nothing

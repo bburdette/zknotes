@@ -135,6 +135,7 @@ type Msg
     | FlipLink EditLink
     | ShowArchivesPress
     | DnDMsg DnDList.Msg
+    | RevertBlock
     | RemoveBlock Int
     | EditBlock Int
     | EditBlockInput String
@@ -206,7 +207,7 @@ type alias Model =
 
 
 type BlockEdit
-    = Text { idx : Int, s : String, b : Block }
+    = Text { idx : Int, s : String, b : Block, original : String }
 
 
 type Command
@@ -240,6 +241,19 @@ type Command
     | SyncFiles Data.ZkNoteSearch
     | SPMod (SP.Model -> ( SP.Model, SP.Command ))
     | Cmd (Cmd Msg)
+
+
+updateBlockEdit : String -> BlockEdit -> BlockEdit
+updateBlockEdit s (Text t) =
+    let
+        b =
+            s
+                |> Markdown.Parser.parse
+                |> Result.toMaybe
+                |> Maybe.andThen (\r -> List.head r)
+                |> Maybe.withDefault (Paragraph [])
+    in
+    Text { t | s = s, b = b, original = t.original }
 
 
 
@@ -1210,9 +1224,17 @@ renderBlocks zone fui cd noteCache vm mdw mbblockedit mbinfo blocks =
                                                     , E.spacing 8
                                                     ]
                                                     [ E.column [ EE.onClick EditBlockOk, E.width E.fill, E.spacing 8 ]
-                                                        [ E.row MG.rowtrib
+                                                        [ E.row (E.height E.shrink :: MG.rowtrib)
                                                             [ headingText "rendered: "
-                                                            , EI.button (edButtonStyle ++ [ E.alignRight, EF.size 10, E.height <| E.px 15 ])
+                                                            , if t.original /= t.s then
+                                                                EI.button (edButtonStyle ++ [ E.alignRight ])
+                                                                    { onPress = Just RevertBlock
+                                                                    , label = E.text "revert"
+                                                                    }
+
+                                                              else
+                                                                E.none
+                                                            , EI.button (edButtonStyle ++ [ E.alignRight ])
                                                                 { onPress = Just (RemoveBlock i)
                                                                 , label = E.text "X"
                                                                 }
@@ -3174,6 +3196,18 @@ update msg model =
                 Err e ->
                     ( model, ShowMessage <| "markdown error: " ++ e )
 
+        RevertBlock ->
+            case model.blockEdit of
+                Just (Text t) ->
+                    let
+                        be =
+                            updateBlockEdit t.original (Text t)
+                    in
+                    ( { model | blockEdit = Just be }, None )
+
+                Nothing ->
+                    ( model, None )
+
         RemoveBlock idx ->
             EM.getBlocks model.edMarkdown
                 |> Result.andThen
@@ -3219,7 +3253,11 @@ update msg model =
                                 Markdown.Renderer.render EM.stringRenderer [ b ]
                                     |> Result.map
                                         (\sl ->
-                                            Text { idx = bi, s = String.concat sl, b = b }
+                                            let
+                                                mds =
+                                                    String.concat sl
+                                            in
+                                            Text { idx = bi, s = mds, b = b, original = mds }
                                         )
                                     |> Result.toMaybe
 
@@ -3229,7 +3267,7 @@ update msg model =
             ( { model
                 | blockEdit =
                     case model.blockEdit of
-                        Just (Text { idx, s }) ->
+                        Just (Text { idx }) ->
                             if bidx == idx then
                                 Nothing
 
@@ -3246,14 +3284,10 @@ update msg model =
             case model.blockEdit of
                 Just (Text t) ->
                     let
-                        b =
-                            s
-                                |> Markdown.Parser.parse
-                                |> Result.toMaybe
-                                |> Maybe.andThen (\r -> List.head r)
-                                |> Maybe.withDefault (Paragraph [])
+                        be =
+                            updateBlockEdit s (Text t)
                     in
-                    ( { model | blockEdit = Just <| Text { t | s = s, b = b } }, None )
+                    ( { model | blockEdit = Just be }, None )
 
                 Nothing ->
                     ( model, None )
@@ -3297,7 +3331,7 @@ update msg model =
                 Ok ( c, em ) ->
                     ( { model
                         | edMarkdown = em
-                        , blockEdit = Just <| Text { idx = 0, s = "", b = Paragraph [] }
+                        , blockEdit = Just <| Text { idx = 0, s = "", b = Paragraph [], original = "" }
                       }
                     , None
                     )
@@ -3315,7 +3349,11 @@ update msg model =
                                     Markdown.Renderer.render EM.stringRenderer [ b ]
                                         |> Result.map
                                             (\sl ->
-                                                Text { idx = t.idx, s = String.concat sl, b = b }
+                                                let
+                                                    mds =
+                                                        String.concat sl
+                                                in
+                                                Text { idx = t.idx, s = mds, b = b, original = t.original }
                                             )
                                         |> Result.toMaybe
                             in
