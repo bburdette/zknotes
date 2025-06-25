@@ -1169,8 +1169,8 @@ renderReadMd zone fui cd noteCache vm md mdw =
             E.text errors
 
 
-renderBlocks : Time.Zone -> FileUrlInfo -> CellDict -> NoteCache -> MC.ViewMode -> Int -> Maybe BlockEdit -> Maybe DnDList.Info -> List Block -> Element Msg
-renderBlocks zone fui cd noteCache vm mdw mbblockedit mbinfo blocks =
+renderBlocks : Time.Zone -> FileUrlInfo -> CellDict -> NoteCache -> MC.ViewMode -> Int -> Bool -> Maybe BlockEdit -> Maybe DnDList.Info -> List Block -> Element Msg
+renderBlocks zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo blocks =
     let
         renderer =
             MC.mkRenderer
@@ -1196,20 +1196,27 @@ renderBlocks zone fui cd noteCache vm mdw mbblockedit mbinfo blocks =
     of
         Ok rendered ->
             E.column
-                [ E.spacing 3
-                , case vm of
-                    MC.PublicView ->
-                        E.padding 20
+                ((if isdirty then
+                    [ EBd.glow TC.darkYellow 3 ]
 
-                    MC.EditView ->
-                        E.paddingEach { top = 20, right = 20, bottom = 20, left = 2 }
-                , E.width (E.fill |> E.maximum 1000)
-                , E.centerX
-                , E.alignTop
-                , EBd.width 2
-                , EBd.color TC.darkGrey
-                , EBk.color TC.lightGrey
-                ]
+                  else
+                    []
+                 )
+                    ++ [ E.spacing 3
+                       , case vm of
+                            MC.PublicView ->
+                                E.padding 20
+
+                            MC.EditView ->
+                                E.paddingEach { top = 20, right = 20, bottom = 20, left = 2 }
+                       , E.width (E.fill |> E.maximum 1000)
+                       , E.centerX
+                       , E.alignTop
+                       , EBd.width 2
+                       , EBd.color TC.darkGrey
+                       , EBk.color TC.lightGrey
+                       ]
+                )
                 (List.indexedMap
                     (\i ( b, r ) ->
                         case vm of
@@ -1777,6 +1784,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                                     MC.PublicView
                                 )
                                 mdw
+                                isdirty
                                 model.blockEdit
                                 mbdi
                                 blocks
