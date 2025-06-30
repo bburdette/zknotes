@@ -3,74 +3,12 @@ module MdGui exposing (Msg, coltrib, guiBlock, rowtrib, updateBlock)
 import Either
 import Element as E
 import Element.Border as EBd
-import Element.Font as EF
 import Element.Input as EI
 import Markdown.Block as MB exposing (..)
 import MdCommon as MC
 import Set
 import TangoColors as TC
 import Toop
-
-
-
-{-
-
-   type Block
-       = -- Container Blocks
-         HtmlBlock (Html Block)
-       | UnorderedList ListSpacing (List (ListItem Block))
-       | OrderedList ListSpacing Int (List (List Block))
-       | BlockQuote (List Block)
-         -- Leaf Blocks With Inlines
-       | Heading HeadingLevel (List Inline)
-       | Paragraph (List Inline)
-       | Table (List { label : List Inline, alignment : Maybe Alignment }) (List (List (List Inline)))
-         -- Leaf Blocks Without Inlines
-       | CodeBlock { body : String, language : Maybe String }
-       | ThematicBreak
-
-
-   type ListSpacing
-       = Loose
-       | Tight
-
-
-   type Alignment
-       = AlignLeft
-       | AlignRight
-       | AlignCenter
-
-
-   type ListItem children
-       = ListItem Task (List children)
-
-
-   type Task
-       = NoTask
-       | IncompleteTask
-       | CompletedTask
-
-
-   type HeadingLevel
-       = H1
-       | H2
-       | H3
-       | H4
-       | H5
-       | H6
-
-   type Inline
-       = HtmlInline (Html Block)
-       | Link String (Maybe String) (List Inline)
-       | Image String (Maybe String) (List Inline)
-       | Emphasis (List Inline)
-       | Strong (List Inline)
-       | Strikethrough (List Inline)
-       | CodeSpan String
-       | Text String
-       | HardLineBreak
-
--}
 
 
 type Msg
@@ -316,8 +254,6 @@ updateListInline idx msg inlines =
                         ++ updateInline msg inline
                         ++ List.drop (idx + 1) inlines
 
-                _ =
-                    Debug.log "updatelistinline" ( idx, inlines, a )
             in
             a
 
