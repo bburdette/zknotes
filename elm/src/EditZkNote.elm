@@ -1,4 +1,4 @@
-module EditZkNote exposing
+port module EditZkNote exposing
     ( Command(..)
     , Model
     , Msg(..)
@@ -65,6 +65,7 @@ import Element.Input as EI
 import Html.Attributes
 import JobsDialog exposing (TJobs)
 import Json.Decode as JD
+import Json.Encode as JE
 import Markdown.Block exposing (Block(..), ListItem(..), Task(..))
 import Markdown.Parser
 import Markdown.Renderer
@@ -269,13 +270,25 @@ dndIdentity _ _ l =
 
 blockDndSystem : DnDList.System Block Msg
 blockDndSystem =
-    DnDList.create
+    DnDList.createWithTouch
         { beforeUpdate = dndIdentity
         , movement = DnDList.Vertical
         , listen = DnDList.OnDrop
         , operation = DnDList.Rotate
         }
         DnDMsg
+        onPointerMove
+        onPointerUp
+        releasePointerCapture
+
+
+port onPointerMove : (JE.Value -> msg) -> Sub msg
+
+
+port onPointerUp : (JE.Value -> msg) -> Sub msg
+
+
+port releasePointerCapture : JE.Value -> Cmd msg
 
 
 blockDndSubscriptions : Model -> List (Sub Msg)
