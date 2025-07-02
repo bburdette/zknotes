@@ -390,7 +390,9 @@ editBlock ddw i focus e =
                        ]
                 )
                 [ E.el
-                    (dragHandleAttrs
+                    (E.htmlAttribute (Html.Attributes.style "touch-action" "none")
+                        :: dragHandleAttrs
+                        -- (dragHandleAttrs
                         ++ List.map E.htmlAttribute (blockDndSystem.dragEvents i bid)
                     )
                     E.none
@@ -404,7 +406,8 @@ editBlock ddw i focus e =
 
         Drop ->
             E.row
-                (baseAttr
+                (E.htmlAttribute (Html.Attributes.style "touch-action" "none")
+                    :: baseAttr
                     ++ List.map E.htmlAttribute (blockDndSystem.dropEvents i bid)
                 )
                 [ E.el dragHandleAttrs E.none
@@ -414,7 +417,10 @@ editBlock ddw i focus e =
 
         DropH ->
             E.row
-                ((EBk.color TC.darkBlue :: baseAttr)
+                ((EBk.color TC.darkBlue
+                    :: E.htmlAttribute (Html.Attributes.style "touch-action" "none")
+                    :: baseAttr
+                 )
                     ++ List.map E.htmlAttribute (blockDndSystem.dropEvents i bid)
                 )
                 [ E.el dragHandleAttrs E.none
@@ -424,7 +430,10 @@ editBlock ddw i focus e =
 
         Ghost ->
             E.row
-                ((EBk.color TC.darkGreen :: baseAttr)
+                ((EBk.color TC.darkGreen
+                    :: E.htmlAttribute (Html.Attributes.style "touch-action" "none")
+                    :: baseAttr
+                 )
                     ++ List.map E.htmlAttribute (blockDndSystem.dragEvents i (blockId i))
                 )
                 [ E.el dragHandleAttrs E.none
