@@ -594,12 +594,6 @@ noteFile fui mbns filename zknote =
                     link (Just zknote.title) (fui.filelocation ++ "/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
 
 
-
--- filesize and stuff.
--- share status?
--- drag handle
-
-
 type alias NoteShow =
     { title : Bool
     , contents : Bool

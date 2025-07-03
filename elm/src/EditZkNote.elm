@@ -373,26 +373,10 @@ editBlock ddw i focus e =
     case ddw of
         Drag ->
             E.row
-                (baseAttr
-                    ++ [ E.inFront
-                            (E.row [ E.alignRight, E.spacing 3, E.padding 0 ]
-                                [-- TODO don't hardcode height, fontsize.  maybe render differently?  or overlay.
-                                 -- EI.button (edButtonStyle ++ [ E.alignRight, EF.size 10, E.height <| E.px 15 ])
-                                 --   { onPress = Just (EditBlock i)
-                                 --   , label = E.el [ E.centerY ] <| E.text "ed"
-                                 --   }
-                                 -- EI.button (edButtonStyle ++ [ E.alignRight, EF.size 10, E.height <| E.px 15 ])
-                                 --   { onPress = Just (RemoveBlock i)
-                                 --   , label = E.text "X"
-                                 --   }
-                                ]
-                            )
-                       ]
-                )
+                baseAttr
                 [ E.el
                     (E.htmlAttribute (Html.Attributes.style "touch-action" "none")
                         :: dragHandleAttrs
-                        -- (dragHandleAttrs
                         ++ List.map E.htmlAttribute (blockDndSystem.dragEvents i bid)
                     )
                     E.none
@@ -1680,15 +1664,15 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                       else
                         E.none
                     ]
-                , E.row [ E.spacing 8, E.width E.fill ]
+                , E.paragraph [ E.spacing 8, E.width E.fill ]
                     [ E.text "server: "
                     , E.text model.server
                     , E.text
                         (if model.server == model.ld.server then
-                            "(local)"
+                            " (local)"
 
                          else
-                            "(remote)"
+                            " (remote)"
                         )
                     ]
                 ]
@@ -1700,12 +1684,12 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                 , E.width E.fill
                 , E.paddingXY 5 0
                 ]
-                ([ if wclass == Narrow then
+                [ if wclass == Narrow then
                     showpagelink
 
-                   else
+                  else
                     E.none
-                 , EI.multiline
+                , EI.multiline
                     ([ if editable then
                         EF.color TC.black
 
@@ -1732,14 +1716,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                     , label = EI.labelHidden "markdown input"
                     , spellcheck = False
                     }
-
-                 -- , divider
-                 ]
-                 -- ++ showComments
-                 -- -- show the links.
-                 -- ++ [ divider ]
-                 -- ++ showLinks linkbkc
-                )
+                ]
 
         mbdi =
             blockDndSystem.info model.blockDnd
@@ -1753,11 +1730,6 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                 , E.paddingXY 5 0
                 ]
             <|
-                -- [E.column
-                --     [ E.centerX
-                --     , E.paddingXY 0 10
-                --     , E.spacing 8
-                --     ]
                 [ E.row [ E.width E.fill, E.spacing 8 ]
                     [ E.paragraph [ EF.bold ] [ E.text model.title ]
                     , EI.button Common.buttonStyle
@@ -1819,11 +1791,6 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                         E.text e
                 ]
 
-        -- :: (if wclass == Wide then
-        --         []
-        --     else
-        --         showComments ++ showLinks linkbkc
-        --    )
         pxy =
             [ E.paddingXY 10 0 ]
 
@@ -1881,17 +1848,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                 )
 
         rawOrEviewPanel =
-            E.column
-                [-- E.spacing 8
-                 -- , E.alignTop
-                 -- , E.alignRight
-                 -- , E.width spwidth
-                 -- , EBd.width 1
-                 -- , EBd.color TC.darkGrey
-                 -- , EBd.rounded 10
-                 -- , EBk.color TC.white
-                 -- , E.clip
-                ]
+            E.column []
                 (Common.navbar 2
                     (case model.editOrView of
                         EditView ->
@@ -1995,8 +1952,6 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                 , EBd.width 1
                 , EBd.color TC.darkGrey
                 , EBd.rounded 10
-
-                -- , E.clip
                 , E.width E.fill
                 , E.height E.fill
                 , EBk.color TC.white
@@ -2050,7 +2005,6 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                                    ]
                        )
                     ++ showComments
-                    -- show the links.
                     ++ [ divider ]
                     ++ showLinks TC.white
     in
@@ -2126,12 +2080,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                     , E.alignTop
                     , E.spacing 8
                     ]
-                    -- [ headingPanel "raw" [ E.width E.fill ] (editview TC.white)
-                    -- , headingPanel "eview" [ E.width E.fill ] (mdview TC.white)
                     [ headingPanel "document" [ E.width E.fill ] <| documentPanel
-
-                    -- rawOrEviewPanel ]
-                    -- [ rawOrEviewPanel
                     , searchOrRecentPanel
                     ]
 
