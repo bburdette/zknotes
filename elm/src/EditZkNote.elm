@@ -1510,7 +1510,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
             else
                 [ EF.color TC.darkGrey ]
 
-        editview linkbkc =
+        editmeta =
             let
                 titleed =
                     EI.text
@@ -1554,7 +1554,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                 , E.width E.fill
                 , E.paddingXY 5 0
                 ]
-                ([ E.paragraph [ E.padding 10, E.width E.fill, E.spacingXY 3 17 ] <|
+                [ E.paragraph [ E.padding 10, E.width E.fill, E.spacingXY 3 17 ] <|
                     List.intersperse (E.text " ")
                         [ if isdirty then
                             EI.button parabuttonstyle { onPress = Just RevertPress, label = E.text "revert" }
@@ -1612,8 +1612,8 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                           else
                             EI.button (E.alignRight :: Common.disabledButtonStyle) { onPress = Nothing, label = E.text "delete" }
                         ]
-                 , titleed
-                 , if mine then
+                , titleed
+                , if mine then
                     EI.checkbox [ E.width E.shrink ]
                         { onChange =
                             if editable then
@@ -1626,7 +1626,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                         , label = EI.labelLeft edlabelattr (E.text "editable")
                         }
 
-                   else
+                  else
                     E.row [ E.spacing 8, E.width E.fill ]
                         [ EI.checkbox [ E.width E.shrink ]
                             { onChange = always Noop -- can't change editable unless you're the owner.
@@ -1636,7 +1636,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                             }
                         , E.row [ E.spacing 8, E.alignRight, EF.color TC.darkGrey ] [ E.text "creator", E.el [ EF.bold ] <| E.text model.noteUserName ]
                         ]
-                 , EI.checkbox [ E.width E.shrink ]
+                , EI.checkbox [ E.width E.shrink ]
                     { onChange =
                         if mine && editable then
                             ShowTitlePress
@@ -1647,7 +1647,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                     , checked = model.showtitle
                     , label = EI.labelLeft edlabelattr (E.text "show title")
                     }
-                 , E.row [ E.spacing 8, E.width E.fill ]
+                , E.row [ E.spacing 8, E.width E.fill ]
                     [ EI.checkbox [ E.width E.shrink ]
                         { onChange =
                             if editable then
@@ -1680,7 +1680,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                       else
                         E.none
                     ]
-                 , E.row [ E.spacing 8, E.width E.fill ]
+                , E.row [ E.spacing 8, E.width E.fill ]
                     [ E.text "server: "
                     , E.text model.server
                     , E.text
@@ -1691,7 +1691,16 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                             "(remote)"
                         )
                     ]
-                 , if wclass == Narrow then
+                ]
+
+        editview linkbkc =
+            E.column
+                [ E.spacing 8
+                , E.alignTop
+                , E.width E.fill
+                , E.paddingXY 5 0
+                ]
+                ([ if wclass == Narrow then
                     showpagelink
 
                    else
@@ -1877,6 +1886,39 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                        ]
                 )
 
+        rawOrEviewPanel =
+            E.column
+                [-- E.spacing 8
+                 -- , E.alignTop
+                 -- , E.alignRight
+                 -- , E.width spwidth
+                 -- , EBd.width 1
+                 -- , EBd.color TC.darkGrey
+                 -- , EBd.rounded 10
+                 -- , EBk.color TC.white
+                 -- , E.clip
+                ]
+                (Common.navbar 2
+                    (case model.editOrView of
+                        EditView ->
+                            EtEdit
+
+                        ViewView ->
+                            EtView
+                    )
+                    TabChanged
+                    [ ( EtEdit, "raw" )
+                    , ( EtView, "eview" )
+                    ]
+                    :: [ case model.editOrView of
+                            EditView ->
+                                editview TC.white
+
+                            ViewView ->
+                                mdview TC.white
+                       ]
+                )
+
         searchPanel bkcolor =
             E.column
                 (E.spacing 3 :: E.width E.fill :: sppad)
@@ -1937,7 +1979,8 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                  , EBd.width 1
                  , EBd.color TC.darkGrey
                  , EBd.rounded 10
-                 , E.clip
+
+                 -- , E.clip
                  , E.height E.fill
                  , EBk.color TC.white
                  ]
@@ -1949,6 +1992,46 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                     [ ( (), name )
                     ]
                 , elt
+                ]
+
+        documentPanel =
+            E.column
+                [ E.spacing 12
+                , E.alignTop
+                , EBd.width 1
+                , EBd.color TC.darkGrey
+                , EBd.rounded 10
+
+                -- , E.clip
+                , E.width E.fill
+                , E.height E.fill
+                , EBk.color TC.white
+                ]
+                [ editmeta
+                , Common.navbar 2
+                    (case model.editOrView of
+                        EditView ->
+                            EtEdit
+
+                        ViewView ->
+                            EtView
+                    )
+                    TabChanged
+                    [ ( EtView, "eview" )
+                    , ( EtEdit
+                      , if editable then
+                            "raw"
+
+                        else
+                            "raw"
+                      )
+                    ]
+                , case model.editOrView of
+                    EditView ->
+                        editview TC.white
+
+                    ViewView ->
+                        mdview TC.white
                 ]
     in
     E.column
@@ -2023,8 +2106,23 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                     , E.alignTop
                     , E.spacing 8
                     ]
-                    [ headingPanel "raw" [ E.width E.fill ] (editview TC.white)
-                    , headingPanel "eview" [ E.width E.fill ] (mdview TC.white)
+                    -- [ headingPanel "raw" [ E.width E.fill ] (editview TC.white)
+                    -- , headingPanel "eview" [ E.width E.fill ] (mdview TC.white)
+                    [ headingPanel "document" [ E.width E.fill ] <|
+                        E.column [ E.spacing 8, E.centerX ]
+                            [ editmeta
+                            , E.row
+                                [ E.width E.fill
+                                , E.alignTop
+                                , E.spacing 8
+                                ]
+                                [ headingPanel "raw" [ E.width E.fill ] (editview TC.white)
+                                , headingPanel "eview" [ E.width E.fill ] (mdview TC.white)
+                                ]
+                            ]
+
+                    -- rawOrEviewPanel ]
+                    -- [ rawOrEviewPanel
                     , searchOrRecentPanel
                     ]
 
@@ -2033,42 +2131,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                     [ E.width E.fill
                     , E.spacing 8
                     ]
-                    [ E.column
-                        [ E.spacing 12
-                        , E.alignTop
-                        , EBd.width 1
-                        , EBd.color TC.darkGrey
-                        , EBd.rounded 10
-                        , E.clip
-                        , E.width E.fill
-                        , E.height E.fill
-                        , EBk.color TC.white
-                        ]
-                        [ Common.navbar 2
-                            (case model.editOrView of
-                                EditView ->
-                                    EtEdit
-
-                                ViewView ->
-                                    EtView
-                            )
-                            TabChanged
-                            [ ( EtView, "eview" )
-                            , ( EtEdit
-                              , if editable then
-                                    "raw"
-
-                                else
-                                    "raw"
-                              )
-                            ]
-                        , case model.editOrView of
-                            EditView ->
-                                editview TC.white
-
-                            ViewView ->
-                                mdview TC.white
-                        ]
+                    [ headingPanel "document" [ E.width E.fill ] <| documentPanel
                     , searchOrRecentPanel
                     ]
 
@@ -2077,23 +2140,23 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                     [ Common.navbar 2
                         model.tab
                         TabChanged
-                        [ ( EtView, "eview" )
-                        , ( EtEdit
-                          , if editable then
-                                "raw"
+                        [ ( case model.editOrView of
+                                EditView ->
+                                    EtEdit
 
-                            else
-                                "raw"
+                                ViewView ->
+                                    EtView
+                          , "document"
                           )
                         , ( EtSearch, "search" )
                         , ( EtRecent, "recent" )
                         ]
                     , case model.tab of
                         EtEdit ->
-                            editview TC.lightGray
+                            documentPanel
 
                         EtView ->
-                            mdview TC.lightGray
+                            documentPanel
 
                         EtSearch ->
                             searchPanel TC.lightGray
