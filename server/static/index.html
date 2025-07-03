@@ -82,17 +82,14 @@
 
       // DNDList
       app.ports.releasePointerCapture.subscribe( event => {
-          event.target.releasePointerCapture(event.pointerId)
+        event.target.releasePointerCapture(event.pointerId)
       })
-
       window.addEventListener("pointermove", (event) => {
-          app.ports.onPointerMove.send(event);
+        app.ports.onPointerMove.send(event);
       });
-
       window.addEventListener("pointerup", (event) => {
-          app.ports.onPointerUp.send(event);
+        app.ports.onPointerUp.send(event);
       });
-
 
     </script>
   </body>
