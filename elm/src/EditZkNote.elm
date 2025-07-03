@@ -1740,10 +1740,10 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                  , dates
                  , divider
                  ]
-                    ++ showComments
-                    -- show the links.
-                    ++ [ divider ]
-                    ++ showLinks linkbkc
+                 -- ++ showComments
+                 -- -- show the links.
+                 -- ++ [ divider ]
+                 -- ++ showLinks linkbkc
                 )
 
         mbdi =
@@ -1758,78 +1758,77 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                 , E.paddingXY 5 0
                 ]
             <|
-                E.column
-                    [ E.centerX
-                    , E.paddingXY 0 10
-                    , E.spacing 8
+                -- [E.column
+                --     [ E.centerX
+                --     , E.paddingXY 0 10
+                --     , E.spacing 8
+                --     ]
+                [ E.row [ E.width E.fill, E.spacing 8 ]
+                    [ E.paragraph [ EF.bold ] [ E.text model.title ]
+                    , EI.button Common.buttonStyle
+                        { onPress = Just NewBlock
+                        , label = E.text "+"
+                        }
+                    , EI.button Common.buttonStyle
+                        { onPress = Just ViewPress
+                        , label = ZC.fullScreen
+                        }
+                    , if search then
+                        EI.button (E.alignRight :: Common.buttonStyle)
+                            (case
+                                JD.decodeString Data.tagSearchDecoder (EM.getMd model.edMarkdown)
+                                    |> Result.toMaybe
+                             of
+                                Just s ->
+                                    { label = E.text ">", onPress = Just <| SetSearch s }
+
+                                Nothing ->
+                                    { label = E.text ">", onPress = Just <| SetSearchString model.title }
+                            )
+
+                      else
+                        EI.button (E.alignRight :: Common.buttonStyle)
+                            { label = E.text ">", onPress = Just <| AddToSearchAsTag model.title }
                     ]
-                    [ E.row [ E.width E.fill, E.spacing 8 ]
-                        [ E.paragraph [ EF.bold ] [ E.text model.title ]
-                        , EI.button Common.buttonStyle
-                            { onPress = Just NewBlock
-                            , label = E.text "+"
-                            }
-                        , EI.button Common.buttonStyle
-                            { onPress = Just ViewPress
-                            , label = ZC.fullScreen
-                            }
-                        , if search then
-                            EI.button (E.alignRight :: Common.buttonStyle)
-                                (case
-                                    JD.decodeString Data.tagSearchDecoder (EM.getMd model.edMarkdown)
-                                        |> Result.toMaybe
-                                 of
-                                    Just s ->
-                                        { label = E.text ">", onPress = Just <| SetSearch s }
+                , case ( model.filestatus, toZkNote model ) of
+                    ( Data.FilePresent, Just zkn ) ->
+                        MC.noteFile model.fui Nothing model.title zkn
 
-                                    Nothing ->
-                                        { label = E.text ">", onPress = Just <| SetSearchString model.title }
-                                )
+                    ( Data.FileMissing, Just _ ) ->
+                        E.text <| "file missing"
 
-                          else
-                            EI.button (E.alignRight :: Common.buttonStyle)
-                                { label = E.text ">", onPress = Just <| AddToSearchAsTag model.title }
-                        ]
-                    , case ( model.filestatus, toZkNote model ) of
-                        ( Data.FilePresent, Just zkn ) ->
-                            MC.noteFile model.fui Nothing model.title zkn
+                    ( Data.NotAFile, Just _ ) ->
+                        E.none
 
-                        ( Data.FileMissing, Just _ ) ->
-                            E.text <| "file missing"
+                    ( _, Nothing ) ->
+                        E.none
+                , case EM.getBlocks model.edMarkdown of
+                    Ok blocks ->
+                        renderBlocks zone
+                            model.fui
+                            model.cells
+                            noteCache
+                            (if editable then
+                                MC.EditView
 
-                        ( Data.NotAFile, Just _ ) ->
-                            E.none
+                             else
+                                MC.PublicView
+                            )
+                            mdw
+                            isdirty
+                            model.blockEdit
+                            mbdi
+                            blocks
 
-                        ( _, Nothing ) ->
-                            E.none
-                    , case EM.getBlocks model.edMarkdown of
-                        Ok blocks ->
-                            renderBlocks zone
-                                model.fui
-                                model.cells
-                                noteCache
-                                (if editable then
-                                    MC.EditView
+                    Err e ->
+                        E.text e
+                ]
 
-                                 else
-                                    MC.PublicView
-                                )
-                                mdw
-                                isdirty
-                                model.blockEdit
-                                mbdi
-                                blocks
-
-                        Err e ->
-                            E.text e
-                    ]
-                    :: (if wclass == Wide then
-                            []
-
-                        else
-                            showComments ++ showLinks linkbkc
-                       )
-
+        -- :: (if wclass == Wide then
+        --         []
+        --     else
+        --         showComments ++ showLinks linkbkc
+        --    )
         pxy =
             [ E.paddingXY 10 0 ]
 
@@ -2007,6 +2006,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                 , E.height E.fill
                 , EBk.color TC.white
                 ]
+            <|
                 [ editmeta
                 , Common.navbar 2
                     (case model.editOrView of
@@ -2033,6 +2033,10 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                     ViewView ->
                         mdview TC.white
                 ]
+                    ++ showComments
+                    -- show the links.
+                    ++ [ divider ]
+                    ++ showLinks TC.white
     in
     E.column
         [ E.width E.fill
@@ -2109,7 +2113,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                     -- [ headingPanel "raw" [ E.width E.fill ] (editview TC.white)
                     -- , headingPanel "eview" [ E.width E.fill ] (mdview TC.white)
                     [ headingPanel "document" [ E.width E.fill ] <|
-                        E.column [ E.spacing 8, E.centerX ]
+                        E.column [ E.spacing 8, E.centerX ] <|
                             [ editmeta
                             , E.row
                                 [ E.width E.fill
@@ -2120,6 +2124,10 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                                 , headingPanel "eview" [ E.width E.fill ] (mdview TC.white)
                                 ]
                             ]
+                                ++ showComments
+                                -- show the links.
+                                ++ [ divider ]
+                                ++ showLinks TC.white
 
                     -- rawOrEviewPanel ]
                     -- [ rawOrEviewPanel
