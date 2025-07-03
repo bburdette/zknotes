@@ -2003,6 +2003,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                 ]
             <|
                 editmeta
+                    :: dates
                     :: (if wclass == Wide then
                             [ E.row
                                 [ E.width E.fill
