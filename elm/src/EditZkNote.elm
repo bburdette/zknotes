@@ -1732,13 +1732,8 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                     , label = EI.labelHidden "markdown input"
                     , spellcheck = False
                     }
-                 , if isdirty then
-                    EI.button perhapsdirtybutton { onPress = Just SavePress, label = E.text "save" }
 
-                   else
-                    E.none
-                 , dates
-                 , divider
+                 -- , divider
                  ]
                  -- ++ showComments
                  -- -- show the links.
@@ -2007,32 +2002,52 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                 , EBk.color TC.white
                 ]
             <|
-                [ editmeta
-                , Common.navbar 2
-                    (case model.editOrView of
-                        EditView ->
-                            EtEdit
-
-                        ViewView ->
-                            EtView
-                    )
-                    TabChanged
-                    [ ( EtView, "eview" )
-                    , ( EtEdit
-                      , if editable then
-                            "raw"
+                editmeta
+                    :: (if wclass == Wide then
+                            [ E.row
+                                [ E.width E.fill
+                                , E.alignTop
+                                , E.spacing 8
+                                ]
+                                [ headingPanel "raw" [ E.width E.fill ] (editview TC.white)
+                                , headingPanel "eview" [ E.width E.fill ] (mdview TC.white)
+                                ]
+                            ]
 
                         else
-                            "raw"
-                      )
-                    ]
-                , case model.editOrView of
-                    EditView ->
-                        editview TC.white
+                            [ Common.navbar 2
+                                (case model.editOrView of
+                                    EditView ->
+                                        EtEdit
 
-                    ViewView ->
-                        mdview TC.white
-                ]
+                                    ViewView ->
+                                        EtView
+                                )
+                                TabChanged
+                                [ ( EtView, "eview" )
+                                , ( EtEdit
+                                  , if editable then
+                                        "raw"
+
+                                    else
+                                        "raw"
+                                  )
+                                ]
+                            , case model.editOrView of
+                                EditView ->
+                                    editview TC.white
+
+                                ViewView ->
+                                    mdview TC.white
+                            ]
+                                ++ [ if isdirty then
+                                        EI.button perhapsdirtybutton { onPress = Just SavePress, label = E.text "save" }
+
+                                     else
+                                        E.none
+                                   , dates
+                                   ]
+                       )
                     ++ showComments
                     -- show the links.
                     ++ [ divider ]
@@ -2112,22 +2127,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                     ]
                     -- [ headingPanel "raw" [ E.width E.fill ] (editview TC.white)
                     -- , headingPanel "eview" [ E.width E.fill ] (mdview TC.white)
-                    [ headingPanel "document" [ E.width E.fill ] <|
-                        E.column [ E.spacing 8, E.centerX ] <|
-                            [ editmeta
-                            , E.row
-                                [ E.width E.fill
-                                , E.alignTop
-                                , E.spacing 8
-                                ]
-                                [ headingPanel "raw" [ E.width E.fill ] (editview TC.white)
-                                , headingPanel "eview" [ E.width E.fill ] (mdview TC.white)
-                                ]
-                            ]
-                                ++ showComments
-                                -- show the links.
-                                ++ [ divider ]
-                                ++ showLinks TC.white
+                    [ headingPanel "document" [ E.width E.fill ] <| documentPanel
 
                     -- rawOrEviewPanel ]
                     -- [ rawOrEviewPanel
