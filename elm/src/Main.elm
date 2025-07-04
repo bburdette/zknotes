@@ -2989,6 +2989,9 @@ actualupdate msg model =
         ( EditZkNoteMsg em, EditZkNote es login ) ->
             handleEditZkNoteCmd model login (EditZkNote.update em es)
 
+        ( EditZkNoteMsg EditZkNote.Noop, _ ) ->
+            ( model, Cmd.none )
+
         ( EditZkNoteListingMsg em, EditZkNoteListing es login ) ->
             handleEditZkNoteListing model login (EditZkNoteListing.update em es model.spmodel model.zknSearchResult login)
 

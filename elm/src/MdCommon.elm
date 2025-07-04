@@ -41,6 +41,8 @@ import Element.Input as EI
 import Element.Region as ER
 import Html
 import Html.Attributes as HA
+import Html.Events as HE
+import Json.Decode as JD
 import Markdown.Block as Block exposing (Block, ListItem(..), Task(..), foldl, inlineFoldl)
 import Markdown.Html
 import Markdown.Parser
@@ -165,8 +167,8 @@ type ViewMode
     | EditView
 
 
-link : Maybe String -> String -> List (Element a) -> Element a
-link title destination body =
+link : String -> List (Element a) -> Element a
+link destination body =
     (if String.contains ":" destination then
         E.newTabLink
 
@@ -183,6 +185,27 @@ link title destination body =
                 ]
                 body
         }
+
+
+nooplink : String -> List (Element a) -> a -> Element a
+nooplink destination body noop =
+    E.el [ E.htmlAttribute <| HE.stopPropagationOn "click" (JD.succeed ( noop, True )) ] <|
+        (if String.contains ":" destination then
+            E.newTabLink
+
+         else
+            E.link
+        )
+            [ E.htmlAttribute (HA.style "display" "inline-flex") ]
+            { url = destination
+            , label =
+                E.paragraph
+                    [ EF.color (E.rgb255 0 0 255)
+                    , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
+                    , E.htmlAttribute (HA.style "word-break" "break-word")
+                    ]
+                    body
+            }
 
 
 renderText : String -> Element msg
@@ -211,6 +234,7 @@ type alias MkrArgs a =
     , showPanelElt : Bool
     , onchanged : String -> String -> a
     , noteCache : NoteCache
+    , noop : a
     }
 
 
@@ -227,7 +251,7 @@ mkRenderer args =
     , strikethrough = \content -> E.paragraph [ EF.strike ] content
     , codeSpan = codeSpan
     , link =
-        \{ title, destination } body -> link title destination body
+        \{ title, destination } body -> nooplink destination body args.noop
     , hardLineBreak = Html.br [] [] |> E.html
     , image =
         \image ->
@@ -316,7 +340,7 @@ elmUiHtml args =
             cellView args.cellDict renderedChildren name schelmeCode args.onchanged
     , searchView =
         \search renderedChildren ->
-            searchView args.viewMode args.addToSearchMsg search renderedChildren
+            searchView args.viewMode args.addToSearchMsg args.noop search renderedChildren
     , panelView =
         \noteid renderedChildren ->
             case zkNoteIdFromString noteid of
@@ -436,8 +460,8 @@ htmlTextTag tag attrs =
         ++ "/>\n\n"
 
 
-searchView : ViewMode -> (String -> a) -> String -> List (Element a) -> Element a
-searchView viewMode addToSearchMsg search renderedChildren =
+searchView : ViewMode -> (String -> a) -> a -> String -> List (Element a) -> Element a
+searchView viewMode addToSearchMsg noop search renderedChildren =
     E.row [ EBk.color TC.darkGray, E.padding 3, E.spacing 3 ]
         (E.el [ EF.italic ] (E.text "search: ")
             :: E.paragraph [] [ E.text search ]
@@ -446,11 +470,16 @@ searchView viewMode addToSearchMsg search renderedChildren =
                         E.none
 
                     EditView ->
-                        EI.button
-                            (buttonStyle ++ [ EBk.color TC.darkGray ])
-                            { label = E.el [ E.centerY, EF.color TC.blue, EF.bold ] <| E.text ">"
-                            , onPress = Just <| addToSearchMsg search
-                            }
+                        E.el
+                            [ E.htmlAttribute <|
+                                HE.stopPropagationOn "click" (JD.succeed ( noop, True ))
+                            ]
+                        <|
+                            EI.button
+                                (buttonStyle ++ [ EBk.color TC.darkGray ])
+                                { label = E.el [ E.centerY, EF.color TC.blue, EF.bold ] <| E.text ">"
+                                , onPress = Just <| addToSearchMsg search
+                                }
                )
             :: renderedChildren
         )
@@ -507,12 +536,11 @@ audioNoteView fui zkn =
             fui.filelocation ++ "/file/" ++ zkNoteIdToString zkn.id
     in
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
-        [ link (Just zkn.title) ("/note/" ++ zkNoteIdToString zkn.id) [ E.text zkn.title ]
+        [ link ("/note/" ++ zkNoteIdToString zkn.id) [ E.text zkn.title ]
         , E.row [ E.spacing 20 ]
             [ htmlAudioView fileurl zkn.title
             , if fui.tauri || List.filter (\i -> i == DataUtil.sysids.publicid) zkn.sysids /= [] then
                 link
-                    (Just "ts↗")
                     ("https://29a.ch/timestretch/#a=" ++ fui.location ++ "/file/" ++ zkNoteIdToString zkn.id)
                     [ E.text "ts↗" ]
 
@@ -530,7 +558,7 @@ videoNoteView fui zknote =
             fui.filelocation ++ "/file/" ++ zkNoteIdToString zknote.id
     in
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
-        [ link (Just zknote.title) ("/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
+        [ link ("/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
         , videoView fui 500 fileurl (Just zknote.title) Nothing Nothing []
         ]
 
@@ -542,7 +570,7 @@ imageNoteView fui zknote =
             fui.filelocation ++ "/file/" ++ zkNoteIdToString zknote.id
     in
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
-        [ link (Just zknote.title) ("/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
+        [ link ("/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
         , E.paragraph [] [ E.text fileurl ]
         , imageView fui zknote.title fileurl Nothing []
         ]
@@ -591,7 +619,7 @@ noteFile fui mbns filename zknote =
                     imageNoteView fui zknote
 
                 _ ->
-                    link (Just zknote.title) (fui.filelocation ++ "/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
+                    link (fui.filelocation ++ "/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
 
 
 type alias NoteShow =

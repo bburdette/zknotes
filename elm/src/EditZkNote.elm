@@ -1137,6 +1137,7 @@ mkrargs model zone nc viewMode mdw =
     , showPanelElt = True
     , onchanged = OnSchelmeCodeChanged
     , noteCache = nc
+    , noop = Noop
     }
 
 
@@ -1154,6 +1155,7 @@ renderReadMd zone fui cd noteCache vm md mdw =
                 , showPanelElt = True
                 , onchanged = OnSchelmeCodeChanged
                 , noteCache = noteCache
+                , noop = Noop
                 }
             )
             md
@@ -1189,6 +1191,7 @@ renderBlocks zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo blocks =
                 , showPanelElt = True
                 , onchanged = OnSchelmeCodeChanged
                 , noteCache = noteCache
+                , noop = Noop
                 }
 
         headingText : String -> Element Msg

@@ -131,6 +131,7 @@ view zone maxw noteCache model loggedin =
                                                 , showPanelElt = False
                                                 , onchanged = OnSchelmeCodeChanged
                                                 , noteCache = noteCache
+                                                , noop = Noop
                                                 }
                                             )
                                             pn.zknote.content
@@ -190,6 +191,7 @@ view zone maxw noteCache model loggedin =
                                 , showPanelElt = False
                                 , onchanged = OnSchelmeCodeChanged
                                 , noteCache = noteCache
+                                , noop = Noop
                                 }
                             )
                             model.md
