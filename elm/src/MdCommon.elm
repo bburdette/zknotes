@@ -189,23 +189,24 @@ link destination body =
 
 nooplink : String -> List (Element a) -> a -> Element a
 nooplink destination body noop =
-    E.el [ E.htmlAttribute <| HE.stopPropagationOn "click" (JD.succeed ( noop, True )) ] <|
-        (if String.contains ":" destination then
-            E.newTabLink
+    (if String.contains ":" destination then
+        E.newTabLink
 
-         else
-            E.link
-        )
-            [ E.htmlAttribute (HA.style "display" "inline-flex") ]
-            { url = destination
-            , label =
-                E.paragraph
-                    [ EF.color (E.rgb255 0 0 255)
-                    , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
-                    , E.htmlAttribute (HA.style "word-break" "break-word")
-                    ]
-                    body
-            }
+     else
+        E.link
+    )
+        [ E.htmlAttribute (HA.style "display" "inline-flex")
+        , E.htmlAttribute <| HE.stopPropagationOn "click" (JD.succeed ( noop, True ))
+        ]
+        { url = destination
+        , label =
+            E.paragraph
+                [ EF.color (E.rgb255 0 0 255)
+                , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
+                , E.htmlAttribute (HA.style "word-break" "break-word")
+                ]
+                body
+        }
 
 
 renderText : String -> Element msg
@@ -470,16 +471,16 @@ searchView viewMode addToSearchMsg noop search renderedChildren =
                         E.none
 
                     EditView ->
-                        E.el
-                            [ E.htmlAttribute <|
-                                HE.stopPropagationOn "click" (JD.succeed ( noop, True ))
-                            ]
-                        <|
-                            EI.button
-                                (buttonStyle ++ [ EBk.color TC.darkGray ])
-                                { label = E.el [ E.centerY, EF.color TC.blue, EF.bold ] <| E.text ">"
-                                , onPress = Just <| addToSearchMsg search
-                                }
+                        EI.button
+                            (buttonStyle
+                                ++ [ E.htmlAttribute <|
+                                        HE.stopPropagationOn "click" (JD.succeed ( noop, True ))
+                                   , EBk.color TC.darkGray
+                                   ]
+                            )
+                            { label = E.el [ E.centerY, EF.color TC.blue, EF.bold ] <| E.text ">"
+                            , onPress = Just <| addToSearchMsg search
+                            }
                )
             :: renderedChildren
         )
