@@ -298,7 +298,7 @@ mkRenderer args =
                 (items
                     |> List.indexedMap
                         (\index itemBlocks ->
-                            E.row [ E.width E.fill ]
+                            E.paragraph [ E.width E.fill ]
                                 (E.text
                                     (String.fromInt (index + startingIndex)
                                         ++ " "
