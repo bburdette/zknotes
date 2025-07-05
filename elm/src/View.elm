@@ -169,7 +169,7 @@ view zone maxw noteCache model loggedin =
                         (\zkn ->
                             case zkn.filestatus of
                                 Data.FilePresent ->
-                                    MC.noteFile model.fui Nothing model.title zkn
+                                    MC.noteFile model.fui mw Nothing model.title zkn
 
                                 Data.FileMissing ->
                                     E.text <| "file missing"

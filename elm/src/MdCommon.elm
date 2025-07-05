@@ -552,15 +552,15 @@ audioNoteView fui zkn =
         ]
 
 
-videoNoteView : FileUrlInfo -> Data.ZkNote -> Element a
-videoNoteView fui zknote =
+videoNoteView : FileUrlInfo -> Int -> Data.ZkNote -> Element a
+videoNoteView fui maxw zknote =
     let
         fileurl =
             fui.filelocation ++ "/file/" ++ zkNoteIdToString zknote.id
     in
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
         [ link ("/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
-        , videoView fui 500 fileurl (Just zknote.title) Nothing Nothing []
+        , videoView fui maxw fileurl (Just zknote.title) Nothing Nothing []
         ]
 
 
@@ -577,8 +577,8 @@ imageNoteView fui zknote =
         ]
 
 
-noteFile : FileUrlInfo -> Maybe NoteShow -> String -> Data.ZkNote -> Element a
-noteFile fui mbns filename zknote =
+noteFile : FileUrlInfo -> Int -> Maybe NoteShow -> String -> Data.ZkNote -> Element a
+noteFile fui maxw mbns filename zknote =
     let
         suffix =
             String.split "." filename
@@ -602,13 +602,13 @@ noteFile fui mbns filename zknote =
                     audioNoteView fui zknote
 
                 "mp4" ->
-                    videoNoteView fui zknote
+                    videoNoteView fui maxw zknote
 
                 "webm" ->
-                    videoNoteView fui zknote
+                    videoNoteView fui maxw zknote
 
                 "mkv" ->
-                    videoNoteView fui zknote
+                    videoNoteView fui maxw zknote
 
                 "jpg" ->
                     imageNoteView fui zknote
@@ -755,7 +755,7 @@ noteView args id show text _ =
                     , if ns.file then
                         case zne.zknote.filestatus of
                             Data.FilePresent ->
-                                noteFile args.fui (Just ns) zne.zknote.title zne.zknote
+                                noteFile args.fui args.maxw (Just ns) zne.zknote.title zne.zknote
 
                             Data.FileMissing ->
                                 E.paragraph []
