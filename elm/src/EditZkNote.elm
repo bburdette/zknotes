@@ -1298,9 +1298,6 @@ renderBlocks zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo blocks =
                                                                 }
                                                             , headingText "GUI edit: "
                                                             , E.map EditBlockMsg <| MG.guiBlock t.b
-
-                                                            -- , EI.button Common.buttonStyle
-                                                            --     { label = E.text "ok", onPress = Just EditBlockOk }
                                                             ]
 
                                                 else

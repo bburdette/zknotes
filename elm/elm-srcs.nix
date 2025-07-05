@@ -40,6 +40,11 @@
         version = "1.0.1";
       };
 
+      "ceddlyburge/dnd-list" = {
+        sha256 = "0d9c54zyzzmji2snyblx2342kvvigizra1zik8y7r0xdb6v9wj22";
+        version = "1.0.0";
+      };
+
       "dillonkearns/elm-markdown" = {
         sha256 = "05chrkn14b3yyv3sq3466ys4bhwdxva853fzbyc1dyjpk3vslqsc";
         version = "7.0.0";
