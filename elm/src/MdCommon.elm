@@ -802,8 +802,11 @@ noteView args id show text _ =
 
 
 videoView : FileUrlInfo -> Int -> String -> Maybe String -> Maybe String -> Maybe String -> List (Element a) -> Element a
-videoView fui maxw url mbtext mbwidth mbheight renderedChildren =
+videoView fui mw url mbtext mbwidth mbheight renderedChildren =
     let
+        maxw =
+            mw + 50
+
         attribs =
             List.filterMap identity
                 [ mbwidth
@@ -816,17 +819,16 @@ videoView fui maxw url mbtext mbwidth mbheight renderedChildren =
                 , Just <| HA.controls True
                 ]
     in
-    E.el [] <|
-        E.html <|
-            Html.video
-                attribs
-                [ Html.source
-                    [ HA.attribute "src" (fileUrl fui url) ]
-                    [ mbtext
-                        |> Maybe.map (\s -> Html.text s)
-                        |> Maybe.withDefault (Html.text "video")
-                    ]
+    E.html <|
+        Html.video
+            attribs
+            [ Html.source
+                [ HA.attribute "src" (fileUrl fui url) ]
+                [ mbtext
+                    |> Maybe.map (\s -> Html.text s)
+                    |> Maybe.withDefault (Html.text "video")
                 ]
+            ]
 
 
 cellView : CellDict -> List (Element a) -> String -> String -> (String -> String -> a) -> Element a

@@ -1244,7 +1244,7 @@ renderBlocks zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo blocks =
                                                             [ E.width E.fill
                                                             , E.spacing 8
                                                             ]
-                                                            [ E.column [ EE.onClick EditBlockOk, E.width E.fill, E.spacing 8 ]
+                                                            [ E.column [ E.padding 2, EBd.glow TC.darkGray 5.0, EE.onClick EditBlockOk, E.width E.fill, E.spacing 8 ]
                                                                 [ E.row (E.height E.shrink :: MG.rowtrib)
                                                                     [ headingText "rendered: "
                                                                     , if t.original /= t.s then
@@ -1257,7 +1257,7 @@ renderBlocks zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo blocks =
                                                                         E.none
                                                                     , EI.button (edButtonStyle ++ [ E.alignRight ])
                                                                         { onPress = Just (RemoveBlock i)
-                                                                        , label = E.text "X"
+                                                                        , label = E.text "🗑"
                                                                         }
                                                                     ]
                                                                 , case MC.markdownView renderer t.s of
