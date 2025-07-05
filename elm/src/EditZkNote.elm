@@ -1,4 +1,4 @@
-module EditZkNote exposing
+port module EditZkNote exposing
     ( Command(..)
     , Model
     , Msg(..)
@@ -6,6 +6,7 @@ module EditZkNote exposing
     , TACommand(..)
     , WClass(..)
     , addComment
+    , blockDndSubscriptions
     , commentsRecieved
     , commonButtonStyle
     , compareZklinks
@@ -13,6 +14,7 @@ module EditZkNote exposing
     , dirty
     , disabledLinkButtonStyle
     , fullSave
+    , ghostView
     , initFull
     , initNew
     , isPublic
@@ -27,7 +29,6 @@ module EditZkNote exposing
     , onTASelection
     , onWkKeyPress
     , pageLink
-    , renderMd
     , replaceOrAdd
     , saveZkLinkList
     , setHomeNote
@@ -52,6 +53,8 @@ import Data exposing (Direction(..), EditLink, EditTab(..), ZkNoteId)
 import DataUtil exposing (FileUrlInfo, zkNoteIdToString, zklKey, zniCompare, zniEq)
 import Dialog as D
 import Dict exposing (Dict)
+import DnDList
+import EdMarkdown as EM
 import Either exposing (Either(..))
 import Element as E exposing (Element)
 import Element.Background as EBk
@@ -62,9 +65,13 @@ import Element.Input as EI
 import Html.Attributes
 import JobsDialog exposing (TJobs)
 import Json.Decode as JD
-import Markdown.Block exposing (ListItem(..), Task(..))
+import Json.Encode as JE
+import Markdown.Block exposing (Block(..), ListItem(..), Task(..))
+import Markdown.Parser
+import Markdown.Renderer
 import Maybe.Extra as ME
 import MdCommon as MC
+import MdGui as MG
 import NoteCache as NC exposing (NoteCache)
 import Orgauth.Data exposing (UserId(..))
 import RequestsDialog exposing (TRequests)
@@ -128,6 +135,14 @@ type Msg
     | JobsPress
     | FlipLink EditLink
     | ShowArchivesPress
+    | DnDMsg DnDList.Msg
+    | RevertBlock
+    | RemoveBlock Int
+    | EditBlock Int
+    | EditBlockInput String
+    | EditBlockOk
+    | NewBlock
+    | EditBlockMsg MG.Msg
     | Noop
 
 
@@ -175,7 +190,6 @@ type alias Model =
     , title : String
     , createdate : Maybe Int
     , changeddate : Maybe Int
-    , md : String
     , cells : CellDict
     , revert : Maybe Data.SaveZkNote
     , initialZklDict : Dict String EditLink
@@ -187,7 +201,14 @@ type alias Model =
     , mbReplaceString : Maybe String
     , mobile : Bool
     , server : String
+    , blockDnd : DnDList.Model
+    , edMarkdown : EM.EdMarkdown
+    , blockEdit : Maybe BlockEdit
     }
+
+
+type BlockEdit
+    = Text { idx : Int, s : String, b : Block, original : String }
 
 
 type Command
@@ -221,6 +242,231 @@ type Command
     | SyncFiles Data.ZkNoteSearch
     | SPMod (SP.Model -> ( SP.Model, SP.Command ))
     | Cmd (Cmd Msg)
+
+
+updateBlockEdit : String -> BlockEdit -> BlockEdit
+updateBlockEdit s (Text t) =
+    let
+        b =
+            s
+                |> Markdown.Parser.parse
+                |> Result.toMaybe
+                |> Maybe.andThen (\r -> List.head r)
+                |> Maybe.withDefault (Paragraph [])
+    in
+    Text { t | s = s, b = b, original = t.original }
+
+
+
+-------------------------------------------------------------------------
+-- Drag and Drop
+-------------------------------------------------------------------------
+
+
+dndIdentity : x -> x -> List a -> List a
+dndIdentity _ _ l =
+    l
+
+
+blockDndSystem : DnDList.System Block Msg
+blockDndSystem =
+    DnDList.createWithTouch
+        { beforeUpdate = dndIdentity
+        , movement = DnDList.Vertical
+        , listen = DnDList.OnDrop
+        , operation = DnDList.Rotate
+        }
+        DnDMsg
+        onPointerMove
+        onPointerUp
+        releasePointerCapture
+
+
+port onPointerMove : (JE.Value -> msg) -> Sub msg
+
+
+port onPointerUp : (JE.Value -> msg) -> Sub msg
+
+
+port releasePointerCapture : JE.Value -> Cmd msg
+
+
+blockDndSubscriptions : Model -> List (Sub Msg)
+blockDndSubscriptions model =
+    [ blockDndSystem.subscriptions model.blockDnd ]
+
+
+
+-- to be called from main.elm!
+
+
+ghostView : Model -> Time.Zone -> NoteCache -> MC.ViewMode -> Int -> Maybe (Element Msg)
+ghostView model zone nc viewMode mdw =
+    blockDndSystem.info model.blockDnd
+        |> Maybe.andThen
+            (\{ dragIndex } ->
+                EM.getBlocks model.edMarkdown
+                    |> Result.toMaybe
+                    |> Maybe.andThen (List.head << List.drop dragIndex)
+                    |> Maybe.map (\b -> ( dragIndex, b ))
+            )
+        |> Maybe.map
+            (\( i, block ) ->
+                let
+                    ma =
+                        mkrargs model zone nc viewMode mdw
+                in
+                E.el
+                    (E.alpha 0.5
+                        :: List.map E.htmlAttribute
+                            (blockDndSystem.ghostStyles model.blockDnd)
+                    )
+                    (viewBlock ma Ghost 0 (Just i) block)
+            )
+
+
+blockId : Int -> String
+blockId i =
+    "block-" ++ String.fromInt i
+
+
+edButtonStyle : List (E.Attribute a)
+edButtonStyle =
+    [ EBk.color TC.blue
+    , EF.color TC.white
+    , EBd.color TC.darkBlue
+    , E.paddingXY 3 3
+    , EBd.rounded 2
+    ]
+
+
+dragHandleWidth : Int
+dragHandleWidth =
+    10
+
+
+editBlock : DragDropWhat -> Int -> Bool -> Element Msg -> Element Msg
+editBlock ddw i focus e =
+    let
+        bid =
+            blockId i
+
+        baseAttr =
+            (if focus then
+                [ EBd.width 5 ]
+
+             else
+                []
+            )
+                ++ [ E.width E.fill
+                   , E.height E.fill
+                   , E.padding 3
+                   , E.spacing 2
+                   , E.htmlAttribute (Html.Attributes.id bid)
+                   ]
+
+        dragHandleAttrs =
+            [ E.width (E.px dragHandleWidth), E.height E.fill, EBk.color TC.gray, E.alignBottom ]
+
+        spacer =
+            E.el [ E.width (E.px dragHandleWidth), E.height E.fill ] E.none
+    in
+    case ddw of
+        Drag ->
+            E.row
+                baseAttr
+                [ E.el
+                    (E.htmlAttribute (Html.Attributes.style "touch-action" "none")
+                        :: dragHandleAttrs
+                        ++ List.map E.htmlAttribute (blockDndSystem.dragEvents i bid)
+                    )
+                    E.none
+                , spacer
+                , if focus then
+                    E.el [ E.width E.fill ] e
+
+                  else
+                    E.el [ EE.onClick (EditBlock i), E.width E.fill ] e
+                ]
+
+        Drop ->
+            E.row
+                (E.htmlAttribute (Html.Attributes.style "touch-action" "none")
+                    :: baseAttr
+                    ++ List.map E.htmlAttribute (blockDndSystem.dropEvents i bid)
+                )
+                [ E.el dragHandleAttrs E.none
+                , spacer
+                , E.el [ E.width E.fill ] e
+                ]
+
+        DropH ->
+            E.row
+                ((EBk.color TC.darkBlue
+                    :: E.htmlAttribute (Html.Attributes.style "touch-action" "none")
+                    :: baseAttr
+                 )
+                    ++ List.map E.htmlAttribute (blockDndSystem.dropEvents i bid)
+                )
+                [ E.el dragHandleAttrs E.none
+                , spacer
+                , E.el [ E.width E.fill ] e
+                ]
+
+        Ghost ->
+            E.row
+                ((EBk.color TC.darkGreen
+                    :: E.htmlAttribute (Html.Attributes.style "touch-action" "none")
+                    :: baseAttr
+                 )
+                    ++ List.map E.htmlAttribute (blockDndSystem.dragEvents i (blockId i))
+                )
+                [ E.el dragHandleAttrs E.none
+                , spacer
+                , E.el [ E.width E.fill ] e
+                ]
+
+        Inactive ->
+            E.row
+                baseAttr
+                [ E.el (dragHandleAttrs ++ [ EBk.color TC.lightGray ]) E.none
+                , spacer
+                , E.el [ E.width E.fill ] e
+                ]
+
+
+viewBlock : MC.MkrArgs Msg -> DragDropWhat -> Int -> Maybe Int -> Block -> Element Msg
+viewBlock ma ddw i focusid b =
+    case Markdown.Renderer.render (MC.mkRenderer ma) [ b ] of
+        Ok rendered ->
+            E.column
+                [ E.spacing 0
+                , E.padding 3
+                , E.width (E.fill |> E.maximum 1000)
+                , E.centerX
+                , E.alignTop
+                , EBd.width 2
+                , EBd.color TC.darkGrey
+                , EBk.color TC.lightGrey
+                ]
+                (List.map (editBlock ddw i (Just i == focusid)) rendered)
+
+        Err errors ->
+            E.text errors
+
+
+type DragDropWhat
+    = Drag
+    | Drop
+    | DropH
+    | Ghost
+    | Inactive
+
+
+
+-------------------------------------------------------------------------
+-- END Drag and Drop
+-------------------------------------------------------------------------
 
 
 setTab : EditTab -> Model -> Model
@@ -341,7 +587,7 @@ toZkNote model =
                 , username = model.noteUserName
                 , usernote = model.usernote
                 , title = model.title
-                , content = model.md
+                , content = EM.getMd model.edMarkdown
                 , pubid =
                     if model.pubidtxt /= "" then
                         Just model.pubidtxt
@@ -367,7 +613,7 @@ sznFromModel : Model -> Data.SaveZkNote
 sznFromModel model =
     { id = model.id
     , title = model.title
-    , content = model.md
+    , content = EM.getMd model.edMarkdown
     , pubid = toPubId (isPublic model) model.pubidtxt
     , editable = model.editableValue
     , showtitle = model.showtitle
@@ -428,7 +674,7 @@ dirty model =
                     (r.id == model.id)
                         && (r.pubid == toPubId (isPublic model) model.pubidtxt)
                         && (r.title == model.title)
-                        && (r.content == model.md)
+                        && (r.content == EM.getMd model.edMarkdown)
                         && (r.editable == model.editableValue)
                         && (r.showtitle == model.showtitle)
                         && (Dict.keys model.zklDict == Dict.keys model.initialZklDict)
@@ -445,7 +691,7 @@ revert model =
                     | id = r.id
                     , pubidtxt = r.pubid |> Maybe.withDefault ""
                     , title = r.title
-                    , md = r.content
+                    , edMarkdown = EM.init r.content
                     , editableValue = r.editable
                     , showtitle = r.showtitle
                     , zklDict = model.initialZklDict
@@ -719,7 +965,7 @@ showSr fontsize bkcolor model isdirty zkln =
 
                     Nothing ->
                         E.none
-                , E.row [] [ E.text <| "link: ", E.el [ EF.italic ] <| E.text model.title ]
+                , E.column [] [ E.text <| "link to current note: ", E.el [ EF.italic ] <| E.text model.title ]
                 ]
             , E.row
                 [ E.spacing 8, E.width E.fill ]
@@ -890,12 +1136,43 @@ addComment ncs =
         ]
 
 
-renderMd : FileUrlInfo -> CellDict -> NoteCache -> String -> Int -> Element Msg
-renderMd fui cd noteCache md mdw =
-    case MC.markdownView (MC.mkRenderer fui MC.EditView RestoreSearch mdw cd True OnSchelmeCodeChanged noteCache) md of
+mkrargs : Model -> Time.Zone -> NoteCache -> MC.ViewMode -> Int -> MC.MkrArgs Msg
+mkrargs model zone nc viewMode mdw =
+    { zone = zone
+    , fui = model.fui
+    , viewMode = viewMode
+    , addToSearchMsg = RestoreSearch
+    , maxw = mdw
+    , cellDict = model.cells
+    , showPanelElt = True
+    , onchanged = OnSchelmeCodeChanged
+    , noteCache = nc
+    , noop = Noop
+    }
+
+
+renderReadMd : Time.Zone -> FileUrlInfo -> CellDict -> NoteCache -> MC.ViewMode -> String -> Int -> Element Msg
+renderReadMd zone fui cd noteCache vm md mdw =
+    case
+        MC.markdownView
+            (MC.mkRenderer
+                { zone = zone
+                , fui = fui
+                , viewMode = vm
+                , addToSearchMsg = RestoreSearch
+                , maxw = mdw
+                , cellDict = cd
+                , showPanelElt = True
+                , onchanged = OnSchelmeCodeChanged
+                , noteCache = noteCache
+                , noop = Noop
+                }
+            )
+            md
+    of
         Ok rendered ->
             E.column
-                [ E.spacing 30
+                [ E.spacing 3
                 , E.padding 20
                 , E.width (E.fill |> E.maximum 1000)
                 , E.centerX
@@ -905,6 +1182,159 @@ renderMd fui cd noteCache md mdw =
                 , EBk.color TC.lightGrey
                 ]
                 rendered
+
+        Err errors ->
+            E.text errors
+
+
+renderBlocks :
+    Time.Zone
+    -> FileUrlInfo
+    -> CellDict
+    -> NoteCache
+    -> MC.ViewMode
+    -> Int
+    -> Bool
+    -> Maybe BlockEdit
+    -> Maybe DnDList.Info
+    -> List Block
+    -> Element Msg
+renderBlocks zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo blocks =
+    let
+        renderer =
+            MC.mkRenderer
+                { zone = zone
+                , fui = fui
+                , viewMode = vm
+                , addToSearchMsg = RestoreSearch
+                , maxw = mdw - dragHandleWidth
+                , cellDict = cd
+                , showPanelElt = True
+                , onchanged = OnSchelmeCodeChanged
+                , noteCache = noteCache
+                , noop = Noop
+                }
+
+        headingText : String -> Element Msg
+        headingText hs =
+            E.el [ EF.bold ] (E.text hs)
+    in
+    case
+        Markdown.Renderer.render
+            renderer
+            blocks
+    of
+        Ok rendered ->
+            E.column
+                ((if isdirty then
+                    [ EBd.glow TC.darkYellow 3 ]
+
+                  else
+                    []
+                 )
+                    ++ [ E.spacing 3
+                       , case vm of
+                            MC.PublicView ->
+                                E.padding 20
+
+                            MC.EditView ->
+                                E.paddingEach { top = 20, right = 20, bottom = 20, left = 2 }
+                       , E.width (E.fill |> E.maximum 1000)
+                       , E.centerX
+                       , E.alignTop
+                       , EBd.width 2
+                       , EBd.color TC.darkGrey
+                       , EBk.color TC.lightGrey
+                       ]
+                )
+                (List.indexedMap
+                    (\i ( b, r ) ->
+                        case vm of
+                            MC.PublicView ->
+                                r
+
+                            MC.EditView ->
+                                let
+                                    mbeb =
+                                        case mbblockedit of
+                                            Just (Text t) ->
+                                                if t.idx == i then
+                                                    Just <|
+                                                        E.column
+                                                            [ E.width E.fill
+                                                            , E.spacing 8
+                                                            ]
+                                                            [ E.column [ E.padding 2, EBd.glow TC.darkGray 5.0, EE.onClick EditBlockOk, E.width E.fill, E.spacing 8 ]
+                                                                [ E.row (E.height E.shrink :: MG.rowtrib)
+                                                                    [ headingText "rendered: "
+                                                                    , if t.original /= t.s then
+                                                                        EI.button (edButtonStyle ++ [ E.alignRight ])
+                                                                            { onPress = Just RevertBlock
+                                                                            , label = E.text "revert"
+                                                                            }
+
+                                                                      else
+                                                                        E.none
+                                                                    , EI.button (edButtonStyle ++ [ E.alignRight ])
+                                                                        { onPress = Just (RemoveBlock i)
+                                                                        , label = E.text "🗑"
+                                                                        }
+                                                                    ]
+                                                                , case MC.markdownView renderer t.s of
+                                                                    Ok elts ->
+                                                                        E.column [ E.width E.fill ] elts
+
+                                                                    Err e ->
+                                                                        E.text e
+                                                                ]
+                                                            , EI.multiline
+                                                                [ E.alignTop
+                                                                ]
+                                                                { onChange = EditBlockInput
+                                                                , text = t.s
+                                                                , placeholder = Nothing
+                                                                , label = EI.labelAbove [] (headingText "markdown edit")
+                                                                , spellcheck = False
+                                                                }
+                                                            , headingText "GUI edit: "
+                                                            , E.map EditBlockMsg <| MG.guiBlock t.b
+
+                                                            -- , EI.button Common.buttonStyle
+                                                            --     { label = E.text "ok", onPress = Just EditBlockOk }
+                                                            ]
+
+                                                else
+                                                    Nothing
+
+                                            Nothing ->
+                                                Nothing
+                                in
+                                editBlock
+                                    (case mbblockedit of
+                                        Nothing ->
+                                            case mbinfo of
+                                                Nothing ->
+                                                    Drag
+
+                                                Just { dragIndex, dropIndex } ->
+                                                    if i == dragIndex then
+                                                        Ghost
+
+                                                    else if i == dropIndex then
+                                                        DropH
+
+                                                    else
+                                                        Drop
+
+                                        Just _ ->
+                                            Inactive
+                                    )
+                                    i
+                                    (mbeb |> Maybe.map (always True) |> Maybe.withDefault False)
+                                    (mbeb |> Maybe.withDefault r)
+                    )
+                    (List.map2 (\l r -> ( l, r )) blocks rendered)
+                )
 
         Err errors ->
             E.text errors
@@ -977,7 +1407,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                 , columns =
                     [ { header = E.none
                       , width = E.fill
-                      , view = \zkn -> renderMd model.fui model.cells noteCache zkn.content mdw
+                      , view = \zkn -> renderReadMd zone model.fui model.cells noteCache MC.PublicView zkn.content mdw
                       }
                     , { header = E.none
                       , width = E.shrink
@@ -1093,7 +1523,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
             else
                 [ EF.color TC.darkGrey ]
 
-        editview linkbkc =
+        editmeta =
             let
                 titleed =
                     EI.text
@@ -1137,7 +1567,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                 , E.width E.fill
                 , E.paddingXY 5 0
                 ]
-                ([ E.paragraph [ E.padding 10, E.width E.fill, E.spacingXY 3 17 ] <|
+                [ E.paragraph [ E.padding 10, E.width E.fill, E.spacingXY 3 17 ] <|
                     List.intersperse (E.text " ")
                         [ if isdirty then
                             EI.button parabuttonstyle { onPress = Just RevertPress, label = E.text "revert" }
@@ -1195,8 +1625,8 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                           else
                             EI.button (E.alignRight :: Common.disabledButtonStyle) { onPress = Nothing, label = E.text "delete" }
                         ]
-                 , titleed
-                 , if mine then
+                , titleed
+                , if mine then
                     EI.checkbox [ E.width E.shrink ]
                         { onChange =
                             if editable then
@@ -1209,7 +1639,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                         , label = EI.labelLeft edlabelattr (E.text "editable")
                         }
 
-                   else
+                  else
                     E.row [ E.spacing 8, E.width E.fill ]
                         [ EI.checkbox [ E.width E.shrink ]
                             { onChange = always Noop -- can't change editable unless you're the owner.
@@ -1219,7 +1649,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                             }
                         , E.row [ E.spacing 8, E.alignRight, EF.color TC.darkGrey ] [ E.text "creator", E.el [ EF.bold ] <| E.text model.noteUserName ]
                         ]
-                 , EI.checkbox [ E.width E.shrink ]
+                , EI.checkbox [ E.width E.shrink ]
                     { onChange =
                         if mine && editable then
                             ShowTitlePress
@@ -1230,7 +1660,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                     , checked = model.showtitle
                     , label = EI.labelLeft edlabelattr (E.text "show title")
                     }
-                 , E.row [ E.spacing 8, E.width E.fill ]
+                , E.row [ E.spacing 8, E.width E.fill ]
                     [ EI.checkbox [ E.width E.shrink ]
                         { onChange =
                             if editable then
@@ -1263,23 +1693,32 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                       else
                         E.none
                     ]
-                 , E.row [ E.spacing 8, E.width E.fill ]
+                , E.paragraph [ E.spacing 8, E.width E.fill ]
                     [ E.text "server: "
                     , E.text model.server
                     , E.text
                         (if model.server == model.ld.server then
-                            "(local)"
+                            " (local)"
 
                          else
-                            "(remote)"
+                            " (remote)"
                         )
                     ]
-                 , if wclass == Narrow then
+                ]
+
+        editview linkbkc =
+            E.column
+                [ E.spacing 8
+                , E.alignTop
+                , E.width E.fill
+                , E.paddingXY 5 0
+                ]
+                [ if wclass == Narrow then
                     showpagelink
 
-                   else
+                  else
                     E.none
-                 , EI.multiline
+                , EI.multiline
                     ([ if editable then
                         EF.color TC.black
 
@@ -1301,24 +1740,15 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
 
                         else
                             always Noop
-                    , text = model.md
+                    , text = EM.getMd model.edMarkdown
                     , placeholder = Nothing
                     , label = EI.labelHidden "markdown input"
                     , spellcheck = False
                     }
-                 , if isdirty then
-                    EI.button perhapsdirtybutton { onPress = Just SavePress, label = E.text "save" }
+                ]
 
-                   else
-                    E.none
-                 , dates
-                 , divider
-                 ]
-                    ++ showComments
-                    -- show the links.
-                    ++ [ divider ]
-                    ++ showLinks linkbkc
-                )
+        mbdi =
+            blockDndSystem.info model.blockDnd
 
         mdview linkbkc =
             E.column
@@ -1329,54 +1759,66 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                 , E.paddingXY 5 0
                 ]
             <|
-                E.column
-                    [ E.centerX
-                    , E.paddingXY 0 10
-                    , E.spacing 8
+                [ E.row [ E.width E.fill, E.spacing 8 ]
+                    [ E.paragraph [ EF.bold ] [ E.text model.title ]
+                    , EI.button Common.buttonStyle
+                        { onPress = Just NewBlock
+                        , label = E.text "+"
+                        }
+                    , EI.button Common.buttonStyle
+                        { onPress = Just ViewPress
+                        , label = ZC.fullScreen
+                        }
+                    , if search then
+                        EI.button (E.alignRight :: Common.buttonStyle)
+                            (case
+                                JD.decodeString Data.tagSearchDecoder (EM.getMd model.edMarkdown)
+                                    |> Result.toMaybe
+                             of
+                                Just s ->
+                                    { label = E.text ">", onPress = Just <| SetSearch s }
+
+                                Nothing ->
+                                    { label = E.text ">", onPress = Just <| SetSearchString model.title }
+                            )
+
+                      else
+                        EI.button (E.alignRight :: Common.buttonStyle)
+                            { label = E.text ">", onPress = Just <| AddToSearchAsTag model.title }
                     ]
-                    [ E.row [ E.width E.fill, E.spacing 8 ]
-                        [ E.paragraph [ EF.bold ] [ E.text model.title ]
-                        , EI.button Common.buttonStyle
-                            { onPress = Just ViewPress
-                            , label = ZC.fullScreen
-                            }
-                        , if search then
-                            EI.button (E.alignRight :: Common.buttonStyle)
-                                (case
-                                    JD.decodeString Data.tagSearchDecoder model.md
-                                        |> Result.toMaybe
-                                 of
-                                    Just s ->
-                                        { label = E.text ">", onPress = Just <| SetSearch s }
+                , case ( model.filestatus, toZkNote model ) of
+                    ( Data.FilePresent, Just zkn ) ->
+                        MC.noteFile model.fui mdw Nothing model.title zkn
 
-                                    Nothing ->
-                                        { label = E.text ">", onPress = Just <| SetSearchString model.title }
-                                )
+                    ( Data.FileMissing, Just _ ) ->
+                        E.text <| "file missing"
 
-                          else
-                            EI.button (E.alignRight :: Common.buttonStyle)
-                                { label = E.text ">", onPress = Just <| AddToSearchAsTag model.title }
-                        ]
-                    , case ( model.filestatus, toZkNote model ) of
-                        ( Data.FilePresent, Just zkn ) ->
-                            MC.noteFile model.fui model.title zkn
+                    ( Data.NotAFile, Just _ ) ->
+                        E.none
 
-                        ( Data.FileMissing, Just _ ) ->
-                            E.text <| "file missing"
+                    ( _, Nothing ) ->
+                        E.none
+                , case EM.getBlocks model.edMarkdown of
+                    Ok blocks ->
+                        renderBlocks zone
+                            model.fui
+                            model.cells
+                            noteCache
+                            (if editable then
+                                MC.EditView
 
-                        ( Data.NotAFile, Just _ ) ->
-                            E.none
+                             else
+                                MC.PublicView
+                            )
+                            mdw
+                            isdirty
+                            model.blockEdit
+                            mbdi
+                            blocks
 
-                        ( _, Nothing ) ->
-                            E.none
-                    , renderMd model.fui model.cells noteCache model.md mdw
-                    ]
-                    :: (if wclass == Wide then
-                            []
-
-                        else
-                            showComments ++ showLinks linkbkc
-                       )
+                    Err e ->
+                        E.text e
+                ]
 
         pxy =
             [ E.paddingXY 10 0 ]
@@ -1431,6 +1873,29 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
 
                             RecentView ->
                                 recentPanel TC.white
+                       ]
+                )
+
+        rawOrEviewPanel =
+            E.column []
+                (Common.navbar 2
+                    (case model.editOrView of
+                        EditView ->
+                            EtEdit
+
+                        ViewView ->
+                            EtView
+                    )
+                    TabChanged
+                    [ ( EtEdit, "raw" )
+                    , ( EtView, "eview" )
+                    ]
+                    :: [ case model.editOrView of
+                            EditView ->
+                                editview TC.white
+
+                            ViewView ->
+                                mdview TC.white
                        ]
                 )
 
@@ -1494,7 +1959,8 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                  , EBd.width 1
                  , EBd.color TC.darkGrey
                  , EBd.rounded 10
-                 , E.clip
+
+                 -- , E.clip
                  , E.height E.fill
                  , EBk.color TC.white
                  ]
@@ -1507,6 +1973,69 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                     ]
                 , elt
                 ]
+
+        documentPanel =
+            E.column
+                [ E.spacing 12
+                , E.alignTop
+                , EBd.width 1
+                , EBd.color TC.darkGrey
+                , EBd.rounded 10
+                , E.width E.fill
+                , E.height E.fill
+                , EBk.color TC.white
+                ]
+            <|
+                editmeta
+                    :: dates
+                    :: (if wclass == Wide then
+                            [ E.row
+                                [ E.width E.fill
+                                , E.alignTop
+                                , E.spacing 8
+                                ]
+                                [ headingPanel "raw" [ E.width E.fill ] (editview TC.white)
+                                , headingPanel "eview" [ E.width E.fill ] (mdview TC.white)
+                                ]
+                            ]
+
+                        else
+                            [ Common.navbar 2
+                                (case model.editOrView of
+                                    EditView ->
+                                        EtEdit
+
+                                    ViewView ->
+                                        EtView
+                                )
+                                TabChanged
+                                [ ( EtView, "eview" )
+                                , ( EtEdit
+                                  , if editable then
+                                        "raw"
+
+                                    else
+                                        "raw"
+                                  )
+                                ]
+                            , case model.editOrView of
+                                EditView ->
+                                    editview TC.white
+
+                                ViewView ->
+                                    mdview TC.white
+                            ]
+                                ++ [ if isdirty then
+                                        EI.button perhapsdirtybutton { onPress = Just SavePress, label = E.text "save" }
+
+                                     else
+                                        E.none
+                                   , dates
+                                   ]
+                       )
+                    ++ showComments
+                    ++ [ divider ]
+                    ++ showLinks TC.white
     in
     E.column
         [ E.width E.fill
@@ -1580,8 +2109,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                     , E.alignTop
                     , E.spacing 8
                     ]
-                    [ headingPanel "edit" [ E.width E.fill ] (editview TC.white)
-                    , headingPanel "view" [ E.width E.fill ] (mdview TC.white)
+                    [ headingPanel "document" [ E.width E.fill ] <| documentPanel
                     , searchOrRecentPanel
                     ]
 
@@ -1590,42 +2118,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                     [ E.width E.fill
                     , E.spacing 8
                     ]
-                    [ E.column
-                        [ E.spacing 12
-                        , E.alignTop
-                        , EBd.width 1
-                        , EBd.color TC.darkGrey
-                        , EBd.rounded 10
-                        , E.clip
-                        , E.width E.fill
-                        , E.height E.fill
-                        , EBk.color TC.white
-                        ]
-                        [ Common.navbar 2
-                            (case model.editOrView of
-                                EditView ->
-                                    EtEdit
-
-                                ViewView ->
-                                    EtView
-                            )
-                            TabChanged
-                            [ ( EtView, "view" )
-                            , ( EtEdit
-                              , if editable then
-                                    "edit"
-
-                                else
-                                    "markdown"
-                              )
-                            ]
-                        , case model.editOrView of
-                            EditView ->
-                                editview TC.white
-
-                            ViewView ->
-                                mdview TC.white
-                        ]
+                    [ headingPanel "document" [ E.width E.fill ] <| documentPanel
                     , searchOrRecentPanel
                     ]
 
@@ -1634,23 +2127,23 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                     [ Common.navbar 2
                         model.tab
                         TabChanged
-                        [ ( EtView, "view" )
-                        , ( EtEdit
-                          , if editable then
-                                "edit"
+                        [ ( case model.editOrView of
+                                EditView ->
+                                    EtEdit
 
-                            else
-                                "markdown"
+                                ViewView ->
+                                    EtView
+                          , "document"
                           )
                         , ( EtSearch, "search" )
                         , ( EtRecent, "recent" )
                         ]
                     , case model.tab of
                         EtEdit ->
-                            editview TC.lightGray
+                            documentPanel
 
                         EtView ->
-                            mdview TC.lightGray
+                            documentPanel
 
                         EtSearch ->
                             searchPanel TC.lightGray
@@ -1750,7 +2243,6 @@ initFull fui ld zknote dtlinks mbedittab mobile =
       , focusLink = Nothing
       , pubidtxt = zknote.pubid |> Maybe.withDefault ""
       , title = zknote.title
-      , md = zknote.content
       , comments = []
       , newcomment = Nothing
       , pendingcomment = Nothing
@@ -1771,6 +2263,9 @@ initFull fui ld zknote dtlinks mbedittab mobile =
       , mbReplaceString = Nothing
       , mobile = mobile
       , server = zknote.server
+      , blockDnd = blockDndSystem.model
+      , edMarkdown = EM.init zknote.content
+      , blockEdit = Nothing
       }
         |> (\m ->
                 Maybe.map (\nc -> setTab nc m) mbedittab
@@ -1817,7 +2312,6 @@ initNew fui ld links mobile =
     , showtitle = True
     , createdate = Nothing
     , changeddate = Nothing
-    , md = ""
     , cells = getCd cc
     , revert = Nothing
     , tab = EtEdit
@@ -1828,6 +2322,9 @@ initNew fui ld links mobile =
     , mbReplaceString = Nothing
     , mobile = mobile
     , server = ld.server
+    , blockDnd = blockDndSystem.model
+    , edMarkdown = EM.init ""
+    , blockEdit = Nothing
     }
         |> (\m1 ->
                 -- for new EMPTY notes, the 'revert' should be the same as the model, so that you aren't
@@ -1967,10 +2464,11 @@ onTASelection model zknSearchResult recentZkns tas =
             in
             TAUpdated
                 { model
-                    | md =
-                        String.left tas.offset model.md
-                            ++ linktext
-                            ++ String.dropLeft (tas.offset + String.length tas.text) model.md
+                    | edMarkdown =
+                        EM.init <|
+                            String.left tas.offset (EM.getMd model.edMarkdown)
+                                ++ linktext
+                                ++ String.dropLeft (tas.offset + String.length tas.text) (EM.getMd model.edMarkdown)
                 }
                 (Just
                     { id = "mdtext"
@@ -2037,10 +2535,11 @@ onTASelection model zknSearchResult recentZkns tas =
             Just s ->
                 TAUpdated
                     { model
-                        | md =
-                            String.left tas.offset model.md
-                                ++ s
-                                ++ String.dropLeft (tas.offset + String.length tas.text) model.md
+                        | edMarkdown =
+                            EM.init <|
+                                String.left tas.offset (EM.getMd model.edMarkdown)
+                                    ++ s
+                                    ++ String.dropLeft (tas.offset + String.length tas.text) (EM.getMd model.edMarkdown)
                     }
                     (Just
                         { id = "mdtext"
@@ -2082,15 +2581,16 @@ onLinkBackSaved model mbtas szn =
 
                     nmod =
                         { model
-                            | md =
-                                String.slice 0 tas.offset model.md
-                                    ++ "["
-                                    ++ tas.text
-                                    ++ "]("
-                                    ++ "/note/"
-                                    ++ zkNoteIdToString szn.id
-                                    ++ ")"
-                                    ++ String.dropLeft (tas.offset + String.length tas.text) model.md
+                            | edMarkdown =
+                                EM.updateMd <|
+                                    String.slice 0 tas.offset (EM.getMd model.edMarkdown)
+                                        ++ "["
+                                        ++ tas.text
+                                        ++ "]("
+                                        ++ "/note/"
+                                        ++ zkNoteIdToString szn.id
+                                        ++ ")"
+                                        ++ String.dropLeft (tas.offset + String.length tas.text) (EM.getMd model.edMarkdown)
                             , zklDict = Dict.insert (zklKey linkback) linkback model.zklDict
                         }
                 in
@@ -2184,7 +2684,7 @@ handleSPUpdate model ( nm, cmd ) =
             ( { model
                 | mbReplaceString =
                     Just <|
-                        (if model.md == "" then
+                        (if EM.getMd model.edMarkdown == "" then
                             "<search query=\""
 
                          else
@@ -2241,7 +2741,7 @@ update msg model =
             )
 
         ViewPress ->
-            MC.mdPanel model.md
+            MC.mdPanel (EM.getMd model.edMarkdown)
                 |> Maybe.map
                     (\panel ->
                         ( model
@@ -2628,7 +3128,9 @@ update msg model =
                         (mkCc cells)
             in
             ( { model
-                | md = newMarkdown
+                | edMarkdown =
+                    EM.init <|
+                        newMarkdown
                 , cells = getCd cc
               }
             , None
@@ -2768,6 +3270,197 @@ update msg model =
 
         RequestsPress ->
             ( model, Requests )
+
+        DnDMsg dmsg ->
+            case
+                EM.getBlocks model.edMarkdown
+                    |> Result.map
+                        (blockDndSystem.update
+                            dmsg
+                            model.blockDnd
+                        )
+            of
+                Ok ( dnd, items ) ->
+                    let
+                        em =
+                            EM.updateBlocks
+                                items
+                    in
+                    ( { model | blockDnd = dnd, edMarkdown = Result.withDefault model.edMarkdown em }
+                    , Cmd <| blockDndSystem.commands dnd
+                    )
+
+                Err e ->
+                    ( model, ShowMessage <| "markdown error: " ++ e )
+
+        RevertBlock ->
+            case model.blockEdit of
+                Just (Text t) ->
+                    let
+                        be =
+                            updateBlockEdit t.original (Text t)
+                    in
+                    ( { model | blockEdit = Just be }, None )
+
+                Nothing ->
+                    ( model, None )
+
+        RemoveBlock idx ->
+            EM.getBlocks model.edMarkdown
+                |> Result.andThen
+                    (\blocks ->
+                        let
+                            db =
+                                List.take idx blocks ++ List.drop (idx + 1) blocks
+                        in
+                        EM.updateBlocks db
+                    )
+                |> Result.map
+                    (\em ->
+                        ( { model
+                            | edMarkdown = em
+                            , blockEdit =
+                                case model.blockEdit of
+                                    Just (Text t) ->
+                                        if t.idx == idx then
+                                            Nothing
+
+                                        else
+                                            model.blockEdit
+
+                                    Nothing ->
+                                        model.blockEdit
+                          }
+                        , None
+                        )
+                    )
+                |> Result.withDefault ( model, None )
+
+        EditBlock bidx ->
+            let
+                eblk : Int -> Maybe BlockEdit
+                eblk =
+                    \bi ->
+                        case
+                            EM.getBlocks model.edMarkdown
+                                |> Result.toMaybe
+                                |> Maybe.andThen (\blocks -> List.head (List.drop bidx blocks))
+                        of
+                            Just b ->
+                                Markdown.Renderer.render EM.stringRenderer [ b ]
+                                    |> Result.map
+                                        (\sl ->
+                                            let
+                                                mds =
+                                                    String.concat sl
+                                            in
+                                            Text { idx = bi, s = mds, b = b, original = mds }
+                                        )
+                                    |> Result.toMaybe
+
+                            Nothing ->
+                                Nothing
+            in
+            ( { model
+                | blockEdit =
+                    case model.blockEdit of
+                        Just (Text { idx }) ->
+                            if bidx == idx then
+                                Nothing
+
+                            else
+                                eblk bidx
+
+                        Nothing ->
+                            eblk bidx
+              }
+            , None
+            )
+
+        EditBlockInput s ->
+            case model.blockEdit of
+                Just (Text t) ->
+                    let
+                        be =
+                            updateBlockEdit s (Text t)
+                    in
+                    ( { model | blockEdit = Just be }, None )
+
+                Nothing ->
+                    ( model, None )
+
+        EditBlockOk ->
+            case model.blockEdit of
+                Just (Text t) ->
+                    let
+                        nb =
+                            model.edMarkdown
+                                |> EM.getBlocks
+                                |> Result.andThen
+                                    (Markdown.Renderer.render EM.stringRenderer)
+                                |> Result.map
+                                    (List.indexedMap
+                                        (\i b ->
+                                            if i == t.idx then
+                                                t.s
+
+                                            else
+                                                b
+                                        )
+                                    )
+                                |> Result.map String.concat
+                                |> Result.withDefault (EM.getMd model.edMarkdown)
+                    in
+                    ( { model | edMarkdown = EM.updateMd nb, blockEdit = Nothing }, None )
+
+                Nothing ->
+                    ( model, None )
+
+        NewBlock ->
+            case
+                EM.getBlocks model.edMarkdown
+                    |> Result.andThen
+                        (\blks ->
+                            EM.updateBlocks (Markdown.Block.Paragraph [ Markdown.Block.Text "" ] :: blks)
+                                |> Result.map (\em -> ( List.length blks, em ))
+                        )
+            of
+                Ok ( c, em ) ->
+                    ( { model
+                        | edMarkdown = em
+                        , blockEdit = Just <| Text { idx = 0, s = "", b = Paragraph [], original = "" }
+                      }
+                    , None
+                    )
+
+                Err _ ->
+                    ( model, None )
+
+        EditBlockMsg ebmsg ->
+            case model.blockEdit of
+                Just (Text t) ->
+                    case MG.updateBlock ebmsg t.b of
+                        [ b ] ->
+                            let
+                                nbe =
+                                    Markdown.Renderer.render EM.stringRenderer [ b ]
+                                        |> Result.map
+                                            (\sl ->
+                                                let
+                                                    mds =
+                                                        String.concat sl
+                                                in
+                                                Text { idx = t.idx, s = mds, b = b, original = t.original }
+                                            )
+                                        |> Result.toMaybe
+                            in
+                            ( { model | blockEdit = nbe }, None )
+
+                        _ ->
+                            ( model, None )
+
+                Nothing ->
+                    ( model, None )
 
         Noop ->
             ( model, None )

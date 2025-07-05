@@ -9,6 +9,7 @@ import Data exposing (EditTab(..), PrivateClosureRequest, ZkNoteId)
 import DataUtil exposing (FileUrlInfo, LoginData, jobComplete, showPrivateReply)
 import Dict exposing (Dict)
 import DisplayMessage
+import EdMarkdown as EM
 import EditZkNote
 import EditZkNoteListing
 import Either exposing (Either(..))
@@ -1300,6 +1301,19 @@ piview pimodel =
 
 view : Model -> { title : String, body : List (Html Msg) }
 view model =
+    let
+        dndif =
+            (case model.state of
+                EditZkNote ezn _ ->
+                    Maybe.map (E.inFront << E.map EditZkNoteMsg) <|
+                        EditZkNote.ghostView ezn model.timezone model.noteCache MC.EditView 500
+
+                _ ->
+                    Nothing
+            )
+                |> Maybe.map List.singleton
+                |> Maybe.withDefault []
+    in
     { title =
         case model.state of
             EditZkNote ezn _ ->
@@ -1377,7 +1391,12 @@ view model =
                             { dm | model = model.trackedRequests }
 
             _ ->
-                E.layout [ EF.size model.fontsize, E.width E.fill ] <| viewState model.size model.state model
+                E.layout
+                    ([ EF.size model.fontsize, E.width E.fill ]
+                        ++ dndif
+                    )
+                <|
+                    viewState model.size model.state model
         ]
     }
 
@@ -1617,7 +1636,7 @@ onZkNoteEditWhat model pt znew =
                             model.mobile
 
                     ngets =
-                        makeNoteCacheGets nst.md model
+                        makeNoteCacheGets (EM.getMd nst.edMarkdown) model
                 in
                 ( { model
                     | state =
@@ -1638,7 +1657,7 @@ onZkNoteEditWhat model pt znew =
                             , changeddate = zknote.changeddate
                             , sysids = zknote.sysids
                             }
-                    , noteCache = NC.setKeeps (MC.noteIds nst.md) model.noteCache
+                    , noteCache = NC.setKeeps (MC.noteIds (EM.getMd nst.edMarkdown)) model.noteCache
                   }
                 , Cmd.batch ((sendZIMsg model.fui <| Data.PvqGetZkNoteComments c) :: ngets)
                 )
@@ -2970,6 +2989,9 @@ actualupdate msg model =
         ( EditZkNoteMsg em, EditZkNote es login ) ->
             handleEditZkNoteCmd model login (EditZkNote.update em es)
 
+        ( EditZkNoteMsg EditZkNote.Noop, _ ) ->
+            ( model, Cmd.none )
+
         ( EditZkNoteListingMsg em, EditZkNoteListing es login ) ->
             handleEditZkNoteListing model login (EditZkNoteListing.update em es model.spmodel model.zknSearchResult login)
 
@@ -3392,7 +3414,7 @@ handleTASelection model emod login tas =
                     Nothing ->
                         Cmd.none
                  )
-                    :: makeNewNoteCacheGets nemod.md model
+                    :: makeNewNoteCacheGets (EM.getMd nemod.edMarkdown) model
                 )
             )
 
@@ -3541,7 +3563,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     ( nm, Cmd.none )
 
         ngets =
-            makeNewNoteCacheGets emod.md model
+            makeNewNoteCacheGets (EM.getMd emod.edMarkdown) model
 
         ( rm, rcmd ) =
             case ecmd of
@@ -3598,7 +3620,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                         | state = EditZkNote emod login
 
                         -- reset keeps on save, to get rid of unused notes.
-                        , noteCache = NC.setKeeps (MC.noteIds emod.md) model.noteCache
+                        , noteCache = NC.setKeeps (MC.noteIds (EM.getMd emod.edMarkdown)) model.noteCache
                       }
                     , sendZIMsg model.fui
                         (Data.PvqSaveZkNoteAndLinks snpl)
@@ -3810,7 +3832,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                                         { emod
                                             | mbReplaceString =
                                                 Just <|
-                                                    (if emod.md == "" then
+                                                    (if EM.getMd emod.edMarkdown == "" then
                                                         "<search query=\""
 
                                                      else
@@ -4228,38 +4250,45 @@ main =
         , subscriptions =
             \model ->
                 let
-                    tracks : List (Sub Msg)
-                    tracks =
+                    rdysubs : List (Sub Msg)
+                    rdysubs =
                         case model of
                             Ready rmd ->
-                                rmd.trackedRequests.requests
-                                    |> Dict.keys
-                                    |> List.map (\k -> Http.track k (RequestProgress k))
+                                let
+                                    tracks : List (Sub Msg)
+                                    tracks =
+                                        rmd.trackedRequests.requests
+                                            |> Dict.keys
+                                            |> List.map (\k -> Http.track k (RequestProgress k))
 
-                            PreInit _ ->
-                                []
+                                    jobtick : List (Sub Msg)
+                                    jobtick =
+                                        if
+                                            Dict.values rmd.jobs.jobs
+                                                |> List.filter
+                                                    (\j ->
+                                                        not <| jobComplete j.state
+                                                    )
+                                                |> List.isEmpty
+                                                |> not
+                                        then
+                                            [ Time.every 1000 JobsPollTick
+                                            ]
 
-                            InitError _ ->
-                                []
+                                        else
+                                            []
 
-                    jobtick : List (Sub Msg)
-                    jobtick =
-                        case model of
-                            Ready rmd ->
-                                if
-                                    Dict.values rmd.jobs.jobs
-                                        |> List.filter
-                                            (\j ->
-                                                not <| jobComplete j.state
-                                            )
-                                        |> List.isEmpty
-                                        |> not
-                                then
-                                    [ Time.every 1000 JobsPollTick
-                                    ]
+                                    stsubs : List (Sub Msg)
+                                    stsubs =
+                                        case rmd.state of
+                                            EditZkNote st _ ->
+                                                List.map (Sub.map EditZkNoteMsg) <|
+                                                    EditZkNote.blockDndSubscriptions st
 
-                                else
-                                    []
+                                            _ ->
+                                                []
+                                in
+                                tracks ++ jobtick ++ stsubs
 
                             PreInit _ ->
                                 []
@@ -4279,8 +4308,7 @@ main =
                     , receivePITauriResponse TauriPublicReplyData
                     , receiveTITauriResponse TauriTauriReplyData
                     ]
-                        ++ jobtick
-                        ++ tracks
+                        ++ rdysubs
         , onUrlRequest = urlRequest
         , onUrlChange = UrlChanged
         }

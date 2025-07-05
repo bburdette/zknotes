@@ -121,7 +121,19 @@ view zone maxw noteCache model loggedin =
                                     ]
                                     (case
                                         MC.markdownView
-                                            (MC.mkRenderer model.fui MC.PublicView (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged noteCache)
+                                            (MC.mkRenderer
+                                                { zone = zone
+                                                , fui = model.fui
+                                                , viewMode = MC.PublicView
+                                                , addToSearchMsg = \_ -> Noop
+                                                , maxw = mw
+                                                , cellDict = model.cells
+                                                , showPanelElt = False
+                                                , onchanged = OnSchelmeCodeChanged
+                                                , noteCache = noteCache
+                                                , noop = Noop
+                                                }
+                                            )
                                             pn.zknote.content
                                      of
                                         Ok rendered ->
@@ -157,7 +169,7 @@ view zone maxw noteCache model loggedin =
                         (\zkn ->
                             case zkn.filestatus of
                                 Data.FilePresent ->
-                                    MC.noteFile model.fui model.title zkn
+                                    MC.noteFile model.fui mw Nothing model.title zkn
 
                                 Data.FileMissing ->
                                     E.text <| "file missing"
@@ -167,10 +179,26 @@ view zone maxw noteCache model loggedin =
                         )
                     |> Maybe.withDefault E.none
                 , E.row [ E.width E.fill ]
-                    [ case MC.markdownView (MC.mkRenderer model.fui MC.PublicView (\_ -> Noop) mw model.cells False OnSchelmeCodeChanged noteCache) model.md of
+                    [ case
+                        MC.markdownView
+                            (MC.mkRenderer
+                                { zone = zone
+                                , fui = model.fui
+                                , viewMode = MC.PublicView
+                                , addToSearchMsg = \_ -> Noop
+                                , maxw = mw
+                                , cellDict = model.cells
+                                , showPanelElt = False
+                                , onchanged = OnSchelmeCodeChanged
+                                , noteCache = noteCache
+                                , noop = Noop
+                                }
+                            )
+                            model.md
+                      of
                         Ok rendered ->
                             E.column
-                                [ E.spacing 30
+                                [ E.spacing 3
                                 , E.width E.fill
                                 , E.centerX
                                 ]

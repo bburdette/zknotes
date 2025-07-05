@@ -1,4 +1,31 @@
-module MdCommon exposing (Panel, ViewMode(..), blockCells, blockPanels, cellView, codeBlock, codeSpan, defCell, heading, imageView, linkDict, markdownView, mdCells, mdPanel, mdPanels, mkRenderer, noteFile, noteIds, panelView, rawTextToId, searchView, showRunState)
+module MdCommon exposing
+    ( MkrArgs
+    , Panel
+    , ViewMode(..)
+    , blockCells
+    , blockPanels
+    , cellView
+    , codeBlock
+    , codeSpan
+    , defCell
+    , editBlock
+    , heading
+    , htmlText
+    , imageView
+    , linkDict
+    , markdownView
+    , mdCells
+    , mdPanel
+    , mdPanels
+    , mkRenderer
+    , noteFile
+    , noteIds
+    , panelView
+    , parseNoteShow
+    , rawTextToId
+    , searchView
+    , showRunState
+    )
 
 import Cellme.Cellme exposing (CellContainer(..), RunState(..))
 import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr)
@@ -14,6 +41,8 @@ import Element.Input as EI
 import Element.Region as ER
 import Html
 import Html.Attributes as HA
+import Html.Events as HE
+import Json.Decode as JD
 import Markdown.Block as Block exposing (Block, ListItem(..), Task(..), foldl, inlineFoldl)
 import Markdown.Html
 import Markdown.Parser
@@ -24,6 +53,7 @@ import Schelme.Show exposing (showTerm)
 import Set exposing (Set(..))
 import TSet
 import TangoColors as TC
+import Time
 import Util
 import ZkCommon
 
@@ -137,8 +167,8 @@ type ViewMode
     | EditView
 
 
-link : Maybe String -> String -> List (Element a) -> Element a
-link title destination body =
+link : String -> List (Element a) -> Element a
+link destination body =
     (if String.contains ":" destination then
         E.newTabLink
 
@@ -146,6 +176,28 @@ link title destination body =
         E.link
     )
         [ E.htmlAttribute (HA.style "display" "inline-flex") ]
+        { url = destination
+        , label =
+            E.paragraph
+                [ EF.color (E.rgb255 0 0 255)
+                , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
+                , E.htmlAttribute (HA.style "word-break" "break-word")
+                ]
+                body
+        }
+
+
+nooplink : String -> List (Element a) -> a -> Element a
+nooplink destination body noop =
+    (if String.contains ":" destination then
+        E.newTabLink
+
+     else
+        E.link
+    )
+        [ E.htmlAttribute (HA.style "display" "inline-flex")
+        , E.htmlAttribute <| HE.stopPropagationOn "click" (JD.succeed ( noop, True ))
+        ]
         { url = destination
         , label =
             E.paragraph
@@ -165,8 +217,30 @@ renderText str =
         [ E.text str ]
 
 
-mkRenderer : FileUrlInfo -> ViewMode -> (String -> a) -> Int -> CellDict -> Bool -> (String -> String -> a) -> NoteCache -> Markdown.Renderer.Renderer (Element a)
-mkRenderer fui viewMode addToSearchMsg maxw cellDict showPanelElt onchanged noteCache =
+editBlock : Element a -> Element a
+editBlock e =
+    E.row [ EBd.width 1, E.width E.fill, E.height E.fill, E.padding 3 ]
+        [ E.el [ E.width (E.px 20), E.height E.fill, EBk.color TC.brown, E.alignBottom ] E.none
+        , e
+        ]
+
+
+type alias MkrArgs a =
+    { zone : Time.Zone
+    , fui : FileUrlInfo
+    , viewMode : ViewMode
+    , addToSearchMsg : String -> a
+    , maxw : Int
+    , cellDict : CellDict
+    , showPanelElt : Bool
+    , onchanged : String -> String -> a
+    , noteCache : NoteCache
+    , noop : a
+    }
+
+
+mkRenderer : MkrArgs a -> Markdown.Renderer.Renderer (Element a)
+mkRenderer args =
     { heading = heading
     , paragraph =
         E.paragraph
@@ -178,7 +252,7 @@ mkRenderer fui viewMode addToSearchMsg maxw cellDict showPanelElt onchanged note
     , strikethrough = \content -> E.paragraph [ EF.strike ] content
     , codeSpan = codeSpan
     , link =
-        \{ title, destination } body -> link title destination body
+        \{ title, destination } body -> nooplink destination body args.noop
     , hardLineBreak = Html.br [] [] |> E.html
     , image =
         \image ->
@@ -191,11 +265,12 @@ mkRenderer fui viewMode addToSearchMsg maxw cellDict showPanelElt onchanged note
                 , E.padding 10
                 , EBd.color (E.rgb255 145 145 145)
                 , EBk.color (E.rgb255 245 245 245)
+                , E.width <| E.fill
                 ]
                 children
     , unorderedList =
         \items ->
-            E.column [ E.paddingXY 10 0 ]
+            E.column [ E.paddingXY 10 0, E.width E.fill ]
                 (items
                     |> List.map
                         (\(ListItem task children) ->
@@ -224,7 +299,7 @@ mkRenderer fui viewMode addToSearchMsg maxw cellDict showPanelElt onchanged note
                 (items
                     |> List.indexedMap
                         (\index itemBlocks ->
-                            E.row [ E.width E.fill ]
+                            E.paragraph [ E.width E.fill ]
                                 (E.text
                                     (String.fromInt (index + startingIndex)
                                         ++ " "
@@ -234,48 +309,7 @@ mkRenderer fui viewMode addToSearchMsg maxw cellDict showPanelElt onchanged note
                         )
                 )
     , codeBlock = codeBlock
-    , html =
-        Markdown.Html.oneOf
-            [ Markdown.Html.tag "cell"
-                (\name schelmeCode renderedChildren ->
-                    cellView cellDict renderedChildren name schelmeCode onchanged
-                )
-                |> Markdown.Html.withAttribute "name"
-                |> Markdown.Html.withAttribute "schelmecode"
-            , Markdown.Html.tag "search"
-                (\search renderedChildren ->
-                    searchView viewMode addToSearchMsg search renderedChildren
-                )
-                |> Markdown.Html.withAttribute "query"
-            , Markdown.Html.tag "panel"
-                (\noteid renderedChildren ->
-                    case zkNoteIdFromString noteid of
-                        Ok id ->
-                            if showPanelElt then
-                                panelView id renderedChildren
-
-                            else
-                                E.none
-
-                        Err _ ->
-                            E.text "error"
-                )
-                |> Markdown.Html.withAttribute "noteid"
-            , Markdown.Html.tag "image" (imageView fui)
-                |> Markdown.Html.withAttribute "text"
-                |> Markdown.Html.withAttribute "url"
-                |> Markdown.Html.withOptionalAttribute "width"
-            , Markdown.Html.tag "video" (videoView fui maxw)
-                |> Markdown.Html.withAttribute "src"
-                |> Markdown.Html.withOptionalAttribute "text"
-                |> Markdown.Html.withOptionalAttribute "width"
-                |> Markdown.Html.withOptionalAttribute "height"
-            , Markdown.Html.tag "audio" (audioView fui)
-                |> Markdown.Html.withAttribute "text"
-                |> Markdown.Html.withAttribute "src"
-            , Markdown.Html.tag "note" (noteView fui noteCache)
-                |> Markdown.Html.withAttribute "id"
-            ]
+    , html = html args
     , table = E.column [ E.width <| E.fill ]
     , tableHeader = E.column [ E.width <| E.fill, EF.bold, EF.underline, E.spacing 8 ]
     , tableBody = E.column [ E.width <| E.fill ]
@@ -289,8 +323,146 @@ mkRenderer fui viewMode addToSearchMsg maxw cellDict showPanelElt onchanged note
     }
 
 
-searchView : ViewMode -> (String -> a) -> String -> List (Element a) -> Element a
-searchView viewMode addToSearchMsg search renderedChildren =
+type alias HtmlFns a =
+    { schelmeView : String -> String -> List a -> a
+    , searchView : String -> List a -> a
+    , panelView : String -> List a -> a
+    , imageView : String -> String -> Maybe String -> List a -> a
+    , videoView : String -> Maybe String -> Maybe String -> Maybe String -> List a -> a
+    , audioView : String -> String -> List a -> a
+    , noteView : String -> Maybe String -> Maybe String -> List a -> a
+    }
+
+
+elmUiHtml : MkrArgs a -> HtmlFns (Element a)
+elmUiHtml args =
+    { schelmeView =
+        \name schelmeCode renderedChildren ->
+            cellView args.cellDict renderedChildren name schelmeCode args.onchanged
+    , searchView =
+        \search renderedChildren ->
+            searchView args.viewMode args.addToSearchMsg args.noop search renderedChildren
+    , panelView =
+        \noteid renderedChildren ->
+            case zkNoteIdFromString noteid of
+                Ok id ->
+                    if args.showPanelElt then
+                        panelView id renderedChildren
+
+                    else
+                        E.none
+
+                Err _ ->
+                    E.text "error"
+    , imageView = imageView args.fui
+    , videoView = videoView args.fui args.maxw
+    , audioView = audioView args.fui
+    , noteView = noteView args
+    }
+
+
+textHtml : HtmlFns String
+textHtml =
+    { schelmeView =
+        \name schelmeCode _ ->
+            htmlTextTag "cell" [ ( "name", name ), ( "schelmecode", schelmeCode ) ]
+    , searchView =
+        \query _ ->
+            htmlTextTag "search" [ ( "query", query ) ]
+    , panelView =
+        \noteid _ ->
+            htmlTextTag "panel" [ ( "noteid", noteid ) ]
+    , imageView =
+        \text url width _ ->
+            htmlTextTag "image"
+                ([ Just ( "text", text )
+                 , Just ( "url", url )
+                 , Maybe.map (\w -> ( "width", w )) width
+                 ]
+                    |> List.filterMap identity
+                )
+    , videoView =
+        \src text width height _ ->
+            htmlTextTag "video"
+                ([ Just ( "src", src )
+                 , Maybe.map (\s -> ( "text", s )) text
+                 , Maybe.map (\s -> ( "height", s )) height
+                 , Maybe.map (\s -> ( "width", s )) width
+                 ]
+                    |> List.filterMap identity
+                )
+    , audioView =
+        \text src _ ->
+            htmlTextTag "audio"
+                [ ( "src", src )
+                , ( "text", text )
+                ]
+    , noteView =
+        \id show text _ ->
+            htmlTextTag "note"
+                ([ Just ( "id", id )
+                 , Maybe.map (\s -> ( "show", s )) show
+                 , Maybe.map (\s -> ( "text", s )) text
+                 ]
+                    |> List.filterMap identity
+                )
+    }
+
+
+htmlF : HtmlFns a -> Markdown.Html.Renderer (List a -> a)
+htmlF hf =
+    Markdown.Html.oneOf
+        [ Markdown.Html.tag "cell" hf.schelmeView
+            |> Markdown.Html.withAttribute "name"
+            |> Markdown.Html.withAttribute "schelmecode"
+        , Markdown.Html.tag "search" hf.searchView
+            |> Markdown.Html.withAttribute "query"
+        , Markdown.Html.tag "panel" hf.panelView
+            |> Markdown.Html.withAttribute "noteid"
+        , Markdown.Html.tag "image" hf.imageView
+            |> Markdown.Html.withAttribute "text"
+            |> Markdown.Html.withAttribute "url"
+            |> Markdown.Html.withOptionalAttribute "width"
+        , Markdown.Html.tag "video" hf.videoView
+            |> Markdown.Html.withAttribute "src"
+            |> Markdown.Html.withOptionalAttribute "text"
+            |> Markdown.Html.withOptionalAttribute "width"
+            |> Markdown.Html.withOptionalAttribute "height"
+        , Markdown.Html.tag "audio" hf.audioView
+            |> Markdown.Html.withAttribute "text"
+            |> Markdown.Html.withAttribute "src"
+        , Markdown.Html.tag "note" hf.noteView
+            |> Markdown.Html.withAttribute "id"
+            |> Markdown.Html.withOptionalAttribute "show"
+            |> Markdown.Html.withOptionalAttribute "text"
+        ]
+
+
+html : MkrArgs a -> Markdown.Html.Renderer (List (Element a) -> Element a)
+html args =
+    htmlF (elmUiHtml args)
+
+
+htmlText : Markdown.Html.Renderer (List String -> String)
+htmlText =
+    htmlF textHtml
+
+
+htmlTextTag : String -> List ( String, String ) -> String
+htmlTextTag tag attrs =
+    "<"
+        ++ tag
+        ++ " "
+        ++ (attrs
+                |> List.map (\( l, r ) -> l ++ "=\"" ++ r ++ "\"")
+                |> List.intersperse " "
+                |> String.concat
+           )
+        ++ "/>\n\n"
+
+
+searchView : ViewMode -> (String -> a) -> a -> String -> List (Element a) -> Element a
+searchView viewMode addToSearchMsg noop search renderedChildren =
     E.row [ EBk.color TC.darkGray, E.padding 3, E.spacing 3 ]
         (E.el [ EF.italic ] (E.text "search: ")
             :: E.paragraph [] [ E.text search ]
@@ -300,7 +472,12 @@ searchView viewMode addToSearchMsg search renderedChildren =
 
                     EditView ->
                         EI.button
-                            (buttonStyle ++ [ EBk.color TC.darkGray ])
+                            (buttonStyle
+                                ++ [ E.htmlAttribute <|
+                                        HE.stopPropagationOn "click" (JD.succeed ( noop, True ))
+                                   , EBk.color TC.darkGray
+                                   ]
+                            )
                             { label = E.el [ E.centerY, EF.color TC.blue, EF.bold ] <| E.text ">"
                             , onPress = Just <| addToSearchMsg search
                             }
@@ -360,12 +537,11 @@ audioNoteView fui zkn =
             fui.filelocation ++ "/file/" ++ zkNoteIdToString zkn.id
     in
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
-        [ link (Just zkn.title) ("/note/" ++ zkNoteIdToString zkn.id) [ E.text zkn.title ]
+        [ link ("/note/" ++ zkNoteIdToString zkn.id) [ E.text zkn.title ]
         , E.row [ E.spacing 20 ]
             [ htmlAudioView fileurl zkn.title
             , if fui.tauri || List.filter (\i -> i == DataUtil.sysids.publicid) zkn.sysids /= [] then
                 link
-                    (Just "ts↗")
                     ("https://29a.ch/timestretch/#a=" ++ fui.location ++ "/file/" ++ zkNoteIdToString zkn.id)
                     [ E.text "ts↗" ]
 
@@ -376,15 +552,15 @@ audioNoteView fui zkn =
         ]
 
 
-videoNoteView : FileUrlInfo -> Data.ZkNote -> Element a
-videoNoteView fui zknote =
+videoNoteView : FileUrlInfo -> Int -> Data.ZkNote -> Element a
+videoNoteView fui maxw zknote =
     let
         fileurl =
             fui.filelocation ++ "/file/" ++ zkNoteIdToString zknote.id
     in
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
-        [ link (Just zknote.title) ("/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
-        , videoView fui 500 fileurl (Just zknote.title) Nothing Nothing []
+        [ link ("/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
+        , videoView fui maxw fileurl (Just zknote.title) Nothing Nothing []
         ]
 
 
@@ -395,14 +571,14 @@ imageNoteView fui zknote =
             fui.filelocation ++ "/file/" ++ zkNoteIdToString zknote.id
     in
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
-        [ link (Just zknote.title) ("/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
+        [ link ("/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
         , E.paragraph [] [ E.text fileurl ]
         , imageView fui zknote.title fileurl Nothing []
         ]
 
 
-noteFile : FileUrlInfo -> String -> Data.ZkNote -> Element a
-noteFile fui filename zknote =
+noteFile : FileUrlInfo -> Int -> Maybe NoteShow -> String -> Data.ZkNote -> Element a
+noteFile fui maxw mbns filename zknote =
     let
         suffix =
             String.split "." filename
@@ -426,13 +602,13 @@ noteFile fui filename zknote =
                     audioNoteView fui zknote
 
                 "mp4" ->
-                    videoNoteView fui zknote
+                    videoNoteView fui maxw zknote
 
                 "webm" ->
-                    videoNoteView fui zknote
+                    videoNoteView fui maxw zknote
 
                 "mkv" ->
-                    videoNoteView fui zknote
+                    videoNoteView fui maxw zknote
 
                 "jpg" ->
                     imageNoteView fui zknote
@@ -444,15 +620,52 @@ noteFile fui filename zknote =
                     imageNoteView fui zknote
 
                 _ ->
-                    link (Just zknote.title) (fui.filelocation ++ "/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
+                    link (fui.filelocation ++ "/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
 
 
-noteView : FileUrlInfo -> NoteCache -> String -> List (Element a) -> Element a
-noteView fui noteCache id _ =
+type alias NoteShow =
+    { title : Bool
+    , contents : Bool
+    , text : Bool
+    , file : Bool
+    , createdate : Bool
+    , changedate : Bool
+    , link : Bool
+    }
+
+
+parseNoteShow : String -> NoteShow
+parseNoteShow text =
+    { title = String.contains "title" text
+    , contents = String.contains "contents" text
+    , text = String.contains "text" text
+    , file = String.contains "file" text
+    , createdate = String.contains "createdate" text
+    , changedate = String.contains "changedate" text
+    , link = String.contains "link" text
+    }
+
+
+noteView : MkrArgs a -> String -> Maybe String -> Maybe String -> List (Element a) -> Element a
+noteView args id show text _ =
+    let
+        ns =
+            show
+                |> Maybe.map parseNoteShow
+                |> Maybe.withDefault
+                    { title = True
+                    , contents = False
+                    , text = False
+                    , file = False
+                    , createdate = False
+                    , changedate = False
+                    , link = True
+                    }
+    in
     case
         zkNoteIdFromString id
             |> Result.toMaybe
-            |> Maybe.andThen (NC.getNote noteCache)
+            |> Maybe.andThen (NC.getNote args.noteCache)
     of
         Just NC.Private ->
             E.text "private note"
@@ -461,13 +674,19 @@ noteView fui noteCache id _ =
             E.text "note not found"
 
         Just (NC.ZNAL zne) ->
-            case zne.zknote.filestatus of
-                Data.FilePresent ->
-                    noteFile fui zne.zknote.title zne.zknote
+            let
+                items =
+                    [ if ns.link then
+                        let
+                            linktext =
+                                case text of
+                                    Just t ->
+                                        t
 
-                Data.FileMissing ->
-                    E.paragraph []
-                        [ E.link
+                                    Nothing ->
+                                        zne.zknote.title
+                        in
+                        E.link
                             [ E.htmlAttribute (HA.style "display" "inline-flex") ]
                             { url = "/note/" ++ id -- don't use prefix here!
                             , label =
@@ -476,32 +695,118 @@ noteView fui noteCache id _ =
                                     , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
                                     , E.htmlAttribute (HA.style "word-break" "break-word")
                                     ]
-                                    [ E.text zne.zknote.title ]
+                                    [ E.text linktext ]
                             }
-                        , E.text " file missing"
-                        ]
 
-                Data.NotAFile ->
-                    E.link
-                        [ E.htmlAttribute (HA.style "display" "inline-flex") ]
-                        { url = "/note/" ++ id -- don't use prefix here!
-                        , label =
-                            E.paragraph
-                                [ EF.color (E.rgb255 0 0 255)
-                                , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
-                                , E.htmlAttribute (HA.style "word-break" "break-word")
-                                ]
-                                [ E.text zne.zknote.title ]
-                        }
+                      else
+                        E.none
+                    , if ns.title && not ns.link then
+                        E.text zne.zknote.title
 
-        -- , E.column [] (List.map (.othername >> Maybe.withDefault "" >> E.text) zne.links)
+                      else
+                        E.none
+                    , if ns.text && not ns.link then
+                        text |> Maybe.map E.text |> Maybe.withDefault E.none
+
+                      else
+                        E.none
+                    , if ns.createdate || ns.changedate then
+                        E.row []
+                            [ if ns.createdate then
+                                zne.zknote.createdate
+                                    |> (\cd ->
+                                            E.row []
+                                                [ E.text "created: "
+                                                , E.text (Util.showDateTime args.zone (Time.millisToPosix cd))
+                                                , E.text " "
+                                                ]
+                                       )
+
+                              else
+                                E.none
+                            , if ns.changedate then
+                                zne.zknote.changeddate
+                                    |> (\cd ->
+                                            E.row []
+                                                [ E.text "updated: "
+                                                , E.text (Util.showDateTime args.zone (Time.millisToPosix cd))
+                                                ]
+                                       )
+
+                              else
+                                E.none
+                            ]
+
+                      else
+                        E.none
+                    , if ns.contents then
+                        case
+                            markdownView (mkRenderer args)
+                                zne.zknote.content
+                        of
+                            Ok le ->
+                                E.column [] le
+
+                            Err s ->
+                                E.row [] [ E.text "markdown error: ", E.text s ]
+
+                      else
+                        E.none
+                    , if ns.file then
+                        case zne.zknote.filestatus of
+                            Data.FilePresent ->
+                                noteFile args.fui args.maxw (Just ns) zne.zknote.title zne.zknote
+
+                            Data.FileMissing ->
+                                E.paragraph []
+                                    [ E.link
+                                        [ E.htmlAttribute (HA.style "display" "inline-flex") ]
+                                        { url = "/note/" ++ id -- don't use prefix here!
+                                        , label =
+                                            E.paragraph
+                                                [ EF.color (E.rgb255 0 0 255)
+                                                , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
+                                                , E.htmlAttribute (HA.style "word-break" "break-word")
+                                                ]
+                                                [ E.text zne.zknote.title ]
+                                        }
+                                    , E.text " file missing"
+                                    ]
+
+                            Data.NotAFile ->
+                                E.link
+                                    [ E.htmlAttribute (HA.style "display" "inline-flex") ]
+                                    { url = "/note/" ++ id -- don't use prefix here!
+                                    , label =
+                                        E.paragraph
+                                            [ EF.color (E.rgb255 0 0 255)
+                                            , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
+                                            , E.htmlAttribute (HA.style "word-break" "break-word")
+                                            ]
+                                            [ E.text zne.zknote.title ]
+                                    }
+
+                      else
+                        E.none
+                    ]
+            in
+            case items of
+                [ a ] ->
+                    a
+
+                x ->
+                    E.column [ E.width E.fill ] x
+
         Nothing ->
             E.text <| "note " ++ id
 
 
 videoView : FileUrlInfo -> Int -> String -> Maybe String -> Maybe String -> Maybe String -> List (Element a) -> Element a
-videoView fui maxw url mbtext mbwidth mbheight renderedChildren =
+videoView fui mw url mbtext mbwidth mbheight renderedChildren =
     let
+        maxw =
+            mw + 50
+
         attribs =
             List.filterMap identity
                 [ mbwidth
@@ -514,17 +819,16 @@ videoView fui maxw url mbtext mbwidth mbheight renderedChildren =
                 , Just <| HA.controls True
                 ]
     in
-    E.el [] <|
-        E.html <|
-            Html.video
-                attribs
-                [ Html.source
-                    [ HA.attribute "src" (fileUrl fui url) ]
-                    [ mbtext
-                        |> Maybe.map (\s -> Html.text s)
-                        |> Maybe.withDefault (Html.text "video")
-                    ]
+    E.html <|
+        Html.video
+            attribs
+            [ Html.source
+                [ HA.attribute "src" (fileUrl fui url) ]
+                [ mbtext
+                    |> Maybe.map (\s -> Html.text s)
+                    |> Maybe.withDefault (Html.text "video")
                 ]
+            ]
 
 
 cellView : CellDict -> List (Element a) -> String -> String -> (String -> String -> a) -> Element a
@@ -637,6 +941,7 @@ codeBlock details =
         [ EBk.color (E.rgba 0 0 0 0.13)
         , E.padding 5
         , EF.family [ EF.monospace ]
+        , E.width E.fill
         ]
         [ E.html <|
             Html.div
