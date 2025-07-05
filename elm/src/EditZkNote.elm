@@ -426,6 +426,14 @@ editBlock ddw i focus e =
                 , E.el [ E.width E.fill ] e
                 ]
 
+        Inactive ->
+            E.row
+                baseAttr
+                [ E.el (dragHandleAttrs ++ [ EBk.color TC.lightGray ]) E.none
+                , spacer
+                , E.el [ E.width E.fill ] e
+                ]
+
 
 viewBlock : MC.MkrArgs Msg -> DragDropWhat -> Int -> Maybe Int -> Block -> Element Msg
 viewBlock ma ddw i focusid b =
@@ -452,6 +460,7 @@ type DragDropWhat
     | Drop
     | DropH
     | Ghost
+    | Inactive
 
 
 
@@ -1178,7 +1187,18 @@ renderReadMd zone fui cd noteCache vm md mdw =
             E.text errors
 
 
-renderBlocks : Time.Zone -> FileUrlInfo -> CellDict -> NoteCache -> MC.ViewMode -> Int -> Bool -> Maybe BlockEdit -> Maybe DnDList.Info -> List Block -> Element Msg
+renderBlocks :
+    Time.Zone
+    -> FileUrlInfo
+    -> CellDict
+    -> NoteCache
+    -> MC.ViewMode
+    -> Int
+    -> Bool
+    -> Maybe BlockEdit
+    -> Maybe DnDList.Info
+    -> List Block
+    -> Element Msg
 renderBlocks zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo blocks =
     let
         renderer =
@@ -1290,19 +1310,24 @@ renderBlocks zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo blocks =
                                                 Nothing
                                 in
                                 editBlock
-                                    (case mbinfo of
+                                    (case mbblockedit of
                                         Nothing ->
-                                            Drag
+                                            case mbinfo of
+                                                Nothing ->
+                                                    Drag
 
-                                        Just { dragIndex, dropIndex } ->
-                                            if i == dragIndex then
-                                                Ghost
+                                                Just { dragIndex, dropIndex } ->
+                                                    if i == dragIndex then
+                                                        Ghost
 
-                                            else if i == dropIndex then
-                                                DropH
+                                                    else if i == dropIndex then
+                                                        DropH
 
-                                            else
-                                                Drop
+                                                    else
+                                                        Drop
+
+                                        Just _ ->
+                                            Inactive
                                     )
                                     i
                                     (mbeb |> Maybe.map (always True) |> Maybe.withDefault False)
