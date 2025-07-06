@@ -368,7 +368,7 @@ textHtml =
             htmlTextTag "cell" [ ( "name", name ), ( "schelmecode", schelmeCode ) ]
     , searchView =
         \query _ ->
-            htmlTextTag "search" [ ( "query", query ) ]
+            htmlTextTag "search" [ ( "query", String.replace "&" "&amp;" query ) ]
     , panelView =
         \noteid _ ->
             htmlTextTag "panel" [ ( "noteid", noteid ) ]
@@ -471,16 +471,19 @@ searchView viewMode addToSearchMsg noop search renderedChildren =
                         E.none
 
                     EditView ->
-                        EI.button
-                            (buttonStyle
-                                ++ [ E.htmlAttribute <|
-                                        HE.stopPropagationOn "click" (JD.succeed ( noop, True ))
-                                   , EBk.color TC.darkGray
-                                   ]
-                            )
-                            { label = E.el [ E.centerY, EF.color TC.blue, EF.bold ] <| E.text ">"
-                            , onPress = Just <| addToSearchMsg search
-                            }
+                        E.el
+                            [ E.htmlAttribute <|
+                                HE.stopPropagationOn "click" (JD.succeed ( noop, True ))
+                            ]
+                        <|
+                            EI.button
+                                (buttonStyle
+                                    ++ [ EBk.color TC.darkGray
+                                       ]
+                                )
+                                { label = E.el [ E.centerY, EF.color TC.blue, EF.bold ] <| E.text ">"
+                                , onPress = Just <| addToSearchMsg search
+                                }
                )
             :: renderedChildren
         )
@@ -687,7 +690,9 @@ noteView args id show text _ =
                                         zne.zknote.title
                         in
                         E.link
-                            [ E.htmlAttribute (HA.style "display" "inline-flex") ]
+                            [ E.htmlAttribute <| HE.stopPropagationOn "click" (JD.succeed ( args.noop, True ))
+                            , E.htmlAttribute (HA.style "display" "inline-flex")
+                            ]
                             { url = "/note/" ++ id -- don't use prefix here!
                             , label =
                                 E.paragraph
