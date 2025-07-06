@@ -690,7 +690,9 @@ noteView args id show text _ =
                                         zne.zknote.title
                         in
                         E.link
-                            [ E.htmlAttribute (HA.style "display" "inline-flex") ]
+                            [ E.htmlAttribute <| HE.stopPropagationOn "click" (JD.succeed ( args.noop, True ))
+                            , E.htmlAttribute (HA.style "display" "inline-flex")
+                            ]
                             { url = "/note/" ++ id -- don't use prefix here!
                             , label =
                                 E.paragraph
