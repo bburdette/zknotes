@@ -2668,38 +2668,6 @@ onWkKeyPress key model =
             ( model, None )
 
 
-handleSPUpdate : Model -> ( SP.Model, SP.Command ) -> ( Model, Command )
-handleSPUpdate model ( nm, cmd ) =
-    case cmd of
-        SP.None ->
-            ( model, None )
-
-        SP.Save ->
-            ( model, None )
-
-        SP.Copy s ->
-            ( { model
-                | mbReplaceString =
-                    Just <|
-                        (if EM.getMd model.edMarkdown == "" then
-                            "<search query=\""
-
-                         else
-                            "<search query=\""
-                        )
-                            ++ String.replace "&" "&amp;" s
-                            ++ "\"/>"
-              }
-            , GetTASelection "mdtext" "replacestring"
-            )
-
-        SP.Search _ ->
-            ( model, None )
-
-        SP.SyncFiles _ ->
-            ( model, None )
-
-
 update : Msg -> Model -> ( Model, Command )
 update msg model =
     case msg of

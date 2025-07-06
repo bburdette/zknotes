@@ -368,7 +368,7 @@ textHtml =
             htmlTextTag "cell" [ ( "name", name ), ( "schelmecode", schelmeCode ) ]
     , searchView =
         \query _ ->
-            htmlTextTag "search" [ ( "query", query ) ]
+            htmlTextTag "search" [ ( "query", String.replace "&" "&amp;" query ) ]
     , panelView =
         \noteid _ ->
             htmlTextTag "panel" [ ( "noteid", noteid ) ]
