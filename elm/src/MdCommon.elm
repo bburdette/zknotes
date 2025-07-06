@@ -471,16 +471,19 @@ searchView viewMode addToSearchMsg noop search renderedChildren =
                         E.none
 
                     EditView ->
-                        EI.button
-                            (buttonStyle
-                                ++ [ E.htmlAttribute <|
-                                        HE.stopPropagationOn "click" (JD.succeed ( noop, True ))
-                                   , EBk.color TC.darkGray
-                                   ]
-                            )
-                            { label = E.el [ E.centerY, EF.color TC.blue, EF.bold ] <| E.text ">"
-                            , onPress = Just <| addToSearchMsg search
-                            }
+                        E.el
+                            [ E.htmlAttribute <|
+                                HE.stopPropagationOn "click" (JD.succeed ( noop, True ))
+                            ]
+                        <|
+                            EI.button
+                                (buttonStyle
+                                    ++ [ EBk.color TC.darkGray
+                                       ]
+                                )
+                                { label = E.el [ E.centerY, EF.color TC.blue, EF.bold ] <| E.text ">"
+                                , onPress = Just <| addToSearchMsg search
+                                }
                )
             :: renderedChildren
         )
