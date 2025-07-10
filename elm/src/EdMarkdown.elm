@@ -1,7 +1,6 @@
 module EdMarkdown exposing (EdMarkdown, getBlocks, getMd, init, stringRenderer, updateBlocks, updateMd)
 
-import Markdown.Block as Block exposing (Block, ListItem(..), Task(..), foldl, inlineFoldl)
-import Markdown.Html
+import Markdown.Block as Block exposing (Block, ListItem(..), Task(..))
 import Markdown.Parser
 import Markdown.Renderer
 import MdCommon as MC
@@ -87,8 +86,10 @@ stringRenderer =
                 ++ "\n\n"
     , paragraph =
         \strs ->
-            String.concat strs
-                ++ "\n\n"
+            strs
+                |> String.concat
+                |> String.trimRight
+                |> (\s -> s ++ "\n\n")
     , hardLineBreak = "  \n"
     , blockQuote =
         \strs ->
@@ -136,15 +137,22 @@ stringRenderer =
                     (\listitem ->
                         case listitem of
                             Block.ListItem Block.NoTask childs ->
-                                "- " ++ String.concat childs ++ "\n"
+                                "- "
+                                    ++ (String.concat childs |> String.trimRight)
+                                    ++ "\n"
 
                             Block.ListItem Block.IncompleteTask childs ->
-                                "- [ ]" ++ String.concat childs ++ "\n"
+                                "- [ ]"
+                                    ++ (String.concat childs |> String.trimRight)
+                                    ++ "\n"
 
                             Block.ListItem Block.CompletedTask childs ->
-                                "- [x]" ++ String.concat childs ++ "\n"
+                                "- [x]"
+                                    ++ (String.concat childs |> String.trimRight)
+                                    ++ "\n"
                     )
                 |> String.concat
+                |> (\s -> String.append s "\n")
     , orderedList =
         \startingIndex items ->
             items
