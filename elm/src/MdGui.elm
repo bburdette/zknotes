@@ -242,6 +242,18 @@ updateListBlock idx msg blocks =
             blocks
 
 
+updateListListBlock : Int -> Msg -> List (List Block) -> List (List Block)
+updateListListBlock idx msg blocklists =
+    case ( List.head (List.drop idx blocklists), msg ) of
+        ( Just blocklist, ListItemMsg i lim ) ->
+            List.take idx blocklists
+                ++ [ updateListBlock i lim blocklist ]
+                ++ List.drop (idx + 1) blocklists
+
+        _ ->
+            blocklists
+
+
 updateListInline : Int -> Msg -> List Inline -> List Inline
 updateListInline idx msg inlines =
     case List.head (List.drop idx inlines) of
@@ -253,7 +265,6 @@ updateListInline idx msg inlines =
                         inlines
                         ++ updateInline msg inline
                         ++ List.drop (idx + 1) inlines
-
             in
             a
 
@@ -372,12 +383,13 @@ updateBlock msg block =
                     [ block ]
 
         OrderedList listSpacing startIndex blockLists ->
-            [ block ]
+            case msg of
+                ListItemMsg i bmsg ->
+                    [ OrderedList listSpacing startIndex (updateListListBlock i bmsg blockLists) ]
 
-        -- case msg of
-        --    ListItemMsg i ulmsg ->
-        --        [ UnorderedList listSpacing (updateListItem i ulmsg listItems)]
-        --    _ -> [block]
+                _ ->
+                    [ block ]
+
         BlockQuote blocks ->
             case msg of
                 ListItemMsg i ulmsg ->
