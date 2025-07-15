@@ -355,9 +355,11 @@ pub async fn download_file(
   // does the hash match?
   if fh != hash {
     std::fs::remove_file(temphashpath)?;
-    return Err(zkerr::Error::String(
-      "downloaded file hash doesn't match!".to_string(),
-    ));
+    return Err(zkerr::Error::String(format!(
+      "downloaded file hash doesn't match.  id, hash: {}, {}",
+      uuid,
+      hash.to_string()
+    )));
   }
 
   // again, file exists?
