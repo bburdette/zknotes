@@ -43,3 +43,23 @@ pub struct Notelist {
 //   pub event: Uuid,
 //   pub offset: i64,
 // }
+
+// #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
+// pub struct PdfAnnotation {
+//   pub event: Uuid,
+//   pub offset: i64,  // text selection?
+//   pub comment: String,
+// }
+
+// #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
+// pub struct VideoAnnotation {
+//   pub event: Uuid,
+//   pub offset: i64,
+//   pub comment: String
+// }
+
+// #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
+// pub struct YeetLinkl{
+//   pub url: String,
+//   pub audioonly: bool,
+// }
