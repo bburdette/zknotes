@@ -5,6 +5,7 @@ pub use zkprotocol::content as zc;
 pub use zkprotocol::private as zprv;
 pub use zkprotocol::public as zpub;
 pub use zkprotocol::search as zs;
+pub use zkprotocol::specialnotes as sn;
 pub use zkprotocol::tauri;
 pub use zkprotocol::upload;
 
@@ -73,6 +74,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                   tauri::TauriRequest,
                   tauri::TauriReply,
                   tauri::UploadedFiles,
+                  sn::SpecialNote,
+                  sn::DateTime,
+                  sn::Search,
+                  sn::CompletedSync,
+                  sn::Notelist,
       ]
       // generates types and decoders for types implementing ElmDecoder
       decoders: [zc::ZkNoteId,
@@ -132,6 +138,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                   tauri::TauriRequest,
                   tauri::TauriReply,
                   tauri::UploadedFiles,
+                  sn::SpecialNote,
+                  sn::DateTime,
+                  sn::Search,
+                  sn::CompletedSync,
+                  sn::Notelist,
       ]
       // generates types and functions for forming queries for types implementing ElmQuery
       queries: [],

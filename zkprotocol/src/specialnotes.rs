@@ -9,45 +9,37 @@ use uuid::Uuid;
 
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
 pub enum SpecialNote {
-  SnDateTime(DateTime),
   SnSearch(ZkNoteSearch),
   SnSync(CompletedSync),
-  SnPlaylist(,
-  SnAlert
+  SnPlaylist(Notelist),
+  SnDateTime(DateTime),
+  // SnAlert(Alert),
 }
-
 
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
 pub struct DateTime {
-    pub datetime i64;
-  }
+  pub datetime: i64,
+}
+
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
 pub struct Search {
+  pub search: ZkNoteSearch,
 }
+
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
 pub struct CompletedSync {
-  after: Option<i64>,
-  now: i64,
+  pub after: Option<i64>,
+  pub now: i64,
 }
 
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
-pub struct Playlist {
-  sequence: Vec[Uuid],
-  current: Option<i64>,
+pub struct Notelist {
+  pub sequence: Vec<Uuid>,
+  pub current: Option<i64>,
 }
 
-#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
-pub struct Alert {
-    pub event Uuid;
-    
-    
-}
-
-#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
-pub struct JobStatus {
-  pub jobno: i64,
-  pub state: JobState,
-  pub message: String,
-}
-
-
+// #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
+// pub struct Alert {
+//   pub event: Uuid,
+//   pub offset: i64,
+// }

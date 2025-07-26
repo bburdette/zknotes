@@ -1118,6 +1118,77 @@ uploadedFilesEncoder struct =
         ]
 
 
+type SpecialNote
+    = SnSearch (ZkNoteSearch)
+    | SnSync (CompletedSync)
+    | SnPlaylist (Notelist)
+    | SnDateTime (DateTime)
+
+
+specialNoteEncoder : SpecialNote -> Json.Encode.Value
+specialNoteEncoder enum =
+    case enum of
+        SnSearch inner ->
+            Json.Encode.object [ ( "SnSearch", zkNoteSearchEncoder inner ) ]
+        SnSync inner ->
+            Json.Encode.object [ ( "SnSync", completedSyncEncoder inner ) ]
+        SnPlaylist inner ->
+            Json.Encode.object [ ( "SnPlaylist", notelistEncoder inner ) ]
+        SnDateTime inner ->
+            Json.Encode.object [ ( "SnDateTime", dateTimeEncoder inner ) ]
+
+type alias DateTime =
+    { datetime : Int
+    }
+
+
+dateTimeEncoder : DateTime -> Json.Encode.Value
+dateTimeEncoder struct =
+    Json.Encode.object
+        [ ( "datetime", (Json.Encode.int) struct.datetime )
+        ]
+
+
+type alias Search =
+    { search : ZkNoteSearch
+    }
+
+
+searchEncoder : Search -> Json.Encode.Value
+searchEncoder struct =
+    Json.Encode.object
+        [ ( "search", (zkNoteSearchEncoder) struct.search )
+        ]
+
+
+type alias CompletedSync =
+    { after : Maybe (Int)
+    , now : Int
+    }
+
+
+completedSyncEncoder : CompletedSync -> Json.Encode.Value
+completedSyncEncoder struct =
+    Json.Encode.object
+        [ ( "after", (Maybe.withDefault Json.Encode.null << Maybe.map (Json.Encode.int)) struct.after )
+        , ( "now", (Json.Encode.int) struct.now )
+        ]
+
+
+type alias Notelist =
+    { sequence : List (String)
+    , current : Maybe (Int)
+    }
+
+
+notelistEncoder : Notelist -> Json.Encode.Value
+notelistEncoder struct =
+    Json.Encode.object
+        [ ( "sequence", (Json.Encode.list (Json.Encode.string)) struct.sequence )
+        , ( "current", (Maybe.withDefault Json.Encode.null << Maybe.map (Json.Encode.int)) struct.current )
+        ]
+
+
 zkNoteIdDecoder : Json.Decode.Decoder ZkNoteId
 zkNoteIdDecoder = 
     Json.Decode.oneOf
@@ -2000,5 +2071,40 @@ uploadedFilesDecoder : Json.Decode.Decoder UploadedFiles
 uploadedFilesDecoder =
     Json.Decode.succeed UploadedFiles
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "notes" (Json.Decode.list (zkListNoteDecoder))))
+
+
+specialNoteDecoder : Json.Decode.Decoder SpecialNote
+specialNoteDecoder = 
+    Json.Decode.oneOf
+        [ Json.Decode.map SnSearch (Json.Decode.field "SnSearch" (zkNoteSearchDecoder))
+        , Json.Decode.map SnSync (Json.Decode.field "SnSync" (completedSyncDecoder))
+        , Json.Decode.map SnPlaylist (Json.Decode.field "SnPlaylist" (notelistDecoder))
+        , Json.Decode.map SnDateTime (Json.Decode.field "SnDateTime" (dateTimeDecoder))
+        ]
+
+dateTimeDecoder : Json.Decode.Decoder DateTime
+dateTimeDecoder =
+    Json.Decode.succeed DateTime
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "datetime" (Json.Decode.int)))
+
+
+searchDecoder : Json.Decode.Decoder Search
+searchDecoder =
+    Json.Decode.succeed Search
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "search" (zkNoteSearchDecoder)))
+
+
+completedSyncDecoder : Json.Decode.Decoder CompletedSync
+completedSyncDecoder =
+    Json.Decode.succeed CompletedSync
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "after" (Json.Decode.nullable (Json.Decode.int))))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "now" (Json.Decode.int)))
+
+
+notelistDecoder : Json.Decode.Decoder Notelist
+notelistDecoder =
+    Json.Decode.succeed Notelist
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "sequence" (Json.Decode.list (Json.Decode.string))))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "current" (Json.Decode.nullable (Json.Decode.int))))
 
 
