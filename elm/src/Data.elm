@@ -1122,7 +1122,6 @@ type SpecialNote
     = SnSearch (ZkNoteSearch)
     | SnSync (CompletedSync)
     | SnPlaylist (Notelist)
-    | SnDateTime (DateTime)
 
 
 specialNoteEncoder : SpecialNote -> Json.Encode.Value
@@ -1134,20 +1133,6 @@ specialNoteEncoder enum =
             Json.Encode.object [ ( "SnSync", completedSyncEncoder inner ) ]
         SnPlaylist inner ->
             Json.Encode.object [ ( "SnPlaylist", notelistEncoder inner ) ]
-        SnDateTime inner ->
-            Json.Encode.object [ ( "SnDateTime", dateTimeEncoder inner ) ]
-
-type alias DateTime =
-    { datetime : Int
-    }
-
-
-dateTimeEncoder : DateTime -> Json.Encode.Value
-dateTimeEncoder struct =
-    Json.Encode.object
-        [ ( "datetime", (Json.Encode.int) struct.datetime )
-        ]
-
 
 type alias Search =
     { search : ZkNoteSearch
@@ -2079,14 +2064,7 @@ specialNoteDecoder =
         [ Json.Decode.map SnSearch (Json.Decode.field "SnSearch" (zkNoteSearchDecoder))
         , Json.Decode.map SnSync (Json.Decode.field "SnSync" (completedSyncDecoder))
         , Json.Decode.map SnPlaylist (Json.Decode.field "SnPlaylist" (notelistDecoder))
-        , Json.Decode.map SnDateTime (Json.Decode.field "SnDateTime" (dateTimeDecoder))
         ]
-
-dateTimeDecoder : Json.Decode.Decoder DateTime
-dateTimeDecoder =
-    Json.Decode.succeed DateTime
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "datetime" (Json.Decode.int)))
-
 
 searchDecoder : Json.Decode.Decoder Search
 searchDecoder =

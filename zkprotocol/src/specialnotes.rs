@@ -12,14 +12,14 @@ pub enum SpecialNote {
   SnSearch(ZkNoteSearch),
   SnSync(CompletedSync),
   SnPlaylist(Notelist),
-  SnDateTime(DateTime),
+  // SnDateTime(DateTime),
   // SnAlert(Alert),
 }
 
-#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
-pub struct DateTime {
-  pub datetime: i64,
-}
+// #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
+// pub struct DateTime {
+//   pub datetime: i64,
+// }
 
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
 pub struct Search {
