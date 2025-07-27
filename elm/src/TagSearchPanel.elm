@@ -10,6 +10,7 @@ module TagSearchPanel exposing
     , getSearch
     , initModel
     , onEnter
+    , onFileStatus
     , onOrdering
     , selectPrevSearch
     , setSearch
@@ -22,7 +23,7 @@ module TagSearchPanel exposing
 -- import Search exposing (AndOr(..), SearchMod(..), TSText, TagSearch(..), showSearchMod, tagSearchParser)
 
 import Common exposing (buttonStyle)
-import Data exposing (AndOr(..), Ordering, SearchMod(..), TagSearch(..))
+import Data exposing (AndOr(..), FileStatus, Ordering, SearchMod(..), TagSearch(..))
 import DataUtil exposing (OrderedTagSearch)
 import Element as E exposing (..)
 import Element.Background as EBk
@@ -56,6 +57,7 @@ type alias Model =
     , searchOnEnter : Bool
     , searchTermFocus : Maybe TSLoc
     , ordering : Maybe Ordering
+    , filestatus : Maybe FileStatus
     }
 
 
@@ -71,6 +73,7 @@ initModel =
     , searchOnEnter = False
     , searchTermFocus = Nothing
     , ordering = Nothing
+    , filestatus = Nothing
     }
 
 
@@ -110,10 +113,10 @@ getSearch : Model -> Maybe OrderedTagSearch
 getSearch model =
     case model.search of
         TagSearch (Ok s) ->
-            Just { ts = s, ordering = model.ordering }
+            Just { ts = s, ordering = model.ordering, filestatus = model.filestatus }
 
         NoSearch ->
-            Just { ts = SearchTerm { mods = [], term = "" }, ordering = model.ordering }
+            Just { ts = SearchTerm { mods = [], term = "" }, ordering = model.ordering, filestatus = model.filestatus }
 
         TagSearch (Err _) ->
             Nothing
@@ -635,6 +638,24 @@ view showCopy narrow nblevel model =
                     )
                 |> Maybe.withDefault E.none
 
+        fileStatusRow =
+            case model.filestatus of
+                Nothing ->
+                    E.none
+
+                Just fs ->
+                    E.row []
+                        [ case fs of
+                            Data.FileMissing ->
+                                E.text "file: missing"
+
+                            Data.FilePresent ->
+                                E.text "file: present"
+
+                            Data.NotAFile ->
+                                E.text "file: not a file"
+                        ]
+
         ddbutton =
             none
 
@@ -734,6 +755,7 @@ view showCopy narrow nblevel model =
                     ]
                )
             :: ( "orderingRow", orderingRow )
+            :: ( "fileStatusRow", fileStatusRow )
             :: ( "tbuttons", row [ spacing 3, width fill ] buttons )
             :: ( "searchhelp"
                , if model.showParse then
@@ -805,6 +827,11 @@ onEnter model =
 onOrdering : Maybe Ordering -> Model -> ( Model, Command )
 onOrdering ordering model =
     ( { model | ordering = ordering }, None )
+
+
+onFileStatus : Maybe FileStatus -> Model -> ( Model, Command )
+onFileStatus filestatus model =
+    ( { model | filestatus = filestatus }, None )
 
 
 doSearchClick : Model -> ( Model, Command )

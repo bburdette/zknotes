@@ -1,4 +1,4 @@
-use crate::content::{ZkListNote, ZkNote, ZkNoteAndLinks, ZkNoteId};
+use crate::content::{FileStatus, ZkListNote, ZkNote, ZkNoteAndLinks, ZkNoteId};
 use elm_rs::{Elm, ElmDecode, ElmEncode};
 
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
@@ -11,6 +11,7 @@ pub struct ZkNoteSearch {
   pub archives: bool,
   pub deleted: bool, // include deleted notes
   pub ordering: Option<Ordering>,
+  pub filestatus: Option<FileStatus>,
 }
 
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]

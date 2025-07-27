@@ -7,6 +7,7 @@ module SearchStackPanel exposing
     , getSearch
     , initModel
     , onEnter
+    , onFileStatus
     , onOrdering
     , paginationView
     , searchResultUpdated
@@ -107,6 +108,11 @@ onEnter model =
 onOrdering : Maybe Data.Ordering -> Model -> ( Model, Command )
 onOrdering ordering model =
     handleSpUpdate model (SP.onOrdering ordering model.spmodel)
+
+
+onFileStatus : Maybe Data.FileStatus -> Model -> ( Model, Command )
+onFileStatus filestatus model =
+    handleSpUpdate model (SP.onFileStatus filestatus model.spmodel)
 
 
 handleSpUpdate : Model -> ( SP.Model, SP.Command ) -> ( Model, Command )

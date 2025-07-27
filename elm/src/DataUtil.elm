@@ -314,6 +314,7 @@ flipOrderDirection od =
 type alias OrderedTagSearch =
     { ts : TagSearch
     , ordering : Maybe Ordering
+    , filestatus : Maybe FileStatus
     }
 
 

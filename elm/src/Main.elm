@@ -1829,6 +1829,7 @@ actualupdate msg model =
                                             , archives = False
                                             , deleted = False
                                             , ordering = Nothing
+                                            , filestatus = Nothing
                                             }
                                         )
 
@@ -4112,6 +4113,7 @@ prevSearchQuery login =
     , archives = False
     , deleted = False
     , ordering = Nothing
+    , filestatus = Nothing
     }
 
 

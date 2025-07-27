@@ -27,6 +27,7 @@ type Msg
     | TitlePress
     | CreatedPress
     | ChangedPress
+    | FilePress
     | PowerDeletePress Int
     | SPMsg SP.Msg
     | DialogMsg D.Msg
@@ -194,7 +195,8 @@ listview fontsize ld size model spmodel notes =
                                          ]
                                         )
                           }
-                        , { header = E.el [ EF.underline ] <| E.text "file"
+                        , { header =
+                                EI.button Common.buttonStyle { onPress = Just FilePress, label = E.text "file" }
                           , width = E.shrink
                           , view =
                                 \n ->
@@ -244,6 +246,22 @@ newOrder model ofld =
             { o | field = ofld, direction = DataUtil.flipOrderDirection o.direction }
 
 
+cycleFileStatus : SP.Model -> Maybe Data.FileStatus
+cycleFileStatus model =
+    case model.spmodel.tagSearchModel.filestatus of
+        Nothing ->
+            Just Data.FilePresent
+
+        Just Data.FilePresent ->
+            Just Data.FileMissing
+
+        Just Data.FileMissing ->
+            Just Data.NotAFile
+
+        Just Data.NotAFile ->
+            Nothing
+
+
 update : Msg -> Model -> SP.Model -> Data.ZkListNoteSearchResult -> LoginData -> ( Model, Command )
 update msg model spmodel notes ld =
     case msg of
@@ -264,6 +282,9 @@ update msg model spmodel notes ld =
 
         ChangedPress ->
             ( model, SPMod (SP.onOrdering (Just (newOrder spmodel Data.Changed))) )
+
+        FilePress ->
+            ( model, SPMod (SP.onFileStatus (cycleFileStatus spmodel)) )
 
         SearchHistoryPress ->
             ( model, SearchHistory )

@@ -51,6 +51,7 @@ defaultSearch =
     , archives = False
     , deleted = False
     , ordering = Nothing
+    , filestatus = Nothing
     }
 
 

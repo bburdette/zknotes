@@ -82,6 +82,7 @@ pub async fn prev_sync(
       field: OrderField::Changed,
       direction: OrderDirection::Descending,
     }),
+    filestatus: None,
   };
 
   if let SearchResult::SrNote(res) = search_zknotes(conn, &file_path, sysid, &zns)? {
@@ -1449,6 +1450,7 @@ pub fn sync_stream(
     archives: false,
     deleted: true,
     ordering: None,
+    filestatus: None,
   };
 
   let sync_users = sync_users(conn.clone(), uid, after, &zns).map(bytesify);
@@ -1480,6 +1482,7 @@ pub fn sync_stream(
     archives: false,
     deleted: true,
     ordering: None,
+    filestatus: None,
   };
 
   let znstream = search_zknotes_stream(
@@ -1500,6 +1503,7 @@ pub fn sync_stream(
     archives: true,
     deleted: false,
     ordering: None,
+    filestatus: None,
   };
 
   let anstream =

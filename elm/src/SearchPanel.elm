@@ -7,6 +7,7 @@ module SearchPanel exposing
     , getSearch
     , initModel
     , onEnter
+    , onFileStatus
     , onOrdering
     , paginationView
     , searchResultUpdated
@@ -58,6 +59,7 @@ getSearch model =
                 , archives = False
                 , deleted = showDeleted
                 , ordering = s.ordering
+                , filestatus = s.filestatus
                 }
             )
 
@@ -96,6 +98,11 @@ onEnter model =
 onOrdering : Maybe Data.Ordering -> Model -> ( Model, Command )
 onOrdering ordering model =
     handleTspUpdate model (TSP.onOrdering ordering model.tagSearchModel)
+
+
+onFileStatus : Maybe Data.FileStatus -> Model -> ( Model, Command )
+onFileStatus filestatus model =
+    handleTspUpdate model (TSP.onFileStatus filestatus model.tagSearchModel)
 
 
 type Msg
@@ -160,6 +167,7 @@ handleTspUpdate model ( nm, cmd ) =
                 , archives = False
                 , deleted = showDeleted
                 , ordering = s.ordering
+                , filestatus = s.filestatus
                 }
             )
 
@@ -174,6 +182,7 @@ handleTspUpdate model ( nm, cmd ) =
                 , archives = False
                 , deleted = showDeleted
                 , ordering = Nothing
+                , filestatus = Nothing
                 }
             )
 
@@ -217,6 +226,7 @@ update msg model =
                                 , archives = False
                                 , deleted = showDeleted
                                 , ordering = s.ordering
+                                , filestatus = s.filestatus
                                 }
                             )
 

@@ -41,6 +41,7 @@ pub fn power_delete_zknotes(
     archives: false,
     deleted: false,
     ordering: None,
+    filestatus: None,
   };
   let znsr = search_zknotes(conn, &file_path, user, &nolimsearch)?;
   match znsr {

@@ -855,6 +855,7 @@ type alias ZkNoteSearch =
     , archives : Bool
     , deleted : Bool
     , ordering : Maybe (Ordering)
+    , filestatus : Maybe (FileStatus)
     }
 
 
@@ -869,6 +870,7 @@ zkNoteSearchEncoder struct =
         , ( "archives", (Json.Encode.bool) struct.archives )
         , ( "deleted", (Json.Encode.bool) struct.deleted )
         , ( "ordering", (Maybe.withDefault Json.Encode.null << Maybe.map (orderingEncoder)) struct.ordering )
+        , ( "filestatus", (Maybe.withDefault Json.Encode.null << Maybe.map (fileStatusEncoder)) struct.filestatus )
         ]
 
 
@@ -1687,6 +1689,7 @@ zkNoteSearchDecoder =
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "archives" (Json.Decode.bool)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "deleted" (Json.Decode.bool)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "ordering" (Json.Decode.nullable (orderingDecoder))))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "filestatus" (Json.Decode.nullable (fileStatusDecoder))))
 
 
 orderingDecoder : Json.Decode.Decoder Ordering
