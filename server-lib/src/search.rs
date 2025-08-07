@@ -432,6 +432,16 @@ pub fn build_base_sql(
     " order by N.changeddate desc ".to_string()
   };
 
+  let fileclause = if let Some(fs) = &search.filestatus {
+    match fs {
+      FileStatus::NotAFile => Some("zkn.file is null"),
+      FileStatus::FileMissing => Some("zkn.file is not null"),
+      FileStatus::FilePresent => Some("zkn.file is not null"),
+    }
+  } else {
+    None
+  };
+
   let archives = search.archives;
   let deleted = if search.deleted {
     ""
