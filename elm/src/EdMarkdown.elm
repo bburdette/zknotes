@@ -132,27 +132,39 @@ stringRenderer =
     , text = identity
     , unorderedList =
         \items ->
-            items
-                |> List.map
-                    (\listitem ->
-                        case listitem of
-                            Block.ListItem Block.NoTask childs ->
-                                "- "
-                                    ++ (String.concat childs |> String.trimRight)
-                                    ++ "\n"
+            let
+                its : List String
+                its =
+                    items
+                        |> List.map
+                            (\listitem ->
+                                let
+                                    childz =
+                                        \childs ->
+                                            ((String.concat childs |> String.trimRight)
+                                                |> String.replace "\n" "\n  "
+                                            )
+                                                ++ "\n"
+                                in
+                                case listitem of
+                                    Block.ListItem Block.NoTask childs ->
+                                        "- "
+                                            -- ++ (String.concat childs |> String.trimRight)
+                                            ++ childz childs
 
-                            Block.ListItem Block.IncompleteTask childs ->
-                                "- [ ]"
-                                    ++ (String.concat childs |> String.trimRight)
-                                    ++ "\n"
+                                    Block.ListItem Block.IncompleteTask childs ->
+                                        "- [ ]"
+                                            ++ childz childs
 
-                            Block.ListItem Block.CompletedTask childs ->
-                                "- [x]"
-                                    ++ (String.concat childs |> String.trimRight)
-                                    ++ "\n"
-                    )
+                                    Block.ListItem Block.CompletedTask childs ->
+                                        "- [x]"
+                                            ++ childz childs
+                            )
+            in
+            "\n"
+                :: its
+                ++ [ "\n" ]
                 |> String.concat
-                |> (\s -> String.append s "\n")
     , orderedList =
         \startingIndex items ->
             items
