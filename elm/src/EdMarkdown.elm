@@ -181,11 +181,11 @@ stringRenderer =
                                             ++ childz childs
 
                                     Block.ListItem Block.IncompleteTask childs ->
-                                        "- [ ]"
+                                        "- [ ] "
                                             ++ childz childs
 
                                     Block.ListItem Block.CompletedTask childs ->
-                                        "- [x]"
+                                        "- [x] "
                                             ++ childz childs
                             )
             in
