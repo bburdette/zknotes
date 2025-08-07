@@ -56,6 +56,19 @@ updateBlocks blocks =
             )
 
 
+spacedash : String -> Bool
+spacedash s =
+    case String.left 1 s of
+        "-" ->
+            True
+
+        " " ->
+            spacedash <| String.dropLeft 1 s
+
+        _ ->
+            False
+
+
 {-| This renders the parsed markdown structs to a string.
 TODO: use the one in Markdown lib when its published.
 -}
@@ -141,7 +154,22 @@ stringRenderer =
                                 let
                                     childz =
                                         \childs ->
-                                            ((String.concat childs |> String.trimRight)
+                                            ((String.concat
+                                                (List.map
+                                                    (\s ->
+                                                        if spacedash s then
+                                                            "\n  "
+                                                                ++ String.replace "\n"
+                                                                    "\n  "
+                                                                    s
+
+                                                        else
+                                                            s
+                                                    )
+                                                    childs
+                                                )
+                                                |> String.trimRight
+                                             )
                                                 |> String.replace "\n" "\n  "
                                             )
                                                 ++ "\n"
@@ -161,8 +189,7 @@ stringRenderer =
                                             ++ childz childs
                             )
             in
-            "\n"
-                :: its
+            its
                 ++ [ "\n" ]
                 |> String.concat
     , orderedList =
