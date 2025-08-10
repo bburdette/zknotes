@@ -260,7 +260,6 @@ updateBlockEdit s (Text t) =
                 |> Maybe.andThen (\r -> List.head r)
                 |> Maybe.withDefault (Paragraph [])
     in
-    Debug.log "text: " <|
         Text
             { t | s = s, b = b, original = t.original }
 
