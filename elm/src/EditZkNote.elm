@@ -1291,10 +1291,14 @@ renderBlocks zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo blocks =
 
                                                                       else
                                                                         E.none
-                                                                    , EI.button (edButtonStyle JoinAboveBlock ++ [ E.alignRight ])
-                                                                        { onPress = Nothing
-                                                                        , label = E.text "join ↑"
-                                                                        }
+                                                                    , if t.idx > 0 then
+                                                                        EI.button (edButtonStyle JoinAboveBlock ++ [ E.alignRight ])
+                                                                            { onPress = Nothing
+                                                                            , label = E.text "join ↑"
+                                                                            }
+
+                                                                      else
+                                                                        E.none
                                                                     , EI.button (edButtonStyle JoinBelowBlock ++ [ E.alignRight ])
                                                                         { onPress = Nothing
                                                                         , label = E.text "join ⇩"
