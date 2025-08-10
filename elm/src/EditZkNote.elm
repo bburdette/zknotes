@@ -1264,7 +1264,7 @@ renderBlocks zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo blocks =
                        ]
                 )
                 (List.indexedMap
-                    (\i ( b, r ) ->
+                    (\i ( _, r ) ->
                         case vm of
                             MC.PublicView ->
                                 r
@@ -1739,7 +1739,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                     ]
                 ]
 
-        editview linkbkc =
+        editview =
             E.column
                 [ E.spacing 8
                 , E.alignTop
@@ -1783,7 +1783,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
         mbdi =
             blockDndSystem.info model.blockDnd
 
-        mdview linkbkc =
+        mdview =
             E.column
                 [ E.width E.fill
                 , E.centerX
@@ -1888,7 +1888,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                 , EBk.color TC.white
                 , E.clip
                 ]
-                (Common.navbar 2
+                [ Common.navbar 2
                     (case model.searchOrRecent of
                         SearchView ->
                             EtSearch
@@ -1900,37 +1900,13 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                     [ ( EtSearch, "search" )
                     , ( EtRecent, "recent" )
                     ]
-                    :: [ case model.searchOrRecent of
-                            SearchView ->
-                                searchPanel TC.white
+                , case model.searchOrRecent of
+                    SearchView ->
+                        searchPanel TC.white
 
-                            RecentView ->
-                                recentPanel TC.white
-                       ]
-                )
-
-        rawOrEviewPanel =
-            E.column []
-                (Common.navbar 2
-                    (case model.editOrView of
-                        EditView ->
-                            EtEdit
-
-                        ViewView ->
-                            EtView
-                    )
-                    TabChanged
-                    [ ( EtEdit, "raw" )
-                    , ( EtView, "eview" )
-                    ]
-                    :: [ case model.editOrView of
-                            EditView ->
-                                editview TC.white
-
-                            ViewView ->
-                                mdview TC.white
-                       ]
-                )
+                    RecentView ->
+                        recentPanel TC.white
+                ]
 
         searchPanel bkcolor =
             E.column
@@ -2027,8 +2003,8 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                                 , E.alignTop
                                 , E.spacing 8
                                 ]
-                                [ headingPanel "raw" [ E.width E.fill ] (editview TC.white)
-                                , headingPanel "eview" [ E.width E.fill ] (mdview TC.white)
+                                [ headingPanel "raw" [ E.width E.fill ] editview
+                                , headingPanel "eview" [ E.width E.fill ] mdview
                                 ]
                             ]
 
@@ -2053,18 +2029,17 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                                 ]
                             , case model.editOrView of
                                 EditView ->
-                                    editview TC.white
+                                    editview
 
                                 ViewView ->
-                                    mdview TC.white
-                            ]
-                                ++ [ if isdirty then
-                                        EI.button perhapsdirtybutton { onPress = Just SavePress, label = E.text "save" }
+                                    mdview
+                            , if isdirty then
+                                EI.button perhapsdirtybutton { onPress = Just SavePress, label = E.text "save" }
 
-                                     else
-                                        E.none
-                                   , dates
-                                   ]
+                              else
+                                E.none
+                            , dates
+                            ]
                        )
                     ++ showComments
                     ++ [ divider ]
@@ -2652,15 +2627,6 @@ compareZklinks left right =
 
         ltgt ->
             ltgt
-
-
-onCtrlS : Model -> ( Model, Command )
-onCtrlS model =
-    if dirty model then
-        update SavePress model
-
-    else
-        ( model, None )
 
 
 onWkKeyPress : WK.Key -> Model -> ( Model, Command )
@@ -3357,7 +3323,7 @@ update msg model =
                                     |> List.intersperse "\n"
                                     |> String.concat
                                     |> (\s ->
-                                            (++) s "\n\n"
+                                            s ++ "\n\n"
                                        )
                                 )
                                 (Text t)
@@ -3479,25 +3445,22 @@ update msg model =
                 eblk : Int -> Maybe BlockEdit
                 eblk =
                     \bi ->
-                        case
-                            EM.getBlocks model.edMarkdown
-                                |> Result.toMaybe
-                                |> Maybe.andThen (\blocks -> List.head (List.drop bidx blocks))
-                        of
-                            Just b ->
-                                Markdown.Renderer.render EM.stringRenderer [ b ]
-                                    |> Result.map
-                                        (\sl ->
-                                            let
-                                                mds =
-                                                    String.concat sl
-                                            in
-                                            Text { idx = bi, s = mds, b = b, original = mds }
-                                        )
-                                    |> Result.toMaybe
-
-                            Nothing ->
-                                Nothing
+                        EM.getBlocks model.edMarkdown
+                            |> Result.toMaybe
+                            |> Maybe.andThen (\blocks -> List.head (List.drop bidx blocks))
+                            |> Maybe.andThen
+                                (\b ->
+                                    Markdown.Renderer.render EM.stringRenderer [ b ]
+                                        |> Result.map
+                                            (\sl ->
+                                                let
+                                                    mds =
+                                                        String.concat sl
+                                                in
+                                                Text { idx = bi, s = mds, b = b, original = mds }
+                                            )
+                                        |> Result.toMaybe
+                                )
             in
             ( { model
                 | blockEdit =
@@ -3563,7 +3526,7 @@ update msg model =
                                 |> Result.map (\em -> ( List.length blks, em ))
                         )
             of
-                Ok ( c, em ) ->
+                Ok ( _, em ) ->
                     ( { model
                         | edMarkdown = em
                         , blockEdit = Just <| Text { idx = 0, s = "", b = Paragraph [], original = "" }
