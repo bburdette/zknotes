@@ -63,6 +63,7 @@ import Element.Events as EE
 import Element.Font as EF
 import Element.Input as EI
 import Html.Attributes
+import Html.Events as HE
 import JobsDialog exposing (TJobs)
 import Json.Decode as JD
 import Json.Encode as JE
@@ -138,6 +139,11 @@ type Msg
     | DnDMsg DnDList.Msg
     | RevertBlock
     | RemoveBlock Int
+    | SplitBlock
+    | JoinBlock
+    | SpaceEndingsBlock
+    | JoinAboveBlock
+    | JoinBelowBlock
     | EditBlock Int
     | EditBlockInput String
     | EditBlockOk
@@ -254,7 +260,9 @@ updateBlockEdit s (Text t) =
                 |> Maybe.andThen (\r -> List.head r)
                 |> Maybe.withDefault (Paragraph [])
     in
-    Text { t | s = s, b = b, original = t.original }
+    Debug.log "text: " <|
+        Text
+            { t | s = s, b = b, original = t.original }
 
 
 
@@ -330,13 +338,21 @@ blockId i =
     "block-" ++ String.fromInt i
 
 
-edButtonStyle : List (E.Attribute a)
-edButtonStyle =
+edButtonStyle : Msg -> List (E.Attribute Msg)
+edButtonStyle m =
     [ EBk.color TC.blue
     , EF.color TC.white
     , EBd.color TC.darkBlue
     , E.paddingXY 3 3
     , EBd.rounded 2
+    , E.htmlAttribute <|
+        HE.custom "click"
+            (JD.succeed
+                { message = m
+                , stopPropagation = True
+                , preventDefault = False
+                }
+            )
     ]
 
 
@@ -1248,7 +1264,7 @@ renderBlocks zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo blocks =
                        ]
                 )
                 (List.indexedMap
-                    (\i ( b, r ) ->
+                    (\i ( _, r ) ->
                         case vm of
                             MC.PublicView ->
                                 r
@@ -1268,15 +1284,39 @@ renderBlocks zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo blocks =
                                                                 [ E.row (E.height E.shrink :: MG.rowtrib)
                                                                     [ headingText "rendered: "
                                                                     , if t.original /= t.s then
-                                                                        EI.button (edButtonStyle ++ [ E.alignRight ])
-                                                                            { onPress = Just RevertBlock
+                                                                        EI.button (edButtonStyle RevertBlock ++ [ E.alignRight ])
+                                                                            { onPress = Nothing
                                                                             , label = E.text "revert"
                                                                             }
 
                                                                       else
                                                                         E.none
-                                                                    , EI.button (edButtonStyle ++ [ E.alignRight ])
-                                                                        { onPress = Just (RemoveBlock i)
+                                                                    , if t.idx > 0 then
+                                                                        EI.button (edButtonStyle JoinAboveBlock ++ [ E.alignRight ])
+                                                                            { onPress = Nothing
+                                                                            , label = E.text "join ↑"
+                                                                            }
+
+                                                                      else
+                                                                        E.none
+                                                                    , EI.button (edButtonStyle JoinBelowBlock ++ [ E.alignRight ])
+                                                                        { onPress = Nothing
+                                                                        , label = E.text "join ⇩"
+                                                                        }
+                                                                    , EI.button (edButtonStyle JoinBlock ++ [ E.alignRight ])
+                                                                        { onPress = Nothing
+                                                                        , label = E.text "join"
+                                                                        }
+                                                                    , EI.button (edButtonStyle SplitBlock ++ [ E.alignRight ])
+                                                                        { onPress = Nothing
+                                                                        , label = E.text "split"
+                                                                        }
+                                                                    , EI.button (edButtonStyle SpaceEndingsBlock ++ [ E.alignRight ])
+                                                                        { onPress = Nothing
+                                                                        , label = E.text "endings"
+                                                                        }
+                                                                    , EI.button (edButtonStyle (RemoveBlock i) ++ [ E.alignRight ])
+                                                                        { onPress = Nothing
                                                                         , label = E.text "🗑"
                                                                         }
                                                                     ]
@@ -1703,7 +1743,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                     ]
                 ]
 
-        editview linkbkc =
+        editview =
             E.column
                 [ E.spacing 8
                 , E.alignTop
@@ -1747,7 +1787,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
         mbdi =
             blockDndSystem.info model.blockDnd
 
-        mdview linkbkc =
+        mdview =
             E.column
                 [ E.width E.fill
                 , E.centerX
@@ -1852,7 +1892,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                 , EBk.color TC.white
                 , E.clip
                 ]
-                (Common.navbar 2
+                [ Common.navbar 2
                     (case model.searchOrRecent of
                         SearchView ->
                             EtSearch
@@ -1864,37 +1904,13 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                     [ ( EtSearch, "search" )
                     , ( EtRecent, "recent" )
                     ]
-                    :: [ case model.searchOrRecent of
-                            SearchView ->
-                                searchPanel TC.white
+                , case model.searchOrRecent of
+                    SearchView ->
+                        searchPanel TC.white
 
-                            RecentView ->
-                                recentPanel TC.white
-                       ]
-                )
-
-        rawOrEviewPanel =
-            E.column []
-                (Common.navbar 2
-                    (case model.editOrView of
-                        EditView ->
-                            EtEdit
-
-                        ViewView ->
-                            EtView
-                    )
-                    TabChanged
-                    [ ( EtEdit, "raw" )
-                    , ( EtView, "eview" )
-                    ]
-                    :: [ case model.editOrView of
-                            EditView ->
-                                editview TC.white
-
-                            ViewView ->
-                                mdview TC.white
-                       ]
-                )
+                    RecentView ->
+                        recentPanel TC.white
+                ]
 
         searchPanel bkcolor =
             E.column
@@ -1991,8 +2007,8 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                                 , E.alignTop
                                 , E.spacing 8
                                 ]
-                                [ headingPanel "raw" [ E.width E.fill ] (editview TC.white)
-                                , headingPanel "eview" [ E.width E.fill ] (mdview TC.white)
+                                [ headingPanel "raw" [ E.width E.fill ] editview
+                                , headingPanel "eview" [ E.width E.fill ] mdview
                                 ]
                             ]
 
@@ -2017,18 +2033,17 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                                 ]
                             , case model.editOrView of
                                 EditView ->
-                                    editview TC.white
+                                    editview
 
                                 ViewView ->
-                                    mdview TC.white
-                            ]
-                                ++ [ if isdirty then
-                                        EI.button perhapsdirtybutton { onPress = Just SavePress, label = E.text "save" }
+                                    mdview
+                            , if isdirty then
+                                EI.button perhapsdirtybutton { onPress = Just SavePress, label = E.text "save" }
 
-                                     else
-                                        E.none
-                                   , dates
-                                   ]
+                              else
+                                E.none
+                            , dates
+                            ]
                        )
                     ++ showComments
                     ++ [ divider ]
@@ -2616,15 +2631,6 @@ compareZklinks left right =
 
         ltgt ->
             ltgt
-
-
-onCtrlS : Model -> ( Model, Command )
-onCtrlS model =
-    if dirty model then
-        update SavePress model
-
-    else
-        ( model, None )
 
 
 onWkKeyPress : WK.Key -> Model -> ( Model, Command )
@@ -3270,6 +3276,143 @@ update msg model =
                 Nothing ->
                     ( model, None )
 
+        SplitBlock ->
+            case model.blockEdit of
+                Just (Text t) ->
+                    let
+                        be =
+                            updateBlockEdit
+                                (t.s
+                                    |> String.split "\n"
+                                    |> List.map String.trimRight
+                                    |> List.intersperse "\n\n"
+                                    |> String.concat
+                                )
+                                (Text t)
+                    in
+                    ( { model | blockEdit = Just be }, None )
+
+                Nothing ->
+                    ( model, None )
+
+        SpaceEndingsBlock ->
+            case model.blockEdit of
+                Just (Text t) ->
+                    let
+                        be =
+                            updateBlockEdit
+                                (t.s
+                                    |> String.split "\n"
+                                    |> List.map String.trimRight
+                                    |> List.intersperse "  \n"
+                                    |> String.concat
+                                )
+                                (Text t)
+                    in
+                    ( { model | blockEdit = Just be }, None )
+
+                Nothing ->
+                    ( model, None )
+
+        JoinBlock ->
+            case model.blockEdit of
+                Just (Text t) ->
+                    let
+                        be =
+                            updateBlockEdit
+                                (t.s
+                                    |> String.split "\n"
+                                    |> List.map String.trimRight
+                                    |> List.filter ((/=) "")
+                                    |> List.intersperse "\n"
+                                    |> String.concat
+                                    |> (\s ->
+                                            s ++ "\n\n"
+                                       )
+                                )
+                                (Text t)
+                    in
+                    ( { model | blockEdit = Just be }, None )
+
+                Nothing ->
+                    ( model, None )
+
+        JoinAboveBlock ->
+            case model.blockEdit of
+                Just (Text be) ->
+                    EM.getBlocks model.edMarkdown
+                        |> Result.toMaybe
+                        |> Maybe.andThen
+                            (\blocks ->
+                                List.take (be.idx - 1) blocks
+                                    ++ List.drop be.idx blocks
+                                    |> (\blks ->
+                                            EM.updateBlocks blks
+                                                |> Result.toMaybe
+                                       )
+                                    |> Maybe.map
+                                        (\db ->
+                                            List.drop (be.idx - 1) blocks
+                                                |> List.head
+                                                |> Maybe.andThen
+                                                    (\lb ->
+                                                        Markdown.Renderer.render EM.stringRenderer [ lb ]
+                                                            |> Result.toMaybe
+                                                    )
+                                                |> Maybe.map
+                                                    (\ls ->
+                                                        let
+                                                            nbe =
+                                                                updateBlockEdit (String.concat ls ++ be.s) (Text { be | idx = be.idx - 1 })
+                                                        in
+                                                        ( { model | blockEdit = Just nbe, edMarkdown = db }, None )
+                                                    )
+                                                |> Maybe.withDefault ( model, None )
+                                        )
+                            )
+                        |> Maybe.withDefault ( model, None )
+
+                Nothing ->
+                    ( model, None )
+
+        JoinBelowBlock ->
+            case model.blockEdit of
+                Just (Text be) ->
+                    EM.getBlocks model.edMarkdown
+                        |> Result.toMaybe
+                        |> Maybe.andThen
+                            (\blocks ->
+                                List.take (be.idx + 1) blocks
+                                    ++ List.drop (be.idx + 2) blocks
+                                    |> (\blks ->
+                                            EM.updateBlocks blks
+                                                |> Result.toMaybe
+                                       )
+                                    |> Maybe.map
+                                        (\db ->
+                                            List.drop (be.idx + 1) blocks
+                                                |> List.head
+                                                |> Maybe.andThen
+                                                    (\lb ->
+                                                        Markdown.Renderer.render EM.stringRenderer [ lb ]
+                                                            |> Result.toMaybe
+                                                    )
+                                                |> Maybe.map
+                                                    (\ls ->
+                                                        let
+                                                            nbe =
+                                                                updateBlockEdit (be.s ++ String.concat ls) (Text { be | idx = be.idx })
+                                                        in
+                                                        ( { model | blockEdit = Just nbe, edMarkdown = db }, None )
+                                                    )
+                                                |> Maybe.withDefault ( model, None )
+                                        )
+                            )
+                        |> Maybe.withDefault ( model, None )
+
+                Nothing ->
+                    ( model, None )
+
         RemoveBlock idx ->
             EM.getBlocks model.edMarkdown
                 |> Result.andThen
@@ -3306,25 +3449,22 @@ update msg model =
                 eblk : Int -> Maybe BlockEdit
                 eblk =
                     \bi ->
-                        case
-                            EM.getBlocks model.edMarkdown
-                                |> Result.toMaybe
-                                |> Maybe.andThen (\blocks -> List.head (List.drop bidx blocks))
-                        of
-                            Just b ->
-                                Markdown.Renderer.render EM.stringRenderer [ b ]
-                                    |> Result.map
-                                        (\sl ->
-                                            let
-                                                mds =
-                                                    String.concat sl
-                                            in
-                                            Text { idx = bi, s = mds, b = b, original = mds }
-                                        )
-                                    |> Result.toMaybe
-
-                            Nothing ->
-                                Nothing
+                        EM.getBlocks model.edMarkdown
+                            |> Result.toMaybe
+                            |> Maybe.andThen (\blocks -> List.head (List.drop bidx blocks))
+                            |> Maybe.andThen
+                                (\b ->
+                                    Markdown.Renderer.render EM.stringRenderer [ b ]
+                                        |> Result.map
+                                            (\sl ->
+                                                let
+                                                    mds =
+                                                        String.concat sl
+                                                in
+                                                Text { idx = bi, s = mds, b = b, original = mds }
+                                            )
+                                        |> Result.toMaybe
+                                )
             in
             ( { model
                 | blockEdit =
@@ -3390,7 +3530,7 @@ update msg model =
                                 |> Result.map (\em -> ( List.length blks, em ))
                         )
             of
-                Ok ( c, em ) ->
+                Ok ( _, em ) ->
                     ( { model
                         | edMarkdown = em
                         , blockEdit = Just <| Text { idx = 0, s = "", b = Paragraph [], original = "" }
