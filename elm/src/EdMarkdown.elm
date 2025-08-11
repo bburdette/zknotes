@@ -196,6 +196,9 @@ stringRenderer =
         \startingIndex items ->
             items
                 |> List.indexedMap (\i item -> String.fromInt (i + startingIndex) ++ ") " ++ String.concat item ++ "\n")
+                |> (\l ->
+                        List.append l [ "\n" ]
+                   )
                 |> String.concat
     , html = MC.htmlText
     , codeBlock =
