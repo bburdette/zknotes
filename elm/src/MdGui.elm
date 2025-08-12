@@ -464,7 +464,7 @@ updateAttrib : String -> Maybe String -> List HtmlAttribute -> List HtmlAttribut
 updateAttrib name mbvalue attribs =
     case mbvalue of
         Nothing ->
-            List.filter (\l -> l.name == name) attribs
+            List.filter (\l -> l.name /= name) attribs
 
         Just v ->
             attribs
@@ -600,7 +600,16 @@ updateHtmlElement msg tag attribs =
                     HtmlElement tag (updateAttrib "id" (Just s) attribs) []
 
                 NoteText s ->
-                    HtmlElement tag (updateAttrib "text" (Just s) attribs) []
+                    let
+                        mb =
+                            case s of
+                                "" ->
+                                    Nothing
+
+                                _ ->
+                                    Just s
+                    in
+                    HtmlElement tag (updateAttrib "text" mb attribs) []
 
                 NoteShowTitle b ->
                     HtmlElement tag (updateShowAttrib "title" b attribs) []
@@ -650,7 +659,17 @@ updateShowAttrib which on attribs =
                     |> List.intersperse " "
                     |> String.concat
             )
-                |> (\a -> updateAttrib "show" (Just a) attribs)
+                |> (\a ->
+                        updateAttrib "show"
+                            (case a of
+                                "" ->
+                                    Nothing
+
+                                _ ->
+                                    Just a
+                            )
+                            attribs
+                   )
 
         Nothing ->
             if on then
