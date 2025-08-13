@@ -52,6 +52,7 @@ fn convert_payloaderr(err: PayloadError) -> std::io::Error {
 pub struct CompletedSync {
   after: Option<i64>,
   now: i64,
+  server: Server,
 }
 
 pub async fn prev_sync(
@@ -258,7 +259,18 @@ pub async fn sync(
       .await?;
 
       let unote = user_note_id(&conn, user.id)?;
-      save_sync(&conn, user.id, &server, unote, CompletedSync { after, now }).await?;
+      save_sync(
+        &conn,
+        user.id,
+        &server,
+        unote,
+        CompletedSync {
+          after,
+          now,
+          server: server.clone(),
+        },
+      )
+      .await?;
 
       tr.commit()?;
 

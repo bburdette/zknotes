@@ -34,7 +34,7 @@ pub fn zknotes_callbacks() -> Callbacks {
   }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Deserialize, Serialize, Debug)]
 pub struct Server {
   pub id: i64,
   pub uuid: String,
@@ -523,8 +523,22 @@ pub fn save_zklink(
 
   let shareid = note_id(&conn, "system", "share")?;
   let publicid = note_id(&conn, "system", "public")?;
+  let archiveid = note_id(&conn, "system", "archive")?;
   let systemid = user_id(&conn, "system")?;
   let usernote = user_note_id(&conn, user)?;
+
+  // only system can link to archive note.
+  if user != systemid {
+    if fromid == archiveid || toid == archiveid {
+      return Err(zkerr::Error::CantLinkToArchive);
+    } else
+    // its ok to link to public, which archive links to.
+    if (fromid != publicid && are_notes_linked(&conn, fromid, archiveid)?)
+      || (toid != publicid && are_notes_linked(&conn, toid, archiveid)?)
+    {
+      return Err(zkerr::Error::CantLinkToArchive);
+    }
+  }
 
   let authed = if fromid == shareid || fromid == publicid || fromid == usernote {
     // can't link non-me notes to shareid or public or usernote.

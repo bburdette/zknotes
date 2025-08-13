@@ -24,6 +24,7 @@ pub enum OrderDirection {
   Ascending,
   Descending,
 }
+
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
 pub enum OrderField {
   Title,
