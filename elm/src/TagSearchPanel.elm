@@ -629,21 +629,21 @@ view showCopy narrow nblevel model =
                                 E.text <|
                                     (case o.field of
                                         Data.Title ->
-                                            "Title"
+                                            "title"
 
                                         Data.Created ->
-                                            "Created"
+                                            "created"
 
                                         Data.Changed ->
-                                            "Changed"
+                                            "changed"
                                     )
                                         ++ " "
                                         ++ (case o.direction of
                                                 Data.Ascending ->
-                                                    "Ascending"
+                                                    "ascending"
 
                                                 Data.Descending ->
-                                                    "Descending"
+                                                    "descending"
                                            )
                             )
 
@@ -880,6 +880,8 @@ update msg model =
             ( { model
                 | searchText = ""
                 , search = NoSearch
+                , ordering = Nothing
+                , archives = Current
               }
             , None
             )
