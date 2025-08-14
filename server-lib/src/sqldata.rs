@@ -34,7 +34,7 @@ pub fn zknotes_callbacks() -> Callbacks {
   }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Deserialize, Serialize, Debug)]
 pub struct Server {
   pub id: i64,
   pub uuid: String,
@@ -523,8 +523,22 @@ pub fn save_zklink(
 
   let shareid = note_id(&conn, "system", "share")?;
   let publicid = note_id(&conn, "system", "public")?;
+  let archiveid = note_id(&conn, "system", "archive")?;
   let systemid = user_id(&conn, "system")?;
   let usernote = user_note_id(&conn, user)?;
+
+  // only system can link to archive note.
+  if user != systemid {
+    if fromid == archiveid || toid == archiveid {
+      return Err(zkerr::Error::CantLinkToArchive);
+    } else
+    // its ok to link to public, which archive links to.
+    if (fromid != publicid && are_notes_linked(&conn, fromid, archiveid)?)
+      || (toid != publicid && are_notes_linked(&conn, toid, archiveid)?)
+    {
+      return Err(zkerr::Error::CantLinkToArchive);
+    }
+  }
 
   let authed = if fromid == shareid || fromid == publicid || fromid == usernote {
     // can't link non-me notes to shareid or public or usernote.
@@ -1219,7 +1233,8 @@ pub fn zknote_access(
         // accessible but not editable.
         Ok(Access::Read)
       } else {
-        Ok(Access::Private)
+        // returns private if not an accessible archive note.
+        zknote_archive_access(conn, uid, id)
       }
     }
     None => {
@@ -1231,6 +1246,38 @@ pub fn zknote_access(
       }
     }
   }
+}
+
+pub fn is_zknote_archive(conn: &Connection, noteid: i64) -> Result<Option<i64>, zkerr::Error> {
+  let aid = note_id(&conn, "system", "archive")?;
+
+  match conn.query_row(
+    "select A.toid from
+      zklink A, zklink B
+      where A.fromid = ?1 and B.fromid = ?1 and B.toid = ?2",
+    params![noteid, aid],
+    |row| {
+      let i: i64 = row.get(0)?;
+      Ok(i)
+    },
+  ) {
+    Ok(i) => Ok(Some(i)),
+    Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+    Err(e) => Err(zkerr::Error::Rusqlite(e)),
+  }
+}
+
+pub fn zknote_archive_access(
+  conn: &Connection,
+  uid: UserId,
+  noteid: i64,
+) -> Result<Access, zkerr::Error> {
+  let id = match is_zknote_archive(&conn, noteid)? {
+    Some(id) => id,
+    None => return Ok(Access::Private),
+  };
+
+  zknote_access_id(conn, Some(uid), id)
 }
 
 pub fn zknote_access_id(
@@ -1252,7 +1299,8 @@ pub fn zknote_access_id(
         // accessible but not editable.
         Ok(Access::Read)
       } else {
-        Ok(Access::Private)
+        // returns private if not an accessible archive.
+        zknote_archive_access(conn, uid, noteid)
       }
     }
     None => {

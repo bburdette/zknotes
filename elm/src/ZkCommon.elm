@@ -36,6 +36,11 @@ publicColor =
     TC.darkBlue
 
 
+archiveColor : E.Color
+archiveColor =
+    TC.darkYellow
+
+
 shareColor : E.Color
 shareColor =
     TC.darkBrown
@@ -46,7 +51,10 @@ systemColor ld ids =
     let
         sysColor : ZkNoteId -> Maybe E.Color
         sysColor color =
-            if zniEq color ld.publicid then
+            if zniEq color ld.archiveid then
+                Just archiveColor
+
+            else if zniEq color ld.publicid then
                 Just publicColor
 
             else if zniEq color ld.shareid then

@@ -1826,7 +1826,7 @@ actualupdate msg model =
                                             , limit = Nothing
                                             , what = ""
                                             , resulttype = Data.RtListNote
-                                            , archives = False
+                                            , archives = Data.Current
                                             , deleted = False
                                             , ordering = Nothing
                                             }
@@ -4109,7 +4109,7 @@ prevSearchQuery login =
     , limit = Just 50
     , what = "prevSearches"
     , resulttype = Data.RtNote
-    , archives = False
+    , archives = Data.Current
     , deleted = False
     , ordering = Nothing
     }

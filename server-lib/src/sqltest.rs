@@ -95,7 +95,7 @@ mod tests {
 
     println!("3");
 
-    let _szn1_1 = save_zknote(
+    let (szn1_1_id, _szn1_1) = save_zknote(
       &conn,
       uid1,
       &server,
@@ -319,6 +319,12 @@ mod tests {
       Err(_e) => (),
     };
 
+    // not ok to link to archive note.
+    match save_zklink(&conn, szn1_4_id, szn1_3_share_id, uid2, None) {
+      Ok(_) => panic!("wat"),
+      Err(_e) => (),
+    };
+
     println!("14");
 
     // TODO test that pubid read works, since that broke in 'production'
@@ -338,7 +344,7 @@ mod tests {
       },
     )?;
 
-    println!("14");
+    println!("14.1");
 
     // despite public id, shouldn't be able to read. because doesn't link to 'public'
     match read_zknotepubid(&conn, filesdir, None, "publicid1") {
@@ -765,6 +771,47 @@ mod tests {
           panic!("test failed")
         }
       }
+      _ => panic!("test failed"),
+    }
+
+    // --------------------------------
+    // get the archive note for note4.
+    let archnote4_search = ZkNoteSearch {
+      tagsearch: vec![TagSearch::SearchTerm {
+        mods: vec![SearchMod::ExactMatch],
+        term: "u1 note4 - share".to_string(),
+      }],
+      offset: 0,
+      limit: None,
+      what: "test".to_string(),
+      resulttype: ResultType::RtListNote,
+      ordering: None,
+      archives: true,
+      deleted: false,
+    };
+
+    let archnote = match search_zknotes(&conn, filesdir, uid1, &archnote4_search)? {
+      SearchResult::SrListNote(zklr) => {
+        if zklr.notes.len() == 1 {
+          zklr.notes[0].clone()
+        } else {
+          println!("length was: {}", zklr.notes.len());
+          panic!("test failed")
+        }
+      }
+      _ => panic!("test failed"),
+    };
+
+    let archnote_id = note_id_for_zknoteid(&conn, &archnote.id)?;
+
+    // try to link against the archive note.
+    match save_zklink(&conn, szn1_1_id, archnote_id, uid1, None) {
+      Err(crate::error::Error::CantLinkToArchive) => (),
+      _ => panic!("test failed"),
+    }
+    // link the other way
+    match save_zklink(&conn, archnote_id, szn1_1_id, uid1, None) {
+      Err(crate::error::Error::CantLinkToArchive) => (),
       _ => panic!("test failed"),
     }
     //

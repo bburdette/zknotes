@@ -17,9 +17,9 @@ use zkprotocol::constants::SpecialUuids;
 use zkprotocol::content::FileStatus;
 use zkprotocol::content::ZkListNote;
 use zkprotocol::search::{
-  AndOr, OrderDirection, OrderField, ResultType, SearchMod, TagSearch, ZkIdSearchResult,
-  ZkListNoteSearchResult, ZkNoteAndLinksSearchResult, ZkNoteSearch, ZkNoteSearchResult,
-  ZkSearchResultHeader,
+  AndOr, ArchivesOrCurrent, OrderDirection, OrderField, ResultType, SearchMod, TagSearch,
+  ZkIdSearchResult, ZkListNoteSearchResult, ZkNoteAndLinksSearchResult, ZkNoteSearch,
+  ZkNoteSearchResult, ZkSearchResultHeader,
 };
 use zkprotocol::sync_data::{SyncMessage, ZkPhantomUser};
 
@@ -38,7 +38,7 @@ pub fn power_delete_zknotes(
     limit: None,
     what: "".to_string(),
     resulttype: ResultType::RtListNote,
-    archives: false,
+    archives: ArchivesOrCurrent::Current,
     deleted: false,
     ordering: None,
   };
@@ -233,10 +233,10 @@ pub fn search_zknotes_stream(
   // {
   try_stream! {
 
-    let user = if search.archives {
-      user_id(&conn, "system")?
-    } else {
-      user
+    let user = match search.archives {
+      ArchivesOrCurrent::Archives =>  user_id(&conn, "system")?,
+      ArchivesOrCurrent::Current =>  user,
+      ArchivesOrCurrent::CurrentAndArchives => panic!("unsupported"),
     };
 
     let (sql, args) = build_sql(&conn, user, &search, exclude_notes)?;
@@ -431,15 +431,20 @@ pub fn build_base_sql(
     " order by N.changeddate desc ".to_string()
   };
 
-  let archives = search.archives;
+  let archives = (search.archives == ArchivesOrCurrent::Archives)
+    || (search.archives == ArchivesOrCurrent::CurrentAndArchives);
+  let current = (search.archives == ArchivesOrCurrent::Current)
+    || (search.archives == ArchivesOrCurrent::CurrentAndArchives);
   let deleted = if search.deleted {
     ""
   } else {
     "and N.deleted = 0"
   };
 
-  let (mut sqlbase, mut baseargs) = if archives {
-    (
+  let mut sqlargs: Vec<(String, Vec<String>)> = Vec::new();
+
+  if archives {
+    let (sqlbase, baseargs) = (
       // archives of notes that are mine.
       format!(
         "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
@@ -451,8 +456,12 @@ pub fn build_base_sql(
         deleted
       ),
       vec![uid.to_string(), archiveid.to_string()],
-    )
-  } else {
+    );
+    sqlargs.push((sqlbase, baseargs));
+  }
+  if current {
+    let ( sqlbase,  baseargs) =
+
     // notes that are mine.
     (
       format!(
@@ -462,12 +471,13 @@ pub fn build_base_sql(
         deleted
       ),
       vec![uid.to_string()],
-    )
+    );
+    sqlargs.push((sqlbase, baseargs));
   };
 
   // notes that are public, and not mine.
-  let (mut sqlpub, mut pubargs) = if archives {
-    (
+  if archives {
+    let (sqlpub, pubargs) = (
       // archives of notes that are public, and not mine.
       format!(
         "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
@@ -480,9 +490,11 @@ pub fn build_base_sql(
         deleted
       ),
       vec![uid.to_string(), publicid.to_string(), archiveid.to_string()],
-    )
-  } else {
-    (
+    );
+    sqlargs.push((sqlpub, pubargs));
+  }
+  if current {
+    let (sqlpub, pubargs) = (
       format!(
         "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N, zklink L
@@ -491,7 +503,8 @@ pub fn build_base_sql(
         deleted
       ),
       vec![uid.to_string(), publicid.to_string()],
-    )
+    );
+    sqlargs.push((sqlpub, pubargs));
   };
 
   // notes shared with a share tag, and not mine.
@@ -502,8 +515,8 @@ pub fn build_base_sql(
   //
   // clause 3 is M.from (the share)
   // is that share linked to usernoteid?
-  let (mut sqlshare, mut shareargs) = if archives {
-    (
+  if archives {
+    let (sqlshare, shareargs) = (
       format!(
         "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N, zklink L, zklink M, zklink U, zknote O, zklink OL, zklink AL
@@ -528,14 +541,16 @@ pub fn build_base_sql(
         usernoteid.to_string(),
         usernoteid.to_string(),
       ],
-    )
-  } else {
-    (
+    );
+    sqlargs.push((sqlshare, shareargs));
+  }
+  if current {
+    let (sqlshare, shareargs) = (
       format!(
         "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N, zklink L, zklink M, zklink U
-      where (N.user != ? 
-        and M.toid = ? 
+      where (N.user != ?
+        and M.toid = ?
         and ((L.fromid = N.id and L.toid = M.fromid )
              or (L.toid = N.id and L.fromid = M.fromid ))
       and
@@ -552,12 +567,13 @@ pub fn build_base_sql(
         usernoteid.to_string(),
         usernoteid.to_string(),
       ],
-    )
+    );
+    sqlargs.push((sqlshare, shareargs));
   };
 
   // notes that are tagged with my usernoteid, and not mine.
-  let (mut sqluser, mut userargs) = if archives {
-    (
+  if archives {
+    let (sqluser, userargs) = (
       format!(
         "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N, zklink L, zknote O, zklink OL, zklink AL
@@ -574,9 +590,11 @@ pub fn build_base_sql(
         usernoteid.to_string(),
         archiveid.to_string(),
       ],
-    )
-  } else {
-    (
+    );
+    sqlargs.push((sqluser, userargs));
+  }
+  if current {
+    let (sqluser, userargs) = (
       format!(
         "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N, zklink L
@@ -591,7 +609,8 @@ pub fn build_base_sql(
         usernoteid.to_string(),
         usernoteid.to_string(),
       ],
-    )
+    );
+    sqlargs.push((sqluser, userargs));
   };
 
   // local ftn to add clause and args.
@@ -605,6 +624,22 @@ pub fn build_base_sql(
       args.append(&mut pendargs);
     }
   };
+
+  let mut rsql: String = String::new();
+  let mut rargs: Vec<String> = Vec::new();
+
+  while let Some((mut sql, mut args)) = sqlargs.pop() {
+    addcls(&mut sql, &mut args);
+
+    rsql.push_str(sql.as_str());
+    if sqlargs.len() > 0 {
+      rsql.push_str("\nunion ");
+    }
+
+    rargs.append(&mut args);
+  }
+
+  /*
 
   addcls(&mut sqlbase, &mut baseargs);
   addcls(&mut sqlpub, &mut pubargs);
@@ -624,13 +659,15 @@ pub fn build_base_sql(
   sqlbase.push_str(sqluser.as_str());
   baseargs.append(&mut userargs);
 
+  */
+
   // add order clause to the end.
-  sqlbase.push_str(ordclause.as_str());
+  rsql.push_str(ordclause.as_str());
 
   // add limit clause to the end.
-  sqlbase.push_str(limclause.as_str());
+  rsql.push_str(limclause.as_str());
 
-  Ok((sqlbase, baseargs))
+  Ok((rsql, rargs))
 }
 
 fn build_tagsearch_clause(

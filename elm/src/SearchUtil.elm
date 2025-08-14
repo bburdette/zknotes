@@ -1,6 +1,14 @@
 module SearchUtil exposing (..)
 
-import Data exposing (AndOr(..), ResultType(..), SearchMod(..), TagSearch(..), ZkNoteSearch)
+import Data
+    exposing
+        ( AndOr(..)
+        , ArchivesOrCurrent(..)
+        , ResultType(..)
+        , SearchMod(..)
+        , TagSearch(..)
+        , ZkNoteSearch
+        )
 import ParseHelp exposing (listOf)
 import Parser
     exposing
@@ -48,7 +56,7 @@ defaultSearch =
     , limit = Just defaultSearchLimit
     , what = ""
     , resulttype = RtListNote
-    , archives = False
+    , archives = Current
     , deleted = False
     , ordering = Nothing
     }
