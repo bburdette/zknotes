@@ -38,7 +38,8 @@ use zkprotocol::content::{FileStatus, SaveZkNote, SyncSince, ZkNoteId};
 use zkprotocol::messages::PrivateStreamingMessage;
 use zkprotocol::private::{PrivateReply, PrivateRequest};
 use zkprotocol::search::{
-  AndOr, OrderDirection, OrderField, Ordering, ResultType, SearchMod, TagSearch, ZkNoteSearch,
+  AndOr, ArchivesOrCurrent, OrderDirection, OrderField, Ordering, ResultType, SearchMod, TagSearch,
+  ZkNoteSearch,
 };
 use zkprotocol::sync_data::SyncMessage;
 use zkprotocol::upload::UploadReply;
@@ -77,7 +78,7 @@ pub async fn prev_sync(
     limit: Some(1),
     what: "".to_string(),
     resulttype: ResultType::RtNote,
-    archives: false,
+    archives: ArchivesOrCurrent::Current,
     deleted: false,
     ordering: Some(Ordering {
       field: OrderField::Changed,
@@ -1458,7 +1459,7 @@ pub fn sync_stream(
     limit: None,
     what: "".to_string(),
     resulttype: ResultType::RtNote,
-    archives: false,
+    archives: ArchivesOrCurrent::Current,
     deleted: true,
     ordering: None,
   };
@@ -1489,7 +1490,7 @@ pub fn sync_stream(
     limit: None,
     what: "".to_string(),
     resulttype: ResultType::RtNote,
-    archives: false,
+    archives: ArchivesOrCurrent::Current,
     deleted: true,
     ordering: None,
   };
@@ -1509,7 +1510,7 @@ pub fn sync_stream(
     limit: None,
     what: "".to_string(),
     resulttype: ResultType::RtNote,
-    archives: true,
+    archives: ArchivesOrCurrent::Archives,
     deleted: false,
     ordering: None,
   };

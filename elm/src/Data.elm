@@ -852,7 +852,7 @@ type alias ZkNoteSearch =
     , limit : Maybe (Int)
     , what : String
     , resulttype : ResultType
-    , archives : Bool
+    , archives : ArchivesOrCurrent
     , deleted : Bool
     , ordering : Maybe (Ordering)
     }
@@ -866,7 +866,7 @@ zkNoteSearchEncoder struct =
         , ( "limit", (Maybe.withDefault Json.Encode.null << Maybe.map (Json.Encode.int)) struct.limit )
         , ( "what", (Json.Encode.string) struct.what )
         , ( "resulttype", (resultTypeEncoder) struct.resulttype )
-        , ( "archives", (Json.Encode.bool) struct.archives )
+        , ( "archives", (archivesOrCurrentEncoder) struct.archives )
         , ( "deleted", (Json.Encode.bool) struct.deleted )
         , ( "ordering", (Maybe.withDefault Json.Encode.null << Maybe.map (orderingEncoder)) struct.ordering )
         ]
@@ -1082,6 +1082,22 @@ zkNoteAndLinksSearchResultEncoder struct =
         , ( "what", (Json.Encode.string) struct.what )
         ]
 
+
+type ArchivesOrCurrent
+    = Current
+    | Archives
+    | CurrentAndArchives
+
+
+archivesOrCurrentEncoder : ArchivesOrCurrent -> Json.Encode.Value
+archivesOrCurrentEncoder enum =
+    case enum of
+        Current ->
+            Json.Encode.string "Current"
+        Archives ->
+            Json.Encode.string "Archives"
+        CurrentAndArchives ->
+            Json.Encode.string "CurrentAndArchives"
 
 type TauriRequest
     = TrqUploadFiles
@@ -1684,7 +1700,7 @@ zkNoteSearchDecoder =
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "limit" (Json.Decode.nullable (Json.Decode.int))))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "what" (Json.Decode.string)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "resulttype" (resultTypeDecoder)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "archives" (Json.Decode.bool)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "archives" (archivesOrCurrentDecoder)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "deleted" (Json.Decode.bool)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "ordering" (Json.Decode.nullable (orderingDecoder))))
 
@@ -1974,6 +1990,38 @@ zkNoteAndLinksSearchResultDecoder =
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "offset" (Json.Decode.int)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "what" (Json.Decode.string)))
 
+
+archivesOrCurrentDecoder : Json.Decode.Decoder ArchivesOrCurrent
+archivesOrCurrentDecoder = 
+    Json.Decode.oneOf
+        [ Json.Decode.string
+            |> Json.Decode.andThen
+                (\x ->
+                    case x of
+                        "Current" ->
+                            Json.Decode.succeed Current
+                        unexpected ->
+                            Json.Decode.fail <| "Unexpected variant " ++ unexpected
+                )
+        , Json.Decode.string
+            |> Json.Decode.andThen
+                (\x ->
+                    case x of
+                        "Archives" ->
+                            Json.Decode.succeed Archives
+                        unexpected ->
+                            Json.Decode.fail <| "Unexpected variant " ++ unexpected
+                )
+        , Json.Decode.string
+            |> Json.Decode.andThen
+                (\x ->
+                    case x of
+                        "CurrentAndArchives" ->
+                            Json.Decode.succeed CurrentAndArchives
+                        unexpected ->
+                            Json.Decode.fail <| "Unexpected variant " ++ unexpected
+                )
+        ]
 
 tauriRequestDecoder : Json.Decode.Decoder TauriRequest
 tauriRequestDecoder = 

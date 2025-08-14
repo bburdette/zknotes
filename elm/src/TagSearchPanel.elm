@@ -22,7 +22,7 @@ module TagSearchPanel exposing
 -- import Search exposing (AndOr(..), SearchMod(..), TSText, TagSearch(..), showSearchMod, tagSearchParser)
 
 import Common exposing (buttonStyle)
-import Data exposing (AndOr(..), Ordering, SearchMod(..), TagSearch(..))
+import Data exposing (AndOr(..), ArchivesOrCurrent(..), Ordering, SearchMod(..), TagSearch(..))
 import DataUtil exposing (OrderedTagSearch)
 import Element as E exposing (..)
 import Element.Background as EBk
@@ -56,6 +56,7 @@ type alias Model =
     , searchOnEnter : Bool
     , searchTermFocus : Maybe TSLoc
     , ordering : Maybe Ordering
+    , archives : ArchivesOrCurrent
     }
 
 
@@ -71,6 +72,7 @@ initModel =
     , searchOnEnter = False
     , searchTermFocus = Nothing
     , ordering = Nothing
+    , archives = Current
     }
 
 
@@ -79,6 +81,7 @@ type Msg
     | STFocus Bool
     | SearchDetails
     | SearchClick
+    | ArchiveClick
     | SyncFilesClick
     | ToggleHelp
     | Clear
@@ -110,10 +113,10 @@ getSearch : Model -> Maybe OrderedTagSearch
 getSearch model =
     case model.search of
         TagSearch (Ok s) ->
-            Just { ts = s, ordering = model.ordering }
+            Just { ts = s, ordering = model.ordering, archives = model.archives }
 
         NoSearch ->
-            Just { ts = SearchTerm { mods = [], term = "" }, ordering = model.ordering }
+            Just { ts = SearchTerm { mods = [], term = "" }, ordering = model.ordering, archives = model.archives }
 
         TagSearch (Err _) ->
             Nothing
@@ -590,6 +593,14 @@ view showCopy narrow nblevel model =
                 _ ->
                     EI.button sbs { onPress = Just SearchClick, label = text "search" }
 
+        archiveButton =
+            case model.search of
+                TagSearch (Err _) ->
+                    E.none
+
+                _ ->
+                    EI.button (sbs ++ [ E.alignRight ]) { onPress = Just ArchiveClick, label = text "A" }
+
         fileSyncButton =
             case model.search of
                 TagSearch (Err _) ->
@@ -610,30 +621,52 @@ view showCopy narrow nblevel model =
                 }
 
         orderingRow =
-            model.ordering
-                |> Maybe.map
-                    (\o ->
-                        E.text <|
-                            (case o.field of
-                                Data.Title ->
-                                    "Title"
+            let
+                ord =
+                    model.ordering
+                        |> Maybe.map
+                            (\o ->
+                                E.text <|
+                                    (case o.field of
+                                        Data.Title ->
+                                            "Title"
 
-                                Data.Created ->
-                                    "Created"
+                                        Data.Created ->
+                                            "Created"
 
-                                Data.Changed ->
-                                    "Changed"
+                                        Data.Changed ->
+                                            "Changed"
+                                    )
+                                        ++ " "
+                                        ++ (case o.direction of
+                                                Data.Ascending ->
+                                                    "Ascending"
+
+                                                Data.Descending ->
+                                                    "Descending"
+                                           )
                             )
-                                ++ " "
-                                ++ (case o.direction of
-                                        Data.Ascending ->
-                                            "Ascending"
 
-                                        Data.Descending ->
-                                            "Descending"
-                                   )
-                    )
-                |> Maybe.withDefault E.none
+                arch =
+                    case model.archives of
+                        Current ->
+                            Nothing
+
+                        Archives ->
+                            Just <| E.text "archives"
+
+                        CurrentAndArchives ->
+                            Just <| E.text "current + archives"
+            in
+            case ( ord, arch ) of
+                ( Nothing, Nothing ) ->
+                    E.none
+
+                ( l, r ) ->
+                    E.row [ E.width E.fill ]
+                        [ Maybe.withDefault E.none l
+                        , r |> Maybe.map (\t -> E.el [ E.alignRight ] t) |> Maybe.withDefault E.none
+                        ]
 
         ddbutton =
             none
@@ -666,6 +699,7 @@ view showCopy narrow nblevel model =
 
         buttons =
             [ searchButton
+            , archiveButton
             , fileSyncButton
             , if showCopy then
                 EI.button (E.alignRight :: buttonStyle)
@@ -875,6 +909,22 @@ update msg model =
 
         SyncFilesClick ->
             doFileSyncClick model
+
+        ArchiveClick ->
+            ( { model
+                | archives =
+                    case model.archives of
+                        Current ->
+                            Archives
+
+                        Archives ->
+                            CurrentAndArchives
+
+                        CurrentAndArchives ->
+                            Current
+              }
+            , None
+            )
 
         ToggleHelp ->
             ( { model | showHelp = not model.showHelp }, None )
