@@ -55,7 +55,7 @@ getSearch model =
                 , limit = Just model.paginationModel.increment
                 , what = ""
                 , resulttype = Data.RtListNote
-                , archives = False
+                , archives = s.archives
                 , deleted = showDeleted
                 , ordering = s.ordering
                 }
@@ -157,7 +157,7 @@ handleTspUpdate model ( nm, cmd ) =
                 , limit = Just model.paginationModel.increment
                 , what = ""
                 , resulttype = Data.RtListNote
-                , archives = False
+                , archives = s.archives
                 , deleted = showDeleted
                 , ordering = s.ordering
                 }
@@ -171,7 +171,7 @@ handleTspUpdate model ( nm, cmd ) =
                 , limit = Nothing
                 , what = ""
                 , resulttype = Data.RtListNote
-                , archives = False
+                , archives = Data.Current
                 , deleted = showDeleted
                 , ordering = Nothing
                 }
@@ -214,7 +214,7 @@ update msg model =
                                 , limit = Just nm.increment
                                 , what = ""
                                 , resulttype = Data.RtListNote
-                                , archives = False
+                                , archives = s.archives
                                 , deleted = showDeleted
                                 , ordering = s.ordering
                                 }
