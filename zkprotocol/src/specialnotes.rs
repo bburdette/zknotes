@@ -1,10 +1,7 @@
 #![allow(non_snake_case)]
 
-use std::fmt::Display;
-
-use crate::search::ZkNoteSearch;
+use crate::{content::Server, search::ZkNoteSearch};
 use elm_rs::{Elm, ElmDecode, ElmEncode};
-use orgauth::data::UserId;
 use uuid::Uuid;
 
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
@@ -30,6 +27,7 @@ pub struct Search {
 pub struct CompletedSync {
   pub after: Option<i64>,
   pub now: i64,
+  pub server: Server,
 }
 
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]

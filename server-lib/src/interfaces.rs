@@ -7,7 +7,6 @@ use crate::jobs::LogMonitor;
 use crate::search;
 use crate::sqldata;
 use crate::sqldata::zknotes_callbacks;
-use crate::sqldata::Server;
 use crate::state::new_jobid;
 use crate::state::State;
 use crate::sync;
@@ -26,6 +25,7 @@ use std::time::Duration;
 use zkprotocol::constants::PrivateStreamingRequests;
 use zkprotocol::content::JobState;
 use zkprotocol::content::JobStatus;
+use zkprotocol::content::Server;
 use zkprotocol::content::{
   GetArchiveZkLinks, GetZkLinksSince, SyncSince, ZkNoteAndLinks, ZkNoteAndLinksWhat, ZkNoteArchives,
 };

@@ -1,11 +1,11 @@
 use crate::config::Config;
 use crate::jobs::JobId;
-use crate::sqldata::Server;
 use girlboss::Girlboss;
 use girlboss::Monitor;
 use orgauth::data::UserId;
 use std::sync::Arc;
 use std::sync::RwLock;
+use zkprotocol::content::Server;
 
 pub struct State {
   pub config: Config,

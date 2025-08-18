@@ -289,3 +289,9 @@ pub struct JobStatus {
   pub state: JobState,
   pub message: String,
 }
+
+#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
+pub struct Server {
+  pub id: i64,
+  pub uuid: String,
+}

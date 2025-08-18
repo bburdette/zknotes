@@ -2,9 +2,7 @@ use crate::error as zkerr;
 use crate::jobs::JobMonitor;
 use crate::search::build_sql;
 use crate::search::{search_zknotes, search_zknotes_stream, sync_users, system_user, SearchResult};
-use crate::sqldata::{
-  self, note_id_for_uuid, save_zklink, save_zknote, server_id, user_note_id, Server,
-};
+use crate::sqldata::{self, note_id_for_uuid, save_zklink, save_zknote, server_id, user_note_id};
 use crate::util::now;
 use actix_multipart_rfc7578 as multipart;
 use actix_web::error::PayloadError;
@@ -34,26 +32,20 @@ use tokio::io::AsyncWriteExt;
 use tokio_util::io::StreamReader;
 use uuid::Uuid;
 use zkprotocol::constants::{PrivateStreamingRequests, SpecialUuids};
-use zkprotocol::content::{FileStatus, SaveZkNote, SyncSince, ZkNoteId};
+use zkprotocol::content::{FileStatus, SaveZkNote, Server, SyncSince, ZkNoteId};
 use zkprotocol::messages::PrivateStreamingMessage;
 use zkprotocol::private::{PrivateReply, PrivateRequest};
 use zkprotocol::search::{
   AndOr, ArchivesOrCurrent, OrderDirection, OrderField, Ordering, ResultType, SearchMod, TagSearch,
   ZkNoteSearch,
 };
+use zkprotocol::specialnotes::{CompletedSync, SpecialNote};
 use zkprotocol::sync_data::SyncMessage;
 use zkprotocol::upload::UploadReply;
 
 fn convert_payloaderr(err: PayloadError) -> std::io::Error {
   error!("convert_err {:?}", err);
   todo!()
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct CompletedSync {
-  after: Option<i64>,
-  now: i64,
-  server: Server,
 }
 
 pub async fn prev_sync(
@@ -112,6 +104,8 @@ pub async fn save_sync(
   let syncid = note_id_for_uuid(conn, &Uuid::parse_str(SpecialUuids::Sync.str())?)?;
   let sysid = user_id(&conn, "system")?;
 
+  let snote = SpecialNote::SnSync(sync);
+
   let (id, _szn) = save_zknote(
     conn,
     sysid, // save under system id.
@@ -120,7 +114,7 @@ pub async fn save_sync(
       id: None,
       title: "sync".to_string(),
       pubid: None,
-      content: serde_json::to_string_pretty(&serde_json::to_value(sync)?)?,
+      content: serde_json::to_string_pretty(&serde_json::to_value(snote)?)?,
       editable: false,
       showtitle: false,
       deleted: false,
