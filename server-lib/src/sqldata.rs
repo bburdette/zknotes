@@ -996,7 +996,8 @@ pub fn get_sysids(
     "select N.uuid
        from zklink A, zknote N
       where
-       (A.fromid = ?1 and A.toid = N.id and N.user = ?2)",
+       (A.fromid = ?1 and A.toid = N.id and N.user = ?2)
+       order by N.title",
   )?;
 
   let r = Ok(
