@@ -8,7 +8,7 @@ pub struct ZkNoteSearch {
   pub limit: Option<i64>,
   pub what: String,
   pub resulttype: ResultType,
-  pub archives: bool,
+  pub archives: ArchivesOrCurrent,
   pub deleted: bool, // include deleted notes
   pub ordering: Option<Ordering>,
 }
@@ -24,11 +24,19 @@ pub enum OrderDirection {
   Ascending,
   Descending,
 }
+
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
 pub enum OrderField {
   Title,
   Created,
   Changed,
+}
+
+#[derive(PartialEq, Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
+pub enum ArchivesOrCurrent {
+  Current,
+  Archives,
+  CurrentAndArchives,
 }
 
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone, Copy)]
