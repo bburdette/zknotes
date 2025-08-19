@@ -50,6 +50,7 @@ import SearchStackPanel as SP
 import SearchUtil as SU
 import SelectString as SS
 import ShowMessage
+import SpecialNotes as SN
 import TSet
 import TagAThing
 import TagFiles
