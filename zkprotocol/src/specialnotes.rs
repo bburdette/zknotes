@@ -1,12 +1,12 @@
 #![allow(non_snake_case)]
 
-use crate::{content::Server, search::ZkNoteSearch};
+use crate::search::{TagSearch, ZkNoteSearch};
 use elm_rs::{Elm, ElmDecode, ElmEncode};
 use uuid::Uuid;
 
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
 pub enum SpecialNote {
-  SnSearch(ZkNoteSearch),
+  SnSearch(Vec<TagSearch>),
   SnSync(CompletedSync),
   SnPlaylist(Notelist),
   // SnDateTime(DateTime),
@@ -20,14 +20,13 @@ pub enum SpecialNote {
 
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
 pub struct Search {
-  pub search: ZkNoteSearch,
+  pub search: Vec<TagSearch>,
 }
 
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
 pub struct CompletedSync {
   pub after: Option<i64>,
   pub now: i64,
-  pub server: Server,
 }
 
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]

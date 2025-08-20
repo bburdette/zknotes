@@ -254,18 +254,7 @@ pub async fn sync(
       .await?;
 
       let unote = user_note_id(&conn, user.id)?;
-      save_sync(
-        &conn,
-        user.id,
-        &server,
-        unote,
-        CompletedSync {
-          after,
-          now,
-          server: server.clone(),
-        },
-      )
-      .await?;
+      save_sync(&conn, user.id, &server, unote, CompletedSync { after, now }).await?;
 
       tr.commit()?;
 

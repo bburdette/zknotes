@@ -5,9 +5,13 @@ use barrel::{types, Migration};
 use orgauth::migrations;
 use regex::{Captures, Regex};
 use rusqlite::{params, Connection};
+use serde_derive::{Deserialize, Serialize};
 use std::path::Path;
 use uuid::Uuid;
 use zkprotocol::constants::SpecialUuids;
+use zkprotocol::content::Server;
+use zkprotocol::search::{TagSearch, ZkNoteSearch};
+use zkprotocol::specialnotes as SN;
 
 pub fn initialdb() -> Migration {
   let mut m = Migration::new();
@@ -2686,6 +2690,132 @@ pub fn udpate36(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   m3.drop_table("zknotetemp");
 
   conn.execute_batch(m3.make::<Sqlite>().as_str())?;
+
+  tr.commit()?;
+
+  Ok(())
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct OldSync {
+  pub after: Option<i64>,
+  pub now: i64,
+}
+
+// modify search and sync notes to new format.
+pub fn udpate37(dbfile: &Path) -> Result<(), orgauth::error::Error> {
+  // find notes that are owned by system, linked to 'sync', and the contents deserialize to an old sync record.
+
+  let conn = Connection::open(dbfile)?;
+  // let conn2 = Connection::open(dbfile)?;
+  let tr = conn.unchecked_transaction()?;
+
+  // implement here instead of using sqldata functions, since those functions may change in the future!
+  let searchid: i64 = conn.query_row(
+    "select zknote.id from
+      zknote, orgauth_user
+      where zknote.title = ?2
+      and orgauth_user.name = ?1
+      and zknote.user = orgauth_user.id",
+    params!["system", "search"],
+    |row| Ok(row.get(0)?),
+  )?;
+
+  let syncid: i64 = conn.query_row(
+    "select zknote.id from
+      zknote, orgauth_user
+      where zknote.title = ?2
+      and orgauth_user.name = ?1
+      and zknote.user = orgauth_user.id",
+    params!["system", "sync"],
+    |row| Ok(row.get(0)?),
+  )?;
+
+  // find notes linked to 'search' where the contents deserialize to zknotesearch.  post failures.
+  let mut pstmt = conn.prepare(
+    "select zknote.id, content from zknote, zklink
+    where zklink.fromid = zknote.id
+    and zklink.toid = ?1",
+  )?;
+  let r: Vec<(i64, String)> = pstmt
+    .query_map(params![searchid], |row| {
+      let id: i64 = row.get(0)?;
+      let s: String = row.get(1)?;
+      Ok((id, s))
+    })?
+    .filter_map(|x| x.ok())
+    .collect();
+
+  let now = now()?;
+
+  for (id, content) in r {
+    println!("attempting search update {}", id);
+    // println!("updating oldsearch: {}, {:?}", id, content);
+    match serde_json::from_str::<Vec<TagSearch>>(content.as_str()) {
+      Ok(zn) => {
+        let sn = SN::Search { search: zn };
+
+        let sns = serde_json::to_string(&serde_json::to_value(sn)?)?;
+
+        conn.execute(
+          "update zknote set content = ?1, changeddate = ?2 where id = ?3",
+          params![sns, now, id],
+        )?;
+        // println!("updated oldsearch: {}, {:?}", id, content);
+      }
+      _ => match serde_json::from_str::<TagSearch>(content.as_str()) {
+        Ok(zn) => {
+          let sn = SN::Search { search: vec![zn] };
+
+          let sns = serde_json::to_string(&serde_json::to_value(sn)?)?;
+
+          conn.execute(
+            "update zknote set content = ?1, changeddate = ?2 where id = ?3",
+            params![sns, now, id],
+          )?;
+          // println!("updated oldsearch: {}, {:?}", id, content);
+        }
+        _ => {
+          println!("search update failed: {}", id);
+        }
+      },
+    };
+  }
+
+  println!("searching for sync {}", syncid);
+  // find notes linked to 'sync' where the contents deserialize to sync.  post failures.
+  let mut pstmt = conn.prepare(
+    "select zknote.id, content from zknote, zklink
+    where zklink.fromid = zknote.id
+    and zklink.toid = ?1",
+  )?;
+  let r: Vec<(i64, String)> = pstmt
+    .query_map(params![syncid], |row| {
+      println!("oldsync");
+      let id: i64 = row.get(0)?;
+      let s: String = row.get(1)?;
+      Ok((id, s))
+    })?
+    .filter_map(|x| x.ok())
+    .collect();
+
+  for (id, content) in r {
+    let oldsync = serde_json::from_str::<OldSync>(content.as_str())?;
+
+    println!("updating oldsync: {}, {:?}", id, oldsync);
+
+    let sn = SN::CompletedSync {
+      after: oldsync.after,
+      now: oldsync.now,
+    };
+
+    let sns = serde_json::to_string(&serde_json::to_value(sn)?)?;
+
+    conn.execute(
+      "update zknote set content = ?1 where id = ?2",
+      params![id, sns],
+    )?;
+  }
 
   tr.commit()?;
 

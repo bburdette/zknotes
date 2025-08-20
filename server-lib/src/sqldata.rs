@@ -433,6 +433,11 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: Option<i64>) -> Result<Server,
     zkm::udpate36(&dbfile)?;
     set_single_value(&conn, "migration_level", "36")?;
   }
+  if nlevel < 37 {
+    info!("udpate37");
+    zkm::udpate37(&dbfile)?;
+    set_single_value(&conn, "migration_level", "37")?;
+  }
 
   info!("db up to date.");
 
