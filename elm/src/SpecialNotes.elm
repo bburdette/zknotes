@@ -8,7 +8,7 @@ import Dict exposing (Dict)
 import Http
 import Json.Decode
 import Json.Encode
-import Data exposing (ZkNoteSearch, zkNoteSearchDecoder, zkNoteSearchEncoder)
+import Data exposing (TagSearch, tagSearchDecoder, tagSearchEncoder)
 import Url.Builder
 
 
@@ -44,7 +44,7 @@ serverEncoder struct =
 
 
 type SpecialNote
-    = SnSearch (ZkNoteSearch)
+    = SnSearch (List (TagSearch))
     | SnSync (CompletedSync)
     | SnPlaylist (Notelist)
 
@@ -53,28 +53,27 @@ specialNoteEncoder : SpecialNote -> Json.Encode.Value
 specialNoteEncoder enum =
     case enum of
         SnSearch inner ->
-            Json.Encode.object [ ( "SnSearch", zkNoteSearchEncoder inner ) ]
+            Json.Encode.object [ ( "SnSearch", Json.Encode.list (tagSearchEncoder) inner ) ]
         SnSync inner ->
             Json.Encode.object [ ( "SnSync", completedSyncEncoder inner ) ]
         SnPlaylist inner ->
             Json.Encode.object [ ( "SnPlaylist", notelistEncoder inner ) ]
 
 type alias Search =
-    { search : ZkNoteSearch
+    { search : List (TagSearch)
     }
 
 
 searchEncoder : Search -> Json.Encode.Value
 searchEncoder struct =
     Json.Encode.object
-        [ ( "search", (zkNoteSearchEncoder) struct.search )
+        [ ( "search", (Json.Encode.list (tagSearchEncoder)) struct.search )
         ]
 
 
 type alias CompletedSync =
     { after : Maybe (Int)
     , now : Int
-    , server : Server
     }
 
 
@@ -83,7 +82,6 @@ completedSyncEncoder struct =
     Json.Encode.object
         [ ( "after", (Maybe.withDefault Json.Encode.null << Maybe.map (Json.Encode.int)) struct.after )
         , ( "now", (Json.Encode.int) struct.now )
-        , ( "server", (serverEncoder) struct.server )
         ]
 
 
@@ -111,7 +109,7 @@ serverDecoder =
 specialNoteDecoder : Json.Decode.Decoder SpecialNote
 specialNoteDecoder = 
     Json.Decode.oneOf
-        [ Json.Decode.map SnSearch (Json.Decode.field "SnSearch" (zkNoteSearchDecoder))
+        [ Json.Decode.map SnSearch (Json.Decode.field "SnSearch" (Json.Decode.list (tagSearchDecoder)))
         , Json.Decode.map SnSync (Json.Decode.field "SnSync" (completedSyncDecoder))
         , Json.Decode.map SnPlaylist (Json.Decode.field "SnPlaylist" (notelistDecoder))
         ]
@@ -119,7 +117,7 @@ specialNoteDecoder =
 searchDecoder : Json.Decode.Decoder Search
 searchDecoder =
     Json.Decode.succeed Search
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "search" (zkNoteSearchDecoder)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "search" (Json.Decode.list (tagSearchDecoder))))
 
 
 completedSyncDecoder : Json.Decode.Decoder CompletedSync
@@ -127,7 +125,6 @@ completedSyncDecoder =
     Json.Decode.succeed CompletedSync
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "after" (Json.Decode.nullable (Json.Decode.int))))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "now" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "server" (serverDecoder)))
 
 
 notelistDecoder : Json.Decode.Decoder Notelist

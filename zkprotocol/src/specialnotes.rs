@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use crate::search::{TagSearch, ZkNoteSearch};
+use crate::search::TagSearch;
 use elm_rs::{Elm, ElmDecode, ElmEncode};
 use uuid::Uuid;
 

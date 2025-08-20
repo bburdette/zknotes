@@ -193,7 +193,7 @@ import Orgauth.Data exposing (UserId(..), userIdDecoder, userIdEncoder)"#,
     let uidout = output.replace(
       "import Json.Encode",
       r#"import Json.Encode
-import Data exposing (ZkNoteSearch, zkNoteSearchDecoder, zkNoteSearchEncoder)"#,
+import Data exposing (TagSearch, tagSearchDecoder, tagSearchEncoder)"#,
     );
 
     let outf = ed
