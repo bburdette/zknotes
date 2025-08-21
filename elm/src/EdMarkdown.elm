@@ -1,9 +1,12 @@
-module EdMarkdown exposing (EdMarkdown, getBlocks, getMd, init, stringRenderer, updateBlocks, updateMd)
+module EdMarkdown exposing (EdMarkdown, getBlocks, getMd, getSpecialNote, init, stringRenderer, updateBlocks, updateMd)
 
+import Json.Decode as JD
+import Json.Encode as JE
 import Markdown.Block as Block exposing (Block, ListItem(..), Task(..))
 import Markdown.Parser
 import Markdown.Renderer
 import MdCommon as MC
+import SpecialNotes exposing (SpecialNote, specialNoteDecoder)
 
 
 type EdMarkdown
@@ -13,6 +16,7 @@ type EdMarkdown
 type alias Emd =
     { md : String
     , elts : Result String (List Block)
+    , specialNote : Result JD.Error SpecialNote
     }
 
 
@@ -34,12 +38,18 @@ updateMd md =
             md
                 |> Markdown.Parser.parse
                 |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
+        , specialNote = JD.decodeString specialNoteDecoder md
         }
 
 
 getBlocks : EdMarkdown -> Result String (List Block)
 getBlocks (EdMarkdown emd) =
     emd.elts
+
+
+getSpecialNote : EdMarkdown -> Result JD.Error SpecialNote
+getSpecialNote (EdMarkdown emd) =
+    emd.specialNote
 
 
 updateBlocks : List Block -> Result String EdMarkdown
@@ -52,6 +62,7 @@ updateBlocks blocks =
                 EdMarkdown
                     { md = String.concat md
                     , elts = Ok blocks
+                    , specialNote = Err (JD.Failure "markdown" JE.null)
                     }
             )
 
