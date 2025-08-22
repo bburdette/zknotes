@@ -103,9 +103,21 @@ syncSearch csync =
                 }
 
         Nothing ->
-            SearchTerm
-                { mods = [ Before, Mod ]
-                , term = String.fromInt csync.now
+            Boolex
+                { ts1 =
+                    Not
+                        { ts =
+                            SearchTerm
+                                { mods = [ Server ]
+                                , term = "local"
+                                }
+                        }
+                , ao = And
+                , ts2 =
+                    SearchTerm
+                        { mods = [ Before, Mod ]
+                        , term = String.fromInt csync.now
+                        }
                 }
 
 
