@@ -2753,7 +2753,7 @@ pub fn udpate37(dbfile: &Path) -> Result<(), orgauth::error::Error> {
     // println!("updating oldsearch: {}, {:?}", id, content);
     match serde_json::from_str::<Vec<TagSearch>>(content.as_str()) {
       Ok(zn) => {
-        let sn = SN::Search { search: zn };
+        let sn = SN::SpecialNote::SnSearch(zn);
 
         let sns = serde_json::to_string(&serde_json::to_value(sn)?)?;
 
@@ -2765,7 +2765,8 @@ pub fn udpate37(dbfile: &Path) -> Result<(), orgauth::error::Error> {
       }
       _ => match serde_json::from_str::<TagSearch>(content.as_str()) {
         Ok(zn) => {
-          let sn = SN::Search { search: vec![zn] };
+          let sn = SN::SpecialNote::SnSearch(vec![zn]);
+          // let sn = SN::Search { search: vec![zn] };
 
           let sns = serde_json::to_string(&serde_json::to_value(sn)?)?;
 
@@ -2800,21 +2801,27 @@ pub fn udpate37(dbfile: &Path) -> Result<(), orgauth::error::Error> {
     .collect();
 
   for (id, content) in r {
-    let oldsync = serde_json::from_str::<OldSync>(content.as_str())?;
+    println!("updating oldsync: {}, {:?}", id, content);
+    match serde_json::from_str::<OldSync>(content.as_str()) {
+      Ok(oldsync) => {
+        println!("blah");
+        let sn = SN::SpecialNote::SnSync(SN::CompletedSync {
+          after: oldsync.after,
+          now: oldsync.now,
+        });
 
-    println!("updating oldsync: {}, {:?}", id, oldsync);
+        let sns = serde_json::to_string(&serde_json::to_value(sn)?)?;
 
-    let sn = SN::CompletedSync {
-      after: oldsync.after,
-      now: oldsync.now,
+        conn.execute(
+          "update zknote set content = ?1 where id = ?2",
+          params![sns, id],
+        )?;
+        println!("updated oldsync: {}, {:?}", id, sns);
+      }
+      Err(e) => {
+        println!("oldsync parse error: {:?}", e);
+      }
     };
-
-    let sns = serde_json::to_string(&serde_json::to_value(sn)?)?;
-
-    conn.execute(
-      "update zknote set content = ?1 where id = ?2",
-      params![id, sns],
-    )?;
   }
 
   tr.commit()?;

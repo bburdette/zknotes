@@ -49,7 +49,7 @@ import Browser.Dom as BD
 import Cellme.Cellme exposing (CellContainer(..), RunState(..), evalCellsFully)
 import Cellme.DictCellme exposing (CellDict(..), getCd, mkCc)
 import Common
-import Data exposing (Direction(..), EditLink, EditTab(..), ZkNoteId)
+import Data exposing (ArchivesOrCurrent(..), Direction(..), EditLink, EditTab(..), ZkNoteId)
 import DataUtil exposing (FileUrlInfo, zkNoteIdToString, zklKey, zniCompare, zniEq)
 import Dialog as D
 import Dict exposing (Dict)
@@ -79,6 +79,7 @@ import RequestsDialog exposing (TRequests)
 import SearchStackPanel as SP
 import SpecialNotes exposing (specialNoteEncoder)
 import SpecialNotesGui as SNG
+import TagSearchPanel exposing (Search(..))
 import TangoColors as TC
 import Task
 import Time
@@ -3594,7 +3595,46 @@ update msg model =
                     ( model, None )
 
         SNGMsg sngmsg ->
-            ( model, None )
+            case EM.getSpecialNote model.edMarkdown of
+                Ok sn ->
+                    let
+                        ( snmd, sncmd ) =
+                            SNG.updateSn sngmsg sn
+                    in
+                    ( { model | edMarkdown = EM.updateSpecialNote snmd }
+                    , case sncmd of
+                        SNG.CopySearch tagSearch ->
+                            SPMod
+                                (\spm ->
+                                    ( SP.setSearch spm tagSearch
+                                    , SP.None
+                                    )
+                                )
+
+                        SNG.CopySyncSearch tagSearch ->
+                            SPMod
+                                (\spm ->
+                                    let
+                                        nsspm =
+                                            spm.spmodel
+
+                                        tsn =
+                                            nsspm.tagSearchModel
+
+                                        x =
+                                            { spm | spmodel = { nsspm | tagSearchModel = { tsn | archives = CurrentAndArchives } } }
+                                    in
+                                    ( SP.setSearch x [ tagSearch ]
+                                    , SP.None
+                                    )
+                                )
+
+                        SNG.None ->
+                            None
+                    )
+
+                Err _ ->
+                    ( model, None )
 
         Noop ->
             ( model, None )

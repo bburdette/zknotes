@@ -1,4 +1,4 @@
-module EdMarkdown exposing (EdMarkdown, getBlocks, getMd, getSpecialNote, init, stringRenderer, updateBlocks, updateMd)
+module EdMarkdown exposing (EdMarkdown, getBlocks, getMd, getSpecialNote, init, stringRenderer, updateBlocks, updateMd, updateSpecialNote)
 
 import Json.Decode as JD
 import Json.Encode as JE
@@ -6,7 +6,7 @@ import Markdown.Block as Block exposing (Block, ListItem(..), Task(..))
 import Markdown.Parser
 import Markdown.Renderer
 import MdCommon as MC
-import SpecialNotes exposing (SpecialNote, specialNoteDecoder)
+import SpecialNotes exposing (SpecialNote, specialNoteDecoder, specialNoteEncoder)
 
 
 type EdMarkdown
@@ -50,6 +50,15 @@ getBlocks (EdMarkdown emd) =
 getSpecialNote : EdMarkdown -> Result JD.Error SpecialNote
 getSpecialNote (EdMarkdown emd) =
     emd.specialNote
+
+
+updateSpecialNote : SpecialNote -> EdMarkdown
+updateSpecialNote sn =
+    EdMarkdown
+        { md = JE.encode 2 (specialNoteEncoder sn)
+        , elts = Err "specialnote"
+        , specialNote = Ok sn
+        }
 
 
 updateBlocks : List Block -> Result String EdMarkdown

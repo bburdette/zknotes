@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use crate::search::TagSearch;
+use crate::search::{TagSearch, ZkNoteSearch};
 use elm_rs::{Elm, ElmDecode, ElmEncode};
 use uuid::Uuid;
 
@@ -18,10 +18,10 @@ pub enum SpecialNote {
 //   pub datetime: i64,
 // }
 
-#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
-pub struct Search {
-  pub search: Vec<TagSearch>,
-}
+// #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
+// pub struct Search {
+//   pub search: Vec<TagSearch>,
+// }
 
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
 pub struct CompletedSync {
