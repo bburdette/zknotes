@@ -2025,7 +2025,18 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                 editmeta
                     :: (case EM.getSpecialNote model.edMarkdown of
                             Ok sn ->
-                                [ SNG.guiSn zone sn |> E.map SNGMsg ]
+                                [ E.row
+                                    [ E.padding 10
+                                    , EBd.rounded 10
+                                    , E.width E.fill
+                                    , EBk.color TC.lightGray
+                                    , E.height E.fill
+                                    ]
+                                    [ E.el [ EBd.color TC.black, EBd.width 1, E.width E.fill, E.centerX, E.padding 3 ] (SNG.guiSn zone sn |> E.map SNGMsg) ]
+                                ]
+                                    ++ showComments
+                                    ++ [ divider ]
+                                    ++ showLinks TC.white
 
                             Err _ ->
                                 (if wclass == Wide then

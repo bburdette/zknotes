@@ -10,6 +10,7 @@ import Element as E
 import Element.Border as EBd
 import Element.Font as EF
 import Element.Input as EI
+import Html.Attributes as HA
 import SearchUtil exposing (showTagSearch)
 import Set
 import SpecialNotes as SN
@@ -35,8 +36,14 @@ guiSn : Time.Zone -> SN.SpecialNote -> E.Element Msg
 guiSn zone snote =
     case snote of
         SN.SnSearch tagsearches ->
-            E.row [ E.alignTop, E.width E.fill ]
-                [ E.column []
+            E.row
+                [ E.alignTop
+                , E.width E.fill
+                ]
+                [ E.paragraph
+                    [ E.htmlAttribute (HA.style "overflow-wrap" "break-word")
+                    , E.htmlAttribute (HA.style "word-break" "break-word")
+                    ]
                     (tagsearches
                         |> List.map (showTagSearch >> E.text)
                     )
@@ -47,20 +54,22 @@ guiSn zone snote =
                 ]
 
         SN.SnSync completedSync ->
-            E.column [ E.alignTop ]
-                [ E.text "sync"
-                , E.row [ E.spacing 3 ]
-                    [ E.el [ EF.bold ] <| E.text "start:"
-                    , case completedSync.after of
-                        Just s ->
-                            E.text (Util.showDateTime zone (Time.millisToPosix s))
+            E.row [ E.alignTop, E.width E.fill ]
+                [ E.column []
+                    [ E.text "sync"
+                    , E.row [ E.spacing 3 ]
+                        [ E.el [ EF.bold ] <| E.text "start:"
+                        , case completedSync.after of
+                            Just s ->
+                                E.text (Util.showDateTime zone (Time.millisToPosix s))
 
-                        Nothing ->
-                            E.text "all"
-                    ]
-                , E.row [ E.spacing 3 ]
-                    [ E.el [ EF.bold ] <| E.text "end:"
-                    , E.text (Util.showDateTime zone (Time.millisToPosix completedSync.now))
+                            Nothing ->
+                                E.text "-∞"
+                        ]
+                    , E.row [ E.spacing 3 ]
+                        [ E.el [ EF.bold ] <| E.text "end:"
+                        , E.text (Util.showDateTime zone (Time.millisToPosix completedSync.now))
+                        ]
                     ]
                 , EI.button (E.alignRight :: Common.buttonStyle)
                     { onPress = Just CopySyncSearhPress
