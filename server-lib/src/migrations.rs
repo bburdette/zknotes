@@ -2776,8 +2776,8 @@ pub fn udpate37(dbfile: &Path) -> Result<(), orgauth::error::Error> {
           )?;
           // println!("updated oldsearch: {}, {:?}", id, content);
         }
-        _ => {
-          println!("search update failed: {}", id);
+        Err(e) => {
+          println!("search update failed: {} {:?}\n{}", id, e, content);
         }
       },
     };
