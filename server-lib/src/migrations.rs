@@ -10,8 +10,7 @@ use std::path::Path;
 use tracing::{error, info};
 use uuid::Uuid;
 use zkprotocol::constants::SpecialUuids;
-use zkprotocol::content::Server;
-use zkprotocol::search::{TagSearch, ZkNoteSearch};
+use zkprotocol::search::TagSearch;
 use zkprotocol::specialnotes as SN;
 
 pub fn initialdb() -> Migration {

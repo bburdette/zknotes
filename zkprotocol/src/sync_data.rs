@@ -2,7 +2,7 @@ use orgauth::data::UserId;
 use uuid::Uuid;
 
 use crate::{
-  content::{ArchiveZkLink, FileInfo, Server, UuidZkLink, ZkNote},
+  content::{ArchiveZkLink, FileInfo, UuidZkLink, ZkNote},
   search::ZkSearchResultHeader,
 };
 

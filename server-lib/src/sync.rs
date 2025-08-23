@@ -230,8 +230,6 @@ pub async fn sync(
     .await?
     .map(|cs| cs.now);
 
-  let now = now()?;
-
   let tr = conn.unchecked_transaction()?;
 
   let ttn = temp_tables(&conn)?;
