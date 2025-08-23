@@ -2770,9 +2770,10 @@ pub fn udpate37(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 
           let sns = serde_json::to_string(&serde_json::to_value(sn)?)?;
 
+          // update without changing changed date!
           conn.execute(
-            "update zknote set content = ?1, changeddate = ?2 where id = ?3",
-            params![sns, now, id],
+            "update zknote set content = ?1 where id = ?2",
+            params![sns, id],
           )?;
           // println!("updated oldsearch: {}, {:?}", id, content);
         }
@@ -2808,10 +2809,12 @@ pub fn udpate37(dbfile: &Path) -> Result<(), orgauth::error::Error> {
         let sn = SN::SpecialNote::SnSync(SN::CompletedSync {
           after: oldsync.after,
           now: oldsync.now,
+          remote: None,
         });
 
         let sns = serde_json::to_string(&serde_json::to_value(sn)?)?;
 
+        // update without changing changed date!
         conn.execute(
           "update zknote set content = ?1 where id = ?2",
           params![sns, id],
