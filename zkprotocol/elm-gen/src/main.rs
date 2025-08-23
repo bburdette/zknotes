@@ -173,14 +173,12 @@ import Orgauth.Data exposing (UserId(..), userIdDecoder, userIdEncoder)"#,
         {        // generates types and encoders for types implementing ElmEncoder
         encoders: [zc::Server,
                     sn::SpecialNote,
-                    sn::Search,
                     sn::CompletedSync,
                     sn::Notelist,
         ]
         // generates types and decoders for types implementing ElmDecoder
         decoders: [zc::Server,
                     sn::SpecialNote,
-                    sn::Search,
                     sn::CompletedSync,
                     sn::Notelist,
         ]

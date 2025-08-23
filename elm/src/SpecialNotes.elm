@@ -59,21 +59,10 @@ specialNoteEncoder enum =
         SnPlaylist inner ->
             Json.Encode.object [ ( "SnPlaylist", notelistEncoder inner ) ]
 
-type alias Search =
-    { search : List (TagSearch)
-    }
-
-
-searchEncoder : Search -> Json.Encode.Value
-searchEncoder struct =
-    Json.Encode.object
-        [ ( "search", (Json.Encode.list (tagSearchEncoder)) struct.search )
-        ]
-
-
 type alias CompletedSync =
     { after : Maybe (Int)
     , now : Int
+    , remote : Maybe (String)
     }
 
 
@@ -82,6 +71,7 @@ completedSyncEncoder struct =
     Json.Encode.object
         [ ( "after", (Maybe.withDefault Json.Encode.null << Maybe.map (Json.Encode.int)) struct.after )
         , ( "now", (Json.Encode.int) struct.now )
+        , ( "remote", (Maybe.withDefault Json.Encode.null << Maybe.map (Json.Encode.string)) struct.remote )
         ]
 
 
@@ -114,17 +104,12 @@ specialNoteDecoder =
         , Json.Decode.map SnPlaylist (Json.Decode.field "SnPlaylist" (notelistDecoder))
         ]
 
-searchDecoder : Json.Decode.Decoder Search
-searchDecoder =
-    Json.Decode.succeed Search
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "search" (Json.Decode.list (tagSearchDecoder))))
-
-
 completedSyncDecoder : Json.Decode.Decoder CompletedSync
 completedSyncDecoder =
     Json.Decode.succeed CompletedSync
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "after" (Json.Decode.nullable (Json.Decode.int))))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "now" (Json.Decode.int)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "remote" (Json.Decode.nullable (Json.Decode.string))))
 
 
 notelistDecoder : Json.Decode.Decoder Notelist
