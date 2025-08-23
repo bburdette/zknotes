@@ -22,7 +22,7 @@ import Util
 
 type Msg
     = CopySearchPress
-    | CopySyncSearhPress
+    | CopySyncSearhPress Bool
     | Noop
 
 
@@ -54,7 +54,7 @@ guiSn zone snote =
                 ]
 
         SN.SnSync completedSync ->
-            E.row [ E.alignTop, E.width E.fill ]
+            E.wrappedRow [ E.alignTop, E.width E.fill ]
                 [ E.column []
                     [ E.text "sync"
                     , E.row [ E.spacing 3 ]
@@ -71,29 +71,42 @@ guiSn zone snote =
                         , E.text (Util.showDateTime zone (Time.millisToPosix completedSync.now))
                         ]
                     ]
-                , EI.button (E.alignRight :: Common.buttonStyle)
-                    { onPress = Just CopySyncSearhPress
-                    , label = E.text ">"
-                    }
+                , E.column [ E.alignRight, E.spacing 3 ]
+                    [ EI.button (E.alignRight :: Common.buttonStyle)
+                        { onPress = Just <| CopySyncSearhPress True
+                        , label = E.text "search notes synced from remote >"
+                        }
+                    , EI.button (E.alignRight :: Common.buttonStyle)
+                        { onPress = Just <| CopySyncSearhPress False
+                        , label = E.text "search notes synced to remote >"
+                        }
+                    ]
                 ]
 
         SN.SnPlaylist _ ->
             E.none
 
 
-syncSearch : SN.CompletedSync -> TagSearch
-syncSearch csync =
+syncSearch : Bool -> SN.CompletedSync -> TagSearch
+syncSearch fromremote csync =
     case csync.after of
         Just a ->
             Boolex
                 { ts1 =
-                    Not
-                        { ts =
+                    let
+                        st =
                             SearchTerm
                                 { mods = [ Server ]
                                 , term = "local"
                                 }
-                        }
+                    in
+                    if fromremote then
+                        Not
+                            { ts = st
+                            }
+
+                    else
+                        st
                 , ao = And
                 , ts2 =
                     Boolex
@@ -138,7 +151,7 @@ updateSn msg snote =
                 CopySearchPress ->
                     ( SN.SnSearch tagsearches, CopySearch tagsearches )
 
-                CopySyncSearhPress ->
+                CopySyncSearhPress _ ->
                     ( SN.SnSearch tagsearches, None )
 
                 Noop ->
@@ -149,8 +162,8 @@ updateSn msg snote =
                 CopySearchPress ->
                     ( SN.SnSync completedSync, None )
 
-                CopySyncSearhPress ->
-                    ( SN.SnSync completedSync, CopySyncSearch (syncSearch completedSync) )
+                CopySyncSearhPress fromremote ->
+                    ( SN.SnSync completedSync, CopySyncSearch (syncSearch fromremote completedSync) )
 
                 Noop ->
                     ( SN.SnSync completedSync, None )
