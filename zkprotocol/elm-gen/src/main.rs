@@ -12,6 +12,8 @@ pub use zkprotocol::upload;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
   let ed = Path::new("../../elm/src");
 
+  // --------------------------------------------------------------------------
+  // Data.elm
   {
     let mut target = vec![];
     // elm_rs provides a macro for conveniently creating an Elm module with everything needed
@@ -159,6 +161,9 @@ import Orgauth.Data exposing (UserId(..), userIdDecoder, userIdEncoder)"#,
     util::write_string(outf.as_str(), uidout.as_str())?;
     println!("wrote file: {}", outf);
   }
+
+  // --------------------------------------------------------------------------
+  // SpecialNotes.elm
   {
     let mut target = vec![];
     // elm_rs provides a macro for conveniently creating an Elm module with everything needed

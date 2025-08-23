@@ -1,22 +1,15 @@
 module SpecialNotesGui exposing (..)
 
--- import SearchPanel exposing (Command(..), Msg(..))
-
 import ArchiveListing exposing (Command)
 import Common
-import Data exposing (AndOr(..), SearchMod(..), TagSearch(..), ZkNoteSearch)
-import Either exposing (andMapLeft)
+import Data exposing (AndOr(..), SearchMod(..), TagSearch(..))
 import Element as E
-import Element.Border as EBd
 import Element.Font as EF
 import Element.Input as EI
 import Html.Attributes as HA
 import SearchUtil exposing (showTagSearch)
-import Set
 import SpecialNotes as SN
-import TangoColors as TC
 import Time
-import Toop
 import Util
 
 

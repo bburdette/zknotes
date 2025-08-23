@@ -7,6 +7,7 @@ use regex::{Captures, Regex};
 use rusqlite::{params, Connection};
 use serde_derive::{Deserialize, Serialize};
 use std::path::Path;
+use tracing::{error, info};
 use uuid::Uuid;
 use zkprotocol::constants::SpecialUuids;
 use zkprotocol::content::Server;
@@ -2749,8 +2750,7 @@ pub fn udpate37(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   let now = now()?;
 
   for (id, content) in r {
-    println!("attempting search update {}", id);
-    // println!("updating oldsearch: {}, {:?}", id, content);
+    info!("attempting search update {}", id);
     match serde_json::from_str::<Vec<TagSearch>>(content.as_str()) {
       Ok(zn) => {
         let sn = SN::SpecialNote::SnSearch(zn);
@@ -2761,12 +2761,10 @@ pub fn udpate37(dbfile: &Path) -> Result<(), orgauth::error::Error> {
           "update zknote set content = ?1, changeddate = ?2 where id = ?3",
           params![sns, now, id],
         )?;
-        // println!("updated oldsearch: {}, {:?}", id, content);
       }
       _ => match serde_json::from_str::<TagSearch>(content.as_str()) {
         Ok(zn) => {
           let sn = SN::SpecialNote::SnSearch(vec![zn]);
-          // let sn = SN::Search { search: vec![zn] };
 
           let sns = serde_json::to_string(&serde_json::to_value(sn)?)?;
 
@@ -2778,7 +2776,7 @@ pub fn udpate37(dbfile: &Path) -> Result<(), orgauth::error::Error> {
           // println!("updated oldsearch: {}, {:?}", id, content);
         }
         Err(e) => {
-          println!("search update failed: {} {:?}\n{}", id, e, content);
+          error!("search update failed: {} {:?}\n{}", id, e, content);
         }
       },
     };
@@ -2793,7 +2791,6 @@ pub fn udpate37(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   )?;
   let r: Vec<(i64, String)> = pstmt
     .query_map(params![syncid], |row| {
-      println!("oldsync");
       let id: i64 = row.get(0)?;
       let s: String = row.get(1)?;
       Ok((id, s))
@@ -2802,10 +2799,9 @@ pub fn udpate37(dbfile: &Path) -> Result<(), orgauth::error::Error> {
     .collect();
 
   for (id, content) in r {
-    println!("updating oldsync: {}, {:?}", id, content);
+    info!("updating oldsync: {}, {:?}", id, content);
     match serde_json::from_str::<OldSync>(content.as_str()) {
       Ok(oldsync) => {
-        println!("blah");
         let sn = SN::SpecialNote::SnSync(SN::CompletedSync {
           after: oldsync.after,
           now: oldsync.now,
@@ -2819,10 +2815,10 @@ pub fn udpate37(dbfile: &Path) -> Result<(), orgauth::error::Error> {
           "update zknote set content = ?1 where id = ?2",
           params![sns, id],
         )?;
-        println!("updated oldsync: {}, {:?}", id, sns);
+        info!("updated oldsync: {}, {:?}", id, sns);
       }
       Err(e) => {
-        println!("oldsync parse error: {:?}", e);
+        error!("oldsync parse error: {:?}", e);
       }
     };
   }
