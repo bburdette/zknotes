@@ -21,16 +21,20 @@ mod tests {
   use orgauth::endpoints::log_user_in;
   use orgauth::endpoints::Callbacks;
   use orgauth::endpoints::UuidTokener;
+  use orgauth::util::now;
   use rusqlite::params;
   use rusqlite::Connection;
   use std::error::Error;
   use std::fs;
   use std::path::Path;
   use std::path::PathBuf;
+  use std::str::FromStr;
   use std::sync::Arc;
+  use zkprotocol::content::Server;
   use zkprotocol::search::SearchMod;
   use zkprotocol::search::TagSearch;
   use zkprotocol::search::ZkNoteSearch;
+  use zkprotocol::sync_data::SyncStart;
   // use std::thread::spawn;
   use tokio_util::io::StreamReader;
   use uuid::Uuid;
@@ -504,7 +508,11 @@ mod tests {
     // use user2, since user2 has limited visibility to user1 notes.
     let cotheruser = user_id(&client_conn, "client-otheruser")?;
     let csyncuser = user_id(&client_conn, "client-syncuser")?;
+    let csu = read_user_by_id(&client_conn, csyncuser)?;
+
     let ssyncuser = user_id(&server_conn, "server-syncuser")?;
+    let ssu = read_user_by_id(&server_conn, ssyncuser)?;
+
     let caconn = Arc::new(client_conn);
     let saconn = Arc::new(server_conn);
 
@@ -514,6 +522,18 @@ mod tests {
     // initial sync, testing duplicate public ids.
     {
       let lm = LogMonitor {};
+
+      let ssyncstart = {
+        let ls = local_server_id(&saconn)?;
+        let luuid = Uuid::from_str(ls.uuid.as_str())?;
+        let now = now()?;
+        SyncStart {
+          after: None,
+          before: now,
+          server: luuid,
+        }
+      };
+
       let server_stream = sync_stream(
         saconn.clone(),
         server_ts.filepath.clone(),
@@ -521,7 +541,7 @@ mod tests {
         None,
         None,
         None,
-        None,
+        ssyncstart.clone(),
         &mut cb,
         &lm,
       );
@@ -541,6 +561,7 @@ mod tests {
       match sync_from_stream(
         &caconn,
         &caserver,
+        &csu,
         &client_ts.filepath,
         Some(&ttn.notetemp),
         Some(&ttn.linktemp),
@@ -593,6 +614,18 @@ mod tests {
 
     {
       let lm = LogMonitor {};
+
+      let csyncstart = {
+        let ls = local_server_id(&caconn)?;
+        let luuid = Uuid::from_str(ls.uuid.as_str())?;
+        let now = now()?;
+        SyncStart {
+          after: None,
+          before: now,
+          server: luuid,
+        }
+      };
+
       let server_stream = sync_stream(
         saconn.clone(),
         server_ts.filepath.clone(),
@@ -600,7 +633,7 @@ mod tests {
         None,
         None,
         None,
-        None,
+        csyncstart.clone(),
         &mut cb,
         &lm,
       );
@@ -627,8 +660,20 @@ mod tests {
         })
         .await?;
     }
+    let csyncstart = {
+      let ls = local_server_id(&caconn)?;
+      let luuid = Uuid::from_str(ls.uuid.as_str())?;
+      let now = now()?;
+      SyncStart {
+        after: None,
+        before: now,
+        server: luuid,
+      }
+    };
+
     {
       let lm = LogMonitor {};
+
       let client_stream = sync_stream(
         caconn.clone(),
         client_ts.filepath.clone(),
@@ -639,7 +684,7 @@ mod tests {
         None,
         // Some(ttn.archivelinktemp.clone()),
         None,
-        None,
+        csyncstart.clone(),
         &mut cb,
         &lm,
       );
@@ -670,6 +715,18 @@ mod tests {
     // sync from server to client.
     // ------------------------------------------------------------
     let lm = LogMonitor {};
+
+    let ssyncstart = {
+      let ls = local_server_id(&saconn)?;
+      let luuid = Uuid::from_str(ls.uuid.as_str())?;
+      let now = now()?;
+      SyncStart {
+        after: None,
+        before: now,
+        server: luuid,
+      }
+    };
+
     let server_stream = sync_stream(
       saconn.clone(),
       server_ts.filepath.clone(),
@@ -677,7 +734,7 @@ mod tests {
       None,
       None,
       None,
-      None,
+      ssyncstart.clone(),
       &mut cb,
       &lm,
     );
@@ -695,6 +752,7 @@ mod tests {
     sync_from_stream(
       &caconn,
       &caserver,
+      &csu,
       &client_ts.filepath,
       Some(&ttn.notetemp),
       Some(&ttn.linktemp),
@@ -715,7 +773,7 @@ mod tests {
       Some(ttn.notetemp),
       Some(ttn.linktemp),
       Some(ttn.archivelinktemp),
-      None,
+      csyncstart.clone(),
       &mut cb,
       &lm,
     );
@@ -727,6 +785,7 @@ mod tests {
     sync_from_stream(
       &saconn,
       &saserver,
+      &ssu,
       &server_ts.filepath,
       None,
       None,
@@ -1025,7 +1084,7 @@ mod tests {
       None,
       None,
       None,
-      None,
+      ssyncstart.clone(),
       &mut cb,
       &lm,
     );
@@ -1038,6 +1097,7 @@ mod tests {
     sync_from_stream(
       &caconn,
       &caserver,
+      &csu,
       &client_ts.filepath,
       Some(&ttn.notetemp),
       Some(&ttn.linktemp),
@@ -1056,7 +1116,7 @@ mod tests {
       Some(ttn.notetemp),
       Some(ttn.linktemp),
       Some(ttn.archivelinktemp),
-      None,
+      ssyncstart.clone(),
       &mut cb,
       &lm,
     );
@@ -1068,6 +1128,7 @@ mod tests {
     sync_from_stream(
       &saconn,
       &saserver,
+      &ssu,
       &server_ts.filepath,
       None,
       None,
@@ -1135,7 +1196,7 @@ mod tests {
       limit: None,
       what: "".to_string(),
       resulttype: zkprotocol::search::ResultType::RtListNote,
-      archives: false,
+      archives: zkprotocol::search::ArchivesOrCurrent::Current,
       deleted: false, // include deleted notes
       ordering: None,
     };

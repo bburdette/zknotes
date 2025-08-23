@@ -50,6 +50,7 @@ import SearchStackPanel as SP
 import SearchUtil as SU
 import SelectString as SS
 import ShowMessage
+import SpecialNotes as SN
 import TSet
 import TagAThing
 import TagFiles
@@ -1166,7 +1167,7 @@ sendSearch model search =
                         { id = Nothing
                         , pubid = Nothing
                         , title = SU.printTagSearch (SU.andifySearches search.tagsearch)
-                        , content = JE.list Data.tagSearchEncoder search.tagsearch |> JE.encode 2
+                        , content = SN.SnSearch search.tagsearch |> SN.specialNoteEncoder |> JE.encode 2
                         , editable = False
                         , showtitle = True
                         , deleted = False
@@ -2673,11 +2674,21 @@ actualupdate msg model =
                         Data.PvyZkNoteSearchResult sr ->
                             if sr.what == "prevSearches" then
                                 let
+                                    -- TODO decode specialnote instead.
                                     pses =
                                         List.filterMap
                                             (\zknote ->
-                                                JD.decodeString (JD.list Data.tagSearchDecoder) zknote.content
+                                                JD.decodeString SN.specialNoteDecoder zknote.content
                                                     |> Result.toMaybe
+                                                    |> Maybe.andThen
+                                                        (\r ->
+                                                            case r of
+                                                                SN.SnSearch s ->
+                                                                    Just s
+
+                                                                _ ->
+                                                                    Nothing
+                                                        )
                                             )
                                             sr.notes
 

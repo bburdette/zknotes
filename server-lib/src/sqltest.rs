@@ -431,7 +431,7 @@ mod tests {
       what: "test".to_string(),
       resulttype: ResultType::RtListNote,
       ordering: None,
-      archives: false,
+      archives: ArchivesOrCurrent::Current,
       deleted: false,
     };
 
@@ -472,7 +472,7 @@ mod tests {
       what: "test".to_string(),
       resulttype: ResultType::RtListNote,
       ordering: None,
-      archives: false,
+      archives: ArchivesOrCurrent::Current,
       deleted: false,
     };
 
@@ -514,7 +514,7 @@ mod tests {
       what: "test".to_string(),
       resulttype: ResultType::RtListNote,
       ordering: None,
-      archives: false,
+      archives: ArchivesOrCurrent::Current,
       deleted: false,
     };
 
@@ -542,7 +542,7 @@ mod tests {
       what: "test".to_string(),
       resulttype: ResultType::RtListNote,
       ordering: None,
-      archives: false,
+      archives: ArchivesOrCurrent::Current,
       deleted: false,
     };
 
@@ -570,7 +570,7 @@ mod tests {
       what: "test".to_string(),
       resulttype: ResultType::RtListNote,
       ordering: None,
-      archives: false,
+      archives: ArchivesOrCurrent::Current,
       deleted: false,
     };
 
@@ -598,7 +598,7 @@ mod tests {
       what: "test".to_string(),
       resulttype: ResultType::RtListNote,
       ordering: None,
-      archives: false,
+      archives: ArchivesOrCurrent::Current,
       deleted: false,
     };
 
@@ -626,7 +626,7 @@ mod tests {
       what: "u2nran test".to_string(),
       resulttype: ResultType::RtListNote,
       ordering: None,
-      archives: false,
+      archives: ArchivesOrCurrent::Current,
       deleted: false,
     };
 
@@ -678,7 +678,7 @@ mod tests {
       what: "test".to_string(),
       resulttype: ResultType::RtListNote,
       ordering: None,
-      archives: false,
+      archives: ArchivesOrCurrent::Current,
       deleted: false,
     };
 
@@ -705,7 +705,7 @@ mod tests {
       what: "test".to_string(),
       resulttype: ResultType::RtListNote,
       ordering: None,
-      archives: false,
+      archives: ArchivesOrCurrent::Current,
       deleted: false,
     };
 
@@ -732,7 +732,7 @@ mod tests {
       what: "test".to_string(),
       resulttype: ResultType::RtListNote,
       ordering: None,
-      archives: false,
+      archives: ArchivesOrCurrent::Current,
       deleted: false,
     };
 
@@ -759,7 +759,7 @@ mod tests {
       what: "test".to_string(),
       resulttype: ResultType::RtListNote,
       ordering: None,
-      archives: false,
+      archives: ArchivesOrCurrent::Current,
       deleted: false,
     };
 
@@ -786,7 +786,7 @@ mod tests {
       what: "test".to_string(),
       resulttype: ResultType::RtListNote,
       ordering: None,
-      archives: true,
+      archives: ArchivesOrCurrent::Archives,
       deleted: false,
     };
 

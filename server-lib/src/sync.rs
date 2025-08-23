@@ -3,7 +3,7 @@ use crate::jobs::JobMonitor;
 use crate::search::build_sql;
 use crate::search::{search_zknotes, search_zknotes_stream, sync_users, system_user, SearchResult};
 use crate::sqldata::{
-  self, note_id_for_uuid, save_zklink, save_zknote, server_id, user_note_id, Server,
+  self, local_server_id, note_id_for_uuid, save_zklink, save_zknote, server_id, user_note_id,
 };
 use crate::util::now;
 use actix_multipart_rfc7578 as multipart;
@@ -34,26 +34,20 @@ use tokio::io::AsyncWriteExt;
 use tokio_util::io::StreamReader;
 use uuid::Uuid;
 use zkprotocol::constants::{PrivateStreamingRequests, SpecialUuids};
-use zkprotocol::content::{FileStatus, SaveZkNote, SyncSince, ZkNoteId};
+use zkprotocol::content::{FileStatus, SaveZkNote, Server, SyncSince, ZkNoteId};
 use zkprotocol::messages::PrivateStreamingMessage;
 use zkprotocol::private::{PrivateReply, PrivateRequest};
 use zkprotocol::search::{
   AndOr, ArchivesOrCurrent, OrderDirection, OrderField, Ordering, ResultType, SearchMod, TagSearch,
   ZkNoteSearch,
 };
-use zkprotocol::sync_data::SyncMessage;
+use zkprotocol::specialnotes::{CompletedSync, SpecialNote};
+use zkprotocol::sync_data::{SyncMessage, SyncStart};
 use zkprotocol::upload::UploadReply;
 
 fn convert_payloaderr(err: PayloadError) -> std::io::Error {
   error!("convert_err {:?}", err);
   todo!()
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct CompletedSync {
-  after: Option<i64>,
-  now: i64,
-  server: Server,
 }
 
 pub async fn prev_sync(
@@ -64,9 +58,16 @@ pub async fn prev_sync(
   let sysid = user_id(&conn, "system")?;
   let zns = ZkNoteSearch {
     tagsearch: vec![TagSearch::Boolex {
-      ts1: Box::new(TagSearch::SearchTerm {
-        mods: vec![SearchMod::Tag, SearchMod::ZkNoteId],
-        term: SpecialUuids::Sync.str().to_string(),
+      ts1: Box::new(TagSearch::Boolex {
+        ts1: Box::new(TagSearch::SearchTerm {
+          mods: vec![SearchMod::Tag, SearchMod::ZkNoteId],
+          term: SpecialUuids::Sync.str().to_string(),
+        }),
+        ao: zkprotocol::search::AndOr::And,
+        ts2: Box::new(TagSearch::SearchTerm {
+          mods: vec![SearchMod::ExactMatch],
+          term: "sync".to_string(),
+        }),
       }),
       ao: zkprotocol::search::AndOr::And,
       ts2: Box::new(TagSearch::SearchTerm {
@@ -87,13 +88,19 @@ pub async fn prev_sync(
   };
 
   if let SearchResult::SrNote(res) = search_zknotes(conn, &file_path, sysid, &zns)? {
+    info!("srnotes: {:?}", res);
     match res.notes.first() {
-      Some(n) => match serde_json::from_str::<CompletedSync>(n.content.as_str()) {
-        Ok(s) => Ok(Some(s)),
+      Some(n) => match serde_json::from_str::<SpecialNote>(n.content.as_str()) {
+        Ok(SpecialNote::SnSync(s)) => Ok(Some(s)),
+        Ok(_) => Err(zkerr::Error::String(
+          "bad special note type, expected SnSync".to_string(),
+        )),
         Err(e) => {
-          error!("CompletedSync parse error: {:?}", e);
-          Ok(None)
-        }
+          error!("note: {:?}", n);
+          Err(e)?
+        } // error!("CompletedSync parse error: {:?}", e);
+          // Ok(None)
+          // }
       },
       None => Ok(None),
     }
@@ -112,6 +119,8 @@ pub async fn save_sync(
   let syncid = note_id_for_uuid(conn, &Uuid::parse_str(SpecialUuids::Sync.str())?)?;
   let sysid = user_id(&conn, "system")?;
 
+  let snote = SpecialNote::SnSync(sync);
+
   let (id, _szn) = save_zknote(
     conn,
     sysid, // save under system id.
@@ -120,7 +129,7 @@ pub async fn save_sync(
       id: None,
       title: "sync".to_string(),
       pubid: None,
-      content: serde_json::to_string_pretty(&serde_json::to_value(sync)?)?,
+      content: serde_json::to_string_pretty(&serde_json::to_value(snote)?)?,
       editable: false,
       showtitle: false,
       deleted: false,
@@ -221,8 +230,6 @@ pub async fn sync(
     .await?
     .map(|cs| cs.now);
 
-  let now = now()?;
-
   let tr = conn.unchecked_transaction()?;
 
   let ttn = temp_tables(&conn)?;
@@ -256,20 +263,6 @@ pub async fn sync(
         after,
         callbacks,
         monitor,
-      )
-      .await?;
-
-      let unote = user_note_id(&conn, user.id)?;
-      save_sync(
-        &conn,
-        user.id,
-        &server,
-        unote,
-        CompletedSync {
-          after,
-          now,
-          server: server.clone(),
-        },
       )
       .await?;
 
@@ -614,6 +607,7 @@ pub async fn sync_from_remote(
   let reply = sync_from_stream(
     conn,
     &server,
+    &user,
     file_path,
     Some(notetemp),
     Some(linktemp),
@@ -646,6 +640,7 @@ where
 pub async fn sync_from_stream<S>(
   conn: &Connection,
   server: &Server,
+  user: &User,
   file_path: &Path,
   notetemp: Option<&str>,
   linktemp: Option<&str>,
@@ -666,10 +661,12 @@ where
 
   sm = read_sync_message(&mut line, br).await?;
 
-  let (_after, remotenow) = match sm {
-    SyncMessage::SyncStart(after, rn) => (after, rn),
+  let ss = match sm {
+    SyncMessage::SyncStart(ss) => ss,
     _ => return Err(format!("expected SyncStart; unexpected syncmessage: {:?}", sm).into()),
   };
+
+  let remotenow = ss.before;
 
   // milliseconds
   if (now - remotenow).abs() > 10000 {
@@ -1143,6 +1140,21 @@ where
     params![],
   )?;
 
+  // write sync complete.
+  let unote = user_note_id(&conn, user.id)?;
+  save_sync(
+    &conn,
+    user.id,
+    &server,
+    unote,
+    CompletedSync {
+      after: ss.after,
+      now,
+      remote: Some(ss.server),
+    },
+  )
+  .await?;
+
   Ok(PrivateReply::PvySyncComplete)
 }
 
@@ -1177,6 +1189,15 @@ pub async fn sync_to_remote(
 
   let cookie = cookie::Cookie::parse_encoded(c)?;
 
+  let ls = local_server_id(&conn)?;
+  let luuid = Uuid::from_str(ls.uuid.as_str())?;
+  let now = now()?;
+  let syncstart = SyncStart {
+    after: after,
+    before: now,
+    server: luuid,
+  };
+
   let ss = sync_stream(
     conn,
     PathBuf::from(files_dir),
@@ -1184,7 +1205,7 @@ pub async fn sync_to_remote(
     exclude_notes,
     exclude_links,
     exclude_archivelinks,
-    after,
+    syncstart,
     callbacks,
     monitor,
   );
@@ -1290,11 +1311,14 @@ pub fn sync_stream(
   exclude_notes: Option<String>,
   exclude_links: Option<String>,
   exclude_archivelinks: Option<String>,
-  after: Option<i64>,
+  sync_start: zkprotocol::sync_data::SyncStart,
   _callbacks: &mut Callbacks,
   monitor: &dyn JobMonitor,
 ) -> impl Stream<Item = Result<Bytes, Box<dyn std::error::Error + 'static>>> {
-  let start = try_stream! { yield SyncMessage::SyncStart(after, now()?); }.map(bytesify);
+  let after = sync_start.after;
+  let start = try_stream! { yield
+  SyncMessage::SyncStart(sync_start); }
+  .map(bytesify);
 
   info!("setting up sync_stream");
   write!(monitor, "setting up sync_stream");

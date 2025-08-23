@@ -16,10 +16,17 @@ pub struct ZkPhantomUser {
   pub active: bool,
 }
 
+#[derive(Clone, Deserialize, Serialize, Debug)]
+pub struct SyncStart {
+  pub server: Uuid,
+  pub after: Option<i64>,
+  pub before: i64,
+}
+
 // TODO: add time on first msg.
 #[derive(Deserialize, Serialize, Debug)]
 pub enum SyncMessage {
-  SyncStart(Option<i64>, i64),
+  SyncStart(SyncStart),
   PhantomUserHeader,
   PhantomUser(ZkPhantomUser),
   ZkSearchResultHeader(ZkSearchResultHeader),

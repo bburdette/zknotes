@@ -49,7 +49,7 @@ import Browser.Dom as BD
 import Cellme.Cellme exposing (CellContainer(..), RunState(..), evalCellsFully)
 import Cellme.DictCellme exposing (CellDict(..), getCd, mkCc)
 import Common
-import Data exposing (Direction(..), EditLink, EditTab(..), ZkNoteId)
+import Data exposing (ArchivesOrCurrent(..), Direction(..), EditLink, EditTab(..), ZkNoteId)
 import DataUtil exposing (FileUrlInfo, zkNoteIdToString, zklKey, zniCompare, zniEq)
 import Dialog as D
 import Dict exposing (Dict)
@@ -77,6 +77,9 @@ import NoteCache as NC exposing (NoteCache)
 import Orgauth.Data exposing (UserId(..))
 import RequestsDialog exposing (TRequests)
 import SearchStackPanel as SP
+import SpecialNotes exposing (specialNoteEncoder)
+import SpecialNotesGui as SNG
+import TagSearchPanel exposing (Search(..))
 import TangoColors as TC
 import Task
 import Time
@@ -149,6 +152,7 @@ type Msg
     | EditBlockOk
     | NewBlock
     | EditBlockMsg MG.Msg
+    | SNGMsg SNG.Msg
     | Noop
 
 
@@ -1748,6 +1752,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                             " (remote)"
                         )
                     ]
+                , dates
                 ]
 
         editview =
@@ -1793,6 +1798,17 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
 
         mbdi =
             blockDndSystem.info model.blockDnd
+
+        snview =
+            E.column
+                [ E.width E.fill
+                , E.centerX
+                , E.alignTop
+                , E.spacing 8
+                , E.paddingXY 5 0
+                ]
+            <|
+                []
 
         mdview =
             E.column
@@ -2007,54 +2023,69 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                 ]
             <|
                 editmeta
-                    :: dates
-                    :: (if wclass == Wide then
-                            [ E.row
-                                [ E.width E.fill
-                                , E.alignTop
-                                , E.spacing 8
+                    :: (case EM.getSpecialNote model.edMarkdown of
+                            Ok sn ->
+                                [ E.row
+                                    [ E.padding 10
+                                    , EBd.rounded 10
+                                    , E.width E.fill
+                                    , EBk.color TC.lightGray
+                                    , E.height E.fill
+                                    ]
+                                    [ E.el [ EBd.color TC.black, EBd.width 1, E.width E.fill, E.centerX, E.padding 3 ] (SNG.guiSn zone sn |> E.map SNGMsg) ]
                                 ]
-                                [ headingPanel "raw" [ E.width E.fill ] editview
-                                , headingPanel "eview" [ E.width E.fill ] mdview
-                                ]
-                            ]
+                                    ++ showComments
+                                    ++ [ divider ]
+                                    ++ showLinks TC.white
 
-                        else
-                            [ Common.navbar 2
-                                (case model.editOrView of
-                                    EditView ->
-                                        EtEdit
+                            Err _ ->
+                                (if wclass == Wide then
+                                    [ E.row
+                                        [ E.width E.fill
+                                        , E.alignTop
+                                        , E.spacing 8
+                                        ]
+                                        [ headingPanel "raw" [ E.width E.fill ] editview
+                                        , headingPanel "eview" [ E.width E.fill ] mdview
+                                        ]
+                                    ]
 
-                                    ViewView ->
-                                        EtView
+                                 else
+                                    [ Common.navbar 2
+                                        (case model.editOrView of
+                                            EditView ->
+                                                EtEdit
+
+                                            ViewView ->
+                                                EtView
+                                        )
+                                        TabChanged
+                                        [ ( EtView, "eview" )
+                                        , ( EtEdit
+                                          , if editable then
+                                                "raw"
+
+                                            else
+                                                "raw"
+                                          )
+                                        ]
+                                    , case model.editOrView of
+                                        EditView ->
+                                            editview
+
+                                        ViewView ->
+                                            mdview
+                                    , if isdirty then
+                                        EI.button perhapsdirtybutton { onPress = Just SavePress, label = E.text "save" }
+
+                                      else
+                                        E.none
+                                    ]
                                 )
-                                TabChanged
-                                [ ( EtView, "eview" )
-                                , ( EtEdit
-                                  , if editable then
-                                        "raw"
-
-                                    else
-                                        "raw"
-                                  )
-                                ]
-                            , case model.editOrView of
-                                EditView ->
-                                    editview
-
-                                ViewView ->
-                                    mdview
-                            , if isdirty then
-                                EI.button perhapsdirtybutton { onPress = Just SavePress, label = E.text "save" }
-
-                              else
-                                E.none
-                            , dates
-                            ]
+                                    ++ showComments
+                                    ++ [ divider ]
+                                    ++ showLinks TC.white
                        )
-                    ++ showComments
-                    ++ [ divider ]
-                    ++ showLinks TC.white
     in
     E.column
         [ E.width E.fill
@@ -3572,6 +3603,48 @@ update msg model =
                             ( model, None )
 
                 Nothing ->
+                    ( model, None )
+
+        SNGMsg sngmsg ->
+            case EM.getSpecialNote model.edMarkdown of
+                Ok sn ->
+                    let
+                        ( snmd, sncmd ) =
+                            SNG.updateSn sngmsg sn
+                    in
+                    ( { model | edMarkdown = EM.updateSpecialNote snmd }
+                    , case sncmd of
+                        SNG.CopySearch tagSearch ->
+                            SPMod
+                                (\spm ->
+                                    ( SP.setSearch spm tagSearch
+                                    , SP.None
+                                    )
+                                )
+
+                        SNG.CopySyncSearch tagSearch ->
+                            SPMod
+                                (\spm ->
+                                    let
+                                        nsspm =
+                                            spm.spmodel
+
+                                        tsn =
+                                            nsspm.tagSearchModel
+
+                                        x =
+                                            { spm | spmodel = { nsspm | tagSearchModel = { tsn | archives = CurrentAndArchives } } }
+                                    in
+                                    ( SP.setSearch x [ tagSearch ]
+                                    , SP.None
+                                    )
+                                )
+
+                        SNG.None ->
+                            None
+                    )
+
+                Err _ ->
                     ( model, None )
 
         Noop ->

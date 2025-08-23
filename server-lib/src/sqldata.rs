@@ -21,8 +21,8 @@ use zkprotocol::constants::SpecialUuids;
 use zkprotocol::content::{
   ArchiveZkLink, Direction, EditLink, ExtraLoginData, FileInfo, FileStatus, GetArchiveZkNote,
   GetZkNoteArchives, GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkLink, SaveZkNote,
-  SavedZkNote, Sysids, UuidZkLink, ZkLink, ZkListNote, ZkNote, ZkNoteAndLinks, ZkNoteAndLinksWhat,
-  ZkNoteId,
+  SavedZkNote, Server, Sysids, UuidZkLink, ZkLink, ZkListNote, ZkNote, ZkNoteAndLinks,
+  ZkNoteAndLinksWhat, ZkNoteId,
 };
 use zkprotocol::sync_data::SyncMessage;
 
@@ -32,12 +32,6 @@ pub fn zknotes_callbacks() -> Callbacks {
     extra_login_data: Box::new(extra_login_data_callback),
     on_delete_user: Box::new(on_delete_user),
   }
-}
-
-#[derive(Clone, Deserialize, Serialize, Debug)]
-pub struct Server {
-  pub id: i64,
-  pub uuid: String,
 }
 
 pub fn local_server_id(conn: &Connection) -> Result<Server, zkerr::Error> {
@@ -438,6 +432,11 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: Option<i64>) -> Result<Server,
     info!("udpate36");
     zkm::udpate36(&dbfile)?;
     set_single_value(&conn, "migration_level", "36")?;
+  }
+  if nlevel < 37 {
+    info!("udpate37");
+    zkm::udpate37(&dbfile)?;
+    set_single_value(&conn, "migration_level", "37")?;
   }
 
   info!("db up to date.");
