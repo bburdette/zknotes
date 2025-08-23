@@ -564,28 +564,27 @@ async fn zk_interface_check_upstreaming(
             ))),
           )
         }
-        Ok(_userdata) => {
+        Ok(user) => {
           // finally!  processing messages as logged in user.
           let rstream =
             body.map_err(convert_bodyerr as fn(actix_web::error::PayloadError) -> std::io::Error);
 
           let mut br = StreamReader::new(rstream);
 
-          Ok(
-            HttpResponse::Ok().json(
-              sync::sync_from_stream(
-                &conn,
-                &server,
-                &config.file_path,
-                None,
-                None,
-                None,
-                &mut sqldata::zknotes_callbacks(),
-                &mut br,
-              )
-              .await?,
-            ),
+          let sr = sync::sync_from_stream(
+            &conn,
+            &server,
+            &user,
+            &config.file_path,
+            None,
+            None,
+            None,
+            &mut sqldata::zknotes_callbacks(),
+            &mut br,
           )
+          .await?;
+
+          Ok(HttpResponse::Ok().json(sr))
         }
       }
     }

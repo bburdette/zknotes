@@ -6,6 +6,7 @@ use crate::jobs::JobMonitor;
 use crate::jobs::LogMonitor;
 use crate::search;
 use crate::sqldata;
+use crate::sqldata::local_server_id;
 use crate::sqldata::zknotes_callbacks;
 use crate::state::new_jobid;
 use crate::state::State;
@@ -17,11 +18,14 @@ use log::info;
 use orgauth;
 use orgauth::data::UserId;
 use orgauth::endpoints::Tokener;
+use orgauth::util::now;
 use rusqlite::Connection;
 use std::error::Error;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
+use uuid::Uuid;
 use zkprotocol::constants::PrivateStreamingRequests;
 use zkprotocol::content::JobState;
 use zkprotocol::content::JobStatus;
@@ -134,6 +138,14 @@ pub async fn zk_interface_loggedin_streaming(
       )?);
       let rq: SyncSince = serde_json::from_value(msgdata.clone())?;
       let jl = LogMonitor {};
+      let ls = local_server_id(&conn)?;
+      let luuid = Uuid::from_str(ls.uuid.as_str())?;
+      let now = now()?;
+      let syncstart = zkprotocol::sync_data::SyncStart {
+        after: rq.after,
+        before: now,
+        server: luuid,
+      };
       let ss = sync::sync_stream(
         conn,
         PathBuf::from(&config.file_path),
@@ -141,7 +153,7 @@ pub async fn zk_interface_loggedin_streaming(
         None,
         None,
         None,
-        rq.after,
+        syncstart,
         &mut zknotes_callbacks(),
         &jl,
       );

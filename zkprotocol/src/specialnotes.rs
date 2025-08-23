@@ -27,6 +27,7 @@ pub enum SpecialNote {
 pub struct CompletedSync {
   pub after: Option<i64>,
   pub now: i64,
+  pub remote: Option<Uuid>,
 }
 
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
