@@ -2707,7 +2707,6 @@ pub fn udpate37(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   // find notes that are owned by system, linked to 'sync', and the contents deserialize to an old sync record.
 
   let conn = Connection::open(dbfile)?;
-  // let conn2 = Connection::open(dbfile)?;
   let tr = conn.unchecked_transaction()?;
 
   // implement here instead of using sqldata functions, since those functions may change in the future!
@@ -2746,20 +2745,19 @@ pub fn udpate37(dbfile: &Path) -> Result<(), orgauth::error::Error> {
     .filter_map(|x| x.ok())
     .collect();
 
-  let now = now()?;
-
   for (id, content) in r {
-    info!("attempting search update {}", id);
     match serde_json::from_str::<Vec<TagSearch>>(content.as_str()) {
       Ok(zn) => {
         let sn = SN::SpecialNote::SnSearch(zn);
 
         let sns = serde_json::to_string(&serde_json::to_value(sn)?)?;
 
+        // update without changing changed date!
         conn.execute(
-          "update zknote set content = ?1, changeddate = ?2 where id = ?3",
-          params![sns, now, id],
+          "update zknote set content = ?1 where id = ?2",
+          params![sns, id],
         )?;
+        info!("updated search {}", id);
       }
       _ => match serde_json::from_str::<TagSearch>(content.as_str()) {
         Ok(zn) => {
@@ -2772,7 +2770,7 @@ pub fn udpate37(dbfile: &Path) -> Result<(), orgauth::error::Error> {
             "update zknote set content = ?1 where id = ?2",
             params![sns, id],
           )?;
-          // println!("updated oldsearch: {}, {:?}", id, content);
+          info!("updated search {}", id);
         }
         Err(e) => {
           error!("search update failed: {} {:?}\n{}", id, e, content);
@@ -2798,7 +2796,6 @@ pub fn udpate37(dbfile: &Path) -> Result<(), orgauth::error::Error> {
     .collect();
 
   for (id, content) in r {
-    info!("updating oldsync: {}, {:?}", id, content);
     match serde_json::from_str::<OldSync>(content.as_str()) {
       Ok(oldsync) => {
         let sn = SN::SpecialNote::SnSync(SN::CompletedSync {
@@ -2814,13 +2811,87 @@ pub fn udpate37(dbfile: &Path) -> Result<(), orgauth::error::Error> {
           "update zknote set content = ?1 where id = ?2",
           params![sns, id],
         )?;
-        info!("updated oldsync: {}, {:?}", id, sns);
+        info!("updated sync: {}, {:?}", id, sns);
       }
       Err(e) => {
         error!("oldsync parse error: {:?}", e);
       }
     };
   }
+
+  tr.commit()?;
+
+  Ok(())
+}
+
+pub fn udpate38(dbfile: &Path) -> Result<(), orgauth::error::Error> {
+  // delete mistakenly archived searches, fix changeddates"
+
+  let conn = Connection::open(dbfile)?;
+  let tr = conn.unchecked_transaction()?;
+
+  let searchid: i64 = conn.query_row(
+    "select zknote.id from
+      zknote, orgauth_user
+      where zknote.title = ?2
+      and orgauth_user.name = ?1
+      and zknote.user = orgauth_user.id",
+    params!["system", "search"],
+    |row| Ok(row.get(0)?),
+  )?;
+
+  let archiveid: i64 = conn.query_row(
+    "select zknote.id from
+      zknote, orgauth_user
+      where zknote.title = ?2
+      and orgauth_user.name = ?1
+      and zknote.user = orgauth_user.id",
+    params!["system", "archive"],
+    |row| Ok(row.get(0)?),
+  )?;
+
+  let updatecount: usize = conn.execute(
+    "update zknote set changeddate = createdate
+      where zknote.id in
+      (select zknote.id from
+      zknote, orgauth_user, zklink
+      where zklink.fromid = zknote.id
+      and zklink.toid = ?2
+      and orgauth_user.name = ?1
+      and zknote.user != orgauth_user.id)",
+    params!["system", searchid],
+  )?;
+
+  info!("updated {} search records", updatecount);
+
+  let mut pstmt = conn.prepare(
+    "select N.id, N.title from zknote N, zklink A, zklink B, zklink C where
+      A.fromid = N.id
+      and A.toid = ?1
+      and B.fromid = N.id
+      and C.fromid = B.toid
+      and C.toid = ?2",
+  )?;
+
+  let r: Vec<(i64, String)> = pstmt
+    .query_map(params![archiveid, searchid], |row| {
+      let id: i64 = row.get(0)?;
+      let title: String = row.get(1)?;
+      // info!("title {:?}", row.get::<usize, String>(1)?);
+      Ok((id, title))
+    })?
+    .filter_map(|x| x.ok())
+    .collect();
+
+  let deletecount = r.len();
+
+  for (id, title) in r {
+    info!("deleting record {}, {}", id, title);
+    conn.execute("delete from zklink where fromid = ?1", params![id])?;
+    conn.execute("delete from zknote where id = ?1", params![id])?;
+  }
+
+  info!("deleted {} archived search records", deletecount);
 
   tr.commit()?;
 
