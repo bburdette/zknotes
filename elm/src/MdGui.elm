@@ -194,19 +194,21 @@ guiInline inline =
                 ]
 
         CodeSpan s ->
-            EI.text []
+            EI.multiline [ E.width E.fill ]
                 { onChange = CodeSpanStr
                 , text = s
                 , placeholder = Nothing
                 , label = EI.labelLeft [] (E.text "code")
+                , spellcheck = False
                 }
 
         Text s ->
-            EI.text []
+            EI.multiline [ E.width E.fill ]
                 { onChange = TextStr
                 , text = s
                 , placeholder = Nothing
                 , label = EI.labelLeft [] (E.text "text")
+                , spellcheck = False
                 }
 
         HardLineBreak ->
