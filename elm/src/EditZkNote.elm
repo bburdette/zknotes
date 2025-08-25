@@ -3321,10 +3321,12 @@ update msg model =
                         be =
                             updateBlockEdit
                                 (t.s
+                                    |> String.trim
                                     |> String.split "\n"
                                     |> List.map String.trimRight
                                     |> List.intersperse "\n\n"
                                     |> String.concat
+                                    |> (\s -> s ++ "\n\n")
                                 )
                                 (Text t)
                     in
@@ -3340,10 +3342,12 @@ update msg model =
                         be =
                             updateBlockEdit
                                 (t.s
+                                    |> String.trim
                                     |> String.split "\n"
                                     |> List.map String.trimRight
                                     |> List.intersperse "  \n"
                                     |> String.concat
+                                    |> (\s -> s ++ "\n\n")
                                 )
                                 (Text t)
                     in
@@ -3359,14 +3363,13 @@ update msg model =
                         be =
                             updateBlockEdit
                                 (t.s
+                                    |> String.trim
                                     |> String.split "\n"
                                     |> List.map String.trimRight
                                     |> List.filter ((/=) "")
                                     |> List.intersperse "\n"
                                     |> String.concat
-                                    |> (\s ->
-                                            s ++ "\n\n"
-                                       )
+                                    |> (\s -> s ++ "\n\n")
                                 )
                                 (Text t)
                     in
