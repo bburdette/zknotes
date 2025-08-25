@@ -3321,6 +3321,7 @@ update msg model =
                         be =
                             updateBlockEdit
                                 (t.s
+                                    |> String.trim
                                     |> String.split "\n"
                                     |> List.map String.trimRight
                                     |> List.intersperse "\n\n"
@@ -3340,6 +3341,7 @@ update msg model =
                         be =
                             updateBlockEdit
                                 (t.s
+                                    |> String.trim
                                     |> String.split "\n"
                                     |> List.map String.trimRight
                                     |> List.intersperse "  \n"
@@ -3359,14 +3361,12 @@ update msg model =
                         be =
                             updateBlockEdit
                                 (t.s
+                                    |> String.trim
                                     |> String.split "\n"
                                     |> List.map String.trimRight
                                     |> List.filter ((/=) "")
                                     |> List.intersperse "\n"
                                     |> String.concat
-                                    |> (\s ->
-                                            s ++ "\n\n"
-                                       )
                                 )
                                 (Text t)
                     in
@@ -3401,7 +3401,9 @@ update msg model =
                                                     (\ls ->
                                                         let
                                                             nbe =
-                                                                updateBlockEdit (String.concat ls ++ be.s) (Text { be | idx = be.idx - 1 })
+                                                                updateBlockEdit
+                                                                    (String.concat ls ++ be.s)
+                                                                    (Text { be | idx = be.idx - 1 })
                                                         in
                                                         ( { model | blockEdit = Just nbe, edMarkdown = db }, None )
                                                     )
@@ -3439,7 +3441,9 @@ update msg model =
                                                     (\ls ->
                                                         let
                                                             nbe =
-                                                                updateBlockEdit (be.s ++ String.concat ls) (Text { be | idx = be.idx })
+                                                                updateBlockEdit
+                                                                    (String.trim be.s ++ "\n\n" ++ String.trim (String.concat ls))
+                                                                    (Text { be | idx = be.idx })
                                                         in
                                                         ( { model | blockEdit = Just nbe, edMarkdown = db }, None )
                                                     )
@@ -3499,7 +3503,7 @@ update msg model =
                                                     mds =
                                                         String.concat sl
                                                 in
-                                                Text { idx = bi, s = mds, b = b, original = mds }
+                                                Text { idx = bi, s = String.trim mds, b = b, original = mds }
                                             )
                                         |> Result.toMaybe
                                 )
@@ -3545,7 +3549,7 @@ update msg model =
                                     (List.indexedMap
                                         (\i b ->
                                             if i == t.idx then
-                                                t.s
+                                                String.trim t.s ++ "\n\n"
 
                                             else
                                                 b
