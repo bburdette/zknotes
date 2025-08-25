@@ -4,6 +4,7 @@ pub mod interfaces;
 pub mod jobs;
 mod migrations;
 mod search;
+pub mod search_util;
 pub mod sqldata;
 mod sqltest;
 pub mod state;

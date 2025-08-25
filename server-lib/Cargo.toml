@@ -47,3 +47,4 @@ actix-multipart-rfc7578 = "0.10.0"
 mime = "0.3.17"
 actix-rt = "2.9.0"
 girlboss = {version = "1.0.0-alpha.4", features = ["actix-rt"]}
+nom = "8.0.0"
