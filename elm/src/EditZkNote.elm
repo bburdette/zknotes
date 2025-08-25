@@ -3401,7 +3401,9 @@ update msg model =
                                                     (\ls ->
                                                         let
                                                             nbe =
-                                                                updateBlockEdit (String.concat ls ++ be.s) (Text { be | idx = be.idx - 1 })
+                                                                updateBlockEdit
+                                                                    (String.concat ls ++ be.s)
+                                                                    (Text { be | idx = be.idx - 1 })
                                                         in
                                                         ( { model | blockEdit = Just nbe, edMarkdown = db }, None )
                                                     )
@@ -3439,7 +3441,9 @@ update msg model =
                                                     (\ls ->
                                                         let
                                                             nbe =
-                                                                updateBlockEdit (String.trim be.s ++ "\n\n" ++ String.trim (String.concat ls)) (Text { be | idx = be.idx })
+                                                                updateBlockEdit
+                                                                    (String.trim be.s ++ "\n\n" ++ String.trim (String.concat ls))
+                                                                    (Text { be | idx = be.idx })
                                                         in
                                                         ( { model | blockEdit = Just nbe, edMarkdown = db }, None )
                                                     )
