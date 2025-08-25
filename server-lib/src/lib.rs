@@ -831,8 +831,8 @@ pub async fn err_main(
   match ((matches.value_of("search_user"), matches.value_of("search"))) {
     (Some(username), Some(search)) => {
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-      match ((user_id(&conn, username), tag_search_parser(search))) {
-        (Ok(uid), Ok(tagsearch)) => {
+      match (user_id(&conn, username), tag_search_parser(search)) {
+        (Ok(uid), Ok((s, tagsearch))) => {
           let zns = ZkNoteSearch {
             tagsearch: vec![tagsearch],
             offset: 0,
@@ -843,6 +843,11 @@ pub async fn err_main(
             deleted: false, // include deleted notes
             ordering: None,
           };
+          let res = search::search_zknotes(&conn, &config.file_path, uid, &zns)?;
+
+          println!("{:?}", res);
+
+          return Ok(());
         }
         (_, Err(e)) => {
           println!("search parsing error: {:?}", e);
@@ -853,9 +858,6 @@ pub async fn err_main(
           return Ok(());
         }
       }
-      // we're gonna search!  probably.
-      println!("ready to search!");
-      return Ok(());
     }
     (Some(_username), None) => {
       println!("search_user and search parameters are both required");

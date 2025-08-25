@@ -7,46 +7,7 @@ use nom::{
   sequence::{delimited, preceded, separated_pair, tuple},
   IResult, Parser,
 };
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum SearchMod {
-  ExactMatch,
-  ZkNoteId,
-  Tag,
-  Note,
-  User,
-  File,
-  Before,
-  After,
-  Create,
-  Mod,
-  Server,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum AndOr {
-  And,
-  Or,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ST {
-  pub mods: Vec<SearchMod>,
-  pub term: String,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum TagSearch {
-  SearchTerm(ST),
-  Not {
-    ts: Box<TagSearch>,
-  },
-  Boolex {
-    ts1: Box<TagSearch>,
-    ao: AndOr,
-    ts2: Box<TagSearch>,
-  },
-}
+use zkprotocol::search::{AndOr, SearchMod, TagSearch};
 
 // --- Parsers ---
 
@@ -123,7 +84,7 @@ fn single_term(input: &str) -> IResult<&str, TagSearch> {
   alt((
     // mods + term
     map(tuple((search_mods, search_term)), |(mods, term)| {
-      TagSearch::SearchTerm(ST { mods, term })
+      TagSearch::SearchTerm { mods, term }
     }),
     // Not
     map(

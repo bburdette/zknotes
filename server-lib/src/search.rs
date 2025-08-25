@@ -95,6 +95,7 @@ pub fn power_delete_zknotes(
   }
 }
 
+#[derive(Debug, Clone)]
 pub enum SearchResult {
   SrId(ZkIdSearchResult),
   SrListNote(ZkListNoteSearchResult),
