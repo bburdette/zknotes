@@ -94,7 +94,7 @@ fn spaces(input: &str) -> IResult<&str, ()> {
 }
 
 // Forward-declare tag_search_parser so we can use it recursively
-fn tag_search_parser(input: &str) -> IResult<&str, TagSearch> {
+pub fn tag_search_parser(input: &str) -> IResult<&str, TagSearch> {
   // single_term then zero or more (op, term)
   let (input, init_term) = single_term(input)?;
   let (input, op_terms) = oplist_parser(input)?;
