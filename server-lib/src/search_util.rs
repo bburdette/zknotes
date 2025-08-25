@@ -1,10 +1,10 @@
 use nom::{
   branch::alt,
-  bytes::complete::{tag, take_while, take_while1},
-  character::complete::{char, multispace0, one_of},
-  combinator::{map, opt, recognize, value},
-  multi::{many0, many1},
-  sequence::{delimited, preceded, separated_pair, tuple},
+  bytes::complete::{tag, take_while1},
+  character::complete::{char, multispace0},
+  combinator::{map, value},
+  multi::many0,
+  sequence::{delimited, preceded},
   IResult, Parser,
 };
 use zkprotocol::search::{AndOr, SearchMod, TagSearch};
@@ -72,31 +72,22 @@ pub fn tag_search_parser(input: &str) -> IResult<&str, TagSearch> {
 
 // oplistParser : Parser (List ( AndOr, TagSearch ))
 fn oplist_parser(input: &str) -> IResult<&str, Vec<(AndOr, TagSearch)>> {
-  many0(tuple((
-    preceded(spaces, andor),
-    preceded(spaces, tag_search_parser),
-  )))
-  .parse(input)
+  many0((preceded(spaces, andor), preceded(spaces, tag_search_parser))).parse(input)
 }
 
 // singleTerm : Parser TagSearch
 fn single_term(input: &str) -> IResult<&str, TagSearch> {
   alt((
     // mods + term
-    map(tuple((search_mods, search_term)), |(mods, term)| {
+    map((search_mods, search_term), |(mods, term)| {
       TagSearch::SearchTerm { mods, term }
     }),
     // Not
-    map(
-      preceded(tuple((tag("!"), spaces)), tag_search_parser),
-      |term| TagSearch::Not { ts: Box::new(term) },
-    ),
+    map(preceded((tag("!"), spaces), tag_search_parser), |term| {
+      TagSearch::Not { ts: Box::new(term) }
+    }),
     // Parenthesized
-    delimited(
-      tuple((tag("("), spaces)),
-      tag_search_parser,
-      tuple((spaces, tag(")"))),
-    ),
+    delimited((tag("("), spaces), tag_search_parser, (spaces, tag(")"))),
   ))
   .parse(input)
 }

@@ -828,11 +828,11 @@ pub async fn err_main(
   }
 
   // searching?
-  match ((matches.value_of("search_user"), matches.value_of("search"))) {
+  match (matches.value_of("search_user"), matches.value_of("search")) {
     (Some(username), Some(search)) => {
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       match (user_id(&conn, username), tag_search_parser(search)) {
-        (Ok(uid), Ok((s, tagsearch))) => {
+        (Ok(uid), Ok((_s, tagsearch))) => {
           let zns = ZkNoteSearch {
             tagsearch: vec![tagsearch],
             offset: 0,
