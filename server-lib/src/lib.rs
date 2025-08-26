@@ -734,6 +734,14 @@ pub async fn err_main(
         .value_name("search expression")
         .takes_value(true),
     )
+    .arg(
+      Arg::with_name("search_result_format")
+        .short("f")
+        .long("search_format")
+        .value_name("search result format")
+        .help("RtId, RtListNote, RtNote, RtNoteAndLinks")
+        .takes_value(true),
+    )
     .get_matches();
 
   // writing a config file?
@@ -831,6 +839,15 @@ pub async fn err_main(
   match (matches.value_of("search_user"), matches.value_of("search")) {
     (Some(username), Some(search)) => {
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+
+      let result_type = match matches.value_of("search_result_format") {
+        Some(s) => {
+          let quoted = format!("\"{}\"", s);
+          serde_json::from_str::<zs::ResultType>(quoted.as_str())?
+        }
+        None => zs::ResultType::RtListNote,
+      };
+
       match (user_id(&conn, username), tag_search_parser(search)) {
         (Ok(uid), Ok((_s, tagsearch))) => {
           let zns = ZkNoteSearch {
@@ -838,14 +855,14 @@ pub async fn err_main(
             offset: 0,
             limit: None,
             what: "".to_string(),
-            resulttype: zs::ResultType::RtListNote,
+            resulttype: result_type,
             archives: zs::ArchivesOrCurrent::Current,
             deleted: false, // include deleted notes
             ordering: None,
           };
           let res = search::search_zknotes(&conn, &config.file_path, uid, &zns)?;
 
-          println!("{:?}", res);
+          println!("{}", serde_json::to_string_pretty(&res)?);
 
           return Ok(());
         }
