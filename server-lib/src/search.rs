@@ -8,6 +8,7 @@ use futures::Stream;
 use orgauth::data::UserId;
 use orgauth::dbfun::user_id;
 use rusqlite::Connection;
+use serde_derive::Serialize;
 use std::convert::TryInto;
 use std::path::Path;
 use std::path::PathBuf;
@@ -95,6 +96,7 @@ pub fn power_delete_zknotes(
   }
 }
 
+#[derive(Serialize, Debug, Clone)]
 pub enum SearchResult {
   SrId(ZkIdSearchResult),
   SrListNote(ZkListNoteSearchResult),
