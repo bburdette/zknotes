@@ -4,6 +4,7 @@ import Either
 import Element as E
 import Element.Border as EBd
 import Element.Input as EI
+import Html.Attributes as HA
 import Markdown.Block as MB exposing (..)
 import MdCommon as MC
 import Set
@@ -194,7 +195,13 @@ guiInline inline =
                 ]
 
         CodeSpan s ->
-            EI.multiline [ E.width E.fill ]
+            EI.multiline
+                [ E.width E.fill
+
+                -- these both seem to be effective in enforcing wrap.
+                , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
+                , E.htmlAttribute (HA.style "word-break" "break-word")
+                ]
                 { onChange = CodeSpanStr
                 , text = s
                 , placeholder = Nothing
@@ -203,7 +210,13 @@ guiInline inline =
                 }
 
         Text s ->
-            EI.multiline [ E.width E.fill ]
+            EI.multiline
+                [ E.height E.fill
+
+                -- these both seem to be effective in enforcing wrap.
+                , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
+                , E.htmlAttribute (HA.style "word-break" "break-word")
+                ]
                 { onChange = TextStr
                 , text = s
                 , placeholder = Nothing
