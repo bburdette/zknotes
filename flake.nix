@@ -11,11 +11,14 @@
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-
+    elm-language-server = {
+      url = "github:WhileTruu/elm-language-server";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
 
-  outputs = { self, nixpkgs, flake-utils, naersk, fenix }:
+  outputs = { self, nixpkgs, flake-utils, naersk, fenix, elm-language-server }:
     let
       makeElmPkg = { pkgs, additionalInputs ? [ ], pythonPackages ? (ps: [ ]) }:
         pkgs.stdenv.mkDerivation {
@@ -113,10 +116,11 @@
               elmPackages.elm-test
               elmPackages.elm-upgrade
               elmPackages.elm-xref
-              elmPackages.elm-language-server
+              # elmPackages.elm-language-server
               elmPackages.elm-verify-examples
               elmPackages.elmi-to-json
               elmPackages.elm-optimize-level-2
+              elm-language-server.defaultPackage.${system}
             ];
           };
         }
