@@ -1,7 +1,7 @@
 module EditZkNoteListing exposing (..)
 
 import Common
-import Data exposing (Ordering)
+import Data
 import DataUtil exposing (LoginData)
 import Dialog as D
 import Element as E exposing (Element)
@@ -91,11 +91,7 @@ view fontsize ld size model spmodel notes =
 
 
 listview : Int -> LoginData -> Util.Size -> Model -> SP.Model -> Data.ZkListNoteSearchResult -> Element Msg
-listview fontsize ld size model spmodel notes =
-    let
-        maxwidth =
-            700
-    in
+listview fontsize ld _ model spmodel notes =
     E.el
         [ E.width E.fill
         , EBk.color TC.lightGrey
@@ -160,21 +156,6 @@ listview fontsize ld size model spmodel notes =
                           -- E.px <| min maxwidth size.width - 32
                           , view =
                                 \n ->
-                                    let
-                                        lnnonme =
-                                            n.user /= ld.userid
-                                    in
-                                    -- E.row
-                                    --     ([ E.centerY
-                                    --      , E.clipX
-                                    --      , E.width E.fill
-                                    --      ]
-                                    --         ++ (ZC.systemColor DataUtil.sysids n.sysids
-                                    --                 |> Maybe.map (\c -> [ EF.color c ])
-                                    --                 |> Maybe.withDefault []
-                                    --            )
-                                    --     )
-                                    --     [
                                     E.row [ E.width E.fill, E.spacing 8 ]
                                         (let
                                             lcolor =
