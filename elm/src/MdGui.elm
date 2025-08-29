@@ -108,7 +108,7 @@ guiBlock block =
             E.none
 
         CodeBlock cb ->
-            E.column [ E.width E.fill ]
+            E.column coltrib
                 [ EI.text []
                     { onChange = CbLanguage
                     , text = cb.language |> Maybe.withDefault ""
@@ -116,9 +116,7 @@ guiBlock block =
                     , label = EI.labelLeft [] (E.text "language")
                     }
                 , EI.multiline
-                    [ E.width E.fill
-                    , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
-                    , E.htmlAttribute (HA.style "word-break" "break-word")
+                    [ E.height E.fill
                     ]
                     { onChange = CbBody
                     , text = cb.body
@@ -201,13 +199,7 @@ guiInline inline =
                 ]
 
         CodeSpan s ->
-            EI.multiline
-                [ E.width E.fill
-
-                -- these both seem to be effective in enforcing wrap.
-                , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
-                , E.htmlAttribute (HA.style "word-break" "break-word")
-                ]
+            EI.multiline [ E.height E.fill ]
                 { onChange = CodeSpanStr
                 , text = s
                 , placeholder = Nothing
@@ -216,13 +208,7 @@ guiInline inline =
                 }
 
         Text s ->
-            EI.multiline
-                [ E.height E.fill
-
-                -- these both seem to be effective in enforcing wrap.
-                , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
-                , E.htmlAttribute (HA.style "word-break" "break-word")
-                ]
+            EI.multiline [ E.height E.fill ]
                 { onChange = TextStr
                 , text = s
                 , placeholder = Nothing
@@ -731,7 +717,7 @@ guiHtmlElement : String -> List HtmlAttribute -> E.Element Msg
 guiHtmlElement tag attribs =
     case tag of
         "cell" ->
-            case ( findAttrib "name" attribs, findAttrib "script" attribs ) of
+            case ( findAttrib "name" attribs, findAttrib "schelmecode" attribs ) of
                 ( Just name, Just script ) ->
                     E.column coltrib
                         [ EI.text []
@@ -740,7 +726,7 @@ guiHtmlElement tag attribs =
                             , placeholder = Nothing
                             , label = EI.labelLeft [] (E.text "name")
                             }
-                        , EI.multiline []
+                        , EI.multiline [ E.height E.fill ]
                             { onChange = CellScript
                             , text = script
                             , placeholder = Nothing
