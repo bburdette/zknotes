@@ -4,7 +4,7 @@ import Cellme.Cellme exposing (CellContainer(..), RunState(..), evalCellsFully)
 import Cellme.DictCellme exposing (CellDict(..), getCd, mkCc)
 import Common
 import Data exposing (ZkNote, ZkNoteId)
-import DataUtil exposing (FileUrlInfo, zkNoteIdToString, zniEq)
+import DataUtil exposing (FileUrlInfo)
 import Dict
 import Element as E exposing (Element)
 import Element.Background as EBk
@@ -47,20 +47,8 @@ type Command
     | Switch ZkNoteId
 
 
-zkLinkName : Data.ZkLink -> ZkNoteId -> String
-zkLinkName zklink noteid =
-    if zniEq noteid zklink.from then
-        zklink.toname |> Maybe.withDefault (zkNoteIdToString zklink.to)
-
-    else if zniEq noteid zklink.to then
-        zklink.fromname |> Maybe.withDefault (zkNoteIdToString zklink.from)
-
-    else
-        "link error"
-
-
-showZkl : ZkNoteId -> Data.EditLink -> Element Msg
-showZkl id zkl =
+showZkl : Data.EditLink -> Element Msg
+showZkl zkl =
     E.row [ E.spacing 8, E.width E.fill ]
         [ case zkl.direction of
             Data.To ->
@@ -223,19 +211,14 @@ view zone maxw noteCache model loggedin =
                     _ ->
                         E.none
                 , E.column [ E.centerX, E.width (E.minimum 150 E.shrink), E.spacing 8 ]
-                    (model.id
-                        |> Maybe.map
-                            (\id ->
-                                if List.isEmpty model.zklinks then
-                                    []
+                    (if List.isEmpty model.zklinks then
+                        []
 
-                                else
-                                    E.row [ Font.bold ] [ E.text "links" ]
-                                        :: List.map
-                                            (showZkl id)
-                                            model.zklinks
-                            )
-                        |> Maybe.withDefault []
+                     else
+                        E.row [ Font.bold ] [ E.text "links" ]
+                            :: List.map
+                                showZkl
+                                model.zklinks
                     )
                 ]
             ]
@@ -253,7 +236,7 @@ initFull fui zknaa =
                 |> MC.mdCells
                 |> Result.withDefault (CellDict Dict.empty)
 
-        ( cc, result ) =
+        ( cc, _ ) =
             evalCellsFully
                 (mkCc cells)
     in
@@ -280,12 +263,7 @@ initSzn fui zknote mbcreatedate mbchangeddate links mbpanelid =
                 |> MC.mdCells
                 |> Result.withDefault (CellDict Dict.empty)
 
-        panels =
-            zknote.content
-                |> MC.mdPanels
-                |> Result.withDefault []
-
-        ( cc, result ) =
+        ( cc, _ ) =
             evalCellsFully
                 (mkCc cells)
     in
@@ -321,7 +299,7 @@ update msg model =
                 (CellDict cd) =
                     model.cells
 
-                ( cc, result ) =
+                ( cc, _ ) =
                     evalCellsFully
                         (mkCc
                             (Dict.insert name (MC.defCell string) cd

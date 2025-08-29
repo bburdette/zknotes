@@ -30,7 +30,7 @@ import Parser
         , token
         )
 import Time
-import UUID exposing (UUID)
+import UUID
 import Util exposing (rest)
 
 
@@ -245,7 +245,7 @@ termSemanticCheck tz st =
                         Ok Nothing ->
                             Err <| InvalidDateFormat st.term
 
-                        Err e ->
+                        Err _ ->
                             case Util.parseDate tz st.term of
                                 Ok (Just t) ->
                                     Ok { mods = st.mods, term = String.fromInt (Time.posixToMillis t) }

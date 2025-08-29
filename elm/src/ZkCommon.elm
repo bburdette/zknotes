@@ -78,38 +78,47 @@ systemColor ld ids =
 ---------------------------------------------------
 
 
+saveColor : E.Color
 saveColor =
     TC.darkYellow
 
 
+myLinkColor : E.Color
 myLinkColor =
     TC.black
 
 
+disabledLinkColor : E.Color
 disabledLinkColor =
     TC.darkGrey
 
 
+otherLinkColor : E.Color
 otherLinkColor =
     TC.darkBlue
 
 
+myLinkStyle : List (E.Attr () a)
 myLinkStyle =
     [ EF.color TC.black, EF.underline ]
 
 
+disabledLinkStyle : List (E.Attr () a)
 disabledLinkStyle =
     [ EF.color TC.darkGrey, EF.underline ]
 
 
+otherLinkStyle : List (E.Attr () a)
 otherLinkStyle =
     [ EF.color TC.darkBlue, EF.underline ]
 
 
+saveLinkStyle : List (E.Attr () a)
 saveLinkStyle =
     [ EF.color saveColor, EF.underline ]
 
 
+fullScreen : E.Element a
 fullScreen =
     E.column []
         [ E.row
@@ -126,6 +135,7 @@ fullScreen =
         ]
 
 
+golink : Int -> ZkNoteId -> E.Color -> E.Element a
 golink size zknid color =
     E.link
         [ EF.color color ]

@@ -45,10 +45,12 @@ type Msg
     | TextStr String
 
 
+rowtrib : List (E.Attribute a)
 rowtrib =
     [ E.spacing 3, E.width E.fill ]
 
 
+coltrib : List (E.Attribute a)
 coltrib =
     [ E.spacing 3, E.width E.fill ]
 
@@ -59,19 +61,19 @@ guiBlock block =
         HtmlBlock htmlBlock ->
             guiHtml htmlBlock
 
-        UnorderedList listSpacing listItems ->
+        UnorderedList _ listItems ->
             E.row rowtrib
                 [ E.el [ E.alignTop ] <| E.text "unordered list"
                 , E.column coltrib <|
                     List.indexedMap
-                        (\i (ListItem t li) ->
+                        (\i (ListItem _ li) ->
                             E.map (ListItemMsg i)
                                 (E.column coltrib <| List.indexedMap (\ii item -> E.map (ListItemMsg ii) (guiBlock item)) li)
                         )
                         listItems
                 ]
 
-        OrderedList listSpacing startIndex blockLists ->
+        OrderedList _ _ blockLists ->
             E.row rowtrib
                 [ E.el [ E.alignTop ] <| E.text "ordered list"
                 , E.column coltrib <|
@@ -90,7 +92,7 @@ guiBlock block =
                     List.indexedMap (\i b -> E.map (ListItemMsg i) (guiBlock b)) blocks
                 ]
 
-        Heading headingLevel inlines ->
+        Heading _ inlines ->
             E.row rowtrib
                 [ E.el [ E.alignTop ] <| E.text "heading"
                 , E.column coltrib <| List.indexedMap (\i inline -> E.map (ListItemMsg i) (guiInline inline)) inlines
@@ -102,7 +104,7 @@ guiBlock block =
                 , E.column coltrib <| List.indexedMap (\i inline -> E.map (ListItemMsg i) (guiInline inline)) inlines
                 ]
 
-        Table headings inlines ->
+        Table _ _ ->
             E.none
 
         CodeBlock cb ->
@@ -113,7 +115,11 @@ guiBlock block =
                     , placeholder = Nothing
                     , label = EI.labelLeft [] (E.text "language")
                     }
-                , EI.multiline [ E.width E.fill ]
+                , EI.multiline
+                    [ E.width E.fill
+                    , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
+                    , E.htmlAttribute (HA.style "word-break" "break-word")
+                    ]
                     { onChange = CbBody
                     , text = cb.body
                     , placeholder = Nothing
@@ -132,7 +138,7 @@ guiInline inline =
         HtmlInline block ->
             guiHtml block
 
-        Link url mbtitle inlines ->
+        Link url _ inlines ->
             E.row rowtrib
                 [ E.el [ E.alignTop ] <| E.text "link"
                 , E.column coltrib <|
@@ -154,7 +160,7 @@ guiInline inline =
                     ]
                 ]
 
-        Image src mbtitle inlines ->
+        Image src _ inlines ->
             E.row rowtrib
                 [ E.el [ E.alignTop ] <| E.text "image"
                 , E.column coltrib <|
@@ -235,8 +241,8 @@ updateListItem idx msg listitems =
             case msg of
                 ListItemMsg bi bmsg ->
                     List.take idx listitems
-                        ++ [ ListItem task <| updateListBlock bi bmsg blocks ]
-                        ++ List.drop (idx + 1) listitems
+                        ++ (ListItem task <| updateListBlock bi bmsg blocks)
+                        :: List.drop (idx + 1) listitems
 
                 _ ->
                     listitems
@@ -262,8 +268,8 @@ updateListListBlock idx msg blocklists =
     case ( List.head (List.drop idx blocklists), msg ) of
         ( Just blocklist, ListItemMsg i lim ) ->
             List.take idx blocklists
-                ++ [ updateListBlock i lim blocklist ]
-                ++ List.drop (idx + 1) blocklists
+                ++ updateListBlock i lim blocklist
+                :: List.drop (idx + 1) blocklists
 
         _ ->
             blocklists
@@ -429,7 +435,7 @@ updateBlock msg block =
                 _ ->
                     [ block ]
 
-        Table headings inlines ->
+        Table _ _ ->
             [ block ]
 
         CodeBlock cb ->

@@ -116,7 +116,7 @@ purgeNotes nc =
             br =
                 nc.byReceipt |> Dict.toList |> List.map (Tuple.second >> TSet.toList) |> List.concat
 
-            ( rcount, nnnc ) =
+            ( _, nnnc ) =
                 Util.foldUntil
                     (\id ( rmv, nnc ) ->
                         if rmv <= 0 then

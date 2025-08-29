@@ -161,7 +161,7 @@ addSearch ls rs =
         NoSearch ->
             rs
 
-        TagSearch (Err e) ->
+        TagSearch (Err _) ->
             rs
 
         TagSearch (Ok sl) ->
@@ -169,7 +169,7 @@ addSearch ls rs =
                 NoSearch ->
                     ls
 
-                TagSearch (Err e) ->
+                TagSearch (Err _) ->
                     ls
 
                 TagSearch (Ok sr) ->
@@ -311,7 +311,7 @@ viewSearchHelper : Maybe TSLoc -> Int -> List (TSLoc -> TSLoc) -> TagSearch -> L
 viewSearchHelper mbfocusloc indent lts ts =
     let
         indentelt =
-            \idt -> E.row [ E.width (E.px (8 * indent)) ] []
+            E.row [ E.width (E.px (8 * indent)) ] []
 
         toLoc : List (TSLoc -> TSLoc) -> TSLoc -> TSLoc
         toLoc tll tsl =
@@ -362,7 +362,7 @@ viewSearchHelper mbfocusloc indent lts ts =
                             }
             in
             [ E.row [ E.width E.fill, E.spacing 8 ]
-                [ indentelt indent
+                [ indentelt
                 , if hasfocus tloc then
                     E.column
                         [ E.width E.fill
@@ -425,13 +425,13 @@ viewSearchHelper mbfocusloc indent lts ts =
                         , E.width E.fill
                         , E.spacing 8
                         ]
-                        ([ E.el
+                        ((E.el
                             [ color tloc
                             ]
-                           <|
+                          <|
                             E.text term
-                         ]
-                            ++ List.map modindicator mods
+                         )
+                            :: List.map modindicator mods
                         )
                 ]
             ]
@@ -441,8 +441,8 @@ viewSearchHelper mbfocusloc indent lts ts =
                 tloc =
                     toLoc lts LThis
             in
-            [ E.row [ E.width E.fill, E.spacing 8 ]
-                [ indentelt indent
+            E.row [ E.width E.fill, E.spacing 8 ]
+                [ indentelt
                 , if hasfocus tloc then
                     E.row [ EBk.color TC.lightGrey, E.paddingXY 0 8, E.spacing 8, E.width E.fill ]
                         [ E.el
@@ -473,8 +473,7 @@ viewSearchHelper mbfocusloc indent lts ts =
                         [ E.text "not"
                         ]
                 ]
-            ]
-                ++ viewSearchHelper mbfocusloc (indent + 1) (LNot :: lts) nts.ts
+                :: viewSearchHelper mbfocusloc (indent + 1) (LNot :: lts) nts.ts
 
         Boolex { ts1, ao, ts2 } ->
             let
@@ -482,74 +481,73 @@ viewSearchHelper mbfocusloc indent lts ts =
                     toLoc lts LThis
             in
             viewSearchHelper mbfocusloc (indent + 1) (LBT1 :: lts) ts1
-                ++ [ E.row [ E.width E.fill, E.spacing 8 ]
-                        [ indentelt indent
-                        , if hasfocus tloc then
-                            E.row [ EBk.color TC.lightGrey, E.paddingXY 0 8, E.spacing 8, E.width E.fill ]
-                                [ E.el
-                                    [ onClick <| ToggleTermFocus tloc
-                                    , color tloc
-                                    ]
-                                  <|
-                                    E.text
-                                        (case ao of
-                                            And ->
-                                                "and"
-
-                                            Or ->
-                                                "or"
-                                        )
-                                , EI.button
-                                    buttonStyle
-                                    { onPress = Just (ToggleAndOr tloc)
-                                    , label =
-                                        text
-                                            (case ao of
-                                                And ->
-                                                    "or"
-
-                                                Or ->
-                                                    "and"
-                                            )
-                                    }
-                                , EI.button
-                                    buttonStyle
-                                    { onPress = Just (NotTerm tloc)
-                                    , label =
-                                        text "!"
-                                    }
-                                , EI.button
-                                    buttonStyle
-                                    { onPress = Just (AddEmptyTerm tloc)
-                                    , label =
-                                        text "+"
-                                    }
-                                , EI.button
-                                    buttonStyle
-                                    { onPress = Just (DeleteTerm tloc)
-                                    , label = text "x"
-                                    }
-                                , E.row [ E.width E.fill, onClick <| ToggleTermFocus tloc ] [ E.text "" ]
-                                ]
-
-                          else
-                            E.row
+                ++ E.row [ E.width E.fill, E.spacing 8 ]
+                    [ indentelt
+                    , if hasfocus tloc then
+                        E.row [ EBk.color TC.lightGrey, E.paddingXY 0 8, E.spacing 8, E.width E.fill ]
+                            [ E.el
                                 [ onClick <| ToggleTermFocus tloc
-                                , E.width E.fill
+                                , color tloc
                                 ]
-                                [ E.el [ color tloc ] <|
-                                    E.text
+                              <|
+                                E.text
+                                    (case ao of
+                                        And ->
+                                            "and"
+
+                                        Or ->
+                                            "or"
+                                    )
+                            , EI.button
+                                buttonStyle
+                                { onPress = Just (ToggleAndOr tloc)
+                                , label =
+                                    text
                                         (case ao of
                                             And ->
-                                                "and"
+                                                "or"
 
                                             Or ->
-                                                "or"
+                                                "and"
                                         )
-                                ]
-                        ]
-                   ]
-                ++ viewSearchHelper mbfocusloc (indent + 1) (LBT2 :: lts) ts2
+                                }
+                            , EI.button
+                                buttonStyle
+                                { onPress = Just (NotTerm tloc)
+                                , label =
+                                    text "!"
+                                }
+                            , EI.button
+                                buttonStyle
+                                { onPress = Just (AddEmptyTerm tloc)
+                                , label =
+                                    text "+"
+                                }
+                            , EI.button
+                                buttonStyle
+                                { onPress = Just (DeleteTerm tloc)
+                                , label = text "x"
+                                }
+                            , E.row [ E.width E.fill, onClick <| ToggleTermFocus tloc ] [ E.text "" ]
+                            ]
+
+                      else
+                        E.row
+                            [ onClick <| ToggleTermFocus tloc
+                            , E.width E.fill
+                            ]
+                            [ E.el [ color tloc ] <|
+                                E.text
+                                    (case ao of
+                                        And ->
+                                            "and"
+
+                                        Or ->
+                                            "or"
+                                    )
+                            ]
+                    ]
+                :: viewSearchHelper mbfocusloc (indent + 1) (LBT2 :: lts) ts2
 
 
 view : Bool -> Bool -> Int -> Model -> Element Msg
@@ -668,9 +666,6 @@ view showCopy narrow nblevel model =
                         , r |> Maybe.map (\t -> E.el [ E.alignRight ] t) |> Maybe.withDefault E.none
                         ]
 
-        ddbutton =
-            none
-
         {- save and restore search stuff, disabled for now:
 
            was ddbutton:
@@ -744,73 +739,72 @@ view showCopy narrow nblevel model =
             , spacing 8
             ]
         )
-        (( "addbutton"
-         , row [ width fill ]
-            [ EI.button (height (px 19) :: E.centerX :: buttonStyle)
-                { label =
-                    E.el [ EF.family [ EF.monospace ] ] <|
-                        E.text "^"
-                , onPress = Just AddToStackClicked
-                }
-            ]
-         )
-            :: ( "viewsearch"
-               , case model.search of
-                    TagSearch (Ok ts) ->
-                        viewSearch model.searchTermFocus ts
+        [ ( "addbutton"
+          , row [ width fill ]
+                [ EI.button (height (px 19) :: E.centerX :: buttonStyle)
+                    { label =
+                        E.el [ EF.family [ EF.monospace ] ] <|
+                            E.text "^"
+                    , onPress = Just AddToStackClicked
+                    }
+                ]
+          )
+        , ( "viewsearch"
+          , case model.search of
+                TagSearch (Ok ts) ->
+                    viewSearch model.searchTermFocus ts
 
-                    _ ->
-                        E.none
-               )
-            :: ( "tinput"
-               , row [ width fill, spacing 3 ]
-                    [ tinput
-                    ]
-               )
-            :: ( "orderingRow", orderingRow )
-            :: ( "tbuttons", row [ spacing 3, width fill ] buttons )
-            :: ( "searchhelp"
-               , if model.showParse then
-                    case model.search of
-                        TagSearch rts ->
-                            case rts of
-                                Err e ->
-                                    column [ width fill ]
-                                        [ row [ spacing 3, width fill ]
-                                            [ text "Syntax error:"
-                                            , paragraph [] [ text (Util.deadEndsToString e) ]
-                                            , el [ alignRight ] <| toggleHelpButton model.showHelp
-                                            ]
-                                        , if model.showHelp then
-                                            E.map HelpMsg <| SearchHelpPanel.view nblevel model.helpPanel
-
-                                          else
-                                            E.none
-                                        ]
-
-                                Ok ts ->
-                                    column [ width fill ]
-                                        [ paragraph [ spacing 3, width fill ]
-                                            [ text "search expression:"
-                                            , paragraph [] [ text <| printTagSearch ts ]
-                                            , el [ alignRight ] <| toggleHelpButton model.showHelp
-                                            ]
-                                        , if model.showHelp then
-                                            E.map HelpMsg <| SearchHelpPanel.view nblevel model.helpPanel
-
-                                          else
-                                            E.none
-                                        ]
-
-                        NoSearch ->
-                            E.map HelpMsg <|
-                                SearchHelpPanel.view nblevel model.helpPanel
-
-                 else
+                _ ->
                     E.none
-               )
-            :: []
-        )
+          )
+        , ( "tinput"
+          , row [ width fill, spacing 3 ]
+                [ tinput
+                ]
+          )
+        , ( "orderingRow", orderingRow )
+        , ( "tbuttons", row [ spacing 3, width fill ] buttons )
+        , ( "searchhelp"
+          , if model.showParse then
+                case model.search of
+                    TagSearch rts ->
+                        case rts of
+                            Err e ->
+                                column [ width fill ]
+                                    [ row [ spacing 3, width fill ]
+                                        [ text "Syntax error:"
+                                        , paragraph [] [ text (Util.deadEndsToString e) ]
+                                        , el [ alignRight ] <| toggleHelpButton model.showHelp
+                                        ]
+                                    , if model.showHelp then
+                                        E.map HelpMsg <| SearchHelpPanel.view nblevel model.helpPanel
+
+                                      else
+                                        E.none
+                                    ]
+
+                            Ok ts ->
+                                column [ width fill ]
+                                    [ paragraph [ spacing 3, width fill ]
+                                        [ text "search expression:"
+                                        , paragraph [] [ text <| printTagSearch ts ]
+                                        , el [ alignRight ] <| toggleHelpButton model.showHelp
+                                        ]
+                                    , if model.showHelp then
+                                        E.map HelpMsg <| SearchHelpPanel.view nblevel model.helpPanel
+
+                                      else
+                                        E.none
+                                    ]
+
+                    NoSearch ->
+                        E.map HelpMsg <|
+                            SearchHelpPanel.view nblevel model.helpPanel
+
+            else
+                E.none
+          )
+        ]
 
 
 toggleHelpButton : Bool -> Element Msg
@@ -818,12 +812,11 @@ toggleHelpButton showHelp =
     EI.button buttonStyle
         { onPress = Just ToggleHelp
         , label =
-            case showHelp of
-                True ->
-                    text "hide search help"
+            if showHelp then
+                text "hide search help"
 
-                False ->
-                    text "show search help"
+            else
+                text "show search help"
         }
 
 
