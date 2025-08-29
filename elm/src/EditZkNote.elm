@@ -77,7 +77,6 @@ import NoteCache as NC exposing (NoteCache)
 import Orgauth.Data exposing (UserId(..))
 import RequestsDialog exposing (TRequests)
 import SearchStackPanel as SP
-import SpecialNotes exposing (specialNoteEncoder)
 import SpecialNotesGui as SNG
 import TagSearchPanel exposing (Search(..))
 import TangoColors as TC
@@ -1346,16 +1345,15 @@ renderBlocks zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo blocks =
                             MC.EditView ->
                                 let
                                     mbeb =
-                                        case mbblockedit of
-                                            Just (Text t) ->
-                                                if t.idx == i then
-                                                    Just <| blockEd (Text t) renderer
+                                        mbblockedit
+                                            |> Maybe.andThen
+                                                (\(Text t) ->
+                                                    if t.idx == i then
+                                                        Just <| blockEd (Text t) renderer
 
-                                                else
-                                                    Nothing
-
-                                            Nothing ->
-                                                Nothing
+                                                    else
+                                                        Nothing
+                                                )
                                 in
                                 editBlock
                                     (case mbblockedit of
@@ -1799,17 +1797,6 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
         mbdi =
             blockDndSystem.info model.blockDnd
 
-        snview =
-            E.column
-                [ E.width E.fill
-                , E.centerX
-                , E.alignTop
-                , E.spacing 8
-                , E.paddingXY 5 0
-                ]
-            <|
-                []
-
         mdview =
             E.column
                 [ E.width E.fill
@@ -2025,7 +2012,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                 editmeta
                     :: (case EM.getSpecialNote model.edMarkdown of
                             Ok sn ->
-                                [ E.row
+                                E.row
                                     [ E.padding 10
                                     , EBd.rounded 10
                                     , E.width E.fill
@@ -2033,10 +2020,8 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                                     , E.height E.fill
                                     ]
                                     [ E.el [ EBd.color TC.black, EBd.width 1, E.width E.fill, E.centerX, E.padding 3 ] (SNG.guiSn zone sn |> E.map SNGMsg) ]
-                                ]
-                                    ++ showComments
-                                    ++ [ divider ]
-                                    ++ showLinks TC.white
+                                    :: showComments
+                                    ++ (divider :: showLinks TC.white)
 
                             Err _ ->
                                 (if wclass == Wide then
@@ -2083,8 +2068,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                                     ]
                                 )
                                     ++ showComments
-                                    ++ [ divider ]
-                                    ++ showLinks TC.white
+                                    ++ (divider :: showLinks TC.white)
                        )
     in
     E.column
