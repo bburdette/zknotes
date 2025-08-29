@@ -649,6 +649,7 @@ type PrivateRequest
     | PvqSyncRemote
     | PvqSyncFiles (ZkNoteSearch)
     | PvqGetJobStatus (Int)
+    | PvqNotifyOnChange (List (ZkNoteId))
 
 
 privateRequestEncoder : PrivateRequest -> Json.Encode.Value
@@ -692,6 +693,8 @@ privateRequestEncoder enum =
             Json.Encode.object [ ( "PvqSyncFiles", zkNoteSearchEncoder inner ) ]
         PvqGetJobStatus inner ->
             Json.Encode.object [ ( "PvqGetJobStatus", Json.Encode.int inner ) ]
+        PvqNotifyOnChange inner ->
+            Json.Encode.object [ ( "PvqNotifyOnChange", Json.Encode.list (zkNoteIdEncoder) inner ) ]
 
 type PrivateReply
     = PvyServerError (PrivateError)
@@ -718,6 +721,7 @@ type PrivateReply
     | PvyJobNotFound (Int)
     | PvyFileSyncComplete
     | PvySyncComplete
+    | PvyNoteChanged (ZkNoteId)
 
 
 privateReplyEncoder : PrivateReply -> Json.Encode.Value
@@ -771,6 +775,8 @@ privateReplyEncoder enum =
             Json.Encode.string "PvyFileSyncComplete"
         PvySyncComplete ->
             Json.Encode.string "PvySyncComplete"
+        PvyNoteChanged inner ->
+            Json.Encode.object [ ( "PvyNoteChanged", zkNoteIdEncoder inner ) ]
 
 type PrivateError
     = PveString (String)
@@ -1576,6 +1582,7 @@ privateRequestDecoder =
                 )
         , Json.Decode.map PvqSyncFiles (Json.Decode.field "PvqSyncFiles" (zkNoteSearchDecoder))
         , Json.Decode.map PvqGetJobStatus (Json.Decode.field "PvqGetJobStatus" (Json.Decode.int))
+        , Json.Decode.map PvqNotifyOnChange (Json.Decode.field "PvqNotifyOnChange" (Json.Decode.list (zkNoteIdDecoder)))
         ]
 
 privateReplyDecoder : Json.Decode.Decoder PrivateReply
@@ -1645,6 +1652,7 @@ privateReplyDecoder =
                         unexpected ->
                             Json.Decode.fail <| "Unexpected variant " ++ unexpected
                 )
+        , Json.Decode.map PvyNoteChanged (Json.Decode.field "PvyNoteChanged" (zkNoteIdDecoder))
         ]
 
 privateErrorDecoder : Json.Decode.Decoder PrivateError

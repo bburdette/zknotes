@@ -46,6 +46,7 @@ pub enum PrivateRequest {
   PvqSyncRemote,
   PvqSyncFiles(ZkNoteSearch),
   PvqGetJobStatus(i64),
+  PvqNotifyOnChange(Vec<ZkNoteId>),
 }
 
 #[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug)]
@@ -74,6 +75,7 @@ pub enum PrivateReply {
   PvyJobNotFound(i64),
   PvyFileSyncComplete,
   PvySyncComplete,
+  PvyNoteChanged(ZkNoteId),
 }
 
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]

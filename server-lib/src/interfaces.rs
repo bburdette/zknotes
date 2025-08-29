@@ -451,6 +451,7 @@ pub async fn zk_interface_loggedin(
         None => Ok(PrivateReply::PvyJobNotFound(jobno.clone())),
       }
     }
+    PrivateRequest::PvqNotifyOnChange(zknoteids) => Ok(PrivateReply::PvyNoteChanged(zknoteids[0])),
   }
 }
 
