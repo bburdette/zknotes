@@ -7,6 +7,7 @@ members = [
     "server-lib",
     "zkprotocol/elm-gen",
     "orgauth/rustlib",
-    "orgauth/elm-gen"]
+    "orgauth/elm-gen",
+    "cli"]
 
 resolver="2"
