@@ -1,9 +1,36 @@
 use clap::{self, Arg};
 use serde_json;
+use std::fmt;
 use zkprotocol::search as zs;
 use zkprotocol::search_util::tag_search_parser;
 
-fn main() -> Result<(), std::io::Error> {
+pub enum Error {
+  String(String),
+}
+
+impl std::error::Error for Error {
+  fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+    None
+  }
+}
+
+impl fmt::Display for Error {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match &self {
+      Error::String(e) => write!(f, "{}", e),
+    }
+  }
+}
+
+impl fmt::Debug for Error {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match &self {
+      Error::String(e) => write!(f, "{}", e),
+    }
+  }
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
   let matches = clap::Command::new("zknotes cli")
     .version("1.0")
     .author("Ben Burdette")
@@ -59,7 +86,12 @@ fn main() -> Result<(), std::io::Error> {
         None => zs::ResultType::RtListNote,
       };
 
-      println!("search parse: {:?}", tag_search_parser(search));
+      let tag_search = match tag_search_parser(search) {
+        Ok(ts) => ts,
+        Err(e) => return Err(Box::new(Error::String(e.to_string()))),
+      };
+
+      println!("search parse: {:?}", tag_search);
 
       // match (user_id(&conn, username), tag_search_parser(search)) {
       //   (Ok(uid), Ok((_s, tagsearch))) => {
