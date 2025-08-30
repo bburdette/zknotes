@@ -1,4 +1,5 @@
 use clap::{self, Arg};
+use reqwest::blocking as rb;
 use serde_json;
 use std::fmt;
 use zkprotocol::search as zs;
@@ -40,7 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .short('c')
         .long("command")
         .value_name("command to execute")
-        .help("search, savenote"),
+        .help("search, savenote, login"),
     )
     .arg(
       Arg::new("server_url")
@@ -57,6 +58,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .help("name of user to search with"),
     )
     .arg(
+      Arg::new("password")
+        .short('p')
+        .long("password")
+        .value_name("password")
+        .help("password"),
+    )
+    .arg(
       Arg::new("search")
         .short('s')
         .long("search")
@@ -70,6 +78,44 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .help("RtId, RtListNote, RtNote, RtNoteAndLinks"),
     )
     .get_matches();
+
+  let url = matches
+    .get_one::<String>("server_url")
+    .ok_or(Error::String("'server_url' is required!".to_string()))?;
+
+  match matches
+    .get_one::<String>("command")
+    .ok_or(Error::String("'command' is required!".to_string()))?
+    .as_str()
+  {
+    "login" => {
+      let client = reqwest::blocking::Client::builder().build()?;
+
+      let username = matches
+        .get_one::<String>("user")
+        .ok_or(Error::String("'user' is required!".to_string()))?;
+      let password = matches
+        .get_one::<String>("password")
+        .ok_or(Error::String("'password' is required!".to_string()))?;
+      let rq = client
+        .post(url)
+        .body(serde_json::to_string(&orgauth::data::Login {
+          uid: username.clone(),
+          pwd: password.clone(),
+        })?);
+
+      println!("result: {:?}", rq.send());
+
+      // client.(f)
+      // zkprotocol::content::
+    }
+    "search" => {
+      println!("searcH");
+    }
+    &_ => {
+      println!("unsupported command");
+    }
+  }
 
   match (
     matches.get_one::<String>("user"),
@@ -90,6 +136,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(ts) => ts,
         Err(e) => return Err(Box::new(Error::String(e.to_string()))),
       };
+
+      // reqwest::Request::
 
       println!("search parse: {:?}", tag_search);
 
