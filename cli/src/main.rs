@@ -1,5 +1,4 @@
 use clap::{self, Arg};
-use reqwest::blocking as rb;
 use serde_json;
 use std::fmt;
 use std::io::Read;
@@ -136,19 +135,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       };
 
       return Ok(());
-
-      // client.(f)
-      // zkprotocol::content::
     }
     "search" => {
       match (
         matches.get_one::<String>("cookie"),
-        matches.get_one::<String>("user"),
         matches.get_one::<String>("search"),
       ) {
-        (Some(cookie), Some(username), Some(search)) => {
-          // let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-
+        (Some(cookie), Some(search)) => {
           let result_type = match matches.get_one::<String>("search_result_format") {
             Some(s) => {
               let quoted = format!("\"{}\"", s);
@@ -161,10 +154,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Ok(ts) => ts,
             Err(e) => return Err(Box::new(Error::String(e.to_string()))),
           };
-
-          println!("search parse: {:?}", tag_search);
-          println!("result_type: {:?}", result_type);
-          // println!("username: {:?}", username);
 
           let zns = ZkNoteSearch {
             tagsearch: vec![tag_search],
@@ -188,40 +177,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
           let mut res = rq.send()?;
 
-          println!("{:?}", res);
-
           let mut buf = String::new();
           res.read_to_string(&mut buf)?;
 
           println!("{}", buf);
 
-          // match (user_id(&conn, username), tag_search_parser(search)) {
-          //   (Ok(uid), Ok((_s, tagsearch))) => {
-          //     let zns = ZkNoteSearch {
-          //       tagsearch: vec![tagsearch],
-          //       offset: 0,
-          //       limit: None,
-          //       what: "".to_string(),
-          //       resulttype: result_type,
-          //       archives: zs::ArchivesOrCurrent::Current,
-          //       deleted: false, // include deleted notes
-          //       ordering: None,
-          //     };
-          //     let res = search::search_zknotes(&conn, &config.file_path, uid, &zns)?;
-
-          //     println!("{}", serde_json::to_string_pretty(&res)?);
-
-          //     return Ok(());
-          //   }
-          //   (_, Err(e)) => {
-          //     println!("search parsing error: {:?}", e);
-          //     return Ok(());
-          //   }
-          //   (Err(e), _) => {
-          //     println!("error retrieving user id: {:?}", e);
-          //     return Ok(());
-          //   }
-          // }
           ()
         }
         _ => {
@@ -234,6 +194,5 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
   }
 
-  println!("Hello, world!");
   Ok(())
 }
