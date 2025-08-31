@@ -1,7 +1,8 @@
 use clap::{self, Arg};
 use serde_json;
-use std::fmt;
 use std::io::Read;
+use std::{fmt, io};
+use zkprotocol::content::SaveZkNote;
 use zkprotocol::search::{self as zs, ZkNoteSearch};
 use zkprotocol::search_util::tag_search_parser;
 
@@ -173,6 +174,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .header(reqwest::header::COOKIE, cookie)
             .body(serde_json::to_string(
               &zkprotocol::private::PrivateRequest::PvqSearchZkNotes(zns),
+            )?);
+
+          let mut res = rq.send()?;
+
+          let mut buf = String::new();
+          res.read_to_string(&mut buf)?;
+
+          println!("{}", buf);
+
+          ()
+        }
+        _ => {
+          println!("cookie, user and search parameters are required");
+        }
+      };
+    }
+    "update" => {
+      match matches.get_one::<String>("cookie") {
+        Some(cookie) => {
+          let stdin = io::stdin();
+
+          // turns out this can read a serialized zknote!
+          let sn: SaveZkNote = serde_json::from_reader(stdin)?;
+
+          let client = reqwest::blocking::Client::builder().build()?;
+          let rq = client
+            .post(url)
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .header(reqwest::header::COOKIE, cookie)
+            .body(serde_json::to_string(
+              &zkprotocol::private::PrivateRequest::PvqSaveZkNote(sn),
             )?);
 
           let mut res = rq.send()?;
