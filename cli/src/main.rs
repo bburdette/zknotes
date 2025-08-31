@@ -190,7 +190,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
       };
     }
-    "update" => {
+    "savenote" => {
       match matches.get_one::<String>("cookie") {
         Some(cookie) => {
           let stdin = io::stdin();
