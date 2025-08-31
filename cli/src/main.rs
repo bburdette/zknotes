@@ -2,7 +2,8 @@ use clap::{self, Arg};
 use reqwest::blocking as rb;
 use serde_json;
 use std::fmt;
-use zkprotocol::search as zs;
+use std::io::Read;
+use zkprotocol::search::{self as zs, ZkNoteSearch};
 use zkprotocol::search_util::tag_search_parser;
 
 pub enum Error {
@@ -65,6 +66,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .help("password"),
     )
     .arg(
+      Arg::new("cookie")
+        .short('k')
+        .long("cookie")
+        .value_name("cookie"),
+    )
+    .arg(
       Arg::new("search")
         .short('s')
         .long("search")
@@ -97,87 +104,135 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       let password = matches
         .get_one::<String>("password")
         .ok_or(Error::String("'password' is required!".to_string()))?;
+
       let rq = client
         .post(url)
-        .body(serde_json::to_string(&orgauth::data::Login {
-          uid: username.clone(),
-          pwd: password.clone(),
-        })?);
+        .header(reqwest::header::CONTENT_TYPE, "application/json")
+        .body(serde_json::to_string(
+          &orgauth::data::UserRequest::UrqLogin(orgauth::data::Login {
+            uid: username.clone(),
+            pwd: password.clone(),
+          }),
+        )?);
 
-      println!("result: {:?}", rq.send());
+      let res = rq.send();
+
+      match res {
+        Ok(r) => {
+          if r.status().is_success() {
+            if let Some(cookie) = r.headers().get("set-cookie") {
+              // let x: &reqwest::header::HeaderValue = cookie;
+              println!("cookie: {}", cookie.to_str()?);
+            } else {
+              println!("cookie not found!");
+            }
+          } else {
+            println!("bad response: {:?}", r);
+          }
+        }
+        Err(e) => {
+          println!("result: {:?}", e);
+        }
+      };
+
+      return Ok(());
 
       // client.(f)
       // zkprotocol::content::
     }
     "search" => {
-      println!("searcH");
+      match (
+        matches.get_one::<String>("cookie"),
+        matches.get_one::<String>("user"),
+        matches.get_one::<String>("search"),
+      ) {
+        (Some(cookie), Some(username), Some(search)) => {
+          // let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+
+          let result_type = match matches.get_one::<String>("search_result_format") {
+            Some(s) => {
+              let quoted = format!("\"{}\"", s);
+              serde_json::from_str::<zs::ResultType>(quoted.as_str())?
+            }
+            None => zs::ResultType::RtListNote,
+          };
+
+          let (_extra, tag_search) = match tag_search_parser(search) {
+            Ok(ts) => ts,
+            Err(e) => return Err(Box::new(Error::String(e.to_string()))),
+          };
+
+          println!("search parse: {:?}", tag_search);
+          println!("result_type: {:?}", result_type);
+          // println!("username: {:?}", username);
+
+          let zns = ZkNoteSearch {
+            tagsearch: vec![tag_search],
+            offset: 0,
+            limit: None,
+            what: "".to_string(),
+            resulttype: result_type,
+            archives: zs::ArchivesOrCurrent::Current,
+            deleted: false, // include deleted notes
+            ordering: None,
+          };
+
+          let client = reqwest::blocking::Client::builder().build()?;
+          let rq = client
+            .post(url)
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .header(reqwest::header::COOKIE, cookie)
+            .body(serde_json::to_string(
+              &zkprotocol::private::PrivateRequest::PvqSearchZkNotes(zns),
+            )?);
+
+          let mut res = rq.send()?;
+
+          println!("{:?}", res);
+
+          let mut buf = String::new();
+          res.read_to_string(&mut buf)?;
+
+          println!("{}", buf);
+
+          // match (user_id(&conn, username), tag_search_parser(search)) {
+          //   (Ok(uid), Ok((_s, tagsearch))) => {
+          //     let zns = ZkNoteSearch {
+          //       tagsearch: vec![tagsearch],
+          //       offset: 0,
+          //       limit: None,
+          //       what: "".to_string(),
+          //       resulttype: result_type,
+          //       archives: zs::ArchivesOrCurrent::Current,
+          //       deleted: false, // include deleted notes
+          //       ordering: None,
+          //     };
+          //     let res = search::search_zknotes(&conn, &config.file_path, uid, &zns)?;
+
+          //     println!("{}", serde_json::to_string_pretty(&res)?);
+
+          //     return Ok(());
+          //   }
+          //   (_, Err(e)) => {
+          //     println!("search parsing error: {:?}", e);
+          //     return Ok(());
+          //   }
+          //   (Err(e), _) => {
+          //     println!("error retrieving user id: {:?}", e);
+          //     return Ok(());
+          //   }
+          // }
+          ()
+        }
+        _ => {
+          println!("cookie, user and search parameters are required");
+        }
+      };
     }
     &_ => {
       println!("unsupported command");
     }
   }
-
-  match (
-    matches.get_one::<String>("user"),
-    matches.get_one::<String>("search"),
-  ) {
-    (Some(username), Some(search)) => {
-      // let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-
-      let result_type = match matches.get_one::<String>("search_result_format") {
-        Some(s) => {
-          let quoted = format!("\"{}\"", s);
-          serde_json::from_str::<zs::ResultType>(quoted.as_str())?
-        }
-        None => zs::ResultType::RtListNote,
-      };
-
-      let tag_search = match tag_search_parser(search) {
-        Ok(ts) => ts,
-        Err(e) => return Err(Box::new(Error::String(e.to_string()))),
-      };
-
-      // reqwest::Request::
-
-      println!("search parse: {:?}", tag_search);
-
-      // match (user_id(&conn, username), tag_search_parser(search)) {
-      //   (Ok(uid), Ok((_s, tagsearch))) => {
-      //     let zns = ZkNoteSearch {
-      //       tagsearch: vec![tagsearch],
-      //       offset: 0,
-      //       limit: None,
-      //       what: "".to_string(),
-      //       resulttype: result_type,
-      //       archives: zs::ArchivesOrCurrent::Current,
-      //       deleted: false, // include deleted notes
-      //       ordering: None,
-      //     };
-      //     let res = search::search_zknotes(&conn, &config.file_path, uid, &zns)?;
-
-      //     println!("{}", serde_json::to_string_pretty(&res)?);
-
-      //     return Ok(());
-      //   }
-      //   (_, Err(e)) => {
-      //     println!("search parsing error: {:?}", e);
-      //     return Ok(());
-      //   }
-      //   (Err(e), _) => {
-      //     println!("error retrieving user id: {:?}", e);
-      //     return Ok(());
-      //   }
-      // }
-      ()
-    }
-    (Some(_username), None) => {
-      println!("search_user and search parameters are both required");
-    }
-    (None, Some(_search)) => {
-      println!("search_user and search parameters are both required");
-    }
-    (None, None) => (),
-  };
 
   println!("Hello, world!");
   Ok(())
