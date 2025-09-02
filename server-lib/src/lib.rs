@@ -3,6 +3,7 @@ pub mod error;
 pub mod interfaces;
 pub mod jobs;
 mod migrations;
+mod scripts;
 pub mod search;
 pub mod sqldata;
 mod sqltest;
@@ -618,6 +619,8 @@ pub fn defcon() -> Config {
     file_path: Path::new("./files").to_path_buf(),
     error_index_note: None,
     tauri_mode: false,
+    on_save_zknote: None,
+    on_set_zknote_file: None,
     orgauth_config: oc,
   }
 }
