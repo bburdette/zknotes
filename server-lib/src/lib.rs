@@ -3,14 +3,12 @@ pub mod error;
 pub mod interfaces;
 pub mod jobs;
 mod migrations;
-mod search;
-pub mod search_util;
+pub mod search;
 pub mod sqldata;
 mod sqltest;
 pub mod state;
 mod sync;
 mod synctest;
-use crate::search_util::tag_search_parser;
 use crate::{error as zkerr, state::State};
 use actix_cors::Cors;
 use actix_files::NamedFile;
@@ -30,7 +28,6 @@ use futures_util::TryStreamExt as _;
 use girlboss::Girlboss;
 use log::{error, info};
 pub use orgauth;
-use orgauth::dbfun::user_id;
 use orgauth::{data::UserId, util};
 pub use orgauth::{
   data::{AdminResponse, UserResponse},
@@ -56,7 +53,6 @@ pub use zkprotocol;
 pub use zkprotocol::content as zc;
 pub use zkprotocol::messages::PrivateStreamingMessage;
 pub use zkprotocol::search as zs;
-use zkprotocol::search::ZkNoteSearch;
 use zkprotocol::{
   private::{PrivateError, PrivateReply, PrivateRequest},
   public::{PublicError, PublicReply, PublicRequest},
@@ -719,29 +715,6 @@ pub async fn err_main(
         .help("create new admin user")
         .takes_value(true),
     )
-    .arg(
-      Arg::with_name("search_user")
-        .short("u")
-        .long("search_user")
-        .value_name("user name")
-        .help("name of user to search with")
-        .takes_value(true),
-    )
-    .arg(
-      Arg::with_name("search")
-        .short("s")
-        .long("search")
-        .value_name("search expression")
-        .takes_value(true),
-    )
-    .arg(
-      Arg::with_name("search_result_format")
-        .short("f")
-        .long("search_format")
-        .value_name("search result format")
-        .help("RtId, RtListNote, RtNote, RtNoteAndLinks")
-        .takes_value(true),
-    )
     .get_matches();
 
   // writing a config file?
@@ -834,58 +807,6 @@ pub async fn err_main(
     println!("admin user created: {}", username);
     return Ok(());
   }
-
-  // searching?
-  match (matches.value_of("search_user"), matches.value_of("search")) {
-    (Some(username), Some(search)) => {
-      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
-
-      let result_type = match matches.value_of("search_result_format") {
-        Some(s) => {
-          let quoted = format!("\"{}\"", s);
-          serde_json::from_str::<zs::ResultType>(quoted.as_str())?
-        }
-        None => zs::ResultType::RtListNote,
-      };
-
-      match (user_id(&conn, username), tag_search_parser(search)) {
-        (Ok(uid), Ok((_s, tagsearch))) => {
-          let zns = ZkNoteSearch {
-            tagsearch: vec![tagsearch],
-            offset: 0,
-            limit: None,
-            what: "".to_string(),
-            resulttype: result_type,
-            archives: zs::ArchivesOrCurrent::Current,
-            deleted: false, // include deleted notes
-            ordering: None,
-          };
-          let res = search::search_zknotes(&conn, &config.file_path, uid, &zns)?;
-
-          println!("{}", serde_json::to_string_pretty(&res)?);
-
-          return Ok(());
-        }
-        (_, Err(e)) => {
-          println!("search parsing error: {:?}", e);
-          return Ok(());
-        }
-        (Err(e), _) => {
-          println!("error retrieving user id: {:?}", e);
-          return Ok(());
-        }
-      }
-    }
-    (Some(_username), None) => {
-      println!("search_user and search parameters are both required");
-      return Ok(());
-    }
-    (None, Some(_search)) => {
-      println!("search_user and search parameters are both required");
-      return Ok(());
-    }
-    (None, None) => (),
-  };
 
   // Web server is the default.
   let server = init_server(config)?;
