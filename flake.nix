@@ -48,7 +48,7 @@
       (
         system:
         let
-          toolchain = fenix.packages.${system}.stable;
+          toolchain = fenix.packages.${system}.latest;
           rs_compiler = (with toolchain; [ rustc cargo ]);
 
           pname = "zknotes";
@@ -101,7 +101,7 @@
               rs_compiler
               # cargo
               # rustc
-              cargo-watch
+              # cargo-watch
               rustfmt
               rust-analyzer
               sqlite
@@ -118,7 +118,7 @@
               elmPackages.elm-xref
               # elmPackages.elm-language-server
               elmPackages.elm-verify-examples
-              elmPackages.elmi-to-json
+              # elmPackages.elmi-to-json
               elmPackages.elm-optimize-level-2
               elm-language-server.defaultPackage.${system}
             ];
