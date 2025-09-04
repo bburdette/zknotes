@@ -5,4 +5,4 @@ edition = "2021"
 
 [dependencies]
 zknotes-server-lib = { path = "../server-lib" }
-log = "0.4.0"
+log = "0.4.28"
