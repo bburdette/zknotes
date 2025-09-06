@@ -3,7 +3,8 @@ use crate::error::to_orgauth_error;
 use crate::migrations as zkm;
 use async_stream::try_stream;
 use barrel::backend::Sqlite;
-use log::info;
+use lapin::Channel;
+use log::{error, info};
 use orgauth::data::{RegistrationData, UserId};
 use orgauth::dbfun::user_id;
 use orgauth::endpoints::Callbacks;
@@ -880,13 +881,37 @@ pub fn set_zknote_file(conn: &Connection, noteid: i64, fileid: i64) -> Result<()
   Ok(())
 }
 
-pub fn save_zknote(
+pub async fn save_zknote(
   conn: &Connection,
-  uid: UserId,
+  lapin_channel: &Option<Channel>,
   server: &Server,
+  uid: UserId,
   note: &SaveZkNote,
 ) -> Result<(i64, SavedZkNote), zkerr::Error> {
   let now = now()?;
+
+  async fn publish_szn(
+    lapin_channel: &Option<Channel>,
+    szn: &SavedZkNote,
+  ) -> Result<(), zkerr::Error> {
+    if let Some(lc) = lapin_channel {
+      match lc
+        .basic_publish(
+          "",
+          "on_save_zknote",
+          lapin::options::BasicPublishOptions::default(),
+          &serde_json::to_vec(&szn)?[..],
+          lapin::BasicProperties::default(),
+        )
+        .await
+      {
+        Ok(_) => info!("published to amqp"),
+        Err(e) => error!("error publishing to AMQP: {:?}", e),
+      }
+    }
+
+    Ok(())
+  }
 
   match note.id {
     Some(uuid) => {
@@ -924,15 +949,16 @@ pub fn save_zknote(
           uid.to_i64(),
         ],
       ) {
-        Ok(1) => Ok((
-          id,
-          SavedZkNote {
+        Ok(1) => {
+          let szn = SavedZkNote {
             id: uuid,
             changeddate: now,
             server: server.uuid.clone(),
             what: note.what.clone(),
-          },
-        )),
+          };
+          publish_szn(lapin_channel, &szn).await?;
+          Ok((id, szn))
+        }
         Ok(0) => {
           // editable flag must be true
           match conn.execute(
@@ -942,12 +968,15 @@ pub fn save_zknote(
           )? {
             0 => Err( zkerr::Error::String(format!("can't update; note is not writable {} {}", note.title, id))),
             // params![note.title, note.content, now, note.pubid, note.showtitle, server.id, id],
-            1 => Ok((id, SavedZkNote {
+            1 => {
+              let szn = SavedZkNote {
                 id: uuid,
                 changeddate: now,
                 server: server.uuid.clone(),
                 what: note.what.clone(),
-              })),
+              };
+              publish_szn(lapin_channel, &szn).await?;
+              Ok((id, szn))},
             _ => bail!("unexpected update success!"),
           }
         }
@@ -977,15 +1006,14 @@ pub fn save_zknote(
         ],
       )?;
       let id = conn.last_insert_rowid();
-      Ok((
-        id,
-        SavedZkNote {
-          id: uuid.into(),
-          changeddate: now,
-          server: server.uuid.clone(),
-          what: note.what.clone(),
-        },
-      ))
+      let szn = SavedZkNote {
+        id: uuid.into(),
+        changeddate: now,
+        server: server.uuid.clone(),
+        what: note.what.clone(),
+      };
+      publish_szn(lapin_channel, &szn).await?;
+      Ok((id, szn))
     }
   }
 }
@@ -2311,10 +2339,11 @@ pub fn read_zneifchanged(
   }
 }
 
-pub fn save_importzknotes(
+pub async fn save_importzknotes(
   conn: &Connection,
-  uid: UserId,
+  lapin_channel: &Option<Channel>,
   server: &Server,
+  uid: UserId,
   izns: &Vec<ImportZkNote>,
 ) -> Result<(), zkerr::Error> {
   for izn in izns.iter() {
@@ -2334,8 +2363,9 @@ pub fn save_importzknotes(
         // new note.
         save_zknote(
           &conn,
-          uid,
+          lapin_channel,
           server,
+          uid,
           &SaveZkNote {
             id: None,
             title: izn.title.clone(),
@@ -2346,7 +2376,8 @@ pub fn save_importzknotes(
             deleted: false,
             what: None,
           },
-        )?
+        )
+        .await?
         .0
       }
     };
@@ -2359,8 +2390,9 @@ pub fn save_importzknotes(
           // new note.
           save_zknote(
             &conn,
-            uid,
+            lapin_channel,
             server,
+            uid,
             &SaveZkNote {
               id: None,
               title: title.clone(),
@@ -2371,7 +2403,8 @@ pub fn save_importzknotes(
               deleted: false,
               what: None,
             },
-          )?
+          )
+          .await?
           .0
         }
       };
@@ -2387,8 +2420,9 @@ pub fn save_importzknotes(
           // new note.
           save_zknote(
             &conn,
-            uid,
+            lapin_channel,
             server,
+            uid,
             &SaveZkNote {
               id: None,
               title: title.clone(),
@@ -2399,7 +2433,8 @@ pub fn save_importzknotes(
               deleted: false,
               what: None,
             },
-          )?
+          )
+          .await?
           .0
         }
       };
@@ -2412,9 +2447,10 @@ pub fn save_importzknotes(
   Ok(())
 }
 
-pub fn make_file_note(
+pub async fn make_file_note(
   conn: &Connection,
   server: &Server,
+  lapin_channel: &Option<Channel>,
   files_dir: &Path,
   uid: UserId,
   name: &String,
@@ -2479,8 +2515,9 @@ pub fn make_file_note(
   // make a new note.
   let (id, sn) = save_zknote(
     &conn,
-    uid,
+    lapin_channel,
     server,
+    uid,
     &SaveZkNote {
       id: None,
       title: name.to_string(),
@@ -2491,10 +2528,27 @@ pub fn make_file_note(
       deleted: false,
       what: None,
     },
-  )?;
+  )
+  .await?;
 
   // set the file id in that note.
   set_zknote_file(&conn, id, fid)?;
+
+  if let Some(lc) = lapin_channel {
+    match lc
+      .basic_publish(
+        "",
+        "on_make_file_note",
+        lapin::options::BasicPublishOptions::default(),
+        &serde_json::to_vec(&sn)?[..],
+        lapin::BasicProperties::default(),
+      )
+      .await
+    {
+      Ok(_) => info!("published to amqp"),
+      Err(e) => error!("error publishing to AMQP: {:?}", e),
+    }
+  }
 
   Ok((id, sn.id, fid))
 }

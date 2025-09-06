@@ -253,7 +253,8 @@ pub async fn zk_interface_loggedin(
       Ok(PrivateReply::PvyDeletedZkNote(id.clone()))
     }
     PrivateRequest::PvqSaveZkNote(sbe) => {
-      let (_id, s) = sqldata::save_zknote(&conn, uid, &state.server, &sbe)?;
+      let (_id, s) =
+        sqldata::save_zknote(&conn, &state.lapin_channel, &state.server, uid, &sbe).await?;
       Ok(PrivateReply::PvySavedZkNote(s))
     }
     PrivateRequest::PvqSaveZkLinks(msg) => {
@@ -261,12 +262,13 @@ pub async fn zk_interface_loggedin(
       Ok(PrivateReply::PvySavedZkLinks)
     }
     PrivateRequest::PvqSaveZkNoteAndLinks(sznpl) => {
-      let (_, szkn) = sqldata::save_zknote(&conn, uid, &state.server, &sznpl.note)?;
+      let (_, szkn) =
+        sqldata::save_zknote(&conn, &state.lapin_channel, &state.server, uid, &sznpl.note).await?;
       let _s = sqldata::save_savezklinks(&conn, uid, szkn.id, &sznpl.links)?;
       Ok(PrivateReply::PvySavedZkNoteAndLinks(szkn))
     }
     PrivateRequest::PvqSaveImportZkNotes(gzl) => {
-      sqldata::save_importzknotes(&conn, uid, &state.server, gzl)?;
+      sqldata::save_importzknotes(&conn, &state.lapin_channel, &state.server, uid, gzl).await?;
       Ok(PrivateReply::PvySavedImportZkNotes)
     }
     PrivateRequest::PvqSetHomeNote(hn) => {
@@ -280,6 +282,7 @@ pub async fn zk_interface_loggedin(
       let jid = new_jobid(state, uid);
       let lgb = state.girlboss.clone();
       let server = state.server.clone();
+      let lapin_channelx = state.lapin_channel.clone();
 
       std::thread::spawn(move || {
         let rt = actix_rt::System::new();
@@ -291,6 +294,7 @@ pub async fn zk_interface_loggedin(
           uid: UserId,
           jid: JobId,
           server: Server,
+          lapin_channel: Option<lapin::Channel>,
         ) -> () {
           lgb
             .write()
@@ -303,8 +307,18 @@ pub async fn zk_interface_loggedin(
               let gbm = GirlbossMonitor { monitor: mon };
               let mut callbacks = &mut zknotes_callbacks();
               let server = server.clone();
+              // let lapin_channel = lapin_channelx.clone();
               write!(gbm, "starting sync");
-              let r = sync::sync(&dbpath, &file_path, uid, &server, &mut callbacks, &gbm).await;
+              let r = sync::sync(
+                &dbpath,
+                &file_path,
+                &lapin_channel,
+                uid,
+                &server,
+                &mut callbacks,
+                &gbm,
+              )
+              .await;
               match r {
                 Ok(_) => write!(gbm, "sync completed"),
                 Err(e) => write!(gbm, "sync err: {:?}", e),
@@ -319,7 +333,15 @@ pub async fn zk_interface_loggedin(
           ()
         }
 
-        rt.block_on(startit(lgb, dbpath, file_path, uid, jid, server));
+        rt.block_on(startit(
+          lgb,
+          dbpath,
+          file_path,
+          uid,
+          jid,
+          server,
+          lapin_channelx,
+        ));
         rt.run()
           .map_err(|e| {
             info!("rt.run error: {}", e);

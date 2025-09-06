@@ -27,6 +27,7 @@ use clap::Arg;
 use config::Config;
 use futures_util::TryStreamExt as _;
 use girlboss::Girlboss;
+use lapin::{self, options::QueueDeclareOptions, types::FieldTable};
 use log::{error, info};
 pub use orgauth;
 use orgauth::{data::UserId, util};
@@ -356,12 +357,14 @@ async fn make_file_notes(
     let (nid64, _noteid, _fid) = sqldata::make_file_note(
       &conn,
       &server,
+      &state.lapin_channel,
       &state.config.file_path,
       uid,
       &name,
       fpath,
       false,
-    )?;
+    )
+    .await?;
 
     // return zknoteedit.
     let listnote = sqldata::read_zklistnote(&conn, &state.config.file_path, Some(uid), nid64)?;
@@ -521,7 +524,7 @@ async fn private_upstreaming(
   data: web::Data<State>,
   body: web::Payload,
 ) -> HttpResponse {
-  match zk_interface_check_upstreaming(&session, &data.config, body).await {
+  match zk_interface_check_upstreaming(&session, &data.config, &data.lapin_channel, body).await {
     Ok(hr) => hr,
     Err(e) => {
       error!("'private' err: {:?}", e);
@@ -539,6 +542,7 @@ fn convert_bodyerr(err: actix_web::error::PayloadError) -> std::io::Error {
 async fn zk_interface_check_upstreaming(
   session: &Session,
   config: &Config,
+  lapin_channel: &Option<lapin::Channel>,
   body: web::Payload,
 ) -> Result<HttpResponse, Box<dyn Error>> {
   match session.get::<Uuid>("token")? {
@@ -573,6 +577,7 @@ async fn zk_interface_check_upstreaming(
 
           let sr = sync::sync_from_stream(
             &conn,
+            lapin_channel,
             &server,
             &user,
             &config.file_path,
@@ -619,8 +624,7 @@ pub fn defcon() -> Config {
     file_path: Path::new("./files").to_path_buf(),
     error_index_note: None,
     tauri_mode: false,
-    on_save_zknote: None,
-    on_set_zknote_file: None,
+    aqmp_uri: None,
     orgauth_config: oc,
   }
 }
@@ -652,6 +656,8 @@ pub async fn err_main(
   oconfig: Option<Config>,
   logfile: Option<PathBuf>,
 ) -> Result<(), Box<dyn Error>> {
+  // async_global_executor::
+
   match logfile {
     Some(lf) => {
       let target = Box::new(File::create(lf).expect("Can't create file"));
@@ -812,13 +818,13 @@ pub async fn err_main(
   }
 
   // Web server is the default.
-  let server = init_server(config)?;
+  let server = init_server(config).await?;
   server.await?;
 
   Ok(())
 }
 
-pub fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
+pub async fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
   // ------------------------------------------------------
   // normal server ops
   info!("server init!");
@@ -861,6 +867,33 @@ pub fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
       },
     );
 
+  println!("config.aqmp_uri {:?}", config.aqmp_uri);
+
+  let lapin_channel = match config.aqmp_uri {
+    Some(ref uri) => {
+      let conn =
+        lapin::Connection::connect(uri.as_str(), lapin::ConnectionProperties::default()).await?;
+      let chan = conn.create_channel().await?;
+      info!("lapin channel created {:?}", chan);
+      chan
+        .queue_declare(
+          "on_save_zknote",
+          QueueDeclareOptions::default(),
+          FieldTable::default(),
+        )
+        .await?;
+      chan
+        .queue_declare(
+          "on_make_file_note",
+          QueueDeclareOptions::default(),
+          FieldTable::default(),
+        )
+        .await?;
+      Some(chan)
+    }
+    None => None,
+  };
+
   // create here, not in the HttpServer::new() call,
   // to prevent multiple copies of jobcounter etc.
   let state = web::Data::new(State {
@@ -868,6 +901,7 @@ pub fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
     girlboss: { Arc::new(RwLock::new(Girlboss::new())) },
     jobcounter: { RwLock::new(0 as i64) },
     server,
+    lapin_channel,
   });
 
   let c = config.clone();

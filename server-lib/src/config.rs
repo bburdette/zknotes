@@ -13,7 +13,6 @@ pub struct Config {
   pub file_path: PathBuf,
   pub error_index_note: Option<i64>,
   pub tauri_mode: bool,
-  pub on_save_zknote: Option<String>,
-  pub on_set_zknote_file: Option<String>,
+  pub aqmp_uri: Option<String>,
   pub orgauth_config: orgauth_data::Config,
 }

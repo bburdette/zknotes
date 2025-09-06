@@ -8,6 +8,6 @@ members = [
     "zkprotocol/elm-gen",
     "orgauth/rustlib",
     "orgauth/elm-gen",
-    "cli"]
+    "cli", "onsave"]
 
 resolver="2"

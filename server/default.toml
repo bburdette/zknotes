@@ -5,6 +5,7 @@ altmainsite = [ "http://localhost:8010"]
 file_tmp_path = "./temp"
 file_path = "./files"
 tauri_mode = false
+aqmp_uri = "amqp://localhost:5672"
 
 [orgauth_config]
 mainsite = 'http://localhost:8010'
