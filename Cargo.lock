@@ -2902,6 +2902,7 @@ name = "onsave"
 version = "0.1.0"
 dependencies = [
  "clap 4.5.47",
+ "futures-lite 2.6.1",
  "lapin 3.4.0",
  "serde_json",
  "tokio",

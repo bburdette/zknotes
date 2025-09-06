@@ -1,6 +1,7 @@
 use clap::Arg;
+use futures_lite::stream::StreamExt;
 use lapin::{
-  options::{BasicConsumeOptions, BasicGetOptions, QueueDeclareOptions},
+  options::{BasicAckOptions, BasicConsumeOptions, BasicGetOptions, QueueDeclareOptions},
   types::FieldTable,
   Connection, ConnectionProperties,
 };
@@ -91,22 +92,32 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await?;
 
-  // tokio::spawn(async move {
-  while let Some(delivery) = chan
-    .basic_get("on_save_zknote", BasicGetOptions::default())
-    .await
-    .expect("error in consumer")
-  {
-    match serde_json::from_slice::<SavedZkNote>(&delivery.data) {
-      Ok(szn) => {
-        println!("savedskznote: {:?}", szn);
+  let mut consumer = chan
+    .basic_consume(
+      "on_save_zknote",
+      "onsave",
+      BasicConsumeOptions::default(),
+      FieldTable::default(),
+    )
+    .await?;
+
+  tokio::spawn(async move {
+    while let Some(rdelivery) = consumer.next().await {
+      let delivery = rdelivery.expect("error");
+      match serde_json::from_slice::<SavedZkNote>(&delivery.data) {
+        Ok(szn) => {
+          println!("savedskznote: {:?}", szn);
+        }
+        Err(e) => {
+          println!("error: {:?}", e);
+        }
       }
-      Err(e) => {
-        println!("error: {:?}", e);
-      }
+      delivery
+        .ack(BasicAckOptions::default())
+        .await
+        .expect("ack error");
     }
-  }
-  // });
+  });
 
   let chan = conn.create_channel().await?;
 
@@ -118,29 +129,32 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await?;
 
-  // tokio::spawn(async move {
-  while let Some(delivery) = chan
-    .basic_get("on_make_file_note", BasicGetOptions::default())
-    .await
-    .expect("error in consumer")
-  {
+  let mut consumer = chan
+    .basic_consume(
+      "on_make_file_note",
+      "onmakefile",
+      BasicConsumeOptions::default(),
+      FieldTable::default(),
+    )
+    .await?;
+
+  while let Some(rdelivery) = consumer.next().await {
+    let delivery = rdelivery.expect("error");
     match serde_json::from_slice::<SavedZkNote>(&delivery.data) {
       Ok(szn) => {
-        println!("savedskznote: {:?}", szn);
+        println!("on_make_file_note: savedskznote: {:?}", szn);
       }
       Err(e) => {
         println!("error: {:?}", e);
       }
     }
+    delivery
+      .ack(BasicAckOptions::default())
+      .await
+      .expect("ack error");
   }
-  // });
 
-  //   onsave_consumer.or_else(f)
-  // while let Some(delivery) =  onsave_consumer.next().await {
-  //   delivery.ack(BasicAckOptions::default()).await.expect("ack")
-  // } }).detach();
-
-  println!("Hello, world!");
+  println!("Goodbye, world!");
 
   Ok(())
 }
