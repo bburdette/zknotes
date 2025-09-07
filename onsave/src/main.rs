@@ -112,6 +112,8 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
           println!("error: {:?}", e);
         }
       }
+      // yeet processing.
+
       delivery
         .ack(BasicAckOptions::default())
         .await
@@ -148,6 +150,42 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
         println!("error: {:?}", e);
       }
     }
+    // file processing.  can get the mime?
+    // send mime with message?  or at least filename.
+    // how is file type determined by front end.
+    //
+    /*
+      case String.toLower s of
+        "mp3" ->
+            audioNoteView fui zknote
+
+        "m4a" ->
+            audioNoteView fui zknote
+
+        "opus" ->
+            audioNoteView fui zknote
+
+        "mp4" ->
+            videoNoteView fui maxw zknote
+
+        "webm" ->
+            videoNoteView fui maxw zknote
+
+        "mkv" ->
+            videoNoteView fui maxw zknote
+
+        "jpg" ->
+            imageNoteView fui zknote
+
+        "gif" ->
+            imageNoteView fui zknote
+
+        "png" ->
+            imageNoteView fui zknote
+
+        _ ->
+            link (fui.filelocation ++ "/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
+    */
     delivery
       .ack(BasicAckOptions::default())
       .await
