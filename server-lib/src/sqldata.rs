@@ -21,9 +21,9 @@ use uuid::Uuid;
 use zkprotocol::constants::SpecialUuids;
 use zkprotocol::content::{
   ArchiveZkLink, Direction, EditLink, ExtraLoginData, FileInfo, FileStatus, GetArchiveZkNote,
-  GetZkNoteArchives, GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkLink, SaveZkNote,
-  SavedZkNote, Server, Sysids, UuidZkLink, ZkLink, ZkListNote, ZkNote, ZkNoteAndLinks,
-  ZkNoteAndLinksWhat, ZkNoteId,
+  GetZkNoteArchives, GetZkNoteComments, GetZnlIfChanged, ImportZkNote, OnMakeFileNote,
+  OnSavedZkNote, SaveZkLink, SaveZkNote, SavedZkNote, Server, Sysids, UuidZkLink, ZkLink,
+  ZkListNote, ZkNote, ZkNoteAndLinks, ZkNoteAndLinksWhat, ZkNoteId,
 };
 use zkprotocol::sync_data::SyncMessage;
 
@@ -443,6 +443,11 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: Option<i64>) -> Result<Server,
     info!("udpate38");
     zkm::udpate38(&dbfile)?;
     set_single_value(&conn, "migration_level", "38")?;
+  }
+  if nlevel < 39 {
+    info!("udpate39");
+    zkm::udpate39(&dbfile)?;
+    set_single_value(&conn, "migration_level", "39")?;
   }
 
   info!("db up to date.");
@@ -891,16 +896,25 @@ pub async fn save_zknote(
   let now = now()?;
 
   async fn publish_szn(
+    conn: &Connection,
+    uid: UserId,
     lapin_channel: &Option<Channel>,
     szn: &SavedZkNote,
   ) -> Result<(), zkerr::Error> {
     if let Some(lc) = lapin_channel {
+      // make a token just for this call.
+      let nt = Uuid::new_v4();
+      orgauth::dbfun::add_token(&conn, uid, nt, None, Some("robot"))?;
+      let oszn = OnSavedZkNote {
+        id: szn.id,
+        token: nt,
+      };
       match lc
         .basic_publish(
           "",
           "on_save_zknote",
           lapin::options::BasicPublishOptions::default(),
-          &serde_json::to_vec(&szn)?[..],
+          &serde_json::to_vec(&oszn)?[..],
           lapin::BasicProperties::default(),
         )
         .await
@@ -956,7 +970,7 @@ pub async fn save_zknote(
             server: server.uuid.clone(),
             what: note.what.clone(),
           };
-          publish_szn(lapin_channel, &szn).await?;
+          publish_szn(&conn, uid, lapin_channel, &szn).await?;
           Ok((id, szn))
         }
         Ok(0) => {
@@ -975,7 +989,7 @@ pub async fn save_zknote(
                 server: server.uuid.clone(),
                 what: note.what.clone(),
               };
-              publish_szn(lapin_channel, &szn).await?;
+              publish_szn(&conn, uid, lapin_channel, &szn).await?;
               Ok((id, szn))},
             _ => bail!("unexpected update success!"),
           }
@@ -1012,7 +1026,7 @@ pub async fn save_zknote(
         server: server.uuid.clone(),
         what: note.what.clone(),
       };
-      publish_szn(lapin_channel, &szn).await?;
+      publish_szn(&conn, uid, lapin_channel, &szn).await?;
       Ok((id, szn))
     }
   }
@@ -2535,12 +2549,21 @@ pub async fn make_file_note(
   set_zknote_file(&conn, id, fid)?;
 
   if let Some(lc) = lapin_channel {
+    // make a token just for this call.
+    let nt = Uuid::new_v4();
+    orgauth::dbfun::add_token(&conn, uid, nt, None, Some("robot"))?;
+    let oszn = OnMakeFileNote {
+      id: sn.id,
+      token: nt,
+      title: name.to_string(),
+    };
+    // send the message.
     match lc
       .basic_publish(
         "",
         "on_make_file_note",
         lapin::options::BasicPublishOptions::default(),
-        &serde_json::to_vec(&sn)?[..],
+        &serde_json::to_vec(&oszn)?[..],
         lapin::BasicProperties::default(),
       )
       .await

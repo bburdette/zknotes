@@ -1,13 +1,13 @@
 use clap::Arg;
 use futures_lite::stream::StreamExt;
 use lapin::{
-  options::{BasicAckOptions, BasicConsumeOptions, BasicGetOptions, QueueDeclareOptions},
+  options::{BasicAckOptions, BasicConsumeOptions, QueueDeclareOptions},
   types::FieldTable,
   Connection, ConnectionProperties,
 };
 use tokio::main;
 use tracing::info;
-use zkprotocol::content::SavedZkNote;
+use zkprotocol::content::{OnMakeFileNote, OnSavedZkNote};
 
 // #[tokio::main(flavor = "multi_thread")]
 #[tokio::main]
@@ -104,7 +104,7 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
   tokio::spawn(async move {
     while let Some(rdelivery) = consumer.next().await {
       let delivery = rdelivery.expect("error");
-      match serde_json::from_slice::<SavedZkNote>(&delivery.data) {
+      match serde_json::from_slice::<OnSavedZkNote>(&delivery.data) {
         Ok(szn) => {
           println!("savedskznote: {:?}", szn);
         }
@@ -142,7 +142,7 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
 
   while let Some(rdelivery) = consumer.next().await {
     let delivery = rdelivery.expect("error");
-    match serde_json::from_slice::<SavedZkNote>(&delivery.data) {
+    match serde_json::from_slice::<OnMakeFileNote>(&delivery.data) {
       Ok(szn) => {
         println!("on_make_file_note: savedskznote: {:?}", szn);
       }
