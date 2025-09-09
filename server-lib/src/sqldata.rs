@@ -2,7 +2,9 @@ use crate::error as zkerr;
 use crate::error::to_orgauth_error;
 use crate::migrations as zkm;
 use async_stream::try_stream;
+use awc::error::HeaderValue;
 use barrel::backend::Sqlite;
+use cookie::CookieBuilder;
 use lapin::Channel;
 use log::{error, info};
 use orgauth::data::{RegistrationData, UserId};
@@ -905,6 +907,14 @@ pub async fn save_zknote(
       // make a token just for this call.
       let nt = Uuid::new_v4();
       orgauth::dbfun::add_token(&conn, uid, nt, None, Some("robot"))?;
+      let c = CookieBuilder::new("token", nt.to_string()).finish();
+      println!("cookie: {:?}", c);
+      println!("cookie: {}", c.encoded().to_string());
+      let val = HeaderValue::from_str(&c.encoded().to_string()).unwrap();
+      // .with_context("Failed to attach a session cookie to the outgoing response")?;
+      println!("haadervalue: {}", val.to_str().unwrap());
+      println!("morecookie: {:?}", c.value_raw());
+      println!("morecookie2: {:?}", c.value());
       let oszn = OnSavedZkNote {
         id: szn.id,
         token: nt,

@@ -15,7 +15,7 @@ use actix_cors::Cors;
 use actix_files::NamedFile;
 use actix_multipart::Multipart;
 use actix_session::{
-  config::PersistentSession, storage::CookieSessionStore, Session, SessionMiddleware,
+  config::PersistentSession, storage::CookieSessionStore, Session, SessionExt, SessionMiddleware,
 };
 use actix_web::{
   cookie::{self, Key},
@@ -425,9 +425,15 @@ async fn private(
   session: Session,
   data: web::Data<State>,
   item: web::Json<PrivateRequest>,
-  _req: HttpRequest,
+  req: HttpRequest,
 ) -> HttpResponse {
   let mut state = data.clone();
+  println!("id: {:?}", req.get_session().get::<String>("token"));
+  println!("cookies: {:?}", req.cookies());
+  println!("cookie, id: {:?}", req.cookie("id"));
+  println!("cookie, vw: {:?}", req.cookie("id").unwrap().value_raw());
+  println!("cookie, v: {:?}", req.cookie("id").unwrap().value());
+
   match zk_interface_check(&session, &mut state, item.into_inner()).await {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {

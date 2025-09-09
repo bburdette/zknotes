@@ -1,3 +1,5 @@
+use std::io::Cursor;
+
 use clap::Arg;
 use futures_lite::stream::StreamExt;
 use lapin::{
@@ -6,8 +8,9 @@ use lapin::{
   Connection, ConnectionProperties,
 };
 use tokio::main;
-use tracing::info;
-use zkprotocol::content::{OnMakeFileNote, OnSavedZkNote};
+use tracing::{error, info};
+use uuid::Uuid;
+use zkprotocol::content::{OnMakeFileNote, OnSavedZkNote, ZkNoteId};
 
 // #[tokio::main(flavor = "multi_thread")]
 #[tokio::main]
@@ -33,52 +36,23 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
         .help("example: 'amqp://localhost:5672'"),
     )
     .arg(
-      Arg::new("server_url")
+      Arg::new("server_uri")
         .short('r')
-        .long("url")
-        .value_name("zknotes server url")
+        .long("server_uri")
+        .value_name("zknotes server uri")
         .help("server to connect to"),
-    )
-    .arg(
-      Arg::new("user")
-        .short('u')
-        .long("user")
-        .value_name("user name")
-        .help("name of user to search with"),
-    )
-    .arg(
-      Arg::new("password")
-        .short('p')
-        .long("password")
-        .value_name("password")
-        .help("password"),
-    )
-    .arg(
-      Arg::new("cookie")
-        .short('k')
-        .long("cookie")
-        .value_name("cookie"),
-    )
-    .arg(
-      Arg::new("search")
-        .short('s')
-        .long("search")
-        .value_name("search expression"),
-    )
-    .arg(
-      Arg::new("search_result_format")
-        .short('f')
-        .long("search_format")
-        .value_name("search result format")
-        .help("RtId, RtListNote, RtNote, RtNoteAndLinks"),
     )
     .get_matches();
 
-  let uri = matches
+  let amqp_uri = matches
     .get_one::<String>("amqp_uri")
     .expect("amqp_uri is required");
 
-  let conn = Connection::connect(&uri, ConnectionProperties::default()).await?;
+  let server_uri = matches
+    .get_one::<String>("server_uri")
+    .expect("server_uri is required");
+
+  let conn = Connection::connect(&amqp_uri, ConnectionProperties::default()).await?;
 
   info!("CONNECTED");
 
@@ -141,51 +115,35 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
     .await?;
 
   while let Some(rdelivery) = consumer.next().await {
+    println!("on_make_file_note: rdeliver: {:?}", rdelivery);
     let delivery = rdelivery.expect("error");
     match serde_json::from_slice::<OnMakeFileNote>(&delivery.data) {
-      Ok(szn) => {
-        println!("on_make_file_note: savedskznote: {:?}", szn);
+      Ok(omfn) => {
+        println!("on_make_file_note: OnMakeFileNote: {:?}", omfn);
+        if let Some(suffix) = omfn.title.split('.').last() {
+          match suffix.to_lowercase().as_str() {
+            "mp4" => resize_video(server_uri.as_str(), omfn).await?,
+            "webm" => resize_video(server_uri.as_str(), omfn).await?,
+            "mkv" => resize_video(server_uri.as_str(), omfn).await?,
+            "jpg" => resize_image(server_uri.as_str(), omfn).await?,
+            "gif" => resize_image(server_uri.as_str(), omfn).await?,
+            "png" => resize_image(server_uri.as_str(), omfn).await?,
+            // "mp3" ->
+            // "m4a" ->
+            // "opus" ->
+            _ => {
+              println!("unsupported file suffix: {}", suffix);
+            }
+          }
+        }
       }
       Err(e) => {
         println!("error: {:?}", e);
       }
     }
-    // file processing.  can get the mime?
-    // send mime with message?  or at least filename.
-    // how is file type determined by front end.
-    //
-    /*
-      case String.toLower s of
-        "mp3" ->
-            audioNoteView fui zknote
 
-        "m4a" ->
-            audioNoteView fui zknote
+    println!("pre ack");
 
-        "opus" ->
-            audioNoteView fui zknote
-
-        "mp4" ->
-            videoNoteView fui maxw zknote
-
-        "webm" ->
-            videoNoteView fui maxw zknote
-
-        "mkv" ->
-            videoNoteView fui maxw zknote
-
-        "jpg" ->
-            imageNoteView fui zknote
-
-        "gif" ->
-            imageNoteView fui zknote
-
-        "png" ->
-            imageNoteView fui zknote
-
-        _ ->
-            link (fui.filelocation ++ "/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
-    */
     delivery
       .ack(BasicAckOptions::default())
       .await
@@ -195,4 +153,70 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
   println!("Goodbye, world!");
 
   Ok(())
+}
+
+async fn resize_video(
+  server_uri: &str,
+  omfn: OnMakeFileNote,
+) -> Result<(), Box<dyn std::error::Error>> {
+  println!("resize_video {:?}", omfn);
+  // download the file.
+  let mut s = String::from(server_uri);
+  s.push_str("/file/");
+  let uuid: Uuid = omfn.id.into();
+  let idstring = uuid.to_string();
+  s.push_str(idstring.as_str());
+
+  let client = reqwest::Client::builder().build()?;
+  let res = client
+    .get(s)
+    .header(
+      reqwest::header::COOKIE,
+      format!("id={}", uuid.to_string().as_str()),
+    )
+    .send()
+    .await?;
+
+  // let res = reqwest::(s).await?;
+  let mut file = std::fs::File::create(idstring.as_str())?;
+  let mut content = Cursor::new(res.bytes().await?);
+  std::io::copy(&mut content, &mut file)?;
+
+  // call out to ffmpeg to resize.
+
+  Ok(())
+}
+
+async fn resize_image(
+  server_uri: &str,
+  omfn: OnMakeFileNote,
+) -> Result<(), Box<dyn std::error::Error>> {
+  println!("resize_image {:?}", omfn);
+  // download the file.
+  // download the file.i
+  let mut s = String::from(server_uri);
+  s.push_str("/file/");
+  let uuid: Uuid = omfn.id.into();
+  let idstring = uuid.to_string();
+  s.push_str(idstring.as_str());
+
+  let client = reqwest::Client::builder().build()?;
+  let res = client
+    .get(s)
+    .header(
+      reqwest::header::COOKIE,
+      format!("id={}", uuid.to_string().as_str()),
+    )
+    .send()
+    .await?;
+
+  let mut file = std::fs::File::create(idstring.as_str())?;
+  let mut content = Cursor::new(res.bytes().await?);
+  std::io::copy(&mut content, &mut file)?;
+
+  Ok(())
+
+  // run imagemagick to resize.
+
+  // upload resized with thumb prefix.
 }
