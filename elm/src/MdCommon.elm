@@ -435,6 +435,10 @@ htmlF hf =
             |> Markdown.Html.withAttribute "id"
             |> Markdown.Html.withOptionalAttribute "show"
             |> Markdown.Html.withOptionalAttribute "text"
+        , Markdown.Html.tag "yeet" hf.noteView
+            |> Markdown.Html.withAttribute "url"
+            |> Markdown.Html.withOptionalAttribute "text"
+            |> Markdown.Html.withOptionalAttribute "audio-only"
         ]
 
 
