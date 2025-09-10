@@ -446,11 +446,6 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: Option<i64>) -> Result<Server,
     zkm::udpate38(&dbfile)?;
     set_single_value(&conn, "migration_level", "38")?;
   }
-  if nlevel < 39 {
-    info!("udpate39");
-    zkm::udpate39(&dbfile)?;
-    set_single_value(&conn, "migration_level", "39")?;
-  }
 
   info!("db up to date.");
 
@@ -888,9 +883,14 @@ pub fn set_zknote_file(conn: &Connection, noteid: i64, fileid: i64) -> Result<()
   Ok(())
 }
 
+pub struct LapinInfo<'a> {
+  pub channel: &'a Channel,
+  pub token: String,
+}
+
 pub async fn save_zknote(
   conn: &Connection,
-  lapin_channel: &Option<Channel>,
+  lapin_info: &Option<LapinInfo<'_>>,
   server: &Server,
   uid: UserId,
   note: &SaveZkNote,
@@ -900,11 +900,11 @@ pub async fn save_zknote(
   async fn publish_szn(
     conn: &Connection,
     uid: UserId,
-    lapin_channel: &Option<Channel>,
+    lapin_info: &Option<LapinInfo<'_>>,
     szn: &SavedZkNote,
   ) -> Result<(), zkerr::Error> {
-    if let Some(lc) = lapin_channel {
-      // make a token just for this call.
+    if let Some(li) = lapin_info {
+      /*// make a token just for this call.
       let nt = Uuid::new_v4();
       orgauth::dbfun::add_token(&conn, uid, nt, None, Some("robot"))?;
       let c = CookieBuilder::new("token", nt.to_string()).finish();
@@ -914,12 +914,13 @@ pub async fn save_zknote(
       // .with_context("Failed to attach a session cookie to the outgoing response")?;
       println!("haadervalue: {}", val.to_str().unwrap());
       println!("morecookie: {:?}", c.value_raw());
-      println!("morecookie2: {:?}", c.value());
+      println!("morecookie2: {:?}", c.value());*/
       let oszn = OnSavedZkNote {
         id: szn.id,
-        token: nt,
+        token: li.token.clone(),
       };
-      match lc
+      match li
+        .channel
         .basic_publish(
           "",
           "on_save_zknote",
@@ -980,7 +981,7 @@ pub async fn save_zknote(
             server: server.uuid.clone(),
             what: note.what.clone(),
           };
-          publish_szn(&conn, uid, lapin_channel, &szn).await?;
+          publish_szn(&conn, uid, lapin_info, &szn).await?;
           Ok((id, szn))
         }
         Ok(0) => {
@@ -999,7 +1000,7 @@ pub async fn save_zknote(
                 server: server.uuid.clone(),
                 what: note.what.clone(),
               };
-              publish_szn(&conn, uid, lapin_channel, &szn).await?;
+              publish_szn(&conn, uid, lapin_info, &szn).await?;
               Ok((id, szn))},
             _ => bail!("unexpected update success!"),
           }
@@ -1036,7 +1037,7 @@ pub async fn save_zknote(
         server: server.uuid.clone(),
         what: note.what.clone(),
       };
-      publish_szn(&conn, uid, lapin_channel, &szn).await?;
+      publish_szn(&conn, uid, lapin_info, &szn).await?;
       Ok((id, szn))
     }
   }
@@ -2365,7 +2366,7 @@ pub fn read_zneifchanged(
 
 pub async fn save_importzknotes(
   conn: &Connection,
-  lapin_channel: &Option<Channel>,
+  lapin_info: &Option<LapinInfo<'_>>,
   server: &Server,
   uid: UserId,
   izns: &Vec<ImportZkNote>,
@@ -2387,7 +2388,7 @@ pub async fn save_importzknotes(
         // new note.
         save_zknote(
           &conn,
-          lapin_channel,
+          lapin_info,
           server,
           uid,
           &SaveZkNote {
@@ -2414,7 +2415,7 @@ pub async fn save_importzknotes(
           // new note.
           save_zknote(
             &conn,
-            lapin_channel,
+            lapin_info,
             server,
             uid,
             &SaveZkNote {
@@ -2444,7 +2445,7 @@ pub async fn save_importzknotes(
           // new note.
           save_zknote(
             &conn,
-            lapin_channel,
+            lapin_info,
             server,
             uid,
             &SaveZkNote {
@@ -2474,7 +2475,7 @@ pub async fn save_importzknotes(
 pub async fn make_file_note(
   conn: &Connection,
   server: &Server,
-  lapin_channel: &Option<Channel>,
+  lapin_info: &Option<LapinInfo<'_>>,
   files_dir: &Path,
   uid: UserId,
   name: &String,
@@ -2539,7 +2540,7 @@ pub async fn make_file_note(
   // make a new note.
   let (id, sn) = save_zknote(
     &conn,
-    lapin_channel,
+    lapin_info,
     server,
     uid,
     &SaveZkNote {
@@ -2558,17 +2559,18 @@ pub async fn make_file_note(
   // set the file id in that note.
   set_zknote_file(&conn, id, fid)?;
 
-  if let Some(lc) = lapin_channel {
+  if let Some(li) = lapin_info {
     // make a token just for this call.
-    let nt = Uuid::new_v4();
-    orgauth::dbfun::add_token(&conn, uid, nt, None, Some("robot"))?;
+    /*let nt = Uuid::new_v4();
+    orgauth::dbfun::add_token(&conn, uid, nt, None, Some("robot"))?;*/
     let oszn = OnMakeFileNote {
       id: sn.id,
-      token: nt,
+      token: li.token.clone(),
       title: name.to_string(),
     };
     // send the message.
-    match lc
+    match li
+      .channel
       .basic_publish(
         "",
         "on_make_file_note",

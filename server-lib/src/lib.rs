@@ -39,7 +39,7 @@ pub use rusqlite;
 use rusqlite::Connection;
 use serde_json;
 use simple_error::simple_error;
-use sqldata::{get_single_value, local_server_id};
+use sqldata::{get_single_value, local_server_id, LapinInfo};
 use std::fs::File;
 use std::io::{stdin, Write};
 use std::path::Path;
@@ -321,8 +321,16 @@ async fn receive_files(
   session: Session,
   config: web::Data<State>,
   mut payload: Multipart,
+  req: HttpRequest,
 ) -> HttpResponse {
-  match make_file_notes(session, config, &mut payload).await {
+  let li = match (&config.lapin_channel.as_ref(), get_cookie_id(&req)) {
+    (Some(channel), Some(token)) => Some(LapinInfo {
+      channel: &channel,
+      token,
+    }),
+    _ => None,
+  };
+  match make_file_notes(session, &config, &li, &mut payload).await {
     Ok(r) => HttpResponse::Ok().json(r),
     Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
   }
@@ -330,7 +338,8 @@ async fn receive_files(
 
 async fn make_file_notes(
   session: Session,
-  state: web::Data<State>,
+  state: &web::Data<State>,
+  lapin_info: &Option<LapinInfo<'_>>,
   payload: &mut Multipart,
 ) -> Result<UploadReply, Box<dyn Error>> {
   let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
@@ -354,10 +363,15 @@ async fn make_file_notes(
     // compute hash.
     let fpath = Path::new(&fp);
 
+    // let li = state.lapin_channel.as_ref().map(|lc| LapinInfo {
+    //   channel: &lc,
+    //   token: "blah".to_string(),
+    // });
+
     let (nid64, _noteid, _fid) = sqldata::make_file_note(
       &conn,
       &server,
-      &state.lapin_channel,
+      &lapin_info,
       &state.config.file_path,
       uid,
       &name,
@@ -421,6 +435,10 @@ async fn save_files(
   Ok(rv)
 }
 
+fn get_cookie_id(req: &HttpRequest) -> Option<String> {
+  req.cookie("id").map(|c| c.value().to_string())
+}
+
 async fn private(
   session: Session,
   data: web::Data<State>,
@@ -434,7 +452,9 @@ async fn private(
   println!("cookie, vw: {:?}", req.cookie("id").unwrap().value_raw());
   println!("cookie, v: {:?}", req.cookie("id").unwrap().value());
 
-  match zk_interface_check(&session, &mut state, item.into_inner()).await {
+  let token = get_cookie_id(&req);
+
+  match zk_interface_check(&session, &mut state, token, item.into_inner()).await {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'private' err: {:?}", e);
@@ -464,20 +484,21 @@ async fn private_streaming(
 async fn zk_interface_check(
   session: &Session,
   state: &State,
+  token: Option<String>,
   msg: PrivateRequest,
 ) -> Result<PrivateReply, zkerr::Error> {
   match session.get::<Uuid>("token")? {
     None => Ok(PrivateReply::PvyServerError(PrivateError::PveNotLoggedIn)),
-    Some(token) => {
+    Some(token_uuid) => {
       let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
       match orgauth::dbfun::read_user_by_token_api(
         &conn,
-        token,
+        token_uuid,
         state.config.orgauth_config.login_token_expiration_ms,
         state.config.orgauth_config.regen_login_tokens,
       ) {
         Err(e) => {
-          info!("read_user_by_token_api error2: {:?}, {:?}", token, e);
+          info!("read_user_by_token_api error2: {:?}, {:?}", token_uuid, e);
 
           Ok(PrivateReply::PvyServerError(PrivateError::PveLoginError(
             e.to_string(),
@@ -485,7 +506,7 @@ async fn zk_interface_check(
         }
         Ok(userdata) => {
           // finally!  processing messages as logged in user.
-          interfaces::zk_interface_loggedin(state, &conn, userdata.id, &msg).await
+          interfaces::zk_interface_loggedin(state, &conn, token, userdata.id, &msg).await
         }
       }
     }
@@ -529,8 +550,16 @@ async fn private_upstreaming(
   session: Session,
   data: web::Data<State>,
   body: web::Payload,
+  req: HttpRequest,
 ) -> HttpResponse {
-  match zk_interface_check_upstreaming(&session, &data.config, &data.lapin_channel, body).await {
+  let li = match (data.lapin_channel.as_ref(), get_cookie_id(&req)) {
+    (Some(channel), Some(token)) => Some(LapinInfo {
+      channel: &channel,
+      token,
+    }),
+    _ => None,
+  };
+  match zk_interface_check_upstreaming(&session, &data.config, &li, body).await {
     Ok(hr) => hr,
     Err(e) => {
       error!("'private' err: {:?}", e);
@@ -548,8 +577,10 @@ fn convert_bodyerr(err: actix_web::error::PayloadError) -> std::io::Error {
 async fn zk_interface_check_upstreaming(
   session: &Session,
   config: &Config,
-  lapin_channel: &Option<lapin::Channel>,
+  lapin_info: &Option<LapinInfo<'_>>,
+  // lapin_channel: &Option<lapin::Channel>,
   body: web::Payload,
+  // req: &HttpRequest,
 ) -> Result<HttpResponse, Box<dyn Error>> {
   match session.get::<Uuid>("token")? {
     None => Ok(HttpResponse::Ok().json(PrivateReply::PvyServerError(PrivateError::PveNotLoggedIn))),
@@ -581,9 +612,11 @@ async fn zk_interface_check_upstreaming(
 
           let mut br = StreamReader::new(rstream);
 
+          // let cid = get_cookie_id(&req);
+
           let sr = sync::sync_from_stream(
             &conn,
-            lapin_channel,
+            &lapin_info,
             &server,
             &user,
             &config.file_path,

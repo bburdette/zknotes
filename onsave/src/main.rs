@@ -78,6 +78,7 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
   tokio::spawn(async move {
     while let Some(rdelivery) = consumer.next().await {
       let delivery = rdelivery.expect("error");
+      // println!("onsaved dilvery.data: {:?}", delivery.data);
       match serde_json::from_slice::<OnSavedZkNote>(&delivery.data) {
         Ok(szn) => {
           println!("savedskznote: {:?}", szn);
@@ -115,7 +116,7 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
     .await?;
 
   while let Some(rdelivery) = consumer.next().await {
-    println!("on_make_file_note: rdeliver: {:?}", rdelivery);
+    // println!("on_make_file_note: rdeliver: {:?}", rdelivery);
     let delivery = rdelivery.expect("error");
     match serde_json::from_slice::<OnMakeFileNote>(&delivery.data) {
       Ok(omfn) => {
@@ -172,7 +173,7 @@ async fn resize_video(
     .get(s)
     .header(
       reqwest::header::COOKIE,
-      format!("id={}", uuid.to_string().as_str()),
+      format!("id={}", omfn.token.as_str()),
     )
     .send()
     .await?;
@@ -183,7 +184,7 @@ async fn resize_video(
   std::io::copy(&mut content, &mut file)?;
 
   // call out to ffmpeg to resize.
-
+  // `ffmpeg -i newphonepix/Camera/VID_20250730_191257.mp4 -x264-params keyint=240:bframes=6:ref=4:me=umh:subme=9:no-fast-pskip=1:b-adapt=2:aq-mode=2 alamo.mp4`
   Ok(())
 }
 
@@ -205,7 +206,7 @@ async fn resize_image(
     .get(s)
     .header(
       reqwest::header::COOKIE,
-      format!("id={}", uuid.to_string().as_str()),
+      format!("id={}", omfn.token.as_str()),
     )
     .send()
     .await?;
@@ -214,9 +215,10 @@ async fn resize_image(
   let mut content = Cursor::new(res.bytes().await?);
   std::io::copy(&mut content, &mut file)?;
 
-  Ok(())
-
   // run imagemagick to resize.
-
+  // resize to area of 400x400, but retaining aspect ratio:
+  // `magick IMG_20230121_101742.jpg -resize 400x400^ out2.jpg`
   // upload resized with thumb prefix.
+
+  Ok(())
 }

@@ -2897,8 +2897,3 @@ pub fn udpate38(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 
   Ok(())
 }
-
-pub fn udpate39(dbfile: &Path) -> Result<(), orgauth::error::Error> {
-  orgauth::migrations::udpate9(dbfile)?;
-  Ok(())
-}

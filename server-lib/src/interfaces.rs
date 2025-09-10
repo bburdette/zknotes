@@ -8,6 +8,7 @@ use crate::search;
 use crate::sqldata;
 use crate::sqldata::local_server_id;
 use crate::sqldata::zknotes_callbacks;
+use crate::sqldata::LapinInfo;
 use crate::state::new_jobid;
 use crate::state::State;
 use crate::sync;
@@ -165,6 +166,7 @@ pub async fn zk_interface_loggedin_streaming(
 pub async fn zk_interface_loggedin(
   state: &State,
   conn: &Connection,
+  token: Option<String>,
   uid: UserId,
   msg: &PrivateRequest,
 ) -> Result<PrivateReply, zkerr::Error> {
@@ -253,8 +255,14 @@ pub async fn zk_interface_loggedin(
       Ok(PrivateReply::PvyDeletedZkNote(id.clone()))
     }
     PrivateRequest::PvqSaveZkNote(sbe) => {
-      let (_id, s) =
-        sqldata::save_zknote(&conn, &state.lapin_channel, &state.server, uid, &sbe).await?;
+      let li = match (state.lapin_channel.as_ref(), token) {
+        (Some(channel), Some(token)) => Some(LapinInfo {
+          channel: &channel,
+          token,
+        }),
+        _ => None,
+      };
+      let (_id, s) = sqldata::save_zknote(&conn, &li, &state.server, uid, &sbe).await?;
       Ok(PrivateReply::PvySavedZkNote(s))
     }
     PrivateRequest::PvqSaveZkLinks(msg) => {
@@ -262,13 +270,31 @@ pub async fn zk_interface_loggedin(
       Ok(PrivateReply::PvySavedZkLinks)
     }
     PrivateRequest::PvqSaveZkNoteAndLinks(sznpl) => {
-      let (_, szkn) =
-        sqldata::save_zknote(&conn, &state.lapin_channel, &state.server, uid, &sznpl.note).await?;
+      let li = match (state.lapin_channel.as_ref(), token) {
+        (Some(channel), Some(token)) => Some(LapinInfo {
+          channel: &channel,
+          token,
+        }),
+        _ => None,
+      };
+
+      // state.lapin_channel.as_ref().map(|lc| LapinInfo {
+      // channel: &lc,
+      // token: "blah".to_string(),
+      // });
+      let (_, szkn) = sqldata::save_zknote(&conn, &li, &state.server, uid, &sznpl.note).await?;
       let _s = sqldata::save_savezklinks(&conn, uid, szkn.id, &sznpl.links)?;
       Ok(PrivateReply::PvySavedZkNoteAndLinks(szkn))
     }
     PrivateRequest::PvqSaveImportZkNotes(gzl) => {
-      sqldata::save_importzknotes(&conn, &state.lapin_channel, &state.server, uid, gzl).await?;
+      let li = match (state.lapin_channel.as_ref(), token) {
+        (Some(channel), Some(token)) => Some(LapinInfo {
+          channel: &channel,
+          token,
+        }),
+        _ => None,
+      };
+      sqldata::save_importzknotes(&conn, &li, &state.server, uid, gzl).await?;
       Ok(PrivateReply::PvySavedImportZkNotes)
     }
     PrivateRequest::PvqSetHomeNote(hn) => {
@@ -283,6 +309,11 @@ pub async fn zk_interface_loggedin(
       let lgb = state.girlboss.clone();
       let server = state.server.clone();
       let lapin_channelx = state.lapin_channel.clone();
+      // let token
+      // let lapin_info = LapinInfo {
+      //   channel: &lapin_channelx,
+      //   token: "".to_string(),
+      // };
 
       std::thread::spawn(move || {
         let rt = actix_rt::System::new();
@@ -295,6 +326,7 @@ pub async fn zk_interface_loggedin(
           jid: JobId,
           server: Server,
           lapin_channel: Option<lapin::Channel>,
+          token: Option<String>,
         ) -> () {
           lgb
             .write()
@@ -309,10 +341,16 @@ pub async fn zk_interface_loggedin(
               let server = server.clone();
               // let lapin_channel = lapin_channelx.clone();
               write!(gbm, "starting sync");
+
+              // let li = lapin_channel.as_ref().map(|lc| LapinInfo {
+              //   channel: &lc,
+              //   token: token
+              // });
+              // None for now!
               let r = sync::sync(
                 &dbpath,
                 &file_path,
-                &lapin_channel,
+                &None,
                 uid,
                 &server,
                 &mut callbacks,
@@ -341,6 +379,7 @@ pub async fn zk_interface_loggedin(
           jid,
           server,
           lapin_channelx,
+          token,
         ));
         rt.run()
           .map_err(|e| {

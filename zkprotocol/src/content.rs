@@ -103,13 +103,13 @@ pub struct SavedZkNote {
 #[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug, Clone)]
 pub struct OnSavedZkNote {
   pub id: ZkNoteId,
-  pub token: Uuid,
+  pub token: String,
 }
 
 #[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug, Clone)]
 pub struct OnMakeFileNote {
   pub id: ZkNoteId,
-  pub token: Uuid,
+  pub token: String,
   pub title: String,
 }
 
