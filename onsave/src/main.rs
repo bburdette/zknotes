@@ -179,7 +179,7 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
                               let bytes_stream =
                                 tokio_util::codec::FramedRead::new(file, BytesCodec::new());
                               let form = reqwest::multipart::Form::new().part(
-                                "files",
+                                f,
                                 multipart::Part::stream(reqwest::Body::wrap_stream(bytes_stream))
                                   .file_name(f),
                               );
@@ -194,6 +194,7 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
                                 .send()
                                 .await;
                               println!("upload result: {res:?}");
+                              match res {}
                             }
                           }
                           Err(e) => {

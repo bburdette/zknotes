@@ -850,6 +850,17 @@ guiHtmlElement tag attribs =
                     E.none
 
         "note" ->
+            renderNote attribs
+            
+        "yeet" ->
+            E.column [] [E.text "yeet",  renderNote attribs ]
+
+        _ ->
+            E.none
+
+
+renderNote : List HtmlAttribute -> E.Element Msg
+renderNote attribs =
             case ( findAttrib "id" attribs, findAttrib "show" attribs, findAttrib "text" attribs ) of
                 ( Just noteid, mbshow, mbtext ) ->
                     let
@@ -934,5 +945,3 @@ guiHtmlElement tag attribs =
                 _ ->
                     E.none
 
-        _ ->
-            E.none

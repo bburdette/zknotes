@@ -331,6 +331,7 @@ type alias HtmlFns a =
     , videoView : String -> Maybe String -> Maybe String -> Maybe String -> List a -> a
     , audioView : String -> String -> List a -> a
     , noteView : String -> Maybe String -> Maybe String -> List a -> a
+    , yeetView : String -> Maybe String -> Maybe String -> Maybe String -> Maybe String -> List a -> a
     }
 
 
@@ -358,6 +359,7 @@ elmUiHtml args =
     , videoView = videoView args.fui args.maxw
     , audioView = audioView args.fui
     , noteView = noteView args
+    , yeetView = yeetView args
     }
 
 
@@ -406,6 +408,17 @@ textHtml =
                  ]
                     |> List.filterMap identity
                 )
+    , yeetView =
+        \url audioOnly id show text _ ->
+            htmlTextTag "yeet"
+                ([ Just ( "url", url )
+                 , Maybe.map (\s -> ( "audio-only", s )) audioOnly
+                 , Maybe.map (\s -> ( "id", s )) id 
+                 , Maybe.map (\s -> ( "show", s )) show
+                 , Maybe.map (\s -> ( "text", s )) text
+                 ]
+                    |> List.filterMap identity
+                )
     }
 
 
@@ -435,10 +448,12 @@ htmlF hf =
             |> Markdown.Html.withAttribute "id"
             |> Markdown.Html.withOptionalAttribute "show"
             |> Markdown.Html.withOptionalAttribute "text"
-        , Markdown.Html.tag "yeet" hf.noteView
+        , Markdown.Html.tag "yeet" hf.yeetView
             |> Markdown.Html.withAttribute "url"
-            |> Markdown.Html.withOptionalAttribute "text"
             |> Markdown.Html.withOptionalAttribute "audio-only"
+            |> Markdown.Html.withOptionalAttribute "id"
+            |> Markdown.Html.withOptionalAttribute "show"
+            |> Markdown.Html.withOptionalAttribute "text"
         ]
 
 
@@ -652,6 +667,17 @@ parseNoteShow text =
     , link = String.contains "link" text
     }
 
+
+yeetView : MkrArgs a -> String -> Maybe String -> Maybe String -> Maybe String -> Maybe String -> List (Element a) -> Element a
+yeetView args url audioOnly mbid show text _ =
+    let _ = Debug.log "yeetview" (url,audioOnly,(mbid,show,text)) in
+    case mbid of
+        Nothing ->
+            E.text <| "yeet " ++ url ++ (audioOnly |> Maybe.map (\_ -> "-x") |> Maybe.withDefault "" ) 
+        Just id ->
+            E.column [] [
+            E.text <| "yeet " ++ url ++ (audioOnly |> Maybe.map (\_ -> "-x") |> Maybe.withDefault "" ) 
+            , noteView args id show text [] ]
 
 noteView : MkrArgs a -> String -> Maybe String -> Maybe String -> List (Element a) -> Element a
 noteView args id show text _ =
