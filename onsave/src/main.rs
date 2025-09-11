@@ -130,60 +130,122 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
                 (true, Ok(m)) => {
                   match m {
                     zkprotocol::private::PrivateReply::PvyZkNote(zkn) => {
-                      // search for yeet text.
-                      match tl::parse(zkn.content.as_str(), ParserOptions::default()) {
+                      // search for yeet text.  have to make an intermediate yeet list because Node is not Send.
+                      // struct MahYeet {
+                      //   url: String,
+                      //   raw: String,
+                      //   }
+                      let yeets = match tl::parse(zkn.content.as_str(), ParserOptions::default()) {
                         Ok(vdom) => {
-                          for n in vdom.nodes() {
-                            match n {
+                          let yeets: Vec<String> = vdom
+                            .nodes()
+                            .iter()
+                            .filter_map(|n| match n {
                               tl::Node::Tag(t) => {
+                                // t.raw()
                                 if t.name().as_utf8_str() == "yeet" {
-                                  println!("yeet found! {t:?}");
-
                                   if let Some(Some(u)) = t.attributes().get("url") {
-                                    println!("url {u:?}");
-                                    let p = Path::new(".");
-                                    if let Ok(f) = yeet(&p, u.as_utf8_str().to_string()) {
-                                      println!("got file {f:?}");
-
-                                      // upload the file to zknotes.
-                                      if let Ok(file) = File::open(&f).await {
-                                        let bytes_stream = tokio_util::codec::FramedRead::new(
-                                          file,
-                                          BytesCodec::new(),
-                                        );
-                                        let form = reqwest::multipart::Form::new().part(
-                                          "files",
-                                          multipart::Part::stream(reqwest::Body::wrap_stream(
-                                            bytes_stream,
-                                          ))
-                                          .file_name(f),
-                                        );
-                                        // .mime_str  needed?
-                                        let res = client
-                                          .post(String::from(onsave_server_uri.clone()) + "/upload")
-                                          .multipart(form)
-                                          .header(
-                                            reqwest::header::COOKIE,
-                                            format!("id={}", szn.token.as_str()),
-                                          )
-                                          .send()
-                                          .await;
-                                        println!("upload result: {res:?}");
-                                      }
-                                    }
-                                    // client.t
+                                    Some(u.as_utf8_str().to_string())
+                                  } else {
+                                    None
                                   }
+                                  // println!("url {u:?}");
+                                  // let p = Path::new(".");
+                                  // if let Ok(f) = yeet(&p, u.as_utf8_str().to_string()) {
+                                  // Some(n.clone())
+                                } else {
+                                  None
                                 }
                               }
-                              _ => {}
-                            }
-                            println!("node: {:?}", n);
-                          }
+                              _ => None,
+                            })
+                            .collect();
+                          yeets
                         }
                         Err(e) => {
                           println!("html parse error: {:?}", e);
+                          Vec::new()
+                        }
+                      };
+
+                      let p = Path::new(".");
+                      for url in yeets {
+                        match yeet(&p, url).map_err(|e| format!("{e:?}")) {
+                          Ok(f) => {
+                            println!("got file {f:?}");
+
+                            // upload the file to zknotes.
+                            if let Ok(file) = File::open(f.clone()).await {
+                              let bytes_stream =
+                                tokio_util::codec::FramedRead::new(file, BytesCodec::new());
+                              let form = reqwest::multipart::Form::new().part(
+                                "files",
+                                multipart::Part::stream(reqwest::Body::wrap_stream(bytes_stream))
+                                  .file_name(f),
+                              );
+                              // .mime_str  needed?
+                              let res = client
+                                .post(String::from(onsave_server_uri.clone()) + "/upload")
+                                .multipart(form)
+                                .header(
+                                  reqwest::header::COOKIE,
+                                  format!("id={}", szn.token.as_str()),
+                                )
+                                .send()
+                                .await;
+                              println!("upload result: {res:?}");
+                            }
+                          }
+                          Err(e) => {
+                            println!("{e:?}");
+                          }
                         }
                       }
+                      // match n {
+                      // tl::Node::Tag(ref t) => {
+                      // if t.name().as_utf8_str() == "yeet" {
+                      // println!("yeet found! {t:?}");
+
+                      // if let Some(Some(u)) = t.attributes().get("url") {
+                      //   println!("url {u:?}");
+                      //   let p = Path::new(".");
+                      //   if let Ok(f) = yeet(&p, u.as_utf8_str().to_string()) {
+                      //     println!("got file {f:?}");
+
+                      //     // upload the file to zknotes.
+                      //     if let Ok(file) = File::open(&f).await {
+                      //       let bytes_stream = tokio_util::codec::FramedRead::new(
+                      //         file,
+                      //         BytesCodec::new(),
+                      //       );
+                      //       let form = reqwest::multipart::Form::new().part(
+                      //         "files",
+                      //         multipart::Part::stream(reqwest::Body::wrap_stream(
+                      //           bytes_stream,
+                      //         ))
+                      //         .file_name(f),
+                      //       );
+                      //       // .mime_str  needed?
+                      //       let res = client
+                      //         .post(String::from(onsave_server_uri.clone()) + "/upload")
+                      //         .multipart(form)
+                      //         .header(
+                      //           reqwest::header::COOKIE,
+                      //           format!("id={}", szn.token.as_str()),
+                      //         )
+                      //         .send()
+                      //         .await;
+                      //       println!("upload result: {res:?}");
+                      //     }
+                      //   }
+                      // client.t
+                      // }
+                      // }
+                      //   }
+                      //   _ => {}
+                      // }
+                      // println!("node: {:?}", n);
+                      // }
                     }
                     x => {
                       println!("unexpected message: {x:?}");
@@ -195,7 +257,6 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
                 }
               }
             }
-
             Err(e) => {
               println!("post error: {:?}", e);
             }
