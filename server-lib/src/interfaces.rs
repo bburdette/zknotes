@@ -278,10 +278,6 @@ pub async fn zk_interface_loggedin(
         _ => None,
       };
 
-      // state.lapin_channel.as_ref().map(|lc| LapinInfo {
-      // channel: &lc,
-      // token: "blah".to_string(),
-      // });
       let (_, szkn) = sqldata::save_zknote(&conn, &li, &state.server, uid, &sznpl.note).await?;
       let _s = sqldata::save_savezklinks(&conn, uid, szkn.id, &sznpl.links)?;
       Ok(PrivateReply::PvySavedZkNoteAndLinks(szkn))

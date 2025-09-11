@@ -1,4 +1,9 @@
-use std::{fmt, io::Cursor, path::Path, process::Command};
+use std::{
+  fmt::{self},
+  io::Cursor,
+  path::Path,
+  process::Command,
+};
 
 use clap::Arg;
 use futures_lite::stream::StreamExt;
@@ -7,7 +12,10 @@ use lapin::{
   types::FieldTable,
   Connection, ConnectionProperties,
 };
+use reqwest::multipart;
 use tl::ParserOptions;
+use tokio::fs::File;
+use tokio_util::codec::BytesCodec;
 use tracing::{error, info};
 use uuid::Uuid;
 use zkprotocol::content::{OnMakeFileNote, OnSavedZkNote};
@@ -81,12 +89,13 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
     let client = reqwest::Client::builder()
       .build()
       .expect("error building reqwest client");
-    let private_uri = String::from(onsave_server_uri) + "/private";
+    let private_uri = String::from(onsave_server_uri.clone()) + "/private";
     while let Some(rdelivery) = consumer.next().await {
       let delivery = rdelivery.expect("error");
       // println!("onsaved dilvery.data: {:?}", delivery.data);
       match serde_json::from_slice::<OnSavedZkNote>(&delivery.data) {
         Ok(szn) => {
+          // let res : Result<(), Box<dyn std::err
           println!("savedskznote: {:?}", szn);
           // yeet processing.
           // retrieve the note.
@@ -133,8 +142,36 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
                                   if let Some(Some(u)) = t.attributes().get("url") {
                                     println!("url {u:?}");
                                     let p = Path::new(".");
-                                    let f = yeet(&p, u.as_utf8_str().to_string());
-                                    println!("got file {f:?}");
+                                    if let Ok(f) = yeet(&p, u.as_utf8_str().to_string()) {
+                                      println!("got file {f:?}");
+
+                                      // upload the file to zknotes.
+                                      if let Ok(file) = File::open(&f).await {
+                                        let bytes_stream = tokio_util::codec::FramedRead::new(
+                                          file,
+                                          BytesCodec::new(),
+                                        );
+                                        let form = reqwest::multipart::Form::new().part(
+                                          "files",
+                                          multipart::Part::stream(reqwest::Body::wrap_stream(
+                                            bytes_stream,
+                                          ))
+                                          .file_name(f),
+                                        );
+                                        // .mime_str  needed?
+                                        let res = client
+                                          .post(String::from(onsave_server_uri.clone()) + "/upload")
+                                          .multipart(form)
+                                          .header(
+                                            reqwest::header::COOKIE,
+                                            format!("id={}", szn.token.as_str()),
+                                          )
+                                          .send()
+                                          .await;
+                                        println!("upload result: {res:?}");
+                                      }
+                                    }
+                                    // client.t
                                   }
                                 }
                               }
