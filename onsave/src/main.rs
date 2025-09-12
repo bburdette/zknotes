@@ -18,7 +18,7 @@ use tracing::{error, info};
 use uuid::Uuid;
 use zkprotocol::{
   content::{OnMakeFileNote, OnSavedZkNote, SaveZkNote},
-  private::PrivateReply,
+  private::{PrivateReply, PrivateRequest},
   upload::UploadReply,
 };
 
@@ -148,7 +148,6 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
                             .iter()
                             .filter_map(|n| match n {
                               tl::Node::Tag(t) => {
-                                // t.raw()
                                 if t.name().as_utf8_str() == "yeet" {
                                   if let Some(Some(_)) = t.attributes().get("id") {
                                     None // don't process yeets that already have an id.
@@ -168,14 +167,9 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
                                       ),
                                       raw: t.raw().as_utf8_str().to_string(),
                                     })
-                                    // Some(u.as_utf8_str().to_string())
                                   } else {
                                     None // if no url, can't process.
                                   }
-                                  // println!("url {u:?}");
-                                  // let p = Path::new(".");
-                                  // if let Ok(f) = yeet(&p, u.as_utf8_str().to_string()) {
-                                  // Some(n.clone())
                                 } else {
                                   None
                                 }
@@ -206,19 +200,14 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
                             // upload the file to zknotes.
                             if let Ok(file) = File::open(f.clone()).await {
                               let blah: Result<(), Box<dyn std::error::Error>> = async {
+                                // upload the file to zknotes.
                                 let bytes_stream =
                                   tokio_util::codec::FramedRead::new(file, BytesCodec::new());
-                                let mut headers = HeaderMap::new();
-                                headers
-                                  .insert(CONTENT_DISPOSITION, HeaderValue::from_str("form-data")?);
-                                // headers.insert(
                                 let form = reqwest::multipart::Form::new().part(
-                                  f.clone(),
+                                  f.clone().replace(" ", "_"), // no spaces allowed.
                                   multipart::Part::stream(reqwest::Body::wrap_stream(bytes_stream))
-                                    .file_name(f)
-                                    .headers(headers),
+                                    .file_name(f),
                                 );
-                                // .mime_str  needed?
                                 let res = client
                                   .post(String::from(onsave_server_uri.clone()) + "/upload")
                                   .multipart(form)
@@ -229,8 +218,8 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
                                   .send()
                                   .await?;
                                 println!("upload result: {res:?}");
-                                // if the result was good, add the id to the yeet tag, and search-and-replace.
 
+                                // if the result was good, add the id to the yeet tag, and search-and-replace.
                                 match (
                                   res.status().is_success(),
                                   res
@@ -253,27 +242,22 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
                                           s: "no note uploaded".to_string(),
                                         })?
                                         .id;
-                                      // my.attribs.remove_entry("id");
                                       my.attribs.insert("id".to_string(), format!("{}", id));
-                                      let newyeet = format!("<yeet id=\"{}\" ", id)
+                                      let newyeet = format!("<yeet ")
                                         + my
                                           .attribs
                                           .into_iter()
                                           .map(|(n, v)| format!(" {}=\"{}\"", n, v))
                                           .collect::<Vec<String>>()
                                           .concat()
-                                          .as_str();
+                                          .as_str()
+                                        + "/>";
 
                                       ed_content =
                                         ed_content.replace(my.raw.as_str(), newyeet.as_str());
 
                                       println!("ed_content {}", ed_content);
-                                      // ++ url=\"{my.url}\"/>");
-
-                                      // szn.id
-                                    } // x => {
-                                      //   println!("unexpected message: {x:?}");
-                                      // }
+                                    }
                                   },
                                   x => {
                                     println!("upload failure: {x:?}");
@@ -312,7 +296,9 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
                               format!("id={}", szn.token.as_str()),
                             )
                             .header(reqwest::header::CONTENT_TYPE, "application/json")
-                            .body(serde_json::to_string(&nszn).unwrap())
+                            .body(
+                              serde_json::to_string(&PrivateRequest::PvqSaveZkNote(nszn)).unwrap(),
+                            )
                             .send()
                             .await?;
 

@@ -670,7 +670,6 @@ parseNoteShow text =
 
 yeetView : MkrArgs a -> String -> Maybe String -> Maybe String -> Maybe String -> Maybe String -> List (Element a) -> Element a
 yeetView args url audioOnly mbid show text _ =
-    let _ = Debug.log "yeetview" (url,audioOnly,(mbid,show,text)) in
     case mbid of
         Nothing ->
             E.text <| "yeet " ++ url ++ (audioOnly |> Maybe.map (\_ -> " -x") |> Maybe.withDefault "" )
@@ -694,6 +693,7 @@ noteView args id show text _ =
                     , changedate = False
                     , link = True
                     }
+
     in
     case
         zkNoteIdFromString id
@@ -1056,7 +1056,27 @@ noteIds markdown =
                                                     zkNoteIdFromString i.value |> Result.toMaybe
 
                                                 else
-                                                    Nothing
+                                                    mbv
+                                            )
+                                            Nothing
+                                            attr
+                                    of
+                                        Just id ->
+                                            TSet.insert id ids
+
+                                        Nothing ->
+                                            ids
+                                "yeet" ->
+                                    let _ =  Debug.log "yeetattrs:" attr in
+                                    Debug.log "yeetnoteids:" <|
+                                    case
+                                        List.foldl
+                                            (\i mbv ->
+                                                if i.name == "id" then
+                                                    zkNoteIdFromString i.value |> Result.toMaybe
+
+                                                else
+                                                    mbv
                                             )
                                             Nothing
                                             attr
