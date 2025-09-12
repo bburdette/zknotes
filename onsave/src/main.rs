@@ -7,7 +7,10 @@ use lapin::{
   types::FieldTable,
   Connection, ConnectionProperties,
 };
-use reqwest::multipart;
+use reqwest::{
+  header::{HeaderMap, HeaderValue, CONTENT_DISPOSITION},
+  multipart,
+};
 use tl::ParserOptions;
 use tokio::fs::File;
 use tokio_util::codec::BytesCodec;
@@ -31,6 +34,8 @@ async fn main() {
 }
 
 async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
+  println!("welcome to err main");
+
   let matches = clap::Command::new("zknotes onsave")
     .version("1.0")
     .author("Ben Burdette")
@@ -200,15 +205,19 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
 
                             // upload the file to zknotes.
                             if let Ok(file) = File::open(f.clone()).await {
-                              let bytes_stream =
-                                tokio_util::codec::FramedRead::new(file, BytesCodec::new());
-                              let form = reqwest::multipart::Form::new().part(
-                                f.clone(),
-                                multipart::Part::stream(reqwest::Body::wrap_stream(bytes_stream))
-                                  .file_name(f),
-                              );
-
                               let blah: Result<(), Box<dyn std::error::Error>> = async {
+                                let bytes_stream =
+                                  tokio_util::codec::FramedRead::new(file, BytesCodec::new());
+                                let mut headers = HeaderMap::new();
+                                headers
+                                  .insert(CONTENT_DISPOSITION, HeaderValue::from_str("form-data")?);
+                                // headers.insert(
+                                let form = reqwest::multipart::Form::new().part(
+                                  f.clone(),
+                                  multipart::Part::stream(reqwest::Body::wrap_stream(bytes_stream))
+                                    .file_name(f)
+                                    .headers(headers),
+                                );
                                 // .mime_str  needed?
                                 let res = client
                                   .post(String::from(onsave_server_uri.clone()) + "/upload")
