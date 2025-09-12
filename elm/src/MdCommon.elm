@@ -413,7 +413,7 @@ textHtml =
             htmlTextTag "yeet"
                 ([ Just ( "url", url )
                  , Maybe.map (\s -> ( "audio-only", s )) audioOnly
-                 , Maybe.map (\s -> ( "id", s )) id 
+                 , Maybe.map (\s -> ( "id", s )) id
                  , Maybe.map (\s -> ( "show", s )) show
                  , Maybe.map (\s -> ( "text", s )) text
                  ]
@@ -673,10 +673,10 @@ yeetView args url audioOnly mbid show text _ =
     let _ = Debug.log "yeetview" (url,audioOnly,(mbid,show,text)) in
     case mbid of
         Nothing ->
-            E.text <| "yeet " ++ url ++ (audioOnly |> Maybe.map (\_ -> "-x") |> Maybe.withDefault "" ) 
+            E.text <| "yeet " ++ url ++ (audioOnly |> Maybe.map (\_ -> " -x") |> Maybe.withDefault "" )
         Just id ->
             E.column [] [
-            E.text <| "yeet " ++ url ++ (audioOnly |> Maybe.map (\_ -> "-x") |> Maybe.withDefault "" ) 
+            E.text <| "yeet " ++ url ++ (audioOnly |> Maybe.map (\_ -> " -x") |> Maybe.withDefault "" )
             , noteView args id show text [] ]
 
 noteView : MkrArgs a -> String -> Maybe String -> Maybe String -> List (Element a) -> Element a

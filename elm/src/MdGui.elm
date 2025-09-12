@@ -602,45 +602,52 @@ updateHtmlElement msg tag attribs =
                     HtmlElement tag attribs []
 
         "note" ->
-            case msg of
-                NoteIdText s ->
-                    HtmlElement tag (updateAttrib "id" (Just s) attribs) []
+            updateNoteAttribs msg tag attribs
 
-                NoteText s ->
-                    let
-                        mb =
-                            case s of
-                                "" ->
-                                    Nothing
+        "yeet" ->
+            updateNoteAttribs msg tag attribs
 
-                                _ ->
-                                    Just s
-                    in
-                    HtmlElement tag (updateAttrib "text" mb attribs) []
+        _ ->
+            HtmlElement tag attribs []
 
-                NoteShowTitle b ->
-                    HtmlElement tag (updateShowAttrib "title" b attribs) []
 
-                NoteShowContents b ->
-                    HtmlElement tag (updateShowAttrib "contents" b attribs) []
+updateNoteAttribs msg tag attribs =
+    case msg of
+        NoteIdText s ->
+            HtmlElement tag (updateAttrib "id" (Just s) attribs) []
 
-                NoteShowText b ->
-                    HtmlElement tag (updateShowAttrib "text" b attribs) []
+        NoteText s ->
+            let
+                mb =
+                    case s of
+                        "" ->
+                            Nothing
 
-                NoteShowFile b ->
-                    HtmlElement tag (updateShowAttrib "file" b attribs) []
+                        _ ->
+                            Just s
+            in
+            HtmlElement tag (updateAttrib "text" mb attribs) []
 
-                NoteShowCreatedate b ->
-                    HtmlElement tag (updateShowAttrib "createdate" b attribs) []
+        NoteShowTitle b ->
+            HtmlElement tag (updateShowAttrib "title" b attribs) []
 
-                NoteShowChangedate b ->
-                    HtmlElement tag (updateShowAttrib "changedate" b attribs) []
+        NoteShowContents b ->
+            HtmlElement tag (updateShowAttrib "contents" b attribs) []
 
-                NoteShowLink b ->
-                    HtmlElement tag (updateShowAttrib "link" b attribs) []
+        NoteShowText b ->
+            HtmlElement tag (updateShowAttrib "text" b attribs) []
 
-                _ ->
-                    HtmlElement tag attribs []
+        NoteShowFile b ->
+            HtmlElement tag (updateShowAttrib "file" b attribs) []
+
+        NoteShowCreatedate b ->
+            HtmlElement tag (updateShowAttrib "createdate" b attribs) []
+
+        NoteShowChangedate b ->
+            HtmlElement tag (updateShowAttrib "changedate" b attribs) []
+
+        NoteShowLink b ->
+            HtmlElement tag (updateShowAttrib "link" b attribs) []
 
         _ ->
             HtmlElement tag attribs []
