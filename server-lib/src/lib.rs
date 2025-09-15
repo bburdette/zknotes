@@ -3,7 +3,6 @@ pub mod error;
 pub mod interfaces;
 pub mod jobs;
 mod migrations;
-mod scripts;
 pub mod search;
 pub mod sqldata;
 mod sqltest;

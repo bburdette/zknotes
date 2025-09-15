@@ -2,9 +2,7 @@ use crate::error as zkerr;
 use crate::error::to_orgauth_error;
 use crate::migrations as zkm;
 use async_stream::try_stream;
-use awc::error::HeaderValue;
 use barrel::backend::Sqlite;
-use cookie::CookieBuilder;
 use lapin::Channel;
 use log::{error, info};
 use orgauth::data::{RegistrationData, UserId};
@@ -898,7 +896,6 @@ pub async fn save_zknote(
   let now = now()?;
 
   async fn publish_szn(
-    conn: &Connection,
     uid: UserId,
     lapin_info: &Option<LapinInfo<'_>>,
     szn: &SavedZkNote,
@@ -982,7 +979,7 @@ pub async fn save_zknote(
             server: server.uuid.clone(),
             what: note.what.clone(),
           };
-          publish_szn(&conn, uid, lapin_info, &szn).await?;
+          publish_szn(uid, lapin_info, &szn).await?;
           Ok((id, szn))
         }
         Ok(0) => {
@@ -1001,7 +998,7 @@ pub async fn save_zknote(
                 server: server.uuid.clone(),
                 what: note.what.clone(),
               };
-              publish_szn(&conn, uid, lapin_info, &szn).await?;
+              publish_szn( uid, lapin_info, &szn).await?;
               Ok((id, szn))},
             _ => bail!("unexpected update success!"),
           }
@@ -1038,7 +1035,7 @@ pub async fn save_zknote(
         server: server.uuid.clone(),
         what: note.what.clone(),
       };
-      publish_szn(&conn, uid, lapin_info, &szn).await?;
+      publish_szn(uid, lapin_info, &szn).await?;
       Ok((id, szn))
     }
   }

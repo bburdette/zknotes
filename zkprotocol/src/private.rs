@@ -2,7 +2,7 @@ use crate::{
   content::{
     ArchiveZkLink, GetArchiveZkLinks, GetArchiveZkNote, GetZkLinksSince, GetZkNoteAndLinks,
     GetZkNoteArchives, GetZkNoteComments, GetZnlIfChanged, ImportZkNote, JobStatus, SaveZkLinks,
-    SaveZkNote, SaveZkNoteAndLinks, SavedZkNote, UuidZkLink, ZkLinks, ZkListNote, ZkNote,
+    SaveZkNote, SaveZkNoteAndLinks, SavedZkNote, UuidZkLink, ZkListNote, ZkNote,
     ZkNoteAndLinksWhat, ZkNoteArchives, ZkNoteId,
   },
   search::{

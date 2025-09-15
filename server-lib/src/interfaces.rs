@@ -338,21 +338,13 @@ pub async fn zk_interface_loggedin(
               // let lapin_channel = lapin_channelx.clone();
               write!(gbm, "starting sync");
 
-              // let li = lapin_channel.as_ref().map(|lc| LapinInfo {
-              //   channel: &lc,
-              //   token: token
-              // });
+              let li = match (lapin_channel.as_ref(), token) {
+                (Some(channel), Some(token)) => Some(LapinInfo { channel, token }),
+                _ => None,
+              };
               // None for now!
-              let r = sync::sync(
-                &dbpath,
-                &file_path,
-                &None,
-                uid,
-                &server,
-                &mut callbacks,
-                &gbm,
-              )
-              .await;
+              let r =
+                sync::sync(&dbpath, &file_path, &li, uid, &server, &mut callbacks, &gbm).await;
               match r {
                 Ok(_) => write!(gbm, "sync completed"),
                 Err(e) => write!(gbm, "sync err: {:?}", e),
