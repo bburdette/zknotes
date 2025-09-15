@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, fmt, io::Cursor, path::Path, process::Command};
+use std::{collections::BTreeMap, fmt, fs, io::Cursor, path::Path, process::Command};
 
 use clap::Arg;
 use futures_lite::stream::StreamExt;
@@ -209,7 +209,7 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
                                 let form = reqwest::multipart::Form::new().part(
                                   f.clone().replace(" ", "_"), // no spaces allowed.
                                   multipart::Part::stream(reqwest::Body::wrap_stream(bytes_stream))
-                                    .file_name(f),
+                                    .file_name(f.clone()),
                                 );
                                 let res = client
                                   .post(String::from(onsave_server_uri.clone()) + "/upload")
@@ -239,6 +239,7 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
                                 ) {
                                   (true, Ok(pr)) => match pr {
                                     UploadReply::UrFilesUploaded(notes) => {
+                                      fs::remove_file(f.clone())?;
                                       let id = notes
                                         .first()
                                         .ok_or(StringError {
@@ -542,6 +543,8 @@ async fn resize_video(
   )
   .await?;
 
+  fs::remove_file(thumbfile)?;
+
   println!("made it here");
   // ---------- link thumb to original. -------------
 
@@ -625,6 +628,8 @@ async fn resize_image(
   )
   .await?;
 
+  fs::remove_file(thumbfile)?;
+
   println!("made it here");
   // ---------- link thumb to original. -------------
 
@@ -678,7 +683,7 @@ pub async fn image_resize(
   let mut child = Command::new("magick")
     .arg(imagefile)
     .arg("-resize")
-    .arg("400x400^")
+    .arg("800x800^")
     .arg(outfile.clone())
     .spawn()
     .expect("magick failed to execute");
