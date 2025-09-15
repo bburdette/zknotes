@@ -7,20 +7,14 @@ use lapin::{
   types::FieldTable,
   Connection, ConnectionProperties,
 };
-use reqwest::{
-  header::{HeaderMap, HeaderValue, CONTENT_DISPOSITION},
-  multipart,
-};
+use reqwest::multipart;
 use tl::ParserOptions;
 use tokio::fs::File;
 use tokio_util::codec::BytesCodec;
 use tracing::{error, info};
 use uuid::Uuid;
 use zkprotocol::{
-  content::{
-    OnMakeFileNote, OnSavedZkNote, SaveZkLink, SaveZkLink2, SaveZkLinks, SaveZkNote,
-    SaveZkNoteAndLinks,
-  },
+  content::{OnMakeFileNote, OnSavedZkNote, SaveZkLink2, SaveZkLinks, SaveZkNote},
   private::{PrivateReply, PrivateRequest},
   upload::UploadReply,
 };
