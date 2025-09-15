@@ -17,7 +17,10 @@ use tokio_util::codec::BytesCodec;
 use tracing::{error, info};
 use uuid::Uuid;
 use zkprotocol::{
-  content::{OnMakeFileNote, OnSavedZkNote, SaveZkNote},
+  content::{
+    OnMakeFileNote, OnSavedZkNote, SaveZkLink, SaveZkLink2, SaveZkLinks, SaveZkNote,
+    SaveZkNoteAndLinks,
+  },
   private::{PrivateReply, PrivateRequest},
   upload::UploadReply,
 };
@@ -367,18 +370,20 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
       Ok(omfn) => {
         println!("on_make_file_note: OnMakeFileNote: {:?}", omfn);
         if let Some(suffix) = omfn.title.split('.').last() {
-          match suffix.to_lowercase().as_str() {
-            "mp4" => resize_video(&server_uri.as_str(), omfn).await?,
-            "webm" => resize_video(&server_uri.as_str(), omfn).await?,
-            "mkv" => resize_video(&server_uri.as_str(), omfn).await?,
-            "jpg" => resize_image(&server_uri.as_str(), omfn).await?,
-            "gif" => resize_image(&server_uri.as_str(), omfn).await?,
-            "png" => resize_image(&server_uri.as_str(), omfn).await?,
-            // "mp3" ->
-            // "m4a" ->
-            // "opus" ->
-            _ => {
-              println!("unsupported file suffix: {}", suffix);
+          if !omfn.title.contains("thumb") {
+            match suffix.to_lowercase().as_str() {
+              "mp4" => resize_video(&server_uri.as_str(), omfn).await?,
+              "webm" => resize_video(&server_uri.as_str(), omfn).await?,
+              "mkv" => resize_video(&server_uri.as_str(), omfn).await?,
+              "jpg" => resize_image(&server_uri.as_str(), omfn).await?,
+              "gif" => resize_image(&server_uri.as_str(), omfn).await?,
+              "png" => resize_image(&server_uri.as_str(), omfn).await?,
+              // "mp3" ->
+              // "m4a" ->
+              // "opus" ->
+              _ => {
+                println!("unsupported file suffix: {}", suffix);
+              }
             }
           }
         }
@@ -525,7 +530,58 @@ async fn resize_video(
 
   // call out to ffmpeg to resize.
   // `ffmpeg -i newphonepix/Camera/VID_20250730_191257.mp4 -x264-params keyint=240:bframes=6:ref=4:me=umh:subme=9:no-fast-pskip=1:b-adapt=2:aq-mode=2 alamo.mp4`
-  Ok(())
+
+  let thumbfile = video_resize(idstring).await?;
+
+  // upload resized thumb
+  let zkprotocol::upload::UploadReply::UrFilesUploaded(uploadreply) = upload_file(
+    &client,
+    Path::new(thumbfile.as_str()),
+    &omfn.token,
+    server_uri,
+  )
+  .await?;
+
+  println!("made it here");
+  // ---------- link thumb to original. -------------
+
+  // for each zklistnote make a link.  should be only one.
+  let szl = SaveZkLinks {
+    links: uploadreply
+      .into_iter()
+      .map(|zln| SaveZkLink2 {
+        from: zln.id,
+        to: omfn.id,
+        linkzknote: None,
+        delete: None,
+      })
+      .collect(),
+  };
+
+  let client = reqwest::Client::builder().build()?;
+  let res = client
+    .post(String::from(server_uri) + "/private")
+    .header(
+      reqwest::header::COOKIE,
+      format!("id={}", omfn.token.as_str()),
+    )
+    .header(reqwest::header::CONTENT_TYPE, "application/json")
+    .body(serde_json::to_string(&PrivateRequest::PvqSaveZkLinks(szl))?)
+    .send()
+    .await?;
+
+  let txt = res.text().await?;
+
+  println!("savezklinkes reply: {txt}");
+
+  let reply = serde_json::from_str::<zkprotocol::private::PrivateReply>(txt.as_str())?;
+
+  match reply {
+    PrivateReply::PvySavedZkLinks => Ok(()),
+    x => Err(Box::new(StringError {
+      s: format!("unexpected reply to savezklinks: {:?}", x),
+    })),
+  }
 }
 
 async fn resize_image(
@@ -534,7 +590,7 @@ async fn resize_image(
 ) -> Result<(), Box<dyn std::error::Error>> {
   println!("resize_image {:?}", omfn);
   // download the file.
-  // download the file.i
+  // download the file.
   let mut s = String::from(server_uri);
   s.push_str("/file/");
   let uuid: Uuid = omfn.id.into();
@@ -558,7 +614,160 @@ async fn resize_image(
   // run imagemagick to resize.
   // resize to area of 400x400, but retaining aspect ratio:
   // `magick IMG_20230121_101742.jpg -resize 400x400^ out2.jpg`
-  // upload resized with thumb prefix.
+  let thumbfile = image_resize(idstring).await?;
 
-  Ok(())
+  // upload resized thumb
+  let zkprotocol::upload::UploadReply::UrFilesUploaded(uploadreply) = upload_file(
+    &client,
+    Path::new(thumbfile.as_str()),
+    &omfn.token,
+    server_uri,
+  )
+  .await?;
+
+  println!("made it here");
+  // ---------- link thumb to original. -------------
+
+  // for each zklistnote make a link.  should be only one.
+  let szl = SaveZkLinks {
+    links: uploadreply
+      .into_iter()
+      .map(|zln| SaveZkLink2 {
+        from: zln.id,
+        to: omfn.id,
+        linkzknote: None,
+        delete: None,
+      })
+      .collect(),
+  };
+
+  let client = reqwest::Client::builder().build()?;
+  let res = client
+    .post(String::from(server_uri) + "/private")
+    .header(
+      reqwest::header::COOKIE,
+      format!("id={}", omfn.token.as_str()),
+    )
+    .header(reqwest::header::CONTENT_TYPE, "application/json")
+    .body(serde_json::to_string(&PrivateRequest::PvqSaveZkLinks(szl))?)
+    .send()
+    .await?;
+
+  let txt = res.text().await?;
+
+  println!("savezklinkes reply: {txt}");
+
+  let reply = serde_json::from_str::<zkprotocol::private::PrivateReply>(txt.as_str())?;
+
+  match reply {
+    PrivateReply::PvySavedZkLinks => Ok(()),
+    x => Err(Box::new(StringError {
+      s: format!("unexpected reply to savezklinks: {:?}", x),
+    })),
+  }
+
+  // TODO: delete file.
+}
+
+pub async fn image_resize(
+  imagefile: String,
+  // sizeparm: String,
+) -> Result<String, Box<dyn std::error::Error>> {
+  let outfile = imagefile.clone() + "-thumb.jpg";
+
+  let mut child = Command::new("magick")
+    .arg(imagefile)
+    .arg("-resize")
+    .arg("400x400^")
+    .arg(outfile.clone())
+    .spawn()
+    .expect("magick failed to execute");
+
+  match child.wait() {
+    Ok(exit_code) => {
+      if exit_code.success() {
+        Ok(outfile)
+      } else {
+        Err(Box::new(StringError {
+          s: format!("magick resize error {:?}", exit_code),
+        }))
+      }
+    }
+    Err(e) => Err(Box::new(StringError {
+      s: format!("magick resize error {:?}", e),
+    })),
+  }
+}
+
+pub async fn video_resize(
+  videofile: String,
+  // sizeparm: String,
+) -> Result<String, Box<dyn std::error::Error>> {
+  let outfile = videofile.clone() + "-thumb.mp4";
+
+  let mut child = Command::new("ffmpeg")
+    .arg("-i")
+    .arg(videofile)
+    .arg("-x264-params")
+    .arg("keyint=240:bframes=6:ref=4:me=umh:subme=9:no-fast-pskip=1:b-adapt=2:aq-mode=2")
+    .arg(outfile.clone())
+    .spawn()
+    .expect("magick failed to execute");
+
+  match child.wait() {
+    Ok(exit_code) => {
+      if exit_code.success() {
+        Ok(outfile)
+      } else {
+        Err(Box::new(StringError {
+          s: format!("ffmpeg resize error {:?}", exit_code),
+        }))
+      }
+    }
+    Err(e) => Err(Box::new(StringError {
+      s: format!("ffmpeg resize error {:?}", e),
+    })),
+  }
+}
+
+pub async fn upload_file(
+  client: &reqwest::Client,
+  filename: &Path,
+  token: &str,
+  server_uri: &str,
+) -> Result<zkprotocol::upload::UploadReply, Box<dyn std::error::Error>> {
+  let file = File::open(filename).await?;
+
+  // upload the file to zknotes.
+  let bytes_stream = tokio_util::codec::FramedRead::new(file, BytesCodec::new());
+  let utf_fname = filename
+    .to_str()
+    .ok_or(StringError {
+      // s: format!("filename unicode error: {:?}", filename.clone()),
+      s: "filename unicode error".to_string(),
+    })?
+    .to_string();
+  let form = reqwest::multipart::Form::new().part(
+    utf_fname.to_string().replace(" ", "_"), // no spaces allowed.
+    multipart::Part::stream(reqwest::Body::wrap_stream(bytes_stream)).file_name(utf_fname),
+  );
+  let res = client
+    .post(String::from(server_uri) + "/upload")
+    .multipart(form)
+    .header(reqwest::header::COOKIE, format!("id={}", token))
+    .send()
+    .await?;
+  println!("upload result: {res:?}");
+
+  if !res.status().is_success() {
+    return Err(Box::new(StringError {
+      s: format!("upload failure: {}", res.status()),
+    }));
+  }
+
+  let txt = res.text().await?;
+
+  let ur = serde_json::from_str::<zkprotocol::upload::UploadReply>(txt.as_str())?;
+
+  Ok(ur)
 }

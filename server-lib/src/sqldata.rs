@@ -24,8 +24,8 @@ use zkprotocol::constants::SpecialUuids;
 use zkprotocol::content::{
   ArchiveZkLink, Direction, EditLink, ExtraLoginData, FileInfo, FileStatus, GetArchiveZkNote,
   GetZkNoteArchives, GetZkNoteComments, GetZnlIfChanged, ImportZkNote, OnMakeFileNote,
-  OnSavedZkNote, SaveZkLink, SaveZkNote, SavedZkNote, Server, Sysids, UuidZkLink, ZkLink,
-  ZkListNote, ZkNote, ZkNoteAndLinks, ZkNoteAndLinksWhat, ZkNoteId,
+  OnSavedZkNote, SaveZkLink, SaveZkLink2, SaveZkNote, SavedZkNote, Server, Sysids, UuidZkLink,
+  ZkLink, ZkListNote, ZkNote, ZkNoteAndLinks, ZkNoteAndLinksWhat, ZkNoteId,
 };
 use zkprotocol::sync_data::SyncMessage;
 
@@ -917,6 +917,7 @@ pub async fn save_zknote(
       println!("morecookie2: {:?}", c.value());*/
       let oszn = OnSavedZkNote {
         id: szn.id,
+        user: uid,
         token: li.token.clone(),
       };
       match li
@@ -1535,35 +1536,39 @@ pub fn delete_zknote(
   Ok(())
 }
 
-pub fn save_zklinks(dbfile: &Path, uid: UserId, zklinks: &Vec<ZkLink>) -> Result<(), zkerr::Error> {
+pub fn save_zklinks(
+  dbfile: &Path,
+  uid: UserId,
+  zklinks: &Vec<SaveZkLink2>,
+) -> Result<(), zkerr::Error> {
   let conn = connection_open(dbfile)?;
 
   for zklink in zklinks.iter() {
     // TODO: integrate into sql instead of separate queries.
     let to = note_id_for_zknoteid(&conn, &zklink.to)?;
     let from = note_id_for_zknoteid(&conn, &zklink.from)?;
-    if zklink.user == uid {
-      if zklink.delete == Some(true) {
-        // create archive record.
-        let now = now()?;
-        conn.execute(
-          "insert into zklinkarchive (fromid, toid, user, linkzknote, createdate, deletedate)
+    if zklink.delete == Some(true) {
+      // if delete, create archive record.
+      let now = now()?;
+      conn.execute(
+        "insert into zklinkarchive (fromid, toid, user, linkzknote, createdate, deletedate)
             select fromid, toid, user, linkzknote, createdate, ?1 from zklink
             where fromid = ?2 and toid = ?3 and user = ?4",
-          params![now, from, to, uid.to_i64()],
-        )?;
+        params![now, from, to, uid.to_i64()],
+      )?;
 
-        // delete link.
-        conn.execute(
-          "delete from zklink where fromid = ?1 and toid = ?2 and user = ?3",
-          params![from, to, uid.to_i64()],
-        )?;
-      } else {
-        let linkzknote = zklink
-          .linkzknote
-          .and_then(|lzn| note_id_for_zknoteid(&conn, &lzn).ok());
-        save_zklink(&conn, from, to, uid, linkzknote)?;
-      }
+      // delete link.
+      conn.execute(
+        "delete from zklink where fromid = ?1 and toid = ?2 and user = ?3",
+        params![from, to, uid.to_i64()],
+      )?;
+    } else {
+      let lzn = match zklink.linkzknote {
+        Some(zknid) => Some(note_id_for_zknoteid(&conn, &zknid)?),
+        None => None,
+      };
+
+      save_zklink(&conn, from, to, uid, lzn)?;
     }
   }
 
@@ -2565,6 +2570,7 @@ pub async fn make_file_note(
     orgauth::dbfun::add_token(&conn, uid, nt, None, Some("robot"))?;*/
     let oszn = OnMakeFileNote {
       id: sn.id,
+      user: uid,
       token: li.token.clone(),
       title: name.to_string(),
     };
