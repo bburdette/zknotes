@@ -14,7 +14,7 @@ use actix_cors::Cors;
 use actix_files::NamedFile;
 use actix_multipart::Multipart;
 use actix_session::{
-  config::PersistentSession, storage::CookieSessionStore, Session, SessionExt, SessionMiddleware,
+  config::PersistentSession, storage::CookieSessionStore, Session, SessionMiddleware,
 };
 use actix_web::{
   cookie::{self, Key},
@@ -352,20 +352,13 @@ async fn make_file_notes(
 
   // Save the files to our temp path.
   let tp = state.config.file_tmp_path.clone();
-  let saved_files_res = save_files(&tp, payload).await;
-  let saved_files = saved_files_res?;
-  // let saved_files = save_files(&tp, payload).await?;
+  let saved_files = save_files(&tp, payload).await?;
 
   let mut zklns = Vec::new();
 
   for (name, fp) in saved_files {
     // compute hash.
     let fpath = Path::new(&fp);
-
-    // let li = state.lapin_channel.as_ref().map(|lc| LapinInfo {
-    //   channel: &lc,
-    //   token: "blah".to_string(),
-    // });
 
     let (nid64, _noteid, _fid) = sqldata::make_file_note(
       &conn,
@@ -445,11 +438,6 @@ async fn private(
   req: HttpRequest,
 ) -> HttpResponse {
   let mut state = data.clone();
-  println!("id: {:?}", req.get_session().get::<String>("token"));
-  println!("cookies: {:?}", req.cookies());
-  println!("cookie, id: {:?}", req.cookie("id"));
-  println!("cookie, vw: {:?}", req.cookie("id").unwrap().value_raw());
-  println!("cookie, v: {:?}", req.cookie("id").unwrap().value());
 
   let token = get_cookie_id(&req);
 
@@ -694,8 +682,6 @@ pub async fn err_main(
   oconfig: Option<Config>,
   logfile: Option<PathBuf>,
 ) -> Result<(), Box<dyn Error>> {
-  // async_global_executor::
-
   match logfile {
     Some(lf) => {
       let target = Box::new(File::create(lf).expect("Can't create file"));
@@ -904,8 +890,6 @@ pub async fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
         Ok(_) => (),
       },
     );
-
-  println!("config.aqmp_uri {:?}", config.aqmp_uri);
 
   let lapin_channel = match config.aqmp_uri {
     Some(ref uri) => {
