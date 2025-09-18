@@ -1067,8 +1067,6 @@ noteIds markdown =
                                         Nothing ->
                                             ids
                                 "yeet" ->
-                                    let _ =  Debug.log "yeetattrs:" attr in
-                                    Debug.log "yeetnoteids:" <|
                                     case
                                         List.foldl
                                             (\i mbv ->

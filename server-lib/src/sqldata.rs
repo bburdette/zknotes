@@ -2551,9 +2551,6 @@ pub async fn make_file_note(
   set_zknote_file(&conn, id, fid)?;
 
   if let Some(li) = lapin_info {
-    // make a token just for this call.
-    /*let nt = Uuid::new_v4();
-    orgauth::dbfun::add_token(&conn, uid, nt, None, Some("robot"))?;*/
     let oszn = OnMakeFileNote {
       id: sn.id,
       user: uid,
