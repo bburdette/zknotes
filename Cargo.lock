@@ -2850,25 +2850,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4895175b425cb1f87721b59f0f286c2092bd4af812243672510e1ac53e2e0ad"
 
 [[package]]
-name = "onsave"
-version = "0.1.0"
-dependencies = [
- "clap 4.5.47",
- "futures-lite 2.6.1",
- "glob",
- "lapin 3.4.0",
- "reqwest 0.12.23",
- "serde_json",
- "tl",
- "tokio",
- "tokio-stream",
- "tokio-util",
- "tracing",
- "uuid",
- "zkprotocol",
-]
-
-[[package]]
 name = "opaque-debug"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5304,6 +5285,25 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "zknotes-onsave"
+version = "0.1.0"
+dependencies = [
+ "clap 4.5.47",
+ "futures-lite 2.6.1",
+ "glob",
+ "lapin 3.4.0",
+ "reqwest 0.12.23",
+ "serde_json",
+ "tl",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+ "tracing",
+ "uuid",
+ "zkprotocol",
 ]
 
 [[package]]

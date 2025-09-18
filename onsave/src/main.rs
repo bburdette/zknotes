@@ -51,6 +51,13 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
         .value_name("zknotes server uri")
         .help("server to connect to"),
     )
+    .arg(
+      Arg::new("yt-dlp-path")
+        // .short('r')
+        .long("yt-dlp-path")
+        .value_name("path of yt-dlp")
+        .help("full path is needed in nixos module/services"),
+    )
     .get_matches();
 
   let amqp_uri = matches
@@ -60,6 +67,10 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
   let server_uri = matches
     .get_one::<String>("server_uri")
     .expect("server_uri is required");
+
+  let yt_dlp_path = matches
+    .get_one::<String>("yt-dlp-path")
+    .unwrap_or_default("yt-dlp".to_string());
 
   let conn = Connection::connect(&amqp_uri, ConnectionProperties::default()).await?;
 
@@ -442,7 +453,7 @@ pub fn yeet(savedir: &Path, url: String) -> Result<String, Box<dyn std::error::E
     s: "missing 'v' from url".to_string(),
   })?;
 
-  let mut child = Command::new("yt-dlp")
+  let mut child = Command::new(yt_dlp_path.as_str())
     .arg("-x")
     .arg(format!("-o{}/%(title)s-%(id)s.%(ext)s", savedir.display()))
     .arg(url.clone())

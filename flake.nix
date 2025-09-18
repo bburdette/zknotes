@@ -63,6 +63,7 @@
             root = ./.;
             buildInputs = with pkgs; [
               # rs_compiler
+              yt-dlp
               sqlite
               pkg-config
               openssl.dev
@@ -125,7 +126,7 @@
           };
         }
       ) // {
-      nixosModules = { zknotes = import ./module.nix; };
+      nixosModules = { zknotes = import ./module.nix; zknotes-onsave = import ./onsave-module.nix; };
     };
 }
 
