@@ -567,9 +567,7 @@ async fn zk_interface_check_upstreaming(
   session: &Session,
   config: &Config,
   lapin_info: &Option<LapinInfo<'_>>,
-  // lapin_channel: &Option<lapin::Channel>,
   body: web::Payload,
-  // req: &HttpRequest,
 ) -> Result<HttpResponse, Box<dyn Error>> {
   match session.get::<Uuid>("token")? {
     None => Ok(HttpResponse::Ok().json(PrivateReply::PvyServerError(PrivateError::PveNotLoggedIn))),
@@ -600,8 +598,6 @@ async fn zk_interface_check_upstreaming(
             body.map_err(convert_bodyerr as fn(actix_web::error::PayloadError) -> std::io::Error);
 
           let mut br = StreamReader::new(rstream);
-
-          // let cid = get_cookie_id(&req);
 
           let sr = sync::sync_from_stream(
             &conn,
