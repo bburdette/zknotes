@@ -7,9 +7,10 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-elm_rs =  { version = "0.2.2", features = ["uuid"] }
+elm_rs =  { version = "0.2.3", features = ["uuid"] }
+nom = "8.0.0"
 orgauth = { path = "../orgauth/rustlib/" }
-serde = "1.0.27"
-serde_derive = "1.0.27"
-serde_json = "1.0.9"
-uuid = { version = "1.7", features = ["serde", "v4", "fast-rng"] }
+serde = "1.0.219"
+serde_derive = "1.0.219"
+serde_json = "1.0.143"
+uuid = { version = "1.18", features = ["serde", "v4", "fast-rng"] }

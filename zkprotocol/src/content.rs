@@ -101,6 +101,21 @@ pub struct SavedZkNote {
 }
 
 #[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug, Clone)]
+pub struct OnSavedZkNote {
+  pub id: ZkNoteId,
+  pub user: UserId,
+  pub token: String,
+}
+
+#[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug, Clone)]
+pub struct OnMakeFileNote {
+  pub id: ZkNoteId,
+  pub user: UserId,
+  pub token: String,
+  pub title: String,
+}
+
+#[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug, Clone)]
 pub struct SaveZkNote {
   pub id: Option<ZkNoteId>,
   pub title: String,
@@ -145,6 +160,14 @@ pub struct ZkLink {
 }
 
 #[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug, Clone)]
+pub struct SaveZkLink2 {
+  pub from: ZkNoteId,
+  pub to: ZkNoteId,
+  pub linkzknote: Option<ZkNoteId>,
+  pub delete: Option<bool>,
+}
+
+#[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug, Clone)]
 pub struct EditLink {
   pub otherid: ZkNoteId,
   pub direction: Direction,
@@ -158,6 +181,11 @@ pub struct EditLink {
 #[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug, Clone)]
 pub struct ZkLinks {
   pub links: Vec<ZkLink>,
+}
+
+#[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug, Clone)]
+pub struct SaveZkLinks {
+  pub links: Vec<SaveZkLink2>,
 }
 
 #[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug, Clone)]

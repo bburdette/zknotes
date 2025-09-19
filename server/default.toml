@@ -1,13 +1,14 @@
 ip = '0.0.0.0'
 port = 8010
 createdirs = false
-altmainsite = [ "http://localhost:8010"]
-file_tmp_path = "./temp"
-file_path = "./files"
+altmainsite = [ 'http://localhost:8010']
+file_tmp_path = './temp'
+file_path = './files'
 tauri_mode = false
+aqmp_uri = 'amqp://localhost:5672'
 
 [orgauth_config]
-mainsite = 'http://localhost:8010'
+mainsite = 'http://10.0.0.66:8010'
 appname = 'zknotes'
 emaildomain = 'zknotes.com'
 db = './zknotes.db'

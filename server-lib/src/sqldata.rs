@@ -3,7 +3,8 @@ use crate::error::to_orgauth_error;
 use crate::migrations as zkm;
 use async_stream::try_stream;
 use barrel::backend::Sqlite;
-use log::info;
+use lapin::Channel;
+use log::{error, info};
 use orgauth::data::{RegistrationData, UserId};
 use orgauth::dbfun::user_id;
 use orgauth::endpoints::Callbacks;
@@ -20,9 +21,9 @@ use uuid::Uuid;
 use zkprotocol::constants::SpecialUuids;
 use zkprotocol::content::{
   ArchiveZkLink, Direction, EditLink, ExtraLoginData, FileInfo, FileStatus, GetArchiveZkNote,
-  GetZkNoteArchives, GetZkNoteComments, GetZnlIfChanged, ImportZkNote, SaveZkLink, SaveZkNote,
-  SavedZkNote, Server, Sysids, UuidZkLink, ZkLink, ZkListNote, ZkNote, ZkNoteAndLinks,
-  ZkNoteAndLinksWhat, ZkNoteId,
+  GetZkNoteArchives, GetZkNoteComments, GetZnlIfChanged, ImportZkNote, OnMakeFileNote,
+  OnSavedZkNote, SaveZkLink, SaveZkLink2, SaveZkNote, SavedZkNote, Server, Sysids, UuidZkLink,
+  ZkLink, ZkListNote, ZkNote, ZkNoteAndLinks, ZkNoteAndLinksWhat, ZkNoteId,
 };
 use zkprotocol::sync_data::SyncMessage;
 
@@ -880,13 +881,49 @@ pub fn set_zknote_file(conn: &Connection, noteid: i64, fileid: i64) -> Result<()
   Ok(())
 }
 
-pub fn save_zknote(
+pub struct LapinInfo<'a> {
+  pub channel: &'a Channel,
+  pub token: String,
+}
+
+pub async fn save_zknote(
   conn: &Connection,
-  uid: UserId,
+  lapin_info: &Option<LapinInfo<'_>>,
   server: &Server,
+  uid: UserId,
   note: &SaveZkNote,
 ) -> Result<(i64, SavedZkNote), zkerr::Error> {
   let now = now()?;
+
+  async fn publish_szn(
+    uid: UserId,
+    lapin_info: &Option<LapinInfo<'_>>,
+    szn: &SavedZkNote,
+  ) -> Result<(), zkerr::Error> {
+    if let Some(li) = lapin_info {
+      let oszn = OnSavedZkNote {
+        id: szn.id,
+        user: uid,
+        token: li.token.clone(),
+      };
+      match li
+        .channel
+        .basic_publish(
+          "",
+          "on_save_zknote",
+          lapin::options::BasicPublishOptions::default(),
+          &serde_json::to_vec(&oszn)?[..],
+          lapin::BasicProperties::default(),
+        )
+        .await
+      {
+        Ok(_) => info!("published to amqp"),
+        Err(e) => error!("error publishing to AMQP: {:?}", e),
+      }
+    }
+
+    Ok(())
+  }
 
   match note.id {
     Some(uuid) => {
@@ -924,15 +961,16 @@ pub fn save_zknote(
           uid.to_i64(),
         ],
       ) {
-        Ok(1) => Ok((
-          id,
-          SavedZkNote {
+        Ok(1) => {
+          let szn = SavedZkNote {
             id: uuid,
             changeddate: now,
             server: server.uuid.clone(),
             what: note.what.clone(),
-          },
-        )),
+          };
+          publish_szn(uid, lapin_info, &szn).await?;
+          Ok((id, szn))
+        }
         Ok(0) => {
           // editable flag must be true
           match conn.execute(
@@ -942,12 +980,15 @@ pub fn save_zknote(
           )? {
             0 => Err( zkerr::Error::String(format!("can't update; note is not writable {} {}", note.title, id))),
             // params![note.title, note.content, now, note.pubid, note.showtitle, server.id, id],
-            1 => Ok((id, SavedZkNote {
+            1 => {
+              let szn = SavedZkNote {
                 id: uuid,
                 changeddate: now,
                 server: server.uuid.clone(),
                 what: note.what.clone(),
-              })),
+              };
+              publish_szn( uid, lapin_info, &szn).await?;
+              Ok((id, szn))},
             _ => bail!("unexpected update success!"),
           }
         }
@@ -977,15 +1018,14 @@ pub fn save_zknote(
         ],
       )?;
       let id = conn.last_insert_rowid();
-      Ok((
-        id,
-        SavedZkNote {
-          id: uuid.into(),
-          changeddate: now,
-          server: server.uuid.clone(),
-          what: note.what.clone(),
-        },
-      ))
+      let szn = SavedZkNote {
+        id: uuid.into(),
+        changeddate: now,
+        server: server.uuid.clone(),
+        what: note.what.clone(),
+      };
+      publish_szn(uid, lapin_info, &szn).await?;
+      Ok((id, szn))
     }
   }
 }
@@ -1482,35 +1522,39 @@ pub fn delete_zknote(
   Ok(())
 }
 
-pub fn save_zklinks(dbfile: &Path, uid: UserId, zklinks: &Vec<ZkLink>) -> Result<(), zkerr::Error> {
+pub fn save_zklinks(
+  dbfile: &Path,
+  uid: UserId,
+  zklinks: &Vec<SaveZkLink2>,
+) -> Result<(), zkerr::Error> {
   let conn = connection_open(dbfile)?;
 
   for zklink in zklinks.iter() {
     // TODO: integrate into sql instead of separate queries.
     let to = note_id_for_zknoteid(&conn, &zklink.to)?;
     let from = note_id_for_zknoteid(&conn, &zklink.from)?;
-    if zklink.user == uid {
-      if zklink.delete == Some(true) {
-        // create archive record.
-        let now = now()?;
-        conn.execute(
-          "insert into zklinkarchive (fromid, toid, user, linkzknote, createdate, deletedate)
+    if zklink.delete == Some(true) {
+      // if delete, create archive record.
+      let now = now()?;
+      conn.execute(
+        "insert into zklinkarchive (fromid, toid, user, linkzknote, createdate, deletedate)
             select fromid, toid, user, linkzknote, createdate, ?1 from zklink
             where fromid = ?2 and toid = ?3 and user = ?4",
-          params![now, from, to, uid.to_i64()],
-        )?;
+        params![now, from, to, uid.to_i64()],
+      )?;
 
-        // delete link.
-        conn.execute(
-          "delete from zklink where fromid = ?1 and toid = ?2 and user = ?3",
-          params![from, to, uid.to_i64()],
-        )?;
-      } else {
-        let linkzknote = zklink
-          .linkzknote
-          .and_then(|lzn| note_id_for_zknoteid(&conn, &lzn).ok());
-        save_zklink(&conn, from, to, uid, linkzknote)?;
-      }
+      // delete link.
+      conn.execute(
+        "delete from zklink where fromid = ?1 and toid = ?2 and user = ?3",
+        params![from, to, uid.to_i64()],
+      )?;
+    } else {
+      let lzn = match zklink.linkzknote {
+        Some(zknid) => Some(note_id_for_zknoteid(&conn, &zknid)?),
+        None => None,
+      };
+
+      save_zklink(&conn, from, to, uid, lzn)?;
     }
   }
 
@@ -2311,10 +2355,11 @@ pub fn read_zneifchanged(
   }
 }
 
-pub fn save_importzknotes(
+pub async fn save_importzknotes(
   conn: &Connection,
-  uid: UserId,
+  lapin_info: &Option<LapinInfo<'_>>,
   server: &Server,
+  uid: UserId,
   izns: &Vec<ImportZkNote>,
 ) -> Result<(), zkerr::Error> {
   for izn in izns.iter() {
@@ -2334,8 +2379,9 @@ pub fn save_importzknotes(
         // new note.
         save_zknote(
           &conn,
-          uid,
+          lapin_info,
           server,
+          uid,
           &SaveZkNote {
             id: None,
             title: izn.title.clone(),
@@ -2346,7 +2392,8 @@ pub fn save_importzknotes(
             deleted: false,
             what: None,
           },
-        )?
+        )
+        .await?
         .0
       }
     };
@@ -2359,8 +2406,9 @@ pub fn save_importzknotes(
           // new note.
           save_zknote(
             &conn,
-            uid,
+            lapin_info,
             server,
+            uid,
             &SaveZkNote {
               id: None,
               title: title.clone(),
@@ -2371,7 +2419,8 @@ pub fn save_importzknotes(
               deleted: false,
               what: None,
             },
-          )?
+          )
+          .await?
           .0
         }
       };
@@ -2387,8 +2436,9 @@ pub fn save_importzknotes(
           // new note.
           save_zknote(
             &conn,
-            uid,
+            lapin_info,
             server,
+            uid,
             &SaveZkNote {
               id: None,
               title: title.clone(),
@@ -2399,7 +2449,8 @@ pub fn save_importzknotes(
               deleted: false,
               what: None,
             },
-          )?
+          )
+          .await?
           .0
         }
       };
@@ -2412,9 +2463,10 @@ pub fn save_importzknotes(
   Ok(())
 }
 
-pub fn make_file_note(
+pub async fn make_file_note(
   conn: &Connection,
   server: &Server,
+  lapin_info: &Option<LapinInfo<'_>>,
   files_dir: &Path,
   uid: UserId,
   name: &String,
@@ -2479,8 +2531,9 @@ pub fn make_file_note(
   // make a new note.
   let (id, sn) = save_zknote(
     &conn,
-    uid,
+    lapin_info,
     server,
+    uid,
     &SaveZkNote {
       id: None,
       title: name.to_string(),
@@ -2491,10 +2544,35 @@ pub fn make_file_note(
       deleted: false,
       what: None,
     },
-  )?;
+  )
+  .await?;
 
   // set the file id in that note.
   set_zknote_file(&conn, id, fid)?;
+
+  if let Some(li) = lapin_info {
+    let oszn = OnMakeFileNote {
+      id: sn.id,
+      user: uid,
+      token: li.token.clone(),
+      title: name.to_string(),
+    };
+    // send the message.
+    match li
+      .channel
+      .basic_publish(
+        "",
+        "on_make_file_note",
+        lapin::options::BasicPublishOptions::default(),
+        &serde_json::to_vec(&oszn)?[..],
+        lapin::BasicProperties::default(),
+      )
+      .await
+    {
+      Ok(_) => info!("published to amqp"),
+      Err(e) => error!("error publishing to AMQP: {:?}", e),
+    }
+  }
 
   Ok((id, sn.id, fid))
 }

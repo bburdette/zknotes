@@ -7,6 +7,7 @@ pub mod messages;
 pub mod private;
 pub mod public;
 pub mod search;
+pub mod search_util;
 pub mod specialnotes;
 pub mod sync_data;
 pub mod tauri;

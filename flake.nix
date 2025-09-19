@@ -48,7 +48,7 @@
       (
         system:
         let
-          toolchain = fenix.packages.${system}.stable;
+          toolchain = fenix.packages.${system}.latest;
           rs_compiler = (with toolchain; [ rustc cargo ]);
 
           pname = "zknotes";
@@ -63,6 +63,7 @@
             root = ./.;
             buildInputs = with pkgs; [
               # rs_compiler
+              yt-dlp
               sqlite
               pkg-config
               openssl.dev
@@ -101,7 +102,7 @@
               rs_compiler
               # cargo
               # rustc
-              cargo-watch
+              # cargo-watch
               rustfmt
               rust-analyzer
               sqlite
@@ -118,14 +119,14 @@
               elmPackages.elm-xref
               # elmPackages.elm-language-server
               elmPackages.elm-verify-examples
-              elmPackages.elmi-to-json
+              # elmPackages.elmi-to-json
               elmPackages.elm-optimize-level-2
               elm-language-server.defaultPackage.${system}
             ];
           };
         }
       ) // {
-      nixosModules = { zknotes = import ./module.nix; };
+      nixosModules = { zknotes = import ./module.nix; zknotes-onsave = import ./onsave-module.nix; };
     };
 }
 

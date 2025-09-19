@@ -4,6 +4,7 @@ use crate::search::build_sql;
 use crate::search::{search_zknotes, search_zknotes_stream, sync_users, system_user, SearchResult};
 use crate::sqldata::{
   self, local_server_id, note_id_for_uuid, save_zklink, save_zknote, server_id, user_note_id,
+  LapinInfo,
 };
 use crate::util::now;
 use actix_multipart_rfc7578 as multipart;
@@ -111,8 +112,9 @@ pub async fn prev_sync(
 
 pub async fn save_sync(
   conn: &Connection,
-  _uid: UserId,
+  lapin_info: &Option<LapinInfo<'_>>,
   server: &Server,
+  _uid: UserId,
   usernoteid: i64,
   sync: CompletedSync,
 ) -> Result<i64, Box<dyn std::error::Error>> {
@@ -122,9 +124,10 @@ pub async fn save_sync(
   let snote = SpecialNote::SnSync(sync);
 
   let (id, _szn) = save_zknote(
-    conn,
+    &conn,
+    lapin_info,
+    server,
     sysid, // save under system id.
-    &server,
     &SaveZkNote {
       id: None,
       title: "sync".to_string(),
@@ -135,7 +138,8 @@ pub async fn save_sync(
       deleted: false,
       what: None,
     },
-  )?;
+  )
+  .await?;
 
   // link to 'sync' system note.
   save_zklink(conn, id, syncid, sysid, None)?;
@@ -214,6 +218,7 @@ pub fn temp_tables(conn: &Connection) -> Result<TempTableNames, zkerr::Error> {
 pub async fn sync(
   dbpath: &Path,
   file_path: &Path,
+  lapin_info: &Option<LapinInfo<'_>>,
   uid: UserId,
   server: &Server,
   callbacks: &mut Callbacks,
@@ -238,6 +243,7 @@ pub async fn sync(
   // TODO: pass in 'now'?
   let res = sync_from_remote(
     &conn,
+    lapin_info,
     &server,
     &user,
     after,
@@ -566,6 +572,7 @@ pub async fn sync_files_up(
 
 pub async fn sync_from_remote(
   conn: &Connection,
+  lapin_info: &Option<LapinInfo<'_>>,
   server: &Server,
   user: &User,
   after: Option<i64>,
@@ -606,6 +613,7 @@ pub async fn sync_from_remote(
 
   let reply = sync_from_stream(
     conn,
+    lapin_info,
     &server,
     &user,
     file_path,
@@ -639,6 +647,7 @@ where
 
 pub async fn sync_from_stream<S>(
   conn: &Connection,
+  lapin_info: &Option<LapinInfo<'_>>,
   server: &Server,
   user: &User,
   file_path: &Path,
@@ -848,8 +857,9 @@ where
               // note is newer.  archive the old and replace.
               sqldata::save_zknote(
                 &conn,
-                uid,
+                lapin_info,
                 &server,
+                uid,
                 &SaveZkNote {
                   id: Some(note.id),
                   title: note.title.clone(),
@@ -861,6 +871,7 @@ where
                   what: None,
                 },
               )
+              .await
               .map(|x| x.0)
             } else if note.changeddate < n.changeddate {
               // note is older.  add as archive note.
@@ -1144,8 +1155,9 @@ where
   let unote = user_note_id(&conn, user.id)?;
   save_sync(
     &conn,
-    user.id,
+    lapin_info,
     &server,
+    user.id,
     unote,
     CompletedSync {
       after: ss.after,

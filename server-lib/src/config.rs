@@ -13,5 +13,6 @@ pub struct Config {
   pub file_path: PathBuf,
   pub error_index_note: Option<i64>,
   pub tauri_mode: bool,
+  pub aqmp_uri: Option<String>,
   pub orgauth_config: orgauth_data::Config,
 }

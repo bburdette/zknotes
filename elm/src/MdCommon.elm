@@ -331,6 +331,7 @@ type alias HtmlFns a =
     , videoView : String -> Maybe String -> Maybe String -> Maybe String -> List a -> a
     , audioView : String -> String -> List a -> a
     , noteView : String -> Maybe String -> Maybe String -> List a -> a
+    , yeetView : String -> Maybe String -> Maybe String -> Maybe String -> Maybe String -> List a -> a
     }
 
 
@@ -358,6 +359,7 @@ elmUiHtml args =
     , videoView = videoView args.fui args.maxw
     , audioView = audioView args.fui
     , noteView = noteView args
+    , yeetView = yeetView args
     }
 
 
@@ -406,6 +408,17 @@ textHtml =
                  ]
                     |> List.filterMap identity
                 )
+    , yeetView =
+        \url audioOnly id show text _ ->
+            htmlTextTag "yeet"
+                ([ Just ( "url", url )
+                 , Maybe.map (\s -> ( "audio-only", s )) audioOnly
+                 , Maybe.map (\s -> ( "id", s )) id
+                 , Maybe.map (\s -> ( "show", s )) show
+                 , Maybe.map (\s -> ( "text", s )) text
+                 ]
+                    |> List.filterMap identity
+                )
     }
 
 
@@ -433,6 +446,12 @@ htmlF hf =
             |> Markdown.Html.withAttribute "src"
         , Markdown.Html.tag "note" hf.noteView
             |> Markdown.Html.withAttribute "id"
+            |> Markdown.Html.withOptionalAttribute "show"
+            |> Markdown.Html.withOptionalAttribute "text"
+        , Markdown.Html.tag "yeet" hf.yeetView
+            |> Markdown.Html.withAttribute "url"
+            |> Markdown.Html.withOptionalAttribute "audio-only"
+            |> Markdown.Html.withOptionalAttribute "id"
             |> Markdown.Html.withOptionalAttribute "show"
             |> Markdown.Html.withOptionalAttribute "text"
         ]
@@ -649,6 +668,16 @@ parseNoteShow text =
     }
 
 
+yeetView : MkrArgs a -> String -> Maybe String -> Maybe String -> Maybe String -> Maybe String -> List (Element a) -> Element a
+yeetView args url audioOnly mbid show text _ =
+    case mbid of
+        Nothing ->
+            E.text <| "yeet " ++ url ++ (audioOnly |> Maybe.map (\_ -> " -x") |> Maybe.withDefault "" )
+        Just id ->
+            E.column [] [
+            E.text <| "yeet " ++ url ++ (audioOnly |> Maybe.map (\_ -> " -x") |> Maybe.withDefault "" )
+            , noteView args id show text [] ]
+
 noteView : MkrArgs a -> String -> Maybe String -> Maybe String -> List (Element a) -> Element a
 noteView args id show text _ =
     let
@@ -664,6 +693,7 @@ noteView args id show text _ =
                     , changedate = False
                     , link = True
                     }
+
     in
     case
         zkNoteIdFromString id
@@ -1026,7 +1056,25 @@ noteIds markdown =
                                                     zkNoteIdFromString i.value |> Result.toMaybe
 
                                                 else
-                                                    Nothing
+                                                    mbv
+                                            )
+                                            Nothing
+                                            attr
+                                    of
+                                        Just id ->
+                                            TSet.insert id ids
+
+                                        Nothing ->
+                                            ids
+                                "yeet" ->
+                                    case
+                                        List.foldl
+                                            (\i mbv ->
+                                                if i.name == "id" then
+                                                    zkNoteIdFromString i.value |> Result.toMaybe
+
+                                                else
+                                                    mbv
                                             )
                                             Nothing
                                             attr

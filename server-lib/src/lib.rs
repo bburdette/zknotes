@@ -3,7 +3,7 @@ pub mod error;
 pub mod interfaces;
 pub mod jobs;
 mod migrations;
-mod search;
+pub mod search;
 pub mod sqldata;
 mod sqltest;
 pub mod state;
@@ -26,6 +26,7 @@ use clap::Arg;
 use config::Config;
 use futures_util::TryStreamExt as _;
 use girlboss::Girlboss;
+use lapin::{self, options::QueueDeclareOptions, types::FieldTable};
 use log::{error, info};
 pub use orgauth;
 use orgauth::{data::UserId, util};
@@ -37,7 +38,7 @@ pub use rusqlite;
 use rusqlite::Connection;
 use serde_json;
 use simple_error::simple_error;
-use sqldata::{get_single_value, local_server_id};
+use sqldata::{get_single_value, local_server_id, LapinInfo};
 use std::fs::File;
 use std::io::{stdin, Write};
 use std::path::Path;
@@ -51,9 +52,8 @@ use tracing_actix_web::TracingLogger;
 use uuid::Uuid;
 pub use zkprotocol;
 pub use zkprotocol::content as zc;
-pub use zkprotocol::search as zs;
-
 pub use zkprotocol::messages::PrivateStreamingMessage;
+pub use zkprotocol::search as zs;
 use zkprotocol::{
   private::{PrivateError, PrivateReply, PrivateRequest},
   public::{PublicError, PublicReply, PublicRequest},
@@ -320,8 +320,16 @@ async fn receive_files(
   session: Session,
   config: web::Data<State>,
   mut payload: Multipart,
+  req: HttpRequest,
 ) -> HttpResponse {
-  match make_file_notes(session, config, &mut payload).await {
+  let li = match (&config.lapin_channel.as_ref(), get_cookie_id(&req)) {
+    (Some(channel), Some(token)) => Some(LapinInfo {
+      channel: &channel,
+      token,
+    }),
+    _ => None,
+  };
+  match make_file_notes(session, &config, &li, &mut payload).await {
     Ok(r) => HttpResponse::Ok().json(r),
     Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
   }
@@ -329,7 +337,8 @@ async fn receive_files(
 
 async fn make_file_notes(
   session: Session,
-  state: web::Data<State>,
+  state: &web::Data<State>,
+  lapin_info: &Option<LapinInfo<'_>>,
   payload: &mut Multipart,
 ) -> Result<UploadReply, Box<dyn Error>> {
   let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
@@ -343,9 +352,7 @@ async fn make_file_notes(
 
   // Save the files to our temp path.
   let tp = state.config.file_tmp_path.clone();
-  let saved_files_res = save_files(&tp, payload).await;
-  let saved_files = saved_files_res?;
-  // let saved_files = save_files(&tp, payload).await?;
+  let saved_files = save_files(&tp, payload).await?;
 
   let mut zklns = Vec::new();
 
@@ -356,12 +363,14 @@ async fn make_file_notes(
     let (nid64, _noteid, _fid) = sqldata::make_file_note(
       &conn,
       &server,
+      &lapin_info,
       &state.config.file_path,
       uid,
       &name,
       fpath,
       false,
-    )?;
+    )
+    .await?;
 
     // return zknoteedit.
     let listnote = sqldata::read_zklistnote(&conn, &state.config.file_path, Some(uid), nid64)?;
@@ -384,9 +393,11 @@ async fn save_files(
     let content_disposition = field.content_disposition().clone();
     // .ok_or(simple_error::SimpleError::new("bad"))?;
 
-    let filename = content_disposition.get_name().ok_or(zkerr::Error::String(
-      "filename not found in content_disposition".to_string(),
-    ))?;
+    let filename = content_disposition
+      .get_filename()
+      .ok_or(zkerr::Error::String(
+        "filename not found in content_disposition".to_string(),
+      ))?;
 
     // can't add this in actix_multipart_rfc7578
     // let mbuuid = content_disposition.get_unknown("noteuuid");
@@ -418,14 +429,21 @@ async fn save_files(
   Ok(rv)
 }
 
+fn get_cookie_id(req: &HttpRequest) -> Option<String> {
+  req.cookie("id").map(|c| c.value().to_string())
+}
+
 async fn private(
   session: Session,
   data: web::Data<State>,
   item: web::Json<PrivateRequest>,
-  _req: HttpRequest,
+  req: HttpRequest,
 ) -> HttpResponse {
   let mut state = data.clone();
-  match zk_interface_check(&session, &mut state, item.into_inner()).await {
+
+  let token = get_cookie_id(&req);
+
+  match zk_interface_check(&session, &mut state, token, item.into_inner()).await {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'private' err: {:?}", e);
@@ -455,20 +473,21 @@ async fn private_streaming(
 async fn zk_interface_check(
   session: &Session,
   state: &State,
+  token: Option<String>,
   msg: PrivateRequest,
 ) -> Result<PrivateReply, zkerr::Error> {
   match session.get::<Uuid>("token")? {
     None => Ok(PrivateReply::PvyServerError(PrivateError::PveNotLoggedIn)),
-    Some(token) => {
+    Some(token_uuid) => {
       let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
       match orgauth::dbfun::read_user_by_token_api(
         &conn,
-        token,
+        token_uuid,
         state.config.orgauth_config.login_token_expiration_ms,
         state.config.orgauth_config.regen_login_tokens,
       ) {
         Err(e) => {
-          info!("read_user_by_token_api error2: {:?}, {:?}", token, e);
+          info!("read_user_by_token_api error2: {:?}, {:?}", token_uuid, e);
 
           Ok(PrivateReply::PvyServerError(PrivateError::PveLoginError(
             e.to_string(),
@@ -476,7 +495,7 @@ async fn zk_interface_check(
         }
         Ok(userdata) => {
           // finally!  processing messages as logged in user.
-          interfaces::zk_interface_loggedin(state, &conn, userdata.id, &msg).await
+          interfaces::zk_interface_loggedin(state, &conn, token, userdata.id, &msg).await
         }
       }
     }
@@ -520,8 +539,16 @@ async fn private_upstreaming(
   session: Session,
   data: web::Data<State>,
   body: web::Payload,
+  req: HttpRequest,
 ) -> HttpResponse {
-  match zk_interface_check_upstreaming(&session, &data.config, body).await {
+  let li = match (data.lapin_channel.as_ref(), get_cookie_id(&req)) {
+    (Some(channel), Some(token)) => Some(LapinInfo {
+      channel: &channel,
+      token,
+    }),
+    _ => None,
+  };
+  match zk_interface_check_upstreaming(&session, &data.config, &li, body).await {
     Ok(hr) => hr,
     Err(e) => {
       error!("'private' err: {:?}", e);
@@ -539,6 +566,7 @@ fn convert_bodyerr(err: actix_web::error::PayloadError) -> std::io::Error {
 async fn zk_interface_check_upstreaming(
   session: &Session,
   config: &Config,
+  lapin_info: &Option<LapinInfo<'_>>,
   body: web::Payload,
 ) -> Result<HttpResponse, Box<dyn Error>> {
   match session.get::<Uuid>("token")? {
@@ -573,6 +601,7 @@ async fn zk_interface_check_upstreaming(
 
           let sr = sync::sync_from_stream(
             &conn,
+            &lapin_info,
             &server,
             &user,
             &config.file_path,
@@ -619,6 +648,7 @@ pub fn defcon() -> Config {
     file_path: Path::new("./files").to_path_buf(),
     error_index_note: None,
     tauri_mode: false,
+    aqmp_uri: None,
     orgauth_config: oc,
   }
 }
@@ -809,13 +839,14 @@ pub async fn err_main(
     return Ok(());
   }
 
-  let server = init_server(config)?;
+  // Web server is the default.
+  let server = init_server(config).await?;
   server.await?;
 
   Ok(())
 }
 
-pub fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
+pub async fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
   // ------------------------------------------------------
   // normal server ops
   info!("server init!");
@@ -858,6 +889,31 @@ pub fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
       },
     );
 
+  let lapin_channel = match config.aqmp_uri {
+    Some(ref uri) => {
+      let conn =
+        lapin::Connection::connect(uri.as_str(), lapin::ConnectionProperties::default()).await?;
+      let chan = conn.create_channel().await?;
+      info!("lapin channel created {:?}", chan);
+      chan
+        .queue_declare(
+          "on_save_zknote",
+          QueueDeclareOptions::default(),
+          FieldTable::default(),
+        )
+        .await?;
+      chan
+        .queue_declare(
+          "on_make_file_note",
+          QueueDeclareOptions::default(),
+          FieldTable::default(),
+        )
+        .await?;
+      Some(chan)
+    }
+    None => None,
+  };
+
   // create here, not in the HttpServer::new() call,
   // to prevent multiple copies of jobcounter etc.
   let state = web::Data::new(State {
@@ -865,6 +921,7 @@ pub fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
     girlboss: { Arc::new(RwLock::new(Girlboss::new())) },
     jobcounter: { RwLock::new(0 as i64) },
     server,
+    lapin_channel,
   });
 
   let c = config.clone();
