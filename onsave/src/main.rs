@@ -25,7 +25,7 @@ async fn main() {
   match err_main().await {
     Ok(_) => (),
     Err(e) => {
-      println!("error: {:?}", e);
+      error!("error: {:?}", e);
     }
   };
 }
@@ -370,7 +370,7 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
       .expect("ack error");
   }
 
-  println!("Goodbye, world!");
+  info!("Goodbye, world!");
 
   Ok(())
 }
@@ -478,7 +478,7 @@ async fn resize_video(
   server_uri: &str,
   omfn: OnMakeFileNote,
 ) -> Result<(), Box<dyn std::error::Error>> {
-  println!("resize_video {:?}", omfn);
+  info!("resize_video {:?}", omfn);
   // download the file.
   let mut s = String::from(server_uri);
   s.push_str("/file/");
@@ -517,7 +517,6 @@ async fn resize_video(
 
   fs::remove_file(thumbfile)?;
 
-  println!("made it here");
   // ---------- link thumb to original. -------------
 
   // for each zklistnote make a link.  should be only one.
@@ -547,8 +546,6 @@ async fn resize_video(
 
   let txt = res.text().await?;
 
-  println!("savezklinkes reply: {txt}");
-
   let reply = serde_json::from_str::<zkprotocol::private::PrivateReply>(txt.as_str())?;
 
   match reply {
@@ -563,7 +560,7 @@ async fn resize_image(
   server_uri: &str,
   omfn: OnMakeFileNote,
 ) -> Result<(), Box<dyn std::error::Error>> {
-  println!("resize_image {:?}", omfn);
+  info!("resize_image {:?}", omfn);
   // download the file.
   // download the file.
   let mut s = String::from(server_uri);
@@ -602,7 +599,6 @@ async fn resize_image(
 
   fs::remove_file(thumbfile)?;
 
-  println!("made it here");
   // ---------- link thumb to original. -------------
 
   // for each zklistnote make a link.  should be only one.
@@ -631,8 +627,6 @@ async fn resize_image(
     .await?;
 
   let txt = res.text().await?;
-
-  println!("savezklinkes reply: {txt}");
 
   let reply = serde_json::from_str::<zkprotocol::private::PrivateReply>(txt.as_str())?;
 
@@ -733,11 +727,10 @@ pub async fn upload_file(
     .header(reqwest::header::COOKIE, format!("id={}", token))
     .send()
     .await?;
-  println!("upload result: {res:?}");
 
   if !res.status().is_success() {
     return Err(Box::new(StringError {
-      s: format!("upload failure: {}", res.status()),
+      s: format!("upload failure: {:?}", res),
     }));
   }
 
