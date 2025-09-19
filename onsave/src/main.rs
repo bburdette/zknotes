@@ -31,7 +31,8 @@ async fn main() {
 }
 
 async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
-  println!("welcome to err main");
+  env_logger::init();
+  info!("zknotes-onsave");
 
   let matches = clap::Command::new("zknotes onsave")
     .version("1.0")
@@ -105,11 +106,10 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
     let private_uri = String::from(onsave_server_uri.clone()) + "/private";
     while let Some(rdelivery) = consumer.next().await {
       let delivery = rdelivery.expect("error");
-      // println!("onsaved dilvery.data: {:?}", delivery.data);
       match serde_json::from_slice::<OnSavedZkNote>(&delivery.data) {
         Ok(szn) => {
           // let res : Result<(), Box<dyn std::err
-          println!("savedskznote: {:?}", szn);
+          info!("savedzkznote: {:?}", szn);
           // yeet processing.
           // retrieve the note.
 
@@ -189,7 +189,7 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
                           yeets
                         }
                         Err(e) => {
-                          println!("html parse error: {:?}", e);
+                          error!("html parse error: {:?}", e);
                           Vec::new()
                         }
                       };
@@ -203,11 +203,11 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
                           .map_err(|e| format!("{e:?}"))
                         {
                           Err(e) => {
-                            println!("error {e:?}");
+                            error!("error {e:?}");
                           }
                           Ok(f) => {
                             let blah: Result<(), Box<dyn std::error::Error>> = async {
-                              println!("got file {f:?}");
+                              info!("got file {f:?}");
                               let uploadreply = upload_file(
                                 &client,
                                 Path::new(&f),
@@ -243,7 +243,7 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
                             }
                             .await;
                             match blah {
-                              Err(e) => println!("error: {e:?}"),
+                              Err(e) => error!("error: {e:?}"),
                               Ok(_) => (),
                             }
                           }
@@ -277,34 +277,34 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
                             .await?;
 
                           if !res.status().is_success() {
-                            println!("error updating note: {}, {:?}", zkn.id, res);
+                            error!("error updating note: {}, {:?}", zkn.id, res);
                           }
                         }
                         Ok(())
                       }
                       .await;
                       match blah {
-                        Err(e) => println!("error: {e:?}"),
+                        Err(e) => error!("error: {e:?}"),
                         Ok(_) => (),
                       }
                     }
                     x => {
-                      println!("unexpected message: {x:?}");
+                      error!("unexpected message: {x:?}");
                     }
                   }
                 }
                 r => {
-                  println!("bad result: {r:?}");
+                  error!("bad result: {r:?}");
                 }
               }
             }
             Err(e) => {
-              println!("post error: {:?}", e);
+              error!("post error: {:?}", e);
             }
           }
         }
         Err(e) => {
-          println!("error: {:?}", e);
+          error!("error: {:?}", e);
         }
       }
 
@@ -335,11 +335,10 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
     .await?;
 
   while let Some(rdelivery) = consumer.next().await {
-    // println!("on_make_file_note: rdeliver: {:?}", rdelivery);
     let delivery = rdelivery.expect("error");
     match serde_json::from_slice::<OnMakeFileNote>(&delivery.data) {
       Ok(omfn) => {
-        println!("on_make_file_note: OnMakeFileNote: {:?}", omfn);
+        info!("on_make_file_note: OnMakeFileNote: {:?}", omfn);
         if let Some(suffix) = omfn.title.split('.').last() {
           if !omfn.title.contains("thumb") {
             match suffix.to_lowercase().as_str() {
@@ -349,22 +348,21 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
               "jpg" => resize_image(&server_uri.as_str(), omfn).await?,
               "gif" => resize_image(&server_uri.as_str(), omfn).await?,
               "png" => resize_image(&server_uri.as_str(), omfn).await?,
-              // "mp3" ->
-              // "m4a" ->
-              // "opus" ->
+              // ignore these.
+              "mp3" => (),
+              "m4a" => (),
+              "opus" => (),
               _ => {
-                println!("unsupported file suffix: {}", suffix);
+                error!("unsupported file suffix: {}", suffix);
               }
             }
           }
         }
       }
       Err(e) => {
-        println!("error: {:?}", e);
+        error!("error: {:?}", e);
       }
     }
-
-    println!("pre ack");
 
     delivery
       .ack(BasicAckOptions::default())

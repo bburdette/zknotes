@@ -5,7 +5,6 @@ with lib;
 let
 
   cfg = config.services.zknotes-onsave;
-  # opt = options.services.zknotes-onsave;
 
 in
 
