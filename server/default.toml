@@ -8,7 +8,7 @@ tauri_mode = false
 aqmp_uri = 'amqp://localhost:5672'
 
 [orgauth_config]
-mainsite = 'http://localhost:8010'
+mainsite = 'http://10.0.0.66:8010'
 appname = 'zknotes'
 emaildomain = 'zknotes.com'
 db = './zknotes.db'

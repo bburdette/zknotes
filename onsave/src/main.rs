@@ -70,7 +70,8 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
 
   let yt_dlp_path = matches
     .get_one::<String>("yt-dlp-path")
-    .unwrap_or_default("yt-dlp".to_string());
+    .unwrap_or(&"yt-dlp".to_string())
+    .clone();
 
   let conn = Connection::connect(&amqp_uri, ConnectionProperties::default()).await?;
 
@@ -198,88 +199,52 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
                       let mut ed_content = zkn.content.clone();
 
                       for mut my in yeets {
-                        match yeet(&p, my.url.clone()).map_err(|e| format!("{e:?}")) {
+                        match yeet(&p, my.url.clone(), yt_dlp_path.clone())
+                          .map_err(|e| format!("{e:?}"))
+                        {
                           Err(e) => {
                             println!("error {e:?}");
                           }
                           Ok(f) => {
-                            println!("got fileeeee {f:?}");
+                            let blah: Result<(), Box<dyn std::error::Error>> = async {
+                              println!("got fileeeee {f:?}");
+                              let uploadreplay = upload_file(
+                                &client,
+                                Path::new(&f),
+                                &szn.token,
+                                onsave_server_uri.as_str(),
+                              )
+                              .await?;
+                              match uploadreplay {
+                                UploadReply::UrFilesUploaded(notes) => {
+                                  fs::remove_file(f.clone())?;
+                                  let id = notes
+                                    .first()
+                                    .ok_or(StringError {
+                                      s: "no note uploaded".to_string(),
+                                    })?
+                                    .id;
+                                  my.attribs.insert("id".to_string(), format!("{}", id));
+                                  let newyeet = format!("<yeet ")
+                                    + my
+                                      .attribs
+                                      .into_iter()
+                                      .map(|(n, v)| format!(" {}=\"{}\"", n, v))
+                                      .collect::<Vec<String>>()
+                                      .concat()
+                                      .as_str()
+                                    + "/>";
 
-                            // upload the file to zknotes.
-                            if let Ok(file) = File::open(f.clone()).await {
-                              let blah: Result<(), Box<dyn std::error::Error>> = async {
-                                // upload the file to zknotes.
-                                let bytes_stream =
-                                  tokio_util::codec::FramedRead::new(file, BytesCodec::new());
-                                let form = reqwest::multipart::Form::new().part(
-                                  f.clone().replace(" ", "_"), // no spaces allowed.
-                                  multipart::Part::stream(reqwest::Body::wrap_stream(bytes_stream))
-                                    .file_name(f.clone()),
-                                );
-                                let res = client
-                                  .post(String::from(onsave_server_uri.clone()) + "/upload")
-                                  .multipart(form)
-                                  .header(
-                                    reqwest::header::COOKIE,
-                                    format!("id={}", szn.token.as_str()),
-                                  )
-                                  .send()
-                                  .await?;
-                                println!("upload result: {res:?}");
-
-                                // if the result was good, add the id to the yeet tag, and search-and-replace.
-                                match (
-                                  res.status().is_success(),
-                                  res
-                                    .text()
-                                    .await
-                                    .map_err(|e| format!("error: {e:?}"))
-                                    .and_then(|t| {
-                                      println!("t : {}", t);
-                                      serde_json::from_str::<zkprotocol::upload::UploadReply>(
-                                        t.as_str(),
-                                      )
-                                      .map_err(|e| format!("error: {e:?}"))
-                                    }),
-                                ) {
-                                  (true, Ok(pr)) => match pr {
-                                    UploadReply::UrFilesUploaded(notes) => {
-                                      fs::remove_file(f.clone())?;
-                                      let id = notes
-                                        .first()
-                                        .ok_or(StringError {
-                                          s: "no note uploaded".to_string(),
-                                        })?
-                                        .id;
-                                      my.attribs.insert("id".to_string(), format!("{}", id));
-                                      let newyeet = format!("<yeet ")
-                                        + my
-                                          .attribs
-                                          .into_iter()
-                                          .map(|(n, v)| format!(" {}=\"{}\"", n, v))
-                                          .collect::<Vec<String>>()
-                                          .concat()
-                                          .as_str()
-                                        + "/>";
-
-                                      ed_content =
-                                        ed_content.replace(my.raw.as_str(), newyeet.as_str());
-
-                                      println!("ed_content {}", ed_content);
-                                    }
-                                  },
-                                  x => {
-                                    println!("upload failure: {x:?}");
-                                  }
+                                  ed_content =
+                                    ed_content.replace(my.raw.as_str(), newyeet.as_str());
                                 }
-                                Ok(())
-                              }
-                              .await;
-
-                              match blah {
-                                Err(e) => println!("error: {e:?}"),
-                                Ok(_) => (),
-                              }
+                              };
+                              Ok(())
+                            }
+                            .await;
+                            match blah {
+                              Err(e) => println!("error: {e:?}"),
+                              Ok(_) => (),
                             }
                           }
                         }
@@ -429,7 +394,11 @@ impl std::error::Error for StringError {
   }
 }
 
-pub fn yeet(savedir: &Path, url: String) -> Result<String, Box<dyn std::error::Error>> {
+pub fn yeet(
+  savedir: &Path,
+  url: String,
+  yt_dlp_path: String,
+) -> Result<String, Box<dyn std::error::Error>> {
   // parse 'url'
   let uri: reqwest::Url = match url.parse() {
     Ok(uri) => uri,

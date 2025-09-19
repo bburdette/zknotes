@@ -52,6 +52,8 @@ in
       after = [ "network.target" ];
       wantedBy = [ "multi-user.target" ];
 
+      # path = [ "${builtins.dirof (lib.getExe pkgs.yt-dlp)}" ];
+
       serviceConfig.User = cfg.user;
       serviceConfig.Group = cfg.group;
 
@@ -59,8 +61,7 @@ in
         cd "/home/${cfg.user}"
         mkdir -p zknotes-onsave
         cd zknotes-onsave
-        echo ${pkgs.yt-dlp}
-        RUST_LOG=info ${pkgs.zknotes}/bin/zknotes-onsave --amqp_uri "${cfg.amqp_uri}" --server_uri "${cfg.server_uri}"
+        RUST_LOG=info ${pkgs.zknotes}/bin/zknotes-onsave --amqp_uri "${cfg.amqp_uri}" --server_uri "${cfg.server_uri}" --yt-dlp-path "${lib.getExe pkgs.yt-dlp}"
         '';
     };
 
