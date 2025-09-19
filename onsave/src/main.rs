@@ -721,21 +721,9 @@ pub async fn upload_file(
   let utf_fname = filename
     .to_str()
     .ok_or(StringError {
-      // s: format!("filename unicode error: {:?}", filename.clone()),
       s: "filename unicode error".to_string(),
     })?
     .to_string();
-  // no spaces allowed
-  // let asciiname : AsciiString = utf_fname.into_ascii_string_unchecked();
-  // let sanitized_name = utf_fname
-  //   .replace("\"", "'")
-  //   .replace(" ", "_")
-  //   .replace("⧸", "-") // not a slash, some unicode char.
-  //   .replace("｜", "-") // not a slash, some unicode char.
-  //   .replace("＂", "'") // not a regular "
-  //   // .escape_unicode()    // fails, can't accept backslash
-  //   .to_string();
-  // println!("sanitized_name: {sanitized_name}");
 
   let form = reqwest::multipart::Form::new().part(
     "whatever_name".to_string(),
