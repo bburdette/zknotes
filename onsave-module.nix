@@ -52,7 +52,8 @@ in
       after = [ "network.target" ];
       wantedBy = [ "multi-user.target" ];
 
-      # path = [ "${builtins.dirof (lib.getExe pkgs.yt-dlp)}" ];
+      # didn't work to make yt-dlp available.
+      # path = [ "${builtins.dirOf (lib.getExe pkgs.yt-dlp)}" ];
 
       serviceConfig.User = cfg.user;
       serviceConfig.Group = cfg.group;

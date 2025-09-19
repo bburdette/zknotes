@@ -207,15 +207,15 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
                           }
                           Ok(f) => {
                             let blah: Result<(), Box<dyn std::error::Error>> = async {
-                              println!("got fileeeee {f:?}");
-                              let uploadreplay = upload_file(
+                              println!("got file {f:?}");
+                              let uploadreply = upload_file(
                                 &client,
                                 Path::new(&f),
                                 &szn.token,
                                 onsave_server_uri.as_str(),
                               )
                               .await?;
-                              match uploadreplay {
+                              match uploadreply {
                                 UploadReply::UrFilesUploaded(notes) => {
                                   fs::remove_file(f.clone())?;
                                   let id = notes
@@ -716,7 +716,6 @@ pub async fn upload_file(
   server_uri: &str,
 ) -> Result<zkprotocol::upload::UploadReply, Box<dyn std::error::Error>> {
   let file = File::open(filename).await?;
-
   // upload the file to zknotes.
   let bytes_stream = tokio_util::codec::FramedRead::new(file, BytesCodec::new());
   let utf_fname = filename
@@ -726,8 +725,20 @@ pub async fn upload_file(
       s: "filename unicode error".to_string(),
     })?
     .to_string();
+  // no spaces allowed
+  // let asciiname : AsciiString = utf_fname.into_ascii_string_unchecked();
+  // let sanitized_name = utf_fname
+  //   .replace("\"", "'")
+  //   .replace(" ", "_")
+  //   .replace("⧸", "-") // not a slash, some unicode char.
+  //   .replace("｜", "-") // not a slash, some unicode char.
+  //   .replace("＂", "'") // not a regular "
+  //   // .escape_unicode()    // fails, can't accept backslash
+  //   .to_string();
+  // println!("sanitized_name: {sanitized_name}");
+
   let form = reqwest::multipart::Form::new().part(
-    utf_fname.to_string().replace(" ", "_"), // no spaces allowed.
+    "whatever_name".to_string(),
     multipart::Part::stream(reqwest::Body::wrap_stream(bytes_stream)).file_name(utf_fname),
   );
   let res = client
