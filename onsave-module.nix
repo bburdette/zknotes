@@ -53,6 +53,11 @@ in
 
       # didn't work to make yt-dlp available.
       # path = [ "${builtins.dirOf (lib.getExe pkgs.yt-dlp)}" ];
+      path = [
+        pkgs.yt-dlp
+        pkgs.imagemagick
+        pkgs.ffmpeg-headless
+      ];
 
       serviceConfig.User = cfg.user;
       serviceConfig.Group = cfg.group;
