@@ -223,7 +223,7 @@ type BlockEdit
 type Command
     = None
     | Save Data.SaveZkNoteAndLinks
-    | SaveExit Data.SaveZkNoteAndLinks
+    | SaveExit Data.SaveZkNoteAndLinks -- TODO: remove usused
     | Revert
     | View
         { note : Either Data.SaveZkNote Data.ZkNoteAndLinks
@@ -517,9 +517,13 @@ setTab nc model =
 newWithSave : Model -> ( Model, Command )
 newWithSave model =
     if dirty model then
-        ( model
+        let
+            nm =
+                mergeEditBlock model
+        in
+        ( nm
         , Save
-            (fullSave model
+            (fullSave nm
                 |> (\fs ->
                         let
                             n =
@@ -688,14 +692,18 @@ dirty model =
     model.revert
         |> Maybe.map
             (\r ->
+                let
+                    m =
+                        mergeEditBlock model
+                in
                 not <|
-                    (r.id == model.id)
-                        && (r.pubid == toPubId (isPublic model) model.pubidtxt)
-                        && (r.title == model.title)
-                        && (r.content == EM.getMd model.edMarkdown)
-                        && (r.editable == model.editableValue)
-                        && (r.showtitle == model.showtitle)
-                        && (Dict.keys model.zklDict == Dict.keys model.initialZklDict)
+                    (r.id == m.id)
+                        && (r.pubid == toPubId (isPublic m) m.pubidtxt)
+                        && (r.title == m.title)
+                        && (r.content == EM.getMd m.edMarkdown)
+                        && (r.editable == m.editableValue)
+                        && (r.showtitle == m.showtitle)
+                        && (Dict.keys m.zklDict == Dict.keys m.initialZklDict)
             )
         |> Maybe.withDefault True
 
@@ -2655,6 +2663,35 @@ compareZklinks left right =
             ltgt
 
 
+mergeEditBlock : Model -> Model
+mergeEditBlock model =
+    case model.blockEdit of
+        Just (Text t) ->
+            let
+                nb =
+                    model.edMarkdown
+                        |> EM.getBlocks
+                        |> Result.andThen
+                            (Markdown.Renderer.render EM.stringRenderer)
+                        |> Result.map
+                            (List.indexedMap
+                                (\i b ->
+                                    if i == t.idx then
+                                        String.trim t.s ++ "\n\n"
+
+                                    else
+                                        b
+                                )
+                            )
+                        |> Result.map (String.concat >> String.trim)
+                        |> Result.withDefault (EM.getMd model.edMarkdown)
+            in
+            { model | edMarkdown = EM.updateMd nb, blockEdit = Nothing }
+
+        Nothing ->
+            model
+
+
 onWkKeyPress : WK.Key -> Model -> ( Model, Command )
 onWkKeyPress key model =
     case Toop.T4 key.key key.ctrl key.alt key.shift of
@@ -2703,9 +2740,13 @@ update msg model =
             ( model, SPMod (\spm -> ( SP.addSearchString spm s, SP.None )) )
 
         SavePress ->
-            ( model
+            let
+                nm =
+                    mergeEditBlock model
+            in
+            ( nm
             , Save
-                (fullSave model)
+                (fullSave nm)
             )
 
         CopyPress ->
@@ -3486,8 +3527,9 @@ update msg model =
                                                 let
                                                     mds =
                                                         String.concat sl
+                                                            |> String.trim
                                                 in
-                                                Text { idx = bi, s = String.trim mds, b = b, original = mds }
+                                                Text { idx = bi, s = mds, b = b, original = mds }
                                             )
                                         |> Result.toMaybe
                                 )
@@ -3521,31 +3563,7 @@ update msg model =
                     ( model, None )
 
         EditBlockOk ->
-            case model.blockEdit of
-                Just (Text t) ->
-                    let
-                        nb =
-                            model.edMarkdown
-                                |> EM.getBlocks
-                                |> Result.andThen
-                                    (Markdown.Renderer.render EM.stringRenderer)
-                                |> Result.map
-                                    (List.indexedMap
-                                        (\i b ->
-                                            if i == t.idx then
-                                                String.trim t.s ++ "\n\n"
-
-                                            else
-                                                b
-                                        )
-                                    )
-                                |> Result.map String.concat
-                                |> Result.withDefault (EM.getMd model.edMarkdown)
-                    in
-                    ( { model | edMarkdown = EM.updateMd nb, blockEdit = Nothing }, None )
-
-                Nothing ->
-                    ( model, None )
+            ( mergeEditBlock model, None )
 
         NewBlock ->
             case
