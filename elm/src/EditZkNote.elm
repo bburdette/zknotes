@@ -45,6 +45,7 @@ port module EditZkNote exposing
     , zknview
     )
 
+import Markdown.Block as MB exposing (..)
 import Browser.Dom as BD
 import Cellme.Cellme exposing (CellContainer(..), RunState(..), evalCellsFully)
 import Cellme.DictCellme exposing (CellDict(..), getCd, mkCc)
@@ -250,6 +251,7 @@ type Command
     | Sync
     | SyncFiles Data.ZkNoteSearch
     | SPMod (SP.Model -> ( SP.Model, SP.Command ))
+    | InlineXform  MB.Inline (MB.Inline -> MG.Msg )
     | Cmd (Cmd Msg)
 
 
@@ -3586,30 +3588,34 @@ update msg model =
                     ( model, None )
 
         EditBlockMsg ebmsg ->
-            case model.blockEdit of
-                Just (Text t) ->
-                    case MG.updateBlock ebmsg t.b of
-                        [ b ] ->
-                            let
-                                nbe =
-                                    Markdown.Renderer.render EM.stringRenderer [ b ]
-                                        |> Result.map
-                                            (\sl ->
-                                                let
-                                                    mds =
-                                                        String.concat sl
-                                                in
-                                                Text { idx = t.idx, s = mds, b = b, original = t.original }
-                                            )
-                                        |> Result.toMaybe
-                            in
-                            ( { model | blockEdit = nbe }, None )
+            case MG.getXformMsg ebmsg of
+                Just (inline, tomsg) ->
+                    ( model, InlineXform inline tomsg )
+                Nothing -> 
+                    case model.blockEdit of
+                        Just (Text t) ->
+                            case MG.updateBlock ebmsg t.b of
+                                [ b ] ->
+                                    let
+                                        nbe =
+                                            Markdown.Renderer.render EM.stringRenderer [ b ]
+                                                |> Result.map
+                                                    (\sl ->
+                                                        let
+                                                            mds =
+                                                                String.concat sl
+                                                        in
+                                                        Text { idx = t.idx, s = mds, b = b, original = t.original }
+                                                    )
+                                                |> Result.toMaybe
+                                    in
+                                    ( { model | blockEdit = nbe }, None )
 
-                        _ ->
+                                _ ->
+                                    ( model, None )
+
+                        Nothing ->
                             ( model, None )
-
-                Nothing ->
-                    ( model, None )
 
         SNGMsg sngmsg ->
             case EM.getSpecialNote model.edMarkdown of

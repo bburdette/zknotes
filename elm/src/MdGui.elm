@@ -1,4 +1,4 @@
-module MdGui exposing (Msg, coltrib, guiBlock, rowtrib, updateBlock)
+module MdGui exposing (Msg, coltrib, guiBlock, rowtrib, updateBlock, getXformMsg)
 
 import Common exposing (buttonStyle)
 import Either
