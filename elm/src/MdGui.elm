@@ -47,6 +47,20 @@ type Msg
     | TextStr String
 
 
+getXformMsg : Msg -> Maybe ( MB.Inline, MB.Inline -> Msg )
+getXformMsg msg =
+    case msg of
+        InlineXform inline ->
+            Just ( inline, InlineXform )
+
+        ListItemMsg i m ->
+            getXformMsg m
+                |> Maybe.map (\( inl, f ) -> ( inl, f >> ListItemMsg i ))
+
+        _ ->
+            Nothing
+
+
 rowtrib : List (E.Attribute a)
 rowtrib =
     [ E.spacing 3, E.width E.fill ]
