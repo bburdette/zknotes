@@ -1,5 +1,6 @@
 module MdGui exposing (Msg, coltrib, guiBlock, rowtrib, updateBlock)
 
+import Common exposing (buttonStyle)
 import Either
 import Element as E
 import Element.Border as EBd
@@ -40,6 +41,7 @@ type Msg
     | ListItemMsg Int Msg
     | LinkUrl String
     | LinkTitle String
+    | InlineXform MB.Inline
     | ImageTitle String
     | CodeSpanStr String
     | TextStr String
@@ -138,7 +140,10 @@ guiInline inline =
 
         Link url _ inlines ->
             E.row rowtrib
-                [ E.el [ E.alignTop ] <| E.text "link"
+                [ EI.button (E.alignTop :: buttonStyle)
+                    { onPress = Just <| InlineXform inline
+                    , label = E.text "link"
+                    }
                 , E.column coltrib <|
                     [ EI.text []
                         { onChange = LinkUrl
@@ -154,7 +159,10 @@ guiInline inline =
                     --     , placeholder = Nothing
                     --     , label = EI.labelLeft [] (E.text "title")
                     --     }
-                    , E.column coltrib <| List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines
+                    , E.column coltrib <|
+                        List.indexedMap
+                            (\i inl -> E.map (ListItemMsg i) (guiInline inl))
+                            inlines
                     ]
                 ]
 
@@ -176,7 +184,10 @@ guiInline inline =
                     --     , placeholder = Nothing
                     --     , label = EI.labelLeft [] (E.text "title")
                     --     }
-                    , E.column coltrib <| List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines
+                    , E.column coltrib <|
+                        List.indexedMap
+                            (\i inl -> E.map (ListItemMsg i) (guiInline inl))
+                            inlines
                     ]
                 ]
 
@@ -858,9 +869,9 @@ guiHtmlElement tag attribs =
 
         "note" ->
             renderNote attribs
-            
+
         "yeet" ->
-            E.column [] [E.text "yeet",  renderNote attribs ]
+            E.column [] [ E.text "yeet", renderNote attribs ]
 
         _ ->
             E.none
@@ -868,87 +879,86 @@ guiHtmlElement tag attribs =
 
 renderNote : List HtmlAttribute -> E.Element Msg
 renderNote attribs =
-            case ( findAttrib "id" attribs, findAttrib "show" attribs, findAttrib "text" attribs ) of
-                ( Just noteid, mbshow, mbtext ) ->
-                    let
-                        ns =
-                            mbshow
-                                |> Maybe.map MC.parseNoteShow
-                                |> Maybe.withDefault
-                                    { title = False
-                                    , contents = False
-                                    , text = False
-                                    , file = False
-                                    , createdate = False
-                                    , changedate = False
-                                    , link = False
-                                    }
-                    in
-                    E.row rowtrib
-                        [ E.el [ E.alignTop ] <| E.text "note"
-                        , E.column coltrib
-                            [ EI.text []
-                                { onChange = NoteSrc
-                                , text = noteid
-                                , placeholder = Nothing
-                                , label = EI.labelLeft [] (E.text "noteid")
+    case ( findAttrib "id" attribs, findAttrib "show" attribs, findAttrib "text" attribs ) of
+        ( Just noteid, mbshow, mbtext ) ->
+            let
+                ns =
+                    mbshow
+                        |> Maybe.map MC.parseNoteShow
+                        |> Maybe.withDefault
+                            { title = False
+                            , contents = False
+                            , text = False
+                            , file = False
+                            , createdate = False
+                            , changedate = False
+                            , link = False
+                            }
+            in
+            E.row rowtrib
+                [ E.el [ E.alignTop ] <| E.text "note"
+                , E.column coltrib
+                    [ EI.text []
+                        { onChange = NoteSrc
+                        , text = noteid
+                        , placeholder = Nothing
+                        , label = EI.labelLeft [] (E.text "noteid")
+                        }
+                    , E.row [ E.width E.fill, E.spacing 3 ]
+                        [ E.el [ E.alignTop ] <| E.text "show"
+                        , E.column [ EBd.color TC.grey, EBd.width 1, E.padding 8, E.spacing 3 ]
+                            [ EI.checkbox []
+                                { onChange = NoteShowTitle
+                                , icon = EI.defaultCheckbox
+                                , checked = ns.title
+                                , label = EI.labelRight [] (E.text "title")
                                 }
-                            , E.row [ E.width E.fill, E.spacing 3 ]
-                                [ E.el [ E.alignTop ] <| E.text "show"
-                                , E.column [ EBd.color TC.grey, EBd.width 1, E.padding 8, E.spacing 3 ]
-                                    [ EI.checkbox []
-                                        { onChange = NoteShowTitle
-                                        , icon = EI.defaultCheckbox
-                                        , checked = ns.title
-                                        , label = EI.labelRight [] (E.text "title")
-                                        }
-                                    , EI.checkbox []
-                                        { onChange = NoteShowContents
-                                        , icon = EI.defaultCheckbox
-                                        , checked = ns.contents
-                                        , label = EI.labelRight [] (E.text "contents")
-                                        }
-                                    , EI.checkbox []
-                                        { onChange = NoteShowText
-                                        , icon = EI.defaultCheckbox
-                                        , checked = ns.text
-                                        , label = EI.labelRight [] (E.text "text")
-                                        }
-                                    , EI.checkbox []
-                                        { onChange = NoteShowFile
-                                        , icon = EI.defaultCheckbox
-                                        , checked = ns.file
-                                        , label = EI.labelRight [] (E.text "file")
-                                        }
-                                    , EI.checkbox []
-                                        { onChange = NoteShowCreatedate
-                                        , icon = EI.defaultCheckbox
-                                        , checked = ns.createdate
-                                        , label = EI.labelRight [] (E.text "createdate")
-                                        }
-                                    , EI.checkbox []
-                                        { onChange = NoteShowChangedate
-                                        , icon = EI.defaultCheckbox
-                                        , checked = ns.changedate
-                                        , label = EI.labelRight [] (E.text "changedate")
-                                        }
-                                    , EI.checkbox []
-                                        { onChange = NoteShowLink
-                                        , icon = EI.defaultCheckbox
-                                        , checked = ns.link
-                                        , label = EI.labelRight [] (E.text "link")
-                                        }
-                                    ]
-                                ]
-                            , EI.text []
-                                { onChange = NoteText
-                                , text = mbtext |> Maybe.withDefault ""
-                                , placeholder = Nothing
-                                , label = EI.labelLeft [] (E.text "text")
+                            , EI.checkbox []
+                                { onChange = NoteShowContents
+                                , icon = EI.defaultCheckbox
+                                , checked = ns.contents
+                                , label = EI.labelRight [] (E.text "contents")
+                                }
+                            , EI.checkbox []
+                                { onChange = NoteShowText
+                                , icon = EI.defaultCheckbox
+                                , checked = ns.text
+                                , label = EI.labelRight [] (E.text "text")
+                                }
+                            , EI.checkbox []
+                                { onChange = NoteShowFile
+                                , icon = EI.defaultCheckbox
+                                , checked = ns.file
+                                , label = EI.labelRight [] (E.text "file")
+                                }
+                            , EI.checkbox []
+                                { onChange = NoteShowCreatedate
+                                , icon = EI.defaultCheckbox
+                                , checked = ns.createdate
+                                , label = EI.labelRight [] (E.text "createdate")
+                                }
+                            , EI.checkbox []
+                                { onChange = NoteShowChangedate
+                                , icon = EI.defaultCheckbox
+                                , checked = ns.changedate
+                                , label = EI.labelRight [] (E.text "changedate")
+                                }
+                            , EI.checkbox []
+                                { onChange = NoteShowLink
+                                , icon = EI.defaultCheckbox
+                                , checked = ns.link
+                                , label = EI.labelRight [] (E.text "link")
                                 }
                             ]
                         ]
+                    , EI.text []
+                        { onChange = NoteText
+                        , text = mbtext |> Maybe.withDefault ""
+                        , placeholder = Nothing
+                        , label = EI.labelLeft [] (E.text "text")
+                        }
+                    ]
+                ]
 
-                _ ->
-                    E.none
-
+        _ ->
+            E.none
