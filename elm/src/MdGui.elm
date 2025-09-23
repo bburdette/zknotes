@@ -384,6 +384,130 @@ updateInline msg inline =
             [ inline ]
 
 
+
+{-
+
+
+    type UpdateCmd
+        = NoneUpdate
+        | ModItem MB.Inline (Msg -> Msg)
+
+   updateInline : Msg -> MB.Inline -> ( List MB.Inline, UpdateCmd )
+   updateInline msg inline =
+       case msg of
+           InlineXform mbreplacement ->
+               case mbreplacement of
+                   Nothing ->
+                       ( [ inline ], ModItem inline identity )
+
+                   Just r ->
+                       ( [ r ], NoneUpdate )
+
+           _ ->
+               let
+                   upd =
+                       case inline of
+                           HtmlInline block ->
+                               [ HtmlInline <| updateHtml msg block ]
+
+                           Link url mbtitle inlines ->
+                               case msg of
+                                   LinkUrl s ->
+                                       [ Link s mbtitle inlines ]
+
+                                   LinkTitle s ->
+                                       [ Link url
+                                           (if String.isEmpty s then
+                                               Nothing
+
+                                            else
+                                               Just s
+                                           )
+                                           inlines
+                                       ]
+
+                                   ListItemMsg idx lim ->
+                                       [ Link url mbtitle <| updateListInline idx lim inlines ]
+
+                                   -- InlineXform mbreplacement ->
+                                   --     case mbreplacement of
+                                   --         Nothing ->
+                                   --             ( [ inline ], ModItem inline identity )
+                                   --         Just r ->
+                                   --             ( [ r ]  )
+                                   _ ->
+                                       [ inline ]
+
+                           Image src mbtitle inlines ->
+                               case msg of
+                                   ImageUrl s ->
+                                       [ Image s mbtitle inlines ]
+
+                                   ImageTitle s ->
+                                       [ Image src
+                                           (if String.isEmpty s then
+                                               Nothing
+
+                                            else
+                                               Just s
+                                           )
+                                           inlines
+                                       ]
+
+                                   ListItemMsg idx lim ->
+                                       [ Image src mbtitle <| updateListInline idx lim inlines ]
+
+                                   _ ->
+                                       [ inline ]
+
+                           Emphasis inlines ->
+                               case msg of
+                                   ListItemMsg idx lim ->
+                                       [ Emphasis <| updateListInline idx lim inlines ]
+
+                                   _ ->
+                                       [ inline ]
+
+                           Strong inlines ->
+                               case msg of
+                                   ListItemMsg idx lim ->
+                                       [ Strong <| updateListInline idx lim inlines ]
+
+                                   _ ->
+                                       [ inline ]
+
+                           Strikethrough inlines ->
+                               case msg of
+                                   ListItemMsg idx lim ->
+                                       [ Strikethrough <| updateListInline idx lim inlines ]
+
+                                   _ ->
+                                       [ inline ]
+
+                           CodeSpan _ ->
+                               case msg of
+                                   CodeSpanStr str ->
+                                       [ CodeSpan str ]
+
+                                   _ ->
+                                       [ inline ]
+
+                           Text _ ->
+                               case msg of
+                                   TextStr str ->
+                                       [ Text str ]
+
+                                   _ ->
+                                       [ inline ]
+
+                           HardLineBreak ->
+                               [ inline ]
+               in
+               ( upd, NoneUpdate )
+
+-}
+
+
 updateBlock : Msg -> MB.Block -> List MB.Block
 updateBlock msg block =
     case block of
