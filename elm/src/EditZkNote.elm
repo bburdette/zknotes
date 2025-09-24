@@ -3643,10 +3643,6 @@ update msg model =
 
 updateEditBlock : MG.Msg -> Model -> Model
 updateEditBlock ebmsg model =
-    let
-        _ =
-            Debug.log "updatediliansdgsa" ebmsg
-    in
     case model.blockEdit of
         Just (Text t) ->
             case MG.updateBlock ebmsg t.b of

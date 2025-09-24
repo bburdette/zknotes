@@ -11,6 +11,7 @@ import MdCommon as MC
 import Set
 import TangoColors as TC
 import Toop
+import Util
 
 
 type Msg
@@ -173,16 +174,21 @@ guiInline inline =
                     --     , placeholder = Nothing
                     --     , label = EI.labelLeft [] (E.text "title")
                     --     }
-                    , E.column coltrib <|
-                        List.indexedMap
+                    , E.column coltrib
+                        (List.indexedMap
                             (\i inl -> E.map (ListItemMsg i) (guiInline inl))
                             inlines
+                            |> Util.listWithDefault [ E.map (ListItemMsg 0) <| guiInline (MB.Text "") ]
+                        )
                     ]
                 ]
 
         Image src _ inlines ->
             E.row rowtrib
-                [ E.el [ E.alignTop ] <| E.text "image"
+                [ EI.button (E.alignTop :: buttonStyle)
+                    { onPress = Just <| InlineXform inline
+                    , label = E.text "image"
+                    }
                 , E.column coltrib <|
                     [ EI.text []
                         { onChange = ImageUrl
@@ -198,28 +204,39 @@ guiInline inline =
                     --     , placeholder = Nothing
                     --     , label = EI.labelLeft [] (E.text "title")
                     --     }
-                    , E.column coltrib <|
-                        List.indexedMap
+                    , E.column coltrib
+                        (List.indexedMap
                             (\i inl -> E.map (ListItemMsg i) (guiInline inl))
                             inlines
+                            |> Util.listWithDefault [ E.map (ListItemMsg 0) <| guiInline (MB.Text "") ]
+                        )
                     ]
                 ]
 
         Emphasis inlines ->
             E.row rowtrib
-                [ E.el [ E.alignTop ] <| E.text "emphasis"
+                [ EI.button (E.alignTop :: buttonStyle)
+                    { onPress = Just <| InlineXform inline
+                    , label = E.text "emphasis"
+                    }
                 , E.column coltrib (List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines)
                 ]
 
         Strong inlines ->
             E.row rowtrib
-                [ E.el [ E.alignTop ] <| E.text "strong"
+                [ EI.button (E.alignTop :: buttonStyle)
+                    { onPress = Just <| InlineXform inline
+                    , label = E.text "strong"
+                    }
                 , E.column coltrib (List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines)
                 ]
 
         Strikethrough inlines ->
             E.row rowtrib
-                [ E.el [ E.alignTop ] <| E.text "strikethrough"
+                [ EI.button (E.alignTop :: buttonStyle)
+                    { onPress = Just <| InlineXform inline
+                    , label = E.text "strikethrough"
+                    }
                 , E.column coltrib (List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines)
                 ]
 
@@ -228,7 +245,13 @@ guiInline inline =
                 { onChange = CodeSpanStr
                 , text = s
                 , placeholder = Nothing
-                , label = EI.labelLeft [] (E.text "code")
+                , label =
+                    EI.labelLeft []
+                        (EI.button (E.alignTop :: buttonStyle)
+                            { onPress = Just <| InlineXform inline
+                            , label = E.text "codespan"
+                            }
+                        )
                 , spellcheck = False
                 }
 
@@ -237,7 +260,13 @@ guiInline inline =
                 { onChange = TextStr
                 , text = s
                 , placeholder = Nothing
-                , label = EI.labelLeft [] (E.text "text")
+                , label =
+                    EI.labelLeft []
+                        (EI.button (E.alignTop :: buttonStyle)
+                            { onPress = Just <| InlineXform inline
+                            , label = E.text "text"
+                            }
+                        )
                 , spellcheck = False
                 }
 
@@ -306,223 +335,101 @@ updateListInline idx msg inlines =
 
 updateInline : Msg -> MB.Inline -> List MB.Inline
 updateInline msg inline =
-    case inline of
-        HtmlInline block ->
-            [ HtmlInline <| updateHtml msg block ]
+    case msg of
+        InlineXform newinline ->
+            [ newinline ]
 
-        Link url mbtitle inlines ->
-            case msg of
-                LinkUrl s ->
-                    [ Link s mbtitle inlines ]
+        _ ->
+            case inline of
+                HtmlInline block ->
+                    [ HtmlInline <| updateHtml msg block ]
 
-                LinkTitle s ->
-                    [ Link url
-                        (if String.isEmpty s then
-                            Nothing
+                Link url mbtitle inlines ->
+                    case msg of
+                        LinkUrl s ->
+                            [ Link s mbtitle inlines ]
 
-                         else
-                            Just s
-                        )
-                        inlines
-                    ]
+                        LinkTitle s ->
+                            [ Link url
+                                (if String.isEmpty s then
+                                    Nothing
 
-                ListItemMsg idx lim ->
-                    [ Link url mbtitle <| updateListInline idx lim inlines ]
+                                 else
+                                    Just s
+                                )
+                                inlines
+                            ]
 
-                InlineXform newinline ->
-                    [ newinline ]
+                        ListItemMsg idx lim ->
+                            [ Link url mbtitle <| updateListInline idx lim (inlines |> Util.listWithDefault [ MB.Text "" ]) ]
 
-                _ ->
+                        _ ->
+                            [ inline ]
+
+                Image src mbtitle inlines ->
+                    case msg of
+                        ImageUrl s ->
+                            [ Image s mbtitle inlines ]
+
+                        ImageTitle s ->
+                            [ Image src
+                                (if String.isEmpty s then
+                                    Nothing
+
+                                 else
+                                    Just s
+                                )
+                                inlines
+                            ]
+
+                        ListItemMsg idx lim ->
+                            [ Image src mbtitle <| updateListInline idx lim (inlines |> Util.listWithDefault [ MB.Text "" ]) ]
+
+                        _ ->
+                            [ inline ]
+
+                Emphasis inlines ->
+                    case msg of
+                        ListItemMsg idx lim ->
+                            [ Emphasis <| updateListInline idx lim inlines ]
+
+                        _ ->
+                            [ inline ]
+
+                Strong inlines ->
+                    case msg of
+                        ListItemMsg idx lim ->
+                            [ Strong <| updateListInline idx lim inlines ]
+
+                        _ ->
+                            [ inline ]
+
+                Strikethrough inlines ->
+                    case msg of
+                        ListItemMsg idx lim ->
+                            [ Strikethrough <| updateListInline idx lim inlines ]
+
+                        _ ->
+                            [ inline ]
+
+                CodeSpan _ ->
+                    case msg of
+                        CodeSpanStr str ->
+                            [ CodeSpan str ]
+
+                        _ ->
+                            [ inline ]
+
+                Text _ ->
+                    case msg of
+                        TextStr str ->
+                            [ Text str ]
+
+                        _ ->
+                            [ inline ]
+
+                HardLineBreak ->
                     [ inline ]
-
-        Image src mbtitle inlines ->
-            case msg of
-                ImageUrl s ->
-                    [ Image s mbtitle inlines ]
-
-                ImageTitle s ->
-                    [ Image src
-                        (if String.isEmpty s then
-                            Nothing
-
-                         else
-                            Just s
-                        )
-                        inlines
-                    ]
-
-                ListItemMsg idx lim ->
-                    [ Image src mbtitle <| updateListInline idx lim inlines ]
-
-                _ ->
-                    [ inline ]
-
-        Emphasis inlines ->
-            case msg of
-                ListItemMsg idx lim ->
-                    [ Emphasis <| updateListInline idx lim inlines ]
-
-                _ ->
-                    [ inline ]
-
-        Strong inlines ->
-            case msg of
-                ListItemMsg idx lim ->
-                    [ Strong <| updateListInline idx lim inlines ]
-
-                _ ->
-                    [ inline ]
-
-        Strikethrough inlines ->
-            case msg of
-                ListItemMsg idx lim ->
-                    [ Strikethrough <| updateListInline idx lim inlines ]
-
-                _ ->
-                    [ inline ]
-
-        CodeSpan _ ->
-            case msg of
-                CodeSpanStr str ->
-                    [ CodeSpan str ]
-
-                _ ->
-                    [ inline ]
-
-        Text _ ->
-            case msg of
-                TextStr str ->
-                    [ Text str ]
-
-                _ ->
-                    [ inline ]
-
-        HardLineBreak ->
-            [ inline ]
-
-
-
-{-
-
-
-    type UpdateCmd
-        = NoneUpdate
-        | ModItem MB.Inline (Msg -> Msg)
-
-   updateInline : Msg -> MB.Inline -> ( List MB.Inline, UpdateCmd )
-   updateInline msg inline =
-       case msg of
-           InlineXform mbreplacement ->
-               case mbreplacement of
-                   Nothing ->
-                       ( [ inline ], ModItem inline identity )
-
-                   Just r ->
-                       ( [ r ], NoneUpdate )
-
-           _ ->
-               let
-                   upd =
-                       case inline of
-                           HtmlInline block ->
-                               [ HtmlInline <| updateHtml msg block ]
-
-                           Link url mbtitle inlines ->
-                               case msg of
-                                   LinkUrl s ->
-                                       [ Link s mbtitle inlines ]
-
-                                   LinkTitle s ->
-                                       [ Link url
-                                           (if String.isEmpty s then
-                                               Nothing
-
-                                            else
-                                               Just s
-                                           )
-                                           inlines
-                                       ]
-
-                                   ListItemMsg idx lim ->
-                                       [ Link url mbtitle <| updateListInline idx lim inlines ]
-
-                                   -- InlineXform mbreplacement ->
-                                   --     case mbreplacement of
-                                   --         Nothing ->
-                                   --             ( [ inline ], ModItem inline identity )
-                                   --         Just r ->
-                                   --             ( [ r ]  )
-                                   _ ->
-                                       [ inline ]
-
-                           Image src mbtitle inlines ->
-                               case msg of
-                                   ImageUrl s ->
-                                       [ Image s mbtitle inlines ]
-
-                                   ImageTitle s ->
-                                       [ Image src
-                                           (if String.isEmpty s then
-                                               Nothing
-
-                                            else
-                                               Just s
-                                           )
-                                           inlines
-                                       ]
-
-                                   ListItemMsg idx lim ->
-                                       [ Image src mbtitle <| updateListInline idx lim inlines ]
-
-                                   _ ->
-                                       [ inline ]
-
-                           Emphasis inlines ->
-                               case msg of
-                                   ListItemMsg idx lim ->
-                                       [ Emphasis <| updateListInline idx lim inlines ]
-
-                                   _ ->
-                                       [ inline ]
-
-                           Strong inlines ->
-                               case msg of
-                                   ListItemMsg idx lim ->
-                                       [ Strong <| updateListInline idx lim inlines ]
-
-                                   _ ->
-                                       [ inline ]
-
-                           Strikethrough inlines ->
-                               case msg of
-                                   ListItemMsg idx lim ->
-                                       [ Strikethrough <| updateListInline idx lim inlines ]
-
-                                   _ ->
-                                       [ inline ]
-
-                           CodeSpan _ ->
-                               case msg of
-                                   CodeSpanStr str ->
-                                       [ CodeSpan str ]
-
-                                   _ ->
-                                       [ inline ]
-
-                           Text _ ->
-                               case msg of
-                                   TextStr str ->
-                                       [ Text str ]
-
-                                   _ ->
-                                       [ inline ]
-
-                           HardLineBreak ->
-                               [ inline ]
-               in
-               ( upd, NoneUpdate )
-
--}
 
 
 updateBlock : Msg -> MB.Block -> List MB.Block

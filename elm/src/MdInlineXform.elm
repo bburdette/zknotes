@@ -68,32 +68,101 @@ init inline fn mobile buttonStyle underLay =
     }
 
 
+inlineText : List MB.Inline -> Maybe String
+inlineText inlines =
+    case inlines of
+        (MB.Text s) :: _ ->
+            Just s
+
+        _ ->
+            Nothing
+
+
 transforms : MB.Inline -> List ( String, MB.Inline )
 transforms inline =
     case inline of
         HtmlInline htmlBlock ->
             []
 
-        Link url _ inlines ->
-            [ ( "yeet", MB.HtmlInline (MB.HtmlElement "yeet" [ { name = "url", value = url } ] []) ) ]
+        Link url mbt inlines ->
+            [ ( "yeet", MB.HtmlInline (MB.HtmlElement "yeet" [ { name = "url", value = url } ] []) )
+            , ( "md image", MB.Image url mbt inlines )
+            , ( "html image"
+              , MB.HtmlInline
+                    (MB.HtmlElement "image"
+                        (List.filterMap identity
+                            [ Just { name = "url", value = url }
+                            , inlineText inlines
+                                |> Maybe.map (\s -> { name = "text", value = s })
+                            ]
+                        )
+                        []
+                    )
+              )
+            ]
 
-        Image src _ inlines ->
-            []
+        Image src mbt inlines ->
+            [ ( "link", MB.Link src mbt inlines )
+            , ( "html image"
+              , MB.HtmlInline
+                    (MB.HtmlElement "image"
+                        (List.filterMap identity
+                            [ Just { name = "url", value = src }
+                            , inlineText inlines
+                                |> Maybe.map (\s -> { name = "text", value = s })
+                            ]
+                        )
+                        []
+                    )
+              )
+            ]
 
         Emphasis inlines ->
-            []
+            [ ( "remove"
+              , case inlines of
+                    [ item ] ->
+                        item
+
+                    plural ->
+                        -- can't return multiple inlines.  TODO fix?
+                        Emphasis inlines
+              )
+            ]
 
         Strong inlines ->
-            []
+            [ ( "remove"
+              , case inlines of
+                    [ item ] ->
+                        item
+
+                    plural ->
+                        -- can't return multiple inlines.  TODO fix?
+                        Strong inlines
+              )
+            ]
 
         Strikethrough inlines ->
-            []
+            [ ( "remove"
+              , case inlines of
+                    [ item ] ->
+                        item
+
+                    plural ->
+                        -- can't return multiple inlines.  TODO fix?
+                        Strikethrough inlines
+              )
+            ]
 
         CodeSpan s ->
-            []
+            [ ( "text", MB.Text s ) ]
 
         Text s ->
-            []
+            [ ( "strong", MB.Strong [ MB.Text s ] )
+            , ( "emphasis", MB.Emphasis [ MB.Text s ] )
+            , ( "strikethrough", MB.Strikethrough [ MB.Text s ] )
+            , ( "codespan", MB.CodeSpan s )
+            , ( "link", MB.Link s Nothing [ MB.Text "" ] )
+            ]
 
         HardLineBreak ->
             []
@@ -116,7 +185,7 @@ view buttonStyle mbsize model =
                 , selected = model.selectedTf
                 , label = EI.labelAbove [] (E.text "xform")
                 }
-            , E.text "blah"
+            , E.text "<preview unimplemented>"
             ]
         , if model.mobile then
             E.none
