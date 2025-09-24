@@ -1393,17 +1393,17 @@ view model =
                             (Just { width = min 600 model.size.width, height = min 500 model.size.height })
                             { dm | model = model.jobs }
 
-            MdInlineXform dm _ ->
+            MdInlineXform gdm _ ->
                 if model.mobile then
                     E.layout [] <|
                         E.map MdInlineXformMsg <|
-                            GD.dialogView Nothing { dm | model = model.jobs }
+                            GD.dialogView Nothing gdm
 
                 else
                     Html.map MdInlineXformMsg <|
                         GD.layout
                             (Just { width = min 600 model.size.width, height = min 500 model.size.height })
-                            { dm | model = model.jobs }
+                            gdm
 
             RequestsDialog dm _ ->
                 if model.mobile then
@@ -3265,11 +3265,10 @@ actualupdate msg model =
 
         ( MdInlineXformMsg bm, MdInlineXform bs prevstate ) ->
             -- TODO address this hack!
-            case GD.update bm { bs | model = model.jobs } of
+            case GD.update bm bs of
                 GD.Dialog nmod ->
                     ( { model
                         | state = MdInlineXform nmod prevstate
-                        , jobs = nmod.model
                       }
                     , Cmd.none
                     )
@@ -3279,23 +3278,14 @@ actualupdate msg model =
                         MdInlineXform.Close ->
                             ( { model | state = prevstate }, Cmd.none )
 
-                        MdInlineXform.Tag s ->
-                            case stateLogin prevstate of
-                                Just login ->
-                                    ( { model
-                                        | state =
-                                            TagFiles
-                                                (TagAThing.init
-                                                    (TagFiles.initThing s)
-                                                    model.recentNotes
-                                                    []
-                                                    login
-                                                )
-                                                login
-                                                prevstate
-                                      }
-                                    , Cmd.none
-                                    )
+                        MdInlineXform.UpdateInline umsg ->
+                            case prevstate of
+                                EditZkNote em login ->
+                                    let
+                                        emod =
+                                            EditZkNote.updateEditBlock umsg em
+                                    in
+                                    ( { model | state = EditZkNote emod login }, Cmd.none )
 
                                 _ ->
                                     ( { model | state = prevstate }, Cmd.none )
@@ -3934,9 +3924,11 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                 EditZkNote.InlineXform inline f ->
                     ( { model
                         | state =
-                            JobsDialog
-                                (JobsDialog.init
-                                    model.jobs
+                            MdInlineXform
+                                (MdInlineXform.init
+                                    inline
+                                    f
+                                    model.mobile
                                     Common.buttonStyle
                                     (E.map (\_ -> ()) (viewState model.size model.state model))
                                 )

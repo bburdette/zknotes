@@ -1,4 +1,4 @@
-module MdGui exposing (Msg, coltrib, guiBlock, rowtrib, updateBlock, getXformMsg)
+module MdGui exposing (Msg, coltrib, getXformMsg, guiBlock, rowtrib, updateBlock)
 
 import Common exposing (buttonStyle)
 import Either
@@ -328,6 +328,9 @@ updateInline msg inline =
 
                 ListItemMsg idx lim ->
                     [ Link url mbtitle <| updateListInline idx lim inlines ]
+
+                InlineXform newinline ->
+                    [ newinline ]
 
                 _ ->
                     [ inline ]

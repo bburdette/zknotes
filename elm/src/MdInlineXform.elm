@@ -12,138 +12,144 @@ import Element.Input as EI
 import GenDialog as GD
 import Html.Attributes as HA
 import Http
+import Markdown.Block as MB exposing (Inline(..))
+import MdGui as MG
 import Orgauth.Data as Data
 import TangoColors as TC
 import Util
 
 
-type alias TJobs =
-    { mobile : Bool, jobs : Dict Int Data.JobStatus }
+type alias Model =
+    { mobile : Bool
+    , inline : MB.Inline
+    , transforms : List ( String, MB.Inline )
+    , selectedTf : Maybe Int
+    , tomsg : MB.Inline -> MG.Msg
+    }
 
 
 type Msg
     = OkClick
     | CancelClick
-    | ClearClick Int
+    | OnSelect Int
     | Noop
 
 
 type Command
-    = Tag (List Data.ZkListNote)
+    = UpdateInline MG.Msg
     | Close
 
 
 type alias GDModel =
-    GD.Model TJobs Msg Command
+    GD.Model Model Msg Command
 
 
-init : TJobs -> List (E.Attribute Msg) -> Element () -> GDModel
-init trqs buttonStyle underLay =
+init : MB.Inline -> (MB.Inline -> MG.Msg) -> Bool -> List (E.Attribute Msg) -> Element () -> GDModel
+init inline fn mobile buttonStyle underLay =
+    let
+        tfs =
+            transforms inline
+    in
     { view = view buttonStyle
     , update = update
-    , model = trqs
+    , model =
+        { mobile = mobile
+        , inline = inline
+        , transforms = tfs
+        , selectedTf =
+            if List.isEmpty tfs then
+                Nothing
+
+            else
+                Just 0
+        , tomsg = fn
+        }
     , underLay = underLay
     }
 
 
-renderProgress : Http.Progress -> Element Msg
-renderProgress p =
-    case p of
-        Http.Sending ps ->
-            Http.fractionSent ps
-                |> String.fromFloat
-                |> (\s -> s ++ " sent")
-                |> E.text
+transforms : MB.Inline -> List ( String, MB.Inline )
+transforms inline =
+    case inline of
+        HtmlInline htmlBlock ->
+            []
 
-        Http.Receiving pr ->
-            Http.fractionReceived pr
-                |> String.fromFloat
-                |> (\s -> s ++ " received")
-                |> E.text
+        Link url _ inlines ->
+            [ ( "yeet", MB.HtmlInline (MB.HtmlElement "yeet" [ { name = "url", value = url } ] []) ) ]
+
+        Image src _ inlines ->
+            []
+
+        Emphasis inlines ->
+            []
+
+        Strong inlines ->
+            []
+
+        Strikethrough inlines ->
+            []
+
+        CodeSpan s ->
+            []
+
+        Text s ->
+            []
+
+        HardLineBreak ->
+            []
 
 
-view : List (E.Attribute Msg) -> Maybe Util.Size -> TJobs -> Element Msg
-view buttonStyle mbsize trqs =
+view : List (E.Attribute Msg) -> Maybe Util.Size -> Model -> Element Msg
+view buttonStyle mbsize model =
     E.column
         [ E.width (mbsize |> Maybe.map .width |> Maybe.map E.px |> Maybe.withDefault E.fill)
         , E.height E.fill
         , E.spacing 15
         ]
-        [ E.el [ E.centerX, EF.bold ] <| E.text "server jobs"
-        , E.column [ E.width E.fill, E.height E.fill, E.scrollbarY, E.spacing 8 ]
-            (trqs.jobs
-                |> Dict.toList
-                |> List.reverse
-                |> List.map
-                    (\( jobno, js ) ->
-                        E.column
-                            [ E.width E.fill
-                            , EBk.color (Common.navbarColor 2)
-                            , EBd.rounded 10
-                            , E.padding 10
-                            , E.spacing 8
-                            ]
-                            [ case js.state of
-                                Data.Started ->
-                                    E.el [ E.centerX, EF.bold ] <| E.text "started..."
+        [ E.el [ E.centerX, EF.bold ] <| E.text "inline xform"
 
-                                Data.Running ->
-                                    E.el [ E.centerX, EF.bold ] <| E.text "running..."
-
-                                Data.Completed ->
-                                    E.el [ E.centerX, EF.bold ] <| E.text <| "completed"
-
-                                Data.Failed ->
-                                    E.el [ E.centerX, EF.bold ] <| E.text "failed"
-                            , E.row [ E.width E.fill ]
-                                [ E.column
-                                    [ EBd.width 3
-                                    , EBd.color TC.darkGrey
-                                    , E.width E.fill
-                                    , E.height <| E.maximum 200 E.fill
-                                    , E.scrollbarY
-                                    ]
-                                    [ E.paragraph
-                                        [ E.htmlAttribute (HA.style "overflow-wrap" "break-word")
-                                        , E.htmlAttribute (HA.style "word-break" "break-word")
-                                        ]
-                                        [ E.text js.message ]
-                                    ]
-                                ]
-                            , if DataUtil.jobComplete js.state then
-                                E.row [ E.width E.fill ]
-                                    [ EI.button (E.alignRight :: buttonStyle)
-                                        { onPress = Just (ClearClick jobno), label = E.text "clear" }
-                                    ]
-
-                              else
-                                E.none
-                            ]
-                    )
-            )
-        , if trqs.mobile then
+        -- , E.row [ E.width E.fill, E.height E.fill, E.scrollbarY, E.spacing 8 ] [
+        , E.row [ E.width E.fill, E.height E.fill, E.scrollbarY, E.spacing 8 ]
+            [ EI.radio []
+                { onChange = OnSelect
+                , options = model.transforms |> List.indexedMap (\i ( name, _ ) -> EI.option i (E.text name))
+                , selected = model.selectedTf
+                , label = EI.labelAbove [] (E.text "xform")
+                }
+            , E.text "blah"
+            ]
+        , if model.mobile then
             E.none
 
           else
             E.row [ E.width E.fill, E.spacing 10 ]
                 [ EI.button
-                    (E.centerX :: buttonStyle)
-                    { onPress = Just CancelClick, label = E.text "close" }
+                    (E.alignLeft :: buttonStyle)
+                    { onPress = Just CancelClick, label = E.text "cancel" }
+                , EI.button
+                    (E.alignRight :: buttonStyle)
+                    { onPress = Just OkClick, label = E.text "ok" }
                 ]
         ]
 
 
-update : Msg -> TJobs -> GD.Transition TJobs Command
+update : Msg -> Model -> GD.Transition Model Command
 update msg model =
     case msg of
         CancelClick ->
             GD.Cancel
 
         OkClick ->
-            GD.Ok Close
+            model.selectedTf
+                |> Maybe.andThen (\i -> List.head (List.drop i model.transforms))
+                |> Maybe.map Tuple.second
+                |> Maybe.map (model.tomsg >> UpdateInline >> GD.Ok)
+                |> Maybe.withDefault GD.Cancel
 
-        ClearClick jobno ->
-            GD.Dialog { model | jobs = Dict.remove jobno model.jobs }
+        -- ClearClick jobno ->
+        --     GD.Dialog { model | jobs = Dict.remove jobno model.jobs }
+        OnSelect i ->
+            GD.Dialog { model | selectedTf = Just i }
 
         Noop ->
             GD.Dialog model
