@@ -204,16 +204,10 @@ transforms inline =
                 _ ->
                     []
 
-        {- note -> yeet
-           note -> panel
-           note -> search (?)
+        {-
+           text -> search?
            note -> audio
-           note -> link
-           yeet -> note
-           image -> md image
-           image -> link
-           video -> link
-           audio -> link
+           note -> video
         -}
         Link url mbt inlines ->
             let
