@@ -40,6 +40,7 @@ port module EditZkNote exposing
     , toPubId
     , toZkListNote
     , update
+    , updateEditBlock
     , view
     , zkLinkName
     , zknview
@@ -67,7 +68,7 @@ import Html.Events as HE
 import JobsDialog exposing (TJobs)
 import Json.Decode as JD
 import Json.Encode as JE
-import Markdown.Block exposing (Block(..), ListItem(..), Task(..))
+import Markdown.Block as MB exposing (..)
 import Markdown.Parser
 import Markdown.Renderer
 import Maybe.Extra as ME
@@ -250,6 +251,7 @@ type Command
     | Sync
     | SyncFiles Data.ZkNoteSearch
     | SPMod (SP.Model -> ( SP.Model, SP.Command ))
+    | InlineXform MB.Inline (MB.Inline -> MG.Msg)
     | Cmd (Cmd Msg)
 
 
@@ -3570,7 +3572,7 @@ update msg model =
                 EM.getBlocks model.edMarkdown
                     |> Result.andThen
                         (\blks ->
-                            EM.updateBlocks (Markdown.Block.Paragraph [ Markdown.Block.Text "" ] :: blks)
+                            EM.updateBlocks (MB.Paragraph [ MB.Text "" ] :: blks)
                                 |> Result.map (\em -> ( List.length blks, em ))
                         )
             of
@@ -3586,30 +3588,12 @@ update msg model =
                     ( model, None )
 
         EditBlockMsg ebmsg ->
-            case model.blockEdit of
-                Just (Text t) ->
-                    case MG.updateBlock ebmsg t.b of
-                        [ b ] ->
-                            let
-                                nbe =
-                                    Markdown.Renderer.render EM.stringRenderer [ b ]
-                                        |> Result.map
-                                            (\sl ->
-                                                let
-                                                    mds =
-                                                        String.concat sl
-                                                in
-                                                Text { idx = t.idx, s = mds, b = b, original = t.original }
-                                            )
-                                        |> Result.toMaybe
-                            in
-                            ( { model | blockEdit = nbe }, None )
-
-                        _ ->
-                            ( model, None )
+            case MG.getXformMsg ebmsg of
+                Just ( inline, tomsg ) ->
+                    ( model, InlineXform inline tomsg )
 
                 Nothing ->
-                    ( model, None )
+                    ( updateEditBlock ebmsg model, None )
 
         SNGMsg sngmsg ->
             case EM.getSpecialNote model.edMarkdown of
@@ -3655,3 +3639,31 @@ update msg model =
 
         Noop ->
             ( model, None )
+
+
+updateEditBlock : MG.Msg -> Model -> Model
+updateEditBlock ebmsg model =
+    case model.blockEdit of
+        Just (Text t) ->
+            case MG.updateBlock ebmsg t.b of
+                [ b ] ->
+                    let
+                        nbe =
+                            case Markdown.Renderer.render EM.stringRenderer [ b ] of
+                                Ok sl ->
+                                    let
+                                        mds =
+                                            String.concat sl
+                                    in
+                                    Text { idx = t.idx, s = mds, b = b, original = t.original }
+
+                                Err e ->
+                                    Text { idx = t.idx, s = e, b = b, original = t.original }
+                    in
+                    { model | blockEdit = Just nbe }
+
+                _ ->
+                    model
+
+        Nothing ->
+            model

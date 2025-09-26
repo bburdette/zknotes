@@ -28,6 +28,7 @@ import Json.Decode as JD
 import Json.Encode as JE
 import LocalStorage as LS
 import MdCommon as MC
+import MdInlineXform
 import MessageNLink
 import NoteCache as NC exposing (NoteCache)
 import Orgauth.ChangeEmail as CE
@@ -113,6 +114,7 @@ type Msg
     | RequestProgress String Http.Progress
     | RequestsDialogMsg (GD.Msg RequestsDialog.Msg)
     | JobsDialogMsg (GD.Msg JobsDialog.Msg)
+    | MdInlineXformMsg (GD.Msg MdInlineXform.Msg)
     | TagFilesMsg (TagAThing.Msg TagFiles.Msg)
     | InviteUserMsg (TagAThing.Msg InviteUser.Msg)
     | JobsPollTick Time.Posix
@@ -147,6 +149,7 @@ type State
     | JobsDialog JobsDialog.GDModel State
     | TagFiles (TagAThing.Model TagFiles.Model TagFiles.Msg TagFiles.Command) LoginData State
     | InviteUser (TagAThing.Model InviteUser.Model InviteUser.Msg InviteUser.Command) LoginData State
+    | MdInlineXform MdInlineXform.GDModel State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
 
 
@@ -780,6 +783,9 @@ showMessage msg =
         JobsDialogMsg _ ->
             "JobsDialogMsg"
 
+        MdInlineXformMsg _ ->
+            "MdInlineXformMsg"
+
         RequestsDialogMsg _ ->
             "RequestsDialogMsg"
 
@@ -873,6 +879,9 @@ showState state =
 
         JobsDialog _ _ ->
             "JobsDialog"
+
+        MdInlineXform _ _ ->
+            "MdInlineXform"
 
         RequestsDialog _ _ ->
             "RequestsDialog"
@@ -983,6 +992,9 @@ viewState size state model =
             -- render is at the layout level, not here.
             E.none
 
+        MdInlineXform _ _ ->
+            E.none
+
         RequestsDialog _ _ ->
             -- render is at the layout level, not here.
             E.none
@@ -1070,6 +1082,9 @@ stateLogin state =
             Just login
 
         JobsDialog _ instate ->
+            stateLogin instate
+
+        MdInlineXform _ instate ->
             stateLogin instate
 
         RequestsDialog _ instate ->
@@ -1377,6 +1392,18 @@ view model =
                         GD.layout
                             (Just { width = min 600 model.size.width, height = min 500 model.size.height })
                             { dm | model = model.jobs }
+
+            MdInlineXform gdm _ ->
+                if model.mobile then
+                    E.layout [] <|
+                        E.map MdInlineXformMsg <|
+                            GD.dialogView Nothing gdm
+
+                else
+                    Html.map MdInlineXformMsg <|
+                        GD.layout
+                            (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                            gdm
 
             RequestsDialog dm _ ->
                 if model.mobile then
@@ -3236,6 +3263,39 @@ actualupdate msg model =
                 Nothing ->
                     ( model, Cmd.none )
 
+        ( MdInlineXformMsg bm, MdInlineXform bs prevstate ) ->
+            -- TODO address this hack!
+            case GD.update bm bs of
+                GD.Dialog nmod ->
+                    ( { model
+                        | state = MdInlineXform nmod prevstate
+                      }
+                    , Cmd.none
+                    )
+
+                GD.Ok return ->
+                    case return of
+                        MdInlineXform.Close ->
+                            ( { model | state = prevstate }, Cmd.none )
+
+                        MdInlineXform.UpdateInline umsg ->
+                            case prevstate of
+                                EditZkNote em login ->
+                                    let
+                                        emod =
+                                            EditZkNote.updateEditBlock umsg em
+                                    in
+                                    ( { model | state = EditZkNote emod login }, Cmd.none )
+
+                                _ ->
+                                    ( { model | state = prevstate }, Cmd.none )
+
+                GD.Cancel ->
+                    ( { model | state = prevstate }, Cmd.none )
+
+        ( MdInlineXformMsg _, _ ) ->
+            ( model, Cmd.none )
+
         ( JobsDialogMsg bm, JobsDialog bs prevstate ) ->
             -- TODO address this hack!
             case GD.update bm { bs | model = model.jobs } of
@@ -3860,6 +3920,22 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                         _ ->
                             -- otherwise its all the usual stuff.
                             handleSPMod model fn
+
+                EditZkNote.InlineXform inline f ->
+                    ( { model
+                        | state =
+                            MdInlineXform
+                                (MdInlineXform.init
+                                    inline
+                                    f
+                                    model.mobile
+                                    Common.buttonStyle
+                                    (E.map (\_ -> ()) (viewState model.size model.state model))
+                                )
+                                model.state
+                      }
+                    , Cmd.none
+                    )
 
                 EditZkNote.Cmd cmd ->
                     ( { model | state = EditZkNote emod login }

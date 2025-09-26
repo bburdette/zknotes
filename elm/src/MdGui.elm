@@ -1,5 +1,6 @@
-module MdGui exposing (Msg, coltrib, guiBlock, rowtrib, updateBlock)
+module MdGui exposing (Msg, coltrib, findAttrib, getXformMsg, guiBlock, rowtrib, updateBlock)
 
+import Common exposing (buttonStyle)
 import Either
 import Element as E
 import Element.Border as EBd
@@ -10,6 +11,7 @@ import MdCommon as MC
 import Set
 import TangoColors as TC
 import Toop
+import Util
 
 
 type Msg
@@ -40,9 +42,25 @@ type Msg
     | ListItemMsg Int Msg
     | LinkUrl String
     | LinkTitle String
+    | InlineXform MB.Inline
     | ImageTitle String
     | CodeSpanStr String
     | TextStr String
+    | YeetUrl String
+
+
+getXformMsg : Msg -> Maybe ( MB.Inline, MB.Inline -> Msg )
+getXformMsg msg =
+    case msg of
+        InlineXform inline ->
+            Just ( inline, InlineXform )
+
+        ListItemMsg i m ->
+            getXformMsg m
+                |> Maybe.map (\( inl, f ) -> ( inl, f >> ListItemMsg i ))
+
+        _ ->
+            Nothing
 
 
 rowtrib : List (E.Attribute a)
@@ -138,7 +156,10 @@ guiInline inline =
 
         Link url _ inlines ->
             E.row rowtrib
-                [ E.el [ E.alignTop ] <| E.text "link"
+                [ EI.button (E.alignTop :: buttonStyle)
+                    { onPress = Just <| InlineXform inline
+                    , label = E.text "link"
+                    }
                 , E.column coltrib <|
                     [ EI.text []
                         { onChange = LinkUrl
@@ -154,13 +175,21 @@ guiInline inline =
                     --     , placeholder = Nothing
                     --     , label = EI.labelLeft [] (E.text "title")
                     --     }
-                    , E.column coltrib <| List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines
+                    , E.column coltrib
+                        (List.indexedMap
+                            (\i inl -> E.map (ListItemMsg i) (guiInline inl))
+                            inlines
+                            |> Util.listWithDefault [ E.map (ListItemMsg 0) <| guiInline (MB.Text "") ]
+                        )
                     ]
                 ]
 
         Image src _ inlines ->
             E.row rowtrib
-                [ E.el [ E.alignTop ] <| E.text "image"
+                [ EI.button (E.alignTop :: buttonStyle)
+                    { onPress = Just <| InlineXform inline
+                    , label = E.text "image"
+                    }
                 , E.column coltrib <|
                     [ EI.text []
                         { onChange = ImageUrl
@@ -176,25 +205,39 @@ guiInline inline =
                     --     , placeholder = Nothing
                     --     , label = EI.labelLeft [] (E.text "title")
                     --     }
-                    , E.column coltrib <| List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines
+                    , E.column coltrib
+                        (List.indexedMap
+                            (\i inl -> E.map (ListItemMsg i) (guiInline inl))
+                            inlines
+                            |> Util.listWithDefault [ E.map (ListItemMsg 0) <| guiInline (MB.Text "") ]
+                        )
                     ]
                 ]
 
         Emphasis inlines ->
             E.row rowtrib
-                [ E.el [ E.alignTop ] <| E.text "emphasis"
+                [ EI.button (E.alignTop :: buttonStyle)
+                    { onPress = Just <| InlineXform inline
+                    , label = E.text "emphasis"
+                    }
                 , E.column coltrib (List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines)
                 ]
 
         Strong inlines ->
             E.row rowtrib
-                [ E.el [ E.alignTop ] <| E.text "strong"
+                [ EI.button (E.alignTop :: buttonStyle)
+                    { onPress = Just <| InlineXform inline
+                    , label = E.text "strong"
+                    }
                 , E.column coltrib (List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines)
                 ]
 
         Strikethrough inlines ->
             E.row rowtrib
-                [ E.el [ E.alignTop ] <| E.text "strikethrough"
+                [ EI.button (E.alignTop :: buttonStyle)
+                    { onPress = Just <| InlineXform inline
+                    , label = E.text "strikethrough"
+                    }
                 , E.column coltrib (List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines)
                 ]
 
@@ -203,7 +246,13 @@ guiInline inline =
                 { onChange = CodeSpanStr
                 , text = s
                 , placeholder = Nothing
-                , label = EI.labelLeft [] (E.text "code")
+                , label =
+                    EI.labelLeft []
+                        (EI.button (E.alignTop :: buttonStyle)
+                            { onPress = Just <| InlineXform inline
+                            , label = E.text "codespan"
+                            }
+                        )
                 , spellcheck = False
                 }
 
@@ -212,7 +261,13 @@ guiInline inline =
                 { onChange = TextStr
                 , text = s
                 , placeholder = Nothing
-                , label = EI.labelLeft [] (E.text "text")
+                , label =
+                    EI.labelLeft []
+                        (EI.button (E.alignTop :: buttonStyle)
+                            { onPress = Just <| InlineXform inline
+                            , label = E.text "text"
+                            }
+                        )
                 , spellcheck = False
                 }
 
@@ -281,105 +336,117 @@ updateListInline idx msg inlines =
 
 updateInline : Msg -> MB.Inline -> List MB.Inline
 updateInline msg inline =
-    case inline of
-        HtmlInline block ->
-            [ HtmlInline <| updateHtml msg block ]
+    case msg of
+        InlineXform newinline ->
+            [ newinline ]
 
-        Link url mbtitle inlines ->
-            case msg of
-                LinkUrl s ->
-                    [ Link s mbtitle inlines ]
+        _ ->
+            case inline of
+                HtmlInline block ->
+                    [ HtmlInline <| updateHtml msg block ]
 
-                LinkTitle s ->
-                    [ Link url
-                        (if String.isEmpty s then
-                            Nothing
+                Link url mbtitle inlines ->
+                    case msg of
+                        LinkUrl s ->
+                            [ Link s mbtitle inlines ]
 
-                         else
-                            Just s
-                        )
-                        inlines
-                    ]
+                        LinkTitle s ->
+                            [ Link url
+                                (if String.isEmpty s then
+                                    Nothing
 
-                ListItemMsg idx lim ->
-                    [ Link url mbtitle <| updateListInline idx lim inlines ]
+                                 else
+                                    Just s
+                                )
+                                inlines
+                            ]
 
-                _ ->
+                        ListItemMsg idx lim ->
+                            [ Link url mbtitle <| updateListInline idx lim (inlines |> Util.listWithDefault [ MB.Text "" ]) ]
+
+                        _ ->
+                            [ inline ]
+
+                Image src mbtitle inlines ->
+                    case msg of
+                        ImageUrl s ->
+                            [ Image s mbtitle inlines ]
+
+                        ImageTitle s ->
+                            [ Image src
+                                (if String.isEmpty s then
+                                    Nothing
+
+                                 else
+                                    Just s
+                                )
+                                inlines
+                            ]
+
+                        ListItemMsg idx lim ->
+                            [ Image src mbtitle <| updateListInline idx lim (inlines |> Util.listWithDefault [ MB.Text "" ]) ]
+
+                        _ ->
+                            [ inline ]
+
+                Emphasis inlines ->
+                    case msg of
+                        ListItemMsg idx lim ->
+                            [ Emphasis <| updateListInline idx lim inlines ]
+
+                        _ ->
+                            [ inline ]
+
+                Strong inlines ->
+                    case msg of
+                        ListItemMsg idx lim ->
+                            [ Strong <| updateListInline idx lim inlines ]
+
+                        _ ->
+                            [ inline ]
+
+                Strikethrough inlines ->
+                    case msg of
+                        ListItemMsg idx lim ->
+                            [ Strikethrough <| updateListInline idx lim inlines ]
+
+                        _ ->
+                            [ inline ]
+
+                CodeSpan _ ->
+                    case msg of
+                        CodeSpanStr str ->
+                            [ CodeSpan str ]
+
+                        _ ->
+                            [ inline ]
+
+                Text _ ->
+                    case msg of
+                        TextStr str ->
+                            [ Text str ]
+
+                        _ ->
+                            [ inline ]
+
+                HardLineBreak ->
                     [ inline ]
-
-        Image src mbtitle inlines ->
-            case msg of
-                ImageUrl s ->
-                    [ Image s mbtitle inlines ]
-
-                ImageTitle s ->
-                    [ Image src
-                        (if String.isEmpty s then
-                            Nothing
-
-                         else
-                            Just s
-                        )
-                        inlines
-                    ]
-
-                ListItemMsg idx lim ->
-                    [ Image src mbtitle <| updateListInline idx lim inlines ]
-
-                _ ->
-                    [ inline ]
-
-        Emphasis inlines ->
-            case msg of
-                ListItemMsg idx lim ->
-                    [ Emphasis <| updateListInline idx lim inlines ]
-
-                _ ->
-                    [ inline ]
-
-        Strong inlines ->
-            case msg of
-                ListItemMsg idx lim ->
-                    [ Strong <| updateListInline idx lim inlines ]
-
-                _ ->
-                    [ inline ]
-
-        Strikethrough inlines ->
-            case msg of
-                ListItemMsg idx lim ->
-                    [ Strikethrough <| updateListInline idx lim inlines ]
-
-                _ ->
-                    [ inline ]
-
-        CodeSpan _ ->
-            case msg of
-                CodeSpanStr str ->
-                    [ CodeSpan str ]
-
-                _ ->
-                    [ inline ]
-
-        Text _ ->
-            case msg of
-                TextStr str ->
-                    [ Text str ]
-
-                _ ->
-                    [ inline ]
-
-        HardLineBreak ->
-            [ inline ]
 
 
 updateBlock : Msg -> MB.Block -> List MB.Block
 updateBlock msg block =
     case block of
         HtmlBlock htmlBlock ->
-            updateHtml msg htmlBlock
-                |> HtmlBlock
-                |> List.singleton
+            case msg of
+                InlineXform newinline ->
+                    [ MB.Paragraph
+                        [ newinline ]
+                    ]
+
+                _ ->
+                    updateHtml msg htmlBlock
+                        |> HtmlBlock
+                        |> List.singleton
 
         UnorderedList listSpacing listItems ->
             case msg of
@@ -605,7 +672,12 @@ updateHtmlElement msg tag attribs =
             updateNoteAttribs msg tag attribs
 
         "yeet" ->
-            updateNoteAttribs msg tag attribs
+            case msg of
+                YeetUrl url ->
+                    HtmlElement tag (updateAttrib "url" (Just url) attribs) []
+
+                _ ->
+                    updateNoteAttribs msg tag attribs
 
         _ ->
             HtmlElement tag attribs []
@@ -722,25 +794,37 @@ findAttrib name attribs =
 
 guiHtmlElement : String -> List HtmlAttribute -> E.Element Msg
 guiHtmlElement tag attribs =
+    let
+        row =
+            \col ->
+                E.row rowtrib
+                    [ EI.button (E.alignTop :: buttonStyle)
+                        { onPress = Just <| InlineXform (MB.HtmlInline <| MB.HtmlElement tag attribs [])
+                        , label = E.text tag
+                        }
+                    , col
+                    ]
+    in
     case tag of
         "cell" ->
             case ( findAttrib "name" attribs, findAttrib "schelmecode" attribs ) of
                 ( Just name, Just script ) ->
-                    E.column coltrib
-                        [ EI.text []
-                            { onChange = CellName
-                            , text = name
-                            , placeholder = Nothing
-                            , label = EI.labelLeft [] (E.text "name")
-                            }
-                        , EI.multiline [ E.height E.fill ]
-                            { onChange = CellScript
-                            , text = script
-                            , placeholder = Nothing
-                            , label = EI.labelLeft [] (E.text "script")
-                            , spellcheck = False
-                            }
-                        ]
+                    row <|
+                        E.column coltrib
+                            [ EI.text []
+                                { onChange = CellName
+                                , text = name
+                                , placeholder = Nothing
+                                , label = EI.labelLeft [] (E.text "name")
+                                }
+                            , EI.multiline [ E.height E.fill ]
+                                { onChange = CellScript
+                                , text = script
+                                , placeholder = Nothing
+                                , label = EI.labelLeft [] (E.text "script")
+                                , spellcheck = False
+                                }
+                            ]
 
                 _ ->
                     E.none
@@ -748,14 +832,15 @@ guiHtmlElement tag attribs =
         "search" ->
             case findAttrib "search" attribs of
                 Just search ->
-                    E.column coltrib
-                        [ EI.text []
-                            { onChange = SearchText
-                            , text = search
-                            , placeholder = Nothing
-                            , label = EI.labelLeft [] (E.text "search")
-                            }
-                        ]
+                    row <|
+                        E.column coltrib
+                            [ EI.text []
+                                { onChange = SearchText
+                                , text = search
+                                , placeholder = Nothing
+                                , label = EI.labelLeft [] (E.text "search")
+                                }
+                            ]
 
                 _ ->
                     E.none
@@ -763,14 +848,15 @@ guiHtmlElement tag attribs =
         "panel" ->
             case findAttrib "noteid" attribs of
                 Just noteid ->
-                    E.column coltrib
-                        [ EI.text []
-                            { onChange = NoteIdText
-                            , text = noteid
-                            , placeholder = Nothing
-                            , label = EI.labelLeft [] (E.text "noteid")
-                            }
-                        ]
+                    row <|
+                        E.column coltrib
+                            [ EI.text []
+                                { onChange = NoteIdText
+                                , text = noteid
+                                , placeholder = Nothing
+                                , label = EI.labelLeft [] (E.text "noteid")
+                                }
+                            ]
 
                 _ ->
                     E.none
@@ -778,26 +864,27 @@ guiHtmlElement tag attribs =
         "image" ->
             case ( findAttrib "text" attribs, findAttrib "url" attribs, findAttrib "width" attribs ) of
                 ( Just name, Just url, mbwidth ) ->
-                    E.column coltrib
-                        [ EI.text []
-                            { onChange = ImageText
-                            , text = name
-                            , placeholder = Nothing
-                            , label = EI.labelLeft [] (E.text "text")
-                            }
-                        , EI.text []
-                            { onChange = ImageUrl
-                            , text = url
-                            , placeholder = Nothing
-                            , label = EI.labelLeft [] (E.text "url")
-                            }
-                        , EI.text []
-                            { onChange = ImageWidth
-                            , text = mbwidth |> Maybe.withDefault ""
-                            , placeholder = Nothing
-                            , label = EI.labelLeft [] (E.text "width")
-                            }
-                        ]
+                    row <|
+                        E.column coltrib
+                            [ EI.text []
+                                { onChange = ImageText
+                                , text = name
+                                , placeholder = Nothing
+                                , label = EI.labelLeft [] (E.text "text")
+                                }
+                            , EI.text []
+                                { onChange = ImageUrl
+                                , text = url
+                                , placeholder = Nothing
+                                , label = EI.labelLeft [] (E.text "url")
+                                }
+                            , EI.text []
+                                { onChange = ImageWidth
+                                , text = mbwidth |> Maybe.withDefault ""
+                                , placeholder = Nothing
+                                , label = EI.labelLeft [] (E.text "width")
+                                }
+                            ]
 
                 _ ->
                     E.none
@@ -805,32 +892,33 @@ guiHtmlElement tag attribs =
         "video" ->
             case Toop.T4 (findAttrib "src" attribs) (findAttrib "text" attribs) (findAttrib "width" attribs) (findAttrib "height" attribs) of
                 Toop.T4 (Just src) mbtext mbwidth mbheight ->
-                    E.column coltrib
-                        [ EI.text []
-                            { onChange = VideoSrc
-                            , text = src
-                            , placeholder = Nothing
-                            , label = EI.labelLeft [] (E.text "src")
-                            }
-                        , EI.text []
-                            { onChange = VideoText
-                            , text = mbtext |> Maybe.withDefault ""
-                            , placeholder = Nothing
-                            , label = EI.labelLeft [] (E.text "mbtext")
-                            }
-                        , EI.text []
-                            { onChange = VideoWidth
-                            , text = mbwidth |> Maybe.withDefault ""
-                            , placeholder = Nothing
-                            , label = EI.labelLeft [] (E.text "mbwidth")
-                            }
-                        , EI.text []
-                            { onChange = VideoHeight
-                            , text = mbheight |> Maybe.withDefault ""
-                            , placeholder = Nothing
-                            , label = EI.labelLeft [] (E.text "mbheight")
-                            }
-                        ]
+                    row <|
+                        E.column coltrib
+                            [ EI.text []
+                                { onChange = VideoSrc
+                                , text = src
+                                , placeholder = Nothing
+                                , label = EI.labelLeft [] (E.text "src")
+                                }
+                            , EI.text []
+                                { onChange = VideoText
+                                , text = mbtext |> Maybe.withDefault ""
+                                , placeholder = Nothing
+                                , label = EI.labelLeft [] (E.text "mbtext")
+                                }
+                            , EI.text []
+                                { onChange = VideoWidth
+                                , text = mbwidth |> Maybe.withDefault ""
+                                , placeholder = Nothing
+                                , label = EI.labelLeft [] (E.text "mbwidth")
+                                }
+                            , EI.text []
+                                { onChange = VideoHeight
+                                , text = mbheight |> Maybe.withDefault ""
+                                , placeholder = Nothing
+                                , label = EI.labelLeft [] (E.text "mbheight")
+                                }
+                            ]
 
                 _ ->
                     E.none
@@ -838,29 +926,40 @@ guiHtmlElement tag attribs =
         "audio" ->
             case Toop.T2 (findAttrib "src" attribs) (findAttrib "text" attribs) of
                 Toop.T2 (Just src) (Just text) ->
-                    E.column coltrib
-                        [ EI.text []
-                            { onChange = AudioSrc
-                            , text = src
-                            , placeholder = Nothing
-                            , label = EI.labelLeft [] (E.text "src")
-                            }
-                        , EI.text []
-                            { onChange = AudioText
-                            , text = text
-                            , placeholder = Nothing
-                            , label = EI.labelLeft [] (E.text "text")
-                            }
-                        ]
+                    row <|
+                        E.column coltrib
+                            [ EI.text []
+                                { onChange = AudioSrc
+                                , text = src
+                                , placeholder = Nothing
+                                , label = EI.labelLeft [] (E.text "src")
+                                }
+                            , EI.text []
+                                { onChange = AudioText
+                                , text = text
+                                , placeholder = Nothing
+                                , label = EI.labelLeft [] (E.text "text")
+                                }
+                            ]
 
                 _ ->
                     E.none
 
         "note" ->
-            renderNote attribs
-            
+            row <|
+                renderNote attribs
+
         "yeet" ->
-            E.column [] [E.text "yeet",  renderNote attribs ]
+            row <|
+                E.column coltrib
+                    [ EI.text []
+                        { onChange = YeetUrl
+                        , text = findAttrib "url" attribs |> Maybe.withDefault ""
+                        , placeholder = Nothing
+                        , label = EI.labelLeft [] (E.text "url")
+                        }
+                    , renderNote attribs
+                    ]
 
         _ ->
             E.none
@@ -868,87 +967,83 @@ guiHtmlElement tag attribs =
 
 renderNote : List HtmlAttribute -> E.Element Msg
 renderNote attribs =
-            case ( findAttrib "id" attribs, findAttrib "show" attribs, findAttrib "text" attribs ) of
-                ( Just noteid, mbshow, mbtext ) ->
-                    let
-                        ns =
-                            mbshow
-                                |> Maybe.map MC.parseNoteShow
-                                |> Maybe.withDefault
-                                    { title = False
-                                    , contents = False
-                                    , text = False
-                                    , file = False
-                                    , createdate = False
-                                    , changedate = False
-                                    , link = False
-                                    }
-                    in
-                    E.row rowtrib
-                        [ E.el [ E.alignTop ] <| E.text "note"
-                        , E.column coltrib
-                            [ EI.text []
-                                { onChange = NoteSrc
-                                , text = noteid
-                                , placeholder = Nothing
-                                , label = EI.labelLeft [] (E.text "noteid")
-                                }
-                            , E.row [ E.width E.fill, E.spacing 3 ]
-                                [ E.el [ E.alignTop ] <| E.text "show"
-                                , E.column [ EBd.color TC.grey, EBd.width 1, E.padding 8, E.spacing 3 ]
-                                    [ EI.checkbox []
-                                        { onChange = NoteShowTitle
-                                        , icon = EI.defaultCheckbox
-                                        , checked = ns.title
-                                        , label = EI.labelRight [] (E.text "title")
-                                        }
-                                    , EI.checkbox []
-                                        { onChange = NoteShowContents
-                                        , icon = EI.defaultCheckbox
-                                        , checked = ns.contents
-                                        , label = EI.labelRight [] (E.text "contents")
-                                        }
-                                    , EI.checkbox []
-                                        { onChange = NoteShowText
-                                        , icon = EI.defaultCheckbox
-                                        , checked = ns.text
-                                        , label = EI.labelRight [] (E.text "text")
-                                        }
-                                    , EI.checkbox []
-                                        { onChange = NoteShowFile
-                                        , icon = EI.defaultCheckbox
-                                        , checked = ns.file
-                                        , label = EI.labelRight [] (E.text "file")
-                                        }
-                                    , EI.checkbox []
-                                        { onChange = NoteShowCreatedate
-                                        , icon = EI.defaultCheckbox
-                                        , checked = ns.createdate
-                                        , label = EI.labelRight [] (E.text "createdate")
-                                        }
-                                    , EI.checkbox []
-                                        { onChange = NoteShowChangedate
-                                        , icon = EI.defaultCheckbox
-                                        , checked = ns.changedate
-                                        , label = EI.labelRight [] (E.text "changedate")
-                                        }
-                                    , EI.checkbox []
-                                        { onChange = NoteShowLink
-                                        , icon = EI.defaultCheckbox
-                                        , checked = ns.link
-                                        , label = EI.labelRight [] (E.text "link")
-                                        }
-                                    ]
-                                ]
-                            , EI.text []
-                                { onChange = NoteText
-                                , text = mbtext |> Maybe.withDefault ""
-                                , placeholder = Nothing
-                                , label = EI.labelLeft [] (E.text "text")
-                                }
-                            ]
+    case ( findAttrib "id" attribs, findAttrib "show" attribs, findAttrib "text" attribs ) of
+        ( Just noteid, mbshow, mbtext ) ->
+            let
+                ns =
+                    mbshow
+                        |> Maybe.map MC.parseNoteShow
+                        |> Maybe.withDefault
+                            { title = False
+                            , contents = False
+                            , text = False
+                            , file = False
+                            , createdate = False
+                            , changedate = False
+                            , link = False
+                            }
+            in
+            E.column coltrib
+                [ EI.text []
+                    { onChange = NoteSrc
+                    , text = noteid
+                    , placeholder = Nothing
+                    , label = EI.labelLeft [] (E.text "noteid")
+                    }
+                , E.row [ E.width E.fill, E.spacing 3 ]
+                    [ E.el [ E.alignTop ] <| E.text "show"
+                    , E.column [ EBd.color TC.grey, EBd.width 1, E.padding 8, E.spacing 3 ]
+                        [ EI.checkbox []
+                            { onChange = NoteShowTitle
+                            , icon = EI.defaultCheckbox
+                            , checked = ns.title
+                            , label = EI.labelRight [] (E.text "title")
+                            }
+                        , EI.checkbox []
+                            { onChange = NoteShowContents
+                            , icon = EI.defaultCheckbox
+                            , checked = ns.contents
+                            , label = EI.labelRight [] (E.text "contents")
+                            }
+                        , EI.checkbox []
+                            { onChange = NoteShowText
+                            , icon = EI.defaultCheckbox
+                            , checked = ns.text
+                            , label = EI.labelRight [] (E.text "text")
+                            }
+                        , EI.checkbox []
+                            { onChange = NoteShowFile
+                            , icon = EI.defaultCheckbox
+                            , checked = ns.file
+                            , label = EI.labelRight [] (E.text "file")
+                            }
+                        , EI.checkbox []
+                            { onChange = NoteShowCreatedate
+                            , icon = EI.defaultCheckbox
+                            , checked = ns.createdate
+                            , label = EI.labelRight [] (E.text "createdate")
+                            }
+                        , EI.checkbox []
+                            { onChange = NoteShowChangedate
+                            , icon = EI.defaultCheckbox
+                            , checked = ns.changedate
+                            , label = EI.labelRight [] (E.text "changedate")
+                            }
+                        , EI.checkbox []
+                            { onChange = NoteShowLink
+                            , icon = EI.defaultCheckbox
+                            , checked = ns.link
+                            , label = EI.labelRight [] (E.text "link")
+                            }
                         ]
+                    ]
+                , EI.text []
+                    { onChange = NoteText
+                    , text = mbtext |> Maybe.withDefault ""
+                    , placeholder = Nothing
+                    , label = EI.labelLeft [] (E.text "text")
+                    }
+                ]
 
-                _ ->
-                    E.none
-
+        _ ->
+            E.none
