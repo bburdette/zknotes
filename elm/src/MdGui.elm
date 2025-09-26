@@ -1,4 +1,4 @@
-module MdGui exposing (Msg, coltrib, getXformMsg, guiBlock, rowtrib, updateBlock)
+module MdGui exposing (Msg, coltrib, findAttrib, getXformMsg, guiBlock, rowtrib, updateBlock)
 
 import Common exposing (buttonStyle)
 import Either
@@ -337,7 +337,8 @@ updateInline : Msg -> MB.Inline -> List MB.Inline
 updateInline msg inline =
     case msg of
         InlineXform newinline ->
-            [ newinline ]
+            Debug.log "newinline"
+                [ newinline ]
 
         _ ->
             case inline of
@@ -436,9 +437,19 @@ updateBlock : Msg -> MB.Block -> List MB.Block
 updateBlock msg block =
     case block of
         HtmlBlock htmlBlock ->
-            updateHtml msg htmlBlock
-                |> HtmlBlock
-                |> List.singleton
+            case msg of
+                InlineXform newinline ->
+                    Debug.log "newinline" <|
+                        [ MB.Paragraph
+                            [ newinline ]
+                        ]
+
+                _ ->
+                    Debug.log "updateblaock htmlBlock" <|
+                        (updateHtml msg htmlBlock
+                            |> HtmlBlock
+                            |> List.singleton
+                        )
 
         UnorderedList listSpacing listItems ->
             case msg of
@@ -781,25 +792,37 @@ findAttrib name attribs =
 
 guiHtmlElement : String -> List HtmlAttribute -> E.Element Msg
 guiHtmlElement tag attribs =
+    let
+        row =
+            \col ->
+                E.row rowtrib
+                    [ EI.button (E.alignTop :: buttonStyle)
+                        { onPress = Just <| InlineXform (MB.HtmlInline <| MB.HtmlElement tag attribs [])
+                        , label = E.text tag
+                        }
+                    , col
+                    ]
+    in
     case tag of
         "cell" ->
             case ( findAttrib "name" attribs, findAttrib "schelmecode" attribs ) of
                 ( Just name, Just script ) ->
-                    E.column coltrib
-                        [ EI.text []
-                            { onChange = CellName
-                            , text = name
-                            , placeholder = Nothing
-                            , label = EI.labelLeft [] (E.text "name")
-                            }
-                        , EI.multiline [ E.height E.fill ]
-                            { onChange = CellScript
-                            , text = script
-                            , placeholder = Nothing
-                            , label = EI.labelLeft [] (E.text "script")
-                            , spellcheck = False
-                            }
-                        ]
+                    row <|
+                        E.column coltrib
+                            [ EI.text []
+                                { onChange = CellName
+                                , text = name
+                                , placeholder = Nothing
+                                , label = EI.labelLeft [] (E.text "name")
+                                }
+                            , EI.multiline [ E.height E.fill ]
+                                { onChange = CellScript
+                                , text = script
+                                , placeholder = Nothing
+                                , label = EI.labelLeft [] (E.text "script")
+                                , spellcheck = False
+                                }
+                            ]
 
                 _ ->
                     E.none
@@ -807,14 +830,15 @@ guiHtmlElement tag attribs =
         "search" ->
             case findAttrib "search" attribs of
                 Just search ->
-                    E.column coltrib
-                        [ EI.text []
-                            { onChange = SearchText
-                            , text = search
-                            , placeholder = Nothing
-                            , label = EI.labelLeft [] (E.text "search")
-                            }
-                        ]
+                    row <|
+                        E.column coltrib
+                            [ EI.text []
+                                { onChange = SearchText
+                                , text = search
+                                , placeholder = Nothing
+                                , label = EI.labelLeft [] (E.text "search")
+                                }
+                            ]
 
                 _ ->
                     E.none
@@ -822,14 +846,15 @@ guiHtmlElement tag attribs =
         "panel" ->
             case findAttrib "noteid" attribs of
                 Just noteid ->
-                    E.column coltrib
-                        [ EI.text []
-                            { onChange = NoteIdText
-                            , text = noteid
-                            , placeholder = Nothing
-                            , label = EI.labelLeft [] (E.text "noteid")
-                            }
-                        ]
+                    row <|
+                        E.column coltrib
+                            [ EI.text []
+                                { onChange = NoteIdText
+                                , text = noteid
+                                , placeholder = Nothing
+                                , label = EI.labelLeft [] (E.text "noteid")
+                                }
+                            ]
 
                 _ ->
                     E.none
@@ -837,26 +862,27 @@ guiHtmlElement tag attribs =
         "image" ->
             case ( findAttrib "text" attribs, findAttrib "url" attribs, findAttrib "width" attribs ) of
                 ( Just name, Just url, mbwidth ) ->
-                    E.column coltrib
-                        [ EI.text []
-                            { onChange = ImageText
-                            , text = name
-                            , placeholder = Nothing
-                            , label = EI.labelLeft [] (E.text "text")
-                            }
-                        , EI.text []
-                            { onChange = ImageUrl
-                            , text = url
-                            , placeholder = Nothing
-                            , label = EI.labelLeft [] (E.text "url")
-                            }
-                        , EI.text []
-                            { onChange = ImageWidth
-                            , text = mbwidth |> Maybe.withDefault ""
-                            , placeholder = Nothing
-                            , label = EI.labelLeft [] (E.text "width")
-                            }
-                        ]
+                    row <|
+                        E.column coltrib
+                            [ EI.text []
+                                { onChange = ImageText
+                                , text = name
+                                , placeholder = Nothing
+                                , label = EI.labelLeft [] (E.text "text")
+                                }
+                            , EI.text []
+                                { onChange = ImageUrl
+                                , text = url
+                                , placeholder = Nothing
+                                , label = EI.labelLeft [] (E.text "url")
+                                }
+                            , EI.text []
+                                { onChange = ImageWidth
+                                , text = mbwidth |> Maybe.withDefault ""
+                                , placeholder = Nothing
+                                , label = EI.labelLeft [] (E.text "width")
+                                }
+                            ]
 
                 _ ->
                     E.none
@@ -864,32 +890,33 @@ guiHtmlElement tag attribs =
         "video" ->
             case Toop.T4 (findAttrib "src" attribs) (findAttrib "text" attribs) (findAttrib "width" attribs) (findAttrib "height" attribs) of
                 Toop.T4 (Just src) mbtext mbwidth mbheight ->
-                    E.column coltrib
-                        [ EI.text []
-                            { onChange = VideoSrc
-                            , text = src
-                            , placeholder = Nothing
-                            , label = EI.labelLeft [] (E.text "src")
-                            }
-                        , EI.text []
-                            { onChange = VideoText
-                            , text = mbtext |> Maybe.withDefault ""
-                            , placeholder = Nothing
-                            , label = EI.labelLeft [] (E.text "mbtext")
-                            }
-                        , EI.text []
-                            { onChange = VideoWidth
-                            , text = mbwidth |> Maybe.withDefault ""
-                            , placeholder = Nothing
-                            , label = EI.labelLeft [] (E.text "mbwidth")
-                            }
-                        , EI.text []
-                            { onChange = VideoHeight
-                            , text = mbheight |> Maybe.withDefault ""
-                            , placeholder = Nothing
-                            , label = EI.labelLeft [] (E.text "mbheight")
-                            }
-                        ]
+                    row <|
+                        E.column coltrib
+                            [ EI.text []
+                                { onChange = VideoSrc
+                                , text = src
+                                , placeholder = Nothing
+                                , label = EI.labelLeft [] (E.text "src")
+                                }
+                            , EI.text []
+                                { onChange = VideoText
+                                , text = mbtext |> Maybe.withDefault ""
+                                , placeholder = Nothing
+                                , label = EI.labelLeft [] (E.text "mbtext")
+                                }
+                            , EI.text []
+                                { onChange = VideoWidth
+                                , text = mbwidth |> Maybe.withDefault ""
+                                , placeholder = Nothing
+                                , label = EI.labelLeft [] (E.text "mbwidth")
+                                }
+                            , EI.text []
+                                { onChange = VideoHeight
+                                , text = mbheight |> Maybe.withDefault ""
+                                , placeholder = Nothing
+                                , label = EI.labelLeft [] (E.text "mbheight")
+                                }
+                            ]
 
                 _ ->
                     E.none
@@ -897,29 +924,32 @@ guiHtmlElement tag attribs =
         "audio" ->
             case Toop.T2 (findAttrib "src" attribs) (findAttrib "text" attribs) of
                 Toop.T2 (Just src) (Just text) ->
-                    E.column coltrib
-                        [ EI.text []
-                            { onChange = AudioSrc
-                            , text = src
-                            , placeholder = Nothing
-                            , label = EI.labelLeft [] (E.text "src")
-                            }
-                        , EI.text []
-                            { onChange = AudioText
-                            , text = text
-                            , placeholder = Nothing
-                            , label = EI.labelLeft [] (E.text "text")
-                            }
-                        ]
+                    row <|
+                        E.column coltrib
+                            [ EI.text []
+                                { onChange = AudioSrc
+                                , text = src
+                                , placeholder = Nothing
+                                , label = EI.labelLeft [] (E.text "src")
+                                }
+                            , EI.text []
+                                { onChange = AudioText
+                                , text = text
+                                , placeholder = Nothing
+                                , label = EI.labelLeft [] (E.text "text")
+                                }
+                            ]
 
                 _ ->
                     E.none
 
         "note" ->
-            renderNote attribs
+            row <|
+                renderNote attribs
 
         "yeet" ->
-            E.column [] [ E.text "yeet", renderNote attribs ]
+            row <|
+                E.column [] [ E.text "yeet", renderNote attribs ]
 
         _ ->
             E.none

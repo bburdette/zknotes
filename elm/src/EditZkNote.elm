@@ -3645,7 +3645,7 @@ updateEditBlock : MG.Msg -> Model -> Model
 updateEditBlock ebmsg model =
     case model.blockEdit of
         Just (Text t) ->
-            case MG.updateBlock ebmsg t.b of
+            case Debug.log "updateblock result: " <| MG.updateBlock (Debug.log "ebmsg" ebmsg) t.b of
                 [ b ] ->
                     let
                         nbe =
@@ -3658,6 +3658,7 @@ updateEditBlock ebmsg model =
                                         in
                                         Text { idx = t.idx, s = mds, b = b, original = t.original }
                                     )
+                                |> Debug.log "rendarr"
                                 |> Result.toMaybe
                     in
                     { model | blockEdit = nbe }
