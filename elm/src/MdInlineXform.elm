@@ -138,7 +138,7 @@ transforms inline =
                             , ( "panel"
                               , MB.HtmlInline
                                     (MB.HtmlElement "panel"
-                                        [ { name = "id", value = noteid } ]
+                                        [ { name = "noteid", value = noteid } ]
                                         []
                                     )
                               )

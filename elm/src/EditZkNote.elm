@@ -3645,23 +3645,22 @@ updateEditBlock : MG.Msg -> Model -> Model
 updateEditBlock ebmsg model =
     case model.blockEdit of
         Just (Text t) ->
-            case Debug.log "updateblock result: " <| MG.updateBlock (Debug.log "ebmsg" ebmsg) t.b of
+            case MG.updateBlock ebmsg t.b of
                 [ b ] ->
                     let
                         nbe =
-                            Markdown.Renderer.render EM.stringRenderer [ b ]
-                                |> Result.map
-                                    (\sl ->
-                                        let
-                                            mds =
-                                                String.concat sl
-                                        in
-                                        Text { idx = t.idx, s = mds, b = b, original = t.original }
-                                    )
-                                |> Debug.log "rendarr"
-                                |> Result.toMaybe
+                            case Markdown.Renderer.render EM.stringRenderer [ b ] of
+                                Ok sl ->
+                                    let
+                                        mds =
+                                            String.concat sl
+                                    in
+                                    Text { idx = t.idx, s = mds, b = b, original = t.original }
+
+                                Err e ->
+                                    Text { idx = t.idx, s = e, b = b, original = t.original }
                     in
-                    { model | blockEdit = nbe }
+                    { model | blockEdit = Just nbe }
 
                 _ ->
                     model

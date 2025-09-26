@@ -337,8 +337,7 @@ updateInline : Msg -> MB.Inline -> List MB.Inline
 updateInline msg inline =
     case msg of
         InlineXform newinline ->
-            Debug.log "newinline"
-                [ newinline ]
+            [ newinline ]
 
         _ ->
             case inline of
@@ -439,17 +438,14 @@ updateBlock msg block =
         HtmlBlock htmlBlock ->
             case msg of
                 InlineXform newinline ->
-                    Debug.log "newinline" <|
-                        [ MB.Paragraph
-                            [ newinline ]
-                        ]
+                    [ MB.Paragraph
+                        [ newinline ]
+                    ]
 
                 _ ->
-                    Debug.log "updateblaock htmlBlock" <|
-                        (updateHtml msg htmlBlock
-                            |> HtmlBlock
-                            |> List.singleton
-                        )
+                    updateHtml msg htmlBlock
+                        |> HtmlBlock
+                        |> List.singleton
 
         UnorderedList listSpacing listItems ->
             case msg of
