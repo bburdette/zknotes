@@ -424,6 +424,8 @@ pub fn yeet(
     .arg("-x")
     .arg(format!("-o{}/%(title)s-%(id)s.%(ext)s", savedir.display()))
     .arg(url.clone())
+    .arg("--extractor-args")
+    .arg("youtube:player-client=default,-tv_simply")
     .spawn()
     .expect("yt-dlp failed to execute");
 
