@@ -17,6 +17,7 @@ import MdGui as MG exposing (findAttrib)
 import Orgauth.Data as Data
 import Route exposing (Route(..))
 import TangoColors as TC
+import Toop
 import Url exposing (Url)
 import Util
 
@@ -148,7 +149,29 @@ transforms inline =
                             []
 
                 MB.HtmlElement "yeet" attribs childs ->
-                    []
+                    case Toop.T4 (findAttrib "text" attribs) (findAttrib "id" attribs) (findAttrib "show" attribs) (findAttrib "url" attribs) of
+                        Toop.T4 mbtext (Just id) mbshow mburl ->
+                            [ ( "note link"
+                              , MB.HtmlInline
+                                    (MB.HtmlElement "note"
+                                        (List.filterMap identity
+                                            [ Just
+                                                { name = "id"
+                                                , value = id
+                                                }
+                                            , mbtext
+                                                |> Maybe.map (\s -> { name = "text", value = s })
+                                            , mbshow
+                                                |> Maybe.map (\s -> { name = "show", value = s })
+                                            ]
+                                        )
+                                        []
+                                    )
+                              )
+                            ]
+
+                        _ ->
+                            []
 
                 MB.HtmlElement "image" attribs childs ->
                     case ( findAttrib "text" attribs, findAttrib "url" attribs, findAttrib "width" attribs ) of
