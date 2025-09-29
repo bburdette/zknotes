@@ -219,12 +219,10 @@ transforms inline =
                video
             -}
             List.filterMap identity
-                [ Just ( "yeet", MB.HtmlInline (MB.HtmlElement "yeet" [ { name = "url", value = url } ] []) )
-                , Just ( "md image", MB.Image url mbt inlines )
-                , Just
-                    ( "html image"
+                [ Just
+                    ( "yeet"
                     , MB.HtmlInline
-                        (MB.HtmlElement "image"
+                        (MB.HtmlElement "yeet"
                             (List.filterMap identity
                                 [ Just { name = "url", value = url }
                                 , inlineText inlines
@@ -253,6 +251,20 @@ transforms inline =
                                 )
                             )
                         )
+                , Just ( "md image", MB.Image url mbt inlines )
+                , Just
+                    ( "html image"
+                    , MB.HtmlInline
+                        (MB.HtmlElement "image"
+                            (List.filterMap identity
+                                [ Just { name = "url", value = url }
+                                , inlineText inlines
+                                    |> Maybe.map (\s -> { name = "text", value = s })
+                                ]
+                            )
+                            []
+                        )
+                    )
                 ]
 
         Image src mbt inlines ->
@@ -316,6 +328,7 @@ transforms inline =
             , ( "strikethrough", MB.Strikethrough [ MB.Text s ] )
             , ( "codespan", MB.CodeSpan s )
             , ( "link", MB.Link s Nothing [ MB.Text "" ] )
+            , ( "yeet", MB.HtmlInline (MB.HtmlElement "yeet" [ { name = "url", value = s } ] []) )
             ]
 
         HardLineBreak ->
