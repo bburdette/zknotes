@@ -13,13 +13,11 @@ pub struct State {
   pub girlboss: Arc<RwLock<Girlboss<JobId, Monitor>>>,
   pub jobcounter: RwLock<i64>,
   pub server: Server,
-  // pub lapin_channel: Option<Channel>,
   pub lapin_conn: Option<Connection>,
 }
 
 pub fn new_jobid(state: &State, uid: UserId) -> JobId {
   let mut j = state.jobcounter.write().unwrap();
-  // let mut j = state.jobcounter.lock().unwrap();
 
   *j = *j + 1;
 
