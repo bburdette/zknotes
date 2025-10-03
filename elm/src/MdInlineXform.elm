@@ -352,18 +352,14 @@ view buttonStyle mbsize model =
                 }
             , E.el [ EBk.color TC.lightGray, E.padding 20 ] <| E.text "<preview unimplemented>"
             ]
-        , if model.mobile then
-            E.none
-
-          else
-            E.row [ E.width E.fill, E.spacing 10 ]
-                [ EI.button
-                    (E.alignLeft :: buttonStyle)
-                    { onPress = Just CancelClick, label = E.text "cancel" }
-                , EI.button
-                    (E.alignRight :: buttonStyle)
-                    { onPress = Just OkClick, label = E.text "ok" }
-                ]
+        , E.row [ E.width E.fill, E.spacing 10 ]
+            [ EI.button
+                (E.alignLeft :: buttonStyle)
+                { onPress = Just CancelClick, label = E.text "cancel" }
+            , EI.button
+                (E.alignRight :: buttonStyle)
+                { onPress = Just OkClick, label = E.text "ok" }
+            ]
         ]
 
 
