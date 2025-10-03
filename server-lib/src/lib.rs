@@ -38,7 +38,7 @@ pub use rusqlite;
 use rusqlite::Connection;
 use serde_json;
 use simple_error::simple_error;
-use sqldata::{get_single_value, local_server_id, LapinInfo};
+use sqldata::{get_single_value, local_server_id, make_lapin_channel, make_lapin_info, LapinInfo};
 use std::fs::File;
 use std::io::{stdin, Write};
 use std::path::Path;
@@ -322,13 +322,8 @@ async fn receive_files(
   mut payload: Multipart,
   req: HttpRequest,
 ) -> HttpResponse {
-  let li = match (&config.lapin_channel.as_ref(), get_cookie_id(&req)) {
-    (Some(channel), Some(token)) => Some(LapinInfo {
-      channel: &channel,
-      token,
-    }),
-    _ => None,
-  };
+  let li = make_lapin_info(config.lapin_conn.as_ref(), get_cookie_id(&req)).await;
+
   match make_file_notes(session, &config, &li, &mut payload).await {
     Ok(r) => HttpResponse::Ok().json(r),
     Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
@@ -338,7 +333,7 @@ async fn receive_files(
 async fn make_file_notes(
   session: Session,
   state: &web::Data<State>,
-  lapin_info: &Option<LapinInfo<'_>>,
+  lapin_info: &Option<LapinInfo>,
   payload: &mut Multipart,
 ) -> Result<UploadReply, Box<dyn Error>> {
   let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
@@ -541,13 +536,7 @@ async fn private_upstreaming(
   body: web::Payload,
   req: HttpRequest,
 ) -> HttpResponse {
-  let li = match (data.lapin_channel.as_ref(), get_cookie_id(&req)) {
-    (Some(channel), Some(token)) => Some(LapinInfo {
-      channel: &channel,
-      token,
-    }),
-    _ => None,
-  };
+  let li = make_lapin_info(data.lapin_conn.as_ref(), get_cookie_id(&req)).await;
   match zk_interface_check_upstreaming(&session, &data.config, &li, body).await {
     Ok(hr) => hr,
     Err(e) => {
@@ -566,7 +555,7 @@ fn convert_bodyerr(err: actix_web::error::PayloadError) -> std::io::Error {
 async fn zk_interface_check_upstreaming(
   session: &Session,
   config: &Config,
-  lapin_info: &Option<LapinInfo<'_>>,
+  lapin_info: &Option<LapinInfo>,
   body: web::Payload,
 ) -> Result<HttpResponse, Box<dyn Error>> {
   match session.get::<Uuid>("token")? {
@@ -889,27 +878,11 @@ pub async fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
       },
     );
 
-  let lapin_channel = match config.aqmp_uri {
+  let lapin_conn = match config.aqmp_uri {
     Some(ref uri) => {
       let conn =
         lapin::Connection::connect(uri.as_str(), lapin::ConnectionProperties::default()).await?;
-      let chan = conn.create_channel().await?;
-      info!("lapin channel created {:?}", chan);
-      chan
-        .queue_declare(
-          "on_save_zknote",
-          QueueDeclareOptions::default(),
-          FieldTable::default(),
-        )
-        .await?;
-      chan
-        .queue_declare(
-          "on_make_file_note",
-          QueueDeclareOptions::default(),
-          FieldTable::default(),
-        )
-        .await?;
-      Some(chan)
+      Some(conn)
     }
     None => None,
   };
@@ -921,7 +894,7 @@ pub async fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
     girlboss: { Arc::new(RwLock::new(Girlboss::new())) },
     jobcounter: { RwLock::new(0 as i64) },
     server,
-    lapin_channel,
+    lapin_conn,
   });
 
   let c = config.clone();

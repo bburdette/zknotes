@@ -3,6 +3,8 @@ use crate::error::to_orgauth_error;
 use crate::migrations as zkm;
 use async_stream::try_stream;
 use barrel::backend::Sqlite;
+use lapin::options::QueueDeclareOptions;
+use lapin::types::FieldTable;
 use lapin::Channel;
 use log::{error, info};
 use orgauth::data::{RegistrationData, UserId};
@@ -881,14 +883,50 @@ pub fn set_zknote_file(conn: &Connection, noteid: i64, fileid: i64) -> Result<()
   Ok(())
 }
 
-pub struct LapinInfo<'a> {
-  pub channel: &'a Channel,
+pub struct LapinInfo {
+  pub channel: Channel,
   pub token: String,
+}
+
+pub async fn make_lapin_info(
+  conn: Option<&lapin::Connection>,
+  token: Option<String>,
+) -> Option<LapinInfo> {
+  match (conn, token) {
+    (Some(conn), Some(token)) => match make_lapin_channel(conn).await {
+      Ok(lc) => Some(LapinInfo { channel: lc, token }),
+      Err(e) => {
+        error!("{e}");
+        None
+      }
+    },
+    _ => None,
+  }
+}
+
+pub async fn make_lapin_channel(conn: &lapin::Connection) -> Result<lapin::Channel, zkerr::Error> {
+  let chan = conn.create_channel().await?;
+  info!("lapin channel created {:?}", chan);
+  chan
+    .queue_declare(
+      "on_save_zknote",
+      QueueDeclareOptions::default(),
+      FieldTable::default(),
+    )
+    .await?;
+  chan
+    .queue_declare(
+      "on_make_file_note",
+      QueueDeclareOptions::default(),
+      FieldTable::default(),
+    )
+    .await?;
+  Ok(chan)
 }
 
 pub async fn save_zknote(
   conn: &Connection,
-  lapin_info: &Option<LapinInfo<'_>>,
+  lapin_info: &Option<LapinInfo>,
   server: &Server,
   uid: UserId,
   note: &SaveZkNote,
@@ -897,7 +935,7 @@ pub async fn save_zknote(
 
   async fn publish_szn(
     uid: UserId,
-    lapin_info: &Option<LapinInfo<'_>>,
+    lapin_info: &Option<LapinInfo>,
     szn: &SavedZkNote,
   ) -> Result<(), zkerr::Error> {
     if let Some(li) = lapin_info {
@@ -2357,7 +2395,7 @@ pub fn read_zneifchanged(
 
 pub async fn save_importzknotes(
   conn: &Connection,
-  lapin_info: &Option<LapinInfo<'_>>,
+  lapin_info: &Option<LapinInfo>,
   server: &Server,
   uid: UserId,
   izns: &Vec<ImportZkNote>,
@@ -2466,7 +2504,7 @@ pub async fn save_importzknotes(
 pub async fn make_file_note(
   conn: &Connection,
   server: &Server,
-  lapin_info: &Option<LapinInfo<'_>>,
+  lapin_info: &Option<LapinInfo>,
   files_dir: &Path,
   uid: UserId,
   name: &String,

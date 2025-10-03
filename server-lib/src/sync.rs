@@ -112,7 +112,7 @@ pub async fn prev_sync(
 
 pub async fn save_sync(
   conn: &Connection,
-  lapin_info: &Option<LapinInfo<'_>>,
+  lapin_info: &Option<LapinInfo>,
   server: &Server,
   _uid: UserId,
   usernoteid: i64,
@@ -218,7 +218,7 @@ pub fn temp_tables(conn: &Connection) -> Result<TempTableNames, zkerr::Error> {
 pub async fn sync(
   dbpath: &Path,
   file_path: &Path,
-  lapin_info: &Option<LapinInfo<'_>>,
+  lapin_info: &Option<LapinInfo>,
   uid: UserId,
   server: &Server,
   callbacks: &mut Callbacks,
@@ -572,7 +572,7 @@ pub async fn sync_files_up(
 
 pub async fn sync_from_remote(
   conn: &Connection,
-  lapin_info: &Option<LapinInfo<'_>>,
+  lapin_info: &Option<LapinInfo>,
   server: &Server,
   user: &User,
   after: Option<i64>,
@@ -647,7 +647,7 @@ where
 
 pub async fn sync_from_stream<S>(
   conn: &Connection,
-  lapin_info: &Option<LapinInfo<'_>>,
+  lapin_info: &Option<LapinInfo>,
   server: &Server,
   user: &User,
   file_path: &Path,

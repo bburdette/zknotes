@@ -22,6 +22,7 @@ pub enum Error {
   Cookie(cookie::ParseError),
   Annotated(AnnotatedE),
   Girlboss(girlboss::Error),
+  Lapin(lapin::Error),
   NoteNotFound,
   CantLinkToArchive,
   NoteIsPrivate,
@@ -66,6 +67,7 @@ pub fn to_orgauth_error(e: Error) -> orgauth::error::Error {
     Error::Cookie(ze) => orgauth::error::Error::String(ze.to_string()),
     Error::Annotated(e) => orgauth::error::Error::String(e.to_string()),
     Error::Girlboss(e) => orgauth::error::Error::String(e.to_string()),
+    Error::Lapin(e) => orgauth::error::Error::String(e.to_string()),
     Error::NoteNotFound => orgauth::error::Error::String("note not found".to_string()),
     Error::CantLinkToArchive => {
       orgauth::error::Error::String("can't link to archive note".to_string())
@@ -98,6 +100,7 @@ impl fmt::Display for Error {
       Error::Cookie(e) => write!(f, "{}", e),
       Error::Annotated(e) => write!(f, "{}", e),
       Error::Girlboss(e) => write!(f, "{}", e),
+      Error::Lapin(e) => write!(f, "{}", e),
       Error::NoteNotFound => write!(f, "{}", "note not found"),
       Error::CantLinkToArchive => write!(f, "{}", "can't link to archive note"),
       Error::NoteIsPrivate => write!(f, "{}", "note is private"),
@@ -123,6 +126,7 @@ impl fmt::Debug for Error {
       Error::Cookie(e) => write!(f, "{}", e),
       Error::Annotated(e) => write!(f, "{}", e),
       Error::Girlboss(e) => write!(f, "{}", e),
+      Error::Lapin(e) => write!(f, "{}", e),
       Error::NoteNotFound => write!(f, "{}", "note not found"),
       Error::CantLinkToArchive => write!(f, "{}", "can't link to archive note"),
       Error::NoteIsPrivate => write!(f, "{}", "note is private"),
@@ -218,5 +222,10 @@ impl From<cookie::ParseError> for Error {
 impl From<girlboss::Error> for Error {
   fn from(e: girlboss::Error) -> Self {
     Error::Girlboss(e)
+  }
+}
+impl From<lapin::Error> for Error {
+  fn from(e: lapin::Error) -> Self {
+    Error::Lapin(e)
   }
 }
