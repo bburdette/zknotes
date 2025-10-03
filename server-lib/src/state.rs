@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::jobs::JobId;
 use girlboss::Girlboss;
 use girlboss::Monitor;
-use lapin::{Channel, Connection};
+use lapin::Connection;
 use orgauth::data::UserId;
 use std::sync::Arc;
 use std::sync::RwLock;
