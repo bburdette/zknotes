@@ -38,7 +38,7 @@ pub use rusqlite;
 use rusqlite::Connection;
 use serde_json;
 use simple_error::simple_error;
-use sqldata::{get_single_value, local_server_id, make_lapin_channel, LapinInfo};
+use sqldata::{get_single_value, local_server_id, make_lapin_channel, make_lapin_info, LapinInfo};
 use std::fs::File;
 use std::io::{stdin, Write};
 use std::path::Path;
@@ -322,16 +322,8 @@ async fn receive_files(
   mut payload: Multipart,
   req: HttpRequest,
 ) -> HttpResponse {
-  let li = match (config.lapin_conn.as_ref(), get_cookie_id(&req)) {
-    (Some(conn), Some(token)) => {
-      if let Some(lc) = make_lapin_channel(conn).await.ok() {
-        Some(LapinInfo { channel: lc, token })
-      } else {
-        None
-      }
-    }
-    _ => None,
-  };
+  let li = make_lapin_info(config.lapin_conn.as_ref(), get_cookie_id(&req)).await;
+
   match make_file_notes(session, &config, &li, &mut payload).await {
     Ok(r) => HttpResponse::Ok().json(r),
     Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
@@ -544,23 +536,7 @@ async fn private_upstreaming(
   body: web::Payload,
   req: HttpRequest,
 ) -> HttpResponse {
-  // let li = match (data.lapin_channel.as_ref(), get_cookie_id(&req)) {
-  //   (Some(channel), Some(token)) => Some(LapinInfo {
-  //     channel: &channel,
-  //     token,
-  //   }),
-  //   _ => None,
-  // };
-  let li = match (data.lapin_conn.as_ref(), get_cookie_id(&req)) {
-    (Some(conn), Some(token)) => {
-      if let Some(lc) = make_lapin_channel(conn).await.ok() {
-        Some(LapinInfo { channel: lc, token })
-      } else {
-        None
-      }
-    }
-    _ => None,
-  };
+  let li = make_lapin_info(data.lapin_conn.as_ref(), get_cookie_id(&req)).await;
   match zk_interface_check_upstreaming(&session, &data.config, &li, body).await {
     Ok(hr) => hr,
     Err(e) => {
@@ -907,23 +883,6 @@ pub async fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
       let conn =
         lapin::Connection::connect(uri.as_str(), lapin::ConnectionProperties::default()).await?;
       Some(conn)
-      // let chan = conn.create_channel().await?;
-      // info!("lapin channel created {:?}", chan);
-      // chan
-      //   .queue_declare(
-      //     "on_save_zknote",
-      //     QueueDeclareOptions::default(),
-      //     FieldTable::default(),
-      //   )
-      //   .await?;
-      // chan
-      //   .queue_declare(
-      //     "on_make_file_note",
-      //     QueueDeclareOptions::default(),
-      //     FieldTable::default(),
-      //   )
-      //   .await?;
-      // Some(chan)
     }
     None => None,
   };

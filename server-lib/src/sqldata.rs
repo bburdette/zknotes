@@ -888,6 +888,22 @@ pub struct LapinInfo {
   pub token: String,
 }
 
+pub async fn make_lapin_info(
+  conn: Option<&lapin::Connection>,
+  token: Option<String>,
+) -> Option<LapinInfo> {
+  match (conn, token) {
+    (Some(conn), Some(token)) => match make_lapin_channel(conn).await {
+      Ok(lc) => Some(LapinInfo { channel: lc, token }),
+      Err(e) => {
+        error!("{e}");
+        None
+      }
+    },
+    _ => None,
+  }
+}
+
 pub async fn make_lapin_channel(conn: &lapin::Connection) -> Result<lapin::Channel, zkerr::Error> {
   let chan = conn.create_channel().await?;
   info!("lapin channel created {:?}", chan);

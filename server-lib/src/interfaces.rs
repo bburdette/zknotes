@@ -8,6 +8,7 @@ use crate::search;
 use crate::sqldata;
 use crate::sqldata::local_server_id;
 use crate::sqldata::make_lapin_channel;
+use crate::sqldata::make_lapin_info;
 use crate::sqldata::zknotes_callbacks;
 use crate::sqldata::LapinInfo;
 use crate::state::new_jobid;
@@ -256,13 +257,7 @@ pub async fn zk_interface_loggedin(
       Ok(PrivateReply::PvyDeletedZkNote(id.clone()))
     }
     PrivateRequest::PvqSaveZkNote(sbe) => {
-      let li = match (state.lapin_conn.as_ref(), token) {
-        (Some(conn), Some(token)) => {
-          let lc = make_lapin_channel(conn).await?;
-          Some(LapinInfo { channel: lc, token })
-        }
-        _ => None,
-      };
+      let li = make_lapin_info(state.lapin_conn.as_ref(), token).await;
       let (_id, s) = sqldata::save_zknote(&conn, &li, &state.server, uid, &sbe).await?;
       Ok(PrivateReply::PvySavedZkNote(s))
     }
@@ -271,26 +266,13 @@ pub async fn zk_interface_loggedin(
       Ok(PrivateReply::PvySavedZkLinks)
     }
     PrivateRequest::PvqSaveZkNoteAndLinks(sznpl) => {
-      let li = match (state.lapin_conn.as_ref(), token) {
-        (Some(conn), Some(token)) => {
-          let lc = make_lapin_channel(conn).await?;
-          Some(LapinInfo { channel: lc, token })
-        }
-        _ => None,
-      };
-
+      let li = make_lapin_info(state.lapin_conn.as_ref(), token).await;
       let (_, szkn) = sqldata::save_zknote(&conn, &li, &state.server, uid, &sznpl.note).await?;
       let _s = sqldata::save_savezklinks(&conn, uid, szkn.id, &sznpl.links)?;
       Ok(PrivateReply::PvySavedZkNoteAndLinks(szkn))
     }
     PrivateRequest::PvqSaveImportZkNotes(gzl) => {
-      let li = match (state.lapin_conn.as_ref(), token) {
-        (Some(conn), Some(token)) => {
-          let lc = make_lapin_channel(conn).await?;
-          Some(LapinInfo { channel: lc, token })
-        }
-        _ => None,
-      };
+      let li = make_lapin_info(state.lapin_conn.as_ref(), token).await;
       sqldata::save_importzknotes(&conn, &li, &state.server, uid, gzl).await?;
       Ok(PrivateReply::PvySavedImportZkNotes)
     }
@@ -309,11 +291,6 @@ pub async fn zk_interface_loggedin(
         Some(conn) => make_lapin_channel(&conn).await.ok(),
         None => None,
       };
-      // let token
-      // let lapin_info = LapinInfo {
-      //   channel: &lapin_channelx,
-      //   token: "".to_string(),
-      // };
 
       std::thread::spawn(move || {
         let rt = actix_rt::System::new();
