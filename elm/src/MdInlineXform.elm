@@ -4,6 +4,7 @@ import Common
 import Data exposing (ZkNoteId)
 import DataUtil exposing (zkNoteIdToString)
 import Dict exposing (Dict)
+import EdMarkdown exposing (stringRenderer)
 import Element as E exposing (Element)
 import Element.Background as EBk
 import Element.Border as EBd
@@ -13,6 +14,7 @@ import GenDialog as GD
 import Html.Attributes as HA
 import Http
 import Markdown.Block as MB exposing (Inline(..))
+import Markdown.Renderer
 import MdGui as MG exposing (findAttrib)
 import Orgauth.Data as Data
 import Route exposing (Route(..))
@@ -343,14 +345,30 @@ view buttonStyle mbsize model =
         , E.spacing 15
         ]
         [ E.el [ E.centerX, EF.bold ] <| E.text "inline xform"
-        , E.row [ E.width E.fill, E.height E.fill, E.scrollbarY, E.spacing 8 ]
+        , E.column [ E.width E.fill, E.height E.fill, E.scrollbarY, E.spacing 8 ]
             [ EI.radio []
                 { onChange = OnSelect
                 , options = model.transforms |> List.indexedMap (\i ( name, _ ) -> EI.option i (E.text name))
                 , selected = model.selectedTf
                 , label = EI.labelAbove [] (E.text "xform")
                 }
-            , E.el [ EBk.color TC.lightGray, E.padding 20 ] <| E.text "<preview unimplemented>"
+            , E.paragraph [ EBk.color TC.lightGray, E.padding 20 ] <|
+                [ E.text
+                    (model.selectedTf
+                        |> Maybe.andThen
+                            (\i ->
+                                List.head (List.drop i model.transforms)
+                            )
+                        |> Maybe.andThen
+                            (\( _, inline ) ->
+                                Markdown.Renderer.render stringRenderer [ MB.Paragraph [ inline ] ]
+                                    |> Result.toMaybe
+                            )
+                        |> Maybe.map String.concat
+                        |> Maybe.withDefault
+                            ""
+                    )
+                ]
             ]
         , E.row [ E.width E.fill, E.spacing 10 ]
             [ EI.button
