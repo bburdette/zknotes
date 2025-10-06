@@ -672,11 +672,14 @@ yeetView : MkrArgs a -> String -> Maybe String -> Maybe String -> Maybe String -
 yeetView args url audioOnly mbid show text _ =
     case mbid of
         Nothing ->
-            E.text <| "yeet " ++ url ++ (audioOnly |> Maybe.map (\_ -> " -x") |> Maybe.withDefault "" )
+            E.paragraph [] <| List.singleton <| E.text <| "yeet " ++ url ++ (audioOnly |> Maybe.map (\_ -> " -x") |> Maybe.withDefault "")
+
         Just id ->
-            E.column [] [
-            E.text <| "yeet " ++ url ++ (audioOnly |> Maybe.map (\_ -> " -x") |> Maybe.withDefault "" )
-            , noteView args id show text [] ]
+            E.column []
+                [ E.paragraph [] <| List.singleton <| E.text <| "yeet " ++ url ++ (audioOnly |> Maybe.map (\_ -> " -x") |> Maybe.withDefault "")
+                , noteView args id show text []
+                ]
+
 
 noteView : MkrArgs a -> String -> Maybe String -> Maybe String -> List (Element a) -> Element a
 noteView args id show text _ =
@@ -693,7 +696,6 @@ noteView args id show text _ =
                     , changedate = False
                     , link = True
                     }
-
     in
     case
         zkNoteIdFromString id
@@ -1066,6 +1068,7 @@ noteIds markdown =
 
                                         Nothing ->
                                             ids
+
                                 "yeet" ->
                                     case
                                         List.foldl
