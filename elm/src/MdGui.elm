@@ -73,6 +73,17 @@ coltrib =
     [ E.spacing 3, E.width E.fill ]
 
 
+indentrib : List (E.Attribute a)
+indentrib =
+    E.paddingEach
+        { top = 0
+        , right = 0
+        , bottom = 0
+        , left = 20
+        }
+        :: coltrib
+
+
 guiBlock : MB.Block -> E.Element Msg
 guiBlock block =
     case block of
@@ -80,9 +91,9 @@ guiBlock block =
             guiHtml htmlBlock
 
         UnorderedList _ listItems ->
-            E.row rowtrib
+            E.column coltrib
                 [ E.el [ E.alignTop ] <| E.text "unordered list"
-                , E.column coltrib <|
+                , E.column indentrib <|
                     List.indexedMap
                         (\i (ListItem _ li) ->
                             E.map (ListItemMsg i)
@@ -92,9 +103,9 @@ guiBlock block =
                 ]
 
         OrderedList _ _ blockLists ->
-            E.row rowtrib
+            E.column coltrib
                 [ E.el [ E.alignTop ] <| E.text "ordered list"
-                , E.column coltrib <|
+                , E.column indentrib <|
                     List.indexedMap
                         (\bli bl ->
                             E.map (ListItemMsg bli)
@@ -104,22 +115,22 @@ guiBlock block =
                 ]
 
         BlockQuote blocks ->
-            E.row rowtrib
+            E.column coltrib
                 [ E.el [ E.alignTop ] <| E.text "blockquote"
-                , E.column coltrib <|
+                , E.column indentrib <|
                     List.indexedMap (\i b -> E.map (ListItemMsg i) (guiBlock b)) blocks
                 ]
 
         Heading _ inlines ->
-            E.row rowtrib
+            E.column coltrib
                 [ E.el [ E.alignTop ] <| E.text "heading"
-                , E.column coltrib <| List.indexedMap (\i inline -> E.map (ListItemMsg i) (guiInline inline)) inlines
+                , E.column indentrib <| List.indexedMap (\i inline -> E.map (ListItemMsg i) (guiInline inline)) inlines
                 ]
 
         Paragraph inlines ->
-            E.row rowtrib
+            E.column coltrib
                 [ E.el [ E.alignTop ] <| E.text "paragraph"
-                , E.column coltrib <| List.indexedMap (\i inline -> E.map (ListItemMsg i) (guiInline inline)) inlines
+                , E.column indentrib <| List.indexedMap (\i inline -> E.map (ListItemMsg i) (guiInline inline)) inlines
                 ]
 
         Table _ _ ->
@@ -127,21 +138,24 @@ guiBlock block =
 
         CodeBlock cb ->
             E.column coltrib
-                [ EI.text []
-                    { onChange = CbLanguage
-                    , text = cb.language |> Maybe.withDefault ""
-                    , placeholder = Nothing
-                    , label = EI.labelLeft [] (E.text "language")
-                    }
-                , EI.multiline
-                    [ E.height E.fill
+                [ E.el [ E.alignTop ] <| E.text "code block"
+                , E.column indentrib
+                    [ EI.text []
+                        { onChange = CbLanguage
+                        , text = cb.language |> Maybe.withDefault ""
+                        , placeholder = Nothing
+                        , label = EI.labelLeft [] (E.text "language")
+                        }
+                    , EI.multiline
+                        [ E.height E.fill
+                        ]
+                        { onChange = CbBody
+                        , text = cb.body
+                        , placeholder = Nothing
+                        , label = EI.labelLeft [] (E.text "body")
+                        , spellcheck = False
+                        }
                     ]
-                    { onChange = CbBody
-                    , text = cb.body
-                    , placeholder = Nothing
-                    , label = EI.labelLeft [] (E.text "body")
-                    , spellcheck = False
-                    }
                 ]
 
         ThematicBreak ->
@@ -257,17 +271,18 @@ guiInline inline =
                 }
 
         Text s ->
-            EI.multiline [ E.height E.fill ]
+            EI.multiline [ E.height E.fill, E.width E.fill ]
                 { onChange = TextStr
                 , text = s
                 , placeholder = Nothing
-                , label =
-                    EI.labelLeft []
-                        (EI.button (E.alignTop :: buttonStyle)
-                            { onPress = Just <| InlineXform inline
-                            , label = E.text "text"
-                            }
-                        )
+                , label = EI.labelHidden "meh"
+
+                -- EI.labelLeft []
+                --     (EI.button (E.alignTop :: buttonStyle)
+                --         { onPress = Just <| InlineXform inline
+                --         , label = E.text "text"
+                --         }
+                --     )
                 , spellcheck = False
                 }
 
