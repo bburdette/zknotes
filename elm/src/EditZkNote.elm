@@ -63,7 +63,7 @@ import Element.Border as EBd
 import Element.Events as EE
 import Element.Font as EF
 import Element.Input as EI
-import Html.Attributes
+import Html.Attributes as HA
 import Html.Events as HE
 import JobsDialog exposing (TJobs)
 import Json.Decode as JD
@@ -382,7 +382,7 @@ editBlock ddw i focus e =
                    , E.height E.fill
                    , E.padding 3
                    , E.spacing 2
-                   , E.htmlAttribute (Html.Attributes.id bid)
+                   , E.htmlAttribute (HA.id bid)
                    ]
 
         dragHandleAttrs =
@@ -396,7 +396,7 @@ editBlock ddw i focus e =
             E.row
                 baseAttr
                 [ E.el
-                    (E.htmlAttribute (Html.Attributes.style "touch-action" "none")
+                    (E.htmlAttribute (HA.style "touch-action" "none")
                         :: dragHandleAttrs
                         ++ List.map E.htmlAttribute (blockDndSystem.dragEvents i bid)
                     )
@@ -411,7 +411,7 @@ editBlock ddw i focus e =
 
         Drop ->
             E.row
-                (E.htmlAttribute (Html.Attributes.style "touch-action" "none")
+                (E.htmlAttribute (HA.style "touch-action" "none")
                     :: baseAttr
                     ++ List.map E.htmlAttribute (blockDndSystem.dropEvents i bid)
                 )
@@ -423,7 +423,7 @@ editBlock ddw i focus e =
         DropH ->
             E.row
                 ((EBk.color TC.darkBlue
-                    :: E.htmlAttribute (Html.Attributes.style "touch-action" "none")
+                    :: E.htmlAttribute (HA.style "touch-action" "none")
                     :: baseAttr
                  )
                     ++ List.map E.htmlAttribute (blockDndSystem.dropEvents i bid)
@@ -436,7 +436,7 @@ editBlock ddw i focus e =
         Ghost ->
             E.row
                 ((EBk.color TC.darkGreen
-                    :: E.htmlAttribute (Html.Attributes.style "touch-action" "none")
+                    :: E.htmlAttribute (HA.style "touch-action" "none")
                     :: baseAttr
                  )
                     ++ List.map E.htmlAttribute (blockDndSystem.dragEvents i (blockId i))
@@ -1276,16 +1276,29 @@ blockEd (Text t) renderer =
                     E.text e
             ]
         , EI.multiline
-            [ E.alignTop
+            [ --E.alignTop
+              -- E.width E.shrink
+              E.height E.fill
+            , E.width E.fill
+
+            -- , E.width <| E.px 400
+            , HA.style "overflow-wrap" "anywhere" |> E.htmlAttribute
+            , HA.style "word-break" "break-all" |> E.htmlAttribute
+            , HA.style "text-wrap" "unrestricted" |> E.htmlAttribute
+            , HA.style "white-space-collapse" "collapse" |> E.htmlAttribute
+            , E.scrollbarX
+
+            -- , E.htmlAttribute (HA.style "word-break" "break-word")
             ]
             { onChange = EditBlockInput
             , text = t.s
             , placeholder = Nothing
-            , label = EI.labelAbove [] (headingText "markdown edit")
+            , label = EI.labelHidden "wat" -- EI.labelAbove [] (headingText "markdown edit")
             , spellcheck = False
             }
-        , headingText "GUI edit: "
-        , E.map EditBlockMsg <| MG.guiBlock t.b
+
+        -- , headingText "GUI edit: "
+        -- , E.map EditBlockMsg <| MG.guiBlock t.b
         ]
 
 
@@ -1590,11 +1603,11 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                              else
                                 []
                             )
-                                ++ [ E.htmlAttribute (Html.Attributes.id "title")
+                                ++ [ E.htmlAttribute (HA.id "title")
                                    ]
 
                          else
-                            [ EF.color TC.darkGrey, E.htmlAttribute (Html.Attributes.id "title") ]
+                            [ EF.color TC.darkGrey, E.htmlAttribute (HA.id "title") ]
                         )
                         { onChange =
                             if editable then
@@ -1781,7 +1794,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
 
                        else
                         EF.color TC.darkGrey
-                     , E.htmlAttribute (Html.Attributes.id "mdtext")
+                     , E.htmlAttribute (HA.id "mdtext")
                      , E.alignTop
                      ]
                         ++ (if isdirty then
