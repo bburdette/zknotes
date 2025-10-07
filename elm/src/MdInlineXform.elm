@@ -329,7 +329,8 @@ transforms inline =
             , ( "emphasis", MB.Emphasis [ MB.Text s ] )
             , ( "strikethrough", MB.Strikethrough [ MB.Text s ] )
             , ( "codespan", MB.CodeSpan s )
-            , ( "link", MB.Link s Nothing [ MB.Text "" ] )
+            , ( "link - url", MB.Link s Nothing [ MB.Text "" ] )
+            , ( "link - text", MB.Link "" Nothing [ MB.Text s ] )
             , ( "yeet", MB.HtmlInline (MB.HtmlElement "yeet" [ { name = "url", value = s } ] []) )
             ]
 

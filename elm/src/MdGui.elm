@@ -275,14 +275,13 @@ guiInline inline =
                 { onChange = TextStr
                 , text = s
                 , placeholder = Nothing
-                , label = EI.labelHidden "meh"
-
-                -- EI.labelLeft []
-                --     (EI.button (E.alignTop :: buttonStyle)
-                --         { onPress = Just <| InlineXform inline
-                --         , label = E.text "text"
-                --         }
-                --     )
+                , label =
+                    EI.labelLeft []
+                        (EI.button (E.alignTop :: buttonStyle)
+                            { onPress = Just <| InlineXform inline
+                            , label = E.text "text"
+                            }
+                        )
                 , spellcheck = False
                 }
 

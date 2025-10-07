@@ -1229,61 +1229,61 @@ blockEd (Text t) renderer =
         [ E.column [ E.padding 2, EBd.glow TC.darkGray 5.0, EE.onClick EditBlockOk, E.width E.fill, E.spacing 8 ]
             [ E.row [ E.width E.fill ]
                 [ headingText "rendered: "
+                , E.wrappedRow (E.alignTop :: MG.rowtrib)
+                    [ if t.original /= t.s then
+                        EI.button (edButtonStyle RevertBlock ++ [ E.alignRight ])
+                            { onPress = Nothing
+                            , label = E.text "revert"
+                            }
 
-                -- , E.wrappedRow (E.alignTop :: MG.rowtrib)
-                --     [ if t.original /= t.s then
-                --         EI.button (edButtonStyle RevertBlock ++ [ E.alignRight ])
-                --             { onPress = Nothing
-                --             , label = E.text "revert"
-                --             }
-                --       else
-                --         E.none
-                --     , if t.idx > 0 then
-                --         EI.button (edButtonStyle JoinAboveBlock ++ [ E.alignRight ])
-                --             { onPress = Nothing
-                --             , label = E.text "join ↑"
-                --             }
-                --       else
-                --         E.none
-                --     , EI.button (edButtonStyle JoinBelowBlock ++ [ E.alignRight ])
-                --         { onPress = Nothing
-                --         , label = E.text "join ↓"
-                --         }
-                --     , EI.button (edButtonStyle JoinBlock ++ [ E.alignRight ])
-                --         { onPress = Nothing
-                --         , label = E.text "join"
-                --         }
-                --     , EI.button (edButtonStyle SplitBlock ++ [ E.alignRight ])
-                --         { onPress = Nothing
-                --         , label = E.text "split"
-                --         }
-                --     , EI.button (edButtonStyle SpaceEndingsBlock ++ [ E.alignRight ])
-                --         { onPress = Nothing
-                --         , label = E.text "endings"
-                --         }
-                --     , EI.button (edButtonStyle (RemoveBlock t.idx) ++ [ E.alignRight ])
-                --         { onPress = Nothing
-                --         , label = E.text "🗑"
-                --         }
-                --     ]
+                      else
+                        E.none
+                    , if t.idx > 0 then
+                        EI.button (edButtonStyle JoinAboveBlock ++ [ E.alignRight ])
+                            { onPress = Nothing
+                            , label = E.text "join ↑"
+                            }
+
+                      else
+                        E.none
+                    , EI.button (edButtonStyle JoinBelowBlock ++ [ E.alignRight ])
+                        { onPress = Nothing
+                        , label = E.text "join ↓"
+                        }
+                    , EI.button (edButtonStyle JoinBlock ++ [ E.alignRight ])
+                        { onPress = Nothing
+                        , label = E.text "join"
+                        }
+                    , EI.button (edButtonStyle SplitBlock ++ [ E.alignRight ])
+                        { onPress = Nothing
+                        , label = E.text "split"
+                        }
+                    , EI.button (edButtonStyle SpaceEndingsBlock ++ [ E.alignRight ])
+                        { onPress = Nothing
+                        , label = E.text "endings"
+                        }
+                    , EI.button (edButtonStyle (RemoveBlock t.idx) ++ [ E.alignRight ])
+                        { onPress = Nothing
+                        , label = E.text "🗑"
+                        }
+                    ]
                 ]
+            , case MC.markdownView renderer t.s of
+                Ok elts ->
+                    E.column [ E.width E.fill ] elts
 
-            -- , case MC.markdownView renderer t.s of
-            --     Ok elts ->
-            --         E.column [ E.width E.fill ] elts
-            --     Err e ->
-            --         E.text e
+                Err e ->
+                    E.text e
             ]
-
-        -- , EI.multiline
-        --     [ E.alignTop
-        --     ]
-        --     { onChange = EditBlockInput
-        --     , text = t.s
-        --     , placeholder = Nothing
-        --     , label = EI.labelAbove [] (headingText "markdown edit")
-        --     , spellcheck = False
-        --     }
+        , EI.multiline
+            [ E.alignTop
+            ]
+            { onChange = EditBlockInput
+            , text = t.s
+            , placeholder = Nothing
+            , label = EI.labelAbove [] (headingText "markdown edit")
+            , spellcheck = False
+            }
         , headingText "GUI edit: "
         , E.map EditBlockMsg <| MG.guiBlock t.b
         ]
