@@ -137,7 +137,8 @@ transforms inline =
                 MB.HtmlElement "note" attribs childs ->
                     case ( findAttrib "text" attribs, findAttrib "id" attribs, findAttrib "show" attribs ) of
                         ( mbtext, Just noteid, show ) ->
-                            [ ( "link", MB.Link ("/note/" ++ noteid) Nothing [ MB.Text (Maybe.withDefault "" mbtext) ] )
+                            [ ( "none", inline )
+                            , ( "link", MB.Link ("/note/" ++ noteid) Nothing [ MB.Text (Maybe.withDefault "" mbtext) ] )
                             , ( "panel"
                               , MB.HtmlInline
                                     (MB.HtmlElement "panel"
@@ -153,7 +154,8 @@ transforms inline =
                 MB.HtmlElement "yeet" attribs childs ->
                     case Toop.T4 (findAttrib "text" attribs) (findAttrib "id" attribs) (findAttrib "show" attribs) (findAttrib "url" attribs) of
                         Toop.T4 mbtext (Just id) mbshow mburl ->
-                            [ ( "note link"
+                            [ ( "none", inline )
+                            , ( "note link"
                               , MB.HtmlInline
                                     (MB.HtmlElement "note"
                                         (List.filterMap identity
@@ -178,7 +180,8 @@ transforms inline =
                 MB.HtmlElement "image" attribs childs ->
                     case ( findAttrib "text" attribs, findAttrib "url" attribs, findAttrib "width" attribs ) of
                         ( Just text, Just url, mbwidth ) ->
-                            [ ( "md image", MB.Image url (Just text) [] )
+                            [ ( "none", inline )
+                            , ( "md image", MB.Image url (Just text) [] )
                             , ( "link", MB.Link url (Just text) [] )
                             ]
 
@@ -188,7 +191,8 @@ transforms inline =
                 MB.HtmlElement "video" attribs childs ->
                     case ( findAttrib "text" attribs, findAttrib "src" attribs ) of
                         ( Just text, Just src ) ->
-                            [ ( "link", MB.Link src (Just text) [] )
+                            [ ( "none", inline )
+                            , ( "link", MB.Link src (Just text) [] )
                             ]
 
                         _ ->
@@ -197,7 +201,8 @@ transforms inline =
                 MB.HtmlElement "audio" attribs childs ->
                     case ( findAttrib "text" attribs, findAttrib "src" attribs ) of
                         ( Just text, Just src ) ->
-                            [ ( "link", MB.Link src (Just text) [] )
+                            [ ( "none", inline )
+                            , ( "link", MB.Link src (Just text) [] )
                             ]
 
                         _ ->
@@ -221,7 +226,8 @@ transforms inline =
                video
             -}
             List.filterMap identity
-                [ Just
+                [ Just ( "none", inline )
+                , Just
                     ( "yeet"
                     , MB.HtmlInline
                         (MB.HtmlElement "yeet"
@@ -270,7 +276,8 @@ transforms inline =
                 ]
 
         Image src mbt inlines ->
-            [ ( "link", MB.Link src mbt inlines )
+            [ ( "none", inline )
+            , ( "link", MB.Link src mbt inlines )
             , ( "html image"
               , MB.HtmlInline
                     (MB.HtmlElement "image"
@@ -322,10 +329,13 @@ transforms inline =
             ]
 
         CodeSpan s ->
-            [ ( "text", MB.Text s ) ]
+            [ ( "none", inline )
+            , ( "text", MB.Text s )
+            ]
 
         Text s ->
-            [ ( "strong", MB.Strong [ MB.Text s ] )
+            [ ( "none", inline )
+            , ( "strong", MB.Strong [ MB.Text s ] )
             , ( "emphasis", MB.Emphasis [ MB.Text s ] )
             , ( "strikethrough", MB.Strikethrough [ MB.Text s ] )
             , ( "codespan", MB.CodeSpan s )
@@ -382,6 +392,24 @@ view buttonStyle mbsize model =
         ]
 
 
+okResult : GD.Model Model Msg Command -> GD.Transition Model Command
+okResult gdm =
+    let
+        model =
+            gdm.model
+    in
+    okResultInternal model
+
+
+okResultInternal : Model -> GD.Transition Model Command
+okResultInternal model =
+    model.selectedTf
+        |> Maybe.andThen (\i -> List.head (List.drop i model.transforms))
+        |> Maybe.map Tuple.second
+        |> Maybe.map (model.tomsg >> UpdateInline >> GD.Ok)
+        |> Maybe.withDefault GD.Cancel
+
+
 update : Msg -> Model -> GD.Transition Model Command
 update msg model =
     case msg of
@@ -389,11 +417,7 @@ update msg model =
             GD.Cancel
 
         OkClick ->
-            model.selectedTf
-                |> Maybe.andThen (\i -> List.head (List.drop i model.transforms))
-                |> Maybe.map Tuple.second
-                |> Maybe.map (model.tomsg >> UpdateInline >> GD.Ok)
-                |> Maybe.withDefault GD.Cancel
+            okResultInternal model
 
         -- ClearClick jobno ->
         --     GD.Dialog { model | jobs = Dict.remove jobno model.jobs }

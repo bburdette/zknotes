@@ -1709,6 +1709,40 @@ makeTDDecoder ad =
         (JD.field "data" ad)
 
 
+
+-- handleMdInlineXformOk : Model -> State -> GD.Transition MdInlineXform.Model MdInlineXform.Command -> ( Model, Cmd Msg )
+
+
+handleMdInlineXformOk model prevstate gdmsg =
+    case gdmsg of
+        GD.Dialog nmod ->
+            ( { model
+                | state = MdInlineXform nmod prevstate
+              }
+            , Cmd.none
+            )
+
+        GD.Ok return ->
+            case return of
+                MdInlineXform.Close ->
+                    ( { model | state = prevstate }, Cmd.none )
+
+                MdInlineXform.UpdateInline umsg ->
+                    case prevstate of
+                        EditZkNote em login ->
+                            let
+                                emod =
+                                    EditZkNote.updateEditBlock umsg em
+                            in
+                            ( { model | state = EditZkNote emod login }, Cmd.none )
+
+                        _ ->
+                            ( { model | state = prevstate }, Cmd.none )
+
+        GD.Cancel ->
+            ( { model | state = prevstate }, Cmd.none )
+
+
 actualupdate : Msg -> Model -> ( Model, Cmd Msg )
 actualupdate msg model =
     case ( msg, model.state ) of
@@ -3263,35 +3297,17 @@ actualupdate msg model =
                 Nothing ->
                     ( model, Cmd.none )
 
+        ( WkMsg (Ok key), MdInlineXform bs prevstate ) ->
+            case Toop.T4 key.key key.ctrl key.alt key.shift of
+                Toop.T4 "Enter" False False False ->
+                    handleMdInlineXformOk model prevstate (GD.update (GD.EltMsg MdInlineXform.OkClick) bs)
+
+                _ ->
+                    ( model, Cmd.none )
+
         ( MdInlineXformMsg bm, MdInlineXform bs prevstate ) ->
             -- TODO address this hack!
-            case GD.update bm bs of
-                GD.Dialog nmod ->
-                    ( { model
-                        | state = MdInlineXform nmod prevstate
-                      }
-                    , Cmd.none
-                    )
-
-                GD.Ok return ->
-                    case return of
-                        MdInlineXform.Close ->
-                            ( { model | state = prevstate }, Cmd.none )
-
-                        MdInlineXform.UpdateInline umsg ->
-                            case prevstate of
-                                EditZkNote em login ->
-                                    let
-                                        emod =
-                                            EditZkNote.updateEditBlock umsg em
-                                    in
-                                    ( { model | state = EditZkNote emod login }, Cmd.none )
-
-                                _ ->
-                                    ( { model | state = prevstate }, Cmd.none )
-
-                GD.Cancel ->
-                    ( { model | state = prevstate }, Cmd.none )
+            handleMdInlineXformOk model prevstate (GD.update bm bs)
 
         ( MdInlineXformMsg _, _ ) ->
             ( model, Cmd.none )
