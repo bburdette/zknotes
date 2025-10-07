@@ -169,12 +169,12 @@ guiInline inline =
             guiHtml block
 
         Link url _ inlines ->
-            E.row rowtrib
+            E.column coltrib
                 [ EI.button (E.alignTop :: buttonStyle)
                     { onPress = Just <| InlineXform inline
                     , label = E.text "link"
                     }
-                , E.column coltrib <|
+                , E.column indentrib <|
                     [ EI.text []
                         { onChange = LinkUrl
                         , text = url
@@ -199,12 +199,12 @@ guiInline inline =
                 ]
 
         Image src _ inlines ->
-            E.row rowtrib
+            E.column coltrib
                 [ EI.button (E.alignTop :: buttonStyle)
                     { onPress = Just <| InlineXform inline
                     , label = E.text "image"
                     }
-                , E.column coltrib <|
+                , E.column indentrib <|
                     [ EI.text []
                         { onChange = ImageUrl
                         , text = src
@@ -229,30 +229,30 @@ guiInline inline =
                 ]
 
         Emphasis inlines ->
-            E.row rowtrib
+            E.column coltrib
                 [ EI.button (E.alignTop :: buttonStyle)
                     { onPress = Just <| InlineXform inline
                     , label = E.text "emphasis"
                     }
-                , E.column coltrib (List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines)
+                , E.column indentrib (List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines)
                 ]
 
         Strong inlines ->
-            E.row rowtrib
+            E.column coltrib
                 [ EI.button (E.alignTop :: buttonStyle)
                     { onPress = Just <| InlineXform inline
                     , label = E.text "strong"
                     }
-                , E.column coltrib (List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines)
+                , E.column indentrib (List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines)
                 ]
 
         Strikethrough inlines ->
-            E.row rowtrib
+            E.column coltrib
                 [ EI.button (E.alignTop :: buttonStyle)
                     { onPress = Just <| InlineXform inline
                     , label = E.text "strikethrough"
                     }
-                , E.column coltrib (List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines)
+                , E.column indentrib (List.indexedMap (\i inl -> E.map (ListItemMsg i) (guiInline inl)) inlines)
                 ]
 
         CodeSpan s ->
