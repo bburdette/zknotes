@@ -939,7 +939,7 @@ guiHtmlElement tag attribs =
 
         "audio" ->
             case Toop.T2 (findAttrib "src" attribs) (findAttrib "text" attribs) of
-                Toop.T2 (Just src) (Just text) ->
+                Toop.T2 (Just src) mbtext ->
                     row <|
                         E.column coltrib
                             [ EI.text []
@@ -950,7 +950,7 @@ guiHtmlElement tag attribs =
                                 }
                             , EI.text []
                                 { onChange = AudioText
-                                , text = text
+                                , text = Maybe.withDefault "" mbtext
                                 , placeholder = Nothing
                                 , label = EI.labelLeft [] (E.text "text")
                                 }

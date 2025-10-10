@@ -139,7 +139,44 @@ transforms inline =
                         ( mbtext, Just noteid, show ) ->
                             [ ( "none", inline )
                             , ( "link", MB.Link ("/note/" ++ noteid) Nothing [ MB.Text (Maybe.withDefault "" mbtext) ] )
-                            , ( "panel"
+                            , ( "md image", MB.Image ("/file/" ++ noteid) mbtext [] )
+                            , ( "zkn image"
+                              , MB.HtmlInline
+                                    (MB.HtmlElement "image"
+                                        (List.filterMap identity
+                                            [ Just { name = "url", value = "/file/" ++ noteid }
+                                            , mbtext
+                                                |> Maybe.map (\s -> { name = "text", value = s })
+                                            ]
+                                        )
+                                        []
+                                    )
+                              )
+                            , ( "zkn video"
+                              , MB.HtmlInline
+                                    (MB.HtmlElement "video"
+                                        (List.filterMap identity
+                                            [ Just { name = "src", value = "/file/" ++ noteid }
+                                            , mbtext
+                                                |> Maybe.map (\s -> { name = "text", value = s })
+                                            ]
+                                        )
+                                        []
+                                    )
+                              )
+                            , ( "zkn audio"
+                              , MB.HtmlInline
+                                    (MB.HtmlElement "audio"
+                                        (List.filterMap identity
+                                            [ Just { name = "src", value = "/file/" ++ noteid }
+                                            , mbtext
+                                                |> Maybe.map (\s -> { name = "text", value = s })
+                                            ]
+                                        )
+                                        []
+                                    )
+                              )
+                            , ( "zkn panel"
                               , MB.HtmlInline
                                     (MB.HtmlElement "panel"
                                         [ { name = "noteid", value = noteid } ]
@@ -261,7 +298,7 @@ transforms inline =
                         )
                 , Just ( "md image", MB.Image url mbt inlines )
                 , Just
-                    ( "html image"
+                    ( "zkn image"
                     , MB.HtmlInline
                         (MB.HtmlElement "image"
                             (List.filterMap identity
@@ -278,7 +315,7 @@ transforms inline =
         Image src mbt inlines ->
             [ ( "none", inline )
             , ( "link", MB.Link src mbt inlines )
-            , ( "html image"
+            , ( "zkn image"
               , MB.HtmlInline
                     (MB.HtmlElement "image"
                         (List.filterMap identity
