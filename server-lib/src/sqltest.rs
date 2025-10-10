@@ -13,9 +13,10 @@ mod tests {
   // Note this useful idiom: importing names from outer (for mod tests) scope.
   // use super::*;
 
-  #[test]
-  fn test_sharing() {
-    let res = match err_test() {
+  // #[test]
+  #[actix_web::test]
+  async fn test_sharing() {
+    let res = match err_test().await {
       Ok(()) => true,
       Err(e) => {
         println!("error {:?}", e);
@@ -25,7 +26,7 @@ mod tests {
     assert_eq!(res, true);
   }
 
-  fn err_test() -> Result<(), Box<dyn Error>> {
+  async fn err_test() -> Result<(), Box<dyn Error>> {
     let dbp = Path::new("test.db");
     match fs::remove_file(dbp) {
       Ok(_) => (),
@@ -97,8 +98,9 @@ mod tests {
 
     let (szn1_1_id, _szn1_1) = save_zknote(
       &conn,
-      uid1,
+      &None,
       &server,
+      uid1,
       &SaveZkNote {
         id: None,
         title: "u1 note1".to_string(),
@@ -109,13 +111,15 @@ mod tests {
         deleted: false,
         what: None,
       },
-    )?;
+    )
+    .await?;
 
     // user 1 note 2 - share
     let (szn1_2_share_id, szn1_2_share) = save_zknote(
       &conn,
-      uid1,
+      &None,
       &server,
+      uid1,
       &SaveZkNote {
         id: None,
         title: "u1 note2 - share".to_string(),
@@ -126,7 +130,8 @@ mod tests {
         deleted: false,
         what: None,
       },
-    )?;
+    )
+    .await?;
 
     save_zklink(&conn, szn1_2_share_id, shareid, uid1, None)?;
 
@@ -135,8 +140,9 @@ mod tests {
     // user 1 note 3 - share
     let (szn1_3_share_id, _szn1_3_share) = save_zknote(
       &conn,
-      uid1,
+      &None,
       &server,
+      uid1,
       &SaveZkNote {
         id: None,
         title: "u1 note3 - share".to_string(),
@@ -147,7 +153,8 @@ mod tests {
         deleted: false,
         what: None,
       },
-    )?;
+    )
+    .await?;
 
     save_zklink(&conn, szn1_3_share_id, shareid, uid1, None)?;
 
@@ -170,8 +177,9 @@ mod tests {
     // user 1 note 4 - on share '2'.
     let (szn1_4_id, szn1_4) = save_zknote(
       &conn,
-      uid1,
+      &None,
       &server,
+      uid1,
       &SaveZkNote {
         id: None,
         title: "u1 note4 - share".to_string(),
@@ -182,7 +190,8 @@ mod tests {
         deleted: false,
         what: None,
       },
-    )?;
+    )
+    .await?;
     save_zklink(&conn, szn1_4_id, szn1_2_share_id, uid1, None)?;
 
     println!("8");
@@ -190,8 +199,9 @@ mod tests {
     // user 1 note 5 - on share '3'.
     let (szn1_5_id, szn1_5) = save_zknote(
       &conn,
-      uid1,
+      &None,
       &server,
+      uid1,
       &SaveZkNote {
         id: None,
         title: "u1 note5 - share".to_string(),
@@ -202,14 +212,16 @@ mod tests {
         deleted: false,
         what: None,
       },
-    )?;
+    )
+    .await?;
     save_zklink(&conn, szn1_5_id, szn1_3_share_id, uid1, None)?;
 
     // user 1 note 6 - shared w user link
     let (szn1_6_id, _szn1_6) = save_zknote(
       &conn,
-      uid1,
+      &None,
       &server,
+      uid1,
       &SaveZkNote {
         id: None,
         title: "u1 note6 - direct share".to_string(),
@@ -220,7 +232,8 @@ mod tests {
         deleted: false,
         what: None,
       },
-    )?;
+    )
+    .await?;
     save_zklink(&conn, szn1_6_id, unid2, uid1, None)?;
 
     println!("9");
@@ -228,8 +241,9 @@ mod tests {
     // user 1 note 7 - shared w reversed user link
     let (szn1_7_id, _szn1_7) = save_zknote(
       &conn,
-      uid1,
+      &None,
       &server,
+      uid1,
       &SaveZkNote {
         id: None,
         title: "u1 note7 - reversed direct share".to_string(),
@@ -240,7 +254,8 @@ mod tests {
         deleted: false,
         what: None,
       },
-    )?;
+    )
+    .await?;
     save_zklink(&conn, unid2, szn1_7_id, uid1, None)?;
 
     println!("10");
@@ -248,8 +263,9 @@ mod tests {
     // user 2 can save changes to note 4.
     match save_zknote(
       &conn,
-      uid2,
+      &None,
       &server,
+      uid2,
       &SaveZkNote {
         id: Some(szn1_4.id),
         title: "u1 note4 - rshare".to_string(),
@@ -260,7 +276,9 @@ mod tests {
         deleted: false,
         what: None,
       },
-    ) {
+    )
+    .await
+    {
       Ok(_) => (),
       Err(e) => {
         println!("error {:?}", e);
@@ -273,8 +291,9 @@ mod tests {
     // user 2 can't save changes to note 5.
     match save_zknote(
       &conn,
-      uid2,
+      &None,
       &server,
+      uid2,
       &SaveZkNote {
         id: Some(szn1_5.id),
         title: "u1 note5 - share".to_string(),
@@ -285,7 +304,9 @@ mod tests {
         deleted: false,
         what: None,
       },
-    ) {
+    )
+    .await
+    {
       Ok(_) => panic!("test failed"),
       Err(_e) => (),
     }
@@ -294,8 +315,9 @@ mod tests {
 
     let (szn2_1_id, _szn2_1) = save_zknote(
       &conn,
-      uid2,
+      &None,
       &server,
+      uid2,
       &SaveZkNote {
         id: None,
         title: "u2 note1".to_string(),
@@ -306,7 +328,8 @@ mod tests {
         deleted: false,
         what: None,
       },
-    )?;
+    )
+    .await?;
 
     println!("13");
 
@@ -330,8 +353,9 @@ mod tests {
     // TODO test that pubid read works, since that broke in 'production'
     let _pubzn1 = save_zknote(
       &conn,
-      uid1,
+      &None,
       &server,
+      uid1,
       &SaveZkNote {
         id: None,
         title: "u1 public note1".to_string(),
@@ -342,7 +366,8 @@ mod tests {
         deleted: false,
         what: None,
       },
-    )?;
+    )
+    .await?;
 
     println!("14.1");
 
@@ -356,8 +381,9 @@ mod tests {
 
     let (pubzn2_id, _pubzn2) = save_zknote(
       &conn,
-      uid1,
+      &None,
       &server,
+      uid1,
       &SaveZkNote {
         id: None,
         title: "u1 public note2".to_string(),
@@ -368,7 +394,8 @@ mod tests {
         deleted: false,
         what: None,
       },
-    )?;
+    )
+    .await?;
     println!("15.1");
     save_zklink(&conn, pubzn2_id, publicid, uid1, None)?;
     println!("15.2");
@@ -379,8 +406,9 @@ mod tests {
     // should be able to save changes to a share note without error.
     save_zknote(
       &conn,
-      uid1,
+      &None,
       &server,
+      uid1,
       &SaveZkNote {
         id: Some(szn1_2_share.id),
         title: "u1 note2 - share".to_string(),
@@ -391,7 +419,8 @@ mod tests {
         deleted: false,
         what: None,
       },
-    )?;
+    )
+    .await?;
 
     println!("16");
 
@@ -400,8 +429,9 @@ mod tests {
     // test notes linked with user BY CREATOR are editable.
     let (_szn1_6_id, _szn1_6) = save_zknote(
       &conn,
-      uid2,
+      &None,
       &server,
+      uid2,
       &SaveZkNote {
         id: None,
         title: "u1 note6 - direct share".to_string(),
@@ -412,7 +442,8 @@ mod tests {
         deleted: false,
         what: None,
       },
-    )?;
+    )
+    .await?;
 
     println!("16");
 
