@@ -329,7 +329,7 @@ type alias HtmlFns a =
     , panelView : String -> List a -> a
     , imageView : String -> String -> Maybe String -> List a -> a
     , videoView : String -> Maybe String -> Maybe String -> Maybe String -> List a -> a
-    , audioView : String -> String -> List a -> a
+    , audioView : String -> Maybe String -> List a -> a
     , noteView : String -> Maybe String -> Maybe String -> List a -> a
     , yeetView : String -> Maybe String -> Maybe String -> Maybe String -> Maybe String -> List a -> a
     }
@@ -394,11 +394,13 @@ textHtml =
                     |> List.filterMap identity
                 )
     , audioView =
-        \text src _ ->
+        \src text _ ->
             htmlTextTag "audio"
-                [ ( "src", src )
-                , ( "text", text )
-                ]
+                ([ Just ( "src", src )
+                 , Maybe.map (\s -> ( "text", s )) text
+                 ]
+                    |> List.filterMap identity
+                )
     , noteView =
         \id show text _ ->
             htmlTextTag "note"
@@ -442,8 +444,8 @@ htmlF hf =
             |> Markdown.Html.withOptionalAttribute "width"
             |> Markdown.Html.withOptionalAttribute "height"
         , Markdown.Html.tag "audio" hf.audioView
-            |> Markdown.Html.withAttribute "text"
             |> Markdown.Html.withAttribute "src"
+            |> Markdown.Html.withOptionalAttribute "text"
         , Markdown.Html.tag "note" hf.noteView
             |> Markdown.Html.withAttribute "id"
             |> Markdown.Html.withOptionalAttribute "show"
@@ -542,14 +544,14 @@ imageView fui text url mbwidth renderedChildren =
                 { src = furl, description = text }
 
 
-audioView : FileUrlInfo -> String -> String -> List (Element a) -> Element a
-audioView fui text url renderedChildren =
-    htmlAudioView (fileUrl fui url) text
+audioView : FileUrlInfo -> String -> Maybe String -> List (Element a) -> Element a
+audioView fui url mbtext renderedChildren =
+    htmlAudioView (fileUrl fui url) mbtext
 
 
-htmlAudioView : String -> String -> Element a
-htmlAudioView url text =
-    E.html (Html.audio [ HA.controls True, HA.src url ] [ Html.text text ])
+htmlAudioView : String -> Maybe String -> Element a
+htmlAudioView url mbtext =
+    E.html (Html.audio [ HA.controls True, HA.src url ] [ Html.text (Maybe.withDefault "" mbtext) ])
 
 
 audioNoteView : FileUrlInfo -> Data.ZkNote -> Element a
@@ -561,7 +563,7 @@ audioNoteView fui zkn =
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
         [ link ("/note/" ++ zkNoteIdToString zkn.id) [ E.text zkn.title ]
         , E.row [ E.spacing 20 ]
-            [ htmlAudioView fileurl zkn.title
+            [ htmlAudioView fileurl (Just zkn.title)
             , if fui.tauri || List.filter (\i -> i == DataUtil.sysids.publicid) zkn.sysids /= [] then
                 link
                     ("https://29a.ch/timestretch/#a=" ++ fui.location ++ "/file/" ++ zkNoteIdToString zkn.id)
