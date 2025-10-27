@@ -342,6 +342,7 @@ transforms inline =
             , ( "strikethrough", Upd <| MB.Strikethrough [ MB.Text s ] )
             , ( "codespan", Upd <| MB.CodeSpan s )
             , ( "link", Upd <| MB.Link s Nothing [ MB.Text "" ] )
+            , ( "link + text", Upd <| MB.Link s Nothing [ MB.Text s ] )
             , ( "yeet", Upd <| MB.HtmlInline (MB.HtmlElement "yeet" [ { name = "url", value = s } ] []) )
             , ( "linkback - note"
               , Lb
