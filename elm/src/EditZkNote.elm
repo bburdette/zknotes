@@ -3644,13 +3644,9 @@ update msg model =
 
 updateEditBlock : MG.Msg -> Model -> Model
 updateEditBlock ebmsg model =
-    let
-        _ =
-            Debug.log "ueb" ebmsg
-    in
-    case Debug.log "blocketit" model.blockEdit of
+    case model.blockEdit of
         Just (Text t) ->
-            case Debug.log "updateBlock" (MG.updateBlock ebmsg t.b) of
+            case MG.updateBlock ebmsg t.b of
                 [ b ] ->
                     let
                         nbe =
@@ -3668,10 +3664,6 @@ updateEditBlock ebmsg model =
                     { model | blockEdit = Just nbe }
 
                 e ->
-                    let
-                        _ =
-                            Debug.log "updatlobclk" e
-                    in
                     model
 
         Nothing ->

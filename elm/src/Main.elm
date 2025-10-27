@@ -3327,7 +3327,7 @@ actualupdate msg model =
                     ( model, Cmd.none )
 
         ( MdInlineXformCmd cm, MdInlineXform _ prevstate ) ->
-            case Debug.log "blahcm" cm of
+            case cm of
                 MdInlineXform.Close ->
                     ( { model | state = prevstate }, Cmd.none )
 
@@ -3347,7 +3347,7 @@ actualupdate msg model =
                     ( { model | state = prevstate }, Cmd.none )
 
         ( MdInlineXformCmd cm, EditZkNote em login ) ->
-            case Debug.log "cm" cm of
+            case cm of
                 MdInlineXform.UpdateInline umsg ->
                     let
                         emod =
