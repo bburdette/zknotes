@@ -79,7 +79,7 @@ mod tests {
     false
   }
 
-  fn makenote(
+  async fn makenote(
     conn: &Connection,
     uid: UserId,
     title: String,
@@ -87,8 +87,9 @@ mod tests {
   ) -> Result<(i64, SavedZkNote), zkerr::Error> {
     save_zknote(
       &conn,
-      uid,
+      &None,
       &server,
+      uid,
       &SaveZkNote {
         id: None,
         title,
@@ -100,9 +101,10 @@ mod tests {
         what: None,
       },
     )
+    .await
   }
 
-  fn setup_db(
+  async fn setup_db(
     conn: &Connection,
     cb: &mut Callbacks,
     remote_url: String,
@@ -224,7 +226,8 @@ mod tests {
       syncuser,
       format!("{} syncuser private", basename),
       &server,
-    )?;
+    )
+    .await?;
     visible_notes.push((private_note_id, private_notesd.id.into()));
 
     // share note, syncuser and otheruser both connected.
@@ -233,7 +236,8 @@ mod tests {
       otheruser,
       format!("{} otheruser, syncuser share", basename),
       &server,
-    )?;
+    )
+    .await?;
     visible_notes.push((share_note_id, share_notesd.id.into()));
     synced_notes.push((share_note_id, share_notesd.id.into()));
     savelink(share_note_id, shareid, otheruser, &mut savedlinks)?;
@@ -246,7 +250,8 @@ mod tests {
       syncuser,
       format!("{} syncuser to delete", basename,),
       &server,
-    )?;
+    )
+    .await?;
     visible_notes.push((del_note_id, del_notesd.id.into()));
 
     // ------------------------------------------------------------------
@@ -261,7 +266,8 @@ mod tests {
         basename
       ),
       &server,
-    )?;
+    )
+    .await?;
     visible_notes.push((shared_note_id, shared_notesd.id.into()));
     synced_notes.push((shared_note_id, shared_notesd.id.into()));
     savelink(shared_note_id, share_note_id, otheruser, &mut savedlinks)?;
@@ -272,7 +278,8 @@ mod tests {
       otheruser,
       format!("{} otheruser public note", basename),
       &server,
-    )?;
+    )
+    .await?;
     visible_notes.push((publid_note_id, publid_notesd.id.into()));
     synced_notes.push((publid_note_id, publid_notesd.id.into()));
     savelink(publid_note_id, publicid, otheruser, &mut savedlinks)?;
@@ -283,8 +290,9 @@ mod tests {
     // public id the same on client and server, so should conflict.
     let (public_note_id, public_notesd) = save_zknote(
       &conn,
-      syncuser,
+      &None,
       &server,
+      syncuser,
       &SaveZkNote {
         id: None,
         title: format!("{} syncuser public note", basename),
@@ -295,7 +303,8 @@ mod tests {
         deleted: false,
         what: None,
       },
-    )?;
+    )
+    .await?;
 
     visible_notes.push((public_note_id, public_notesd.id.into()));
     synced_notes.push((public_note_id, public_notesd.id.into()));
@@ -311,7 +320,8 @@ mod tests {
       otheruser,
       format!("{} otheruser note linked to syncuser", basename),
       &server,
-    )?;
+    )
+    .await?;
     visible_notes.push((user_linked_note_id, user_linked_notesd.id.into()));
     savelink(
       user_linked_note_id,
@@ -335,12 +345,14 @@ mod tests {
     let (filenote, _noteid, _fid) = sqldata::make_file_note(
       &conn,
       &server,
+      &None,
       Path::new(filesdir.as_str()),
       syncuser,
       &fname,
       fpath,
       false,
     )
+    .await
     .map_err(|e| {
       zkerr::annotate_string(
         format!("make_file_note error: {}", fpath.display()),
@@ -357,7 +369,8 @@ mod tests {
       otheruser,
       format!("{} otheruser private", basename),
       &server,
-    )?;
+    )
+    .await?;
     unvisible_notes.push((
       otheruser_private_note_id,
       otheruser_private_notesd.id.into(),
@@ -369,7 +382,8 @@ mod tests {
       otheruser,
       format!("{} otheruser othershare, not visible to syncuser", basename),
       &server,
-    )?;
+    )
+    .await?;
     unvisible_notes.push((othershare_note_id, othershare_notesd.id.into()));
     savelink(othershare_note_id, shareid, otheruser, &mut savedlinks)?;
     savelink(
@@ -388,7 +402,8 @@ mod tests {
         basename
       ),
       &server,
-    )?;
+    )
+    .await?;
     unvisible_notes.push((othershared_note_id, othershared_notesd.id.into()));
     savelink(
       othershared_note_id,
@@ -464,7 +479,7 @@ mod tests {
       }
     }
     let server_conn = connection_open(dbp_server)?;
-    let server_ts = setup_db(&server_conn, &mut cb, "".to_string(), None, None, "server")?;
+    let server_ts = setup_db(&server_conn, &mut cb, "".to_string(), None, None, "server").await?;
 
     println!("0.1");
     let ssyncuser = user_id(&server_conn, "server-syncuser")?;
@@ -497,7 +512,8 @@ mod tests {
       Some(server_ts.syncusertoken.to_string()),
       Some((ssu.uuid, ssyncuserld)),
       "client",
-    )?;
+    )
+    .await?;
 
     println!("0.2");
 
@@ -560,6 +576,7 @@ mod tests {
 
       match sync_from_stream(
         &caconn,
+        &None,
         &caserver,
         &csu,
         &client_ts.filepath,
@@ -597,8 +614,9 @@ mod tests {
 
     let (_spc2_id, spc2) = save_zknote(
       &caconn,
-      csyncuser,
+      &None,
       &caserver,
+      csyncuser,
       &SaveZkNote {
         id: Some(cpub2.id),
         title: "public-note 2".to_string(),
@@ -609,7 +627,8 @@ mod tests {
         deleted: false,
         what: None,
       },
-    )?;
+    )
+    .await?;
     assert!(cpub2.id == spc2.id);
 
     {
@@ -751,6 +770,7 @@ mod tests {
 
     sync_from_stream(
       &caconn,
+      &None,
       &caserver,
       &csu,
       &client_ts.filepath,
@@ -784,6 +804,7 @@ mod tests {
 
     sync_from_stream(
       &saconn,
+      &None,
       &saserver,
       &ssu,
       &server_ts.filepath,
@@ -1096,6 +1117,7 @@ mod tests {
 
     sync_from_stream(
       &caconn,
+      &None,
       &caserver,
       &csu,
       &client_ts.filepath,
@@ -1127,6 +1149,7 @@ mod tests {
 
     sync_from_stream(
       &saconn,
+      &None,
       &saserver,
       &ssu,
       &server_ts.filepath,
@@ -1157,7 +1180,7 @@ mod tests {
 
     // start a server in another thread.
     let config = load_config("testserver.toml")?;
-    let server = init_server(config.clone())?;
+    let server = init_server(config.clone()).await?;
     let handle = server.handle();
     let joinhandle = tokio::task::spawn(async move { server.await });
 

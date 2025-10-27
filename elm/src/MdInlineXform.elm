@@ -142,7 +142,8 @@ transforms inline =
                 MB.HtmlElement "note" attribs childs ->
                     case ( findAttrib "text" attribs, findAttrib "id" attribs, findAttrib "show" attribs ) of
                         ( mbtext, Just noteid, show ) ->
-                            [ ( "link", Upd <| MB.Link ("/note/" ++ noteid) Nothing [ MB.Text (Maybe.withDefault "" mbtext) ] )
+                            [ ( "none", Upd inline )
+                            , ( "link", Upd <| MB.Link ("/note/" ++ noteid) Nothing [ MB.Text (Maybe.withDefault "" mbtext) ] )
                             , ( "panel"
                               , Upd <|
                                     MB.HtmlInline
@@ -159,7 +160,8 @@ transforms inline =
                 MB.HtmlElement "yeet" attribs childs ->
                     case Toop.T4 (findAttrib "text" attribs) (findAttrib "id" attribs) (findAttrib "show" attribs) (findAttrib "url" attribs) of
                         Toop.T4 mbtext (Just id) mbshow mburl ->
-                            [ ( "note link"
+                            [ ( "none", Upd inline )
+                            , ( "note link"
                               , Upd <|
                                     MB.HtmlInline
                                         (MB.HtmlElement "note"
@@ -185,7 +187,8 @@ transforms inline =
                 MB.HtmlElement "image" attribs childs ->
                     case ( findAttrib "text" attribs, findAttrib "url" attribs, findAttrib "width" attribs ) of
                         ( Just text, Just url, mbwidth ) ->
-                            [ ( "md image", Upd <| MB.Image url (Just text) [] )
+                            [ ( "none", Upd inline )
+                            , ( "md image", Upd <| MB.Image url (Just text) [] )
                             , ( "link", Upd <| MB.Link url (Just text) [] )
                             ]
 
@@ -195,7 +198,8 @@ transforms inline =
                 MB.HtmlElement "video" attribs childs ->
                     case ( findAttrib "text" attribs, findAttrib "src" attribs ) of
                         ( Just text, Just src ) ->
-                            [ ( "link", Upd <| MB.Link src (Just text) [] )
+                            [ ( "none", Upd inline )
+                            , ( "link", Upd <| MB.Link src (Just text) [] )
                             ]
 
                         _ ->
@@ -204,7 +208,8 @@ transforms inline =
                 MB.HtmlElement "audio" attribs childs ->
                     case ( findAttrib "text" attribs, findAttrib "src" attribs ) of
                         ( Just text, Just src ) ->
-                            [ ( "link", Upd <| MB.Link src (Just text) [] )
+                            [ ( "none", Upd inline )
+                            , ( "link", Upd <| MB.Link src (Just text) [] )
                             ]
 
                         _ ->
@@ -223,7 +228,8 @@ transforms inline =
                video
             -}
             List.filterMap identity
-                [ Just
+                [ Just ( "none", Upd inline )
+                , Just
                     ( "yeet"
                     , Upd <|
                         MB.HtmlInline
@@ -275,7 +281,8 @@ transforms inline =
                 ]
 
         Image src mbt inlines ->
-            [ ( "link", Upd <| MB.Link src mbt inlines )
+            [ ( "none", Upd inline )
+            , ( "link", Upd <| MB.Link src mbt inlines )
             , ( "html image"
               , Upd <|
                     MB.HtmlInline
@@ -331,13 +338,16 @@ transforms inline =
             ]
 
         CodeSpan s ->
-            [ ( "text", Upd <| MB.Text s ) ]
+            [ ( "none", Upd inline )
+            , ( "text", Upd <| MB.Text s )
+            ]
 
         {-
            text -> search?
         -}
         Text s ->
-            [ ( "strong", Upd <| MB.Strong [ MB.Text s ] )
+            [ ( "none", Upd inline )
+            , ( "strong", Upd <| MB.Strong [ MB.Text s ] )
             , ( "emphasis", Upd <| MB.Emphasis [ MB.Text s ] )
             , ( "strikethrough", Upd <| MB.Strikethrough [ MB.Text s ] )
             , ( "codespan", Upd <| MB.CodeSpan s )
@@ -429,6 +439,38 @@ view buttonStyle mbsize model =
         ]
 
 
+okResult : GD.Model Model Msg Command -> GD.Transition Model Command
+okResult gdm =
+    let
+        model =
+            gdm.model
+    in
+    okResultInternal model
+
+
+okResultInternal : Model -> GD.Transition Model Command
+okResultInternal model =
+    model.selectedTf
+        |> Maybe.andThen (\i -> List.head (List.drop i model.transforms))
+        |> Maybe.map Tuple.second
+        |> Maybe.map
+            (\xf ->
+                case xf of
+                    Upd inl ->
+                        (model.tomsg >> UpdateInline >> GD.Ok) inl
+
+                    Lb ( s, f ) ->
+                        GD.Ok <|
+                            LinkBack s
+                                (\sn ->
+                                    UpdateInline <|
+                                        model.tomsg <|
+                                            f sn
+                                )
+            )
+        |> Maybe.withDefault GD.Cancel
+
+
 update : Msg -> Model -> GD.Transition Model Command
 update msg model =
     case msg of
@@ -436,25 +478,7 @@ update msg model =
             GD.Cancel
 
         OkClick ->
-            model.selectedTf
-                |> Maybe.andThen (\i -> List.head (List.drop i model.transforms))
-                |> Maybe.map Tuple.second
-                |> Maybe.map
-                    (\xf ->
-                        case xf of
-                            Upd inl ->
-                                (model.tomsg >> UpdateInline >> GD.Ok) inl
-
-                            Lb ( s, f ) ->
-                                GD.Ok <|
-                                    LinkBack s
-                                        (\sn ->
-                                            UpdateInline <|
-                                                model.tomsg <|
-                                                    f sn
-                                        )
-                    )
-                |> Maybe.withDefault GD.Cancel
+            okResultInternal model
 
         -- ClearClick jobno ->
         --     GD.Dialog { model | jobs = Dict.remove jobno model.jobs }
