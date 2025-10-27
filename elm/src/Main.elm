@@ -115,6 +115,7 @@ type Msg
     | RequestsDialogMsg (GD.Msg RequestsDialog.Msg)
     | JobsDialogMsg (GD.Msg JobsDialog.Msg)
     | MdInlineXformMsg (GD.Msg MdInlineXform.Msg)
+    | MdInlineXformCmd MdInlineXform.Command
     | TagFilesMsg (TagAThing.Msg TagFiles.Msg)
     | InviteUserMsg (TagAThing.Msg InviteUser.Msg)
     | JobsPollTick Time.Posix
@@ -785,6 +786,9 @@ showMessage msg =
 
         MdInlineXformMsg _ ->
             "MdInlineXformMsg"
+
+        MdInlineXformCmd _ ->
+            "MdInlineXformCmd"
 
         RequestsDialogMsg _ ->
             "RequestsDialogMsg"
@@ -3263,6 +3267,38 @@ actualupdate msg model =
                 Nothing ->
                     ( model, Cmd.none )
 
+        ( MdInlineXformCmd cm, MdInlineXform _ prevstate ) ->
+            case Debug.log "blahcm" cm of
+                MdInlineXform.Close ->
+                    ( { model | state = prevstate }, Cmd.none )
+
+                MdInlineXform.UpdateInline umsg ->
+                    case prevstate of
+                        EditZkNote em login ->
+                            let
+                                emod =
+                                    EditZkNote.updateEditBlock umsg em
+                            in
+                            ( { model | state = EditZkNote emod login }, Cmd.none )
+
+                        _ ->
+                            ( { model | state = prevstate }, Cmd.none )
+
+                _ ->
+                    ( { model | state = prevstate }, Cmd.none )
+
+        ( MdInlineXformCmd cm, EditZkNote em login ) ->
+            case Debug.log "cm" cm of
+                MdInlineXform.UpdateInline umsg ->
+                    let
+                        emod =
+                            EditZkNote.updateEditBlock umsg em
+                    in
+                    ( { model | state = EditZkNote emod login }, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
+
         ( MdInlineXformMsg bm, MdInlineXform bs prevstate ) ->
             -- TODO address this hack!
             case GD.update bm bs of
@@ -3289,6 +3325,34 @@ actualupdate msg model =
 
                                 _ ->
                                     ( { model | state = prevstate }, Cmd.none )
+
+                        MdInlineXform.LinkBack title mkmsg ->
+                            case prevstate of
+                                EditZkNote ezst login ->
+                                    case EditZkNote.initLinkBackNote ezst title of
+                                        Ok nst ->
+                                            sendZIMsgExp model
+                                                model.fui
+                                                (Data.PvqSaveZkNoteAndLinks (EditZkNote.fullSave nst))
+                                                (\ziresponse ->
+                                                    case ziresponse of
+                                                        Ok ( _, Data.PvyServerError e ) ->
+                                                            MdInlineXformCmd MdInlineXform.Close
+
+                                                        -- ( displayMessageDialog model <| DataUtil.showPrivateError e, Cmd.none )
+                                                        Ok ( _, Data.PvySavedZkNoteAndLinks szkn ) ->
+                                                            MdInlineXformCmd (mkmsg szkn)
+
+                                                        _ ->
+                                                            MdInlineXformCmd MdInlineXform.Close
+                                                 -- ( unexpectedMsg model msg, Cmd.none )
+                                                )
+
+                                        Err e ->
+                                            ( model, Cmd.none )
+
+                                _ ->
+                                    ( model, Cmd.none )
 
                 GD.Cancel ->
                     ( { model | state = prevstate }, Cmd.none )

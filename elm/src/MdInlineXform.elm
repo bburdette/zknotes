@@ -1,18 +1,13 @@
 module MdInlineXform exposing (..)
 
-import Common
-import Data exposing (ZkNoteId)
+import Data
 import DataUtil exposing (zkNoteIdToString)
-import Dict exposing (Dict)
 import EdMarkdown exposing (stringRenderer)
 import Element as E exposing (Element)
 import Element.Background as EBk
-import Element.Border as EBd
 import Element.Font as EF
 import Element.Input as EI
 import GenDialog as GD
-import Html.Attributes as HA
-import Http
 import Markdown.Block as MB exposing (Inline(..))
 import Markdown.Renderer
 import MdGui as MG exposing (findAttrib)
@@ -20,14 +15,14 @@ import Orgauth.Data as Data
 import Route exposing (Route(..))
 import TangoColors as TC
 import Toop
-import Url exposing (Url)
+import Url
 import Util
 
 
 type alias Model =
     { mobile : Bool
     , inline : MB.Inline
-    , transforms : List ( String, MB.Inline )
+    , transforms : List ( String, XForm )
     , selectedTf : Maybe Int
     , tomsg : MB.Inline -> MG.Msg
     }
@@ -40,8 +35,14 @@ type Msg
     | Noop
 
 
+type XForm
+    = Upd MB.Inline
+    | Lb ( String, (MB.Inline -> MG.Msg) -> Data.SavedZkNote -> Command )
+
+
 type Command
     = UpdateInline MG.Msg
+    | LinkBack String (Data.SavedZkNote -> Command)
     | Close
 
 
@@ -129,21 +130,26 @@ pathZkNoteId route =
             Nothing
 
 
-transforms : MB.Inline -> List ( String, MB.Inline )
+transforms : MB.Inline -> List ( String, XForm )
 transforms inline =
     case inline of
         HtmlInline htmlBlock ->
             case htmlBlock of
+                {-
+                   note -> audio
+                   note -> video
+                -}
                 MB.HtmlElement "note" attribs childs ->
                     case ( findAttrib "text" attribs, findAttrib "id" attribs, findAttrib "show" attribs ) of
                         ( mbtext, Just noteid, show ) ->
-                            [ ( "link", MB.Link ("/note/" ++ noteid) Nothing [ MB.Text (Maybe.withDefault "" mbtext) ] )
+                            [ ( "link", Upd <| MB.Link ("/note/" ++ noteid) Nothing [ MB.Text (Maybe.withDefault "" mbtext) ] )
                             , ( "panel"
-                              , MB.HtmlInline
-                                    (MB.HtmlElement "panel"
-                                        [ { name = "noteid", value = noteid } ]
-                                        []
-                                    )
+                              , Upd <|
+                                    MB.HtmlInline
+                                        (MB.HtmlElement "panel"
+                                            [ { name = "noteid", value = noteid } ]
+                                            []
+                                        )
                               )
                             ]
 
@@ -154,21 +160,22 @@ transforms inline =
                     case Toop.T4 (findAttrib "text" attribs) (findAttrib "id" attribs) (findAttrib "show" attribs) (findAttrib "url" attribs) of
                         Toop.T4 mbtext (Just id) mbshow mburl ->
                             [ ( "note link"
-                              , MB.HtmlInline
-                                    (MB.HtmlElement "note"
-                                        (List.filterMap identity
-                                            [ Just
-                                                { name = "id"
-                                                , value = id
-                                                }
-                                            , mbtext
-                                                |> Maybe.map (\s -> { name = "text", value = s })
-                                            , mbshow
-                                                |> Maybe.map (\s -> { name = "show", value = s })
-                                            ]
+                              , Upd <|
+                                    MB.HtmlInline
+                                        (MB.HtmlElement "note"
+                                            (List.filterMap identity
+                                                [ Just
+                                                    { name = "id"
+                                                    , value = id
+                                                    }
+                                                , mbtext
+                                                    |> Maybe.map (\s -> { name = "text", value = s })
+                                                , mbshow
+                                                    |> Maybe.map (\s -> { name = "show", value = s })
+                                                ]
+                                            )
+                                            []
                                         )
-                                        []
-                                    )
                               )
                             ]
 
@@ -178,8 +185,8 @@ transforms inline =
                 MB.HtmlElement "image" attribs childs ->
                     case ( findAttrib "text" attribs, findAttrib "url" attribs, findAttrib "width" attribs ) of
                         ( Just text, Just url, mbwidth ) ->
-                            [ ( "md image", MB.Image url (Just text) [] )
-                            , ( "link", MB.Link url (Just text) [] )
+                            [ ( "md image", Upd <| MB.Image url (Just text) [] )
+                            , ( "link", Upd <| MB.Link url (Just text) [] )
                             ]
 
                         _ ->
@@ -188,7 +195,7 @@ transforms inline =
                 MB.HtmlElement "video" attribs childs ->
                     case ( findAttrib "text" attribs, findAttrib "src" attribs ) of
                         ( Just text, Just src ) ->
-                            [ ( "link", MB.Link src (Just text) [] )
+                            [ ( "link", Upd <| MB.Link src (Just text) [] )
                             ]
 
                         _ ->
@@ -197,7 +204,7 @@ transforms inline =
                 MB.HtmlElement "audio" attribs childs ->
                     case ( findAttrib "text" attribs, findAttrib "src" attribs ) of
                         ( Just text, Just src ) ->
-                            [ ( "link", MB.Link src (Just text) [] )
+                            [ ( "link", Upd <| MB.Link src (Just text) [] )
                             ]
 
                         _ ->
@@ -206,11 +213,6 @@ transforms inline =
                 _ ->
                     []
 
-        {-
-           text -> search?
-           note -> audio
-           note -> video
-        -}
         Link url mbt inlines ->
             let
                 upath =
@@ -223,114 +225,140 @@ transforms inline =
             List.filterMap identity
                 [ Just
                     ( "yeet"
-                    , MB.HtmlInline
-                        (MB.HtmlElement "yeet"
-                            (List.filterMap identity
-                                [ Just { name = "url", value = url }
-                                , inlineText inlines
-                                    |> Maybe.map (\s -> { name = "text", value = s })
-                                ]
+                    , Upd <|
+                        MB.HtmlInline
+                            (MB.HtmlElement "yeet"
+                                (List.filterMap identity
+                                    [ Just { name = "url", value = url }
+                                    , inlineText inlines
+                                        |> Maybe.map (\s -> { name = "text", value = s })
+                                    ]
+                                )
+                                []
                             )
-                            []
-                        )
                     )
                 , upath
                     |> Maybe.map
                         (\znid ->
                             ( "note link"
-                            , MB.HtmlInline
-                                (MB.HtmlElement "note"
-                                    (List.filterMap identity
-                                        [ Just
-                                            { name = "id"
-                                            , value = zkNoteIdToString znid
-                                            }
-                                        , inlineText inlines
-                                            |> Maybe.map (\s -> { name = "text", value = s })
-                                        ]
+                            , Upd <|
+                                MB.HtmlInline
+                                    (MB.HtmlElement "note"
+                                        (List.filterMap identity
+                                            [ Just
+                                                { name = "id"
+                                                , value = zkNoteIdToString znid
+                                                }
+                                            , inlineText inlines
+                                                |> Maybe.map (\s -> { name = "text", value = s })
+                                            ]
+                                        )
+                                        []
                                     )
-                                    []
-                                )
                             )
                         )
-                , Just ( "md image", MB.Image url mbt inlines )
+                , Just ( "md image", Upd <| MB.Image url mbt inlines )
                 , Just
                     ( "html image"
-                    , MB.HtmlInline
+                    , Upd <|
+                        MB.HtmlInline
+                            (MB.HtmlElement "image"
+                                (List.filterMap identity
+                                    [ Just { name = "url", value = url }
+                                    , inlineText inlines
+                                        |> Maybe.map (\s -> { name = "text", value = s })
+                                    ]
+                                )
+                                []
+                            )
+                    )
+                ]
+
+        Image src mbt inlines ->
+            [ ( "link", Upd <| MB.Link src mbt inlines )
+            , ( "html image"
+              , Upd <|
+                    MB.HtmlInline
                         (MB.HtmlElement "image"
                             (List.filterMap identity
-                                [ Just { name = "url", value = url }
+                                [ Just { name = "url", value = src }
                                 , inlineText inlines
                                     |> Maybe.map (\s -> { name = "text", value = s })
                                 ]
                             )
                             []
                         )
-                    )
-                ]
-
-        Image src mbt inlines ->
-            [ ( "link", MB.Link src mbt inlines )
-            , ( "html image"
-              , MB.HtmlInline
-                    (MB.HtmlElement "image"
-                        (List.filterMap identity
-                            [ Just { name = "url", value = src }
-                            , inlineText inlines
-                                |> Maybe.map (\s -> { name = "text", value = s })
-                            ]
-                        )
-                        []
-                    )
               )
             ]
 
         Emphasis inlines ->
             [ ( "remove"
-              , case inlines of
-                    [ item ] ->
-                        item
+              , Upd <|
+                    case inlines of
+                        [ item ] ->
+                            item
 
-                    plural ->
-                        -- can't return multiple inlines.  TODO fix?
-                        Emphasis inlines
+                        plural ->
+                            -- can't return multiple inlines.  TODO fix?
+                            Emphasis inlines
               )
             ]
 
         Strong inlines ->
             [ ( "remove"
-              , case inlines of
-                    [ item ] ->
-                        item
+              , Upd <|
+                    case inlines of
+                        [ item ] ->
+                            item
 
-                    plural ->
-                        -- can't return multiple inlines.  TODO fix?
-                        Strong inlines
+                        plural ->
+                            -- can't return multiple inlines.  TODO fix?
+                            Strong inlines
               )
             ]
 
         Strikethrough inlines ->
             [ ( "remove"
-              , case inlines of
-                    [ item ] ->
-                        item
+              , Upd <|
+                    case inlines of
+                        [ item ] ->
+                            item
 
-                    plural ->
-                        -- can't return multiple inlines.  TODO fix?
-                        Strikethrough inlines
+                        plural ->
+                            -- can't return multiple inlines.  TODO fix?
+                            Strikethrough inlines
               )
             ]
 
         CodeSpan s ->
-            [ ( "text", MB.Text s ) ]
+            [ ( "text", Upd <| MB.Text s ) ]
 
+        {-
+           text -> search?
+        -}
         Text s ->
-            [ ( "strong", MB.Strong [ MB.Text s ] )
-            , ( "emphasis", MB.Emphasis [ MB.Text s ] )
-            , ( "strikethrough", MB.Strikethrough [ MB.Text s ] )
-            , ( "codespan", MB.CodeSpan s )
-            , ( "link", MB.Link s Nothing [ MB.Text "" ] )
-            , ( "yeet", MB.HtmlInline (MB.HtmlElement "yeet" [ { name = "url", value = s } ] []) )
+            [ ( "strong", Upd <| MB.Strong [ MB.Text s ] )
+            , ( "emphasis", Upd <| MB.Emphasis [ MB.Text s ] )
+            , ( "strikethrough", Upd <| MB.Strikethrough [ MB.Text s ] )
+            , ( "codespan", Upd <| MB.CodeSpan s )
+            , ( "link", Upd <| MB.Link s Nothing [ MB.Text "" ] )
+            , ( "yeet", Upd <| MB.HtmlInline (MB.HtmlElement "yeet" [ { name = "url", value = s } ] []) )
+            , ( "linkback"
+              , Lb
+                    ( s
+                    , \tomsg sn ->
+                        UpdateInline <|
+                            tomsg <|
+                                MB.HtmlInline
+                                    (MB.HtmlElement "note"
+                                        [ { name = "id"
+                                          , value = zkNoteIdToString sn.id
+                                          }
+                                        ]
+                                        []
+                                    )
+                    )
+              )
             ]
 
         HardLineBreak ->
@@ -360,9 +388,14 @@ view buttonStyle mbsize model =
                                 List.head (List.drop i model.transforms)
                             )
                         |> Maybe.andThen
-                            (\( _, inline ) ->
-                                Markdown.Renderer.render stringRenderer [ MB.Paragraph [ inline ] ]
-                                    |> Result.toMaybe
+                            (\( _, xform ) ->
+                                case xform of
+                                    Upd inline ->
+                                        Markdown.Renderer.render stringRenderer [ MB.Paragraph [ inline ] ]
+                                            |> Result.toMaybe
+
+                                    _ ->
+                                        Nothing
                             )
                         |> Maybe.map String.concat
                         |> Maybe.withDefault
@@ -391,7 +424,15 @@ update msg model =
             model.selectedTf
                 |> Maybe.andThen (\i -> List.head (List.drop i model.transforms))
                 |> Maybe.map Tuple.second
-                |> Maybe.map (model.tomsg >> UpdateInline >> GD.Ok)
+                |> Maybe.map
+                    (\xf ->
+                        case xf of
+                            Upd inl ->
+                                (model.tomsg >> UpdateInline >> GD.Ok) inl
+
+                            Lb ( s, f ) ->
+                                GD.Ok <| LinkBack s (f model.tomsg)
+                    )
                 |> Maybe.withDefault GD.Cancel
 
         -- ClearClick jobno ->

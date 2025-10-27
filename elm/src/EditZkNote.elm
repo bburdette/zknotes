@@ -16,6 +16,7 @@ port module EditZkNote exposing
     , fullSave
     , ghostView
     , initFull
+    , initLinkBackNote
     , initNew
     , isPublic
     , isSearch
@@ -3643,9 +3644,13 @@ update msg model =
 
 updateEditBlock : MG.Msg -> Model -> Model
 updateEditBlock ebmsg model =
-    case model.blockEdit of
+    let
+        _ =
+            Debug.log "ueb" ebmsg
+    in
+    case Debug.log "blocketit" model.blockEdit of
         Just (Text t) ->
-            case MG.updateBlock ebmsg t.b of
+            case Debug.log "updateBlock" (MG.updateBlock ebmsg t.b) of
                 [ b ] ->
                     let
                         nbe =
@@ -3662,7 +3667,11 @@ updateEditBlock ebmsg model =
                     in
                     { model | blockEdit = Just nbe }
 
-                _ ->
+                e ->
+                    let
+                        _ =
+                            Debug.log "updatlobclk" e
+                    in
                     model
 
         Nothing ->
