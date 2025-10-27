@@ -16,6 +16,7 @@ port module EditZkNote exposing
     , fullSave
     , ghostView
     , initFull
+    , initLinkBackNote
     , initNew
     , isPublic
     , isSearch

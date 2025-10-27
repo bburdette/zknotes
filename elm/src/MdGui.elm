@@ -1,11 +1,10 @@
-module MdGui exposing (Msg, coltrib, findAttrib, getXformMsg, guiBlock, rowtrib, updateBlock)
+module MdGui exposing (Msg(..), coltrib, findAttrib, getXformMsg, guiBlock, rowtrib, updateBlock)
 
 import Common exposing (buttonStyle)
 import Either
 import Element as E
 import Element.Border as EBd
 import Element.Input as EI
-import Html.Attributes as HA
 import Markdown.Block as MB exposing (..)
 import MdCommon as MC
 import Set

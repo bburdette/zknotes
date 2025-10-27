@@ -115,6 +115,7 @@ type Msg
     | RequestsDialogMsg (GD.Msg RequestsDialog.Msg)
     | JobsDialogMsg (GD.Msg JobsDialog.Msg)
     | MdInlineXformMsg (GD.Msg MdInlineXform.Msg)
+    | MdInlineXformCmd MdInlineXform.Command
     | TagFilesMsg (TagAThing.Msg TagFiles.Msg)
     | InviteUserMsg (TagAThing.Msg InviteUser.Msg)
     | JobsPollTick Time.Posix
@@ -785,6 +786,9 @@ showMessage msg =
 
         MdInlineXformMsg _ ->
             "MdInlineXformMsg"
+
+        MdInlineXformCmd _ ->
+            "MdInlineXformCmd"
 
         RequestsDialogMsg _ ->
             "RequestsDialogMsg"
@@ -1709,10 +1713,7 @@ makeTDDecoder ad =
         (JD.field "data" ad)
 
 
-
--- handleMdInlineXformOk : Model -> State -> GD.Transition MdInlineXform.Model MdInlineXform.Command -> ( Model, Cmd Msg )
-
-
+handleMdInlineXformOk : Model -> State -> GD.Transition MdInlineXform.GDModel MdInlineXform.Command -> ( Model, Cmd Msg )
 handleMdInlineXformOk model prevstate gdmsg =
     case gdmsg of
         GD.Dialog nmod ->
@@ -1738,6 +1739,32 @@ handleMdInlineXformOk model prevstate gdmsg =
 
                         _ ->
                             ( { model | state = prevstate }, Cmd.none )
+
+                MdInlineXform.LinkBack title mkmsg ->
+                    case prevstate of
+                        EditZkNote ezst _ ->
+                            case EditZkNote.initLinkBackNote ezst title of
+                                Ok nst ->
+                                    sendZIMsgExp model
+                                        model.fui
+                                        (Data.PvqSaveZkNoteAndLinks (EditZkNote.fullSave nst))
+                                        (\ziresponse ->
+                                            case ziresponse of
+                                                Ok ( _, Data.PvyServerError _ ) ->
+                                                    MdInlineXformCmd MdInlineXform.Close
+
+                                                Ok ( _, Data.PvySavedZkNoteAndLinks szkn ) ->
+                                                    MdInlineXformCmd (mkmsg szkn)
+
+                                                _ ->
+                                                    MdInlineXformCmd MdInlineXform.Close
+                                        )
+
+                                Err e ->
+                                    ( displayMessageDialog model e, Cmd.none )
+
+                        _ ->
+                            ( model, Cmd.none )
 
         GD.Cancel ->
             ( { model | state = prevstate }, Cmd.none )
@@ -3297,6 +3324,38 @@ actualupdate msg model =
                 Nothing ->
                     ( model, Cmd.none )
 
+        ( MdInlineXformCmd cm, MdInlineXform _ prevstate ) ->
+            case cm of
+                MdInlineXform.Close ->
+                    ( { model | state = prevstate }, Cmd.none )
+
+                MdInlineXform.UpdateInline umsg ->
+                    case prevstate of
+                        EditZkNote em login ->
+                            let
+                                emod =
+                                    EditZkNote.updateEditBlock umsg em
+                            in
+                            ( { model | state = EditZkNote emod login }, Cmd.none )
+
+                        _ ->
+                            ( { model | state = prevstate }, Cmd.none )
+
+                _ ->
+                    ( { model | state = prevstate }, Cmd.none )
+
+        ( MdInlineXformCmd cm, EditZkNote em login ) ->
+            case cm of
+                MdInlineXform.UpdateInline umsg ->
+                    let
+                        emod =
+                            EditZkNote.updateEditBlock umsg em
+                    in
+                    ( { model | state = EditZkNote emod login }, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
+
         ( WkMsg (Ok key), MdInlineXform bs prevstate ) ->
             case Toop.T4 key.key key.ctrl key.alt key.shift of
                 Toop.T4 "Enter" False False False ->
@@ -3306,7 +3365,6 @@ actualupdate msg model =
                     ( model, Cmd.none )
 
         ( MdInlineXformMsg bm, MdInlineXform bs prevstate ) ->
-            -- TODO address this hack!
             handleMdInlineXformOk model prevstate (GD.update bm bs)
 
         ( MdInlineXformMsg _, _ ) ->
