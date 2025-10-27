@@ -37,7 +37,7 @@ type Msg
 
 type XForm
     = Upd MB.Inline
-    | Lb ( String, (MB.Inline -> MG.Msg) -> Data.SavedZkNote -> Command )
+    | Lb ( String, Data.SavedZkNote -> MB.Inline )
 
 
 type Command
@@ -343,20 +343,25 @@ transforms inline =
             , ( "codespan", Upd <| MB.CodeSpan s )
             , ( "link", Upd <| MB.Link s Nothing [ MB.Text "" ] )
             , ( "yeet", Upd <| MB.HtmlInline (MB.HtmlElement "yeet" [ { name = "url", value = s } ] []) )
-            , ( "linkback"
+            , ( "linkback - note"
               , Lb
                     ( s
-                    , \tomsg sn ->
-                        UpdateInline <|
-                            tomsg <|
-                                MB.HtmlInline
-                                    (MB.HtmlElement "note"
-                                        [ { name = "id"
-                                          , value = zkNoteIdToString sn.id
-                                          }
-                                        ]
-                                        []
-                                    )
+                    , \sn ->
+                        MB.HtmlInline
+                            (MB.HtmlElement "note"
+                                [ { name = "id"
+                                  , value = zkNoteIdToString sn.id
+                                  }
+                                ]
+                                []
+                            )
+                    )
+              )
+            , ( "linkback - link"
+              , Lb
+                    ( s
+                    , \sn ->
+                        MB.Link ("/note/" ++ zkNoteIdToString sn.id) Nothing [ MB.Text s ]
                     )
               )
             ]
@@ -394,8 +399,17 @@ view buttonStyle mbsize model =
                                         Markdown.Renderer.render stringRenderer [ MB.Paragraph [ inline ] ]
                                             |> Result.toMaybe
 
-                                    _ ->
-                                        Nothing
+                                    Lb ( title, f ) ->
+                                        let
+                                            sn =
+                                                { id = Data.Zni "new-note-id"
+                                                , changeddate = 0
+                                                , server = "local"
+                                                , what = Nothing
+                                                }
+                                        in
+                                        Markdown.Renderer.render stringRenderer [ MB.Paragraph [ f sn ] ]
+                                            |> Result.toMaybe
                             )
                         |> Maybe.map String.concat
                         |> Maybe.withDefault
@@ -431,7 +445,13 @@ update msg model =
                                 (model.tomsg >> UpdateInline >> GD.Ok) inl
 
                             Lb ( s, f ) ->
-                                GD.Ok <| LinkBack s (f model.tomsg)
+                                GD.Ok <|
+                                    LinkBack s
+                                        (\sn ->
+                                            UpdateInline <|
+                                                model.tomsg <|
+                                                    f sn
+                                        )
                     )
                 |> Maybe.withDefault GD.Cancel
 
