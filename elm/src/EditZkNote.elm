@@ -3663,7 +3663,7 @@ updateEditBlock ebmsg model =
                     in
                     { model | blockEdit = Just nbe }
 
-                e ->
+                _ ->
                     model
 
         Nothing ->

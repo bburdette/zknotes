@@ -1742,7 +1742,7 @@ handleMdInlineXformOk model prevstate gdmsg =
 
                 MdInlineXform.LinkBack title mkmsg ->
                     case prevstate of
-                        EditZkNote ezst login ->
+                        EditZkNote ezst _ ->
                             case EditZkNote.initLinkBackNote ezst title of
                                 Ok nst ->
                                     sendZIMsgExp model
@@ -1750,20 +1750,18 @@ handleMdInlineXformOk model prevstate gdmsg =
                                         (Data.PvqSaveZkNoteAndLinks (EditZkNote.fullSave nst))
                                         (\ziresponse ->
                                             case ziresponse of
-                                                Ok ( _, Data.PvyServerError e ) ->
+                                                Ok ( _, Data.PvyServerError _ ) ->
                                                     MdInlineXformCmd MdInlineXform.Close
 
-                                                -- ( displayMessageDialog model <| DataUtil.showPrivateError e, Cmd.none )
                                                 Ok ( _, Data.PvySavedZkNoteAndLinks szkn ) ->
                                                     MdInlineXformCmd (mkmsg szkn)
 
                                                 _ ->
                                                     MdInlineXformCmd MdInlineXform.Close
-                                         -- ( unexpectedMsg model msg, Cmd.none )
                                         )
 
                                 Err e ->
-                                    ( model, Cmd.none )
+                                    ( displayMessageDialog model e, Cmd.none )
 
                         _ ->
                             ( model, Cmd.none )
