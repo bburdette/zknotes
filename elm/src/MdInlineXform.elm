@@ -157,32 +157,51 @@ transforms inline =
                         _ ->
                             []
 
-                MB.HtmlElement "yeet" attribs childs ->
+                MB.HtmlElement "yeet" attribs _ ->
                     case Toop.T4 (findAttrib "text" attribs) (findAttrib "id" attribs) (findAttrib "show" attribs) (findAttrib "url" attribs) of
                         Toop.T4 mbtext (Just id) mbshow mburl ->
-                            [ ( "none", Upd inline )
-                            , ( "note link"
-                              , Upd <|
-                                    MB.HtmlInline
-                                        (MB.HtmlElement "note"
-                                            (List.filterMap identity
-                                                [ Just
-                                                    { name = "id"
-                                                    , value = id
-                                                    }
-                                                , mbtext
-                                                    |> Maybe.map (\s -> { name = "text", value = s })
-                                                , mbshow
-                                                    |> Maybe.map (\s -> { name = "show", value = s })
-                                                ]
-                                            )
-                                            []
+                            List.filterMap identity
+                                [ Just ( "none", Upd inline )
+                                , mburl
+                                    |> Maybe.map
+                                        (\url ->
+                                            ( "link", Upd <| MB.Link url Nothing [ MB.Text (Maybe.withDefault "" mbtext) ] )
                                         )
-                              )
-                            ]
+                                , Just
+                                    ( "note link"
+                                    , Upd <|
+                                        MB.HtmlInline
+                                            (MB.HtmlElement "note"
+                                                (List.filterMap identity
+                                                    [ Just
+                                                        { name = "id"
+                                                        , value = id
+                                                        }
+                                                    , mbtext
+                                                        |> Maybe.map (\s -> { name = "text", value = s })
+                                                    , mbshow
+                                                        |> Maybe.map (\s -> { name = "show", value = s })
+                                                    ]
+                                                )
+                                                []
+                                            )
+                                    )
+                                ]
 
-                        _ ->
-                            []
+                        Toop.T4 mbtext Nothing _ mburl ->
+                            List.filterMap identity
+                                [ Just ( "none", Upd inline )
+                                , mburl
+                                    |> Maybe.map
+                                        (\url ->
+                                            ( "link"
+                                            , Upd <|
+                                                MB.Link url
+                                                    Nothing
+                                                    [ MB.Text (Maybe.withDefault "" mbtext) ]
+                                            )
+                                        )
+                                ]
 
                 MB.HtmlElement "image" attribs childs ->
                     case ( findAttrib "text" attribs, findAttrib "url" attribs, findAttrib "width" attribs ) of
