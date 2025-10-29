@@ -559,8 +559,7 @@ audioNoteView fui zkn =
             fui.filelocation ++ "/file/" ++ zkNoteIdToString zkn.id
     in
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
-        [ link ("/note/" ++ zkNoteIdToString zkn.id) [ E.text zkn.title ]
-        , E.row [ E.spacing 20 ]
+        [ E.row [ E.spacing 20 ]
             [ htmlAudioView fileurl zkn.title
             , if fui.tauri || List.filter (\i -> i == DataUtil.sysids.publicid) zkn.sysids /= [] then
                 link
@@ -581,8 +580,7 @@ videoNoteView fui maxw zknote =
             fui.filelocation ++ "/file/" ++ zkNoteIdToString zknote.id
     in
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
-        [ link ("/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
-        , videoView fui maxw fileurl (Just zknote.title) Nothing Nothing []
+        [ videoView fui maxw fileurl (Just zknote.title) Nothing Nothing []
         ]
 
 
@@ -593,9 +591,7 @@ imageNoteView fui zknote =
             fui.filelocation ++ "/file/" ++ zkNoteIdToString zknote.id
     in
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
-        [ link ("/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
-        , E.paragraph [] [ E.text fileurl ]
-        , imageView fui zknote.title fileurl Nothing []
+        [ imageView fui zknote.title fileurl Nothing []
         ]
 
 
