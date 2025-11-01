@@ -258,7 +258,7 @@ pub async fn zk_interface_loggedin(
     }
     PrivateRequest::PvqSaveZkNote(sbe) => {
       let li = make_lapin_info(state.lapin_conn.as_ref(), token).await;
-      let (_id, s) = sqldata::save_zknote(&conn, &li, &state.server, uid, &sbe).await?;
+      let (_id, s) = sqldata::save_zknote(&conn, &li, &state.server, uid, &sbe, None).await?;
       Ok(PrivateReply::PvySavedZkNote(s))
     }
     PrivateRequest::PvqSaveZkLinks(msg) => {
@@ -267,7 +267,8 @@ pub async fn zk_interface_loggedin(
     }
     PrivateRequest::PvqSaveZkNoteAndLinks(sznpl) => {
       let li = make_lapin_info(state.lapin_conn.as_ref(), token).await;
-      let (_, szkn) = sqldata::save_zknote(&conn, &li, &state.server, uid, &sznpl.note).await?;
+      let (_, szkn) =
+        sqldata::save_zknote(&conn, &li, &state.server, uid, &sznpl.note, None).await?;
       let _s = sqldata::save_savezklinks(&conn, uid, szkn.id, &sznpl.links)?;
       Ok(PrivateReply::PvySavedZkNoteAndLinks(szkn))
     }

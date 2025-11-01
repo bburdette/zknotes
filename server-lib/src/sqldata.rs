@@ -924,14 +924,26 @@ pub async fn make_lapin_channel(conn: &lapin::Connection) -> Result<lapin::Chann
   Ok(chan)
 }
 
+pub struct NoteDates {
+  pub createdate: i64,
+  pub changeddate: i64,
+}
+
 pub async fn save_zknote(
   conn: &Connection,
   lapin_info: &Option<LapinInfo>,
   server: &Server,
   uid: UserId,
   note: &SaveZkNote,
+  dates: Option<NoteDates>, // just used during sync!
 ) -> Result<(i64, SavedZkNote), zkerr::Error> {
-  let now = now()?;
+  let (createdate, changeddate) = match dates {
+    Some(dates) => (dates.createdate, dates.changeddate),
+    None => {
+      let now = now()?;
+      (now, now)
+    }
+  };
 
   async fn publish_szn(
     uid: UserId,
@@ -989,7 +1001,7 @@ pub async fn save_zknote(
         params![
           note.title,
           note.content,
-          now,
+          changeddate,
           note.pubid,
           note.editable,
           note.showtitle,
@@ -1002,7 +1014,7 @@ pub async fn save_zknote(
         Ok(1) => {
           let szn = SavedZkNote {
             id: uuid,
-            changeddate: now,
+            changeddate,
             server: server.uuid.clone(),
             what: note.what.clone(),
           };
@@ -1014,14 +1026,14 @@ pub async fn save_zknote(
           match conn.execute(
             "update zknote set title = ?1, content = ?2, changeddate = ?3, pubid = ?4, showtitle = ?5, server = ?6
              where id = ?7 and editable = 1",
-            params![note.title, note.content, now, note.pubid, note.showtitle, server.id, id],
+            params![note.title, note.content, changeddate, note.pubid, note.showtitle, server.id, id],
           )? {
             0 => Err( zkerr::Error::String(format!("can't update; note is not writable {} {}", note.title, id))),
             // params![note.title, note.content, now, note.pubid, note.showtitle, server.id, id],
             1 => {
               let szn = SavedZkNote {
                 id: uuid,
-                changeddate: now,
+                changeddate,
                 server: server.uuid.clone(),
                 what: note.what.clone(),
               };
@@ -1050,15 +1062,15 @@ pub async fn save_zknote(
           note.showtitle,
           note.deleted,
           uuid.to_string(),
-          now,
-          now,
+          createdate,
+          changeddate,
           server.id,
         ],
       )?;
       let id = conn.last_insert_rowid();
       let szn = SavedZkNote {
         id: uuid.into(),
-        changeddate: now,
+        changeddate,
         server: server.uuid.clone(),
         what: note.what.clone(),
       };
@@ -2430,6 +2442,7 @@ pub async fn save_importzknotes(
             deleted: false,
             what: None,
           },
+          None,
         )
         .await?
         .0
@@ -2457,6 +2470,7 @@ pub async fn save_importzknotes(
               deleted: false,
               what: None,
             },
+            None,
           )
           .await?
           .0
@@ -2487,6 +2501,7 @@ pub async fn save_importzknotes(
               deleted: false,
               what: None,
             },
+            None,
           )
           .await?
           .0
@@ -2582,6 +2597,7 @@ pub async fn make_file_note(
       deleted: false,
       what: None,
     },
+    None,
   )
   .await?;
 
