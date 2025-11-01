@@ -627,6 +627,7 @@ mod tests {
         deleted: false,
         what: None,
       },
+      None,
     )
     .await?;
     assert!(cpub2.id == spc2.id);

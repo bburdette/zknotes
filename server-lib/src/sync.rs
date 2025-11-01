@@ -4,7 +4,7 @@ use crate::search::build_sql;
 use crate::search::{search_zknotes, search_zknotes_stream, sync_users, system_user, SearchResult};
 use crate::sqldata::{
   self, local_server_id, note_id_for_uuid, save_zklink, save_zknote, server_id, user_note_id,
-  LapinInfo,
+  LapinInfo, NoteDates,
 };
 use crate::util::now;
 use actix_multipart_rfc7578 as multipart;
@@ -138,6 +138,7 @@ pub async fn save_sync(
       deleted: false,
       what: None,
     },
+    None,
   )
   .await?;
 
@@ -258,7 +259,9 @@ pub async fn sync(
 
   match res {
     PrivateReply::PvySyncComplete => {
-      write!(monitor, "starting sync to remote");
+      // Q: is this including some notes we just read??
+
+      // write!(monitor, "starting sync to remote");
       let remres = sync_to_remote(
         conn.clone(),
         file_path,
@@ -276,7 +279,7 @@ pub async fn sync(
 
       write!(monitor, "sync completed");
 
-      Ok(remres)
+      Ok(res)
     }
     _ => Ok(res),
   }
@@ -850,9 +853,8 @@ where
       Err(rusqlite::Error::SqliteFailure(e, Some(s))) => {
         if e.code == rusqlite::ErrorCode::ConstraintViolation {
           if s.contains("uuid") {
-            let (nid, n) = sqldata::read_zknote_unchecked(&conn, file_path, &note.id)?;
-            // TODO: uuid conflict;  resolve with older one becoming archive note.
             // SqliteFailure(Error { code: ConstraintViolation, extended_code: 2067 }, Some("UNIQUE constraint failed: zknote.uuid"));
+            let (nid, n) = sqldata::read_zknote_unchecked(&conn, file_path, &note.id)?;
             if note.changeddate > n.changeddate {
               // note is newer.  archive the old and replace.
               sqldata::save_zknote(
@@ -870,6 +872,10 @@ where
                   deleted: note.deleted,
                   what: None,
                 },
+                Some(NoteDates {
+                  createdate: note.createdate,
+                  changeddate: note.changeddate,
+                }),
               )
               .await
               .map(|x| x.0)
