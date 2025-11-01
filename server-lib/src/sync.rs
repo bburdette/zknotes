@@ -259,9 +259,7 @@ pub async fn sync(
 
   match res {
     PrivateReply::PvySyncComplete => {
-      // Q: is this including some notes we just read??
-
-      // write!(monitor, "starting sync to remote");
+      write!(monitor, "starting sync to remote");
       let remres = sync_to_remote(
         conn.clone(),
         file_path,
