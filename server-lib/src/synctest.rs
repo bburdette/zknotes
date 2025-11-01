@@ -100,6 +100,7 @@ mod tests {
         deleted: false,
         what: None,
       },
+      None,
     )
     .await
   }
@@ -303,6 +304,7 @@ mod tests {
         deleted: false,
         what: None,
       },
+      None,
     )
     .await?;
 
