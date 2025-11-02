@@ -3,9 +3,9 @@ use std::{collections::BTreeMap, fmt, fs, io::Cursor, path::Path, process::Comma
 use clap::Arg;
 use futures_lite::stream::StreamExt;
 use lapin::{
+  Connection, ConnectionProperties,
   options::{BasicAckOptions, BasicConsumeOptions, QueueDeclareOptions},
   types::FieldTable,
-  Connection, ConnectionProperties,
 };
 use reqwest::multipart;
 use tl::ParserOptions;
@@ -203,7 +203,83 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
                           .map_err(|e| format!("{e:?}"))
                         {
                           Err(e) => {
-                            error!("error {e:?}");
+                            error!("yeet error {e:?}");
+
+                            let nszn = SaveZkNote {
+                              id: None,
+                              title: "yeet error".to_string(),
+                              pubid: None,
+                              content: format!("{:?}", e),
+                              editable: false,
+                              showtitle: false,
+                              deleted: false,
+                              what: None,
+                            };
+                            let res = client
+                              .post(String::from(onsave_server_uri.clone()) + "/private")
+                              .header(
+                                reqwest::header::COOKIE,
+                                format!("id={}", szn.token.as_str()),
+                              )
+                              .header(reqwest::header::CONTENT_TYPE, "application/json")
+                              .body(
+                                serde_json::to_string(&PrivateRequest::PvqSaveZkNote(nszn))
+                                  .unwrap(),
+                              )
+                              .send()
+                              .await;
+
+                            match res {
+                              Ok(res) => {
+                                println!("res: {:?}", res);
+
+                                if !res.status().is_success() {
+                                  error!("error saving yeet error note: {}, {:?}", zkn.id, res);
+                                }
+
+                                // async block so we can use ? operator.
+                                let blah: Result<(), Box<dyn std::error::Error>> =
+                                  async {
+                                    let txt = res.text().await?;
+
+                                    let pr = serde_json::from_str::<
+                                      zkprotocol::private::PrivateReply,
+                                    >(txt.as_str())?;
+
+                                    match pr {
+                                      zkprotocol::private::PrivateReply::PvySavedZkNote(szn) => {
+                                        // add id of the yeet error note to the <yeet>
+                                        my.attribs.insert("id".to_string(), format!("{}", szn.id));
+                                        let newyeet = format!("<yeet ")
+                                          + my
+                                            .attribs
+                                            .into_iter()
+                                            .map(|(n, v)| format!(" {}=\"{}\"", n, v))
+                                            .collect::<Vec<String>>()
+                                            .concat()
+                                            .as_str()
+                                          + "/>";
+
+                                        ed_content =
+                                          ed_content.replace(my.raw.as_str(), newyeet.as_str());
+                                      }
+                                      _ => {
+                                        error!("unexpected reply: {:?}", pr);
+                                      }
+                                    };
+
+                                    Ok(())
+                                  }
+                                  .await;
+                                match blah {
+                                  Err(e) => {
+                                    error!("{e:?}");
+                                  }
+                                  _ => (),
+                                };
+                              }
+                              Err(e) => error!("{e:?}"),
+                            };
                           }
                           Ok(f) => {
                             let blah: Result<(), Box<dyn std::error::Error>> = async {
@@ -403,7 +479,7 @@ pub fn yeet(
     Err(e) => {
       return Err(Box::new(StringError {
         s: format!("yeet err {:?}", e),
-      }))
+      }));
     }
   };
 
@@ -441,19 +517,19 @@ pub fn yeet(
                 Err(e) => {
                   return Err(Box::new(StringError {
                     s: format!("glob error {:?}", e),
-                  }))
+                  }));
                 }
               },
               None => {
                 return Err(Box::new(StringError {
                   s: format!("yeet file not found {:?}", v),
-                }))
+                }));
               }
             },
             Err(e) => {
               return Err(Box::new(StringError {
                 s: format!("glob error {:?}", e),
-              }))
+              }));
             }
           };
         let filename = file
