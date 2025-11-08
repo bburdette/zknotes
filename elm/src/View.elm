@@ -186,7 +186,7 @@ view zone maxw noteCache model loggedin =
                       of
                         Ok rendered ->
                             E.column
-                                [ E.spacing 3
+                                [ E.spacing 8
                                 , E.width E.fill
                                 , E.centerX
                                 ]
