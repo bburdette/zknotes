@@ -692,6 +692,124 @@ noteView args id show text _ =
                     , changedate = False
                     , link = True
                     }
+
+        mkitems =
+            \zne ->
+                [ if ns.link then
+                    let
+                        linktext =
+                            case text of
+                                Just t ->
+                                    t
+
+                                Nothing ->
+                                    zne.zknote.title
+                    in
+                    E.link
+                        [ E.htmlAttribute <| HE.stopPropagationOn "click" (JD.succeed ( args.noop, True ))
+                        , E.htmlAttribute (HA.style "display" "inline-flex")
+                        ]
+                        { url = "/note/" ++ id -- don't use prefix here!
+                        , label =
+                            E.paragraph
+                                [ EF.color (E.rgb255 0 0 255)
+                                , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
+                                , E.htmlAttribute (HA.style "word-break" "break-word")
+                                ]
+                                [ E.text linktext ]
+                        }
+
+                  else
+                    E.none
+                , if ns.title && not ns.link then
+                    E.text zne.zknote.title
+
+                  else
+                    E.none
+                , if ns.text && not ns.link then
+                    text |> Maybe.map E.text |> Maybe.withDefault E.none
+
+                  else
+                    E.none
+                , if ns.createdate || ns.changedate then
+                    E.row []
+                        [ if ns.createdate then
+                            zne.zknote.createdate
+                                |> (\cd ->
+                                        E.row []
+                                            [ E.text "created: "
+                                            , E.text (Util.showDateTime args.zone (Time.millisToPosix cd))
+                                            , E.text " "
+                                            ]
+                                   )
+
+                          else
+                            E.none
+                        , if ns.changedate then
+                            zne.zknote.changeddate
+                                |> (\cd ->
+                                        E.row []
+                                            [ E.text "updated: "
+                                            , E.text (Util.showDateTime args.zone (Time.millisToPosix cd))
+                                            ]
+                                   )
+
+                          else
+                            E.none
+                        ]
+
+                  else
+                    E.none
+                , if ns.contents then
+                    case
+                        markdownView (mkRenderer args)
+                            zne.zknote.content
+                    of
+                        Ok le ->
+                            E.column [] le
+
+                        Err s ->
+                            E.row [] [ E.text "markdown error: ", E.text s ]
+
+                  else
+                    E.none
+                , if ns.file then
+                    case zne.zknote.filestatus of
+                        Data.FilePresent ->
+                            noteFile args.fui args.maxw (Just ns) zne.zknote.title zne.zknote
+
+                        Data.FileMissing ->
+                            E.paragraph []
+                                [ E.link
+                                    [ E.htmlAttribute (HA.style "display" "inline-flex") ]
+                                    { url = "/note/" ++ id -- don't use prefix here!
+                                    , label =
+                                        E.paragraph
+                                            [ EF.color (E.rgb255 0 0 255)
+                                            , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
+                                            , E.htmlAttribute (HA.style "word-break" "break-word")
+                                            ]
+                                            [ E.text zne.zknote.title ]
+                                    }
+                                , E.text " file missing"
+                                ]
+
+                        Data.NotAFile ->
+                            E.link
+                                [ E.htmlAttribute (HA.style "display" "inline-flex") ]
+                                { url = "/note/" ++ id -- don't use prefix here!
+                                , label =
+                                    E.paragraph
+                                        [ EF.color (E.rgb255 0 0 255)
+                                        , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
+                                        , E.htmlAttribute (HA.style "word-break" "break-word")
+                                        ]
+                                        [ E.text zne.zknote.title ]
+                                }
+
+                  else
+                    E.none
+                ]
     in
     case
         zkNoteIdFromString id
@@ -707,121 +825,19 @@ noteView args id show text _ =
         Just (NC.ZNAL zne) ->
             let
                 items =
-                    [ if ns.link then
-                        let
-                            linktext =
-                                case text of
-                                    Just t ->
-                                        t
+                    mkitems zne
+            in
+            case items of
+                [ a ] ->
+                    a
 
-                                    Nothing ->
-                                        zne.zknote.title
-                        in
-                        E.link
-                            [ E.htmlAttribute <| HE.stopPropagationOn "click" (JD.succeed ( args.noop, True ))
-                            , E.htmlAttribute (HA.style "display" "inline-flex")
-                            ]
-                            { url = "/note/" ++ id -- don't use prefix here!
-                            , label =
-                                E.paragraph
-                                    [ EF.color (E.rgb255 0 0 255)
-                                    , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
-                                    , E.htmlAttribute (HA.style "word-break" "break-word")
-                                    ]
-                                    [ E.text linktext ]
-                            }
+                x ->
+                    E.column [ E.width E.fill ] x
 
-                      else
-                        E.none
-                    , if ns.title && not ns.link then
-                        E.text zne.zknote.title
-
-                      else
-                        E.none
-                    , if ns.text && not ns.link then
-                        text |> Maybe.map E.text |> Maybe.withDefault E.none
-
-                      else
-                        E.none
-                    , if ns.createdate || ns.changedate then
-                        E.row []
-                            [ if ns.createdate then
-                                zne.zknote.createdate
-                                    |> (\cd ->
-                                            E.row []
-                                                [ E.text "created: "
-                                                , E.text (Util.showDateTime args.zone (Time.millisToPosix cd))
-                                                , E.text " "
-                                                ]
-                                       )
-
-                              else
-                                E.none
-                            , if ns.changedate then
-                                zne.zknote.changeddate
-                                    |> (\cd ->
-                                            E.row []
-                                                [ E.text "updated: "
-                                                , E.text (Util.showDateTime args.zone (Time.millisToPosix cd))
-                                                ]
-                                       )
-
-                              else
-                                E.none
-                            ]
-
-                      else
-                        E.none
-                    , if ns.contents then
-                        case
-                            markdownView (mkRenderer args)
-                                zne.zknote.content
-                        of
-                            Ok le ->
-                                E.column [] le
-
-                            Err s ->
-                                E.row [] [ E.text "markdown error: ", E.text s ]
-
-                      else
-                        E.none
-                    , if ns.file then
-                        case zne.zknote.filestatus of
-                            Data.FilePresent ->
-                                noteFile args.fui args.maxw (Just ns) zne.zknote.title zne.zknote
-
-                            Data.FileMissing ->
-                                E.paragraph []
-                                    [ E.link
-                                        [ E.htmlAttribute (HA.style "display" "inline-flex") ]
-                                        { url = "/note/" ++ id -- don't use prefix here!
-                                        , label =
-                                            E.paragraph
-                                                [ EF.color (E.rgb255 0 0 255)
-                                                , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
-                                                , E.htmlAttribute (HA.style "word-break" "break-word")
-                                                ]
-                                                [ E.text zne.zknote.title ]
-                                        }
-                                    , E.text " file missing"
-                                    ]
-
-                            Data.NotAFile ->
-                                E.link
-                                    [ E.htmlAttribute (HA.style "display" "inline-flex") ]
-                                    { url = "/note/" ++ id -- don't use prefix here!
-                                    , label =
-                                        E.paragraph
-                                            [ EF.color (E.rgb255 0 0 255)
-                                            , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
-                                            , E.htmlAttribute (HA.style "word-break" "break-word")
-                                            ]
-                                            [ E.text zne.zknote.title ]
-                                    }
-
-                      else
-                        E.none
-                    ]
+        Just (NC.Changed zne _) ->
+            let
+                items =
+                    mkitems zne
             in
             case items of
                 [ a ] ->

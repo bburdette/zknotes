@@ -76,6 +76,47 @@ view zone maxw noteCache model loggedin =
 
         narrow =
             maxw < 1300
+
+        shownote =
+            \pn ->
+                E.el
+                    [ if narrow then
+                        E.width E.fill
+
+                      else
+                        E.width <| E.px 300
+                    , E.alignTop
+                    , EBk.color TC.darkGrey
+                    , E.padding 10
+                    ]
+                    (case
+                        MC.markdownView
+                            (MC.mkRenderer
+                                { zone = zone
+                                , fui = model.fui
+                                , viewMode = MC.PublicView
+                                , addToSearchMsg = \_ -> Noop
+                                , maxw = mw
+                                , cellDict = model.cells
+                                , showPanelElt = False
+                                , onchanged = OnSchelmeCodeChanged
+                                , noteCache = noteCache
+                                , noop = Noop
+                                }
+                            )
+                            pn.zknote.content
+                     of
+                        Ok rendered ->
+                            E.column
+                                [ E.spacing 30
+                                , E.width E.fill
+                                , E.centerX
+                                ]
+                                rendered
+
+                        Err errors ->
+                            E.text errors
+                    )
     in
     E.column [ E.width E.fill ]
         [ if loggedin then
@@ -96,45 +137,11 @@ view zone maxw noteCache model loggedin =
                 |> Maybe.map
                     (\ce ->
                         case ce of
+                            Changed pn _ ->
+                                shownote pn
+
                             ZNAL pn ->
-                                E.el
-                                    [ if narrow then
-                                        E.width E.fill
-
-                                      else
-                                        E.width <| E.px 300
-                                    , E.alignTop
-                                    , EBk.color TC.darkGrey
-                                    , E.padding 10
-                                    ]
-                                    (case
-                                        MC.markdownView
-                                            (MC.mkRenderer
-                                                { zone = zone
-                                                , fui = model.fui
-                                                , viewMode = MC.PublicView
-                                                , addToSearchMsg = \_ -> Noop
-                                                , maxw = mw
-                                                , cellDict = model.cells
-                                                , showPanelElt = False
-                                                , onchanged = OnSchelmeCodeChanged
-                                                , noteCache = noteCache
-                                                , noop = Noop
-                                                }
-                                            )
-                                            pn.zknote.content
-                                     of
-                                        Ok rendered ->
-                                            E.column
-                                                [ E.spacing 30
-                                                , E.width E.fill
-                                                , E.centerX
-                                                ]
-                                                rendered
-
-                                        Err errors ->
-                                            E.text errors
-                                    )
+                                shownote pn
 
                             Private ->
                                 E.text "private note"

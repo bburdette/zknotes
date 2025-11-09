@@ -3574,6 +3574,9 @@ makeNoteCacheGets md model =
         |> List.map
             (\id ->
                 case NC.getNote model.noteCache id of
+                    Just (NC.Changed _ _) ->
+                        Cmd.none
+
                     Just (NC.ZNAL zkn) ->
                         sendZIMsg model.fui
                             (Data.PvqGetZnlIfChanged
@@ -3624,6 +3627,9 @@ makePubNoteCacheGets model md =
 makePubNoteCacheGet : Model -> ZkNoteId -> Cmd Msg
 makePubNoteCacheGet model id =
     case NC.getNote model.noteCache id of
+        Just (NC.Changed _ _) ->
+            Cmd.none
+
         Just (NC.ZNAL zkn) ->
             sendPIMsg
                 model.fui

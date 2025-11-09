@@ -14,7 +14,8 @@ type alias ZneEntry =
 
 
 type CacheEntry
-    = ZNAL ZkNoteAndLinks
+    = Changed ZkNoteAndLinks ZkNoteAndLinks
+    | ZNAL ZkNoteAndLinks
     | Private
     | NotFound
 
