@@ -4011,9 +4011,23 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     , Cmd.none
                     )
 
-                EditZkNote.Cmd cmd ->
+                EditZkNote.SaveLinks szl ->
                     ( { model | state = EditZkNote emod login }
-                    , Cmd.map EditZkNoteMsg cmd
+                    , sendZIMsg model.fui (Data.PvqSaveZkLinks szl)
+                    )
+
+                EditZkNote.Cmd cmd mbcommand ->
+                    let
+                        ( nmod, mbcmd ) =
+                            case mbcommand of
+                                Just emd ->
+                                    handleEditZkNoteCmd model login ( emod, emd )
+
+                                Nothing ->
+                                    ( { model | state = EditZkNote emod login }, Cmd.none )
+                    in
+                    ( nmod
+                    , Cmd.batch [ Cmd.map EditZkNoteMsg cmd, mbcmd ]
                     )
     in
     ( rm, Cmd.batch (rcmd :: ngets) )

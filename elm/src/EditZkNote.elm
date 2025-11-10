@@ -85,6 +85,7 @@ import TangoColors as TC
 import Task
 import Time
 import Toop
+import UUID exposing (UUID)
 import Url as U
 import Url.Builder as UB
 import Url.Parser as UP exposing ((</>))
@@ -154,6 +155,7 @@ type Msg
     | NewBlock
     | EditBlockMsg MG.Msg
     | SNGMsg SNG.Msg
+    | SetDropLinkMode Bool
     | Noop
 
 
@@ -215,6 +217,7 @@ type alias Model =
     , blockDnd : DnDList.Model
     , edMarkdown : EM.EdMarkdown
     , blockEdit : Maybe BlockEdit
+    , droplinkmode : Bool
     }
 
 
@@ -226,6 +229,7 @@ type Command
     = None
     | Save Data.SaveZkNoteAndLinks
     | SaveExit Data.SaveZkNoteAndLinks -- TODO: remove usused
+    | SaveLinks Data.ZkLinks
     | Revert
     | View
         { note : Either Data.SaveZkNote Data.ZkNoteAndLinks
@@ -253,7 +257,7 @@ type Command
     | SyncFiles Data.ZkNoteSearch
     | SPMod (SP.Model -> ( SP.Model, SP.Command ))
     | InlineXform MB.Inline (MB.Inline -> MG.Msg)
-    | Cmd (Cmd Msg)
+    | Cmd (Cmd Msg) (Maybe Command)
 
 
 updateBlockEdit : String -> BlockEdit -> BlockEdit
@@ -288,6 +292,44 @@ blockDndSystem =
         , movement = DnDList.Vertical
         , listen = DnDList.OnDrop
         , operation = DnDList.Rotate
+        }
+        DnDMsg
+        onPointerMove
+        onPointerUp
+        releasePointerCapture
+
+
+type alias IBlock =
+    { idx : Int
+    , draggee : Bool
+    , droppee : Bool
+    , block : Block
+    }
+
+
+dndIBlock : Int -> Int -> List IBlock -> List IBlock
+dndIBlock dragIdx dropIdx iblocks =
+    List.indexedMap
+        (\i ib ->
+            if i == dropIdx then
+                { ib | droppee = True }
+
+            else if i == dragIdx then
+                { ib | draggee = True }
+
+            else
+                ib
+        )
+        iblocks
+
+
+blockDndSystemUnaltered : DnDList.System IBlock Msg
+blockDndSystemUnaltered =
+    DnDList.createWithTouch
+        { beforeUpdate = dndIBlock
+        , movement = DnDList.Vertical
+        , listen = DnDList.OnDrop
+        , operation = DnDList.Unaltered
         }
         DnDMsg
         onPointerMove
@@ -1227,7 +1269,13 @@ blockEd (Text t) renderer =
         [ E.width E.fill
         , E.spacing 8
         ]
-        [ E.column [ E.padding 2, EBd.glow TC.darkGray 5.0, EE.onClick EditBlockOk, E.width E.fill, E.spacing 8 ]
+        [ E.column
+            [ E.padding 2
+            , EBd.glow TC.darkGray 5.0
+            , EE.onClick EditBlockOk
+            , E.width E.fill
+            , E.spacing 8
+            ]
             [ E.row [ E.width E.fill ]
                 [ headingText "rendered: "
                 , E.wrappedRow (E.alignTop :: MG.rowtrib)
@@ -1271,7 +1319,7 @@ blockEd (Text t) renderer =
                 ]
             , case MC.markdownView renderer t.s of
                 Ok elts ->
-                    E.column [ E.width E.fill ] elts
+                    E.column [ E.width E.fill, E.spacing 8 ] elts
 
                 Err e ->
                     E.text e
@@ -1300,9 +1348,10 @@ renderBlocks :
     -> Bool
     -> Maybe BlockEdit
     -> Maybe DnDList.Info
+    -> Bool
     -> List Block
     -> Element Msg
-renderBlocks zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo blocks =
+renderBlocks zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo droplinkmode blocks =
     let
         renderer : Markdown.Renderer.Renderer (Element Msg)
         renderer =
@@ -1348,7 +1397,7 @@ renderBlocks zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo blocks =
                        ]
                 )
                 (List.indexedMap
-                    (\i ( _, r ) ->
+                    (\i ( b, r ) ->
                         case vm of
                             MC.PublicView ->
                                 r
@@ -1367,24 +1416,37 @@ renderBlocks zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo blocks =
                                                 )
                                 in
                                 editBlock
-                                    (case mbblockedit of
-                                        Nothing ->
-                                            case mbinfo of
+                                    (let
+                                        nm =
+                                            case mbblockedit of
                                                 Nothing ->
-                                                    Drag
+                                                    case mbinfo of
+                                                        Nothing ->
+                                                            Drag
 
-                                                Just { dragIndex, dropIndex } ->
-                                                    if i == dragIndex then
-                                                        Ghost
+                                                        Just { dragIndex, dropIndex } ->
+                                                            if i == dragIndex then
+                                                                Ghost
 
-                                                    else if i == dropIndex then
-                                                        DropH
+                                                            else if i == dropIndex then
+                                                                DropH
 
-                                                    else
-                                                        Drop
+                                                            else
+                                                                Drop
 
-                                        Just _ ->
-                                            Inactive
+                                                Just _ ->
+                                                    Inactive
+                                     in
+                                     if droplinkmode then
+                                        case getBlockNoteId b of
+                                            Just _ ->
+                                                nm
+
+                                            Nothing ->
+                                                Inactive
+
+                                     else
+                                        nm
                                     )
                                     i
                                     (mbeb |> Maybe.map (always True) |> Maybe.withDefault False)
@@ -1819,6 +1881,12 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
             <|
                 [ E.row [ E.width E.fill, E.spacing 8 ]
                     [ E.paragraph [ EF.bold ] [ E.text model.title ]
+                    , EI.checkbox (E.width E.shrink :: Common.buttonStyle)
+                        { onChange = SetDropLinkMode
+                        , icon = EI.defaultCheckbox
+                        , checked = model.droplinkmode
+                        , label = EI.labelLeft [] (E.text "DLMode")
+                        }
                     , EI.button Common.buttonStyle
                         { onPress = Just NewBlock
                         , label = E.text "+"
@@ -1872,6 +1940,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                             isdirty
                             model.blockEdit
                             mbdi
+                            model.droplinkmode
                             blocks
 
                     Err e ->
@@ -2311,6 +2380,7 @@ initFull fui ld zknote dtlinks mbedittab mobile =
       , blockDnd = blockDndSystem.model
       , edMarkdown = EM.init zknote.content
       , blockEdit = Nothing
+      , droplinkmode = False
       }
         |> (\m ->
                 Maybe.map (\nc -> setTab nc m) mbedittab
@@ -2370,6 +2440,7 @@ initNew fui ld links mobile =
     , blockDnd = blockDndSystem.model
     , edMarkdown = EM.init ""
     , blockEdit = Nothing
+    , droplinkmode = False
     }
         |> (\m1 ->
                 -- for new EMPTY notes, the 'revert' should be the same as the model, so that you aren't
@@ -2703,7 +2774,7 @@ onWkKeyPress key model =
                 ( m, _ ) =
                     update (TabChanged EtEdit) model
             in
-            ( m, Cmd (BD.focus "mdtext" |> Task.attempt (\_ -> Noop)) )
+            ( m, Cmd (BD.focus "mdtext" |> Task.attempt (\_ -> Noop)) Nothing )
 
         Toop.T4 "v" True True False ->
             update (TabChanged EtView) model
@@ -2713,7 +2784,7 @@ onWkKeyPress key model =
                 ( m, _ ) =
                     update (TabChanged EtSearch) model
             in
-            ( m, Cmd (BD.focus "searchtext" |> Task.attempt (\_ -> Noop)) )
+            ( m, Cmd (BD.focus "searchtext" |> Task.attempt (\_ -> Noop)) Nothing )
 
         Toop.T4 "r" True True False ->
             update (TabChanged EtRecent) model
@@ -3309,26 +3380,111 @@ update msg model =
             ( model, Requests )
 
         DnDMsg dmsg ->
-            case
-                EM.getBlocks model.edMarkdown
-                    |> Result.map
-                        (blockDndSystem.update
-                            dmsg
-                            model.blockDnd
-                        )
-            of
-                Ok ( dnd, items ) ->
-                    let
-                        em =
-                            EM.updateBlocks
-                                items
-                    in
-                    ( { model | blockDnd = dnd, edMarkdown = Result.withDefault model.edMarkdown em }
-                    , Cmd <| blockDndSystem.commands dnd
-                    )
+            -- TODO make system with Unaltered as the list reordering thing.
+            -- Make checkbox to enter drop-link mode.
+            -- IF drop-link mode want to:
+            --   - only allow drag of note links.  maybe could do with some conditional rendering.
+            --   - only allow drop on note links.  conditional ghost rendering.
+            --   - remove item being dragged.
+            --   - how to know where was dropped.  I guess look at DndMsg?
+            --   - make a link from it to the note where it is dropped.
+            if model.droplinkmode then
+                case
+                    EM.getBlocks model.edMarkdown
+                        |> Result.map (List.indexedMap (\i item -> { idx = i, draggee = False, droppee = False, block = item }))
+                        |> Result.map
+                            (blockDndSystemUnaltered.update
+                                dmsg
+                                model.blockDnd
+                            )
+                of
+                    Ok ( dnd, iblocks ) ->
+                        let
+                            ( mbDraggee, mbDroppee ) =
+                                iblocks
+                                    |> List.foldl
+                                        (\item ( l, r ) ->
+                                            ( if item.draggee then
+                                                Just item
 
-                Err e ->
-                    ( model, ShowMessage <| "markdown error: " ++ e )
+                                              else
+                                                l
+                                            , if item.droppee then
+                                                Just item
+
+                                              else
+                                                r
+                                            )
+                                        )
+                                        ( Nothing, Nothing )
+
+                            ( em, mbsavelinks ) =
+                                case ( mbDraggee, mbDroppee ) of
+                                    ( Just draggee, Just droppee ) ->
+                                        case saveLink draggee.block droppee.block of
+                                            Just ( dezni, drozni ) ->
+                                                let
+                                                    link =
+                                                        { from = dezni
+                                                        , to = drozni
+                                                        , user = model.ld.userid
+                                                        , linkzknote = Nothing
+                                                        , delete = Nothing
+                                                        , fromname = Nothing
+                                                        , toname = Nothing
+                                                        }
+                                                in
+                                                -- remove the draggee.
+                                                ( iblocks
+                                                    |> List.filterMap
+                                                        (\item ->
+                                                            if item.draggee then
+                                                                Nothing
+
+                                                            else
+                                                                Just item
+                                                        )
+                                                    |> List.map .block
+                                                    |> EM.updateBlocks
+                                                , Just <| SaveLinks { links = [ link ] }
+                                                )
+
+                                            Nothing ->
+                                                -- do nothing!
+                                                ( Ok model.edMarkdown, Nothing )
+
+                                    _ ->
+                                        -- do nothing!
+                                        ( Ok model.edMarkdown, Nothing )
+                        in
+                        ( { model | blockDnd = dnd, edMarkdown = Result.withDefault model.edMarkdown em }
+                        , Cmd (blockDndSystem.commands dnd) mbsavelinks
+                        )
+
+                    Err e ->
+                        ( model, ShowMessage <| "markdown error: " ++ e )
+
+            else
+                case
+                    EM.getBlocks model.edMarkdown
+                        |> Result.map
+                            (blockDndSystem.update
+                                dmsg
+                                model.blockDnd
+                            )
+                of
+                    Ok ( dnd, items ) ->
+                        let
+                            em =
+                                EM.updateBlocks
+                                    items
+                        in
+                        ( { model | blockDnd = dnd, edMarkdown = Result.withDefault model.edMarkdown em }
+                        , Cmd (blockDndSystem.commands dnd) Nothing
+                        )
+
+                    Err e ->
+                        ( model, ShowMessage <| "markdown error: " ++ e )
 
         RevertBlock ->
             case model.blockEdit of
@@ -3638,6 +3794,9 @@ update msg model =
                 Err _ ->
                     ( model, None )
 
+        SetDropLinkMode b ->
+            ( { model | droplinkmode = b }, None )
+
         Noop ->
             ( model, None )
 
@@ -3668,3 +3827,49 @@ updateEditBlock ebmsg model =
 
         Nothing ->
             model
+
+
+getBlockNoteId : Block -> Maybe ZkNoteId
+getBlockNoteId block =
+    case block of
+        MB.Paragraph [ MB.Link url _ _ ] ->
+            -- is it /note/<uuid> ?
+            if String.startsWith "/note/" url then
+                let
+                    s =
+                        String.dropLeft (String.length "/note/") url
+                in
+                case UUID.fromString s of
+                    Ok _ ->
+                        Just (Data.Zni s)
+
+                    Err _ ->
+                        Nothing
+
+            else
+                Nothing
+
+        MB.HtmlBlock (MB.HtmlElement elt attribs _) ->
+            if elt == "note" || elt == "yeet" then
+                MG.findAttrib "noteid" attribs
+                    |> Maybe.andThen
+                        (\s ->
+                            case UUID.fromString s of
+                                Ok _ ->
+                                    Just (Data.Zni s)
+
+                                _ ->
+                                    Nothing
+                        )
+
+            else
+                Nothing
+
+        _ ->
+            Nothing
+
+
+saveLink : Block -> Block -> Maybe ( ZkNoteId, ZkNoteId )
+saveLink draggee droppee =
+    -- if both are notes, link them.
+    Maybe.map2 Tuple.pair (getBlockNoteId draggee) (getBlockNoteId droppee)
