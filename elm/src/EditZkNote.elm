@@ -1269,7 +1269,13 @@ blockEd (Text t) renderer =
         [ E.width E.fill
         , E.spacing 8
         ]
-        [ E.column [ E.padding 2, EBd.glow TC.darkGray 5.0, EE.onClick EditBlockOk, E.width E.fill, E.spacing 8 ]
+        [ E.column
+            [ E.padding 2
+            , EBd.glow TC.darkGray 5.0
+            , EE.onClick EditBlockOk
+            , E.width E.fill
+            , E.spacing 8
+            ]
             [ E.row [ E.width E.fill ]
                 [ headingText "rendered: "
                 , E.wrappedRow (E.alignTop :: MG.rowtrib)
@@ -1313,7 +1319,7 @@ blockEd (Text t) renderer =
                 ]
             , case MC.markdownView renderer t.s of
                 Ok elts ->
-                    E.column [ E.width E.fill ] elts
+                    E.column [ E.width E.fill, E.spacing 8 ] elts
 
                 Err e ->
                     E.text e
@@ -1342,9 +1348,10 @@ renderBlocks :
     -> Bool
     -> Maybe BlockEdit
     -> Maybe DnDList.Info
+    -> Bool
     -> List Block
     -> Element Msg
-renderBlocks zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo blocks =
+renderBlocks zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo droplinkmode blocks =
     let
         renderer : Markdown.Renderer.Renderer (Element Msg)
         renderer =
@@ -1390,7 +1397,7 @@ renderBlocks zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo blocks =
                        ]
                 )
                 (List.indexedMap
-                    (\i ( _, r ) ->
+                    (\i ( b, r ) ->
                         case vm of
                             MC.PublicView ->
                                 r
@@ -1409,24 +1416,37 @@ renderBlocks zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo blocks =
                                                 )
                                 in
                                 editBlock
-                                    (case mbblockedit of
-                                        Nothing ->
-                                            case mbinfo of
+                                    (let
+                                        nm =
+                                            case mbblockedit of
                                                 Nothing ->
-                                                    Drag
+                                                    case mbinfo of
+                                                        Nothing ->
+                                                            Drag
 
-                                                Just { dragIndex, dropIndex } ->
-                                                    if i == dragIndex then
-                                                        Ghost
+                                                        Just { dragIndex, dropIndex } ->
+                                                            if i == dragIndex then
+                                                                Ghost
 
-                                                    else if i == dropIndex then
-                                                        DropH
+                                                            else if i == dropIndex then
+                                                                DropH
 
-                                                    else
-                                                        Drop
+                                                            else
+                                                                Drop
 
-                                        Just _ ->
-                                            Inactive
+                                                Just _ ->
+                                                    Inactive
+                                     in
+                                     if droplinkmode then
+                                        case getBlockNoteId b of
+                                            Just _ ->
+                                                nm
+
+                                            Nothing ->
+                                                Inactive
+
+                                     else
+                                        nm
                                     )
                                     i
                                     (mbeb |> Maybe.map (always True) |> Maybe.withDefault False)
@@ -1920,6 +1940,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                             isdirty
                             model.blockEdit
                             mbdi
+                            model.droplinkmode
                             blocks
 
                     Err e ->
@@ -3806,11 +3827,6 @@ updateEditBlock ebmsg model =
 
         Nothing ->
             model
-
-
-
--- | Paragraph (List Inline)
---
 
 
 getBlockNoteId : Block -> Maybe ZkNoteId
