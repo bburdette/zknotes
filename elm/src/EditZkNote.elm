@@ -2803,6 +2803,19 @@ onWkKeyPress key model =
             -- handleSPUpdate model (SP.onEnter model.spmodel)
             ( model, SPMod SP.onEnter )
 
+        Toop.T4 "Escape" False False False ->
+            -- close blockedit if no changes.
+            case model.blockEdit of
+                Just (Text t) ->
+                    if t.s == t.original then
+                        ( { model | blockEdit = Nothing }, None )
+
+                    else
+                        ( model, None )
+
+                Nothing ->
+                    ( model, None )
+
         _ ->
             ( model, None )
 
