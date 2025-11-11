@@ -3851,7 +3851,7 @@ getBlockNoteId block =
 
         MB.HtmlBlock (MB.HtmlElement elt attribs _) ->
             if elt == "note" || elt == "yeet" then
-                MG.findAttrib "noteid" attribs
+                MG.findAttrib "id" attribs
                     |> Maybe.andThen
                         (\s ->
                             case UUID.fromString s of
