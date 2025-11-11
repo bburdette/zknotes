@@ -494,6 +494,14 @@ editBlock ddw i focus e =
                 baseAttr
                 [ E.el (dragHandleAttrs ++ [ EBk.color TC.lightGray ]) E.none
                 , spacer
+                , E.el [ EE.onClick (EditBlock i), E.width E.fill ] e
+                ]
+
+        DDWBlockEdit ->
+            E.row
+                baseAttr
+                [ E.el (dragHandleAttrs ++ [ EBk.color TC.lightGray ]) E.none
+                , spacer
                 , E.el [ E.width E.fill ] e
                 ]
 
@@ -524,6 +532,7 @@ type DragDropWhat
     | DropH
     | Ghost
     | Inactive
+    | DDWBlockEdit
 
 
 
@@ -1434,8 +1443,12 @@ renderBlocks zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo droplinkmod
                                                             else
                                                                 Drop
 
-                                                Just _ ->
-                                                    Inactive
+                                                Just (Text t) ->
+                                                    if t.idx == i then
+                                                        DDWBlockEdit
+
+                                                    else
+                                                        Inactive
                                      in
                                      if droplinkmode then
                                         case getBlockNoteId b of
@@ -3685,6 +3698,19 @@ update msg model =
 
         EditBlock bidx ->
             let
+                edok : Bool
+                edok =
+                    case model.blockEdit of
+                        Just (Text t) ->
+                            if t.s == t.original && bidx /= t.idx then
+                                True
+
+                            else
+                                False
+
+                        Nothing ->
+                            True
+
                 eblk : Int -> Maybe BlockEdit
                 eblk =
                     \bi ->
@@ -3706,21 +3732,11 @@ update msg model =
                                         |> Result.toMaybe
                                 )
             in
-            ( { model
-                | blockEdit =
-                    case model.blockEdit of
-                        Just (Text { idx }) ->
-                            if bidx == idx then
-                                Nothing
+            if edok then
+                ( { model | blockEdit = eblk bidx }, None )
 
-                            else
-                                eblk bidx
-
-                        Nothing ->
-                            eblk bidx
-              }
-            , None
-            )
+            else
+                ( model, None )
 
         EditBlockInput s ->
             case model.blockEdit of
