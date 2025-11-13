@@ -10,6 +10,7 @@ import DataUtil exposing (FileUrlInfo, LoginData, jobComplete, showPrivateReply)
 import Dict exposing (Dict)
 import DisplayMessage
 import EdMarkdown as EM
+import EditCache as EC
 import EditZkNote
 import EditZkNoteListing
 import Either exposing (Either(..))
