@@ -59,6 +59,20 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
         .value_name("path of yt-dlp")
         .help("full path is needed in nixos module/services"),
     )
+    .arg(
+      Arg::new("yeet-service")
+        .value_name("enable yeet service - true/false")
+        .help("consume on_save_note amqp messages and check for yeetlinks.  yeet accordingly."),
+    )
+    .arg(
+      Arg::new("thumb-service")
+        .value_name("enable thumb service - true/false")
+        .help(
+          "consume on_make_file_note amqp messages and generate thumb files for movies/images.",
+        ),
+    )
+    .arg(Arg::new("amqp-uid-file").value_name("amqp user name file"))
+    .arg(Arg::new("amqp-pwd-file").value_name("amqp password file"))
     .get_matches();
 
   let amqp_uri = matches
