@@ -41,14 +41,14 @@ in
       };
       yeet-service = mkOption {
         type = types.nullOr types.bool;
-        default = "true";
-        example = "true";
+        default = true;
+        example = true;
         description = "consume on_save_note amqp messages and check for yeetlinks.  yeet accordingly.";
       };
       thumb-service = mkOption {
         type = types.nullOr types.bool;
-        default = "true";
-        example = "true";
+        default = true;
+        example = true;
         description = "consume on_make_file_note amqp messages and generate thumb files for movies/images.";
       };
       amqp-uid-file = mkOption {
