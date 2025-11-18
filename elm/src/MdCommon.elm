@@ -549,7 +549,7 @@ audioView fui text url renderedChildren =
 
 htmlAudioView : String -> String -> Element a
 htmlAudioView url text =
-    E.html (Html.audio [ HA.controls True, HA.src url ] [ Html.text text ])
+    E.el [ E.width E.fill ] <| E.html (Html.audio [ HA.controls True, HA.src url ] [ Html.text text ])
 
 
 audioNoteView : FileUrlInfo -> Data.ZkNote -> Element a
@@ -558,8 +558,8 @@ audioNoteView fui zkn =
         fileurl =
             fui.filelocation ++ "/file/" ++ zkNoteIdToString zkn.id
     in
-    E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
-        [ E.row [ E.spacing 20 ]
+    E.column [ EBd.width 1, E.spacing 5, E.padding 5, E.width E.fill ]
+        [ E.row [ E.spacing 20, E.width E.fill ]
             [ htmlAudioView fileurl zkn.title
             , if fui.tauri || List.filter (\i -> i == DataUtil.sysids.publicid) zkn.sysids /= [] then
                 link
