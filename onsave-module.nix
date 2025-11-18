@@ -68,6 +68,9 @@ in
   ###### implementation
   config = mkIf cfg.enable {
 
+    uidfile = if builtins.isNull cfg.amqp-uid-file then "" else "--amqp-uid-file \"${cfg.amqp-uid-file}\"";
+    pwdfile = if builtins.isNull cfg.amqp-pwd-file then "" else "--amqp-pwd-file \"${cfg.amqp-pwd-file}\'";
+
     systemd.services.zknotes-onsave = {
       description = "zknotes-onsave";
       after = [ "network.target" ];
@@ -83,9 +86,6 @@ in
 
       serviceConfig.User = cfg.user;
       serviceConfig.Group = cfg.group;
-
-      uidfile = if builtins.isNull cfg.amqp-uid-file then "" else "--amqp-uid-file \"${cfg.amqp-uid-file}\"";
-      pwdfile = if builtins.isNull cfg.amqp-pwd-file then "" else "--amqp-pwd-file \"${cfg.amqp-pwd-file}\'";
 
       script = ''
         cd "/home/${cfg.user}"
