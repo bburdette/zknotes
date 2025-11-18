@@ -6,12 +6,11 @@ let
 
   cfg = config.services.zknotes-onsave;
 
-  
   thumbstr = if cfg.thumb-service then "true" else "false";
   yeetstr = if cfg.yeet-service then "true" else "false";
 
   uidfile = if builtins.isNull cfg.amqp-uid-file then "" else "--amqp-uid-file \"${cfg.amqp-uid-file}\"";
-  pwdfile = if builtins.isNull cfg.amqp-pwd-file then "" else "--amqp-pwd-file \"${cfg.amqp-pwd-file}\'";
+  pwdfile = if builtins.isNull cfg.amqp-pwd-file then "" else "--amqp-pwd-file \"${cfg.amqp-pwd-file}\"";
 in
 
 {
