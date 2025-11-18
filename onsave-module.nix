@@ -6,6 +6,9 @@ let
 
   cfg = config.services.zknotes-onsave;
 
+  
+  thumbstr = if cfg.thumb-service then "true" else "false";
+  yeetstr = if cfg.yeet-service then "true" else "false";
 
 in
 
@@ -88,7 +91,7 @@ in
         cd "/home/${cfg.user}"
         mkdir -p zknotes-onsave
         cd zknotes-onsave
-        RUST_LOG=info ${pkgs.zknotes}/bin/zknotes-onsave --amqp_uri "${cfg.amqp_uri}" --server_uri "${cfg.server_uri}" --yt-dlp-path "${lib.getExe pkgs.yt-dlp}" --thumb-service ${cfg.thumb-service} --yeet-service ${cfg.yeet-service} 
+        RUST_LOG=info ${pkgs.zknotes}/bin/zknotes-onsave --amqp_uri "${cfg.amqp_uri}" --server_uri "${cfg.server_uri}" --yt-dlp-path "${lib.getExe pkgs.yt-dlp}" --thumb-service ${thumbstr} --yeet-service ${yeetstr}
         '';
     };
 
