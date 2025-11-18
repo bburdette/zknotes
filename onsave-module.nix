@@ -6,8 +6,6 @@ let
 
   cfg = config.services.zknotes-onsave;
 
-  uidfile = if builtins.isNull cfg.amqp-uid-file then "" else "--amqp-uid-file \"${cfg.amqp-uid-file}\"";
-  pwdfile = if builtins.isNull cfg.amqp-pwd-file then "" else "--amqp-pwd-file \"${cfg.amqp-pwd-file}\'";
 
 in
 
@@ -86,12 +84,11 @@ in
 
       serviceConfig.User = cfg.user;
       serviceConfig.Group = cfg.group;
-
       script = ''
         cd "/home/${cfg.user}"
         mkdir -p zknotes-onsave
         cd zknotes-onsave
-        RUST_LOG=info ${pkgs.zknotes}/bin/zknotes-onsave --amqp_uri "${cfg.amqp_uri}" --server_uri "${cfg.server_uri}" --yt-dlp-path "${lib.getExe pkgs.yt-dlp}" --thumb-service ${cfg.thumb-service} --yeet-service ${cfg.yeet-service} ${uidfile} ${pwdfile} 
+        RUST_LOG=info ${pkgs.zknotes}/bin/zknotes-onsave --amqp_uri "${cfg.amqp_uri}" --server_uri "${cfg.server_uri}" --yt-dlp-path "${lib.getExe pkgs.yt-dlp}" --thumb-service ${cfg.thumb-service} --yeet-service ${cfg.yeet-service} 
         '';
     };
 
