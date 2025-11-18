@@ -1,6 +1,6 @@
 module EditCache exposing (EdEntry, EditZkNote, ExistingStuff)
 
-import Data exposing (EditLink, FileStatus, ZkNoteAndLinks, ZkNoteId)
+import Data exposing (EditLink, FileStatus, SaveZkNote, ZkNote, ZkNoteAndLinks, ZkNoteId)
 import DataUtil
 import Dict exposing (Dict)
 import EdMarkdown exposing (EdMarkdown)
@@ -8,11 +8,12 @@ import Orgauth.Data exposing (UserId)
 import TDict exposing (TDict)
 
 
-type alias EdEntry =
-    { edm : EdMarkdown
-    , original : Maybe ZkNoteAndLinks
-    , zklDict : Dict String EditLink
-    }
+-- for full editing state.  for now just storing EditZkNotes.  
+-- type alias EdEntry =
+--     { edm : EdMarkdown
+--     , original : Maybe ZkNoteAndLinks
+--     , zklDict : Dict String EditLink
+--     }
 
 
 {-| fields that only exist in a saved note.
@@ -44,6 +45,45 @@ type alias EditZkNote =
     }
 
 
+zkNoteToEditNote : ZkNote -> EditZkNote
+zkNoteToEditNote zkn =
+    { xstuff =
+        Just
+            { id = zkn.id
+            , user = zkn.user
+            , username = zkn.username
+            , usernote = zkn.usernote
+            , filestatus = zkn.filestatus
+            , createdate = zkn.createdate
+            , changeddate = zkn.changeddate
+            , server = zkn.server
+            }
+    , title = zkn.title
+    , content = zkn.content
+    , editable = zkn.editable
+    , editableValue = zkn.editableValue
+    , showtitle = zkn.showtitle
+    , pubid = zkn.pubid
+    , deleted = zkn.deleted
+    , sysids = zkn.sysids
+    }
+
+
+editNoteToZkNote : EditZkNote -> SaveZkNote
+editNoteToZkNote ezn =
+    { id =
+        ezn.xstuff
+            |> Maybe.map .id
+    , title = ezn.title
+    , pubid = ezn.pubid
+    , content = ezn.content
+    , editable = ezn.editable
+    , showtitle = ezn.showtitle
+    , deleted = ezn.deleted
+    , what = Nothing
+    }
+
+
 
 -- new notes need fake ids or something!
 -- situation:  have a note, embed another note in it, but that is a new note!
@@ -55,8 +95,8 @@ type alias EditIdGen =
     }
 
 
-getId : EditIdGen -> ( Int, EditIdGen )
-getId eig =
+newId : EditIdGen -> ( Int, EditIdGen )
+newId eig =
     ( eig.nextId, { eig | nextId = eig.nextId + 1 } )
 
 
