@@ -84,8 +84,8 @@ in
       serviceConfig.User = cfg.user;
       serviceConfig.Group = cfg.group;
 
-      uidfile = if builtins.isNull cfg.amqp-uid-file then "" else "--amqp-uid-file ${cfg.amqp-uid-file}";
-      pwdfile = if builtins.isNull cfg.amqp-pwd-file then "" else "--amqp-pwd-file ${cfg.amqp-pwd-file}";
+      uidfile = if builtins.isNull cfg.amqp-uid-file then "" else "--amqp-uid-file \"${cfg.amqp-uid-file}\"";
+      pwdfile = if builtins.isNull cfg.amqp-pwd-file then "" else "--amqp-pwd-file \"${cfg.amqp-pwd-file}\'";
 
       script = ''
         cd "/home/${cfg.user}"
