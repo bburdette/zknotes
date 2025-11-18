@@ -10,6 +10,8 @@ let
   thumbstr = if cfg.thumb-service then "true" else "false";
   yeetstr = if cfg.yeet-service then "true" else "false";
 
+  uidfile = if builtins.isNull cfg.amqp-uid-file then "" else "--amqp-uid-file \"${cfg.amqp-uid-file}\"";
+  pwdfile = if builtins.isNull cfg.amqp-pwd-file then "" else "--amqp-pwd-file \"${cfg.amqp-pwd-file}\'";
 in
 
 {
@@ -91,7 +93,7 @@ in
         cd "/home/${cfg.user}"
         mkdir -p zknotes-onsave
         cd zknotes-onsave
-        RUST_LOG=info ${pkgs.zknotes}/bin/zknotes-onsave --amqp_uri "${cfg.amqp_uri}" --server_uri "${cfg.server_uri}" --yt-dlp-path "${lib.getExe pkgs.yt-dlp}" --thumb-service ${thumbstr} --yeet-service ${yeetstr}
+        RUST_LOG=info ${pkgs.zknotes}/bin/zknotes-onsave --amqp_uri "${cfg.amqp_uri}" --server_uri "${cfg.server_uri}" --yt-dlp-path "${lib.getExe pkgs.yt-dlp}" --thumb-service ${thumbstr} --yeet-service ${yeetstr} ${uidfile} ${pwdfile} 
         '';
     };
 
