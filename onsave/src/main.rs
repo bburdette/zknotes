@@ -8,6 +8,7 @@ use lapin::{
   types::FieldTable,
 };
 use reqwest::multipart;
+use std::io::Read;
 use tl::ParserOptions;
 use tokio::fs::File;
 use tokio_util::codec::BytesCodec;
@@ -124,7 +125,23 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
   let amqp_uid_file = matches.get_one::<String>("amqp-uid-file");
   let amqp_pwd_file = matches.get_one::<String>("amqp-pwd-file");
 
-  let conn = Connection::connect(&amqp_uri, ConnectionProperties::default()).await?;
+  let amqp_uid = match amqp_uid_file {
+    Some(f) => Some(load_string(f)?),
+    None => None,
+  };
+  let amqp_pwd = match amqp_pwd_file {
+    Some(f) => Some(load_string(f)?),
+    None => None,
+  };
+
+  let conn = match (amqp_uid, amqp_pwd) {
+    (Some(uid), Some(pwd)) => {
+      let up_amqp_uri = str::replace(&amqp_uri, "//", format!("//{}:{}@", uid, pwd).as_str());
+      info!("up_amqp_uri : {}", up_amqp_uri);
+      Connection::connect(&up_amqp_uri, ConnectionProperties::default()).await?
+    }
+    _ => Connection::connect(&amqp_uri, ConnectionProperties::default()).await?,
+  };
 
   info!("CONNECTED");
 
@@ -221,6 +238,14 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
   info!("Goodbye, world!");
 
   Ok(())
+}
+
+pub fn load_string(file_name: &str) -> Result<String, Box<dyn std::error::Error>> {
+  let path = &Path::new(&file_name);
+  let mut inf = std::fs::File::open(path)?;
+  let mut result = String::new();
+  inf.read_to_string(&mut result)?;
+  Ok(result)
 }
 
 pub async fn yeet_service(mut consumer: Consumer, onsave_server_uri: String, yt_dlp_path: String) {
