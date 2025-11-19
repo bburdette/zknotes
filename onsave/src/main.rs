@@ -54,18 +54,19 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .arg(
       Arg::new("yt-dlp-path")
-        // .short('r')
         .long("yt-dlp-path")
         .value_name("path of yt-dlp")
         .help("full path is needed in nixos module/services"),
     )
     .arg(
       Arg::new("yeet-service")
+        .long("yeet-service")
         .value_name("enable yeet service - true/false")
         .help("consume on_save_note amqp messages and check for yeetlinks.  yeet accordingly."),
     )
     .arg(
       Arg::new("thumb-service")
+        .long("thumb-service")
         .value_name("enable thumb service - true/false")
         .help(
           "consume on_make_file_note amqp messages and generate thumb files for movies/images.",
