@@ -72,8 +72,16 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
           "consume on_make_file_note amqp messages and generate thumb files for movies/images.",
         ),
     )
-    .arg(Arg::new("amqp-uid-file").value_name("amqp user name file"))
-    .arg(Arg::new("amqp-pwd-file").value_name("amqp password file"))
+    .arg(
+      Arg::new("amqp-uid-file")
+        .long("amqp-uid-file")
+        .value_name("amqp user name file"),
+    )
+    .arg(
+      Arg::new("amqp-pwd-file")
+        .long("amqp-pwd-file")
+        .value_name("amqp password file"),
+    )
     .get_matches();
 
   let amqp_uri = matches
