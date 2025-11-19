@@ -92,6 +92,7 @@ in
         cd "/home/${cfg.user}"
         mkdir -p zknotes-onsave
         cd zknotes-onsave
+        echo RUST_LOG=info ${pkgs.zknotes}/bin/zknotes-onsave --amqp_uri "${cfg.amqp_uri}" --server_uri "${cfg.server_uri}" --yt-dlp-path "${lib.getExe pkgs.yt-dlp}" --thumb-service ${thumbstr} --yeet-service ${yeetstr} ${uidfile} ${pwdfile} 
         RUST_LOG=info ${pkgs.zknotes}/bin/zknotes-onsave --amqp_uri "${cfg.amqp_uri}" --server_uri "${cfg.server_uri}" --yt-dlp-path "${lib.getExe pkgs.yt-dlp}" --thumb-service ${thumbstr} --yeet-service ${yeetstr} ${uidfile} ${pwdfile} 
         '';
     };
