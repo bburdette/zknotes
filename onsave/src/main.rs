@@ -148,9 +148,7 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
   let conn = match (amqp_uid, amqp_pwd) {
     (Some(uid), Some(pwd)) => {
       let up_amqp_uri = str::replace(&amqp_uri, "//", format!("//{}:{}@", uid, pwd).as_str());
-      info!("up_amqp_uri : {}", up_amqp_uri);
-      let amqp_uri = AMQPUri::from_str(up_amqp_uri.as_str());
-      info!("amqp_uri: {:?}", amqp_uri);
+      // let amqp_uri = AMQPUri::from_str(up_amqp_uri.as_str());
       Connection::connect(&up_amqp_uri, ConnectionProperties::default()).await?
     }
     _ => Connection::connect(&amqp_uri, ConnectionProperties::default()).await?,
@@ -312,6 +310,7 @@ pub async fn yeet_service(mut consumer: Consumer, onsave_server_uri: String, yt_
                       raw: String,
                     }
 
+                    // Parse html tags in the zknote text.  Save the yeet tags.
                     let yeets = match tl::parse(zkn.content.as_str(), ParserOptions::default()) {
                       Ok(vdom) => {
                         let yeets: Vec<MahYeet> = vdom
