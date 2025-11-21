@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, fmt, fs, io::Cursor, path::Path, process::Command};
+use std::{collections::BTreeMap, fmt, fs, io::Cursor, path::Path, process::Command, str::FromStr};
 
 use clap::Arg;
 use futures_lite::stream::StreamExt;
@@ -6,6 +6,7 @@ use lapin::{
   Connection, ConnectionProperties, Consumer,
   options::{BasicAckOptions, BasicConsumeOptions, QueueDeclareOptions},
   types::FieldTable,
+  uri::AMQPUri,
 };
 use reqwest::multipart;
 use std::io::Read;
@@ -134,10 +135,22 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
     None => None,
   };
 
+  rustls::crypto::aws_lc_rs::default_provider()
+    .install_default()
+    .map_err(|_| {
+      Box::new(StringError {
+        s: format!("error from rustls::crypto::aws_lc_rs::default_provider().install_default()"),
+      })
+    })?;
+  // rustls::crypto::aws_lc_rs::install_default();
+  // rustls::CryptoProvider::install_default();
+
   let conn = match (amqp_uid, amqp_pwd) {
     (Some(uid), Some(pwd)) => {
       let up_amqp_uri = str::replace(&amqp_uri, "//", format!("//{}:{}@", uid, pwd).as_str());
       info!("up_amqp_uri : {}", up_amqp_uri);
+      let amqp_uri = AMQPUri::from_str(up_amqp_uri.as_str());
+      info!("amqp_uri: {:?}", amqp_uri);
       Connection::connect(&up_amqp_uri, ConnectionProperties::default()).await?
     }
     _ => Connection::connect(&amqp_uri, ConnectionProperties::default()).await?,
