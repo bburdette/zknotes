@@ -49,4 +49,3 @@ actix-rt = "2.11.0"
 girlboss = {version = "1.0.0-alpha.4", features = ["actix-rt"]}
 nom = "8.0.0"
 lapin = "3.4.0"
-# lapin = "2.5.4"
