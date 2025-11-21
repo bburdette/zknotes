@@ -6,6 +6,11 @@ let
 
   cfg = config.services.zknotes-onsave;
 
+  thumbstr = if cfg.thumb-service then "true" else "false";
+  yeetstr = if cfg.yeet-service then "true" else "false";
+
+  uidfile = if builtins.isNull cfg.amqp-uid-file then "" else "--amqp-uid-file \"${cfg.amqp-uid-file}\"";
+  pwdfile = if builtins.isNull cfg.amqp-pwd-file then "" else "--amqp-pwd-file \"${cfg.amqp-pwd-file}\"";
 in
 
 {
@@ -26,19 +31,41 @@ in
         default = "zknotes";
         description = lib.mdDoc "linux group under which zknotes-onsave runs.";
       };
-
       amqp_uri = mkOption {
         type = types.nullOr types.str;
         default = "amqp://localhost:5672";
         example = "amqp://localhost:5672";
         description = "uri of the amqp (rabbitmq) server";
       };
-
       server_uri = mkOption {
         type = types.nullOr types.str;
         default = "http://localhost:8010";
         example = "http://localhost:8010";
         description = "uri of the zknotes server";
+      };
+      yeet-service = mkOption {
+        type = types.nullOr types.bool;
+        default = true;
+        example = true;
+        description = "consume on_save_note amqp messages and check for yeetlinks.  yeet accordingly.";
+      };
+      thumb-service = mkOption {
+        type = types.nullOr types.bool;
+        default = true;
+        example = true;
+        description = "consume on_make_file_note amqp messages and generate thumb files for movies/images.";
+      };
+      amqp-uid-file = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        example = "/run/secrets/onsave-uid";
+        description = "file containing amqp (rabbitmq) user name";
+      };
+      amqp-pwd-file = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        example = "/run/secrets/onsave-pwd";
+        description = "file containing amqp (rabbitmq) password";
       };
     };
   };
@@ -61,12 +88,12 @@ in
 
       serviceConfig.User = cfg.user;
       serviceConfig.Group = cfg.group;
-
       script = ''
         cd "/home/${cfg.user}"
         mkdir -p zknotes-onsave
         cd zknotes-onsave
-        RUST_LOG=info ${pkgs.zknotes}/bin/zknotes-onsave --amqp_uri "${cfg.amqp_uri}" --server_uri "${cfg.server_uri}" --yt-dlp-path "${lib.getExe pkgs.yt-dlp}"
+        echo RUST_LOG=info ${pkgs.zknotes}/bin/zknotes-onsave --amqp_uri "${cfg.amqp_uri}" --server_uri "${cfg.server_uri}" --yt-dlp-path "${lib.getExe pkgs.yt-dlp}" --thumb-service ${thumbstr} --yeet-service ${yeetstr} ${uidfile} ${pwdfile} 
+        RUST_LOG=info ${pkgs.zknotes}/bin/zknotes-onsave --amqp_uri "${cfg.amqp_uri}" --server_uri "${cfg.server_uri}" --yt-dlp-path "${lib.getExe pkgs.yt-dlp}" --thumb-service ${thumbstr} --yeet-service ${yeetstr} ${uidfile} ${pwdfile} 
         '';
     };
 
