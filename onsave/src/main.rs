@@ -5,18 +5,14 @@ use std::{
   path::{Path, PathBuf},
   process::Command,
 };
-// use std::{collections::BTreeMap, fmt, fs, io::Cursor, path::Path, process::Command, str::FromStr};
 
 use clap::Arg;
 use futures_lite::stream::StreamExt;
 use glob::GlobError;
 use lapin::{
-  Connection,
-  ConnectionProperties,
-  Consumer,
+  Connection, ConnectionProperties, Consumer,
   options::{BasicAckOptions, BasicConsumeOptions, QueueDeclareOptions},
   types::FieldTable,
-  // uri::AMQPUri,
 };
 use reqwest::multipart;
 use std::io::Read;
@@ -202,6 +198,7 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
   };
 
   if do_thumb_service {
+    info!("starting thumb service");
     let chan = conn.create_channel().await?;
 
     chan
@@ -272,7 +269,7 @@ pub fn load_string(file_name: &str) -> Result<String, Box<dyn std::error::Error>
 }
 
 pub async fn yeet_service(mut consumer: Consumer, onsave_server_uri: String, yt_dlp_path: String) {
-  info!("yeet service");
+  info!("starting yeet service");
   let client = reqwest::Client::builder()
     .build()
     .expect("error building reqwest client");
@@ -281,11 +278,7 @@ pub async fn yeet_service(mut consumer: Consumer, onsave_server_uri: String, yt_
     let delivery = rdelivery.expect("error");
     match serde_json::from_slice::<OnSavedZkNote>(&delivery.data) {
       Ok(szn) => {
-        // let res : Result<(), Box<dyn std::err
-        info!("savedzkznote: {:?}", szn);
-        // yeet processing.
         // retrieve the note.
-
         let rq = zkprotocol::private::PrivateRequest::PvqGetZkNote(szn.id);
 
         let rs = serde_json::to_string(&rq).expect("serde error");
@@ -597,27 +590,6 @@ pub async fn yeet_service(mut consumer: Consumer, onsave_server_uri: String, yt_
                                       Ok(())
                                     }
                                     .await;
-
-                                    //
-                                    // let id = notes
-                                    //   .first()
-                                    //   .ok_or(StringError {
-                                    //     s: "no note uploaded".to_string(),
-                                    //   })?
-                                    //   .id;
-                                    // my.attribs.insert("id".to_string(), format!("{}", id));
-                                    // let newyeet = format!("<yeet ")
-                                    //   + my
-                                    //     .attribs
-                                    //     .into_iter()
-                                    //     .map(|(n, v)| format!(" {}=\"{}\"", n, v))
-                                    //     .collect::<Vec<String>>()
-                                    //     .concat()
-                                    //     .as_str()
-                                    //   + "/>";
-
-                                    // ed_content =
-                                    //   ed_content.replace(my.raw.as_str(), newyeet.as_str());
                                   }
                                 };
                                 Ok(())
@@ -722,28 +694,6 @@ pub fn yeet(
   url: String,
   yt_dlp_path: String,
 ) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
-  // parse 'url'
-  // let uri: reqwest::Url = match url.parse() {
-  //   Ok(uri) => uri,
-  //   Err(e) => {
-  //     return Err(Box::new(StringError {
-  //       s: format!("yeet err {:?}", e),
-  //     }));
-  //   }
-  // };
-  // get 'v' parameter.
-  // let qps = uri.query_pairs();
-  // let mut vid: Option<String> = None;
-  // for (name, value) in qps {
-  //   if name == "v" {
-  //     vid = Some(value.to_string());
-  //   }
-  // }
-
-  // let v = vid.ok_or(StringError {
-  //   s: "missing 'v' from url".to_string(),
-  // })?;
-
   let tmpdir = format!("onsavewk_{}", Uuid::new_v4());
   let p = {
     let mut p = PathBuf::from(savedir);
@@ -780,21 +730,6 @@ pub fn yeet(
               }
             }
           }
-
-          // match paths.next() {
-          // Some(rpb) => match rpb {
-          //   Ok(pb) => pb,
-          //   Err(e) => {
-          //     return Err(Box::new(StringError {
-          //       s: format!("glob error {:?}", e),
-          //     }));
-          //   }
-          // },
-          // None => {
-          //   return Err(Box::new(StringError {
-          //     s: format!("yeet file not found {:?}", v),
-          //   }));
-          // }
           Err(e) => {
             return Err(Box::new(StringError {
               s: format!("glob error {:?}", e),
@@ -802,14 +737,6 @@ pub fn yeet(
           }
         };
         Ok(files)
-        // let filename = file
-        //   .as_path()
-        //   .file_name()
-        //   .and_then(|x| x.to_str())
-        //   .unwrap_or("meh.txt")
-        //   .to_string();
-
-        // Ok(filename)
       } else {
         Err(Box::new(StringError {
           s: format!("yeet err {:?}", exit_code),
@@ -909,7 +836,6 @@ async fn resize_image(
   omfn: OnMakeFileNote,
 ) -> Result<(), Box<dyn std::error::Error>> {
   info!("resize_image {:?}", omfn);
-  // download the file.
   // download the file.
   let mut s = String::from(server_uri);
   s.push_str("/file/");
