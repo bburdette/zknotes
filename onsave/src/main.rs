@@ -144,7 +144,7 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
     None => None,
   };
 
-  rustls::crypto::aws_lc_rs::default_provider()
+  rustls::crypto::ring::default_provider()
     .install_default()
     .map_err(|_| {
       Box::new(StringError {
