@@ -1,7 +1,14 @@
-use std::{collections::BTreeMap, fmt, fs, io::Cursor, path::Path, process::Command};
+use std::{
+  collections::BTreeMap,
+  fmt, fs,
+  io::Cursor,
+  path::{Path, PathBuf},
+  process::Command,
+};
 
 use clap::Arg;
 use futures_lite::stream::StreamExt;
+use glob::GlobError;
 use lapin::{
   Connection, ConnectionProperties,
   options::{BasicAckOptions, BasicConsumeOptions, QueueDeclareOptions},
@@ -281,41 +288,88 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
                               Err(e) => error!("{e:?}"),
                             };
                           }
-                          Ok(f) => {
+                          Ok(paths) => {
                             let blah: Result<(), Box<dyn std::error::Error>> = async {
-                              info!("got file {f:?}");
-                              let uploadreply = upload_file(
-                                &client,
-                                Path::new(&f),
-                                &szn.token,
-                                onsave_server_uri.as_str(),
-                              )
-                              .await?;
-                              match uploadreply {
-                                UploadReply::UrFilesUploaded(notes) => {
-                                  fs::remove_file(f.clone())?;
-                                  let id = notes
-                                    .first()
-                                    .ok_or(StringError {
-                                      s: "no note uploaded".to_string(),
-                                    })?
-                                    .id;
-                                  my.attribs.insert("id".to_string(), format!("{}", id));
-                                  let newyeet = format!("<yeet ")
-                                    + my
-                                      .attribs
-                                      .into_iter()
-                                      .map(|(n, v)| format!(" {}=\"{}\"", n, v))
-                                      .collect::<Vec<String>>()
-                                      .concat()
-                                      .as_str()
-                                    + "/>";
-
-                                  ed_content =
-                                    ed_content.replace(my.raw.as_str(), newyeet.as_str());
+                              info!("got files {paths:?}");
+                              // if one file, just upload it.
+                              match &paths[..] {
+                                [] => {
+                                  Err(StringError {
+                                    s: "no paths from yeet!".to_string(),
+                                  })?;
+                                  Ok(())
                                 }
-                              };
-                              Ok(())
+                                [f] => {
+                                  let uploadreply = upload_file(
+                                    &client,
+                                    Path::new(&f),
+                                    &szn.token,
+                                    onsave_server_uri.as_str(),
+                                  )
+                                  .await?;
+                                  match uploadreply {
+                                    UploadReply::UrFilesUploaded(notes) => {
+                                      fs::remove_file(f.clone())?;
+                                      let id = notes
+                                        .first()
+                                        .ok_or(StringError {
+                                          s: "no note uploaded".to_string(),
+                                        })?
+                                        .id;
+                                      my.attribs.insert("id".to_string(), format!("{}", id));
+                                      let newyeet = format!("<yeet ")
+                                        + my
+                                          .attribs
+                                          .into_iter()
+                                          .map(|(n, v)| format!(" {}=\"{}\"", n, v))
+                                          .collect::<Vec<String>>()
+                                          .concat()
+                                          .as_str()
+                                        + "/>";
+
+                                      ed_content =
+                                        ed_content.replace(my.raw.as_str(), newyeet.as_str());
+                                    }
+                                  };
+                                  Ok(())
+                                }
+                                _ => {
+                                  let uploadreply = upload_files(
+                                    &client,
+                                    &paths,
+                                    &szn.token,
+                                    onsave_server_uri.as_str(),
+                                  )
+                                  .await?;
+                                  match uploadreply {
+                                    UploadReply::UrFilesUploaded(notes) => {
+                                      for f in paths {
+                                        fs::remove_file(f)?;
+                                      }
+                                      let id = notes
+                                        .first()
+                                        .ok_or(StringError {
+                                          s: "no note uploaded".to_string(),
+                                        })?
+                                        .id;
+                                      my.attribs.insert("id".to_string(), format!("{}", id));
+                                      let newyeet = format!("<yeet ")
+                                        + my
+                                          .attribs
+                                          .into_iter()
+                                          .map(|(n, v)| format!(" {}=\"{}\"", n, v))
+                                          .collect::<Vec<String>>()
+                                          .concat()
+                                          .as_str()
+                                        + "/>";
+
+                                      ed_content =
+                                        ed_content.replace(my.raw.as_str(), newyeet.as_str());
+                                    }
+                                  };
+                                  Ok(())
+                                }
+                              }
                             }
                             .await;
                             match blah {
@@ -472,31 +526,39 @@ pub fn yeet(
   savedir: &Path,
   url: String,
   yt_dlp_path: String,
-) -> Result<String, Box<dyn std::error::Error>> {
+) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
   // parse 'url'
-  let uri: reqwest::Url = match url.parse() {
-    Ok(uri) => uri,
-    Err(e) => {
-      return Err(Box::new(StringError {
-        s: format!("yeet err {:?}", e),
-      }));
-    }
-  };
-
+  // let uri: reqwest::Url = match url.parse() {
+  //   Ok(uri) => uri,
+  //   Err(e) => {
+  //     return Err(Box::new(StringError {
+  //       s: format!("yeet err {:?}", e),
+  //     }));
+  //   }
+  // };
   // get 'v' parameter.
-  let qps = uri.query_pairs();
-  let mut vid: Option<String> = None;
-  for (name, value) in qps {
-    if name == "v" {
-      vid = Some(value.to_string());
-    }
-  }
+  // let qps = uri.query_pairs();
+  // let mut vid: Option<String> = None;
+  // for (name, value) in qps {
+  //   if name == "v" {
+  //     vid = Some(value.to_string());
+  //   }
+  // }
 
-  let v = vid.ok_or(StringError {
-    s: "missing 'v' from url".to_string(),
-  })?;
+  // let v = vid.ok_or(StringError {
+  //   s: "missing 'v' from url".to_string(),
+  // })?;
+
+  let tmpdir = format!("onsavewk_{}", Uuid::new_v4());
+  let p = {
+    let mut p = PathBuf::from(savedir);
+    p.push(tmpdir);
+    p
+  };
+  std::fs::create_dir(&p)?;
 
   let mut child = Command::new(yt_dlp_path.as_str())
+    .current_dir(&p)
     .arg("-x")
     .arg(format!("-o{}/%(title)s-%(id)s.%(ext)s", savedir.display()))
     .arg(url.clone())
@@ -509,37 +571,50 @@ pub fn yeet(
     Ok(exit_code) => {
       if exit_code.success() {
         // find the yeeted file by 'v'.
-        let file: std::path::PathBuf =
-          match glob::glob(format!("{}/*{}*", savedir.display(), v).as_str()) {
-            Ok(mut paths) => match paths.next() {
-              Some(rpb) => match rpb {
-                Ok(pb) => pb,
-                Err(e) => {
-                  return Err(Box::new(StringError {
-                    s: format!("glob error {:?}", e),
-                  }));
-                }
-              },
-              None => {
+        let files: Vec<std::path::PathBuf> = match glob::glob(format!("{}/*", p.display()).as_str())
+        {
+          Ok(paths) => {
+            // let x: Result<Vec<PathBuf>, Box<dyn std::error::Error>> = paths.collect();
+            let x: Result<Vec<PathBuf>, GlobError> = paths.collect();
+            match x {
+              Ok(pb) => pb,
+              Err(e) => {
                 return Err(Box::new(StringError {
-                  s: format!("yeet file not found {:?}", v),
+                  s: format!("glob error {:?}", e),
                 }));
               }
-            },
-            Err(e) => {
-              return Err(Box::new(StringError {
-                s: format!("glob error {:?}", e),
-              }));
             }
-          };
-        let filename = file
-          .as_path()
-          .file_name()
-          .and_then(|x| x.to_str())
-          .unwrap_or("meh.txt")
-          .to_string();
+          }
 
-        Ok(filename)
+          // match paths.next() {
+          // Some(rpb) => match rpb {
+          //   Ok(pb) => pb,
+          //   Err(e) => {
+          //     return Err(Box::new(StringError {
+          //       s: format!("glob error {:?}", e),
+          //     }));
+          //   }
+          // },
+          // None => {
+          //   return Err(Box::new(StringError {
+          //     s: format!("yeet file not found {:?}", v),
+          //   }));
+          // }
+          Err(e) => {
+            return Err(Box::new(StringError {
+              s: format!("glob error {:?}", e),
+            }));
+          }
+        };
+        Ok(files)
+        // let filename = file
+        //   .as_path()
+        //   .file_name()
+        //   .and_then(|x| x.to_str())
+        //   .unwrap_or("meh.txt")
+        //   .to_string();
+
+        // Ok(filename)
       } else {
         Err(Box::new(StringError {
           s: format!("yeet err {:?}", exit_code),
@@ -799,6 +874,49 @@ pub async fn upload_file(
     "whatever_name".to_string(),
     multipart::Part::stream(reqwest::Body::wrap_stream(bytes_stream)).file_name(utf_fname),
   );
+  let res = client
+    .post(String::from(server_uri) + "/upload")
+    .multipart(form)
+    .header(reqwest::header::COOKIE, format!("id={}", token))
+    .send()
+    .await?;
+
+  if !res.status().is_success() {
+    return Err(Box::new(StringError {
+      s: format!("upload failure: {:?}", res),
+    }));
+  }
+
+  let txt = res.text().await?;
+
+  let ur = serde_json::from_str::<zkprotocol::upload::UploadReply>(txt.as_str())?;
+
+  Ok(ur)
+}
+
+pub async fn upload_files(
+  client: &reqwest::Client,
+  files: &Vec<PathBuf>,
+  token: &str,
+  server_uri: &str,
+) -> Result<zkprotocol::upload::UploadReply, Box<dyn std::error::Error>> {
+  let mut form = reqwest::multipart::Form::new();
+  for filename in files {
+    let file = File::open(filename).await?;
+    // upload the file to zknotes.
+    let bytes_stream = tokio_util::codec::FramedRead::new(file, BytesCodec::new());
+    let utf_fname = filename
+      .to_str()
+      .ok_or(StringError {
+        s: "filename unicode error".to_string(),
+      })?
+      .to_string();
+    form = form.part(
+      "whatever_name".to_string(),
+      multipart::Part::stream(reqwest::Body::wrap_stream(bytes_stream)).file_name(utf_fname),
+    );
+  }
+
   let res = client
     .post(String::from(server_uri) + "/upload")
     .multipart(form)
