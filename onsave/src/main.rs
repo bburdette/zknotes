@@ -43,7 +43,7 @@ async fn main() {
 
 async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
   env_logger::init();
-  info!("zknotes-onsave");
+  info!("starting zknotes-onsave service");
 
   let matches = clap::Command::new("zknotes onsave")
     .version("1.0")
@@ -162,7 +162,7 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
     _ => Connection::connect(&amqp_uri, ConnectionProperties::default()).await?,
   };
 
-  info!("CONNECTED");
+  info!("connected to rabbitmq!");
 
   let chan = conn.create_channel().await?;
 
@@ -222,7 +222,7 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
       let delivery = rdelivery.expect("error");
       match serde_json::from_slice::<OnMakeFileNote>(&delivery.data) {
         Ok(omfn) => {
-          info!("on_make_file_note: OnMakeFileNote: {:?}", omfn);
+          info!("on_make_file_note: OnMakeFileNote: {:?}", omfn.title);
           if let Some(suffix) = omfn.title.split('.').last() {
             if !omfn.title.contains("thumb") {
               match suffix.to_lowercase().as_str() {
@@ -617,9 +617,7 @@ pub async fn yeet_service(mut consumer: Consumer, onsave_server_uri: String, yt_
 
                     // if ed_content has changed, update the note.
                     let blah: Result<(), Box<dyn std::error::Error>> = async {
-                      info!("is ed_content different?");
                       if ed_content != zkn.content {
-                        info!("yes, will try save:{zkn:?} {ed_content}");
                         let nszn = SaveZkNoteAndLinks {
                           note: SaveZkNote {
                             id: Some(zkn.id),
@@ -776,7 +774,7 @@ async fn resize_video(
   server_uri: &str,
   omfn: OnMakeFileNote,
 ) -> Result<(), Box<dyn std::error::Error>> {
-  info!("resize_video {:?}", omfn);
+  info!("resize_video {:?}", omfn.title);
   // download the file.
   let mut s = String::from(server_uri);
   s.push_str("/file/");
@@ -858,7 +856,7 @@ async fn resize_image(
   server_uri: &str,
   omfn: OnMakeFileNote,
 ) -> Result<(), Box<dyn std::error::Error>> {
-  info!("resize_image {:?}", omfn);
+  info!("resize_image {:?}", omfn.title);
   // download the file.
   let mut s = String::from(server_uri);
   s.push_str("/file/");
