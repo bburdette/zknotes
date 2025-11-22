@@ -272,6 +272,7 @@ pub fn load_string(file_name: &str) -> Result<String, Box<dyn std::error::Error>
 }
 
 pub async fn yeet_service(mut consumer: Consumer, onsave_server_uri: String, yt_dlp_path: String) {
+  info!("yeet service");
   let client = reqwest::Client::builder()
     .build()
     .expect("error building reqwest client");
@@ -457,12 +458,14 @@ pub async fn yeet_service(mut consumer: Consumer, onsave_server_uri: String, yt_
                             // if one file, just upload it.
                             match &paths[..] {
                               [] => {
+                                // No files!
                                 Err(StringError {
                                   s: "no paths from yeet!".to_string(),
                                 })?;
                                 Ok(())
                               }
                               [f] => {
+                                // one file
                                 let uploadreply = upload_file(
                                   &client,
                                   Path::new(&f),
@@ -497,6 +500,7 @@ pub async fn yeet_service(mut consumer: Consumer, onsave_server_uri: String, yt_
                                 Ok(())
                               }
                               _ => {
+                                // multiple files!
                                 let uploadreply = upload_files(
                                   &client,
                                   &paths,
@@ -511,7 +515,9 @@ pub async fn yeet_service(mut consumer: Consumer, onsave_server_uri: String, yt_
                                     }
                                     let content =
                                       notes.iter().fold("".to_string(), |mut acc, zkln| {
-                                        acc.push_str(format!("<yeet id={}/>\n", zkln.id).as_str());
+                                        acc.push_str(
+                                          format!("<note id=\"{}\"/>\n", zkln.id).as_str(),
+                                        );
                                         acc
                                       });
                                     // make a new note with all these ids.
@@ -557,25 +563,61 @@ pub async fn yeet_service(mut consumer: Consumer, onsave_server_uri: String, yt_
                                       error!("error updating note: {}, {:?}", zkn.id, res);
                                     }
                                     //
-                                    let id = notes
-                                      .first()
-                                      .ok_or(StringError {
-                                        s: "no note uploaded".to_string(),
-                                      })?
-                                      .id;
-                                    my.attribs.insert("id".to_string(), format!("{}", id));
-                                    let newyeet = format!("<yeet ")
-                                      + my
-                                        .attribs
-                                        .into_iter()
-                                        .map(|(n, v)| format!(" {}=\"{}\"", n, v))
-                                        .collect::<Vec<String>>()
-                                        .concat()
-                                        .as_str()
-                                      + "/>";
+                                    let _blah: Result<(), Box<dyn std::error::Error>> = async {
+                                      let txt = res.text().await?;
 
-                                    ed_content =
-                                      ed_content.replace(my.raw.as_str(), newyeet.as_str());
+                                      let pr =
+                                        serde_json::from_str::<zkprotocol::private::PrivateReply>(
+                                          txt.as_str(),
+                                        )?;
+
+                                      match pr {
+                                        zkprotocol::private::PrivateReply::PvySavedZkNoteAndLinks(szn) => {
+                                          // add id of the yeet error note to the <yeet>
+                                          my.attribs
+                                            .insert("id".to_string(), format!("{}", szn.id));
+                                          let newyeet = format!("<yeet ")
+                                            + my
+                                              .attribs
+                                              .into_iter()
+                                              .map(|(n, v)| format!(" {}=\"{}\"", n, v))
+                                              .collect::<Vec<String>>()
+                                              .concat()
+                                              .as_str()
+                                            + "/>";
+
+                                          ed_content =
+                                            ed_content.replace(my.raw.as_str(), newyeet.as_str());
+                                        }
+                                        _ => {
+                                          error!("unexpected reply: {:?}", pr);
+                                        }
+                                      };
+
+                                      Ok(())
+                                    }
+                                    .await;
+
+                                    //
+                                    // let id = notes
+                                    //   .first()
+                                    //   .ok_or(StringError {
+                                    //     s: "no note uploaded".to_string(),
+                                    //   })?
+                                    //   .id;
+                                    // my.attribs.insert("id".to_string(), format!("{}", id));
+                                    // let newyeet = format!("<yeet ")
+                                    //   + my
+                                    //     .attribs
+                                    //     .into_iter()
+                                    //     .map(|(n, v)| format!(" {}=\"{}\"", n, v))
+                                    //     .collect::<Vec<String>>()
+                                    //     .concat()
+                                    //     .as_str()
+                                    //   + "/>";
+
+                                    // ed_content =
+                                    //   ed_content.replace(my.raw.as_str(), newyeet.as_str());
                                   }
                                 };
                                 Ok(())
@@ -593,7 +635,9 @@ pub async fn yeet_service(mut consumer: Consumer, onsave_server_uri: String, yt_
 
                     // if ed_content has changed, update the note.
                     let blah: Result<(), Box<dyn std::error::Error>> = async {
+                      info!("is ed_content different?");
                       if ed_content != zkn.content {
+                        info!("yes, will try save:{zkn:?} {ed_content}");
                         let nszn = SaveZkNote {
                           id: Some(zkn.id),
                           title: zkn.title,
@@ -1015,9 +1059,13 @@ pub async fn upload_file(
   // upload the file to zknotes.
   let bytes_stream = tokio_util::codec::FramedRead::new(file, BytesCodec::new());
   let utf_fname = filename
+    .file_name()
+    .ok_or(StringError {
+      s: format!("filename error {:?}", filename),
+    })?
     .to_str()
     .ok_or(StringError {
-      s: "filename unicode error".to_string(),
+      s: format!("filename unicode error {:?}", filename),
     })?
     .to_string();
 
@@ -1057,6 +1105,10 @@ pub async fn upload_files(
     // upload the file to zknotes.
     let bytes_stream = tokio_util::codec::FramedRead::new(file, BytesCodec::new());
     let utf_fname = filename
+      .file_name()
+      .ok_or(StringError {
+        s: format!("invalid filename! {filename:?}"),
+      })?
       .to_str()
       .ok_or(StringError {
         s: "filename unicode error".to_string(),
