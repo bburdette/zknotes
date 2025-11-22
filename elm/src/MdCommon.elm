@@ -671,7 +671,7 @@ yeetView args url audioOnly mbid show text _ =
             E.paragraph [] <| List.singleton <| E.text <| "yeet " ++ url ++ (audioOnly |> Maybe.map (\_ -> " -x") |> Maybe.withDefault "")
 
         Just id ->
-            E.column []
+            E.column [ E.width E.fill ]
                 [ E.paragraph [] <|
                     [ E.text <| "yeet " ++ url
                     , nooplink url

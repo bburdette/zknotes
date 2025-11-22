@@ -5,16 +5,19 @@ use std::{
   path::{Path, PathBuf},
   process::Command,
 };
+// use std::{collections::BTreeMap, fmt, fs, io::Cursor, path::Path, process::Command, str::FromStr};
 
 use clap::Arg;
 use futures_lite::stream::StreamExt;
 use glob::GlobError;
 use lapin::{
-  Connection, ConnectionProperties,
+  Connection, ConnectionProperties, Consumer,
   options::{BasicAckOptions, BasicConsumeOptions, QueueDeclareOptions},
   types::FieldTable,
+  uri::AMQPUri,
 };
 use reqwest::multipart;
+use std::io::Read;
 use tl::ParserOptions;
 use tokio::fs::File;
 use tokio_util::codec::BytesCodec;
@@ -61,10 +64,33 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .arg(
       Arg::new("yt-dlp-path")
-        // .short('r')
         .long("yt-dlp-path")
         .value_name("path of yt-dlp")
         .help("full path is needed in nixos module/services"),
+    )
+    .arg(
+      Arg::new("yeet-service")
+        .long("yeet-service")
+        .value_name("enable yeet service - true/false")
+        .help("consume on_save_note amqp messages and check for yeetlinks.  yeet accordingly."),
+    )
+    .arg(
+      Arg::new("thumb-service")
+        .long("thumb-service")
+        .value_name("enable thumb service - true/false")
+        .help(
+          "consume on_make_file_note amqp messages and generate thumb files for movies/images.",
+        ),
+    )
+    .arg(
+      Arg::new("amqp-uid-file")
+        .long("amqp-uid-file")
+        .value_name("amqp user name file"),
+    )
+    .arg(
+      Arg::new("amqp-pwd-file")
+        .long("amqp-pwd-file")
+        .value_name("amqp password file"),
     )
     .get_matches();
 
@@ -76,12 +102,64 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
     .get_one::<String>("server_uri")
     .expect("server_uri is required");
 
+  // if not found default to 'yt-dlp'
   let yt_dlp_path = matches
     .get_one::<String>("yt-dlp-path")
     .unwrap_or(&"yt-dlp".to_string())
     .clone();
 
-  let conn = Connection::connect(&amqp_uri, ConnectionProperties::default()).await?;
+  let do_yeet_service = match matches
+    .get_one::<String>("yeet-service")
+    .unwrap_or(&"true".to_string())
+    .as_str()
+  {
+    "true" => true,
+    "false" => false,
+    _ => panic!("yeet_service arg must be 'true' or 'false'"),
+  };
+  let do_thumb_service = match matches
+    .get_one::<String>("thumb-service")
+    .unwrap_or(&"true".to_string())
+    .as_str()
+  {
+    "true" => true,
+    "false" => false,
+    _ => panic!("thumb_service arg must be 'true' or 'false'"),
+  };
+
+  if !do_thumb_service && !do_yeet_service {
+    panic!("at least one of 'thumb_service' or 'yeet_service' must be 'true'")
+  }
+
+  let amqp_uid_file = matches.get_one::<String>("amqp-uid-file");
+  let amqp_pwd_file = matches.get_one::<String>("amqp-pwd-file");
+
+  let amqp_uid = match amqp_uid_file {
+    Some(f) => Some(load_string(f)?),
+    None => None,
+  };
+  let amqp_pwd = match amqp_pwd_file {
+    Some(f) => Some(load_string(f)?),
+    None => None,
+  };
+
+  rustls::crypto::aws_lc_rs::default_provider()
+    .install_default()
+    .map_err(|_| {
+      Box::new(StringError {
+        s: format!("error from rustls::crypto::aws_lc_rs::default_provider().install_default()"),
+      })
+    })?;
+
+  let conn = match (amqp_uid, amqp_pwd) {
+    (Some(uid), Some(pwd)) => {
+      let up_amqp_uri = str::replace(&amqp_uri, "//", format!("//{}:{}@", uid, pwd).as_str());
+      // let amqp_uri = AMQPUri::from_str(up_amqp_uri.as_str());
+      // info!("amqp_uri: {:?}", amqp_uri);
+      Connection::connect(&up_amqp_uri, ConnectionProperties::default()).await?
+    }
+    _ => Connection::connect(&amqp_uri, ConnectionProperties::default()).await?,
+  };
 
   info!("CONNECTED");
 
@@ -95,7 +173,7 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await?;
 
-  let mut consumer = chan
+  let consumer = chan
     .basic_consume(
       "on_save_zknote",
       "onsave",
@@ -106,330 +184,60 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
 
   let onsave_server_uri = server_uri.clone();
 
-  tokio::spawn(async move {
-    let client = reqwest::Client::builder()
-      .build()
-      .expect("error building reqwest client");
-    let private_uri = String::from(onsave_server_uri.clone()) + "/private";
+  // if we're doing thumbs, spawn a thread for yeets.  otherwise do yeets in the
+  // current thread.
+  if do_yeet_service {
+    if do_thumb_service {
+      tokio::spawn(async move {
+        yeet_service(consumer, onsave_server_uri, yt_dlp_path).await;
+      });
+    } else {
+      yeet_service(consumer, onsave_server_uri, yt_dlp_path).await;
+    }
+  };
+
+  if do_thumb_service {
+    let chan = conn.create_channel().await?;
+
+    chan
+      .queue_declare(
+        "on_make_file_note",
+        QueueDeclareOptions::default(),
+        FieldTable::default(),
+      )
+      .await?;
+
+    let mut consumer = chan
+      .basic_consume(
+        "on_make_file_note",
+        "onmakefile",
+        BasicConsumeOptions::default(),
+        FieldTable::default(),
+      )
+      .await?;
+
     while let Some(rdelivery) = consumer.next().await {
       let delivery = rdelivery.expect("error");
-      match serde_json::from_slice::<OnSavedZkNote>(&delivery.data) {
-        Ok(szn) => {
-          // let res : Result<(), Box<dyn std::err
-          info!("savedzkznote: {:?}", szn);
-          // yeet processing.
-          // retrieve the note.
-
-          let rq = zkprotocol::private::PrivateRequest::PvqGetZkNote(szn.id);
-
-          let rs = serde_json::to_string(&rq).expect("serde error");
-
-          let res = client
-            .post(&private_uri)
-            .header(
-              reqwest::header::COOKIE,
-              format!("id={}", szn.token.as_str()),
-            )
-            .header(reqwest::header::CONTENT_TYPE, "application/json")
-            .body(rs)
-            .send()
-            .await;
-
-          match res {
-            Ok(r) => {
-              match (
-                r.status().is_success(),
-                r.text()
-                  .await
-                  .map_err(|e| format!("error: {e:?}"))
-                  .and_then(|t| {
-                    serde_json::from_str::<zkprotocol::private::PrivateReply>(t.as_str())
-                      .map_err(|e| format!("error: {e:?}"))
-                  }),
-              ) {
-                (true, Ok(m)) => {
-                  match m {
-                    zkprotocol::private::PrivateReply::PvyZkNote(zkn) => {
-                      // search for yeet text.  have to make an intermediate yeet list because Node is not Send.
-                      struct MahYeet {
-                        url: String,
-                        attribs: BTreeMap<String, String>,
-                        raw: String,
-                      }
-
-                      let yeets = match tl::parse(zkn.content.as_str(), ParserOptions::default()) {
-                        Ok(vdom) => {
-                          let yeets: Vec<MahYeet> = vdom
-                            .nodes()
-                            .iter()
-                            .filter_map(|n| match n {
-                              tl::Node::Tag(t) => {
-                                if t.name().as_utf8_str() == "yeet" {
-                                  if let Some(Some(_)) = t.attributes().get("id") {
-                                    None // don't process yeets that already have an id.
-                                  } else if let Some(Some(u)) = t.attributes().get("url") {
-                                    Some(MahYeet {
-                                      url: u.as_utf8_str().to_string(),
-                                      attribs: t.attributes().iter().fold(
-                                        BTreeMap::new(),
-                                        |mut acc: BTreeMap<String, String>, (name, mbvalue)| {
-                                          if let Some(v) = mbvalue {
-                                            acc.insert(name.to_string(), v.to_string());
-                                            acc
-                                          } else {
-                                            acc
-                                          }
-                                        },
-                                      ),
-                                      raw: t.raw().as_utf8_str().to_string(),
-                                    })
-                                  } else {
-                                    None // if no url, can't process.
-                                  }
-                                } else {
-                                  None
-                                }
-                              }
-                              _ => None,
-                            })
-                            .collect();
-                          yeets
-                        }
-                        Err(e) => {
-                          error!("html parse error: {:?}", e);
-                          Vec::new()
-                        }
-                      };
-
-                      let p = Path::new(".");
-
-                      let mut ed_content = zkn.content.clone();
-
-                      for mut my in yeets {
-                        match yeet(&p, my.url.clone(), yt_dlp_path.clone())
-                          .map_err(|e| format!("{e:?}"))
-                        {
-                          Err(e) => {
-                            error!("yeet error {e:?}");
-
-                            let nszn = SaveZkNote {
-                              id: None,
-                              title: "yeet error".to_string(),
-                              pubid: None,
-                              content: format!("{:?}", e),
-                              editable: false,
-                              showtitle: false,
-                              deleted: false,
-                              what: None,
-                            };
-                            let res = client
-                              .post(String::from(onsave_server_uri.clone()) + "/private")
-                              .header(
-                                reqwest::header::COOKIE,
-                                format!("id={}", szn.token.as_str()),
-                              )
-                              .header(reqwest::header::CONTENT_TYPE, "application/json")
-                              .body(
-                                serde_json::to_string(&PrivateRequest::PvqSaveZkNote(nszn))
-                                  .unwrap(),
-                              )
-                              .send()
-                              .await;
-
-                            match res {
-                              Ok(res) => {
-                                println!("res: {:?}", res);
-
-                                if !res.status().is_success() {
-                                  error!("error saving yeet error note: {}, {:?}", zkn.id, res);
-                                }
-
-                                // async block so we can use ? operator.
-                                let blah: Result<(), Box<dyn std::error::Error>> =
-                                  async {
-                                    let txt = res.text().await?;
-
-                                    let pr = serde_json::from_str::<
-                                      zkprotocol::private::PrivateReply,
-                                    >(txt.as_str())?;
-
-                                    match pr {
-                                      zkprotocol::private::PrivateReply::PvySavedZkNote(szn) => {
-                                        // add id of the yeet error note to the <yeet>
-                                        my.attribs.insert("id".to_string(), format!("{}", szn.id));
-                                        let newyeet = format!("<yeet ")
-                                          + my
-                                            .attribs
-                                            .into_iter()
-                                            .map(|(n, v)| format!(" {}=\"{}\"", n, v))
-                                            .collect::<Vec<String>>()
-                                            .concat()
-                                            .as_str()
-                                          + "/>";
-
-                                        ed_content =
-                                          ed_content.replace(my.raw.as_str(), newyeet.as_str());
-                                      }
-                                      _ => {
-                                        error!("unexpected reply: {:?}", pr);
-                                      }
-                                    };
-
-                                    Ok(())
-                                  }
-                                  .await;
-                                match blah {
-                                  Err(e) => {
-                                    error!("{e:?}");
-                                  }
-                                  _ => (),
-                                };
-                              }
-                              Err(e) => error!("{e:?}"),
-                            };
-                          }
-                          Ok(paths) => {
-                            let blah: Result<(), Box<dyn std::error::Error>> = async {
-                              info!("got files {paths:?}");
-                              // if one file, just upload it.
-                              match &paths[..] {
-                                [] => {
-                                  Err(StringError {
-                                    s: "no paths from yeet!".to_string(),
-                                  })?;
-                                  Ok(())
-                                }
-                                [f] => {
-                                  let uploadreply = upload_file(
-                                    &client,
-                                    Path::new(&f),
-                                    &szn.token,
-                                    onsave_server_uri.as_str(),
-                                  )
-                                  .await?;
-                                  match uploadreply {
-                                    UploadReply::UrFilesUploaded(notes) => {
-                                      fs::remove_file(f.clone())?;
-                                      let id = notes
-                                        .first()
-                                        .ok_or(StringError {
-                                          s: "no note uploaded".to_string(),
-                                        })?
-                                        .id;
-                                      my.attribs.insert("id".to_string(), format!("{}", id));
-                                      let newyeet = format!("<yeet ")
-                                        + my
-                                          .attribs
-                                          .into_iter()
-                                          .map(|(n, v)| format!(" {}=\"{}\"", n, v))
-                                          .collect::<Vec<String>>()
-                                          .concat()
-                                          .as_str()
-                                        + "/>";
-
-                                      ed_content =
-                                        ed_content.replace(my.raw.as_str(), newyeet.as_str());
-                                    }
-                                  };
-                                  Ok(())
-                                }
-                                _ => {
-                                  let uploadreply = upload_files(
-                                    &client,
-                                    &paths,
-                                    &szn.token,
-                                    onsave_server_uri.as_str(),
-                                  )
-                                  .await?;
-                                  match uploadreply {
-                                    UploadReply::UrFilesUploaded(notes) => {
-                                      for f in paths {
-                                        fs::remove_file(f)?;
-                                      }
-                                      let id = notes
-                                        .first()
-                                        .ok_or(StringError {
-                                          s: "no note uploaded".to_string(),
-                                        })?
-                                        .id;
-                                      my.attribs.insert("id".to_string(), format!("{}", id));
-                                      let newyeet = format!("<yeet ")
-                                        + my
-                                          .attribs
-                                          .into_iter()
-                                          .map(|(n, v)| format!(" {}=\"{}\"", n, v))
-                                          .collect::<Vec<String>>()
-                                          .concat()
-                                          .as_str()
-                                        + "/>";
-
-                                      ed_content =
-                                        ed_content.replace(my.raw.as_str(), newyeet.as_str());
-                                    }
-                                  };
-                                  Ok(())
-                                }
-                              }
-                            }
-                            .await;
-                            match blah {
-                              Err(e) => error!("error: {e:?}"),
-                              Ok(_) => (),
-                            }
-                          }
-                        }
-                      }
-
-                      // if ed_content has changed, update the note.
-                      let blah: Result<(), Box<dyn std::error::Error>> = async {
-                        if ed_content != zkn.content {
-                          let nszn = SaveZkNote {
-                            id: Some(zkn.id),
-                            title: zkn.title,
-                            pubid: zkn.pubid,
-                            content: ed_content,
-                            editable: zkn.editable,
-                            showtitle: zkn.showtitle,
-                            deleted: zkn.deleted,
-                            what: None,
-                          };
-                          let res = client
-                            .post(String::from(onsave_server_uri.clone()) + "/private")
-                            .header(
-                              reqwest::header::COOKIE,
-                              format!("id={}", szn.token.as_str()),
-                            )
-                            .header(reqwest::header::CONTENT_TYPE, "application/json")
-                            .body(
-                              serde_json::to_string(&PrivateRequest::PvqSaveZkNote(nszn)).unwrap(),
-                            )
-                            .send()
-                            .await?;
-
-                          if !res.status().is_success() {
-                            error!("error updating note: {}, {:?}", zkn.id, res);
-                          }
-                        }
-                        Ok(())
-                      }
-                      .await;
-                      match blah {
-                        Err(e) => error!("error: {e:?}"),
-                        Ok(_) => (),
-                      }
-                    }
-                    x => {
-                      error!("unexpected message: {x:?}");
-                    }
-                  }
-                }
-                r => {
-                  error!("bad result: {r:?}");
+      match serde_json::from_slice::<OnMakeFileNote>(&delivery.data) {
+        Ok(omfn) => {
+          info!("on_make_file_note: OnMakeFileNote: {:?}", omfn);
+          if let Some(suffix) = omfn.title.split('.').last() {
+            if !omfn.title.contains("thumb") {
+              match suffix.to_lowercase().as_str() {
+                "mp4" => resize_video(&server_uri.as_str(), omfn).await?,
+                "webm" => resize_video(&server_uri.as_str(), omfn).await?,
+                "mkv" => resize_video(&server_uri.as_str(), omfn).await?,
+                "jpg" => resize_image(&server_uri.as_str(), omfn).await?,
+                "gif" => resize_image(&server_uri.as_str(), omfn).await?,
+                "png" => resize_image(&server_uri.as_str(), omfn).await?,
+                // ignore these.
+                "mp3" => (),
+                "m4a" => (),
+                "opus" => (),
+                _ => {
+                  error!("unsupported file suffix: {}", suffix);
                 }
               }
-            }
-            Err(e) => {
-              error!("post error: {:?}", e);
             }
           }
         }
@@ -443,49 +251,609 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
         .await
         .expect("ack error");
     }
-  });
+  }
 
-  let chan = conn.create_channel().await?;
+  info!("Goodbye, world!");
 
-  chan
-    .queue_declare(
-      "on_make_file_note",
-      QueueDeclareOptions::default(),
-      FieldTable::default(),
-    )
-    .await?;
+  Ok(())
+}
 
-  let mut consumer = chan
-    .basic_consume(
-      "on_make_file_note",
-      "onmakefile",
-      BasicConsumeOptions::default(),
-      FieldTable::default(),
-    )
-    .await?;
+pub fn load_string(file_name: &str) -> Result<String, Box<dyn std::error::Error>> {
+  let path = &Path::new(&file_name);
+  let mut inf = std::fs::File::open(path)?;
+  let mut result = String::new();
+  inf.read_to_string(&mut result)?;
+  Ok(result)
+}
 
+// match serde_json::from_slice::<OnSavedZkNote>(&delivery.data) {
+//   Ok(szn) => {
+//     // let res : Result<(), Box<dyn std::err
+//     info!("savedzkznote: {:?}", szn);
+//     // yeet processing.
+//     // retrieve the note.
+
+//     let rq = zkprotocol::private::PrivateRequest::PvqGetZkNote(szn.id);
+
+//     let rs = serde_json::to_string(&rq).expect("serde error");
+
+//     let res = client
+//       .post(&private_uri)
+//       .header(
+//         reqwest::header::COOKIE,
+//         format!("id={}", szn.token.as_str()),
+//       )
+//       .header(reqwest::header::CONTENT_TYPE, "application/json")
+//       .body(rs)
+//       .send()
+//       .await;
+
+//     match res {
+//       Ok(r) => {
+//         match (
+//           r.status().is_success(),
+//           r.text()
+//             .await
+//             .map_err(|e| format!("error: {e:?}"))
+//             .and_then(|t| {
+//               serde_json::from_str::<zkprotocol::private::PrivateReply>(t.as_str())
+//                 .map_err(|e| format!("error: {e:?}"))
+//             }),
+//         ) {
+//           (true, Ok(m)) => {
+//             match m {
+//               zkprotocol::private::PrivateReply::PvyZkNote(zkn) => {
+//                 // search for yeet text.  have to make an intermediate yeet list because Node is not Send.
+//                 struct MahYeet {
+//                   url: String,
+//                   attribs: BTreeMap<String, String>,
+//                   raw: String,
+//                 }
+
+//                 let yeets = match tl::parse(zkn.content.as_str(), ParserOptions::default()) {
+//                   Ok(vdom) => {
+//                     let yeets: Vec<MahYeet> = vdom
+//                       .nodes()
+//                       .iter()
+//                       .filter_map(|n| match n {
+//                         tl::Node::Tag(t) => {
+//                           if t.name().as_utf8_str() == "yeet" {
+//                             if let Some(Some(_)) = t.attributes().get("id") {
+//                               None // don't process yeets that already have an id.
+//                             } else if let Some(Some(u)) = t.attributes().get("url") {
+//                               Some(MahYeet {
+//                                 url: u.as_utf8_str().to_string(),
+//                                 attribs: t.attributes().iter().fold(
+//                                   BTreeMap::new(),
+//                                   |mut acc: BTreeMap<String, String>, (name, mbvalue)| {
+//                                     if let Some(v) = mbvalue {
+//                                       acc.insert(name.to_string(), v.to_string());
+//                                       acc
+//                                     } else {
+//                                       acc
+//                                     }
+//                                   },
+//                                 ),
+//                                 raw: t.raw().as_utf8_str().to_string(),
+//                               })
+//                             } else {
+//                               None // if no url, can't process.
+//                             }
+//                           } else {
+//                             None
+//                           }
+//                         }
+//                         _ => None,
+//                       })
+//                       .collect();
+//                     yeets
+//                   }
+//                   Err(e) => {
+//                     error!("html parse error: {:?}", e);
+//                     Vec::new()
+//                   }
+//                 };
+
+//                 let p = Path::new(".");
+
+//                 let mut ed_content = zkn.content.clone();
+
+//                 for mut my in yeets {
+//                   match yeet(&p, my.url.clone(), yt_dlp_path.clone())
+//                     .map_err(|e| format!("{e:?}"))
+//                   {
+//                     Err(e) => {
+//                       error!("yeet error {e:?}");
+
+//                       let nszn = SaveZkNote {
+//                         id: None,
+//                         title: "yeet error".to_string(),
+//                         pubid: None,
+//                         content: format!("{:?}", e),
+//                         editable: false,
+//                         showtitle: false,
+//                         deleted: false,
+//                         what: None,
+//                       };
+//                       let res = client
+//                         .post(String::from(onsave_server_uri.clone()) + "/private")
+//                         .header(
+//                           reqwest::header::COOKIE,
+//                           format!("id={}", szn.token.as_str()),
+//                         )
+//                         .header(reqwest::header::CONTENT_TYPE, "application/json")
+//                         .body(
+//                           serde_json::to_string(&PrivateRequest::PvqSaveZkNote(nszn))
+//                             .unwrap(),
+//                         )
+//                         .send()
+//                         .await;
+
+//                       match res {
+//                         Ok(res) => {
+//                           println!("res: {:?}", res);
+
+//                           if !res.status().is_success() {
+//                             error!("error saving yeet error note: {}, {:?}", zkn.id, res);
+//                           }
+
+//                           // async block so we can use ? operator.
+//                           let blah: Result<(), Box<dyn std::error::Error>> =
+//                             async {
+//                               let txt = res.text().await?;
+
+//                               let pr = serde_json::from_str::<
+//                                 zkprotocol::private::PrivateReply,
+//                               >(txt.as_str())?;
+
+//                               match pr {
+//                                 zkprotocol::private::PrivateReply::PvySavedZkNote(szn) => {
+//                                   // add id of the yeet error note to the <yeet>
+//                                   my.attribs.insert("id".to_string(), format!("{}", szn.id));
+//                                   let newyeet = format!("<yeet ")
+//                                     + my
+//                                       .attribs
+//                                       .into_iter()
+//                                       .map(|(n, v)| format!(" {}=\"{}\"", n, v))
+//                                       .collect::<Vec<String>>()
+//                                       .concat()
+//                                       .as_str()
+//                                     + "/>";
+
+//                                   ed_content =
+//                                     ed_content.replace(my.raw.as_str(), newyeet.as_str());
+//                                 }
+//                                 _ => {
+//                                   error!("unexpected reply: {:?}", pr);
+//                                 }
+//                               };
+
+//                               Ok(())
+//                             }
+//                             .await;
+//                           match blah {
+//                             Err(e) => {
+//                               error!("{e:?}");
+//                             }
+//                             _ => (),
+//                           };
+//                         }
+//                         Err(e) => error!("{e:?}"),
+//                       };
+//                     }
+//                     Ok(paths) => {
+//                       let blah: Result<(), Box<dyn std::error::Error>> = async {
+//                         info!("got files {paths:?}");
+//                         // if one file, just upload it.
+//                         match &paths[..] {
+//                           [] => {
+//                             Err(StringError {
+//                               s: "no paths from yeet!".to_string(),
+//                             })?;
+//                             Ok(())
+//                           }
+//                           [f] => {
+//                             let uploadreply = upload_file(
+//                               &client,
+//                               Path::new(&f),
+//                               &szn.token,
+//                               onsave_server_uri.as_str(),
+//                             )
+//                             .await?;
+//                             match uploadreply {
+//                               UploadReply::UrFilesUploaded(notes) => {
+//                                 fs::remove_file(f.clone())?;
+//                                 let id = notes
+//                                   .first()
+//                                   .ok_or(StringError {
+//                                     s: "no note uploaded".to_string(),
+//                                   })?
+//                                   .id;
+//                                 my.attribs.insert("id".to_string(), format!("{}", id));
+//                                 let newyeet = format!("<yeet ")
+//                                   + my
+//                                     .attribs
+//                                     .into_iter()
+//                                     .map(|(n, v)| format!(" {}=\"{}\"", n, v))
+//                                     .collect::<Vec<String>>()
+//                                     .concat()
+//                                     .as_str()
+//                                   + "/>";
+
+//                                 ed_content =
+//                                   ed_content.replace(my.raw.as_str(), newyeet.as_str());
+//                               }
+//                             };
+//                             Ok(())
+//                           }
+//                           _ => {
+//                             let uploadreply = upload_files(
+//                               &client,
+//                               &paths,
+//                               &szn.token,
+//                               onsave_server_uri.as_str(),
+//                             )
+//                             .await?;
+//                             match uploadreply {
+//                               UploadReply::UrFilesUploaded(notes) => {
+//                                 for f in paths {
+//                                   fs::remove_file(f)?;
+//                                 }
+//                                 let id = notes
+//                                   .first()
+//                                   .ok_or(StringError {
+//                                     s: "no note uploaded".to_string(),
+//                                   })?
+//                                   .id;
+//                                 my.attribs.insert("id".to_string(), format!("{}", id));
+//                                 let newyeet = format!("<yeet ")
+//                                   + my
+//                                     .attribs
+//                                     .into_iter()
+//                                     .map(|(n, v)| format!(" {}=\"{}\"", n, v))
+//                                     .collect::<Vec<String>>()
+//                                     .concat()
+//                                     .as_str()
+//                                   + "/>";
+
+//                                 ed_content =
+//                                   ed_content.replace(my.raw.as_str(), newyeet.as_str());
+//                               }
+//                             };
+//                             Ok(())
+//                           }
+//                         }
+//                       }
+//                       .await;
+//                       match blah {
+//                         Err(e) => error!("error: {e:?}"),
+//                         Ok(_) => (),
+//                       }
+//                     }
+//                   }
+//                 }
+
+//                 // if ed_content has changed, update the note.
+//                 let blah: Result<(), Box<dyn std::error::Error>> = async {
+//                   if ed_content != zkn.content {
+//                     let nszn = SaveZkNote {
+//                       id: Some(zkn.id),
+//                       title: zkn.title,
+//                       pubid: zkn.pubid,
+//                       content: ed_content,
+//                       editable: zkn.editable,
+//                       showtitle: zkn.showtitle,
+//                       deleted: zkn.deleted,
+//                       what: None,
+//                     };
+//                     let res = client
+//                       .post(String::from(onsave_server_uri.clone()) + "/private")
+//                       .header(
+//                         reqwest::header::COOKIE,
+//                         format!("id={}", szn.token.as_str()),
+//                       )
+//                       .header(reqwest::header::CONTENT_TYPE, "application/json")
+//                       .body(
+//                         serde_json::to_string(&PrivateRequest::PvqSaveZkNote(nszn)).unwrap(),
+//                       )
+//                       .send()
+//                       .await?;
+
+//                     if !res.status().is_success() {
+//                       error!("error updating note: {}, {:?}", zkn.id, res);
+//                     }
+//                   }
+//                   Ok(())
+//                 }
+//                 .await;
+//                 match blah {
+//                   Err(e) => error!("error: {e:?}"),
+//                   Ok(_) => (),
+//                 }
+//               }
+//               x => {
+//                 error!("unexpected message: {x:?}");
+//               }
+//             }
+//           }
+//           r => {
+//             error!("bad result: {r:?}");
+
+pub async fn yeet_service(mut consumer: Consumer, onsave_server_uri: String, yt_dlp_path: String) {
+  let client = reqwest::Client::builder()
+    .build()
+    .expect("error building reqwest client");
+  let private_uri = String::from(onsave_server_uri.clone()) + "/private";
   while let Some(rdelivery) = consumer.next().await {
     let delivery = rdelivery.expect("error");
-    match serde_json::from_slice::<OnMakeFileNote>(&delivery.data) {
-      Ok(omfn) => {
-        info!("on_make_file_note: OnMakeFileNote: {:?}", omfn);
-        if let Some(suffix) = omfn.title.split('.').last() {
-          if !omfn.title.contains("thumb") {
-            match suffix.to_lowercase().as_str() {
-              "mp4" => resize_video(&server_uri.as_str(), omfn).await?,
-              "webm" => resize_video(&server_uri.as_str(), omfn).await?,
-              "mkv" => resize_video(&server_uri.as_str(), omfn).await?,
-              "jpg" => resize_image(&server_uri.as_str(), omfn).await?,
-              "gif" => resize_image(&server_uri.as_str(), omfn).await?,
-              "png" => resize_image(&server_uri.as_str(), omfn).await?,
-              // ignore these.
-              "mp3" => (),
-              "m4a" => (),
-              "opus" => (),
-              _ => {
-                error!("unsupported file suffix: {}", suffix);
+    match serde_json::from_slice::<OnSavedZkNote>(&delivery.data) {
+      Ok(szn) => {
+        // let res : Result<(), Box<dyn std::err
+        info!("savedzkznote: {:?}", szn);
+        // yeet processing.
+        // retrieve the note.
+
+        let rq = zkprotocol::private::PrivateRequest::PvqGetZkNote(szn.id);
+
+        let rs = serde_json::to_string(&rq).expect("serde error");
+
+        let res = client
+          .post(&private_uri)
+          .header(
+            reqwest::header::COOKIE,
+            format!("id={}", szn.token.as_str()),
+          )
+          .header(reqwest::header::CONTENT_TYPE, "application/json")
+          .body(rs)
+          .send()
+          .await;
+
+        match res {
+          Ok(r) => {
+            match (
+              r.status().is_success(),
+              r.text()
+                .await
+                .map_err(|e| format!("error: {e:?}"))
+                .and_then(|t| {
+                  serde_json::from_str::<zkprotocol::private::PrivateReply>(t.as_str())
+                    .map_err(|e| format!("error: {e:?}"))
+                }),
+            ) {
+              (true, Ok(m)) => {
+                match m {
+                  zkprotocol::private::PrivateReply::PvyZkNote(zkn) => {
+                    // search for yeet text.  have to make an intermediate yeet list because Node is not Send.
+                    struct MahYeet {
+                      url: String,
+                      attribs: BTreeMap<String, String>,
+                      raw: String,
+                    }
+
+                    // Parse html tags in the zknote text.  Save the yeet tags.
+                    let yeets = match tl::parse(zkn.content.as_str(), ParserOptions::default()) {
+                      Ok(vdom) => {
+                        let yeets: Vec<MahYeet> = vdom
+                          .nodes()
+                          .iter()
+                          .filter_map(|n| match n {
+                            tl::Node::Tag(t) => {
+                              if t.name().as_utf8_str() == "yeet" {
+                                if let Some(Some(_)) = t.attributes().get("id") {
+                                  None // don't process yeets that already have an id.
+                                } else if let Some(Some(u)) = t.attributes().get("url") {
+                                  Some(MahYeet {
+                                    url: u.as_utf8_str().to_string(),
+                                    attribs: t.attributes().iter().fold(
+                                      BTreeMap::new(),
+                                      |mut acc: BTreeMap<String, String>, (name, mbvalue)| {
+                                        if let Some(v) = mbvalue {
+                                          acc.insert(name.to_string(), v.to_string());
+                                          acc
+                                        } else {
+                                          acc
+                                        }
+                                      },
+                                    ),
+                                    raw: t.raw().as_utf8_str().to_string(),
+                                  })
+                                } else {
+                                  None // if no url, can't process.
+                                }
+                              } else {
+                                None
+                              }
+                            }
+                            _ => None,
+                          })
+                          .collect();
+                        yeets
+                      }
+                      Err(e) => {
+                        error!("html parse error: {:?}", e);
+                        Vec::new()
+                      }
+                    };
+
+                    let p = Path::new(".");
+
+                    let mut ed_content = zkn.content.clone();
+
+                    for mut my in yeets {
+                      match yeet(&p, my.url.clone(), yt_dlp_path.clone())
+                        .map_err(|e| format!("{e:?}"))
+                      {
+                        Err(e) => {
+                          error!("yeet error {e:?}");
+
+                          let nszn = SaveZkNote {
+                            id: None,
+                            title: "yeet error".to_string(),
+                            pubid: None,
+                            content: format!("{:?}", e),
+                            editable: false,
+                            showtitle: false,
+                            deleted: false,
+                            what: None,
+                          };
+                          let res = client
+                            .post(String::from(onsave_server_uri.clone()) + "/private")
+                            .header(
+                              reqwest::header::COOKIE,
+                              format!("id={}", szn.token.as_str()),
+                            )
+                            .header(reqwest::header::CONTENT_TYPE, "application/json")
+                            .body(
+                              serde_json::to_string(&PrivateRequest::PvqSaveZkNote(nszn)).unwrap(),
+                            )
+                            .send()
+                            .await;
+
+                          match res {
+                            Ok(res) => {
+                              println!("res: {:?}", res);
+
+                              if !res.status().is_success() {
+                                error!("error saving yeet error note: {}, {:?}", zkn.id, res);
+                              }
+
+                              // async block so we can use ? operator.
+                              let blah: Result<(), Box<dyn std::error::Error>> = async {
+                                let txt = res.text().await?;
+
+                                let pr = serde_json::from_str::<zkprotocol::private::PrivateReply>(
+                                  txt.as_str(),
+                                )?;
+
+                                match pr {
+                                  zkprotocol::private::PrivateReply::PvySavedZkNote(szn) => {
+                                    // add id of the yeet error note to the <yeet>
+                                    my.attribs.insert("id".to_string(), format!("{}", szn.id));
+                                    let newyeet = format!("<yeet ")
+                                      + my
+                                        .attribs
+                                        .into_iter()
+                                        .map(|(n, v)| format!(" {}=\"{}\"", n, v))
+                                        .collect::<Vec<String>>()
+                                        .concat()
+                                        .as_str()
+                                      + "/>";
+
+                                    ed_content =
+                                      ed_content.replace(my.raw.as_str(), newyeet.as_str());
+                                  }
+                                  _ => {
+                                    error!("unexpected reply: {:?}", pr);
+                                  }
+                                };
+
+                                Ok(())
+                              }
+                              .await;
+                              match blah {
+                                Err(e) => {
+                                  error!("{e:?}");
+                                }
+                                _ => (),
+                              };
+                            }
+                            Err(e) => error!("{e:?}"),
+                          };
+                        }
+                        Ok(f) => {
+                          let blah: Result<(), Box<dyn std::error::Error>> = async {
+                            info!("got file {f:?}");
+                            let uploadreply = upload_file(
+                              &client,
+                              Path::new(&f),
+                              &szn.token,
+                              onsave_server_uri.as_str(),
+                            )
+                            .await?;
+                            match uploadreply {
+                              UploadReply::UrFilesUploaded(notes) => {
+                                fs::remove_file(f.clone())?;
+                                let id = notes
+                                  .first()
+                                  .ok_or(StringError {
+                                    s: "no note uploaded".to_string(),
+                                  })?
+                                  .id;
+                                my.attribs.insert("id".to_string(), format!("{}", id));
+                                let newyeet = format!("<yeet ")
+                                  + my
+                                    .attribs
+                                    .into_iter()
+                                    .map(|(n, v)| format!(" {}=\"{}\"", n, v))
+                                    .collect::<Vec<String>>()
+                                    .concat()
+                                    .as_str()
+                                  + "/>";
+
+                                ed_content = ed_content.replace(my.raw.as_str(), newyeet.as_str());
+                              }
+                            };
+                            Ok(())
+                          }
+                          .await;
+                          match blah {
+                            Err(e) => error!("error: {e:?}"),
+                            Ok(_) => (),
+                          }
+                        }
+                      }
+                    }
+
+                    // if ed_content has changed, update the note.
+                    let blah: Result<(), Box<dyn std::error::Error>> = async {
+                      if ed_content != zkn.content {
+                        let nszn = SaveZkNote {
+                          id: Some(zkn.id),
+                          title: zkn.title,
+                          pubid: zkn.pubid,
+                          content: ed_content,
+                          editable: zkn.editable,
+                          showtitle: zkn.showtitle,
+                          deleted: zkn.deleted,
+                          what: None,
+                        };
+                        let res = client
+                          .post(String::from(onsave_server_uri.clone()) + "/private")
+                          .header(
+                            reqwest::header::COOKIE,
+                            format!("id={}", szn.token.as_str()),
+                          )
+                          .header(reqwest::header::CONTENT_TYPE, "application/json")
+                          .body(
+                            serde_json::to_string(&PrivateRequest::PvqSaveZkNote(nszn)).unwrap(),
+                          )
+                          .send()
+                          .await?;
+
+                        if !res.status().is_success() {
+                          error!("error updating note: {}, {:?}", zkn.id, res);
+                        }
+                      }
+                      Ok(())
+                    }
+                    .await;
+                    match blah {
+                      Err(e) => error!("error: {e:?}"),
+                      Ok(_) => (),
+                    }
+                  }
+                  x => {
+                    error!("unexpected message: {x:?}");
+                  }
+                }
+              }
+              r => {
+                error!("bad result: {r:?}");
               }
             }
+          }
+          Err(e) => {
+            error!("post error: {:?}", e);
           }
         }
       }
@@ -499,10 +867,6 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
       .await
       .expect("ack error");
   }
-
-  info!("Goodbye, world!");
-
-  Ok(())
 }
 
 #[derive(Debug)]
