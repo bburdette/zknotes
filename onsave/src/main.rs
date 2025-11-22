@@ -363,6 +363,7 @@ pub async fn yeet_service(mut consumer: Consumer, onsave_server_uri: String, yt_
                     let p = Path::new(".");
 
                     let mut ed_content = zkn.content.clone();
+                    let mut linkids = Vec::new();
 
                     for mut my in yeets {
                       match yeet(&p, my.url.clone(), yt_dlp_path.clone())
@@ -412,6 +413,7 @@ pub async fn yeet_service(mut consumer: Consumer, onsave_server_uri: String, yt_
 
                                 match pr {
                                   zkprotocol::private::PrivateReply::PvySavedZkNote(szn) => {
+                                    linkids.push(szn.id);
                                     // add id of the yeet error note to the <yeet>
                                     my.attribs.insert("id".to_string(), format!("{}", szn.id));
                                     let newyeet = format!("<yeet ")
@@ -453,7 +455,7 @@ pub async fn yeet_service(mut consumer: Consumer, onsave_server_uri: String, yt_
                               [] => {
                                 // No files!
                                 Err(StringError {
-                                  s: "no paths from yeet!".to_string(),
+                                  s: "no files from yeet!".to_string(),
                                 })?;
                                 Ok(())
                               }
@@ -475,6 +477,7 @@ pub async fn yeet_service(mut consumer: Consumer, onsave_server_uri: String, yt_
                                         s: "no note uploaded".to_string(),
                                       })?
                                       .id;
+                                    linkids.push(id);
                                     my.attribs.insert("id".to_string(), format!("{}", id));
                                     let newyeet = format!("<yeet ")
                                       + my
@@ -506,6 +509,11 @@ pub async fn yeet_service(mut consumer: Consumer, onsave_server_uri: String, yt_
                                     for f in paths {
                                       fs::remove_file(f)?;
                                     }
+                                    fs::remove_dir(p)?;
+                                    for n in &notes {
+                                      linkids.push(n.id);
+                                    };
+
                                     let content =
                                       notes.iter().fold("".to_string(), |mut acc, zkln| {
                                         acc.push_str(
@@ -605,20 +613,34 @@ pub async fn yeet_service(mut consumer: Consumer, onsave_server_uri: String, yt_
                       }
                     }
 
+                    // TODO add ZkLink to the new note.
+
                     // if ed_content has changed, update the note.
                     let blah: Result<(), Box<dyn std::error::Error>> = async {
                       info!("is ed_content different?");
                       if ed_content != zkn.content {
                         info!("yes, will try save:{zkn:?} {ed_content}");
-                        let nszn = SaveZkNote {
-                          id: Some(zkn.id),
-                          title: zkn.title,
-                          pubid: zkn.pubid,
-                          content: ed_content,
-                          editable: zkn.editable,
-                          showtitle: zkn.showtitle,
-                          deleted: zkn.deleted,
-                          what: None,
+                        let nszn = SaveZkNoteAndLinks {
+                          note: SaveZkNote {
+                            id: Some(zkn.id),
+                            title: zkn.title,
+                            pubid: zkn.pubid,
+                            content: ed_content,
+                            editable: zkn.editable,
+                            showtitle: zkn.showtitle,
+                            deleted: zkn.deleted,
+                            what: None,
+                          },
+                          links: linkids
+                            .iter()
+                            .map(|n| SaveZkLink {
+                              otherid: *n,
+                              direction: Direction::From,
+                              user: zkn.user,
+                              zknote: None,
+                              delete: None,
+                            })
+                            .collect(),
                         };
                         let res = client
                           .post(String::from(onsave_server_uri.clone()) + "/private")
@@ -628,7 +650,8 @@ pub async fn yeet_service(mut consumer: Consumer, onsave_server_uri: String, yt_
                           )
                           .header(reqwest::header::CONTENT_TYPE, "application/json")
                           .body(
-                            serde_json::to_string(&PrivateRequest::PvqSaveZkNote(nszn)).unwrap(),
+                            serde_json::to_string(&PrivateRequest::PvqSaveZkNoteAndLinks(nszn))
+                              .unwrap(),
                           )
                           .send()
                           .await?;
