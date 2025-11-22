@@ -360,13 +360,21 @@ pub async fn yeet_service(mut consumer: Consumer, onsave_server_uri: String, yt_
                       }
                     };
 
-                    let p = Path::new(".");
+                    let currentdir = Path::new(".");
 
                     let mut ed_content = zkn.content.clone();
                     let mut linkids = Vec::new();
 
                     for mut my in yeets {
-                      match yeet(&p, my.url.clone(), yt_dlp_path.clone())
+                      let tmpdir = format!("onsavewk_{}", Uuid::new_v4());
+                      let wkdir = {
+                        let mut p = PathBuf::from(currentdir);
+                        p.push(tmpdir);
+                        p
+                      };
+                      let _ = std::fs::create_dir(&wkdir);
+
+                      match yeet(&wkdir, my.url.clone(), yt_dlp_path.clone())
                         .map_err(|e| format!("{e:?}"))
                       {
                         Err(e) => {
@@ -449,7 +457,7 @@ pub async fn yeet_service(mut consumer: Consumer, onsave_server_uri: String, yt_
                         }
                         Ok(paths) => {
                           let blah: Result<(), Box<dyn std::error::Error>> = async {
-                            info!("got files {paths:?}");
+                            info!("uploading files {paths:?}");
                             // if one file, just upload it.
                             match &paths[..] {
                               [] => {
@@ -471,6 +479,7 @@ pub async fn yeet_service(mut consumer: Consumer, onsave_server_uri: String, yt_
                                 match uploadreply {
                                   UploadReply::UrFilesUploaded(notes) => {
                                     fs::remove_file(f.clone())?;
+                                    fs::remove_dir(wkdir)?;
                                     let id = notes
                                       .first()
                                       .ok_or(StringError {
@@ -509,7 +518,7 @@ pub async fn yeet_service(mut consumer: Consumer, onsave_server_uri: String, yt_
                                     for f in paths {
                                       fs::remove_file(f)?;
                                     }
-                                    fs::remove_dir(p)?;
+                                    fs::remove_dir(wkdir)?;
                                     for n in &notes {
                                       linkids.push(n.id);
                                     };
@@ -521,6 +530,7 @@ pub async fn yeet_service(mut consumer: Consumer, onsave_server_uri: String, yt_
                                         );
                                         acc
                                       });
+
                                     // make a new note with all these ids.
                                     let nszn = SaveZkNoteAndLinks {
                                       note: SaveZkNote {
@@ -715,18 +725,10 @@ pub fn yeet(
   url: String,
   yt_dlp_path: String,
 ) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
-  let tmpdir = format!("onsavewk_{}", Uuid::new_v4());
-  let p = {
-    let mut p = PathBuf::from(savedir);
-    p.push(tmpdir);
-    p
-  };
-  std::fs::create_dir(&p)?;
-
   let mut child = Command::new(yt_dlp_path.as_str())
-    .current_dir(&p)
+    .current_dir(&savedir)
     .arg("-x")
-    .arg(format!("-o{}/%(title)s-%(id)s.%(ext)s", savedir.display()))
+    .arg(format!("-o%(title)s-%(id)s.%(ext)s"))
     .arg(url.clone())
     .arg("--extractor-args")
     .arg("youtube:player-client=default,-tv_simply")
@@ -737,26 +739,26 @@ pub fn yeet(
     Ok(exit_code) => {
       if exit_code.success() {
         // find the yeeted file by 'v'.
-        let files: Vec<std::path::PathBuf> = match glob::glob(format!("{}/*", p.display()).as_str())
-        {
-          Ok(paths) => {
-            // let x: Result<Vec<PathBuf>, Box<dyn std::error::Error>> = paths.collect();
-            let x: Result<Vec<PathBuf>, GlobError> = paths.collect();
-            match x {
-              Ok(pb) => pb,
-              Err(e) => {
-                return Err(Box::new(StringError {
-                  s: format!("glob error {:?}", e),
-                }));
+        let files: Vec<std::path::PathBuf> =
+          match glob::glob(format!("{}/*", savedir.display()).as_str()) {
+            Ok(paths) => {
+              // let x: Result<Vec<PathBuf>, Box<dyn std::error::Error>> = paths.collect();
+              let x: Result<Vec<PathBuf>, GlobError> = paths.collect();
+              match x {
+                Ok(pb) => pb,
+                Err(e) => {
+                  return Err(Box::new(StringError {
+                    s: format!("glob error {:?}", e),
+                  }));
+                }
               }
             }
-          }
-          Err(e) => {
-            return Err(Box::new(StringError {
-              s: format!("glob error {:?}", e),
-            }));
-          }
-        };
+            Err(e) => {
+              return Err(Box::new(StringError {
+                s: format!("glob error {:?}", e),
+              }));
+            }
+          };
         Ok(files)
       } else {
         Err(Box::new(StringError {
