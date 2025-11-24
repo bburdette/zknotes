@@ -4,6 +4,7 @@ use std::{
   io::Cursor,
   path::{Path, PathBuf},
   process::Command,
+  time,
 };
 
 use clap::Arg;
@@ -152,94 +153,103 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
       })
     })?;
 
-  let conn = match (amqp_uid, amqp_pwd) {
-    (Some(uid), Some(pwd)) => {
-      let up_amqp_uri = str::replace(&amqp_uri, "//", format!("//{}:{}@", uid, pwd).as_str());
-      // let amqp_uri = AMQPUri::from_str(up_amqp_uri.as_str());
-      // info!("amqp_uri: {:?}", amqp_uri);
-      Connection::connect(
-        &up_amqp_uri,
-        ConnectionProperties::default().with_experimental_recovery_config(
-          RecoveryConfig::default()
-            .auto_recover_channels()
-            .auto_recover_connection(),
-        ),
-      )
-      .await?
-    }
-    _ => {
-      Connection::connect(
-        &amqp_uri,
-        ConnectionProperties::default().with_experimental_recovery_config(
-          RecoveryConfig::default()
-            .auto_recover_channels()
-            .auto_recover_connection(),
-        ),
-      )
-      .await?
-    }
-  };
+  loop {
+    let r: Result<(), Box<dyn std::error::Error>> = async {
+      println!("here!!");
+      let conn = match (amqp_uid.clone(), amqp_pwd.clone()) {
+        (Some(uid), Some(pwd)) => {
+          let up_amqp_uri = str::replace(&amqp_uri, "//", format!("//{}:{}@", uid, pwd).as_str());
+          // let amqp_uri = AMQPUri::from_str(up_amqp_uri.as_str());
+          // info!("amqp_uri: {:?}", amqp_uri);
+          Connection::connect(
+            &up_amqp_uri,
+            ConnectionProperties::default().with_experimental_recovery_config(
+              RecoveryConfig::default()
+                .auto_recover_channels()
+                .auto_recover_connection(),
+            ),
+          )
+          .await?
+        }
+        _ => {
+          Connection::connect(
+            &amqp_uri,
+            ConnectionProperties::default().with_experimental_recovery_config(
+              RecoveryConfig::default()
+                .auto_recover_channels()
+                .auto_recover_connection(),
+            ),
+          )
+          .await?
+        }
+      };
 
-  info!("connected to rabbitmq!");
+      info!("connected to rabbitmq!");
 
-  let chan = conn.create_channel().await?;
+      let chan = conn.create_channel().await?;
 
-  chan
-    .queue_declare(
-      "on_save_zknote",
-      QueueDeclareOptions::default(),
-      FieldTable::default(),
-    )
-    .await?;
+      chan
+        .queue_declare(
+          "on_save_zknote",
+          QueueDeclareOptions::default(),
+          FieldTable::default(),
+        )
+        .await?;
 
-  let consumer = chan
-    .basic_consume(
-      "on_save_zknote",
-      "onsave",
-      BasicConsumeOptions::default(),
-      FieldTable::default(),
-    )
-    .await?;
+      let consumer = chan
+        .basic_consume(
+          "on_save_zknote",
+          "onsave",
+          BasicConsumeOptions::default(),
+          FieldTable::default(),
+        )
+        .await?;
 
-  let onsave_server_uri = server_uri.clone();
+      let onsave_server_uri = server_uri.clone();
 
-  // if we're doing thumbs, spawn a thread for yeets.  otherwise do yeets in the
-  // current thread.
-  if do_yeet_service {
-    if do_thumb_service {
-      tokio::spawn(async move {
-        yeet_service(consumer, onsave_server_uri, yt_dlp_path).await;
-      });
-    } else {
-      yeet_service(consumer, onsave_server_uri, yt_dlp_path).await;
-    }
-  };
+      // if we're doing thumbs, spawn a thread for yeets.  otherwise do yeets in the
+      // current thread.
+      if do_yeet_service {
+        if do_thumb_service {
+          let yt_dlp_path = yt_dlp_path.clone();
+          tokio::spawn(async move {
+            match yeet_service(consumer, onsave_server_uri, yt_dlp_path).await {
+              Err(e) => error!("yeet error: {e:?}"),
+              Ok(()) => (),
+            }
+          });
+        } else {
+          match yeet_service(consumer, onsave_server_uri, yt_dlp_path.clone()).await {
+            Err(e) => error!("yeet error: {e:?}"),
+            Ok(()) => (),
+          }
+        }
+      };
 
-  if do_thumb_service {
-    info!("starting thumb service");
-    let chan = conn.create_channel().await?;
+      if do_thumb_service {
+        info!("starting thumb service");
+        let chan = conn.create_channel().await?;
 
-    chan
-      .queue_declare(
-        "on_make_file_note",
-        QueueDeclareOptions::default(),
-        FieldTable::default(),
-      )
-      .await?;
+        chan
+          .queue_declare(
+            "on_make_file_note",
+            QueueDeclareOptions::default(),
+            FieldTable::default(),
+          )
+          .await?;
 
-    let mut consumer = chan
-      .basic_consume(
-        "on_make_file_note",
-        "onmakefile",
-        BasicConsumeOptions::default(),
-        FieldTable::default(),
-      )
-      .await?;
+        let mut consumer = chan
+          .basic_consume(
+            "on_make_file_note",
+            "onmakefile",
+            BasicConsumeOptions::default(),
+            FieldTable::default(),
+          )
+          .await?;
 
-    while let Some(rdelivery) = consumer.next().await {
-      let delivery = rdelivery.expect("error");
-      match serde_json::from_slice::<OnMakeFileNote>(&delivery.data) {
-        Ok(omfn) => {
+        while let Some(rdelivery) = consumer.next().await {
+          let delivery = rdelivery?;
+          let omfn = serde_json::from_slice::<OnMakeFileNote>(&delivery.data)?;
           info!("on_make_file_note: OnMakeFileNote: {:?}", omfn.title);
           if let Some(suffix) = omfn.title.split('.').last() {
             if !omfn.title.contains("thumb") {
@@ -260,23 +270,24 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
               }
             }
           }
-        }
-        Err(e) => {
-          error!("error: {:?}", e);
-        }
-      }
 
-      delivery
-        .ack(BasicAckOptions::default())
-        .await
-        .expect("ack error");
+          delivery.ack(BasicAckOptions::default()).await?;
+        }
+      };
+
+      Ok(())
     }
+    .await;
+    println!("endaloop");
+    error!("ERROR {r:?}");
+    info!("retrying in 10 secs");
+    std::thread::sleep(time::Duration::from_secs(10));
   }
-
-  info!("Goodbye, world!");
-
-  Ok(())
 }
+
+// info!("Goodbye, world!");
+// Ok(())
+// }
 
 pub fn load_string(file_name: &str) -> Result<String, Box<dyn std::error::Error>> {
   let path = &Path::new(&file_name);
@@ -286,20 +297,23 @@ pub fn load_string(file_name: &str) -> Result<String, Box<dyn std::error::Error>
   Ok(result)
 }
 
-pub async fn yeet_service(mut consumer: Consumer, onsave_server_uri: String, yt_dlp_path: String) {
+pub async fn yeet_service(
+  mut consumer: Consumer,
+  onsave_server_uri: String,
+  yt_dlp_path: String,
+) -> Result<(), Box<dyn std::error::Error>> {
   info!("starting yeet service");
-  let client = reqwest::Client::builder()
-    .build()
-    .expect("error building reqwest client");
+  let client = reqwest::Client::builder().build()?;
+  // .expect("error building reqwest client");
   let private_uri = String::from(onsave_server_uri.clone()) + "/private";
   while let Some(rdelivery) = consumer.next().await {
-    let delivery = rdelivery.expect("error");
+    let delivery = rdelivery?;
     match serde_json::from_slice::<OnSavedZkNote>(&delivery.data) {
       Ok(szn) => {
         // retrieve the note.
         let rq = zkprotocol::private::PrivateRequest::PvqGetZkNote(szn.id);
 
-        let rs = serde_json::to_string(&rq).expect("serde error");
+        let rs = serde_json::to_string(&rq)?;
 
         let res = client
           .post(&private_uri)
@@ -714,11 +728,10 @@ pub async fn yeet_service(mut consumer: Consumer, onsave_server_uri: String, yt_
       }
     }
 
-    delivery
-      .ack(BasicAckOptions::default())
-      .await
-      .expect("ack error");
+    delivery.ack(BasicAckOptions::default()).await?;
+    ()
   }
+  Ok(())
 }
 
 #[derive(Debug)]
@@ -750,8 +763,8 @@ pub fn yeet(
     .arg(url.clone())
     .arg("--extractor-args")
     .arg("youtube:player-client=default,-tv_simply")
-    .spawn()
-    .expect("yt-dlp failed to execute");
+    .spawn()?;
+  // .expect("yt-dlp failed to execute");
 
   match child.wait() {
     Ok(exit_code) => {
@@ -966,8 +979,8 @@ pub async fn image_resize(
     .arg("-resize")
     .arg("800x800^")
     .arg(outfile.clone())
-    .spawn()
-    .expect("magick failed to execute");
+    .spawn()?;
+  // .expect("magick failed to execute");
 
   match child.wait() {
     Ok(exit_code) => {
@@ -997,8 +1010,8 @@ pub async fn video_resize(
     .arg("-x264-params")
     .arg("keyint=240:bframes=6:ref=4:me=umh:subme=9:no-fast-pskip=1:b-adapt=2:aq-mode=2")
     .arg(outfile.clone())
-    .spawn()
-    .expect("magick failed to execute");
+    .spawn()?;
+  // .expect("magick failed to execute");
 
   match child.wait() {
     Ok(exit_code) => {
