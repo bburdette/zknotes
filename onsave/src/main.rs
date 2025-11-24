@@ -10,7 +10,7 @@ use clap::Arg;
 use futures_lite::stream::StreamExt;
 use glob::GlobError;
 use lapin::{
-  Connection, ConnectionProperties, Consumer,
+  Connection, ConnectionProperties, Consumer, RecoveryConfig,
   options::{BasicAckOptions, BasicConsumeOptions, QueueDeclareOptions},
   types::FieldTable,
 };
@@ -157,9 +157,27 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
       let up_amqp_uri = str::replace(&amqp_uri, "//", format!("//{}:{}@", uid, pwd).as_str());
       // let amqp_uri = AMQPUri::from_str(up_amqp_uri.as_str());
       // info!("amqp_uri: {:?}", amqp_uri);
-      Connection::connect(&up_amqp_uri, ConnectionProperties::default()).await?
+      Connection::connect(
+        &up_amqp_uri,
+        ConnectionProperties::default().with_experimental_recovery_config(
+          RecoveryConfig::default()
+            .auto_recover_channels()
+            .auto_recover_connection(),
+        ),
+      )
+      .await?
     }
-    _ => Connection::connect(&amqp_uri, ConnectionProperties::default()).await?,
+    _ => {
+      Connection::connect(
+        &amqp_uri,
+        ConnectionProperties::default().with_experimental_recovery_config(
+          RecoveryConfig::default()
+            .auto_recover_channels()
+            .auto_recover_connection(),
+        ),
+      )
+      .await?
+    }
   };
 
   info!("connected to rabbitmq!");
