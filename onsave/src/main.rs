@@ -164,9 +164,9 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
           Connection::connect(
             &up_amqp_uri,
             ConnectionProperties::default().with_experimental_recovery_config(
-              RecoveryConfig::default()
-                .auto_recover_channels()
-                .auto_recover_connection(),
+              RecoveryConfig::default(), // this doesn't work.
+                                         // .auto_recover_channels()
+                                         // .auto_recover_connection(),
             ),
           )
           .await?
@@ -175,9 +175,9 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
           Connection::connect(
             &amqp_uri,
             ConnectionProperties::default().with_experimental_recovery_config(
-              RecoveryConfig::default()
-                .auto_recover_channels()
-                .auto_recover_connection(),
+              RecoveryConfig::default(), // this doesn't work.
+                                         // .auto_recover_channels()
+                                         // .auto_recover_connection(),
             ),
           )
           .await?
@@ -285,10 +285,6 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
   }
 }
 
-// info!("Goodbye, world!");
-// Ok(())
-// }
-
 pub fn load_string(file_name: &str) -> Result<String, Box<dyn std::error::Error>> {
   let path = &Path::new(&file_name);
   let mut inf = std::fs::File::open(path)?;
@@ -304,7 +300,6 @@ pub async fn yeet_service(
 ) -> Result<(), Box<dyn std::error::Error>> {
   info!("starting yeet service");
   let client = reqwest::Client::builder().build()?;
-  // .expect("error building reqwest client");
   let private_uri = String::from(onsave_server_uri.clone()) + "/private";
   while let Some(rdelivery) = consumer.next().await {
     let delivery = rdelivery?;
@@ -764,7 +759,6 @@ pub fn yeet(
     .arg("--extractor-args")
     .arg("youtube:player-client=default,-tv_simply")
     .spawn()?;
-  // .expect("yt-dlp failed to execute");
 
   match child.wait() {
     Ok(exit_code) => {
@@ -980,7 +974,6 @@ pub async fn image_resize(
     .arg("800x800^")
     .arg(outfile.clone())
     .spawn()?;
-  // .expect("magick failed to execute");
 
   match child.wait() {
     Ok(exit_code) => {
@@ -1011,7 +1004,6 @@ pub async fn video_resize(
     .arg("keyint=240:bframes=6:ref=4:me=umh:subme=9:no-fast-pskip=1:b-adapt=2:aq-mode=2")
     .arg(outfile.clone())
     .spawn()?;
-  // .expect("magick failed to execute");
 
   match child.wait() {
     Ok(exit_code) => {
