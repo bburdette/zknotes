@@ -13,7 +13,7 @@ pub struct State {
   pub girlboss: Arc<RwLock<Girlboss<JobId, Monitor>>>,
   pub jobcounter: RwLock<i64>,
   pub server: Server,
-  pub lapin_conn: Option<Connection>,
+  pub lapin_conn: RwLock<Option<Connection>>,
 }
 
 pub fn new_jobid(state: &State, uid: UserId) -> JobId {

@@ -7,8 +7,6 @@ use crate::jobs::LogMonitor;
 use crate::search;
 use crate::sqldata;
 use crate::sqldata::local_server_id;
-use crate::sqldata::make_lapin_channel;
-use crate::sqldata::make_lapin_info;
 use crate::sqldata::zknotes_callbacks;
 use crate::sqldata::LapinInfo;
 use crate::state::new_jobid;
@@ -17,7 +15,8 @@ use crate::sync;
 use actix_session::Session;
 use actix_web::HttpResponse;
 use futures_util::StreamExt;
-use log::info;
+use lapin::ConnectionState;
+use log::{error, info};
 use orgauth;
 use orgauth::data::UserId;
 use orgauth::endpoints::Tokener;
@@ -78,6 +77,79 @@ pub fn login_data_for_token(
     }
   };
   Ok(ldopt)
+}
+
+pub async fn connect_and_make_lapin_info(
+  state: &State,
+  token: Option<String>,
+) -> Option<LapinInfo> {
+  // TODO: maybe attempt reconnect only every X seconds, so as not to
+  // slow processing during rmq outage.
+
+  // if no uri configured, will never be a connection.
+  let uri = match &state.config.aqmp_uri {
+    Some(uri) => uri,
+    None => {
+      return None;
+    }
+  };
+
+  // use existing connection if there is one.
+  println!("connect_and_make_lapin_info");
+  let reconnect = match &state.lapin_conn.read() {
+    Ok(wut) => match &**wut {
+      Some(lc) => {
+        let reconnect = match lc.status().state() {
+          ConnectionState::Initial => true,
+          ConnectionState::Connecting => false,
+          ConnectionState::Connected => false,
+          ConnectionState::Closing => true,
+          ConnectionState::Closed => true,
+          ConnectionState::Reconnecting => false,
+          ConnectionState::Error => true,
+        };
+        if reconnect {
+          true
+        } else {
+          println!("using existing lapin connection");
+          return sqldata::make_lapin_info(Some(&lc), token).await;
+        }
+      }
+      None => true, // connection missing!
+    },
+    Err(e) => {
+      error!("lapin_conn poisoned: {e:?}");
+      false
+    }
+  };
+
+  // existing connection has bad state. try reconnect.
+  if reconnect {
+    // have to do the write() after the read() is out of scope.
+    match state.lapin_conn.write() {
+      Ok(mut lcmod) => {
+        println!("attempting amqp reconnect");
+        match lapin::Connection::connect(uri.as_str(), lapin::ConnectionProperties::default()).await
+        {
+          Err(e) => {
+            error!("amqp connection error: {e:?}");
+            None
+          }
+          Ok(conn) => {
+            info!("amqp reconnected!");
+            let ret = sqldata::make_lapin_info(Some(&conn), token).await;
+            println!("about to write new lapin_conn to state");
+            *lcmod = Some(conn);
+            println!("done writing new lapin_conn to state");
+            ret
+          }
+        }
+      }
+      _ => None,
+    }
+  } else {
+    None
+  }
 }
 
 // Just like orgauth::endpoints::user_interface, except adds in extra user data.
@@ -257,7 +329,7 @@ pub async fn zk_interface_loggedin(
       Ok(PrivateReply::PvyDeletedZkNote(id.clone()))
     }
     PrivateRequest::PvqSaveZkNote(sbe) => {
-      let li = make_lapin_info(state.lapin_conn.as_ref(), token).await;
+      let li = connect_and_make_lapin_info(state, token).await;
       let (_id, s) = sqldata::save_zknote(&conn, &li, &state.server, uid, &sbe, None).await?;
       Ok(PrivateReply::PvySavedZkNote(s))
     }
@@ -266,14 +338,14 @@ pub async fn zk_interface_loggedin(
       Ok(PrivateReply::PvySavedZkLinks)
     }
     PrivateRequest::PvqSaveZkNoteAndLinks(sznpl) => {
-      let li = make_lapin_info(state.lapin_conn.as_ref(), token).await;
+      let li = connect_and_make_lapin_info(state, token).await;
       let (_, szkn) =
         sqldata::save_zknote(&conn, &li, &state.server, uid, &sznpl.note, None).await?;
       let _s = sqldata::save_savezklinks(&conn, uid, szkn.id, &sznpl.links)?;
       Ok(PrivateReply::PvySavedZkNoteAndLinks(szkn))
     }
     PrivateRequest::PvqSaveImportZkNotes(gzl) => {
-      let li = make_lapin_info(state.lapin_conn.as_ref(), token).await;
+      let li = connect_and_make_lapin_info(state, token).await;
       sqldata::save_importzknotes(&conn, &li, &state.server, uid, gzl).await?;
       Ok(PrivateReply::PvySavedImportZkNotes)
     }
@@ -288,10 +360,8 @@ pub async fn zk_interface_loggedin(
       let jid = new_jobid(state, uid);
       let lgb = state.girlboss.clone();
       let server = state.server.clone();
-      let lapin_channelx = match state.lapin_conn.as_ref() {
-        Some(conn) => make_lapin_channel(&conn).await.ok(),
-        None => None,
-      };
+      let li = connect_and_make_lapin_info(state, token.clone()).await;
+      let lapin_channelx = li.map(|li| li.channel).clone();
 
       std::thread::spawn(move || {
         let rt = actix_rt::System::new();

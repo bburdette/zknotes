@@ -26,6 +26,7 @@ use clap::Arg;
 use config::Config;
 use futures_util::TryStreamExt as _;
 use girlboss::Girlboss;
+use interfaces::connect_and_make_lapin_info;
 use lapin;
 use log::{error, info};
 pub use orgauth;
@@ -38,7 +39,7 @@ pub use rusqlite;
 use rusqlite::Connection;
 use serde_json;
 use simple_error::simple_error;
-use sqldata::{get_single_value, local_server_id, make_lapin_info, LapinInfo};
+use sqldata::{get_single_value, local_server_id, LapinInfo};
 use std::fs::File;
 use std::io::{stdin, Write};
 use std::path::Path;
@@ -322,8 +323,7 @@ async fn receive_files(
   mut payload: Multipart,
   req: HttpRequest,
 ) -> HttpResponse {
-  let li = make_lapin_info(config.lapin_conn.as_ref(), get_cookie_id(&req)).await;
-
+  let li = connect_and_make_lapin_info(config.get_ref(), get_cookie_id(&req)).await;
   match make_file_notes(session, &config, &li, &mut payload).await {
     Ok(r) => HttpResponse::Ok().json(r),
     Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
@@ -536,7 +536,7 @@ async fn private_upstreaming(
   body: web::Payload,
   req: HttpRequest,
 ) -> HttpResponse {
-  let li = make_lapin_info(data.lapin_conn.as_ref(), get_cookie_id(&req)).await;
+  let li = connect_and_make_lapin_info(data.get_ref(), get_cookie_id(&req)).await;
   match zk_interface_check_upstreaming(&session, &data.config, &li, body).await {
     Ok(hr) => hr,
     Err(e) => {
@@ -880,9 +880,13 @@ pub async fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
 
   let lapin_conn = match config.aqmp_uri {
     Some(ref uri) => {
-      let conn =
-        lapin::Connection::connect(uri.as_str(), lapin::ConnectionProperties::default()).await?;
-      Some(conn)
+      match lapin::Connection::connect(uri.as_str(), lapin::ConnectionProperties::default()).await {
+        Err(e) => {
+          error!("amqp connection error: {e:?}");
+          None
+        }
+        Ok(conn) => Some(conn),
+      }
     }
     None => None,
   };
@@ -894,7 +898,7 @@ pub async fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
     girlboss: { Arc::new(RwLock::new(Girlboss::new())) },
     jobcounter: { RwLock::new(0 as i64) },
     server,
-    lapin_conn,
+    lapin_conn: lapin_conn.into(),
   });
 
   let c = config.clone();
