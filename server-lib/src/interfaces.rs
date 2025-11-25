@@ -83,6 +83,9 @@ pub async fn connect_and_make_lapin_info(
   state: &State,
   token: Option<String>,
 ) -> Option<LapinInfo> {
+  // TODO: maybe attempt reconnect only every X seconds, so as not to
+  // slow processing during rmq outage.
+
   // if no uri configured, will never be a connection.
   let uri = match &state.config.aqmp_uri {
     Some(uri) => uri,
