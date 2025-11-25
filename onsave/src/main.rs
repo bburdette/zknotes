@@ -145,13 +145,13 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
     None => None,
   };
 
-  rustls::crypto::ring::default_provider()
-    .install_default()
-    .map_err(|_| {
-      Box::new(StringError {
-        s: format!("error from rustls::crypto::aws_lc_rs::default_provider().install_default()"),
-      })
-    })?;
+  // rustls::crypto::ring::default_provider()
+  //   .install_default()
+  //   .map_err(|_| {
+  //     Box::new(StringError {
+  //       s: format!("error from rustls::crypto::aws_lc_rs::default_provider().install_default()"),
+  //     })
+  //   })?;
 
   loop {
     let r: Result<(), Box<dyn std::error::Error>> = async {
