@@ -158,7 +158,9 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
       println!("here!!");
       let conn = match (amqp_uid.clone(), amqp_pwd.clone()) {
         (Some(uid), Some(pwd)) => {
+          // Hack in the uid and pwd to the url.
           let up_amqp_uri = str::replace(&amqp_uri, "//", format!("//{}:{}@", uid, pwd).as_str());
+          // for debug: verify good amqp url.
           // let amqp_uri = AMQPUri::from_str(up_amqp_uri.as_str());
           // info!("amqp_uri: {:?}", amqp_uri);
           Connection::connect(
@@ -278,8 +280,7 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
       Ok(())
     }
     .await;
-    println!("endaloop");
-    error!("ERROR {r:?}");
+    error!("{r:?}");
     info!("retrying in 10 secs");
     std::thread::sleep(time::Duration::from_secs(10));
   }
