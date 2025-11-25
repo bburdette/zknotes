@@ -39,7 +39,7 @@ pub use rusqlite;
 use rusqlite::Connection;
 use serde_json;
 use simple_error::simple_error;
-use sqldata::{get_single_value, local_server_id, make_lapin_info, LapinInfo};
+use sqldata::{get_single_value, local_server_id, LapinInfo};
 use std::fs::File;
 use std::io::{stdin, Write};
 use std::path::Path;

@@ -11,7 +11,7 @@ use clap::Arg;
 use futures_lite::stream::StreamExt;
 use glob::GlobError;
 use lapin::{
-  Connection, ConnectionProperties, Consumer, RecoveryConfig,
+  Connection, ConnectionProperties, Consumer,
   options::{BasicAckOptions, BasicConsumeOptions, QueueDeclareOptions},
   types::FieldTable,
 };

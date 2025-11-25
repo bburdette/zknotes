@@ -7,8 +7,6 @@ use crate::jobs::LogMonitor;
 use crate::search;
 use crate::sqldata;
 use crate::sqldata::local_server_id;
-use crate::sqldata::make_lapin_channels;
-use crate::sqldata::make_lapin_info;
 use crate::sqldata::zknotes_callbacks;
 use crate::sqldata::LapinInfo;
 use crate::state::new_jobid;
