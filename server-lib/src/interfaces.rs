@@ -17,7 +17,8 @@ use crate::sync;
 use actix_session::Session;
 use actix_web::HttpResponse;
 use futures_util::StreamExt;
-use log::info;
+use lapin::ConnectionState;
+use log::{error, info};
 use orgauth;
 use orgauth::data::UserId;
 use orgauth::endpoints::Tokener;
@@ -79,6 +80,60 @@ pub fn login_data_for_token(
   };
   Ok(ldopt)
 }
+
+pub async fn connect_and_make_lapin_info(
+  state: &State,
+  token: Option<String>,
+) -> Option<LapinInfo> {
+  match &state.lapin_conn.read() {
+    Ok(wut) => match &**wut {
+      Some(lc) => {
+        let reconnect = match lc.status().state() {
+          ConnectionState::Initial => true,
+          ConnectionState::Connecting => false,
+          ConnectionState::Connected => false,
+          ConnectionState::Closing => true,
+          ConnectionState::Closed => true,
+          ConnectionState::Reconnecting => false,
+          ConnectionState::Error => true,
+        };
+        if reconnect {
+          let uri = match &state.config.aqmp_uri {
+            Some(uri) => uri,
+            None => return None,
+          };
+          match lapin::Connection::connect(uri.as_str(), lapin::ConnectionProperties::default())
+            .await
+          {
+            Err(e) => {
+              error!("amqp connection error: {e:?}");
+              None
+            }
+            Ok(conn) => {
+              let ret = sqldata::make_lapin_info(Some(&conn), token).await;
+              match state.lapin_conn.write() {
+                Ok(mut lcmod) => *lcmod = Some(conn),
+                _ => (),
+              }
+              ret
+            }
+          }
+        } else {
+          sqldata::make_lapin_info(Some(&lc), token).await
+        }
+      }
+      None => None,
+    },
+    Err(e) => {
+      error!("lapin_conn poisoned: {e:?}");
+      None
+    }
+  }
+}
+// pub async fn make_lapin_info(
+//   conn: Option<&lapin::Connection>,
+//   token: Option<String>,
+// ) -> Option<LapinInfo> {
 
 // Just like orgauth::endpoints::user_interface, except adds in extra user data.
 pub async fn user_interface(
@@ -257,7 +312,8 @@ pub async fn zk_interface_loggedin(
       Ok(PrivateReply::PvyDeletedZkNote(id.clone()))
     }
     PrivateRequest::PvqSaveZkNote(sbe) => {
-      let li = make_lapin_info(state.lapin_conn.as_ref(), token).await;
+      let li = connect_and_make_lapin_info(state, token).await;
+      // let li = make_lapin_info(state.lapin_conn.as_ref(), token).await;
       let (_id, s) = sqldata::save_zknote(&conn, &li, &state.server, uid, &sbe, None).await?;
       Ok(PrivateReply::PvySavedZkNote(s))
     }
@@ -266,14 +322,16 @@ pub async fn zk_interface_loggedin(
       Ok(PrivateReply::PvySavedZkLinks)
     }
     PrivateRequest::PvqSaveZkNoteAndLinks(sznpl) => {
-      let li = make_lapin_info(state.lapin_conn.as_ref(), token).await;
+      let li = connect_and_make_lapin_info(state, token).await;
+      // let li = make_lapin_info(state.lapin_conn.as_ref(), token).await;
       let (_, szkn) =
         sqldata::save_zknote(&conn, &li, &state.server, uid, &sznpl.note, None).await?;
       let _s = sqldata::save_savezklinks(&conn, uid, szkn.id, &sznpl.links)?;
       Ok(PrivateReply::PvySavedZkNoteAndLinks(szkn))
     }
     PrivateRequest::PvqSaveImportZkNotes(gzl) => {
-      let li = make_lapin_info(state.lapin_conn.as_ref(), token).await;
+      let li = connect_and_make_lapin_info(state, token).await;
+      // let li = make_lapin_info(state.lapin_conn.as_ref(), token).await;
       sqldata::save_importzknotes(&conn, &li, &state.server, uid, gzl).await?;
       Ok(PrivateReply::PvySavedImportZkNotes)
     }
@@ -288,10 +346,12 @@ pub async fn zk_interface_loggedin(
       let jid = new_jobid(state, uid);
       let lgb = state.girlboss.clone();
       let server = state.server.clone();
-      let lapin_channelx = match state.lapin_conn.as_ref() {
-        Some(conn) => make_lapin_channel(&conn).await.ok(),
-        None => None,
-      };
+      let li = connect_and_make_lapin_info(state, token.clone()).await;
+      let lapin_channelx = li.map(|li| li.channel).clone();
+      //   match state.lapin_conn.as_ref() {
+      //   Some(conn) => make_lapin_channel(&conn).await.ok(),
+      //   None => None,
+      // };
 
       std::thread::spawn(move || {
         let rt = actix_rt::System::new();
