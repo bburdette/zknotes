@@ -260,7 +260,7 @@ pub async fn sync(
   match res {
     PrivateReply::PvySyncComplete => {
       write!(monitor, "starting sync to remote");
-      let _remres = sync_to_remote(
+      let _reply = sync_to_remote(
         conn.clone(),
         file_path,
         &user,

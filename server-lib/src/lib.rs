@@ -324,8 +324,6 @@ async fn receive_files(
   req: HttpRequest,
 ) -> HttpResponse {
   let li = connect_and_make_lapin_info(config.get_ref(), get_cookie_id(&req)).await;
-  // let li = make_lapin_info(config.lapin_conn.as_ref(), get_cookie_id(&req)).await;
-
   match make_file_notes(session, &config, &li, &mut payload).await {
     Ok(r) => HttpResponse::Ok().json(r),
     Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
@@ -539,7 +537,6 @@ async fn private_upstreaming(
   req: HttpRequest,
 ) -> HttpResponse {
   let li = connect_and_make_lapin_info(data.get_ref(), get_cookie_id(&req)).await;
-  // let li = make_lapin_info(data.lapin_conn.as_ref(), get_cookie_id(&req)).await;
   match zk_interface_check_upstreaming(&session, &data.config, &li, body).await {
     Ok(hr) => hr,
     Err(e) => {
