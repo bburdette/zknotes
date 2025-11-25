@@ -163,22 +163,22 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
           // info!("amqp_uri: {:?}", amqp_uri);
           Connection::connect(
             &up_amqp_uri,
-            ConnectionProperties::default().with_experimental_recovery_config(
-              RecoveryConfig::default(), // this doesn't work.
-                                         // .auto_recover_channels()
-                                         // .auto_recover_connection(),
-            ),
+            ConnectionProperties::default(), // .with_experimental_recovery_config(
+                                             // RecoveryConfig::default(), // this doesn't work.
+                                             //                            // .auto_recover_channels()
+                                             //                            // .auto_recover_connection(),
+                                             // ),
           )
           .await?
         }
         _ => {
           Connection::connect(
             &amqp_uri,
-            ConnectionProperties::default().with_experimental_recovery_config(
-              RecoveryConfig::default(), // this doesn't work.
-                                         // .auto_recover_channels()
-                                         // .auto_recover_connection(),
-            ),
+            ConnectionProperties::default(), // .with_experimental_recovery_config(
+                                             // RecoveryConfig::default(), // this doesn't work.
+                                             //                            // .auto_recover_channels()
+                                             //                            // .auto_recover_connection(),
+                                             // ),
           )
           .await?
         }
@@ -305,6 +305,7 @@ pub async fn yeet_service(
     let delivery = rdelivery?;
     match serde_json::from_slice::<OnSavedZkNote>(&delivery.data) {
       Ok(szn) => {
+        info!("yeet processing note {:?}", szn.id);
         // retrieve the note.
         let rq = zkprotocol::private::PrivateRequest::PvqGetZkNote(szn.id);
 
@@ -400,6 +401,8 @@ pub async fn yeet_service(
                         p
                       };
                       let _ = std::fs::create_dir(&wkdir);
+
+                      info!("yeeting {}", my.url);
 
                       match yeet(&wkdir, my.url.clone(), yt_dlp_path.clone())
                         .map_err(|e| format!("{e:?}"))

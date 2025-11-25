@@ -7,7 +7,7 @@ use crate::jobs::LogMonitor;
 use crate::search;
 use crate::sqldata;
 use crate::sqldata::local_server_id;
-use crate::sqldata::make_lapin_channel;
+use crate::sqldata::make_lapin_channels;
 use crate::sqldata::make_lapin_info;
 use crate::sqldata::zknotes_callbacks;
 use crate::sqldata::LapinInfo;
@@ -85,7 +85,17 @@ pub async fn connect_and_make_lapin_info(
   state: &State,
   token: Option<String>,
 ) -> Option<LapinInfo> {
-  match &state.lapin_conn.read() {
+  // if no uri configured, will never be a connection.
+  let uri = match &state.config.aqmp_uri {
+    Some(uri) => uri,
+    None => {
+      return None;
+    }
+  };
+
+  // use existing connection if there is one.
+  println!("connect_and_make_lapin_info");
+  let reconnect = match &state.lapin_conn.read() {
     Ok(wut) => match &**wut {
       Some(lc) => {
         let reconnect = match lc.status().state() {
@@ -98,36 +108,46 @@ pub async fn connect_and_make_lapin_info(
           ConnectionState::Error => true,
         };
         if reconnect {
-          let uri = match &state.config.aqmp_uri {
-            Some(uri) => uri,
-            None => return None,
-          };
-          match lapin::Connection::connect(uri.as_str(), lapin::ConnectionProperties::default())
-            .await
-          {
-            Err(e) => {
-              error!("amqp connection error: {e:?}");
-              None
-            }
-            Ok(conn) => {
-              let ret = sqldata::make_lapin_info(Some(&conn), token).await;
-              match state.lapin_conn.write() {
-                Ok(mut lcmod) => *lcmod = Some(conn),
-                _ => (),
-              }
-              ret
-            }
-          }
+          true
         } else {
-          sqldata::make_lapin_info(Some(&lc), token).await
+          println!("using existing lapin connection");
+          return sqldata::make_lapin_info(Some(&lc), token).await;
         }
       }
-      None => None,
+      None => true, // connection missing!
     },
     Err(e) => {
       error!("lapin_conn poisoned: {e:?}");
-      None
+      false
     }
+  };
+
+  // existing connection has bad state. try reconnect.
+  if reconnect {
+    // have to do the write() after the read() is out of scope.
+    match state.lapin_conn.write() {
+      Ok(mut lcmod) => {
+        println!("attempting amqp reconnect");
+        match lapin::Connection::connect(uri.as_str(), lapin::ConnectionProperties::default()).await
+        {
+          Err(e) => {
+            error!("amqp connection error: {e:?}");
+            None
+          }
+          Ok(conn) => {
+            info!("amqp reconnected!");
+            let ret = sqldata::make_lapin_info(Some(&conn), token).await;
+            println!("about to write new lapin_conn to state");
+            *lcmod = Some(conn);
+            println!("done writing new lapin_conn to state");
+            ret
+          }
+        }
+      }
+      _ => None,
+    }
+  } else {
+    None
   }
 }
 // pub async fn make_lapin_info(

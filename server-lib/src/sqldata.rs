@@ -893,7 +893,7 @@ pub async fn make_lapin_info(
   token: Option<String>,
 ) -> Option<LapinInfo> {
   match (conn, token) {
-    (Some(conn), Some(token)) => match make_lapin_channel(conn).await {
+    (Some(conn), Some(token)) => match make_lapin_channels(conn).await {
       Ok(lc) => Some(LapinInfo { channel: lc, token }),
       Err(e) => {
         error!("{e}");
@@ -904,7 +904,7 @@ pub async fn make_lapin_info(
   }
 }
 
-pub async fn make_lapin_channel(conn: &lapin::Connection) -> Result<lapin::Channel, zkerr::Error> {
+pub async fn make_lapin_channels(conn: &lapin::Connection) -> Result<lapin::Channel, zkerr::Error> {
   let chan = conn.create_channel().await?;
   info!("lapin channel created {:?}", chan);
   chan
@@ -967,7 +967,7 @@ pub async fn save_zknote(
         )
         .await
       {
-        Ok(_) => info!("published to amqp"),
+        Ok(_) => info!("published to amqp on_save_zknote"),
         Err(e) => error!("error publishing to AMQP: {:?}", e),
       }
     }
