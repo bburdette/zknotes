@@ -95,7 +95,6 @@ pub async fn connect_and_make_lapin_info(
   };
 
   // use existing connection if there is one.
-  println!("connect_and_make_lapin_info");
   let reconnect = match &state.lapin_conn.read() {
     Ok(wut) => match &**wut {
       Some(lc) => {
@@ -111,7 +110,6 @@ pub async fn connect_and_make_lapin_info(
         if reconnect {
           true
         } else {
-          println!("using existing lapin connection");
           return sqldata::make_lapin_info(Some(&lc), token).await;
         }
       }
@@ -128,7 +126,6 @@ pub async fn connect_and_make_lapin_info(
     // have to do the write() after the read() is out of scope.
     match state.lapin_conn.write() {
       Ok(mut lcmod) => {
-        println!("attempting amqp reconnect");
         match lapin::Connection::connect(uri.as_str(), lapin::ConnectionProperties::default()).await
         {
           Err(e) => {
@@ -138,9 +135,7 @@ pub async fn connect_and_make_lapin_info(
           Ok(conn) => {
             info!("amqp reconnected!");
             let ret = sqldata::make_lapin_info(Some(&conn), token).await;
-            println!("about to write new lapin_conn to state");
             *lcmod = Some(conn);
-            println!("done writing new lapin_conn to state");
             ret
           }
         }
