@@ -8,11 +8,12 @@ clap = "4.5.47"
 env_logger = "0.11.8"
 futures-lite = "2.6.1"
 glob = "0.3.3"
-lapin = "3.4.0"
+lapin = { version = "3.7.2", default-features = false, features = [ "rustls--ring", "default-runtime" ] }
 #  for the connection recovery thing, which doesn't work right now
 # lapin = { version ="3.4.0",  features = [ "unstable" ]}
 reqwest = { version ="0.12.23", default-features=false, features = [ "rustls-tls", "multipart", "stream"]}
-rustls = { version ="0.23.35", default-features=false, features = [ "ring", "tls12", "logging", "std" ]}
+# rustls = { version ="0.23.35", default-features=false, features = [ "rustls-ring"ring", "tls12", "logging", "std" ]}
+# rustls = { version ="0.23.35", default-features=false, features = [ "rustls-ring" ]}
 serde_json = "1.0.143"
 tl = "0.7.8"
 tokio = {version="1.47.1", features=["rt-multi-thread", "macros"]}
