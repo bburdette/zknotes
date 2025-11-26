@@ -48,4 +48,5 @@ mime = "0.3.17"
 actix-rt = "2.11.0"
 girlboss = {version = "1.0.0-alpha.4", features = ["actix-rt"]}
 nom = "8.0.0"
-lapin = { version = "3.7.2", default-features = false, features = [ "rustls--ring", "default-runtime" ] }
+# lapin = { version = "3.7.2", default-features = false, features = [ "rustls--ring", "default-runtime" ] }
+lapin = { version = "2.5.5", default-features = true }

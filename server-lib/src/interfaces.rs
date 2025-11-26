@@ -104,7 +104,7 @@ pub async fn connect_and_make_lapin_info(
           ConnectionState::Connected => false,
           ConnectionState::Closing => true,
           ConnectionState::Closed => true,
-          ConnectionState::Reconnecting => false,
+          // ConnectionState::Reconnecting => false,
           ConnectionState::Error => true,
         };
         if reconnect {

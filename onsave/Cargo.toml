@@ -8,7 +8,8 @@ clap = "4.5.47"
 env_logger = "0.11.8"
 futures-lite = "2.6.1"
 glob = "0.3.3"
-lapin = { version = "3.7.2", default-features = false, features = [ "rustls--ring", "default-runtime" ] }
+lapin = { version = "2.5.5", default-features = true }
+# lapin = { version = "3.7.2", default-features = false, features = [ "rustls--ring", "default-runtime" ] }
 reqwest = { version ="0.12.23", default-features=false, features = [ "rustls-tls", "multipart", "stream"]}
 serde_json = "1.0.143"
 tl = "0.7.8"
