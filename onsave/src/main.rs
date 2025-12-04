@@ -570,7 +570,7 @@ pub async fn yeet_service(
                                         .iter()
                                         .map(|n| SaveZkLink {
                                           otherid: n.id,
-                                          direction: Direction::To,
+                                          direction: Direction::From,
                                           user: zkn.user,
                                           zknote: None,
                                           delete: None,
