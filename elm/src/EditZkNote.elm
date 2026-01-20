@@ -685,6 +685,8 @@ toZkNote model =
             Nothing
 
 
+{-| ignores changes in the editblock
+-}
 sznFromModel : Model -> Data.SaveZkNote
 sznFromModel model =
     { id = model.id
@@ -700,8 +702,12 @@ sznFromModel model =
 
 fullSave : Model -> Data.SaveZkNoteAndLinks
 fullSave model =
-    { note = sznFromModel model
-    , links = saveZkLinkList model
+    let
+        m =
+            mergeEditBlock model
+    in
+    { note = sznFromModel m
+    , links = saveZkLinkList m
     }
 
 
