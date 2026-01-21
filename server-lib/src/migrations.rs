@@ -2278,7 +2278,7 @@ pub fn udpate30(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   let conn = Connection::open(dbfile)?;
   conn.execute("PRAGMA foreign_keys = false;", params![])?;
 
-  // update system notes with specific uuids.
+  // get archive system note id.
   let archiveid: i64 = conn.query_row(
     "select zknote.id from
       zknote, orgauth_user
@@ -2907,6 +2907,7 @@ pub fn udpate39(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   conn.execute(
     "CREATE TABLE IF NOT EXISTS \"zkarch\"
 	(\"id\" INTEGER PRIMARY KEY NOT NULL,
+	 \"zknote\" INTEGER NOT NULL REFERENCES zknote(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
 	 \"title\" TEXT NOT NULL,
 	 \"content\" TEXT NOT NULL,
 	 \"sysdata\" TEXT,
@@ -2919,11 +2920,11 @@ pub fn udpate39(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 	 \"uuid\" TEXT NOT NULL,
 	 \"server\" INTEGER NOT NULL REFERENCES server(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
 	 \"createdate\" INTEGER NOT NULL,
-	 \"changeddate\" INTEGER NOT NULL);",
+	 \"changeddate\" INTEGER NOT NULL)",
     params![],
   )?;
 
-  // update system notes with specific uuids.
+  // get archive system note id.
   let archiveid: i64 = conn.query_row(
     "select zknote.id from
       zknote, orgauth_user
@@ -2936,21 +2937,26 @@ pub fn udpate39(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 
   conn.execute(
     "insert into zkarch
-    ( id, title, content, sysdata, pubid, user, editable, showtitle,
+    ( id, zknote, title, content, sysdata, pubid, user, editable, showtitle,
     deleted, file, uuid, server, createdate, changeddate)
-	select  id, title, content, sysdata, pubid, user, editable, showtitle,
-	deleted, file, uuid, server, createdate, changeddate
-	from zknote where zknote.id in (select fromid from zklink where toid = ?1); ",
+	select  zknote.id, zklink.toid, zknote.title, zknote.content, zknote.sysdata,
+      zknote.pubid, zknote.user, zknote.editable, zknote.showtitle, zknote.deleted,
+      zknote.file, zknote.uuid, zknote.server, zknote.createdate, zknote.changeddate
+	from zknote, zklink where zknote.id = zklink.fromid
+	and zklink.toid <> ?1
+	and zknote.id in (select fromid from zklink where toid = ?1)",
     params![archiveid],
   )?;
 
-  conn.execute("delete from zklink where toid = ?1; ", params![archiveid])?;
+  conn.execute(
+    "delete from zklink where fromid in (select id from zkarch)",
+    params![],
+  )?;
 
   conn.execute(
     "delete from zknote where zknote.id in (select id from zkarch); ",
-    params![archiveid],
+    params![],
   )?;
-
   tr.commit()?;
 
   Ok(())
