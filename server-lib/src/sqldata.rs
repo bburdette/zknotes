@@ -812,23 +812,15 @@ pub fn are_notes_linked(conn: &Connection, nid1: i64, nid2: i64) -> Result<bool,
 
 pub fn archive_zknote_i64(conn: &Connection, noteid: i64) -> Result<(), zkerr::Error> {
   let sysid = user_id(&conn, "system")?;
-  let aid = note_id(&conn, "system", "archive")?;
   let uuid = uuid::Uuid::new_v4();
   // copy the note, with user 'system'.
   // exclude pubid, to avoid unique constraint problems.
   conn.execute(
-    "insert into zknote (title, content, user, editable, showtitle, deleted, uuid, createdate, changeddate, server)
-     select title, content, ?1, editable, showtitle, deleted, ?2, createdate, changeddate, server from
+    "insert into zkarch (zknote, title, content, user, editable, showtitle, deleted, uuid, createdate, changeddate, server)
+     select id, title, content, ?1, editable, showtitle, deleted, ?2, createdate, changeddate, server from
          zknote where id = ?3",
     params![sysid.to_i64(), uuid.to_string(), noteid],
   )?;
-  let archive_note_id = conn.last_insert_rowid();
-
-  // mark the note as an archive note.
-  save_zklink(&conn, archive_note_id, aid, sysid, None)?;
-
-  // link the note to the original note, AND indicate this is an archive link.
-  save_zklink(&conn, archive_note_id, noteid, sysid, Some(aid))?;
 
   Ok(())
 }
@@ -840,14 +832,14 @@ pub fn archive_zknote(
   note: &ZkNote,
 ) -> Result<(i64, SavedZkNote), zkerr::Error> {
   let sysid = user_id(&conn, "system")?;
-  let aid = note_id(&conn, "system", "archive")?;
   let uuid = uuid::Uuid::new_v4();
   // copy the note, with user 'system'.
   // exclude pubid, to avoid unique constraint problems.
   conn.execute(
-    "insert into zknote (title, content, user, editable, showtitle, deleted, uuid, createdate, changeddate, server)
-     values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, (select id from server where uuid = ?10))",
+    "insert into zkarch (zknote, title, content, user, editable, showtitle, deleted, uuid, createdate, changeddate, server)
+     values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, (select id from server where uuid = ?11))",
     params![
+      noteid,
       note.title,
       note.content,
       sysid.to_i64(),
@@ -861,12 +853,6 @@ pub fn archive_zknote(
     ])?;
 
   let archive_note_id = conn.last_insert_rowid();
-
-  // mark the note as an archive note.
-  save_zklink(&conn, archive_note_id, aid, sysid, None)?;
-
-  // link the note to the original note, AND indicate this is an archive link.
-  save_zklink(&conn, archive_note_id, noteid, sysid, Some(aid))?;
 
   Ok((
     archive_note_id,
