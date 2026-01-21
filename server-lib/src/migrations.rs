@@ -2897,3 +2897,61 @@ pub fn udpate38(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 
   Ok(())
 }
+
+pub fn udpate39(dbfile: &Path) -> Result<(), orgauth::error::Error> {
+  // delete mistakenly archived searches, fix changeddates"
+
+  let conn = Connection::open(dbfile)?;
+  let tr = conn.unchecked_transaction()?;
+
+  conn.execute(
+    "CREATE TABLE IF NOT EXISTS \"zkarch\"
+	(\"id\" INTEGER PRIMARY KEY NOT NULL,
+	 \"title\" TEXT NOT NULL,
+	 \"content\" TEXT NOT NULL,
+	 \"sysdata\" TEXT,
+	 \"pubid\" TEXT UNIQUE,
+	 \"user\" INTEGER NOT NULL REFERENCES orgauth_user(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+	 \"editable\" BOOLEAN NOT NULL,
+	 \"showtitle\" BOOLEAN NOT NULL,
+	 \"deleted\" BOOLEAN NOT NULL,
+	 \"file\" INTEGER REFERENCES file(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+	 \"uuid\" TEXT NOT NULL,
+	 \"server\" INTEGER NOT NULL REFERENCES server(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+	 \"createdate\" INTEGER NOT NULL,
+	 \"changeddate\" INTEGER NOT NULL);",
+    params![],
+  )?;
+
+  // update system notes with specific uuids.
+  let archiveid: i64 = conn.query_row(
+    "select zknote.id from
+      zknote, orgauth_user
+      where zknote.title = ?2
+      and orgauth_user.name = ?1
+      and zknote.user = orgauth_user.id",
+    params!["system", "archive"],
+    |row| Ok(row.get(0)?),
+  )?;
+
+  conn.execute(
+    "insert into zkarch
+    ( id, title, content, sysdata, pubid, user, editable, showtitle,
+    deleted, file, uuid, server, createdate, changeddate)
+	select  id, title, content, sysdata, pubid, user, editable, showtitle,
+	deleted, file, uuid, server, createdate, changeddate
+	from zknote where zknote.id in (select fromid from zklink where toid = ?1); ",
+    params![archiveid],
+  )?;
+
+  conn.execute("delete from zklink where toid = ?1; ", params![archiveid])?;
+
+  conn.execute(
+    "delete from zknote where zknote.id in (select id from zkarch); ",
+    params![archiveid],
+  )?;
+
+  tr.commit()?;
+
+  Ok(())
+}
