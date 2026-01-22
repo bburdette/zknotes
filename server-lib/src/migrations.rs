@@ -2957,6 +2957,12 @@ pub fn udpate39(dbfile: &Path) -> Result<(), orgauth::error::Error> {
     "delete from zknote where zknote.id in (select id from zkarch); ",
     params![],
   )?;
+
+  conn.execute(
+    "delete from zknote where zknote.id = ?1",
+    params![archiveid],
+  )?;
+
   tr.commit()?;
 
   Ok(())
