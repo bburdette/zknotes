@@ -1427,23 +1427,14 @@ pub fn sync_stream(
               ts1: Box::new(TagSearch::Not {
                 ts: Box::new(TagSearch::SearchTerm {
                   mods: vec![SearchMod::ZkNoteId],
-                  term: SpecialUuids::Archive.str().to_string(),
+                  term: SpecialUuids::System.str().to_string(),
                 }),
               }),
               ao: AndOr::And,
-              ts2: Box::new(TagSearch::Boolex {
-                ts1: Box::new(TagSearch::Not {
-                  ts: Box::new(TagSearch::SearchTerm {
-                    mods: vec![SearchMod::ZkNoteId],
-                    term: SpecialUuids::System.str().to_string(),
-                  }),
-                }),
-                ao: AndOr::And,
-                ts2: Box::new(TagSearch::Not {
-                  ts: Box::new(TagSearch::SearchTerm {
-                    mods: vec![SearchMod::ZkNoteId],
-                    term: SpecialUuids::Sync.str().to_string(),
-                  }),
+              ts2: Box::new(TagSearch::Not {
+                ts: Box::new(TagSearch::SearchTerm {
+                  mods: vec![SearchMod::ZkNoteId],
+                  term: SpecialUuids::Sync.str().to_string(),
                 }),
               }),
             }),

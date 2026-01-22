@@ -2303,7 +2303,7 @@ pub fn udpate30(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   update_note_id("share", SpecialUuids::Share.str())?;
   update_note_id("search", SpecialUuids::Search.str())?;
   update_note_id("user", SpecialUuids::User.str())?;
-  update_note_id("archive", SpecialUuids::Archive.str())?;
+  update_note_id("archive", "ad6a4ca8-0446-4ecc-b047-46282ced0d84")?;
   update_note_id("comment", SpecialUuids::Comment.str())?;
 
   // update system user uuid.
@@ -2469,7 +2469,7 @@ pub fn udpate33(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   ids.push(format!("'{}'", SpecialUuids::Share.str()).to_string());
   ids.push(format!("'{}'", SpecialUuids::Search.str()).to_string());
   ids.push(format!("'{}'", SpecialUuids::User.str()).to_string());
-  ids.push(format!("'{}'", SpecialUuids::Archive.str()).to_string());
+  ids.push(format!("'{}'", "ad6a4ca8-0446-4ecc-b047-46282ced0d84").to_string());
   ids.push(format!("'{}'", SpecialUuids::Sync.str()).to_string());
 
   conn.execute(
@@ -2902,25 +2902,26 @@ pub fn udpate39(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   // delete mistakenly archived searches, fix changeddates"
 
   let conn = Connection::open(dbfile)?;
+  conn.execute("PRAGMA foreign_keys = false;", params![])?;
   let tr = conn.unchecked_transaction()?;
 
   conn.execute(
     "CREATE TABLE IF NOT EXISTS \"zkarch\"
-	(\"id\" INTEGER PRIMARY KEY NOT NULL,
-	 \"zknote\" INTEGER NOT NULL REFERENCES zknote(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
-	 \"title\" TEXT NOT NULL,
-	 \"content\" TEXT NOT NULL,
-	 \"sysdata\" TEXT,
-	 \"pubid\" TEXT UNIQUE,
-	 \"user\" INTEGER NOT NULL REFERENCES orgauth_user(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
-	 \"editable\" BOOLEAN NOT NULL,
-	 \"showtitle\" BOOLEAN NOT NULL,
-	 \"deleted\" BOOLEAN NOT NULL,
-	 \"file\" INTEGER REFERENCES file(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
-	 \"uuid\" TEXT NOT NULL,
-	 \"server\" INTEGER NOT NULL REFERENCES server(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
-	 \"createdate\" INTEGER NOT NULL,
-	 \"changeddate\" INTEGER NOT NULL)",
+    (\"id\" INTEGER PRIMARY KEY NOT NULL,
+     \"zknote\" INTEGER NOT NULL REFERENCES zknote(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+     \"title\" TEXT NOT NULL,
+     \"content\" TEXT NOT NULL,
+     \"sysdata\" TEXT,
+     \"pubid\" TEXT UNIQUE,
+     \"user\" INTEGER NOT NULL REFERENCES orgauth_user(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+     \"editable\" BOOLEAN NOT NULL,
+     \"showtitle\" BOOLEAN NOT NULL,
+     \"deleted\" BOOLEAN NOT NULL,
+     \"file\" INTEGER REFERENCES file(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+     \"uuid\" TEXT NOT NULL,
+     \"server\" INTEGER NOT NULL REFERENCES server(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+     \"createdate\" INTEGER NOT NULL,
+     \"changeddate\" INTEGER NOT NULL)",
     params![],
   )?;
 
@@ -2935,35 +2936,49 @@ pub fn udpate39(dbfile: &Path) -> Result<(), orgauth::error::Error> {
     |row| Ok(row.get(0)?),
   )?;
 
+  // copy archive notes into zkarch table.
   conn.execute(
     "insert into zkarch
     ( id, zknote, title, content, sysdata, pubid, user, editable, showtitle,
     deleted, file, uuid, server, createdate, changeddate)
-	select  zknote.id, zklink.toid, zknote.title, zknote.content, zknote.sysdata,
+    select  zknote.id, zklink.toid, zknote.title, zknote.content, zknote.sysdata,
       zknote.pubid, zknote.user, zknote.editable, zknote.showtitle, zknote.deleted,
       zknote.file, zknote.uuid, zknote.server, zknote.createdate, zknote.changeddate
-	from zknote, zklink where zknote.id = zklink.fromid
-	and zklink.toid <> ?1
-	and zknote.id in (select fromid from zklink where toid = ?1)",
+    from zknote, zklink where zknote.id = zklink.fromid
+    and zklink.toid <> ?1
+    and zknote.id in (select fromid from zklink where toid = ?1)",
     params![archiveid],
+  )?;
+
+  // set user to note creator instead of system
+  conn.execute(
+    "update zkarch set user = (select user from zknote where id = zkarch.zknote) ",
+    params![],
   )?;
 
   conn.execute(
     "delete from zklink where fromid in (select id from zkarch)",
     params![],
   )?;
-
-  conn.execute(
-    "delete from zknote where zknote.id in (select id from zkarch); ",
-    params![],
-  )?;
-
   conn.execute(
     "delete from zknote where zknote.id = ?1",
     params![archiveid],
   )?;
 
   tr.commit()?;
+
+  {
+    // risky!  turn off foreign key checking because this step takes
+    // so long.
+    conn.execute("PRAGMA foreign_keys = false;", params![])?;
+    let tr = conn.unchecked_transaction()?;
+    conn.execute(
+      "delete from zknote where id in (select zkarch.id from zkarch); ",
+      params![],
+    )?;
+
+    tr.commit()?;
+  }
 
   Ok(())
 }

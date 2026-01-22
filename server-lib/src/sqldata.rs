@@ -149,7 +149,6 @@ pub fn sysids() -> Result<Sysids, zkerr::Error> {
     shareid: Uuid::parse_str(SpecialUuids::Share.str())?.into(),
     searchid: Uuid::parse_str(SpecialUuids::Search.str())?.into(),
     userid: Uuid::parse_str(SpecialUuids::User.str())?.into(),
-    archiveid: Uuid::parse_str(SpecialUuids::Archive.str())?.into(),
     systemid: Uuid::parse_str(SpecialUuids::System.str())?.into(),
   })
 }
@@ -649,12 +648,32 @@ pub fn note_id_for_zknoteid(conn: &Connection, zknoteid: &ZkNoteId) -> Result<i6
     ZkNoteId::Zni(uuid) => note_id_for_uuid(conn, uuid),
   }
 }
+pub fn archive_note_id_for_zknoteid(
+  conn: &Connection,
+  zknoteid: &ZkNoteId,
+) -> Result<i64, zkerr::Error> {
+  match zknoteid {
+    ZkNoteId::Zni(uuid) => archive_note_id_for_uuid(conn, uuid),
+  }
+}
 
 pub fn note_id_for_uuid(conn: &Connection, uuid: &Uuid) -> Result<i64, zkerr::Error> {
   let id: i64 = conn
     .query_row(
       "select zknote.id from zknote
       where zknote.uuid = ?1",
+      params![uuid.to_string()],
+      |row| Ok(row.get(0)?),
+    )
+    .map_err(|e| zkerr::annotate_string("note not found".to_string(), e.into()))?;
+  Ok(id)
+}
+
+pub fn archive_note_id_for_uuid(conn: &Connection, uuid: &Uuid) -> Result<i64, zkerr::Error> {
+  let id: i64 = conn
+    .query_row(
+      "select id from zkarch
+      where uuid = ?1",
       params![uuid.to_string()],
       |row| Ok(row.get(0)?),
     )
@@ -1197,6 +1216,44 @@ pub fn read_zknote_unchecked(
         closure).map_err(|e| zkerr::annotate_string(format!("note not found: {}", id), e ))
 }
 
+pub fn read_zkarch_unchecked(
+  conn: &Connection,
+  filedir: &Path,
+  id: &ZkNoteId,
+) -> Result<(i64, ZkNote), zkerr::Error> {
+  let closure = |row: &Row<'_>| {
+    Ok::<_, zkerr::Error>((
+      row.get(0)?,
+      ZkNote {
+        id: Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?.into(),
+        title: row.get(2)?,
+        content: row.get(3)?,
+        user: UserId::Uid(row.get(4)?),
+        username: row.get(5)?,
+        usernote: Uuid::parse_str(row.get::<usize, String>(6)?.as_str())?.into(),
+        pubid: row.get(7)?,
+        editable: row.get(8)?,      // editable same as editableValue!
+        editableValue: row.get(8)?, // <--- same index.
+        showtitle: row.get(9)?,
+        deleted: row.get(10)?,
+        filestatus: file_status(&conn, &filedir, row.get(11)?)?,
+        createdate: row.get(12)?,
+        changeddate: row.get(13)?,
+        server: row.get(14)?,
+        sysids: Vec::new(),
+      },
+    ))
+  };
+
+  conn.query_row_and_then(
+        "select ZN.id, ZN.uuid, ZN.title, ZN.content, ZN.user, OU.name, ZKN.uuid,
+            ZN.pubid, ZN.editable, ZN.showtitle, ZN.deleted, ZN.file, ZN.createdate, ZN.changeddate, S.uuid
+          from zkarch ZN, orgauth_user OU, user U, zknote ZKN, server S
+          where ZN.uuid = ?1 and U.id = ZN.user and OU.id = ZN.user and ZKN.id = U.zknote and S.id = ZN.server",
+          params![id.to_string()],
+        closure).map_err(|e| zkerr::annotate_string(format!("note not found: {}", id), e ))
+}
+
 pub fn read_file_info(conn: &Connection, noteid: i64) -> Result<FileInfo, zkerr::Error> {
   let closure = |row: &Row<'_>| {
     Ok::<_, zkerr::Error>(FileInfo {
@@ -1248,6 +1305,43 @@ pub fn read_zknote(
 }
 
 pub fn read_zklistnote(
+  conn: &Connection,
+  files_dir: &Path,
+  uid: Option<UserId>,
+  id: i64,
+) -> Result<ZkListNote, zkerr::Error> {
+  let sysid = user_id(&conn, "system")?;
+  let sysids = get_sysids(conn, sysid, id)?;
+
+  // access check
+  let zna = zknote_access_id(conn, uid, id)?;
+  match zna {
+    Access::Private => Err::<_, zkerr::Error>(zkerr::Error::NoteIsPrivate),
+    _ => Ok(()),
+  }?;
+
+  let note = conn.query_row_and_then(
+    "select ZN.uuid, ZN.title, ZN.file, ZN.user, ZN.createdate, ZN.changeddate
+      from zknote ZN, orgauth_user OU, user U where ZN.id = ?1 and U.id = ZN.user and OU.id = ZN.user",
+    params![id],
+    |row| {
+      let zln = ZkListNote {
+        id:  Uuid::parse_str(row.get::<usize,String>(0)?.as_str())?.into(),
+        title: row.get(1)?,
+        filestatus: file_status(&conn, &files_dir, row.get(2)?)?,
+        user: UserId::Uid(row.get(3)?),
+        createdate: row.get(4)?,
+        changeddate: row.get(5)?,
+        sysids,
+      };
+      Ok::<_, zkerr::Error>(zln)
+    },
+  )?;
+
+  Ok(note)
+}
+
+pub fn read_zklistarchnote(
   conn: &Connection,
   files_dir: &Path,
   uid: Option<UserId>,
@@ -1884,40 +1978,53 @@ pub fn read_zknotearchives(
   uid: UserId,
   gzna: &GetZkNoteArchives,
 ) -> Result<Vec<ZkListNote>, zkerr::Error> {
-  let aid = note_id(&conn, "system", "archive")?;
   let sysid = user_id(&conn, "system")?;
-
-  // if this is the archive note itself, return empty array.
-  // otherwise we can see all the archives for everyone's notes!
-  if gzna.zknote.to_string().as_str() == SpecialUuids::Archive.str() {
-    // handled the int case, without bothering with read_zknote.
-    return Ok(Vec::new());
-  }
+  let id = note_id_for_zknoteid(conn, &gzna.zknote)?;
+  let sysids = get_sysids(conn, sysid, id)?;
 
   // users that can't see a note, can't see the archives either.
-  let (id, _zkn) = read_zknote(&conn, files_dir, Some(uid), &gzna.zknote)?;
+  let zna = zknote_access_id(conn, Some(uid), id)?;
+  match zna {
+    Access::Private => Err::<_, zkerr::Error>(zkerr::Error::NoteIsPrivate),
+    _ => Ok(()),
+  }?;
 
-  // notes with a TO link to our note
-  // and a TO link to 'archive'
+  // read from zkarch table, the archive notes table.
   let mut stmt = conn.prepare(
-    "select N.fromid from zknote, zklink C, zklink N
-      where N.fromid = C.fromid
-      and zknote.id = N.fromid
-      and N.toid = ?1 and C.toid = ?2
-      order by zknote.changeddate desc",
+    "select ZN.uuid, ZN.title, ZN.file, ZN.user, ZN.createdate, ZN.changeddate
+      from zkarch ZN, orgauth_user OU, user U
+      where ZN.zknote = ?1 and U.id = ZN.user and OU.id = ZN.user
+      order by ZN.changeddate",
   )?;
 
   let c_iter = stmt
-    .query_map(params![id, aid], |row| Ok(row.get(0)?))?
+    .query_map(params![id], |row| {
+      Ok((
+        row.get::<usize, String>(0)?,
+        row.get::<usize, String>(1)?,
+        row.get::<usize, Option<i64>>(2)?,
+        row.get::<usize, i64>(3)?,
+        row.get::<usize, i64>(4)?,
+        row.get::<usize, i64>(5)?,
+      ))
+    })?
     .skip(gzna.offset as usize);
 
   let mut nv = Vec::new();
 
-  for id in c_iter {
-    match id {
-      Ok(id) => {
-        let note = read_zklistnote(&conn, files_dir, Some(sysid), id)?;
-        nv.push(note);
+  for x in c_iter {
+    match x {
+      Ok((v0, v1, v2, v3, v4, v5)) => {
+        let zln = ZkListNote {
+          id: Uuid::parse_str(v0.as_str())?.into(),
+          title: v1,
+          filestatus: file_status(&conn, &files_dir, v2)?,
+          user: UserId::Uid(v3),
+          createdate: v4,
+          changeddate: v5,
+          sysids: sysids.clone(),
+        };
+        nv.push(zln);
         match gzna.limit {
           Some(l) => {
             if nv.len() >= l as usize {
@@ -1927,48 +2034,23 @@ pub fn read_zknotearchives(
           None => (),
         }
       }
-      Err(_) => (),
+      Err(e) => return Err(e.into()),
     }
   }
 
   Ok(nv)
 }
 
-pub fn read_archivezknote(
+pub fn read_zkarch(
   conn: &Connection,
   files_dir: &Path,
   uid: UserId,
   gazn: &GetArchiveZkNote,
 ) -> Result<(i64, ZkNote), zkerr::Error> {
-  let sysid = user_id(&conn, "system")?;
-  let auid = Uuid::parse_str(SpecialUuids::Archive.str())?;
-  let archiveid = note_id_for_uuid(&conn, &auid)?;
-
-  if gazn.parentnote == auid.into() {
-    bail!("query not allowed!");
-  }
-
   // have access to the parent note?
-  let (pid, _pnote) = read_zknote(conn, files_dir, Some(uid), &gazn.parentnote)?;
+  let (_pid, _pnote) = read_zknote(conn, files_dir, Some(uid), &gazn.parentnote)?;
 
-  let note_id = note_id_for_zknoteid(conn, &gazn.noteid)?;
-
-  // archive note should have a TO link to the parent note
-  // and a TO link to 'archive'
-  let _i: i64 = match conn.query_row(
-    "select N.fromid from zklink C, zklink N
-      where N.fromid = C.fromid
-      and N.toid = ?1 and C.toid = ?2 and N.fromid = ?3",
-    params![pid, archiveid, note_id],
-    |row| Ok(row.get(0)?),
-  ) {
-    Ok(v) => Ok::<_, zkerr::Error>(v),
-    Err(rusqlite::Error::QueryReturnedNoRows) => Err("not an archive note!".into()),
-    Err(x) => Err(x.into()),
-  }?;
-
-  // now read the archive note AS SYSTEM.
-  read_zknote(conn, files_dir, Some(sysid), &gazn.noteid)
+  read_zkarch_unchecked(conn, files_dir, &gazn.noteid)
 }
 
 pub fn read_archivezklinks(
@@ -2154,7 +2236,6 @@ pub fn read_zklinks_since_stream(
     // TODO: unique id for this temp table.
     let tabname = format!("accnotes_{}", uid);
 
-
     conn.execute(
       format!(
         "create temporary table if not exists {} (\"id\" integer primary key not null)",
@@ -2168,21 +2249,6 @@ pub fn read_zklinks_since_stream(
     conn.execute(
       format!("insert into {} {}", tabname, acc_sql).as_str(),
       rusqlite::params_from_iter(acc_args.iter()),
-    )?;
-
-    let systemid = user_id(&conn, "system")?;
-    // archive note id.
-    let auid = Uuid::parse_str(SpecialUuids::Archive.str())?.into();
-    let archiveid = note_id_for_zknoteid(&conn, &auid)?;
-
-    // also insert archive notes into accessible notes!
-    conn.execute(
-      format!("insert into {} select ZL.fromid from zklink ZL, {} AN
-          where ZL.toid = AN.id
-           and ZL.linkzknote = ?1
-           and ZL.user = ?2
-           on conflict DO NOTHING", tabname, tabname).as_str(),
-      params![archiveid, systemid.to_i64()],
     )?;
 
     // links.  Fact:  these records are only created when a link is deleted!

@@ -50,7 +50,6 @@ pub struct Sysids {
   pub shareid: ZkNoteId,
   pub searchid: ZkNoteId,
   pub userid: ZkNoteId,
-  pub archiveid: ZkNoteId,
   pub systemid: ZkNoteId,
 }
 
