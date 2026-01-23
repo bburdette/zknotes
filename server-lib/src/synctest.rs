@@ -449,7 +449,6 @@ mod tests {
       Uuid::parse_str(SpecialUuids::Share.str())?,
       Uuid::parse_str(SpecialUuids::Search.str())?,
       Uuid::parse_str(SpecialUuids::User.str())?,
-      Uuid::parse_str(SpecialUuids::Archive.str())?,
       Uuid::parse_str(SpecialUuids::System.str())?,
       Uuid::parse_str(SpecialUuids::Sync.str())?,
     ]);
@@ -903,6 +902,9 @@ mod tests {
       )?;
 
       assert!(cpcarchs.len() > 0);
+
+      println!("cpcarchs {:?}", cpcarchs);
+      println!("spcarchs {:?}", spcarchs);
 
       assert!(cpcarchs == spcarchs);
     }

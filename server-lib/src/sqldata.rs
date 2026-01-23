@@ -534,22 +534,18 @@ pub fn save_zklink(
 
   let shareid = note_id(&conn, "system", "share")?;
   let publicid = note_id(&conn, "system", "public")?;
-  let archiveid = note_id(&conn, "system", "archive")?;
   let systemid = user_id(&conn, "system")?;
   let usernote = user_note_id(&conn, user)?;
 
   // only system can link to archive note.
-  if user != systemid {
-    if fromid == archiveid || toid == archiveid {
-      return Err(zkerr::Error::CantLinkToArchive);
-    } else
-    // its ok to link to public, which archive links to.
-    if (fromid != publicid && are_notes_linked(&conn, fromid, archiveid)?)
-      || (toid != publicid && are_notes_linked(&conn, toid, archiveid)?)
-    {
-      return Err(zkerr::Error::CantLinkToArchive);
-    }
-  }
+  // if user != systemid {
+  //   // its ok to link to public, which archive links to.
+  //   if (fromid != publicid && are_notes_linked(&conn, fromid, archiveid)?)
+  //     || (toid != publicid && are_notes_linked(&conn, toid, archiveid)?)
+  //   {
+  //     return Err(zkerr::Error::CantLinkToArchive);
+  //   }
+  // }
 
   let authed = if fromid == shareid || fromid == publicid || fromid == usernote {
     // can't link non-me notes to shareid or public or usernote.
@@ -836,9 +832,9 @@ pub fn archive_zknote_i64(conn: &Connection, noteid: i64) -> Result<(), zkerr::E
   // exclude pubid, to avoid unique constraint problems.
   conn.execute(
     "insert into zkarch (zknote, title, content, user, editable, showtitle, deleted, uuid, createdate, changeddate, server)
-     select id, title, content, ?1, editable, showtitle, deleted, ?2, createdate, changeddate, server from
-         zknote where id = ?3",
-    params![sysid.to_i64(), uuid.to_string(), noteid],
+     select id, title, content, user, editable, showtitle, deleted, ?1, createdate, changeddate, server from
+         zknote where id = ?2",
+    params![uuid.to_string(), noteid],
   )?;
 
   Ok(())
@@ -848,9 +844,9 @@ pub fn archive_zknote_i64(conn: &Connection, noteid: i64) -> Result<(), zkerr::E
 pub fn archive_zknote(
   conn: &Connection,
   noteid: i64,
+  uid: &UserId,
   note: &ZkNote,
 ) -> Result<(i64, SavedZkNote), zkerr::Error> {
-  let sysid = user_id(&conn, "system")?;
   let uuid = uuid::Uuid::new_v4();
   // copy the note, with user 'system'.
   // exclude pubid, to avoid unique constraint problems.
@@ -861,7 +857,7 @@ pub fn archive_zknote(
       noteid,
       note.title,
       note.content,
-      sysid.to_i64(),
+      uid.to_i64(),
       note.editable,
       note.showtitle,
       note.deleted,
@@ -2318,7 +2314,6 @@ pub fn accessible_notes(
   uid: UserId,
 ) -> Result<(String, Vec<String>), zkerr::Error> {
   let publicid = note_id(&conn, "system", "public")?;
-  let archiveid = note_id(&conn, "system", "archive")?;
   let shareid = note_id(&conn, "system", "share")?;
   let usernoteid = user_note_id(&conn, uid)?;
 
@@ -2367,14 +2362,11 @@ pub fn accessible_notes(
         and ((L.fromid = N.id and L.toid = M.fromid )
              or (L.toid = N.id and L.fromid = M.fromid ))
       and
-        L.linkzknote is not ?
-      and
         ((U.fromid = ? and U.toid = M.fromid) or (U.fromid = M.fromid and U.toid = ?)))",
       ),
       vec![
         uid.to_string(),
         shareid.to_string(),
-        archiveid.to_string(),
         usernoteid.to_string(),
         usernoteid.to_string(),
       ],

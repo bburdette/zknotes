@@ -880,7 +880,7 @@ where
             } else if note.changeddate < n.changeddate {
               // note is older.  add as archive note.
               // may create duplicate archive notes if edited on two systems and then synced.
-              sqldata::archive_zknote(&conn, nid, &note).map(|x| x.0)
+              sqldata::archive_zknote(&conn, nid, &uid, &note).map(|x| x.0)
             } else {
               Ok(nid)
             }

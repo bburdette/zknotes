@@ -114,6 +114,9 @@ pub fn search_zknotes(
 
   let mut pstmt = conn.prepare(sql.as_str())?;
 
+  // println!("sql {:?}", sql);
+  // println!("args {:?}", args);
+
   let sysid = user_id(&conn, "system")?;
 
   let rec_iter = pstmt.query_and_then(rusqlite::params_from_iter(args.iter()), |row| {
@@ -405,10 +408,7 @@ pub fn build_base_sql(
 ) -> Result<(String, Vec<String>), zkerr::Error> {
   let ts = andify_search(&search.tagsearch);
 
-  let (cls, clsargs) = build_tagsearch_clause(&conn, uid, &search.archives, false, &ts)?;
-
   let publicid = note_id(&conn, "system", "public")?;
-  // let archiveid = note_id(&conn, "system", "archive")?;
   let shareid = note_id(&conn, "system", "share")?;
   let usernoteid = sqldata::user_note_id(&conn, uid)?;
 
@@ -445,7 +445,8 @@ pub fn build_base_sql(
     "and N.deleted = 0"
   };
 
-  let mut sqlargs: Vec<(String, Vec<String>)> = Vec::new();
+  // sql, sqlargs, current (or archives = false)
+  let mut sqlargs: Vec<(String, Vec<String>, bool)> = Vec::new();
 
   if archives {
     let (sqlbase, baseargs) = (
@@ -458,7 +459,7 @@ pub fn build_base_sql(
       ),
       vec![uid.to_string()],
     );
-    sqlargs.push((sqlbase, baseargs));
+    sqlargs.push((sqlbase, baseargs, false));
   }
   if current {
     let ( sqlbase,  baseargs) =
@@ -473,7 +474,7 @@ pub fn build_base_sql(
       ),
       vec![uid.to_string()],
     );
-    sqlargs.push((sqlbase, baseargs));
+    sqlargs.push((sqlbase, baseargs, true));
   };
 
   // notes that are public, and not mine.
@@ -490,7 +491,7 @@ pub fn build_base_sql(
       ),
       vec![uid.to_string(), publicid.to_string()],
     );
-    sqlargs.push((sqlpub, pubargs));
+    sqlargs.push((sqlpub, pubargs, false));
   }
   if current {
     let (sqlpub, pubargs) = (
@@ -503,7 +504,7 @@ pub fn build_base_sql(
       ),
       vec![uid.to_string(), publicid.to_string()],
     );
-    sqlargs.push((sqlpub, pubargs));
+    sqlargs.push((sqlpub, pubargs, true));
   };
 
   // notes shared with a share tag, and not mine.
@@ -536,7 +537,7 @@ pub fn build_base_sql(
         usernoteid.to_string(),
       ],
     );
-    sqlargs.push((sqlshare, shareargs));
+    sqlargs.push((sqlshare, shareargs, false));
   }
   if current {
     let (sqlshare, shareargs) = (
@@ -559,7 +560,7 @@ pub fn build_base_sql(
         usernoteid.to_string(),
       ],
     );
-    sqlargs.push((sqlshare, shareargs));
+    sqlargs.push((sqlshare, shareargs, true));
   };
 
   // notes that are tagged with my usernoteid, and not mine.
@@ -579,7 +580,7 @@ pub fn build_base_sql(
         usernoteid.to_string(),
       ],
     );
-    sqlargs.push((sqluser, userargs));
+    sqlargs.push((sqluser, userargs, false));
   }
   if current {
     let (sqluser, userargs) = (
@@ -598,26 +599,70 @@ pub fn build_base_sql(
         usernoteid.to_string(),
       ],
     );
-    sqlargs.push((sqluser, userargs));
+    sqlargs.push((sqluser, userargs, true));
   };
 
-  // local ftn to add clause and args.
-  let addcls = |sql: &mut String, args: &mut Vec<String>| {
-    if !args.is_empty() {
-      sql.push_str("\nand ");
-      sql.push_str(cls.as_str());
+  struct Tsc {
+    cls: String,
+    clsargs: Vec<String>,
+  }
 
-      // clone, otherwise no clause vals next time!
-      let mut pendargs = clsargs.clone();
-      args.append(&mut pendargs);
+  let cur_tsc: Option<Tsc> = if current {
+    let (cls, clsargs) =
+      build_tagsearch_clause(&conn, uid, &ArchivesOrCurrent::Current, false, &ts)?;
+    Some(Tsc {
+      cls: cls,
+      clsargs: clsargs,
+    })
+  } else {
+    None
+  };
+  let arch_tsc: Option<Tsc> = if archives {
+    let (cls, clsargs) =
+      build_tagsearch_clause(&conn, uid, &ArchivesOrCurrent::Archives, false, &ts)?;
+    Some(Tsc {
+      cls: cls,
+      clsargs: clsargs,
+    })
+  } else {
+    None
+  };
+
+  // let (cls, clsargs) = build_tagsearch_clause(&conn, uid, &search.archives, false, &ts)?;
+
+  // local ftn to add clause and args.
+  let addcls = |sql: &mut String, args: &mut Vec<String>, current: bool| {
+    if !args.is_empty() {
+      let tsc: Option<&Tsc> = if current {
+        match &cur_tsc {
+          Some(tsc) => Some(&tsc),
+          None => None,
+        }
+      } else {
+        match &arch_tsc {
+          Some(tsc) => Some(&tsc),
+          None => None,
+        }
+      };
+
+      if let Some(&ref tsc) = tsc {
+        sql.push_str("\nand ");
+        sql.push_str(tsc.cls.as_str());
+
+        // clone, otherwise no clause vals next time!
+        let mut pendargs = tsc.clsargs.clone();
+        args.append(&mut pendargs);
+      } else {
+        tracing::error!("tsc error");
+      };
     }
   };
 
   let mut rsql: String = String::new();
   let mut rargs: Vec<String> = Vec::new();
 
-  while let Some((mut sql, mut args)) = sqlargs.pop() {
-    addcls(&mut sql, &mut args);
+  while let Some((mut sql, mut args, current)) = sqlargs.pop() {
+    addcls(&mut sql, &mut args, current);
 
     rsql.push_str(sql.as_str());
     if sqlargs.len() > 0 {
@@ -753,33 +798,73 @@ fn build_tagsearch_clause(
 
           let notstr = if not { "not" } else { "" };
 
-          let nid = match aoc {
-            ArchivesOrCurrent::Current => "id",
-            ArchivesOrCurrent::Archives => "zknote",
-            ArchivesOrCurrent::CurrentAndArchives => "invalid",
+          enum Aocid {
+            AocS(&'static str),
+            Both,
+          }
+
+          let ai = match aoc {
+            ArchivesOrCurrent::Current => Aocid::AocS("id"),
+            ArchivesOrCurrent::Archives => Aocid::AocS("zknote"),
+            ArchivesOrCurrent::CurrentAndArchives => Aocid::Both,
           };
-          (
-            // clause
-            format!(
-              "{} (N.{} in (select zklink.toid from zknote as zkn, zklink
-             where zkn.id = zklink.fromid
-               and {})
-            or
-                N.{} in (select zklink.fromid from zknote as zkn, zklink
-             where zkn.id = zklink.toid
-               and {}))",
-              notstr, nid, clause, nid, clause
+          match ai {
+            Aocid::AocS(nid) => (
+              // clause
+              format!(
+                "{} (N.{} in (select zklink.toid from zknote as zkn, zklink
+                 where zkn.id = zklink.fromid
+                   and {})
+                or
+                    N.{} in (select zklink.fromid from zknote as zkn, zklink
+                 where zkn.id = zklink.toid
+                   and {}))",
+                notstr, nid, clause, nid, clause
+              ),
+              // args
+              if exact {
+                vec![term.clone(), term.clone()]
+              } else {
+                vec![
+                  format!("%{}%", term).to_string(),
+                  format!("%{}%", term).to_string(),
+                ]
+              },
             ),
-            // args
-            if exact {
-              vec![term.clone(), term.clone()]
-            } else {
-              vec![
-                format!("%{}%", term).to_string(),
-                format!("%{}%", term).to_string(),
-              ]
-            },
-          )
+            Aocid::Both => (
+              // clause
+              format!(
+                "{} (N.id in (select zklink.toid from zknote as zkn, zklink
+                 where zkn.id = zklink.fromid
+                   and {})
+                or
+                    N.id in (select zklink.fromid from zknote as zkn, zklink
+                 where zkn.id = zklink.toid
+                   and {})
+                or
+                    N.zknote in (select zklink.fromid from zknote as zkn, zklink
+                 where zkn.id = zklink.toid
+                   and {})
+                or
+                    N.zknote in (select zklink.fromid from zknote as zkn, zklink
+                 where zkn.id = zklink.toid
+                   and {})
+                   )",
+                notstr, clause, clause, clause, clause
+              ),
+              // args
+              if exact {
+                vec![term.clone(), term.clone(), term.clone(), term.clone()]
+              } else {
+                vec![
+                  format!("%{}%", term).to_string(),
+                  format!("%{}%", term).to_string(),
+                  format!("%{}%", term).to_string(),
+                  format!("%{}%", term).to_string(),
+                ]
+              },
+            ),
+          }
         } else {
           let fileclause = if file { "and N.file is not null" } else { "" };
 
