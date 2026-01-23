@@ -103,7 +103,10 @@ By default zknotes uses 'invite links' for new users.  To onboard a new user, an
 
 ## developing
 
-Strictly speaking you only need git, rust, elm, sqlite and openssl to do development (I think).  But you can use nix to install the full array of gadgets I use which will supply lsp support, formatting, automatic recompiling, etc.
+Strictly speaking you only need git, rust, elm, sqlite and openssl to do development (I think).  But you can use nix to install the full array of gadgets I use which will supply lsp support, formatting, automatic recompiling, etc.  Do that with nix develop:
+```
+ nix develop
+```
 
 currently my orgauth lib is used here with submodules.  so you have to:
 ```
