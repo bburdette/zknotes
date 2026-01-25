@@ -291,11 +291,11 @@ pub async fn zk_interface_loggedin(
       };
       Ok(PrivateReply::PvyZkNoteArchives(zka))
     }
-    PrivateRequest::PvqGetArchiveZkNote(rq) => {
-      let (_nid, note) = sqldata::read_zkarch(&conn, &state.config.file_path, uid, &rq)?;
-      info!("user#getarchivezknote: {} - {}", note.id, note.title);
-      Ok(PrivateReply::PvyZkNote(note))
-    }
+    // PrivateRequest::PvqGetArchiveZkNote(rq) => {
+    //   let (_nid, note) = sqldata::read_zkarch(&conn, &state.config.file_path, uid, &rq)?;
+    //   info!("user#getarchivezknote: {} - {}", note.id, note.title);
+    //   Ok(PrivateReply::PvyZkNote(note))
+    // }
     PrivateRequest::PvqGetArchiveZklinks(rq) => {
       let links = sqldata::read_archivezklinks(&conn, uid, rq.createddate_after)?;
       Ok(PrivateReply::PvyArchiveZkLinks(links))

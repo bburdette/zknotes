@@ -31,6 +31,7 @@ resultDecoder errDecoder okDecoder =
 
 type ZkNoteId
     = Zni (String)
+    | ArchiveZni (String) (String)
 
 
 zkNoteIdEncoder : ZkNoteId -> Json.Encode.Value
@@ -38,6 +39,8 @@ zkNoteIdEncoder enum =
     case enum of
         Zni inner ->
             Json.Encode.object [ ( "Zni", Json.Encode.string inner ) ]
+        ArchiveZni t0 t1 ->
+            Json.Encode.object [ ( "ArchiveZni", Json.Encode.list identity [ Json.Encode.string t0, Json.Encode.string t1 ] ) ]
 
 type alias ExtraLoginData =
     { userid : UserId
@@ -384,20 +387,6 @@ zkNoteArchivesEncoder struct =
         ]
 
 
-type alias GetArchiveZkNote =
-    { parentnote : ZkNoteId
-    , noteid : ZkNoteId
-    }
-
-
-getArchiveZkNoteEncoder : GetArchiveZkNote -> Json.Encode.Value
-getArchiveZkNoteEncoder struct =
-    Json.Encode.object
-        [ ( "parentnote", (zkNoteIdEncoder) struct.parentnote )
-        , ( "noteid", (zkNoteIdEncoder) struct.noteid )
-        ]
-
-
 type alias GetArchiveZkLinks =
     { createddateAfter : Maybe (Int)
     }
@@ -635,14 +624,13 @@ type PrivateRequest
     | PvqGetZnlIfChanged (GetZnlIfChanged)
     | PvqGetZkNoteComments (GetZkNoteComments)
     | PvqGetZkNoteArchives (GetZkNoteArchives)
-    | PvqGetArchiveZkNote (GetArchiveZkNote)
     | PvqGetArchiveZklinks (GetArchiveZkLinks)
     | PvqGetZkLinksSince (GetZkLinksSince)
     | PvqSearchZkNotes (ZkNoteSearch)
     | PvqPowerDelete (List (TagSearch))
     | PvqDeleteZkNote (ZkNoteId)
     | PvqSaveZkNote (SaveZkNote)
-    | PvqSaveZkLinks (ZkLinks)
+    | PvqSaveZkLinks (SaveZkLinks)
     | PvqSaveZkNoteAndLinks (SaveZkNoteAndLinks)
     | PvqSaveImportZkNotes (List (ImportZkNote))
     | PvqSetHomeNote (ZkNoteId)
@@ -664,8 +652,6 @@ privateRequestEncoder enum =
             Json.Encode.object [ ( "PvqGetZkNoteComments", getZkNoteCommentsEncoder inner ) ]
         PvqGetZkNoteArchives inner ->
             Json.Encode.object [ ( "PvqGetZkNoteArchives", getZkNoteArchivesEncoder inner ) ]
-        PvqGetArchiveZkNote inner ->
-            Json.Encode.object [ ( "PvqGetArchiveZkNote", getArchiveZkNoteEncoder inner ) ]
         PvqGetArchiveZklinks inner ->
             Json.Encode.object [ ( "PvqGetArchiveZklinks", getArchiveZkLinksEncoder inner ) ]
         PvqGetZkLinksSince inner ->
@@ -679,7 +665,7 @@ privateRequestEncoder enum =
         PvqSaveZkNote inner ->
             Json.Encode.object [ ( "PvqSaveZkNote", saveZkNoteEncoder inner ) ]
         PvqSaveZkLinks inner ->
-            Json.Encode.object [ ( "PvqSaveZkLinks", zkLinksEncoder inner ) ]
+            Json.Encode.object [ ( "PvqSaveZkLinks", saveZkLinksEncoder inner ) ]
         PvqSaveZkNoteAndLinks inner ->
             Json.Encode.object [ ( "PvqSaveZkNoteAndLinks", saveZkNoteAndLinksEncoder inner ) ]
         PvqSaveImportZkNotes inner ->
@@ -1138,6 +1124,7 @@ zkNoteIdDecoder : Json.Decode.Decoder ZkNoteId
 zkNoteIdDecoder = 
     Json.Decode.oneOf
         [ Json.Decode.map Zni (Json.Decode.field "Zni" (Json.Decode.string))
+        , Json.Decode.field "ArchiveZni" (Json.Decode.succeed ArchiveZni |> Json.Decode.andThen (\x -> Json.Decode.index 0 (Json.Decode.string) |> Json.Decode.map x) |> Json.Decode.andThen (\x -> Json.Decode.index 1 (Json.Decode.string) |> Json.Decode.map x))
         ]
 
 extraLoginDataDecoder : Json.Decode.Decoder ExtraLoginData
@@ -1353,13 +1340,6 @@ zkNoteArchivesDecoder =
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "results" (zkListNoteSearchResultDecoder)))
 
 
-getArchiveZkNoteDecoder : Json.Decode.Decoder GetArchiveZkNote
-getArchiveZkNoteDecoder =
-    Json.Decode.succeed GetArchiveZkNote
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "parentnote" (zkNoteIdDecoder)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "noteid" (zkNoteIdDecoder)))
-
-
 getArchiveZkLinksDecoder : Json.Decode.Decoder GetArchiveZkLinks
 getArchiveZkLinksDecoder =
     Json.Decode.succeed GetArchiveZkLinks
@@ -1554,14 +1534,13 @@ privateRequestDecoder =
         , Json.Decode.map PvqGetZnlIfChanged (Json.Decode.field "PvqGetZnlIfChanged" (getZnlIfChangedDecoder))
         , Json.Decode.map PvqGetZkNoteComments (Json.Decode.field "PvqGetZkNoteComments" (getZkNoteCommentsDecoder))
         , Json.Decode.map PvqGetZkNoteArchives (Json.Decode.field "PvqGetZkNoteArchives" (getZkNoteArchivesDecoder))
-        , Json.Decode.map PvqGetArchiveZkNote (Json.Decode.field "PvqGetArchiveZkNote" (getArchiveZkNoteDecoder))
         , Json.Decode.map PvqGetArchiveZklinks (Json.Decode.field "PvqGetArchiveZklinks" (getArchiveZkLinksDecoder))
         , Json.Decode.map PvqGetZkLinksSince (Json.Decode.field "PvqGetZkLinksSince" (getZkLinksSinceDecoder))
         , Json.Decode.map PvqSearchZkNotes (Json.Decode.field "PvqSearchZkNotes" (zkNoteSearchDecoder))
         , Json.Decode.map PvqPowerDelete (Json.Decode.field "PvqPowerDelete" (Json.Decode.list (tagSearchDecoder)))
         , Json.Decode.map PvqDeleteZkNote (Json.Decode.field "PvqDeleteZkNote" (zkNoteIdDecoder))
         , Json.Decode.map PvqSaveZkNote (Json.Decode.field "PvqSaveZkNote" (saveZkNoteDecoder))
-        , Json.Decode.map PvqSaveZkLinks (Json.Decode.field "PvqSaveZkLinks" (zkLinksDecoder))
+        , Json.Decode.map PvqSaveZkLinks (Json.Decode.field "PvqSaveZkLinks" (saveZkLinksDecoder))
         , Json.Decode.map PvqSaveZkNoteAndLinks (Json.Decode.field "PvqSaveZkNoteAndLinks" (saveZkNoteAndLinksDecoder))
         , Json.Decode.map PvqSaveImportZkNotes (Json.Decode.field "PvqSaveImportZkNotes" (Json.Decode.list (importZkNoteDecoder)))
         , Json.Decode.map PvqSetHomeNote (Json.Decode.field "PvqSetHomeNote" (zkNoteIdDecoder))

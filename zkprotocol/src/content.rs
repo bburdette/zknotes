@@ -11,26 +11,29 @@ use uuid::Uuid;
 #[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum ZkNoteId {
   Zni(Uuid),
+  ArchiveZni(Uuid, Uuid),
 }
 
 impl Into<Uuid> for ZkNoteId {
   fn into(self) -> Uuid {
     match self {
       ZkNoteId::Zni(uuid) => uuid,
+      ZkNoteId::ArchiveZni(uuid, _) => uuid,
     }
   }
 }
 
-impl From<Uuid> for ZkNoteId {
-  fn from(a: Uuid) -> Self {
-    ZkNoteId::Zni(a)
-  }
-}
+// impl From<Uuid> for ZkNoteId {
+//   fn from(a: Uuid) -> Self {
+//     ZkNoteId::Zni(a)
+//   }
+// }
 
 impl Display for ZkNoteId {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
-      ZkNoteId::Zni(uuid) => write!(f, "{}", uuid),
+      ZkNoteId::Zni(uuid) => write!(f, "zknote {}", uuid),
+      ZkNoteId::ArchiveZni(uuid, _) => write!(f, "archive {}", uuid),
     }
   }
 }
@@ -236,11 +239,11 @@ pub struct ZkNoteArchives {
   pub results: ZkListNoteSearchResult,
 }
 
-#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]
-pub struct GetArchiveZkNote {
-  pub parentnote: ZkNoteId,
-  pub noteid: ZkNoteId,
-}
+// #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]
+// pub struct GetArchiveZkNote {
+//   pub parentnote: ZkNoteId,
+//   pub noteid: ZkNoteId,
+// }
 
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]
 pub struct GetArchiveZkLinks {

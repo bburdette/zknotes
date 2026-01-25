@@ -1313,7 +1313,7 @@ pub fn new_shares(
   let res: Result<Vec<(i64, ZkNoteId)>, zkerr::Error> = rec_iter
     .map(|i| {
       i.map_err(|e| e.into())
-        .and_then(|(id, uuid)| Ok((id, Uuid::parse_str(uuid.as_str())?.into())))
+        .and_then(|(id, uuid)| Ok((id, ZkNoteId::Zni(Uuid::parse_str(uuid.as_str())?))))
     })
     .collect();
   res
@@ -1545,6 +1545,8 @@ pub fn sync_stream(
     deleted: false,
     ordering: None,
   };
+
+  println!("ans {:?}", ans);
 
   let anstream =
     search_zknotes_stream(conn.clone(), files_dir, uid, ans, exclude_notes).map(bytesify);

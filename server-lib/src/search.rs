@@ -17,6 +17,7 @@ use uuid::Uuid;
 use zkprotocol::constants::SpecialUuids;
 use zkprotocol::content::FileStatus;
 use zkprotocol::content::ZkListNote;
+use zkprotocol::content::ZkNoteId;
 use zkprotocol::search::{
   AndOr, ArchivesOrCurrent, OrderDirection, OrderField, ResultType, SearchMod, TagSearch,
   ZkIdSearchResult, ZkListNoteSearchResult, ZkNoteAndLinksSearchResult, ZkNoteSearch,
@@ -124,7 +125,7 @@ pub fn search_zknotes(
     let uuid = Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?;
     let sysids = get_sysids(conn, sysid, id)?;
     Ok::<ZkListNote, zkerr::Error>(ZkListNote {
-      id: uuid.into(),
+      id: ZkNoteId::Zni(uuid),
       title: row.get(2)?,
       filestatus: {
         let wat: Option<i64> = row.get(3)?;
@@ -274,7 +275,17 @@ pub fn search_zknotes_stream(
           yield SyncMessage::SyncError("unimplemented".to_string())
         }
         ResultType::RtNote => {
-          let zn = sqldata::read_zknote_i64(&conn, &files_dir,Some(user), row.get(0)?)?;
+          // TODO: distinguish archive zknotes from regular zknotes in search results.
+          // Either switch read_zknote functions, or something.
+          let uuid = Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?;
+          let parent : Option<Uuid>
+           = row.get::<usize, Option<String>>(3)?.and_then(
+               |x| Uuid::parse_str(x.as_str()).ok());
+          // let uuid = Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?;
+          let (_id, zn) = match parent {
+            None => sqldata::read_zknote(&conn, &files_dir,Some(user), &ZkNoteId::Zni(uuid))?,
+            Some(pid) => sqldata::read_zknote(&conn, &files_dir,Some(user), &ZkNoteId::ArchiveZni(uuid, pid))?,
+            };
           let mbf = if zn.filestatus != FileStatus::NotAFile {
             Some( sqldata::read_file_info(&conn, row.get(0)?)? )} else { None };
           yield SyncMessage::from((zn, mbf))
@@ -372,8 +383,8 @@ pub fn build_sql(
   match exclude_notes {
     Some(exclude_note_table) => {
       let nusql = format!(
-        "with SN ( id, uuid, title, file, user, createdate, changeddate) as ({})
-        select SN.id, SN.uuid, SN.title, SN.file, SN.user, SN.createdate, SN.changeddate
+        "with SN ( id, uuid, zknote, title, file, user, createdate, changeddate) as ({})
+        select SN.id, SN.uuid, SN.zknote, SN.title, SN.file, SN.user, SN.createdate, SN.changeddate
         from SN
         left join {} as EN
         on SN.id = EN.id
@@ -452,7 +463,7 @@ pub fn build_base_sql(
     let (sqlbase, baseargs) = (
       // archives of notes that are mine.
       format!(
-        "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
+        "select N.id, N.uuid, N.zknote, N.title, N.file, N.user, N.createdate, N.changeddate
       from zkarch N where N.user = ?
         {}",
         deleted
@@ -467,7 +478,7 @@ pub fn build_base_sql(
     // notes that are mine.
     (
       format!(
-        "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
+        "select N.id, N.uuid, null, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N where N.user = ?
         {}",
         deleted
@@ -482,7 +493,7 @@ pub fn build_base_sql(
     let (sqlpub, pubargs) = (
       // archives of notes that are public, and not mine.
       format!(
-        "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
+        "select N.id, N.uuid, N.zknote, N.title, N.file, N.user, N.createdate, N.changeddate
       from zkarch N, zklink L
       where (N.user != ?
         and L.fromid = N.zknote and L.toid = ? )
@@ -496,7 +507,7 @@ pub fn build_base_sql(
   if current {
     let (sqlpub, pubargs) = (
       format!(
-        "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
+        "select N.id, N.uuid, null, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N, zklink L
       where (N.user != ? and L.fromid = N.id and L.toid = ?)
       {}",
@@ -518,7 +529,7 @@ pub fn build_base_sql(
   if archives {
     let (sqlshare, shareargs) = (
       format!(
-        "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
+        "select N.id, N.uuid, N.zknote, N.title, N.file, N.user, N.createdate, N.changeddate
       from zkarch N, zklink L, zklink M, zklink U
       where N.user != ?
       and
@@ -542,7 +553,7 @@ pub fn build_base_sql(
   if current {
     let (sqlshare, shareargs) = (
       format!(
-        "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
+        "select N.id, N.uuid, null, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N, zklink L, zklink M, zklink U
       where (N.user != ?
         and M.toid = ?
@@ -567,7 +578,7 @@ pub fn build_base_sql(
   if archives {
     let (sqluser, userargs) = (
       format!(
-        "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
+        "select N.id, N.uuid, N.zknote, N.title, N.file, N.user, N.createdate, N.changeddate
       from zkarch N, zklink L
       where N.user != ?
         and ((L.fromid = N.zknote and L.toid = ?) or (L.toid = N.zknote and L.fromid = ?))
@@ -585,7 +596,7 @@ pub fn build_base_sql(
   if current {
     let (sqluser, userargs) = (
       format!(
-        "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
+        "select N.id, N.uuid, null, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N, zklink L
       where (
         N.user != ? and
