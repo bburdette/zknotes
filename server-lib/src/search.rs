@@ -115,20 +115,22 @@ pub fn search_zknotes(
 
   let mut pstmt = conn.prepare(sql.as_str())?;
 
-  // println!("sql {:?}", sql);
-  // println!("args {:?}", args);
+  println!("sql {:?}", sql);
+  println!("args {:?}", args);
 
   let sysid = user_id(&conn, "system")?;
 
   let rec_iter = pstmt.query_and_then(rusqlite::params_from_iter(args.iter()), |row| {
     let id = row.get(0)?;
+    println!("got id {}", id);
     let uuid = Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?;
+    println!("got uuid {}", uuid);
     let sysids = get_sysids(conn, sysid, id)?;
     Ok::<ZkListNote, zkerr::Error>(ZkListNote {
       id: ZkNoteId::Zni(uuid),
-      title: row.get(2)?,
+      title: row.get(3)?,
       filestatus: {
-        let wat: Option<i64> = row.get(3)?;
+        let wat: Option<i64> = row.get(4)?;
         match wat {
           Some(file_id) => {
             if sqldata::file_exists(&conn, filedir, file_id)? {
@@ -140,9 +142,9 @@ pub fn search_zknotes(
           None => FileStatus::NotAFile,
         }
       },
-      user: UserId::Uid(row.get(4)?),
-      createdate: row.get(5)?,
-      changeddate: row.get(6)?,
+      user: UserId::Uid(row.get(5)?),
+      createdate: row.get(6)?,
+      changeddate: row.get(7)?,
       sysids,
     })
   })?;
@@ -178,6 +180,7 @@ pub fn search_zknotes(
         }
       }
 
+      println!("resutingsnotes: {:?}", pv);
       Ok(SearchResult::SrListNote(ZkListNoteSearchResult {
         notes: pv,
         offset: search.offset,
@@ -316,7 +319,7 @@ pub fn sync_users(
 
     let mut pstmt = conn.prepare(
       format!(
-        "with search_notes ( id, uuid, title, file, user, createdate, changeddate) as ({})
+        "with search_notes ( id, uuid, zknote, title, file, user, createdate, changeddate) as ({})
         select U.id, U.uuid, U.name, U.active
         from orgauth_user U where
           U.id in (select distinct user from search_notes)",
@@ -335,8 +338,8 @@ pub fn sync_users(
             id: UserId::Uid(row.get(0)?),
             uuid: uuid,
             data: serde_json::Value::Null.to_string(),
-            name: row.get(2)?,
-            active: row.get(3)?,
+            name: row.get(3)?,
+            active: row.get(4)?,
           }),
           Err(_e) => Err(rusqlite::Error::InvalidColumnType(
             0,

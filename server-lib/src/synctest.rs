@@ -31,6 +31,7 @@ mod tests {
   use std::str::FromStr;
   use std::sync::Arc;
   use zkprotocol::content::Server;
+  use zkprotocol::content::ZkNoteId;
   use zkprotocol::search::SearchMod;
   use zkprotocol::search::TagSearch;
   use zkprotocol::search::ZkNoteSearch;
@@ -923,7 +924,7 @@ mod tests {
         &saconn,
         &server_ts.filepath,
         Some(ssyncuser),
-        &szn.clone().into(),
+        &ZkNoteId::Zni(szn.clone()),
       ) {
         Err(zkerr::Error::Rusqlite(rusqlite::Error::QueryReturnedNoRows)) => {
           Err(format!("not found: {:?}", szn).into())
@@ -940,7 +941,7 @@ mod tests {
         &caconn,
         &client_ts.filepath,
         Some(csyncuser),
-        &szn.clone().into(),
+        &ZkNoteId::Zni(szn.clone()),
       )?;
     }
 
@@ -951,7 +952,7 @@ mod tests {
         &saconn,
         &server_ts.filepath,
         Some(ssyncuser),
-        &szn.clone().into(),
+        &ZkNoteId::Zni(szn.clone()),
       ) {
         Ok(_) => Err(format!(
           "client note was not supposed to sync to server: {}",
@@ -967,7 +968,7 @@ mod tests {
         &caconn,
         &client_ts.filepath,
         Some(csyncuser),
-        &szn.clone().into(),
+        &ZkNoteId::Zni(szn.clone()),
       ) {
         Ok(_) => Err(format!(
           "server note was not supposed to sync to client: {}",
@@ -1042,7 +1043,7 @@ mod tests {
       &saconn,
       &server_ts.filepath,
       Some(server_ts.otheruser),
-      &server_ts.otherusersharenote.1.into(),
+      &ZkNoteId::Zni(server_ts.otherusersharenote.1),
     )
     .map_err(|e| {
       zkerr::annotate_string(
@@ -1056,7 +1057,7 @@ mod tests {
       &saconn,
       &server_ts.filepath,
       Some(server_ts.syncuser),
-      &server_ts.otherusersharenote.1.into(),
+      &ZkNoteId::Zni(server_ts.otherusersharenote.1),
     )
     .map_err(|e| {
       zkerr::annotate_string(
@@ -1171,7 +1172,7 @@ mod tests {
       &caconn,
       &client_ts.filepath,
       Some(client_ts.syncuser),
-      &server_ts.otherusersharenote.1.into(),
+      &ZkNoteId::Zni(server_ts.otherusersharenote.1),
     )
     .map_err(|e| {
       zkerr::annotate_string(

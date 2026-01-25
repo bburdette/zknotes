@@ -5,7 +5,7 @@ import Browser
 import Browser.Events
 import Browser.Navigation
 import Common
-import Data exposing (EditTab(..), PrivateClosureRequest, ZkNoteId)
+import Data exposing (EditTab(..), PrivateClosureRequest, ZkNoteId(..))
 import DataUtil exposing (FileUrlInfo, LoginData, jobComplete, showPrivateReply)
 import Dict exposing (Dict)
 import DisplayMessage
@@ -2201,7 +2201,7 @@ actualupdate msg model =
         ( ZkReplyData (Ok ( _, Data.PvyZkNoteArchives lm )), ArchiveAwait id aid ld ) ->
             ( { model | state = ArchiveListing (ArchiveListing.init lm) ld }
             , sendZIMsg model.fui
-                (Data.PvqGetArchiveZkNote { parentnote = id, noteid = aid })
+                (Data.PvqGetZkNote (Data.ArchiveZni (DataUtil.zkNoteIdToString aid) (DataUtil.zkNoteIdToString id)))
             )
 
         ( PublicReplyData prd, state ) ->
@@ -4183,15 +4183,15 @@ handleTagFiles model ( lmod, lcmd ) login st =
                         zkls =
                             Dict.values lmod.zklDict
 
-                        zklinks : List Data.ZkLink
+                        zklinks : List Data.SaveZkLink2
                         zklinks =
-                            zklns
-                                |> List.foldl
-                                    (\zkln links ->
-                                        List.map (\el -> DataUtil.toZkLink zkln.id login.userid el) zkls
-                                            ++ links
-                                    )
-                                    []
+                            List.foldl
+                                (\zkln links ->
+                                    List.map (\el -> DataUtil.elToSzl2 zkln.id el) zkls
+                                        ++ links
+                                )
+                                []
+                                zklns
                     in
                     ( { model | state = st }
                     , sendZIMsg model.fui

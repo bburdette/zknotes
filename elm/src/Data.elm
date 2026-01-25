@@ -219,6 +219,36 @@ saveZkLinkEncoder struct =
         ]
 
 
+type alias SaveZkLink2 =
+    { from : ZkNoteId
+    , to : ZkNoteId
+    , linkzknote : Maybe (ZkNoteId)
+    , delete : Maybe (Bool)
+    }
+
+
+saveZkLink2Encoder : SaveZkLink2 -> Json.Encode.Value
+saveZkLink2Encoder struct =
+    Json.Encode.object
+        [ ( "from", (zkNoteIdEncoder) struct.from )
+        , ( "to", (zkNoteIdEncoder) struct.to )
+        , ( "linkzknote", (Maybe.withDefault Json.Encode.null << Maybe.map (zkNoteIdEncoder)) struct.linkzknote )
+        , ( "delete", (Maybe.withDefault Json.Encode.null << Maybe.map (Json.Encode.bool)) struct.delete )
+        ]
+
+
+type alias SaveZkLinks =
+    { links : List (SaveZkLink2)
+    }
+
+
+saveZkLinksEncoder : SaveZkLinks -> Json.Encode.Value
+saveZkLinksEncoder struct =
+    Json.Encode.object
+        [ ( "links", (Json.Encode.list (saveZkLink2Encoder)) struct.links )
+        ]
+
+
 type alias SaveZkNoteAndLinks =
     { note : SaveZkNote
     , links : List (SaveZkLink)
@@ -1254,6 +1284,21 @@ saveZkLinkDecoder =
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "user" (userIdDecoder)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "zknote" (Json.Decode.nullable (zkNoteIdDecoder))))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "delete" (Json.Decode.nullable (Json.Decode.bool))))
+
+
+saveZkLink2Decoder : Json.Decode.Decoder SaveZkLink2
+saveZkLink2Decoder =
+    Json.Decode.succeed SaveZkLink2
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "from" (zkNoteIdDecoder)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "to" (zkNoteIdDecoder)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "linkzknote" (Json.Decode.nullable (zkNoteIdDecoder))))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "delete" (Json.Decode.nullable (Json.Decode.bool))))
+
+
+saveZkLinksDecoder : Json.Decode.Decoder SaveZkLinks
+saveZkLinksDecoder =
+    Json.Decode.succeed SaveZkLinks
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "links" (Json.Decode.list (saveZkLink2Decoder))))
 
 
 saveZkNoteAndLinksDecoder : Json.Decode.Decoder SaveZkNoteAndLinks

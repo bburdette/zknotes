@@ -32,8 +32,8 @@ impl Into<Uuid> for ZkNoteId {
 impl Display for ZkNoteId {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
-      ZkNoteId::Zni(uuid) => write!(f, "zknote {}", uuid),
-      ZkNoteId::ArchiveZni(uuid, _) => write!(f, "archive {}", uuid),
+      ZkNoteId::Zni(uuid) => write!(f, "{}", uuid),
+      ZkNoteId::ArchiveZni(uuid, _) => write!(f, "{}", uuid),
     }
   }
 }
