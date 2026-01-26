@@ -115,26 +115,14 @@ pub fn search_zknotes(
   let (sql, args) = build_sql(&conn, user, &search, None)?;
 
   let mut pstmt = conn.prepare(sql.as_str())?;
-
-  println!("sql {:?}", sql);
-  println!("args {:?}", args);
-
   let sysid = user_id(&conn, "system")?;
-
   let rec_iter = pstmt.query_and_then(rusqlite::params_from_iter(args.iter()), |row| {
     let id = row.get(0)?;
-    println!("got id {}", id);
     let uuid = Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?;
-    println!("got uuid {}", uuid);
-    let pid = row.get::<usize, String>(2).ok().and_then(|x| {
-      println!("pid: {:?}", x);
-      Uuid::parse_str(x.as_str()).ok()
-    });
-    // let pid = row.get::<usize, Option<String>>(2)?.and_then(|x| {
-    //   println!("pid: {:?}", x);
-    //   Uuid::parse_str(x.as_str()).ok()
-    // });
-    println!("got pid {:?}", pid);
+    let pid = row
+      .get::<usize, String>(2)
+      .ok()
+      .and_then(|x| Uuid::parse_str(x.as_str()).ok());
     let sysids = get_sysids(conn, sysid, id)?;
     Ok::<ZkListNote, zkerr::Error>(ZkListNote {
       id: match pid {
@@ -194,7 +182,6 @@ pub fn search_zknotes(
         }
       }
 
-      println!("resutingsnotes: {:?}", pv);
       Ok(SearchResult::SrListNote(ZkListNoteSearchResult {
         notes: pv,
         offset: search.offset,
@@ -255,17 +242,8 @@ pub fn search_zknotes_stream(
   // uncomment for formatting, lsp
   // {
   try_stream! {
-    println!("search_zknotes_stream 1");
-    // let user = match search.archives {
-    //   ArchivesOrCurrent::Archives =>  user_id(&conn, "system")?,
-    //   ArchivesOrCurrent::Current =>  user,
-    //   ArchivesOrCurrent::CurrentAndArchives => panic!("unsupported"),
-    // };
-
     let (sql, args) = build_sql(&conn, user, &search, exclude_notes)?;
 
-    println!("sql: {}", sql);
-    println!("args: {:?}", args);
 
     let mut stmt = conn.prepare(sql.as_str())?;
     let mut rows = stmt.query(rusqlite::params_from_iter(args.iter()))?;
@@ -275,44 +253,17 @@ pub fn search_zknotes_stream(
       offset: search.offset,
     });
 
-    println!("search_zknotes_stream 2");
     while let Some(row) = rows.next()? {
       match search.resulttype {
         ResultType::RtId => yield SyncMessage::ZkNoteId(row.get::<usize, String>(1)?),
         ResultType::RtListNote => {
-          // let zln = ZkListNote {
-          //   id: Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?,
-          //   title: row.get(2)?,
-          //   is_file: {
-          //     let wat: Option<i64> = row.get(3)?;
-          //     wat.is_some()
-          //   },
-          //   user: row.get(4)?,
-          //   createdate: row.get(5)?,
-          //   changeddate: row.get(6)?,
-          //   sysids: Vec::new(),
-          // };
-          // yield SyncMessage::from(zln)
           yield SyncMessage::SyncError("unimplemented".to_string())
         }
         ResultType::RtNote => {
-          // TODO: distinguish archive zknotes from regular zknotes in search results.
-        // id, uuid, zknote, title, file, user,
-          // Either switch read_zknote functions, or something.
-    println!("search_zknotes_stream 3");
           let uuid = Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?;
-          println!("uuid:  {:?}", uuid);
-    println!("search_zknotes_stream 3.1");
-          println!("row.get::<usize, i64>(2) {:?}", row.get::<usize, i64>(2));
-          println!("row.get::<usize, String>(2) {:?}", row.get::<usize, String>(2));
           let parent : Option<Uuid>
            = row.get::<usize, String>(2).ok().and_then(
-               |x| {println!("x: {}", x);
-                 Uuid::parse_str(x.as_str()).ok()});
-          println!("parrtent:  {:?}", parent);
-               // |x| Uuid::parse_str(x.as_str()).ok());
-          // let uuid = Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?;
-    println!("search_zknotes_stream 4");
+               |x| Uuid::parse_str(x.as_str()).ok());
           let (_id, zn) = match parent {
             None => sqldata::read_zknote(&conn, &files_dir,Some(user), &ZkNoteId::Zni(uuid))?,
             Some(pid) => sqldata::read_zknote(&conn, &files_dir,Some(user), &ZkNoteId::ArchiveZni(uuid, pid))?,
@@ -322,10 +273,6 @@ pub fn search_zknotes_stream(
           yield SyncMessage::from((zn, mbf))
         }
         ResultType::RtNoteAndLinks => {
-          // TODO: i64 version
-          // let uuid = Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?;
-          // let zn = sqldata::read_zknoteandlinks(&conn, Some(user), &uuid)?;
-          // yield SyncMessage::from(zn)
           yield SyncMessage::SyncError("unimplemented".to_string())
         }
       }
