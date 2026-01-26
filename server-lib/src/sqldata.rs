@@ -1246,34 +1246,34 @@ pub fn read_zkarch_unchecked(
       ZkNote {
         id: ZkNoteId::ArchiveZni(
           Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?,
-          Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?,
+          Uuid::parse_str(row.get::<usize, String>(2)?.as_str())?,
         ),
-        title: row.get(2)?,
-        content: row.get(3)?,
-        user: UserId::Uid(row.get(4)?),
-        username: row.get(5)?,
-        usernote: ZkNoteId::Zni(Uuid::parse_str(row.get::<usize, String>(6)?.as_str())?),
-        pubid: row.get(7)?,
-        editable: row.get(8)?,      // editable same as editableValue!
-        editableValue: row.get(8)?, // <--- same index.
-        showtitle: row.get(9)?,
-        deleted: row.get(10)?,
-        filestatus: file_status(&conn, &filedir, row.get(11)?)?,
-        createdate: row.get(12)?,
-        changeddate: row.get(13)?,
-        server: row.get(14)?,
+        title: row.get(3)?,
+        content: row.get(4)?,
+        user: UserId::Uid(row.get(5)?),
+        username: row.get(6)?,
+        usernote: ZkNoteId::Zni(Uuid::parse_str(row.get::<usize, String>(7)?.as_str())?),
+        pubid: row.get(8)?,
+        editable: row.get(9)?,      // editable same as editableValue!
+        editableValue: row.get(9)?, // <--- same index.
+        showtitle: row.get(10)?,
+        deleted: row.get(11)?,
+        filestatus: file_status(&conn, &filedir, row.get(12)?)?,
+        createdate: row.get(13)?,
+        changeddate: row.get(14)?,
+        server: row.get(15)?,
         sysids: Vec::new(),
       },
     ))
   };
 
   conn.query_row_and_then(
-        "select ZN.id, ZN.uuid, ZN.title, ZN.content, ZN.user, OU.name, ZKN.uuid,
+        "select ZN.id, ZN.uuid, ZKP.uuid, ZN.title, ZN.content, ZN.user, OU.name, ZKN.uuid,
             ZN.pubid, ZN.editable, ZN.showtitle, ZN.deleted, ZN.file, ZN.createdate, ZN.changeddate, S.uuid
-          from zkarch ZN, orgauth_user OU, user U, zknote ZKN, server S
-          where ZN.uuid = ?1 and U.id = ZN.user and OU.id = ZN.user and ZKN.id = U.zknote and S.id = ZN.server",
+          from zkarch ZN, orgauth_user OU, user U, zknote ZKN, zknote ZKP, server S
+          where ZN.uuid = ?1 and U.id = ZN.user and OU.id = ZN.user and ZKP.id = ZN.zknote and ZKN.id = U.zknote and S.id = ZN.server",
           params![uuid.to_string()],
-        closure).map_err(|e| zkerr::annotate_string(format!("note not found: {}", uuid), e ))
+        closure).map_err(|e| zkerr::annotate_string(format!("archive note not found: {}", uuid), e ))
 }
 
 pub fn read_file_info(conn: &Connection, noteid: i64) -> Result<FileInfo, zkerr::Error> {
@@ -1409,17 +1409,21 @@ pub fn read_zklistarchnote(
   }?;
 
   let note = conn.query_row_and_then(
-    "select ZN.uuid, ZN.title, ZN.file, ZN.user, ZN.createdate, ZN.changeddate
-      from zknote ZN, orgauth_user OU, user U where ZN.id = ?1 and U.id = ZN.user and OU.id = ZN.user",
+    "select ZN.uuid, ZKP.uuid, ZN.title, ZN.file, ZN.user, ZN.createdate, ZN.changeddate
+      from zkarch ZN, zkarch ZKP, orgauth_user OU, user U
+      where ZN.id = ?1 and U.id = ZN.user and OU.id = ZN.user and ZKP.id = ZN.zknote",
     params![id],
     |row| {
       let zln = ZkListNote {
-        id:  ZkNoteId::Zni(Uuid::parse_str(row.get::<usize,String>(0)?.as_str())?),
-        title: row.get(1)?,
-        filestatus: file_status(&conn, &files_dir, row.get(2)?)?,
-        user: UserId::Uid(row.get(3)?),
-        createdate: row.get(4)?,
-        changeddate: row.get(5)?,
+        id: ZkNoteId::ArchiveZni(
+          Uuid::parse_str(row.get::<usize, String>(0)?.as_str())?,
+          Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?,
+        ),
+        title: row.get(2)?,
+        filestatus: file_status(&conn, &files_dir, row.get(3)?)?,
+        user: UserId::Uid(row.get(4)?),
+        createdate: row.get(5)?,
+        changeddate: row.get(6)?,
         sysids,
       };
       Ok::<_, zkerr::Error>(zln)
@@ -2137,6 +2141,7 @@ pub fn read_archivezklinks(
     let mut av = vec![a.clone(), a.clone(), a.clone()];
     acc_args.append(&mut av);
   }
+  println!("read_archivezklinks_stream");
 
   let rec_iter = pstmt.query_map(rusqlite::params_from_iter(acc_args.iter()), |row| {
     Ok(ArchiveZkLink {
@@ -2149,6 +2154,7 @@ pub fn read_archivezklinks(
     })
   })?;
 
+  println!("read_archivezklinks_stream2");
   Ok(rec_iter.filter_map(|x| x.ok()).collect())
 }
 
@@ -2160,6 +2166,7 @@ pub fn read_archivezklinks_stream(
 ) -> impl futures_util::Stream<Item = Result<SyncMessage, Box<dyn std::error::Error>>> {
   // {
   try_stream! {
+    println!("read_archivezklinks_stream");
     let (acc_sql, mut acc_args) = accessible_notes(&conn, uid)?;
 
     let mut pstmt = conn.prepare(
@@ -2196,7 +2203,7 @@ pub fn read_archivezklinks_stream(
       acc_args.push(a.clone());
       acc_args.push(a);
     }
-
+    println!("read_archivezklinks_stream");
     let rec_iter = pstmt.query_map(rusqlite::params_from_iter(acc_args.iter()), |row| {
       let azl = ArchiveZkLink {
         userUuid: row.get(0)?,
@@ -2208,6 +2215,7 @@ pub fn read_archivezklinks_stream(
       };
       Ok(azl)
     })?;
+    println!("read_archivezklinks_stream2");
 
     yield SyncMessage::ArchiveZkLinkHeader;
 
@@ -2274,6 +2282,8 @@ pub fn read_zklinks_since_stream(
   // {
   try_stream! {
 
+    println!("read_zklinks_since_stream 1");
+
     let (acc_sql, acc_args) = accessible_notes(&conn, uid)?;
 
     // make an accessible notes temp table.
@@ -2302,6 +2312,7 @@ pub fn read_zklinks_since_stream(
       rusqlite::params_from_iter(acc_args.iter()),
     )?;
 
+    println!("read_zklinks_since_stream 2");
     // links.  Fact:  these records are only created when a link is deleted!
     // so the createdate is the date the original link was created, and the deletedate is the date the
     // zklinkarchive record was created.
@@ -2342,6 +2353,7 @@ pub fn read_zklinks_since_stream(
       }
 
       yield SyncMessage::UuidZkLinkHeader;
+    println!("read_zklinks_since_stream 3");
 
       let rec_iter = pstmt.query_map(rusqlite::params_from_iter(lnargs.iter()), |row| {
         Ok(SyncMessage::from(UuidZkLink {
@@ -2358,6 +2370,7 @@ pub fn read_zklinks_since_stream(
         }
       }
     }
+    println!("read_zklinks_since_stream 4");
 
     conn.execute(format!("drop table {}", tabname).as_str(), params![])?;
 

@@ -260,17 +260,21 @@ routeState model route =
         ( st, cmds ) =
             routeStateInternal model route
     in
-    case stateLogin st of
-        Just login ->
-            ( st
-            , Cmd.batch
-                [ cmds
-                , sendZIMsg model.fui (Data.PvqSearchZkNotes <| prevSearchQuery login)
-                ]
-            )
+    ( st, cmds )
 
-        Nothing ->
-            ( st, cmds )
+
+
+-- case stateLogin st of
+--     Just login ->
+--         ( st
+--         , Cmd.batch
+--             [ cmds
+--             -- TODO: uh don't do this search every time??
+--             , sendZIMsg model.fui (Data.PvqSearchZkNotes <| prevSearchQuery login)
+--             ]
+--         )
+--     Nothing ->
+--         ( st, cmds )
 
 
 routeStateInternal : Model -> Route -> ( State, Cmd Msg )
@@ -1534,26 +1538,43 @@ urlupdate msg model =
                     -- in the browser address bar, its a site reload so this isn't called.
                     case parseUrl url of
                         Just route ->
+                            let
+                                reroot =
+                                    let
+                                        ( st, rscmd ) =
+                                            routeState model route
+                                    in
+                                    -- swap out the savedRoute, so we don't write over history.
+                                    ( { model
+                                        | state = st
+                                        , savedRoute =
+                                            let
+                                                nssr =
+                                                    stateRoute st
+                                            in
+                                            { nssr | save = False }
+                                      }
+                                    , rscmd
+                                    )
+                            in
                             if route == (stateRoute model.state).route then
                                 ( model, Cmd.none )
 
                             else
-                                let
-                                    ( st, rscmd ) =
-                                        routeState model route
-                                in
-                                -- swap out the savedRoute, so we don't write over history.
-                                ( { model
-                                    | state = st
-                                    , savedRoute =
+                                case ( route, model.state ) of
+                                    ( ArchiveNoteR pid nid, ArchiveListing almod _ ) ->
                                         let
-                                            nssr =
-                                                stateRoute st
+                                            _ =
+                                                Debug.log "blah" ( almod.noteid, pid )
                                         in
-                                        { nssr | save = False }
-                                  }
-                                , rscmd
-                                )
+                                        if almod.noteid == pid then
+                                            ( model, Cmd.none )
+
+                                        else
+                                            reroot
+
+                                    _ ->
+                                        reroot
 
                         Nothing ->
                             -- load foreign site

@@ -525,12 +525,17 @@ mod tests {
 
     // use user2, since user2 has limited visibility to user1 notes.
     let cotheruser = user_id(&client_conn, "client-otheruser")?;
+    println!("0.21");
     let csyncuser = user_id(&client_conn, "client-syncuser")?;
+    println!("0.22");
     let csu = read_user_by_id(&client_conn, csyncuser)?;
+    println!("0.23");
 
     let ssyncuser = user_id(&server_conn, "server-syncuser")?;
+    println!("0.24");
     let ssu = read_user_by_id(&server_conn, ssyncuser)?;
 
+    println!("0.25");
     let caconn = Arc::new(client_conn);
     let saconn = Arc::new(server_conn);
 
@@ -563,6 +568,7 @@ mod tests {
         &mut cb,
         &lm,
       );
+      println!("0.26");
 
       let ctr = caconn.unchecked_transaction()?;
 
@@ -575,6 +581,7 @@ mod tests {
       let ss = server_stream.map_err(convert_err);
       pin_mut!(ss);
       let mut br = StreamReader::new(ss);
+      println!("0.27");
 
       match sync_from_stream(
         &caconn,

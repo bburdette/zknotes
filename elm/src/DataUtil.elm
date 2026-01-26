@@ -333,7 +333,12 @@ jobComplete js =
 
 editNoteLink : ZkNoteId -> String
 editNoteLink noteid =
-    UB.absolute [ "editnote", zkNoteIdToString noteid ] []
+    case noteid of
+        Zni uuid ->
+            UB.absolute [ "editnote", uuid ] []
+
+        ArchiveZni uuid parentnoteid ->
+            UB.absolute [ "archivenote", parentnoteid, uuid ] []
 
 
 archiveNoteLink : ZkNoteId -> ZkNoteId -> String

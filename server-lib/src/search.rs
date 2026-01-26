@@ -2,6 +2,7 @@ use crate::error as zkerr;
 use crate::sqldata;
 use crate::sqldata::local_server_id;
 use crate::sqldata::server_id;
+use crate::sqldata::uuid_for_note_id;
 use crate::sqldata::{delete_zknote, get_sysids, note_id};
 use async_stream::try_stream;
 use futures::Stream;
@@ -125,12 +126,25 @@ pub fn search_zknotes(
     println!("got id {}", id);
     let uuid = Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?;
     println!("got uuid {}", uuid);
+    let pid = row.get::<usize, String>(2).ok().and_then(|x| {
+      println!("pid: {:?}", x);
+      Uuid::parse_str(x.as_str()).ok()
+    });
+    // let pid = row.get::<usize, Option<String>>(2)?.and_then(|x| {
+    //   println!("pid: {:?}", x);
+    //   Uuid::parse_str(x.as_str()).ok()
+    // });
+    println!("got pid {:?}", pid);
     let sysids = get_sysids(conn, sysid, id)?;
     Ok::<ZkListNote, zkerr::Error>(ZkListNote {
-      id: ZkNoteId::Zni(uuid),
+      id: match pid {
+        Some(pid) => ZkNoteId::ArchiveZni(uuid, pid),
+        None => ZkNoteId::Zni(uuid),
+      },
       title: row.get(3)?,
       filestatus: {
         let wat: Option<i64> = row.get(4)?;
+
         match wat {
           Some(file_id) => {
             if sqldata::file_exists(&conn, filedir, file_id)? {
@@ -241,14 +255,17 @@ pub fn search_zknotes_stream(
   // uncomment for formatting, lsp
   // {
   try_stream! {
-
-    let user = match search.archives {
-      ArchivesOrCurrent::Archives =>  user_id(&conn, "system")?,
-      ArchivesOrCurrent::Current =>  user,
-      ArchivesOrCurrent::CurrentAndArchives => panic!("unsupported"),
-    };
+    println!("search_zknotes_stream 1");
+    // let user = match search.archives {
+    //   ArchivesOrCurrent::Archives =>  user_id(&conn, "system")?,
+    //   ArchivesOrCurrent::Current =>  user,
+    //   ArchivesOrCurrent::CurrentAndArchives => panic!("unsupported"),
+    // };
 
     let (sql, args) = build_sql(&conn, user, &search, exclude_notes)?;
+
+    println!("sql: {}", sql);
+    println!("args: {:?}", args);
 
     let mut stmt = conn.prepare(sql.as_str())?;
     let mut rows = stmt.query(rusqlite::params_from_iter(args.iter()))?;
@@ -258,6 +275,7 @@ pub fn search_zknotes_stream(
       offset: search.offset,
     });
 
+    println!("search_zknotes_stream 2");
     while let Some(row) = rows.next()? {
       match search.resulttype {
         ResultType::RtId => yield SyncMessage::ZkNoteId(row.get::<usize, String>(1)?),
@@ -279,12 +297,22 @@ pub fn search_zknotes_stream(
         }
         ResultType::RtNote => {
           // TODO: distinguish archive zknotes from regular zknotes in search results.
+        // id, uuid, zknote, title, file, user,
           // Either switch read_zknote functions, or something.
+    println!("search_zknotes_stream 3");
           let uuid = Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?;
+          println!("uuid:  {:?}", uuid);
+    println!("search_zknotes_stream 3.1");
+          println!("row.get::<usize, i64>(2) {:?}", row.get::<usize, i64>(2));
+          println!("row.get::<usize, String>(2) {:?}", row.get::<usize, String>(2));
           let parent : Option<Uuid>
-           = row.get::<usize, Option<String>>(3)?.and_then(
-               |x| Uuid::parse_str(x.as_str()).ok());
+           = row.get::<usize, String>(2).ok().and_then(
+               |x| {println!("x: {}", x);
+                 Uuid::parse_str(x.as_str()).ok()});
+          println!("parrtent:  {:?}", parent);
+               // |x| Uuid::parse_str(x.as_str()).ok());
           // let uuid = Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?;
+    println!("search_zknotes_stream 4");
           let (_id, zn) = match parent {
             None => sqldata::read_zknote(&conn, &files_dir,Some(user), &ZkNoteId::Zni(uuid))?,
             Some(pid) => sqldata::read_zknote(&conn, &files_dir,Some(user), &ZkNoteId::ArchiveZni(uuid, pid))?,
@@ -338,8 +366,8 @@ pub fn sync_users(
             id: UserId::Uid(row.get(0)?),
             uuid: uuid,
             data: serde_json::Value::Null.to_string(),
-            name: row.get(3)?,
-            active: row.get(4)?,
+            name: row.get(2)?,
+            active: row.get(3)?,
           }),
           Err(_e) => Err(rusqlite::Error::InvalidColumnType(
             0,
@@ -466,8 +494,8 @@ pub fn build_base_sql(
     let (sqlbase, baseargs) = (
       // archives of notes that are mine.
       format!(
-        "select N.id, N.uuid, N.zknote, N.title, N.file, N.user, N.createdate, N.changeddate
-      from zkarch N where N.user = ?
+        "select N.id, N.uuid, PN.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
+      from zkarch N, zknote PN where N.user = ? and PN.id = N.zknote
         {}",
         deleted
       ),
@@ -496,10 +524,11 @@ pub fn build_base_sql(
     let (sqlpub, pubargs) = (
       // archives of notes that are public, and not mine.
       format!(
-        "select N.id, N.uuid, N.zknote, N.title, N.file, N.user, N.createdate, N.changeddate
-      from zkarch N, zklink L
+        "select N.id, N.uuid, PN.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
+      from zkarch N, zklink L, zknote PN
       where (N.user != ?
         and L.fromid = N.zknote and L.toid = ? )
+        and PN.id = N.zknote
         {}",
         deleted
       ),
@@ -532,8 +561,8 @@ pub fn build_base_sql(
   if archives {
     let (sqlshare, shareargs) = (
       format!(
-        "select N.id, N.uuid, N.zknote, N.title, N.file, N.user, N.createdate, N.changeddate
-      from zkarch N, zklink L, zklink M, zklink U
+        "select N.id, N.uuid, PN.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
+      from zkarch N, zklink L, zklink M, zklink U, zknote PN
       where N.user != ?
       and
         (M.toid = ? and
@@ -541,6 +570,7 @@ pub fn build_base_sql(
            (L.toid = N.zknote and L.fromid = M.fromid )))
       and
         ((U.fromid = ? and U.toid = M.fromid) or (U.fromid = M.fromid and U.toid = ?))
+        and PN.id = N.zknote
         {}",
         deleted
       ),
@@ -581,10 +611,11 @@ pub fn build_base_sql(
   if archives {
     let (sqluser, userargs) = (
       format!(
-        "select N.id, N.uuid, N.zknote, N.title, N.file, N.user, N.createdate, N.changeddate
-      from zkarch N, zklink L
+        "select N.id, N.uuid, PN.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
+      from zkarch N, zklink L, zknote PN
       where N.user != ?
         and ((L.fromid = N.zknote and L.toid = ?) or (L.toid = N.zknote and L.fromid = ?))
+        and PN.id = N.zknote
         {}",
         deleted
       ),
