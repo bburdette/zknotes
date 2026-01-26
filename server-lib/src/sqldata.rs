@@ -537,16 +537,6 @@ pub fn save_zklink(
   let systemid = user_id(&conn, "system")?;
   let usernote = user_note_id(&conn, user)?;
 
-  // only system can link to archive note.
-  // if user != systemid {
-  //   // its ok to link to public, which archive links to.
-  //   if (fromid != publicid && are_notes_linked(&conn, fromid, archiveid)?)
-  //     || (toid != publicid && are_notes_linked(&conn, toid, archiveid)?)
-  //   {
-  //     return Err(zkerr::Error::CantLinkToArchive);
-  //   }
-  // }
-
   let authed = if fromid == shareid || fromid == publicid || fromid == usernote {
     // can't link non-me notes to shareid or public or usernote.
     let izm = is_zknote_mine(&conn, toid, user)?;
@@ -1163,21 +1153,6 @@ pub fn read_zknote_i64(
   )
   .map(|x| x.1)
 }
-
-// pub fn read_zkarch_i64(
-//   conn: &Connection,
-//   files_dir: &Path,
-//   uid: Option<UserId>,
-//   id: i64,
-// ) -> Result<ZkNote, zkerr::Error> {
-//   read_zkarch(
-//     &conn,
-//     &files_dir,
-//     uid,
-//     &ZkNoteId::Zni(uuid_for_note_id(&conn, id)?),
-//   )
-//   .map(|x| x.1)
-// }
 
 pub fn file_status(
   conn: &Connection,
@@ -2000,6 +1975,8 @@ pub fn read_zknotecomments(
       where N.fromid = C.fromid
       and N.toid = ?1 and C.toid = ?2",
   )?;
+  // TODO: return uuid here so we don't have to look it up in
+  // read_zknote_i64.
   let c_iter = stmt.query_map(params![zknid, cid], |row| Ok(row.get(0)?))?;
 
   let mut nv = Vec::new();
@@ -2096,18 +2073,6 @@ pub fn read_zknotearchives(
   Ok(nv)
 }
 
-// pub fn read_zkarch(
-//   conn: &Connection,
-//   files_dir: &Path,
-//   uid: UserId,
-//   gazn: &GetArchiveZkNote,
-// ) -> Result<(i64, ZkNote), zkerr::Error> {
-//   // have access to the parent note?
-//   let (_pid, _pnote) = read_zknote(conn, files_dir, Some(uid), &gazn.parentnote)?;
-
-//   read_zkarch_unchecked(conn, files_dir, &gazn.noteid)
-// }
-
 pub fn read_archivezklinks(
   conn: &Connection,
   uid: UserId,
@@ -2141,7 +2106,6 @@ pub fn read_archivezklinks(
     let mut av = vec![a.clone(), a.clone(), a.clone()];
     acc_args.append(&mut av);
   }
-  println!("read_archivezklinks_stream");
 
   let rec_iter = pstmt.query_map(rusqlite::params_from_iter(acc_args.iter()), |row| {
     Ok(ArchiveZkLink {
@@ -2154,7 +2118,6 @@ pub fn read_archivezklinks(
     })
   })?;
 
-  println!("read_archivezklinks_stream2");
   Ok(rec_iter.filter_map(|x| x.ok()).collect())
 }
 
@@ -2166,7 +2129,6 @@ pub fn read_archivezklinks_stream(
 ) -> impl futures_util::Stream<Item = Result<SyncMessage, Box<dyn std::error::Error>>> {
   // {
   try_stream! {
-    println!("read_archivezklinks_stream");
     let (acc_sql, mut acc_args) = accessible_notes(&conn, uid)?;
 
     let mut pstmt = conn.prepare(
@@ -2203,7 +2165,6 @@ pub fn read_archivezklinks_stream(
       acc_args.push(a.clone());
       acc_args.push(a);
     }
-    println!("read_archivezklinks_stream");
     let rec_iter = pstmt.query_map(rusqlite::params_from_iter(acc_args.iter()), |row| {
       let azl = ArchiveZkLink {
         userUuid: row.get(0)?,
@@ -2215,7 +2176,6 @@ pub fn read_archivezklinks_stream(
       };
       Ok(azl)
     })?;
-    println!("read_archivezklinks_stream2");
 
     yield SyncMessage::ArchiveZkLinkHeader;
 
@@ -2281,9 +2241,6 @@ pub fn read_zklinks_since_stream(
 ) -> impl futures_util::Stream<Item = Result<SyncMessage, Box<dyn std::error::Error>>> {
   // {
   try_stream! {
-
-    println!("read_zklinks_since_stream 1");
-
     let (acc_sql, acc_args) = accessible_notes(&conn, uid)?;
 
     // make an accessible notes temp table.
@@ -2312,7 +2269,6 @@ pub fn read_zklinks_since_stream(
       rusqlite::params_from_iter(acc_args.iter()),
     )?;
 
-    println!("read_zklinks_since_stream 2");
     // links.  Fact:  these records are only created when a link is deleted!
     // so the createdate is the date the original link was created, and the deletedate is the date the
     // zklinkarchive record was created.
@@ -2353,7 +2309,6 @@ pub fn read_zklinks_since_stream(
       }
 
       yield SyncMessage::UuidZkLinkHeader;
-    println!("read_zklinks_since_stream 3");
 
       let rec_iter = pstmt.query_map(rusqlite::params_from_iter(lnargs.iter()), |row| {
         Ok(SyncMessage::from(UuidZkLink {
@@ -2370,10 +2325,8 @@ pub fn read_zklinks_since_stream(
         }
       }
     }
-    println!("read_zklinks_since_stream 4");
 
     conn.execute(format!("drop table {}", tabname).as_str(), params![])?;
-
   }
 }
 

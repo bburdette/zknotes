@@ -620,8 +620,6 @@ pub fn build_base_sql(
     None
   };
 
-  // let (cls, clsargs) = build_tagsearch_clause(&conn, uid, &search.archives, false, &ts)?;
-
   // local ftn to add clause and args.
   let addcls = |sql: &mut String, args: &mut Vec<String>, current: bool| {
     if !args.is_empty() {

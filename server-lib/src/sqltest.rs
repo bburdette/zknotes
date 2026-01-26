@@ -706,7 +706,6 @@ mod tests {
       deleted: false,
     };
 
-    // let systemid = user_id(&conn, "system")?;
     match search_zknotes(&conn, filesdir, uid2, &u1note4_archive_search2)? {
       SearchResult::SrListNote(zklr) => {
         if zklr.notes.len() > 0 {
@@ -871,19 +870,6 @@ mod tests {
       Err(_e) => (),
       Ok(x) => panic!("archive note found in zknote table?! {:?}", x),
     };
-
-    // let archnote_id = archive_note_id_for_zknoteid(&conn, &archnote.id)?;
-
-    // // try to link against the archive note.
-    // match save_zklink(&conn, szn1_1_id, archnote_id, uid1, None) {
-    //   Err(crate::error::Error::CantLinkToArchive) => (),
-    //   x => panic!("test failed : {:?}", x),
-    // }
-    // // link the other way
-    // match save_zklink(&conn, archnote_id, szn1_1_id, uid1, None) {
-    //   Err(crate::error::Error::CantLinkToArchive) => (),
-    //   _ => panic!("test failed"),
-    // }
 
     Ok(())
   }

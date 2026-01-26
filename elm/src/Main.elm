@@ -1563,10 +1563,6 @@ urlupdate msg model =
                             else
                                 case ( route, model.state ) of
                                     ( ArchiveNoteR pid nid, ArchiveListing almod _ ) ->
-                                        let
-                                            _ =
-                                                Debug.log "blah" ( almod.noteid, pid )
-                                        in
                                         if almod.noteid == pid then
                                             ( model, Cmd.none )
 

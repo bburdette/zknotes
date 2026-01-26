@@ -732,8 +732,6 @@ where
     sm = read_sync_message(&mut line, br).await?;
   }
 
-  println!("userhash {:?}", userhash);
-
   // ----------------------------------------------------------------------------------
   // current zknotes
   // ----------------------------------------------------------------------------------
@@ -754,7 +752,6 @@ where
   let serverhash = HashMap::<String, i64>::new();
 
   while let SyncMessage::ZkNote(ref note, ref mbf) = sm {
-    // println!("sync note {:?}", note);
     let uid = UserId::Uid(
       *userhash
         .get(note.user.to_i64())
@@ -916,8 +913,6 @@ where
     sm = read_sync_message(&mut line, br).await?;
   }
 
-  println!("eer");
-
   // ----------------------------------------------------------------------------------
   // archive notes
   // ----------------------------------------------------------------------------------
@@ -933,8 +928,6 @@ where
     );
   }
 
-  println!("eer2");
-
   sm = read_sync_message(&mut line, br).await?;
   while let SyncMessage::ZkNote(ref note, ref _mbf) = sm {
     // TODO: make file source record (?)
@@ -945,13 +938,10 @@ where
         .ok_or_else(|| zkerr::Error::String("user not found".to_string()))?,
     );
 
-    println!("wat {:?}", note.id);
     let (nid, pid) = match note.id {
       ZkNoteId::ArchiveZni(n, p) => Ok((n, note_id_for_uuid(conn, &p)?)),
       ZkNoteId::Zni(_) => Err(zkerr::Error::String("not an archive note".to_string())),
     }?;
-
-    println!("watt");
 
     let server_id = match serverhash.get(&note.server).ok_or_else(|| {
       match server_id(&conn, note.server.as_str()) {
@@ -1013,8 +1003,6 @@ where
     }
     sm = read_sync_message(&mut line, br).await?;
   }
-
-  println!("sm {:?}", sm);
 
   if let SyncMessage::ArchiveZkLinkHeader = sm {
   } else {
@@ -1564,26 +1552,20 @@ pub fn sync_stream(
     ordering: None,
   };
 
-  println!("ans {:?}", ans);
-
   let anstream =
     search_zknotes_stream(conn.clone(), files_dir, uid, ans, exclude_notes).map(bytesify);
 
   // if there's a new share, just get all links since the beginning of time.
   let linkafter = if new_shares { None } else { after };
 
-  println!("ans2 ");
   let als =
     sqldata::read_archivezklinks_stream(conn.clone(), uid, linkafter, exclude_archivelinks.clone())
       .map(bytesify);
-  println!("ans3 ");
 
   let ls = sqldata::read_zklinks_since_stream(conn, uid, linkafter, exclude_links).map(bytesify);
 
-  println!("ans4 ");
   let end = try_stream! { yield SyncMessage::SyncEnd; }.map(bytesify);
 
-  println!("ans5 ");
   start
     .chain(sync_users)
     .chain(system_user)
