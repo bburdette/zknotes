@@ -2026,7 +2026,7 @@ pub fn read_zknotearchives(
     "select ZN.uuid, ZN.title, ZN.file, ZN.user, ZN.createdate, ZN.changeddate
       from zkarch ZN, orgauth_user OU, user U
       where ZN.zknote = ?1 and U.id = ZN.user and OU.id = ZN.user
-      order by ZN.changeddate",
+      order by ZN.changeddate desc",
   )?;
 
   let c_iter = stmt
