@@ -357,6 +357,18 @@ pub fn build_sql(
   search: &ZkNoteSearch,
   exclude_notes: Option<String>,
 ) -> Result<(String, Vec<String>), zkerr::Error> {
+  // protect against this,
+  // since archive note i64 ids should NOT be used for zknotes,
+  // and vice versa.
+  match (&search.archives, &exclude_notes) {
+    (ArchivesOrCurrent::CurrentAndArchives, Some(_)) => {
+      return Err(zkerr::Error::String(
+        "exclude notes not allowed on CurrentAndArchive searches".to_string(),
+      ));
+    }
+    _ => (),
+  }
+
   let (sql, args) = build_base_sql(conn, uid, search)?;
   match exclude_notes {
     Some(exclude_note_table) => {

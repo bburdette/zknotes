@@ -223,6 +223,7 @@ pub async fn zk_interface_loggedin_streaming(
         None,
         None,
         None,
+        None,
         syncstart,
         &mut zknotes_callbacks(),
         &jl,

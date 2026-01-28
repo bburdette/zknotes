@@ -15,7 +15,7 @@ import Util
 
 type Msg
     = CopySearchPress
-    | CopySyncSearhPress Bool
+    | CopySyncSearchPress Bool
     | Noop
 
 
@@ -66,11 +66,11 @@ guiSn zone snote =
                     ]
                 , E.column [ E.alignRight, E.spacing 3 ]
                     [ EI.button (E.alignRight :: Common.buttonStyle)
-                        { onPress = Just <| CopySyncSearhPress True
+                        { onPress = Just <| CopySyncSearchPress True
                         , label = E.text "search notes synced from remote >"
                         }
                     , EI.button (E.alignRight :: Common.buttonStyle)
-                        { onPress = Just <| CopySyncSearhPress False
+                        { onPress = Just <| CopySyncSearchPress False
                         , label = E.text "search notes synced to remote >"
                         }
                     ]
@@ -120,13 +120,20 @@ syncSearch fromremote csync =
         Nothing ->
             Boolex
                 { ts1 =
-                    Not
-                        { ts =
+                    let
+                        st =
                             SearchTerm
                                 { mods = [ Server ]
                                 , term = "local"
                                 }
-                        }
+                    in
+                    if fromremote then
+                        Not
+                            { ts = st
+                            }
+
+                    else
+                        st
                 , ao = And
                 , ts2 =
                     SearchTerm
@@ -144,7 +151,7 @@ updateSn msg snote =
                 CopySearchPress ->
                     ( SN.SnSearch tagsearches, CopySearch tagsearches )
 
-                CopySyncSearhPress _ ->
+                CopySyncSearchPress _ ->
                     ( SN.SnSearch tagsearches, None )
 
                 Noop ->
@@ -155,7 +162,7 @@ updateSn msg snote =
                 CopySearchPress ->
                     ( SN.SnSync completedSync, None )
 
-                CopySyncSearhPress fromremote ->
+                CopySyncSearchPress fromremote ->
                     ( SN.SnSync completedSync, CopySyncSearch (syncSearch fromremote completedSync) )
 
                 Noop ->

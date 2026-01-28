@@ -153,6 +153,7 @@ pub async fn save_sync(
 
 pub struct TempTableNames {
   pub notetemp: String,
+  pub archivenotetemp: String,
   pub linktemp: String,
   pub archivelinktemp: String,
 }
@@ -166,6 +167,7 @@ pub fn temp_tables(conn: &Connection) -> Result<TempTableNames, zkerr::Error> {
   })?;
 
   let notetemp = format!("notetemp_{}", id);
+  let archivenotetemp = format!("archivenotetemp_{}", id);
   let linktemp = format!("linktemp_{}", id);
   let archivelinktemp = format!("archivelinktemp_{}", id);
 
@@ -174,6 +176,15 @@ pub fn temp_tables(conn: &Connection) -> Result<TempTableNames, zkerr::Error> {
     format!(
       "create temporary table {} (\"id\" integer primary key not null)",
       notetemp
+    )
+    .as_str(),
+    params![],
+  )?;
+
+  conn.execute(
+    format!(
+      "create temporary table {} (\"id\" integer primary key not null)",
+      archivenotetemp
     )
     .as_str(),
     params![],
@@ -211,6 +222,7 @@ pub fn temp_tables(conn: &Connection) -> Result<TempTableNames, zkerr::Error> {
 
   Ok(TempTableNames {
     notetemp,
+    archivenotetemp,
     linktemp,
     archivelinktemp,
   })
@@ -250,6 +262,7 @@ pub async fn sync(
     after,
     &file_path,
     &ttn.notetemp,
+    &ttn.archivenotetemp,
     &ttn.linktemp,
     &ttn.archivelinktemp,
     callbacks,
@@ -265,6 +278,7 @@ pub async fn sync(
         file_path,
         &user,
         Some(ttn.notetemp.clone()),
+        Some(ttn.archivenotetemp.clone()),
         Some(ttn.linktemp.clone()),
         Some(ttn.archivelinktemp.clone()),
         after,
@@ -579,6 +593,7 @@ pub async fn sync_from_remote(
   after: Option<i64>,
   file_path: &Path,
   notetemp: &String,
+  archivenotetemp: &String,
   linktemp: &String,
   archivelinktemp: &String,
   callbacks: &mut Callbacks,
@@ -619,6 +634,7 @@ pub async fn sync_from_remote(
     &user,
     file_path,
     Some(notetemp),
+    Some(archivenotetemp),
     Some(linktemp),
     Some(archivelinktemp),
     callbacks,
@@ -653,6 +669,7 @@ pub async fn sync_from_stream<S>(
   user: &User,
   file_path: &Path,
   notetemp: Option<&str>,
+  archivenotetemp: Option<&str>,
   linktemp: Option<&str>,
   archivelinktemp: Option<&str>,
   callbacks: &mut Callbacks,
@@ -995,7 +1012,7 @@ where
           Err(e) => return Err(e)?,
         }?;
 
-    if let (Some(id), Some(nt)) = (mbid, &notetemp) {
+    if let (Some(id), Some(nt)) = (mbid, &archivenotetemp) {
       conn.execute(
         format!("insert into {} values (?1)", nt).as_str(),
         params![id],
@@ -1186,6 +1203,7 @@ pub async fn sync_to_remote(
   files_dir: &Path,
   user: &User,
   exclude_notes: Option<String>,
+  exclude_archivenotes: Option<String>,
   exclude_links: Option<String>,
   exclude_archivelinks: Option<String>,
   after: Option<i64>,
@@ -1225,6 +1243,7 @@ pub async fn sync_to_remote(
     PathBuf::from(files_dir),
     user.id,
     exclude_notes,
+    exclude_archivenotes,
     exclude_links,
     exclude_archivelinks,
     syncstart,
@@ -1331,6 +1350,7 @@ pub fn sync_stream(
   files_dir: PathBuf,
   uid: UserId,
   exclude_notes: Option<String>,
+  exclude_archivenotes: Option<String>,
   exclude_links: Option<String>,
   exclude_archivelinks: Option<String>,
   sync_start: zkprotocol::sync_data::SyncStart,
@@ -1553,7 +1573,7 @@ pub fn sync_stream(
   };
 
   let anstream =
-    search_zknotes_stream(conn.clone(), files_dir, uid, ans, exclude_notes).map(bytesify);
+    search_zknotes_stream(conn.clone(), files_dir, uid, ans, exclude_archivenotes).map(bytesify);
 
   // if there's a new share, just get all links since the beginning of time.
   let linkafter = if new_shares { None } else { after };
