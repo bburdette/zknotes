@@ -680,7 +680,6 @@ where
 {
   // TODO: pass in now instead of compute here?
   let now = now()?;
-  let sysid = user_id(&conn, "system")?;
 
   let mut line = String::new();
 
@@ -875,7 +874,10 @@ where
               sqldata::save_zknote(
                 &conn,
                 lapin_info,
-                &server,
+                &Server {
+                  id: server_id,
+                  uuid: note.server.clone(),
+                },
                 uid,
                 &SaveZkNote {
                   id: Some(note.id),
@@ -1178,21 +1180,47 @@ where
     params![],
   )?;
 
-  // write sync complete.
-  let unote = user_note_id(&conn, user.id)?;
-  save_sync(
-    &conn,
-    lapin_info,
-    &server,
-    user.id,
-    unote,
-    CompletedSync {
-      after: ss.after,
-      now,
-      remote: Some(ss.server),
-    },
-  )
-  .await?;
+  {
+    // use remote server id on the sync complete, so we know where the
+    // sync originated.
+    let ssuuid = ss.server.to_string();
+    let server_id =
+      match serverhash
+        .get(ssuuid.as_str())
+        .ok_or_else(|| match server_id(&conn, ssuuid.as_str()) {
+          Ok(id) => Ok(id),
+          Err(_e) => conn
+            .execute(
+              "insert into server (uuid, createdate) values (?1, ?2)",
+              params![ssuuid.as_str(), now],
+            )
+            .map(|_| conn.last_insert_rowid())
+            .map_err(|e| zkerr::Error::from(e)),
+        }) {
+        Ok(id) => Ok(id.clone()),
+        Err(Ok(id)) => Ok(id),
+        Err(Err(e)) => Err(e),
+      }?;
+
+    // write sync complete.
+    let unote = user_note_id(&conn, user.id)?;
+    save_sync(
+      &conn,
+      lapin_info,
+      &Server {
+        id: server_id,
+        uuid: ssuuid,
+      },
+      user.id,
+      unote,
+      CompletedSync {
+        after: ss.after,
+        now,
+        remote: Some(ss.server),
+      },
+    )
+    .await?;
+  }
 
   Ok(PrivateReply::PvySyncComplete)
 }
