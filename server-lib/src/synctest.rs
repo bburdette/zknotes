@@ -564,6 +564,7 @@ mod tests {
         None,
         None,
         None,
+        None,
         ssyncstart.clone(),
         &mut cb,
         &lm,
@@ -590,6 +591,7 @@ mod tests {
         &csu,
         &client_ts.filepath,
         Some(&ttn.notetemp),
+        Some(&ttn.archivenotetemp),
         Some(&ttn.linktemp),
         Some(&ttn.archivelinktemp),
         &mut cb,
@@ -641,6 +643,8 @@ mod tests {
     .await?;
     assert!(cpub2.id == spc2.id);
 
+    println!("3");
+
     {
       let lm = LogMonitor {};
 
@@ -659,6 +663,7 @@ mod tests {
         saconn.clone(),
         server_ts.filepath.clone(),
         ssyncuser,
+        None,
         None,
         None,
         None,
@@ -707,11 +712,9 @@ mod tests {
         caconn.clone(),
         client_ts.filepath.clone(),
         csyncuser,
-        // Some(ttn.notetemp.clone()),
         None,
-        // Some(ttn.linktemp.clone()),
         None,
-        // Some(ttn.archivelinktemp.clone()),
+        None,
         None,
         csyncstart.clone(),
         &mut cb,
@@ -740,6 +743,9 @@ mod tests {
         })
         .await?;
     }
+
+    println!("4");
+
     // ------------------------------------------------------------
     // sync from server to client.
     // ------------------------------------------------------------
@@ -760,6 +766,7 @@ mod tests {
       saconn.clone(),
       server_ts.filepath.clone(),
       ssyncuser,
+      None,
       None,
       None,
       None,
@@ -785,12 +792,15 @@ mod tests {
       &csu,
       &client_ts.filepath,
       Some(&ttn.notetemp),
+      Some(&ttn.archivenotetemp),
       Some(&ttn.linktemp),
       Some(&ttn.archivelinktemp),
       &mut cb,
       &mut br,
     )
     .await?;
+
+    println!("5");
 
     // ------------------------------------------------------------
     // sync from client to server.
@@ -801,6 +811,7 @@ mod tests {
       client_ts.filepath.clone(),
       csyncuser,
       Some(ttn.notetemp),
+      Some(ttn.archivenotetemp),
       Some(ttn.linktemp),
       Some(ttn.archivelinktemp),
       csyncstart.clone(),
@@ -821,6 +832,7 @@ mod tests {
       None,
       None,
       None,
+      None,
       &mut cb,
       &mut cbr,
     )
@@ -828,7 +840,7 @@ mod tests {
 
     let postsync_time = util::now()?;
 
-    println!("blah minus one");
+    println!("6");
 
     // ------------------------------------------------------------
     // post-sync tests.
@@ -1118,6 +1130,7 @@ mod tests {
       None,
       None,
       None,
+      None,
       ssyncstart.clone(),
       &mut cb,
       &lm,
@@ -1135,6 +1148,7 @@ mod tests {
       &csu,
       &client_ts.filepath,
       Some(&ttn.notetemp),
+      Some(&ttn.archivenotetemp),
       Some(&ttn.linktemp),
       Some(&ttn.archivelinktemp),
       &mut cb,
@@ -1149,6 +1163,7 @@ mod tests {
       client_ts.filepath.clone(),
       csyncuser,
       Some(ttn.notetemp),
+      Some(ttn.archivenotetemp),
       Some(ttn.linktemp),
       Some(ttn.archivelinktemp),
       ssyncstart.clone(),
@@ -1166,6 +1181,7 @@ mod tests {
       &saserver,
       &ssu,
       &server_ts.filepath,
+      None,
       None,
       None,
       None,
