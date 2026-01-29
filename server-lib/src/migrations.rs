@@ -2983,3 +2983,77 @@ pub fn udpate39(dbfile: &Path) -> Result<(), orgauth::error::Error> {
 
   Ok(())
 }
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct OldSync2 {
+  pub after: Option<i64>,
+  pub now: i64,
+  pub remote: Option<Uuid>, // optional for backward compatibility
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub enum OldSpecialNote {
+  SnSync(OldSync2),
+}
+
+pub fn udpate40(dbfile: &Path) -> Result<(), orgauth::error::Error> {
+  // find notes that are owned by system, linked to 'sync', and the contents deserialize to an old sync record.
+
+  let conn = Connection::open(dbfile)?;
+  let tr = conn.unchecked_transaction()?;
+
+  // implement here instead of using sqldata functions, since those functions may change in the future!
+  let syncid: i64 = conn.query_row(
+    "select zknote.id from
+      zknote, orgauth_user
+      where zknote.title = ?2
+      and orgauth_user.name = ?1
+      and zknote.user = orgauth_user.id",
+    params!["system", "sync"],
+    |row| Ok(row.get(0)?),
+  )?;
+
+  // find notes linked to 'sync' where the contents deserialize to sync.  post failures.
+  let mut pstmt = conn.prepare(
+    "select zknote.id, content from zknote, zklink
+    where zklink.fromid = zknote.id
+    and zklink.toid = ?1",
+  )?;
+  let r: Vec<(i64, String)> = pstmt
+    .query_map(params![syncid], |row| {
+      let id: i64 = row.get(0)?;
+      let s: String = row.get(1)?;
+      Ok((id, s))
+    })?
+    .filter_map(|x| x.ok())
+    .collect();
+
+  for (id, content) in r {
+    match serde_json::from_str::<OldSpecialNote>(content.as_str()) {
+      Ok(OldSpecialNote::SnSync(oldsync)) => {
+        let sn = SN::SpecialNote::SnSync(SN::CompletedSync {
+          after: oldsync.after,
+          now: oldsync.now,
+          local: None,
+          remote: oldsync.remote,
+        });
+
+        let sns = serde_json::to_string(&serde_json::to_value(sn)?)?;
+
+        // update without changing changed date!
+        conn.execute(
+          "update zknote set content = ?1 where id = ?2",
+          params![sns, id],
+        )?;
+        info!("updated sync: {}, {:?}", id, sns);
+      }
+      Err(e) => {
+        error!("oldsync parse error: {:?} \n {}", e, content);
+      }
+    };
+  }
+
+  tr.commit()?;
+
+  Ok(())
+}
