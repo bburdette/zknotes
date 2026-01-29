@@ -2801,6 +2801,7 @@ pub fn udpate37(dbfile: &Path) -> Result<(), orgauth::error::Error> {
         let sn = SN::SpecialNote::SnSync(SN::CompletedSync {
           after: oldsync.after,
           now: oldsync.now,
+          local: None,
           remote: None,
         });
 

@@ -63,6 +63,14 @@ guiSn zone snote =
                         [ E.el [ EF.bold ] <| E.text "end:"
                         , E.text (Util.showDateTime zone (Time.millisToPosix completedSync.now))
                         ]
+                    , E.row [ E.spacing 3 ]
+                        [ E.el [ EF.bold ] <| E.text "local server id:"
+                        , completedSync.local |> Maybe.withDefault "" |> E.text
+                        ]
+                    , E.row [ E.spacing 3 ]
+                        [ E.el [ EF.bold ] <| E.text "remote server id:"
+                        , completedSync.remote |> Maybe.withDefault "" |> E.text
+                        ]
                     ]
                 , E.column [ E.alignRight, E.spacing 3 ]
                     [ EI.button (E.alignRight :: Common.buttonStyle)

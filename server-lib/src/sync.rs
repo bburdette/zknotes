@@ -126,8 +126,8 @@ pub async fn save_sync(
   let (id, _szn) = save_zknote(
     &conn,
     lapin_info,
-    server,
-    sysid, // save under system id.
+    server, // local server
+    sysid,  // save under system id.
     &SaveZkNote {
       id: None,
       title: "sync".to_string(),
@@ -1181,41 +1181,18 @@ where
   )?;
 
   {
-    // use remote server id on the sync complete, so we know where the
-    // sync originated.
-    let ssuuid = ss.server.to_string();
-    let server_id =
-      match serverhash
-        .get(ssuuid.as_str())
-        .ok_or_else(|| match server_id(&conn, ssuuid.as_str()) {
-          Ok(id) => Ok(id),
-          Err(_e) => conn
-            .execute(
-              "insert into server (uuid, createdate) values (?1, ?2)",
-              params![ssuuid.as_str(), now],
-            )
-            .map(|_| conn.last_insert_rowid())
-            .map_err(|e| zkerr::Error::from(e)),
-        }) {
-        Ok(id) => Ok(id.clone()),
-        Err(Ok(id)) => Ok(id),
-        Err(Err(e)) => Err(e),
-      }?;
-
     // write sync complete.
     let unote = user_note_id(&conn, user.id)?;
     save_sync(
       &conn,
       lapin_info,
-      &Server {
-        id: server_id,
-        uuid: ssuuid,
-      },
+      &server,
       user.id,
       unote,
       CompletedSync {
         after: ss.after,
         now,
+        local: Some(Uuid::parse_str(server.uuid.as_str())?),
         remote: Some(ss.server),
       },
     )
