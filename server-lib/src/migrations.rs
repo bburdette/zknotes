@@ -2899,6 +2899,18 @@ pub fn udpate38(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   Ok(())
 }
 
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct OldSync2 {
+  pub after: Option<i64>,
+  pub now: i64,
+  pub remote: Option<Uuid>, // optional for backward compatibility
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub enum OldSpecialNote {
+  SnSync(OldSync2),
+}
+
 pub fn udpate39(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   // delete mistakenly archived searches, fix changeddates"
 
@@ -2966,43 +2978,8 @@ pub fn udpate39(dbfile: &Path) -> Result<(), orgauth::error::Error> {
     params![archiveid],
   )?;
 
-  tr.commit()?;
-
-  {
-    // risky!  turn off foreign key checking because this step takes
-    // so long.
-    conn.execute("PRAGMA foreign_keys = false;", params![])?;
-    let tr = conn.unchecked_transaction()?;
-    conn.execute(
-      "delete from zknote where id in (select zkarch.id from zkarch); ",
-      params![],
-    )?;
-
-    tr.commit()?;
-  }
-
-  Ok(())
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct OldSync2 {
-  pub after: Option<i64>,
-  pub now: i64,
-  pub remote: Option<Uuid>, // optional for backward compatibility
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub enum OldSpecialNote {
-  SnSync(OldSync2),
-}
-
-pub fn udpate40(dbfile: &Path) -> Result<(), orgauth::error::Error> {
-  // find notes that are owned by system, linked to 'sync', and the contents deserialize to an old sync record.
-
-  let conn = Connection::open(dbfile)?;
-  let tr = conn.unchecked_transaction()?;
-
-  // implement here instead of using sqldata functions, since those functions may change in the future!
+  // ---------------------------------------------
+  // convert sync notes to new format
   let syncid: i64 = conn.query_row(
     "select zknote.id from
       zknote, orgauth_user
@@ -3053,7 +3030,22 @@ pub fn udpate40(dbfile: &Path) -> Result<(), orgauth::error::Error> {
     };
   }
 
+  // ---------------------------------------------
+
   tr.commit()?;
+
+  {
+    // risky!  turn off foreign key checking because this step takes
+    // so long.
+    conn.execute("PRAGMA foreign_keys = false;", params![])?;
+    let tr = conn.unchecked_transaction()?;
+    conn.execute(
+      "delete from zknote where id in (select zkarch.id from zkarch); ",
+      params![],
+    )?;
+
+    tr.commit()?;
+  }
 
   Ok(())
 }
