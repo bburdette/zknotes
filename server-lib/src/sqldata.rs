@@ -640,7 +640,7 @@ pub fn archive_note_id_for_zknoteid(
   zknoteid: &ZkNoteId,
 ) -> Result<i64, zkerr::Error> {
   match zknoteid {
-    ZkNoteId::Zni(uuid) => Err(zkerr::Error::NoteNotFound),
+    ZkNoteId::Zni(_uuid) => Err(zkerr::Error::NoteNotFound),
     ZkNoteId::ArchiveZni(uuid, _) => archive_note_id_for_uuid(conn, uuid),
   }
 }
@@ -818,10 +818,7 @@ pub fn are_notes_linked(conn: &Connection, nid1: i64, nid2: i64) -> Result<bool,
 }
 
 pub fn archive_zknote_i64(conn: &Connection, noteid: i64) -> Result<(), zkerr::Error> {
-  let sysid = user_id(&conn, "system")?;
   let uuid = uuid::Uuid::new_v4();
-  // copy the note, with user 'system'.
-  // exclude pubid, to avoid unique constraint problems.
   conn.execute(
     "insert into zkarch (zknote, title, content, user, editable, showtitle, deleted, uuid, createdate, changeddate, server)
      select id, title, content, user, editable, showtitle, deleted, ?1, createdate, changeddate, server from
@@ -1279,7 +1276,7 @@ pub fn read_zknote(
   id: &ZkNoteId,
 ) -> Result<(i64, ZkNote), zkerr::Error> {
   match id {
-    ZkNoteId::Zni(nid) => {
+    ZkNoteId::Zni(_nid) => {
       let (id, mut note) = read_zknote_unchecked(&conn, &files_dir, id)?;
 
       let sysid = user_id(&conn, "system")?;

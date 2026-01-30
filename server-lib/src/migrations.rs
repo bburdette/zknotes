@@ -2911,11 +2911,16 @@ pub enum OldSpecialNote {
   SnSync(OldSync2),
 }
 
-pub fn udpate39(dbfile: &Path) -> Result<(), orgauth::error::Error> {
-  // delete mistakenly archived searches, fix changeddates"
+pub fn udpate39(dbfile: &Path) -> Result<(), zkerr::Error> {
+  // store archive notes in zkarch instead of zknote table.
 
   let conn = Connection::open(dbfile)?;
-  conn.execute("PRAGMA foreign_keys = false;", params![])?;
+
+  // BEFORE starting a transaction.  We'll check for foreign key
+  // problems at the end and won't commit if that's the case.
+  // without this, takes 20 minutes to run.
+  conn.execute("PRAGMA foreign_keys = OFF", params![])?;
+
   let tr = conn.unchecked_transaction()?;
 
   conn.execute(
@@ -2969,10 +2974,29 @@ pub fn udpate39(dbfile: &Path) -> Result<(), orgauth::error::Error> {
     params![],
   )?;
 
+  // IDs are copied to zkarch table from zknote.  So unintuitively we
+  // should delete where in (select id from zkarch)
+
   conn.execute(
-    "delete from zklink where fromid in (select id from zkarch)",
-    params![],
+    "delete from zklink where
+      fromid in (select id from zkarch)
+      or toid in (select id from zkarch)
+      or toid = ?1
+      or fromid = ?1
+      or linkzknote = ?1",
+    params![archiveid],
   )?;
+
+  conn.execute(
+    "delete from zklinkarchive where
+      fromid in (select id from zkarch)
+      or toid in (select id from zkarch)
+      or toid = ?1
+      or fromid = ?1
+      or linkzknote = ?1",
+    params![archiveid],
+  )?;
+
   conn.execute(
     "delete from zknote where zknote.id = ?1",
     params![archiveid],
@@ -3022,7 +3046,6 @@ pub fn udpate39(dbfile: &Path) -> Result<(), orgauth::error::Error> {
           "update zknote set content = ?1 where id = ?2",
           params![sns, id],
         )?;
-        info!("updated sync: {}, {:?}", id, sns);
       }
       Err(e) => {
         error!("oldsync parse error: {:?} \n {}", e, content);
@@ -3030,22 +3053,50 @@ pub fn udpate39(dbfile: &Path) -> Result<(), orgauth::error::Error> {
     };
   }
 
-  // ---------------------------------------------
+  // for a few pathological records, accidental archives of 'public'
+  conn.execute(
+    "delete from zkarch where zknote in (select zkarch.id from zkarch); ",
+    params![],
+  )?;
+
+  // let mut pstmt = conn.prepare("PRAGMA foreign_keys")?;
+  // let r: Vec<i64> = pstmt
+  //   .query_map(params![], |row| {
+  //     let s: i64 = row.get(0)?;
+  //     Ok(s)
+  //   })?
+  //   .filter_map(|x| x.ok())
+  //   .collect();
+  // println!("foreign_keys: {:?}", r);
+
+  // this takes forever because of the foreign keys.
+  conn.execute(
+    "delete from zknote where id in (select zkarch.id from zkarch); ",
+    params![],
+  )?;
+
+  let mut pstmt = conn.prepare("PRAGMA foreign_key_check;")?;
+  let r: Vec<(String, i64, String, i64)> = pstmt
+    .query_map(params![], |row| {
+      let t: String = row.get(0)?;
+      let rowid: i64 = row.get(1)?;
+      let s: String = row.get(2)?;
+      let i: i64 = row.get(3)?;
+      Ok((t, rowid, s, i))
+    })?
+    .filter_map(|x| x.ok())
+    .collect();
+
+  println!("foreign_key_check: {:?}", r);
+
+  if r.len() > 0 {
+    // Don't commit this transaction!
+    return Err(zkerr::Error::String(
+      "migration failed! can't remove archive notes!".to_string(),
+    ));
+  }
 
   tr.commit()?;
-
-  {
-    // risky!  turn off foreign key checking because this step takes
-    // so long.
-    conn.execute("PRAGMA foreign_keys = false;", params![])?;
-    let tr = conn.unchecked_transaction()?;
-    conn.execute(
-      "delete from zknote where id in (select zkarch.id from zkarch); ",
-      params![],
-    )?;
-
-    tr.commit()?;
-  }
 
   Ok(())
 }
