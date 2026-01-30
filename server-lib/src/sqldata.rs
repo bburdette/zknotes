@@ -632,7 +632,7 @@ pub fn uuid_for_note_id(conn: &Connection, id: i64) -> Result<Uuid, zkerr::Error
 pub fn note_id_for_zknoteid(conn: &Connection, zknoteid: &ZkNoteId) -> Result<i64, zkerr::Error> {
   match zknoteid {
     ZkNoteId::Zni(uuid) => note_id_for_uuid(conn, uuid),
-    ZkNoteId::ArchiveZni(_, _) => Err(zkerr::Error::NoteNotFound),
+    ZkNoteId::ArchiveZni(_, _) => Err(zkerr::Error::ArchiveNoteNotAllowed),
   }
 }
 pub fn archive_note_id_for_zknoteid(
@@ -640,7 +640,7 @@ pub fn archive_note_id_for_zknoteid(
   zknoteid: &ZkNoteId,
 ) -> Result<i64, zkerr::Error> {
   match zknoteid {
-    ZkNoteId::Zni(_uuid) => Err(zkerr::Error::NoteNotFound),
+    ZkNoteId::Zni(_uuid) => Err(zkerr::Error::ArchiveNoteRequired),
     ZkNoteId::ArchiveZni(uuid, _) => archive_note_id_for_uuid(conn, uuid),
   }
 }
