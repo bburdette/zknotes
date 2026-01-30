@@ -61,8 +61,13 @@ getPrqNoteInfo pr =
 
 
 zkNoteIdToString : ZkNoteId -> String
-zkNoteIdToString (Zni zni) =
-    zni
+zkNoteIdToString id =
+    case id of
+        Zni zni ->
+            zni
+
+        ArchiveZni zni _ ->
+            zni
 
 
 zkNoteIdFromString : String -> Result UUID.Error ZkNoteId
@@ -101,12 +106,37 @@ emptyZniDict =
 
 
 zniEq : ZkNoteId -> ZkNoteId -> Bool
-zniEq (Zni l) (Zni r) =
-    l == r
+zniEq li ri =
+    case ( li, ri ) of
+        ( Zni l, Zni r ) ->
+            l == r
+
+        ( ArchiveZni l _, ArchiveZni r _ ) ->
+            l == r
+
+        _ ->
+            False
 
 
 zniCompare : ZkNoteId -> ZkNoteId -> Order
-zniCompare (Zni l) (Zni r) =
+zniCompare li ri =
+    let
+        l =
+            case li of
+                Zni i ->
+                    i
+
+                ArchiveZni i _ ->
+                    i
+
+        r =
+            case ri of
+                Zni i ->
+                    i
+
+                ArchiveZni i _ ->
+                    i
+    in
     compare l r
 
 
@@ -253,6 +283,24 @@ elToSzl el =
     }
 
 
+elToSzl2 : ZkNoteId -> EditLink -> SaveZkLink2
+elToSzl2 thisid el =
+    let
+        ( from, to ) =
+            case el.direction of
+                From ->
+                    ( el.otherid, thisid )
+
+                To ->
+                    ( thisid, el.otherid )
+    in
+    { from = from
+    , to = to
+    , linkzknote = Nothing
+    , delete = el.delete
+    }
+
+
 saveZkNote : ZkNote -> SaveZkNote
 saveZkNote fzn =
     { id = Just fzn.id
@@ -285,7 +333,12 @@ jobComplete js =
 
 editNoteLink : ZkNoteId -> String
 editNoteLink noteid =
-    UB.absolute [ "editnote", zkNoteIdToString noteid ] []
+    case noteid of
+        Zni uuid ->
+            UB.absolute [ "editnote", uuid ] []
+
+        ArchiveZni uuid parentnoteid ->
+            UB.absolute [ "archivenote", parentnoteid, uuid ] []
 
 
 archiveNoteLink : ZkNoteId -> ZkNoteId -> String

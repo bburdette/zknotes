@@ -31,6 +31,7 @@ mod tests {
   use std::str::FromStr;
   use std::sync::Arc;
   use zkprotocol::content::Server;
+  use zkprotocol::content::ZkNoteId;
   use zkprotocol::search::SearchMod;
   use zkprotocol::search::TagSearch;
   use zkprotocol::search::ZkNoteSearch;
@@ -449,7 +450,6 @@ mod tests {
       Uuid::parse_str(SpecialUuids::Share.str())?,
       Uuid::parse_str(SpecialUuids::Search.str())?,
       Uuid::parse_str(SpecialUuids::User.str())?,
-      Uuid::parse_str(SpecialUuids::Archive.str())?,
       Uuid::parse_str(SpecialUuids::System.str())?,
       Uuid::parse_str(SpecialUuids::Sync.str())?,
     ]);
@@ -525,12 +525,17 @@ mod tests {
 
     // use user2, since user2 has limited visibility to user1 notes.
     let cotheruser = user_id(&client_conn, "client-otheruser")?;
+    println!("0.21");
     let csyncuser = user_id(&client_conn, "client-syncuser")?;
+    println!("0.22");
     let csu = read_user_by_id(&client_conn, csyncuser)?;
+    println!("0.23");
 
     let ssyncuser = user_id(&server_conn, "server-syncuser")?;
+    println!("0.24");
     let ssu = read_user_by_id(&server_conn, ssyncuser)?;
 
+    println!("0.25");
     let caconn = Arc::new(client_conn);
     let saconn = Arc::new(server_conn);
 
@@ -559,10 +564,12 @@ mod tests {
         None,
         None,
         None,
+        None,
         ssyncstart.clone(),
         &mut cb,
         &lm,
       );
+      println!("0.26");
 
       let ctr = caconn.unchecked_transaction()?;
 
@@ -575,6 +582,7 @@ mod tests {
       let ss = server_stream.map_err(convert_err);
       pin_mut!(ss);
       let mut br = StreamReader::new(ss);
+      println!("0.27");
 
       match sync_from_stream(
         &caconn,
@@ -583,6 +591,7 @@ mod tests {
         &csu,
         &client_ts.filepath,
         Some(&ttn.notetemp),
+        Some(&ttn.archivenotetemp),
         Some(&ttn.linktemp),
         Some(&ttn.archivelinktemp),
         &mut cb,
@@ -634,6 +643,8 @@ mod tests {
     .await?;
     assert!(cpub2.id == spc2.id);
 
+    println!("3");
+
     {
       let lm = LogMonitor {};
 
@@ -652,6 +663,7 @@ mod tests {
         saconn.clone(),
         server_ts.filepath.clone(),
         ssyncuser,
+        None,
         None,
         None,
         None,
@@ -700,11 +712,9 @@ mod tests {
         caconn.clone(),
         client_ts.filepath.clone(),
         csyncuser,
-        // Some(ttn.notetemp.clone()),
         None,
-        // Some(ttn.linktemp.clone()),
         None,
-        // Some(ttn.archivelinktemp.clone()),
+        None,
         None,
         csyncstart.clone(),
         &mut cb,
@@ -733,6 +743,9 @@ mod tests {
         })
         .await?;
     }
+
+    println!("4");
+
     // ------------------------------------------------------------
     // sync from server to client.
     // ------------------------------------------------------------
@@ -753,6 +766,7 @@ mod tests {
       saconn.clone(),
       server_ts.filepath.clone(),
       ssyncuser,
+      None,
       None,
       None,
       None,
@@ -778,12 +792,15 @@ mod tests {
       &csu,
       &client_ts.filepath,
       Some(&ttn.notetemp),
+      Some(&ttn.archivenotetemp),
       Some(&ttn.linktemp),
       Some(&ttn.archivelinktemp),
       &mut cb,
       &mut br,
     )
     .await?;
+
+    println!("5");
 
     // ------------------------------------------------------------
     // sync from client to server.
@@ -794,6 +811,7 @@ mod tests {
       client_ts.filepath.clone(),
       csyncuser,
       Some(ttn.notetemp),
+      Some(ttn.archivenotetemp),
       Some(ttn.linktemp),
       Some(ttn.archivelinktemp),
       csyncstart.clone(),
@@ -814,6 +832,7 @@ mod tests {
       None,
       None,
       None,
+      None,
       &mut cb,
       &mut cbr,
     )
@@ -821,7 +840,7 @@ mod tests {
 
     let postsync_time = util::now()?;
 
-    println!("blah minus one");
+    println!("6");
 
     // ------------------------------------------------------------
     // post-sync tests.
@@ -904,6 +923,9 @@ mod tests {
 
       assert!(cpcarchs.len() > 0);
 
+      println!("cpcarchs {:?}", cpcarchs);
+      println!("spcarchs {:?}", spcarchs);
+
       assert!(cpcarchs == spcarchs);
     }
 
@@ -921,7 +943,7 @@ mod tests {
         &saconn,
         &server_ts.filepath,
         Some(ssyncuser),
-        &szn.clone().into(),
+        &ZkNoteId::Zni(szn.clone()),
       ) {
         Err(zkerr::Error::Rusqlite(rusqlite::Error::QueryReturnedNoRows)) => {
           Err(format!("not found: {:?}", szn).into())
@@ -938,7 +960,7 @@ mod tests {
         &caconn,
         &client_ts.filepath,
         Some(csyncuser),
-        &szn.clone().into(),
+        &ZkNoteId::Zni(szn.clone()),
       )?;
     }
 
@@ -949,7 +971,7 @@ mod tests {
         &saconn,
         &server_ts.filepath,
         Some(ssyncuser),
-        &szn.clone().into(),
+        &ZkNoteId::Zni(szn.clone()),
       ) {
         Ok(_) => Err(format!(
           "client note was not supposed to sync to server: {}",
@@ -965,7 +987,7 @@ mod tests {
         &caconn,
         &client_ts.filepath,
         Some(csyncuser),
-        &szn.clone().into(),
+        &ZkNoteId::Zni(szn.clone()),
       ) {
         Ok(_) => Err(format!(
           "server note was not supposed to sync to client: {}",
@@ -1040,7 +1062,7 @@ mod tests {
       &saconn,
       &server_ts.filepath,
       Some(server_ts.otheruser),
-      &server_ts.otherusersharenote.1.into(),
+      &ZkNoteId::Zni(server_ts.otherusersharenote.1),
     )
     .map_err(|e| {
       zkerr::annotate_string(
@@ -1054,7 +1076,7 @@ mod tests {
       &saconn,
       &server_ts.filepath,
       Some(server_ts.syncuser),
-      &server_ts.otherusersharenote.1.into(),
+      &ZkNoteId::Zni(server_ts.otherusersharenote.1),
     )
     .map_err(|e| {
       zkerr::annotate_string(
@@ -1108,6 +1130,7 @@ mod tests {
       None,
       None,
       None,
+      None,
       ssyncstart.clone(),
       &mut cb,
       &lm,
@@ -1125,6 +1148,7 @@ mod tests {
       &csu,
       &client_ts.filepath,
       Some(&ttn.notetemp),
+      Some(&ttn.archivenotetemp),
       Some(&ttn.linktemp),
       Some(&ttn.archivelinktemp),
       &mut cb,
@@ -1139,6 +1163,7 @@ mod tests {
       client_ts.filepath.clone(),
       csyncuser,
       Some(ttn.notetemp),
+      Some(ttn.archivenotetemp),
       Some(ttn.linktemp),
       Some(ttn.archivelinktemp),
       ssyncstart.clone(),
@@ -1159,6 +1184,7 @@ mod tests {
       None,
       None,
       None,
+      None,
       &mut cb,
       &mut cbr,
     )
@@ -1169,7 +1195,7 @@ mod tests {
       &caconn,
       &client_ts.filepath,
       Some(client_ts.syncuser),
-      &server_ts.otherusersharenote.1.into(),
+      &ZkNoteId::Zni(server_ts.otherusersharenote.1),
     )
     .map_err(|e| {
       zkerr::annotate_string(

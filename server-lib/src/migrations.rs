@@ -2278,7 +2278,7 @@ pub fn udpate30(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   let conn = Connection::open(dbfile)?;
   conn.execute("PRAGMA foreign_keys = false;", params![])?;
 
-  // update system notes with specific uuids.
+  // get archive system note id.
   let archiveid: i64 = conn.query_row(
     "select zknote.id from
       zknote, orgauth_user
@@ -2303,7 +2303,7 @@ pub fn udpate30(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   update_note_id("share", SpecialUuids::Share.str())?;
   update_note_id("search", SpecialUuids::Search.str())?;
   update_note_id("user", SpecialUuids::User.str())?;
-  update_note_id("archive", SpecialUuids::Archive.str())?;
+  update_note_id("archive", "ad6a4ca8-0446-4ecc-b047-46282ced0d84")?;
   update_note_id("comment", SpecialUuids::Comment.str())?;
 
   // update system user uuid.
@@ -2469,7 +2469,7 @@ pub fn udpate33(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   ids.push(format!("'{}'", SpecialUuids::Share.str()).to_string());
   ids.push(format!("'{}'", SpecialUuids::Search.str()).to_string());
   ids.push(format!("'{}'", SpecialUuids::User.str()).to_string());
-  ids.push(format!("'{}'", SpecialUuids::Archive.str()).to_string());
+  ids.push(format!("'{}'", "ad6a4ca8-0446-4ecc-b047-46282ced0d84").to_string());
   ids.push(format!("'{}'", SpecialUuids::Sync.str()).to_string());
 
   conn.execute(
@@ -2801,6 +2801,7 @@ pub fn udpate37(dbfile: &Path) -> Result<(), orgauth::error::Error> {
         let sn = SN::SpecialNote::SnSync(SN::CompletedSync {
           after: oldsync.after,
           now: oldsync.now,
+          local: None,
           remote: None,
         });
 
@@ -2892,6 +2893,208 @@ pub fn udpate38(dbfile: &Path) -> Result<(), orgauth::error::Error> {
   }
 
   info!("deleted {} archived search records", deletecount);
+
+  tr.commit()?;
+
+  Ok(())
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct OldSync2 {
+  pub after: Option<i64>,
+  pub now: i64,
+  pub remote: Option<Uuid>, // optional for backward compatibility
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub enum OldSpecialNote {
+  SnSync(OldSync2),
+}
+
+pub fn udpate39(dbfile: &Path) -> Result<(), zkerr::Error> {
+  // store archive notes in zkarch instead of zknote table.
+
+  let conn = Connection::open(dbfile)?;
+
+  // BEFORE starting a transaction.  We'll check for foreign key
+  // problems at the end and won't commit if that's the case.
+  // without this, takes 20 minutes to run.
+  conn.execute("PRAGMA foreign_keys = OFF", params![])?;
+
+  let tr = conn.unchecked_transaction()?;
+
+  conn.execute(
+    "CREATE TABLE IF NOT EXISTS \"zkarch\"
+    (\"id\" INTEGER PRIMARY KEY NOT NULL,
+     \"zknote\" INTEGER NOT NULL REFERENCES zknote(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+     \"title\" TEXT NOT NULL,
+     \"content\" TEXT NOT NULL,
+     \"sysdata\" TEXT,
+     \"pubid\" TEXT UNIQUE,
+     \"user\" INTEGER NOT NULL REFERENCES orgauth_user(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+     \"editable\" BOOLEAN NOT NULL,
+     \"showtitle\" BOOLEAN NOT NULL,
+     \"deleted\" BOOLEAN NOT NULL,
+     \"file\" INTEGER REFERENCES file(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+     \"uuid\" TEXT NOT NULL,
+     \"server\" INTEGER NOT NULL REFERENCES server(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+     \"createdate\" INTEGER NOT NULL,
+     \"changeddate\" INTEGER NOT NULL)",
+    params![],
+  )?;
+
+  // get archive system note id.
+  let archiveid: i64 = conn.query_row(
+    "select zknote.id from
+      zknote, orgauth_user
+      where zknote.title = ?2
+      and orgauth_user.name = ?1
+      and zknote.user = orgauth_user.id",
+    params!["system", "archive"],
+    |row| Ok(row.get(0)?),
+  )?;
+
+  // copy archive notes into zkarch table.
+  conn.execute(
+    "insert into zkarch
+    ( id, zknote, title, content, sysdata, pubid, user, editable, showtitle,
+    deleted, file, uuid, server, createdate, changeddate)
+    select  zknote.id, zklink.toid, zknote.title, zknote.content, zknote.sysdata,
+      zknote.pubid, zknote.user, zknote.editable, zknote.showtitle, zknote.deleted,
+      zknote.file, zknote.uuid, zknote.server, zknote.createdate, zknote.changeddate
+    from zknote, zklink where zknote.id = zklink.fromid
+    and zklink.toid <> ?1
+    and zknote.id in (select fromid from zklink where toid = ?1)",
+    params![archiveid],
+  )?;
+
+  // set user to note creator instead of system
+  conn.execute(
+    "update zkarch set user = (select user from zknote where id = zkarch.zknote) ",
+    params![],
+  )?;
+
+  // IDs are copied to zkarch table from zknote.  So unintuitively we
+  // should delete where in (select id from zkarch)
+
+  conn.execute(
+    "delete from zklink where
+      fromid in (select id from zkarch)
+      or toid in (select id from zkarch)
+      or toid = ?1
+      or fromid = ?1
+      or linkzknote = ?1",
+    params![archiveid],
+  )?;
+
+  conn.execute(
+    "delete from zklinkarchive where
+      fromid in (select id from zkarch)
+      or toid in (select id from zkarch)
+      or toid = ?1
+      or fromid = ?1
+      or linkzknote = ?1",
+    params![archiveid],
+  )?;
+
+  conn.execute(
+    "delete from zknote where zknote.id = ?1",
+    params![archiveid],
+  )?;
+
+  // ---------------------------------------------
+  // convert sync notes to new format
+  let syncid: i64 = conn.query_row(
+    "select zknote.id from
+      zknote, orgauth_user
+      where zknote.title = ?2
+      and orgauth_user.name = ?1
+      and zknote.user = orgauth_user.id",
+    params!["system", "sync"],
+    |row| Ok(row.get(0)?),
+  )?;
+
+  // find notes linked to 'sync' where the contents deserialize to sync.  post failures.
+  let mut pstmt = conn.prepare(
+    "select zknote.id, content from zknote, zklink
+    where zklink.fromid = zknote.id
+    and zklink.toid = ?1",
+  )?;
+  let r: Vec<(i64, String)> = pstmt
+    .query_map(params![syncid], |row| {
+      let id: i64 = row.get(0)?;
+      let s: String = row.get(1)?;
+      Ok((id, s))
+    })?
+    .filter_map(|x| x.ok())
+    .collect();
+
+  for (id, content) in r {
+    match serde_json::from_str::<OldSpecialNote>(content.as_str()) {
+      Ok(OldSpecialNote::SnSync(oldsync)) => {
+        let sn = SN::SpecialNote::SnSync(SN::CompletedSync {
+          after: oldsync.after,
+          now: oldsync.now,
+          local: None,
+          remote: oldsync.remote,
+        });
+
+        let sns = serde_json::to_string(&serde_json::to_value(sn)?)?;
+
+        // update without changing changed date!
+        conn.execute(
+          "update zknote set content = ?1 where id = ?2",
+          params![sns, id],
+        )?;
+      }
+      Err(e) => {
+        error!("oldsync parse error: {:?} \n {}", e, content);
+      }
+    };
+  }
+
+  // for a few pathological records, accidental archives of 'public'
+  conn.execute(
+    "delete from zkarch where zknote in (select zkarch.id from zkarch); ",
+    params![],
+  )?;
+
+  // let mut pstmt = conn.prepare("PRAGMA foreign_keys")?;
+  // let r: Vec<i64> = pstmt
+  //   .query_map(params![], |row| {
+  //     let s: i64 = row.get(0)?;
+  //     Ok(s)
+  //   })?
+  //   .filter_map(|x| x.ok())
+  //   .collect();
+  // println!("foreign_keys: {:?}", r);
+
+  // this takes forever because of the foreign keys.
+  conn.execute(
+    "delete from zknote where id in (select zkarch.id from zkarch); ",
+    params![],
+  )?;
+
+  let mut pstmt = conn.prepare("PRAGMA foreign_key_check;")?;
+  let r: Vec<(String, i64, String, i64)> = pstmt
+    .query_map(params![], |row| {
+      let t: String = row.get(0)?;
+      let rowid: i64 = row.get(1)?;
+      let s: String = row.get(2)?;
+      let i: i64 = row.get(3)?;
+      Ok((t, rowid, s, i))
+    })?
+    .filter_map(|x| x.ok())
+    .collect();
+
+  println!("foreign_key_check: {:?}", r);
+
+  if r.len() > 0 {
+    // Don't commit this transaction!
+    return Err(zkerr::Error::String(
+      "migration failed! can't remove archive notes!".to_string(),
+    ));
+  }
 
   tr.commit()?;
 

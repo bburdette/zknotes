@@ -229,7 +229,7 @@ type Command
     = None
     | Save Data.SaveZkNoteAndLinks
     | SaveExit Data.SaveZkNoteAndLinks -- TODO: remove usused
-    | SaveLinks Data.ZkLinks
+    | SaveLinks Data.SaveZkLinks
     | Revert
     | View
         { note : Either Data.SaveZkNote Data.ZkNoteAndLinks
@@ -3459,11 +3459,8 @@ update msg model =
                                                     link =
                                                         { from = dezni
                                                         , to = drozni
-                                                        , user = model.ld.userid
                                                         , linkzknote = Nothing
                                                         , delete = Nothing
-                                                        , fromname = Nothing
-                                                        , toname = Nothing
                                                         }
                                                 in
                                                 -- remove the draggee.

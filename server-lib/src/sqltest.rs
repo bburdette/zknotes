@@ -3,7 +3,7 @@ mod tests {
   use crate::search::*;
   use crate::sqldata::*;
   use orgauth::data::RegistrationData;
-  use orgauth::dbfun::{new_user, user_id};
+  use orgauth::dbfun::new_user;
   use std::error::Error;
   use std::fs;
   use std::path::Path;
@@ -64,6 +64,7 @@ mod tests {
       None,
       &mut cb.on_new_user,
     )?;
+
     let uid2 = new_user(
       &conn,
       &RegistrationData {
@@ -96,7 +97,7 @@ mod tests {
 
     println!("3");
 
-    let (szn1_1_id, _szn1_1) = save_zknote(
+    let (_szn1_1_id, _szn1_1) = save_zknote(
       &conn,
       &None,
       &server,
@@ -689,9 +690,23 @@ mod tests {
     }
     println!("24");
 
-    // system user can see the archive note
-    let systemid = user_id(&conn, "system")?;
-    match search_zknotes(&conn, filesdir, systemid, &u1note4_archive_search)? {
+    // system user can see the archive note NOPE not anymore.
+    // u2 can't see note4 archive note.
+    let u1note4_archive_search2 = ZkNoteSearch {
+      tagsearch: vec![TagSearch::SearchTerm {
+        mods: vec![SearchMod::ExactMatch],
+        term: "u1 note4 - share".to_string(),
+      }],
+      offset: 0,
+      limit: None,
+      what: "u2nran arch test".to_string(),
+      resulttype: ResultType::RtListNote,
+      ordering: None,
+      archives: ArchivesOrCurrent::CurrentAndArchives,
+      deleted: false,
+    };
+
+    match search_zknotes(&conn, filesdir, uid2, &u1note4_archive_search2)? {
       SearchResult::SrListNote(zklr) => {
         if zklr.notes.len() > 0 {
           ()
@@ -819,6 +834,8 @@ mod tests {
       _ => panic!("test failed"),
     }
 
+    println!("28");
+
     // --------------------------------
     // get the archive note for note4.
     let archnote4_search = ZkNoteSearch {
@@ -847,19 +864,13 @@ mod tests {
       _ => panic!("test failed"),
     };
 
-    let archnote_id = note_id_for_zknoteid(&conn, &archnote.id)?;
+    println!("29");
 
-    // try to link against the archive note.
-    match save_zklink(&conn, szn1_1_id, archnote_id, uid1, None) {
-      Err(crate::error::Error::CantLinkToArchive) => (),
-      _ => panic!("test failed"),
-    }
-    // link the other way
-    match save_zklink(&conn, archnote_id, szn1_1_id, uid1, None) {
-      Err(crate::error::Error::CantLinkToArchive) => (),
-      _ => panic!("test failed"),
-    }
-    //
+    match note_id_for_zknoteid(&conn, &archnote.id) {
+      Err(_e) => (),
+      Ok(x) => panic!("archive note found in zknote table?! {:?}", x),
+    };
+
     Ok(())
   }
 }

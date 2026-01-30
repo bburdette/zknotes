@@ -5,7 +5,7 @@ import Browser
 import Browser.Events
 import Browser.Navigation
 import Common
-import Data exposing (EditTab(..), PrivateClosureRequest, ZkNoteId)
+import Data exposing (EditTab(..), PrivateClosureRequest, ZkNoteId(..))
 import DataUtil exposing (FileUrlInfo, LoginData, jobComplete, showPrivateReply)
 import Dict exposing (Dict)
 import DisplayMessage
@@ -260,17 +260,21 @@ routeState model route =
         ( st, cmds ) =
             routeStateInternal model route
     in
-    case stateLogin st of
-        Just login ->
-            ( st
-            , Cmd.batch
-                [ cmds
-                , sendZIMsg model.fui (Data.PvqSearchZkNotes <| prevSearchQuery login)
-                ]
-            )
+    ( st, cmds )
 
-        Nothing ->
-            ( st, cmds )
+
+
+-- case stateLogin st of
+--     Just login ->
+--         ( st
+--         , Cmd.batch
+--             [ cmds
+--             -- TODO: uh don't do this search every time??
+--             , sendZIMsg model.fui (Data.PvqSearchZkNotes <| prevSearchQuery login)
+--             ]
+--         )
+--     Nothing ->
+--         ( st, cmds )
 
 
 routeStateInternal : Model -> Route -> ( State, Cmd Msg )
@@ -1534,26 +1538,39 @@ urlupdate msg model =
                     -- in the browser address bar, its a site reload so this isn't called.
                     case parseUrl url of
                         Just route ->
+                            let
+                                reroot =
+                                    let
+                                        ( st, rscmd ) =
+                                            routeState model route
+                                    in
+                                    -- swap out the savedRoute, so we don't write over history.
+                                    ( { model
+                                        | state = st
+                                        , savedRoute =
+                                            let
+                                                nssr =
+                                                    stateRoute st
+                                            in
+                                            { nssr | save = False }
+                                      }
+                                    , rscmd
+                                    )
+                            in
                             if route == (stateRoute model.state).route then
                                 ( model, Cmd.none )
 
                             else
-                                let
-                                    ( st, rscmd ) =
-                                        routeState model route
-                                in
-                                -- swap out the savedRoute, so we don't write over history.
-                                ( { model
-                                    | state = st
-                                    , savedRoute =
-                                        let
-                                            nssr =
-                                                stateRoute st
-                                        in
-                                        { nssr | save = False }
-                                  }
-                                , rscmd
-                                )
+                                case ( route, model.state ) of
+                                    ( ArchiveNoteR pid nid, ArchiveListing almod _ ) ->
+                                        if almod.noteid == pid then
+                                            ( model, Cmd.none )
+
+                                        else
+                                            reroot
+
+                                    _ ->
+                                        reroot
 
                         Nothing ->
                             -- load foreign site
@@ -2201,7 +2218,7 @@ actualupdate msg model =
         ( ZkReplyData (Ok ( _, Data.PvyZkNoteArchives lm )), ArchiveAwait id aid ld ) ->
             ( { model | state = ArchiveListing (ArchiveListing.init lm) ld }
             , sendZIMsg model.fui
-                (Data.PvqGetArchiveZkNote { parentnote = id, noteid = aid })
+                (Data.PvqGetZkNote (Data.ArchiveZni (DataUtil.zkNoteIdToString aid) (DataUtil.zkNoteIdToString id)))
             )
 
         ( PublicReplyData prd, state ) ->
@@ -4183,15 +4200,15 @@ handleTagFiles model ( lmod, lcmd ) login st =
                         zkls =
                             Dict.values lmod.zklDict
 
-                        zklinks : List Data.ZkLink
+                        zklinks : List Data.SaveZkLink2
                         zklinks =
-                            zklns
-                                |> List.foldl
-                                    (\zkln links ->
-                                        List.map (\el -> DataUtil.toZkLink zkln.id login.userid el) zkls
-                                            ++ links
-                                    )
-                                    []
+                            List.foldl
+                                (\zkln links ->
+                                    List.map (\el -> DataUtil.elToSzl2 zkln.id el) zkls
+                                        ++ links
+                                )
+                                []
+                                zklns
                     in
                     ( { model | state = st }
                     , sendZIMsg model.fui

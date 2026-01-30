@@ -51,7 +51,7 @@
         system:
         let
           toolchain = fenix.packages.${system}.latest;
-          rs_compiler = (with toolchain; [ rustc cargo ]);
+          rs_compiler = (with toolchain; [ rustc cargo rust-analyzer ]);
 
           pname = "zknotes";
           pkgs = nixpkgs.legacyPackages."${system}";
@@ -106,7 +106,7 @@
               # rustc
               # cargo-watch
               rustfmt
-              rust-analyzer
+              # rust-analyzer
               sqlite
               pkg-config
               openssl.dev

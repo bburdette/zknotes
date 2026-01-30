@@ -223,6 +223,7 @@ pub async fn zk_interface_loggedin_streaming(
         None,
         None,
         None,
+        None,
         syncstart,
         &mut zknotes_callbacks(),
         &jl,
@@ -290,11 +291,6 @@ pub async fn zk_interface_loggedin(
         results: zlnsr,
       };
       Ok(PrivateReply::PvyZkNoteArchives(zka))
-    }
-    PrivateRequest::PvqGetArchiveZkNote(rq) => {
-      let (_nid, note) = sqldata::read_archivezknote(&conn, &state.config.file_path, uid, &rq)?;
-      info!("user#getarchivezknote: {} - {}", note.id, note.title);
-      Ok(PrivateReply::PvyZkNote(note))
     }
     PrivateRequest::PvqGetArchiveZklinks(rq) => {
       let links = sqldata::read_archivezklinks(&conn, uid, rq.createddate_after)?;

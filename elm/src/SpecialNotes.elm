@@ -62,6 +62,7 @@ specialNoteEncoder enum =
 type alias CompletedSync =
     { after : Maybe (Int)
     , now : Int
+    , local : Maybe (String)
     , remote : Maybe (String)
     }
 
@@ -71,6 +72,7 @@ completedSyncEncoder struct =
     Json.Encode.object
         [ ( "after", (Maybe.withDefault Json.Encode.null << Maybe.map (Json.Encode.int)) struct.after )
         , ( "now", (Json.Encode.int) struct.now )
+        , ( "local", (Maybe.withDefault Json.Encode.null << Maybe.map (Json.Encode.string)) struct.local )
         , ( "remote", (Maybe.withDefault Json.Encode.null << Maybe.map (Json.Encode.string)) struct.remote )
         ]
 
@@ -109,6 +111,7 @@ completedSyncDecoder =
     Json.Decode.succeed CompletedSync
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "after" (Json.Decode.nullable (Json.Decode.int))))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "now" (Json.Decode.int)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "local" (Json.Decode.nullable (Json.Decode.string))))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "remote" (Json.Decode.nullable (Json.Decode.string))))
 
 

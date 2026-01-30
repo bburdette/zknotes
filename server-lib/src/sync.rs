@@ -126,8 +126,8 @@ pub async fn save_sync(
   let (id, _szn) = save_zknote(
     &conn,
     lapin_info,
-    server,
-    sysid, // save under system id.
+    server, // local server
+    sysid,  // save under system id.
     &SaveZkNote {
       id: None,
       title: "sync".to_string(),
@@ -153,6 +153,7 @@ pub async fn save_sync(
 
 pub struct TempTableNames {
   pub notetemp: String,
+  pub archivenotetemp: String,
   pub linktemp: String,
   pub archivelinktemp: String,
 }
@@ -166,6 +167,7 @@ pub fn temp_tables(conn: &Connection) -> Result<TempTableNames, zkerr::Error> {
   })?;
 
   let notetemp = format!("notetemp_{}", id);
+  let archivenotetemp = format!("archivenotetemp_{}", id);
   let linktemp = format!("linktemp_{}", id);
   let archivelinktemp = format!("archivelinktemp_{}", id);
 
@@ -174,6 +176,15 @@ pub fn temp_tables(conn: &Connection) -> Result<TempTableNames, zkerr::Error> {
     format!(
       "create temporary table {} (\"id\" integer primary key not null)",
       notetemp
+    )
+    .as_str(),
+    params![],
+  )?;
+
+  conn.execute(
+    format!(
+      "create temporary table {} (\"id\" integer primary key not null)",
+      archivenotetemp
     )
     .as_str(),
     params![],
@@ -211,6 +222,7 @@ pub fn temp_tables(conn: &Connection) -> Result<TempTableNames, zkerr::Error> {
 
   Ok(TempTableNames {
     notetemp,
+    archivenotetemp,
     linktemp,
     archivelinktemp,
   })
@@ -250,6 +262,7 @@ pub async fn sync(
     after,
     &file_path,
     &ttn.notetemp,
+    &ttn.archivenotetemp,
     &ttn.linktemp,
     &ttn.archivelinktemp,
     callbacks,
@@ -265,6 +278,7 @@ pub async fn sync(
         file_path,
         &user,
         Some(ttn.notetemp.clone()),
+        Some(ttn.archivenotetemp.clone()),
         Some(ttn.linktemp.clone()),
         Some(ttn.archivelinktemp.clone()),
         after,
@@ -579,6 +593,7 @@ pub async fn sync_from_remote(
   after: Option<i64>,
   file_path: &Path,
   notetemp: &String,
+  archivenotetemp: &String,
   linktemp: &String,
   archivelinktemp: &String,
   callbacks: &mut Callbacks,
@@ -619,6 +634,7 @@ pub async fn sync_from_remote(
     &user,
     file_path,
     Some(notetemp),
+    Some(archivenotetemp),
     Some(linktemp),
     Some(archivelinktemp),
     callbacks,
@@ -653,6 +669,7 @@ pub async fn sync_from_stream<S>(
   user: &User,
   file_path: &Path,
   notetemp: Option<&str>,
+  archivenotetemp: Option<&str>,
   linktemp: Option<&str>,
   archivelinktemp: Option<&str>,
   callbacks: &mut Callbacks,
@@ -663,7 +680,6 @@ where
 {
   // TODO: pass in now instead of compute here?
   let now = now()?;
-  let sysid = user_id(&conn, "system")?;
 
   let mut line = String::new();
 
@@ -858,7 +874,10 @@ where
               sqldata::save_zknote(
                 &conn,
                 lapin_info,
-                &server,
+                &Server {
+                  id: server_id,
+                  uuid: note.server.clone(),
+                },
                 uid,
                 &SaveZkNote {
                   id: Some(note.id),
@@ -880,7 +899,7 @@ where
             } else if note.changeddate < n.changeddate {
               // note is older.  add as archive note.
               // may create duplicate archive notes if edited on two systems and then synced.
-              sqldata::archive_zknote(&conn, nid, &note).map(|x| x.0)
+              sqldata::archive_zknote(&conn, nid, &uid, &note).map(|x| x.0)
             } else {
               Ok(nid)
             }
@@ -937,7 +956,12 @@ where
         .get(note.user.to_i64())
         .ok_or_else(|| zkerr::Error::String("user not found".to_string()))?,
     );
-    assert!(uid == sysid);
+
+    let (nid, pid) = match note.id {
+      ZkNoteId::ArchiveZni(n, p) => Ok((n, note_id_for_uuid(conn, &p)?)),
+      ZkNoteId::Zni(_) => Err(zkerr::Error::String("not an archive note".to_string())),
+    }?;
+
     let server_id = match serverhash.get(&note.server).ok_or_else(|| {
       match server_id(&conn, note.server.as_str()) {
         Ok(id) => Ok(id),
@@ -955,17 +979,18 @@ where
       Err(Err(e)) => Err(e),
     }?;
     let mbid = match conn.execute(
-      "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, server, createdate, changeddate)
-       values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+      "insert into zkarch (zknote, title, content, user, pubid, editable, showtitle, deleted, uuid, server, createdate, changeddate)
+       values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
         params![
+          pid,
           note.title,
           note.content,
-          sysid.to_i64(),    // archivenotes all owned by system.
+          uid.to_i64(),
           note.pubid,
           note.editable,
           note.showtitle,
           note.deleted,
-          note.id.to_string(),
+          nid.to_string(),
           server_id,
           note.createdate,
           note.changeddate,
@@ -989,7 +1014,7 @@ where
           Err(e) => return Err(e)?,
         }?;
 
-    if let (Some(id), Some(nt)) = (mbid, &notetemp) {
+    if let (Some(id), Some(nt)) = (mbid, &archivenotetemp) {
       conn.execute(
         format!("insert into {} values (?1)", nt).as_str(),
         params![id],
@@ -1155,21 +1180,24 @@ where
     params![],
   )?;
 
-  // write sync complete.
-  let unote = user_note_id(&conn, user.id)?;
-  save_sync(
-    &conn,
-    lapin_info,
-    &server,
-    user.id,
-    unote,
-    CompletedSync {
-      after: ss.after,
-      now,
-      remote: Some(ss.server),
-    },
-  )
-  .await?;
+  {
+    // write sync complete.
+    let unote = user_note_id(&conn, user.id)?;
+    save_sync(
+      &conn,
+      lapin_info,
+      &server,
+      user.id,
+      unote,
+      CompletedSync {
+        after: ss.after,
+        now,
+        local: Some(Uuid::parse_str(server.uuid.as_str())?),
+        remote: Some(ss.server),
+      },
+    )
+    .await?;
+  }
 
   Ok(PrivateReply::PvySyncComplete)
 }
@@ -1180,6 +1208,7 @@ pub async fn sync_to_remote(
   files_dir: &Path,
   user: &User,
   exclude_notes: Option<String>,
+  exclude_archivenotes: Option<String>,
   exclude_links: Option<String>,
   exclude_archivelinks: Option<String>,
   after: Option<i64>,
@@ -1219,6 +1248,7 @@ pub async fn sync_to_remote(
     PathBuf::from(files_dir),
     user.id,
     exclude_notes,
+    exclude_archivenotes,
     exclude_links,
     exclude_archivelinks,
     syncstart,
@@ -1313,7 +1343,7 @@ pub fn new_shares(
   let res: Result<Vec<(i64, ZkNoteId)>, zkerr::Error> = rec_iter
     .map(|i| {
       i.map_err(|e| e.into())
-        .and_then(|(id, uuid)| Ok((id, Uuid::parse_str(uuid.as_str())?.into())))
+        .and_then(|(id, uuid)| Ok((id, ZkNoteId::Zni(Uuid::parse_str(uuid.as_str())?))))
     })
     .collect();
   res
@@ -1325,6 +1355,7 @@ pub fn sync_stream(
   files_dir: PathBuf,
   uid: UserId,
   exclude_notes: Option<String>,
+  exclude_archivenotes: Option<String>,
   exclude_links: Option<String>,
   exclude_archivelinks: Option<String>,
   sync_start: zkprotocol::sync_data::SyncStart,
@@ -1427,23 +1458,14 @@ pub fn sync_stream(
               ts1: Box::new(TagSearch::Not {
                 ts: Box::new(TagSearch::SearchTerm {
                   mods: vec![SearchMod::ZkNoteId],
-                  term: SpecialUuids::Archive.str().to_string(),
+                  term: SpecialUuids::System.str().to_string(),
                 }),
               }),
               ao: AndOr::And,
-              ts2: Box::new(TagSearch::Boolex {
-                ts1: Box::new(TagSearch::Not {
-                  ts: Box::new(TagSearch::SearchTerm {
-                    mods: vec![SearchMod::ZkNoteId],
-                    term: SpecialUuids::System.str().to_string(),
-                  }),
-                }),
-                ao: AndOr::And,
-                ts2: Box::new(TagSearch::Not {
-                  ts: Box::new(TagSearch::SearchTerm {
-                    mods: vec![SearchMod::ZkNoteId],
-                    term: SpecialUuids::Sync.str().to_string(),
-                  }),
+              ts2: Box::new(TagSearch::Not {
+                ts: Box::new(TagSearch::SearchTerm {
+                  mods: vec![SearchMod::ZkNoteId],
+                  term: SpecialUuids::Sync.str().to_string(),
                 }),
               }),
             }),
@@ -1556,7 +1578,7 @@ pub fn sync_stream(
   };
 
   let anstream =
-    search_zknotes_stream(conn.clone(), files_dir, uid, ans, exclude_notes).map(bytesify);
+    search_zknotes_stream(conn.clone(), files_dir, uid, ans, exclude_archivenotes).map(bytesify);
 
   // if there's a new share, just get all links since the beginning of time.
   let linkafter = if new_shares { None } else { after };

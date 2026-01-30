@@ -17,6 +17,7 @@ use uuid::Uuid;
 use zkprotocol::constants::SpecialUuids;
 use zkprotocol::content::FileStatus;
 use zkprotocol::content::ZkListNote;
+use zkprotocol::content::ZkNoteId;
 use zkprotocol::search::{
   AndOr, ArchivesOrCurrent, OrderDirection, OrderField, ResultType, SearchMod, TagSearch,
   ZkIdSearchResult, ZkListNoteSearchResult, ZkNoteAndLinksSearchResult, ZkNoteSearch,
@@ -113,18 +114,24 @@ pub fn search_zknotes(
   let (sql, args) = build_sql(&conn, user, &search, None)?;
 
   let mut pstmt = conn.prepare(sql.as_str())?;
-
   let sysid = user_id(&conn, "system")?;
-
   let rec_iter = pstmt.query_and_then(rusqlite::params_from_iter(args.iter()), |row| {
     let id = row.get(0)?;
     let uuid = Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?;
+    let pid = row
+      .get::<usize, String>(2)
+      .ok()
+      .and_then(|x| Uuid::parse_str(x.as_str()).ok());
     let sysids = get_sysids(conn, sysid, id)?;
     Ok::<ZkListNote, zkerr::Error>(ZkListNote {
-      id: uuid.into(),
-      title: row.get(2)?,
+      id: match pid {
+        Some(pid) => ZkNoteId::ArchiveZni(uuid, pid),
+        None => ZkNoteId::Zni(uuid),
+      },
+      title: row.get(3)?,
       filestatus: {
-        let wat: Option<i64> = row.get(3)?;
+        let wat: Option<i64> = row.get(4)?;
+
         match wat {
           Some(file_id) => {
             if sqldata::file_exists(&conn, filedir, file_id)? {
@@ -136,9 +143,9 @@ pub fn search_zknotes(
           None => FileStatus::NotAFile,
         }
       },
-      user: UserId::Uid(row.get(4)?),
-      createdate: row.get(5)?,
-      changeddate: row.get(6)?,
+      user: UserId::Uid(row.get(5)?),
+      createdate: row.get(6)?,
+      changeddate: row.get(7)?,
       sysids,
     })
   })?;
@@ -234,14 +241,8 @@ pub fn search_zknotes_stream(
   // uncomment for formatting, lsp
   // {
   try_stream! {
-
-    let user = match search.archives {
-      ArchivesOrCurrent::Archives =>  user_id(&conn, "system")?,
-      ArchivesOrCurrent::Current =>  user,
-      ArchivesOrCurrent::CurrentAndArchives => panic!("unsupported"),
-    };
-
     let (sql, args) = build_sql(&conn, user, &search, exclude_notes)?;
+
 
     let mut stmt = conn.prepare(sql.as_str())?;
     let mut rows = stmt.query(rusqlite::params_from_iter(args.iter()))?;
@@ -255,32 +256,22 @@ pub fn search_zknotes_stream(
       match search.resulttype {
         ResultType::RtId => yield SyncMessage::ZkNoteId(row.get::<usize, String>(1)?),
         ResultType::RtListNote => {
-          // let zln = ZkListNote {
-          //   id: Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?,
-          //   title: row.get(2)?,
-          //   is_file: {
-          //     let wat: Option<i64> = row.get(3)?;
-          //     wat.is_some()
-          //   },
-          //   user: row.get(4)?,
-          //   createdate: row.get(5)?,
-          //   changeddate: row.get(6)?,
-          //   sysids: Vec::new(),
-          // };
-          // yield SyncMessage::from(zln)
           yield SyncMessage::SyncError("unimplemented".to_string())
         }
         ResultType::RtNote => {
-          let zn = sqldata::read_zknote_i64(&conn, &files_dir,Some(user), row.get(0)?)?;
+          let uuid = Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?;
+          let parent : Option<Uuid>
+           = row.get::<usize, String>(2).ok().and_then(
+               |x| Uuid::parse_str(x.as_str()).ok());
+          let (_id, zn) = match parent {
+            None => sqldata::read_zknote(&conn, &files_dir,Some(user), &ZkNoteId::Zni(uuid))?,
+            Some(pid) => sqldata::read_zknote(&conn, &files_dir,Some(user), &ZkNoteId::ArchiveZni(uuid, pid))?,
+            };
           let mbf = if zn.filestatus != FileStatus::NotAFile {
             Some( sqldata::read_file_info(&conn, row.get(0)?)? )} else { None };
           yield SyncMessage::from((zn, mbf))
         }
         ResultType::RtNoteAndLinks => {
-          // TODO: i64 version
-          // let uuid = Uuid::parse_str(row.get::<usize, String>(1)?.as_str())?;
-          // let zn = sqldata::read_zknoteandlinks(&conn, Some(user), &uuid)?;
-          // yield SyncMessage::from(zn)
           yield SyncMessage::SyncError("unimplemented".to_string())
         }
       }
@@ -302,7 +293,7 @@ pub fn sync_users(
 
     let mut pstmt = conn.prepare(
       format!(
-        "with search_notes ( id, uuid, title, file, user, createdate, changeddate) as ({})
+        "with search_notes ( id, uuid, zknote, title, file, user, createdate, changeddate) as ({})
         select U.id, U.uuid, U.name, U.active
         from orgauth_user U where
           U.id in (select distinct user from search_notes)",
@@ -365,12 +356,24 @@ pub fn build_sql(
   search: &ZkNoteSearch,
   exclude_notes: Option<String>,
 ) -> Result<(String, Vec<String>), zkerr::Error> {
+  // protect against this,
+  // since archive note i64 ids should NOT be used for zknotes,
+  // and vice versa.
+  match (&search.archives, &exclude_notes) {
+    (ArchivesOrCurrent::CurrentAndArchives, Some(_)) => {
+      return Err(zkerr::Error::String(
+        "exclude notes not allowed on CurrentAndArchive searches".to_string(),
+      ));
+    }
+    _ => (),
+  }
+
   let (sql, args) = build_base_sql(conn, uid, search)?;
   match exclude_notes {
     Some(exclude_note_table) => {
       let nusql = format!(
-        "with SN ( id, uuid, title, file, user, createdate, changeddate) as ({})
-        select SN.id, SN.uuid, SN.title, SN.file, SN.user, SN.createdate, SN.changeddate
+        "with SN ( id, uuid, zknote, title, file, user, createdate, changeddate) as ({})
+        select SN.id, SN.uuid, SN.zknote, SN.title, SN.file, SN.user, SN.createdate, SN.changeddate
         from SN
         left join {} as EN
         on SN.id = EN.id
@@ -405,10 +408,7 @@ pub fn build_base_sql(
 ) -> Result<(String, Vec<String>), zkerr::Error> {
   let ts = andify_search(&search.tagsearch);
 
-  let (cls, clsargs) = build_tagsearch_clause(&conn, uid, false, &ts)?;
-
   let publicid = note_id(&conn, "system", "public")?;
-  let archiveid = note_id(&conn, "system", "archive")?;
   let shareid = note_id(&conn, "system", "share")?;
   let usernoteid = sqldata::user_note_id(&conn, uid)?;
 
@@ -435,31 +435,31 @@ pub fn build_base_sql(
 
   let archives = (search.archives == ArchivesOrCurrent::Archives)
     || (search.archives == ArchivesOrCurrent::CurrentAndArchives);
+
   let current = (search.archives == ArchivesOrCurrent::Current)
     || (search.archives == ArchivesOrCurrent::CurrentAndArchives);
+
   let deleted = if search.deleted {
     ""
   } else {
     "and N.deleted = 0"
   };
 
-  let mut sqlargs: Vec<(String, Vec<String>)> = Vec::new();
+  // sql, sqlargs, current (or archives = false)
+  let mut sqlargs: Vec<(String, Vec<String>, bool)> = Vec::new();
 
   if archives {
     let (sqlbase, baseargs) = (
       // archives of notes that are mine.
       format!(
-        "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
-      from zknote N, zknote O, zklink OL, zklink AL where
-      (O.user = ?
-        and OL.fromid = N.id and OL.toid = O.id
-        and AL.fromid = N.id and AL.toid = ?)
+        "select N.id, N.uuid, PN.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
+      from zkarch N, zknote PN where N.user = ? and PN.id = N.zknote
         {}",
         deleted
       ),
-      vec![uid.to_string(), archiveid.to_string()],
+      vec![uid.to_string()],
     );
-    sqlargs.push((sqlbase, baseargs));
+    sqlargs.push((sqlbase, baseargs, false));
   }
   if current {
     let ( sqlbase,  baseargs) =
@@ -467,14 +467,14 @@ pub fn build_base_sql(
     // notes that are mine.
     (
       format!(
-        "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
+        "select N.id, N.uuid, null, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N where N.user = ?
         {}",
         deleted
       ),
       vec![uid.to_string()],
     );
-    sqlargs.push((sqlbase, baseargs));
+    sqlargs.push((sqlbase, baseargs, true));
   };
 
   // notes that are public, and not mine.
@@ -482,23 +482,22 @@ pub fn build_base_sql(
     let (sqlpub, pubargs) = (
       // archives of notes that are public, and not mine.
       format!(
-        "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
-      from zknote N, zklink L, zknote O, zklink OL, zklink AL
+        "select N.id, N.uuid, PN.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
+      from zkarch N, zklink L, zknote PN
       where (N.user != ?
-        and L.fromid = N.id and L.toid = ?
-        and OL.fromid = N.id and OL.toid = O.id
-        and AL.fromid = N.id and AL.toid = ?)
+        and L.fromid = N.zknote and L.toid = ? )
+        and PN.id = N.zknote
         {}",
         deleted
       ),
-      vec![uid.to_string(), publicid.to_string(), archiveid.to_string()],
+      vec![uid.to_string(), publicid.to_string()],
     );
-    sqlargs.push((sqlpub, pubargs));
+    sqlargs.push((sqlpub, pubargs, false));
   }
   if current {
     let (sqlpub, pubargs) = (
       format!(
-        "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
+        "select N.id, N.uuid, null, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N, zklink L
       where (N.user != ? and L.fromid = N.id and L.toid = ?)
       {}",
@@ -506,13 +505,13 @@ pub fn build_base_sql(
       ),
       vec![uid.to_string(), publicid.to_string()],
     );
-    sqlargs.push((sqlpub, pubargs));
+    sqlargs.push((sqlpub, pubargs, true));
   };
 
   // notes shared with a share tag, and not mine.
   // clause 1: user is not-me
   //
-  // clause 2: is N linked to a share note?
+  // clause 2: is O (original (non-archived) note) linked to a share note?
   // link M is to shareid, and L links either to or from M's from.
   //
   // clause 3 is M.from (the share)
@@ -520,43 +519,37 @@ pub fn build_base_sql(
   if archives {
     let (sqlshare, shareargs) = (
       format!(
-        "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
-      from zknote N, zklink L, zklink M, zklink U, zknote O, zklink OL, zklink AL
-      where (N.user != ? and
-        (M.toid = ? and (
-          (L.fromid = N.id and L.toid = M.fromid ) or
-          (L.toid = N.id and L.fromid = M.fromid ))
-        and OL.fromid = N.id and OL.toid = O.id
-        and AL.fromid = N.id and AL.toid = ?))
+        "select N.id, N.uuid, PN.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
+      from zkarch N, zklink L, zklink M, zklink U, zknote PN
+      where N.user != ?
       and
-        L.linkzknote is not ?
+        (M.toid = ? and
+          ((L.fromid = N.zknote and L.toid = M.fromid ) or
+           (L.toid = N.zknote and L.fromid = M.fromid )))
       and
         ((U.fromid = ? and U.toid = M.fromid) or (U.fromid = M.fromid and U.toid = ?))
+        and PN.id = N.zknote
         {}",
         deleted
       ),
       vec![
         uid.to_string(),
         shareid.to_string(),
-        archiveid.to_string(),
-        archiveid.to_string(),
         usernoteid.to_string(),
         usernoteid.to_string(),
       ],
     );
-    sqlargs.push((sqlshare, shareargs));
+    sqlargs.push((sqlshare, shareargs, false));
   }
   if current {
     let (sqlshare, shareargs) = (
       format!(
-        "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
+        "select N.id, N.uuid, null, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N, zklink L, zklink M, zklink U
       where (N.user != ?
         and M.toid = ?
         and ((L.fromid = N.id and L.toid = M.fromid )
              or (L.toid = N.id and L.fromid = M.fromid ))
-      and
-        L.linkzknote is not ?
       and
         ((U.fromid = ? and U.toid = M.fromid) or (U.fromid = M.fromid and U.toid = ?)))
         {}",
@@ -565,24 +558,22 @@ pub fn build_base_sql(
       vec![
         uid.to_string(),
         shareid.to_string(),
-        archiveid.to_string(),
         usernoteid.to_string(),
         usernoteid.to_string(),
       ],
     );
-    sqlargs.push((sqlshare, shareargs));
+    sqlargs.push((sqlshare, shareargs, true));
   };
 
   // notes that are tagged with my usernoteid, and not mine.
   if archives {
     let (sqluser, userargs) = (
       format!(
-        "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
-      from zknote N, zklink L, zknote O, zklink OL, zklink AL
+        "select N.id, N.uuid, PN.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
+      from zkarch N, zklink L, zknote PN
       where N.user != ?
-        and ((L.fromid = N.id and L.toid = ?) or (L.toid = N.id and L.fromid = ?))
-        and OL.fromid = N.id and OL.toid = O.id
-        and AL.fromid = N.id and AL.toid = ?
+        and ((L.fromid = N.zknote and L.toid = ?) or (L.toid = N.zknote and L.fromid = ?))
+        and PN.id = N.zknote
         {}",
         deleted
       ),
@@ -590,15 +581,14 @@ pub fn build_base_sql(
         uid.to_string(),
         usernoteid.to_string(),
         usernoteid.to_string(),
-        archiveid.to_string(),
       ],
     );
-    sqlargs.push((sqluser, userargs));
+    sqlargs.push((sqluser, userargs, false));
   }
   if current {
     let (sqluser, userargs) = (
       format!(
-        "select N.id, N.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
+        "select N.id, N.uuid, null, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N, zklink L
       where (
         N.user != ? and
@@ -612,26 +602,68 @@ pub fn build_base_sql(
         usernoteid.to_string(),
       ],
     );
-    sqlargs.push((sqluser, userargs));
+    sqlargs.push((sqluser, userargs, true));
+  };
+
+  struct Tsc {
+    cls: String,
+    clsargs: Vec<String>,
+  }
+
+  let cur_tsc: Option<Tsc> = if current {
+    let (cls, clsargs) =
+      build_tagsearch_clause(&conn, uid, &ArchivesOrCurrent::Current, false, &ts)?;
+    Some(Tsc {
+      cls: cls,
+      clsargs: clsargs,
+    })
+  } else {
+    None
+  };
+  let arch_tsc: Option<Tsc> = if archives {
+    let (cls, clsargs) =
+      build_tagsearch_clause(&conn, uid, &ArchivesOrCurrent::Archives, false, &ts)?;
+    Some(Tsc {
+      cls: cls,
+      clsargs: clsargs,
+    })
+  } else {
+    None
   };
 
   // local ftn to add clause and args.
-  let addcls = |sql: &mut String, args: &mut Vec<String>| {
+  let addcls = |sql: &mut String, args: &mut Vec<String>, current: bool| {
     if !args.is_empty() {
-      sql.push_str("\nand ");
-      sql.push_str(cls.as_str());
+      let tsc: Option<&Tsc> = if current {
+        match &cur_tsc {
+          Some(tsc) => Some(&tsc),
+          None => None,
+        }
+      } else {
+        match &arch_tsc {
+          Some(tsc) => Some(&tsc),
+          None => None,
+        }
+      };
 
-      // clone, otherwise no clause vals next time!
-      let mut pendargs = clsargs.clone();
-      args.append(&mut pendargs);
+      if let Some(&ref tsc) = tsc {
+        sql.push_str("\nand ");
+        sql.push_str(tsc.cls.as_str());
+
+        // clone, otherwise no clause vals next time!
+        let mut pendargs = tsc.clsargs.clone();
+        args.append(&mut pendargs);
+      } else {
+        tracing::error!("tsc error");
+      };
     }
   };
 
   let mut rsql: String = String::new();
   let mut rargs: Vec<String> = Vec::new();
 
-  while let Some((mut sql, mut args)) = sqlargs.pop() {
-    addcls(&mut sql, &mut args);
+  while let Some((mut sql, mut args, current)) = sqlargs.pop() {
+    addcls(&mut sql, &mut args, current);
 
     rsql.push_str(sql.as_str());
     if sqlargs.len() > 0 {
@@ -675,6 +707,7 @@ pub fn build_base_sql(
 fn build_tagsearch_clause(
   conn: &Connection,
   uid: UserId,
+  aoc: &ArchivesOrCurrent,
   not: bool,
   search: &TagSearch,
 ) -> Result<(String, Vec<String>), zkerr::Error> {
@@ -766,28 +799,73 @@ fn build_tagsearch_clause(
 
           let notstr = if not { "not" } else { "" };
 
-          (
-            // clause
-            format!(
-              "{} (N.id in (select zklink.toid from zknote as zkn, zklink
-             where zkn.id = zklink.fromid
-               and {})
-            or
-                N.id in (select zklink.fromid from zknote as zkn, zklink
-             where zkn.id = zklink.toid
-               and {}))",
-              notstr, clause, clause
+          enum Aocid {
+            AocS(&'static str),
+            Both,
+          }
+
+          let ai = match aoc {
+            ArchivesOrCurrent::Current => Aocid::AocS("id"),
+            ArchivesOrCurrent::Archives => Aocid::AocS("zknote"),
+            ArchivesOrCurrent::CurrentAndArchives => Aocid::Both,
+          };
+          match ai {
+            Aocid::AocS(nid) => (
+              // clause
+              format!(
+                "{} (N.{} in (select zklink.toid from zknote as zkn, zklink
+                 where zkn.id = zklink.fromid
+                   and {})
+                or
+                    N.{} in (select zklink.fromid from zknote as zkn, zklink
+                 where zkn.id = zklink.toid
+                   and {}))",
+                notstr, nid, clause, nid, clause
+              ),
+              // args
+              if exact {
+                vec![term.clone(), term.clone()]
+              } else {
+                vec![
+                  format!("%{}%", term).to_string(),
+                  format!("%{}%", term).to_string(),
+                ]
+              },
             ),
-            // args
-            if exact {
-              vec![term.clone(), term.clone()]
-            } else {
-              vec![
-                format!("%{}%", term).to_string(),
-                format!("%{}%", term).to_string(),
-              ]
-            },
-          )
+            Aocid::Both => (
+              // clause
+              format!(
+                "{} (N.id in (select zklink.toid from zknote as zkn, zklink
+                 where zkn.id = zklink.fromid
+                   and {})
+                or
+                    N.id in (select zklink.fromid from zknote as zkn, zklink
+                 where zkn.id = zklink.toid
+                   and {})
+                or
+                    N.zknote in (select zklink.fromid from zknote as zkn, zklink
+                 where zkn.id = zklink.toid
+                   and {})
+                or
+                    N.zknote in (select zklink.fromid from zknote as zkn, zklink
+                 where zkn.id = zklink.toid
+                   and {})
+                   )",
+                notstr, clause, clause, clause, clause
+              ),
+              // args
+              if exact {
+                vec![term.clone(), term.clone(), term.clone(), term.clone()]
+              } else {
+                vec![
+                  format!("%{}%", term).to_string(),
+                  format!("%{}%", term).to_string(),
+                  format!("%{}%", term).to_string(),
+                  format!("%{}%", term).to_string(),
+                ]
+              },
+            ),
+          }
         } else {
           let fileclause = if file { "and N.file is not null" } else { "" };
 
@@ -815,10 +893,10 @@ fn build_tagsearch_clause(
         }
       }
     }
-    TagSearch::Not { ts } => build_tagsearch_clause(&conn, uid, true, &*ts)?,
+    TagSearch::Not { ts } => build_tagsearch_clause(&conn, uid, aoc, true, &*ts)?,
     TagSearch::Boolex { ts1, ao, ts2 } => {
-      let (cl1, mut arg1) = build_tagsearch_clause(&conn, uid, false, &*ts1)?;
-      let (cl2, mut arg2) = build_tagsearch_clause(&conn, uid, false, &*ts2)?;
+      let (cl1, mut arg1) = build_tagsearch_clause(&conn, uid, aoc, false, &*ts1)?;
+      let (cl2, mut arg2) = build_tagsearch_clause(&conn, uid, aoc, false, &*ts2)?;
       let mut cls = String::new();
       let conj = match ao {
         AndOr::Or => " or ",

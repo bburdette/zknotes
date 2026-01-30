@@ -24,6 +24,8 @@ pub enum Error {
   Girlboss(girlboss::Error),
   Lapin(lapin::Error),
   NoteNotFound,
+  ArchiveNoteNotAllowed,
+  ArchiveNoteRequired,
   CantLinkToArchive,
   NoteIsPrivate,
   NoteIsReadOnly,
@@ -69,6 +71,12 @@ pub fn to_orgauth_error(e: Error) -> orgauth::error::Error {
     Error::Girlboss(e) => orgauth::error::Error::String(e.to_string()),
     Error::Lapin(e) => orgauth::error::Error::String(e.to_string()),
     Error::NoteNotFound => orgauth::error::Error::String("note not found".to_string()),
+    Error::ArchiveNoteNotAllowed => {
+      orgauth::error::Error::String("archive note not allowed".to_string())
+    }
+    Error::ArchiveNoteRequired => {
+      orgauth::error::Error::String("archive note required".to_string())
+    }
     Error::CantLinkToArchive => {
       orgauth::error::Error::String("can't link to archive note".to_string())
     }
@@ -102,6 +110,8 @@ impl fmt::Display for Error {
       Error::Girlboss(e) => write!(f, "{}", e),
       Error::Lapin(e) => write!(f, "{}", e),
       Error::NoteNotFound => write!(f, "{}", "note not found"),
+      Error::ArchiveNoteNotAllowed => write!(f, "{}", "archive note not allowed"),
+      Error::ArchiveNoteRequired => write!(f, "{}", "archive note required"),
       Error::CantLinkToArchive => write!(f, "{}", "can't link to archive note"),
       Error::NoteIsPrivate => write!(f, "{}", "note is private"),
       Error::NoteIsReadOnly => write!(f, "{}", "note is readonly"),
@@ -128,6 +138,8 @@ impl fmt::Debug for Error {
       Error::Girlboss(e) => write!(f, "{}", e),
       Error::Lapin(e) => write!(f, "{}", e),
       Error::NoteNotFound => write!(f, "{}", "note not found"),
+      Error::ArchiveNoteNotAllowed => write!(f, "{}", "archive note not allowed"),
+      Error::ArchiveNoteRequired => write!(f, "{}", "archive note required"),
       Error::CantLinkToArchive => write!(f, "{}", "can't link to archive note"),
       Error::NoteIsPrivate => write!(f, "{}", "note is private"),
       Error::NoteIsReadOnly => write!(f, "{}", "note is readonly"),

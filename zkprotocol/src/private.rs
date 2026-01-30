@@ -1,9 +1,9 @@
 use crate::{
   content::{
-    ArchiveZkLink, GetArchiveZkLinks, GetArchiveZkNote, GetZkLinksSince, GetZkNoteAndLinks,
-    GetZkNoteArchives, GetZkNoteComments, GetZnlIfChanged, ImportZkNote, JobStatus, SaveZkLinks,
-    SaveZkNote, SaveZkNoteAndLinks, SavedZkNote, UuidZkLink, ZkListNote, ZkNote,
-    ZkNoteAndLinksWhat, ZkNoteArchives, ZkNoteId,
+    ArchiveZkLink, GetArchiveZkLinks, GetZkLinksSince, GetZkNoteAndLinks, GetZkNoteArchives,
+    GetZkNoteComments, GetZnlIfChanged, ImportZkNote, JobStatus, SaveZkLinks, SaveZkNote,
+    SaveZkNoteAndLinks, SavedZkNote, UuidZkLink, ZkListNote, ZkNote, ZkNoteAndLinksWhat,
+    ZkNoteArchives, ZkNoteId,
   },
   search::{
     TagSearch, ZkIdSearchResult, ZkListNoteSearchResult, ZkNoteAndLinksSearchResult, ZkNoteSearch,
@@ -32,7 +32,6 @@ pub enum PrivateRequest {
   PvqGetZnlIfChanged(GetZnlIfChanged),
   PvqGetZkNoteComments(GetZkNoteComments),
   PvqGetZkNoteArchives(GetZkNoteArchives),
-  PvqGetArchiveZkNote(GetArchiveZkNote),
   PvqGetArchiveZklinks(GetArchiveZkLinks),
   PvqGetZkLinksSince(GetZkLinksSince),
   PvqSearchZkNotes(ZkNoteSearch),

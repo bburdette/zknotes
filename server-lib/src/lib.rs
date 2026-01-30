@@ -597,6 +597,7 @@ async fn zk_interface_check_upstreaming(
             None,
             None,
             None,
+            None,
             &mut sqldata::zknotes_callbacks(),
             &mut br,
           )
