@@ -123,6 +123,7 @@
               elmPackages.elm-optimize-level-2
             ];
 
+            # Need RUST_SRC_PATH so that rust-analyzer sees rust stdlib
             shellHook = ''
               export RUST_SRC_PATH=${toolchain.rust-src}/lib/rustlib/src/rust/library
             '';
