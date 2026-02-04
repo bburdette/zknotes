@@ -51,7 +51,7 @@
         system:
         let
           toolchain = fenix.packages.${system}.latest;
-          rs_compiler = (with toolchain; [ rustc cargo rust-analyzer ]);
+          rs_compiler = (with toolchain; [ rustc cargo rust-analyzer rust-src ]);
 
           pname = "zknotes";
           pkgs = nixpkgs.legacyPackages."${system}";
@@ -102,11 +102,8 @@
           devShell = pkgs.mkShell {
             nativeBuildInputs = with pkgs; [
               rs_compiler
-              # cargo
-              # rustc
-              # cargo-watch
+              cargo-watch
               rustfmt
-              # rust-analyzer
               sqlite
               pkg-config
               openssl.dev
@@ -125,6 +122,11 @@
               # elmPackages.elmi-to-json
               elmPackages.elm-optimize-level-2
             ];
+
+            shellHook = ''
+              export RUST_SRC_PATH=${toolchain.rust-src}/lib/rustlib/src/rust/library
+            '';
+
           };
         }
       ) // {
