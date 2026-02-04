@@ -2241,8 +2241,14 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                     [ E.width E.fill
                     , E.alignTop
                     , E.spacing 8
+                    , EBd.rounded 10
                     ]
-                    [ headingPanel "document" [ E.width E.fill ] <| documentPanel
+                    [ headingPanel "document"
+                        [ E.width E.fill
+                        , EBd.rounded 10
+                        ]
+                      <|
+                        documentPanel
                     , searchOrRecentPanel
                     ]
 
@@ -2250,13 +2256,22 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                 E.row
                     [ E.width E.fill
                     , E.spacing 8
+                    , EBd.rounded 10
                     ]
-                    [ headingPanel "document" [ E.width E.fill ] <| documentPanel
+                    [ headingPanel "document"
+                        [ E.width E.fill
+                        , EBd.rounded 10
+                        ]
+                      <|
+                        documentPanel
                     , searchOrRecentPanel
                     ]
 
             Narrow ->
-                E.column [ E.width E.fill ]
+                E.column
+                    [ E.width E.fill
+                    , EBd.rounded 10
+                    ]
                     [ Common.navbar 2
                         model.tab
                         TabChanged
