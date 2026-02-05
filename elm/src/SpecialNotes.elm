@@ -46,7 +46,7 @@ serverEncoder struct =
 type SpecialNote
     = SnSearch (List (TagSearch))
     | SnSync (CompletedSync)
-    | SnPlaylist (Notelist)
+    | SnGraph (Notegraph)
 
 
 specialNoteEncoder : SpecialNote -> Json.Encode.Value
@@ -56,8 +56,8 @@ specialNoteEncoder enum =
             Json.Encode.object [ ( "SnSearch", Json.Encode.list (tagSearchEncoder) inner ) ]
         SnSync inner ->
             Json.Encode.object [ ( "SnSync", completedSyncEncoder inner ) ]
-        SnPlaylist inner ->
-            Json.Encode.object [ ( "SnPlaylist", notelistEncoder inner ) ]
+        SnGraph inner ->
+            Json.Encode.object [ ( "SnGraph", notegraphEncoder inner ) ]
 
 type alias CompletedSync =
     { after : Maybe (Int)
@@ -77,17 +77,15 @@ completedSyncEncoder struct =
         ]
 
 
-type alias Notelist =
-    { sequence : List (String)
-    , current : Maybe (Int)
+type alias Notegraph =
+    { current : Maybe (String)
     }
 
 
-notelistEncoder : Notelist -> Json.Encode.Value
-notelistEncoder struct =
+notegraphEncoder : Notegraph -> Json.Encode.Value
+notegraphEncoder struct =
     Json.Encode.object
-        [ ( "sequence", (Json.Encode.list (Json.Encode.string)) struct.sequence )
-        , ( "current", (Maybe.withDefault Json.Encode.null << Maybe.map (Json.Encode.int)) struct.current )
+        [ ( "current", (Maybe.withDefault Json.Encode.null << Maybe.map (Json.Encode.string)) struct.current )
         ]
 
 
@@ -103,7 +101,7 @@ specialNoteDecoder =
     Json.Decode.oneOf
         [ Json.Decode.map SnSearch (Json.Decode.field "SnSearch" (Json.Decode.list (tagSearchDecoder)))
         , Json.Decode.map SnSync (Json.Decode.field "SnSync" (completedSyncDecoder))
-        , Json.Decode.map SnPlaylist (Json.Decode.field "SnPlaylist" (notelistDecoder))
+        , Json.Decode.map SnGraph (Json.Decode.field "SnGraph" (notegraphDecoder))
         ]
 
 completedSyncDecoder : Json.Decode.Decoder CompletedSync
@@ -115,10 +113,9 @@ completedSyncDecoder =
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "remote" (Json.Decode.nullable (Json.Decode.string))))
 
 
-notelistDecoder : Json.Decode.Decoder Notelist
-notelistDecoder =
-    Json.Decode.succeed Notelist
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "sequence" (Json.Decode.list (Json.Decode.string))))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "current" (Json.Decode.nullable (Json.Decode.int))))
+notegraphDecoder : Json.Decode.Decoder Notegraph
+notegraphDecoder =
+    Json.Decode.succeed Notegraph
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "current" (Json.Decode.nullable (Json.Decode.string))))
 
 

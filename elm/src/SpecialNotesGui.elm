@@ -84,7 +84,7 @@ guiSn zone snote =
                     ]
                 ]
 
-        SN.SnPlaylist _ ->
+        SN.SnGraph _ ->
             E.none
 
 
@@ -176,5 +176,5 @@ updateSn msg snote =
                 Noop ->
                     ( SN.SnSync completedSync, None )
 
-        SN.SnPlaylist notelist ->
-            ( SN.SnPlaylist notelist, None )
+        SN.SnGraph g ->
+            ( SN.SnGraph g, None )
