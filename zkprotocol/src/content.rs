@@ -154,6 +154,16 @@ pub struct ZkLink {
   pub toname: Option<String>,
 }
 
+// links that contain a particular linkzknote value, not included here.
+#[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug, Clone)]
+pub struct LzLink {
+  pub from: ZkNoteId,
+  pub to: ZkNoteId,
+  pub user: UserId,
+  pub fromname: String,
+  pub toname: String,
+}
+
 #[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug, Clone)]
 pub struct SaveZkLink2 {
   pub from: ZkNoteId,
@@ -283,6 +293,7 @@ pub struct GetZkNoteComments {
 pub struct ZkNoteAndLinks {
   pub zknote: ZkNote,
   pub links: Vec<EditLink>,
+  pub lzlinks: Vec<LzLink>,
 }
 
 #[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug)]

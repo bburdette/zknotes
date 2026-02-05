@@ -23,9 +23,9 @@ use uuid::Uuid;
 use zkprotocol::constants::SpecialUuids;
 use zkprotocol::content::{
   ArchiveZkLink, Direction, EditLink, ExtraLoginData, FileInfo, FileStatus, GetZkNoteArchives,
-  GetZkNoteComments, GetZnlIfChanged, ImportZkNote, OnMakeFileNote, OnSavedZkNote, SaveZkLink,
-  SaveZkLink2, SaveZkNote, SavedZkNote, Server, Sysids, UuidZkLink, ZkLink, ZkListNote, ZkNote,
-  ZkNoteAndLinks, ZkNoteAndLinksWhat, ZkNoteId,
+  GetZkNoteComments, GetZnlIfChanged, ImportZkNote, LzLink, OnMakeFileNote, OnSavedZkNote,
+  SaveZkLink, SaveZkLink2, SaveZkNote, SavedZkNote, Server, Sysids, UuidZkLink, ZkLink, ZkListNote,
+  ZkNote, ZkNoteAndLinks, ZkNoteAndLinksWhat, ZkNoteId,
 };
 use zkprotocol::sync_data::SyncMessage;
 
@@ -1949,6 +1949,69 @@ pub fn read_public_zklinks(
         othername,
         sysids: get_sysids(&conn, sysid, otherid)?,
         delete: None,
+      })
+    },
+  )?);
+
+  r
+}
+
+pub fn read_public_lzlinks(
+  conn: &Connection,
+  noteid: &ZkNoteId,
+) -> Result<Vec<LzLink>, zkerr::Error> {
+  let pubid = note_id(&conn, "system", "public")?;
+  let sysid = user_id(&conn, "system")?;
+  let zknid = note_id_for_zknoteid(&conn, noteid)?;
+
+  // TODO: integrate sysid lookup in the query?
+  let mut pstmt = conn.prepare(
+    // return zklinks with linkzknote = noteid, and
+    // that link to or from notes that link to 'public'.
+    "select A.fromid, A.toid, A.user, A.linkzknote, L.uuid, L.title, R.uuid, R.title
+       from zklink A, zklink B, zklink C
+       inner join zknote as L ON A.fromid = L.id
+       inner join zknote as R ON A.toid = R.id
+     where
+       (L.user != ?3 and R.user != ?3) and
+       (A.linkzknote = ?1 and
+       (A.fromid = B.fromid and B.toid = ?2 or
+        A.fromid = B.toid and B.fromid = ?2) and
+       (A.toid = C.fromid and C.toid = ?2 or
+        A.toid = C.toid and C.fromid = ?2))",
+  )?;
+
+  let r = Result::from_iter(pstmt.query_and_then(
+    params![zknid, pubid, sysid.to_i64()],
+    |row| {
+      // let fromid: i64 = row.get(0)?;
+      // let toid: i64 = row.get(1)?;
+      let fromuuid = Uuid::parse_str(row.get::<usize, String>(4)?.as_str()).map_err(|e| {
+        zkerr::annotate_string(
+          format!("error parsing link uuid: {:?}", row.get::<usize, String>(4)),
+          e.into(),
+        )
+      })?;
+      let fromtitle = row.get::<usize, String>(5)?;
+
+      let touuid = Uuid::parse_str(row.get::<usize, String>(6)?.as_str()).map_err(|e| {
+        zkerr::annotate_string(
+          format!("error parsing link uuid: {:?}", row.get::<usize, String>(6)),
+          e.into(),
+        )
+      })?;
+      let totitle = row.get::<usize, String>(7)?;
+
+      // For test!
+      let linkzknotei64 = row.get::<usize, i64>(3)?;
+      assert!(linkzknotei64 == zknid);
+
+      Ok::<_, zkerr::Error>(LzLink {
+        from: ZkNoteId::Zni(fromuuid),
+        to: ZkNoteId::Zni(touuid),
+        user: UserId::Uid(row.get(2)?), // really?  i64?
+        fromname: fromtitle,
+        toname: totitle,
       })
     },
   )?);

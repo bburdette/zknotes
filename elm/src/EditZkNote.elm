@@ -2118,7 +2118,15 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                                     , EBk.color TC.lightGray
                                     , E.height E.fill
                                     ]
-                                    [ E.el [ EBd.color TC.black, EBd.width 1, E.width E.fill, E.centerX, E.padding 3 ] (SNG.guiSn zone sn |> E.map SNGMsg) ]
+                                    [ E.el
+                                        [ EBd.color TC.black
+                                        , EBd.width 1
+                                        , E.width E.fill
+                                        , E.centerX
+                                        , E.padding 3
+                                        ]
+                                        (SNG.guiSn zone sn |> E.map SNGMsg)
+                                    ]
                                     :: showComments
                                     ++ (divider :: showLinks TC.white)
 

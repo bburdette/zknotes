@@ -516,6 +516,7 @@ getZkNoteCommentsEncoder struct =
 type alias ZkNoteAndLinks =
     { zknote : ZkNote
     , links : List (EditLink)
+    , lzlinks : List (LzLink)
     }
 
 
@@ -524,6 +525,7 @@ zkNoteAndLinksEncoder struct =
     Json.Encode.object
         [ ( "zknote", (zkNoteEncoder) struct.zknote )
         , ( "links", (Json.Encode.list (editLinkEncoder)) struct.links )
+        , ( "lzlinks", (Json.Encode.list (lzLinkEncoder)) struct.lzlinks )
         ]
 
 
@@ -1438,6 +1440,7 @@ zkNoteAndLinksDecoder =
     Json.Decode.succeed ZkNoteAndLinks
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "zknote" (zkNoteDecoder)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "links" (Json.Decode.list (editLinkDecoder))))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "lzlinks" (Json.Decode.list (lzLinkDecoder))))
 
 
 zkNoteAndLinksWhatDecoder : Json.Decode.Decoder ZkNoteAndLinksWhat
