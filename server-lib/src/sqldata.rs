@@ -1882,6 +1882,146 @@ pub fn read_zklinks(
   r
 }
 
+pub fn read_lzlinks(
+  conn: &Connection,
+  uid: UserId,
+  zknid: i64,
+) -> Result<Vec<LzLink>, zkerr::Error> {
+  let pubid = note_id(&conn, "system", "public")?;
+  let sysid = user_id(&conn, "system")?;
+  let usershares = user_shares(&conn, uid)?;
+  let unid = user_note_id(&conn, uid)?;
+
+  // user shares in '1,3,4,5,6' form (minus the quotes!)
+  let mut s = usershares
+    .iter()
+    .map(|x| {
+      let mut s = x.to_string();
+      s.push_str(",");
+      s
+    })
+    .collect::<String>();
+  s.truncate(s.len() - 1);
+
+  // good old fashioned string templating here, since I can't figure out how to
+  // do array parameters.
+  //
+  // should be ok because the strings are built from vec<i64> returned by user_shares().
+  //
+  // zklinks that are mine.
+  // +
+  // not-mine zklinks with from = this note and toid = note that ISA public.
+  // +
+  // not-mine zklinks with from = note that is public, and to = this.
+  // +
+  // not-mine zklinks with from/to = this, and to/from in usershares.
+  // +
+  // not-mine zklinks from/to notes that link to my usernote.
+  //
+  // lzlinks that are visible:
+  //
+  // lzlinks where both notes are visible.
+  //
+  // note is visible when any of:
+  //   it is mine
+  //   ISA public
+  //   ISA usershare
+  //   links to my usernote.
+
+  // // TODO: integrate sysid lookup in the query?
+  // let sqlstr = format!(
+  //   "select A.user, L.uuid, L.title, R.uuid, R.title
+  //     from zklink A, zklink B
+  //     inner join zknote as L ON A.fromid = L.id
+  //     inner join zknote as R ON A.toid = R.id
+  //     where A.linkzknote = ?2
+  //     and
+  //       -- FROM is visible??  one of:
+  //      (
+  //       -- from is mine
+  //       L.user = ?1 or
+  //       -- from is public
+  //       (B.fromid = A.fromid and B.toid = ?3) or
+  //        -- from links to usershare
+  //       ((A.fromid = B.fromid and B.toid in ({})) or
+  //        (A.fromid = B.toid and B.fromid in ({})))
+  //       -- from links to usernote
+  //       (A.fromid == B.fromid and B.toid = ?4)
+  //      )
+  //      and
+  //       -- TO is visible??  one of:
+  //      (
+  //       -- to is mine
+  //       L.user = ?1 or
+  //       -- to is public
+  //       (A.toid = B.fromid and B.toid = ?3) or
+  //        -- to links to usershare
+  //       ((A.toid = B.fromid and B.toid in ({})) or
+  //        (A.toid = B.toid and B.fromid in ({})))
+  //       -- to links to usernote
+  //       (A.toid == B.fromid and B.toid = ?4)
+  //      )
+  //      -- only return one copy of each
+  //      group by A.user, L.uuid, R.uuid
+  //     ",
+  //   s, s, s, s
+  // );
+
+  // TODO: integrate sysid lookup in the query?
+  let sqlstr = format!(
+    "select A.user, L.uuid, L.title, R.uuid, R.title
+      from zklink A, zklink B
+      inner join zknote as L ON A.fromid = L.id
+      inner join zknote as R ON A.toid = R.id
+      where A.linkzknote = ?2
+      and
+       (
+        L.user = ?1 or
+        (B.fromid = A.fromid and B.toid = ?3) or
+        ((A.fromid = B.fromid and B.toid in ({})) or
+         (A.fromid = B.toid and B.fromid in ({}))) or
+        (A.fromid == B.fromid and B.toid = ?4)
+       )
+       and
+       (
+        L.user = ?1 or
+        (A.toid = B.fromid and B.toid = ?3) or
+        ((A.toid = B.fromid and B.toid in ({})) or
+         (A.toid = B.toid and B.fromid in ({}))) or
+        (A.toid == B.fromid and B.toid = ?4)
+       )
+       group by A.user, L.uuid, R.uuid
+      ",
+    s, s, s, s
+  );
+
+  let mut pstmt = conn.prepare(sqlstr.as_str())?;
+  let r = Result::from_iter(
+    pstmt
+      .query_and_then(params![uid.to_i64(), zknid, pubid, unid], |row| {
+        Ok((
+          row.get::<usize, String>(1)?,
+          row.get::<usize, String>(3)?,
+          row.get::<usize, i64>(0)?,
+          row.get::<usize, String>(2)?,
+          row.get::<usize, String>(4)?,
+        ))
+      })?
+      .map(|x| match x {
+        Ok((lid, rid, u, lname, rname)) => Ok(LzLink {
+          from: ZkNoteId::Zni(Uuid::parse_str(lid.as_str())?),
+          to: ZkNoteId::Zni(Uuid::parse_str(rid.as_str())?),
+          user: UserId::Uid(u),
+          fromname: lname,
+          toname: rname,
+        }),
+        Err(a) => Err(a),
+      }),
+  );
+
+  r
+}
+
 pub fn read_public_zklinks(
   conn: &Connection,
   noteid: &ZkNoteId,
@@ -2503,7 +2643,16 @@ pub fn read_zknoteandlinks(
     None => read_public_zklinks(conn, &zknote.id)?,
   };
 
-  Ok(ZkNoteAndLinks { zknote, links })
+  let lzlinks = match uid {
+    Some(uid) => read_lzlinks(conn, uid, id)?,
+    None => read_public_lzlinks(conn, &zknote.id)?,
+  };
+
+  Ok(ZkNoteAndLinks {
+    zknote,
+    links,
+    lzlinks,
+  })
 }
 
 pub fn read_zneifchanged(

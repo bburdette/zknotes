@@ -287,6 +287,26 @@ zkLinkEncoder struct =
         ]
 
 
+type alias LzLink =
+    { from : ZkNoteId
+    , to : ZkNoteId
+    , user : UserId
+    , fromname : String
+    , toname : String
+    }
+
+
+lzLinkEncoder : LzLink -> Json.Encode.Value
+lzLinkEncoder struct =
+    Json.Encode.object
+        [ ( "from", (zkNoteIdEncoder) struct.from )
+        , ( "to", (zkNoteIdEncoder) struct.to )
+        , ( "user", (userIdEncoder) struct.user )
+        , ( "fromname", (Json.Encode.string) struct.fromname )
+        , ( "toname", (Json.Encode.string) struct.toname )
+        ]
+
+
 type alias EditLink =
     { otherid : ZkNoteId
     , direction : Direction
@@ -1320,6 +1340,16 @@ zkLinkDecoder =
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "delete" (Json.Decode.nullable (Json.Decode.bool))))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "fromname" (Json.Decode.nullable (Json.Decode.string))))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "toname" (Json.Decode.nullable (Json.Decode.string))))
+
+
+lzLinkDecoder : Json.Decode.Decoder LzLink
+lzLinkDecoder =
+    Json.Decode.succeed LzLink
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "from" (zkNoteIdDecoder)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "to" (zkNoteIdDecoder)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "user" (userIdDecoder)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "fromname" (Json.Decode.string)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "toname" (Json.Decode.string)))
 
 
 editLinkDecoder : Json.Decode.Decoder EditLink

@@ -564,6 +564,7 @@ pub fn public_interface(
         what: gzne.what.clone(),
         edittab: gzne.edittab.clone(),
         znl: ZkNoteAndLinks {
+          lzlinks: sqldata::read_public_lzlinks(&conn, &note.id)?,
           links: sqldata::read_public_zklinks(&conn, &note.id)?,
           zknote: note,
         },
@@ -590,6 +591,7 @@ pub fn public_interface(
         pubid, note.title, ipaddr,
       );
       Ok(PublicReply::PbyZkNoteAndLinks(ZkNoteAndLinks {
+        lzlinks: sqldata::read_public_lzlinks(&conn, &note.id)?,
         links: sqldata::read_public_zklinks(&conn, &note.id)?,
         zknote: note,
       }))

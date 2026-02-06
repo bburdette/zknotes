@@ -2915,6 +2915,7 @@ update msg model =
                                         Right
                                             { zknote = zkn
                                             , links = model.zklDict |> Dict.values |> List.filterMap elToDel
+                                            , lzlinks = [] -- TODO fix
                                             }
 
                                     Nothing ->
@@ -2935,6 +2936,7 @@ update msg model =
                                     Right
                                         { zknote = zkn
                                         , links = model.zklDict |> Dict.values |> List.filterMap elToDel
+                                        , lzlinks = [] -- TODO fix
                                         }
 
                                 Nothing ->
