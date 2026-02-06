@@ -1976,7 +1976,7 @@ pub fn read_lzlinks(
       where A.linkzknote = ?2
       and
        (
-        L.user = ?1 or
+        (L.user = 2 and A.fromid = B.fromid and A.toid = B.toid and A.user = B.user) or
         (B.fromid = A.fromid and B.toid = ?3) or
         ((A.fromid = B.fromid and B.toid in ({})) or
          (A.fromid = B.toid and B.fromid in ({}))) or
@@ -1984,16 +1984,20 @@ pub fn read_lzlinks(
        )
        and
        (
-        L.user = ?1 or
+        -- comment
+        (R.user = 2 and A.fromid = B.fromid and A.toid = B.toid and A.user = B.user) or
         (A.toid = B.fromid and B.toid = ?3) or
         ((A.toid = B.fromid and B.toid in ({})) or
          (A.toid = B.toid and B.fromid in ({}))) or
         (A.toid == B.fromid and B.toid = ?4)
        )
-       group by A.user, L.uuid, R.uuid
       ",
     s, s, s, s
   );
+
+  println!("lzquery: {}", sqlstr);
+
+  println!("lzargs: {:?}", (uid.to_i64(), zknid, pubid, unid));
 
   let mut pstmt = conn.prepare(sqlstr.as_str())?;
   let r = Result::from_iter(
