@@ -518,6 +518,38 @@ pub fn read_uuidzklink_linkzknote(
     .map_err(|e| e.into())
 }
 
+// // really just for checking existence of the zklink.
+// pub fn read_uuidzklink_linkzknote(
+//   conn: &Connection,
+//   fromid: &str,
+//   toid: &str,
+//   user: &str,
+// ) -> Result<Option<String>, zkerr::Error> {
+//   let (l, r, u, lz) = conn.query_row(
+//     "select F.id, T.id, zklink.user, L.uuid from
+//       zklink, zknote F, zknote T, orgauth_user OU
+//       left join zknote L on L.id = zklink.linkzknote
+//       where zklink.fromid = F.id
+//        and F.uuid = ?1
+//        and zklink.toid = T.id
+//        and T.uuid = ?2
+//        and zklink.user = OU.id
+//        and OU.uuid = ?3",
+//     params![fromid, toid, user],
+//     |row| {
+//       Ok((
+//         row.get::<usize, i64>(0)?,
+//         row.get::<usize, i64>(1)?,
+//         row.get::<usize, i64>(2)?,
+//         row.get::<usize, Option<String>>(3)?,
+//       ))
+//     },
+//   )?;
+//   // .map_err(|e| e.into())?;
+//   println!("(l, r, u, lz) {:?}", (l, r, u, &lz));
+//   Ok(lz)
+// }
+
 // user CRUD
 
 pub fn save_zklink(
@@ -2289,10 +2321,10 @@ pub fn read_archivezklinks(
     format!(
       "with accessible_notes as ({})
       select ZLA.user, FN.uuid, TN.uuid, LN.uuid, ZLA.createdate, ZLA.deletedate
-      from zklinkarchive ZLA, zknote FN, zknote TN, zknote LN
+      from zklinkarchive ZLA, zknote FN, zknote TN
+      left join zknote LN on LN.id = ZLA.linkzknote
       where FN.id = ZLA.fromid
       and TN.id = ZLA.toid
-      and LN.id = ZLA.toid
       and ZLA.fromid in accessible_notes
       and ZLA.toid in accessible_notes
       {}",
@@ -2340,10 +2372,10 @@ pub fn read_archivezklinks_stream(
       format!(
         "with accessible_notes as ({})
         select OU.uuid, FN.uuid, TN.uuid, LN.uuid, ZLA.createdate, ZLA.deletedate
-        from zklinkarchive ZLA, zknote FN, zknote TN, zknote LN, orgauth_user OU
+        from zklinkarchive ZLA, zknote FN, zknote TN, orgauth_user OU
+        left join zknote LN on LN.id = ZLA.linkzknote
         where FN.id = ZLA.fromid
         and TN.id = ZLA.toid
-        and LN.id = ZLA.toid
         and ZLA.user = OU.id
         and ZLA.fromid in accessible_notes
         and ZLA.toid in accessible_notes
@@ -2481,10 +2513,10 @@ pub fn read_zklinks_since_stream(
       let pstmt1 = conn.prepare(
         format!(
           "select OU.uuid, FN.uuid, TN.uuid, LN.uuid, ZL.createdate
-          from zklink ZL, zknote FN, zknote TN, zknote LN, orgauth_user OU, {} FW, {} TW
+          from zklink ZL, zknote FN, zknote TN, orgauth_user OU, {} FW, {} TW
+          left join zknote LN on LN.id = ZL.linkzknote
           where FN.id = ZL.fromid
           and TN.id = ZL.toid
-          and LN.id = ZL.toid
           and ZL.user = OU.id
           and ZL.fromid = FW.id
           and ZL.toid = TW.id
