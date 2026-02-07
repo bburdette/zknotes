@@ -47,8 +47,6 @@ mod tests {
   // Note this useful idiom: importing names from outer (for mod tests) scope.
   // use super::*;
 
-  // TODO: test that copied zklinks and zkarchivelinks are identical on server and client.
-
   #[actix_web::test]
   async fn test_sync() -> Result<(), Box<dyn Error>> {
     // let _ = System::new();
