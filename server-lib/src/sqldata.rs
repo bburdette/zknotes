@@ -495,16 +495,17 @@ pub fn read_uuidzklink(
 }
 
 // really just for checking existence of the zklink.
-pub fn read_uuidzklink_createdate(
+pub fn read_uuidzklink_linkzknote(
   conn: &Connection,
   fromid: &str,
   toid: &str,
   user: &str,
-) -> Result<i64, zkerr::Error> {
+) -> Result<Option<String>, zkerr::Error> {
   conn
     .query_row(
-      "select zklink.createdate from
+      "select L.uuid from
       zklink, zknote F, zknote T, orgauth_user OU
+      left join zknote L on L.id = zklink.linkzknote
       where zklink.fromid = F.id
        and F.uuid = ?1
        and zklink.toid = T.id

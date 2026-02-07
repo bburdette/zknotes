@@ -1020,18 +1020,22 @@ mod tests {
       if (idin(&fromid, &client_ts.visible_notes) || systemnotes.contains(&fromid))
         && (idin(&toid, &client_ts.visible_notes) || systemnotes.contains(&toid))
       {
-        // link should be on the server.
         println!("checking link: {:?}", uzl);
-        read_uuidzklink_createdate(
+        // link should be on the server.
+        let uuid = read_uuidzklink_linkzknote(
           &saconn,
           uzl.fromUuid.as_str(),
           uzl.toUuid.as_str(),
           uzl.userUuid.as_str(),
         )?;
+
+        println!("link uuid: {:?}", uuid);
+        // also linkzknote should be the same.
+        assert!(uzl.linkUuid == uuid);
       } else {
         // link should not be on the server.
         println!("checking unsynced link: {:?}", uzl);
-        match read_uuidzklink_createdate(
+        match read_uuidzklink_linkzknote(
           &saconn,
           uzl.fromUuid.as_str(),
           uzl.toUuid.as_str(),
