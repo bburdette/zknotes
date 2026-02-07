@@ -2434,8 +2434,10 @@ pub fn read_zklinks_since(
   let mut pstmt = conn.prepare(
     format!(
       "with accessible_notes as ({})
-        select OU.uuid, FN.uuid, TN.uuid, ZL.createdate
+        select OU.uuid, FN.uuid, TN.uuid, LN.uuid, ZL.createdate
         from zklink ZL, zknote FN, zknote TN, orgauth_user OU
+        left join zknote LN
+        on LN.id = ZL.linkzknote
         where FN.id = ZL.fromid
         and TN.id = ZL.toid
         and ZL.user = OU.id
