@@ -35,7 +35,7 @@ use tokio::io::AsyncWriteExt;
 use tokio_util::io::StreamReader;
 use uuid::Uuid;
 use zkprotocol::constants::{PrivateStreamingRequests, SpecialUuids};
-use zkprotocol::content::{FileStatus, SaveZkNote, Server, SyncSince, ZkNoteId};
+use zkprotocol::content::{FileStatus, OnMakeFileNote, SaveZkNote, Server, SyncSince, ZkNoteId};
 use zkprotocol::messages::PrivateStreamingMessage;
 use zkprotocol::private::{PrivateReply, PrivateRequest};
 use zkprotocol::search::{
@@ -307,20 +307,22 @@ pub enum DownloadResult {
 
 pub async fn download_file(
   conn: &Connection,
+  lapin_info: &Option<LapinInfo>,
   user: &User,
   tmp_files_dir: &Path,
   files_dir: &Path,
   note_id: i64,
 ) -> Result<DownloadResult, zkerr::Error> {
   // get the note hash, and verify there's a source with this user's id.
-  let (uuid, ohash, fs_user_id): (String, Option<String>, Option<i64>) = conn.query_row(
-    "select N.uuid, F.hash, FS.user_id from zknote N
+  let (uuid, title, ohash, fs_user_id): (String, String, Option<String>, Option<i64>) = conn
+    .query_row(
+      "select N.uuid, N.title, F.hash, FS.user_id from zknote N
       left join file F on N.file = F.id 
       left join file_source FS on F.id == FS.file_id and FS.user_id = ?2
       where N.id = ?1",
-    params![note_id, user.id.to_i64()],
-    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-  )?;
+      params![note_id, user.id.to_i64()],
+      |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+    )?;
 
   let hash = match ohash {
     Some(h) => h,
@@ -396,6 +398,30 @@ pub async fn download_file(
   } else {
     // move into hashed-files dir.
     std::fs::rename(temphashpath, finalhashpath)?;
+  }
+
+  if let Some(li) = lapin_info {
+    let oszn = OnMakeFileNote {
+      id: ZkNoteId::Zni(Uuid::parse_str(uuid.as_str())?),
+      user: user.id,
+      token: li.token.clone(),
+      title: title,
+    };
+    // send the message.
+    match li
+      .channel
+      .basic_publish(
+        "",
+        "on_make_file_note",
+        lapin::options::BasicPublishOptions::default(),
+        &serde_json::to_vec(&oszn)?[..],
+        lapin::BasicProperties::default(),
+      )
+      .await
+    {
+      Ok(_) => info!("published to amqp"),
+      Err(e) => error!("error publishing to AMQP: {:?}", e),
+    }
   }
 
   // TODO: remove source records??
@@ -515,6 +541,7 @@ pub async fn upload_file(
 
 pub async fn sync_files_down(
   conn: &Connection,
+  lapin_info: &Option<LapinInfo>,
   temp_file_path: &Path,
   file_path: &Path,
   uid: UserId,
@@ -535,7 +562,7 @@ pub async fn sync_files_down(
   for rec in rec_iter {
     match rec {
       Ok(id) => {
-        match download_file(&conn, &user, temp_file_path, file_path, id).await? {
+        match download_file(&conn, &lapin_info, &user, temp_file_path, file_path, id).await? {
           DownloadResult::Downloaded => resvec.push(DownloadResult::Downloaded),
           DownloadResult::AlreadyDownloaded => (), // resvec.push(DownloadResult::AlreadyDownloaded),
           DownloadResult::NoSource => resvec.push(DownloadResult::NoSource),
@@ -548,6 +575,7 @@ pub async fn sync_files_down(
 
   Ok(resvec)
 }
+
 pub async fn sync_files_up(
   conn: &Connection,
   file_path: &Path,
