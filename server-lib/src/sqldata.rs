@@ -6,7 +6,7 @@ use barrel::backend::Sqlite;
 use lapin::options::QueueDeclareOptions;
 use lapin::types::FieldTable;
 use lapin::Channel;
-use log::{error, info};
+use log::{debug, error, info};
 use orgauth::data::{RegistrationData, UserId};
 use orgauth::dbfun::user_id;
 use orgauth::endpoints::Callbacks;
@@ -884,6 +884,7 @@ pub fn set_zknote_file(conn: &Connection, noteid: i64, fileid: i64) -> Result<()
   Ok(())
 }
 
+#[derive(Debug)]
 pub struct LapinInfo {
   pub channel: Channel,
   pub token: String,
@@ -2609,8 +2610,11 @@ pub async fn make_file_note(
   let size = std::fs::metadata(fpath)?.len();
   let hashpath = files_dir.join(Path::new(fh.as_str()));
 
+  let mut existed = false;
+
   // file exists?
   if hashpath.exists() {
+    existed = true;
     // file already exists.  don't need the new one.
     std::fs::remove_file(fpath)?;
   } else {
@@ -2638,11 +2642,45 @@ pub async fn make_file_note(
     Some(fid) => {
       // note exists too, for this user?
       match conn.query_row_and_then(
-        "select id, uuid from zknote where file = ?1 and user = ?2",
+        "select id, uuid, title from zknote where file = ?1 and user = ?2",
         params![fid, uid.to_i64()],
-        |row| Ok((row.get(0)?, row.get::<usize, String>(1)?)),
+        |row| {
+          Ok((
+            row.get(0)?,
+            row.get::<usize, String>(1)?,
+            row.get::<usize, String>(2)?,
+          ))
+        },
       ) {
-        Ok((id, uuid)) => return Ok((id, ZkNoteId::Zni(Uuid::parse_str(uuid.as_str())?), fid)),
+        Ok((id, uuid, title)) => {
+          let zni = ZkNoteId::Zni(Uuid::parse_str(uuid.as_str())?);
+          if !existed {
+            if let Some(li) = lapin_info {
+              let oszn = OnMakeFileNote {
+                id: zni,
+                user: uid,
+                token: li.token.clone(),
+                title: title.to_string(),
+              };
+              // send the message.
+              match li
+                .channel
+                .basic_publish(
+                  "",
+                  "on_make_file_note",
+                  lapin::options::BasicPublishOptions::default(),
+                  &serde_json::to_vec(&oszn)?[..],
+                  lapin::BasicProperties::default(),
+                )
+                .await
+              {
+                Ok(_) => info!("OnMakeFileNote published to amqp"),
+                Err(e) => error!("error publishing to AMQP: {:?}", e),
+              }
+            }
+          }
+          return Ok((id, zni, fid));
+        }
         Err(rusqlite::Error::QueryReturnedNoRows) => fid,
         Err(e) => Err(e)?,
       }
@@ -2701,7 +2739,7 @@ pub async fn make_file_note(
       )
       .await
     {
-      Ok(_) => info!("published to amqp"),
+      Ok(_) => info!("OnMakeFileNote published to amqp"),
       Err(e) => error!("error publishing to AMQP: {:?}", e),
     }
   }

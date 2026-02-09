@@ -1260,6 +1260,7 @@ mod tests {
 
     let reply = sync_files_down(
       &caconn,
+      &None,
       client_ts.tempfilepath.as_path(),
       client_ts.filepath.as_path(),
       client_ts.syncuser,

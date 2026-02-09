@@ -400,6 +400,7 @@ pub async fn download_file(
     std::fs::rename(temphashpath, finalhashpath)?;
   }
 
+  println!("before OnMakeFileNote, li: {:?}", lapin_info);
   if let Some(li) = lapin_info {
     let oszn = OnMakeFileNote {
       id: ZkNoteId::Zni(Uuid::parse_str(uuid.as_str())?),
@@ -686,7 +687,6 @@ where
     );
   }
   let sm = serde_json::from_str(line.trim())?;
-  debug!("syncmessage : {:?}", sm);
   Ok(sm)
 }
 
@@ -888,10 +888,7 @@ where
       ]
       );
     let id: i64 = match ex {
-      Ok(_) => {
-        debug!("wrote zknote {}", conn.last_insert_rowid());
-        Ok(conn.last_insert_rowid())
-      }
+      Ok(_) => Ok(conn.last_insert_rowid()),
       Err(rusqlite::Error::SqliteFailure(e, Some(s))) => {
         if e.code == rusqlite::ErrorCode::ConstraintViolation {
           if s.contains("uuid") {

@@ -28,7 +28,7 @@ use futures_util::TryStreamExt as _;
 use girlboss::Girlboss;
 use interfaces::connect_and_make_lapin_info;
 use lapin;
-use log::{error, info};
+use log::{debug, error, info};
 pub use orgauth;
 use orgauth::{data::UserId, util};
 pub use orgauth::{
