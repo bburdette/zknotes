@@ -434,12 +434,14 @@ pub async fn zk_interface_loggedin(
       let jid = new_jobid(state, uid);
       let lgb = state.girlboss.clone();
       let zns = znsrq.clone();
+      let li = connect_and_make_lapin_info(state, token).await;
 
       std::thread::spawn(move || {
         let rt = actix_rt::System::new();
 
         async fn startit(
           lgb: Arc<std::sync::RwLock<girlboss::Girlboss<JobId, girlboss::Monitor>>>,
+          lapin_info: Option<LapinInfo>,
           dbpath: PathBuf,
           file_path: PathBuf,
           file_tmp_path: PathBuf,
@@ -462,6 +464,7 @@ pub async fn zk_interface_loggedin(
                 let conn = sqldata::connection_open(&dbpath.as_path())?;
                 let _dv = sync::sync_files_down(
                   &conn,
+                  &lapin_info,
                   &file_tmp_path.as_path(),
                   &file_path.as_path(),
                   uid,
@@ -491,6 +494,7 @@ pub async fn zk_interface_loggedin(
 
         rt.block_on(startit(
           lgb,
+          li,
           dbpath,
           file_path,
           file_tmp_path,
