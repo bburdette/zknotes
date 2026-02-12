@@ -400,7 +400,6 @@ pub async fn download_file(
     std::fs::rename(temphashpath, finalhashpath)?;
   }
 
-  println!("before OnMakeFileNote, li: {:?}", lapin_info);
   if let Some(li) = lapin_info {
     let oszn = OnMakeFileNote {
       id: ZkNoteId::Zni(Uuid::parse_str(uuid.as_str())?),
