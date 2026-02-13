@@ -16,6 +16,16 @@ server/config.toml
 target/
 files/
 result
+server-lib/client.db
+server-lib/client.db.saved
+server-lib/client_files/
+server-lib/client_stream.txt
+server-lib/server.db
+server-lib/server.db.saved
+server-lib/server_files/
+server-lib/server_stream.txt
+server-lib/test.db
+server/client_files/
 
 # tauri-mobile
 .cargo/
