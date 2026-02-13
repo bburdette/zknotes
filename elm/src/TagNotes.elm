@@ -1,4 +1,4 @@
-module TagFiles exposing (..)
+module TagNotes exposing (..)
 
 import Common
 import Data
@@ -20,11 +20,12 @@ type Msg
 type Command
     = Ok
     | Cancel
+    | Which TagAThing.AddWhich
     | None
 
 
 type alias Model =
-    { files : List Data.ZkListNote }
+    { notes : List Data.ZkListNote }
 
 
 view : Model -> Element Msg
@@ -32,7 +33,7 @@ view model =
     E.column [ E.width E.fill, E.height E.fill, EBk.color TC.white, EBd.rounded 10, E.spacing 8, E.padding 10 ]
         [ E.el [ E.centerX, EF.bold ] <| E.text "notes"
         , E.column [ E.width E.fill, E.height <| E.maximum 200 E.fill, E.scrollbarY, E.centerX ]
-            (model.files
+            (model.notes
                 |> List.map (\fn -> E.paragraph [] [ E.text fn.title ])
             )
         , E.row [ E.width E.fill, E.spacing 10 ]
@@ -60,13 +61,13 @@ update msg model =
 
 
 addNote : Data.ZkListNote -> Model -> Model
-addNote _ model =
-    model
+addNote zln model =
+    { model | notes = model.notes ++ [ zln ] }
 
 
 initThing : List Data.ZkListNote -> Thing Model Msg Command
 initThing notes =
-    { model = { files = notes }
+    { model = { notes = notes }
     , view = view
     , update = update
     , addNote = addNote

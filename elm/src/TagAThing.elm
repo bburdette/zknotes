@@ -19,10 +19,12 @@ import WindowKeys as WK
 import ZkCommon as ZC
 
 
+linkButtonStyle : List (E.Attribute msg)
 linkButtonStyle =
     Common.buttonStyle
 
 
+disabledLinkButtonStyle : List (E.Attribute msg)
 disabledLinkButtonStyle =
     Common.disabledButtonStyle
 
@@ -37,10 +39,17 @@ type SearchOrRecent
     | RecentView
 
 
+type AddWhich
+    = AddNotes
+    | AddLinks
+    | AddLinksOnly
+
+
 type alias Thing tmod tmsg tcmd =
     { view : tmod -> Element tmsg
     , update : tmsg -> tmod -> ( tmod, tcmd )
     , model : tmod
+    , addNote : Data.ZkListNote -> tmod -> tmod
     }
 
 
@@ -49,6 +58,7 @@ type alias Model tmod tmsg tcmd =
     , ld : DataUtil.LoginData
     , zklDict : Dict String Data.EditLink
     , searchOrRecent : SearchOrRecent
+    , addWhich : AddWhich
     , focusSr : Maybe ZkNoteId -- note id in search result.
     , focusLink : Maybe Data.EditLink
     }
@@ -60,6 +70,7 @@ type Msg tmsg
     | AddToSearchAsTag String
     | ToLinkPress Data.ZkListNote
     | FromLinkPress Data.ZkListNote
+    | AddNotePress Data.ZkListNote
     | SrFocusPress ZkNoteId
     | LinkFocusPress Data.EditLink
     | FlipLink Data.EditLink
@@ -82,16 +93,17 @@ type Command tcmd
 
 init :
     Thing tmod tmsg tcmd
-    -> List Data.ZkListNote
+    -> AddWhich
     -> List Data.EditLink
     -> DataUtil.LoginData
     -> Model tmod tmsg tcmd
-init thing recentZkns links loginData =
+init thing addwhich links loginData =
     { thing = thing
     , ld = loginData
     , zklDict =
         Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) links)
     , searchOrRecent = SearchView
+    , addWhich = addwhich
     , focusSr = Nothing
     , focusLink = Nothing
     }
@@ -110,9 +122,6 @@ onWkKeyPress key model =
 showSr : Model tmod tmsg tcmd -> Data.ZkListNote -> Element (Msg tmsg)
 showSr model zkln =
     let
-        lnnonme =
-            zkln.user /= model.ld.userid
-
         sysColor =
             ZC.systemColor DataUtil.sysids zkln.sysids
 
@@ -125,46 +134,65 @@ showSr model zkln =
                 model.zklDict
 
         controlrow =
-            E.row [ E.spacing 8, E.width E.fill ]
-                [ mbTo
-                    |> Maybe.map
-                        (\zkl ->
-                            EI.button
-                                disabledLinkButtonStyle
-                                { onPress = Just <| RemoveLink zkl
+            let
+                tflinks =
+                    [ mbTo
+                        |> Maybe.map
+                            (\zkl ->
+                                EI.button
+                                    disabledLinkButtonStyle
+                                    { onPress = Just <| RemoveLink zkl
+                                    , label = E.el [ E.centerY ] <| E.text "→"
+                                    }
+                            )
+                        |> Maybe.withDefault
+                            (EI.button linkButtonStyle
+                                { onPress = Just <| ToLinkPress zkln
                                 , label = E.el [ E.centerY ] <| E.text "→"
                                 }
-                        )
-                    |> Maybe.withDefault
-                        (EI.button linkButtonStyle
-                            { onPress = Just <| ToLinkPress zkln
-                            , label = E.el [ E.centerY ] <| E.text "→"
-                            }
-                        )
-                , mbFrom
-                    |> Maybe.map
-                        (\zkl ->
-                            EI.button
-                                disabledLinkButtonStyle
-                                { onPress = Just <| RemoveLink zkl
+                            )
+                    , mbFrom
+                        |> Maybe.map
+                            (\zkl ->
+                                EI.button
+                                    disabledLinkButtonStyle
+                                    { onPress = Just <| RemoveLink zkl
+                                    , label = E.el [ E.centerY ] <| E.text "←"
+                                    }
+                            )
+                        |> Maybe.withDefault
+                            (EI.button linkButtonStyle
+                                { onPress = Just <| FromLinkPress zkln
                                 , label = E.el [ E.centerY ] <| E.text "←"
                                 }
-                        )
-                    |> Maybe.withDefault
-                        (EI.button linkButtonStyle
-                            { onPress = Just <| FromLinkPress zkln
-                            , label = E.el [ E.centerY ] <| E.text "←"
+                            )
+                    ]
+            in
+            E.row [ E.spacing 8, E.width E.fill ]
+                ((case model.addWhich of
+                    AddLinks ->
+                        tflinks
+
+                    AddLinksOnly ->
+                        tflinks
+
+                    AddNotes ->
+                        [ EI.button linkButtonStyle
+                            { onPress = Just <| AddNotePress zkln
+                            , label = E.el [ E.centerY ] <| E.text "+"
                             }
-                        )
-                , EI.button linkButtonStyle
-                    { onPress = Just (AddToSearch zkln)
-                    , label = E.text "^"
-                    }
-                , EI.button linkButtonStyle
-                    { onPress = Just (AddToSearchAsTag zkln.title)
-                    , label = E.text "t"
-                    }
-                ]
+                        ]
+                 )
+                    ++ [ EI.button linkButtonStyle
+                            { onPress = Just (AddToSearch zkln)
+                            , label = E.text "^"
+                            }
+                       , EI.button linkButtonStyle
+                            { onPress = Just (AddToSearchAsTag zkln.title)
+                            , label = E.text "t"
+                            }
+                       ]
+                )
 
         listingrow =
             E.el
@@ -504,6 +532,9 @@ update msg model =
               }
             , AddToRecent zkln
             )
+
+        AddNotePress zkln ->
+            ( model, None )
 
         SrFocusPress id ->
             ( { model

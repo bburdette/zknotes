@@ -123,9 +123,18 @@ listview fontsize ld _ model spmodel notes =
                     { onPress = Just DonePress, label = E.text "settings" }
                 ]
             , E.row [ E.spacing 8 ]
-                [ EI.button Common.buttonStyle { onPress = Just NewPress, label = E.text "new" }
-                , EI.button Common.buttonStyle { onPress = Just ImportPress, label = E.text "import" }
-                , EI.button Common.buttonStyle { onPress = Just (PowerDeletePress fontsize), label = E.text "delete..." }
+                [ EI.button Common.buttonStyle
+                    { onPress = Just NewPress
+                    , label = E.text "new"
+                    }
+                , EI.button Common.buttonStyle
+                    { onPress = Just ImportPress
+                    , label = E.text "import"
+                    }
+                , EI.button Common.buttonStyle
+                    { onPress = Just (PowerDeletePress fontsize)
+                    , label = E.text "delete..."
+                    }
                 ]
             , E.column
                 [ E.padding 8

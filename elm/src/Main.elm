@@ -55,6 +55,7 @@ import SpecialNotes as SN
 import TSet
 import TagAThing
 import TagFiles
+import TagNotes
 import Task
 import Time
 import Toop
@@ -117,6 +118,7 @@ type Msg
     | MdInlineXformMsg (GD.Msg MdInlineXform.Msg)
     | MdInlineXformCmd MdInlineXform.Command
     | TagFilesMsg (TagAThing.Msg TagFiles.Msg)
+    | TagNotesMsg (TagAThing.Msg TagNotes.Msg)
     | InviteUserMsg (TagAThing.Msg InviteUser.Msg)
     | JobsPollTick Time.Posix
     | Noop
@@ -149,6 +151,7 @@ type State
     | RequestsDialog RequestsDialog.GDModel State
     | JobsDialog JobsDialog.GDModel State
     | TagFiles (TagAThing.Model TagFiles.Model TagFiles.Msg TagFiles.Command) LoginData State
+    | TagNotes (TagAThing.Model TagNotes.Model TagNotes.Msg TagNotes.Command) LoginData State
     | InviteUser (TagAThing.Model InviteUser.Model InviteUser.Msg InviteUser.Command) LoginData State
     | MdInlineXform MdInlineXform.GDModel State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
@@ -803,6 +806,9 @@ showMessage msg =
         TagFilesMsg _ ->
             "TagFilesMsg"
 
+        TagNotesMsg _ ->
+            "TagNotesMsg"
+
         InviteUserMsg _ ->
             "InviteUserMsg"
 
@@ -896,6 +902,9 @@ showState state =
 
         TagFiles _ _ _ ->
             "TagFiles"
+
+        TagNotes _ _ _ ->
+            "TagNotes"
 
         InviteUser _ _ _ ->
             "InviteUser"
@@ -1010,6 +1019,9 @@ viewState size state model =
         TagFiles tfmod _ _ ->
             E.map TagFilesMsg <| TagAThing.view model.stylePalette model.recentNotes (Just size) model.spmodel model.zknSearchResult tfmod
 
+        TagNotes tfmod _ _ ->
+            E.map TagNotesMsg <| TagAThing.view model.stylePalette model.recentNotes (Just size) model.spmodel model.zknSearchResult tfmod
+
         InviteUser tfmod _ _ ->
             E.map InviteUserMsg <| TagAThing.view model.stylePalette model.recentNotes (Just size) model.spmodel model.zknSearchResult tfmod
 
@@ -1099,6 +1111,9 @@ stateLogin state =
             stateLogin instate
 
         TagFiles _ login _ ->
+            Just login
+
+        TagNotes _ login _ ->
             Just login
 
         InviteUser _ login _ ->
@@ -2104,7 +2119,7 @@ actualupdate msg model =
                             InviteUser
                                 (TagAThing.init
                                     (InviteUser.initThing "")
-                                    model.recentNotes
+                                    TagAThing.AddLinksOnly
                                     []
                                     login
                                 )
@@ -2175,6 +2190,9 @@ actualupdate msg model =
 
         ( WkMsg (Ok key), TagFiles mod ld ps ) ->
             handleTagFiles model (TagAThing.onWkKeyPress key mod) ld ps
+
+        ( WkMsg (Ok key), TagNotes mod ld ps ) ->
+            handleTagNotes model (TagAThing.onWkKeyPress key mod) ld ps
 
         ( WkMsg (Ok key), InviteUser mod ld ps ) ->
             handleInviteUser model (TagAThing.onWkKeyPress key mod) ld ps
@@ -3411,7 +3429,7 @@ actualupdate msg model =
                                             TagFiles
                                                 (TagAThing.init
                                                     (TagFiles.initThing s)
-                                                    model.recentNotes
+                                                    TagAThing.AddLinksOnly
                                                     []
                                                     login
                                                 )
@@ -3466,7 +3484,7 @@ actualupdate msg model =
                                             TagFiles
                                                 (TagAThing.init
                                                     (TagFiles.initThing s)
-                                                    model.recentNotes
+                                                    TagAThing.AddLinksOnly
                                                     []
                                                     login
                                                 )
@@ -3952,6 +3970,22 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     , sendZIMsg model.fui Data.PvqSyncRemote
                     )
 
+                EditZkNote.PowerTag ->
+                    ( { model
+                        | state =
+                            TagFiles
+                                (TagAThing.init
+                                    (TagFiles.initThing [])
+                                    TagAThing.AddLinks
+                                    []
+                                    login
+                                )
+                                login
+                                model.state
+                      }
+                    , Cmd.none
+                    )
+
                 EditZkNote.Requests ->
                     ( { model
                         | state =
@@ -4219,6 +4253,73 @@ handleTagFiles model ( lmod, lcmd ) login st =
                     ( { model | state = st }, Cmd.none )
 
                 TagFiles.None ->
+                    ( { model | state = updstate }, Cmd.none )
+
+        TagAThing.SPMod fn ->
+            handleSPMod model fn
+
+
+handleTagNotes :
+    Model
+    -> ( TagAThing.Model TagNotes.Model TagNotes.Msg TagNotes.Command, TagAThing.Command TagNotes.Command )
+    -> LoginData
+    -> State
+    -> ( Model, Cmd Msg )
+handleTagNotes model ( lmod, lcmd ) login st =
+    let
+        updstate =
+            TagNotes lmod login st
+    in
+    case lcmd of
+        TagAThing.Search s ->
+            sendSearch { model | state = updstate } s
+
+        TagAThing.SyncFiles s ->
+            ( { model | state = updstate }
+            , sendZIMsg model.fui (Data.PvqSyncFiles s)
+            )
+
+        TagAThing.SearchHistory ->
+            ( { model | state = updstate }, Cmd.none )
+
+        TagAThing.None ->
+            ( { model | state = updstate }, Cmd.none )
+
+        TagAThing.AddToRecent _ ->
+            ( { model | state = updstate }, Cmd.none )
+
+        TagAThing.ThingCommand tc ->
+            case tc of
+                TagNotes.Ok ->
+                    let
+                        zklns =
+                            lmod.thing.model.notes
+
+                        zkls =
+                            Dict.values lmod.zklDict
+
+                        zklinks : List Data.SaveZkLink2
+                        zklinks =
+                            List.foldl
+                                (\zkln links ->
+                                    List.map (\el -> DataUtil.elToSzl2 zkln.id el) zkls
+                                        ++ links
+                                )
+                                []
+                                zklns
+                    in
+                    ( { model | state = st }
+                    , sendZIMsg model.fui
+                        (Data.PvqSaveZkLinks { links = zklinks })
+                    )
+
+                TagNotes.Cancel ->
+                    ( { model | state = st }, Cmd.none )
+
+                TagNotes.Which _ ->
+                    ( model, Cmd.none )
+
+                TagNotes.None ->
                     ( { model | state = updstate }, Cmd.none )
 
         TagAThing.SPMod fn ->
