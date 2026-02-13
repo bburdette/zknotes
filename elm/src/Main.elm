@@ -2221,6 +2221,9 @@ actualupdate msg model =
         ( TagFilesMsg lm, TagFiles mod ld st ) ->
             handleTagFiles model (TagAThing.update lm mod) ld st
 
+        ( TagNotesMsg lm, TagNotes mod ld st ) ->
+            handleTagNotes model (TagAThing.update lm mod) ld st
+
         ( InviteUserMsg lm, InviteUser mod ld st ) ->
             handleInviteUser model (TagAThing.update lm mod) ld st
 
@@ -3973,9 +3976,9 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                 EditZkNote.PowerTag ->
                     ( { model
                         | state =
-                            TagFiles
+                            TagNotes
                                 (TagAThing.init
-                                    (TagFiles.initThing [])
+                                    (TagNotes.initThing [])
                                     TagAThing.AddLinks
                                     []
                                     login
@@ -4316,8 +4319,8 @@ handleTagNotes model ( lmod, lcmd ) login st =
                 TagNotes.Cancel ->
                     ( { model | state = st }, Cmd.none )
 
-                TagNotes.Which _ ->
-                    ( model, Cmd.none )
+                TagNotes.Which w ->
+                    ( { model | state = TagNotes { lmod | addWhich = w } login st }, Cmd.none )
 
                 TagNotes.None ->
                     ( { model | state = updstate }, Cmd.none )

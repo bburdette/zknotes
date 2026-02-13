@@ -71,6 +71,7 @@ type Msg tmsg
     | ToLinkPress Data.ZkListNote
     | FromLinkPress Data.ZkListNote
     | AddNotePress Data.ZkListNote
+    | SetAddWhich AddWhich
     | SrFocusPress ZkNoteId
     | LinkFocusPress Data.EditLink
     | FlipLink Data.EditLink
@@ -340,9 +341,25 @@ view stylePalette recentZkns mbsize spmodel zknSearchResult model =
             E.px
                 400
 
+        albutton =
+            [ EI.button
+                Common.buttonStyle
+                { onPress = Just (SetAddWhich AddLinks), label = E.text "add links" }
+            ]
+
         showLinks =
             E.column [ E.height E.fill, EBk.color TC.white, EBd.rounded 10, E.padding 10, E.width E.fill ]
-                (E.row [ EF.bold, E.width E.fill, E.centerX ] [ E.text "add links" ]
+                (E.row [ EF.bold, E.width E.fill, E.centerX ]
+                    (case model.addWhich of
+                        AddNotes ->
+                            albutton
+
+                        AddLinks ->
+                            albutton
+
+                        AddLinksOnly ->
+                            [ E.text "add links" ]
+                    )
                     :: List.map
                         (\( l, c ) ->
                             showZkl
@@ -433,6 +450,12 @@ view stylePalette recentZkns mbsize spmodel zknSearchResult model =
                     recentZkns
                 )
 
+        focusStyle =
+            [ EBd.width 3, EBd.color TC.blue, E.width E.fill, E.height E.fill ]
+
+        nonFocusStyle =
+            [ E.width E.fill, E.height E.fill ]
+
         searchOrRecentPanel =
             E.column
                 [ E.spacing 8
@@ -471,8 +494,32 @@ view stylePalette recentZkns mbsize spmodel zknSearchResult model =
         , E.spacing 10
         ]
         [ E.row [ E.centerX, E.width <| E.maximum 1000 E.fill, E.spacing 10, E.alignTop, E.height E.fill ] <|
-            [ E.map ThingMsg <| model.thing.view model.thing.model
-            , showLinks
+            [ E.el
+                (case model.addWhich of
+                    AddLinks ->
+                        nonFocusStyle
+
+                    AddLinksOnly ->
+                        nonFocusStyle
+
+                    AddNotes ->
+                        focusStyle
+                )
+              <|
+                E.map ThingMsg <|
+                    model.thing.view model.thing.model
+            , E.el
+                (case model.addWhich of
+                    AddLinks ->
+                        focusStyle
+
+                    AddLinksOnly ->
+                        focusStyle
+
+                    AddNotes ->
+                        nonFocusStyle
+                )
+                showLinks
             ]
         , searchOrRecentPanel
         ]
@@ -534,7 +581,14 @@ update msg model =
             )
 
         AddNotePress zkln ->
-            ( model, None )
+            let
+                tmod =
+                    model.thing.addNote zkln model.thing.model
+
+                thing =
+                    model.thing
+            in
+            ( { model | thing = { thing | model = tmod } }, None )
 
         SrFocusPress id ->
             ( { model
@@ -601,6 +655,9 @@ update msg model =
                     model.thing
             in
             ( { model | thing = { thing | model = tmod } }, ThingCommand tcmd )
+
+        SetAddWhich aw ->
+            ( { model | addWhich = aw }, None )
 
         NavChoiceChanged nc ->
             ( { model

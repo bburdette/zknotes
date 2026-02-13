@@ -5,7 +5,6 @@ import Data
 import Element as E exposing (Element)
 import Element.Background as EBk
 import Element.Border as EBd
-import Element.Font as EF
 import Element.Input as EI
 import TagAThing exposing (Thing)
 import TangoColors as TC
@@ -14,6 +13,7 @@ import TangoColors as TC
 type Msg
     = OkClick
     | CancelClick
+    | NotesClick
     | Noop
 
 
@@ -31,7 +31,9 @@ type alias Model =
 view : Model -> Element Msg
 view model =
     E.column [ E.width E.fill, E.height E.fill, EBk.color TC.white, EBd.rounded 10, E.spacing 8, E.padding 10 ]
-        [ E.el [ E.centerX, EF.bold ] <| E.text "notes"
+        [ EI.button
+            Common.buttonStyle
+            { onPress = Just NotesClick, label = E.text "notes" }
         , E.column [ E.width E.fill, E.height <| E.maximum 200 E.fill, E.scrollbarY, E.centerX ]
             (model.notes
                 |> List.map (\fn -> E.paragraph [] [ E.text fn.title ])
@@ -55,6 +57,9 @@ update msg model =
 
         CancelClick ->
             ( model, Cancel )
+
+        NotesClick ->
+            ( model, Which TagAThing.AddNotes )
 
         Noop ->
             ( model, None )
