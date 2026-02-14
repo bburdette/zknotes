@@ -213,7 +213,6 @@ type alias Model =
     , prevSearches : List (List Data.TagSearch)
     , recentNotes : List Data.ZkListNote
     , errorNotes : Dict String String
-    , fontsize : Int
     , stylePalette : StylePalette
     , adminSettings : OD.AdminSettings
     , trackedRequests : TRequests
@@ -498,7 +497,7 @@ routeStateInternal model route =
         SettingsR ->
             case stateLogin model.state of
                 Just login ->
-                    ( UserSettings (UserSettings.init login model.fontsize) login model.state, Cmd.none )
+                    ( UserSettings (UserSettings.init login model.stylePalette.fontSize) login model.state, Cmd.none )
 
                 Nothing ->
                     ( (displayMessageDialog { model | state = initLoginState model route } "can't view user settings; you're not logged in!").state, Cmd.none )
@@ -931,10 +930,10 @@ viewState size state model =
             E.map InvitedMsg <| Invited.view model.stylePalette size em
 
         EditZkNote em _ ->
-            E.map EditZkNoteMsg <| EditZkNote.view model.fontsize model.timezone size model.spmodel model.zknSearchResult model.recentNotes model.trackedRequests model.jobs model.noteCache em
+            E.map EditZkNoteMsg <| EditZkNote.view model.stylePalette.fontSize model.timezone size model.spmodel model.zknSearchResult model.recentNotes model.trackedRequests model.jobs model.noteCache em
 
         EditZkNoteListing em ld ->
-            E.map EditZkNoteListingMsg <| EditZkNoteListing.view model.fontsize ld size em model.spmodel model.zknSearchResult
+            E.map EditZkNoteListingMsg <| EditZkNoteListing.view model.stylePalette.fontSize ld size em model.spmodel model.zknSearchResult
 
         ArchiveListing em ld ->
             E.map ArchiveListingMsg <| ArchiveListing.view ld model.timezone size em
@@ -1443,7 +1442,7 @@ view model =
 
             _ ->
                 E.layout
-                    ([ EF.size model.fontsize, E.width E.fill ]
+                    ([ EF.size model.stylePalette.fontSize, E.width E.fill ]
                         ++ dndif
                     )
                 <|
@@ -2094,9 +2093,13 @@ actualupdate msg model =
                     )
 
                 UserSettings.ChangeFontSize size ->
+                    let
+                        s =
+                            model.stylePalette
+                    in
                     ( { model
                         | state = UserSettings numod login prevstate
-                        , fontsize = size
+                        , stylePalette = { s | fontSize = size }
                       }
                     , LS.storeLocalVal { name = "fontsize", value = String.fromInt size }
                     )
@@ -2792,7 +2795,7 @@ actualupdate msg model =
                         Data.PvyPowerDeleteComplete count ->
                             case model.state of
                                 EditZkNoteListing mod li ->
-                                    ( { model | state = EditZkNoteListing (EditZkNoteListing.onPowerDeleteComplete model.fontsize count li mod model.spmodel model.zknSearchResult) li }, Cmd.none )
+                                    ( { model | state = EditZkNoteListing (EditZkNoteListing.onPowerDeleteComplete model.stylePalette.fontSize count li mod model.spmodel model.zknSearchResult) li }, Cmd.none )
 
                                 _ ->
                                     ( model, Cmd.none )
@@ -3923,7 +3926,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     backtolisting
 
                 EditZkNote.Settings ->
-                    ( { model | state = UserSettings (UserSettings.init login model.fontsize) login (EditZkNote emod login) }
+                    ( { model | state = UserSettings (UserSettings.init login model.stylePalette.fontSize) login (EditZkNote emod login) }
                     , Cmd.none
                     )
 
@@ -4097,7 +4100,7 @@ handleEditZkNoteListing model login ( emod, ecmd ) =
             ( { model | state = EditZkNote (EditZkNote.initNew model.fui login [] model.mobile) login }, Cmd.none )
 
         EditZkNoteListing.Done ->
-            ( { model | state = UserSettings (UserSettings.init login model.fontsize) login (EditZkNoteListing emod login) }
+            ( { model | state = UserSettings (UserSettings.init login model.stylePalette.fontSize) login (EditZkNoteListing emod login) }
             , Cmd.none
             )
 
@@ -4133,7 +4136,7 @@ handleArchiveListing model login ( emod, ecmd ) =
             )
 
         ArchiveListing.Done ->
-            ( { model | state = UserSettings (UserSettings.init login model.fontsize) login (ArchiveListing emod login) }
+            ( { model | state = UserSettings (UserSettings.init login model.stylePalette.fontSize) login (ArchiveListing emod login) }
             , Cmd.none
             )
 
@@ -4488,8 +4491,7 @@ init flags url key zone fontsize =
             , prevSearches = []
             , recentNotes = []
             , errorNotes = Dict.empty
-            , fontsize = fontsize
-            , stylePalette = { defaultSpacing = 10 }
+            , stylePalette = { defaultSpacing = 10, fontSize = fontsize }
             , adminSettings = flags.adminsettings
             , trackedRequests = { requestCount = 0, mobile = flags.mobile, requests = Dict.empty }
             , jobs = { mobile = flags.mobile, jobs = Dict.empty }

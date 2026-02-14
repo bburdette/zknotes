@@ -35,12 +35,12 @@ view model =
         [ EI.button
             Common.buttonStyle
             { onPress = Just NotesClick, label = E.text "notes" }
-        , E.column [ E.width E.fill, E.height <| E.maximum 200 E.fill, E.scrollbarY, E.centerX ]
+        , E.column [ E.width E.fill, E.height <| E.maximum 200 E.fill, E.scrollbarY, E.centerX, E.spacing 4 ]
             (model.notes
                 |> List.map
                     (\fn ->
-                        E.row [ E.paddingXY 0 8, E.spacing 8 ]
-                            [ EI.button (Common.buttonStyle ++ [ E.paddingXY 2 1 ])
+                        E.row [ E.spacing 8 ]
+                            [ EI.button (Common.buttonStyle ++ [ E.paddingXY 2 2 ])
                                 { onPress = Just (RemoveClick fn.id), label = E.text "x" }
                             , E.paragraph [] [ E.text fn.title ]
                             ]

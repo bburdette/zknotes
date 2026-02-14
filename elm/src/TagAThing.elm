@@ -120,8 +120,8 @@ onWkKeyPress key model =
             ( model, None )
 
 
-showSr : Model tmod tmsg tcmd -> Data.ZkListNote -> Element (Msg tmsg)
-showSr model zkln =
+showSr : Int -> Model tmod tmsg tcmd -> Data.ZkListNote -> Element (Msg tmsg)
+showSr fontsize model zkln =
     let
         sysColor =
             ZC.systemColor DataUtil.sysids zkln.sysids
@@ -199,7 +199,7 @@ showSr model zkln =
             E.el
                 ([ E.width E.fill
                  , EE.onClick (SrFocusPress zkln.id)
-                 , E.height <| E.px 30
+                 , E.height <| E.px <| round <| toFloat fontsize * 1.15
                  , E.clipX
                  ]
                     ++ (sysColor
@@ -428,7 +428,7 @@ view stylePalette recentZkns mbsize spmodel zknSearchResult model =
                             SP.view True True 0 spmodel
                        )
                     :: (List.map
-                            (showSr model)
+                            (showSr stylePalette.fontSize model)
                         <|
                             zknSearchResult.notes
                        )
@@ -445,7 +445,7 @@ view stylePalette recentZkns mbsize spmodel zknSearchResult model =
         recentPanel =
             E.column (E.spacing 8 :: sppad)
                 (List.map
-                    (showSr model)
+                    (showSr stylePalette.fontSize model)
                  <|
                     recentZkns
                 )

@@ -12,6 +12,7 @@ import Util as U
 
 type alias StylePalette =
     { defaultSpacing : Int
+    , fontSize : Int
     }
 
 
