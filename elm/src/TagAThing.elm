@@ -514,7 +514,7 @@ view stylePalette recentZkns mbsize spmodel zknSearchResult model =
                         focusStyle
 
                     AddLinksOnly ->
-                        focusStyle
+                        nonFocusStyle
 
                     AddNotes ->
                         nonFocusStyle
