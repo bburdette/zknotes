@@ -3979,7 +3979,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                             TagNotes
                                 (TagAThing.init
                                     (TagNotes.initThing [])
-                                    TagAThing.AddLinks
+                                    TagAThing.AddNotes
                                     []
                                     login
                                 )

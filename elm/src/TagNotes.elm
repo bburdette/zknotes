@@ -14,6 +14,7 @@ type Msg
     = OkClick
     | CancelClick
     | NotesClick
+    | RemoveClick Data.ZkNoteId
     | Noop
 
 
@@ -36,7 +37,14 @@ view model =
             { onPress = Just NotesClick, label = E.text "notes" }
         , E.column [ E.width E.fill, E.height <| E.maximum 200 E.fill, E.scrollbarY, E.centerX ]
             (model.notes
-                |> List.map (\fn -> E.paragraph [] [ E.text fn.title ])
+                |> List.map
+                    (\fn ->
+                        E.row [ E.paddingXY 0 8, E.spacing 8 ]
+                            [ EI.button (Common.buttonStyle ++ [ E.paddingXY 2 1 ])
+                                { onPress = Just (RemoveClick fn.id), label = E.text "x" }
+                            , E.paragraph [] [ E.text fn.title ]
+                            ]
+                    )
             )
         , E.row [ E.width E.fill, E.spacing 10 ]
             [ EI.button
@@ -60,6 +68,9 @@ update msg model =
 
         NotesClick ->
             ( model, Which TagAThing.AddNotes )
+
+        RemoveClick zni ->
+            ( { model | notes = List.filter (\n -> n.id /= zni) model.notes }, None )
 
         Noop ->
             ( model, None )
