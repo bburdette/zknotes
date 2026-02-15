@@ -238,20 +238,8 @@ showSr fontsize model lastSelected zlnSearchResult zkln =
     in
     if TSet.member zkln.id model.focusSr then
         if lastSelected == Just zkln.id then
-            -- focus result!  show controlrow.
             E.column
-                [ -- EBd.width 1
-                  E.padding 3
-                , EBd.rounded 3
-                , EBd.color TC.darkGrey
-                , E.width E.fill
-                , E.inFront
-                    (E.row [ E.height E.fill, E.alignRight, EBk.color TC.white ]
-                        [ E.el [ E.centerY ] <|
-                            ZC.golink 25 zkln.id ZC.otherLinkColor
-                        ]
-                    )
-                ]
+                [ E.width E.fill, E.spacing 3 ]
                 [ listingrow True, controlrow ]
 
         else
