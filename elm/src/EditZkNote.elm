@@ -2024,6 +2024,14 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                         recentPanel TC.white
                 ]
 
+        pagView =
+            if List.length zknSearchResult.notes < 15 then
+                E.none
+
+            else
+                E.map SPMsg <|
+                    SP.paginationView spmodel
+
         searchPanel bkcolor =
             E.column
                 (E.spacing 3 :: E.width E.fill :: sppad)
@@ -2040,6 +2048,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                     :: (E.map SPMsg <|
                             SP.view True (size.width < 500 || wclass /= Narrow) 0 spmodel
                        )
+                    :: pagView
                     :: (List.map
                             (showSr fontsize bkcolor model isdirty)
                         <|
@@ -2050,14 +2059,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                                 Nothing ->
                                     zknSearchResult.notes
                        )
-                    ++ (if List.length zknSearchResult.notes < 15 then
-                            []
-
-                        else
-                            [ E.map SPMsg <|
-                                SP.paginationView spmodel
-                            ]
-                       )
+                    ++ [ pagView ]
                 )
 
         recentPanel bkcolor =

@@ -2,7 +2,7 @@ module TagAThing exposing (..)
 
 import Common
 import Data exposing (Direction(..), ZkNoteId)
-import DataUtil exposing (zklKey, zniCompare)
+import DataUtil exposing (ZniSet, emptyZniSet, zklKey, zniCompare)
 import Dict exposing (Dict(..))
 import Element as E exposing (Element)
 import Element.Background as EBk
@@ -12,6 +12,7 @@ import Element.Font as EF
 import Element.Input as EI
 import Orgauth.Data exposing (UserId(..))
 import SearchStackPanel as SP
+import TSet
 import TangoColors as TC
 import Toop
 import Util
@@ -59,7 +60,7 @@ type alias Model tmod tmsg tcmd =
     , zklDict : Dict String Data.EditLink
     , searchOrRecent : SearchOrRecent
     , addWhich : AddWhich
-    , focusSr : Maybe ZkNoteId -- note id in search result.
+    , focusSr : ZniSet
     , focusLink : Maybe Data.EditLink
     }
 
@@ -70,9 +71,10 @@ type Msg tmsg
     | AddToSearchAsTag String
     | ToLinkPress Data.ZkListNote
     | FromLinkPress Data.ZkListNote
-    | AddNotePress Data.ZkListNote
+    | AddNotePress (List Data.ZkListNote)
     | SetAddWhich AddWhich
     | SrFocusPress ZkNoteId
+    | ClearSelection
     | LinkFocusPress Data.EditLink
     | FlipLink Data.EditLink
     | RemoveLink Data.EditLink
@@ -105,7 +107,7 @@ init thing addwhich links loginData =
         Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) links)
     , searchOrRecent = SearchView
     , addWhich = addwhich
-    , focusSr = Nothing
+    , focusSr = emptyZniSet
     , focusLink = Nothing
     }
 
@@ -120,8 +122,8 @@ onWkKeyPress key model =
             ( model, None )
 
 
-showSr : Int -> Model tmod tmsg tcmd -> Data.ZkListNote -> Element (Msg tmsg)
-showSr fontsize model zkln =
+showSr : Int -> Model tmod tmsg tcmd -> Maybe Data.ZkNoteId -> Data.ZkListNoteSearchResult -> Data.ZkListNote -> Element (Msg tmsg)
+showSr fontsize model lastSelected zlnSearchResult zkln =
     let
         sysColor =
             ZC.systemColor DataUtil.sysids zkln.sysids
@@ -179,7 +181,13 @@ showSr fontsize model zkln =
 
                     AddNotes ->
                         [ EI.button linkButtonStyle
-                            { onPress = Just <| AddNotePress zkln
+                            { onPress =
+                                Just <|
+                                    AddNotePress
+                                        (List.filter
+                                            (\n -> TSet.member n.id model.focusSr)
+                                            zlnSearchResult.notes
+                                        )
                             , label = E.el [ E.centerY ] <| E.text "+"
                             }
                         ]
@@ -192,43 +200,65 @@ showSr fontsize model zkln =
                             { onPress = Just (AddToSearchAsTag zkln.title)
                             , label = E.text "t"
                             }
+                       , clearButton
                        ]
                 )
 
+        clearButton =
+            if TSet.isEmpty model.focusSr then
+                E.none
+
+            else
+                EI.button Common.buttonStyle
+                    { onPress = Just <| ClearSelection
+                    , label = E.el [ E.centerY ] <| E.text "clear"
+                    }
+
         listingrow =
-            E.el
-                ([ E.width E.fill
-                 , EE.onClick (SrFocusPress zkln.id)
-                 , E.height <| E.px <| round <| toFloat fontsize * 1.15
-                 , E.clipX
-                 ]
-                    ++ (sysColor
-                            |> Maybe.map (\c -> [ EF.color c ])
-                            |> Maybe.withDefault []
-                       )
-                )
-            <|
-                E.text zkln.title
+            \focus ->
+                E.el
+                    ([ E.width E.fill
+                     , EE.onClick (SrFocusPress zkln.id)
+                     , E.height <| E.px <| round <| toFloat fontsize * 1.15
+                     , E.clipX
+                     ]
+                        ++ (sysColor
+                                |> Maybe.map (\c -> [ EF.color c ])
+                                |> Maybe.withDefault []
+                           )
+                        ++ (if focus then
+                                [ EBk.color TC.grey ]
+
+                            else
+                                []
+                           )
+                    )
+                <|
+                    E.text zkln.title
     in
-    if model.focusSr == Just zkln.id then
-        -- focus result!  show controlrow.
-        E.column
-            [ EBd.width 1
-            , E.padding 3
-            , EBd.rounded 3
-            , EBd.color TC.darkGrey
-            , E.width E.fill
-            , E.inFront
-                (E.row [ E.height E.fill, E.alignRight, EBk.color TC.white ]
-                    [ E.el [ E.centerY ] <|
-                        ZC.golink 25 zkln.id ZC.otherLinkColor
-                    ]
-                )
-            ]
-            [ listingrow, controlrow ]
+    if TSet.member zkln.id model.focusSr then
+        if lastSelected == Just zkln.id then
+            -- focus result!  show controlrow.
+            E.column
+                [ -- EBd.width 1
+                  E.padding 3
+                , EBd.rounded 3
+                , EBd.color TC.darkGrey
+                , E.width E.fill
+                , E.inFront
+                    (E.row [ E.height E.fill, E.alignRight, EBk.color TC.white ]
+                        [ E.el [ E.centerY ] <|
+                            ZC.golink 25 zkln.id ZC.otherLinkColor
+                        ]
+                    )
+                ]
+                [ listingrow True, controlrow ]
+
+        else
+            listingrow True
 
     else
-        listingrow
+        listingrow False
 
 
 showZkl : Maybe Data.EditLink -> DataUtil.LoginData -> Maybe ZkNoteId -> Maybe E.Color -> Bool -> Data.EditLink -> Element (Msg tmsg)
@@ -415,6 +445,30 @@ view stylePalette recentZkns mbsize spmodel zknSearchResult model =
                         )
                 )
 
+        lastSelected =
+            List.foldl
+                (\n mbn ->
+                    if TSet.member n.id model.focusSr then
+                        Just n
+
+                    else
+                        mbn
+                )
+                Nothing
+                zknSearchResult.notes
+                |> Maybe.map .id
+
+        pagView =
+            E.row [ E.width E.fill ]
+                (if List.length zknSearchResult.notes < 15 then
+                    []
+
+                 else
+                    [ E.map SPMsg <|
+                        SP.paginationView spmodel
+                    ]
+                )
+
         searchPanel =
             E.column
                 (E.spacing 8 :: E.width E.fill :: sppad)
@@ -427,25 +481,19 @@ view stylePalette recentZkns mbsize spmodel zknSearchResult model =
                     :: (E.map SPMsg <|
                             SP.view True True 0 spmodel
                        )
+                    :: pagView
                     :: (List.map
-                            (showSr stylePalette.fontSize model)
+                            (showSr stylePalette.fontSize model lastSelected zknSearchResult)
                         <|
                             zknSearchResult.notes
                        )
-                    ++ (if List.length zknSearchResult.notes < 15 then
-                            []
-
-                        else
-                            [ E.map SPMsg <|
-                                SP.paginationView spmodel
-                            ]
-                       )
+                    ++ [ pagView ]
                 )
 
         recentPanel =
             E.column (E.spacing 8 :: sppad)
                 (List.map
-                    (showSr stylePalette.fontSize model)
+                    (showSr stylePalette.fontSize model lastSelected zknSearchResult)
                  <|
                     recentZkns
                 )
@@ -580,10 +628,15 @@ update msg model =
             , AddToRecent zkln
             )
 
-        AddNotePress zkln ->
+        AddNotePress zlns ->
             let
                 tmod =
-                    model.thing.addNote zkln model.thing.model
+                    List.foldl
+                        (\n mod ->
+                            model.thing.addNote n mod
+                        )
+                        model.thing.model
+                        zlns
 
                 thing =
                     model.thing
@@ -593,14 +646,17 @@ update msg model =
         SrFocusPress id ->
             ( { model
                 | focusSr =
-                    if model.focusSr == Just id then
-                        Nothing
+                    if TSet.member id model.focusSr then
+                        TSet.remove id model.focusSr
 
                     else
-                        Just id
+                        TSet.insert id model.focusSr
               }
             , None
             )
+
+        ClearSelection ->
+            ( { model | focusSr = emptyZniSet }, None )
 
         LinkFocusPress link ->
             ( { model
