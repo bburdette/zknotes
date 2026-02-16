@@ -10,6 +10,9 @@ import Element.Border as EBd
 import Element.Events as EE
 import Element.Font as EF
 import Element.Input as EI
+import Html.Events as HE
+import Json.Decode as JD
+import Json.Encode as JE
 import Orgauth.Data exposing (UserId(..))
 import SearchStackPanel as SP
 import TSet
@@ -73,7 +76,7 @@ type Msg tmsg
     | FromLinkPress Data.ZkListNote
     | AddNotePress (List Data.ZkListNote)
     | SetAddWhich AddWhich
-    | SrFocusPress ZkNoteId
+    | SrFocusPress ZkNoteId (List ZkNoteId)
     | ClearSelection
     | LinkFocusPress Data.EditLink
     | FlipLink Data.EditLink
@@ -218,7 +221,40 @@ showSr fontsize model lastSelected zlnSearchResult zkln =
             \focus ->
                 E.el
                     ([ E.width E.fill
-                     , EE.onClick (SrFocusPress zkln.id)
+                     , E.htmlAttribute <|
+                        HE.stopPropagationOn "click"
+                            (JD.map
+                                (\shiftkey ->
+                                    if shiftkey then
+                                        let
+                                            sel_range =
+                                                Util.foldUntil
+                                                    (\i range ->
+                                                        if i.id == zkln.id then
+                                                            Util.Stop range
+
+                                                        else if TSet.member i.id model.focusSr then
+                                                            Util.Go [ i.id ]
+
+                                                        else if List.isEmpty range then
+                                                            Util.Go []
+
+                                                        else
+                                                            Util.Go <| i.id :: range
+                                                    )
+                                                    []
+                                                    zlnSearchResult.notes
+                                        in
+                                        ( SrFocusPress zkln.id sel_range, True )
+
+                                    else
+                                        ( SrFocusPress zkln.id [], True )
+                                )
+                                (JD.field "shiftKey" JD.bool)
+                            )
+
+                     -- |> (SrFocusPress zkln.id))
+                     -- , EE.onClick (SrFocusPress zkln.id)
                      , E.height <| E.px <| round <| toFloat fontsize * 1.15
                      , E.clipX
                      ]
@@ -239,7 +275,9 @@ showSr fontsize model lastSelected zlnSearchResult zkln =
     if TSet.member zkln.id model.focusSr then
         if lastSelected == Just zkln.id then
             E.column
-                [ E.width E.fill, E.spacing 3 ]
+                [ E.width E.fill
+                , E.spacing 3
+                ]
                 [ listingrow True, controlrow ]
 
         else
@@ -459,7 +497,13 @@ view stylePalette recentZkns mbsize spmodel zknSearchResult model =
 
         searchPanel =
             E.column
-                (E.spacing 8 :: E.width E.fill :: sppad)
+                (E.spacing 8
+                    :: E.width E.fill
+                    :: (E.htmlAttribute <|
+                            HE.preventDefaultOn "click" (JD.succeed ( Noop, True ))
+                       )
+                    :: sppad
+                )
                 (E.row [ E.width E.fill ]
                     [ EI.button Common.buttonStyle
                         { onPress = Just <| SearchHistoryPress
@@ -631,18 +675,70 @@ update msg model =
             in
             ( { model | thing = { thing | model = tmod } }, None )
 
-        SrFocusPress id ->
-            ( { model
-                | focusSr =
-                    if TSet.member id model.focusSr then
-                        TSet.remove id model.focusSr
+        SrFocusPress id range ->
+            let
+                _ =
+                    Debug.log "id, range" ( id, range )
+            in
+            case range of
+                [] ->
+                    ( { model
+                        | focusSr =
+                            if TSet.member id model.focusSr then
+                                TSet.remove id model.focusSr
 
-                    else
-                        TSet.insert id model.focusSr
-              }
-            , None
-            )
+                            else
+                                TSet.insert id model.focusSr
+                      }
+                    , None
+                    )
 
+                nonempty ->
+                    ( { model
+                        | focusSr =
+                            List.foldl (\nid set -> TSet.insert nid set)
+                                model.focusSr
+                                (id :: nonempty)
+                      }
+                    , None
+                    )
+
+        {- if shiftkey then
+               let sel_range = Util.foldUntil (\i range ->
+                       if i.id == id then
+                           Util.Stop mbp
+                       else if TSet.member i.id model.focusSr) then
+                           Util.Go [ i.id ]
+                       else if List.empty range then
+                           Util.Go []
+                       else
+                           Util.Go <| i.id :: range
+
+
+                       ) [] model.
+               ( { model
+                   | focusSr =
+                       if TSet.member id model.focusSr then
+                           TSet.remove id model.focusSr
+
+                       else
+                           TSet.insert id model.focusSr
+                 }
+               , None
+               )
+
+           else
+               ( { model
+                   | focusSr =
+                       if TSet.member id model.focusSr then
+                           TSet.remove id model.focusSr
+
+                       else
+                           TSet.insert id model.focusSr
+                 }
+               , None
+               )
+        -}
         ClearSelection ->
             ( { model | focusSr = emptyZniSet }, None )
 
