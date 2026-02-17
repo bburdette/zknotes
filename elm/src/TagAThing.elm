@@ -711,42 +711,6 @@ update msg model =
                     , None
                     )
 
-        {- if shiftkey then
-               let sel_range = Util.foldUntil (\i range ->
-                       if i.id == id then
-                           Util.Stop mbp
-                       else if TSet.member i.id model.focusSr) then
-                           Util.Go [ i.id ]
-                       else if List.empty range then
-                           Util.Go []
-                       else
-                           Util.Go <| i.id :: range
-
-
-                       ) [] model.
-               ( { model
-                   | focusSr =
-                       if TSet.member id model.focusSr then
-                           TSet.remove id model.focusSr
-
-                       else
-                           TSet.insert id model.focusSr
-                 }
-               , None
-               )
-
-           else
-               ( { model
-                   | focusSr =
-                       if TSet.member id model.focusSr then
-                           TSet.remove id model.focusSr
-
-                       else
-                           TSet.insert id model.focusSr
-                 }
-               , None
-               )
-        -}
         ClearSelection ->
             ( { model | focusSr = emptyZniSet }, None )
 
