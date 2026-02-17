@@ -10,6 +10,7 @@ import Element.Border as EBd
 import Element.Events as EE
 import Element.Font as EF
 import Element.Input as EI
+import Html.Attributes as HA
 import Html.Events as HE
 import Json.Decode as JD
 import Json.Encode as JE
@@ -222,7 +223,7 @@ showSr fontsize model lastSelected zlnSearchResult zkln =
                 E.el
                     ([ E.width E.fill
                      , E.htmlAttribute <|
-                        HE.stopPropagationOn "click"
+                        HE.preventDefaultOn "click"
                             (JD.map
                                 (\shiftkey ->
                                     if shiftkey then
@@ -257,6 +258,7 @@ showSr fontsize model lastSelected zlnSearchResult zkln =
                      -- , EE.onClick (SrFocusPress zkln.id)
                      , E.height <| E.px <| round <| toFloat fontsize * 1.15
                      , E.clipX
+                     , E.htmlAttribute <| HA.style "user-select" "None"
                      ]
                         ++ (sysColor
                                 |> Maybe.map (\c -> [ EF.color c ])
@@ -277,6 +279,8 @@ showSr fontsize model lastSelected zlnSearchResult zkln =
             E.column
                 [ E.width E.fill
                 , E.spacing 3
+                , E.htmlAttribute <|
+                    HE.preventDefaultOn "click" (JD.succeed ( Noop, True ))
                 ]
                 [ listingrow True, controlrow ]
 
@@ -523,7 +527,13 @@ view stylePalette recentZkns mbsize spmodel zknSearchResult model =
                 )
 
         recentPanel =
-            E.column (E.spacing 8 :: sppad)
+            E.column
+                (E.spacing 8
+                    :: (E.htmlAttribute <|
+                            HE.preventDefaultOn "click" (JD.succeed ( Noop, True ))
+                       )
+                    :: sppad
+                )
                 (List.map
                     (showSr stylePalette.fontSize model lastSelected zknSearchResult)
                  <|
@@ -547,6 +557,8 @@ view stylePalette recentZkns mbsize spmodel zknSearchResult model =
                 , EBd.rounded 10
                 , EBk.color TC.white
                 , E.clip
+                , E.htmlAttribute <|
+                    HE.preventDefaultOn "click" (JD.succeed ( Noop, True ))
                 ]
                 (Common.navbar 2
                     (case model.searchOrRecent of
@@ -572,8 +584,19 @@ view stylePalette recentZkns mbsize spmodel zknSearchResult model =
     E.row
         [ E.width (mbsize |> Maybe.map .width |> Maybe.withDefault 500 |> E.px)
         , E.spacing 10
+        , E.htmlAttribute <|
+            HE.preventDefaultOn "click" (JD.succeed ( Noop, True ))
         ]
-        [ E.row [ E.centerX, E.width <| E.maximum 1000 E.fill, E.spacing 10, E.alignTop, E.height E.fill ] <|
+        [ E.row
+            [ E.centerX
+            , E.width <| E.maximum 1000 E.fill
+            , E.spacing 10
+            , E.alignTop
+            , E.height E.fill
+            , E.htmlAttribute <|
+                HE.preventDefaultOn "click" (JD.succeed ( Noop, True ))
+            ]
+          <|
             [ E.el
                 (case model.addWhich of
                     AddLinks ->
