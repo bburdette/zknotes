@@ -222,7 +222,7 @@ showSr fontsize model lastSelected zlnSearchResult zkln =
                 E.el
                     ([ E.width E.fill
                      , E.htmlAttribute <|
-                        HE.preventDefaultOn "click"
+                        HE.on "click"
                             (JD.map
                                 (\shiftkey ->
                                     if shiftkey then
@@ -245,10 +245,10 @@ showSr fontsize model lastSelected zlnSearchResult zkln =
                                                     []
                                                     zlnSearchResult.notes
                                         in
-                                        ( SrFocusPress zkln.id sel_range, True )
+                                        SrFocusPress zkln.id sel_range
 
                                     else
-                                        ( SrFocusPress zkln.id [], True )
+                                        SrFocusPress zkln.id []
                                 )
                                 (JD.field "shiftKey" JD.bool)
                             )
