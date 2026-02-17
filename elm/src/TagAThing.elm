@@ -13,7 +13,6 @@ import Element.Input as EI
 import Html.Attributes as HA
 import Html.Events as HE
 import Json.Decode as JD
-import Json.Encode as JE
 import Orgauth.Data exposing (UserId(..))
 import SearchStackPanel as SP
 import TSet
@@ -279,8 +278,6 @@ showSr fontsize model lastSelected zlnSearchResult zkln =
             E.column
                 [ E.width E.fill
                 , E.spacing 3
-                , E.htmlAttribute <|
-                    HE.preventDefaultOn "click" (JD.succeed ( Noop, True ))
                 ]
                 [ listingrow True, controlrow ]
 
@@ -503,9 +500,6 @@ view stylePalette recentZkns mbsize spmodel zknSearchResult model =
             E.column
                 (E.spacing 8
                     :: E.width E.fill
-                    :: (E.htmlAttribute <|
-                            HE.preventDefaultOn "click" (JD.succeed ( Noop, True ))
-                       )
                     :: sppad
                 )
                 (E.row [ E.width E.fill ]
@@ -529,9 +523,6 @@ view stylePalette recentZkns mbsize spmodel zknSearchResult model =
         recentPanel =
             E.column
                 (E.spacing 8
-                    :: (E.htmlAttribute <|
-                            HE.preventDefaultOn "click" (JD.succeed ( Noop, True ))
-                       )
                     :: sppad
                 )
                 (List.map
@@ -557,8 +548,6 @@ view stylePalette recentZkns mbsize spmodel zknSearchResult model =
                 , EBd.rounded 10
                 , EBk.color TC.white
                 , E.clip
-                , E.htmlAttribute <|
-                    HE.preventDefaultOn "click" (JD.succeed ( Noop, True ))
                 ]
                 (Common.navbar 2
                     (case model.searchOrRecent of
@@ -584,8 +573,6 @@ view stylePalette recentZkns mbsize spmodel zknSearchResult model =
     E.row
         [ E.width (mbsize |> Maybe.map .width |> Maybe.withDefault 500 |> E.px)
         , E.spacing 10
-        , E.htmlAttribute <|
-            HE.preventDefaultOn "click" (JD.succeed ( Noop, True ))
         ]
         [ E.row
             [ E.centerX
@@ -593,8 +580,6 @@ view stylePalette recentZkns mbsize spmodel zknSearchResult model =
             , E.spacing 10
             , E.alignTop
             , E.height E.fill
-            , E.htmlAttribute <|
-                HE.preventDefaultOn "click" (JD.succeed ( Noop, True ))
             ]
           <|
             [ E.el
