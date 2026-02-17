@@ -257,7 +257,7 @@ showSr fontsize model lastSelected zlnSearchResult zkln =
                      -- , EE.onClick (SrFocusPress zkln.id)
                      , E.height <| E.px <| round <| toFloat fontsize * 1.15
                      , E.clipX
-                     , E.htmlAttribute <| HA.style "user-select" "None"
+                     , E.htmlAttribute <| HA.style "user-select" "none"
                      ]
                         ++ (sysColor
                                 |> Maybe.map (\c -> [ EF.color c ])
