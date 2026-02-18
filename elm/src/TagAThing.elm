@@ -72,14 +72,15 @@ type Msg tmsg
     = SearchHistoryPress
     | AddToSearch Data.ZkListNote
     | AddToSearchAsTag String
-    | ToLinkPress Data.ZkListNote
-    | FromLinkPress Data.ZkListNote
+    | ToLinkPress
+    | FromLinkPress
     | AddNotePress
     | SetAddWhich AddWhich
     | SrFocusPress ZkListNote (List ZkListNote)
     | ClearSelection
     | LinkFocusPress Data.EditLink
     | FlipLink Data.EditLink
+    | RemoveLinks Direction
     | RemoveLink Data.EditLink
     | SPMsg SP.Msg
     | NavChoiceChanged NavChoice
@@ -92,7 +93,7 @@ type Command tcmd
     | SearchHistory
     | Search Data.ZkNoteSearch
     | SyncFiles Data.ZkNoteSearch
-    | AddToRecent Data.ZkListNote
+    | AddToRecent (List Data.ZkListNote)
     | ThingCommand tcmd
     | SPMod (SP.Model -> ( SP.Model, SP.Command ))
 
@@ -131,47 +132,44 @@ showSr fontsize model lastSelected zlnSearchResult zkln =
         sysColor =
             ZC.systemColor DataUtil.sysids zkln.sysids
 
-        mbTo =
-            Dict.get (zklKey { direction = To, otherid = zkln.id })
-                model.zklDict
+        calcAll =
+            \direction zklns ->
+                List.all
+                    (\n ->
+                        Dict.member (zklKey { direction = direction, otherid = n.id })
+                            model.zklDict
+                    )
 
-        mbFrom =
-            Dict.get (zklKey { direction = From, otherid = zkln.id })
-                model.zklDict
+        focusNotes =
+            TDict.toList model.focusSr |> List.map Tuple.second
 
         controlrow =
             let
                 tflinks =
-                    [ mbTo
-                        |> Maybe.map
-                            (\zkl ->
-                                EI.button
-                                    disabledLinkButtonStyle
-                                    { onPress = Just <| RemoveLink zkl
-                                    , label = E.el [ E.centerY ] <| E.text "→"
-                                    }
-                            )
-                        |> Maybe.withDefault
-                            (EI.button linkButtonStyle
-                                { onPress = Just <| ToLinkPress zkln
-                                , label = E.el [ E.centerY ] <| E.text "→"
-                                }
-                            )
-                    , mbFrom
-                        |> Maybe.map
-                            (\zkl ->
-                                EI.button
-                                    disabledLinkButtonStyle
-                                    { onPress = Just <| RemoveLink zkl
-                                    , label = E.el [ E.centerY ] <| E.text "←"
-                                    }
-                            )
-                        |> Maybe.withDefault
-                            (EI.button linkButtonStyle
-                                { onPress = Just <| FromLinkPress zkln
-                                , label = E.el [ E.centerY ] <| E.text "←"
-                                }
-                            )
+                    [ if calcAll To model.focusSr focusNotes then
+                        EI.button
+                            disabledLinkButtonStyle
+                            { onPress = Just <| RemoveLinks To
+                            , label = E.el [ E.centerY ] <| E.text "→"
+                            }
+
+                      else
+                        EI.button linkButtonStyle
+                            { onPress = Just <| ToLinkPress
+                            , label = E.el [ E.centerY ] <| E.text "→"
+                            }
+                    , if calcAll From model.focusSr focusNotes then
+                        EI.button
+                            disabledLinkButtonStyle
+                            { onPress = Just <| RemoveLinks From
+                            , label = E.el [ E.centerY ] <| E.text "←"
+                            }
+
+                      else
+                        EI.button linkButtonStyle
+                            { onPress = Just <| FromLinkPress
+                            , label = E.el [ E.centerY ] <| E.text "←"
+                            }
                     ]
             in
             E.row [ E.spacing 8, E.width E.fill ]
@@ -623,40 +621,64 @@ update msg model =
         AddToSearchAsTag title ->
             ( model, SPMod (\m -> ( SP.addToSearch m [ Data.ExactMatch, Data.Tag ] title, SP.None )) )
 
-        ToLinkPress zkln ->
+        ToLinkPress ->
             let
-                nzkl =
-                    { direction = To
-                    , otherid = zkln.id
-                    , user = model.ld.userid
-                    , zknote = Nothing
-                    , othername = Just zkln.title
-                    , sysids = zkln.sysids
-                    , delete = Nothing
-                    }
+                focusNotes =
+                    TDict.toList model.focusSr |> List.map Tuple.second
+
+                zklDict =
+                    List.foldr
+                        (\zkln zkld ->
+                            let
+                                nzkl =
+                                    { direction = To
+                                    , otherid = zkln.id
+                                    , user = model.ld.userid
+                                    , zknote = Nothing
+                                    , othername = Just zkln.title
+                                    , sysids = zkln.sysids
+                                    , delete = Nothing
+                                    }
+                            in
+                            Dict.insert (zklKey nzkl) nzkl zkld
+                        )
+                        model.zklDict
+                        focusNotes
             in
             ( { model
-                | zklDict = Dict.insert (zklKey nzkl) nzkl model.zklDict
+                | zklDict = zklDict
               }
-            , AddToRecent zkln
+            , AddToRecent focusNotes
             )
 
-        FromLinkPress zkln ->
+        FromLinkPress ->
             let
-                nzkl =
-                    { direction = From
-                    , otherid = zkln.id
-                    , user = model.ld.userid
-                    , zknote = Nothing
-                    , othername = Just zkln.title
-                    , sysids = zkln.sysids
-                    , delete = Nothing
-                    }
+                focusNotes =
+                    TDict.toList model.focusSr |> List.map Tuple.second
+
+                zklDict =
+                    List.foldr
+                        (\zkln zkld ->
+                            let
+                                nzkl =
+                                    { direction = From
+                                    , otherid = zkln.id
+                                    , user = model.ld.userid
+                                    , zknote = Nothing
+                                    , othername = Just zkln.title
+                                    , sysids = zkln.sysids
+                                    , delete = Nothing
+                                    }
+                            in
+                            Dict.insert (zklKey nzkl) nzkl zkld
+                        )
+                        model.zklDict
+                        focusNotes
             in
             ( { model
-                | zklDict = Dict.insert (zklKey nzkl) nzkl model.zklDict
+                | zklDict = zklDict
               }
-            , AddToRecent zkln
+            , AddToRecent focusNotes
             )
 
         AddNotePress ->
@@ -738,6 +760,16 @@ update msg model =
         RemoveLink zkln ->
             ( { model
                 | zklDict = Dict.remove (zklKey zkln) model.zklDict
+              }
+            , None
+            )
+
+        RemoveLinks direction ->
+            ( { model
+                | zklDict =
+                    List.foldl (\zkln zkld -> Dict.remove (zklKey { direction = direction, otherid = zkln.id }) zkld)
+                        model.zklDict
+                        (TDict.toList model.focusSr |> List.map Tuple.second)
               }
             , None
             )
