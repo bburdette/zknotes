@@ -217,6 +217,8 @@ showSr fontsize model lastSelected zlnSearchResult zkln =
                     ([ E.width E.fill
                      , E.htmlAttribute <|
                         HE.on "click"
+                            -- get the zklistnotes here, since they aren't available in
+                            -- the update fn.
                             (JD.map
                                 (\shiftkey ->
                                     if shiftkey then
@@ -246,9 +248,6 @@ showSr fontsize model lastSelected zlnSearchResult zkln =
                                 )
                                 (JD.field "shiftKey" JD.bool)
                             )
-
-                     -- |> (SrFocusPress zkln.id))
-                     -- , EE.onClick (SrFocusPress zkln.id)
                      , E.height <| E.px <| round <| toFloat fontsize * 1.15
                      , E.clipX
                      , E.htmlAttribute <| HA.style "user-select" "none"
