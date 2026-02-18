@@ -14,8 +14,10 @@ import Html.Attributes as HA
 import Html.Events as HE
 import Json.Decode as JD
 import Orgauth.Data exposing (UserId(..))
+import SearchPanel
 import SearchStackPanel as SP
 import TDict
+import TagSearchPanel
 import TangoColors as TC
 import Toop
 import Util
@@ -775,7 +777,14 @@ update msg model =
             )
 
         SPMsg m ->
-            ( model, SPMod (SP.update m) )
+            -- clicking Search button clears focusSr.  next/prev don't
+            -- nor do other search panel msgs.  bit of a hack.
+            case m of
+                SP.SPMsg (SearchPanel.TSPMsg TagSearchPanel.SearchClick) ->
+                    ( { model | focusSr = emptyZlnDict }, SPMod (SP.update m) )
+
+                _ ->
+                    ( model, SPMod (SP.update m) )
 
         ThingMsg tmsg ->
             let

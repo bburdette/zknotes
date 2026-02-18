@@ -4329,7 +4329,7 @@ handleTagNotes model ( lmod, lcmd ) login st =
                     ( { model | state = updstate }, Cmd.none )
 
         TagAThing.SPMod fn ->
-            handleSPMod model fn
+            handleSPMod { model | state = updstate } fn
 
 
 handleInviteUser :
