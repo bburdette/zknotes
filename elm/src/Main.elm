@@ -55,6 +55,7 @@ import SpecialNotes as SN
 import TSet
 import TagAThing
 import TagFiles
+import TagNotes
 import Task
 import Time
 import Toop
@@ -117,6 +118,7 @@ type Msg
     | MdInlineXformMsg (GD.Msg MdInlineXform.Msg)
     | MdInlineXformCmd MdInlineXform.Command
     | TagFilesMsg (TagAThing.Msg TagFiles.Msg)
+    | TagNotesMsg (TagAThing.Msg TagNotes.Msg)
     | InviteUserMsg (TagAThing.Msg InviteUser.Msg)
     | JobsPollTick Time.Posix
     | Noop
@@ -149,6 +151,7 @@ type State
     | RequestsDialog RequestsDialog.GDModel State
     | JobsDialog JobsDialog.GDModel State
     | TagFiles (TagAThing.Model TagFiles.Model TagFiles.Msg TagFiles.Command) LoginData State
+    | TagNotes (TagAThing.Model TagNotes.Model TagNotes.Msg TagNotes.Command) LoginData State
     | InviteUser (TagAThing.Model InviteUser.Model InviteUser.Msg InviteUser.Command) LoginData State
     | MdInlineXform MdInlineXform.GDModel State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
@@ -210,7 +213,6 @@ type alias Model =
     , prevSearches : List (List Data.TagSearch)
     , recentNotes : List Data.ZkListNote
     , errorNotes : Dict String String
-    , fontsize : Int
     , stylePalette : StylePalette
     , adminSettings : OD.AdminSettings
     , trackedRequests : TRequests
@@ -495,7 +497,7 @@ routeStateInternal model route =
         SettingsR ->
             case stateLogin model.state of
                 Just login ->
-                    ( UserSettings (UserSettings.init login model.fontsize) login model.state, Cmd.none )
+                    ( UserSettings (UserSettings.init login model.stylePalette.fontSize) login model.state, Cmd.none )
 
                 Nothing ->
                     ( (displayMessageDialog { model | state = initLoginState model route } "can't view user settings; you're not logged in!").state, Cmd.none )
@@ -803,6 +805,9 @@ showMessage msg =
         TagFilesMsg _ ->
             "TagFilesMsg"
 
+        TagNotesMsg _ ->
+            "TagNotesMsg"
+
         InviteUserMsg _ ->
             "InviteUserMsg"
 
@@ -897,6 +902,9 @@ showState state =
         TagFiles _ _ _ ->
             "TagFiles"
 
+        TagNotes _ _ _ ->
+            "TagNotes"
+
         InviteUser _ _ _ ->
             "InviteUser"
 
@@ -922,10 +930,10 @@ viewState size state model =
             E.map InvitedMsg <| Invited.view model.stylePalette size em
 
         EditZkNote em _ ->
-            E.map EditZkNoteMsg <| EditZkNote.view model.fontsize model.timezone size model.spmodel model.zknSearchResult model.recentNotes model.trackedRequests model.jobs model.noteCache em
+            E.map EditZkNoteMsg <| EditZkNote.view model.stylePalette.fontSize model.timezone size model.spmodel model.zknSearchResult model.recentNotes model.trackedRequests model.jobs model.noteCache em
 
         EditZkNoteListing em ld ->
-            E.map EditZkNoteListingMsg <| EditZkNoteListing.view model.fontsize ld size em model.spmodel model.zknSearchResult
+            E.map EditZkNoteListingMsg <| EditZkNoteListing.view model.stylePalette.fontSize ld size em model.spmodel model.zknSearchResult
 
         ArchiveListing em ld ->
             E.map ArchiveListingMsg <| ArchiveListing.view ld model.timezone size em
@@ -1009,6 +1017,9 @@ viewState size state model =
 
         TagFiles tfmod _ _ ->
             E.map TagFilesMsg <| TagAThing.view model.stylePalette model.recentNotes (Just size) model.spmodel model.zknSearchResult tfmod
+
+        TagNotes tfmod _ _ ->
+            E.map TagNotesMsg <| TagAThing.view model.stylePalette model.recentNotes (Just size) model.spmodel model.zknSearchResult tfmod
 
         InviteUser tfmod _ _ ->
             E.map InviteUserMsg <| TagAThing.view model.stylePalette model.recentNotes (Just size) model.spmodel model.zknSearchResult tfmod
@@ -1099,6 +1110,9 @@ stateLogin state =
             stateLogin instate
 
         TagFiles _ login _ ->
+            Just login
+
+        TagNotes _ login _ ->
             Just login
 
         InviteUser _ login _ ->
@@ -1428,7 +1442,7 @@ view model =
 
             _ ->
                 E.layout
-                    ([ EF.size model.fontsize, E.width E.fill ]
+                    ([ EF.size model.stylePalette.fontSize, E.width E.fill ]
                         ++ dndif
                     )
                 <|
@@ -2079,9 +2093,13 @@ actualupdate msg model =
                     )
 
                 UserSettings.ChangeFontSize size ->
+                    let
+                        s =
+                            model.stylePalette
+                    in
                     ( { model
                         | state = UserSettings numod login prevstate
-                        , fontsize = size
+                        , stylePalette = { s | fontSize = size }
                       }
                     , LS.storeLocalVal { name = "fontsize", value = String.fromInt size }
                     )
@@ -2104,7 +2122,7 @@ actualupdate msg model =
                             InviteUser
                                 (TagAThing.init
                                     (InviteUser.initThing "")
-                                    model.recentNotes
+                                    TagAThing.AddLinksOnly
                                     []
                                     login
                                 )
@@ -2176,6 +2194,9 @@ actualupdate msg model =
         ( WkMsg (Ok key), TagFiles mod ld ps ) ->
             handleTagFiles model (TagAThing.onWkKeyPress key mod) ld ps
 
+        ( WkMsg (Ok key), TagNotes mod ld ps ) ->
+            handleTagNotes model (TagAThing.onWkKeyPress key mod) ld ps
+
         ( WkMsg (Ok key), InviteUser mod ld ps ) ->
             handleInviteUser model (TagAThing.onWkKeyPress key mod) ld ps
 
@@ -2202,6 +2223,9 @@ actualupdate msg model =
 
         ( TagFilesMsg lm, TagFiles mod ld st ) ->
             handleTagFiles model (TagAThing.update lm mod) ld st
+
+        ( TagNotesMsg lm, TagNotes mod ld st ) ->
+            handleTagNotes model (TagAThing.update lm mod) ld st
 
         ( InviteUserMsg lm, InviteUser mod ld st ) ->
             handleInviteUser model (TagAThing.update lm mod) ld st
@@ -2771,7 +2795,7 @@ actualupdate msg model =
                         Data.PvyPowerDeleteComplete count ->
                             case model.state of
                                 EditZkNoteListing mod li ->
-                                    ( { model | state = EditZkNoteListing (EditZkNoteListing.onPowerDeleteComplete model.fontsize count li mod model.spmodel model.zknSearchResult) li }, Cmd.none )
+                                    ( { model | state = EditZkNoteListing (EditZkNoteListing.onPowerDeleteComplete model.stylePalette.fontSize count li mod model.spmodel model.zknSearchResult) li }, Cmd.none )
 
                                 _ ->
                                     ( model, Cmd.none )
@@ -3411,7 +3435,7 @@ actualupdate msg model =
                                             TagFiles
                                                 (TagAThing.init
                                                     (TagFiles.initThing s)
-                                                    model.recentNotes
+                                                    TagAThing.AddLinksOnly
                                                     []
                                                     login
                                                 )
@@ -3466,7 +3490,7 @@ actualupdate msg model =
                                             TagFiles
                                                 (TagAThing.init
                                                     (TagFiles.initThing s)
-                                                    model.recentNotes
+                                                    TagAThing.AddLinksOnly
                                                     []
                                                     login
                                                 )
@@ -3902,7 +3926,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     backtolisting
 
                 EditZkNote.Settings ->
-                    ( { model | state = UserSettings (UserSettings.init login model.fontsize) login (EditZkNote emod login) }
+                    ( { model | state = UserSettings (UserSettings.init login model.stylePalette.fontSize) login (EditZkNote emod login) }
                     , Cmd.none
                     )
 
@@ -3950,6 +3974,22 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                 EditZkNote.Sync ->
                     ( model
                     , sendZIMsg model.fui Data.PvqSyncRemote
+                    )
+
+                EditZkNote.PowerTag ->
+                    ( { model
+                        | state =
+                            TagNotes
+                                (TagAThing.init
+                                    (TagNotes.initThing [])
+                                    TagAThing.AddNotes
+                                    []
+                                    login
+                                )
+                                login
+                                model.state
+                      }
+                    , Cmd.none
                     )
 
                 EditZkNote.Requests ->
@@ -4060,7 +4100,7 @@ handleEditZkNoteListing model login ( emod, ecmd ) =
             ( { model | state = EditZkNote (EditZkNote.initNew model.fui login [] model.mobile) login }, Cmd.none )
 
         EditZkNoteListing.Done ->
-            ( { model | state = UserSettings (UserSettings.init login model.fontsize) login (EditZkNoteListing emod login) }
+            ( { model | state = UserSettings (UserSettings.init login model.stylePalette.fontSize) login (EditZkNoteListing emod login) }
             , Cmd.none
             )
 
@@ -4096,7 +4136,7 @@ handleArchiveListing model login ( emod, ecmd ) =
             )
 
         ArchiveListing.Done ->
-            ( { model | state = UserSettings (UserSettings.init login model.fontsize) login (ArchiveListing emod login) }
+            ( { model | state = UserSettings (UserSettings.init login model.stylePalette.fontSize) login (ArchiveListing emod login) }
             , Cmd.none
             )
 
@@ -4219,6 +4259,73 @@ handleTagFiles model ( lmod, lcmd ) login st =
                     ( { model | state = st }, Cmd.none )
 
                 TagFiles.None ->
+                    ( { model | state = updstate }, Cmd.none )
+
+        TagAThing.SPMod fn ->
+            handleSPMod model fn
+
+
+handleTagNotes :
+    Model
+    -> ( TagAThing.Model TagNotes.Model TagNotes.Msg TagNotes.Command, TagAThing.Command TagNotes.Command )
+    -> LoginData
+    -> State
+    -> ( Model, Cmd Msg )
+handleTagNotes model ( lmod, lcmd ) login st =
+    let
+        updstate =
+            TagNotes lmod login st
+    in
+    case lcmd of
+        TagAThing.Search s ->
+            sendSearch { model | state = updstate } s
+
+        TagAThing.SyncFiles s ->
+            ( { model | state = updstate }
+            , sendZIMsg model.fui (Data.PvqSyncFiles s)
+            )
+
+        TagAThing.SearchHistory ->
+            ( { model | state = updstate }, Cmd.none )
+
+        TagAThing.None ->
+            ( { model | state = updstate }, Cmd.none )
+
+        TagAThing.AddToRecent _ ->
+            ( { model | state = updstate }, Cmd.none )
+
+        TagAThing.ThingCommand tc ->
+            case tc of
+                TagNotes.Ok ->
+                    let
+                        zklns =
+                            lmod.thing.model.notes
+
+                        zkls =
+                            Dict.values lmod.zklDict
+
+                        zklinks : List Data.SaveZkLink2
+                        zklinks =
+                            List.foldl
+                                (\zkln links ->
+                                    List.map (\el -> DataUtil.elToSzl2 zkln.id el) zkls
+                                        ++ links
+                                )
+                                []
+                                zklns
+                    in
+                    ( { model | state = st }
+                    , sendZIMsg model.fui
+                        (Data.PvqSaveZkLinks { links = zklinks })
+                    )
+
+                TagNotes.Cancel ->
+                    ( { model | state = st }, Cmd.none )
+
+                TagNotes.Which w ->
+                    ( { model | state = TagNotes { lmod | addWhich = w } login st }, Cmd.none )
+
+                TagNotes.None ->
                     ( { model | state = updstate }, Cmd.none )
 
         TagAThing.SPMod fn ->
@@ -4384,8 +4491,7 @@ init flags url key zone fontsize =
             , prevSearches = []
             , recentNotes = []
             , errorNotes = Dict.empty
-            , fontsize = fontsize
-            , stylePalette = { defaultSpacing = 10 }
+            , stylePalette = { defaultSpacing = 10, fontSize = fontsize }
             , adminSettings = flags.adminsettings
             , trackedRequests = { requestCount = 0, mobile = flags.mobile, requests = Dict.empty }
             , jobs = { mobile = flags.mobile, jobs = Dict.empty }

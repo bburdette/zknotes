@@ -96,6 +96,15 @@ emptyZniSet =
     TSet.empty zkNoteIdToString trustedZkNoteIdFromString
 
 
+type alias ZlnDict =
+    TDict ZkNoteId String ZkListNote
+
+
+emptyZlnDict : ZlnDict
+emptyZlnDict =
+    TDict.empty zkNoteIdToString trustedZkNoteIdFromString
+
+
 type alias ZniDict =
     TDict ZkNoteId String Data.ZkNote
 

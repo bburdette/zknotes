@@ -57,6 +57,7 @@ import Dialog as D
 import Dict exposing (Dict)
 import DnDList
 import EdMarkdown as EM
+import EditZkNoteListing exposing (Msg(..))
 import Either exposing (Either(..))
 import Element as E exposing (Element)
 import Element.Background as EBk
@@ -112,6 +113,7 @@ type Msg
     | ViewPress
     | NewPress
     | UploadPress
+    | PowerTagPress
     | SyncPress
     | LinkBackPress
     | CopyPress
@@ -255,6 +257,7 @@ type Command
     | FileUpload
     | Sync
     | SyncFiles Data.ZkNoteSearch
+    | PowerTag
     | SPMod (SP.Model -> ( SP.Model, SP.Command ))
     | InlineXform MB.Inline (MB.Inline -> MG.Msg)
     | Cmd (Cmd Msg) (Maybe Command)
@@ -1758,10 +1761,10 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                             }
                         , EI.button perhapsdirtyparabuttonstyle { onPress = Just NewPress, label = E.text "new" }
                         , if mine && not model.deleted then
-                            EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just <| DeletePress fontsize zone, label = E.text "delete" }
+                            EI.button parabuttonstyle { onPress = Just <| DeletePress fontsize zone, label = E.text "delete" }
 
                           else
-                            EI.button (E.alignRight :: Common.disabledButtonStyle) { onPress = Nothing, label = E.text "delete" }
+                            EI.button disabledparabuttonstyle { onPress = Nothing, label = E.text "delete" }
                         ]
                 , titleed
                 , if mine then
@@ -2021,6 +2024,14 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                         recentPanel TC.white
                 ]
 
+        pagView =
+            if List.length zknSearchResult.notes < 15 then
+                E.none
+
+            else
+                E.map SPMsg <|
+                    SP.paginationView spmodel
+
         searchPanel bkcolor =
             E.column
                 (E.spacing 3 :: E.width E.fill :: sppad)
@@ -2037,6 +2048,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                     :: (E.map SPMsg <|
                             SP.view True (size.width < 500 || wclass /= Narrow) 0 spmodel
                        )
+                    :: pagView
                     :: (List.map
                             (showSr fontsize bkcolor model isdirty)
                         <|
@@ -2047,14 +2059,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                                 Nothing ->
                                     zknSearchResult.notes
                        )
-                    ++ (if List.length zknSearchResult.notes < 15 then
-                            []
-
-                        else
-                            [ E.map SPMsg <|
-                                SP.paginationView spmodel
-                            ]
-                       )
+                    ++ [ pagView ]
                 )
 
         recentPanel bkcolor =
@@ -2201,6 +2206,10 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                     [ EI.button (E.alignRight :: Common.buttonStyle)
                         { onPress = Just SyncPress
                         , label = E.text "sync"
+                        }
+                    , EI.button (E.alignRight :: Common.buttonStyle)
+                        { onPress = Just PowerTagPress
+                        , label = E.text "tag"
                         }
                     , EI.button (E.alignRight :: Common.buttonStyle)
                         { onPress = Just UploadPress
@@ -3003,6 +3012,11 @@ update msg model =
         SyncPress ->
             ( model
             , Sync
+            )
+
+        PowerTagPress ->
+            ( model
+            , PowerTag
             )
 
         ToLinkPress zkln ->
