@@ -5,5 +5,5 @@ RUST_LOG=debug ../target/debug/zknotes-onsave \
   --yt-dlp-path "yt-dlp" \
   --yeet-service "true" \
   --thumb-service "false" \
-  --amqp-uid-file "./uid" \
-  --amqp-pwd-file "./pwd"
+  --amqp-uid-file "../../../yeetwds/uid" \
+  --amqp-pwd-file "../../../yeetwds/pwd"

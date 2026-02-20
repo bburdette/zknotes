@@ -1,6 +1,7 @@
 module InviteUser exposing (..)
 
 import Common
+import Data
 import Element as E exposing (Element)
 import Element.Background as EBk
 import Element.Border as EBd
@@ -65,9 +66,15 @@ update msg model =
             ( model, None )
 
 
+addNote : Data.ZkListNote -> Model -> Model
+addNote _ model =
+    model
+
+
 initThing : String -> Thing Model Msg Command
 initThing email =
     { model = { email = email }
     , view = view
     , update = update
+    , addNote = addNote
     }

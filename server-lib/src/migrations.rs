@@ -3100,3 +3100,16 @@ pub fn udpate39(dbfile: &Path) -> Result<(), zkerr::Error> {
 
   Ok(())
 }
+
+pub fn udpate40(dbfile: &Path) -> Result<(), zkerr::Error> {
+  let conn = Connection::open(dbfile)?;
+
+  let tr = conn.unchecked_transaction()?;
+
+  // remove linkzknote ids.  these got in from a bug in sync
+  conn.execute("update zklink set linkzknote = null", params![])?;
+  conn.execute("update zklinkarchive set linkzknote = null", params![])?;
+
+  tr.commit()?;
+  Ok(())
+}
