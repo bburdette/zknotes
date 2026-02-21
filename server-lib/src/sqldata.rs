@@ -1838,6 +1838,10 @@ pub fn read_zklinks(
   // not-mine zklinks with from/to = this, and to/from in usershares.
   // +
   // not-mine zklinks from/to notes that link to my usernote.
+  //
+
+  // exclude links with non-null linkzknote.  this prevents links being in
+  // both read_zklinks results and read_lzlinks results.
 
   // TODO: integrate sysid lookup in the query?
   let sqlstr = format!(
@@ -1846,6 +1850,7 @@ pub fn read_zklinks(
       inner join zknote as L ON A.fromid = L.id
       inner join zknote as R ON A.toid = R.id
       where A.user = ?1 and (A.fromid = ?2 or A.toid = ?2)
+      and A.linkzknote is null
       union
     select A.fromid, A.toid, A.user, A.linkzknote, L.uuid, L.title, R.uuid, R.title
       from zklink A, zklink B
@@ -1854,6 +1859,7 @@ pub fn read_zklinks(
       where A.user != ?1 and A.fromid = ?2
       and B.fromid = A.toid
       and B.toid = ?3
+      and A.linkzknote is null
       union
    select A.fromid, A.toid, A.user, A.linkzknote, L.uuid, L.title, R.uuid, R.title
       from zklink A, zklink B
@@ -1862,12 +1868,14 @@ pub fn read_zklinks(
       where A.user != ?1 and A.toid = ?2
       and B.fromid = A.fromid
       and B.toid = ?3
+      and A.linkzknote is null
       union
     select A.fromid, A.toid, A.user, A.linkzknote, L.uuid, L.title, R.uuid, R.title
         from zklink A, zklink B
         inner join zknote as L ON A.fromid = L.id
         inner join zknote as R ON A.toid = R.id
         where A.user != ?1 and
+          and A.linkzknote is null
           ((A.toid = ?2 and A.fromid = B.fromid and B.toid in ({})) or
            (A.toid = ?2 and A.fromid = B.toid and B.fromid in ({})) or
            (A.fromid = ?2 and A.toid = B.fromid and B.toid in ({})) or
@@ -1878,6 +1886,7 @@ pub fn read_zklinks(
         inner join zknote as L ON A.fromid = L.id
         inner join zknote as R ON A.toid = R.id
         where A.user != ?1 and
+          and A.linkzknote is null
           ((A.toid = ?2 and A.fromid = B.fromid and B.toid = ?4) or
            (A.toid = ?2 and A.fromid = B.toid and B.fromid = ?4) or
            (A.fromid = ?2 and A.toid = B.fromid and B.toid = ?4) or
@@ -1942,31 +1951,6 @@ pub fn read_lzlinks(
     .collect::<String>();
   s.truncate(s.len() - 1);
 
-  // good old fashioned string templating here, since I can't figure out how to
-  // do array parameters.
-  //
-  // should be ok because the strings are built from vec<i64> returned by user_shares().
-  //
-  // zklinks that are mine.
-  // +
-  // not-mine zklinks with from = this note and toid = note that ISA public.
-  // +
-  // not-mine zklinks with from = note that is public, and to = this.
-  // +
-  // not-mine zklinks with from/to = this, and to/from in usershares.
-  // +
-  // not-mine zklinks from/to notes that link to my usernote.
-  //
-  // lzlinks that are visible:
-  //
-  // lzlinks where both notes are visible.
-  //
-  // note is visible when any of:
-  //   it is mine
-  //   ISA public
-  //   ISA usershare
-  //   links to my usernote.
-
   // // TODO: integrate sysid lookup in the query?
   // let sqlstr = format!(
   //   "select A.user, L.uuid, L.title, R.uuid, R.title
@@ -2006,7 +1990,6 @@ pub fn read_lzlinks(
   //   s, s, s, s
   // );
 
-  // TODO: integrate sysid lookup in the query?
   let sqlstr = format!(
     "select A.user, L.uuid, L.title, R.uuid, R.title
       from zklink A, zklink B
@@ -2014,20 +1997,29 @@ pub fn read_lzlinks(
       inner join zknote as R ON A.toid = R.id
       where A.linkzknote = ?2
       and
+       -- FROM is visible?
        (
-        (L.user = 2 and A.fromid = B.fromid and A.toid = B.toid and A.user = B.user) or
+        -- FROM user is mine.  rest is to prevent duplicate results.
+        (L.user = ?1 and A.fromid = B.fromid and A.toid = B.toid and A.user = B.user) or
+        -- FROM is public.
         (B.fromid = A.fromid and B.toid = ?3) or
+        -- FROM is in one of user's share.
         ((A.fromid = B.fromid and B.toid in ({})) or
          (A.fromid = B.toid and B.fromid in ({}))) or
+        -- FROM linked to user note.
         (A.fromid == B.fromid and B.toid = ?4)
        )
        and
+       -- TO is visible?
        (
-        -- comment
-        (R.user = 2 and A.fromid = B.fromid and A.toid = B.toid and A.user = B.user) or
+        -- TO user is mine.  rest is to prevent duplicate results.
+        (R.user = ?1 and A.fromid = B.fromid and A.toid = B.toid and A.user = B.user) or
+        -- TO is public.
         (A.toid = B.fromid and B.toid = ?3) or
+        -- TO is in one of user's share.
         ((A.toid = B.fromid and B.toid in ({})) or
          (A.toid = B.toid and B.fromid in ({}))) or
+        -- TO linked to user note.
         (A.toid == B.fromid and B.toid = ?4)
        )
       ",
