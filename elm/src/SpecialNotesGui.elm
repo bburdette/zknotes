@@ -2,7 +2,8 @@ module SpecialNotesGui exposing (..)
 
 import ArchiveListing exposing (Command)
 import Common
-import Data exposing (AndOr(..), SearchMod(..), TagSearch(..))
+import Data exposing (AndOr(..), LzLink, SearchMod(..), TagSearch(..))
+import Dict exposing (Dict)
 import Element as E
 import Element.Font as EF
 import Element.Input as EI
@@ -25,8 +26,12 @@ type Command
     | None
 
 
-guiSn : Time.Zone -> SN.SpecialNote -> E.Element Msg
-guiSn zone snote =
+guiSn :
+    Time.Zone
+    -> SN.SpecialNote
+    -> Dict String LzLink
+    -> E.Element Msg
+guiSn zone snote lzlinks =
     case snote of
         SN.SnSearch tagsearches ->
             E.row
@@ -151,30 +156,39 @@ syncSearch fromremote csync =
                 }
 
 
-updateSn : Msg -> SN.SpecialNote -> ( SN.SpecialNote, Command )
-updateSn msg snote =
+updateSn :
+    Msg
+    -> SN.SpecialNote
+    -> Dict String LzLink
+    ->
+        ( ( SN.SpecialNote
+          , Dict String LzLink
+          )
+        , Command
+        )
+updateSn msg snote lzlinks =
     case snote of
         SN.SnSearch tagsearches ->
             case msg of
                 CopySearchPress ->
-                    ( SN.SnSearch tagsearches, CopySearch tagsearches )
+                    ( ( SN.SnSearch tagsearches, lzlinks ), CopySearch tagsearches )
 
                 CopySyncSearchPress _ ->
-                    ( SN.SnSearch tagsearches, None )
+                    ( ( SN.SnSearch tagsearches, lzlinks ), None )
 
                 Noop ->
-                    ( SN.SnSearch tagsearches, None )
+                    ( ( SN.SnSearch tagsearches, lzlinks ), None )
 
         SN.SnSync completedSync ->
             case msg of
                 CopySearchPress ->
-                    ( SN.SnSync completedSync, None )
+                    ( ( SN.SnSync completedSync, lzlinks ), None )
 
                 CopySyncSearchPress fromremote ->
-                    ( SN.SnSync completedSync, CopySyncSearch (syncSearch fromremote completedSync) )
+                    ( ( SN.SnSync completedSync, lzlinks ), CopySyncSearch (syncSearch fromremote completedSync) )
 
                 Noop ->
-                    ( SN.SnSync completedSync, None )
+                    ( ( SN.SnSync completedSync, lzlinks ), None )
 
         SN.SnGraph g ->
-            ( SN.SnGraph g, None )
+            ( ( SN.SnGraph g, lzlinks ), None )

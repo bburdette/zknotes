@@ -282,6 +282,13 @@ zklKey zkl =
            )
 
 
+lzlKey : { a | from : ZkNoteId, to : ZkNoteId } -> String
+lzlKey lzl =
+    zkNoteIdToString lzl.from
+        ++ ":"
+        ++ zkNoteIdToString lzl.to
+
+
 elToSzl : EditLink -> SaveZkLink
 elToSzl el =
     { otherid = el.otherid
@@ -307,6 +314,14 @@ elToSzl2 thisid el =
     , to = to
     , linkzknote = Nothing
     , delete = el.delete
+    }
+
+
+lzlToSll : Bool -> LzLink -> SaveLzLink
+lzlToSll delete lzl =
+    { from = lzl.from
+    , to = lzl.to
+    , delete = Just delete
     }
 
 
