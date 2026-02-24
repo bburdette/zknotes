@@ -1874,8 +1874,9 @@ pub fn read_zklinks(
         from zklink A, zklink B
         inner join zknote as L ON A.fromid = L.id
         inner join zknote as R ON A.toid = R.id
-        where A.user != ?1 and
+        where A.user != ?1
           and A.linkzknote is null
+          and
           ((A.toid = ?2 and A.fromid = B.fromid and B.toid in ({})) or
            (A.toid = ?2 and A.fromid = B.toid and B.fromid in ({})) or
            (A.fromid = ?2 and A.toid = B.fromid and B.toid in ({})) or
@@ -1885,8 +1886,9 @@ pub fn read_zklinks(
         from zklink A, zklink B
         inner join zknote as L ON A.fromid = L.id
         inner join zknote as R ON A.toid = R.id
-        where A.user != ?1 and
+        where A.user != ?1
           and A.linkzknote is null
+          and
           ((A.toid = ?2 and A.fromid = B.fromid and B.toid = ?4) or
            (A.toid = ?2 and A.fromid = B.toid and B.fromid = ?4) or
            (A.fromid = ?2 and A.toid = B.fromid and B.toid = ?4) or
