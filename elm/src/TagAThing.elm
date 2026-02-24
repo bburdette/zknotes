@@ -135,10 +135,11 @@ showSr fontsize model lastSelected zlnSearchResult zkln =
             ZC.systemColor DataUtil.sysids zkln.sysids
 
         calcAll =
-            \direction zklns ->
+            \direction ->
                 List.all
                     (\n ->
-                        Dict.member (zklKey { direction = direction, otherid = n.id })
+                        Dict.member
+                            (zklKey { direction = direction, otherid = n.id })
                             model.zklDict
                     )
 
@@ -148,7 +149,7 @@ showSr fontsize model lastSelected zlnSearchResult zkln =
         controlrow =
             let
                 tflinks =
-                    [ if calcAll To model.focusSr focusNotes then
+                    [ if calcAll To focusNotes then
                         EI.button
                             disabledLinkButtonStyle
                             { onPress = Just <| RemoveLinks To
@@ -160,7 +161,7 @@ showSr fontsize model lastSelected zlnSearchResult zkln =
                             { onPress = Just <| ToLinkPress
                             , label = E.el [ E.centerY ] <| E.text "→"
                             }
-                    , if calcAll From model.focusSr focusNotes then
+                    , if calcAll From focusNotes then
                         EI.button
                             disabledLinkButtonStyle
                             { onPress = Just <| RemoveLinks From
