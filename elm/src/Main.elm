@@ -268,20 +268,6 @@ routeState model route =
     ( st, cmds )
 
 
-
--- case stateLogin st of
---     Just login ->
---         ( st
---         , Cmd.batch
---             [ cmds
---             -- TODO: uh don't do this search every time??
---             , sendZIMsg model.fui (Data.PvqSearchZkNotes <| prevSearchQuery login)
---             ]
---         )
---     Nothing ->
---         ( st, cmds )
-
-
 routeStateInternal : Model -> Route -> ( State, Cmd Msg )
 routeStateInternal model route =
     case route of
@@ -3975,12 +3961,6 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     , Cmd.none
                     )
 
-                -- ( { model
-                --     | state = EditZkNote emod login
-                --     , recentNotes = addRecentZkListNote model.recentNotes zkln
-                --   }
-                -- , Cmd.none
-                -- )
                 EditZkNote.ShowMessage e ->
                     ( displayMessageDialog model e, Cmd.none )
 
@@ -4010,18 +3990,6 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     )
 
                 EditZkNote.PowerTag ->
-                    -- ( { model
-                    --     | state =
-                    --         TagNotes
-                    --             (TagAThing.init
-                    --                 (TagNotes.initThing [])
-                    --                 TagAThing.AddNotes
-                    --                 []
-                    --                 login
-                    --             )
-                    --             login
-                    --             model.state
-                    --   }
                     ( { model
                         | state =
                             TagNotes2
