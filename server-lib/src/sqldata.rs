@@ -1938,7 +1938,6 @@ pub fn read_lzlinks(
   zknid: i64,
 ) -> Result<Vec<LzLink>, zkerr::Error> {
   let pubid = note_id(&conn, "system", "public")?;
-  let sysid = user_id(&conn, "system")?;
   let usershares = user_shares(&conn, uid)?;
   let unid = user_note_id(&conn, uid)?;
 
@@ -1952,45 +1951,6 @@ pub fn read_lzlinks(
     })
     .collect::<String>();
   s.truncate(s.len() - 1);
-
-  // // TODO: integrate sysid lookup in the query?
-  // let sqlstr = format!(
-  //   "select A.user, L.uuid, L.title, R.uuid, R.title
-  //     from zklink A, zklink B
-  //     inner join zknote as L ON A.fromid = L.id
-  //     inner join zknote as R ON A.toid = R.id
-  //     where A.linkzknote = ?2
-  //     and
-  //       -- FROM is visible??  one of:
-  //      (
-  //       -- from is mine
-  //       L.user = ?1 or
-  //       -- from is public
-  //       (B.fromid = A.fromid and B.toid = ?3) or
-  //        -- from links to usershare
-  //       ((A.fromid = B.fromid and B.toid in ({})) or
-  //        (A.fromid = B.toid and B.fromid in ({})))
-  //       -- from links to usernote
-  //       (A.fromid == B.fromid and B.toid = ?4)
-  //      )
-  //      and
-  //       -- TO is visible??  one of:
-  //      (
-  //       -- to is mine
-  //       L.user = ?1 or
-  //       -- to is public
-  //       (A.toid = B.fromid and B.toid = ?3) or
-  //        -- to links to usershare
-  //       ((A.toid = B.fromid and B.toid in ({})) or
-  //        (A.toid = B.toid and B.fromid in ({})))
-  //       -- to links to usernote
-  //       (A.toid == B.fromid and B.toid = ?4)
-  //      )
-  //      -- only return one copy of each
-  //      group by A.user, L.uuid, R.uuid
-  //     ",
-  //   s, s, s, s
-  // );
 
   let sqlstr = format!(
     "select A.user, L.uuid, L.title, R.uuid, R.title

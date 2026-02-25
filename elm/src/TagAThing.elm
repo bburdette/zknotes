@@ -146,6 +146,7 @@ showSr fontsize model lastSelected zlnSearchResult zkln =
         focusNotes =
             TDict.toList model.focusSr |> List.map Tuple.second
 
+        controlrow : E.Element (Msg tmsg)
         controlrow =
             let
                 tflinks =

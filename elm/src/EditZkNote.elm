@@ -82,6 +82,7 @@ import RequestsDialog exposing (TRequests)
 import SearchStackPanel as SP
 import SpecialNotesGui as SNG
 import TagSearchPanel exposing (Search(..))
+import TagThings
 import TangoColors as TC
 import Task
 import Time

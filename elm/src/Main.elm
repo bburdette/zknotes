@@ -56,6 +56,7 @@ import TSet
 import TagAThing
 import TagFiles
 import TagNotes
+import TagNotes2
 import Task
 import Time
 import Toop
@@ -119,6 +120,7 @@ type Msg
     | MdInlineXformCmd MdInlineXform.Command
     | TagFilesMsg (TagAThing.Msg TagFiles.Msg)
     | TagNotesMsg (TagAThing.Msg TagNotes.Msg)
+    | TagNotes2Msg TagNotes2.Msg
     | InviteUserMsg (TagAThing.Msg InviteUser.Msg)
     | JobsPollTick Time.Posix
     | Noop
@@ -152,6 +154,7 @@ type State
     | JobsDialog JobsDialog.GDModel State
     | TagFiles (TagAThing.Model TagFiles.Model TagFiles.Msg TagFiles.Command) LoginData State
     | TagNotes (TagAThing.Model TagNotes.Model TagNotes.Msg TagNotes.Command) LoginData State
+    | TagNotes2 TagNotes2.Model LoginData State
     | InviteUser (TagAThing.Model InviteUser.Model InviteUser.Msg InviteUser.Command) LoginData State
     | MdInlineXform MdInlineXform.GDModel State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
@@ -810,6 +813,9 @@ showMessage msg =
         TagNotesMsg _ ->
             "TagNotesMsg"
 
+        TagNotes2Msg _ ->
+            "TagNotes2Msg"
+
         InviteUserMsg _ ->
             "InviteUserMsg"
 
@@ -906,6 +912,9 @@ showState state =
 
         TagNotes _ _ _ ->
             "TagNotes"
+
+        TagNotes2 _ _ _ ->
+            "TagNotes2"
 
         InviteUser _ _ _ ->
             "InviteUser"
@@ -1023,6 +1032,9 @@ viewState size state model =
         TagNotes tfmod _ _ ->
             E.map TagNotesMsg <| TagAThing.view model.stylePalette model.recentNotes (Just size) model.spmodel model.zknSearchResult tfmod
 
+        TagNotes2 tfmod _ _ ->
+            E.map TagNotes2Msg <| TagNotes2.view model.stylePalette (Just size) model.recentNotes model.spmodel model.zknSearchResult tfmod
+
         InviteUser tfmod _ _ ->
             E.map InviteUserMsg <| TagAThing.view model.stylePalette model.recentNotes (Just size) model.spmodel model.zknSearchResult tfmod
 
@@ -1115,6 +1127,9 @@ stateLogin state =
             Just login
 
         TagNotes _ login _ ->
+            Just login
+
+        TagNotes2 _ login _ ->
             Just login
 
         InviteUser _ login _ ->
@@ -2231,6 +2246,9 @@ actualupdate msg model =
         ( TagNotesMsg lm, TagNotes mod ld st ) ->
             handleTagNotes model (TagAThing.update lm mod) ld st
 
+        ( TagNotes2Msg lm, TagNotes2 mod ld st ) ->
+            handleTagNotes2 model (TagNotes2.update lm mod) ld st
+
         ( InviteUserMsg lm, InviteUser mod ld st ) ->
             handleInviteUser model (TagAThing.update lm mod) ld st
 
@@ -3145,20 +3163,19 @@ actualupdate msg model =
                     Import.update em es
 
                 backtolisting =
-                    \imod ->
-                        let
-                            nm =
-                                { model
-                                    | state =
-                                        EditZkNoteListing { dialog = Nothing, zone = model.timezone } login
-                                }
-                        in
-                        case SP.getSearch model.spmodel of
-                            Just s ->
-                                sendSearch nm s
+                    let
+                        nm =
+                            { model
+                                | state =
+                                    EditZkNoteListing { dialog = Nothing, zone = model.timezone } login
+                            }
+                    in
+                    case SP.getSearch model.spmodel of
+                        Just s ->
+                            sendSearch nm s
 
-                            Nothing ->
-                                ( nm, Cmd.none )
+                        Nothing ->
+                            ( nm, Cmd.none )
             in
             case ecmd of
                 Import.None ->
@@ -3167,7 +3184,7 @@ actualupdate msg model =
                 Import.SaveExit notes ->
                     let
                         ( m, c ) =
-                            backtolisting emod
+                            backtolisting
 
                         notecmds =
                             List.map
@@ -3191,7 +3208,7 @@ actualupdate msg model =
                     )
 
                 Import.Cancel ->
-                    backtolisting emod
+                    backtolisting
 
                 Import.Command cmd ->
                     ( model, Cmd.map ImportMsg cmd )
@@ -3981,14 +3998,26 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     )
 
                 EditZkNote.PowerTag ->
+                    -- ( { model
+                    --     | state =
+                    --         TagNotes
+                    --             (TagAThing.init
+                    --                 (TagNotes.initThing [])
+                    --                 TagAThing.AddNotes
+                    --                 []
+                    --                 login
+                    --             )
+                    --             login
+                    --             model.state
+                    --   }
                     ( { model
                         | state =
-                            TagNotes
-                                (TagAThing.init
-                                    (TagNotes.initThing [])
-                                    TagAThing.AddNotes
-                                    []
+                            TagNotes2
+                                (TagNotes2.init
                                     login
+                                    []
+                                    []
+                                    TagNotes2.AddNotes
                                 )
                                 login
                                 model.state
@@ -4028,11 +4057,14 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     let
                         ( nspm, spcmd ) =
                             fn model.spmodel
+
+                        nmod =
+                            { model | spmodel = nspm }
                     in
                     case spcmd of
                         SP.Copy s ->
                             -- kind of messed up to have this here and not in the EditZkNote file
-                            ( { model
+                            ( { nmod
                                 | state =
                                     EditZkNote
                                         { emod
@@ -4054,7 +4086,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
 
                         _ ->
                             -- otherwise its all the usual stuff.
-                            handleSPMod model fn
+                            handleSPMod nmod fn
 
                 EditZkNote.InlineXform inline f ->
                     ( { model
@@ -4334,6 +4366,60 @@ handleTagNotes model ( lmod, lcmd ) login st =
 
         TagAThing.SPMod fn ->
             handleSPMod { model | state = updstate } fn
+
+
+handleTagNotes2 :
+    Model
+    -> ( TagNotes2.Model, TagNotes2.Command )
+    -> LoginData
+    -> State
+    -> ( Model, Cmd Msg )
+handleTagNotes2 model ( lmod, lcmd ) login st =
+    let
+        updstate =
+            TagNotes2 lmod login st
+    in
+    case lcmd of
+        TagNotes2.AddToRecent _ ->
+            ( { model | state = updstate }, Cmd.none )
+
+        TagNotes2.SearchHistory ->
+            ( { model | state = updstate }, Cmd.none )
+
+        TagNotes2.Ok ->
+            let
+                zklns =
+                    lmod.notes
+
+                zkls =
+                    Dict.values lmod.zklDict
+
+                zklinks : List Data.SaveZkLink2
+                zklinks =
+                    List.foldl
+                        (\zkln links ->
+                            List.map (\el -> DataUtil.elToSzl2 zkln.id el) zkls
+                                ++ links
+                        )
+                        []
+                        zklns
+            in
+            ( { model | state = st }
+            , sendZIMsg model.fui
+                (Data.PvqSaveZkLinks { links = zklinks })
+            )
+
+        TagNotes2.Cancel ->
+            ( { model | state = st }, Cmd.none )
+
+        TagNotes2.Which w ->
+            ( { model | state = TagNotes2 { lmod | addWhich = w } login st }, Cmd.none )
+
+        TagNotes2.SPMod fn ->
+            handleSPMod { model | state = updstate } fn
+
+        TagNotes2.None ->
+            ( { model | state = updstate }, Cmd.none )
 
 
 handleInviteUser :
