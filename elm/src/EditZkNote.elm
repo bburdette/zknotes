@@ -34,7 +34,6 @@ port module EditZkNote exposing
     , saveZkLinkList
     , setHomeNote
     , setTab
-    , showSr
     , showZkl
     , sznFromModel
     , tabsOnLoad
@@ -81,8 +80,9 @@ import Orgauth.Data exposing (UserId(..))
 import RequestsDialog exposing (TRequests)
 import SearchStackPanel as SP
 import SpecialNotesGui as SNG
+import TDict exposing (TDict)
 import TagSearchPanel exposing (Search(..))
-import TagThings
+import TagThings as TT
 import TangoColors as TC
 import Task
 import Time
@@ -110,7 +110,7 @@ type Msg
     | OnPubidChanged String
     | SavePress
     | RevertPress
-    | DeletePress Int Time.Zone
+    | DeletePress ZC.StylePalette Time.Zone
     | ViewPress
     | NewPress
     | UploadPress
@@ -120,8 +120,8 @@ type Msg
     | CopyPress
     | SearchHistoryPress
     | SwitchPress ZkNoteId
-    | ToLinkPress Data.ZkListNote
-    | FromLinkPress Data.ZkListNote
+      -- | ToLinkPress Data.ZkListNote
+      -- | FromLinkPress Data.ZkListNote
     | PublicPress Bool
     | EditablePress Bool
     | ShowTitlePress Bool
@@ -133,7 +133,7 @@ type Msg
     | RestoreSearch String
     | SrFocusPress ZkNoteId
     | LinkFocusPress EditLink
-    | AddToSearch Data.ZkListNote
+      -- | AddToSearch Data.ZkListNote
     | AddToSearchAsTag String
     | SetSearchString String
     | SetSearch Data.TagSearch
@@ -159,6 +159,12 @@ type Msg
     | EditBlockMsg MG.Msg
     | SNGMsg SNG.Msg
     | SetDropLinkMode Bool
+    | RemoveLinks Direction
+    | ToLinkPress
+    | FromLinkPress
+    | AddFocusToSearch
+    | AddFocusToSearchAsTag
+    | TTMsg (TT.Msg Msg)
     | Noop
 
 
@@ -223,6 +229,7 @@ type alias Model =
     , edMarkdown : EM.EdMarkdown
     , blockEdit : Maybe BlockEdit
     , droplinkmode : Bool
+    , tagThings : TT.Model
     }
 
 
@@ -254,7 +261,7 @@ type Command
     | Requests
     | Jobs
     | SetHomeNote ZkNoteId
-    | AddToRecent Data.ZkListNote
+    | AddToRecent (List Data.ZkListNote)
     | ShowMessage String
     | ShowArchives ZkNoteId
     | FileUpload
@@ -954,7 +961,7 @@ pageLink model =
 
 
 view :
-    Int
+    ZC.StylePalette
     -> Time.Zone
     -> Util.Size
     -> SP.Model
@@ -965,13 +972,13 @@ view :
     -> NoteCache
     -> Model
     -> Element Msg
-view fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCache model =
+view stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs noteCache model =
     case model.dialog of
         Just dialog ->
             D.view size dialog |> E.map DialogMsg
 
         Nothing ->
-            zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCache model
+            zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs noteCache model
 
 
 commonButtonStyle : Bool -> List (E.Attribute msg)
@@ -998,145 +1005,134 @@ disabledLinkButtonStyle =
     Common.disabledButtonStyle
 
 
-showSr : Int -> E.Color -> Model -> Bool -> Data.ZkListNote -> Element Msg
-showSr fontsize bkcolor model isdirty zkln =
-    let
-        lnnonme =
-            zkln.user /= model.ld.userid
 
-        sysColor =
-            ZC.systemColor DataUtil.sysids zkln.sysids
-
-        mbTo =
-            Dict.get (zklKey { direction = To, otherid = zkln.id })
-                model.zklDict
-
-        mbFrom =
-            Dict.get (zklKey { direction = From, otherid = zkln.id })
-                model.zklDict
-
-        controlrows =
-            [ E.row [ E.spacing 8, E.width E.fill ]
-                [ mbTo
-                    |> Maybe.map
-                        (\zkl ->
-                            EI.button
-                                disabledLinkButtonStyle
-                                { onPress = Just <| RemoveLink zkl
-                                , label = E.el [ E.centerY ] <| E.text "→"
-                                }
-                        )
-                    |> Maybe.withDefault
-                        (EI.button linkButtonStyle
-                            { onPress = Just <| ToLinkPress zkln
-                            , label = E.el [ E.centerY ] <| E.text "→"
-                            }
-                        )
-                , mbFrom
-                    |> Maybe.map
-                        (\zkl ->
-                            EI.button
-                                disabledLinkButtonStyle
-                                { onPress = Just <| RemoveLink zkl
-                                , label = E.el [ E.centerY ] <| E.text "←"
-                                }
-                        )
-                    |> Maybe.withDefault
-                        (EI.button linkButtonStyle
-                            { onPress = Just <| FromLinkPress zkln
-                            , label = E.el [ E.centerY ] <| E.text "←"
-                            }
-                        )
-                , let
-                    mbzkl =
-                        case ( mbTo, mbFrom ) of
-                            ( Just to, _ ) ->
-                                Just to
-
-                            ( _, Just from ) ->
-                                Just from
-
-                            _ ->
-                                Nothing
-                  in
-                  case mbzkl of
-                    Just zkl ->
-                        EI.button linkButtonStyle
-                            { onPress = Just (MdLink zkl "addsearchlink")
-                            , label = E.text "<"
-                            }
-
-                    Nothing ->
-                        E.none
-                , E.column [] [ E.text <| "link to current note: ", E.el [ EF.italic ] <| E.text model.title ]
-                ]
-            , E.row
-                [ E.spacing 8, E.width E.fill ]
-                [ EI.button linkButtonStyle
-                    { onPress = Just (AddToSearch zkln)
-                    , label = E.text "^"
-                    }
-                , EI.button linkButtonStyle
-                    { onPress = Just (AddToSearchAsTag zkln.title)
-                    , label = E.text "t"
-                    }
-                , E.text "add to search"
-                ]
-            ]
-
-        listingrow =
-            E.el
-                ([ E.width E.fill
-                 , EE.onClick (SrFocusPress zkln.id)
-                 , E.height <| E.px <| round <| toFloat fontsize * 1.15
-                 , E.clip
-                 ]
-                    ++ (sysColor
-                            |> Maybe.map (\c -> [ EF.color c ])
-                            |> Maybe.withDefault []
-                       )
-                )
-            <|
-                E.text zkln.title
-    in
-    if model.focusSr == Just zkln.id then
-        -- focus result!  show controlrow.
-        E.column
-            [ EBd.width 1
-            , E.padding 3
-            , EBd.rounded 3
-            , EBd.color TC.darkGrey
-            , E.width E.fill
-            , E.spacing 8
-            , E.inFront
-                (E.row
-                    [ E.alignRight, EBk.color bkcolor ]
-                    [ if lnnonme then
-                        ZC.golink (golinkSize fontsize)
-                            zkln.id
-                            (if isdirty then
-                                ZC.saveColor
-
-                             else
-                                ZC.otherLinkColor
-                            )
-
-                      else
-                        ZC.golink (golinkSize fontsize)
-                            zkln.id
-                            (if isdirty then
-                                ZC.saveColor
-
-                             else
-                                ZC.myLinkColor
-                            )
-                    ]
-                )
-            ]
-            (listingrow :: controlrows)
-
-    else
-        listingrow
+-- showSr : Int -> E.Color -> Model -> Bool -> Data.ZkListNote -> Element Msg
+-- showSr fontsize bkcolor model isdirty zkln =
+--     let
+--         lnnonme =
+--             zkln.user /= model.ld.userid
+--         sysColor =
+--             ZC.systemColor DataUtil.sysids zkln.sysids
+--         mbTo =
+--             Dict.get (zklKey { direction = To, otherid = zkln.id })
+--                 model.zklDict
+--         mbFrom =
+--             Dict.get (zklKey { direction = From, otherid = zkln.id })
+--                 model.zklDict
+--         controlrows =
+--             [ E.row [ E.spacing 8, E.width E.fill ]
+--                 [ mbTo
+--                     |> Maybe.map
+--                         (\zkl ->
+--                             EI.button
+--                                 disabledLinkButtonStyle
+--                                 { onPress = Just <| RemoveLink zkl
+--                                 , label = E.el [ E.centerY ] <| E.text "→"
+--                                 }
+--                         )
+--                     |> Maybe.withDefault
+--                         (EI.button linkButtonStyle
+--                             { onPress = Just <| ToLinkPress zkln
+--                             , label = E.el [ E.centerY ] <| E.text "→"
+--                             }
+--                         )
+--                 , mbFrom
+--                     |> Maybe.map
+--                         (\zkl ->
+--                             EI.button
+--                                 disabledLinkButtonStyle
+--                                 { onPress = Just <| RemoveLink zkl
+--                                 , label = E.el [ E.centerY ] <| E.text "←"
+--                                 }
+--                         )
+--                     |> Maybe.withDefault
+--                         (EI.button linkButtonStyle
+--                             { onPress = Just <| FromLinkPress zkln
+--                             , label = E.el [ E.centerY ] <| E.text "←"
+--                             }
+--                         )
+--                 , let
+--                     mbzkl =
+--                         case ( mbTo, mbFrom ) of
+--                             ( Just to, _ ) ->
+--                                 Just to
+--                             ( _, Just from ) ->
+--                                 Just from
+--                             _ ->
+--                                 Nothing
+--                   in
+--                   case mbzkl of
+--                     Just zkl ->
+--                         EI.button linkButtonStyle
+--                             { onPress = Just (MdLink zkl "addsearchlink")
+--                             , label = E.text "<"
+--                             }
+--                     Nothing ->
+--                         E.none
+--                 , E.column [] [ E.text <| "link to current note: ", E.el [ EF.italic ] <| E.text model.title ]
+--                 ]
+--             , E.row
+--                 [ E.spacing 8, E.width E.fill ]
+--                 [ EI.button linkButtonStyle
+--                     { onPress = Just (AddToSearch zkln)
+--                     , label = E.text "^"
+--                     }
+--                 , EI.button linkButtonStyle
+--                     { onPress = Just (AddToSearchAsTag zkln.title)
+--                     , label = E.text "t"
+--                     }
+--                 , E.text "add to search"
+--                 ]
+--             ]
+--         listingrow =
+--             E.el
+--                 ([ E.width E.fill
+--                  , EE.onClick (SrFocusPress zkln.id)
+--                  , E.height <| E.px <| round <| toFloat fontsize * 1.15
+--                  , E.clip
+--                  ]
+--                     ++ (sysColor
+--                             |> Maybe.map (\c -> [ EF.color c ])
+--                             |> Maybe.withDefault []
+--                        )
+--                 )
+--             <|
+--                 E.text zkln.title
+--     in
+--     if model.focusSr == Just zkln.id then
+--         -- focus result!  show controlrow.
+--         E.column
+--             [ EBd.width 1
+--             , E.padding 3
+--             , EBd.rounded 3
+--             , EBd.color TC.darkGrey
+--             , E.width E.fill
+--             , E.spacing 8
+--             , E.inFront
+--                 (E.row
+--                     [ E.alignRight, EBk.color bkcolor ]
+--                     [ if lnnonme then
+--                         ZC.golink (golinkSize fontsize)
+--                             zkln.id
+--                             (if isdirty then
+--                                 ZC.saveColor
+--                              else
+--                                 ZC.otherLinkColor
+--                             )
+--                       else
+--                         ZC.golink (golinkSize fontsize)
+--                             zkln.id
+--                             (if isdirty then
+--                                 ZC.saveColor
+--                              else
+--                                 ZC.myLinkColor
+--                             )
+--                     ]
+--                 )
+--             ]
+--             (listingrow :: controlrows)
+--     else
+--         listingrow
 
 
 makeNewCommentState : Model -> NewCommentState
@@ -1495,8 +1491,75 @@ renderBlocks zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo droplinkmod
             E.text errors
 
 
+controlRow : Model -> Element Msg
+controlRow model =
+    let
+        focusNotes =
+            TDict.toList model.tagThings.focusSr |> List.map Tuple.second
+
+        clearButton =
+            if TDict.isEmpty model.tagThings.focusSr then
+                E.none
+
+            else
+                EI.button Common.buttonStyle
+                    { onPress = Just <| TTMsg TT.ClearSelection
+                    , label = E.el [ E.centerY ] <| E.text "clear"
+                    }
+
+        calcAll =
+            \direction ->
+                List.all
+                    (\n ->
+                        Dict.member
+                            (zklKey { direction = direction, otherid = n.id })
+                            model.zklDict
+                    )
+
+        tflinks =
+            [ if calcAll To focusNotes then
+                EI.button
+                    disabledLinkButtonStyle
+                    { onPress = Just <| RemoveLinks To
+                    , label = E.el [ E.centerY ] <| E.text "→"
+                    }
+
+              else
+                EI.button linkButtonStyle
+                    { onPress = Just <| ToLinkPress
+                    , label = E.el [ E.centerY ] <| E.text "→"
+                    }
+            , if calcAll From focusNotes then
+                EI.button
+                    disabledLinkButtonStyle
+                    { onPress = Just <| RemoveLinks From
+                    , label = E.el [ E.centerY ] <| E.text "←"
+                    }
+
+              else
+                EI.button linkButtonStyle
+                    { onPress = Just <| FromLinkPress
+                    , label = E.el [ E.centerY ] <| E.text "←"
+                    }
+            ]
+    in
+    E.row [ E.spacing 8, E.width E.fill ]
+        (tflinks
+            ++ [ EI.button linkButtonStyle
+                    { onPress = Just AddFocusToSearch
+                    , label = E.text "^"
+                    }
+               , EI.button linkButtonStyle
+                    { onPress = Just AddFocusToSearchAsTag
+                    , label = E.text "t"
+                    }
+               , clearButton
+               ]
+        )
+
+
 zknview :
-    Int
+    ZC.StylePalette
     -> Time.Zone
     -> Util.Size
     -> SP.Model
@@ -1507,7 +1570,7 @@ zknview :
     -> NoteCache
     -> Model
     -> Element Msg
-zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCache model =
+zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs noteCache model =
     let
         wclass =
             if size.width < 800 then
@@ -1572,7 +1635,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                       , width = E.shrink
                       , view =
                             \zkn ->
-                                ZC.golink (golinkSize fontsize)
+                                ZC.golink (golinkSize stylePalette.fontSize)
                                     zkn.id
                                     (if isdirty then
                                         ZC.saveColor
@@ -1616,7 +1679,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
             E.row [ EF.bold ] [ E.text "links" ]
                 :: List.map
                     (\( l, c ) ->
-                        showZkl fontsize
+                        showZkl stylePalette.fontSize
                             linkbkc
                             isdirty
                             editable
@@ -1775,7 +1838,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                             }
                         , EI.button perhapsdirtyparabuttonstyle { onPress = Just NewPress, label = E.text "new" }
                         , if mine && not model.deleted then
-                            EI.button parabuttonstyle { onPress = Just <| DeletePress fontsize zone, label = E.text "delete" }
+                            EI.button parabuttonstyle { onPress = Just <| DeletePress stylePalette zone, label = E.text "delete" }
 
                           else
                             EI.button disabledparabuttonstyle { onPress = Nothing, label = E.text "delete" }
@@ -1995,95 +2058,87 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
         perhapsdirtyparabuttonstyle =
             perhapsdirtybutton ++ pxy
 
-        ( spwidth, sppad ) =
-            case wclass of
-                Narrow ->
-                    ( E.fill, [ E.paddingXY 0 5 ] )
+        -- ( spwidth, sppad ) =
+        --     case wclass of
+        --         Narrow ->
+        --             ( E.fill, [ E.paddingXY 0 5 ] )
+        --         Medium ->
+        --             ( E.px 400, [ E.padding 5 ] )
+        --         Wide ->
+        --             ( E.px 400, [ E.padding 5 ] )
+        ttviews =
+            TT.makeViews stylePalette (Just size) recentZkns spmodel zknSearchResult model.tagThings (controlRow model)
 
-                Medium ->
-                    ( E.px 400, [ E.padding 5 ] )
-
-                Wide ->
-                    ( E.px 400, [ E.padding 5 ] )
-
-        searchOrRecentPanel =
-            E.column
-                [ E.spacing 8
-                , E.alignTop
-                , E.alignRight
-                , E.width spwidth
-                , EBd.width 1
-                , EBd.color TC.darkGrey
-                , EBd.rounded 10
-                , EBk.color TC.white
-                , E.clip
-                ]
-                [ Common.navbar 2
-                    (case model.searchOrRecent of
-                        SearchView ->
-                            EtSearch
-
-                        RecentView ->
-                            EtRecent
-                    )
-                    TabChanged
-                    [ ( EtSearch, "search" )
-                    , ( EtRecent, "recent" )
-                    ]
-                , case model.searchOrRecent of
-                    SearchView ->
-                        searchPanel TC.white
-
-                    RecentView ->
-                        recentPanel TC.white
-                ]
-
-        pagView =
-            if List.length zknSearchResult.notes < 15 then
-                E.none
-
-            else
-                E.map SPMsg <|
-                    SP.paginationView spmodel
-
-        searchPanel bkcolor =
-            E.column
-                (E.spacing 3 :: E.width E.fill :: sppad)
-                (E.row [ E.width E.fill ]
-                    [ EI.button Common.buttonStyle
-                        { onPress = Just <| SearchHistoryPress
-                        , label = E.el [ E.centerY ] <| E.text "history"
-                        }
-                    , EI.button (E.alignRight :: Common.buttonStyle)
-                        { onPress = Just <| BigSearchPress
-                        , label = ZC.fullScreen
-                        }
-                    ]
-                    :: (E.map SPMsg <|
-                            SP.view True (size.width < 500 || wclass /= Narrow) 0 spmodel
-                       )
-                    :: pagView
-                    :: (List.map
-                            (showSr fontsize bkcolor model isdirty)
-                        <|
-                            case model.id of
-                                Just id ->
-                                    List.filter (\zkl -> zkl.id /= id) zknSearchResult.notes
-
-                                Nothing ->
-                                    zknSearchResult.notes
-                       )
-                    ++ [ pagView ]
-                )
-
-        recentPanel bkcolor =
-            E.column (E.spacing 8 :: E.width E.fill :: sppad)
-                (List.map
-                    (showSr fontsize bkcolor model isdirty)
-                 <|
-                    recentZkns
-                )
-
+        -- searchOrRecentPanel =
+        --     E.column
+        --         [ E.spacing 8
+        --         , E.alignTop
+        --         , E.alignRight
+        --         , E.width spwidth
+        --         , EBd.width 1
+        --         , EBd.color TC.darkGrey
+        --         , EBd.rounded 10
+        --         , EBk.color TC.white
+        --         , E.clip
+        --         ]
+        --         [ Common.navbar 2
+        --             (case model.searchOrRecent of
+        --                 SearchView ->
+        --                     EtSearch
+        --                 RecentView ->
+        --                     EtRecent
+        --             )
+        --             TabChanged
+        --             [ ( EtSearch, "search" )
+        --             , ( EtRecent, "recent" )
+        --             ]
+        --         , case model.searchOrRecent of
+        --             SearchView ->
+        --                 searchPanel TC.white
+        --             RecentView ->
+        --                 recentPanel TC.white
+        --         ]
+        -- pagView =
+        --     if List.length zknSearchResult.notes < 15 then
+        --         E.none
+        --     else
+        --         E.map SPMsg <|
+        --             SP.paginationView spmodel
+        -- searchPanel bkcolor =
+        --     E.column
+        --         (E.spacing 3 :: E.width E.fill :: sppad)
+        --         (E.row [ E.width E.fill ]
+        --             [ EI.button Common.buttonStyle
+        --                 { onPress = Just <| SearchHistoryPress
+        --                 , label = E.el [ E.centerY ] <| E.text "history"
+        --                 }
+        --             , EI.button (E.alignRight :: Common.buttonStyle)
+        --                 { onPress = Just <| BigSearchPress
+        --                 , label = ZC.fullScreen
+        --                 }
+        --             ]
+        --             :: (E.map SPMsg <|
+        --                     SP.view True (size.width < 500 || wclass /= Narrow) 0 spmodel
+        --                )
+        --             :: pagView
+        --             :: (List.map
+        --                     (showSr fontsize bkcolor model isdirty)
+        --                 <|
+        --                     case model.id of
+        --                         Just id ->
+        --                             List.filter (\zkl -> zkl.id /= id) zknSearchResult.notes
+        --                         Nothing ->
+        --                             zknSearchResult.notes
+        --                )
+        --             ++ [ pagView ]
+        --         )
+        -- recentPanel bkcolor =
+        --     E.column (E.spacing 8 :: E.width E.fill :: sppad)
+        --         (List.map
+        --             (showSr fontsize bkcolor model isdirty)
+        --          <|
+        --             recentZkns
+        --         )
         showpagelink =
             case pageLink model of
                 Just pl ->
@@ -2280,7 +2335,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                         ]
                       <|
                         documentPanel
-                    , searchOrRecentPanel
+                    , E.map TTMsg ttviews.searchOrRecentPanel
                     ]
 
             Medium ->
@@ -2295,7 +2350,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                         ]
                       <|
                         documentPanel
-                    , searchOrRecentPanel
+                    , E.map TTMsg ttviews.searchOrRecentPanel
                     ]
 
             Narrow ->
@@ -2325,10 +2380,10 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                             documentPanel
 
                         EtSearch ->
-                            searchPanel TC.lightGray
+                            E.map TTMsg <| ttviews.searchPanel
 
                         EtRecent ->
-                            recentPanel TC.lightGray
+                            E.map TTMsg <| ttviews.recentPanel
                     ]
         ]
 
@@ -2454,6 +2509,7 @@ initFull fui ld zknote dtlinks lzlinks mbedittab mobile =
       , edMarkdown = EM.init zknote.content
       , blockEdit = Nothing
       , droplinkmode = False
+      , tagThings = TT.init
       }
         |> (\m ->
                 Maybe.map (\nc -> setTab nc m) mbedittab
@@ -2519,6 +2575,7 @@ initNew fui ld links lzlinks mobile =
     , edMarkdown = EM.init ""
     , blockEdit = Nothing
     , droplinkmode = False
+    , tagThings = TT.init
     }
         |> (\m1 ->
                 -- for new EMPTY notes, the 'revert' should be the same as the model, so that you aren't
@@ -3057,40 +3114,98 @@ update msg model =
             , PowerTag
             )
 
-        ToLinkPress zkln ->
+        -- ToLinkPress zkln ->
+        --     let
+        --         nzkl =
+        --             { direction = To
+        --             , otherid = zkln.id
+        --             , user = model.ld.userid
+        --             , zknote = Nothing
+        --             , othername = Just zkln.title
+        --             , sysids = zkln.sysids
+        --             , delete = Nothing
+        --             }
+        --     in
+        --     ( { model
+        --         | zklDict = Dict.insert (zklKey nzkl) nzkl model.zklDict
+        --       }
+        --     , AddToRecent zkln
+        --     )
+        -- FromLinkPress zkln ->
+        --     let
+        --         nzkl =
+        --             { direction = From
+        --             , otherid = zkln.id
+        --             , user = model.ld.userid
+        --             , zknote = Nothing
+        --             , othername = Just zkln.title
+        --             , sysids = zkln.sysids
+        --             , delete = Nothing
+        --             }
+        --     in
+        --     ( { model
+        --         | zklDict = Dict.insert (zklKey nzkl) nzkl model.zklDict
+        --       }
+        --     , AddToRecent zkln
+        --     )
+        ToLinkPress ->
             let
-                nzkl =
-                    { direction = To
-                    , otherid = zkln.id
-                    , user = model.ld.userid
-                    , zknote = Nothing
-                    , othername = Just zkln.title
-                    , sysids = zkln.sysids
-                    , delete = Nothing
-                    }
+                focusNotes =
+                    TDict.toList model.tagThings.focusSr |> List.map Tuple.second
+
+                zklDict =
+                    List.foldr
+                        (\zkln zkld ->
+                            let
+                                nzkl =
+                                    { direction = To
+                                    , otherid = zkln.id
+                                    , user = model.ld.userid
+                                    , zknote = Nothing
+                                    , othername = Just zkln.title
+                                    , sysids = zkln.sysids
+                                    , delete = Nothing
+                                    }
+                            in
+                            Dict.insert (zklKey nzkl) nzkl zkld
+                        )
+                        model.zklDict
+                        focusNotes
             in
             ( { model
-                | zklDict = Dict.insert (zklKey nzkl) nzkl model.zklDict
+                | zklDict = zklDict
               }
-            , AddToRecent zkln
+            , AddToRecent (model.tagThings.focusSr |> TDict.values)
             )
 
-        FromLinkPress zkln ->
+        FromLinkPress ->
             let
-                nzkl =
-                    { direction = From
-                    , otherid = zkln.id
-                    , user = model.ld.userid
-                    , zknote = Nothing
-                    , othername = Just zkln.title
-                    , sysids = zkln.sysids
-                    , delete = Nothing
-                    }
+                focusNotes =
+                    TDict.toList model.tagThings.focusSr |> List.map Tuple.second
+
+                zklDict =
+                    List.foldr
+                        (\zkln zkld ->
+                            let
+                                nzkl =
+                                    { direction = From
+                                    , otherid = zkln.id
+                                    , user = model.ld.userid
+                                    , zknote = Nothing
+                                    , othername = Just zkln.title
+                                    , sysids = zkln.sysids
+                                    , delete = Nothing
+                                    }
+                            in
+                            Dict.insert (zklKey nzkl) nzkl zkld
+                        )
+                        model.zklDict
+                        focusNotes
             in
             ( { model
-                | zklDict = Dict.insert (zklKey nzkl) nzkl model.zklDict
+                | zklDict = zklDict
               }
-            , AddToRecent zkln
+            , AddToRecent focusNotes
             )
 
         RemoveLink zkln ->
@@ -3179,7 +3294,7 @@ update msg model =
         RevertPress ->
             ( revert model, None )
 
-        DeletePress fontsize zone ->
+        DeletePress stylePalette zone ->
             ( { model
                 | dialog =
                     Just <|
@@ -3187,7 +3302,7 @@ update msg model =
                             True
                             (\size ->
                                 E.map (\_ -> ())
-                                    (view fontsize
+                                    (view stylePalette
                                         zone
                                         size
                                         SP.initModel
@@ -3395,29 +3510,27 @@ update msg model =
             , None
             )
 
-        AddToSearch zkln ->
-            if List.any ((==) DataUtil.sysids.searchid) zkln.sysids then
-                ( model
-                , SPMod
-                    (\spm ->
-                        ( SP.setSearchString spm zkln.title
-                        , SP.None
-                        )
-                    )
-                )
-
-            else
-                ( model
-                , SPMod
-                    (\spm ->
-                        ( SP.addToSearch spm
-                            [ Data.ExactMatch ]
-                            zkln.title
-                        , SP.None
-                        )
-                    )
-                )
-
+        -- AddToSearch zkln ->
+        --     if List.any ((==) DataUtil.sysids.searchid) zkln.sysids then
+        --         ( model
+        --         , SPMod
+        --             (\spm ->
+        --                 ( SP.setSearchString spm zkln.title
+        --                 , SP.None
+        --                 )
+        --             )
+        --         )
+        --     else
+        --         ( model
+        --         , SPMod
+        --             (\spm ->
+        --                 ( SP.addToSearch spm
+        --                     [ Data.ExactMatch ]
+        --                     zkln.title
+        --                 , SP.None
+        --                 )
+        --             )
+        --         )
         SetSearchString text ->
             ( model
             , SPMod
@@ -3437,6 +3550,12 @@ update msg model =
                     )
                 )
             )
+
+        AddFocusToSearch ->
+            ( model, SPMod (TT.addToSearch (model.tagThings.focusSr |> TDict.values)) )
+
+        AddFocusToSearchAsTag ->
+            ( model, SPMod (TT.addToSearchAsTag (model.tagThings.focusSr |> TDict.values)) )
 
         AddToSearchAsTag title ->
             ( model
@@ -3899,6 +4018,34 @@ update msg model =
 
         SetDropLinkMode b ->
             ( { model | droplinkmode = b }, None )
+
+        RemoveLinks direction ->
+            ( { model
+                | zklDict =
+                    List.foldl (\zkln zkld -> Dict.remove (zklKey { direction = direction, otherid = zkln.id }) zkld)
+                        model.zklDict
+                        (TDict.toList model.tagThings.focusSr |> List.map Tuple.second)
+              }
+            , None
+            )
+
+        TTMsg ttm ->
+            let
+                ( nm, cmd ) =
+                    TT.update ttm model.tagThings
+            in
+            case cmd of
+                TT.None ->
+                    ( { model | tagThings = nm }, None )
+
+                TT.SearchHistory ->
+                    ( { model | tagThings = nm }, SearchHistory )
+
+                TT.ControlCommand cc ->
+                    update cc { model | tagThings = nm }
+
+                TT.SPMod f ->
+                    ( { model | tagThings = nm }, SPMod f )
 
         Noop ->
             ( model, None )

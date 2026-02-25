@@ -35,22 +35,6 @@ type SearchOrRecent
     | RecentView
 
 
-
--- type AddWhich
---     = AddNotes
---     | AddLinks
---     | AddLinksOnly
--- Q: can swap out the Thing dynamically??
--- or, make Thing have various modes?
--- type alias Thing tmod tmsg tcmd =
---     { view : tmod -> Element tmsg
---     , update : tmsg -> tmod -> ( tmod, tcmd )
---     , model : tmod
---     , controlRow : tmod -> Element tmsg
---     , addNote : Data.ZkListNote -> tmod -> tmod
---     }
-
-
 type alias Model =
     { searchOrRecent : SearchOrRecent
     , focusSr : ZlnDict
@@ -180,6 +164,30 @@ view :
     -> Element (Msg tmsg)
 view stylePalette mbsize recentZkns spmodel zknSearchResult model controlRow =
     let
+        v =
+            makeViews stylePalette mbsize recentZkns spmodel zknSearchResult model controlRow
+    in
+    v.searchOrRecentPanel
+
+
+type alias Views tmsg =
+    { searchPanel : Element (Msg tmsg)
+    , recentPanel : Element (Msg tmsg)
+    , searchOrRecentPanel : Element (Msg tmsg)
+    }
+
+
+makeViews :
+    ZC.StylePalette
+    -> Maybe Util.Size
+    -> List Data.ZkListNote
+    -> SSP.Model
+    -> Data.ZkListNoteSearchResult
+    -> Model
+    -> Element tmsg
+    -> Views tmsg
+makeViews stylePalette mbsize recentZkns spmodel zknSearchResult model controlRow =
+    let
         sppad =
             [ E.padding 5 ]
 
@@ -278,7 +286,10 @@ view stylePalette mbsize recentZkns spmodel zknSearchResult model controlRow =
                         recentPanel
                 ]
     in
-    searchOrRecentPanel
+    { searchPanel = searchPanel
+    , recentPanel = recentPanel
+    , searchOrRecentPanel = searchOrRecentPanel
+    }
 
 
 update : Msg tmsg -> Model -> ( Model, Command tmsg )
@@ -330,13 +341,6 @@ update msg model =
         ControlMsg tmsg ->
             ( model, ControlCommand tmsg )
 
-        -- let
-        --     ( tmod, tcmd ) =
-        --         model.thing.update tmsg model.thing.model
-        --     thing =
-        --         model.thing
-        -- in
-        -- ( { model | thing = { thing | model = tmod } }, ThingCommand tcmd )
         NavChoiceChanged nc ->
             ( { model
                 | searchOrRecent =

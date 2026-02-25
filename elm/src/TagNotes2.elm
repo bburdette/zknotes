@@ -75,10 +75,6 @@ disabledLinkButtonStyle =
     Common.disabledButtonStyle
 
 
-
--- Thing Model Msg Command
-
-
 viewNotes : Model -> Element Msg
 viewNotes model =
     E.column [ E.width E.fill, E.height E.fill, EBk.color TC.white, EBd.rounded 10, E.spacing 8, E.padding 10 ]

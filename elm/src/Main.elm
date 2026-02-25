@@ -941,7 +941,7 @@ viewState size state model =
             E.map InvitedMsg <| Invited.view model.stylePalette size em
 
         EditZkNote em _ ->
-            E.map EditZkNoteMsg <| EditZkNote.view model.stylePalette.fontSize model.timezone size model.spmodel model.zknSearchResult model.recentNotes model.trackedRequests model.jobs model.noteCache em
+            E.map EditZkNoteMsg <| EditZkNote.view model.stylePalette model.timezone size model.spmodel model.zknSearchResult model.recentNotes model.trackedRequests model.jobs model.noteCache em
 
         EditZkNoteListing em ld ->
             E.map EditZkNoteListingMsg <| EditZkNoteListing.view model.stylePalette.fontSize ld size em model.spmodel model.zknSearchResult
@@ -3961,14 +3961,26 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     , sendZIMsg model.fui (Data.PvqSetHomeNote id)
                     )
 
-                EditZkNote.AddToRecent zkln ->
+                EditZkNote.AddToRecent zklns ->
                     ( { model
                         | state = EditZkNote emod login
-                        , recentNotes = addRecentZkListNote model.recentNotes zkln
+                        , recentNotes =
+                            List.foldl
+                                (\zkln rns ->
+                                    addRecentZkListNote rns zkln
+                                )
+                                model.recentNotes
+                                zklns
                       }
                     , Cmd.none
                     )
 
+                -- ( { model
+                --     | state = EditZkNote emod login
+                --     , recentNotes = addRecentZkListNote model.recentNotes zkln
+                --   }
+                -- , Cmd.none
+                -- )
                 EditZkNote.ShowMessage e ->
                     ( displayMessageDialog model e, Cmd.none )
 
