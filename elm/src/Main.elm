@@ -967,7 +967,6 @@ viewState size state model =
             -- render is at the layout level, not here.
             E.none
 
-        -- E.map DisplayMessageMsg <| DisplayMessage.view em
         Wait innerState _ ->
             E.map (\_ -> Noop) (viewState size innerState model)
 

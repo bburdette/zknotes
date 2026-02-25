@@ -1,7 +1,5 @@
 module TagNotes2 exposing (..)
 
--- import TagAThing exposing (Thing)
-
 import Common
 import Data exposing (Direction(..), EditLink)
 import DataUtil exposing (ZlnDict, emptyZlnDict, zklKey, zniCompare)
@@ -504,12 +502,6 @@ update msg model =
                 TT.SPMod f ->
                     ( { model | tagThings = nm }, SPMod f )
 
-        -- None
-        -- SearchHistory
-        -- Search Data.ZkNoteSearch
-        -- SyncFiles Data.ZkNoteSearch
-        -- ControlCommand tmsg
-        -- SPMod (SSP.Model -> ( SSP.Model, SSP.Command ))
         Noop ->
             ( model, None )
 
@@ -517,16 +509,6 @@ update msg model =
 addNote : Data.ZkListNote -> Model -> Model
 addNote zln model =
     { model | notes = model.notes ++ [ zln ] }
-
-
-
--- type alias Thing tmod tmsg tcmd =
---     { view : tmod -> Element tmsg
---     , update : tmsg -> tmod -> ( tmod, tcmd )
---     , model : tmod
---     , controlRow : tmod -> Element tmsg
---     , addNote : Data.ZkListNote -> tmod -> tmod
---     }
 
 
 controlrow : Model -> Element Msg
@@ -619,12 +601,3 @@ init ld notes links addwhich =
     , focusLink = Nothing
     , tagThings = TT.init
     }
-
-
-
--- type alias Model =
---     { notes : List Data.ZkListNote
---     , zklDict : Dict String Data.EditLink
---     , addwhich : AddWhich
---     , tagThings : TT.Model
---     }

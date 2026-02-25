@@ -120,8 +120,6 @@ type Msg
     | CopyPress
     | SearchHistoryPress
     | SwitchPress ZkNoteId
-      -- | ToLinkPress Data.ZkListNote
-      -- | FromLinkPress Data.ZkListNote
     | PublicPress Bool
     | EditablePress Bool
     | ShowTitlePress Bool
@@ -133,7 +131,6 @@ type Msg
     | RestoreSearch String
     | SrFocusPress ZkNoteId
     | LinkFocusPress EditLink
-      -- | AddToSearch Data.ZkListNote
     | AddToSearchAsTag String
     | SetSearchString String
     | SetSearch Data.TagSearch
