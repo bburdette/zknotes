@@ -4258,13 +4258,26 @@ handleTagFiles model ( lmod, lcmd ) login st =
             )
 
         TagAThing.SearchHistory ->
-            ( { model | state = updstate }, Cmd.none )
+            ( shDialog { model | state = updstate }
+            , Cmd.none
+            )
 
         TagAThing.None ->
             ( { model | state = updstate }, Cmd.none )
 
-        TagAThing.AddToRecent _ ->
-            ( { model | state = updstate }, Cmd.none )
+        TagAThing.AddToRecent zklns ->
+            ( { model
+                | state = updstate
+                , recentNotes =
+                    List.foldl
+                        (\zkln rns ->
+                            addRecentZkListNote rns zkln
+                        )
+                        model.recentNotes
+                        zklns
+              }
+            , Cmd.none
+            )
 
         TagAThing.ThingCommand tc ->
             case tc of
@@ -4322,13 +4335,26 @@ handleTagNotes model ( lmod, lcmd ) login st =
             )
 
         TagAThing.SearchHistory ->
-            ( { model | state = updstate }, Cmd.none )
+            ( shDialog { model | state = updstate }
+            , Cmd.none
+            )
 
         TagAThing.None ->
             ( { model | state = updstate }, Cmd.none )
 
-        TagAThing.AddToRecent _ ->
-            ( { model | state = updstate }, Cmd.none )
+        TagAThing.AddToRecent zklns ->
+            ( { model
+                | state = updstate
+                , recentNotes =
+                    List.foldl
+                        (\zkln rns ->
+                            addRecentZkListNote rns zkln
+                        )
+                        model.recentNotes
+                        zklns
+              }
+            , Cmd.none
+            )
 
         TagAThing.ThingCommand tc ->
             case tc of
@@ -4380,11 +4406,24 @@ handleTagNotes2 model ( lmod, lcmd ) login st =
             TagNotes2 lmod login st
     in
     case lcmd of
-        TagNotes2.AddToRecent _ ->
-            ( { model | state = updstate }, Cmd.none )
+        TagNotes2.AddToRecent zklns ->
+            ( { model
+                | state = updstate
+                , recentNotes =
+                    List.foldl
+                        (\zkln rns ->
+                            addRecentZkListNote rns zkln
+                        )
+                        model.recentNotes
+                        zklns
+              }
+            , Cmd.none
+            )
 
         TagNotes2.SearchHistory ->
-            ( { model | state = updstate }, Cmd.none )
+            ( shDialog { model | state = updstate }
+            , Cmd.none
+            )
 
         TagNotes2.Ok ->
             let
@@ -4448,8 +4487,19 @@ handleInviteUser model ( lmod, lcmd ) login st =
         TagAThing.None ->
             ( { model | state = updstate }, Cmd.none )
 
-        TagAThing.AddToRecent _ ->
-            ( { model | state = updstate }, Cmd.none )
+        TagAThing.AddToRecent zklns ->
+            ( { model
+                | state = updstate
+                , recentNotes =
+                    List.foldl
+                        (\zkln rns ->
+                            addRecentZkListNote rns zkln
+                        )
+                        model.recentNotes
+                        zklns
+              }
+            , Cmd.none
+            )
 
         TagAThing.ThingCommand tc ->
             case tc of
