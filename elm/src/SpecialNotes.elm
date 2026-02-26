@@ -46,7 +46,7 @@ serverEncoder struct =
 type SpecialNote
     = SnSearch (List (TagSearch))
     | SnSync (CompletedSync)
-    | SnGraph (Notegraph)
+    | SnList (Notegraph)
 
 
 specialNoteEncoder : SpecialNote -> Json.Encode.Value
@@ -56,8 +56,8 @@ specialNoteEncoder enum =
             Json.Encode.object [ ( "SnSearch", Json.Encode.list (tagSearchEncoder) inner ) ]
         SnSync inner ->
             Json.Encode.object [ ( "SnSync", completedSyncEncoder inner ) ]
-        SnGraph inner ->
-            Json.Encode.object [ ( "SnGraph", notegraphEncoder inner ) ]
+        SnList inner ->
+            Json.Encode.object [ ( "SnList", notegraphEncoder inner ) ]
 
 type alias CompletedSync =
     { after : Maybe (Int)
@@ -78,14 +78,14 @@ completedSyncEncoder struct =
 
 
 type alias Notegraph =
-    { current : Maybe (String)
+    { currentUuid : Maybe (String)
     }
 
 
 notegraphEncoder : Notegraph -> Json.Encode.Value
 notegraphEncoder struct =
     Json.Encode.object
-        [ ( "current", (Maybe.withDefault Json.Encode.null << Maybe.map (Json.Encode.string)) struct.current )
+        [ ( "currentUuid", (Maybe.withDefault Json.Encode.null << Maybe.map (Json.Encode.string)) struct.currentUuid )
         ]
 
 
@@ -101,7 +101,7 @@ specialNoteDecoder =
     Json.Decode.oneOf
         [ Json.Decode.map SnSearch (Json.Decode.field "SnSearch" (Json.Decode.list (tagSearchDecoder)))
         , Json.Decode.map SnSync (Json.Decode.field "SnSync" (completedSyncDecoder))
-        , Json.Decode.map SnGraph (Json.Decode.field "SnGraph" (notegraphDecoder))
+        , Json.Decode.map SnList (Json.Decode.field "SnList" (notegraphDecoder))
         ]
 
 completedSyncDecoder : Json.Decode.Decoder CompletedSync
@@ -116,6 +116,6 @@ completedSyncDecoder =
 notegraphDecoder : Json.Decode.Decoder Notegraph
 notegraphDecoder =
     Json.Decode.succeed Notegraph
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "current" (Json.Decode.nullable (Json.Decode.string))))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "currentUuid" (Json.Decode.nullable (Json.Decode.string))))
 
 

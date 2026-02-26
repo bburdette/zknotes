@@ -149,6 +149,21 @@ zniCompare li ri =
     compare l r
 
 
+type alias LzlGraphKey =
+    { from : ZkNoteId
+    , to : ZkNoteId
+    }
+
+
+type alias LzlDict =
+    TDict ZkNoteId String LzLink
+
+
+emptyLzlDict : LzlDict
+emptyLzlDict =
+    TDict.empty zkNoteIdToString trustedZkNoteIdFromString
+
+
 type alias LoginData =
     { userid : UserId
     , uuid : String
@@ -287,6 +302,14 @@ lzlKey lzl =
     zkNoteIdToString lzl.from
         ++ ":"
         ++ zkNoteIdToString lzl.to
+
+
+
+-- lzlKeyFromString :  String -> LzlGraphKey ->
+-- lzlKeyFromString lzl =
+--     zkNoteIdToString lzl.from
+--         ++ ":"
+--         ++ zkNoteIdToString lzl.to
 
 
 elToSzl : EditLink -> SaveZkLink

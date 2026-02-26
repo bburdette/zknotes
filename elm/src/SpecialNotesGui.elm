@@ -2,14 +2,17 @@ module SpecialNotesGui exposing (..)
 
 import ArchiveListing exposing (Command)
 import Common
-import Data exposing (AndOr(..), LzLink, SearchMod(..), TagSearch(..))
+import Data exposing (AndOr(..), LzLink, SearchMod(..), TagSearch(..), ZkListNote)
+import DataUtil exposing (lzlKey, zkNoteIdToString, zklKey)
 import Dict exposing (Dict)
 import Element as E
 import Element.Font as EF
 import Element.Input as EI
 import Html.Attributes as HA
+import Orgauth.Data exposing (UserId)
 import SearchUtil exposing (showTagSearch)
 import SpecialNotes as SN
+import TDict
 import Time
 import Util
 
@@ -17,12 +20,14 @@ import Util
 type Msg
     = CopySearchPress
     | CopySyncSearchPress Bool
+    | GraphFocusClick
     | Noop
 
 
 type Command
     = CopySearch (List TagSearch)
     | CopySyncSearch TagSearch
+    | GraphFocus
     | None
 
 
@@ -89,8 +94,146 @@ guiSn zone snote lzlinks =
                     ]
                 ]
 
-        SN.SnGraph _ ->
-            E.none
+        SN.SnList _ ->
+            E.column []
+                (EI.button Common.buttonStyle
+                    { onPress = Just <| GraphFocusClick
+                    , label = E.text "search notes synced to remote >"
+                    }
+                    :: List.map
+                        (\lzl ->
+                            E.row []
+                                [ E.text <| lzlKey lzl
+                                , E.text lzl.fromname
+                                , E.text lzl.toname
+                                ]
+                        )
+                        (Dict.values lzlinks)
+                )
+
+
+toLists : Data.ZkNoteId -> Dict String LzLink -> List (List ZkListNote)
+toLists this lzls =
+    let
+        toDict =
+            List.foldl
+                (\lzl todict ->
+                    let
+                        zkto =
+                            zkNoteIdToString lzl.to
+                    in
+                    case Dict.get zkto todict of
+                        Nothing ->
+                            Dict.insert zkto [ lzl ] todict
+
+                        Just lzlz ->
+                            Dict.insert zkto (lzl :: lzlz) todict
+                )
+                Dict.empty
+                (Dict.values lzls)
+    in
+    []
+
+
+lzToDict : Dict String LzLink -> DataUtil.LzlDict
+lzToDict lzls =
+    lzls
+        |> Dict.values
+        |> List.foldl
+            (\lzl lzll ->
+                TDict.insert lzl.to lzl lzll
+            )
+            DataUtil.emptyLzlDict
+
+
+addNotes :
+    List ZkListNote
+    -> UserId
+    -> Data.ZkNoteId
+    -> String
+    -> SN.SpecialNote
+    -> Dict String LzLink
+    -> ( SN.SpecialNote, Dict String LzLink )
+addNotes zlns uid this title sn lzls =
+    case sn of
+        SN.SnList ng ->
+            let
+                lz2d =
+                    lzToDict lzls
+
+                current =
+                    ng.currentUuid
+                        |> Maybe.map Data.Zni
+                        |> Maybe.withDefault this
+
+                currentTitle =
+                    TDict.get current lz2d
+                        |> Maybe.map (\lz -> lz.toname)
+                        |> Maybe.withDefault title
+
+                -- add note after 'current'
+                -- what about notes after current?
+                links : List LzLink
+                links =
+                    List.foldl
+                        (\zln zlnlst ->
+                            case zlnlst of
+                                first :: rest ->
+                                    { from = zln.id
+                                    , to = first.from
+                                    , user = uid
+                                    , fromname = zln.title
+                                    , toname = first.toname
+                                    }
+                                        :: first
+                                        :: rest
+
+                                [] ->
+                                    [ { from = zln.id
+                                      , to = current
+                                      , user = uid
+                                      , fromname = zln.title
+                                      , toname = currentTitle
+                                      }
+                                    ]
+                        )
+                        []
+                        zlns
+
+                aftercurrent =
+                    case ( TDict.get current lz2d, List.head links ) of
+                        ( Just ac, Just l ) ->
+                            Just { ac | to = l.from, toname = l.fromname }
+
+                        _ ->
+                            Nothing
+
+                nlz2d =
+                    List.foldl
+                        (\lzl ltd ->
+                            TDict.insert lzl.to lzl ltd
+                        )
+                        lz2d
+                        links
+                        |> (\l ->
+                                aftercurrent
+                                    |> Maybe.map (\ac -> TDict.insert ac.to ac l)
+                                    |> Maybe.withDefault l
+                           )
+
+                nlzls =
+                    nlz2d
+                        |> TDict.values
+                        |> List.foldl
+                            (\lz ld ->
+                                Dict.insert (lzlKey lz) lz ld
+                            )
+                            Dict.empty
+            in
+            ( sn, nlzls )
+
+        _ ->
+            ( sn, lzls )
 
 
 syncSearch : Bool -> SN.CompletedSync -> TagSearch
@@ -170,6 +313,9 @@ updateSn msg snote lzlinks =
     case snote of
         SN.SnSearch tagsearches ->
             case msg of
+                GraphFocusClick ->
+                    ( ( SN.SnSearch tagsearches, lzlinks ), None )
+
                 CopySearchPress ->
                     ( ( SN.SnSearch tagsearches, lzlinks ), CopySearch tagsearches )
 
@@ -181,6 +327,9 @@ updateSn msg snote lzlinks =
 
         SN.SnSync completedSync ->
             case msg of
+                GraphFocusClick ->
+                    ( ( SN.SnSync completedSync, lzlinks ), None )
+
                 CopySearchPress ->
                     ( ( SN.SnSync completedSync, lzlinks ), None )
 
@@ -190,5 +339,16 @@ updateSn msg snote lzlinks =
                 Noop ->
                     ( ( SN.SnSync completedSync, lzlinks ), None )
 
-        SN.SnGraph g ->
-            ( ( SN.SnGraph g, lzlinks ), None )
+        SN.SnList g ->
+            case msg of
+                GraphFocusClick ->
+                    ( ( SN.SnList g, lzlinks ), GraphFocus )
+
+                CopySearchPress ->
+                    ( ( SN.SnList g, lzlinks ), None )
+
+                CopySyncSearchPress _ ->
+                    ( ( SN.SnList g, lzlinks ), None )
+
+                Noop ->
+                    ( ( SN.SnList g, lzlinks ), None )

@@ -8,7 +8,7 @@ use uuid::Uuid;
 pub enum SpecialNote {
   SnSearch(Vec<TagSearch>),
   SnSync(CompletedSync),
-  SnGraph(Notegraph),
+  SnList(Notegraph),
   // SnDateTime(DateTime),
   // SnAlert(Alert),
 }
@@ -33,7 +33,7 @@ pub struct CompletedSync {
 
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
 pub struct Notegraph {
-  pub current: Option<Uuid>,
+  pub currentUuid: Option<Uuid>,
 }
 
 // #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]

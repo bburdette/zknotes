@@ -79,6 +79,7 @@ import NoteCache as NC exposing (NoteCache)
 import Orgauth.Data exposing (UserId(..))
 import RequestsDialog exposing (TRequests)
 import SearchStackPanel as SP
+import SpecialNotes as SN
 import SpecialNotesGui as SNG
 import TDict exposing (TDict)
 import TagSearchPanel exposing (Search(..))
@@ -157,8 +158,8 @@ type Msg
     | SNGMsg SNG.Msg
     | SetDropLinkMode Bool
     | RemoveLinks Direction
-    | ToLinkPress
-    | FromLinkPress
+    | AddLinkPress Direction
+    | AddGraphNotes
     | AddFocusToSearch
     | AddFocusToSearchAsTag
     | TTMsg (TT.Msg Msg)
@@ -185,6 +186,11 @@ type alias NewCommentState =
     { text : String
     , sharelinks : List ( EditLink, Bool )
     }
+
+
+type SearchControlRowMode
+    = GraphTarget
+    | LinksTarget
 
 
 type alias Model =
@@ -227,6 +233,7 @@ type alias Model =
     , blockEdit : Maybe BlockEdit
     , droplinkmode : Bool
     , tagThings : TT.Model
+    , searchControlRowMode : SearchControlRowMode
     }
 
 
@@ -1362,7 +1369,7 @@ controlRow : Model -> Element Msg
 controlRow model =
     let
         focusNotes =
-            TDict.toList model.tagThings.focusSr |> List.map Tuple.second
+            TDict.values model.tagThings.focusSr
 
         clearButton =
             if TDict.isEmpty model.tagThings.focusSr then
@@ -1393,7 +1400,7 @@ controlRow model =
 
               else
                 EI.button linkButtonStyle
-                    { onPress = Just <| ToLinkPress
+                    { onPress = Just <| AddLinkPress To
                     , label = E.el [ E.centerY ] <| E.text "→"
                     }
             , if calcAll From focusNotes then
@@ -1405,13 +1412,26 @@ controlRow model =
 
               else
                 EI.button linkButtonStyle
-                    { onPress = Just <| FromLinkPress
+                    { onPress = Just <| AddLinkPress From
                     , label = E.el [ E.centerY ] <| E.text "←"
                     }
             ]
+
+        graphbutts =
+            [ EI.button linkButtonStyle
+                { onPress = Just <| AddGraphNotes
+                , label = E.el [ E.centerY ] <| E.text "→"
+                }
+            ]
     in
     E.row [ E.spacing 8, E.width E.fill ]
-        (tflinks
+        ((case model.searchControlRowMode of
+            GraphTarget ->
+                graphbutts
+
+            LinksTarget ->
+                tflinks
+         )
             ++ [ EI.button linkButtonStyle
                     { onPress = Just AddFocusToSearch
                     , label = E.text "^"
@@ -2299,6 +2319,7 @@ initFull fui ld zknote dtlinks lzlinks mbedittab mobile =
       , blockEdit = Nothing
       , droplinkmode = False
       , tagThings = TT.init
+      , searchControlRowMode = LinksTarget
       }
         |> (\m ->
                 Maybe.map (\nc -> setTab nc m) mbedittab
@@ -2365,6 +2386,7 @@ initNew fui ld links lzlinks mobile =
     , blockEdit = Nothing
     , droplinkmode = False
     , tagThings = TT.init
+    , searchControlRowMode = LinksTarget
     }
         |> (\m1 ->
                 -- for new EMPTY notes, the 'revert' should be the same as the model, so that you aren't
@@ -2903,17 +2925,17 @@ update msg model =
             , PowerTag
             )
 
-        ToLinkPress ->
+        AddLinkPress direction ->
             let
                 focusNotes =
-                    TDict.toList model.tagThings.focusSr |> List.map Tuple.second
+                    TDict.values model.tagThings.focusSr
 
                 zklDict =
                     List.foldr
                         (\zkln zkld ->
                             let
                                 nzkl =
-                                    { direction = To
+                                    { direction = direction
                                     , otherid = zkln.id
                                     , user = model.ld.userid
                                     , zknote = Nothing
@@ -2933,35 +2955,29 @@ update msg model =
             , AddToRecent (model.tagThings.focusSr |> TDict.values)
             )
 
-        FromLinkPress ->
-            let
-                focusNotes =
-                    TDict.toList model.tagThings.focusSr |> List.map Tuple.second
+        AddGraphNotes ->
+            case ( EM.getSpecialNote model.edMarkdown, model.id ) of
+                ( Ok sn, Just znid ) ->
+                    let
+                        ( nsn, lzls ) =
+                            -- addNotes zlns uid this title sn lzls
+                            SNG.addNotes
+                                (TDict.values model.tagThings.focusSr)
+                                model.ld.userid
+                                znid
+                                model.title
+                                sn
+                                model.lzlDict
+                    in
+                    ( { model
+                        | edMarkdown = EM.updateSpecialNote nsn
+                        , lzlDict = lzls
+                      }
+                    , None
+                    )
 
-                zklDict =
-                    List.foldr
-                        (\zkln zkld ->
-                            let
-                                nzkl =
-                                    { direction = From
-                                    , otherid = zkln.id
-                                    , user = model.ld.userid
-                                    , zknote = Nothing
-                                    , othername = Just zkln.title
-                                    , sysids = zkln.sysids
-                                    , delete = Nothing
-                                    }
-                            in
-                            Dict.insert (zklKey nzkl) nzkl zkld
-                        )
-                        model.zklDict
-                        focusNotes
-            in
-            ( { model
-                | zklDict = zklDict
-              }
-            , AddToRecent focusNotes
-            )
+                _ ->
+                    ( model, None )
 
         RemoveLink zkln ->
             ( { model
@@ -3711,22 +3727,27 @@ update msg model =
                     let
                         ( ( snmd, lzld ), sncmd ) =
                             SNG.updateSn sngmsg sn model.lzlDict
+
+                        umod =
+                            { model
+                                | edMarkdown = EM.updateSpecialNote snmd
+                                , lzlDict = lzld
+                            }
                     in
-                    ( { model
-                        | edMarkdown = EM.updateSpecialNote snmd
-                        , lzlDict = lzld
-                      }
-                    , case sncmd of
+                    case sncmd of
                         SNG.CopySearch tagSearch ->
-                            SPMod
+                            ( umod
+                            , SPMod
                                 (\spm ->
                                     ( SP.setSearch spm tagSearch
                                     , SP.None
                                     )
                                 )
+                            )
 
                         SNG.CopySyncSearch tagSearch ->
-                            SPMod
+                            ( umod
+                            , SPMod
                                 (\spm ->
                                     let
                                         nsspm =
@@ -3742,10 +3763,25 @@ update msg model =
                                     , SP.None
                                     )
                                 )
+                            )
+
+                        SNG.GraphFocus ->
+                            ( { umod
+                                | searchControlRowMode =
+                                    case umod.searchControlRowMode of
+                                        GraphTarget ->
+                                            LinksTarget
+
+                                        LinksTarget ->
+                                            GraphTarget
+                              }
+                            , None
+                            )
 
                         SNG.None ->
-                            None
-                    )
+                            ( umod
+                            , None
+                            )
 
                 Err _ ->
                     ( model, None )
@@ -3758,7 +3794,7 @@ update msg model =
                 | zklDict =
                     List.foldl (\zkln zkld -> Dict.remove (zklKey { direction = direction, otherid = zkln.id }) zkld)
                         model.zklDict
-                        (TDict.toList model.tagThings.focusSr |> List.map Tuple.second)
+                        (TDict.values model.tagThings.focusSr)
               }
             , None
             )
