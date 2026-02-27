@@ -2023,9 +2023,9 @@ pub fn read_lzlinks(
     s, s, s, s
   );
 
-  println!("lzquery: {}", sqlstr);
+  // println!("lzquery: {}", sqlstr);
 
-  println!("lzargs: {:?}", (uid.to_i64(), zknid, pubid, unid));
+  // println!("lzargs: {:?}", (uid.to_i64(), zknid, pubid, unid));
 
   let mut pstmt = conn.prepare(sqlstr.as_str())?;
   let r = Result::from_iter(
@@ -2051,7 +2051,7 @@ pub fn read_lzlinks(
       }),
   );
 
-  println!("lzquery result: {:?}", r);
+  // println!("lzquery result: {:?}", r);
 
   r
 }

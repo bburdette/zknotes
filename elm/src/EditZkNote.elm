@@ -221,8 +221,7 @@ type alias Model =
     , revert : Maybe Data.SaveZkNote
     , initialZklDict : Dict String EditLink
     , initialSnState : Maybe SpecialNoteState
-
-    -- , initialLzlDict : Dict String LzLink
+    , initialLzls : Dict String Data.SaveLzLink
     , tab : EditTab
     , searchOrRecent : SearchOrRecent
     , editOrView : EditOrView
@@ -754,13 +753,14 @@ saveLzLinks model =
                             |> Dict.fromList
                         )
                     )
-                    (Debug.log "initialSnState saveLzLinkList"
-                        (SNG.saveLzLinks znid initialSnState
-                            |> List.map (\sll -> ( lzlKey sll, sll ))
-                            |> Dict.fromList
-                        )
-                    )
+                    model.initialLzls
 
+        -- (Debug.log "initialSnState saveLzLinkList"
+        --     (SNG.saveLzLinks znid initialSnState
+        --         |> List.map (\sll -> ( lzlKey sll, sll ))
+        --         |> Dict.fromList
+        --     )
+        -- )
         _ ->
             []
 
@@ -2365,6 +2365,11 @@ initFull fui ld zknote dtlinks lzlinks mbedittab mobile =
                 )
       , snState = snState
       , initialSnState = snState
+      , initialLzls =
+            List.map
+                (\lzl -> ( lzlKey lzl, { to = lzl.to, from = lzl.from, delete = Just False } ))
+                lzlinks
+                |> Dict.fromList
       , focusLink = Nothing
       , pubidtxt = zknote.pubid |> Maybe.withDefault ""
       , title = zknote.title
@@ -2430,6 +2435,7 @@ initNew fui ld links mobile =
     , snState = Nothing
     , initialZklDict = Dict.empty
     , initialSnState = Nothing
+    , initialLzls = Dict.empty
     , focusLink = Nothing
     , pubidtxt = ""
     , title = ""
@@ -2514,6 +2520,15 @@ onSaved oldmodel szn =
                     | revert = Just <| sznFromModel oldmodel
                     , initialZklDict = oldmodel.zklDict
                     , initialSnState = oldmodel.snState
+                    , initialLzls =
+                        case ( oldmodel.id, oldmodel.snState ) of
+                            ( Just id, Just snState ) ->
+                                SNG.saveLzLinks id snState
+                                    |> List.map (\sll -> ( lzlKey sll, sll ))
+                                    |> Dict.fromList
+
+                            _ ->
+                                Dict.empty
                 }
         in
         case model.pendingcomment of
@@ -3061,11 +3076,22 @@ update msg model =
             case model.snState of
                 Just sns ->
                     let
+                        _ =
+                            Debug.log "addgraphnotes" ""
+
                         nsn =
-                            -- addNotes zlns uid this title sn lzls
-                            SNG.addNotes
-                                (TDict.values model.tagThings.focusSr)
-                                sns
+                            case model.id of
+                                Just zid ->
+                                    let
+                                        _ =
+                                            Debug.log "addgraphnotes" "2"
+                                    in
+                                    SNG.addNotes zid
+                                        (TDict.values model.tagThings.focusSr)
+                                        sns
+
+                                Nothing ->
+                                    sns
                     in
                     ( { model
                         | edMarkdown = EM.updateSpecialNote <| SNG.getSpecialNote nsn

@@ -11,6 +11,7 @@ import Element.Input as EI
 import Html.Attributes as HA
 import Orgauth.Data exposing (UserId)
 import SearchUtil exposing (showTagSearch)
+import Set
 import SpecialNotes as SN exposing (CompletedSync, Notegraph, SpecialNote)
 import TDict
 import Time
@@ -88,8 +89,9 @@ saveLzLinks this sns =
                     )
                 )
                 ( this, [] )
-                nlls
+                (Debug.log "nlls: " (filterNotes this nlls))
                 |> Tuple.second
+                |> Debug.log "saveLzLinks: "
 
 
 guiSn :
@@ -218,19 +220,22 @@ lzToDict2 lzls =
 
 
 addNotes :
-    List ZkListNote
+    ZkNoteId
+    -> List ZkListNote
     -> SpecialNoteState
     -> SpecialNoteState
-addNotes zlns sns =
+addNotes this zlns sns =
     case sns of
         SnsList ng lnks ->
+            -- disallow linking 'this' and disallow multiple occurances
+            -- of notes.
             let
                 notes =
                     List.map (\zln -> { id = zln.id, title = zln.title }) zlns
             in
             case ng.currentUuid of
                 Nothing ->
-                    SnsList ng (notes ++ lnks)
+                    SnsList ng (filterNotes this <| notes ++ lnks)
 
                 Just uuid ->
                     let
@@ -238,24 +243,48 @@ addNotes zlns sns =
                             Zni uuid
 
                         nlnks =
-                            List.foldr
-                                (\n lst ->
-                                    if n.id == zni then
-                                        n :: notes ++ lst
+                            Debug.log "lniks" <|
+                                List.foldr
+                                    (\n lst ->
+                                        if n.id == zni then
+                                            n :: notes ++ lst
 
-                                    else
-                                        n :: lst
-                                )
-                                []
-                                lnks
+                                        else
+                                            n :: lst
+                                    )
+                                    []
+                                    lnks
+
+                        flnks =
+                            Debug.log "filtered" (filterNotes this nlnks)
                     in
-                    SnsList ng nlnks
+                    SnsList ng flnks
 
         SnsSearch s ->
             SnsSearch s
 
         SnsSync s ->
             SnsSync s
+
+
+filterNotes : ZkNoteId -> List NlLink -> List NlLink
+filterNotes this nlls =
+    -- filter out duplicates and 'this'
+    List.foldl
+        (\nll ( nls, nlst ) ->
+            let
+                nllid =
+                    zkNoteIdToString nll.id
+            in
+            if Set.member nllid nls then
+                ( nls, nlst )
+
+            else
+                ( Set.insert nllid nls, nll :: nlst )
+        )
+        ( Set.singleton (zkNoteIdToString this), [] )
+        nlls
+        |> Tuple.second
 
 
 
