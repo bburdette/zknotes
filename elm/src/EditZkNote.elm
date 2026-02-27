@@ -124,12 +124,12 @@ type Msg
     | EditablePress Bool
     | ShowTitlePress Bool
     | RemoveLink EditLink
-    | MdLink EditLink String
+    | MdLink String
     | SPMsg SP.Msg
     | TabChanged EditTab
     | DialogMsg D.Msg
     | RestoreSearch String
-    | SrFocusPress ZkNoteId
+      -- | SrFocusPress ZkNoteId
     | LinkFocusPress EditLink
     | AddToSearchAsTag String
     | SetSearchString String
@@ -200,7 +200,8 @@ type alias Model =
     , noteUser : UserId
     , noteUserName : String
     , usernote : ZkNoteId
-    , focusSr : Maybe ZkNoteId -- note id in search result.
+
+    -- , focusSr : Maybe ZkNoteId -- note id in search result.
     , zklDict : Dict String EditLink
     , snState : Maybe SpecialNoteState
     , focusLink : Maybe EditLink
@@ -948,7 +949,7 @@ showZkl fontsize bkcolor isDirty editable focusLink ld _ sysColor showflip zkl =
                         }
                 , if editable then
                     EI.button (linkButtonStyle ++ [ E.alignLeft ])
-                        { onPress = Just (MdLink zkl "addlink")
+                        { onPress = Just (MdLink "addlink")
                         , label = E.text "^"
                         }
 
@@ -1402,8 +1403,13 @@ renderBlocks zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo droplinkmod
             E.text errors
 
 
-controlRow : Model -> Element Msg
-controlRow model =
+controlRow :
+    ZC.StylePalette
+    -> Bool
+    -> Model
+    -> ZkNoteId
+    -> Element Msg
+controlRow stylePalette isDirty model zknid =
     let
         focusNotes =
             TDict.values model.tagThings.focusSr
@@ -1427,8 +1433,14 @@ controlRow model =
                             model.zklDict
                     )
 
+        ct =
+            calcAll To focusNotes
+
+        cf =
+            calcAll From focusNotes
+
         tflinks =
-            [ if calcAll To focusNotes then
+            [ if ct then
                 EI.button
                     disabledLinkButtonStyle
                     { onPress = Just <| RemoveLinks To
@@ -1440,7 +1452,7 @@ controlRow model =
                     { onPress = Just <| AddLinkPress To
                     , label = E.el [ E.centerY ] <| E.text "→"
                     }
-            , if calcAll From focusNotes then
+            , if cf then
                 EI.button
                     disabledLinkButtonStyle
                     { onPress = Just <| RemoveLinks From
@@ -1452,6 +1464,14 @@ controlRow model =
                     { onPress = Just <| AddLinkPress From
                     , label = E.el [ E.centerY ] <| E.text "←"
                     }
+            , if ct || cf then
+                EI.button linkButtonStyle
+                    { onPress = Just (MdLink "addsearchlink")
+                    , label = E.text "<"
+                    }
+
+              else
+                E.none
             ]
 
         graphbutts =
@@ -1478,6 +1498,15 @@ controlRow model =
                     , label = E.text "t"
                     }
                , clearButton
+               , E.el [ E.alignRight ] <|
+                    ZC.golink (golinkSize stylePalette.fontSize)
+                        zknid
+                        (if isDirty then
+                            ZC.saveColor
+
+                         else
+                            ZC.myLinkColor
+                        )
                ]
         )
 
@@ -1987,7 +2016,7 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
             perhapsdirtybutton ++ pxy
 
         ttviews =
-            TT.makeViews stylePalette (Just size) recentZkns spmodel zknSearchResult model.tagThings (controlRow model)
+            TT.makeViews stylePalette (Just size) recentZkns spmodel zknSearchResult model.tagThings (controlRow stylePalette isdirty model)
 
         showpagelink =
             case pageLink model of
@@ -2325,7 +2354,8 @@ initFull fui ld zknote dtlinks lzlinks mbedittab mobile =
       , noteUser = zknote.user
       , noteUserName = zknote.username
       , usernote = zknote.usernote
-      , focusSr = Nothing
+
+      -- , focusSr = Nothing
       , zklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) links)
       , initialZklDict =
             Dict.fromList
@@ -2362,7 +2392,7 @@ initFull fui ld zknote dtlinks lzlinks mbedittab mobile =
       , edMarkdown = edMarkdown -- EM.init zknote.content
       , blockEdit = Nothing
       , droplinkmode = False
-      , tagThings = TT.init
+      , tagThings = TT.init True
       , searchControlRowMode = LinksTarget
       }
         |> (\m ->
@@ -2394,7 +2424,8 @@ initNew fui ld links mobile =
     , noteUser = ld.userid
     , noteUserName = ld.name
     , usernote = ld.zknote
-    , focusSr = Nothing
+
+    -- , focusSr = Nothing
     , zklDict = zklDict
     , snState = Nothing
     , initialZklDict = Dict.empty
@@ -2426,7 +2457,7 @@ initNew fui ld links mobile =
     , edMarkdown = EM.init ""
     , blockEdit = Nothing
     , droplinkmode = False
-    , tagThings = TT.init
+    , tagThings = TT.init True
     , searchControlRowMode = LinksTarget
     }
         |> (\m1 ->
@@ -2580,6 +2611,31 @@ onTASelection model zknSearchResult recentZkns tas =
                     , length = 0
                     }
                 )
+
+        addLinks ids =
+            let
+                linktext =
+                    List.map
+                        (\id ->
+                            "\n<note id=\"" ++ zkNoteIdToString id ++ "\"/>"
+                        )
+                        ids
+                        |> String.concat
+            in
+            TAUpdated
+                { model
+                    | edMarkdown =
+                        EM.init <|
+                            String.left tas.offset (EM.getMd model.edMarkdown)
+                                ++ linktext
+                                ++ String.dropLeft (tas.offset + String.length tas.text) (EM.getMd model.edMarkdown)
+                }
+                (Just
+                    { id = "mdtext"
+                    , offset = tas.offset + String.length linktext
+                    , length = 0
+                    }
+                )
     in
     if tas.what == "linkback" then
         case initLinkBackNote model tas.text of
@@ -2612,27 +2668,32 @@ onTASelection model zknSearchResult recentZkns tas =
 
     else if tas.what == "addsearchlink" then
         case
-            model.focusSr
-                |> Maybe.andThen
-                    (\id ->
+            -- TO DO: multiple selection links.
+            model.tagThings.focusSr
+                |> TDict.values
+                |> List.filterMap
+                    (\zln ->
                         zknSearchResult.notes
-                            |> List.filter (\zkln -> id == zkln.id)
+                            |> List.filter (\zkln -> zln.id == zkln.id)
                             |> List.head
                             |> ME.orElse
-                                (List.filter (\zkln -> id == zkln.id) recentZkns
+                                (List.filter (\zkln -> zln.id == zkln.id) recentZkns
                                     |> List.head
                                 )
                     )
         of
-            Just zkln ->
+            [ zkln ] ->
                 let
                     ( title, id ) =
                         ( zkln.title, zkln.id )
                 in
                 addLink title id
 
-            Nothing ->
+            [] ->
                 TANoop
+
+            moar ->
+                addLinks (List.map .id moar)
 
     else if tas.what == "replacestring" then
         case model.mbReplaceString of
@@ -3045,7 +3106,7 @@ update msg model =
             , None
             )
 
-        MdLink _ what ->
+        MdLink what ->
             ( model
             , GetTASelection "mdtext" what
             )
@@ -3294,18 +3355,16 @@ update msg model =
             , None
             )
 
-        SrFocusPress id ->
-            ( { model
-                | focusSr =
-                    if model.focusSr == Just id then
-                        Nothing
-
-                    else
-                        Just id
-              }
-            , None
-            )
-
+        -- SrFocusPress id ->
+        --     ( { model
+        --         | focusSr =
+        --             if model.focusSr == Just id then
+        --                 Nothing
+        --             else
+        --                 Just id
+        --       }
+        --     , None
+        --     )
         LinkFocusPress link ->
             ( { model
                 | focusLink =
@@ -3859,6 +3918,9 @@ update msg model =
 
                 TT.SearchHistory ->
                     ( { model | tagThings = nm }, SearchHistory )
+
+                TT.BigSearch ->
+                    ( { model | tagThings = nm }, BigSearch )
 
                 TT.ControlCommand cc ->
                     update cc { model | tagThings = nm }

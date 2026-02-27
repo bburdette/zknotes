@@ -38,11 +38,13 @@ type SearchOrRecent
 type alias Model =
     { searchOrRecent : SearchOrRecent
     , focusSr : ZlnDict
+    , showBigSearch : Bool
     }
 
 
 type Msg tmsg
     = SearchHistoryPress
+    | BigSearchPress
       -- | AddToSearch Data.ZkListNote
       -- | AddToSearchAsTag String
     | SrFocusPress ZkListNote (List ZkListNote)
@@ -56,14 +58,16 @@ type Msg tmsg
 type Command tmsg
     = None
     | SearchHistory
+    | BigSearch
     | ControlCommand tmsg
     | SPMod (SSP.Model -> ( SSP.Model, SSP.Command ))
 
 
-init : Model
-init =
+init : Bool -> Model
+init bs =
     { searchOrRecent = SearchView
     , focusSr = emptyZlnDict
+    , showBigSearch = bs
     }
 
 
@@ -77,7 +81,7 @@ onWkKeyPress key model =
             ( model, None )
 
 
-showSr : Int -> Model -> Maybe Data.ZkNoteId -> Data.ZkListNoteSearchResult -> Element tmsg -> Data.ZkListNote -> Element (Msg tmsg)
+showSr : Int -> Model -> Maybe Data.ZkNoteId -> Data.ZkListNoteSearchResult -> (Data.ZkNoteId -> Element tmsg) -> Data.ZkListNote -> Element (Msg tmsg)
 showSr fontsize model lastSelected zlnSearchResult controlRow zkln =
     let
         sysColor =
@@ -144,7 +148,7 @@ showSr fontsize model lastSelected zlnSearchResult controlRow zkln =
                 [ E.width E.fill
                 , E.spacing 3
                 ]
-                [ listingrow True, E.map ControlMsg <| controlRow ]
+                [ listingrow True, E.map ControlMsg <| controlRow zkln.id ]
 
         else
             listingrow True
@@ -160,7 +164,7 @@ view :
     -> SSP.Model
     -> Data.ZkListNoteSearchResult
     -> Model
-    -> Element tmsg
+    -> (Data.ZkNoteId -> Element tmsg)
     -> Element (Msg tmsg)
 view stylePalette mbsize recentZkns spmodel zknSearchResult model controlRow =
     let
@@ -184,7 +188,7 @@ makeViews :
     -> SSP.Model
     -> Data.ZkListNoteSearchResult
     -> Model
-    -> Element tmsg
+    -> (Data.ZkNoteId -> Element tmsg)
     -> Views tmsg
 makeViews stylePalette mbsize recentZkns spmodel zknSearchResult model controlRow =
     let
@@ -230,6 +234,14 @@ makeViews stylePalette mbsize recentZkns spmodel zknSearchResult model controlRo
                         { onPress = Just <| SearchHistoryPress
                         , label = E.el [ E.centerY ] <| E.text "history"
                         }
+                    , if model.showBigSearch then
+                        EI.button (E.alignRight :: Common.buttonStyle)
+                            { onPress = Just <| BigSearchPress
+                            , label = ZC.fullScreen
+                            }
+
+                      else
+                        E.none
                     ]
                     :: (E.map SPMsg <|
                             SSP.view True True 0 spmodel
@@ -300,6 +312,9 @@ update msg model =
 
         SearchHistoryPress ->
             ( model, SearchHistory )
+
+        BigSearchPress ->
+            ( model, BigSearch )
 
         SrFocusPress zln range ->
             case range of

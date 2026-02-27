@@ -496,6 +496,9 @@ update msg model =
                 TT.SearchHistory ->
                     ( { model | tagThings = nm }, SearchHistory )
 
+                TT.BigSearch ->
+                    ( { model | tagThings = nm }, None )
+
                 TT.ControlCommand cc ->
                     update cc { model | tagThings = nm }
 
@@ -511,8 +514,8 @@ addNote zln model =
     { model | notes = model.notes ++ [ zln ] }
 
 
-controlrow : Model -> Element Msg
-controlrow model =
+controlrow : Model -> Data.ZkNoteId -> Element Msg
+controlrow model znid =
     let
         focusNotes =
             TDict.toList model.tagThings.focusSr |> List.map Tuple.second
@@ -599,5 +602,5 @@ init ld notes links addwhich =
         Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) links)
     , addWhich = addwhich
     , focusLink = Nothing
-    , tagThings = TT.init
+    , tagThings = TT.init False
     }
