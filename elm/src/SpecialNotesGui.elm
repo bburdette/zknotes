@@ -158,7 +158,7 @@ guiSn zone snote =
             E.column []
                 (EI.button Common.buttonStyle
                     { onPress = Just <| GraphFocusClick
-                    , label = E.text "search notes synced to remote >"
+                    , label = E.text "add to list"
                     }
                     :: List.map
                         (\lzl ->

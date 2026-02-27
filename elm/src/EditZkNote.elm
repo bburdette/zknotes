@@ -79,7 +79,7 @@ import NoteCache as NC exposing (NoteCache)
 import Orgauth.Data exposing (UserId(..))
 import RequestsDialog exposing (TRequests)
 import SearchStackPanel as SP
-import SpecialNotesGui as SNG exposing (SpecialNoteState, snLzLinks)
+import SpecialNotesGui as SNG exposing (SpecialNoteState(..), snLzLinks)
 import TDict
 import TagSearchPanel exposing (Search(..))
 import TagThings as TT
@@ -154,6 +154,7 @@ type Msg
     | EditBlockOk
     | NewBlock
     | EditBlockMsg MG.Msg
+    | MakeList
     | SNGMsg SNG.Msg
     | SetDropLinkMode Bool
     | RemoveLinks Direction
@@ -822,6 +823,7 @@ dirty model =
                         && (r.editable == m.editableValue)
                         && (r.showtitle == m.showtitle)
                         && (Dict.keys m.zklDict == Dict.keys m.initialZklDict)
+                        && (m.snState == m.initialSnState)
             )
         |> Maybe.withDefault True
 
@@ -1450,7 +1452,7 @@ controlRow model =
         graphbutts =
             [ EI.button linkButtonStyle
                 { onPress = Just <| AddGraphNotes
-                , label = E.el [ E.centerY ] <| E.text "→"
+                , label = E.el [ E.centerY ] <| E.text "+"
                 }
             ]
     in
@@ -1902,6 +1904,10 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                         , icon = EI.defaultCheckbox
                         , checked = model.droplinkmode
                         , label = EI.labelLeft [] (E.text "DLMode")
+                        }
+                    , EI.button Common.buttonStyle
+                        { onPress = Just MakeList
+                        , label = E.text "list"
                         }
                     , EI.button Common.buttonStyle
                         { onPress = Just NewBlock
@@ -2471,6 +2477,7 @@ onSaved oldmodel szn =
                 { oldmodel
                     | revert = Just <| sznFromModel oldmodel
                     , initialZklDict = oldmodel.zklDict
+                    , initialSnState = oldmodel.snState
                 }
         in
         case model.pendingcomment of
@@ -3228,7 +3235,7 @@ update msg model =
                                             Nothing
                                     )
                                     newcomment.sharelinks
-                        , lzlinks = []
+                        , lzlinks = saveLzLinks model
                         }
                     )
 
@@ -3737,6 +3744,18 @@ update msg model =
 
                 Err _ ->
                     ( model, None )
+
+        MakeList ->
+            let
+                sns =
+                    SnsList { currentUuid = Nothing } []
+            in
+            ( { model
+                | edMarkdown = EM.updateSpecialNote (SNG.getSpecialNote sns)
+                , snState = Just sns
+              }
+            , None
+            )
 
         EditBlockMsg ebmsg ->
             case MG.getXformMsg ebmsg of
