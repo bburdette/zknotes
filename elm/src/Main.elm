@@ -413,7 +413,7 @@ routeStateInternal model route =
                     ( nm.state, cmd )
 
                 EditZkNoteListing st login ->
-                    ( EditZkNote (EditZkNote.initNew model.fui login [] [] model.mobile) login, Cmd.none )
+                    ( EditZkNote (EditZkNote.initNew model.fui login [] model.mobile) login, Cmd.none )
 
                 st ->
                     case stateLogin st of
@@ -421,7 +421,6 @@ routeStateInternal model route =
                             ( EditZkNote
                                 (EditZkNote.initNew model.fui
                                     login
-                                    []
                                     []
                                     model.mobile
                                 )
@@ -520,7 +519,6 @@ routeStateInternal model route =
                             ( EditZkNote
                                 (EditZkNote.initNew model.fui
                                     login
-                                    []
                                     []
                                     model.mobile
                                 )
@@ -4112,7 +4110,7 @@ handleEditZkNoteListing model login ( emod, ecmd ) =
             ( { model | state = EditZkNoteListing emod login }, Cmd.none )
 
         EditZkNoteListing.New ->
-            ( { model | state = EditZkNote (EditZkNote.initNew model.fui login [] [] model.mobile) login }, Cmd.none )
+            ( { model | state = EditZkNote (EditZkNote.initNew model.fui login [] model.mobile) login }, Cmd.none )
 
         EditZkNoteListing.Done ->
             ( { model | state = UserSettings (UserSettings.init login model.stylePalette.fontSize) login (EditZkNoteListing emod login) }

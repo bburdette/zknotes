@@ -50,7 +50,7 @@ import Browser.Dom as BD
 import Cellme.Cellme exposing (CellContainer(..), RunState(..), evalCellsFully)
 import Cellme.DictCellme exposing (CellDict(..), getCd, mkCc)
 import Common
-import Data exposing (ArchivesOrCurrent(..), Direction(..), EditLink, EditTab(..), LzLink, ZkNoteId)
+import Data exposing (ArchivesOrCurrent(..), Direction(..), EditLink, EditTab(..), ZkNoteId)
 import DataUtil exposing (FileUrlInfo, lzlKey, zkNoteIdToString, zklKey, zniCompare, zniEq)
 import Dialog as D
 import Dict exposing (Dict)
@@ -79,16 +79,15 @@ import NoteCache as NC exposing (NoteCache)
 import Orgauth.Data exposing (UserId(..))
 import RequestsDialog exposing (TRequests)
 import SearchStackPanel as SP
-import SpecialNotes as SN
-import SpecialNotesGui as SNG
-import TDict exposing (TDict)
+import SpecialNotesGui as SNG exposing (SpecialNoteState, snLzLinks)
+import TDict
 import TagSearchPanel exposing (Search(..))
 import TagThings as TT
 import TangoColors as TC
 import Task
 import Time
 import Toop
-import UUID exposing (UUID)
+import UUID
 import Url as U
 import Url.Builder as UB
 import Url.Parser as UP exposing ((</>))
@@ -202,7 +201,7 @@ type alias Model =
     , usernote : ZkNoteId
     , focusSr : Maybe ZkNoteId -- note id in search result.
     , zklDict : Dict String EditLink
-    , lzlDict : Dict String LzLink
+    , snState : Maybe SpecialNoteState
     , focusLink : Maybe EditLink
     , comments : List Data.ZkNote
     , newcomment : Maybe NewCommentState
@@ -219,7 +218,9 @@ type alias Model =
     , cells : CellDict
     , revert : Maybe Data.SaveZkNote
     , initialZklDict : Dict String EditLink
-    , initialLzlDict : Dict String LzLink
+    , initialSnState : Maybe SpecialNoteState
+
+    -- , initialLzlDict : Dict String LzLink
     , tab : EditTab
     , searchOrRecent : SearchOrRecent
     , editOrView : EditOrView
@@ -606,7 +607,7 @@ newWithSave model =
         )
 
     else
-        ( initNew model.fui model.ld (shareLinks model) [] model.mobile
+        ( initNew model.fui model.ld (shareLinks model) model.mobile
         , None
         )
 
@@ -725,7 +726,7 @@ fullSave model =
     in
     { note = sznFromModel m
     , links = saveZkLinkList m
-    , lzlinks = saveLzLinkList m
+    , lzlinks = saveLzLinks m
     }
 
 
@@ -739,14 +740,43 @@ saveZkLinkList model =
             (List.map DataUtil.elToSzl (Dict.values (Dict.diff model.initialZklDict model.zklDict)))
 
 
-saveLzLinkList : Model -> List Data.SaveLzLink
-saveLzLinkList model =
+saveLzLinks : Model -> List Data.SaveLzLink
+saveLzLinks model =
+    case ( model.id, model.snState, model.initialSnState ) of
+        ( Just znid, Just snState, Just initialSnState ) ->
+            saveLzLinkList
+                (snLzLinks znid snState
+                    |> List.map (\sll -> ( lzlKey sll, sll ))
+                    |> Dict.fromList
+                )
+                (snLzLinks znid initialSnState
+                    |> List.map (\sll -> ( lzlKey sll, sll ))
+                    |> Dict.fromList
+                )
+
+        _ ->
+            []
+
+
+saveLzLinkList : Dict String Data.SaveLzLink -> Dict String Data.SaveLzLink -> List Data.SaveLzLink
+saveLzLinkList lzlDict initialLzlDict =
     List.map
-        (DataUtil.lzlToSll False)
-        (Dict.values (Dict.diff model.lzlDict model.initialLzlDict))
+        (\sll -> { sll | delete = Just False })
+        (Dict.values (Dict.diff lzlDict initialLzlDict))
         ++ List.map
-            (DataUtil.lzlToSll True)
-            (Dict.values (Dict.diff model.initialLzlDict model.lzlDict))
+            (\sll -> { sll | delete = Just True })
+            (Dict.values (Dict.diff initialLzlDict lzlDict))
+
+
+
+-- saveLzLinkList : Dict String LzLink -> Dict String LzLink -> List Data.SaveLzLink
+-- saveLzLinkList lzlDict initialLzlDict =
+--     List.map
+--         (DataUtil.lzlToSll False)
+--         (Dict.values (Dict.diff lzlDict initialLzlDict))
+--         ++ List.map
+--             (DataUtil.lzlToSll True)
+--             (Dict.values (Dict.diff initialLzlDict lzlDict))
 
 
 commentsRecieved : List Data.ZkNote -> Model -> Model
@@ -812,7 +842,7 @@ revert model =
                 }
             )
         |> Maybe.withDefault
-            (initNew model.fui model.ld (Dict.values model.initialZklDict) (Dict.values model.initialLzlDict) model.mobile)
+            (initNew model.fui model.ld (Dict.values model.initialZklDict) model.mobile)
 
 
 golinkSize : Int -> Int
@@ -1992,8 +2022,8 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                 ]
             <|
                 editmeta
-                    :: (case EM.getSpecialNote model.edMarkdown of
-                            Ok sn ->
+                    :: (case model.snState of
+                            Just sn ->
                                 E.row
                                     [ E.padding 10
                                     , EBd.rounded 10
@@ -2008,12 +2038,12 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                                         , E.centerX
                                         , E.padding 3
                                         ]
-                                        (SNG.guiSn zone sn model.lzlDict |> E.map SNGMsg)
+                                        (SNG.guiSn zone sn |> E.map SNGMsg)
                                     ]
                                     :: showComments
                                     ++ (divider :: showLinks TC.white)
 
-                            Err _ ->
+                            Nothing ->
                                 (if wclass == Wide then
                                     [ E.row
                                         [ E.width E.fill
@@ -2270,10 +2300,13 @@ initFull fui ld zknote dtlinks lzlinks mbedittab mobile =
                 )
                 dtlinks
 
-        lzls =
-            lzlinks
-                |> List.map (\lzl -> ( lzlKey lzl, lzl ))
-                |> Dict.fromList
+        edMarkdown =
+            EM.init zknote.content
+
+        snState =
+            EM.getSpecialNote edMarkdown
+                |> Result.toMaybe
+                |> Maybe.map (\sn -> SNG.initSpecialNoteState zknote.id sn lzlinks)
     in
     ( { id = Just zknote.id
       , fui = fui
@@ -2289,8 +2322,8 @@ initFull fui ld zknote dtlinks lzlinks mbedittab mobile =
                     (\zl -> ( zklKey zl, zl ))
                     links
                 )
-      , lzlDict = lzls
-      , initialLzlDict = lzls
+      , snState = snState
+      , initialSnState = snState
       , focusLink = Nothing
       , pubidtxt = zknote.pubid |> Maybe.withDefault ""
       , title = zknote.title
@@ -2315,7 +2348,7 @@ initFull fui ld zknote dtlinks lzlinks mbedittab mobile =
       , mobile = mobile
       , server = zknote.server
       , blockDnd = blockDndSystem.model
-      , edMarkdown = EM.init zknote.content
+      , edMarkdown = edMarkdown -- EM.init zknote.content
       , blockEdit = Nothing
       , droplinkmode = False
       , tagThings = TT.init
@@ -2329,14 +2362,11 @@ initFull fui ld zknote dtlinks lzlinks mbedittab mobile =
     )
 
 
-initNew : FileUrlInfo -> DataUtil.LoginData -> List EditLink -> List LzLink -> Bool -> Model
-initNew fui ld links lzlinks mobile =
+initNew : FileUrlInfo -> DataUtil.LoginData -> List EditLink -> Bool -> Model
+initNew fui ld links mobile =
     let
         zklDict =
             Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) links)
-
-        lzlDict =
-            Dict.fromList (List.map (\zl -> ( lzlKey zl, zl )) lzlinks)
 
         cells =
             ""
@@ -2355,9 +2385,9 @@ initNew fui ld links lzlinks mobile =
     , usernote = ld.zknote
     , focusSr = Nothing
     , zklDict = zklDict
-    , lzlDict = lzlDict
+    , snState = Nothing
     , initialZklDict = Dict.empty
-    , initialLzlDict = Dict.empty
+    , initialSnState = Nothing
     , focusLink = Nothing
     , pubidtxt = ""
     , title = ""
@@ -2433,7 +2463,7 @@ sznToZkn uid uname unote sysids sdzn szn =
 onSaved : Model -> Data.SavedZkNote -> Model
 onSaved oldmodel szn =
     if szn.what == Just "and-new" then
-        initNew oldmodel.fui oldmodel.ld (shareLinks oldmodel) [] oldmodel.mobile
+        initNew oldmodel.fui oldmodel.ld (shareLinks oldmodel) oldmodel.mobile
 
     else
         let
@@ -2496,7 +2526,6 @@ initLinkBackNote model title =
                          }
                             :: shareLinks model
                         )
-                        []
                         model.mobile
             in
             Ok
@@ -2956,22 +2985,18 @@ update msg model =
             )
 
         AddGraphNotes ->
-            case ( EM.getSpecialNote model.edMarkdown, model.id ) of
-                ( Ok sn, Just znid ) ->
+            case model.snState of
+                Just sns ->
                     let
-                        ( nsn, lzls ) =
+                        nsn =
                             -- addNotes zlns uid this title sn lzls
                             SNG.addNotes
                                 (TDict.values model.tagThings.focusSr)
-                                model.ld.userid
-                                znid
-                                model.title
-                                sn
-                                model.lzlDict
+                                sns
                     in
                     ( { model
-                        | edMarkdown = EM.updateSpecialNote nsn
-                        , lzlDict = lzls
+                        | edMarkdown = EM.updateSpecialNote <| SNG.getSpecialNote nsn
+                        , snState = Just nsn
                       }
                     , None
                     )
@@ -3722,16 +3747,16 @@ update msg model =
                     ( updateEditBlock ebmsg model, None )
 
         SNGMsg sngmsg ->
-            case EM.getSpecialNote model.edMarkdown of
-                Ok sn ->
+            case model.snState of
+                Just sns ->
                     let
-                        ( ( snmd, lzld ), sncmd ) =
-                            SNG.updateSn sngmsg sn model.lzlDict
+                        ( snmd, sncmd ) =
+                            SNG.updateSn sngmsg sns
 
                         umod =
                             { model
-                                | edMarkdown = EM.updateSpecialNote snmd
-                                , lzlDict = lzld
+                                | edMarkdown = EM.updateSpecialNote (SNG.getSpecialNote snmd)
+                                , snState = Just snmd
                             }
                     in
                     case sncmd of
@@ -3783,7 +3808,7 @@ update msg model =
                             , None
                             )
 
-                Err _ ->
+                Nothing ->
                     ( model, None )
 
         SetDropLinkMode b ->

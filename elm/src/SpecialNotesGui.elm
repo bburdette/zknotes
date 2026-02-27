@@ -2,7 +2,7 @@ module SpecialNotesGui exposing (..)
 
 import ArchiveListing exposing (Command)
 import Common
-import Data exposing (AndOr(..), LzLink, SearchMod(..), TagSearch(..), ZkListNote)
+import Data exposing (AndOr(..), LzLink, SaveLzLink, SearchMod(..), TagSearch(..), ZkListNote, ZkNoteId(..))
 import DataUtil exposing (lzlKey, zkNoteIdToString, zklKey)
 import Dict exposing (Dict)
 import Element as E
@@ -11,7 +11,7 @@ import Element.Input as EI
 import Html.Attributes as HA
 import Orgauth.Data exposing (UserId)
 import SearchUtil exposing (showTagSearch)
-import SpecialNotes as SN
+import SpecialNotes as SN exposing (CompletedSync, Notegraph, SpecialNote)
 import TDict
 import Time
 import Util
@@ -31,14 +31,74 @@ type Command
     | None
 
 
+type alias NlLink =
+    { id : ZkNoteId, title : String }
+
+
+type SpecialNoteState
+    = SnsSearch (List TagSearch)
+    | SnsSync CompletedSync
+    | SnsList Notegraph (List NlLink)
+
+
+initSpecialNoteState : ZkNoteId -> SN.SpecialNote -> List LzLink -> SpecialNoteState
+initSpecialNoteState znid sn lzls =
+    case sn of
+        SN.SnSearch tagSearch ->
+            SnsSearch tagSearch
+
+        SN.SnSync completedSync ->
+            SnsSync completedSync
+
+        SN.SnList notegraph ->
+            SnsList notegraph (mklzList znid lzls)
+
+
+getSpecialNote : SpecialNoteState -> SpecialNote
+getSpecialNote sns =
+    case sns of
+        SnsSearch tagSearch ->
+            SN.SnSearch tagSearch
+
+        SnsSync completedSync ->
+            SN.SnSync completedSync
+
+        SnsList notegraph _ ->
+            SN.SnList notegraph
+
+
+snLzLinks : ZkNoteId -> SpecialNoteState -> List SaveLzLink
+snLzLinks this sns =
+    case sns of
+        SnsSearch _ ->
+            []
+
+        SnsSync _ ->
+            []
+
+        SnsList _ nlls ->
+            List.foldl
+                (\nll ( to, lst ) ->
+                    ( nll.id
+                    , { to = to
+                      , from = nll.id
+                      , delete = Just False
+                      }
+                        :: lst
+                    )
+                )
+                ( this, [] )
+                nlls
+                |> Tuple.second
+
+
 guiSn :
     Time.Zone
-    -> SN.SpecialNote
-    -> Dict String LzLink
+    -> SpecialNoteState
     -> E.Element Msg
-guiSn zone snote lzlinks =
+guiSn zone snote =
     case snote of
-        SN.SnSearch tagsearches ->
+        SnsSearch tagsearches ->
             E.row
                 [ E.alignTop
                 , E.width E.fill
@@ -56,7 +116,7 @@ guiSn zone snote lzlinks =
                     }
                 ]
 
-        SN.SnSync completedSync ->
+        SnsSync completedSync ->
             E.wrappedRow [ E.alignTop, E.width E.fill ]
                 [ E.column []
                     [ E.text "sync"
@@ -94,7 +154,7 @@ guiSn zone snote lzlinks =
                     ]
                 ]
 
-        SN.SnList _ ->
+        SnsList _ nls ->
             E.column []
                 (EI.button Common.buttonStyle
                     { onPress = Just <| GraphFocusClick
@@ -103,36 +163,37 @@ guiSn zone snote lzlinks =
                     :: List.map
                         (\lzl ->
                             E.row []
-                                [ E.text <| lzlKey lzl
-                                , E.text lzl.fromname
-                                , E.text lzl.toname
+                                [ E.text lzl.title
                                 ]
                         )
-                        (Dict.values lzlinks)
+                        nls
                 )
 
 
-toLists : Data.ZkNoteId -> Dict String LzLink -> List (List ZkListNote)
-toLists this lzls =
-    let
-        toDict =
-            List.foldl
-                (\lzl todict ->
-                    let
-                        zkto =
-                            zkNoteIdToString lzl.to
-                    in
-                    case Dict.get zkto todict of
-                        Nothing ->
-                            Dict.insert zkto [ lzl ] todict
 
-                        Just lzlz ->
-                            Dict.insert zkto (lzl :: lzlz) todict
-                )
-                Dict.empty
-                (Dict.values lzls)
-    in
-    []
+{-
+   toLists : Data.ZkNoteId -> Dict String LzLink -> List (List ZkListNote)
+   toLists this lzls =
+       let
+           toDict =
+               List.foldl
+                   (\lzl todict ->
+                       let
+                           zkto =
+                               zkNoteIdToString lzl.to
+                       in
+                       case Dict.get zkto todict of
+                           Nothing ->
+                               Dict.insert zkto [ lzl ] todict
+
+                           Just lzlz ->
+                               Dict.insert zkto (lzl :: lzlz) todict
+                   )
+                   Dict.empty
+                   (Dict.values lzls)
+       in
+       []
+-}
 
 
 lzToDict : Dict String LzLink -> DataUtil.LzlDict
@@ -146,94 +207,165 @@ lzToDict lzls =
             DataUtil.emptyLzlDict
 
 
+lzToDict2 : List LzLink -> DataUtil.LzlDict
+lzToDict2 lzls =
+    lzls
+        |> List.foldl
+            (\lzl lzll ->
+                TDict.insert lzl.to lzl lzll
+            )
+            DataUtil.emptyLzlDict
+
+
 addNotes :
     List ZkListNote
-    -> UserId
-    -> Data.ZkNoteId
-    -> String
-    -> SN.SpecialNote
-    -> Dict String LzLink
-    -> ( SN.SpecialNote, Dict String LzLink )
-addNotes zlns uid this title sn lzls =
-    case sn of
-        SN.SnList ng ->
+    -> SpecialNoteState
+    -> SpecialNoteState
+addNotes zlns sns =
+    case sns of
+        SnsList ng lnks ->
             let
-                lz2d =
-                    lzToDict lzls
-
-                current =
-                    ng.currentUuid
-                        |> Maybe.map Data.Zni
-                        |> Maybe.withDefault this
-
-                currentTitle =
-                    TDict.get current lz2d
-                        |> Maybe.map (\lz -> lz.toname)
-                        |> Maybe.withDefault title
-
-                -- add note after 'current'
-                -- what about notes after current?
-                links : List LzLink
-                links =
-                    List.foldl
-                        (\zln zlnlst ->
-                            case zlnlst of
-                                first :: rest ->
-                                    { from = zln.id
-                                    , to = first.from
-                                    , user = uid
-                                    , fromname = zln.title
-                                    , toname = first.toname
-                                    }
-                                        :: first
-                                        :: rest
-
-                                [] ->
-                                    [ { from = zln.id
-                                      , to = current
-                                      , user = uid
-                                      , fromname = zln.title
-                                      , toname = currentTitle
-                                      }
-                                    ]
-                        )
-                        []
-                        zlns
-
-                aftercurrent =
-                    case ( TDict.get current lz2d, List.head links ) of
-                        ( Just ac, Just l ) ->
-                            Just { ac | to = l.from, toname = l.fromname }
-
-                        _ ->
-                            Nothing
-
-                nlz2d =
-                    List.foldl
-                        (\lzl ltd ->
-                            TDict.insert lzl.to lzl ltd
-                        )
-                        lz2d
-                        links
-                        |> (\l ->
-                                aftercurrent
-                                    |> Maybe.map (\ac -> TDict.insert ac.to ac l)
-                                    |> Maybe.withDefault l
-                           )
-
-                nlzls =
-                    nlz2d
-                        |> TDict.values
-                        |> List.foldl
-                            (\lz ld ->
-                                Dict.insert (lzlKey lz) lz ld
-                            )
-                            Dict.empty
+                notes =
+                    List.map (\zln -> { id = zln.id, title = zln.title }) zlns
             in
-            ( sn, nlzls )
+            case ng.currentUuid of
+                Nothing ->
+                    SnsList ng (notes ++ lnks)
 
-        _ ->
-            ( sn, lzls )
+                Just uuid ->
+                    let
+                        zni =
+                            Zni uuid
+
+                        nlnks =
+                            List.foldr
+                                (\n lst ->
+                                    if n.id == zni then
+                                        n :: notes ++ lst
+
+                                    else
+                                        n :: lst
+                                )
+                                []
+                                lnks
+                    in
+                    SnsList ng nlnks
+
+        SnsSearch s ->
+            SnsSearch s
+
+        SnsSync s ->
+            SnsSync s
+
+
+
+{-
+   addNotes :
+       List ZkListNote
+       -> UserId
+       -> Data.ZkNoteId
+       -> String
+       -> SN.SpecialNote
+       -> Dict String LzLink
+       -> ( SN.SpecialNote, Dict String LzLink )
+   addNotes zlns uid this title sn lzls =
+       case sn of
+           SnsList ng lzls ->
+               let
+                   lz2d =
+                       lzToDict lzls
+
+                   current =
+                       ng.currentUuid
+                           |> Maybe.map Data.Zni
+                           |> Maybe.withDefault this
+
+                   currentTitle =
+                       TDict.get current lz2d
+                           |> Maybe.map (\lz -> lz.toname)
+                           |> Maybe.withDefault title
+
+                   -- add note after 'current'
+                   -- what about notes after current?
+                   links : List LzLink
+                   links =
+                       List.foldl
+                           (\zln zlnlst ->
+                               case zlnlst of
+                                   first :: rest ->
+                                       { from = zln.id
+                                       , to = first.from
+                                       , user = uid
+                                       , fromname = zln.title
+                                       , toname = first.toname
+                                       }
+                                           :: first
+                                           :: rest
+
+                                   [] ->
+                                       [ { from = zln.id
+                                         , to = current
+                                         , user = uid
+                                         , fromname = zln.title
+                                         , toname = currentTitle
+                                         }
+                                       ]
+                           )
+                           []
+                           zlns
+
+                   aftercurrent =
+                       case ( TDict.get current lz2d, List.head links ) of
+                           ( Just ac, Just l ) ->
+                               Just { ac | to = l.from, toname = l.fromname }
+
+                           _ ->
+                               Nothing
+
+                   nlz2d =
+                       List.foldl
+                           (\lzl ltd ->
+                               TDict.insert lzl.to lzl ltd
+                           )
+                           lz2d
+                           links
+                           |> (\l ->
+                                   aftercurrent
+                                       |> Maybe.map (\ac -> TDict.insert ac.to ac l)
+                                       |> Maybe.withDefault l
+                              )
+
+                   nlzls =
+                       nlz2d
+                           |> TDict.values
+                           |> List.foldl
+                               (\lz ld ->
+                                   Dict.insert (lzlKey lz) lz ld
+                               )
+                               Dict.empty
+               in
+               ( sn, nlzls )
+
+           _ ->
+               ( sn, lzls )
+-}
+
+
+mklzList : ZkNoteId -> List Data.LzLink -> List { id : ZkNoteId, title : String }
+mklzList this links =
+    dolst this (lzToDict2 links) []
+
+
+dolst : ZkNoteId -> DataUtil.LzlDict -> List { id : ZkNoteId, title : String } -> List { id : ZkNoteId, title : String }
+dolst toid lz2d lst =
+    case TDict.get toid lz2d of
+        Nothing ->
+            lst
+
+        Just l ->
+            dolst l.from
+                (TDict.remove toid lz2d)
+                ({ id = l.from, title = l.fromname } :: lst)
 
 
 syncSearch : Bool -> SN.CompletedSync -> TagSearch
@@ -299,56 +431,47 @@ syncSearch fromremote csync =
                 }
 
 
-updateSn :
-    Msg
-    -> SN.SpecialNote
-    -> Dict String LzLink
-    ->
-        ( ( SN.SpecialNote
-          , Dict String LzLink
-          )
-        , Command
-        )
-updateSn msg snote lzlinks =
+updateSn : Msg -> SpecialNoteState -> ( SpecialNoteState, Command )
+updateSn msg snote =
     case snote of
-        SN.SnSearch tagsearches ->
+        SnsSearch tagsearches ->
             case msg of
                 GraphFocusClick ->
-                    ( ( SN.SnSearch tagsearches, lzlinks ), None )
+                    ( SnsSearch tagsearches, None )
 
                 CopySearchPress ->
-                    ( ( SN.SnSearch tagsearches, lzlinks ), CopySearch tagsearches )
+                    ( SnsSearch tagsearches, CopySearch tagsearches )
 
                 CopySyncSearchPress _ ->
-                    ( ( SN.SnSearch tagsearches, lzlinks ), None )
+                    ( SnsSearch tagsearches, None )
 
                 Noop ->
-                    ( ( SN.SnSearch tagsearches, lzlinks ), None )
+                    ( SnsSearch tagsearches, None )
 
-        SN.SnSync completedSync ->
+        SnsSync completedSync ->
             case msg of
                 GraphFocusClick ->
-                    ( ( SN.SnSync completedSync, lzlinks ), None )
+                    ( SnsSync completedSync, None )
 
                 CopySearchPress ->
-                    ( ( SN.SnSync completedSync, lzlinks ), None )
+                    ( SnsSync completedSync, None )
 
                 CopySyncSearchPress fromremote ->
-                    ( ( SN.SnSync completedSync, lzlinks ), CopySyncSearch (syncSearch fromremote completedSync) )
+                    ( SnsSync completedSync, CopySyncSearch (syncSearch fromremote completedSync) )
 
                 Noop ->
-                    ( ( SN.SnSync completedSync, lzlinks ), None )
+                    ( SnsSync completedSync, None )
 
-        SN.SnList g ->
+        SnsList g lz ->
             case msg of
                 GraphFocusClick ->
-                    ( ( SN.SnList g, lzlinks ), GraphFocus )
+                    ( SnsList g lz, GraphFocus )
 
                 CopySearchPress ->
-                    ( ( SN.SnList g, lzlinks ), None )
+                    ( SnsList g lz, None )
 
                 CopySyncSearchPress _ ->
-                    ( ( SN.SnList g, lzlinks ), None )
+                    ( SnsList g lz, None )
 
                 Noop ->
-                    ( ( SN.SnList g, lzlinks ), None )
+                    ( SnsList g lz, None )
