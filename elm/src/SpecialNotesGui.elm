@@ -67,8 +67,8 @@ getSpecialNote sns =
             SN.SnList notegraph
 
 
-snLzLinks : ZkNoteId -> SpecialNoteState -> List SaveLzLink
-snLzLinks this sns =
+saveLzLinks : ZkNoteId -> SpecialNoteState -> List SaveLzLink
+saveLzLinks this sns =
     case sns of
         SnsSearch _ ->
             []

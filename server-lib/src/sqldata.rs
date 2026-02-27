@@ -24,8 +24,8 @@ use zkprotocol::constants::SpecialUuids;
 use zkprotocol::content::{
   ArchiveZkLink, Direction, EditLink, ExtraLoginData, FileInfo, FileStatus, GetZkNoteArchives,
   GetZkNoteComments, GetZnlIfChanged, ImportZkNote, LzLink, OnMakeFileNote, OnSavedZkNote,
-  SaveZkLink, SaveZkLink2, SaveZkNote, SavedZkNote, Server, Sysids, UuidZkLink, ZkLink, ZkListNote,
-  ZkNote, ZkNoteAndLinks, ZkNoteAndLinksWhat, ZkNoteId,
+  SaveLzLink, SaveZkLink, SaveZkLink2, SaveZkNote, SavedZkNote, Server, Sysids, UuidZkLink, ZkLink,
+  ZkListNote, ZkNote, ZkNoteAndLinks, ZkNoteAndLinksWhat, ZkNoteId,
 };
 use zkprotocol::sync_data::SyncMessage;
 
@@ -1803,6 +1803,41 @@ pub fn save_savezklinks(
   Ok(())
 }
 
+pub fn save_savelzlinks(
+  conn: &Connection,
+  uid: UserId,
+  zknid: ZkNoteId,
+  lzlinks: &Vec<SaveLzLink>,
+) -> Result<(), zkerr::Error> {
+  for link in lzlinks.iter() {
+    // TODO: integrate into sql instead of separate queries.
+    let to = note_id_for_zknoteid(&conn, &link.to)?;
+    let from = note_id_for_zknoteid(&conn, &link.from)?;
+    let linkzknote = note_id_for_zknoteid(&conn, &zknid)?;
+    if link.delete == Some(true) {
+      // create archive record.
+      let now = now()?;
+      let ac = conn.execute(
+        "insert into zklinkarchive (fromid, toid, user, linkzknote, createdate, deletedate)
+            select fromid, toid, user, linkzknote, createdate, ?1 from zklink
+            where fromid = ?2 and toid = ?3 and user = ?4",
+        params![now, from, to, uid.to_i64()],
+      )?;
+      println!("inserted {} archive lzlink", ac);
+      // delete the link.
+      let dc = conn.execute(
+        "delete from zklink where fromid = ?1 and toid = ?2 and user = ?3",
+        params![from, to, uid.to_i64()],
+      )?;
+      println!("deleted {} lzlink", dc);
+    } else {
+      save_zklink(&conn, from, to, uid, Some(linkzknote))?;
+    }
+  }
+
+  Ok(())
+}
+
 pub fn read_zklinks(
   conn: &Connection,
   uid: UserId,
@@ -2015,6 +2050,8 @@ pub fn read_lzlinks(
         Err(a) => Err(a),
       }),
   );
+
+  println!("lzquery result: {:?}", r);
 
   r
 }

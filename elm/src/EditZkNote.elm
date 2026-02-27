@@ -79,7 +79,7 @@ import NoteCache as NC exposing (NoteCache)
 import Orgauth.Data exposing (UserId(..))
 import RequestsDialog exposing (TRequests)
 import SearchStackPanel as SP
-import SpecialNotesGui as SNG exposing (SpecialNoteState(..), snLzLinks)
+import SpecialNotesGui as SNG exposing (SpecialNoteState(..))
 import TDict
 import TagSearchPanel exposing (Search(..))
 import TagThings as TT
@@ -745,15 +745,20 @@ saveLzLinks : Model -> List Data.SaveLzLink
 saveLzLinks model =
     case ( model.id, model.snState, model.initialSnState ) of
         ( Just znid, Just snState, Just initialSnState ) ->
-            saveLzLinkList
-                (snLzLinks znid snState
-                    |> List.map (\sll -> ( lzlKey sll, sll ))
-                    |> Dict.fromList
-                )
-                (snLzLinks znid initialSnState
-                    |> List.map (\sll -> ( lzlKey sll, sll ))
-                    |> Dict.fromList
-                )
+            Debug.log " saveLzLinkList" <|
+                saveLzLinkList
+                    (Debug.log "snState saveLzLinkList"
+                        (SNG.saveLzLinks znid snState
+                            |> List.map (\sll -> ( lzlKey sll, sll ))
+                            |> Dict.fromList
+                        )
+                    )
+                    (Debug.log "initialSnState saveLzLinkList"
+                        (SNG.saveLzLinks znid initialSnState
+                            |> List.map (\sll -> ( lzlKey sll, sll ))
+                            |> Dict.fromList
+                        )
+                    )
 
         _ ->
             []
