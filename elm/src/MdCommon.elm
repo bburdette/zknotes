@@ -637,6 +637,9 @@ noteFile fui maxw mbns filename zknote =
                 "png" ->
                     imageNoteView fui zknote
 
+                "webp" ->
+                    imageNoteView fui zknote
+
                 _ ->
                     link (fui.filelocation ++ "/note/" ++ zkNoteIdToString zknote.id) [ E.text zknote.title ]
 
