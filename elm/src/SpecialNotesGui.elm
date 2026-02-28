@@ -89,9 +89,8 @@ saveLzLinks this sns =
                     )
                 )
                 ( this, [] )
-                (Debug.log "nlls: " (filterNotes this nlls))
+                (filterNotes this nlls)
                 |> Tuple.second
-                |> Debug.log "saveLzLinks: "
 
 
 guiSn :
@@ -243,20 +242,19 @@ addNotes this zlns sns =
                             Zni uuid
 
                         nlnks =
-                            Debug.log "lniks" <|
-                                List.foldr
-                                    (\n lst ->
-                                        if n.id == zni then
-                                            n :: notes ++ lst
+                            List.foldr
+                                (\n lst ->
+                                    if n.id == zni then
+                                        n :: notes ++ lst
 
-                                        else
-                                            n :: lst
-                                    )
-                                    []
-                                    lnks
+                                    else
+                                        n :: lst
+                                )
+                                []
+                                lnks
 
                         flnks =
-                            Debug.log "filtered" (filterNotes this nlnks)
+                            filterNotes this nlnks
                     in
                     SnsList ng flnks
 
