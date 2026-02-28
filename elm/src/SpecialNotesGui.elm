@@ -12,6 +12,7 @@ import Html.Attributes as HA
 import Orgauth.Data exposing (UserId)
 import SearchUtil exposing (showTagSearch)
 import Set
+import SnListEdit
 import SpecialNotes as SN exposing (CompletedSync, Notegraph, SpecialNote)
 import TDict
 import Time
@@ -283,99 +284,6 @@ filterNotes this nlls =
         ( Set.singleton (zkNoteIdToString this), [] )
         nlls
         |> Tuple.second
-
-
-
-{-
-   addNotes :
-       List ZkListNote
-       -> UserId
-       -> Data.ZkNoteId
-       -> String
-       -> SN.SpecialNote
-       -> Dict String LzLink
-       -> ( SN.SpecialNote, Dict String LzLink )
-   addNotes zlns uid this title sn lzls =
-       case sn of
-           SnsList ng lzls ->
-               let
-                   lz2d =
-                       lzToDict lzls
-
-                   current =
-                       ng.currentUuid
-                           |> Maybe.map Data.Zni
-                           |> Maybe.withDefault this
-
-                   currentTitle =
-                       TDict.get current lz2d
-                           |> Maybe.map (\lz -> lz.toname)
-                           |> Maybe.withDefault title
-
-                   -- add note after 'current'
-                   -- what about notes after current?
-                   links : List LzLink
-                   links =
-                       List.foldl
-                           (\zln zlnlst ->
-                               case zlnlst of
-                                   first :: rest ->
-                                       { from = zln.id
-                                       , to = first.from
-                                       , user = uid
-                                       , fromname = zln.title
-                                       , toname = first.toname
-                                       }
-                                           :: first
-                                           :: rest
-
-                                   [] ->
-                                       [ { from = zln.id
-                                         , to = current
-                                         , user = uid
-                                         , fromname = zln.title
-                                         , toname = currentTitle
-                                         }
-                                       ]
-                           )
-                           []
-                           zlns
-
-                   aftercurrent =
-                       case ( TDict.get current lz2d, List.head links ) of
-                           ( Just ac, Just l ) ->
-                               Just { ac | to = l.from, toname = l.fromname }
-
-                           _ ->
-                               Nothing
-
-                   nlz2d =
-                       List.foldl
-                           (\lzl ltd ->
-                               TDict.insert lzl.to lzl ltd
-                           )
-                           lz2d
-                           links
-                           |> (\l ->
-                                   aftercurrent
-                                       |> Maybe.map (\ac -> TDict.insert ac.to ac l)
-                                       |> Maybe.withDefault l
-                              )
-
-                   nlzls =
-                       nlz2d
-                           |> TDict.values
-                           |> List.foldl
-                               (\lz ld ->
-                                   Dict.insert (lzlKey lz) lz ld
-                               )
-                               Dict.empty
-               in
-               ( sn, nlzls )
-
-           _ ->
-               ( sn, lzls )
--}
 
 
 mklzList : ZkNoteId -> List Data.LzLink -> List { id : ZkNoteId, title : String }
