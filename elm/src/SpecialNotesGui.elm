@@ -52,7 +52,7 @@ initSpecialNoteState znid sn lzls =
             SnsSync completedSync
 
         SN.SnList notegraph ->
-            SnsList notegraph (mklzList znid lzls)
+            SnsList notegraph (Debug.log "mklzList " <| mklzList znid <| Debug.log "lzls" lzls)
 
 
 getSpecialNote : SpecialNoteState -> SpecialNote
@@ -270,7 +270,7 @@ addNotes this zlns sns =
 filterNotes : ZkNoteId -> List NlLink -> List NlLink
 filterNotes this nlls =
     -- filter out duplicates and 'this'
-    List.foldl
+    List.foldr
         (\nll ( nls, nlst ) ->
             let
                 nllid =
@@ -382,7 +382,7 @@ filterNotes this nlls =
 
 mklzList : ZkNoteId -> List Data.LzLink -> List { id : ZkNoteId, title : String }
 mklzList this links =
-    dolst this (lzToDict2 links) []
+    List.reverse <| dolst this (lzToDict2 links) []
 
 
 dolst : ZkNoteId -> DataUtil.LzlDict -> List { id : ZkNoteId, title : String } -> List { id : ZkNoteId, title : String }
