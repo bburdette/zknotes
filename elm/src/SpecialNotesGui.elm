@@ -52,7 +52,7 @@ initSpecialNoteState znid sn lzls =
             SnsSync completedSync
 
         SN.SnList notegraph ->
-            SnsList notegraph (Debug.log "mklzList " <| mklzList znid <| Debug.log "lzls" lzls)
+            SnsList notegraph (mklzList znid lzls)
 
 
 getSpecialNote : SpecialNoteState -> SpecialNote

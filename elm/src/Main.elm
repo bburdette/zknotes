@@ -3551,20 +3551,25 @@ handleSPMod model fn =
         ( nspm, spcmd ) =
             fn model.spmodel
     in
+    handleSPCmd { model | spmodel = nspm } spcmd
+
+
+handleSPCmd : Model -> SP.Command -> ( Model, Cmd Msg )
+handleSPCmd model spcmd =
     case spcmd of
         SP.None ->
-            ( { model | spmodel = nspm }
+            ( model
             , Cmd.none
             )
 
         SP.Save ->
-            ( { model | spmodel = nspm }
+            ( model
             , Cmd.none
             )
 
         SP.Copy _ ->
             -- TODO
-            ( { model | spmodel = nspm }
+            ( model
             , Cmd.none
             )
 
@@ -3574,10 +3579,10 @@ handleSPMod model fn =
                 zsr =
                     model.zknSearchResult
             in
-            sendSearch { model | spmodel = nspm, zknSearchResult = { zsr | notes = [] } } ts
+            sendSearch { model | zknSearchResult = { zsr | notes = [] } } ts
 
         SP.SyncFiles ts ->
-            ( { model | spmodel = nspm }
+            ( model
             , sendZIMsg model.fui (Data.PvqSyncFiles ts)
             )
 
@@ -4036,7 +4041,10 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                             fn model.spmodel
 
                         nmod =
-                            { model | spmodel = nspm }
+                            { model
+                                | spmodel =
+                                    Debug.log "spmod" <| nspm
+                            }
                     in
                     case spcmd of
                         SP.Copy s ->
@@ -4063,7 +4071,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
 
                         _ ->
                             -- otherwise its all the usual stuff.
-                            handleSPMod nmod fn
+                            handleSPCmd nmod spcmd
 
                 EditZkNote.InlineXform inline f ->
                     ( { model
