@@ -12,7 +12,7 @@ import Html.Attributes as HA
 import Orgauth.Data exposing (UserId)
 import SearchUtil exposing (showTagSearch)
 import Set
-import SnListEdit
+import SnListEdit as SLE exposing (NlLink)
 import SpecialNotes as SN exposing (CompletedSync, Notegraph, SpecialNote)
 import TDict
 import Time
@@ -31,10 +31,6 @@ type Command
     | CopySyncSearch TagSearch
     | GraphFocus
     | None
-
-
-type alias NlLink =
-    { id : ZkNoteId, title : String }
 
 
 type SpecialNoteState
