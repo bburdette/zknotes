@@ -61,10 +61,10 @@ update msg model =
 
         DnDMsg dmsg ->
             let
-                _ =
-                    Debug.log "DnDMsg" msg
+                ( nm, lst ) =
+                    nllDndSystem.update dmsg model.nllDnd model.nlls
             in
-            model
+            { model | nlls = lst, nllDnd = nm }
 
 
 

@@ -433,8 +433,8 @@ updateSn msg snote =
                 CopySyncSearchPress _ ->
                     ( SnsList slem, None )
 
-                SLEMsg _ ->
-                    ( SnsList slem, None )
+                SLEMsg m ->
+                    ( SnsList (SLE.update m slem), None )
 
                 Noop ->
                     ( SnsList slem, None )

@@ -80,6 +80,7 @@ import NoteCache as NC exposing (NoteCache)
 import Orgauth.Data exposing (UserId(..))
 import RequestsDialog exposing (TRequests)
 import SearchStackPanel as SP
+import SnListEdit as SLE
 import SpecialNotes
 import SpecialNotesGui as SNG exposing (SpecialNoteState(..), initSpecialNoteState)
 import TDict
@@ -377,27 +378,36 @@ dndSubscriptions model =
 
 ghostView : Model -> Time.Zone -> NoteCache -> MC.ViewMode -> Int -> Maybe (Element Msg)
 ghostView model zone nc viewMode mdw =
-    blockDndSystem.info model.blockDnd
-        |> Maybe.andThen
-            (\{ dragIndex } ->
-                EM.getBlocks model.edMarkdown
-                    |> Result.toMaybe
-                    |> Maybe.andThen (List.head << List.drop dragIndex)
-                    |> Maybe.map (\b -> ( dragIndex, b ))
-            )
-        |> Maybe.map
-            (\( i, block ) ->
-                let
-                    ma =
-                        mkrargs model zone nc viewMode mdw
-                in
-                E.el
-                    (E.alpha 0.5
-                        :: List.map E.htmlAttribute
-                            (blockDndSystem.ghostStyles model.blockDnd)
+    case model.snState of
+        Just (SnsList slem) ->
+            SLE.ghostView slem nc mdw
+                |> Maybe.map
+                    (\wut ->
+                        E.map SNGMsg <| E.map SNG.SLEMsg <| wut
                     )
-                    (viewBlock ma Ghost 0 (Just i) block)
-            )
+
+        _ ->
+            blockDndSystem.info model.blockDnd
+                |> Maybe.andThen
+                    (\{ dragIndex } ->
+                        EM.getBlocks model.edMarkdown
+                            |> Result.toMaybe
+                            |> Maybe.andThen (List.head << List.drop dragIndex)
+                            |> Maybe.map (\b -> ( dragIndex, b ))
+                    )
+                |> Maybe.map
+                    (\( i, block ) ->
+                        let
+                            ma =
+                                mkrargs model zone nc viewMode mdw
+                        in
+                        E.el
+                            (E.alpha 0.5
+                                :: List.map E.htmlAttribute
+                                    (blockDndSystem.ghostStyles model.blockDnd)
+                            )
+                            (viewBlock ma Ghost 0 (Just i) block)
+                    )
 
 
 blockId : Int -> String
