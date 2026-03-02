@@ -181,7 +181,7 @@ guiSn zone snote =
                             E.map SLEMsg <|
                                 SLE.dndRow
                                     SLE.nllId
-                                    DdwItemEdit
+                                    Drag
                                     i
                                     False
                                     (E.text lzl.title)

@@ -306,7 +306,7 @@ viewItem ddw i focusid nll =
         , EBd.color TC.darkGrey
         , EBk.color TC.lightGrey
         ]
-        (List.map (dndRow nllId ddw i (Just i == focusid)) [ E.text nll.title ])
+        [ dndRow nllId ddw i (Just i == focusid) (E.text nll.title) ]
 
 
 
