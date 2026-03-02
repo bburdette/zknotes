@@ -22,7 +22,7 @@ type alias NlLink =
 
 type Msg
     = GraphFocusClick
-    | EditBlock Int
+    | EditItem Int
     | DnDMsg DnDList.Msg
 
 
@@ -33,10 +33,44 @@ type alias Model =
     }
 
 
+update : Msg -> Model -> Model
+update msg model =
+    case msg of
+        GraphFocusClick ->
+            let
+                _ =
+                    Debug.log "GraphFocusClick" msg
+            in
+            model
+
+        EditItem i ->
+            let
+                _ =
+                    Debug.log "EditItem" msg
+            in
+            model
+
+        DnDMsg dmsg ->
+            let
+                _ =
+                    Debug.log "DnDMsg" msg
+            in
+            model
+
+
 
 -------------------------------------------------------------------------
 -- Drag and Drop
 -------------------------------------------------------------------------
+
+
+type DragDropWhat
+    = Drag
+    | Drop
+    | DropH
+    | Ghost
+    | Inactive
+    | DdwItemEdit
 
 
 dndIdentity : x -> x -> List a -> List a
@@ -203,7 +237,7 @@ dndRow toid ddw i focus e =
                     E.el [ E.width E.fill ] e
 
                   else
-                    E.el [ EE.onClick (EditBlock i), E.width E.fill ] e
+                    E.el [ EE.onClick (EditItem i), E.width E.fill ] e
                 ]
 
         Drop ->
@@ -248,10 +282,10 @@ dndRow toid ddw i focus e =
                 baseAttr
                 [ E.el (dragHandleAttrs ++ [ EBk.color TC.lightGray ]) E.none
                 , spacer
-                , E.el [ EE.onClick (EditBlock i), E.width E.fill ] e
+                , E.el [ EE.onClick (EditItem i), E.width E.fill ] e
                 ]
 
-        DDWBlockEdit ->
+        DdwItemEdit ->
             E.row
                 baseAttr
                 [ E.el (dragHandleAttrs ++ [ EBk.color TC.lightGray ]) E.none
@@ -262,8 +296,6 @@ dndRow toid ddw i focus e =
 
 viewItem : DragDropWhat -> Int -> Maybe Int -> NlLink -> Element Msg
 viewItem ddw i focusid nll =
-    -- case Markdown.Renderer.render (MC.mkRenderer ma) [ b ] of
-    --     Ok rendered ->
     E.column
         [ E.spacing 0
         , E.padding 3
@@ -275,20 +307,6 @@ viewItem ddw i focusid nll =
         , EBk.color TC.lightGrey
         ]
         (List.map (dndRow nllId ddw i (Just i == focusid)) [ E.text nll.title ])
-
-
-
--- Err errors ->
---     E.text errors
-
-
-type DragDropWhat
-    = Drag
-    | Drop
-    | DropH
-    | Ghost
-    | Inactive
-    | DDWBlockEdit
 
 
 

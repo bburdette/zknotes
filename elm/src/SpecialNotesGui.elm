@@ -12,7 +12,7 @@ import Html.Attributes as HA
 import Orgauth.Data exposing (UserId)
 import SearchUtil exposing (showTagSearch)
 import Set
-import SnListEdit as SLE exposing (NlLink)
+import SnListEdit as SLE exposing (DragDropWhat(..), NlLink)
 import SpecialNotes as SN exposing (CompletedSync, Notegraph, SpecialNote)
 import TDict
 import Time
@@ -23,6 +23,7 @@ type Msg
     = CopySearchPress
     | CopySyncSearchPress Bool
     | GraphFocusClick
+    | SLEMsg SLE.Msg
     | Noop
 
 
@@ -158,11 +159,15 @@ guiSn zone snote =
                     { onPress = Just <| GraphFocusClick
                     , label = E.text "add to list"
                     }
-                    :: List.map
-                        (\lzl ->
-                            E.row []
-                                [ E.text lzl.title
-                                ]
+                    :: List.indexedMap
+                        (\i lzl ->
+                            E.map SLEMsg <|
+                                SLE.dndRow
+                                    SLE.nllId
+                                    DdwItemEdit
+                                    i
+                                    False
+                                    (E.text lzl.title)
                         )
                         nls
                 )
@@ -376,6 +381,9 @@ updateSn msg snote =
                 CopySyncSearchPress _ ->
                     ( SnsSearch tagsearches, None )
 
+                SLEMsg _ ->
+                    ( SnsSearch tagsearches, None )
+
                 Noop ->
                     ( SnsSearch tagsearches, None )
 
@@ -390,6 +398,9 @@ updateSn msg snote =
                 CopySyncSearchPress fromremote ->
                     ( SnsSync completedSync, CopySyncSearch (syncSearch fromremote completedSync) )
 
+                SLEMsg _ ->
+                    ( SnsSync completedSync, None )
+
                 Noop ->
                     ( SnsSync completedSync, None )
 
@@ -402,6 +413,9 @@ updateSn msg snote =
                     ( SnsList g lz, None )
 
                 CopySyncSearchPress _ ->
+                    ( SnsList g lz, None )
+
+                SLEMsg _ ->
                     ( SnsList g lz, None )
 
                 Noop ->
