@@ -1,4 +1,4 @@
-port module EditZkNote exposing
+module EditZkNote exposing
     ( Command(..)
     , Model
     , Msg(..)
@@ -55,6 +55,7 @@ import DataUtil exposing (FileUrlInfo, lzlKey, zkNoteIdToString, zklKey, zniComp
 import Dialog as D
 import Dict exposing (Dict)
 import DnDList
+import DndPorts exposing (..)
 import EdMarkdown as EM
 import EditZkNoteListing exposing (Msg(..))
 import Either exposing (Either(..))
@@ -79,7 +80,8 @@ import NoteCache as NC exposing (NoteCache)
 import Orgauth.Data exposing (UserId(..))
 import RequestsDialog exposing (TRequests)
 import SearchStackPanel as SP
-import SpecialNotesGui as SNG exposing (SpecialNoteState(..))
+import SpecialNotes
+import SpecialNotesGui as SNG exposing (SpecialNoteState(..), initSpecialNoteState)
 import TDict
 import TagSearchPanel exposing (Search(..))
 import TagThings as TT
@@ -200,8 +202,6 @@ type alias Model =
     , noteUser : UserId
     , noteUserName : String
     , usernote : ZkNoteId
-
-    -- , focusSr : Maybe ZkNoteId -- note id in search result.
     , zklDict : Dict String EditLink
     , snState : Maybe SpecialNoteState
     , focusLink : Maybe EditLink
@@ -356,18 +356,19 @@ blockDndSystemUnaltered =
         releasePointerCapture
 
 
-port onPointerMove : (JE.Value -> msg) -> Sub msg
-
-
-port onPointerUp : (JE.Value -> msg) -> Sub msg
-
-
-port releasePointerCapture : JE.Value -> Cmd msg
-
-
 blockDndSubscriptions : Model -> List (Sub Msg)
 blockDndSubscriptions model =
     [ blockDndSystem.subscriptions model.blockDnd ]
+
+
+dndSubscriptions : Model -> List (Sub Msg)
+dndSubscriptions model =
+    case model.snState of
+        Just (SnsList slem) ->
+            List.map (Sub.map SNGMsg) <| SNG.sngSubscriptions (SnsList slem)
+
+        _ ->
+            blockDndSubscriptions model
 
 
 
@@ -3836,16 +3837,21 @@ update msg model =
                     ( model, None )
 
         MakeList ->
-            let
-                sns =
-                    SnsList { currentUuid = Nothing } []
-            in
-            ( { model
-                | edMarkdown = EM.updateSpecialNote (SNG.getSpecialNote sns)
-                , snState = Just sns
-              }
-            , None
-            )
+            case model.id of
+                Just znid ->
+                    let
+                        sns =
+                            initSpecialNoteState znid (SpecialNotes.SnList { currentUuid = Nothing }) []
+                    in
+                    ( { model
+                        | edMarkdown = EM.updateSpecialNote (SNG.getSpecialNote sns)
+                        , snState = Just sns
+                      }
+                    , None
+                    )
+
+                Nothing ->
+                    ( model, None )
 
         EditBlockMsg ebmsg ->
             case MG.getXformMsg ebmsg of

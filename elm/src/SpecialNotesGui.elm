@@ -12,7 +12,7 @@ import Html.Attributes as HA
 import Orgauth.Data exposing (UserId)
 import SearchUtil exposing (showTagSearch)
 import Set
-import SnListEdit as SLE exposing (DragDropWhat(..), NlLink)
+import SnListEdit as SLE exposing (DragDropWhat(..), NlLink, nllDndSubscriptions)
 import SpecialNotes as SN exposing (CompletedSync, Notegraph, SpecialNote)
 import TDict
 import Time
@@ -37,7 +37,7 @@ type Command
 type SpecialNoteState
     = SnsSearch (List TagSearch)
     | SnsSync CompletedSync
-    | SnsList Notegraph (List NlLink)
+    | SnsList SLE.Model
 
 
 initSpecialNoteState : ZkNoteId -> SN.SpecialNote -> List LzLink -> SpecialNoteState
@@ -50,7 +50,7 @@ initSpecialNoteState znid sn lzls =
             SnsSync completedSync
 
         SN.SnList notegraph ->
-            SnsList notegraph (mklzList znid lzls)
+            SnsList (SLE.init notegraph (mklzList znid lzls))
 
 
 getSpecialNote : SpecialNoteState -> SpecialNote
@@ -62,8 +62,25 @@ getSpecialNote sns =
         SnsSync completedSync ->
             SN.SnSync completedSync
 
-        SnsList notegraph _ ->
-            SN.SnList notegraph
+        SnsList slem ->
+            SN.SnList slem.ng
+
+
+sngSubscriptions : SpecialNoteState -> List (Sub Msg)
+sngSubscriptions sns =
+    case sns of
+        SnsSearch tagSearch ->
+            []
+
+        SnsSync completedSync ->
+            []
+
+        SnsList slem ->
+            List.map (Sub.map SLEMsg) <| nllDndSubscriptions slem
+
+
+
+-- [ nllDndSystem.subscriptions model.nllDnd ]
 
 
 saveLzLinks : ZkNoteId -> SpecialNoteState -> List SaveLzLink
@@ -75,7 +92,7 @@ saveLzLinks this sns =
         SnsSync _ ->
             []
 
-        SnsList _ nlls ->
+        SnsList slem ->
             List.foldl
                 (\nll ( to, lst ) ->
                     ( nll.id
@@ -87,7 +104,7 @@ saveLzLinks this sns =
                     )
                 )
                 ( this, [] )
-                (filterNotes this nlls)
+                (filterNotes this slem.nlls)
                 |> Tuple.second
 
 
@@ -153,7 +170,7 @@ guiSn zone snote =
                     ]
                 ]
 
-        SnsList _ nls ->
+        SnsList slem ->
             E.column []
                 (EI.button Common.buttonStyle
                     { onPress = Just <| GraphFocusClick
@@ -169,7 +186,7 @@ guiSn zone snote =
                                     False
                                     (E.text lzl.title)
                         )
-                        nls
+                        slem.nlls
                 )
 
 
@@ -227,16 +244,17 @@ addNotes :
     -> SpecialNoteState
 addNotes this zlns sns =
     case sns of
-        SnsList ng lnks ->
+        SnsList slem ->
             -- disallow linking 'this' and disallow multiple occurances
             -- of notes.
             let
                 notes =
                     List.map (\zln -> { id = zln.id, title = zln.title }) zlns
             in
-            case ng.currentUuid of
+            case slem.ng.currentUuid of
                 Nothing ->
-                    SnsList ng (filterNotes this <| notes ++ lnks)
+                    SnsList
+                        { slem | nlls = filterNotes this <| notes ++ slem.nlls }
 
                 Just uuid ->
                     let
@@ -253,12 +271,12 @@ addNotes this zlns sns =
                                         n :: lst
                                 )
                                 []
-                                lnks
+                                slem.nlls
 
                         flnks =
                             filterNotes this nlnks
                     in
-                    SnsList ng flnks
+                    SnsList { slem | nlls = flnks }
 
         SnsSearch s ->
             SnsSearch s
@@ -404,19 +422,19 @@ updateSn msg snote =
                 Noop ->
                     ( SnsSync completedSync, None )
 
-        SnsList g lz ->
+        SnsList slem ->
             case msg of
                 GraphFocusClick ->
-                    ( SnsList g lz, GraphFocus )
+                    ( SnsList slem, GraphFocus )
 
                 CopySearchPress ->
-                    ( SnsList g lz, None )
+                    ( SnsList slem, None )
 
                 CopySyncSearchPress _ ->
-                    ( SnsList g lz, None )
+                    ( SnsList slem, None )
 
                 SLEMsg _ ->
-                    ( SnsList g lz, None )
+                    ( SnsList slem, None )
 
                 Noop ->
-                    ( SnsList g lz, None )
+                    ( SnsList slem, None )

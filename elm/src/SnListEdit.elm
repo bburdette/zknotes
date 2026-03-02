@@ -1,7 +1,8 @@
-port module SnListEdit exposing (..)
+module SnListEdit exposing (..)
 
 import Data exposing (ZkNoteId)
 import DnDList
+import DndPorts exposing (..)
 import Element as E exposing (Element)
 import Element.Background as EBk
 import Element.Border as EBd
@@ -30,6 +31,14 @@ type alias Model =
     { ng : Notegraph
     , nlls : List NlLink
     , nllDnd : DnDList.Model
+    }
+
+
+init : Notegraph -> List NlLink -> Model
+init ng nlls =
+    { ng = ng
+    , nlls = nlls
+    , nllDnd = nllDndSystem.model
     }
 
 
@@ -130,17 +139,8 @@ nllDndSystemUnaltered =
         releasePointerCapture
 
 
-port onPointerMove : (JE.Value -> msg) -> Sub msg
-
-
-port onPointerUp : (JE.Value -> msg) -> Sub msg
-
-
-port releasePointerCapture : JE.Value -> Cmd msg
-
-
-dllDndSubscriptions : Model -> List (Sub Msg)
-dllDndSubscriptions model =
+nllDndSubscriptions : Model -> List (Sub Msg)
+nllDndSubscriptions model =
     [ nllDndSystem.subscriptions model.nllDnd ]
 
 
