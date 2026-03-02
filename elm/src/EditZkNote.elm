@@ -13,6 +13,7 @@ module EditZkNote exposing
     , copyTabs
     , dirty
     , disabledLinkButtonStyle
+    , dndSubscriptions
     , fullSave
     , ghostView
     , initFull
@@ -380,6 +381,10 @@ ghostView : Model -> Time.Zone -> NoteCache -> MC.ViewMode -> Int -> Maybe (Elem
 ghostView model zone nc viewMode mdw =
     case model.snState of
         Just (SnsList slem) ->
+            let
+                _ =
+                    Debug.log "sle ghotsview" "SnsList"
+            in
             SLE.ghostView slem nc mdw
                 |> Maybe.map
                     (\wut ->
@@ -3574,6 +3579,12 @@ update msg model =
                 of
                     Ok ( dnd, items ) ->
                         let
+                            _ =
+                                Debug.log "blockDndSystem dmsg" dmsg
+
+                            _ =
+                                Debug.log "blockDndSystem.info" (blockDndSystem.info dnd)
+
                             em =
                                 EM.updateBlocks
                                     items

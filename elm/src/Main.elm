@@ -4707,7 +4707,8 @@ main =
                                         case rmd.state of
                                             EditZkNote st _ ->
                                                 List.map (Sub.map EditZkNoteMsg) <|
-                                                    EditZkNote.blockDndSubscriptions st
+                                                    EditZkNote.dndSubscriptions
+                                                        st
 
                                             _ ->
                                                 []

@@ -52,7 +52,7 @@ update msg model =
             in
             model
 
-        EditItem i ->
+        EditItem _ ->
             let
                 _ =
                     Debug.log "EditItem" msg
@@ -62,7 +62,17 @@ update msg model =
         DnDMsg dmsg ->
             let
                 ( nm, lst ) =
+                    let
+                        _ =
+                            Debug.log "nllDndSystemupdate" dmsg
+                    in
                     nllDndSystem.update dmsg model.nllDnd model.nlls
+
+                _ =
+                    Debug.log "nllDndSystem nm" nm
+
+                _ =
+                    Debug.log "nllDndSystem.info" (nllDndSystem.info nm)
             in
             { model | nlls = lst, nllDnd = nm }
 
@@ -101,42 +111,45 @@ nllDndSystem =
         releasePointerCapture
 
 
-type alias INlLink =
-    { idx : Int
-    , draggee : Bool
-    , droppee : Bool
-    , nll : NlLink
-    }
+
+{- }
+   type alias INlLink =
+       { idx : Int
+       , draggee : Bool
+       , droppee : Bool
+       , nll : NlLink
+       }
 
 
-dndINlLink : Int -> Int -> List INlLink -> List INlLink
-dndINlLink dragIdx dropIdx iNlLinks =
-    List.indexedMap
-        (\i ib ->
-            if i == dropIdx then
-                { ib | droppee = True }
+   dndINlLink : Int -> Int -> List INlLink -> List INlLink
+   dndINlLink dragIdx dropIdx iNlLinks =
+       List.indexedMap
+           (\i ib ->
+               if i == dropIdx then
+                   { ib | droppee = True }
 
-            else if i == dragIdx then
-                { ib | draggee = True }
+               else if i == dragIdx then
+                   { ib | draggee = True }
 
-            else
-                ib
-        )
-        iNlLinks
+               else
+                   ib
+           )
+           iNlLinks
 
 
-nllDndSystemUnaltered : DnDList.System INlLink Msg
-nllDndSystemUnaltered =
-    DnDList.createWithTouch
-        { beforeUpdate = dndINlLink
-        , movement = DnDList.Vertical
-        , listen = DnDList.OnDrop
-        , operation = DnDList.Unaltered
-        }
-        DnDMsg
-        onPointerMove
-        onPointerUp
-        releasePointerCapture
+   nllDndSystemUnaltered : DnDList.System INlLink Msg
+   nllDndSystemUnaltered =
+       DnDList.createWithTouch
+           { beforeUpdate = dndINlLink
+           , movement = DnDList.Vertical
+           , listen = DnDList.OnDrop
+           , operation = DnDList.Unaltered
+           }
+           DnDMsg
+           onPointerMove
+           onPointerUp
+           releasePointerCapture
+-}
 
 
 nllDndSubscriptions : Model -> List (Sub Msg)
@@ -153,12 +166,20 @@ ghostView model nc mdw =
     nllDndSystem.info model.nllDnd
         |> Maybe.andThen
             (\{ dragIndex } ->
+                let
+                    _ =
+                        Debug.log "sle ghotsview di" dragIndex
+                in
                 model.nlls
                     |> (List.head << List.drop dragIndex)
                     |> Maybe.map (\b -> ( dragIndex, b ))
             )
         |> Maybe.map
             (\( i, item ) ->
+                let
+                    _ =
+                        Debug.log "sle ghotsview" ""
+                in
                 E.el
                     (E.alpha 0.5
                         :: List.map E.htmlAttribute

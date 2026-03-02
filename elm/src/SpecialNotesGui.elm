@@ -181,7 +181,20 @@ guiSn zone snote =
                             E.map SLEMsg <|
                                 SLE.dndRow
                                     SLE.nllId
-                                    Drag
+                                    (case mbinfo of
+                                        Nothing ->
+                                            Drag
+
+                                        Just { dragIndex, dropIndex } ->
+                                            if i == dragIndex then
+                                                Ghost
+
+                                            else if i == dropIndex then
+                                                DropH
+
+                                            else
+                                                Drop
+                                    )
                                     i
                                     False
                                     (E.text lzl.title)
