@@ -51,7 +51,7 @@ import Cellme.Cellme exposing (CellContainer(..), RunState(..), evalCellsFully)
 import Cellme.DictCellme exposing (CellDict(..), getCd, mkCc)
 import Common
 import Data exposing (ArchivesOrCurrent(..), Direction(..), EditLink, EditTab(..), ZkNoteId)
-import DataUtil exposing (FileUrlInfo, lzlKey, zkNoteIdToString, zklKey, zniCompare, zniEq)
+import DataUtil exposing (FileUrlInfo, NlLink, lzlKey, zkNoteIdToString, zklKey, zniCompare, zniEq)
 import Dialog as D
 import Dict exposing (Dict)
 import DnDList
@@ -277,6 +277,7 @@ type Command
     | PowerTag
     | SPMod (SP.Model -> ( SP.Model, SP.Command ))
     | InlineXform MB.Inline (MB.Inline -> MG.Msg)
+    | SlideShow (List NlLink)
     | Cmd (Cmd Msg) (Maybe Command)
 
 
@@ -3906,6 +3907,9 @@ update msg model =
                               }
                             , None
                             )
+
+                        SNG.SlideShow lst ->
+                            ( umod, SlideShow lst )
 
                         SNG.DndCmd c ->
                             ( umod

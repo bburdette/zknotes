@@ -3,7 +3,7 @@ module SpecialNotesGui exposing (..)
 import ArchiveListing exposing (Command)
 import Common
 import Data exposing (AndOr(..), LzLink, SaveLzLink, SearchMod(..), TagSearch(..), ZkListNote, ZkNoteId(..))
-import DataUtil exposing (lzlKey, zkNoteIdToString, zklKey)
+import DataUtil exposing (NlLink, lzlKey, zkNoteIdToString, zklKey)
 import Dict exposing (Dict)
 import Element as E
 import Element.Font as EF
@@ -12,7 +12,7 @@ import Html.Attributes as HA
 import Orgauth.Data exposing (UserId)
 import SearchUtil exposing (showTagSearch)
 import Set
-import SnListEdit as SLE exposing (DragDropWhat(..), NlLink, nllDndSubscriptions)
+import SnListEdit as SLE exposing (DragDropWhat(..), nllDndSubscriptions)
 import SpecialNotes as SN exposing (CompletedSync, Notegraph, SpecialNote)
 import TDict
 import Time
@@ -23,6 +23,7 @@ type Msg
     = CopySearchPress
     | CopySyncSearchPress Bool
     | GraphFocusClick
+    | SlideShowClick
     | SLEMsg SLE.Msg
     | Noop
 
@@ -32,6 +33,7 @@ type Command
     | CopySyncSearch TagSearch
     | GraphFocus
     | DndCmd (Cmd Msg)
+    | SlideShow (List NlLink)
     | None
 
 
@@ -169,10 +171,16 @@ guiSn zone snote =
 
         SnsList slem ->
             E.column []
-                [ EI.button Common.buttonStyle
-                    { onPress = Just <| GraphFocusClick
-                    , label = E.text "add to list"
-                    }
+                [ E.row []
+                    [ EI.button Common.buttonStyle
+                        { onPress = Just <| GraphFocusClick
+                        , label = E.text "add to list"
+                        }
+                    , EI.button Common.buttonStyle
+                        { onPress = Just <| SlideShowClick
+                        , label = E.text "slideshow"
+                        }
+                    ]
                 , E.map SLEMsg <| SLE.view slem
                 ]
 
@@ -354,6 +362,9 @@ updateSn msg snote =
                 GraphFocusClick ->
                     ( SnsSearch tagsearches, None )
 
+                SlideShowClick ->
+                    ( SnsSearch tagsearches, None )
+
                 CopySearchPress ->
                     ( SnsSearch tagsearches, CopySearch tagsearches )
 
@@ -369,6 +380,9 @@ updateSn msg snote =
         SnsSync completedSync ->
             case msg of
                 GraphFocusClick ->
+                    ( SnsSync completedSync, None )
+
+                SlideShowClick ->
                     ( SnsSync completedSync, None )
 
                 CopySearchPress ->
@@ -387,6 +401,9 @@ updateSn msg snote =
             case msg of
                 GraphFocusClick ->
                     ( SnsList slem, GraphFocus )
+
+                SlideShowClick ->
+                    ( SnsList slem, SlideShow slem.nlls )
 
                 CopySearchPress ->
                     ( SnsList slem, None )

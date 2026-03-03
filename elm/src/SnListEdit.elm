@@ -1,8 +1,8 @@
 module SnListEdit exposing (..)
 
-import Common exposing (buttonStyle)
+import Common
 import Data exposing (ZkNoteId)
-import DataUtil exposing (ZniSet, emptyZniSet)
+import DataUtil exposing (NlLink, ZniSet, emptyZniSet)
 import DnDList
 import DndPorts exposing (..)
 import Element as E exposing (Element)
@@ -20,10 +20,6 @@ import TSet
 import TangoColors as TC
 import Util
 import ZkCommon as ZC
-
-
-type alias NlLink =
-    { id : ZkNoteId, title : String }
 
 
 type Msg

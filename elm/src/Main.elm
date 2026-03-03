@@ -51,6 +51,7 @@ import SearchStackPanel as SP
 import SearchUtil as SU
 import SelectString as SS
 import ShowMessage
+import SlideShow
 import SpecialNotes as SN
 import TSet
 import TagAThing
@@ -123,6 +124,7 @@ type Msg
     | TagNotes2Msg TagNotes2.Msg
     | InviteUserMsg (TagAThing.Msg InviteUser.Msg)
     | JobsPollTick Time.Posix
+    | SlideShowMsg SlideShow.Msg
     | Noop
 
 
@@ -158,6 +160,7 @@ type State
     | InviteUser (TagAThing.Model InviteUser.Model InviteUser.Msg InviteUser.Command) LoginData State
     | MdInlineXform MdInlineXform.GDModel State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
+    | SlideShow SlideShow.Model State
 
 
 decodeFlags : JD.Decoder Flags
@@ -806,6 +809,9 @@ showMessage msg =
         JobsPollTick _ ->
             "JobsPollTick"
 
+        SlideShowMsg _ ->
+            "SlideShowMsg"
+
 
 showState : State -> String
 showState state =
@@ -903,6 +909,9 @@ showState state =
         InviteUser _ _ _ ->
             "InviteUser"
 
+        SlideShow _ _ ->
+            "SlideShow"
+
 
 unexpectedMsg : Model -> Msg -> Model
 unexpectedMsg model msg =
@@ -949,10 +958,14 @@ viewState size state model =
             E.map ImportMsg <| Import.view size em model.spmodel model.zknSearchResult
 
         View em ->
-            E.map ViewMsg <| View.view model.timezone size.width model.noteCache em False
+            let
+                config =
+                    View.defaultConfig
+            in
+            E.map ViewMsg <| View.view model.timezone size.width model.noteCache { config | loggedin = False } em
 
         EView em _ ->
-            E.map ViewMsg <| View.view model.timezone size.width model.noteCache em True
+            E.map ViewMsg <| View.view model.timezone size.width model.noteCache View.defaultConfig em
 
         UserSettings em _ _ ->
             E.map UserSettingsMsg <| UserSettings.view em
@@ -1020,6 +1033,9 @@ viewState size state model =
 
         InviteUser tfmod _ _ ->
             E.map InviteUserMsg <| TagAThing.view model.stylePalette model.recentNotes (Just size) model.spmodel model.zknSearchResult tfmod
+
+        SlideShow ssmodel _ ->
+            E.map SlideShowMsg <| SlideShow.view model.timezone size.width model.noteCache ssmodel
 
 
 stateLogin : State -> Maybe LoginData
@@ -1117,6 +1133,9 @@ stateLogin state =
 
         InviteUser _ login _ ->
             Just login
+
+        SlideShow _ instate ->
+            stateLogin instate
 
 
 sendUIMsg : FileUrlInfo -> OD.UserRequest -> Cmd Msg
@@ -3131,6 +3150,35 @@ actualupdate msg model =
                         )
                     )
 
+        ( SlideShowMsg em, SlideShow es instate ) ->
+            let
+                ( emod, ecmd ) =
+                    SlideShow.update em model.noteCache es
+            in
+            case ecmd of
+                SlideShow.Noop ->
+                    ( { model | state = SlideShow emod instate }, Cmd.none )
+
+                SlideShow.Close ->
+                    ( { model | state = instate }, Cmd.none )
+
+                SlideShow.GetNote id ->
+                    ( { model
+                        | state =
+                            PubShowMessage
+                                { message = "loading article"
+                                }
+                                (Just model.state)
+                      }
+                    , sendPIMsg model.fui
+                        (Data.PbrGetZkNoteAndLinks
+                            { zknote = id
+                            , what = ""
+                            , edittab = Nothing
+                            }
+                        )
+                    )
+
         ( EditZkNoteMsg em, EditZkNote es login ) ->
             handleEditZkNoteCmd model login (EditZkNote.update em es)
 
@@ -3621,46 +3669,48 @@ makeNoteCacheGets : String -> Model -> List (Cmd Msg)
 makeNoteCacheGets md model =
     MC.noteIds md
         |> TSet.toList
-        |> List.map
-            (\id ->
-                case NC.getNote model.noteCache id of
-                    Just (NC.ZNAL zkn) ->
-                        sendZIMsg model.fui
-                            (Data.PvqGetZnlIfChanged
-                                { zknote = id
-                                , what = "cache"
-                                , edittab = Nothing
-                                , changeddate = zkn.zknote.changeddate
-                                }
-                            )
+        |> List.map (makeNoteCacheGet model)
 
-                    Just NC.Private ->
-                        sendZIMsg model.fui
-                            (Data.PvqGetZkNoteAndLinks
-                                { zknote = id
-                                , what = "cache"
-                                , edittab = Nothing
-                                }
-                            )
 
-                    Just NC.NotFound ->
-                        sendZIMsg model.fui
-                            (Data.PvqGetZkNoteAndLinks
-                                { zknote = id
-                                , what = "cache"
-                                , edittab = Nothing
-                                }
-                            )
+makeNoteCacheGet : Model -> ZkNoteId -> Cmd Msg
+makeNoteCacheGet model id =
+    case NC.getNote model.noteCache id of
+        Just (NC.ZNAL zkn) ->
+            sendZIMsg model.fui
+                (Data.PvqGetZnlIfChanged
+                    { zknote = id
+                    , what = "cache"
+                    , edittab = Nothing
+                    , changeddate = zkn.zknote.changeddate
+                    }
+                )
 
-                    Nothing ->
-                        sendZIMsg model.fui
-                            (Data.PvqGetZkNoteAndLinks
-                                { zknote = id
-                                , what = "cache"
-                                , edittab = Nothing
-                                }
-                            )
-            )
+        Just NC.Private ->
+            sendZIMsg model.fui
+                (Data.PvqGetZkNoteAndLinks
+                    { zknote = id
+                    , what = "cache"
+                    , edittab = Nothing
+                    }
+                )
+
+        Just NC.NotFound ->
+            sendZIMsg model.fui
+                (Data.PvqGetZkNoteAndLinks
+                    { zknote = id
+                    , what = "cache"
+                    , edittab = Nothing
+                    }
+                )
+
+        Nothing ->
+            sendZIMsg model.fui
+                (Data.PvqGetZkNoteAndLinks
+                    { zknote = id
+                    , what = "cache"
+                    , edittab = Nothing
+                    }
+                )
 
 
 makePubNoteCacheGets : Model -> String -> List (Cmd Msg)
@@ -4090,6 +4140,30 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     ( { model | state = EditZkNote emod login }
                     , sendZIMsg model.fui (Data.PvqSaveZkLinks szl)
                     )
+
+                EditZkNote.SlideShow lst ->
+                    case lst of
+                        fst :: rest ->
+                            let
+                                ( ssmod, sscmd ) =
+                                    SlideShow.init model.fui model.noteCache fst rest
+                            in
+                            ( { model | state = SlideShow ssmod (EditZkNote emod login) }
+                            , case sscmd of
+                                SlideShow.GetNote id ->
+                                    makeNoteCacheGet model id
+
+                                SlideShow.Close ->
+                                    Cmd.none
+
+                                SlideShow.Noop ->
+                                    Cmd.none
+                            )
+
+                        [] ->
+                            ( model
+                            , Cmd.none
+                            )
 
                 EditZkNote.Cmd cmd mbcommand ->
                     let

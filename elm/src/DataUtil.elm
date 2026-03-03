@@ -21,6 +21,10 @@ type alias FileUrlInfo =
     }
 
 
+type alias NlLink =
+    { id : ZkNoteId, title : String }
+
+
 getPrNoteInfo : PublicReply -> Maybe ( ZkNoteId, Maybe String )
 getPrNoteInfo pr =
     case pr of
