@@ -51,33 +51,15 @@ update : Msg -> Model -> Model
 update msg model =
     case msg of
         GraphFocusClick ->
-            let
-                _ =
-                    Debug.log "GraphFocusClick" msg
-            in
             model
 
         EditItem _ ->
-            let
-                _ =
-                    Debug.log "EditItem" msg
-            in
             model
 
         DnDMsg dmsg ->
             let
                 ( nm, lst ) =
-                    let
-                        _ =
-                            Debug.log "nllDndSystemupdate" dmsg
-                    in
                     nllDndSystem.update dmsg model.nllDnd model.nlls
-
-                _ =
-                    Debug.log "nllDndSystem nm" nm
-
-                _ =
-                    Debug.log "nllDndSystem.info" (nllDndSystem.info nm)
             in
             { model | nllDnd = nm, nlls = lst }
 
@@ -204,20 +186,12 @@ ghostView model nc mdw =
     nllDndSystem.info model.nllDnd
         |> Maybe.andThen
             (\{ dragIndex } ->
-                let
-                    _ =
-                        Debug.log "sle ghotsview di" dragIndex
-                in
                 model.nlls
                     |> (List.head << List.drop dragIndex)
                     |> Maybe.map (\b -> ( dragIndex, b ))
             )
         |> Maybe.map
             (\( i, item ) ->
-                let
-                    _ =
-                        Debug.log "sle ghotsview" ""
-                in
                 E.el
                     (E.alpha 0.5
                         :: List.map E.htmlAttribute

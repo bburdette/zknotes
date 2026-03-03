@@ -4041,10 +4041,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                             fn model.spmodel
 
                         nmod =
-                            { model
-                                | spmodel =
-                                    Debug.log "spmod" <| nspm
-                            }
+                            { model | spmodel = nspm }
                     in
                     case spcmd of
                         SP.Copy s ->

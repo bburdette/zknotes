@@ -380,10 +380,6 @@ ghostView : Model -> Time.Zone -> NoteCache -> MC.ViewMode -> Int -> Maybe (Elem
 ghostView model zone nc viewMode mdw =
     case model.snState of
         Just (SnsList slem) ->
-            let
-                _ =
-                    Debug.log "sle ghotsview" "SnsList"
-            in
             SLE.ghostView slem nc mdw
                 |> Maybe.map
                     (\wut ->
@@ -760,22 +756,13 @@ saveLzLinks : Model -> List Data.SaveLzLink
 saveLzLinks model =
     case ( model.id, model.snState, model.initialSnState ) of
         ( Just znid, Just snState, Just initialSnState ) ->
-            Debug.log " saveLzLinkList" <|
-                saveLzLinkList
-                    (Debug.log "snState saveLzLinkList"
-                        (SNG.saveLzLinks znid snState
-                            |> List.map (\sll -> ( lzlKey sll, sll ))
-                            |> Dict.fromList
-                        )
-                    )
-                    model.initialLzls
+            saveLzLinkList
+                (SNG.saveLzLinks znid snState
+                    |> List.map (\sll -> ( lzlKey sll, sll ))
+                    |> Dict.fromList
+                )
+                model.initialLzls
 
-        -- (Debug.log "initialSnState saveLzLinkList"
-        --     (SNG.saveLzLinks znid initialSnState
-        --         |> List.map (\sll -> ( lzlKey sll, sll ))
-        --         |> Dict.fromList
-        --     )
-        -- )
         _ ->
             []
 
@@ -788,17 +775,6 @@ saveLzLinkList lzlDict initialLzlDict =
         ++ List.map
             (\sll -> { sll | delete = Just True })
             (Dict.values (Dict.diff initialLzlDict lzlDict))
-
-
-
--- saveLzLinkList : Dict String LzLink -> Dict String LzLink -> List Data.SaveLzLink
--- saveLzLinkList lzlDict initialLzlDict =
---     List.map
---         (DataUtil.lzlToSll False)
---         (Dict.values (Dict.diff lzlDict initialLzlDict))
---         ++ List.map
---             (DataUtil.lzlToSll True)
---             (Dict.values (Dict.diff initialLzlDict lzlDict))
 
 
 commentsRecieved : List Data.ZkNote -> Model -> Model
@@ -3091,16 +3067,9 @@ update msg model =
             case model.snState of
                 Just sns ->
                     let
-                        _ =
-                            Debug.log "addgraphnotes" ""
-
                         nsn =
                             case model.id of
                                 Just zid ->
-                                    let
-                                        _ =
-                                            Debug.log "addgraphnotes" "2"
-                                    in
                                     SNG.addNotes zid
                                         (TDict.values model.tagThings.focusSr)
                                         sns
@@ -3578,12 +3547,6 @@ update msg model =
                 of
                     Ok ( dnd, items ) ->
                         let
-                            _ =
-                                Debug.log "blockDndSystem dmsg" dmsg
-
-                            _ =
-                                Debug.log "blockDndSystem.info" (blockDndSystem.info dnd)
-
                             em =
                                 EM.updateBlocks
                                     items
