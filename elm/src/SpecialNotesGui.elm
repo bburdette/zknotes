@@ -35,10 +35,6 @@ type Command
     | None
 
 
-
--- , Cmd (blockDndSystem.commands dnd) mbsavelinks
-
-
 type SpecialNoteState
     = SnsSearch (List TagSearch)
     | SnsSync CompletedSync

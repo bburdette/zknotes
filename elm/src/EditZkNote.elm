@@ -122,7 +122,7 @@ type Msg
     | LinkBackPress
     | CopyPress
     | SearchHistoryPress
-    | SwitchPress ZkNoteId
+    | SwitchPress ZkNoteId -- TODO: remove?
     | PublicPress Bool
     | EditablePress Bool
     | ShowTitlePress Bool

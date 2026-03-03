@@ -1,6 +1,8 @@
 module SnListEdit exposing (..)
 
+import Common exposing (buttonStyle)
 import Data exposing (ZkNoteId)
+import DataUtil exposing (ZniSet, emptyZniSet)
 import DnDList
 import DndPorts exposing (..)
 import Element as E exposing (Element)
@@ -8,12 +10,16 @@ import Element.Background as EBk
 import Element.Border as EBd
 import Element.Events as EE
 import Element.Font as EF
+import Element.Input as EI
 import Html.Attributes
 import Html.Events as HE
 import Json.Decode as JD
 import NoteCache exposing (NoteCache)
 import SpecialNotes exposing (Notegraph)
+import TSet
 import TangoColors as TC
+import Util
+import ZkCommon as ZC
 
 
 type alias NlLink =
@@ -24,12 +30,15 @@ type Msg
     = GraphFocusClick
     | EditItem Int
     | DnDMsg DnDList.Msg
+    | Select ZkNoteId
+    | Delete
 
 
 type alias Model =
     { ng : Notegraph
     , nlls : List NlLink
     , nllDnd : DnDList.Model
+    , selected : ZniSet
     }
 
 
@@ -38,6 +47,7 @@ init ng nlls =
     { ng = ng
     , nlls = nlls
     , nllDnd = nllDndSystem.model
+    , selected = emptyZniSet
     }
 
 
@@ -62,16 +72,62 @@ update msg model =
             in
             { model | nllDnd = nm, nlls = lst }
 
+        Select id ->
+            { model
+                | selected =
+                    if TSet.member id model.selected then
+                        TSet.remove id model.selected
+
+                    else
+                        TSet.insert id model.selected
+            }
+
+        Delete ->
+            { model
+                | nlls =
+                    model.nlls
+                        |> List.filter
+                            (\nl ->
+                                not <|
+                                    TSet.member nl.id model.selected
+                            )
+                , selected = emptyZniSet
+            }
+
+
+controlRow : ZkNoteId -> E.Element Msg
+controlRow id =
+    E.row [ E.width E.fill ]
+        [ EI.button Common.buttonStyle
+            { onPress = Just Delete
+            , label = E.text "x"
+            }
+        , ZC.golinkns id TC.black
+        ]
+
 
 view : Model -> E.Element Msg
 view model =
     let
         mbinfo =
             nllDndSystem.info model.nllDnd
+
+        lastselected =
+            model.nlls
+                |> List.reverse
+                |> Util.foldUntil
+                    (\nl x ->
+                        if TSet.member nl.id model.selected then
+                            Util.Stop (Just nl.id)
+
+                        else
+                            Util.Go Nothing
+                    )
+                    Nothing
     in
     E.column []
         (List.indexedMap
-            (\i lzl ->
+            (\i nl ->
                 dndRow
                     nllId
                     (case mbinfo of
@@ -90,7 +146,31 @@ view model =
                     )
                     i
                     False
-                    (E.text lzl.title)
+                    (let
+                        r =
+                            E.row
+                                [ E.width E.fill
+                                , EE.onClick (Select nl.id)
+                                , EBk.color
+                                    (if TSet.member nl.id model.selected then
+                                        TC.lightCharcoal
+
+                                     else
+                                        TC.lightGray
+                                    )
+                                ]
+                                [ E.text nl.title ]
+                     in
+                     E.column [ E.width E.fill ]
+                        (r
+                            :: (if lastselected == Just nl.id then
+                                    [ controlRow nl.id ]
+
+                                else
+                                    [ E.none ]
+                               )
+                        )
+                    )
             )
             model.nlls
         )
