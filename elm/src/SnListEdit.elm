@@ -42,6 +42,11 @@ init ng nlls =
     }
 
 
+commands : Model -> Cmd Msg
+commands model =
+    nllDndSystem.commands model.nllDnd
+
+
 update : Msg -> Model -> Model
 update msg model =
     case msg of
@@ -74,7 +79,40 @@ update msg model =
                 _ =
                     Debug.log "nllDndSystem.info" (nllDndSystem.info nm)
             in
-            { model | nlls = lst, nllDnd = nm }
+            { model | nllDnd = nm, nlls = lst }
+
+
+view : Model -> E.Element Msg
+view model =
+    let
+        mbinfo =
+            nllDndSystem.info model.nllDnd
+    in
+    E.column []
+        (List.indexedMap
+            (\i lzl ->
+                dndRow
+                    nllId
+                    (case mbinfo of
+                        Nothing ->
+                            Drag
+
+                        Just { dragIndex, dropIndex } ->
+                            if i == dragIndex then
+                                Ghost
+
+                            else if i == dropIndex then
+                                DropH
+
+                            else
+                                Drop
+                    )
+                    i
+                    False
+                    (E.text lzl.title)
+            )
+            model.nlls
+        )
 
 
 
@@ -191,7 +229,7 @@ ghostView model nc mdw =
 
 nllId : Int -> String
 nllId i =
-    "nll-" ++ String.fromInt i
+    "nll_" ++ String.fromInt i
 
 
 edButtonStyle : Msg -> List (E.Attribute Msg)
@@ -291,7 +329,7 @@ dndRow toid ddw i focus e =
                     :: E.htmlAttribute (Html.Attributes.style "touch-action" "none")
                     :: baseAttr
                  )
-                    ++ List.map E.htmlAttribute (nllDndSystem.dragEvents i (nllId i))
+                    ++ List.map E.htmlAttribute (nllDndSystem.dragEvents i bid)
                 )
                 [ E.el dragHandleAttrs E.none
                 , spacer

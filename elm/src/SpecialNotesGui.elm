@@ -31,7 +31,12 @@ type Command
     = CopySearch (List TagSearch)
     | CopySyncSearch TagSearch
     | GraphFocus
+    | DndCmd (Cmd Msg)
     | None
+
+
+
+-- , Cmd (blockDndSystem.commands dnd) mbsavelinks
 
 
 type SpecialNoteState
@@ -69,18 +74,14 @@ getSpecialNote sns =
 sngSubscriptions : SpecialNoteState -> List (Sub Msg)
 sngSubscriptions sns =
     case sns of
-        SnsSearch tagSearch ->
+        SnsSearch _ ->
             []
 
-        SnsSync completedSync ->
+        SnsSync _ ->
             []
 
         SnsList slem ->
             List.map (Sub.map SLEMsg) <| nllDndSubscriptions slem
-
-
-
--- [ nllDndSystem.subscriptions model.nllDnd ]
 
 
 saveLzLinks : ZkNoteId -> SpecialNoteState -> List SaveLzLink
@@ -172,35 +173,12 @@ guiSn zone snote =
 
         SnsList slem ->
             E.column []
-                (EI.button Common.buttonStyle
+                [ EI.button Common.buttonStyle
                     { onPress = Just <| GraphFocusClick
                     , label = E.text "add to list"
                     }
-                    :: List.indexedMap
-                        (\i lzl ->
-                            E.map SLEMsg <|
-                                SLE.dndRow
-                                    SLE.nllId
-                                    (case mbinfo of
-                                        Nothing ->
-                                            Drag
-
-                                        Just { dragIndex, dropIndex } ->
-                                            if i == dragIndex then
-                                                Ghost
-
-                                            else if i == dropIndex then
-                                                DropH
-
-                                            else
-                                                Drop
-                                    )
-                                    i
-                                    False
-                                    (E.text lzl.title)
-                        )
-                        slem.nlls
-                )
+                , E.map SLEMsg <| SLE.view slem
+                ]
 
 
 
@@ -447,7 +425,11 @@ updateSn msg snote =
                     ( SnsList slem, None )
 
                 SLEMsg m ->
-                    ( SnsList (SLE.update m slem), None )
+                    let
+                        nm =
+                            SLE.update m slem
+                    in
+                    ( SnsList nm, DndCmd <| Cmd.map SLEMsg <| SLE.commands nm )
 
                 Noop ->
                     ( SnsList slem, None )

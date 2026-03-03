@@ -6,7 +6,6 @@ module EditZkNote exposing
     , TACommand(..)
     , WClass(..)
     , addComment
-    , blockDndSubscriptions
     , commentsRecieved
     , commonButtonStyle
     , compareZklinks
@@ -3937,6 +3936,11 @@ update msg model =
                                             GraphTarget
                               }
                             , None
+                            )
+
+                        SNG.DndCmd c ->
+                            ( umod
+                            , Cmd (Cmd.map SNGMsg c) Nothing
                             )
 
                         SNG.None ->
