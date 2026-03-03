@@ -838,10 +838,16 @@ revert model =
                     , editableValue = r.editable
                     , showtitle = r.showtitle
                     , zklDict = model.initialZklDict
+                    , snState = model.initialSnState
                 }
             )
         |> Maybe.withDefault
-            (initNew model.fui model.ld (Dict.values model.initialZklDict) model.mobile)
+            (initNew
+                model.fui
+                model.ld
+                (Dict.values model.initialZklDict)
+                model.mobile
+            )
 
 
 golinkSize : Int -> Int

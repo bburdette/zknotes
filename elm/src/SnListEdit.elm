@@ -31,7 +31,7 @@ type Msg
     | EditItem Int
     | DnDMsg DnDList.Msg
     | Select ZkNoteId
-    | Delete
+    | Remove
 
 
 type alias Model =
@@ -82,7 +82,7 @@ update msg model =
                         TSet.insert id model.selected
             }
 
-        Delete ->
+        Remove ->
             { model
                 | nlls =
                     model.nlls
@@ -99,7 +99,7 @@ controlRow : ZkNoteId -> E.Element Msg
 controlRow id =
     E.row [ E.width E.fill ]
         [ EI.button Common.buttonStyle
-            { onPress = Just Delete
+            { onPress = Just Remove
             , label = E.text "x"
             }
         , ZC.golinkns id TC.black
