@@ -523,38 +523,6 @@ pub fn read_uuidzklink_linkzknote(
     .map_err(|e| e.into())
 }
 
-// // really just for checking existence of the zklink.
-// pub fn read_uuidzklink_linkzknote(
-//   conn: &Connection,
-//   fromid: &str,
-//   toid: &str,
-//   user: &str,
-// ) -> Result<Option<String>, zkerr::Error> {
-//   let (l, r, u, lz) = conn.query_row(
-//     "select F.id, T.id, zklink.user, L.uuid from
-//       zklink, zknote F, zknote T, orgauth_user OU
-//       left join zknote L on L.id = zklink.linkzknote
-//       where zklink.fromid = F.id
-//        and F.uuid = ?1
-//        and zklink.toid = T.id
-//        and T.uuid = ?2
-//        and zklink.user = OU.id
-//        and OU.uuid = ?3",
-//     params![fromid, toid, user],
-//     |row| {
-//       Ok((
-//         row.get::<usize, i64>(0)?,
-//         row.get::<usize, i64>(1)?,
-//         row.get::<usize, i64>(2)?,
-//         row.get::<usize, Option<String>>(3)?,
-//       ))
-//     },
-//   )?;
-//   // .map_err(|e| e.into())?;
-//   println!("(l, r, u, lz) {:?}", (l, r, u, &lz));
-//   Ok(lz)
-// }
-
 // user CRUD
 
 pub fn save_zklink(
@@ -2023,10 +1991,6 @@ pub fn read_lzlinks(
     s, s, s, s
   );
 
-  // println!("lzquery: {}", sqlstr);
-
-  // println!("lzargs: {:?}", (uid.to_i64(), zknid, pubid, unid));
-
   let mut pstmt = conn.prepare(sqlstr.as_str())?;
   let r = Result::from_iter(
     pstmt
@@ -2050,8 +2014,6 @@ pub fn read_lzlinks(
         Err(a) => Err(a),
       }),
   );
-
-  // println!("lzquery result: {:?}", r);
 
   r
 }
@@ -2158,8 +2120,6 @@ pub fn read_public_lzlinks(
   let r = Result::from_iter(pstmt.query_and_then(
     params![zknid, pubid, sysid.to_i64()],
     |row| {
-      // let fromid: i64 = row.get(0)?;
-      // let toid: i64 = row.get(1)?;
       let fromuuid = Uuid::parse_str(row.get::<usize, String>(4)?.as_str()).map_err(|e| {
         zkerr::annotate_string(
           format!("error parsing link uuid: {:?}", row.get::<usize, String>(4)),

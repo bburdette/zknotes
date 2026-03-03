@@ -11,7 +11,6 @@ import Element.Font as EF
 import Html.Attributes
 import Html.Events as HE
 import Json.Decode as JD
-import Json.Encode as JE
 import NoteCache exposing (NoteCache)
 import SpecialNotes exposing (Notegraph)
 import TangoColors as TC
@@ -129,47 +128,6 @@ nllDndSystem =
         onPointerMove
         onPointerUp
         releasePointerCapture
-
-
-
-{- }
-   type alias INlLink =
-       { idx : Int
-       , draggee : Bool
-       , droppee : Bool
-       , nll : NlLink
-       }
-
-
-   dndINlLink : Int -> Int -> List INlLink -> List INlLink
-   dndINlLink dragIdx dropIdx iNlLinks =
-       List.indexedMap
-           (\i ib ->
-               if i == dropIdx then
-                   { ib | droppee = True }
-
-               else if i == dragIdx then
-                   { ib | draggee = True }
-
-               else
-                   ib
-           )
-           iNlLinks
-
-
-   nllDndSystemUnaltered : DnDList.System INlLink Msg
-   nllDndSystemUnaltered =
-       DnDList.createWithTouch
-           { beforeUpdate = dndINlLink
-           , movement = DnDList.Vertical
-           , listen = DnDList.OnDrop
-           , operation = DnDList.Unaltered
-           }
-           DnDMsg
-           onPointerMove
-           onPointerUp
-           releasePointerCapture
--}
 
 
 nllDndSubscriptions : Model -> List (Sub Msg)

@@ -181,32 +181,6 @@ guiSn zone snote =
                 ]
 
 
-
-{-
-   toLists : Data.ZkNoteId -> Dict String LzLink -> List (List ZkListNote)
-   toLists this lzls =
-       let
-           toDict =
-               List.foldl
-                   (\lzl todict ->
-                       let
-                           zkto =
-                               zkNoteIdToString lzl.to
-                       in
-                       case Dict.get zkto todict of
-                           Nothing ->
-                               Dict.insert zkto [ lzl ] todict
-
-                           Just lzlz ->
-                               Dict.insert zkto (lzl :: lzlz) todict
-                   )
-                   Dict.empty
-                   (Dict.values lzls)
-       in
-       []
--}
-
-
 lzToDict : Dict String LzLink -> DataUtil.LzlDict
 lzToDict lzls =
     lzls
