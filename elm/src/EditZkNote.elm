@@ -1968,7 +1968,7 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                     ]
                 , case ( model.filestatus, toZkNote model ) of
                     ( Data.FilePresent, Just zkn ) ->
-                        MC.noteFile model.fui mdw Nothing model.title zkn
+                        MC.noteFile model.fui mdw False Nothing model.title zkn
 
                     ( Data.FileMissing, Just _ ) ->
                         E.text <| "file missing"

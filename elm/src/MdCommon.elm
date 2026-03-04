@@ -356,8 +356,8 @@ elmUiHtml args =
                 Err _ ->
                     E.text "error"
     , imageView = imageView args.fui
-    , videoView = videoView args.fui args.maxw
-    , audioView = audioView args.fui
+    , videoView = videoView args.fui args.maxw False Nothing
+    , audioView = audioView args.fui Nothing
     , noteView = noteView args
     , yeetView = yeetView args
     }
@@ -542,25 +542,35 @@ imageView fui text url mbwidth renderedChildren =
                 { src = furl, description = text }
 
 
-audioView : FileUrlInfo -> String -> String -> List (Element a) -> Element a
-audioView fui text url renderedChildren =
-    htmlAudioView (fileUrl fui url) text
+audioView : FileUrlInfo -> Maybe a -> String -> String -> List (Element a) -> Element a
+audioView fui mbOnEnded text url renderedChildren =
+    htmlAudioView False mbOnEnded (fileUrl fui url) text
 
 
-htmlAudioView : String -> String -> Element a
-htmlAudioView url text =
-    E.el [ E.width E.fill ] <| E.html (Html.audio [ HA.controls True, HA.src url ] [ Html.text text ])
+htmlAudioView : Bool -> Maybe a -> String -> String -> Element a
+htmlAudioView autoplay mbOnEnded url text =
+    E.el [ E.width E.fill ] <|
+        E.html
+            (Html.audio
+                ([ HA.autoplay autoplay, HA.controls True, HA.src url ]
+                    ++ (mbOnEnded
+                            |> Maybe.map (\endevt -> [ HE.on "ended" (JD.succeed endevt) ])
+                            |> Maybe.withDefault []
+                       )
+                )
+                [ Html.text text ]
+            )
 
 
-audioNoteView : FileUrlInfo -> Data.ZkNote -> Element a
-audioNoteView fui zkn =
+audioNoteView : FileUrlInfo -> Bool -> Maybe a -> Data.ZkNote -> Element a
+audioNoteView fui autoplay mbOnEnded zkn =
     let
         fileurl =
             fui.filelocation ++ "/file/" ++ zkNoteIdToString zkn.id
     in
     E.column [ EBd.width 1, E.spacing 5, E.padding 5, E.width E.fill ]
         [ E.row [ E.spacing 20, E.width E.fill ]
-            [ htmlAudioView fileurl zkn.title
+            [ htmlAudioView autoplay mbOnEnded fileurl zkn.title
             , if fui.tauri || List.filter (\i -> i == DataUtil.sysids.publicid) zkn.sysids /= [] then
                 link
                     ("https://29a.ch/timestretch/#a=" ++ fui.location ++ "/file/" ++ zkNoteIdToString zkn.id)
@@ -573,14 +583,14 @@ audioNoteView fui zkn =
         ]
 
 
-videoNoteView : FileUrlInfo -> Int -> Data.ZkNote -> Element a
-videoNoteView fui maxw zknote =
+videoNoteView : FileUrlInfo -> Int -> Bool -> Maybe a -> Data.ZkNote -> Element a
+videoNoteView fui maxw autoplay mbOnEnded zknote =
     let
         fileurl =
             fui.filelocation ++ "/file/" ++ zkNoteIdToString zknote.id
     in
     E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
-        [ videoView fui maxw fileurl (Just zknote.title) Nothing Nothing []
+        [ videoView fui maxw autoplay mbOnEnded fileurl (Just zknote.title) Nothing Nothing []
         ]
 
 
@@ -595,8 +605,8 @@ imageNoteView fui zknote =
         ]
 
 
-noteFile : FileUrlInfo -> Int -> Maybe NoteShow -> String -> Data.ZkNote -> Element a
-noteFile fui maxw mbns filename zknote =
+noteFile : FileUrlInfo -> Int -> Bool -> Maybe a -> String -> Data.ZkNote -> Element a
+noteFile fui maxw autoplay mbOnEnded filename zknote =
     let
         suffix =
             String.split "." filename
@@ -611,22 +621,22 @@ noteFile fui maxw mbns filename zknote =
         Just s ->
             case String.toLower s of
                 "mp3" ->
-                    audioNoteView fui zknote
+                    audioNoteView fui autoplay mbOnEnded zknote
 
                 "m4a" ->
-                    audioNoteView fui zknote
+                    audioNoteView fui autoplay mbOnEnded zknote
 
                 "opus" ->
-                    audioNoteView fui zknote
+                    audioNoteView fui autoplay mbOnEnded zknote
 
                 "mp4" ->
-                    videoNoteView fui maxw zknote
+                    videoNoteView fui maxw autoplay mbOnEnded zknote
 
                 "webm" ->
-                    videoNoteView fui maxw zknote
+                    videoNoteView fui maxw autoplay mbOnEnded zknote
 
                 "mkv" ->
-                    videoNoteView fui maxw zknote
+                    videoNoteView fui maxw autoplay mbOnEnded zknote
 
                 "jpg" ->
                     imageNoteView fui zknote
@@ -802,7 +812,7 @@ noteView args id show text _ =
                     , if ns.file then
                         case zne.zknote.filestatus of
                             Data.FilePresent ->
-                                noteFile args.fui args.maxw (Just ns) zne.zknote.title zne.zknote
+                                noteFile args.fui args.maxw False Nothing zne.zknote.title zne.zknote
 
                             Data.FileMissing ->
                                 E.paragraph []
@@ -848,8 +858,8 @@ noteView args id show text _ =
             E.text <| "note " ++ id
 
 
-videoView : FileUrlInfo -> Int -> String -> Maybe String -> Maybe String -> Maybe String -> List (Element a) -> Element a
-videoView fui mw url mbtext mbwidth mbheight renderedChildren =
+videoView : FileUrlInfo -> Int -> Bool -> Maybe a -> String -> Maybe String -> Maybe String -> Maybe String -> List (Element a) -> Element a
+videoView fui mw autoplay mbOnEnded url mbtext mbwidth mbheight renderedChildren =
     let
         maxw =
             mw + 50
@@ -864,6 +874,9 @@ videoView fui mw url mbtext mbwidth mbheight renderedChildren =
                     |> Maybe.andThen (\s -> String.toInt s)
                     |> Maybe.map (\i -> HA.height i)
                 , Just <| HA.controls True
+                , Just <| HA.autoplay autoplay
+                , mbOnEnded
+                    |> Maybe.map (\endevt -> HE.on "ended" (JD.succeed endevt))
                 ]
     in
     E.html <|

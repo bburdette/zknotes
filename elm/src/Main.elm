@@ -3129,6 +3129,9 @@ actualupdate msg model =
                         )
                     )
 
+                View.OnPlaybackEnded ->
+                    ( model, Cmd.none )
+
         ( ViewMsg em, EView es state ) ->
             let
                 ( emod, ecmd ) =
@@ -3172,6 +3175,9 @@ actualupdate msg model =
                             }
                         )
                     )
+
+                View.OnPlaybackEnded ->
+                    ( model, Cmd.none )
 
         ( SlideShowMsg em, SlideShow es instate ) ->
             let

@@ -32,6 +32,7 @@ type Msg
     = OnSchelmeCodeChanged String String
     | DonePress
     | SwitchPress ZkNoteId -- TODO: remove?
+    | OnPlaybackEnd
     | Noop
 
 
@@ -53,24 +54,26 @@ type alias Model =
 
 type alias Config =
     { showLinks : Bool
-    , showTitle : Bool
+    , alwaysShowTitle : Bool
     , showContents : Bool
     , showMedia : Bool
     , showDates : Bool
     , showPanel : Bool
     , loggedin : Bool
+    , autoplay : Bool
     }
 
 
 defaultConfig : Config
 defaultConfig =
     { showLinks = True
-    , showTitle = True
+    , alwaysShowTitle = True
     , showContents = True
     , showMedia = True
     , showDates = True
     , showPanel = True
     , loggedin = True
+    , autoplay = True
     }
 
 
@@ -78,6 +81,7 @@ type Command
     = None
     | Done
     | Switch ZkNoteId
+    | OnPlaybackEnded
 
 
 showZkl : Data.EditLink -> Element Msg
@@ -186,8 +190,12 @@ view zone maxw noteCache config model =
                 |> Maybe.withDefault E.none
             , E.column
                 [ E.width (E.fill |> E.maximum 1000), E.centerX, E.spacing 20, E.padding 10, E.alignTop ]
-                [ if model.showtitle && config.showTitle then
-                    E.row [ E.centerX ] [ E.paragraph [ Font.bold, Font.size 20 ] [ E.text model.title ] ]
+                [ if model.showtitle || config.alwaysShowTitle then
+                    E.row [ E.centerX ]
+                        [ E.paragraph
+                            [ Font.bold, Font.size 20 ]
+                            [ E.text model.title ]
+                        ]
 
                   else
                     E.none
@@ -206,7 +214,7 @@ view zone maxw noteCache config model =
                         (\zkn ->
                             case zkn.filestatus of
                                 Data.FilePresent ->
-                                    MC.noteFile model.fui mw Nothing model.title zkn
+                                    MC.noteFile model.fui mw config.autoplay (Just OnPlaybackEnd) model.title zkn
 
                                 Data.FileMissing ->
                                     E.text <| "file missing"
@@ -373,3 +381,6 @@ update msg model =
               }
             , None
             )
+
+        OnPlaybackEnd ->
+            ( model, OnPlaybackEnded )

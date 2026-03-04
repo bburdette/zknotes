@@ -49,12 +49,13 @@ type Command
 viewConfig : View.Config
 viewConfig =
     { showLinks = False
-    , showTitle = True
+    , alwaysShowTitle = True
     , showContents = True
     , showMedia = True
     , showDates = True
     , showPanel = True
     , loggedin = False
+    , autoplay = True
     }
 
 
@@ -141,13 +142,32 @@ update msg nc model =
             ( model, Close )
 
         ViewMsg vmsg ->
-            ( { model
-                | viewModel =
-                    model.viewModel
-                        |> Maybe.map (\vmod -> View.update vmsg vmod |> Tuple.first)
-              }
-            , Noop
-            )
+            case model.viewModel of
+                Just vm ->
+                    let
+                        ( vmod, vcmd ) =
+                            View.update vmsg vm
+                    in
+                    case vcmd of
+                        View.None ->
+                            ( { model | viewModel = Just vmod }, Noop )
+
+                        View.Done ->
+                            ( { model | viewModel = Just vmod }, Noop )
+
+                        View.Switch _ ->
+                            ( { model | viewModel = Just vmod }, Noop )
+
+                        View.OnPlaybackEnded ->
+                            { model
+                                | current =
+                                    modBy (Array.length model.nlls)
+                                        (model.current + 1)
+                            }
+                                |> updateNote nc
+
+                Nothing ->
+                    ( model, Noop )
 
 
 updateNote : NoteCache -> Model -> ( Model, Command )
