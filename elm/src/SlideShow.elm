@@ -121,7 +121,7 @@ view tz maxw nc model =
 
 update : Msg -> NoteCache -> Model -> ( Model, Command )
 update msg nc model =
-    case Debug.log "ssupdatemsg: " msg of
+    case msg of
         NextPress ->
             { model
                 | current =
@@ -130,7 +130,6 @@ update msg nc model =
                         (model.current + 1)
             }
                 |> updateNote nc
-                |> Debug.log "nextpress updatenote"
 
         PrevPress ->
             { model
@@ -153,11 +152,11 @@ update msg nc model =
 
 updateNote : NoteCache -> Model -> ( Model, Command )
 updateNote nc model =
-    case Debug.log "updateNote current" <| Array.get model.current model.nlls of
+    case Array.get model.current model.nlls of
         Just n ->
             let
                 ( nvm, c ) =
-                    case Debug.log "getnote" <| getNote nc n.id of
+                    case getNote nc n.id of
                         Just (ZNAL gotn) ->
                             ( Just <| View.initFull model.fui gotn, Noop )
 

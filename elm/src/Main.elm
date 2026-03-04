@@ -1708,8 +1708,7 @@ onZkNoteEditWhat model pt znew =
                     SlideShow ssmod instate ->
                         let
                             ( ss, c ) =
-                                Debug.log "updatenote: " <|
-                                    SlideShow.updateNote noteCache ssmod
+                                SlideShow.updateNote noteCache ssmod
                         in
                         ( SlideShow ss instate
                         , case c of
