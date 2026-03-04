@@ -99,10 +99,7 @@ init fui nc nl nlls =
 view : Time.Zone -> Int -> NoteCache -> Model -> E.Element Msg
 view tz maxw nc model =
     E.column []
-        [ model.viewModel
-            |> Maybe.map (\m -> E.map ViewMsg <| View.view tz maxw nc viewConfig m)
-            |> Maybe.withDefault (E.text "loading... ")
-        , E.row []
+        [ E.row []
             [ EI.button Common.buttonStyle
                 { onPress = Just PrevPress
                 , label = E.text "prev"
@@ -116,6 +113,9 @@ view tz maxw nc model =
                 , label = E.text "close"
                 }
             ]
+        , model.viewModel
+            |> Maybe.map (\m -> E.map ViewMsg <| View.view tz maxw nc viewConfig m)
+            |> Maybe.withDefault (E.text "loading... ")
         ]
 
 
