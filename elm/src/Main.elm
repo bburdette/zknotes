@@ -1698,12 +1698,36 @@ onZkNoteEditWhat model pt znew =
             model.state
     in
     if znew.what == "cache" then
-        ( { model
-            | noteCache =
+        let
+            noteCache =
                 NC.addNote pt znew.znl.zknote.id (NC.ZNAL znew.znl) model.noteCache
                     |> NC.purgeNotes
+
+            ( ns, cmd ) =
+                case model.state of
+                    SlideShow ssmod instate ->
+                        let
+                            ( ss, c ) =
+                                Debug.log "updatenote: " <|
+                                    SlideShow.updateNote noteCache ssmod
+                        in
+                        ( SlideShow ss instate
+                        , case c of
+                            SlideShow.GetNote id ->
+                                makeNoteCacheGet model id
+
+                            _ ->
+                                Cmd.none
+                        )
+
+                    _ ->
+                        ( model.state, Cmd.none )
+        in
+        ( { model
+            | noteCache = noteCache
+            , state = ns
           }
-        , Cmd.none
+        , cmd
         )
 
     else
@@ -3163,20 +3187,8 @@ actualupdate msg model =
                     ( { model | state = instate }, Cmd.none )
 
                 SlideShow.GetNote id ->
-                    ( { model
-                        | state =
-                            PubShowMessage
-                                { message = "loading article"
-                                }
-                                (Just model.state)
-                      }
-                    , sendPIMsg model.fui
-                        (Data.PbrGetZkNoteAndLinks
-                            { zknote = id
-                            , what = ""
-                            , edittab = Nothing
-                            }
-                        )
+                    ( { model | state = SlideShow emod instate }
+                    , makeNoteCacheGet model id
                     )
 
         ( EditZkNoteMsg em, EditZkNote es login ) ->

@@ -29,6 +29,7 @@ type alias Model =
     { nlls : Array NlLink
     , current : Int
     , viewModel : Maybe View.Model
+    , fui : FileUrlInfo
     }
 
 
@@ -36,7 +37,6 @@ type Msg
     = NextPress
     | PrevPress
     | ClosePress
-    | GotNote ZkNoteId
     | ViewMsg View.Msg
 
 
@@ -79,6 +79,7 @@ init fui nc nl nlls =
 
                 Nothing ->
                     Nothing
+      , fui = fui
       }
     , case zkn of
         Just (ZNAL note) ->
@@ -110,23 +111,34 @@ view tz maxw nc model =
                 { onPress = Just NextPress
                 , label = E.text "next"
                 }
+            , EI.button Common.buttonStyle
+                { onPress = Just ClosePress
+                , label = E.text "close"
+                }
             ]
         ]
 
 
 update : Msg -> NoteCache -> Model -> ( Model, Command )
 update msg nc model =
-    case msg of
+    case Debug.log "ssupdatemsg: " msg of
         NextPress ->
-            ( { model | current = (model.current + 1) // Array.length model.nlls }, Noop )
+            { model
+                | current =
+                    modBy
+                        (Array.length model.nlls)
+                        (model.current + 1)
+            }
+                |> updateNote nc
+                |> Debug.log "nextpress updatenote"
 
         PrevPress ->
-            ( { model | current = (model.current - 1) // Array.length model.nlls }, Noop )
+            { model
+                | current = modBy (Array.length model.nlls) (model.current - 1)
+            }
+                |> updateNote nc
 
         ClosePress ->
-            ( model, Close )
-
-        GotNote zkid ->
             ( model, Close )
 
         ViewMsg vmsg ->
@@ -137,3 +149,37 @@ update msg nc model =
               }
             , Noop
             )
+
+
+updateNote : NoteCache -> Model -> ( Model, Command )
+updateNote nc model =
+    case Debug.log "updateNote current" <| Array.get model.current model.nlls of
+        Just n ->
+            let
+                ( nvm, c ) =
+                    case Debug.log "getnote" <| getNote nc n.id of
+                        Just (ZNAL gotn) ->
+                            ( Just <| View.initFull model.fui gotn, Noop )
+
+                        Just Private ->
+                            ( Nothing, Noop )
+
+                        Just NotFound ->
+                            ( Nothing, Noop )
+
+                        Nothing ->
+                            ( Nothing, GetNote n.id )
+            in
+            case model.viewModel of
+                Just vm ->
+                    if vm.id == Just n.id then
+                        ( model, Noop )
+
+                    else
+                        ( { model | viewModel = nvm }, c )
+
+                Nothing ->
+                    ( { model | viewModel = nvm }, c )
+
+        Nothing ->
+            ( { model | viewModel = Nothing }, Noop )
