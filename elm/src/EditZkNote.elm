@@ -3983,6 +3983,14 @@ update noteCache msg model =
                             , Cmd (Cmd.map SNGMsg c) Nothing
                             )
 
+                        SNG.ToMarkdown s ->
+                            ( { model
+                                | edMarkdown = EM.init s
+                                , snState = Nothing
+                              }
+                            , None
+                            )
+
                         SNG.None ->
                             ( umod
                             , None

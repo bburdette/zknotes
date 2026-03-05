@@ -24,6 +24,7 @@ type Msg
     | CopySyncSearchPress Bool
     | GraphFocusClick
     | SlideShowClick
+    | ToMarkdownPress
     | SLEMsg SLE.Msg
     | Noop
 
@@ -34,6 +35,7 @@ type Command
     | GraphFocus
     | DndCmd (Cmd Msg)
     | SlideShow (List NlLink)
+    | ToMarkdown String
     | None
 
 
@@ -184,6 +186,10 @@ guiSn zone snote =
                     , EI.button Common.buttonStyle
                         { onPress = Just <| SlideShowClick
                         , label = E.text "slideshow"
+                        }
+                    , EI.button Common.buttonStyle
+                        { onPress = Just <| ToMarkdownPress
+                        , label = E.text "markdown"
                         }
                     ]
                 , E.map SLEMsg <| SLE.view slem
@@ -373,6 +379,9 @@ updateSn msg snote =
                 CopySearchPress ->
                     ( SnsSearch tagsearches, CopySearch tagsearches )
 
+                ToMarkdownPress ->
+                    ( SnsSearch tagsearches, None )
+
                 CopySyncSearchPress _ ->
                     ( SnsSearch tagsearches, None )
 
@@ -393,6 +402,9 @@ updateSn msg snote =
                 CopySearchPress ->
                     ( SnsSync completedSync, None )
 
+                ToMarkdownPress ->
+                    ( SnsSync completedSync, None )
+
                 CopySyncSearchPress fromremote ->
                     ( SnsSync completedSync, CopySyncSearch (syncSearch fromremote completedSync) )
 
@@ -409,6 +421,19 @@ updateSn msg snote =
 
                 SlideShowClick ->
                     ( SnsList slem, SlideShow slem.nlls )
+
+                ToMarkdownPress ->
+                    ( SnsList slem
+                    , ToMarkdown
+                        (List.map
+                            (\nl ->
+                                "<note id=\"" ++ zkNoteIdToString nl.id ++ "\" text=\"" ++ nl.title ++ "\"/>"
+                            )
+                            slem.nlls
+                            |> List.intersperse "\n"
+                            |> String.concat
+                        )
+                    )
 
                 CopySearchPress ->
                     ( SnsList slem, None )
