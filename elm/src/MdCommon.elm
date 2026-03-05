@@ -23,6 +23,7 @@ module MdCommon exposing
     , mkRenderer
     , noteFile
     , noteIds
+    , otroHtmlLinks
     , panelView
     , parseNoteShow
     , rawTextToId
@@ -430,6 +431,45 @@ type alias Link =
     { id : Either ZkNoteId String
     , title : String
     }
+
+
+otroLinkHtml : HtmlFns ( Maybe String, List Link )
+otroLinkHtml =
+    { schelmeView =
+        \name schelmeCode _ ->
+            ( Nothing, [] )
+    , searchView =
+        \query _ ->
+            ( Nothing, [] )
+    , panelView =
+        \noteid _ ->
+            ( Nothing, [] )
+    , imageView =
+        \text url width _ ->
+            ( Nothing, [ { id = Right url, title = text } ] )
+    , videoView =
+        \src text width height _ ->
+            ( Nothing, [ { id = Right src, title = text |> Maybe.withDefault "" } ] )
+    , audioView =
+        \text src _ ->
+            ( Nothing, [ { id = Right src, title = text } ] )
+    , noteView =
+        \id show text _ ->
+            ( Nothing, [ { id = Left (Data.Zni id), title = text |> Maybe.withDefault "" } ] )
+    , yeetView =
+        \url audioOnly id show text _ ->
+            id
+                |> Maybe.map
+                    (\nid ->
+                        ( Nothing, [ { id = Left (Data.Zni nid), title = text |> Maybe.withDefault "" } ] )
+                    )
+                |> Maybe.withDefault ( Nothing, [] )
+    }
+
+
+otroHtmlLinks : Markdown.Html.Renderer (List ( Maybe String, List Link ) -> ( Maybe String, List Link ))
+otroHtmlLinks =
+    htmlF otroLinkHtml
 
 
 linkHtml : HtmlFns (List Link)
