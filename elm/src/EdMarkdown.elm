@@ -278,66 +278,13 @@ stringRenderer =
 
 {-| This renders the parsed markdown structs to a list of links.
 -}
-lrConcat : ( Maybe String, List (List Link) ) -> ( Maybe String, List Link )
-lrConcat ( mbs, lnks ) =
-    ( mbs, List.concat lnks )
-
-
-otroLrConcat : List ( Maybe String, List Link ) -> ( Maybe String, List Link )
-otroLrConcat lst =
-    List.foldl
-        (\( mbs, links ) ( smbs, slinks ) ->
-            ( case ( mbs, smbs ) of
-                ( Just s, _ ) ->
-                    Just s
-
-                ( Nothing, Just s ) ->
-                    Just s
-
-                ( Nothing, Nothing ) ->
-                    Nothing
-            , List.concat [ links, slinks ]
-            )
-        )
-        ( Nothing, [] )
-        lst
-
-
-
-{-
-   { heading : { level : Block.HeadingLevel, rawText : String, children : List (Maybe String, List Link) } -> (Maybe String, List Link)
-   , paragraph : List (Maybe String, List Link) -> (Maybe String, List Link)
-   , blockQuote : List (Maybe String, List Link) -> (Maybe String, List Link)
-   , html : Markdown.Html.Renderer (List (Maybe String, List Link) -> (Maybe String, List Link))
-   , text : String -> (Maybe String, List Link)
-   , codeSpan : String -> (Maybe String, List Link)
-   , strong : List (Maybe String, List Link) -> (Maybe String, List Link)
-   , emphasis : List (Maybe String, List Link) -> (Maybe String, List Link)
-   , strikethrough : List (Maybe String, List Link) -> (Maybe String, List Link)
-   , hardLineBreak : (Maybe String, List Link)
-   , link : { title : Maybe String, destination : String } -> List (Maybe String, List Link) -> (Maybe String, List Link)
-   , image : { alt : String, src : String, title : Maybe String } -> (Maybe String, List Link)
-   , unorderedList : List (ListItem (Maybe String, List Link)) -> (Maybe String, List Link)
-   , orderedList : Int -> List (List (Maybe String, List Link)) -> (Maybe String, List Link)
-   , codeBlock : { body : String, language : Maybe String } -> (Maybe String, List Link)
-   , thematicBreak : (Maybe String, List Link)
-   , table : List (Maybe String, List Link) -> (Maybe String, List Link)
-   , tableHeader : List (Maybe String, List Link) -> (Maybe String, List Link)
-   , tableBody : List (Maybe String, List Link) -> (Maybe String, List Link)
-   , tableRow : List (Maybe String, List Link) -> (Maybe String, List Link)
-   , tableCell : Maybe Block.Alignment -> List (Maybe String, List Link) -> (Maybe String, List Link)
-   , tableHeaderCell : Maybe Block.Alignment -> List (Maybe String, List Link) -> (Maybe String, List Link)
-
--}
-
-
 linkRenderer : Markdown.Renderer.Renderer ( Maybe String, List Link )
 linkRenderer =
     { heading =
         \{ level, rawText, children } -> otroLrConcat children
     , paragraph = otroLrConcat
     , blockQuote = otroLrConcat
-    , html = MC.otroHtmlLinks
+    , html = MC.htmlLinks
     , text = \s -> ( Just s, [] )
     , codeSpan = \_ -> ( Nothing, [] )
     , strong = otroLrConcat
@@ -395,65 +342,24 @@ linkRenderer =
     }
 
 
+otroLrConcat : List ( Maybe String, List Link ) -> ( Maybe String, List Link )
+otroLrConcat lst =
+    List.foldl
+        (\( mbs, links ) ( smbs, slinks ) ->
+            ( case ( mbs, smbs ) of
+                ( Just s, _ ) ->
+                    Just s
 
--- linkRenderer : Markdown.Renderer.Renderer ( Maybe String, List Link )
--- linkRenderer =
---     { heading =
---         \{ level, rawText, children } -> List.concat children
---     , paragraph = List.concat
---     , blockQuote = List.concat
---     , html = MC.htmlLinks
---     , text = \_ -> []
---     , codeSpan = \_ -> []
---     , strong = List.concat
---     , emphasis = List.concat
---     , strikethrough = List.concat
---     , hardLineBreak = []
---     , link =
---         \{ title, destination } content ->
---             let
---                 _ =
---                     Debug.log "  title, destination } content ->" ( title, destination, content )
---             in
---             [ { id = Right destination, title = title |> Maybe.withDefault "" } ]
---     , image =
---         \imageInfo ->
---             [ { id = Right imageInfo.src, title = imageInfo.alt } ]
---     , unorderedList =
---         \items ->
---             let
---                 its : List (List Link)
---                 its =
---                     items
---                         |> List.map
---                             (\listitem ->
---                                 case listitem of
---                                     Block.ListItem Block.NoTask childs ->
---                                         List.concat childs
---                                     Block.ListItem Block.IncompleteTask childs ->
---                                         List.concat childs
---                                     Block.ListItem Block.CompletedTask childs ->
---                                         List.concat childs
---                             )
---             in
---             List.concat its
---     , orderedList =
---         \startingIndex items ->
---             List.concat <| List.concat items
---     , codeBlock =
---         \{ body, language } -> []
---     , thematicBreak = []
---     , table = List.concat
---     , tableHeader = List.concat
---     , tableBody = List.concat
---     , tableRow = List.concat
---     , tableCell =
---         \_ lnks ->
---             List.concat lnks
---     , tableHeaderCell =
---         \maybeAlignment lnks ->
---             List.concat lnks
---     }
+                ( Nothing, Just s ) ->
+                    Just s
+
+                ( Nothing, Nothing ) ->
+                    Nothing
+            , List.concat [ links, slinks ]
+            )
+        )
+        ( Nothing, [] )
+        lst
 
 
 twoheads : String -> String

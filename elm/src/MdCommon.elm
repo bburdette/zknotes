@@ -15,7 +15,6 @@ module MdCommon exposing
     , htmlText
     , imageView
     , linkDict
-    , linkHtml
     , markdownView
     , mdCells
     , mdPanel
@@ -23,7 +22,6 @@ module MdCommon exposing
     , mkRenderer
     , noteFile
     , noteIds
-    , otroHtmlLinks
     , panelView
     , parseNoteShow
     , rawTextToId
@@ -433,8 +431,8 @@ type alias Link =
     }
 
 
-otroLinkHtml : HtmlFns ( Maybe String, List Link )
-otroLinkHtml =
+linkHtml : HtmlFns ( Maybe String, List Link )
+linkHtml =
     { schelmeView =
         \name schelmeCode _ ->
             ( Nothing, [] )
@@ -467,46 +465,7 @@ otroLinkHtml =
     }
 
 
-otroHtmlLinks : Markdown.Html.Renderer (List ( Maybe String, List Link ) -> ( Maybe String, List Link ))
-otroHtmlLinks =
-    htmlF otroLinkHtml
-
-
-linkHtml : HtmlFns (List Link)
-linkHtml =
-    { schelmeView =
-        \name schelmeCode _ ->
-            []
-    , searchView =
-        \query _ ->
-            []
-    , panelView =
-        \noteid _ ->
-            []
-    , imageView =
-        \text url width _ ->
-            [ { id = Right url, title = text } ]
-    , videoView =
-        \src text width height _ ->
-            [ { id = Right src, title = text |> Maybe.withDefault "" } ]
-    , audioView =
-        \text src _ ->
-            [ { id = Right src, title = text } ]
-    , noteView =
-        \id show text _ ->
-            [ { id = Left (Data.Zni id), title = text |> Maybe.withDefault "" } ]
-    , yeetView =
-        \url audioOnly id show text _ ->
-            id
-                |> Maybe.map
-                    (\nid ->
-                        [ { id = Left (Data.Zni nid), title = text |> Maybe.withDefault "" } ]
-                    )
-                |> Maybe.withDefault []
-    }
-
-
-htmlLinks : Markdown.Html.Renderer (List (List Link) -> List Link)
+htmlLinks : Markdown.Html.Renderer (List ( Maybe String, List Link ) -> ( Maybe String, List Link ))
 htmlLinks =
     htmlF linkHtml
 
