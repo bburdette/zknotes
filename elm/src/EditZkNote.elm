@@ -82,7 +82,7 @@ import RequestsDialog exposing (TRequests)
 import SearchStackPanel as SP
 import SnListEdit as SLE
 import SpecialNotes
-import SpecialNotesGui as SNG exposing (SpecialNoteState(..), initSpecialNoteState)
+import SpecialNotesGui as SNG exposing (SpecialNoteState(..), initSpecialNoteState, initSpecialNoteStateLz)
 import TDict
 import TagSearchPanel exposing (Search(..))
 import TagThings as TT
@@ -2344,7 +2344,7 @@ initFull fui ld zknote dtlinks lzlinks mbedittab mobile =
         snState =
             EM.getSpecialNote edMarkdown
                 |> Result.toMaybe
-                |> Maybe.map (\sn -> SNG.initSpecialNoteState zknote.id sn lzlinks)
+                |> Maybe.map (\sn -> SNG.initSpecialNoteStateLz zknote.id sn lzlinks)
     in
     ( { id = Just zknote.id
       , fui = fui
@@ -2828,41 +2828,41 @@ mergeEditBlock model =
             model
 
 
-onWkKeyPress : WK.Key -> Model -> ( Model, Command )
-onWkKeyPress key model =
+onWkKeyPress : NoteCache -> WK.Key -> Model -> ( Model, Command )
+onWkKeyPress noteCache key model =
     case Toop.T4 key.key key.ctrl key.alt key.shift of
         Toop.T4 "e" True True False ->
             let
                 ( m, _ ) =
-                    update (TabChanged EtEdit) model
+                    update noteCache (TabChanged EtEdit) model
             in
             ( m, Cmd (BD.focus "mdtext" |> Task.attempt (\_ -> Noop)) Nothing )
 
         Toop.T4 "v" True True False ->
-            update (TabChanged EtView) model
+            update noteCache (TabChanged EtView) model
 
         Toop.T4 "s" True True False ->
             let
                 ( m, _ ) =
-                    update (TabChanged EtSearch) model
+                    update noteCache (TabChanged EtSearch) model
             in
             ( m, Cmd (BD.focus "searchtext" |> Task.attempt (\_ -> Noop)) Nothing )
 
         Toop.T4 "r" True True False ->
-            update (TabChanged EtRecent) model
+            update noteCache (TabChanged EtRecent) model
 
         Toop.T4 "l" True True False ->
-            update LinkBackPress model
+            update noteCache LinkBackPress model
 
         Toop.T4 "s" True False False ->
             if dirty model then
-                update SavePress model
+                update noteCache SavePress model
 
             else
                 ( model, None )
 
         Toop.T4 "Enter" False False False ->
-            -- handleSPUpdate model (SP.onEnter model.spmodel)
+            -- handleSPUpdate noteCache model (SP.onEnter model.spmodel)
             ( model, SPMod SP.onEnter )
 
         Toop.T4 "Escape" False False False ->
@@ -2882,8 +2882,8 @@ onWkKeyPress key model =
             ( model, None )
 
 
-update : Msg -> Model -> ( Model, Command )
-update msg model =
+update : NoteCache -> Msg -> Model -> ( Model, Command )
+update noteCache msg model =
     case msg of
         RestoreSearch s ->
             ( model, SPMod (\spm -> ( SP.addSearchString spm s, SP.None )) )
@@ -3830,8 +3830,40 @@ update msg model =
             case model.id of
                 Just znid ->
                     let
+                        -- get all note links.
+                        links =
+                            EM.getBlocks model.edMarkdown
+                                |> Result.andThen
+                                    (\blks -> Markdown.Renderer.render EM.linkRenderer blks)
+                                |> Result.map List.concat
+                                |> Result.withDefault []
+                                |> Debug.log "lknks"
+                                |> List.filterMap
+                                    (\{ id, title } ->
+                                        case id of
+                                            Left zkid ->
+                                                Just
+                                                    { id = zkid
+                                                    , title =
+                                                        NC.getNote noteCache zkid
+                                                            |> Maybe.andThen
+                                                                (\ce ->
+                                                                    case ce of
+                                                                        NC.ZNAL n ->
+                                                                            Just n.zknote.title
+
+                                                                        _ ->
+                                                                            Nothing
+                                                                )
+                                                            |> Maybe.withDefault (zkNoteIdToString zkid)
+                                                    }
+
+                                            Right _ ->
+                                                Nothing
+                                    )
+
                         sns =
-                            initSpecialNoteState znid (SpecialNotes.SnList { currentUuid = Nothing }) []
+                            initSpecialNoteState (SpecialNotes.SnList { currentUuid = Nothing }) links
                     in
                     ( { model
                         | edMarkdown = EM.updateSpecialNote (SNG.getSpecialNote sns)
@@ -3953,7 +3985,7 @@ update msg model =
                     ( { model | tagThings = nm }, BigSearch )
 
                 TT.ControlCommand cc ->
-                    update cc { model | tagThings = nm }
+                    update noteCache cc { model | tagThings = nm }
 
                 TT.SPMod f ->
                     ( { model | tagThings = nm }, SPMod f )

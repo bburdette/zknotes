@@ -2253,7 +2253,7 @@ actualupdate msg model =
                     ( model, Cmd.none )
 
         ( WkMsg (Ok key), EditZkNote es login ) ->
-            handleEditZkNoteCmd model login (EditZkNote.onWkKeyPress key es)
+            handleEditZkNoteCmd model login (EditZkNote.onWkKeyPress model.noteCache key es)
 
         ( WkMsg (Ok key), EditZkNoteListing es login ) ->
             handleEditZkNoteListing model
@@ -3197,7 +3197,7 @@ actualupdate msg model =
                     )
 
         ( EditZkNoteMsg em, EditZkNote es login ) ->
-            handleEditZkNoteCmd model login (EditZkNote.update em es)
+            handleEditZkNoteCmd model login (EditZkNote.update model.noteCache em es)
 
         ( EditZkNoteMsg EditZkNote.Noop, _ ) ->
             ( model, Cmd.none )

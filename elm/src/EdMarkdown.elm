@@ -1,11 +1,25 @@
-module EdMarkdown exposing (EdMarkdown, getBlocks, getMd, getSpecialNote, init, stringRenderer, updateBlocks, updateMd, updateSpecialNote)
+module EdMarkdown exposing
+    ( EdMarkdown
+    , getBlocks
+    , getMd
+    , getSpecialNote
+    , init
+    , linkRenderer
+    , stringRenderer
+    , updateBlocks
+    , updateMd
+    , updateSpecialNote
+    )
 
+import Data exposing (ZkNoteId)
+import DataUtil exposing (NlLink)
+import Either exposing (Either(..))
 import Json.Decode as JD
 import Json.Encode as JE
 import Markdown.Block as Block exposing (Block, ListItem(..), Task(..))
 import Markdown.Parser
 import Markdown.Renderer
-import MdCommon as MC
+import MdCommon as MC exposing (Link)
 import SpecialNotes exposing (SpecialNote, specialNoteDecoder, specialNoteEncoder)
 
 
@@ -259,6 +273,66 @@ stringRenderer =
     , tableCell =
         \_ strs ->
             String.concat strs
+    }
+
+
+{-| This renders the parsed markdown structs to a list of links.
+-}
+linkRenderer : Markdown.Renderer.Renderer (List Link)
+linkRenderer =
+    { heading =
+        \{ level, rawText, children } -> List.concat children
+    , paragraph = List.concat
+    , blockQuote = List.concat
+    , html = MC.htmlLinks
+    , text = \_ -> []
+    , codeSpan = \_ -> []
+    , strong = List.concat
+    , emphasis = List.concat
+    , strikethrough = List.concat
+    , hardLineBreak = []
+    , link =
+        \{ title, destination } content ->
+            [ { id = Right destination, title = title |> Maybe.withDefault "" } ]
+    , image =
+        \imageInfo ->
+            [ { id = Right imageInfo.src, title = imageInfo.alt } ]
+    , unorderedList =
+        \items ->
+            let
+                its : List (List Link)
+                its =
+                    items
+                        |> List.map
+                            (\listitem ->
+                                case listitem of
+                                    Block.ListItem Block.NoTask childs ->
+                                        List.concat childs
+
+                                    Block.ListItem Block.IncompleteTask childs ->
+                                        List.concat childs
+
+                                    Block.ListItem Block.CompletedTask childs ->
+                                        List.concat childs
+                            )
+            in
+            List.concat its
+    , orderedList =
+        \startingIndex items ->
+            List.concat <| List.concat items
+    , codeBlock =
+        \{ body, language } -> []
+    , thematicBreak = []
+    , table = List.concat
+    , tableHeader = List.concat
+    , tableBody = List.concat
+    , tableRow = List.concat
+    , tableCell =
+        \_ lnks ->
+            List.concat lnks
+    , tableHeaderCell =
+        \maybeAlignment lnks ->
+            List.concat lnks
     }
 
 

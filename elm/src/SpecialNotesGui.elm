@@ -43,8 +43,13 @@ type SpecialNoteState
     | SnsList SLE.Model
 
 
-initSpecialNoteState : ZkNoteId -> SN.SpecialNote -> List LzLink -> SpecialNoteState
-initSpecialNoteState znid sn lzls =
+initSpecialNoteStateLz : ZkNoteId -> SN.SpecialNote -> List LzLink -> SpecialNoteState
+initSpecialNoteStateLz znid sn lzls =
+    initSpecialNoteState sn (mklzList znid lzls)
+
+
+initSpecialNoteState : SN.SpecialNote -> List NlLink -> SpecialNoteState
+initSpecialNoteState sn lzls =
     case sn of
         SN.SnSearch tagSearch ->
             SnsSearch tagSearch
@@ -53,7 +58,7 @@ initSpecialNoteState znid sn lzls =
             SnsSync completedSync
 
         SN.SnList notegraph ->
-            SnsList (SLE.init notegraph (mklzList znid lzls))
+            SnsList (SLE.init notegraph lzls)
 
 
 getSpecialNote : SpecialNoteState -> SpecialNote

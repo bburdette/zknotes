@@ -1,5 +1,6 @@
 module MdCommon exposing
-    ( MkrArgs
+    ( Link
+    , MkrArgs
     , Panel
     , ViewMode(..)
     , blockCells
@@ -10,9 +11,11 @@ module MdCommon exposing
     , defCell
     , editBlock
     , heading
+    , htmlLinks
     , htmlText
     , imageView
     , linkDict
+    , linkHtml
     , markdownView
     , mdCells
     , mdPanel
@@ -33,6 +36,7 @@ import Common exposing (buttonStyle)
 import Data exposing (ZkNoteId)
 import DataUtil exposing (FileUrlInfo, ZniSet, emptyZniSet, zkNoteIdFromString, zkNoteIdToString)
 import Dict exposing (Dict)
+import Either exposing (Either(..))
 import Element as E exposing (Element)
 import Element.Background as EBk
 import Element.Border as EBd
@@ -420,6 +424,51 @@ textHtml =
                     |> List.filterMap identity
                 )
     }
+
+
+type alias Link =
+    { id : Either ZkNoteId String
+    , title : String
+    }
+
+
+linkHtml : HtmlFns (List Link)
+linkHtml =
+    { schelmeView =
+        \name schelmeCode _ ->
+            []
+    , searchView =
+        \query _ ->
+            []
+    , panelView =
+        \noteid _ ->
+            []
+    , imageView =
+        \text url width _ ->
+            [ { id = Right url, title = text } ]
+    , videoView =
+        \src text width height _ ->
+            [ { id = Right src, title = text |> Maybe.withDefault "" } ]
+    , audioView =
+        \text src _ ->
+            [ { id = Right src, title = text } ]
+    , noteView =
+        \id show text _ ->
+            [ { id = Left (Data.Zni id), title = text |> Maybe.withDefault "" } ]
+    , yeetView =
+        \url audioOnly id show text _ ->
+            id
+                |> Maybe.map
+                    (\nid ->
+                        [ { id = Left (Data.Zni nid), title = text |> Maybe.withDefault "" } ]
+                    )
+                |> Maybe.withDefault []
+    }
+
+
+htmlLinks : Markdown.Html.Renderer (List (List Link) -> List Link)
+htmlLinks =
+    htmlF linkHtml
 
 
 htmlF : HtmlFns a -> Markdown.Html.Renderer (List a -> a)
