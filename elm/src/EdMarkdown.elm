@@ -68,12 +68,11 @@ getSpecialNote (EdMarkdown emd) =
 
 updateSpecialNote : SpecialNote -> EdMarkdown
 updateSpecialNote sn =
-    Debug.log "updateSpecialNote" <|
-        EdMarkdown
-            { md = JE.encode 2 (specialNoteEncoder sn)
-            , elts = Err "specialnote"
-            , specialNote = Ok sn
-            }
+    EdMarkdown
+        { md = JE.encode 2 (specialNoteEncoder sn)
+        , elts = Err "specialnote"
+        , specialNote = Ok sn
+        }
 
 
 updateBlocks : List Block -> Result String EdMarkdown
@@ -294,10 +293,6 @@ linkRenderer =
     , hardLineBreak = ( Nothing, [] )
     , link =
         \{ title, destination } c ->
-            let
-                _ =
-                    Debug.log "  title, destination } content ->" ( title, destination, c )
-            in
             ( Nothing, [ { id = Right destination, title = otroLrConcat c |> Tuple.first |> Maybe.withDefault "" } ] )
     , image =
         \imageInfo ->

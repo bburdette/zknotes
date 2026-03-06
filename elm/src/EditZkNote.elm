@@ -573,10 +573,6 @@ type DragDropWhat
 
 setCurrentSlideNote : Maybe ZkNoteId -> Model -> Model
 setCurrentSlideNote mbznid model =
-    let
-        _ =
-            Debug.log "setCurrentSlideNote" mbznid
-    in
     case model.snState of
         Just (SnsList slem) ->
             { model
@@ -1796,8 +1792,6 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
 
                             ( Nothing, Just _ ) ->
                                 enb
-
-                        -- , EI.button parabuttonstyle { onPress = Just LinksPress, label = E.text"links" }
                         , if isdirty then
                             EI.button perhapsdirtyparabuttonstyle { onPress = Just SavePress, label = E.text "save" }
 
@@ -2378,8 +2372,6 @@ initFull fui ld zknote dtlinks lzlinks mbedittab mobile =
       , noteUser = zknote.user
       , noteUserName = zknote.username
       , usernote = zknote.usernote
-
-      -- , focusSr = Nothing
       , zklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) links)
       , initialZklDict =
             Dict.fromList
@@ -2453,8 +2445,6 @@ initNew fui ld links mobile =
     , noteUser = ld.userid
     , noteUserName = ld.name
     , usernote = ld.zknote
-
-    -- , focusSr = Nothing
     , zklDict = zklDict
     , snState = Nothing
     , initialZklDict = Dict.empty
@@ -3398,16 +3388,6 @@ update noteCache msg model =
             , None
             )
 
-        -- SrFocusPress id ->
-        --     ( { model
-        --         | focusSr =
-        --             if model.focusSr == Just id then
-        --                 Nothing
-        --             else
-        --                 Just id
-        --       }
-        --     , None
-        --     )
         LinkFocusPress link ->
             ( { model
                 | focusLink =
@@ -3858,69 +3838,64 @@ update noteCache msg model =
                     let
                         -- get all note links.
                         links =
-                            Debug.log "links"
-                                (EM.getBlocks model.edMarkdown
-                                    |> Result.andThen
-                                        (\blks -> Markdown.Renderer.render EM.linkRenderer blks)
-                                    |> Result.map (\l -> List.map Tuple.second l |> List.concat)
-                                    |> Result.withDefault []
-                                    |> Debug.log "lknks"
-                                    |> List.filterMap
-                                        (\{ id, title } ->
-                                            case id of
-                                                Left zkid ->
-                                                    Just
-                                                        { id = zkid
-                                                        , title =
-                                                            NC.getNote noteCache zkid
-                                                                |> Maybe.andThen
-                                                                    (\ce ->
-                                                                        case ce of
-                                                                            NC.ZNAL n ->
-                                                                                Just n.zknote.title
+                            EM.getBlocks model.edMarkdown
+                                |> Result.andThen
+                                    (\blks -> Markdown.Renderer.render EM.linkRenderer blks)
+                                |> Result.map (\l -> List.map Tuple.second l |> List.concat)
+                                |> Result.withDefault []
+                                |> List.filterMap
+                                    (\{ id, title } ->
+                                        case id of
+                                            Left zkid ->
+                                                Just
+                                                    { id = zkid
+                                                    , title =
+                                                        NC.getNote noteCache zkid
+                                                            |> Maybe.andThen
+                                                                (\ce ->
+                                                                    case ce of
+                                                                        NC.ZNAL n ->
+                                                                            Just n.zknote.title
 
-                                                                            _ ->
-                                                                                Nothing
-                                                                    )
-                                                                |> Maybe.withDefault (zkNoteIdToString zkid)
-                                                        }
-
-                                                Right url ->
-                                                    let
-                                                        es =
-                                                            Debug.log "es" <|
-                                                                case Debug.log "splurl" <| String.split "/" url of
-                                                                    [ "note", s ] ->
-                                                                        Just s
-
-                                                                    [ "", "note", s ] ->
-                                                                        Just s
-
-                                                                    [ "", "editnote", s ] ->
-                                                                        Just s
-
-                                                                    [ "editnote", s ] ->
-                                                                        Just s
-
-                                                                    _ ->
-                                                                        Debug.log "nothing"
+                                                                        _ ->
                                                                             Nothing
-                                                    in
-                                                    es
-                                                        |> Maybe.andThen
-                                                            (\s ->
-                                                                case Debug.log "UUID.fromString" <| UUID.fromString s of
-                                                                    Ok uuid ->
-                                                                        Just
-                                                                            { id = Data.Zni s
-                                                                            , title = title
-                                                                            }
+                                                                )
+                                                            |> Maybe.withDefault (zkNoteIdToString zkid)
+                                                    }
 
-                                                                    Err _ ->
-                                                                        Nothing
-                                                            )
-                                        )
-                                )
+                                            Right url ->
+                                                let
+                                                    es =
+                                                        case String.split "/" url of
+                                                            [ "note", s ] ->
+                                                                Just s
+
+                                                            [ "", "note", s ] ->
+                                                                Just s
+
+                                                            [ "", "editnote", s ] ->
+                                                                Just s
+
+                                                            [ "editnote", s ] ->
+                                                                Just s
+
+                                                            _ ->
+                                                                Nothing
+                                                in
+                                                es
+                                                    |> Maybe.andThen
+                                                        (\s ->
+                                                            case UUID.fromString s of
+                                                                Ok uuid ->
+                                                                    Just
+                                                                        { id = Data.Zni s
+                                                                        , title = title
+                                                                        }
+
+                                                                Err _ ->
+                                                                    Nothing
+                                                        )
+                                    )
 
                         sns =
                             initSpecialNoteState (SpecialNotes.SnList { currentUuid = Nothing }) links

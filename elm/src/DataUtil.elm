@@ -308,14 +308,6 @@ lzlKey lzl =
         ++ zkNoteIdToString lzl.to
 
 
-
--- lzlKeyFromString :  String -> LzlGraphKey ->
--- lzlKeyFromString lzl =
---     zkNoteIdToString lzl.from
---         ++ ":"
---         ++ zkNoteIdToString lzl.to
-
-
 elToSzl : EditLink -> SaveZkLink
 elToSzl el =
     { otherid = el.otherid
