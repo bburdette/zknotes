@@ -2,7 +2,7 @@ module SnListEdit exposing (..)
 
 import Common
 import Data exposing (ZkNoteId)
-import DataUtil exposing (NlLink, ZniSet, emptyZniSet)
+import DataUtil exposing (NlLink, ZniSet, emptyZniSet, zkNoteIdToString)
 import DnDList
 import DndPorts exposing (..)
 import Element as E exposing (Element)
@@ -28,6 +28,7 @@ type Msg
     | DnDMsg DnDList.Msg
     | Select ZkNoteId
     | Remove
+    | Play ZkNoteId
 
 
 type alias Model =
@@ -78,6 +79,15 @@ update msg model =
                         TSet.insert id model.selected
             }
 
+        Play id ->
+            let
+                ng =
+                    model.ng
+            in
+            { model
+                | ng = { ng | currentUuid = Just <| zkNoteIdToString id }
+            }
+
         Remove ->
             { model
                 | nlls =
@@ -93,10 +103,14 @@ update msg model =
 
 controlRow : ZkNoteId -> E.Element Msg
 controlRow id =
-    E.row [ E.width E.fill ]
+    E.row [ E.width E.fill, E.spacing 3, E.padding 3 ]
         [ EI.button Common.buttonStyle
             { onPress = Just Remove
             , label = E.text "x"
+            }
+        , EI.button Common.buttonStyle
+            { onPress = Just (Play id)
+            , label = E.text "▶"
             }
         , ZC.golinkns id TC.black
         ]
@@ -154,8 +168,15 @@ view model =
                                      else
                                         TC.lightGray
                                     )
+                                , E.spacing 3
                                 ]
-                                [ E.text nl.title ]
+                                [ E.text nl.title
+                                , if Just nl.id == Maybe.map Data.Zni model.ng.currentUuid then
+                                    E.el [ EF.bold ] (E.text "▶")
+
+                                  else
+                                    E.none
+                                ]
                      in
                      E.column [ E.width E.fill ]
                         (r

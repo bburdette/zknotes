@@ -68,11 +68,12 @@ getSpecialNote (EdMarkdown emd) =
 
 updateSpecialNote : SpecialNote -> EdMarkdown
 updateSpecialNote sn =
-    EdMarkdown
-        { md = JE.encode 2 (specialNoteEncoder sn)
-        , elts = Err "specialnote"
-        , specialNote = Ok sn
-        }
+    Debug.log "updateSpecialNote" <|
+        EdMarkdown
+            { md = JE.encode 2 (specialNoteEncoder sn)
+            , elts = Err "specialnote"
+            , specialNote = Ok sn
+            }
 
 
 updateBlocks : List Block -> Result String EdMarkdown

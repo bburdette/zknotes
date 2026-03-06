@@ -34,7 +34,7 @@ type Command
     | CopySyncSearch TagSearch
     | GraphFocus
     | DndCmd (Cmd Msg)
-    | SlideShow (List NlLink)
+    | SlideShow (Maybe ZkNoteId) (List NlLink)
     | ToMarkdown String
     | None
 
@@ -178,7 +178,7 @@ guiSn zone snote =
 
         SnsList slem ->
             E.column []
-                [ E.row []
+                [ E.row [ E.spacing 3 ]
                     [ EI.button Common.buttonStyle
                         { onPress = Just <| GraphFocusClick
                         , label = E.text "add to list"
@@ -189,7 +189,7 @@ guiSn zone snote =
                         }
                     , EI.button Common.buttonStyle
                         { onPress = Just <| ToMarkdownPress
-                        , label = E.text "markdown"
+                        , label = E.text "to markdown"
                         }
                     ]
                 , E.map SLEMsg <| SLE.view slem
@@ -420,7 +420,7 @@ updateSn msg snote =
                     ( SnsList slem, GraphFocus )
 
                 SlideShowClick ->
-                    ( SnsList slem, SlideShow slem.nlls )
+                    ( SnsList slem, SlideShow (Maybe.map Zni slem.ng.currentUuid) slem.nlls )
 
                 ToMarkdownPress ->
                     ( SnsList slem

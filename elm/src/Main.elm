@@ -3188,8 +3188,17 @@ actualupdate msg model =
                 SlideShow.Noop ->
                     ( { model | state = SlideShow emod instate }, Cmd.none )
 
-                SlideShow.Close ->
-                    ( { model | state = instate }, Cmd.none )
+                SlideShow.Close mbcurrent ->
+                    let
+                        ins =
+                            case instate of
+                                EditZkNote ezn login ->
+                                    EditZkNote (EditZkNote.setCurrentSlideNote mbcurrent ezn) login
+
+                                _ ->
+                                    instate
+                    in
+                    ( { model | state = ins }, Cmd.none )
 
                 SlideShow.GetNote id ->
                     ( { model | state = SlideShow emod instate }
@@ -4158,19 +4167,19 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     , sendZIMsg model.fui (Data.PvqSaveZkLinks szl)
                     )
 
-                EditZkNote.SlideShow lst ->
+                EditZkNote.SlideShow mbcurrent lst ->
                     case lst of
                         fst :: rest ->
                             let
                                 ( ssmod, sscmd ) =
-                                    SlideShow.init model.fui model.noteCache fst rest
+                                    SlideShow.init model.fui model.noteCache mbcurrent fst rest
                             in
                             ( { model | state = SlideShow ssmod (EditZkNote emod login) }
                             , case sscmd of
                                 SlideShow.GetNote id ->
                                     makeNoteCacheGet model id
 
-                                SlideShow.Close ->
+                                SlideShow.Close _ ->
                                     Cmd.none
 
                                 SlideShow.Noop ->

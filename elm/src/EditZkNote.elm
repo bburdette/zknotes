@@ -32,6 +32,7 @@ module EditZkNote exposing
     , pageLink
     , replaceOrAdd
     , saveZkLinkList
+    , setCurrentSlideNote
     , setHomeNote
     , setTab
     , showZkl
@@ -133,7 +134,6 @@ type Msg
     | TabChanged EditTab
     | DialogMsg D.Msg
     | RestoreSearch String
-      -- | SrFocusPress ZkNoteId
     | LinkFocusPress EditLink
     | AddToSearchAsTag String
     | SetSearchString String
@@ -278,7 +278,7 @@ type Command
     | PowerTag
     | SPMod (SP.Model -> ( SP.Model, SP.Command ))
     | InlineXform MB.Inline (MB.Inline -> MG.Msg)
-    | SlideShow (List NlLink)
+    | SlideShow (Maybe ZkNoteId) (List NlLink)
     | Cmd (Cmd Msg) (Maybe Command)
 
 
@@ -374,10 +374,8 @@ dndSubscriptions model =
             blockDndSubscriptions model
 
 
-
--- to be called from main.elm!
-
-
+{-| to be called from main.elm!
+-}
 ghostView : Model -> Time.Zone -> NoteCache -> MC.ViewMode -> Int -> Maybe (Element Msg)
 ghostView model zone nc viewMode mdw =
     case model.snState of
@@ -573,6 +571,23 @@ type DragDropWhat
 -------------------------------------------------------------------------
 
 
+setCurrentSlideNote : Maybe ZkNoteId -> Model -> Model
+setCurrentSlideNote mbznid model =
+    let
+        _ =
+            Debug.log "setCurrentSlideNote" mbznid
+    in
+    case model.snState of
+        Just (SnsList slem) ->
+            { model
+                | snState =
+                    Just (SnsList { slem | ng = { currentUuid = Maybe.map zkNoteIdToString mbznid } })
+            }
+
+        _ ->
+            model
+
+
 setTab : EditTab -> Model -> Model
 setTab nc model =
     { model
@@ -723,7 +738,17 @@ sznFromModel : Model -> Data.SaveZkNote
 sznFromModel model =
     { id = model.id
     , title = model.title
-    , content = EM.getMd model.edMarkdown
+    , content =
+        let
+            edm =
+                case model.snState of
+                    Just sn ->
+                        EM.updateSpecialNote (SNG.getSpecialNote sn)
+
+                    Nothing ->
+                        model.edMarkdown
+        in
+        EM.getMd edm
     , pubid = toPubId (isPublic model) model.pubidtxt
     , editable = model.editableValue
     , showtitle = model.showtitle
@@ -3975,8 +4000,8 @@ update noteCache msg model =
                             , None
                             )
 
-                        SNG.SlideShow lst ->
-                            ( umod, SlideShow lst )
+                        SNG.SlideShow current lst ->
+                            ( umod, SlideShow current lst )
 
                         SNG.DndCmd c ->
                             ( umod

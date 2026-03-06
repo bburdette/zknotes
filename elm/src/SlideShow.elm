@@ -41,7 +41,7 @@ type Msg
 
 
 type Command
-    = Close
+    = Close (Maybe ZkNoteId)
     | GetNote ZkNoteId
     | Noop
 
@@ -59,14 +59,21 @@ viewConfig =
     }
 
 
-init : FileUrlInfo -> NoteCache -> NlLink -> List NlLink -> ( Model, Command )
-init fui nc nl nlls =
+init : FileUrlInfo -> NoteCache -> Maybe ZkNoteId -> NlLink -> List NlLink -> ( Model, Command )
+init fui nc mbcurrent nl rnlls =
     let
         zkn =
             getNote nc nl.id
+
+        nlls =
+            Array.fromList (nl :: rnlls)
+
+        current =
+            Util.findFirstIndex (\nll -> Just nll.id == mbcurrent) nlls
+                |> Maybe.withDefault 0
     in
-    ( { nlls = Array.fromList (nl :: nlls)
-      , current = 0
+    ( { nlls = nlls
+      , current = current
       , viewModel =
             case zkn of
                 Just (ZNAL note) ->
@@ -139,7 +146,12 @@ update msg nc model =
                 |> updateNote nc
 
         ClosePress ->
-            ( model, Close )
+            ( model
+            , Close
+                (Array.get model.current model.nlls
+                    |> Maybe.map .id
+                )
+            )
 
         ViewMsg vmsg ->
             case model.viewModel of
