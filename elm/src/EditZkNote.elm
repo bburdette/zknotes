@@ -1940,6 +1940,14 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
         mbdi =
             blockDndSystem.info model.blockDnd
 
+        gotid =
+            case model.id of
+                Just _ ->
+                    True
+
+                Nothing ->
+                    False
+
         mdview =
             E.column
                 [ E.width E.fill
@@ -1957,8 +1965,19 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                         , checked = model.droplinkmode
                         , label = EI.labelLeft [] (E.text "DLMode")
                         }
-                    , EI.button Common.buttonStyle
-                        { onPress = Just MakeList
+                    , EI.button
+                        (if gotid then
+                            Common.buttonStyle
+
+                         else
+                            Common.disabledButtonStyle
+                        )
+                        { onPress =
+                            if gotid then
+                                Just MakeList
+
+                            else
+                                Nothing
                         , label = E.text "list"
                         }
                     , EI.button Common.buttonStyle
