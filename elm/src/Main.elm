@@ -57,7 +57,6 @@ import TSet
 import TagAThing
 import TagFiles
 import TagNotes
-import TagNotes2
 import Task
 import Time
 import Toop
@@ -120,8 +119,7 @@ type Msg
     | MdInlineXformMsg (GD.Msg MdInlineXform.Msg)
     | MdInlineXformCmd MdInlineXform.Command
     | TagFilesMsg (TagAThing.Msg TagFiles.Msg)
-    | TagNotesMsg (TagAThing.Msg TagNotes.Msg)
-    | TagNotes2Msg TagNotes2.Msg
+    | TagNotes2Msg TagNotes.Msg
     | InviteUserMsg (TagAThing.Msg InviteUser.Msg)
     | JobsPollTick Time.Posix
     | SlideShowMsg SlideShow.Msg
@@ -155,8 +153,7 @@ type State
     | RequestsDialog RequestsDialog.GDModel State
     | JobsDialog JobsDialog.GDModel State
     | TagFiles (TagAThing.Model TagFiles.Model TagFiles.Msg TagFiles.Command) LoginData State
-    | TagNotes (TagAThing.Model TagNotes.Model TagNotes.Msg TagNotes.Command) LoginData State
-    | TagNotes2 TagNotes2.Model LoginData State
+    | TagNotes TagNotes.Model LoginData State
     | InviteUser (TagAThing.Model InviteUser.Model InviteUser.Msg InviteUser.Command) LoginData State
     | MdInlineXform MdInlineXform.GDModel State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
@@ -797,9 +794,6 @@ showMessage msg =
         TagFilesMsg _ ->
             "TagFilesMsg"
 
-        TagNotesMsg _ ->
-            "TagNotesMsg"
-
         TagNotes2Msg _ ->
             "TagNotes2Msg"
 
@@ -902,9 +896,6 @@ showState state =
 
         TagNotes _ _ _ ->
             "TagNotes"
-
-        TagNotes2 _ _ _ ->
-            "TagNotes2"
 
         InviteUser _ _ _ ->
             "InviteUser"
@@ -1026,10 +1017,7 @@ viewState size state model =
             E.map TagFilesMsg <| TagAThing.view model.stylePalette model.recentNotes (Just size) model.spmodel model.zknSearchResult tfmod
 
         TagNotes tfmod _ _ ->
-            E.map TagNotesMsg <| TagAThing.view model.stylePalette model.recentNotes (Just size) model.spmodel model.zknSearchResult tfmod
-
-        TagNotes2 tfmod _ _ ->
-            E.map TagNotes2Msg <| TagNotes2.view model.stylePalette (Just size) model.recentNotes model.spmodel model.zknSearchResult tfmod
+            E.map TagNotes2Msg <| TagNotes.view model.stylePalette (Just size) model.recentNotes model.spmodel model.zknSearchResult tfmod
 
         InviteUser tfmod _ _ ->
             E.map InviteUserMsg <| TagAThing.view model.stylePalette model.recentNotes (Just size) model.spmodel model.zknSearchResult tfmod
@@ -1126,9 +1114,6 @@ stateLogin state =
             Just login
 
         TagNotes _ login _ ->
-            Just login
-
-        TagNotes2 _ login _ ->
             Just login
 
         InviteUser _ login _ ->
@@ -2238,9 +2223,6 @@ actualupdate msg model =
         ( WkMsg (Ok key), TagFiles mod ld ps ) ->
             handleTagFiles model (TagAThing.onWkKeyPress key mod) ld ps
 
-        ( WkMsg (Ok key), TagNotes mod ld ps ) ->
-            handleTagNotes model (TagAThing.onWkKeyPress key mod) ld ps
-
         ( WkMsg (Ok key), InviteUser mod ld ps ) ->
             handleInviteUser model (TagAThing.onWkKeyPress key mod) ld ps
 
@@ -2268,11 +2250,8 @@ actualupdate msg model =
         ( TagFilesMsg lm, TagFiles mod ld st ) ->
             handleTagFiles model (TagAThing.update lm mod) ld st
 
-        ( TagNotesMsg lm, TagNotes mod ld st ) ->
-            handleTagNotes model (TagAThing.update lm mod) ld st
-
-        ( TagNotes2Msg lm, TagNotes2 mod ld st ) ->
-            handleTagNotes2 model (TagNotes2.update lm mod) ld st
+        ( TagNotes2Msg lm, TagNotes mod ld st ) ->
+            handleTagNotes2 model (TagNotes.update lm mod) ld st
 
         ( InviteUserMsg lm, InviteUser mod ld st ) ->
             handleInviteUser model (TagAThing.update lm mod) ld st
@@ -4070,12 +4049,12 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                 EditZkNote.PowerTag ->
                     ( { model
                         | state =
-                            TagNotes2
-                                (TagNotes2.init
+                            TagNotes
+                                (TagNotes.init
                                     login
                                     []
                                     []
-                                    TagNotes2.AddNotes
+                                    TagNotes.AddNotes
                                 )
                                 login
                                 model.state
@@ -4396,99 +4375,19 @@ handleTagFiles model ( lmod, lcmd ) login st =
             handleSPMod model fn
 
 
-handleTagNotes :
-    Model
-    -> ( TagAThing.Model TagNotes.Model TagNotes.Msg TagNotes.Command, TagAThing.Command TagNotes.Command )
-    -> LoginData
-    -> State
-    -> ( Model, Cmd Msg )
-handleTagNotes model ( lmod, lcmd ) login st =
-    let
-        updstate =
-            TagNotes lmod login st
-    in
-    case lcmd of
-        TagAThing.Search s ->
-            sendSearch { model | state = updstate } s
-
-        TagAThing.SyncFiles s ->
-            ( { model | state = updstate }
-            , sendZIMsg model.fui (Data.PvqSyncFiles s)
-            )
-
-        TagAThing.SearchHistory ->
-            ( shDialog { model | state = updstate }
-            , Cmd.none
-            )
-
-        TagAThing.None ->
-            ( { model | state = updstate }, Cmd.none )
-
-        TagAThing.AddToRecent zklns ->
-            ( { model
-                | state = updstate
-                , recentNotes =
-                    List.foldl
-                        (\zkln rns ->
-                            addRecentZkListNote rns zkln
-                        )
-                        model.recentNotes
-                        zklns
-              }
-            , Cmd.none
-            )
-
-        TagAThing.ThingCommand tc ->
-            case tc of
-                TagNotes.Ok ->
-                    let
-                        zklns =
-                            lmod.thing.model.notes
-
-                        zkls =
-                            Dict.values lmod.zklDict
-
-                        zklinks : List Data.SaveZkLink2
-                        zklinks =
-                            List.foldl
-                                (\zkln links ->
-                                    List.map (\el -> DataUtil.elToSzl2 zkln.id el) zkls
-                                        ++ links
-                                )
-                                []
-                                zklns
-                    in
-                    ( { model | state = st }
-                    , sendZIMsg model.fui
-                        (Data.PvqSaveZkLinks { links = zklinks })
-                    )
-
-                TagNotes.Cancel ->
-                    ( { model | state = st }, Cmd.none )
-
-                TagNotes.Which w ->
-                    ( { model | state = TagNotes { lmod | addWhich = w } login st }, Cmd.none )
-
-                TagNotes.None ->
-                    ( { model | state = updstate }, Cmd.none )
-
-        TagAThing.SPMod fn ->
-            handleSPMod { model | state = updstate } fn
-
-
 handleTagNotes2 :
     Model
-    -> ( TagNotes2.Model, TagNotes2.Command )
+    -> ( TagNotes.Model, TagNotes.Command )
     -> LoginData
     -> State
     -> ( Model, Cmd Msg )
 handleTagNotes2 model ( lmod, lcmd ) login st =
     let
         updstate =
-            TagNotes2 lmod login st
+            TagNotes lmod login st
     in
     case lcmd of
-        TagNotes2.AddToRecent zklns ->
+        TagNotes.AddToRecent zklns ->
             ( { model
                 | state = updstate
                 , recentNotes =
@@ -4502,12 +4401,12 @@ handleTagNotes2 model ( lmod, lcmd ) login st =
             , Cmd.none
             )
 
-        TagNotes2.SearchHistory ->
+        TagNotes.SearchHistory ->
             ( shDialog { model | state = updstate }
             , Cmd.none
             )
 
-        TagNotes2.Ok ->
+        TagNotes.Ok ->
             let
                 zklns =
                     lmod.notes
@@ -4530,16 +4429,16 @@ handleTagNotes2 model ( lmod, lcmd ) login st =
                 (Data.PvqSaveZkLinks { links = zklinks })
             )
 
-        TagNotes2.Cancel ->
+        TagNotes.Cancel ->
             ( { model | state = st }, Cmd.none )
 
-        TagNotes2.Which w ->
-            ( { model | state = TagNotes2 { lmod | addWhich = w } login st }, Cmd.none )
+        TagNotes.Which w ->
+            ( { model | state = TagNotes { lmod | addWhich = w } login st }, Cmd.none )
 
-        TagNotes2.SPMod fn ->
+        TagNotes.SPMod fn ->
             handleSPMod { model | state = updstate } fn
 
-        TagNotes2.None ->
+        TagNotes.None ->
             ( { model | state = updstate }, Cmd.none )
 
 
