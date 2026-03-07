@@ -62,15 +62,18 @@ viewConfig =
 init : FileUrlInfo -> NoteCache -> Maybe ZkNoteId -> NlLink -> List NlLink -> ( Model, Command )
 init fui nc mbcurrent nl rnlls =
     let
-        zkn =
-            getNote nc nl.id
-
         nlls =
             Array.fromList (nl :: rnlls)
 
         current =
             Util.findFirstIndex (\nll -> Just nll.id == mbcurrent) nlls
                 |> Maybe.withDefault 0
+
+        getid =
+            mbcurrent |> Maybe.withDefault nl.id
+
+        zkn =
+            getNote nc getid
     in
     ( { nlls = nlls
       , current = current
@@ -100,7 +103,7 @@ init fui nc mbcurrent nl rnlls =
             Noop
 
         Nothing ->
-            GetNote nl.id
+            GetNote getid
     )
 
 
