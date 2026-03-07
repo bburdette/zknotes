@@ -1,11 +1,25 @@
-module EdMarkdown exposing (EdMarkdown, getBlocks, getMd, getSpecialNote, init, stringRenderer, updateBlocks, updateMd, updateSpecialNote)
+module EdMarkdown exposing
+    ( EdMarkdown
+    , getBlocks
+    , getMd
+    , getSpecialNote
+    , init
+    , linkRenderer
+    , stringRenderer
+    , updateBlocks
+    , updateMd
+    , updateSpecialNote
+    )
 
+import Data exposing (ZkNoteId)
+import DataUtil exposing (NlLink)
+import Either exposing (Either(..))
 import Json.Decode as JD
 import Json.Encode as JE
 import Markdown.Block as Block exposing (Block, ListItem(..), Task(..))
 import Markdown.Parser
 import Markdown.Renderer
-import MdCommon as MC
+import MdCommon as MC exposing (Link)
 import SpecialNotes exposing (SpecialNote, specialNoteDecoder, specialNoteEncoder)
 
 
@@ -260,6 +274,88 @@ stringRenderer =
         \_ strs ->
             String.concat strs
     }
+
+
+{-| This renders the parsed markdown structs to a list of links.
+-}
+linkRenderer : Markdown.Renderer.Renderer ( Maybe String, List Link )
+linkRenderer =
+    { heading =
+        \{ level, rawText, children } -> otroLrConcat children
+    , paragraph = otroLrConcat
+    , blockQuote = otroLrConcat
+    , html = MC.htmlLinks
+    , text = \s -> ( Just s, [] )
+    , codeSpan = \_ -> ( Nothing, [] )
+    , strong = otroLrConcat
+    , emphasis = otroLrConcat
+    , strikethrough = otroLrConcat
+    , hardLineBreak = ( Nothing, [] )
+    , link =
+        \{ title, destination } c ->
+            ( Nothing, [ { id = Right destination, title = otroLrConcat c |> Tuple.first |> Maybe.withDefault "" } ] )
+    , image =
+        \imageInfo ->
+            ( Nothing, [ { id = Right imageInfo.src, title = imageInfo.alt } ] )
+    , unorderedList =
+        \items ->
+            let
+                its : List ( Maybe String, List Link )
+                its =
+                    items
+                        |> List.map
+                            (\listitem ->
+                                case listitem of
+                                    Block.ListItem Block.NoTask childs ->
+                                        otroLrConcat childs
+
+                                    Block.ListItem Block.IncompleteTask childs ->
+                                        otroLrConcat childs
+
+                                    Block.ListItem Block.CompletedTask childs ->
+                                        otroLrConcat childs
+                            )
+            in
+            otroLrConcat its
+    , orderedList =
+        -- List (List (Maybe String, List Link))
+        \startingIndex items ->
+            -- otroLrConcat <| otroLrConcat items
+            otroLrConcat (List.map otroLrConcat items)
+    , codeBlock =
+        \{ body, language } -> ( Nothing, [] )
+    , thematicBreak = ( Nothing, [] )
+    , table = otroLrConcat
+    , tableHeader = otroLrConcat
+    , tableBody = otroLrConcat
+    , tableRow = otroLrConcat
+    , tableCell =
+        \_ lnks ->
+            otroLrConcat lnks
+    , tableHeaderCell =
+        \maybeAlignment lnks ->
+            otroLrConcat lnks
+    }
+
+
+otroLrConcat : List ( Maybe String, List Link ) -> ( Maybe String, List Link )
+otroLrConcat lst =
+    List.foldl
+        (\( mbs, links ) ( smbs, slinks ) ->
+            ( case ( mbs, smbs ) of
+                ( Just s, _ ) ->
+                    Just s
+
+                ( Nothing, Just s ) ->
+                    Just s
+
+                ( Nothing, Nothing ) ->
+                    Nothing
+            , List.concat [ links, slinks ]
+            )
+        )
+        ( Nothing, [] )
+        lst
 
 
 twoheads : String -> String

@@ -151,6 +151,20 @@ golink size zknid color =
         }
 
 
+golinkns : ZkNoteId -> E.Color -> E.Element a
+golinkns zknid color =
+    E.link
+        [ EF.color color ]
+        { url = DU.editNoteLink zknid
+        , label =
+            E.el
+                [ E.inFront (E.el [] <| E.text "↗")
+                ]
+            <|
+                E.text "☐"
+        }
+
+
 stringToolTip : String -> E.Element msg
 stringToolTip str =
     E.el

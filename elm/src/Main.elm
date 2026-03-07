@@ -51,6 +51,7 @@ import SearchStackPanel as SP
 import SearchUtil as SU
 import SelectString as SS
 import ShowMessage
+import SlideShow
 import SpecialNotes as SN
 import TSet
 import TagAThing
@@ -118,9 +119,10 @@ type Msg
     | MdInlineXformMsg (GD.Msg MdInlineXform.Msg)
     | MdInlineXformCmd MdInlineXform.Command
     | TagFilesMsg (TagAThing.Msg TagFiles.Msg)
-    | TagNotesMsg (TagAThing.Msg TagNotes.Msg)
+    | TagNotes2Msg TagNotes.Msg
     | InviteUserMsg (TagAThing.Msg InviteUser.Msg)
     | JobsPollTick Time.Posix
+    | SlideShowMsg SlideShow.Msg
     | Noop
 
 
@@ -151,10 +153,11 @@ type State
     | RequestsDialog RequestsDialog.GDModel State
     | JobsDialog JobsDialog.GDModel State
     | TagFiles (TagAThing.Model TagFiles.Model TagFiles.Msg TagFiles.Command) LoginData State
-    | TagNotes (TagAThing.Model TagNotes.Model TagNotes.Msg TagNotes.Command) LoginData State
+    | TagNotes TagNotes.Model LoginData State
     | InviteUser (TagAThing.Model InviteUser.Model InviteUser.Msg InviteUser.Command) LoginData State
     | MdInlineXform MdInlineXform.GDModel State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
+    | SlideShow SlideShow.Model State
 
 
 decodeFlags : JD.Decoder Flags
@@ -263,20 +266,6 @@ routeState model route =
             routeStateInternal model route
     in
     ( st, cmds )
-
-
-
--- case stateLogin st of
---     Just login ->
---         ( st
---         , Cmd.batch
---             [ cmds
---             -- TODO: uh don't do this search every time??
---             , sendZIMsg model.fui (Data.PvqSearchZkNotes <| prevSearchQuery login)
---             ]
---         )
---     Nothing ->
---         ( st, cmds )
 
 
 routeStateInternal : Model -> Route -> ( State, Cmd Msg )
@@ -805,14 +794,17 @@ showMessage msg =
         TagFilesMsg _ ->
             "TagFilesMsg"
 
-        TagNotesMsg _ ->
-            "TagNotesMsg"
+        TagNotes2Msg _ ->
+            "TagNotes2Msg"
 
         InviteUserMsg _ ->
             "InviteUserMsg"
 
         JobsPollTick _ ->
             "JobsPollTick"
+
+        SlideShowMsg _ ->
+            "SlideShowMsg"
 
 
 showState : State -> String
@@ -908,6 +900,9 @@ showState state =
         InviteUser _ _ _ ->
             "InviteUser"
 
+        SlideShow _ _ ->
+            "SlideShow"
+
 
 unexpectedMsg : Model -> Msg -> Model
 unexpectedMsg model msg =
@@ -930,7 +925,7 @@ viewState size state model =
             E.map InvitedMsg <| Invited.view model.stylePalette size em
 
         EditZkNote em _ ->
-            E.map EditZkNoteMsg <| EditZkNote.view model.stylePalette.fontSize model.timezone size model.spmodel model.zknSearchResult model.recentNotes model.trackedRequests model.jobs model.noteCache em
+            E.map EditZkNoteMsg <| EditZkNote.view model.stylePalette model.timezone size model.spmodel model.zknSearchResult model.recentNotes model.trackedRequests model.jobs model.noteCache em
 
         EditZkNoteListing em ld ->
             E.map EditZkNoteListingMsg <| EditZkNoteListing.view model.stylePalette.fontSize ld size em model.spmodel model.zknSearchResult
@@ -954,10 +949,14 @@ viewState size state model =
             E.map ImportMsg <| Import.view size em model.spmodel model.zknSearchResult
 
         View em ->
-            E.map ViewMsg <| View.view model.timezone size.width model.noteCache em False
+            let
+                config =
+                    View.defaultConfig
+            in
+            E.map ViewMsg <| View.view model.timezone size.width model.noteCache { config | loggedin = False } em
 
         EView em _ ->
-            E.map ViewMsg <| View.view model.timezone size.width model.noteCache em True
+            E.map ViewMsg <| View.view model.timezone size.width model.noteCache View.defaultConfig em
 
         UserSettings em _ _ ->
             E.map UserSettingsMsg <| UserSettings.view em
@@ -970,7 +969,6 @@ viewState size state model =
             -- render is at the layout level, not here.
             E.none
 
-        -- E.map DisplayMessageMsg <| DisplayMessage.view em
         Wait innerState _ ->
             E.map (\_ -> Noop) (viewState size innerState model)
 
@@ -1019,10 +1017,13 @@ viewState size state model =
             E.map TagFilesMsg <| TagAThing.view model.stylePalette model.recentNotes (Just size) model.spmodel model.zknSearchResult tfmod
 
         TagNotes tfmod _ _ ->
-            E.map TagNotesMsg <| TagAThing.view model.stylePalette model.recentNotes (Just size) model.spmodel model.zknSearchResult tfmod
+            E.map TagNotes2Msg <| TagNotes.view model.stylePalette (Just size) model.recentNotes model.spmodel model.zknSearchResult tfmod
 
         InviteUser tfmod _ _ ->
             E.map InviteUserMsg <| TagAThing.view model.stylePalette model.recentNotes (Just size) model.spmodel model.zknSearchResult tfmod
+
+        SlideShow ssmodel _ ->
+            E.map SlideShowMsg <| SlideShow.view model.timezone size.width model.noteCache ssmodel
 
 
 stateLogin : State -> Maybe LoginData
@@ -1117,6 +1118,9 @@ stateLogin state =
 
         InviteUser _ login _ ->
             Just login
+
+        SlideShow _ instate ->
+            stateLogin instate
 
 
 sendUIMsg : FileUrlInfo -> OD.UserRequest -> Cmd Msg
@@ -1218,6 +1222,7 @@ sendSearch model search =
                           , delete = Nothing
                           }
                         ]
+                    , lzlinks = []
                     }
 
                 datesearch =
@@ -1678,12 +1683,35 @@ onZkNoteEditWhat model pt znew =
             model.state
     in
     if znew.what == "cache" then
-        ( { model
-            | noteCache =
+        let
+            noteCache =
                 NC.addNote pt znew.znl.zknote.id (NC.ZNAL znew.znl) model.noteCache
                     |> NC.purgeNotes
+
+            ( ns, cmd ) =
+                case model.state of
+                    SlideShow ssmod instate ->
+                        let
+                            ( ss, c ) =
+                                SlideShow.updateNote noteCache ssmod
+                        in
+                        ( SlideShow ss instate
+                        , case c of
+                            SlideShow.GetNote id ->
+                                makeNoteCacheGet model id
+
+                            _ ->
+                                Cmd.none
+                        )
+
+                    _ ->
+                        ( model.state, Cmd.none )
+        in
+        ( { model
+            | noteCache = noteCache
+            , state = ns
           }
-        , Cmd.none
+        , cmd
         )
 
     else
@@ -1695,6 +1723,7 @@ onZkNoteEditWhat model pt znew =
                             login
                             znew.znl.zknote
                             znew.znl.links
+                            znew.znl.lzlinks
                             znew.edittab
                             model.mobile
 
@@ -2194,9 +2223,6 @@ actualupdate msg model =
         ( WkMsg (Ok key), TagFiles mod ld ps ) ->
             handleTagFiles model (TagAThing.onWkKeyPress key mod) ld ps
 
-        ( WkMsg (Ok key), TagNotes mod ld ps ) ->
-            handleTagNotes model (TagAThing.onWkKeyPress key mod) ld ps
-
         ( WkMsg (Ok key), InviteUser mod ld ps ) ->
             handleInviteUser model (TagAThing.onWkKeyPress key mod) ld ps
 
@@ -2209,7 +2235,7 @@ actualupdate msg model =
                     ( model, Cmd.none )
 
         ( WkMsg (Ok key), EditZkNote es login ) ->
-            handleEditZkNoteCmd model login (EditZkNote.onWkKeyPress key es)
+            handleEditZkNoteCmd model login (EditZkNote.onWkKeyPress model.noteCache key es)
 
         ( WkMsg (Ok key), EditZkNoteListing es login ) ->
             handleEditZkNoteListing model
@@ -2224,8 +2250,8 @@ actualupdate msg model =
         ( TagFilesMsg lm, TagFiles mod ld st ) ->
             handleTagFiles model (TagAThing.update lm mod) ld st
 
-        ( TagNotesMsg lm, TagNotes mod ld st ) ->
-            handleTagNotes model (TagAThing.update lm mod) ld st
+        ( TagNotes2Msg lm, TagNotes mod ld st ) ->
+            handleTagNotes2 model (TagNotes.update lm mod) ld st
 
         ( InviteUserMsg lm, InviteUser mod ld st ) ->
             handleInviteUser model (TagAThing.update lm mod) ld st
@@ -3082,6 +3108,9 @@ actualupdate msg model =
                         )
                     )
 
+                View.OnPlaybackEnded ->
+                    ( model, Cmd.none )
+
         ( ViewMsg em, EView es state ) ->
             let
                 ( emod, ecmd ) =
@@ -3126,8 +3155,37 @@ actualupdate msg model =
                         )
                     )
 
+                View.OnPlaybackEnded ->
+                    ( model, Cmd.none )
+
+        ( SlideShowMsg em, SlideShow es instate ) ->
+            let
+                ( emod, ecmd ) =
+                    SlideShow.update em model.noteCache es
+            in
+            case ecmd of
+                SlideShow.Noop ->
+                    ( { model | state = SlideShow emod instate }, Cmd.none )
+
+                SlideShow.Close mbcurrent ->
+                    let
+                        ins =
+                            case instate of
+                                EditZkNote ezn login ->
+                                    EditZkNote (EditZkNote.setCurrentSlideNote mbcurrent ezn) login
+
+                                _ ->
+                                    instate
+                    in
+                    ( { model | state = ins }, Cmd.none )
+
+                SlideShow.GetNote id ->
+                    ( { model | state = SlideShow emod instate }
+                    , makeNoteCacheGet model id
+                    )
+
         ( EditZkNoteMsg em, EditZkNote es login ) ->
-            handleEditZkNoteCmd model login (EditZkNote.update em es)
+            handleEditZkNoteCmd model login (EditZkNote.update model.noteCache em es)
 
         ( EditZkNoteMsg EditZkNote.Noop, _ ) ->
             ( model, Cmd.none )
@@ -3141,20 +3199,19 @@ actualupdate msg model =
                     Import.update em es
 
                 backtolisting =
-                    \imod ->
-                        let
-                            nm =
-                                { model
-                                    | state =
-                                        EditZkNoteListing { dialog = Nothing, zone = model.timezone } login
-                                }
-                        in
-                        case SP.getSearch model.spmodel of
-                            Just s ->
-                                sendSearch nm s
+                    let
+                        nm =
+                            { model
+                                | state =
+                                    EditZkNoteListing { dialog = Nothing, zone = model.timezone } login
+                            }
+                    in
+                    case SP.getSearch model.spmodel of
+                        Just s ->
+                            sendSearch nm s
 
-                            Nothing ->
-                                ( nm, Cmd.none )
+                        Nothing ->
+                            ( nm, Cmd.none )
             in
             case ecmd of
                 Import.None ->
@@ -3163,7 +3220,7 @@ actualupdate msg model =
                 Import.SaveExit notes ->
                     let
                         ( m, c ) =
-                            backtolisting emod
+                            backtolisting
 
                         notecmds =
                             List.map
@@ -3187,7 +3244,7 @@ actualupdate msg model =
                     )
 
                 Import.Cancel ->
-                    backtolisting emod
+                    backtolisting
 
                 Import.Command cmd ->
                     ( model, Cmd.map ImportMsg cmd )
@@ -3547,20 +3604,25 @@ handleSPMod model fn =
         ( nspm, spcmd ) =
             fn model.spmodel
     in
+    handleSPCmd { model | spmodel = nspm } spcmd
+
+
+handleSPCmd : Model -> SP.Command -> ( Model, Cmd Msg )
+handleSPCmd model spcmd =
     case spcmd of
         SP.None ->
-            ( { model | spmodel = nspm }
+            ( model
             , Cmd.none
             )
 
         SP.Save ->
-            ( { model | spmodel = nspm }
+            ( model
             , Cmd.none
             )
 
         SP.Copy _ ->
             -- TODO
-            ( { model | spmodel = nspm }
+            ( model
             , Cmd.none
             )
 
@@ -3570,10 +3632,10 @@ handleSPMod model fn =
                 zsr =
                     model.zknSearchResult
             in
-            sendSearch { model | spmodel = nspm, zknSearchResult = { zsr | notes = [] } } ts
+            sendSearch { model | zknSearchResult = { zsr | notes = [] } } ts
 
         SP.SyncFiles ts ->
-            ( { model | spmodel = nspm }
+            ( model
             , sendZIMsg model.fui (Data.PvqSyncFiles ts)
             )
 
@@ -3612,46 +3674,48 @@ makeNoteCacheGets : String -> Model -> List (Cmd Msg)
 makeNoteCacheGets md model =
     MC.noteIds md
         |> TSet.toList
-        |> List.map
-            (\id ->
-                case NC.getNote model.noteCache id of
-                    Just (NC.ZNAL zkn) ->
-                        sendZIMsg model.fui
-                            (Data.PvqGetZnlIfChanged
-                                { zknote = id
-                                , what = "cache"
-                                , edittab = Nothing
-                                , changeddate = zkn.zknote.changeddate
-                                }
-                            )
+        |> List.map (makeNoteCacheGet model)
 
-                    Just NC.Private ->
-                        sendZIMsg model.fui
-                            (Data.PvqGetZkNoteAndLinks
-                                { zknote = id
-                                , what = "cache"
-                                , edittab = Nothing
-                                }
-                            )
 
-                    Just NC.NotFound ->
-                        sendZIMsg model.fui
-                            (Data.PvqGetZkNoteAndLinks
-                                { zknote = id
-                                , what = "cache"
-                                , edittab = Nothing
-                                }
-                            )
+makeNoteCacheGet : Model -> ZkNoteId -> Cmd Msg
+makeNoteCacheGet model id =
+    case NC.getNote model.noteCache id of
+        Just (NC.ZNAL zkn) ->
+            sendZIMsg model.fui
+                (Data.PvqGetZnlIfChanged
+                    { zknote = id
+                    , what = "cache"
+                    , edittab = Nothing
+                    , changeddate = zkn.zknote.changeddate
+                    }
+                )
 
-                    Nothing ->
-                        sendZIMsg model.fui
-                            (Data.PvqGetZkNoteAndLinks
-                                { zknote = id
-                                , what = "cache"
-                                , edittab = Nothing
-                                }
-                            )
-            )
+        Just NC.Private ->
+            sendZIMsg model.fui
+                (Data.PvqGetZkNoteAndLinks
+                    { zknote = id
+                    , what = "cache"
+                    , edittab = Nothing
+                    }
+                )
+
+        Just NC.NotFound ->
+            sendZIMsg model.fui
+                (Data.PvqGetZkNoteAndLinks
+                    { zknote = id
+                    , what = "cache"
+                    , edittab = Nothing
+                    }
+                )
+
+        Nothing ->
+            sendZIMsg model.fui
+                (Data.PvqGetZkNoteAndLinks
+                    { zknote = id
+                    , what = "cache"
+                    , edittab = Nothing
+                    }
+                )
 
 
 makePubNoteCacheGets : Model -> String -> List (Cmd Msg)
@@ -3940,10 +4004,16 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     , sendZIMsg model.fui (Data.PvqSetHomeNote id)
                     )
 
-                EditZkNote.AddToRecent zkln ->
+                EditZkNote.AddToRecent zklns ->
                     ( { model
                         | state = EditZkNote emod login
-                        , recentNotes = addRecentZkListNote model.recentNotes zkln
+                        , recentNotes =
+                            List.foldl
+                                (\zkln rns ->
+                                    addRecentZkListNote rns zkln
+                                )
+                                model.recentNotes
+                                zklns
                       }
                     , Cmd.none
                     )
@@ -3980,11 +4050,11 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     ( { model
                         | state =
                             TagNotes
-                                (TagAThing.init
-                                    (TagNotes.initThing [])
-                                    TagAThing.AddNotes
-                                    []
+                                (TagNotes.init
                                     login
+                                    []
+                                    []
+                                    TagNotes.AddNotes
                                 )
                                 login
                                 model.state
@@ -4024,11 +4094,14 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     let
                         ( nspm, spcmd ) =
                             fn model.spmodel
+
+                        nmod =
+                            { model | spmodel = nspm }
                     in
                     case spcmd of
                         SP.Copy s ->
                             -- kind of messed up to have this here and not in the EditZkNote file
-                            ( { model
+                            ( { nmod
                                 | state =
                                     EditZkNote
                                         { emod
@@ -4050,7 +4123,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
 
                         _ ->
                             -- otherwise its all the usual stuff.
-                            handleSPMod model fn
+                            handleSPCmd nmod spcmd
 
                 EditZkNote.InlineXform inline f ->
                     ( { model
@@ -4072,6 +4145,30 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     ( { model | state = EditZkNote emod login }
                     , sendZIMsg model.fui (Data.PvqSaveZkLinks szl)
                     )
+
+                EditZkNote.SlideShow mbcurrent lst ->
+                    case lst of
+                        fst :: rest ->
+                            let
+                                ( ssmod, sscmd ) =
+                                    SlideShow.init model.fui model.noteCache mbcurrent fst rest
+                            in
+                            ( { model | state = SlideShow ssmod (EditZkNote emod login) }
+                            , case sscmd of
+                                SlideShow.GetNote id ->
+                                    makeNoteCacheGet model id
+
+                                SlideShow.Close _ ->
+                                    Cmd.none
+
+                                SlideShow.Noop ->
+                                    Cmd.none
+                            )
+
+                        [] ->
+                            ( model
+                            , Cmd.none
+                            )
 
                 EditZkNote.Cmd cmd mbcommand ->
                     let
@@ -4222,13 +4319,26 @@ handleTagFiles model ( lmod, lcmd ) login st =
             )
 
         TagAThing.SearchHistory ->
-            ( { model | state = updstate }, Cmd.none )
+            ( shDialog { model | state = updstate }
+            , Cmd.none
+            )
 
         TagAThing.None ->
             ( { model | state = updstate }, Cmd.none )
 
-        TagAThing.AddToRecent _ ->
-            ( { model | state = updstate }, Cmd.none )
+        TagAThing.AddToRecent zklns ->
+            ( { model
+                | state = updstate
+                , recentNotes =
+                    List.foldl
+                        (\zkln rns ->
+                            addRecentZkListNote rns zkln
+                        )
+                        model.recentNotes
+                        zklns
+              }
+            , Cmd.none
+            )
 
         TagAThing.ThingCommand tc ->
             case tc of
@@ -4265,71 +4375,71 @@ handleTagFiles model ( lmod, lcmd ) login st =
             handleSPMod model fn
 
 
-handleTagNotes :
+handleTagNotes2 :
     Model
-    -> ( TagAThing.Model TagNotes.Model TagNotes.Msg TagNotes.Command, TagAThing.Command TagNotes.Command )
+    -> ( TagNotes.Model, TagNotes.Command )
     -> LoginData
     -> State
     -> ( Model, Cmd Msg )
-handleTagNotes model ( lmod, lcmd ) login st =
+handleTagNotes2 model ( lmod, lcmd ) login st =
     let
         updstate =
             TagNotes lmod login st
     in
     case lcmd of
-        TagAThing.Search s ->
-            sendSearch { model | state = updstate } s
-
-        TagAThing.SyncFiles s ->
-            ( { model | state = updstate }
-            , sendZIMsg model.fui (Data.PvqSyncFiles s)
+        TagNotes.AddToRecent zklns ->
+            ( { model
+                | state = updstate
+                , recentNotes =
+                    List.foldl
+                        (\zkln rns ->
+                            addRecentZkListNote rns zkln
+                        )
+                        model.recentNotes
+                        zklns
+              }
+            , Cmd.none
             )
 
-        TagAThing.SearchHistory ->
-            ( { model | state = updstate }, Cmd.none )
+        TagNotes.SearchHistory ->
+            ( shDialog { model | state = updstate }
+            , Cmd.none
+            )
 
-        TagAThing.None ->
-            ( { model | state = updstate }, Cmd.none )
+        TagNotes.Ok ->
+            let
+                zklns =
+                    lmod.notes
 
-        TagAThing.AddToRecent _ ->
-            ( { model | state = updstate }, Cmd.none )
+                zkls =
+                    Dict.values lmod.zklDict
 
-        TagAThing.ThingCommand tc ->
-            case tc of
-                TagNotes.Ok ->
-                    let
-                        zklns =
-                            lmod.thing.model.notes
+                zklinks : List Data.SaveZkLink2
+                zklinks =
+                    List.foldl
+                        (\zkln links ->
+                            List.map (\el -> DataUtil.elToSzl2 zkln.id el) zkls
+                                ++ links
+                        )
+                        []
+                        zklns
+            in
+            ( { model | state = st }
+            , sendZIMsg model.fui
+                (Data.PvqSaveZkLinks { links = zklinks })
+            )
 
-                        zkls =
-                            Dict.values lmod.zklDict
+        TagNotes.Cancel ->
+            ( { model | state = st }, Cmd.none )
 
-                        zklinks : List Data.SaveZkLink2
-                        zklinks =
-                            List.foldl
-                                (\zkln links ->
-                                    List.map (\el -> DataUtil.elToSzl2 zkln.id el) zkls
-                                        ++ links
-                                )
-                                []
-                                zklns
-                    in
-                    ( { model | state = st }
-                    , sendZIMsg model.fui
-                        (Data.PvqSaveZkLinks { links = zklinks })
-                    )
+        TagNotes.Which w ->
+            ( { model | state = TagNotes { lmod | addWhich = w } login st }, Cmd.none )
 
-                TagNotes.Cancel ->
-                    ( { model | state = st }, Cmd.none )
-
-                TagNotes.Which w ->
-                    ( { model | state = TagNotes { lmod | addWhich = w } login st }, Cmd.none )
-
-                TagNotes.None ->
-                    ( { model | state = updstate }, Cmd.none )
-
-        TagAThing.SPMod fn ->
+        TagNotes.SPMod fn ->
             handleSPMod { model | state = updstate } fn
+
+        TagNotes.None ->
+            ( { model | state = updstate }, Cmd.none )
 
 
 handleInviteUser :
@@ -4358,8 +4468,19 @@ handleInviteUser model ( lmod, lcmd ) login st =
         TagAThing.None ->
             ( { model | state = updstate }, Cmd.none )
 
-        TagAThing.AddToRecent _ ->
-            ( { model | state = updstate }, Cmd.none )
+        TagAThing.AddToRecent zklns ->
+            ( { model
+                | state = updstate
+                , recentNotes =
+                    List.foldl
+                        (\zkln rns ->
+                            addRecentZkListNote rns zkln
+                        )
+                        model.recentNotes
+                        zklns
+              }
+            , Cmd.none
+            )
 
         TagAThing.ThingCommand tc ->
             case tc of
@@ -4582,7 +4703,8 @@ main =
                                         case rmd.state of
                                             EditZkNote st _ ->
                                                 List.map (Sub.map EditZkNoteMsg) <|
-                                                    EditZkNote.blockDndSubscriptions st
+                                                    EditZkNote.dndSubscriptions
+                                                        st
 
                                             _ ->
                                                 []

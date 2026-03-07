@@ -21,6 +21,10 @@ type alias FileUrlInfo =
     }
 
 
+type alias NlLink =
+    { id : ZkNoteId, title : String }
+
+
 getPrNoteInfo : PublicReply -> Maybe ( ZkNoteId, Maybe String )
 getPrNoteInfo pr =
     case pr of
@@ -147,6 +151,21 @@ zniCompare li ri =
                     i
     in
     compare l r
+
+
+type alias LzlGraphKey =
+    { from : ZkNoteId
+    , to : ZkNoteId
+    }
+
+
+type alias LzlDict =
+    TDict ZkNoteId String LzLink
+
+
+emptyLzlDict : LzlDict
+emptyLzlDict =
+    TDict.empty zkNoteIdToString trustedZkNoteIdFromString
 
 
 type alias LoginData =
@@ -282,6 +301,13 @@ zklKey zkl =
            )
 
 
+lzlKey : { a | from : ZkNoteId, to : ZkNoteId } -> String
+lzlKey lzl =
+    zkNoteIdToString lzl.from
+        ++ ":"
+        ++ zkNoteIdToString lzl.to
+
+
 elToSzl : EditLink -> SaveZkLink
 elToSzl el =
     { otherid = el.otherid
@@ -307,6 +333,14 @@ elToSzl2 thisid el =
     , to = to
     , linkzknote = Nothing
     , delete = el.delete
+    }
+
+
+lzlToSll : Bool -> LzLink -> SaveLzLink
+lzlToSll delete lzl =
+    { from = lzl.from
+    , to = lzl.to
+    , delete = Just delete
     }
 
 
