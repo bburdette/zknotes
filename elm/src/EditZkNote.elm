@@ -777,8 +777,8 @@ saveZkLinkList model =
 
 saveLzLinks : Model -> List Data.SaveLzLink
 saveLzLinks model =
-    case ( model.id, model.snState, model.initialSnState ) of
-        ( Just znid, Just snState, Just initialSnState ) ->
+    case ( model.id, model.snState ) of
+        ( Just znid, Just snState ) ->
             saveLzLinkList
                 (SNG.saveLzLinks znid snState
                     |> List.map (\sll -> ( lzlKey sll, sll ))
