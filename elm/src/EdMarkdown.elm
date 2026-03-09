@@ -1,14 +1,16 @@
 module EdMarkdown exposing
     ( EdMarkdown
     , getBlocks
-    , getMd
+    , getContent
     , getSpecialNote
-    , init
+    , getSpecialNoteState
+    , initMd
+    , initSpecial
     , linkRenderer
     , stringRenderer
     , updateBlocks
     , updateMd
-    , updateSpecialNote
+    , updateSpecialNoteState
     )
 
 import Data exposing (ZkNoteId)
@@ -21,27 +23,47 @@ import Markdown.Parser
 import Markdown.Renderer
 import MdCommon as MC exposing (Link)
 import SpecialNotes exposing (SpecialNote, specialNoteDecoder, specialNoteEncoder)
+import SpecialNotesGui as SNG exposing (SpecialNoteState)
+
+
+
+-- TRY THIS
 
 
 type EdMarkdown
     = EdMarkdown Emd
+    | EdSpecial Special
 
 
 type alias Emd =
     { md : String
     , elts : Result String (List Block)
-    , specialNote : Result JD.Error SpecialNote
     }
 
 
-init : String -> EdMarkdown
-init s =
+type alias Special =
+    { snState : SpecialNoteState
+    }
+
+
+initMd : String -> EdMarkdown
+initMd s =
     updateMd s
 
 
-getMd : EdMarkdown -> String
-getMd (EdMarkdown emd) =
-    emd.md
+initSpecial : SpecialNoteState -> EdMarkdown
+initSpecial sns =
+    EdSpecial { snState = sns }
+
+
+getContent : EdMarkdown -> String
+getContent em =
+    case em of
+        EdSpecial s ->
+            JE.encode 2 (specialNoteEncoder (SNG.getSpecialNote s.snState))
+
+        EdMarkdown emd ->
+            emd.md
 
 
 updateMd : String -> EdMarkdown
@@ -52,27 +74,42 @@ updateMd md =
             md
                 |> Markdown.Parser.parse
                 |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
-        , specialNote = JD.decodeString specialNoteDecoder md
         }
 
 
 getBlocks : EdMarkdown -> Result String (List Block)
-getBlocks (EdMarkdown emd) =
-    emd.elts
+getBlocks em =
+    case em of
+        EdMarkdown emd ->
+            emd.elts
+
+        EdSpecial _ ->
+            Err "special note"
 
 
-getSpecialNote : EdMarkdown -> Result JD.Error SpecialNote
-getSpecialNote (EdMarkdown emd) =
-    emd.specialNote
+getSpecialNote : EdMarkdown -> Maybe SpecialNote
+getSpecialNote em =
+    case em of
+        EdMarkdown _ ->
+            Nothing
+
+        EdSpecial s ->
+            Just <| SNG.getSpecialNote s.snState
 
 
-updateSpecialNote : SpecialNote -> EdMarkdown
-updateSpecialNote sn =
-    EdMarkdown
-        { md = JE.encode 2 (specialNoteEncoder sn)
-        , elts = Err "specialnote"
-        , specialNote = Ok sn
-        }
+getSpecialNoteState : EdMarkdown -> Maybe SpecialNoteState
+getSpecialNoteState em =
+    case em of
+        EdMarkdown _ ->
+            Nothing
+
+        EdSpecial s ->
+            Just <| s.snState
+
+
+updateSpecialNoteState : SpecialNoteState -> EdMarkdown
+updateSpecialNoteState sns =
+    EdSpecial { snState = sns }
 
 
 updateBlocks : List Block -> Result String EdMarkdown
@@ -85,7 +122,6 @@ updateBlocks blocks =
                 EdMarkdown
                     { md = String.concat md
                     , elts = Ok blocks
-                    , specialNote = Err (JD.Failure "markdown" JE.null)
                     }
             )
 

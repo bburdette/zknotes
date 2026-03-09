@@ -205,7 +205,6 @@ type alias Model =
     , noteUserName : String
     , usernote : ZkNoteId
     , zklDict : Dict String EditLink
-    , snState : Maybe SpecialNoteState
     , focusLink : Maybe EditLink
     , comments : List Data.ZkNote
     , newcomment : Maybe NewCommentState
@@ -366,7 +365,7 @@ blockDndSubscriptions model =
 
 dndSubscriptions : Model -> List (Sub Msg)
 dndSubscriptions model =
-    case model.snState of
+    case EM.getSpecialNoteState model.edMarkdown of
         Just (SnsList slem) ->
             List.map (Sub.map SNGMsg) <| SNG.sngSubscriptions (SnsList slem)
 
@@ -378,7 +377,7 @@ dndSubscriptions model =
 -}
 ghostView : Model -> Time.Zone -> NoteCache -> MC.ViewMode -> Int -> Maybe (Element Msg)
 ghostView model zone nc viewMode mdw =
-    case model.snState of
+    case EM.getSpecialNoteState model.edMarkdown of
         Just (SnsList slem) ->
             SLE.ghostView slem nc mdw
                 |> Maybe.map
@@ -573,11 +572,11 @@ type DragDropWhat
 
 setCurrentSlideNote : Maybe ZkNoteId -> Model -> Model
 setCurrentSlideNote mbznid model =
-    case model.snState of
+    case EM.getSpecialNoteState model.edMarkdown of
         Just (SnsList slem) ->
             { model
-                | snState =
-                    Just (SnsList { slem | ng = { currentUuid = Maybe.map zkNoteIdToString mbznid } })
+                | edMarkdown =
+                    EM.initSpecial (SnsList { slem | ng = { currentUuid = Maybe.map zkNoteIdToString mbznid } })
             }
 
         _ ->
@@ -706,7 +705,7 @@ toZkNote model =
                 , username = model.noteUserName
                 , usernote = model.usernote
                 , title = model.title
-                , content = EM.getMd model.edMarkdown
+                , content = EM.getContent model.edMarkdown
                 , pubid =
                     if model.pubidtxt /= "" then
                         Just model.pubidtxt
@@ -734,17 +733,7 @@ sznFromModel : Model -> Data.SaveZkNote
 sznFromModel model =
     { id = model.id
     , title = model.title
-    , content =
-        let
-            edm =
-                case model.snState of
-                    Just sn ->
-                        EM.updateSpecialNote (SNG.getSpecialNote sn)
-
-                    Nothing ->
-                        model.edMarkdown
-        in
-        EM.getMd edm
+    , content = EM.getContent model.edMarkdown
     , pubid = toPubId (isPublic model) model.pubidtxt
     , editable = model.editableValue
     , showtitle = model.showtitle
@@ -777,7 +766,7 @@ saveZkLinkList model =
 
 saveLzLinks : Model -> List Data.SaveLzLink
 saveLzLinks model =
-    case ( model.id, model.snState ) of
+    case ( model.id, EM.getSpecialNoteState model.edMarkdown ) of
         ( Just znid, Just snState ) ->
             saveLzLinkList
                 (SNG.saveLzLinks znid snState
@@ -839,11 +828,11 @@ dirty model =
                     (r.id == m.id)
                         && (r.pubid == toPubId (isPublic m) m.pubidtxt)
                         && (r.title == m.title)
-                        && (r.content == EM.getMd m.edMarkdown)
+                        && (r.content == EM.getContent m.edMarkdown)
                         && (r.editable == m.editableValue)
                         && (r.showtitle == m.showtitle)
                         && (Dict.keys m.zklDict == Dict.keys m.initialZklDict)
-                        && (m.snState == m.initialSnState)
+                        && (EM.getSpecialNoteState m.edMarkdown == m.initialSnState)
             )
         |> Maybe.withDefault True
 
@@ -857,11 +846,16 @@ revert model =
                     | id = r.id
                     , pubidtxt = r.pubid |> Maybe.withDefault ""
                     , title = r.title
-                    , edMarkdown = EM.init r.content
+                    , edMarkdown =
+                        case model.initialSnState of
+                            Just sns ->
+                                EM.initSpecial sns
+
+                            Nothing ->
+                                EM.initMd r.content
                     , editableValue = r.editable
                     , showtitle = r.showtitle
                     , zklDict = model.initialZklDict
-                    , snState = model.initialSnState
                 }
             )
         |> Maybe.withDefault
@@ -1930,7 +1924,7 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
 
                         else
                             always Noop
-                    , text = EM.getMd model.edMarkdown
+                    , text = EM.getContent model.edMarkdown
                     , placeholder = Nothing
                     , label = EI.labelHidden "markdown input"
                     , spellcheck = False
@@ -1991,7 +1985,7 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                     , if search then
                         EI.button (E.alignRight :: Common.buttonStyle)
                             (case
-                                JD.decodeString Data.tagSearchDecoder (EM.getMd model.edMarkdown)
+                                JD.decodeString Data.tagSearchDecoder (EM.getContent model.edMarkdown)
                                     |> Result.toMaybe
                              of
                                 Just s ->
@@ -2099,7 +2093,7 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                 ]
             <|
                 editmeta
-                    :: (case model.snState of
+                    :: (case EM.getSpecialNoteState model.edMarkdown of
                             Just sn ->
                                 E.row
                                     [ E.padding 10
@@ -2378,12 +2372,12 @@ initFull fui ld zknote dtlinks lzlinks mbedittab mobile =
                 dtlinks
 
         edMarkdown =
-            EM.init zknote.content
+            case JD.decodeString SpecialNotes.specialNoteDecoder zknote.content of
+                Ok sn ->
+                    EM.initSpecial (SNG.initSpecialNoteStateLz zknote.id sn lzlinks)
 
-        snState =
-            EM.getSpecialNote edMarkdown
-                |> Result.toMaybe
-                |> Maybe.map (\sn -> SNG.initSpecialNoteStateLz zknote.id sn lzlinks)
+                Err _ ->
+                    EM.initMd zknote.content
     in
     ( { id = Just zknote.id
       , fui = fui
@@ -2398,8 +2392,7 @@ initFull fui ld zknote dtlinks lzlinks mbedittab mobile =
                     (\zl -> ( zklKey zl, zl ))
                     links
                 )
-      , snState = snState
-      , initialSnState = snState
+      , initialSnState = EM.getSpecialNoteState edMarkdown
       , initialLzls =
             List.map
                 (\lzl -> ( lzlKey lzl, { to = lzl.to, from = lzl.from, delete = Just False } ))
@@ -2429,7 +2422,7 @@ initFull fui ld zknote dtlinks lzlinks mbedittab mobile =
       , mobile = mobile
       , server = zknote.server
       , blockDnd = blockDndSystem.model
-      , edMarkdown = edMarkdown -- EM.init zknote.content
+      , edMarkdown = edMarkdown
       , blockEdit = Nothing
       , droplinkmode = False
       , tagThings = TT.init True
@@ -2465,7 +2458,6 @@ initNew fui ld links mobile =
     , noteUserName = ld.name
     , usernote = ld.zknote
     , zklDict = zklDict
-    , snState = Nothing
     , initialZklDict = Dict.empty
     , initialSnState = Nothing
     , initialLzls = Dict.empty
@@ -2493,7 +2485,7 @@ initNew fui ld links mobile =
     , mobile = mobile
     , server = ld.server
     , blockDnd = blockDndSystem.model
-    , edMarkdown = EM.init ""
+    , edMarkdown = EM.initMd ""
     , blockEdit = Nothing
     , droplinkmode = False
     , tagThings = TT.init True
@@ -2552,9 +2544,9 @@ onSaved oldmodel szn =
                 { oldmodel
                     | revert = Just <| sznFromModel oldmodel
                     , initialZklDict = oldmodel.zklDict
-                    , initialSnState = oldmodel.snState
+                    , initialSnState = EM.getSpecialNoteState oldmodel.edMarkdown
                     , initialLzls =
-                        case ( oldmodel.id, oldmodel.snState ) of
+                        case ( oldmodel.id, EM.getSpecialNoteState oldmodel.edMarkdown ) of
                             ( Just id, Just snState ) ->
                                 SNG.saveLzLinks id snState
                                     |> List.map (\sll -> ( lzlKey sll, sll ))
@@ -2648,10 +2640,10 @@ onTASelection model zknSearchResult recentZkns tas =
             TAUpdated
                 { model
                     | edMarkdown =
-                        EM.init <|
-                            String.left tas.offset (EM.getMd model.edMarkdown)
+                        EM.initMd <|
+                            String.left tas.offset (EM.getContent model.edMarkdown)
                                 ++ linktext
-                                ++ String.dropLeft (tas.offset + String.length tas.text) (EM.getMd model.edMarkdown)
+                                ++ String.dropLeft (tas.offset + String.length tas.text) (EM.getContent model.edMarkdown)
                 }
                 (Just
                     { id = "mdtext"
@@ -2673,10 +2665,10 @@ onTASelection model zknSearchResult recentZkns tas =
             TAUpdated
                 { model
                     | edMarkdown =
-                        EM.init <|
-                            String.left tas.offset (EM.getMd model.edMarkdown)
+                        EM.initMd <|
+                            String.left tas.offset (EM.getContent model.edMarkdown)
                                 ++ linktext
-                                ++ String.dropLeft (tas.offset + String.length tas.text) (EM.getMd model.edMarkdown)
+                                ++ String.dropLeft (tas.offset + String.length tas.text) (EM.getContent model.edMarkdown)
                 }
                 (Just
                     { id = "mdtext"
@@ -2749,10 +2741,10 @@ onTASelection model zknSearchResult recentZkns tas =
                 TAUpdated
                     { model
                         | edMarkdown =
-                            EM.init <|
-                                String.left tas.offset (EM.getMd model.edMarkdown)
+                            EM.initMd <|
+                                String.left tas.offset (EM.getContent model.edMarkdown)
                                     ++ s
-                                    ++ String.dropLeft (tas.offset + String.length tas.text) (EM.getMd model.edMarkdown)
+                                    ++ String.dropLeft (tas.offset + String.length tas.text) (EM.getContent model.edMarkdown)
                     }
                     (Just
                         { id = "mdtext"
@@ -2796,14 +2788,14 @@ onLinkBackSaved model mbtas szn =
                         { model
                             | edMarkdown =
                                 EM.updateMd <|
-                                    String.slice 0 tas.offset (EM.getMd model.edMarkdown)
+                                    String.slice 0 tas.offset (EM.getContent model.edMarkdown)
                                         ++ "["
                                         ++ tas.text
                                         ++ "]("
                                         ++ "/note/"
                                         ++ zkNoteIdToString szn.id
                                         ++ ")"
-                                        ++ String.dropLeft (tas.offset + String.length tas.text) (EM.getMd model.edMarkdown)
+                                        ++ String.dropLeft (tas.offset + String.length tas.text) (EM.getContent model.edMarkdown)
                             , zklDict = Dict.insert (zklKey linkback) linkback model.zklDict
                         }
                 in
@@ -2855,9 +2847,10 @@ mergeEditBlock model =
                                 )
                             )
                         |> Result.map (String.concat >> String.trim)
-                        |> Result.withDefault (EM.getMd model.edMarkdown)
+                        |> Result.map (\s -> EM.updateMd s)
+                        |> Result.withDefault model.edMarkdown
             in
-            { model | edMarkdown = EM.updateMd nb, blockEdit = Nothing }
+            { model | edMarkdown = nb, blockEdit = Nothing }
 
         Nothing ->
             model
@@ -2897,7 +2890,6 @@ onWkKeyPress noteCache key model =
                 ( model, None )
 
         Toop.T4 "Enter" False False False ->
-            -- handleSPUpdate noteCache model (SP.onEnter model.spmodel)
             ( model, SPMod SP.onEnter )
 
         Toop.T4 "Escape" False False False ->
@@ -2959,7 +2951,7 @@ update noteCache msg model =
             )
 
         ViewPress ->
-            MC.mdPanel (EM.getMd model.edMarkdown)
+            MC.mdPanel (EM.getContent model.edMarkdown)
                 |> Maybe.map
                     (\panel ->
                         ( model
@@ -3003,55 +2995,6 @@ update noteCache msg model =
                         }
                     )
 
-        {- LinksPress ->
-           let
-               blah =
-                   model.md
-                       |> Markdown.Parser.parse
-                       |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
-
-               zklDict =
-                   case ( blah, model.id ) of
-                       ( Err _, _ ) ->
-                           Dict.empty
-
-                       ( Ok blocks, Nothing ) ->
-                           Dict.empty
-
-                       ( Ok blocks, Just id ) ->
-                           inlineFoldl
-                               (\inline links ->
-                                   case inline of
-                                       Block.Link str mbstr moarinlines ->
-                                           case noteLink str of
-                                               Just rid ->
-                                                   let
-                                                       zkl =
-                                                           { from = id
-                                                           , to = rid
-                                                           , user = model.ld.userid
-                                                           , zknote = Nothing
-                                                           , fromname = Nothing
-                                                           , toname = mbstr
-                                                           , delete = Nothing
-                                                           }
-                                                   in
-                                                   ( zklKey zkl, zkl )
-                                                       :: links
-
-                                               Nothing ->
-                                                   links
-
-                                       _ ->
-                                           links
-                               )
-                               []
-                               blocks
-                               |> Dict.fromList
-           in
-           ( { model | zklDict = Dict.union model.zklDict zklDict }, None )
-
-        -}
         LinkBackPress ->
             ( model
             , GetTASelection "mdtext" "linkback"
@@ -3106,7 +3049,7 @@ update noteCache msg model =
             )
 
         AddGraphNotes ->
-            case model.snState of
+            case EM.getSpecialNoteState model.edMarkdown of
                 Just sns ->
                     let
                         nsn =
@@ -3120,8 +3063,7 @@ update noteCache msg model =
                                     sns
                     in
                     ( { model
-                        | edMarkdown = EM.updateSpecialNote <| SNG.getSpecialNote nsn
-                        , snState = Just nsn
+                        | edMarkdown = EM.updateSpecialNoteState nsn
                       }
                     , None
                     )
@@ -3373,7 +3315,7 @@ update noteCache msg model =
             in
             ( { model
                 | edMarkdown =
-                    EM.init <|
+                    EM.initMd <|
                         newMarkdown
                 , cells = getCd cc
               }
@@ -3920,8 +3862,7 @@ update noteCache msg model =
                             initSpecialNoteState (SpecialNotes.SnList { currentUuid = Nothing }) links
                     in
                     ( { model
-                        | edMarkdown = EM.updateSpecialNote (SNG.getSpecialNote sns)
-                        , snState = Just sns
+                        | edMarkdown = EM.updateSpecialNoteState sns
                       }
                     , None
                     )
@@ -3938,7 +3879,7 @@ update noteCache msg model =
                     ( updateEditBlock ebmsg model, None )
 
         SNGMsg sngmsg ->
-            case model.snState of
+            case EM.getSpecialNoteState model.edMarkdown of
                 Just sns ->
                     let
                         ( snmd, sncmd ) =
@@ -3946,8 +3887,7 @@ update noteCache msg model =
 
                         umod =
                             { model
-                                | edMarkdown = EM.updateSpecialNote (SNG.getSpecialNote snmd)
-                                , snState = Just snmd
+                                | edMarkdown = EM.updateSpecialNoteState snmd
                             }
                     in
                     case sncmd of
@@ -4004,8 +3944,7 @@ update noteCache msg model =
 
                         SNG.ToMarkdown s ->
                             ( { model
-                                | edMarkdown = EM.init s
-                                , snState = Nothing
+                                | edMarkdown = EM.initMd s
                               }
                             , None
                             )

@@ -1728,7 +1728,7 @@ onZkNoteEditWhat model pt znew =
                             model.mobile
 
                     ngets =
-                        makeNoteCacheGets (EM.getMd nst.edMarkdown) model
+                        makeNoteCacheGets (EM.getContent nst.edMarkdown) model
                 in
                 ( { model
                     | state =
@@ -1749,7 +1749,7 @@ onZkNoteEditWhat model pt znew =
                             , changeddate = zknote.changeddate
                             , sysids = zknote.sysids
                             }
-                    , noteCache = NC.setKeeps (MC.noteIds (EM.getMd nst.edMarkdown)) model.noteCache
+                    , noteCache = NC.setKeeps (MC.noteIds (EM.getContent nst.edMarkdown)) model.noteCache
                   }
                 , Cmd.batch ((sendZIMsg model.fui <| Data.PvqGetZkNoteComments c) :: ngets)
                 )
@@ -3662,7 +3662,7 @@ handleTASelection model emod login tas =
                     Nothing ->
                         Cmd.none
                  )
-                    :: makeNewNoteCacheGets (EM.getMd nemod.edMarkdown) model
+                    :: makeNewNoteCacheGets (EM.getContent nemod.edMarkdown) model
                 )
             )
 
@@ -3813,7 +3813,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     ( nm, Cmd.none )
 
         ngets =
-            makeNewNoteCacheGets (EM.getMd emod.edMarkdown) model
+            makeNewNoteCacheGets (EM.getContent emod.edMarkdown) model
 
         ( rm, rcmd ) =
             case ecmd of
@@ -3870,7 +3870,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                         | state = EditZkNote emod login
 
                         -- reset keeps on save, to get rid of unused notes.
-                        , noteCache = NC.setKeeps (MC.noteIds (EM.getMd emod.edMarkdown)) model.noteCache
+                        , noteCache = NC.setKeeps (MC.noteIds (EM.getContent emod.edMarkdown)) model.noteCache
                       }
                     , sendZIMsg model.fui
                         (Data.PvqSaveZkNoteAndLinks snpl)
@@ -4107,7 +4107,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                                         { emod
                                             | mbReplaceString =
                                                 Just <|
-                                                    (if EM.getMd emod.edMarkdown == "" then
+                                                    (if EM.getContent emod.edMarkdown == "" then
                                                         "<search query=\""
 
                                                      else
