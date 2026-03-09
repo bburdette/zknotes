@@ -333,6 +333,7 @@ pub async fn zk_interface_loggedin(
       let (_, szkn) =
         sqldata::save_zknote(&conn, &li, &state.server, uid, &sznpl.note, None).await?;
       let _s = sqldata::save_savezklinks(&conn, uid, szkn.id, &sznpl.links)?;
+      let _s = sqldata::save_savelzlinks(&conn, uid, szkn.id, &sznpl.lzlinks)?;
       Ok(PrivateReply::PvySavedZkNoteAndLinks(szkn))
     }
     PrivateRequest::PvqSaveImportZkNotes(gzl) => {
@@ -568,6 +569,7 @@ pub fn public_interface(
         what: gzne.what.clone(),
         edittab: gzne.edittab.clone(),
         znl: ZkNoteAndLinks {
+          lzlinks: sqldata::read_public_lzlinks(&conn, &note.id)?,
           links: sqldata::read_public_zklinks(&conn, &note.id)?,
           zknote: note,
         },
@@ -594,6 +596,7 @@ pub fn public_interface(
         pubid, note.title, ipaddr,
       );
       Ok(PublicReply::PbyZkNoteAndLinks(ZkNoteAndLinks {
+        lzlinks: sqldata::read_public_lzlinks(&conn, &note.id)?,
         links: sqldata::read_public_zklinks(&conn, &note.id)?,
         zknote: note,
       }))

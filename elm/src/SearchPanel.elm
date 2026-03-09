@@ -125,7 +125,6 @@ view : Bool -> Bool -> Int -> Model -> Element Msg
 view showCopy narrow nblevel model =
     column [ E.width E.fill, E.spacing 8 ]
         [ E.map TSPMsg <| TSP.view showCopy narrow nblevel model.tagSearchModel
-        , paginationView model
         ]
 
 

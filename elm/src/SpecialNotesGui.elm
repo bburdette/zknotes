@@ -2,13 +2,19 @@ module SpecialNotesGui exposing (..)
 
 import ArchiveListing exposing (Command)
 import Common
-import Data exposing (AndOr(..), SearchMod(..), TagSearch(..))
+import Data exposing (AndOr(..), LzLink, SaveLzLink, SearchMod(..), TagSearch(..), ZkListNote, ZkNoteId(..))
+import DataUtil exposing (NlLink, lzlKey, zkNoteIdToString, zklKey)
+import Dict exposing (Dict)
 import Element as E
 import Element.Font as EF
 import Element.Input as EI
 import Html.Attributes as HA
+import Orgauth.Data exposing (UserId)
 import SearchUtil exposing (showTagSearch)
-import SpecialNotes as SN
+import Set
+import SnListEdit as SLE exposing (DragDropWhat(..), nllDndSubscriptions)
+import SpecialNotes as SN exposing (CompletedSync, Notegraph, SpecialNote)
+import TDict
 import Time
 import Util
 
@@ -16,19 +22,105 @@ import Util
 type Msg
     = CopySearchPress
     | CopySyncSearchPress Bool
+    | GraphFocusClick
+    | SlideShowClick
+    | ToMarkdownPress
+    | SLEMsg SLE.Msg
     | Noop
 
 
 type Command
     = CopySearch (List TagSearch)
     | CopySyncSearch TagSearch
+    | GraphFocus
+    | DndCmd (Cmd Msg)
+    | SlideShow (Maybe ZkNoteId) (List NlLink)
+    | ToMarkdown String
     | None
 
 
-guiSn : Time.Zone -> SN.SpecialNote -> E.Element Msg
+type SpecialNoteState
+    = SnsSearch (List TagSearch)
+    | SnsSync CompletedSync
+    | SnsList SLE.Model
+
+
+initSpecialNoteStateLz : ZkNoteId -> SN.SpecialNote -> List LzLink -> SpecialNoteState
+initSpecialNoteStateLz znid sn lzls =
+    initSpecialNoteState sn (mklzList znid lzls)
+
+
+initSpecialNoteState : SN.SpecialNote -> List NlLink -> SpecialNoteState
+initSpecialNoteState sn lzls =
+    case sn of
+        SN.SnSearch tagSearch ->
+            SnsSearch tagSearch
+
+        SN.SnSync completedSync ->
+            SnsSync completedSync
+
+        SN.SnList notegraph ->
+            SnsList (SLE.init notegraph lzls)
+
+
+getSpecialNote : SpecialNoteState -> SpecialNote
+getSpecialNote sns =
+    case sns of
+        SnsSearch tagSearch ->
+            SN.SnSearch tagSearch
+
+        SnsSync completedSync ->
+            SN.SnSync completedSync
+
+        SnsList slem ->
+            SN.SnList slem.ng
+
+
+sngSubscriptions : SpecialNoteState -> List (Sub Msg)
+sngSubscriptions sns =
+    case sns of
+        SnsSearch _ ->
+            []
+
+        SnsSync _ ->
+            []
+
+        SnsList slem ->
+            List.map (Sub.map SLEMsg) <| nllDndSubscriptions slem
+
+
+saveLzLinks : ZkNoteId -> SpecialNoteState -> List SaveLzLink
+saveLzLinks this sns =
+    case sns of
+        SnsSearch _ ->
+            []
+
+        SnsSync _ ->
+            []
+
+        SnsList slem ->
+            List.foldl
+                (\nll ( to, lst ) ->
+                    ( nll.id
+                    , { to = to
+                      , from = nll.id
+                      , delete = Just False
+                      }
+                        :: lst
+                    )
+                )
+                ( this, [] )
+                (filterNotes this slem.nlls)
+                |> Tuple.second
+
+
+guiSn :
+    Time.Zone
+    -> SpecialNoteState
+    -> E.Element Msg
 guiSn zone snote =
     case snote of
-        SN.SnSearch tagsearches ->
+        SnsSearch tagsearches ->
             E.row
                 [ E.alignTop
                 , E.width E.fill
@@ -46,7 +138,7 @@ guiSn zone snote =
                     }
                 ]
 
-        SN.SnSync completedSync ->
+        SnsSync completedSync ->
             E.wrappedRow [ E.alignTop, E.width E.fill ]
                 [ E.column []
                     [ E.text "sync"
@@ -84,8 +176,130 @@ guiSn zone snote =
                     ]
                 ]
 
-        SN.SnPlaylist _ ->
-            E.none
+        SnsList slem ->
+            E.column []
+                [ E.row [ E.spacing 3 ]
+                    [ EI.button Common.buttonStyle
+                        { onPress = Just <| GraphFocusClick
+                        , label = E.text "add to list"
+                        }
+                    , EI.button Common.buttonStyle
+                        { onPress = Just <| SlideShowClick
+                        , label = E.text "slideshow"
+                        }
+                    , EI.button Common.buttonStyle
+                        { onPress = Just <| ToMarkdownPress
+                        , label = E.text "to markdown"
+                        }
+                    ]
+                , E.map SLEMsg <| SLE.view slem
+                ]
+
+
+lzToDict : Dict String LzLink -> DataUtil.LzlDict
+lzToDict lzls =
+    lzls
+        |> Dict.values
+        |> List.foldl
+            (\lzl lzll ->
+                TDict.insert lzl.to lzl lzll
+            )
+            DataUtil.emptyLzlDict
+
+
+lzToDict2 : List LzLink -> DataUtil.LzlDict
+lzToDict2 lzls =
+    lzls
+        |> List.foldl
+            (\lzl lzll ->
+                TDict.insert lzl.to lzl lzll
+            )
+            DataUtil.emptyLzlDict
+
+
+addNotes :
+    ZkNoteId
+    -> List ZkListNote
+    -> SpecialNoteState
+    -> SpecialNoteState
+addNotes this zlns sns =
+    case sns of
+        SnsList slem ->
+            -- disallow linking 'this' and disallow multiple occurances
+            -- of notes.
+            let
+                notes =
+                    List.map (\zln -> { id = zln.id, title = zln.title }) zlns
+            in
+            case slem.ng.currentUuid of
+                Nothing ->
+                    SnsList
+                        { slem | nlls = filterNotes this <| notes ++ slem.nlls }
+
+                Just uuid ->
+                    let
+                        zni =
+                            Zni uuid
+
+                        nlnks =
+                            List.foldr
+                                (\n lst ->
+                                    if n.id == zni then
+                                        n :: notes ++ lst
+
+                                    else
+                                        n :: lst
+                                )
+                                []
+                                slem.nlls
+
+                        flnks =
+                            filterNotes this nlnks
+                    in
+                    SnsList { slem | nlls = flnks }
+
+        SnsSearch s ->
+            SnsSearch s
+
+        SnsSync s ->
+            SnsSync s
+
+
+filterNotes : ZkNoteId -> List NlLink -> List NlLink
+filterNotes this nlls =
+    -- filter out duplicates and 'this'
+    List.foldr
+        (\nll ( nls, nlst ) ->
+            let
+                nllid =
+                    zkNoteIdToString nll.id
+            in
+            if Set.member nllid nls then
+                ( nls, nlst )
+
+            else
+                ( Set.insert nllid nls, nll :: nlst )
+        )
+        ( Set.singleton (zkNoteIdToString this), [] )
+        nlls
+        |> Tuple.second
+
+
+mklzList : ZkNoteId -> List Data.LzLink -> List { id : ZkNoteId, title : String }
+mklzList this links =
+    List.reverse <| dolst this (lzToDict2 links) []
+
+
+dolst : ZkNoteId -> DataUtil.LzlDict -> List { id : ZkNoteId, title : String } -> List { id : ZkNoteId, title : String }
+dolst toid lz2d lst =
+    case TDict.get toid lz2d of
+        Nothing ->
+            lst
+
+        Just l ->
+            dolst l.from
+                (TDict.remove toid lz2d)
+                ({ id = l.from, title = l.fromname } :: lst)
 
 
 syncSearch : Bool -> SN.CompletedSync -> TagSearch
@@ -151,30 +365,88 @@ syncSearch fromremote csync =
                 }
 
 
-updateSn : Msg -> SN.SpecialNote -> ( SN.SpecialNote, Command )
+updateSn : Msg -> SpecialNoteState -> ( SpecialNoteState, Command )
 updateSn msg snote =
     case snote of
-        SN.SnSearch tagsearches ->
+        SnsSearch tagsearches ->
             case msg of
+                GraphFocusClick ->
+                    ( SnsSearch tagsearches, None )
+
+                SlideShowClick ->
+                    ( SnsSearch tagsearches, None )
+
                 CopySearchPress ->
-                    ( SN.SnSearch tagsearches, CopySearch tagsearches )
+                    ( SnsSearch tagsearches, CopySearch tagsearches )
+
+                ToMarkdownPress ->
+                    ( SnsSearch tagsearches, None )
 
                 CopySyncSearchPress _ ->
-                    ( SN.SnSearch tagsearches, None )
+                    ( SnsSearch tagsearches, None )
+
+                SLEMsg _ ->
+                    ( SnsSearch tagsearches, None )
 
                 Noop ->
-                    ( SN.SnSearch tagsearches, None )
+                    ( SnsSearch tagsearches, None )
 
-        SN.SnSync completedSync ->
+        SnsSync completedSync ->
             case msg of
+                GraphFocusClick ->
+                    ( SnsSync completedSync, None )
+
+                SlideShowClick ->
+                    ( SnsSync completedSync, None )
+
                 CopySearchPress ->
-                    ( SN.SnSync completedSync, None )
+                    ( SnsSync completedSync, None )
+
+                ToMarkdownPress ->
+                    ( SnsSync completedSync, None )
 
                 CopySyncSearchPress fromremote ->
-                    ( SN.SnSync completedSync, CopySyncSearch (syncSearch fromremote completedSync) )
+                    ( SnsSync completedSync, CopySyncSearch (syncSearch fromremote completedSync) )
+
+                SLEMsg _ ->
+                    ( SnsSync completedSync, None )
 
                 Noop ->
-                    ( SN.SnSync completedSync, None )
+                    ( SnsSync completedSync, None )
 
-        SN.SnPlaylist notelist ->
-            ( SN.SnPlaylist notelist, None )
+        SnsList slem ->
+            case msg of
+                GraphFocusClick ->
+                    ( SnsList slem, GraphFocus )
+
+                SlideShowClick ->
+                    ( SnsList slem, SlideShow (Maybe.map Zni slem.ng.currentUuid) slem.nlls )
+
+                ToMarkdownPress ->
+                    ( SnsList slem
+                    , ToMarkdown
+                        (List.map
+                            (\nl ->
+                                "<note id=\"" ++ zkNoteIdToString nl.id ++ "\" text=\"" ++ nl.title ++ "\"/>"
+                            )
+                            slem.nlls
+                            |> List.intersperse "\n"
+                            |> String.concat
+                        )
+                    )
+
+                CopySearchPress ->
+                    ( SnsList slem, None )
+
+                CopySyncSearchPress _ ->
+                    ( SnsList slem, None )
+
+                SLEMsg m ->
+                    let
+                        nm =
+                            SLE.update m slem
+                    in
+                    ( SnsList nm, DndCmd <| Cmd.map SLEMsg <| SLE.commands nm )
+
+                Noop ->
+                    ( SnsList slem, None )

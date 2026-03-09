@@ -1026,7 +1026,14 @@ mod tests {
           uzl.toUuid.as_str(),
           uzl.userUuid.as_str(),
         )?;
+        let uuid_client = read_uuidzklink_linkzknote(
+          &caconn,
+          uzl.fromUuid.as_str(),
+          uzl.toUuid.as_str(),
+          uzl.userUuid.as_str(),
+        )?;
 
+        println!("client uuid: {:?}", uuid_client);
         println!("link uuid: {:?}", uuid);
         // also linkzknote should be the same.
         assert!(uzl.linkUuid == uuid);

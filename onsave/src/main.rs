@@ -576,6 +576,7 @@ pub async fn yeet_service(
                                           delete: None,
                                         })
                                         .collect(),
+                                      lzlinks: Vec::new(),
                                     };
                                     let res = client
                                       .post(String::from(onsave_server_uri.clone()) + "/private")
@@ -672,6 +673,7 @@ pub async fn yeet_service(
                               delete: None,
                             })
                             .collect(),
+                          lzlinks: Vec::new(),
                         };
                         let res = client
                           .post(String::from(onsave_server_uri.clone()) + "/private")

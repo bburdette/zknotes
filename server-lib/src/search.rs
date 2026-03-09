@@ -461,6 +461,7 @@ pub fn build_base_sql(
     );
     sqlargs.push((sqlbase, baseargs, false));
   }
+
   if current {
     let ( sqlbase,  baseargs) =
 
@@ -484,26 +485,26 @@ pub fn build_base_sql(
       format!(
         "select N.id, N.uuid, PN.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
       from zkarch N, zklink L, zknote PN
-      where (N.user != ?
-        and L.fromid = N.zknote and L.toid = ? )
+      where ((N.user != ? and L.fromid = N.zknote and L.toid = ?) or N.zknote = ?)
         and PN.id = N.zknote
         {}",
         deleted
       ),
-      vec![uid.to_string(), publicid.to_string()],
+      vec![uid.to_string(), publicid.to_string(), publicid.to_string()],
     );
     sqlargs.push((sqlpub, pubargs, false));
   }
+
   if current {
     let (sqlpub, pubargs) = (
       format!(
         "select N.id, N.uuid, null, N.title, N.file, N.user, N.createdate, N.changeddate
       from zknote N, zklink L
-      where (N.user != ? and L.fromid = N.id and L.toid = ?)
+      where ((N.user != ? and L.fromid = N.id and L.toid = ?) or N.id = ?)
       {}",
         deleted
       ),
-      vec![uid.to_string(), publicid.to_string()],
+      vec![uid.to_string(), publicid.to_string(), publicid.to_string()],
     );
     sqlargs.push((sqlpub, pubargs, true));
   };

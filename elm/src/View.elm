@@ -1,4 +1,14 @@
-module View exposing (Command(..), Model, Msg(..), initFull, initSzn, update, view)
+module View exposing
+    ( Command(..)
+    , Config
+    , Model
+    , Msg(..)
+    , defaultConfig
+    , initFull
+    , initSzn
+    , update
+    , view
+    )
 
 import Cellme.Cellme exposing (CellContainer(..), RunState(..), evalCellsFully)
 import Cellme.DictCellme exposing (CellDict(..), getCd, mkCc)
@@ -21,7 +31,8 @@ import Util
 type Msg
     = OnSchelmeCodeChanged String String
     | DonePress
-    | SwitchPress ZkNoteId
+    | SwitchPress ZkNoteId -- TODO: remove?
+    | OnPlaybackEnd
     | Noop
 
 
@@ -41,10 +52,36 @@ type alias Model =
     }
 
 
+type alias Config =
+    { showLinks : Bool
+    , alwaysShowTitle : Bool
+    , showContents : Bool
+    , showMedia : Bool
+    , showDates : Bool
+    , showPanel : Bool
+    , loggedin : Bool
+    , autoplay : Bool
+    }
+
+
+defaultConfig : Config
+defaultConfig =
+    { showLinks = True
+    , alwaysShowTitle = True
+    , showContents = True
+    , showMedia = True
+    , showDates = True
+    , showPanel = True
+    , loggedin = True
+    , autoplay = True
+    }
+
+
 type Command
     = None
     | Done
     | Switch ZkNoteId
+    | OnPlaybackEnded
 
 
 showZkl : Data.EditLink -> Element Msg
@@ -68,8 +105,8 @@ showZkl zkl =
         ]
 
 
-view : Time.Zone -> Int -> NoteCache -> Model -> Bool -> Element Msg
-view zone maxw noteCache model loggedin =
+view : Time.Zone -> Int -> NoteCache -> Config -> Model -> Element Msg
+view zone maxw noteCache config model =
     let
         mw =
             min maxw 1000 - 160
@@ -78,7 +115,7 @@ view zone maxw noteCache model loggedin =
             maxw < 1300
     in
     E.column [ E.width E.fill ]
-        [ if loggedin then
+        [ if config.loggedin then
             E.row []
                 [ EI.button Common.buttonStyle { onPress = Just DonePress, label = E.text "Edit" }
                 ]
@@ -92,6 +129,14 @@ view zone maxw noteCache model loggedin =
             \x -> E.row [ E.width E.fill ] [ E.row [ E.centerX, E.spacing 10 ] x ]
           )
             [ model.panelNote
+                |> Maybe.andThen
+                    (\pn ->
+                        if config.showPanel then
+                            Just pn
+
+                        else
+                            Nothing
+                    )
                 |> Maybe.andThen (NC.getNote noteCache)
                 |> Maybe.map
                     (\ce ->
@@ -145,19 +190,31 @@ view zone maxw noteCache model loggedin =
                 |> Maybe.withDefault E.none
             , E.column
                 [ E.width (E.fill |> E.maximum 1000), E.centerX, E.spacing 20, E.padding 10, E.alignTop ]
-                [ if model.showtitle then
-                    E.row [ E.centerX ] [ E.paragraph [ Font.bold, Font.size 20 ] [ E.text model.title ] ]
+                [ if model.showtitle || config.alwaysShowTitle then
+                    E.row [ E.centerX ]
+                        [ E.paragraph
+                            [ Font.bold, Font.size 20 ]
+                            [ E.text model.title ]
+                        ]
 
                   else
                     E.none
 
                 -- if has a file, show file view
                 , model.zknote
+                    |> Maybe.andThen
+                        (\n ->
+                            if config.showMedia then
+                                Just n
+
+                            else
+                                Nothing
+                        )
                     |> Maybe.map
                         (\zkn ->
                             case zkn.filestatus of
                                 Data.FilePresent ->
-                                    MC.noteFile model.fui mw Nothing model.title zkn
+                                    MC.noteFile model.fui mw config.autoplay (Just OnPlaybackEnd) model.title zkn
 
                                 Data.FileMissing ->
                                     E.text <| "file missing"
@@ -166,60 +223,72 @@ view zone maxw noteCache model loggedin =
                                     E.none
                         )
                     |> Maybe.withDefault E.none
-                , E.row [ E.width E.fill ]
-                    [ case
-                        MC.markdownView
-                            (MC.mkRenderer
-                                { zone = zone
-                                , fui = model.fui
-                                , viewMode = MC.PublicView
-                                , addToSearchMsg = \_ -> Noop
-                                , maxw = mw
-                                , cellDict = model.cells
-                                , showPanelElt = False
-                                , onchanged = OnSchelmeCodeChanged
-                                , noteCache = noteCache
-                                , noop = Noop
-                                }
-                            )
-                            model.md
-                      of
-                        Ok rendered ->
-                            E.column
-                                [ E.spacing 8
-                                , E.width E.fill
-                                , E.centerX
-                                ]
-                                rendered
+                , if config.showContents then
+                    E.row [ E.width E.fill ]
+                        [ case
+                            MC.markdownView
+                                (MC.mkRenderer
+                                    { zone = zone
+                                    , fui = model.fui
+                                    , viewMode = MC.PublicView
+                                    , addToSearchMsg = \_ -> Noop
+                                    , maxw = mw
+                                    , cellDict = model.cells
+                                    , showPanelElt = False
+                                    , onchanged = OnSchelmeCodeChanged
+                                    , noteCache = noteCache
+                                    , noop = Noop
+                                    }
+                                )
+                                model.md
+                          of
+                            Ok rendered ->
+                                E.column
+                                    [ E.spacing 8
+                                    , E.width E.fill
+                                    , E.centerX
+                                    ]
+                                    rendered
 
-                        Err errors ->
-                            E.text errors
-                    ]
-                , case ( model.createdate, model.changeddate ) of
-                    ( Just cd, Just chd ) ->
-                        E.row [ E.width E.fill, Font.italic ]
-                            [ E.paragraph []
-                                [ E.text "created: "
-                                , E.text (Util.showDateTime zone (Time.millisToPosix cd))
-                                ]
-                            , E.paragraph [ Font.alignRight ]
-                                [ E.text "updated: "
-                                , E.text (Util.showDateTime zone (Time.millisToPosix chd))
-                                ]
-                            ]
+                            Err errors ->
+                                E.text errors
+                        ]
 
-                    _ ->
-                        E.none
-                , E.column [ E.centerX, E.width (E.minimum 150 E.shrink), E.spacing 8 ]
-                    (if List.isEmpty model.zklinks then
-                        []
+                  else
+                    E.none
+                , if config.showDates then
+                    case ( model.createdate, model.changeddate ) of
+                        ( Just cd, Just chd ) ->
+                            E.row [ E.width E.fill, Font.italic ]
+                                [ E.paragraph []
+                                    [ E.text "created: "
+                                    , E.text (Util.showDateTime zone (Time.millisToPosix cd))
+                                    ]
+                                , E.paragraph [ Font.alignRight ]
+                                    [ E.text "updated: "
+                                    , E.text (Util.showDateTime zone (Time.millisToPosix chd))
+                                    ]
+                                ]
 
-                     else
-                        E.row [ Font.bold ] [ E.text "links" ]
-                            :: List.map
-                                showZkl
-                                model.zklinks
-                    )
+                        _ ->
+                            E.none
+
+                  else
+                    E.none
+                , if config.showLinks then
+                    E.column [ E.centerX, E.width (E.minimum 150 E.shrink), E.spacing 8 ]
+                        (if List.isEmpty model.zklinks then
+                            []
+
+                         else
+                            E.row [ Font.bold ] [ E.text "links" ]
+                                :: List.map
+                                    showZkl
+                                    model.zklinks
+                        )
+
+                  else
+                    E.none
                 ]
             ]
         ]
@@ -312,3 +381,6 @@ update msg model =
               }
             , None
             )
+
+        OnPlaybackEnd ->
+            ( model, OnPlaybackEnded )

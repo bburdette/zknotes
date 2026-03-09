@@ -1,4 +1,4 @@
-port module EditZkNote exposing
+module EditZkNote exposing
     ( Command(..)
     , Model
     , Msg(..)
@@ -6,13 +6,13 @@ port module EditZkNote exposing
     , TACommand(..)
     , WClass(..)
     , addComment
-    , blockDndSubscriptions
     , commentsRecieved
     , commonButtonStyle
     , compareZklinks
     , copyTabs
     , dirty
     , disabledLinkButtonStyle
+    , dndSubscriptions
     , fullSave
     , ghostView
     , initFull
@@ -32,9 +32,9 @@ port module EditZkNote exposing
     , pageLink
     , replaceOrAdd
     , saveZkLinkList
+    , setCurrentSlideNote
     , setHomeNote
     , setTab
-    , showSr
     , showZkl
     , sznFromModel
     , tabsOnLoad
@@ -52,11 +52,13 @@ import Cellme.Cellme exposing (CellContainer(..), RunState(..), evalCellsFully)
 import Cellme.DictCellme exposing (CellDict(..), getCd, mkCc)
 import Common
 import Data exposing (ArchivesOrCurrent(..), Direction(..), EditLink, EditTab(..), ZkNoteId)
-import DataUtil exposing (FileUrlInfo, zkNoteIdToString, zklKey, zniCompare, zniEq)
+import DataUtil exposing (FileUrlInfo, NlLink, lzlKey, zkNoteIdToString, zklKey, zniCompare, zniEq)
 import Dialog as D
 import Dict exposing (Dict)
 import DnDList
+import DndPorts exposing (..)
 import EdMarkdown as EM
+import EditZkNoteListing exposing (Msg(..))
 import Either exposing (Either(..))
 import Element as E exposing (Element)
 import Element.Background as EBk
@@ -78,14 +80,19 @@ import MdGui as MG
 import NoteCache as NC exposing (NoteCache)
 import Orgauth.Data exposing (UserId(..))
 import RequestsDialog exposing (TRequests)
+import Route exposing (parseUrl)
 import SearchStackPanel as SP
-import SpecialNotesGui as SNG
+import SnListEdit as SLE
+import SpecialNotes
+import SpecialNotesGui as SNG exposing (SpecialNoteState(..), initSpecialNoteState, initSpecialNoteStateLz)
+import TDict
 import TagSearchPanel exposing (Search(..))
+import TagThings as TT
 import TangoColors as TC
 import Task
 import Time
 import Toop
-import UUID exposing (UUID)
+import UUID
 import Url as U
 import Url.Builder as UB
 import Url.Parser as UP exposing ((</>))
@@ -108,29 +115,26 @@ type Msg
     | OnPubidChanged String
     | SavePress
     | RevertPress
-    | DeletePress Int Time.Zone
+    | DeletePress ZC.StylePalette Time.Zone
     | ViewPress
     | NewPress
     | UploadPress
+    | PowerTagPress
     | SyncPress
     | LinkBackPress
     | CopyPress
     | SearchHistoryPress
-    | SwitchPress ZkNoteId
-    | ToLinkPress Data.ZkListNote
-    | FromLinkPress Data.ZkListNote
+    | SwitchPress ZkNoteId -- TODO: remove?
     | PublicPress Bool
     | EditablePress Bool
     | ShowTitlePress Bool
     | RemoveLink EditLink
-    | MdLink EditLink String
+    | MdLink String
     | SPMsg SP.Msg
     | TabChanged EditTab
     | DialogMsg D.Msg
     | RestoreSearch String
-    | SrFocusPress ZkNoteId
     | LinkFocusPress EditLink
-    | AddToSearch Data.ZkListNote
     | AddToSearchAsTag String
     | SetSearchString String
     | SetSearch Data.TagSearch
@@ -154,8 +158,15 @@ type Msg
     | EditBlockOk
     | NewBlock
     | EditBlockMsg MG.Msg
+    | MakeList
     | SNGMsg SNG.Msg
     | SetDropLinkMode Bool
+    | RemoveLinks Direction
+    | AddLinkPress Direction
+    | AddGraphNotes
+    | AddFocusToSearch
+    | AddFocusToSearchAsTag
+    | TTMsg (TT.Msg Msg)
     | Noop
 
 
@@ -181,6 +192,11 @@ type alias NewCommentState =
     }
 
 
+type SearchControlRowMode
+    = GraphTarget
+    | LinksTarget
+
+
 type alias Model =
     { id : Maybe ZkNoteId
     , fui : FileUrlInfo
@@ -188,8 +204,8 @@ type alias Model =
     , noteUser : UserId
     , noteUserName : String
     , usernote : ZkNoteId
-    , focusSr : Maybe ZkNoteId -- note id in search result.
     , zklDict : Dict String EditLink
+    , snState : Maybe SpecialNoteState
     , focusLink : Maybe EditLink
     , comments : List Data.ZkNote
     , newcomment : Maybe NewCommentState
@@ -206,6 +222,8 @@ type alias Model =
     , cells : CellDict
     , revert : Maybe Data.SaveZkNote
     , initialZklDict : Dict String EditLink
+    , initialSnState : Maybe SpecialNoteState
+    , initialLzls : Dict String Data.SaveLzLink
     , tab : EditTab
     , searchOrRecent : SearchOrRecent
     , editOrView : EditOrView
@@ -218,6 +236,8 @@ type alias Model =
     , edMarkdown : EM.EdMarkdown
     , blockEdit : Maybe BlockEdit
     , droplinkmode : Bool
+    , tagThings : TT.Model
+    , searchControlRowMode : SearchControlRowMode
     }
 
 
@@ -249,14 +269,16 @@ type Command
     | Requests
     | Jobs
     | SetHomeNote ZkNoteId
-    | AddToRecent Data.ZkListNote
+    | AddToRecent (List Data.ZkListNote)
     | ShowMessage String
     | ShowArchives ZkNoteId
     | FileUpload
     | Sync
     | SyncFiles Data.ZkNoteSearch
+    | PowerTag
     | SPMod (SP.Model -> ( SP.Model, SP.Command ))
     | InlineXform MB.Inline (MB.Inline -> MG.Msg)
+    | SlideShow (Maybe ZkNoteId) (List NlLink)
     | Cmd (Cmd Msg) (Maybe Command)
 
 
@@ -337,47 +359,55 @@ blockDndSystemUnaltered =
         releasePointerCapture
 
 
-port onPointerMove : (JE.Value -> msg) -> Sub msg
-
-
-port onPointerUp : (JE.Value -> msg) -> Sub msg
-
-
-port releasePointerCapture : JE.Value -> Cmd msg
-
-
 blockDndSubscriptions : Model -> List (Sub Msg)
 blockDndSubscriptions model =
     [ blockDndSystem.subscriptions model.blockDnd ]
 
 
+dndSubscriptions : Model -> List (Sub Msg)
+dndSubscriptions model =
+    case model.snState of
+        Just (SnsList slem) ->
+            List.map (Sub.map SNGMsg) <| SNG.sngSubscriptions (SnsList slem)
 
--- to be called from main.elm!
+        _ ->
+            blockDndSubscriptions model
 
 
+{-| to be called from main.elm!
+-}
 ghostView : Model -> Time.Zone -> NoteCache -> MC.ViewMode -> Int -> Maybe (Element Msg)
 ghostView model zone nc viewMode mdw =
-    blockDndSystem.info model.blockDnd
-        |> Maybe.andThen
-            (\{ dragIndex } ->
-                EM.getBlocks model.edMarkdown
-                    |> Result.toMaybe
-                    |> Maybe.andThen (List.head << List.drop dragIndex)
-                    |> Maybe.map (\b -> ( dragIndex, b ))
-            )
-        |> Maybe.map
-            (\( i, block ) ->
-                let
-                    ma =
-                        mkrargs model zone nc viewMode mdw
-                in
-                E.el
-                    (E.alpha 0.5
-                        :: List.map E.htmlAttribute
-                            (blockDndSystem.ghostStyles model.blockDnd)
+    case model.snState of
+        Just (SnsList slem) ->
+            SLE.ghostView slem nc mdw
+                |> Maybe.map
+                    (\wut ->
+                        E.map SNGMsg <| E.map SNG.SLEMsg <| wut
                     )
-                    (viewBlock ma Ghost 0 (Just i) block)
-            )
+
+        _ ->
+            blockDndSystem.info model.blockDnd
+                |> Maybe.andThen
+                    (\{ dragIndex } ->
+                        EM.getBlocks model.edMarkdown
+                            |> Result.toMaybe
+                            |> Maybe.andThen (List.head << List.drop dragIndex)
+                            |> Maybe.map (\b -> ( dragIndex, b ))
+                    )
+                |> Maybe.map
+                    (\( i, block ) ->
+                        let
+                            ma =
+                                mkrargs model zone nc viewMode mdw
+                        in
+                        E.el
+                            (E.alpha 0.5
+                                :: List.map E.htmlAttribute
+                                    (blockDndSystem.ghostStyles model.blockDnd)
+                            )
+                            (viewBlock ma Ghost 0 (Just i) block)
+                    )
 
 
 blockId : Int -> String
@@ -541,6 +571,19 @@ type DragDropWhat
 -------------------------------------------------------------------------
 
 
+setCurrentSlideNote : Maybe ZkNoteId -> Model -> Model
+setCurrentSlideNote mbznid model =
+    case model.snState of
+        Just (SnsList slem) ->
+            { model
+                | snState =
+                    Just (SnsList { slem | ng = { currentUuid = Maybe.map zkNoteIdToString mbznid } })
+            }
+
+        _ ->
+            model
+
+
 setTab : EditTab -> Model -> Model
 setTab nc model =
     { model
@@ -691,7 +734,17 @@ sznFromModel : Model -> Data.SaveZkNote
 sznFromModel model =
     { id = model.id
     , title = model.title
-    , content = EM.getMd model.edMarkdown
+    , content =
+        let
+            edm =
+                case model.snState of
+                    Just sn ->
+                        EM.updateSpecialNote (SNG.getSpecialNote sn)
+
+                    Nothing ->
+                        model.edMarkdown
+        in
+        EM.getMd edm
     , pubid = toPubId (isPublic model) model.pubidtxt
     , editable = model.editableValue
     , showtitle = model.showtitle
@@ -708,6 +761,7 @@ fullSave model =
     in
     { note = sznFromModel m
     , links = saveZkLinkList m
+    , lzlinks = saveLzLinks m
     }
 
 
@@ -719,6 +773,31 @@ saveZkLinkList model =
         ++ List.map
             (\zkl -> { zkl | delete = Just True })
             (List.map DataUtil.elToSzl (Dict.values (Dict.diff model.initialZklDict model.zklDict)))
+
+
+saveLzLinks : Model -> List Data.SaveLzLink
+saveLzLinks model =
+    case ( model.id, model.snState ) of
+        ( Just znid, Just snState ) ->
+            saveLzLinkList
+                (SNG.saveLzLinks znid snState
+                    |> List.map (\sll -> ( lzlKey sll, sll ))
+                    |> Dict.fromList
+                )
+                model.initialLzls
+
+        _ ->
+            []
+
+
+saveLzLinkList : Dict String Data.SaveLzLink -> Dict String Data.SaveLzLink -> List Data.SaveLzLink
+saveLzLinkList lzlDict initialLzlDict =
+    List.map
+        (\sll -> { sll | delete = Just False })
+        (Dict.values (Dict.diff lzlDict initialLzlDict))
+        ++ List.map
+            (\sll -> { sll | delete = Just True })
+            (Dict.values (Dict.diff initialLzlDict lzlDict))
 
 
 commentsRecieved : List Data.ZkNote -> Model -> Model
@@ -764,6 +843,7 @@ dirty model =
                         && (r.editable == m.editableValue)
                         && (r.showtitle == m.showtitle)
                         && (Dict.keys m.zklDict == Dict.keys m.initialZklDict)
+                        && (m.snState == m.initialSnState)
             )
         |> Maybe.withDefault True
 
@@ -781,10 +861,16 @@ revert model =
                     , editableValue = r.editable
                     , showtitle = r.showtitle
                     , zklDict = model.initialZklDict
+                    , snState = model.initialSnState
                 }
             )
         |> Maybe.withDefault
-            (initNew model.fui model.ld (Dict.values model.initialZklDict) model.mobile)
+            (initNew
+                model.fui
+                model.ld
+                (Dict.values model.initialZklDict)
+                model.mobile
+            )
 
 
 golinkSize : Int -> Int
@@ -883,7 +969,7 @@ showZkl fontsize bkcolor isDirty editable focusLink ld _ sysColor showflip zkl =
                         }
                 , if editable then
                     EI.button (linkButtonStyle ++ [ E.alignLeft ])
-                        { onPress = Just (MdLink zkl "addlink")
+                        { onPress = Just (MdLink "addlink")
                         , label = E.text "^"
                         }
 
@@ -937,7 +1023,7 @@ pageLink model =
 
 
 view :
-    Int
+    ZC.StylePalette
     -> Time.Zone
     -> Util.Size
     -> SP.Model
@@ -948,13 +1034,13 @@ view :
     -> NoteCache
     -> Model
     -> Element Msg
-view fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCache model =
+view stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs noteCache model =
     case model.dialog of
         Just dialog ->
             D.view size dialog |> E.map DialogMsg
 
         Nothing ->
-            zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCache model
+            zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs noteCache model
 
 
 commonButtonStyle : Bool -> List (E.Attribute msg)
@@ -979,147 +1065,6 @@ linkButtonStyle =
 disabledLinkButtonStyle : List (E.Attribute msg)
 disabledLinkButtonStyle =
     Common.disabledButtonStyle
-
-
-showSr : Int -> E.Color -> Model -> Bool -> Data.ZkListNote -> Element Msg
-showSr fontsize bkcolor model isdirty zkln =
-    let
-        lnnonme =
-            zkln.user /= model.ld.userid
-
-        sysColor =
-            ZC.systemColor DataUtil.sysids zkln.sysids
-
-        mbTo =
-            Dict.get (zklKey { direction = To, otherid = zkln.id })
-                model.zklDict
-
-        mbFrom =
-            Dict.get (zklKey { direction = From, otherid = zkln.id })
-                model.zklDict
-
-        controlrows =
-            [ E.row [ E.spacing 8, E.width E.fill ]
-                [ mbTo
-                    |> Maybe.map
-                        (\zkl ->
-                            EI.button
-                                disabledLinkButtonStyle
-                                { onPress = Just <| RemoveLink zkl
-                                , label = E.el [ E.centerY ] <| E.text "→"
-                                }
-                        )
-                    |> Maybe.withDefault
-                        (EI.button linkButtonStyle
-                            { onPress = Just <| ToLinkPress zkln
-                            , label = E.el [ E.centerY ] <| E.text "→"
-                            }
-                        )
-                , mbFrom
-                    |> Maybe.map
-                        (\zkl ->
-                            EI.button
-                                disabledLinkButtonStyle
-                                { onPress = Just <| RemoveLink zkl
-                                , label = E.el [ E.centerY ] <| E.text "←"
-                                }
-                        )
-                    |> Maybe.withDefault
-                        (EI.button linkButtonStyle
-                            { onPress = Just <| FromLinkPress zkln
-                            , label = E.el [ E.centerY ] <| E.text "←"
-                            }
-                        )
-                , let
-                    mbzkl =
-                        case ( mbTo, mbFrom ) of
-                            ( Just to, _ ) ->
-                                Just to
-
-                            ( _, Just from ) ->
-                                Just from
-
-                            _ ->
-                                Nothing
-                  in
-                  case mbzkl of
-                    Just zkl ->
-                        EI.button linkButtonStyle
-                            { onPress = Just (MdLink zkl "addsearchlink")
-                            , label = E.text "<"
-                            }
-
-                    Nothing ->
-                        E.none
-                , E.column [] [ E.text <| "link to current note: ", E.el [ EF.italic ] <| E.text model.title ]
-                ]
-            , E.row
-                [ E.spacing 8, E.width E.fill ]
-                [ EI.button linkButtonStyle
-                    { onPress = Just (AddToSearch zkln)
-                    , label = E.text "^"
-                    }
-                , EI.button linkButtonStyle
-                    { onPress = Just (AddToSearchAsTag zkln.title)
-                    , label = E.text "t"
-                    }
-                , E.text "add to search"
-                ]
-            ]
-
-        listingrow =
-            E.el
-                ([ E.width E.fill
-                 , EE.onClick (SrFocusPress zkln.id)
-                 , E.height <| E.px <| round <| toFloat fontsize * 1.15
-                 , E.clip
-                 ]
-                    ++ (sysColor
-                            |> Maybe.map (\c -> [ EF.color c ])
-                            |> Maybe.withDefault []
-                       )
-                )
-            <|
-                E.text zkln.title
-    in
-    if model.focusSr == Just zkln.id then
-        -- focus result!  show controlrow.
-        E.column
-            [ EBd.width 1
-            , E.padding 3
-            , EBd.rounded 3
-            , EBd.color TC.darkGrey
-            , E.width E.fill
-            , E.spacing 8
-            , E.inFront
-                (E.row
-                    [ E.alignRight, EBk.color bkcolor ]
-                    [ if lnnonme then
-                        ZC.golink (golinkSize fontsize)
-                            zkln.id
-                            (if isdirty then
-                                ZC.saveColor
-
-                             else
-                                ZC.otherLinkColor
-                            )
-
-                      else
-                        ZC.golink (golinkSize fontsize)
-                            zkln.id
-                            (if isdirty then
-                                ZC.saveColor
-
-                             else
-                                ZC.myLinkColor
-                            )
-                    ]
-                )
-            ]
-            (listingrow :: controlrows)
-
-    else
-        listingrow
 
 
 makeNewCommentState : Model -> NewCommentState
@@ -1478,8 +1423,116 @@ renderBlocks zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo droplinkmod
             E.text errors
 
 
+controlRow :
+    ZC.StylePalette
+    -> Bool
+    -> Model
+    -> ZkNoteId
+    -> Element Msg
+controlRow stylePalette isDirty model zknid =
+    let
+        focusNotes =
+            TDict.values model.tagThings.focusSr
+
+        clearButton =
+            if TDict.isEmpty model.tagThings.focusSr then
+                E.none
+
+            else
+                EI.button Common.buttonStyle
+                    { onPress = Just <| TTMsg TT.ClearSelection
+                    , label = E.el [ E.centerY ] <| E.text "clear"
+                    }
+
+        calcAll =
+            \direction ->
+                List.all
+                    (\n ->
+                        Dict.member
+                            (zklKey { direction = direction, otherid = n.id })
+                            model.zklDict
+                    )
+
+        ct =
+            calcAll To focusNotes
+
+        cf =
+            calcAll From focusNotes
+
+        tflinks =
+            [ if ct then
+                EI.button
+                    disabledLinkButtonStyle
+                    { onPress = Just <| RemoveLinks To
+                    , label = E.el [ E.centerY ] <| E.text "→"
+                    }
+
+              else
+                EI.button linkButtonStyle
+                    { onPress = Just <| AddLinkPress To
+                    , label = E.el [ E.centerY ] <| E.text "→"
+                    }
+            , if cf then
+                EI.button
+                    disabledLinkButtonStyle
+                    { onPress = Just <| RemoveLinks From
+                    , label = E.el [ E.centerY ] <| E.text "←"
+                    }
+
+              else
+                EI.button linkButtonStyle
+                    { onPress = Just <| AddLinkPress From
+                    , label = E.el [ E.centerY ] <| E.text "←"
+                    }
+            , if ct || cf then
+                EI.button linkButtonStyle
+                    { onPress = Just (MdLink "addsearchlink")
+                    , label = E.text "<"
+                    }
+
+              else
+                E.none
+            ]
+
+        graphbutts =
+            [ EI.button linkButtonStyle
+                { onPress = Just <| AddGraphNotes
+                , label = E.el [ E.centerY ] <| E.text "+"
+                }
+            ]
+    in
+    E.row [ E.spacing 8, E.width E.fill ]
+        ((case model.searchControlRowMode of
+            GraphTarget ->
+                graphbutts
+
+            LinksTarget ->
+                tflinks
+         )
+            ++ [ EI.button linkButtonStyle
+                    { onPress = Just AddFocusToSearch
+                    , label = E.text "^"
+                    }
+               , EI.button linkButtonStyle
+                    { onPress = Just AddFocusToSearchAsTag
+                    , label = E.text "t"
+                    }
+               , clearButton
+               , E.el [ E.alignRight ] <|
+                    ZC.golink (golinkSize stylePalette.fontSize)
+                        zknid
+                        (if isDirty then
+                            ZC.saveColor
+
+                         else
+                            ZC.myLinkColor
+                        )
+               ]
+        )
+
+
 zknview :
-    Int
+    ZC.StylePalette
     -> Time.Zone
     -> Util.Size
     -> SP.Model
@@ -1490,7 +1543,7 @@ zknview :
     -> NoteCache
     -> Model
     -> Element Msg
-zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCache model =
+zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs noteCache model =
     let
         wclass =
             if size.width < 800 then
@@ -1555,7 +1608,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                       , width = E.shrink
                       , view =
                             \zkn ->
-                                ZC.golink (golinkSize fontsize)
+                                ZC.golink (golinkSize stylePalette.fontSize)
                                     zkn.id
                                     (if isdirty then
                                         ZC.saveColor
@@ -1599,7 +1652,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
             E.row [ EF.bold ] [ E.text "links" ]
                 :: List.map
                     (\( l, c ) ->
-                        showZkl fontsize
+                        showZkl stylePalette.fontSize
                             linkbkc
                             isdirty
                             editable
@@ -1739,8 +1792,6 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
 
                             ( Nothing, Just _ ) ->
                                 enb
-
-                        -- , EI.button parabuttonstyle { onPress = Just LinksPress, label = E.text"links" }
                         , if isdirty then
                             EI.button perhapsdirtyparabuttonstyle { onPress = Just SavePress, label = E.text "save" }
 
@@ -1758,10 +1809,10 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                             }
                         , EI.button perhapsdirtyparabuttonstyle { onPress = Just NewPress, label = E.text "new" }
                         , if mine && not model.deleted then
-                            EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just <| DeletePress fontsize zone, label = E.text "delete" }
+                            EI.button parabuttonstyle { onPress = Just <| DeletePress stylePalette zone, label = E.text "delete" }
 
                           else
-                            EI.button (E.alignRight :: Common.disabledButtonStyle) { onPress = Nothing, label = E.text "delete" }
+                            EI.button disabledparabuttonstyle { onPress = Nothing, label = E.text "delete" }
                         ]
                 , titleed
                 , if mine then
@@ -1889,6 +1940,14 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
         mbdi =
             blockDndSystem.info model.blockDnd
 
+        gotid =
+            case model.id of
+                Just _ ->
+                    True
+
+                Nothing ->
+                    False
+
         mdview =
             E.column
                 [ E.width E.fill
@@ -1905,6 +1964,21 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                         , icon = EI.defaultCheckbox
                         , checked = model.droplinkmode
                         , label = EI.labelLeft [] (E.text "DLMode")
+                        }
+                    , EI.button
+                        (if gotid then
+                            Common.buttonStyle
+
+                         else
+                            Common.disabledButtonStyle
+                        )
+                        { onPress =
+                            if gotid then
+                                Just MakeList
+
+                            else
+                                Nothing
+                        , label = E.text "list"
                         }
                     , EI.button Common.buttonStyle
                         { onPress = Just NewBlock
@@ -1933,7 +2007,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                     ]
                 , case ( model.filestatus, toZkNote model ) of
                     ( Data.FilePresent, Just zkn ) ->
-                        MC.noteFile model.fui mdw Nothing model.title zkn
+                        MC.noteFile model.fui mdw False Nothing model.title zkn
 
                     ( Data.FileMissing, Just _ ) ->
                         E.text <| "file missing"
@@ -1978,92 +2052,8 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
         perhapsdirtyparabuttonstyle =
             perhapsdirtybutton ++ pxy
 
-        ( spwidth, sppad ) =
-            case wclass of
-                Narrow ->
-                    ( E.fill, [ E.paddingXY 0 5 ] )
-
-                Medium ->
-                    ( E.px 400, [ E.padding 5 ] )
-
-                Wide ->
-                    ( E.px 400, [ E.padding 5 ] )
-
-        searchOrRecentPanel =
-            E.column
-                [ E.spacing 8
-                , E.alignTop
-                , E.alignRight
-                , E.width spwidth
-                , EBd.width 1
-                , EBd.color TC.darkGrey
-                , EBd.rounded 10
-                , EBk.color TC.white
-                , E.clip
-                ]
-                [ Common.navbar 2
-                    (case model.searchOrRecent of
-                        SearchView ->
-                            EtSearch
-
-                        RecentView ->
-                            EtRecent
-                    )
-                    TabChanged
-                    [ ( EtSearch, "search" )
-                    , ( EtRecent, "recent" )
-                    ]
-                , case model.searchOrRecent of
-                    SearchView ->
-                        searchPanel TC.white
-
-                    RecentView ->
-                        recentPanel TC.white
-                ]
-
-        searchPanel bkcolor =
-            E.column
-                (E.spacing 3 :: E.width E.fill :: sppad)
-                (E.row [ E.width E.fill ]
-                    [ EI.button Common.buttonStyle
-                        { onPress = Just <| SearchHistoryPress
-                        , label = E.el [ E.centerY ] <| E.text "history"
-                        }
-                    , EI.button (E.alignRight :: Common.buttonStyle)
-                        { onPress = Just <| BigSearchPress
-                        , label = ZC.fullScreen
-                        }
-                    ]
-                    :: (E.map SPMsg <|
-                            SP.view True (size.width < 500 || wclass /= Narrow) 0 spmodel
-                       )
-                    :: (List.map
-                            (showSr fontsize bkcolor model isdirty)
-                        <|
-                            case model.id of
-                                Just id ->
-                                    List.filter (\zkl -> zkl.id /= id) zknSearchResult.notes
-
-                                Nothing ->
-                                    zknSearchResult.notes
-                       )
-                    ++ (if List.length zknSearchResult.notes < 15 then
-                            []
-
-                        else
-                            [ E.map SPMsg <|
-                                SP.paginationView spmodel
-                            ]
-                       )
-                )
-
-        recentPanel bkcolor =
-            E.column (E.spacing 8 :: E.width E.fill :: sppad)
-                (List.map
-                    (showSr fontsize bkcolor model isdirty)
-                 <|
-                    recentZkns
-                )
+        ttviews =
+            TT.makeViews stylePalette (Just size) recentZkns spmodel zknSearchResult model.tagThings (controlRow stylePalette isdirty model)
 
         showpagelink =
             case pageLink model of
@@ -2109,8 +2099,8 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                 ]
             <|
                 editmeta
-                    :: (case EM.getSpecialNote model.edMarkdown of
-                            Ok sn ->
+                    :: (case model.snState of
+                            Just sn ->
                                 E.row
                                     [ E.padding 10
                                     , EBd.rounded 10
@@ -2118,11 +2108,19 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                                     , EBk.color TC.lightGray
                                     , E.height E.fill
                                     ]
-                                    [ E.el [ EBd.color TC.black, EBd.width 1, E.width E.fill, E.centerX, E.padding 3 ] (SNG.guiSn zone sn |> E.map SNGMsg) ]
+                                    [ E.el
+                                        [ EBd.color TC.black
+                                        , EBd.width 1
+                                        , E.width E.fill
+                                        , E.centerX
+                                        , E.padding 3
+                                        ]
+                                        (SNG.guiSn zone sn |> E.map SNGMsg)
+                                    ]
                                     :: showComments
                                     ++ (divider :: showLinks TC.white)
 
-                            Err _ ->
+                            Nothing ->
                                 (if wclass == Wide then
                                     [ E.row
                                         [ E.width E.fill
@@ -2203,6 +2201,10 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                         , label = E.text "sync"
                         }
                     , EI.button (E.alignRight :: Common.buttonStyle)
+                        { onPress = Just PowerTagPress
+                        , label = E.text "tag"
+                        }
+                    , EI.button (E.alignRight :: Common.buttonStyle)
                         { onPress = Just UploadPress
                         , label = E.text "upload"
                         }
@@ -2249,7 +2251,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                         ]
                       <|
                         documentPanel
-                    , searchOrRecentPanel
+                    , E.map TTMsg ttviews.searchOrRecentPanel
                     ]
 
             Medium ->
@@ -2264,7 +2266,7 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                         ]
                       <|
                         documentPanel
-                    , searchOrRecentPanel
+                    , E.map TTMsg ttviews.searchOrRecentPanel
                     ]
 
             Narrow ->
@@ -2294,10 +2296,10 @@ zknview fontsize zone size spmodel zknSearchResult recentZkns trqs tjobs noteCac
                             documentPanel
 
                         EtSearch ->
-                            searchPanel TC.lightGray
+                            E.map TTMsg <| ttviews.searchPanel
 
                         EtRecent ->
-                            recentPanel TC.lightGray
+                            E.map TTMsg <| ttviews.recentPanel
                     ]
         ]
 
@@ -2346,10 +2348,11 @@ initFull :
     -> DataUtil.LoginData
     -> Data.ZkNote
     -> List Data.EditLink
+    -> List Data.LzLink
     -> Maybe EditTab
     -> Bool
     -> ( Model, Data.GetZkNoteComments )
-initFull fui ld zknote dtlinks mbedittab mobile =
+initFull fui ld zknote dtlinks lzlinks mbedittab mobile =
     let
         cells =
             zknote.content
@@ -2373,6 +2376,14 @@ initFull fui ld zknote dtlinks mbedittab mobile =
                     }
                 )
                 dtlinks
+
+        edMarkdown =
+            EM.init zknote.content
+
+        snState =
+            EM.getSpecialNote edMarkdown
+                |> Result.toMaybe
+                |> Maybe.map (\sn -> SNG.initSpecialNoteStateLz zknote.id sn lzlinks)
     in
     ( { id = Just zknote.id
       , fui = fui
@@ -2380,7 +2391,6 @@ initFull fui ld zknote dtlinks mbedittab mobile =
       , noteUser = zknote.user
       , noteUserName = zknote.username
       , usernote = zknote.usernote
-      , focusSr = Nothing
       , zklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) links)
       , initialZklDict =
             Dict.fromList
@@ -2388,6 +2398,13 @@ initFull fui ld zknote dtlinks mbedittab mobile =
                     (\zl -> ( zklKey zl, zl ))
                     links
                 )
+      , snState = snState
+      , initialSnState = snState
+      , initialLzls =
+            List.map
+                (\lzl -> ( lzlKey lzl, { to = lzl.to, from = lzl.from, delete = Just False } ))
+                lzlinks
+                |> Dict.fromList
       , focusLink = Nothing
       , pubidtxt = zknote.pubid |> Maybe.withDefault ""
       , title = zknote.title
@@ -2412,9 +2429,11 @@ initFull fui ld zknote dtlinks mbedittab mobile =
       , mobile = mobile
       , server = zknote.server
       , blockDnd = blockDndSystem.model
-      , edMarkdown = EM.init zknote.content
+      , edMarkdown = edMarkdown -- EM.init zknote.content
       , blockEdit = Nothing
       , droplinkmode = False
+      , tagThings = TT.init True
+      , searchControlRowMode = LinksTarget
       }
         |> (\m ->
                 Maybe.map (\nc -> setTab nc m) mbedittab
@@ -2427,13 +2446,13 @@ initFull fui ld zknote dtlinks mbedittab mobile =
 initNew : FileUrlInfo -> DataUtil.LoginData -> List EditLink -> Bool -> Model
 initNew fui ld links mobile =
     let
+        zklDict =
+            Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) links)
+
         cells =
             ""
                 |> MC.mdCells
                 |> Result.withDefault (CellDict Dict.empty)
-
-        zklDict =
-            Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) links)
 
         ( cc, _ ) =
             evalCellsFully
@@ -2445,9 +2464,11 @@ initNew fui ld links mobile =
     , noteUser = ld.userid
     , noteUserName = ld.name
     , usernote = ld.zknote
-    , focusSr = Nothing
     , zklDict = zklDict
+    , snState = Nothing
     , initialZklDict = Dict.empty
+    , initialSnState = Nothing
+    , initialLzls = Dict.empty
     , focusLink = Nothing
     , pubidtxt = ""
     , title = ""
@@ -2475,6 +2496,8 @@ initNew fui ld links mobile =
     , edMarkdown = EM.init ""
     , blockEdit = Nothing
     , droplinkmode = False
+    , tagThings = TT.init True
+    , searchControlRowMode = LinksTarget
     }
         |> (\m1 ->
                 -- for new EMPTY notes, the 'revert' should be the same as the model, so that you aren't
@@ -2529,6 +2552,16 @@ onSaved oldmodel szn =
                 { oldmodel
                     | revert = Just <| sznFromModel oldmodel
                     , initialZklDict = oldmodel.zklDict
+                    , initialSnState = oldmodel.snState
+                    , initialLzls =
+                        case ( oldmodel.id, oldmodel.snState ) of
+                            ( Just id, Just snState ) ->
+                                SNG.saveLzLinks id snState
+                                    |> List.map (\sll -> ( lzlKey sll, sll ))
+                                    |> Dict.fromList
+
+                            _ ->
+                                Dict.empty
                 }
         in
         case model.pendingcomment of
@@ -2626,6 +2659,31 @@ onTASelection model zknSearchResult recentZkns tas =
                     , length = 0
                     }
                 )
+
+        addLinks ids =
+            let
+                linktext =
+                    List.map
+                        (\id ->
+                            "\n<note id=\"" ++ zkNoteIdToString id ++ "\"/>"
+                        )
+                        ids
+                        |> String.concat
+            in
+            TAUpdated
+                { model
+                    | edMarkdown =
+                        EM.init <|
+                            String.left tas.offset (EM.getMd model.edMarkdown)
+                                ++ linktext
+                                ++ String.dropLeft (tas.offset + String.length tas.text) (EM.getMd model.edMarkdown)
+                }
+                (Just
+                    { id = "mdtext"
+                    , offset = tas.offset + String.length linktext
+                    , length = 0
+                    }
+                )
     in
     if tas.what == "linkback" then
         case initLinkBackNote model tas.text of
@@ -2658,27 +2716,32 @@ onTASelection model zknSearchResult recentZkns tas =
 
     else if tas.what == "addsearchlink" then
         case
-            model.focusSr
-                |> Maybe.andThen
-                    (\id ->
+            -- TO DO: multiple selection links.
+            model.tagThings.focusSr
+                |> TDict.values
+                |> List.filterMap
+                    (\zln ->
                         zknSearchResult.notes
-                            |> List.filter (\zkln -> id == zkln.id)
+                            |> List.filter (\zkln -> zln.id == zkln.id)
                             |> List.head
                             |> ME.orElse
-                                (List.filter (\zkln -> id == zkln.id) recentZkns
+                                (List.filter (\zkln -> zln.id == zkln.id) recentZkns
                                     |> List.head
                                 )
                     )
         of
-            Just zkln ->
+            [ zkln ] ->
                 let
                     ( title, id ) =
                         ( zkln.title, zkln.id )
                 in
                 addLink title id
 
-            Nothing ->
+            [] ->
                 TANoop
+
+            moar ->
+                addLinks (List.map .id moar)
 
     else if tas.what == "replacestring" then
         case model.mbReplaceString of
@@ -2800,41 +2863,41 @@ mergeEditBlock model =
             model
 
 
-onWkKeyPress : WK.Key -> Model -> ( Model, Command )
-onWkKeyPress key model =
+onWkKeyPress : NoteCache -> WK.Key -> Model -> ( Model, Command )
+onWkKeyPress noteCache key model =
     case Toop.T4 key.key key.ctrl key.alt key.shift of
         Toop.T4 "e" True True False ->
             let
                 ( m, _ ) =
-                    update (TabChanged EtEdit) model
+                    update noteCache (TabChanged EtEdit) model
             in
             ( m, Cmd (BD.focus "mdtext" |> Task.attempt (\_ -> Noop)) Nothing )
 
         Toop.T4 "v" True True False ->
-            update (TabChanged EtView) model
+            update noteCache (TabChanged EtView) model
 
         Toop.T4 "s" True True False ->
             let
                 ( m, _ ) =
-                    update (TabChanged EtSearch) model
+                    update noteCache (TabChanged EtSearch) model
             in
             ( m, Cmd (BD.focus "searchtext" |> Task.attempt (\_ -> Noop)) Nothing )
 
         Toop.T4 "r" True True False ->
-            update (TabChanged EtRecent) model
+            update noteCache (TabChanged EtRecent) model
 
         Toop.T4 "l" True True False ->
-            update LinkBackPress model
+            update noteCache LinkBackPress model
 
         Toop.T4 "s" True False False ->
             if dirty model then
-                update SavePress model
+                update noteCache SavePress model
 
             else
                 ( model, None )
 
         Toop.T4 "Enter" False False False ->
-            -- handleSPUpdate model (SP.onEnter model.spmodel)
+            -- handleSPUpdate noteCache model (SP.onEnter model.spmodel)
             ( model, SPMod SP.onEnter )
 
         Toop.T4 "Escape" False False False ->
@@ -2854,8 +2917,8 @@ onWkKeyPress key model =
             ( model, None )
 
 
-update : Msg -> Model -> ( Model, Command )
-update msg model =
+update : NoteCache -> Msg -> Model -> ( Model, Command )
+update noteCache msg model =
     case msg of
         RestoreSearch s ->
             ( model, SPMod (\spm -> ( SP.addSearchString spm s, SP.None )) )
@@ -2907,6 +2970,7 @@ update msg model =
                                         Right
                                             { zknote = zkn
                                             , links = model.zklDict |> Dict.values |> List.filterMap elToDel
+                                            , lzlinks = [] -- TODO fix
                                             }
 
                                     Nothing ->
@@ -2927,6 +2991,7 @@ update msg model =
                                     Right
                                         { zknote = zkn
                                         , links = model.zklDict |> Dict.values |> List.filterMap elToDel
+                                        , lzlinks = [] -- TODO fix
                                         }
 
                                 Nothing ->
@@ -3005,41 +3070,64 @@ update msg model =
             , Sync
             )
 
-        ToLinkPress zkln ->
-            let
-                nzkl =
-                    { direction = To
-                    , otherid = zkln.id
-                    , user = model.ld.userid
-                    , zknote = Nothing
-                    , othername = Just zkln.title
-                    , sysids = zkln.sysids
-                    , delete = Nothing
-                    }
-            in
-            ( { model
-                | zklDict = Dict.insert (zklKey nzkl) nzkl model.zklDict
-              }
-            , AddToRecent zkln
+        PowerTagPress ->
+            ( model
+            , PowerTag
             )
 
-        FromLinkPress zkln ->
+        AddLinkPress direction ->
             let
-                nzkl =
-                    { direction = From
-                    , otherid = zkln.id
-                    , user = model.ld.userid
-                    , zknote = Nothing
-                    , othername = Just zkln.title
-                    , sysids = zkln.sysids
-                    , delete = Nothing
-                    }
+                focusNotes =
+                    TDict.values model.tagThings.focusSr
+
+                zklDict =
+                    List.foldr
+                        (\zkln zkld ->
+                            let
+                                nzkl =
+                                    { direction = direction
+                                    , otherid = zkln.id
+                                    , user = model.ld.userid
+                                    , zknote = Nothing
+                                    , othername = Just zkln.title
+                                    , sysids = zkln.sysids
+                                    , delete = Nothing
+                                    }
+                            in
+                            Dict.insert (zklKey nzkl) nzkl zkld
+                        )
+                        model.zklDict
+                        focusNotes
             in
             ( { model
-                | zklDict = Dict.insert (zklKey nzkl) nzkl model.zklDict
+                | zklDict = zklDict
               }
-            , AddToRecent zkln
+            , AddToRecent (model.tagThings.focusSr |> TDict.values)
             )
+
+        AddGraphNotes ->
+            case model.snState of
+                Just sns ->
+                    let
+                        nsn =
+                            case model.id of
+                                Just zid ->
+                                    SNG.addNotes zid
+                                        (TDict.values model.tagThings.focusSr)
+                                        sns
+
+                                Nothing ->
+                                    sns
+                    in
+                    ( { model
+                        | edMarkdown = EM.updateSpecialNote <| SNG.getSpecialNote nsn
+                        , snState = Just nsn
+                      }
+                    , None
+                    )
+
+                _ ->
+                    ( model, None )
 
         RemoveLink zkln ->
             ( { model
@@ -3070,7 +3158,7 @@ update msg model =
             , None
             )
 
-        MdLink _ what ->
+        MdLink what ->
             ( model
             , GetTASelection "mdtext" what
             )
@@ -3127,7 +3215,7 @@ update msg model =
         RevertPress ->
             ( revert model, None )
 
-        DeletePress fontsize zone ->
+        DeletePress stylePalette zone ->
             ( { model
                 | dialog =
                     Just <|
@@ -3135,7 +3223,7 @@ update msg model =
                             True
                             (\size ->
                                 E.map (\_ -> ())
-                                    (view fontsize
+                                    (view stylePalette
                                         zone
                                         size
                                         SP.initModel
@@ -3265,6 +3353,7 @@ update msg model =
                                             Nothing
                                     )
                                     newcomment.sharelinks
+                        , lzlinks = saveLzLinks model
                         }
                     )
 
@@ -3318,18 +3407,6 @@ update msg model =
             , None
             )
 
-        SrFocusPress id ->
-            ( { model
-                | focusSr =
-                    if model.focusSr == Just id then
-                        Nothing
-
-                    else
-                        Just id
-              }
-            , None
-            )
-
         LinkFocusPress link ->
             ( { model
                 | focusLink =
@@ -3341,29 +3418,6 @@ update msg model =
               }
             , None
             )
-
-        AddToSearch zkln ->
-            if List.any ((==) DataUtil.sysids.searchid) zkln.sysids then
-                ( model
-                , SPMod
-                    (\spm ->
-                        ( SP.setSearchString spm zkln.title
-                        , SP.None
-                        )
-                    )
-                )
-
-            else
-                ( model
-                , SPMod
-                    (\spm ->
-                        ( SP.addToSearch spm
-                            [ Data.ExactMatch ]
-                            zkln.title
-                        , SP.None
-                        )
-                    )
-                )
 
         SetSearchString text ->
             ( model
@@ -3384,6 +3438,12 @@ update msg model =
                     )
                 )
             )
+
+        AddFocusToSearch ->
+            ( model, SPMod (TT.addToSearch (model.tagThings.focusSr |> TDict.values)) )
+
+        AddFocusToSearchAsTag ->
+            ( model, SPMod (TT.addToSearchAsTag (model.tagThings.focusSr |> TDict.values)) )
 
         AddToSearchAsTag title ->
             ( model
@@ -3791,6 +3851,84 @@ update msg model =
                 Err _ ->
                     ( model, None )
 
+        MakeList ->
+            case model.id of
+                Just znid ->
+                    let
+                        -- get all note links.
+                        links =
+                            EM.getBlocks model.edMarkdown
+                                |> Result.andThen
+                                    (\blks -> Markdown.Renderer.render EM.linkRenderer blks)
+                                |> Result.map (\l -> List.map Tuple.second l |> List.concat)
+                                |> Result.withDefault []
+                                |> List.filterMap
+                                    (\{ id, title } ->
+                                        case id of
+                                            Left zkid ->
+                                                Just
+                                                    { id = zkid
+                                                    , title =
+                                                        NC.getNote noteCache zkid
+                                                            |> Maybe.andThen
+                                                                (\ce ->
+                                                                    case ce of
+                                                                        NC.ZNAL n ->
+                                                                            Just n.zknote.title
+
+                                                                        _ ->
+                                                                            Nothing
+                                                                )
+                                                            |> Maybe.withDefault (zkNoteIdToString zkid)
+                                                    }
+
+                                            Right url ->
+                                                let
+                                                    es =
+                                                        case String.split "/" url of
+                                                            [ "note", s ] ->
+                                                                Just s
+
+                                                            [ "", "note", s ] ->
+                                                                Just s
+
+                                                            [ "", "editnote", s ] ->
+                                                                Just s
+
+                                                            [ "editnote", s ] ->
+                                                                Just s
+
+                                                            _ ->
+                                                                Nothing
+                                                in
+                                                es
+                                                    |> Maybe.andThen
+                                                        (\s ->
+                                                            case UUID.fromString s of
+                                                                Ok uuid ->
+                                                                    Just
+                                                                        { id = Data.Zni s
+                                                                        , title = title
+                                                                        }
+
+                                                                Err _ ->
+                                                                    Nothing
+                                                        )
+                                    )
+
+                        sns =
+                            initSpecialNoteState (SpecialNotes.SnList { currentUuid = Nothing }) links
+                    in
+                    ( { model
+                        | edMarkdown = EM.updateSpecialNote (SNG.getSpecialNote sns)
+                        , snState = Just sns
+                      }
+                    , None
+                    )
+
+                Nothing ->
+                    ( model, None )
+
         EditBlockMsg ebmsg ->
             case MG.getXformMsg ebmsg of
                 Just ( inline, tomsg ) ->
@@ -3800,24 +3938,32 @@ update msg model =
                     ( updateEditBlock ebmsg model, None )
 
         SNGMsg sngmsg ->
-            case EM.getSpecialNote model.edMarkdown of
-                Ok sn ->
+            case model.snState of
+                Just sns ->
                     let
                         ( snmd, sncmd ) =
-                            SNG.updateSn sngmsg sn
+                            SNG.updateSn sngmsg sns
+
+                        umod =
+                            { model
+                                | edMarkdown = EM.updateSpecialNote (SNG.getSpecialNote snmd)
+                                , snState = Just snmd
+                            }
                     in
-                    ( { model | edMarkdown = EM.updateSpecialNote snmd }
-                    , case sncmd of
+                    case sncmd of
                         SNG.CopySearch tagSearch ->
-                            SPMod
+                            ( umod
+                            , SPMod
                                 (\spm ->
                                     ( SP.setSearch spm tagSearch
                                     , SP.None
                                     )
                                 )
+                            )
 
                         SNG.CopySyncSearch tagSearch ->
-                            SPMod
+                            ( umod
+                            , SPMod
                                 (\spm ->
                                     let
                                         nsspm =
@@ -3833,16 +3979,78 @@ update msg model =
                                     , SP.None
                                     )
                                 )
+                            )
+
+                        SNG.GraphFocus ->
+                            ( { umod
+                                | searchControlRowMode =
+                                    case umod.searchControlRowMode of
+                                        GraphTarget ->
+                                            LinksTarget
+
+                                        LinksTarget ->
+                                            GraphTarget
+                              }
+                            , None
+                            )
+
+                        SNG.SlideShow current lst ->
+                            ( umod, SlideShow current lst )
+
+                        SNG.DndCmd c ->
+                            ( umod
+                            , Cmd (Cmd.map SNGMsg c) Nothing
+                            )
+
+                        SNG.ToMarkdown s ->
+                            ( { model
+                                | edMarkdown = EM.init s
+                                , snState = Nothing
+                              }
+                            , None
+                            )
 
                         SNG.None ->
-                            None
-                    )
+                            ( umod
+                            , None
+                            )
 
-                Err _ ->
+                Nothing ->
                     ( model, None )
 
         SetDropLinkMode b ->
             ( { model | droplinkmode = b }, None )
+
+        RemoveLinks direction ->
+            ( { model
+                | zklDict =
+                    List.foldl (\zkln zkld -> Dict.remove (zklKey { direction = direction, otherid = zkln.id }) zkld)
+                        model.zklDict
+                        (TDict.values model.tagThings.focusSr)
+              }
+            , None
+            )
+
+        TTMsg ttm ->
+            let
+                ( nm, cmd ) =
+                    TT.update ttm model.tagThings
+            in
+            case cmd of
+                TT.None ->
+                    ( { model | tagThings = nm }, None )
+
+                TT.SearchHistory ->
+                    ( { model | tagThings = nm }, SearchHistory )
+
+                TT.BigSearch ->
+                    ( { model | tagThings = nm }, BigSearch )
+
+                TT.ControlCommand cc ->
+                    update noteCache cc { model | tagThings = nm }
+
+                TT.SPMod f ->
+                    ( { model | tagThings = nm }, SPMod f )
 
         Noop ->
             ( model, None )

@@ -23,9 +23,9 @@ use uuid::Uuid;
 use zkprotocol::constants::SpecialUuids;
 use zkprotocol::content::{
   ArchiveZkLink, Direction, EditLink, ExtraLoginData, FileInfo, FileStatus, GetZkNoteArchives,
-  GetZkNoteComments, GetZnlIfChanged, ImportZkNote, OnMakeFileNote, OnSavedZkNote, SaveZkLink,
-  SaveZkLink2, SaveZkNote, SavedZkNote, Server, Sysids, UuidZkLink, ZkLink, ZkListNote, ZkNote,
-  ZkNoteAndLinks, ZkNoteAndLinksWhat, ZkNoteId,
+  GetZkNoteComments, GetZnlIfChanged, ImportZkNote, LzLink, OnMakeFileNote, OnSavedZkNote,
+  SaveLzLink, SaveZkLink, SaveZkLink2, SaveZkNote, SavedZkNote, Server, Sysids, UuidZkLink, ZkLink,
+  ZkListNote, ZkNote, ZkNoteAndLinks, ZkNoteAndLinksWhat, ZkNoteId,
 };
 use zkprotocol::sync_data::SyncMessage;
 
@@ -1771,6 +1771,41 @@ pub fn save_savezklinks(
   Ok(())
 }
 
+pub fn save_savelzlinks(
+  conn: &Connection,
+  uid: UserId,
+  zknid: ZkNoteId,
+  lzlinks: &Vec<SaveLzLink>,
+) -> Result<(), zkerr::Error> {
+  for link in lzlinks.iter() {
+    // TODO: integrate into sql instead of separate queries.
+    let to = note_id_for_zknoteid(&conn, &link.to)?;
+    let from = note_id_for_zknoteid(&conn, &link.from)?;
+    let linkzknote = note_id_for_zknoteid(&conn, &zknid)?;
+    if link.delete == Some(true) {
+      // create archive record.
+      let now = now()?;
+      let ac = conn.execute(
+        "insert into zklinkarchive (fromid, toid, user, linkzknote, createdate, deletedate)
+            select fromid, toid, user, linkzknote, createdate, ?1 from zklink
+            where fromid = ?2 and toid = ?3 and user = ?4",
+        params![now, from, to, uid.to_i64()],
+      )?;
+      println!("inserted {} archive lzlink", ac);
+      // delete the link.
+      let dc = conn.execute(
+        "delete from zklink where fromid = ?1 and toid = ?2 and user = ?3",
+        params![from, to, uid.to_i64()],
+      )?;
+      println!("deleted {} lzlink", dc);
+    } else {
+      save_zklink(&conn, from, to, uid, Some(linkzknote))?;
+    }
+  }
+
+  Ok(())
+}
+
 pub fn read_zklinks(
   conn: &Connection,
   uid: UserId,
@@ -1806,6 +1841,10 @@ pub fn read_zklinks(
   // not-mine zklinks with from/to = this, and to/from in usershares.
   // +
   // not-mine zklinks from/to notes that link to my usernote.
+  //
+
+  // exclude links with non-null linkzknote.  this prevents links being in
+  // both read_zklinks results and read_lzlinks results.
 
   // TODO: integrate sysid lookup in the query?
   let sqlstr = format!(
@@ -1814,6 +1853,7 @@ pub fn read_zklinks(
       inner join zknote as L ON A.fromid = L.id
       inner join zknote as R ON A.toid = R.id
       where A.user = ?1 and (A.fromid = ?2 or A.toid = ?2)
+      and A.linkzknote is null
       union
     select A.fromid, A.toid, A.user, A.linkzknote, L.uuid, L.title, R.uuid, R.title
       from zklink A, zklink B
@@ -1822,6 +1862,7 @@ pub fn read_zklinks(
       where A.user != ?1 and A.fromid = ?2
       and B.fromid = A.toid
       and B.toid = ?3
+      and A.linkzknote is null
       union
    select A.fromid, A.toid, A.user, A.linkzknote, L.uuid, L.title, R.uuid, R.title
       from zklink A, zklink B
@@ -1830,12 +1871,15 @@ pub fn read_zklinks(
       where A.user != ?1 and A.toid = ?2
       and B.fromid = A.fromid
       and B.toid = ?3
+      and A.linkzknote is null
       union
     select A.fromid, A.toid, A.user, A.linkzknote, L.uuid, L.title, R.uuid, R.title
         from zklink A, zklink B
         inner join zknote as L ON A.fromid = L.id
         inner join zknote as R ON A.toid = R.id
-        where A.user != ?1 and
+        where A.user != ?1
+          and A.linkzknote is null
+          and
           ((A.toid = ?2 and A.fromid = B.fromid and B.toid in ({})) or
            (A.toid = ?2 and A.fromid = B.toid and B.fromid in ({})) or
            (A.fromid = ?2 and A.toid = B.fromid and B.toid in ({})) or
@@ -1845,7 +1889,9 @@ pub fn read_zklinks(
         from zklink A, zklink B
         inner join zknote as L ON A.fromid = L.id
         inner join zknote as R ON A.toid = R.id
-        where A.user != ?1 and
+        where A.user != ?1
+          and A.linkzknote is null
+          and
           ((A.toid = ?2 and A.fromid = B.fromid and B.toid = ?4) or
            (A.toid = ?2 and A.fromid = B.toid and B.fromid = ?4) or
            (A.fromid = ?2 and A.toid = B.fromid and B.toid = ?4) or
@@ -1886,6 +1932,89 @@ pub fn read_zklinks(
       })
     },
   )?);
+  r
+}
+
+pub fn read_lzlinks(
+  conn: &Connection,
+  uid: UserId,
+  zknid: i64,
+) -> Result<Vec<LzLink>, zkerr::Error> {
+  let pubid = note_id(&conn, "system", "public")?;
+  let usershares = user_shares(&conn, uid)?;
+  let unid = user_note_id(&conn, uid)?;
+
+  // user shares in '1,3,4,5,6' form (minus the quotes!)
+  let mut s = usershares
+    .iter()
+    .map(|x| {
+      let mut s = x.to_string();
+      s.push_str(",");
+      s
+    })
+    .collect::<String>();
+  s.truncate(s.len() - 1);
+
+  let sqlstr = format!(
+    "select A.user, L.uuid, L.title, R.uuid, R.title
+      from zklink A, zklink B
+      inner join zknote as L ON A.fromid = L.id
+      inner join zknote as R ON A.toid = R.id
+      where A.linkzknote = ?2
+      and
+       -- FROM is visible?
+       (
+        -- FROM user is mine.  rest is to prevent duplicate results.
+        (L.user = ?1 and A.fromid = B.fromid and A.toid = B.toid and A.user = B.user) or
+        -- FROM is public.
+        (B.fromid = A.fromid and B.toid = ?3) or
+        -- FROM is in one of user's share.
+        ((A.fromid = B.fromid and B.toid in ({})) or
+         (A.fromid = B.toid and B.fromid in ({}))) or
+        -- FROM linked to user note.
+        (A.fromid == B.fromid and B.toid = ?4)
+       )
+       and
+       -- TO is visible?
+       (
+        -- TO user is mine.  rest is to prevent duplicate results.
+        (R.user = ?1 and A.fromid = B.fromid and A.toid = B.toid and A.user = B.user) or
+        -- TO is public.
+        (A.toid = B.fromid and B.toid = ?3) or
+        -- TO is in one of user's share.
+        ((A.toid = B.fromid and B.toid in ({})) or
+         (A.toid = B.toid and B.fromid in ({}))) or
+        -- TO linked to user note.
+        (A.toid == B.fromid and B.toid = ?4)
+       )
+      ",
+    s, s, s, s
+  );
+
+  let mut pstmt = conn.prepare(sqlstr.as_str())?;
+  let r = Result::from_iter(
+    pstmt
+      .query_and_then(params![uid.to_i64(), zknid, pubid, unid], |row| {
+        Ok((
+          row.get::<usize, String>(1)?,
+          row.get::<usize, String>(3)?,
+          row.get::<usize, i64>(0)?,
+          row.get::<usize, String>(2)?,
+          row.get::<usize, String>(4)?,
+        ))
+      })?
+      .map(|x| match x {
+        Ok((lid, rid, u, lname, rname)) => Ok(LzLink {
+          from: ZkNoteId::Zni(Uuid::parse_str(lid.as_str())?),
+          to: ZkNoteId::Zni(Uuid::parse_str(rid.as_str())?),
+          user: UserId::Uid(u),
+          fromname: lname,
+          toname: rname,
+        }),
+        Err(a) => Err(a),
+      }),
+  );
+
   r
 }
 
@@ -1956,6 +2085,67 @@ pub fn read_public_zklinks(
         othername,
         sysids: get_sysids(&conn, sysid, otherid)?,
         delete: None,
+      })
+    },
+  )?);
+
+  r
+}
+
+pub fn read_public_lzlinks(
+  conn: &Connection,
+  noteid: &ZkNoteId,
+) -> Result<Vec<LzLink>, zkerr::Error> {
+  let pubid = note_id(&conn, "system", "public")?;
+  let sysid = user_id(&conn, "system")?;
+  let zknid = note_id_for_zknoteid(&conn, noteid)?;
+
+  // TODO: integrate sysid lookup in the query?
+  let mut pstmt = conn.prepare(
+    // return zklinks with linkzknote = noteid, and
+    // that link to or from notes that link to 'public'.
+    "select A.fromid, A.toid, A.user, A.linkzknote, L.uuid, L.title, R.uuid, R.title
+       from zklink A, zklink B, zklink C
+       inner join zknote as L ON A.fromid = L.id
+       inner join zknote as R ON A.toid = R.id
+     where
+       (L.user != ?3 and R.user != ?3) and
+       (A.linkzknote = ?1 and
+       (A.fromid = B.fromid and B.toid = ?2 or
+        A.fromid = B.toid and B.fromid = ?2) and
+       (A.toid = C.fromid and C.toid = ?2 or
+        A.toid = C.toid and C.fromid = ?2))",
+  )?;
+
+  let r = Result::from_iter(pstmt.query_and_then(
+    params![zknid, pubid, sysid.to_i64()],
+    |row| {
+      let fromuuid = Uuid::parse_str(row.get::<usize, String>(4)?.as_str()).map_err(|e| {
+        zkerr::annotate_string(
+          format!("error parsing link uuid: {:?}", row.get::<usize, String>(4)),
+          e.into(),
+        )
+      })?;
+      let fromtitle = row.get::<usize, String>(5)?;
+
+      let touuid = Uuid::parse_str(row.get::<usize, String>(6)?.as_str()).map_err(|e| {
+        zkerr::annotate_string(
+          format!("error parsing link uuid: {:?}", row.get::<usize, String>(6)),
+          e.into(),
+        )
+      })?;
+      let totitle = row.get::<usize, String>(7)?;
+
+      // For test!
+      let linkzknotei64 = row.get::<usize, i64>(3)?;
+      assert!(linkzknotei64 == zknid);
+
+      Ok::<_, zkerr::Error>(LzLink {
+        from: ZkNoteId::Zni(fromuuid),
+        to: ZkNoteId::Zni(touuid),
+        user: UserId::Uid(row.get(2)?), // really?  i64?
+        fromname: fromtitle,
+        toname: totitle,
       })
     },
   )?);
@@ -2089,8 +2279,7 @@ pub fn read_archivezklinks(
       "with accessible_notes as ({})
       select ZLA.user, FN.uuid, TN.uuid, LN.uuid, ZLA.createdate, ZLA.deletedate
       from zklinkarchive ZLA, zknote FN, zknote TN
-      left join zknote LN
-      on LN.id = ZLA.linkzknote
+      left join zknote LN on LN.id = ZLA.linkzknote
       where FN.id = ZLA.fromid
       and TN.id = ZLA.toid
       and ZLA.fromid in accessible_notes
@@ -2141,8 +2330,7 @@ pub fn read_archivezklinks_stream(
         "with accessible_notes as ({})
         select OU.uuid, FN.uuid, TN.uuid, LN.uuid, ZLA.createdate, ZLA.deletedate
         from zklinkarchive ZLA, zknote FN, zknote TN, orgauth_user OU
-        left join zknote LN
-        on LN.id = ZLA.linkzknote
+        left join zknote LN on LN.id = ZLA.linkzknote
         where FN.id = ZLA.fromid
         and TN.id = ZLA.toid
         and ZLA.user = OU.id
@@ -2285,8 +2473,7 @@ pub fn read_zklinks_since_stream(
         format!(
           "select OU.uuid, FN.uuid, TN.uuid, LN.uuid, ZL.createdate
           from zklink ZL, zknote FN, zknote TN, orgauth_user OU, {} FW, {} TW
-          left join zknote LN
-          on LN.id = ZL.linkzknote
+          left join zknote LN on LN.id = ZL.linkzknote
           where FN.id = ZL.fromid
           and TN.id = ZL.toid
           and ZL.user = OU.id
@@ -2452,7 +2639,16 @@ pub fn read_zknoteandlinks(
     None => read_public_zklinks(conn, &zknote.id)?,
   };
 
-  Ok(ZkNoteAndLinks { zknote, links })
+  let lzlinks = match uid {
+    Some(uid) => read_lzlinks(conn, uid, id)?,
+    None => read_public_lzlinks(conn, &zknote.id)?,
+  };
+
+  Ok(ZkNoteAndLinks {
+    zknote,
+    links,
+    lzlinks,
+  })
 }
 
 pub fn read_zneifchanged(

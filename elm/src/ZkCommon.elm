@@ -12,6 +12,7 @@ import Util as U
 
 type alias StylePalette =
     { defaultSpacing : Int
+    , fontSize : Int
     }
 
 
@@ -144,6 +145,20 @@ golink size zknid color =
             E.el
                 [ E.inFront (E.el [ EF.size size ] <| E.text "↗")
                 , EF.size size
+                ]
+            <|
+                E.text "☐"
+        }
+
+
+golinkns : ZkNoteId -> E.Color -> E.Element a
+golinkns zknid color =
+    E.link
+        [ EF.color color ]
+        { url = DU.editNoteLink zknid
+        , label =
+            E.el
+                [ E.inFront (E.el [] <| E.text "↗")
                 ]
             <|
                 E.text "☐"

@@ -59,9 +59,15 @@ update msg model =
             ( model, None )
 
 
+addNote : Data.ZkListNote -> Model -> Model
+addNote _ model =
+    model
+
+
 initThing : List Data.ZkListNote -> Thing Model Msg Command
 initThing notes =
     { model = { files = notes }
     , view = view
     , update = update
+    , addNote = addNote
     }
