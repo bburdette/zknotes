@@ -48,6 +48,19 @@ init ng nlls =
     }
 
 
+dirty : Model -> Model -> Bool
+dirty new old =
+    -- leave 'selected' out of the comparison
+    not
+        (new.ng
+            == old.ng
+            && new.nlls
+            == old.nlls
+            && new.nllDnd
+            == old.nllDnd
+        )
+
+
 commands : Model -> Cmd Msg
 commands model =
     nllDndSystem.commands model.nllDnd
