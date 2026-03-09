@@ -832,7 +832,7 @@ dirty model =
                         && (r.editable == m.editableValue)
                         && (r.showtitle == m.showtitle)
                         && (Dict.keys m.zklDict == Dict.keys m.initialZklDict)
-                        && (EM.getSpecialNoteState m.edMarkdown == m.initialSnState)
+                        && (not <| SNG.dirty (EM.getSpecialNoteState m.edMarkdown) m.initialSnState)
             )
         |> Maybe.withDefault True
 

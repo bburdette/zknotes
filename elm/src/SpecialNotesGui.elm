@@ -63,6 +63,16 @@ initSpecialNoteState sn lzls =
             SnsList (SLE.init notegraph lzls)
 
 
+dirty : Maybe SpecialNoteState -> Maybe SpecialNoteState -> Bool
+dirty new old =
+    case ( new, old ) of
+        ( Just (SnsList n), Just (SnsList o) ) ->
+            SLE.dirty n o
+
+        _ ->
+            new /= old
+
+
 getSpecialNote : SpecialNoteState -> SpecialNote
 getSpecialNote sns =
     case sns of
