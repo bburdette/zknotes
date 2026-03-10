@@ -170,23 +170,31 @@ view fontsize model =
                     i
                     False
                     (let
+                        selected =
+                            TSet.member nl.id model.selected
+
                         r =
                             E.row
                                 [ E.width E.fill
                                 , EE.onClick (Select nl.id)
                                 , EBk.color
-                                    (if TSet.member nl.id model.selected then
+                                    (if selected then
                                         TC.lightCharcoal
 
                                      else
                                         TC.lightGray
                                     )
                                 , E.spacing 3
+                                , if selected then
+                                    E.paddingXY 0 4
+
+                                  else
+                                    E.padding 0
                                 ]
                                 [ E.paragraph
                                     [ E.clipX
                                     , E.width E.fill
-                                    , if lastselected == Just nl.id then
+                                    , if selected then
                                         E.height E.shrink
 
                                       else
