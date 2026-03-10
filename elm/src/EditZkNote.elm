@@ -908,7 +908,11 @@ showZkl fontsize bkcolor isDirty editable focusLink ld _ sysColor showflip zkl =
                 |> (\s ->
                         E.paragraph
                             ([ E.clipX
-                             , E.height <| E.px (fontsize * 3 // 2)
+                             , if focus then
+                                E.height E.shrink
+
+                               else
+                                E.height (E.px <| fontsize * 3 // 2)
                              , E.width E.fill
                              , EE.onClick (LinkFocusPress zkl)
                              , E.htmlAttribute (HA.style "word-break" "break-word")

@@ -173,8 +173,6 @@ view fontsize model =
                         r =
                             E.row
                                 [ E.width E.fill
-                                , E.clipX
-                                , E.height (E.px <| fontsize * 3 // 2)
                                 , EE.onClick (Select nl.id)
                                 , EBk.color
                                     (if TSet.member nl.id model.selected then
@@ -188,7 +186,11 @@ view fontsize model =
                                 [ E.paragraph
                                     [ E.clipX
                                     , E.width E.fill
-                                    , E.height (E.px <| fontsize * 3 // 2)
+                                    , if lastselected == Just nl.id then
+                                        E.height E.shrink
+
+                                      else
+                                        E.height (E.px <| fontsize * 3 // 2)
                                     , E.htmlAttribute (HA.style "word-break" "break-word")
                                     ]
                                   <|
