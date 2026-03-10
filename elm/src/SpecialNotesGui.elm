@@ -126,9 +126,10 @@ saveLzLinks this sns =
 
 guiSn :
     Time.Zone
+    -> Int
     -> SpecialNoteState
     -> E.Element Msg
-guiSn zone snote =
+guiSn zone fontsize snote =
     case snote of
         SnsSearch tagsearches ->
             E.row
@@ -202,7 +203,7 @@ guiSn zone snote =
                         , label = E.text "to markdown"
                         }
                     ]
-                , E.map SLEMsg <| SLE.view slem
+                , E.map SLEMsg <| SLE.view fontsize slem
                 ]
 
 

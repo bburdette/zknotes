@@ -66,7 +66,7 @@ import Element.Border as EBd
 import Element.Events as EE
 import Element.Font as EF
 import Element.Input as EI
-import Html.Attributes
+import Html.Attributes as HA
 import Html.Events as HE
 import JobsDialog exposing (TJobs)
 import Json.Decode as JD
@@ -454,7 +454,7 @@ editBlock ddw i focus e =
                    , E.height E.fill
                    , E.padding 3
                    , E.spacing 2
-                   , E.htmlAttribute (Html.Attributes.id bid)
+                   , E.htmlAttribute (HA.id bid)
                    ]
 
         dragHandleAttrs =
@@ -468,7 +468,7 @@ editBlock ddw i focus e =
             E.row
                 baseAttr
                 [ E.el
-                    (E.htmlAttribute (Html.Attributes.style "touch-action" "none")
+                    (E.htmlAttribute (HA.style "touch-action" "none")
                         :: dragHandleAttrs
                         ++ List.map E.htmlAttribute (blockDndSystem.dragEvents i bid)
                     )
@@ -483,7 +483,7 @@ editBlock ddw i focus e =
 
         Drop ->
             E.row
-                (E.htmlAttribute (Html.Attributes.style "touch-action" "none")
+                (E.htmlAttribute (HA.style "touch-action" "none")
                     :: baseAttr
                     ++ List.map E.htmlAttribute (blockDndSystem.dropEvents i bid)
                 )
@@ -495,7 +495,7 @@ editBlock ddw i focus e =
         DropH ->
             E.row
                 ((EBk.color TC.darkBlue
-                    :: E.htmlAttribute (Html.Attributes.style "touch-action" "none")
+                    :: E.htmlAttribute (HA.style "touch-action" "none")
                     :: baseAttr
                  )
                     ++ List.map E.htmlAttribute (blockDndSystem.dropEvents i bid)
@@ -508,7 +508,7 @@ editBlock ddw i focus e =
         Ghost ->
             E.row
                 ((EBk.color TC.darkGreen
-                    :: E.htmlAttribute (Html.Attributes.style "touch-action" "none")
+                    :: E.htmlAttribute (HA.style "touch-action" "none")
                     :: baseAttr
                  )
                     ++ List.map E.htmlAttribute (blockDndSystem.dragEvents i (blockId i))
@@ -900,24 +900,25 @@ showZkl fontsize bkcolor isDirty editable focusLink ld _ sysColor showflip zkl =
 
         display =
             [ E.el
-                [ E.height <| E.px 30
+                [ E.height <| E.px (fontsize * 3 // 2)
                 ]
                 dir
             , zkl.othername
                 |> Maybe.withDefault ""
                 |> (\s ->
-                        E.el
+                        E.paragraph
                             ([ E.clipX
-                             , E.height <| E.px 30
+                             , E.height <| E.px (fontsize * 3 // 2)
                              , E.width E.fill
                              , EE.onClick (LinkFocusPress zkl)
+                             , E.htmlAttribute (HA.style "word-break" "break-word")
                              ]
                                 ++ (sysColor
                                         |> Maybe.map (\c -> [ EF.color c ])
                                         |> Maybe.withDefault []
                                    )
                             )
-                            (E.text s)
+                            [ E.text s ]
                    )
             ]
     in
@@ -1643,63 +1644,64 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
             E.row [ E.width E.fill, EBd.widthEach { bottom = 1, left = 0, right = 0, top = 0 } ] []
 
         showLinks linkbkc =
-            E.row [ EF.bold ] [ E.text "links" ]
-                :: List.map
-                    (\( l, c ) ->
-                        showZkl stylePalette.fontSize
-                            linkbkc
-                            isdirty
-                            editable
-                            model.focusLink
-                            model.ld
-                            model.id
-                            c
-                            (Dict.get
-                                (zklKey
-                                    { otherid = l.otherid
-                                    , direction =
-                                        case l.direction of
-                                            To ->
-                                                From
+            E.column [ E.width E.fill ] <|
+                E.row [ EF.bold ] [ E.text "links" ]
+                    :: List.map
+                        (\( l, c ) ->
+                            showZkl stylePalette.fontSize
+                                linkbkc
+                                isdirty
+                                editable
+                                model.focusLink
+                                model.ld
+                                model.id
+                                c
+                                (Dict.get
+                                    (zklKey
+                                        { otherid = l.otherid
+                                        , direction =
+                                            case l.direction of
+                                                To ->
+                                                    From
 
-                                            From ->
-                                                To
-                                    }
+                                                From ->
+                                                    To
+                                        }
+                                    )
+                                    model.zklDict
+                                    |> Util.isJust
+                                    |> not
                                 )
-                                model.zklDict
-                                |> Util.isJust
-                                |> not
-                            )
-                            l
-                    )
-                    (Dict.values model.zklDict
-                        |> List.map
-                            (\l ->
-                                ( l
-                                , ZC.systemColor DataUtil.sysids l.sysids
+                                l
+                        )
+                        (Dict.values model.zklDict
+                            |> List.map
+                                (\l ->
+                                    ( l
+                                    , ZC.systemColor DataUtil.sysids l.sysids
+                                    )
                                 )
-                            )
-                        |> List.sortWith
-                            (\( l, lc ) ( r, rc ) ->
-                                case ( lc, rc ) of
-                                    ( Nothing, Nothing ) ->
-                                        zniCompare r.otherid l.otherid
+                            |> List.sortWith
+                                (\( l, lc ) ( r, rc ) ->
+                                    case ( lc, rc ) of
+                                        ( Nothing, Nothing ) ->
+                                            zniCompare r.otherid l.otherid
 
-                                    ( Just _, Nothing ) ->
-                                        GT
+                                        ( Just _, Nothing ) ->
+                                            GT
 
-                                    ( Nothing, Just _ ) ->
-                                        LT
+                                        ( Nothing, Just _ ) ->
+                                            LT
 
-                                    ( Just lcolor, Just rcolor ) ->
-                                        case Util.compareColor lcolor rcolor of
-                                            EQ ->
-                                                zniCompare r.otherid l.otherid
+                                        ( Just lcolor, Just rcolor ) ->
+                                            case Util.compareColor lcolor rcolor of
+                                                EQ ->
+                                                    zniCompare r.otherid l.otherid
 
-                                            a ->
-                                                a
-                            )
-                    )
+                                                a ->
+                                                    a
+                                )
+                        )
 
         edlabelattr =
             if editable then
@@ -1719,11 +1721,11 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                              else
                                 []
                             )
-                                ++ [ E.htmlAttribute (Html.Attributes.id "title")
+                                ++ [ E.htmlAttribute (HA.id "title")
                                    ]
 
                          else
-                            [ EF.color TC.darkGrey, E.htmlAttribute (Html.Attributes.id "title") ]
+                            [ EF.color TC.darkGrey, E.htmlAttribute (HA.id "title") ]
                         )
                         { onChange =
                             if editable then
@@ -1908,7 +1910,7 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
 
                        else
                         EF.color TC.darkGrey
-                     , E.htmlAttribute (Html.Attributes.id "mdtext")
+                     , E.htmlAttribute (HA.id "mdtext")
                      , E.alignTop
                      ]
                         ++ (if isdirty then
@@ -2109,10 +2111,10 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                                         , E.centerX
                                         , E.padding 3
                                         ]
-                                        (SNG.guiSn zone sn |> E.map SNGMsg)
+                                        (SNG.guiSn zone stylePalette.fontSize sn |> E.map SNGMsg)
                                     ]
                                     :: showComments
-                                    ++ (divider :: showLinks TC.white)
+                                    ++ (divider :: [ showLinks TC.white ])
 
                             Nothing ->
                                 (if wclass == Wide then
@@ -2159,7 +2161,7 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                                     ]
                                 )
                                     ++ showComments
-                                    ++ (divider :: showLinks TC.white)
+                                    ++ (divider :: [ showLinks TC.white ])
                        )
     in
     E.column

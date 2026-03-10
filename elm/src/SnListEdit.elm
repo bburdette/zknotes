@@ -11,7 +11,7 @@ import Element.Border as EBd
 import Element.Events as EE
 import Element.Font as EF
 import Element.Input as EI
-import Html.Attributes
+import Html.Attributes as HA
 import Html.Events as HE
 import Json.Decode as JD
 import NoteCache exposing (NoteCache)
@@ -129,8 +129,8 @@ controlRow id =
         ]
 
 
-view : Model -> E.Element Msg
-view model =
+view : Int -> Model -> E.Element Msg
+view fontsize model =
     let
         mbinfo =
             nllDndSystem.info model.nllDnd
@@ -173,6 +173,8 @@ view model =
                         r =
                             E.row
                                 [ E.width E.fill
+                                , E.clipX
+                                , E.height (E.px <| fontsize * 3 // 2)
                                 , EE.onClick (Select nl.id)
                                 , EBk.color
                                     (if TSet.member nl.id model.selected then
@@ -183,7 +185,14 @@ view model =
                                     )
                                 , E.spacing 3
                                 ]
-                                [ E.text nl.title
+                                [ E.paragraph
+                                    [ E.clipX
+                                    , E.width E.fill
+                                    , E.height (E.px <| fontsize * 3 // 2)
+                                    , E.htmlAttribute (HA.style "word-break" "break-word")
+                                    ]
+                                  <|
+                                    [ E.text nl.title ]
                                 , if Just nl.id == Maybe.map Data.Zni model.ng.currentUuid then
                                     E.el [ EF.bold ] (E.text "▶")
 
@@ -314,7 +323,7 @@ dndRow toid ddw i focus e =
                    , E.height E.fill
                    , E.padding 3
                    , E.spacing 2
-                   , E.htmlAttribute (Html.Attributes.id bid)
+                   , E.htmlAttribute (HA.id bid)
                    ]
 
         dragHandleAttrs =
@@ -328,7 +337,7 @@ dndRow toid ddw i focus e =
             E.row
                 baseAttr
                 [ E.el
-                    (E.htmlAttribute (Html.Attributes.style "touch-action" "none")
+                    (E.htmlAttribute (HA.style "touch-action" "none")
                         :: dragHandleAttrs
                         ++ List.map E.htmlAttribute (nllDndSystem.dragEvents i bid)
                     )
@@ -343,7 +352,7 @@ dndRow toid ddw i focus e =
 
         Drop ->
             E.row
-                (E.htmlAttribute (Html.Attributes.style "touch-action" "none")
+                (E.htmlAttribute (HA.style "touch-action" "none")
                     :: baseAttr
                     ++ List.map E.htmlAttribute (nllDndSystem.dropEvents i bid)
                 )
@@ -355,7 +364,7 @@ dndRow toid ddw i focus e =
         DropH ->
             E.row
                 ((EBk.color TC.darkBlue
-                    :: E.htmlAttribute (Html.Attributes.style "touch-action" "none")
+                    :: E.htmlAttribute (HA.style "touch-action" "none")
                     :: baseAttr
                  )
                     ++ List.map E.htmlAttribute (nllDndSystem.dropEvents i bid)
@@ -368,7 +377,7 @@ dndRow toid ddw i focus e =
         Ghost ->
             E.row
                 ((EBk.color TC.darkGreen
-                    :: E.htmlAttribute (Html.Attributes.style "touch-action" "none")
+                    :: E.htmlAttribute (HA.style "touch-action" "none")
                     :: baseAttr
                  )
                     ++ List.map E.htmlAttribute (nllDndSystem.dragEvents i bid)

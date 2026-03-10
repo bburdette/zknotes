@@ -26,10 +26,6 @@ import SpecialNotes exposing (SpecialNote, specialNoteDecoder, specialNoteEncode
 import SpecialNotesGui as SNG exposing (SpecialNoteState)
 
 
-
--- TRY THIS
-
-
 type EdMarkdown
     = EdMarkdown Emd
     | EdSpecial Special
