@@ -3639,7 +3639,12 @@ update noteCache msg model =
                                                             nbe =
                                                                 updateBlockEdit
                                                                     (String.concat ls ++ be.s)
-                                                                    (Text { be | idx = be.idx - 1 })
+                                                                    (Text
+                                                                        { be
+                                                                            | idx = be.idx - 1
+                                                                            , original = String.concat (ls ++ [ be.original ])
+                                                                        }
+                                                                    )
                                                         in
                                                         ( { model | blockEdit = Just nbe, edMarkdown = db }, None )
                                                     )
@@ -3678,8 +3683,21 @@ update noteCache msg model =
                                                         let
                                                             nbe =
                                                                 updateBlockEdit
-                                                                    (String.trim be.s ++ "\n\n" ++ String.trim (String.concat ls))
-                                                                    (Text { be | idx = be.idx })
+                                                                    (String.trim be.s
+                                                                        ++ "\n\n"
+                                                                        ++ String.trim (String.concat ls)
+                                                                    )
+                                                                    (Text
+                                                                        { be
+                                                                            | idx = be.idx
+                                                                            , original =
+                                                                                String.concat
+                                                                                    (be.original
+                                                                                        :: "\n\n"
+                                                                                        :: [ String.trim (String.concat ls) ]
+                                                                                    )
+                                                                        }
+                                                                    )
                                                         in
                                                         ( { model | blockEdit = Just nbe, edMarkdown = db }, None )
                                                     )
