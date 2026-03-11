@@ -384,6 +384,9 @@ transforms inline =
                                 [ { name = "id"
                                   , value = zkNoteIdToString sn.id
                                   }
+                                , { name = "text"
+                                  , value = s
+                                  }
                                 ]
                                 []
                             )
@@ -484,9 +487,7 @@ okResultInternal model =
                         GD.Ok <|
                             LinkBack s
                                 (\sn ->
-                                    UpdateInline model.idx <|
-                                        model.tomsg <|
-                                            f sn
+                                    UpdateInline model.idx <| model.tomsg <| f sn
                                 )
             )
         |> Maybe.withDefault GD.Cancel

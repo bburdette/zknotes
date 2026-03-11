@@ -4008,20 +4008,20 @@ updateEditBlock i ebmsg model =
             case List.drop i t.b |> List.head |> Maybe.map (\b -> MG.updateBlock ebmsg b) of
                 Just b ->
                     let
-                        newb =
+                        newbs =
                             List.take i t.b ++ b ++ List.drop (i + 1) t.b
 
                         nbe =
-                            case Markdown.Renderer.render EM.stringRenderer newb of
+                            case Markdown.Renderer.render EM.stringRenderer newbs of
                                 Ok sl ->
                                     let
                                         mds =
                                             String.concat sl
                                     in
-                                    Text { idx = t.idx, s = mds, b = newb, original = t.original }
+                                    Text { idx = t.idx, s = mds, b = newbs, original = t.original }
 
                                 Err e ->
-                                    Text { idx = t.idx, s = e, b = newb, original = t.original }
+                                    Text { idx = t.idx, s = e, b = newbs, original = t.original }
                     in
                     { model | blockEdit = Just nbe }
 
