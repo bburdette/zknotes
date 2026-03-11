@@ -157,7 +157,7 @@ type Msg
     | EditBlockInput String
     | EditBlockOk
     | NewBlock
-    | EditBlockMsg MG.Msg
+    | EditBlockMsg Int MG.Msg
     | MakeList
     | SNGMsg SNG.Msg
     | SetDropLinkMode Bool
@@ -241,7 +241,7 @@ type alias Model =
 
 
 type BlockEdit
-    = Text { idx : Int, s : String, b : Block, original : String }
+    = Text { idx : Int, s : String, b : List Block, original : String }
 
 
 type Command
@@ -276,7 +276,7 @@ type Command
     | SyncFiles Data.ZkNoteSearch
     | PowerTag
     | SPMod (SP.Model -> ( SP.Model, SP.Command ))
-    | InlineXform MB.Inline (MB.Inline -> MG.Msg)
+    | InlineXform Int MB.Inline (MB.Inline -> MG.Msg)
     | SlideShow (Maybe ZkNoteId) (List NlLink)
     | Cmd (Cmd Msg) (Maybe Command)
 
@@ -288,8 +288,7 @@ updateBlockEdit s (Text t) =
             s
                 |> Markdown.Parser.parse
                 |> Result.toMaybe
-                |> Maybe.andThen (\r -> List.head r)
-                |> Maybe.withDefault (Paragraph [])
+                |> Maybe.withDefault [ Paragraph [] ]
     in
     Text
         { t | s = s, b = b, original = t.original }
@@ -1228,7 +1227,7 @@ blockEd (Text t) renderer =
         [ E.width E.fill
         , E.spacing 8
         ]
-        [ E.column
+        ([ E.column
             [ E.padding 2
             , EBd.glow TC.darkGray 5.0
             , EE.onClick EditBlockOk
@@ -1283,7 +1282,7 @@ blockEd (Text t) renderer =
                 Err e ->
                     E.text e
             ]
-        , EI.multiline
+         , EI.multiline
             [ E.alignTop
             ]
             { onChange = EditBlockInput
@@ -1292,9 +1291,10 @@ blockEd (Text t) renderer =
             , label = EI.labelAbove [] (headingText "markdown edit")
             , spellcheck = False
             }
-        , headingText "GUI edit: "
-        , E.map EditBlockMsg <| MG.guiBlock t.b
-        ]
+         , headingText "GUI edit: "
+         ]
+            ++ List.indexedMap (\i b -> E.map (EditBlockMsg i) <| MG.guiBlock b) t.b
+        )
 
 
 renderBlocks :
@@ -3639,7 +3639,12 @@ update noteCache msg model =
                                                             nbe =
                                                                 updateBlockEdit
                                                                     (String.concat ls ++ be.s)
-                                                                    (Text { be | idx = be.idx - 1 })
+                                                                    (Text
+                                                                        { be
+                                                                            | idx = be.idx - 1
+                                                                            , original = String.concat (ls ++ [ be.original ])
+                                                                        }
+                                                                    )
                                                         in
                                                         ( { model | blockEdit = Just nbe, edMarkdown = db }, None )
                                                     )
@@ -3678,8 +3683,21 @@ update noteCache msg model =
                                                         let
                                                             nbe =
                                                                 updateBlockEdit
-                                                                    (String.trim be.s ++ "\n\n" ++ String.trim (String.concat ls))
-                                                                    (Text { be | idx = be.idx })
+                                                                    (String.trim be.s
+                                                                        ++ "\n\n"
+                                                                        ++ String.trim (String.concat ls)
+                                                                    )
+                                                                    (Text
+                                                                        { be
+                                                                            | idx = be.idx
+                                                                            , original =
+                                                                                String.concat
+                                                                                    (be.original
+                                                                                        :: "\n\n"
+                                                                                        :: [ String.trim (String.concat ls) ]
+                                                                                    )
+                                                                        }
+                                                                    )
                                                         in
                                                         ( { model | blockEdit = Just nbe, edMarkdown = db }, None )
                                                     )
@@ -3753,7 +3771,7 @@ update noteCache msg model =
                                                         String.concat sl
                                                             |> String.trim
                                                 in
-                                                Text { idx = bi, s = mds, b = b, original = mds }
+                                                Text { idx = bi, s = mds, b = [ b ], original = mds }
                                             )
                                         |> Result.toMaybe
                                 )
@@ -3791,7 +3809,7 @@ update noteCache msg model =
                 Ok ( _, em ) ->
                     ( { model
                         | edMarkdown = em
-                        , blockEdit = Just <| Text { idx = 0, s = "", b = Paragraph [], original = "" }
+                        , blockEdit = Just <| Text { idx = 0, s = "", b = [ Paragraph [] ], original = "" }
                       }
                     , None
                     )
@@ -3876,13 +3894,13 @@ update noteCache msg model =
                 Nothing ->
                     ( model, None )
 
-        EditBlockMsg ebmsg ->
+        EditBlockMsg i ebmsg ->
             case MG.getXformMsg ebmsg of
                 Just ( inline, tomsg ) ->
-                    ( model, InlineXform inline tomsg )
+                    ( model, InlineXform i inline tomsg )
 
                 Nothing ->
-                    ( updateEditBlock ebmsg model, None )
+                    ( updateEditBlock i ebmsg model, None )
 
         SNGMsg sngmsg ->
             case EM.getSpecialNoteState model.edMarkdown of
@@ -4001,28 +4019,31 @@ update noteCache msg model =
             ( model, None )
 
 
-updateEditBlock : MG.Msg -> Model -> Model
-updateEditBlock ebmsg model =
+updateEditBlock : Int -> MG.Msg -> Model -> Model
+updateEditBlock i ebmsg model =
     case model.blockEdit of
         Just (Text t) ->
-            case MG.updateBlock ebmsg t.b of
-                [ b ] ->
+            case List.drop i t.b |> List.head |> Maybe.map (\b -> MG.updateBlock ebmsg b) of
+                Just b ->
                     let
+                        newbs =
+                            List.take i t.b ++ b ++ List.drop (i + 1) t.b
+
                         nbe =
-                            case Markdown.Renderer.render EM.stringRenderer [ b ] of
+                            case Markdown.Renderer.render EM.stringRenderer newbs of
                                 Ok sl ->
                                     let
                                         mds =
                                             String.concat sl
                                     in
-                                    Text { idx = t.idx, s = mds, b = b, original = t.original }
+                                    Text { idx = t.idx, s = mds, b = newbs, original = t.original }
 
                                 Err e ->
-                                    Text { idx = t.idx, s = e, b = b, original = t.original }
+                                    Text { idx = t.idx, s = e, b = newbs, original = t.original }
                     in
                     { model | blockEdit = Just nbe }
 
-                _ ->
+                Nothing ->
                     model
 
         Nothing ->

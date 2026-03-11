@@ -21,6 +21,7 @@ import Util
 
 type alias Model =
     { mobile : Bool
+    , idx : Int
     , inline : MB.Inline
     , transforms : List ( String, XForm )
     , selectedTf : Maybe Int
@@ -41,7 +42,7 @@ type XForm
 
 
 type Command
-    = UpdateInline MG.Msg
+    = UpdateInline Int MG.Msg
     | LinkBack String (Data.SavedZkNote -> Command)
     | Close
 
@@ -50,8 +51,8 @@ type alias GDModel =
     GD.Model Model Msg Command
 
 
-init : MB.Inline -> (MB.Inline -> MG.Msg) -> Bool -> List (E.Attribute Msg) -> Element () -> GDModel
-init inline fn mobile buttonStyle underLay =
+init : Int -> MB.Inline -> (MB.Inline -> MG.Msg) -> Bool -> List (E.Attribute Msg) -> Element () -> GDModel
+init i inline fn mobile buttonStyle underLay =
     let
         tfs =
             transforms inline
@@ -60,6 +61,7 @@ init inline fn mobile buttonStyle underLay =
     , update = update
     , model =
         { mobile = mobile
+        , idx = i
         , inline = inline
         , transforms = tfs
         , selectedTf =
@@ -382,6 +384,9 @@ transforms inline =
                                 [ { name = "id"
                                   , value = zkNoteIdToString sn.id
                                   }
+                                , { name = "text"
+                                  , value = s
+                                  }
                                 ]
                                 []
                             )
@@ -476,15 +481,13 @@ okResultInternal model =
             (\xf ->
                 case xf of
                     Upd inl ->
-                        (model.tomsg >> UpdateInline >> GD.Ok) inl
+                        (model.tomsg >> UpdateInline model.idx >> GD.Ok) inl
 
                     Lb ( s, f ) ->
                         GD.Ok <|
                             LinkBack s
                                 (\sn ->
-                                    UpdateInline <|
-                                        model.tomsg <|
-                                            f sn
+                                    UpdateInline model.idx <| model.tomsg <| f sn
                                 )
             )
         |> Maybe.withDefault GD.Cancel

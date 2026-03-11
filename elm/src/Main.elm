@@ -1788,12 +1788,12 @@ handleMdInlineXformOk model prevstate gdmsg =
                 MdInlineXform.Close ->
                     ( { model | state = prevstate }, Cmd.none )
 
-                MdInlineXform.UpdateInline umsg ->
+                MdInlineXform.UpdateInline i umsg ->
                     case prevstate of
                         EditZkNote em login ->
                             let
                                 emod =
-                                    EditZkNote.updateEditBlock umsg em
+                                    EditZkNote.updateEditBlock i umsg em
                             in
                             ( { model | state = EditZkNote emod login }, Cmd.none )
 
@@ -3427,12 +3427,12 @@ actualupdate msg model =
                 MdInlineXform.Close ->
                     ( { model | state = prevstate }, Cmd.none )
 
-                MdInlineXform.UpdateInline umsg ->
+                MdInlineXform.UpdateInline i umsg ->
                     case prevstate of
                         EditZkNote em login ->
                             let
                                 emod =
-                                    EditZkNote.updateEditBlock umsg em
+                                    EditZkNote.updateEditBlock i umsg em
                             in
                             ( { model | state = EditZkNote emod login }, Cmd.none )
 
@@ -3444,10 +3444,10 @@ actualupdate msg model =
 
         ( MdInlineXformCmd cm, EditZkNote em login ) ->
             case cm of
-                MdInlineXform.UpdateInline umsg ->
+                MdInlineXform.UpdateInline i umsg ->
                     let
                         emod =
-                            EditZkNote.updateEditBlock umsg em
+                            EditZkNote.updateEditBlock i umsg em
                     in
                     ( { model | state = EditZkNote emod login }, Cmd.none )
 
@@ -4125,11 +4125,12 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                             -- otherwise its all the usual stuff.
                             handleSPCmd nmod spcmd
 
-                EditZkNote.InlineXform inline f ->
+                EditZkNote.InlineXform i inline f ->
                     ( { model
                         | state =
                             MdInlineXform
                                 (MdInlineXform.init
+                                    i
                                     inline
                                     f
                                     model.mobile
