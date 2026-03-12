@@ -41,7 +41,6 @@ import Orgauth.Login as Login
 import Orgauth.ResetPassword as ResetPassword
 import Orgauth.ShowUrl as ShowUrl
 import Orgauth.UserEdit as UserEdit
-import Orgauth.UserId exposing (getUserIdVal)
 import Orgauth.UserListing as UserListing
 import Platform.Cmd as Cmd
 import Random exposing (Seed, initialSeed)
@@ -412,7 +411,7 @@ routeStateInternal model route =
                     in
                     ( nm.state, cmd )
 
-                EditZkNoteListing st login ->
+                EditZkNoteListing _ login ->
                     ( EditZkNote (EditZkNote.initNew model.fui login [] model.mobile) login, Cmd.none )
 
                 st ->
@@ -1581,7 +1580,7 @@ urlupdate msg model =
 
                             else
                                 case ( route, model.state ) of
-                                    ( ArchiveNoteR pid nid, ArchiveListing almod _ ) ->
+                                    ( ArchiveNoteR pid _, ArchiveListing almod _ ) ->
                                         if almod.noteid == pid then
                                             ( model, Cmd.none )
 

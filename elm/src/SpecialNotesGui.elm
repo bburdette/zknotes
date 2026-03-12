@@ -3,17 +3,16 @@ module SpecialNotesGui exposing (..)
 import ArchiveListing exposing (Command)
 import Common
 import Data exposing (AndOr(..), LzLink, SaveLzLink, SearchMod(..), TagSearch(..), ZkListNote, ZkNoteId(..))
-import DataUtil exposing (NlLink, lzlKey, zkNoteIdToString, zklKey)
+import DataUtil exposing (NlLink, zkNoteIdToString)
 import Dict exposing (Dict)
 import Element as E
 import Element.Font as EF
 import Element.Input as EI
 import Html.Attributes as HA
-import Orgauth.Data exposing (UserId)
 import SearchUtil exposing (showTagSearch)
 import Set
 import SnListEdit as SLE exposing (DragDropWhat(..), nllDndSubscriptions)
-import SpecialNotes as SN exposing (CompletedSync, Notegraph, SpecialNote)
+import SpecialNotes as SN exposing (CompletedSync, SpecialNote)
 import TDict
 import Time
 import Util

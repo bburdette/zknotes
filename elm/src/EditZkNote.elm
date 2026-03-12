@@ -68,7 +68,6 @@ import Html.Attributes as HA
 import Html.Events as HE
 import JobsDialog exposing (TJobs)
 import Json.Decode as JD
-import Json.Encode as JE
 import Markdown.Block as MB exposing (..)
 import Markdown.Parser
 import Markdown.Renderer

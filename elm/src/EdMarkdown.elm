@@ -13,16 +13,13 @@ module EdMarkdown exposing
     , updateSpecialNoteState
     )
 
-import Data exposing (ZkNoteId)
-import DataUtil exposing (NlLink)
 import Either exposing (Either(..))
-import Json.Decode as JD
 import Json.Encode as JE
 import Markdown.Block as Block exposing (Block, ListItem(..), Task(..))
 import Markdown.Parser
 import Markdown.Renderer
 import MdCommon as MC exposing (Link)
-import SpecialNotes exposing (SpecialNote, specialNoteDecoder, specialNoteEncoder)
+import SpecialNotes exposing (SpecialNote, specialNoteEncoder)
 import SpecialNotesGui as SNG exposing (SpecialNoteState)
 
 

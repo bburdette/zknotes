@@ -2,7 +2,7 @@ module TagNotes exposing (..)
 
 import Common
 import Data exposing (Direction(..), EditLink)
-import DataUtil exposing (ZlnDict, emptyZlnDict, zklKey, zniCompare)
+import DataUtil exposing (zklKey, zniCompare)
 import Dict exposing (Dict(..))
 import Element as E exposing (Element)
 import Element.Background as EBk
@@ -11,7 +11,7 @@ import Element.Events as EE
 import Element.Font as EF
 import Element.Input as EI
 import SearchStackPanel as SSP
-import TDict exposing (TDict)
+import TDict
 import TagThings as TT
 import TangoColors as TC
 import Util
