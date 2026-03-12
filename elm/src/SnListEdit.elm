@@ -198,8 +198,9 @@ view fontsize model =
                                         E.height E.shrink
 
                                       else
-                                        E.height (E.px <| fontsize * 3 // 2)
+                                        E.height (E.px <| fontsize * 4 // 3)
                                     , E.htmlAttribute (HA.style "word-break" "break-word")
+                                    , E.htmlAttribute (HA.style "overflow" "hidden")
                                     ]
                                   <|
                                     [ E.text nl.title ]
