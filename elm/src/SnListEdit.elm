@@ -139,7 +139,7 @@ view fontsize model =
             model.nlls
                 |> List.reverse
                 |> Util.foldUntil
-                    (\nl x ->
+                    (\nl _ ->
                         if TSet.member nl.id model.selected then
                             Util.Stop (Just nl.id)
 
@@ -274,7 +274,7 @@ nllDndSubscriptions model =
 
 
 ghostView : Model -> NoteCache -> Int -> Maybe (Element Msg)
-ghostView model nc mdw =
+ghostView model _ _ =
     nllDndSystem.info model.nllDnd
         |> Maybe.andThen
             (\{ dragIndex } ->

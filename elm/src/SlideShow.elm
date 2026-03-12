@@ -3,26 +3,14 @@ module SlideShow exposing (..)
 import Array exposing (Array)
 import Common
 import Data exposing (ZkNoteId)
-import DataUtil exposing (FileUrlInfo, NlLink, ZniSet, emptyZniSet)
-import DnDList
+import DataUtil exposing (FileUrlInfo, NlLink)
 import DndPorts exposing (..)
-import Element as E exposing (Element)
-import Element.Background as EBk
-import Element.Border as EBd
-import Element.Events as EE
-import Element.Font as EF
+import Element as E
 import Element.Input as EI
-import Html.Attributes
-import Html.Events as HE
-import Json.Decode as JD
 import NoteCache exposing (CacheEntry(..), NoteCache, getNote)
-import SpecialNotes exposing (Notegraph)
-import TSet
-import TangoColors as TC
 import Time
 import Util
 import View
-import ZkCommon as ZC
 
 
 type alias Model =
@@ -93,7 +81,7 @@ init fui nc mbcurrent nl rnlls =
       , fui = fui
       }
     , case zkn of
-        Just (ZNAL note) ->
+        Just (ZNAL _) ->
             Noop
 
         Just Private ->
@@ -110,7 +98,7 @@ init fui nc mbcurrent nl rnlls =
 view : Time.Zone -> Int -> NoteCache -> Model -> E.Element Msg
 view tz maxw nc model =
     E.column []
-        [ E.row []
+        [ E.row [ E.spacing 3 ]
             [ EI.button Common.buttonStyle
                 { onPress = Just PrevPress
                 , label = E.text "prev"
