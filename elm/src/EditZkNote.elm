@@ -2,14 +2,12 @@ module EditZkNote exposing
     ( Command(..)
     , Model
     , Msg(..)
-    , SearchOrRecent(..)
     , TACommand(..)
     , WClass(..)
     , addComment
     , commentsRecieved
     , commonButtonStyle
     , compareZklinks
-    , copyTabs
     , dirty
     , disabledLinkButtonStyle
     , dndSubscriptions
@@ -124,7 +122,6 @@ type Msg
     | LinkBackPress
     | CopyPress
     | SearchHistoryPress
-    | SwitchPress ZkNoteId -- TODO: remove?
     | PublicPress Bool
     | EditablePress Bool
     | ShowTitlePress Bool
@@ -168,11 +165,6 @@ type Msg
     | AddFocusToSearchAsTag
     | TTMsg (TT.Msg Msg)
     | Noop
-
-
-type SearchOrRecent
-    = SearchView
-    | RecentView
 
 
 type EditOrView
@@ -224,7 +216,6 @@ type alias Model =
     , initialSnState : Maybe SpecialNoteState
     , initialLzls : Dict String Data.SaveLzLink
     , tab : EditTab
-    , searchOrRecent : SearchOrRecent
     , editOrView : EditOrView
     , dialog : Maybe D.Model
     , panelNote : Maybe Data.ZkNote
@@ -586,16 +577,6 @@ setTab : EditTab -> Model -> Model
 setTab nc model =
     { model
         | tab = nc
-        , searchOrRecent =
-            case nc of
-                EtSearch ->
-                    SearchView
-
-                EtRecent ->
-                    RecentView
-
-                _ ->
-                    model.searchOrRecent
         , editOrView =
             case nc of
                 EtEdit ->
@@ -2319,20 +2300,10 @@ isSearch model =
     linksWith (Dict.values model.zklDict) DataUtil.sysids.searchid
 
 
-copyTabs : Model -> Model -> Model
-copyTabs from to =
-    { to
-        | searchOrRecent = from.searchOrRecent
-        , editOrView = from.editOrView
-        , tab = from.tab
-    }
-
-
 tabsOnLoad : Model -> Model
 tabsOnLoad model =
     { model
-        | searchOrRecent = model.searchOrRecent
-        , editOrView = model.editOrView
+        | editOrView = model.editOrView
         , tab =
             case model.editOrView of
                 EditView ->
@@ -2420,7 +2391,6 @@ initFull fui ld zknote dtlinks lzlinks mbedittab mobile =
       , cells = getCd cc
       , revert = Just (DataUtil.saveZkNote zknote)
       , tab = EtView
-      , searchOrRecent = SearchView
       , editOrView = ViewView
       , dialog = Nothing
       , panelNote = Nothing
@@ -2483,7 +2453,6 @@ initNew fui ld links mobile =
     , cells = getCd cc
     , revert = Nothing
     , tab = EtEdit
-    , searchOrRecent = SearchView
     , editOrView = EditView
     , dialog = Nothing
     , panelNote = Nothing
@@ -3110,13 +3079,6 @@ update noteCache msg model =
             ( model
             , GetTASelection "mdtext" what
             )
-
-        SwitchPress id ->
-            if dirty model then
-                ( model, SaveSwitch (fullSave model) id )
-
-            else
-                ( model, Switch id )
 
         EditablePress _ ->
             -- if we're getting this event, we should be allowed to change the value.
