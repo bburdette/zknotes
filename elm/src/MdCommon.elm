@@ -900,7 +900,7 @@ noteView args id show text _ =
                     a
 
                 x ->
-                    E.column [ E.width E.fill ] x
+                    E.column [ E.width E.fill, E.spacing 3 ] x
 
         Nothing ->
             E.text <| "note " ++ id
@@ -1036,9 +1036,7 @@ codeSpan snippet =
             (E.rgba 0 0 0 0.13)
         ]
         [ E.paragraph
-            [ HA.style "word-break" "break-all" |> E.htmlAttribute
-            , E.paddingXY 3 10
-            ]
+            [ HA.style "word-break" "break-all" |> E.htmlAttribute ]
             [ E.text snippet ]
         ]
 
