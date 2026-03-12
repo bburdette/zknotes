@@ -899,7 +899,7 @@ showZkl fontsize bkcolor isDirty editable focusLink ld _ sysColor showflip zkl =
 
         display =
             [ E.el
-                [ E.height <| E.px (fontsize * 4 // 3)
+                [ E.height <| E.px (fontsize * 5 // 4)
                 ]
                 dir
             , zkl.othername
@@ -911,7 +911,7 @@ showZkl fontsize bkcolor isDirty editable focusLink ld _ sysColor showflip zkl =
                                 E.height E.shrink
 
                                else
-                                E.height (E.px <| fontsize * 4 // 3)
+                                E.height (E.px <| fontsize * 5 // 4)
                              , E.width E.fill
                              , EE.onClick (LinkFocusPress zkl)
                              , E.htmlAttribute (HA.style "word-break" "break-word")
