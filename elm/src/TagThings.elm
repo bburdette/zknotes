@@ -81,8 +81,8 @@ onWkKeyPress key model =
             ( model, None )
 
 
-showSr : Int -> Model -> Maybe Data.ZkNoteId -> Data.ZkListNoteSearchResult -> (Data.ZkNoteId -> Element tmsg) -> Data.ZkListNote -> Element (Msg tmsg)
-showSr fontsize model lastSelected zlnSearchResult controlRow zkln =
+showSr : Int -> Model -> Maybe Data.ZkNoteId -> List ZkListNote -> (Data.ZkNoteId -> Element tmsg) -> Data.ZkListNote -> Element (Msg tmsg)
+showSr fontsize model lastSelected zlnNotes controlRow zkln =
     let
         sysColor =
             ZC.systemColor DataUtil.sysids zkln.sysids
@@ -115,7 +115,7 @@ showSr fontsize model lastSelected zlnSearchResult controlRow zkln =
                                                             Util.Go <| i :: range
                                                     )
                                                     []
-                                                    zlnSearchResult.notes
+                                                    zlnNotes
                                         in
                                         SrFocusPress zkln sel_range
 
@@ -209,7 +209,13 @@ makeViews stylePalette mbsize recentZkns spmodel zknSearchResult model controlRo
                         mbn
                 )
                 Nothing
-                zknSearchResult.notes
+                (case model.searchOrRecent of
+                    SearchView ->
+                        zknSearchResult.notes
+
+                    RecentView ->
+                        recentZkns
+                )
                 |> Maybe.map .id
 
         pagView =
@@ -248,7 +254,7 @@ makeViews stylePalette mbsize recentZkns spmodel zknSearchResult model controlRo
                        )
                     :: pagView
                     :: (List.map
-                            (showSr stylePalette.fontSize model lastSelected zknSearchResult controlRow)
+                            (showSr stylePalette.fontSize model lastSelected zknSearchResult.notes controlRow)
                         <|
                             zknSearchResult.notes
                        )
@@ -261,7 +267,7 @@ makeViews stylePalette mbsize recentZkns spmodel zknSearchResult model controlRo
                     :: sppad
                 )
                 (List.map
-                    (showSr stylePalette.fontSize model lastSelected zknSearchResult controlRow)
+                    (showSr stylePalette.fontSize model lastSelected recentZkns controlRow)
                  <|
                     recentZkns
                 )
