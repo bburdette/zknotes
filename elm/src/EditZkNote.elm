@@ -906,16 +906,15 @@ showZkl fontsize bkcolor isDirty editable focusLink ld _ sysColor showflip zkl =
                 |> Maybe.withDefault ""
                 |> (\s ->
                         E.paragraph
-                            ([ E.clipX
-                             , if focus then
+                            ([ if focus then
                                 E.height E.shrink
 
                                else
                                 E.height (E.px <| fontsize * 5 // 4)
                              , E.width E.fill
                              , EE.onClick (LinkFocusPress zkl)
-                             , E.htmlAttribute (HA.style "word-break" "break-word")
-                             , E.htmlAttribute (HA.style "overflow" "hidden")
+                             , E.htmlAttribute (HA.style "overflow-wrap" "anywhere")
+                             , E.htmlAttribute (HA.style "overflow" "clip")
                              ]
                                 ++ (sysColor
                                         |> Maybe.map (\c -> [ EF.color c ])

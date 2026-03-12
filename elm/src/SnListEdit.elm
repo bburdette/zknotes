@@ -191,19 +191,23 @@ view fontsize model =
                                   else
                                     E.padding 0
                                 ]
-                                [ E.paragraph
-                                    [ E.clipX
-                                    , E.width E.fill
-                                    , if selected then
-                                        E.height E.shrink
+                                [ if selected then
+                                    E.paragraph
+                                        [ E.width E.fill
+                                        , E.htmlAttribute (HA.style "overflow-wrap" "anywhere")
+                                        ]
+                                    <|
+                                        [ E.text nl.title ]
 
-                                      else
-                                        E.height (E.px <| fontsize * 5 // 4)
-                                    , E.htmlAttribute (HA.style "word-break" "break-word")
-                                    , E.htmlAttribute (HA.style "overflow" "hidden")
-                                    ]
-                                  <|
-                                    [ E.text nl.title ]
+                                  else
+                                    E.paragraph
+                                        [ E.width E.fill
+                                        , E.height (E.px <| fontsize * 5 // 4)
+                                        , E.htmlAttribute (HA.style "overflow-wrap" "anywhere")
+                                        , E.htmlAttribute (HA.style "overflow" "clip")
+                                        ]
+                                    <|
+                                        [ E.text nl.title ]
                                 , if Just nl.id == Maybe.map Data.Zni model.ng.currentUuid then
                                     E.el [ EF.bold ] (E.text "▶")
 
