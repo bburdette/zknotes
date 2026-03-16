@@ -44,8 +44,6 @@ type alias Model =
 type Msg tmsg
     = SearchHistoryPress
     | BigSearchPress
-      -- | AddToSearch Data.ZkListNote
-      -- | AddToSearchAsTag String
     | SrFocusPress ZkListNote (List ZkListNote)
     | ClearSelection
     | SPMsg SSP.Msg
@@ -265,6 +263,7 @@ makeViews stylePalette mbsize recentZkns spmodel zknSearchResult model controlRo
         recentPanel =
             E.column
                 (E.spacing 8
+                    :: E.width E.fill
                     :: sppad
                 )
                 (List.map
