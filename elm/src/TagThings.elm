@@ -2,12 +2,11 @@ module TagThings exposing (..)
 
 import Common
 import Data exposing (Direction(..), ZkListNote)
-import DataUtil exposing (ZlnDict, emptyZlnDict, zklKey, zniCompare)
+import DataUtil exposing (ZlnDict, emptyZlnDict)
 import Dict exposing (Dict(..))
 import Element as E exposing (Element)
 import Element.Background as EBk
 import Element.Border as EBd
-import Element.Events as EE
 import Element.Font as EF
 import Element.Input as EI
 import Html.Attributes as HA
@@ -148,7 +147,9 @@ showSr fontsize model lastSelected zlnNotes controlRow zkln =
                 [ E.width E.fill
                 , E.spacing 3
                 ]
-                [ listingrow True, E.map ControlMsg <| controlRow zkln.id ]
+                [ listingrow True
+                , E.map ControlMsg <| controlRow zkln.id
+                ]
 
         else
             listingrow True
@@ -200,23 +201,18 @@ makeViews stylePalette mbsize recentZkns spmodel zknSearchResult model controlRo
                 400
 
         lastSelected =
-            List.foldl
-                (\n mbn ->
-                    if TDict.member n.id model.focusSr then
-                        Just n
+            \zklns ->
+                List.foldl
+                    (\n mbn ->
+                        if TDict.member n.id model.focusSr then
+                            Just n
 
-                    else
-                        mbn
-                )
-                Nothing
-                (case model.searchOrRecent of
-                    SearchView ->
-                        zknSearchResult.notes
-
-                    RecentView ->
-                        recentZkns
-                )
-                |> Maybe.map .id
+                        else
+                            mbn
+                    )
+                    Nothing
+                    zklns
+                    |> Maybe.map .id
 
         pagView =
             E.row [ E.width E.fill ]
@@ -254,7 +250,12 @@ makeViews stylePalette mbsize recentZkns spmodel zknSearchResult model controlRo
                        )
                     :: pagView
                     :: (List.map
-                            (showSr stylePalette.fontSize model lastSelected zknSearchResult.notes controlRow)
+                            (showSr stylePalette.fontSize
+                                model
+                                (lastSelected zknSearchResult.notes)
+                                zknSearchResult.notes
+                                controlRow
+                            )
                         <|
                             zknSearchResult.notes
                        )
@@ -267,7 +268,12 @@ makeViews stylePalette mbsize recentZkns spmodel zknSearchResult model controlRo
                     :: sppad
                 )
                 (List.map
-                    (showSr stylePalette.fontSize model lastSelected recentZkns controlRow)
+                    (showSr stylePalette.fontSize
+                        model
+                        (lastSelected recentZkns)
+                        recentZkns
+                        controlRow
+                    )
                  <|
                     recentZkns
                 )
