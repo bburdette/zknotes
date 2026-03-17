@@ -431,6 +431,77 @@ routeStateInternal model route =
                             -- err 'you're not logged in.'
                             ( (displayMessageDialog { model | state = initLoginState model route } "can't create a new note; you're not logged in!").state, Cmd.none )
 
+        SlideShow id ->
+            case model.state of
+                -- TODO: extract current zknoteid and list of notes
+                -- if the id is the same but the edit tab has changed, just change the edit tab.
+                EditZkNote st login ->
+                    case ( mbtab, st.id == Just id ) of
+                        ( Just et, True ) ->
+                            ( EditZkNote (EditZkNote.setTab et st) login, Cmd.none )
+
+                        _ ->
+                            ( EditZkNote st login
+                            , sendZIMsg model.fui
+                                -- Need a ZKN if changed, not Znl?
+                                (Data.PvqGetZnlIfChanged
+                                    { zknote = id
+                                    , what = "slideshow"
+                                    , edittab = mbtab
+                                    }
+                                )
+                            )
+
+                -- change all the below to get zkn if changed?
+                EditZkNoteListing st login ->
+                    ( EditZkNoteListing st login
+                    , sendZIMsg model.fui
+                        (Data.PvqGetZkNoteAndLinks
+                            { zknote = id
+                            , what = ""
+                            , edittab = mbtab
+                            }
+                        )
+                    )
+
+                EView st login ->
+                    ( EView st login
+                    , sendPIMsg model.fui
+                        (Data.PbrGetZkNoteAndLinks
+                            { zknote = id
+                            , what = ""
+                            , edittab = mbtab
+                            }
+                        )
+                    )
+
+                st ->
+                    case stateLogin st of
+                        Just login ->
+                            ( ShowMessage { message = "loading note..." }
+                                login
+                                (Just model.state)
+                            , sendZIMsg model.fui
+                                (Data.PvqGetZkNoteAndLinks
+                                    { zknote = id
+                                    , what = ""
+                                    , edittab = mbtab
+                                    }
+                                )
+                            )
+
+                        Nothing ->
+                            ( PubShowMessage { message = "loading note..." }
+                                (Just model.state)
+                            , sendPIMsg model.fui
+                                (Data.PbrGetZkNoteAndLinks
+                                    { zknote = id
+                                    , what = ""
+                                    , edittab = mbtab
+                                    }
+                                )
+                            )
+
         ArchiveNoteListingR id ->
             case model.state of
                 ArchiveListing st login ->
