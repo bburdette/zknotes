@@ -23,7 +23,7 @@ use uuid::Uuid;
 use zkprotocol::constants::SpecialUuids;
 use zkprotocol::content::{
   ArchiveZkLink, Direction, EditLink, ExtraLoginData, FileInfo, FileStatus, GetZkNoteArchives,
-  GetZkNoteComments, GetZnlIfChanged, ImportZkNote, LzLink, OnMakeFileNote, OnSavedZkNote,
+  GetZkNoteComments, GetZknIfChanged, ImportZkNote, LzLink, OnMakeFileNote, OnSavedZkNote,
   SaveLzLink, SaveZkLink, SaveZkLink2, SaveZkNote, SavedZkNote, Server, Sysids, UuidZkLink, ZkLink,
   ZkListNote, ZkNote, ZkNoteAndLinks, ZkNoteAndLinksWhat, ZkNoteId,
 };
@@ -2655,7 +2655,7 @@ pub fn read_zneifchanged(
   conn: &Connection,
   files_dir: &Path,
   uid: Option<UserId>,
-  gzic: &GetZnlIfChanged,
+  gzic: &GetZknIfChanged,
 ) -> Result<Option<ZkNoteAndLinksWhat>, zkerr::Error> {
   let id = note_id_for_zknoteid(&conn, &gzic.zknote)?;
   let changeddate: i64 = conn.query_row(

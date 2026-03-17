@@ -407,7 +407,7 @@ getZkNoteAndLinksEncoder struct =
         ]
 
 
-type alias GetZnlIfChanged =
+type alias GetZknIfChanged =
     { zknote : ZkNoteId
     , changeddate : Int
     , what : String
@@ -415,8 +415,8 @@ type alias GetZnlIfChanged =
     }
 
 
-getZnlIfChangedEncoder : GetZnlIfChanged -> Json.Encode.Value
-getZnlIfChangedEncoder struct =
+getZknIfChangedEncoder : GetZknIfChanged -> Json.Encode.Value
+getZknIfChangedEncoder struct =
     Json.Encode.object
         [ ( "zknote", (zkNoteIdEncoder) struct.zknote )
         , ( "changeddate", (Json.Encode.int) struct.changeddate )
@@ -639,7 +639,7 @@ jobStatusEncoder struct =
 
 type PublicRequest
     = PbrGetZkNoteAndLinks (GetZkNoteAndLinks)
-    | PbrGetZnlIfChanged (GetZnlIfChanged)
+    | PbrGetZknIfChanged (GetZknIfChanged)
     | PbrGetZkNotePubId (String)
 
 
@@ -648,8 +648,8 @@ publicRequestEncoder enum =
     case enum of
         PbrGetZkNoteAndLinks inner ->
             Json.Encode.object [ ( "PbrGetZkNoteAndLinks", getZkNoteAndLinksEncoder inner ) ]
-        PbrGetZnlIfChanged inner ->
-            Json.Encode.object [ ( "PbrGetZnlIfChanged", getZnlIfChangedEncoder inner ) ]
+        PbrGetZknIfChanged inner ->
+            Json.Encode.object [ ( "PbrGetZknIfChanged", getZknIfChangedEncoder inner ) ]
         PbrGetZkNotePubId inner ->
             Json.Encode.object [ ( "PbrGetZkNotePubId", Json.Encode.string inner ) ]
 
@@ -691,7 +691,7 @@ publicErrorEncoder enum =
 type PrivateRequest
     = PvqGetZkNote (ZkNoteId)
     | PvqGetZkNoteAndLinks (GetZkNoteAndLinks)
-    | PvqGetZnlIfChanged (GetZnlIfChanged)
+    | PvqGetZknIfChanged (GetZknIfChanged)
     | PvqGetZkNoteComments (GetZkNoteComments)
     | PvqGetZkNoteArchives (GetZkNoteArchives)
     | PvqGetArchiveZklinks (GetArchiveZkLinks)
@@ -716,8 +716,8 @@ privateRequestEncoder enum =
             Json.Encode.object [ ( "PvqGetZkNote", zkNoteIdEncoder inner ) ]
         PvqGetZkNoteAndLinks inner ->
             Json.Encode.object [ ( "PvqGetZkNoteAndLinks", getZkNoteAndLinksEncoder inner ) ]
-        PvqGetZnlIfChanged inner ->
-            Json.Encode.object [ ( "PvqGetZnlIfChanged", getZnlIfChangedEncoder inner ) ]
+        PvqGetZknIfChanged inner ->
+            Json.Encode.object [ ( "PvqGetZknIfChanged", getZknIfChangedEncoder inner ) ]
         PvqGetZkNoteComments inner ->
             Json.Encode.object [ ( "PvqGetZkNoteComments", getZkNoteCommentsEncoder inner ) ]
         PvqGetZkNoteArchives inner ->
@@ -1420,9 +1420,9 @@ getZkNoteAndLinksDecoder =
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "edittab" (Json.Decode.nullable (editTabDecoder))))
 
 
-getZnlIfChangedDecoder : Json.Decode.Decoder GetZnlIfChanged
-getZnlIfChangedDecoder =
-    Json.Decode.succeed GetZnlIfChanged
+getZknIfChangedDecoder : Json.Decode.Decoder GetZknIfChanged
+getZknIfChangedDecoder =
+    Json.Decode.succeed GetZknIfChanged
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "zknote" (zkNoteIdDecoder)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "changeddate" (Json.Decode.int)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "what" (Json.Decode.string)))
@@ -1602,7 +1602,7 @@ publicRequestDecoder : Json.Decode.Decoder PublicRequest
 publicRequestDecoder = 
     Json.Decode.oneOf
         [ Json.Decode.map PbrGetZkNoteAndLinks (Json.Decode.field "PbrGetZkNoteAndLinks" (getZkNoteAndLinksDecoder))
-        , Json.Decode.map PbrGetZnlIfChanged (Json.Decode.field "PbrGetZnlIfChanged" (getZnlIfChangedDecoder))
+        , Json.Decode.map PbrGetZknIfChanged (Json.Decode.field "PbrGetZknIfChanged" (getZknIfChangedDecoder))
         , Json.Decode.map PbrGetZkNotePubId (Json.Decode.field "PbrGetZkNotePubId" (Json.Decode.string))
         ]
 
@@ -1636,7 +1636,7 @@ privateRequestDecoder =
     Json.Decode.oneOf
         [ Json.Decode.map PvqGetZkNote (Json.Decode.field "PvqGetZkNote" (zkNoteIdDecoder))
         , Json.Decode.map PvqGetZkNoteAndLinks (Json.Decode.field "PvqGetZkNoteAndLinks" (getZkNoteAndLinksDecoder))
-        , Json.Decode.map PvqGetZnlIfChanged (Json.Decode.field "PvqGetZnlIfChanged" (getZnlIfChangedDecoder))
+        , Json.Decode.map PvqGetZknIfChanged (Json.Decode.field "PvqGetZknIfChanged" (getZknIfChangedDecoder))
         , Json.Decode.map PvqGetZkNoteComments (Json.Decode.field "PvqGetZkNoteComments" (getZkNoteCommentsDecoder))
         , Json.Decode.map PvqGetZkNoteArchives (Json.Decode.field "PvqGetZkNoteArchives" (getZkNoteArchivesDecoder))
         , Json.Decode.map PvqGetArchiveZklinks (Json.Decode.field "PvqGetArchiveZklinks" (getArchiveZkLinksDecoder))

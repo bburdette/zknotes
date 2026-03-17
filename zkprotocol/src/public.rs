@@ -1,11 +1,11 @@
-use crate::content::{GetZkNoteAndLinks, GetZnlIfChanged, ZkNoteAndLinks, ZkNoteAndLinksWhat};
+use crate::content::{GetZkNoteAndLinks, GetZknIfChanged, ZkNoteAndLinks, ZkNoteAndLinksWhat};
 use elm_rs::{Elm, ElmDecode, ElmEncode};
 use serde_derive::{Deserialize, Serialize};
 
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug)]
 pub enum PublicRequest {
   PbrGetZkNoteAndLinks(GetZkNoteAndLinks),
-  PbrGetZnlIfChanged(GetZnlIfChanged),
+  PbrGetZknIfChanged(GetZknIfChanged),
   PbrGetZkNotePubId(String),
 }
 
