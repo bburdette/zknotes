@@ -118,7 +118,8 @@ pub async fn save_sync(
   usernoteid: i64,
   sync: CompletedSync,
 ) -> Result<i64, Box<dyn std::error::Error>> {
-  let syncid = note_id_for_uuid(conn, &Uuid::parse_str(SpecialUuids::Sync.str())?)?;
+  let syncid = note_id_for_uuid(conn, &Uuid::parse_str(SpecialUuids::Sync.str())?)
+    .map_err(|e| zkerr::annotate_string(format!("SpecialUuids::Sync"), e.into()))?;
   let sysid = user_id(&conn, "system")?;
 
   let snote = SpecialNote::SnSync(sync);
@@ -982,7 +983,11 @@ where
     );
 
     let (nid, pid) = match note.id {
-      ZkNoteId::ArchiveZni(n, p) => Ok((n, note_id_for_uuid(conn, &p)?)),
+      ZkNoteId::ArchiveZni(n, p) => Ok((
+        n,
+        note_id_for_uuid(conn, &p)
+          .map_err(|e| zkerr::annotate_string(format!("archive"), e.into()))?,
+      )),
       ZkNoteId::Zni(_) => Err(zkerr::Error::String("not an archive note".to_string())),
     }?;
 
