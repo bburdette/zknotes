@@ -67,7 +67,7 @@ addNote pt id ce nc =
 
 getNote : NoteCache -> ZkNoteId -> Maybe CacheEntry
 getNote nc id =
-    TDict.get id nc.byId
+    getZneEntry nc id
         |> Maybe.map .ce
 
 

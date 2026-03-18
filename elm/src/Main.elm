@@ -1938,7 +1938,7 @@ onZkNoteEditWhat model pt znew =
                         EM.initMd znew.znl.zknote.content
 
             ( ns, cmd ) =
-                -- going into slideshow mode naiow.
+                -- going into slideshow mode.
                 case EM.getSpecialNoteState em of
                     Just (SpecialNotesGui.SnsList slem) ->
                         case slem.nlls of
@@ -3428,15 +3428,51 @@ actualupdate msg model =
 
                 SlideShow.Close mbcurrent ->
                     let
-                        ins =
+                        ( ins, c ) =
                             case instate of
                                 EditZkNote ezn login ->
-                                    EditZkNote (EditZkNote.setCurrentSlideNote mbcurrent ezn) login
+                                    ( EditZkNote (EditZkNote.setCurrentSlideNote mbcurrent ezn) login, Cmd.none )
+
+                                ShowMessage _ login _ ->
+                                    mbid
+                                        |> Maybe.andThen (\id -> NC.getNote model.noteCache id)
+                                        |> Maybe.andThen
+                                            (\ce ->
+                                                case ce of
+                                                    NC.ZNAL zkn ->
+                                                        Just zkn
+
+                                                    _ ->
+                                                        Nothing
+                                            )
+                                        |> Maybe.map
+                                            (\zknl ->
+                                                let
+                                                    ( nst, cmts ) =
+                                                        EditZkNote.initFull model.fui
+                                                            login
+                                                            zknl.zknote
+                                                            zknl.links
+                                                            zknl.lzlinks
+                                                            Nothing
+                                                            model.mobile
+
+                                                    ngets =
+                                                        makeNoteCacheGets (EM.getContent nst.edMarkdown) model
+                                                in
+                                                ( EditZkNote (EditZkNote.setCurrentSlideNote mbcurrent nst) login
+                                                , Cmd.batch ((sendZIMsg model.fui <| Data.PvqGetZkNoteComments cmts) :: ngets)
+                                                )
+                                            )
+                                        |> Maybe.withDefault
+                                            ( EditZkNoteListing { dialog = Nothing, zone = model.timezone } login
+                                            , Cmd.none
+                                            )
 
                                 _ ->
-                                    instate
+                                    ( instate, Cmd.none )
                     in
-                    ( { model | state = ins }, Cmd.none )
+                    ( { model | state = ins }, c )
 
                 SlideShow.GetNote id ->
                     ( { model | state = SlideShow mbid emod instate }
