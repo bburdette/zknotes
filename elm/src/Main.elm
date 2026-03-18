@@ -656,6 +656,12 @@ routeStateInternal model route =
 
 stateRoute : State -> SavedRoute
 stateRoute state =
+    let
+        top =
+            { route = Top
+            , save = False
+            }
+    in
     case state of
         View vst ->
             case vst.pubid of
@@ -715,10 +721,81 @@ stateRoute state =
             , save = True
             }
 
-        _ ->
-            { route = Top
-            , save = False
-            }
+        -- explicitly handle all these instead of wildcard, so we'll get errors for unhandled states.
+        Invited _ ->
+            top
+
+        EditZkNoteListing _ _ ->
+            top
+
+        ArchiveAwait _ _ _ ->
+            top
+
+        Import _ _ ->
+            top
+
+        ShowMessage _ _ _ ->
+            top
+
+        PubShowMessage _ _ ->
+            top
+
+        LoginShowMessage _ _ _ ->
+            top
+
+        SelectDialog _ _ ->
+            top
+
+        ChangePasswordDialog _ _ ->
+            top
+
+        ChangeEmailDialog _ _ ->
+            top
+
+        ChangeRemoteUrlDialog _ _ ->
+            top
+
+        ResetPassword _ ->
+            top
+
+        UserEdit _ _ ->
+            top
+
+        ShowUrl _ _ ->
+            top
+
+        DisplayMessage _ _ ->
+            top
+
+        MessageNLink _ _ ->
+            top
+
+        RequestsDialog _ _ ->
+            top
+
+        JobsDialog _ _ ->
+            top
+
+        TagFiles _ _ _ ->
+            top
+
+        TagNotes _ _ _ ->
+            top
+
+        InviteUser _ _ _ ->
+            top
+
+        MdInlineXform _ _ ->
+            top
+
+        UserListing _ _ ->
+            top
+
+        Wait _ _ ->
+            top
+
+        SlideShow _ _ ->
+            top
 
 
 showMessage : Msg -> String
