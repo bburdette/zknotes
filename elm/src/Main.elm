@@ -3436,15 +3436,6 @@ actualupdate msg model =
                                 ShowMessage _ login _ ->
                                     mbid
                                         |> Maybe.andThen (\id -> NC.getNote model.noteCache id)
-                                        |> Maybe.andThen
-                                            (\ce ->
-                                                case ce of
-                                                    NC.ZNAL zkn ->
-                                                        Just zkn
-
-                                                    _ ->
-                                                        Nothing
-                                            )
                                         |> Maybe.map
                                             (\zknl ->
                                                 let
@@ -3974,7 +3965,7 @@ makeNoteCacheGets md model =
 
 makeNoteCacheGet : Model -> ZkNoteId -> Cmd Msg
 makeNoteCacheGet model id =
-    case NC.getNote model.noteCache id of
+    case NC.getCacheEntry model.noteCache id of
         Just (NC.ZNAL zkn) ->
             sendZIMsg model.fui
                 (Data.PvqGetZknIfChanged
@@ -4023,7 +4014,7 @@ makePubNoteCacheGets model md =
 
 makePubNoteCacheGet : Model -> ZkNoteId -> Cmd Msg
 makePubNoteCacheGet model id =
-    case NC.getNote model.noteCache id of
+    case NC.getCacheEntry model.noteCache id of
         Just (NC.ZNAL zkn) ->
             sendPIMsg
                 model.fui
@@ -4073,7 +4064,7 @@ makeNewNoteCacheGets md model =
         |> TSet.toList
         |> List.filterMap
             (\id ->
-                case NC.getNote model.noteCache id of
+                case NC.getCacheEntry model.noteCache id of
                     Just _ ->
                         Nothing
 

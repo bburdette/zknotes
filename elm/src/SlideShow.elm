@@ -7,7 +7,7 @@ import DataUtil exposing (FileUrlInfo, NlLink)
 import DndPorts exposing (..)
 import Element as E
 import Element.Input as EI
-import NoteCache exposing (CacheEntry(..), NoteCache, getNote)
+import NoteCache exposing (CacheEntry(..), NoteCache, getCacheEntry)
 import Time
 import Util
 import View
@@ -60,13 +60,13 @@ init fui nc mbcurrent nl rnlls =
         getid =
             mbcurrent |> Maybe.withDefault nl.id
 
-        zkn =
-            getNote nc getid
+        ce =
+            getCacheEntry nc getid
     in
     ( { nlls = nlls
       , current = current
       , viewModel =
-            case zkn of
+            case ce of
                 Just (ZNAL note) ->
                     Just <| View.initFull fui note
 
@@ -80,7 +80,7 @@ init fui nc mbcurrent nl rnlls =
                     Nothing
       , fui = fui
       }
-    , case zkn of
+    , case ce of
         Just (ZNAL _) ->
             Noop
 
@@ -179,7 +179,7 @@ updateNote nc model =
         Just n ->
             let
                 ( nvm, c ) =
-                    case getNote nc n.id of
+                    case getCacheEntry nc n.id of
                         Just (ZNAL gotn) ->
                             ( Just <| View.initFull model.fui gotn, Noop )
 

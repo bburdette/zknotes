@@ -3803,15 +3803,7 @@ update noteCache msg model =
                                                     { id = zkid
                                                     , title =
                                                         NC.getNote noteCache zkid
-                                                            |> Maybe.andThen
-                                                                (\ce ->
-                                                                    case ce of
-                                                                        NC.ZNAL n ->
-                                                                            Just n.zknote.title
-
-                                                                        _ ->
-                                                                            Nothing
-                                                                )
+                                                            |> Maybe.map (\n -> n.zknote.title)
                                                             |> Maybe.withDefault (zkNoteIdToString zkid)
                                                     }
 

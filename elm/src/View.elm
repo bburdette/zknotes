@@ -137,7 +137,7 @@ view zone maxw noteCache config model =
                         else
                             Nothing
                     )
-                |> Maybe.andThen (NC.getNote noteCache)
+                |> Maybe.andThen (NC.getCacheEntry noteCache)
                 |> Maybe.map
                     (\ce ->
                         case ce of

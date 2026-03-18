@@ -768,7 +768,7 @@ noteView args id show text _ =
     case
         zkNoteIdFromString id
             |> Result.toMaybe
-            |> Maybe.andThen (NC.getNote args.noteCache)
+            |> Maybe.andThen (NC.getCacheEntry args.noteCache)
     of
         Just NC.Private ->
             E.text "private note"
