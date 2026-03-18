@@ -52,6 +52,7 @@ import SelectString as SS
 import ShowMessage
 import SlideShow
 import SpecialNotes as SN
+import SpecialNotesGui
 import TSet
 import TagAThing
 import TagFiles
@@ -432,78 +433,128 @@ routeStateInternal model route =
                             ( (displayMessageDialog { model | state = initLoginState model route } "can't create a new note; you're not logged in!").state, Cmd.none )
 
         Route.SlideShow id ->
-            {- case model.state of
-               -- TODO: extract current zknoteid and list of notes
-               -- if the id is the same but the edit tab has changed, just change the edit tab.
-               EditZkNote st login ->
-                   case ( mbtab, st.id == Just id ) of
-                       ( Just et, True ) ->
-                           ( EditZkNote (EditZkNote.setTab et st) login, Cmd.none )
+            let
+                mbrt =
+                    NC.getZneEntry model.noteCache id
+                        |> Maybe.map .receivetime
+            in
+            case stateLogin model.state of
+                Just login ->
+                    ( ShowMessage { message = "loading note..." }
+                        login
+                        (Just model.state)
+                    , sendZIMsg model.fui
+                        (case mbrt of
+                            Just rt ->
+                                Data.PvqGetZknIfChanged
+                                    { zknote = id
+                                    , changeddate = rt
+                                    , what = "slideshow"
+                                    , edittab = Nothing
+                                    }
 
-                       _ ->
-                           ( EditZkNote st login
-                           , sendZIMsg model.fui
-                               -- Need a ZKN if changed, not Znl?
-                               (Data.PvqGetZknIfChanged
-                                   { zknote = id
-                                   , what = "slideshow"
-                                   , edittab = mbtab
-                                   }
-                               )
+                            Nothing ->
+                                Data.PvqGetZkNoteAndLinks
+                                    { zknote = id
+                                    , what = "slideshow"
+                                    , edittab = Nothing
+                                    }
+                        )
+                    )
+
+                Nothing ->
+                    ( PubShowMessage { message = "loading note..." }
+                        (Just model.state)
+                    , sendPIMsg model.fui
+                        (case mbrt of
+                            Just rt ->
+                                Data.PbrGetZknIfChanged
+                                    { zknote = id
+                                    , changeddate = rt
+                                    , what = "slideshow"
+                                    , edittab = Nothing
+                                    }
+
+                            Nothing ->
+                                Data.PbrGetZkNoteAndLinks
+                                    { zknote = id
+                                    , what = "slideshow"
+                                    , edittab = Nothing
+                                    }
+                        )
+                    )
+
+        -- ( model.state, Cmd.none )
+        {- case model.state of
+           -- TODO: extract current zknoteid and list of notes
+           -- if the id is the same but the edit tab has changed, just change the edit tab.
+           EditZkNote st login ->
+               case ( mbtab, st.id == Just id ) of
+                   ( Just et, True ) ->
+                       ( EditZkNote (EditZkNote.setTab et st) login, Cmd.none )
+
+                   _ ->
+                       ( EditZkNote st login
+                       , sendZIMsg model.fui
+                           -- Need a ZKN if changed, not Znl?
+                           (Data.PvqGetZknIfChanged
+                               { zknote = id
+                               , what = "slideshow"
+                               , edittab = mbtab
+                               }
                            )
-
-               -- change all the below to get zkn if changed?
-               EditZkNoteListing st login ->
-                   ( EditZkNoteListing st login
-                   , sendZIMsg model.fui
-                       (Data.PvqGetZkNoteAndLinks
-                           { zknote = id
-                           , what = ""
-                           , edittab = mbtab
-                           }
                        )
-                   )
 
-               EView st login ->
-                   ( EView st login
-                   , sendPIMsg model.fui
-                       (Data.PbrGetZkNoteAndLinks
-                           { zknote = id
-                           , what = ""
-                           , edittab = mbtab
-                           }
+           -- change all the below to get zkn if changed?
+           EditZkNoteListing st login ->
+               ( EditZkNoteListing st login
+               , sendZIMsg model.fui
+                   (Data.PvqGetZkNoteAndLinks
+                       { zknote = id
+                       , what = ""
+                       , edittab = mbtab
+                       }
+                   )
+               )
+
+           EView st login ->
+               ( EView st login
+               , sendPIMsg model.fui
+                   (Data.PbrGetZkNoteAndLinks
+                       { zknote = id
+                       , what = ""
+                       , edittab = mbtab
+                       }
+                   )
+               )
+
+           st ->
+               case stateLogin st of
+                   Just login ->
+                       ( ShowMessage { message = "loading note..." }
+                           login
+                           (Just model.state)
+                       , sendZIMsg model.fui
+                           (Data.PvqGetZkNoteAndLinks
+                               { zknote = id
+                               , what = ""
+                               , edittab = mbtab
+                               }
+                           )
                        )
-                   )
 
-               st ->
-                   case stateLogin st of
-                       Just login ->
-                           ( ShowMessage { message = "loading note..." }
-                               login
-                               (Just model.state)
-                           , sendZIMsg model.fui
-                               (Data.PvqGetZkNoteAndLinks
-                                   { zknote = id
-                                   , what = ""
-                                   , edittab = mbtab
-                                   }
-                               )
+                   Nothing ->
+                       ( PubShowMessage { message = "loading note..." }
+                           (Just model.state)
+                       , sendPIMsg model.fui
+                           (Data.PbrGetZkNoteAndLinks
+                               { zknote = id
+                               , what = ""
+                               , edittab = mbtab
+                               }
                            )
-
-                       Nothing ->
-                           ( PubShowMessage { message = "loading note..." }
-                               (Just model.state)
-                           , sendPIMsg model.fui
-                               (Data.PbrGetZkNoteAndLinks
-                                   { zknote = id
-                                   , what = ""
-                                   , edittab = mbtab
-                                   }
-                               )
-                           )
-            -}
-            ( model.state, Cmd.none )
-
+                       )
+        -}
         ArchiveNoteListingR id ->
             case model.state of
                 ArchiveListing st login ->
@@ -1722,15 +1773,17 @@ shDialog model =
 
 displayMessageDialog : Model -> String -> Model
 displayMessageDialog model message =
-    { model
-        | state =
-            DisplayMessage
-                (DisplayMessage.init Common.buttonStyle
-                    message
-                    (E.map (\_ -> ()) (viewState model.size model.state model))
-                )
-                model.state
-    }
+    { model | state = displayMessageDialogState model message }
+
+
+displayMessageDialogState : Model -> String -> State
+displayMessageDialogState model message =
+    DisplayMessage
+        (DisplayMessage.init Common.buttonStyle
+            message
+            (E.map (\_ -> ()) (viewState model.size model.state model))
+        )
+        model.state
 
 
 displayMessageNLinkDialog : Model -> String -> String -> String -> Model
@@ -1779,6 +1832,62 @@ onZkNoteEditWhat model pt znew =
                     _ ->
                         ( model.state, Cmd.none )
         in
+        ( { model
+            | noteCache = noteCache
+            , state = ns
+          }
+        , cmd
+        )
+
+    else if znew.what == "slideshow" then
+        let
+            noteCache =
+                NC.addNote pt znew.znl.zknote.id (NC.ZNAL znew.znl) model.noteCache
+                    |> NC.purgeNotes
+
+            em =
+                EM.initMd znew.znl.zknote.content
+
+            ( ns, cmd ) =
+                -- going into slideshow mode naiow.
+                case EM.getSpecialNoteState em of
+                    Just (SpecialNotesGui.SnsList slem) ->
+                        case slem.nlls of
+                            fst :: rest ->
+                                let
+                                    ( st, cmd_ ) =
+                                        SlideShow.init model.fui model.noteCache (Maybe.map Data.Zni slem.ng.currentUuid) fst rest
+                                in
+                                ( SlideShow st model.state, Cmd.none )
+
+                            _ ->
+                                ( displayMessageDialogState model "empty slideshow"
+                                , Cmd.none
+                                )
+
+                    _ ->
+                        ( displayMessageDialogState model "not a slideshow"
+                        , Cmd.none
+                        )
+        in
+        -- SpecialNotesGui.initSpecialNoteStateLz
+        -- in
+        --         case model.state of
+        --             SlideShow ssmod instate ->
+        --                 let
+        --                     ( ss, c ) =
+        --                         SlideShow.updateNote noteCache ssmod
+        --                 in
+        --                 ( SlideShow ss instate
+        --                 , case c of
+        --                     SlideShow.GetNote id ->
+        --                         makeNoteCacheGets model id
+        --                     _ ->
+        --                         Cmd.none
+        --                 )
+        --             _ ->
+        --                 ( model.state, Cmd.none )
+        -- in
         ( { model
             | noteCache = noteCache
             , state = ns

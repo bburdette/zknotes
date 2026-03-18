@@ -1,4 +1,4 @@
-module NoteCache exposing (CacheEntry(..), NoteCache, addNote, empty, getNote, purgeNotes, setKeeps)
+module NoteCache exposing (CacheEntry(..), NoteCache, addNote, empty, getNote, getZneEntry, purgeNotes, setKeeps)
 
 import Data exposing (ZkNoteAndLinks, ZkNoteId)
 import DataUtil exposing (ZniSet)
@@ -69,6 +69,11 @@ getNote : NoteCache -> ZkNoteId -> Maybe CacheEntry
 getNote nc id =
     TDict.get id nc.byId
         |> Maybe.map .ce
+
+
+getZneEntry : NoteCache -> ZkNoteId -> Maybe ZneEntry
+getZneEntry nc id =
+    TDict.get id nc.byId
 
 
 removeNote : NoteCache -> ZkNoteId -> NoteCache
