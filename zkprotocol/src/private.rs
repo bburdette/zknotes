@@ -1,7 +1,7 @@
 use crate::{
   content::{
     ArchiveZkLink, GetArchiveZkLinks, GetZkLinksSince, GetZkNoteAndLinks, GetZkNoteArchives,
-    GetZkNoteComments, GetZnlIfChanged, ImportZkNote, JobStatus, SaveZkLinks, SaveZkNote,
+    GetZkNoteComments, GetZknIfChanged, ImportZkNote, JobStatus, SaveZkLinks, SaveZkNote,
     SaveZkNoteAndLinks, SavedZkNote, UuidZkLink, ZkListNote, ZkNote, ZkNoteAndLinksWhat,
     ZkNoteArchives, ZkNoteId,
   },
@@ -29,7 +29,7 @@ pub struct PrivateClosureReply {
 pub enum PrivateRequest {
   PvqGetZkNote(ZkNoteId),
   PvqGetZkNoteAndLinks(GetZkNoteAndLinks),
-  PvqGetZnlIfChanged(GetZnlIfChanged),
+  PvqGetZknIfChanged(GetZknIfChanged),
   PvqGetZkNoteComments(GetZkNoteComments),
   PvqGetZkNoteArchives(GetZkNoteArchives),
   PvqGetArchiveZklinks(GetArchiveZkLinks),

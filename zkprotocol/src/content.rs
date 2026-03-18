@@ -230,7 +230,7 @@ pub struct GetZkNoteAndLinks {
 }
 
 #[derive(Elm, ElmDecode, ElmEncode, Serialize, Deserialize, Debug, Clone)]
-pub struct GetZnlIfChanged {
+pub struct GetZknIfChanged {
   pub zknote: ZkNoteId,
   pub changeddate: i64,
   pub what: String,

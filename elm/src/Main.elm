@@ -52,6 +52,7 @@ import SelectString as SS
 import ShowMessage
 import SlideShow
 import SpecialNotes as SN
+import SpecialNotesGui
 import TSet
 import TagAThing
 import TagFiles
@@ -156,7 +157,7 @@ type State
     | InviteUser (TagAThing.Model InviteUser.Model InviteUser.Msg InviteUser.Command) LoginData State
     | MdInlineXform MdInlineXform.GDModel State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
-    | SlideShow SlideShow.Model State
+    | SlideShow (Maybe ZkNoteId) SlideShow.Model State
 
 
 decodeFlags : JD.Decoder Flags
@@ -431,6 +432,58 @@ routeStateInternal model route =
                             -- err 'you're not logged in.'
                             ( (displayMessageDialog { model | state = initLoginState model route } "can't create a new note; you're not logged in!").state, Cmd.none )
 
+        Route.SlideShow id ->
+            let
+                mbrt =
+                    NC.getZneEntry model.noteCache id
+                        |> Maybe.map .receivetime
+            in
+            case stateLogin model.state of
+                Just login ->
+                    ( ShowMessage { message = "loading note..." }
+                        login
+                        (Just model.state)
+                    , sendZIMsg model.fui
+                        (case mbrt of
+                            Just rt ->
+                                Data.PvqGetZknIfChanged
+                                    { zknote = id
+                                    , changeddate = rt
+                                    , what = "slideshow"
+                                    , edittab = Nothing
+                                    }
+
+                            Nothing ->
+                                Data.PvqGetZkNoteAndLinks
+                                    { zknote = id
+                                    , what = "slideshow"
+                                    , edittab = Nothing
+                                    }
+                        )
+                    )
+
+                Nothing ->
+                    ( PubShowMessage { message = "loading note..." }
+                        (Just model.state)
+                    , sendPIMsg model.fui
+                        (case mbrt of
+                            Just rt ->
+                                Data.PbrGetZknIfChanged
+                                    { zknote = id
+                                    , changeddate = rt
+                                    , what = "slideshow"
+                                    , edittab = Nothing
+                                    }
+
+                            Nothing ->
+                                Data.PbrGetZkNoteAndLinks
+                                    { zknote = id
+                                    , what = "slideshow"
+                                    , edittab = Nothing
+                                    }
+                        )
+                    )
+
         ArchiveNoteListingR id ->
             case model.state of
                 ArchiveListing st login ->
@@ -532,6 +585,12 @@ routeStateInternal model route =
 
 stateRoute : State -> SavedRoute
 stateRoute state =
+    let
+        top =
+            { route = Top
+            , save = False
+            }
+    in
     case state of
         View vst ->
             case vst.pubid of
@@ -591,10 +650,88 @@ stateRoute state =
             , save = True
             }
 
-        _ ->
-            { route = Top
-            , save = False
-            }
+        SlideShow mbid ssmod _ ->
+            case mbid of
+                Just id ->
+                    { route = Route.SlideShow id
+                    , save = True
+                    }
+
+                Nothing ->
+                    top
+
+        -- explicitly handle all these instead of wildcard, so we'll get errors for unhandled states.
+        Invited _ ->
+            top
+
+        EditZkNoteListing _ _ ->
+            top
+
+        ArchiveAwait _ _ _ ->
+            top
+
+        Import _ _ ->
+            top
+
+        ShowMessage _ _ _ ->
+            top
+
+        PubShowMessage _ _ ->
+            top
+
+        LoginShowMessage _ _ _ ->
+            top
+
+        SelectDialog _ _ ->
+            top
+
+        ChangePasswordDialog _ _ ->
+            top
+
+        ChangeEmailDialog _ _ ->
+            top
+
+        ChangeRemoteUrlDialog _ _ ->
+            top
+
+        ResetPassword _ ->
+            top
+
+        UserEdit _ _ ->
+            top
+
+        ShowUrl _ _ ->
+            top
+
+        DisplayMessage _ _ ->
+            top
+
+        MessageNLink _ _ ->
+            top
+
+        RequestsDialog _ _ ->
+            top
+
+        JobsDialog _ _ ->
+            top
+
+        TagFiles _ _ _ ->
+            top
+
+        TagNotes _ _ _ ->
+            top
+
+        InviteUser _ _ _ ->
+            top
+
+        MdInlineXform _ _ ->
+            top
+
+        UserListing _ _ ->
+            top
+
+        Wait _ _ ->
+            top
 
 
 showMessage : Msg -> String
@@ -899,7 +1036,7 @@ showState state =
         InviteUser _ _ _ ->
             "InviteUser"
 
-        SlideShow _ _ ->
+        SlideShow _ _ _ ->
             "SlideShow"
 
 
@@ -1021,7 +1158,7 @@ viewState size state model =
         InviteUser tfmod _ _ ->
             E.map InviteUserMsg <| TagAThing.view model.stylePalette model.recentNotes (Just size) model.spmodel model.zknSearchResult tfmod
 
-        SlideShow ssmodel _ ->
+        SlideShow _ ssmodel _ ->
             E.map SlideShowMsg <| SlideShow.view model.timezone size.width model.noteCache ssmodel
 
 
@@ -1118,7 +1255,7 @@ stateLogin state =
         InviteUser _ login _ ->
             Just login
 
-        SlideShow _ instate ->
+        SlideShow _ _ instate ->
             stateLogin instate
 
 
@@ -1649,15 +1786,17 @@ shDialog model =
 
 displayMessageDialog : Model -> String -> Model
 displayMessageDialog model message =
-    { model
-        | state =
-            DisplayMessage
-                (DisplayMessage.init Common.buttonStyle
-                    message
-                    (E.map (\_ -> ()) (viewState model.size model.state model))
-                )
-                model.state
-    }
+    { model | state = displayMessageDialogState model message }
+
+
+displayMessageDialogState : Model -> String -> State
+displayMessageDialogState model message =
+    DisplayMessage
+        (DisplayMessage.init Common.buttonStyle
+            message
+            (E.map (\_ -> ()) (viewState model.size model.state model))
+        )
+        model.state
 
 
 displayMessageNLinkDialog : Model -> String -> String -> String -> Model
@@ -1689,12 +1828,12 @@ onZkNoteEditWhat model pt znew =
 
             ( ns, cmd ) =
                 case model.state of
-                    SlideShow ssmod instate ->
+                    SlideShow mbid ssmod instate ->
                         let
                             ( ss, c ) =
                                 SlideShow.updateNote noteCache ssmod
                         in
-                        ( SlideShow ss instate
+                        ( SlideShow mbid ss instate
                         , case c of
                             SlideShow.GetNote id ->
                                 makeNoteCacheGet model id
@@ -1705,6 +1844,56 @@ onZkNoteEditWhat model pt znew =
 
                     _ ->
                         ( model.state, Cmd.none )
+        in
+        ( { model
+            | noteCache = noteCache
+            , state = ns
+          }
+        , cmd
+        )
+
+    else if znew.what == "slideshow" then
+        let
+            noteCache =
+                NC.addNote pt znew.znl.zknote.id (NC.ZNAL znew.znl) model.noteCache
+                    |> NC.purgeNotes
+
+            em =
+                case JD.decodeString SN.specialNoteDecoder znew.znl.zknote.content of
+                    Ok sn ->
+                        EM.initSpecial (SpecialNotesGui.initSpecialNoteStateLz znew.znl.zknote.id sn znew.znl.lzlinks)
+
+                    Err _ ->
+                        EM.initMd znew.znl.zknote.content
+
+            ( ns, cmd ) =
+                -- going into slideshow mode.
+                case EM.getSpecialNoteState em of
+                    Just (SpecialNotesGui.SnsList slem) ->
+                        case slem.nlls of
+                            fst :: rest ->
+                                let
+                                    ( st, c ) =
+                                        SlideShow.init model.fui model.noteCache (Maybe.map Data.Zni slem.ng.currentUuid) fst rest
+                                in
+                                ( SlideShow (Just znew.znl.zknote.id) st model.state
+                                , case c of
+                                    SlideShow.GetNote id ->
+                                        makeNoteCacheGet model id
+
+                                    _ ->
+                                        Cmd.none
+                                )
+
+                            _ ->
+                                ( displayMessageDialogState model "empty slideshow"
+                                , Cmd.none
+                                )
+
+                    _ ->
+                        ( displayMessageDialogState model "not a slideshow"
+                        , Cmd.none
+                        )
         in
         ( { model
             | noteCache = noteCache
@@ -3157,29 +3346,56 @@ actualupdate msg model =
                 View.OnPlaybackEnded ->
                     ( model, Cmd.none )
 
-        ( SlideShowMsg em, SlideShow es instate ) ->
+        ( SlideShowMsg em, SlideShow mbid es instate ) ->
             let
                 ( emod, ecmd ) =
                     SlideShow.update em model.noteCache es
             in
             case ecmd of
                 SlideShow.Noop ->
-                    ( { model | state = SlideShow emod instate }, Cmd.none )
+                    ( { model | state = SlideShow mbid emod instate }, Cmd.none )
 
                 SlideShow.Close mbcurrent ->
                     let
-                        ins =
+                        ( ins, c ) =
                             case instate of
                                 EditZkNote ezn login ->
-                                    EditZkNote (EditZkNote.setCurrentSlideNote mbcurrent ezn) login
+                                    ( EditZkNote (EditZkNote.setCurrentSlideNote mbcurrent ezn) login, Cmd.none )
+
+                                ShowMessage _ login _ ->
+                                    mbid
+                                        |> Maybe.andThen (\id -> NC.getNote model.noteCache id)
+                                        |> Maybe.map
+                                            (\zknl ->
+                                                let
+                                                    ( nst, cmts ) =
+                                                        EditZkNote.initFull model.fui
+                                                            login
+                                                            zknl.zknote
+                                                            zknl.links
+                                                            zknl.lzlinks
+                                                            Nothing
+                                                            model.mobile
+
+                                                    ngets =
+                                                        makeNoteCacheGets (EM.getContent nst.edMarkdown) model
+                                                in
+                                                ( EditZkNote (EditZkNote.setCurrentSlideNote mbcurrent nst) login
+                                                , Cmd.batch ((sendZIMsg model.fui <| Data.PvqGetZkNoteComments cmts) :: ngets)
+                                                )
+                                            )
+                                        |> Maybe.withDefault
+                                            ( EditZkNoteListing { dialog = Nothing, zone = model.timezone } login
+                                            , Cmd.none
+                                            )
 
                                 _ ->
-                                    instate
+                                    ( instate, Cmd.none )
                     in
-                    ( { model | state = ins }, Cmd.none )
+                    ( { model | state = ins }, c )
 
                 SlideShow.GetNote id ->
-                    ( { model | state = SlideShow emod instate }
+                    ( { model | state = SlideShow mbid emod instate }
                     , makeNoteCacheGet model id
                     )
 
@@ -3678,10 +3894,10 @@ makeNoteCacheGets md model =
 
 makeNoteCacheGet : Model -> ZkNoteId -> Cmd Msg
 makeNoteCacheGet model id =
-    case NC.getNote model.noteCache id of
+    case NC.getCacheEntry model.noteCache id of
         Just (NC.ZNAL zkn) ->
             sendZIMsg model.fui
-                (Data.PvqGetZnlIfChanged
+                (Data.PvqGetZknIfChanged
                     { zknote = id
                     , what = "cache"
                     , edittab = Nothing
@@ -3727,11 +3943,11 @@ makePubNoteCacheGets model md =
 
 makePubNoteCacheGet : Model -> ZkNoteId -> Cmd Msg
 makePubNoteCacheGet model id =
-    case NC.getNote model.noteCache id of
+    case NC.getCacheEntry model.noteCache id of
         Just (NC.ZNAL zkn) ->
             sendPIMsg
                 model.fui
-                (Data.PbrGetZnlIfChanged
+                (Data.PbrGetZknIfChanged
                     { zknote = id
                     , what = "cache"
                     , edittab = Nothing
@@ -3777,7 +3993,7 @@ makeNewNoteCacheGets md model =
         |> TSet.toList
         |> List.filterMap
             (\id ->
-                case NC.getNote model.noteCache id of
+                case NC.getCacheEntry model.noteCache id of
                     Just _ ->
                         Nothing
 
@@ -4153,7 +4369,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                                 ( ssmod, sscmd ) =
                                     SlideShow.init model.fui model.noteCache mbcurrent fst rest
                             in
-                            ( { model | state = SlideShow ssmod (EditZkNote emod login) }
+                            ( { model | state = SlideShow emod.id ssmod (EditZkNote emod login) }
                             , case sscmd of
                                 SlideShow.GetNote id ->
                                     makeNoteCacheGet model id

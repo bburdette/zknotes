@@ -263,7 +263,7 @@ pub async fn zk_interface_loggedin(
 
       Ok(PrivateReply::PvyZkNoteAndLinksWhat(znew))
     }
-    PrivateRequest::PvqGetZnlIfChanged(gzic) => {
+    PrivateRequest::PvqGetZknIfChanged(gzic) => {
       info!(
         "user#getzneifchanged: {:?} - {}",
         gzic.zknote, gzic.changeddate
@@ -575,7 +575,7 @@ pub fn public_interface(
         },
       }))
     }
-    PublicRequest::PbrGetZnlIfChanged(gzic) => {
+    PublicRequest::PbrGetZknIfChanged(gzic) => {
       info!(
         "user#getzneifchanged: {:?} - {}",
         gzic.zknote, gzic.changeddate

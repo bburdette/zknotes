@@ -113,6 +113,9 @@ pathZkNoteId route =
         EditZkNoteNew ->
             Nothing
 
+        SlideShow id ->
+            Just id
+
         ArchiveNoteListingR _ ->
             Nothing
 

@@ -57,7 +57,7 @@ getPrqNoteInfo pr =
         PbrGetZkNoteAndLinks getZkNoteAndLinks ->
             Just ( getZkNoteAndLinks.zknote, getZkNoteAndLinks.what )
 
-        PbrGetZnlIfChanged getZnlIfChanged ->
+        PbrGetZknIfChanged getZnlIfChanged ->
             Just ( getZnlIfChanged.zknote, getZnlIfChanged.what )
 
         PbrGetZkNotePubId _ ->

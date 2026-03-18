@@ -2356,7 +2356,7 @@ initFull fui ld zknote dtlinks lzlinks mbedittab mobile =
         edMarkdown =
             case JD.decodeString SpecialNotes.specialNoteDecoder zknote.content of
                 Ok sn ->
-                    EM.initSpecial (SNG.initSpecialNoteStateLz zknote.id sn lzlinks)
+                    EM.initSpecial (initSpecialNoteStateLz zknote.id sn lzlinks)
 
                 Err _ ->
                     EM.initMd zknote.content
@@ -3803,15 +3803,7 @@ update noteCache msg model =
                                                     { id = zkid
                                                     , title =
                                                         NC.getNote noteCache zkid
-                                                            |> Maybe.andThen
-                                                                (\ce ->
-                                                                    case ce of
-                                                                        NC.ZNAL n ->
-                                                                            Just n.zknote.title
-
-                                                                        _ ->
-                                                                            Nothing
-                                                                )
+                                                            |> Maybe.map (\n -> n.zknote.title)
                                                             |> Maybe.withDefault (zkNoteIdToString zkid)
                                                     }
 

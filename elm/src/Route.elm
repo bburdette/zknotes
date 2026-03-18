@@ -15,7 +15,7 @@ type Route
     | PublicZkPubId String
     | EditZkNoteR ZkNoteId (Maybe EditTab)
     | EditZkNoteNew
-      -- | SearchListing
+    | SlideShow ZkNoteId
     | ArchiveNoteListingR ZkNoteId
     | ArchiveNoteR ZkNoteId ZkNoteId
     | ResetPasswordR String UUID
@@ -41,6 +41,9 @@ routeTitle route =
 
         EditZkNoteNew ->
             "new zknote"
+
+        SlideShow id ->
+            "slideshow " ++ zkNoteIdToString id
 
         ArchiveNoteListingR id ->
             "archives " ++ zkNoteIdToString id
@@ -94,6 +97,10 @@ parseUrl url =
                 UP.s
                     "editnote"
                     </> UP.s "new"
+            , UP.map SlideShow <|
+                UP.s
+                    "playlist"
+                    </> UP.custom "ZkNoteId" (zkNoteIdFromString >> Result.toMaybe)
             , UP.map ResetPasswordR <|
                 UP.s
                     "reset"
@@ -134,6 +141,9 @@ routeUrl route =
 
         EditZkNoteNew ->
             UB.absolute [ "editnote", "new" ] []
+
+        SlideShow uuid ->
+            UB.absolute [ "playlist", zkNoteIdToString uuid ] []
 
         ArchiveNoteListingR uuid ->
             UB.absolute [ "archivelisting", zkNoteIdToString uuid ] []
