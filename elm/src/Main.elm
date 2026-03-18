@@ -157,7 +157,7 @@ type State
     | InviteUser (TagAThing.Model InviteUser.Model InviteUser.Msg InviteUser.Command) LoginData State
     | MdInlineXform MdInlineXform.GDModel State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
-    | SlideShow SlideShow.Model State
+    | SlideShow (Maybe ZkNoteId) SlideShow.Model State
 
 
 decodeFlags : JD.Decoder Flags
@@ -721,6 +721,16 @@ stateRoute state =
             , save = True
             }
 
+        SlideShow mbid ssmod _ ->
+            case mbid of
+                Just id ->
+                    { route = Route.SlideShow id
+                    , save = True
+                    }
+
+                Nothing ->
+                    top
+
         -- explicitly handle all these instead of wildcard, so we'll get errors for unhandled states.
         Invited _ ->
             top
@@ -792,9 +802,6 @@ stateRoute state =
             top
 
         Wait _ _ ->
-            top
-
-        SlideShow _ _ ->
             top
 
 
@@ -1100,7 +1107,7 @@ showState state =
         InviteUser _ _ _ ->
             "InviteUser"
 
-        SlideShow _ _ ->
+        SlideShow _ _ _ ->
             "SlideShow"
 
 
@@ -1222,7 +1229,7 @@ viewState size state model =
         InviteUser tfmod _ _ ->
             E.map InviteUserMsg <| TagAThing.view model.stylePalette model.recentNotes (Just size) model.spmodel model.zknSearchResult tfmod
 
-        SlideShow ssmodel _ ->
+        SlideShow _ ssmodel _ ->
             E.map SlideShowMsg <| SlideShow.view model.timezone size.width model.noteCache ssmodel
 
 
@@ -1319,7 +1326,7 @@ stateLogin state =
         InviteUser _ login _ ->
             Just login
 
-        SlideShow _ instate ->
+        SlideShow _ _ instate ->
             stateLogin instate
 
 
@@ -1892,12 +1899,12 @@ onZkNoteEditWhat model pt znew =
 
             ( ns, cmd ) =
                 case model.state of
-                    SlideShow ssmod instate ->
+                    SlideShow mbid ssmod instate ->
                         let
                             ( ss, c ) =
                                 SlideShow.updateNote noteCache ssmod
                         in
-                        ( SlideShow ss instate
+                        ( SlideShow mbid ss instate
                         , case c of
                             SlideShow.GetNote id ->
                                 makeNoteCacheGet model id
@@ -1923,7 +1930,12 @@ onZkNoteEditWhat model pt znew =
                     |> NC.purgeNotes
 
             em =
-                EM.initMd znew.znl.zknote.content
+                case JD.decodeString SN.specialNoteDecoder znew.znl.zknote.content of
+                    Ok sn ->
+                        EM.initSpecial (SpecialNotesGui.initSpecialNoteStateLz znew.znl.zknote.id sn znew.znl.lzlinks)
+
+                    Err _ ->
+                        EM.initMd znew.znl.zknote.content
 
             ( ns, cmd ) =
                 -- going into slideshow mode naiow.
@@ -1932,10 +1944,17 @@ onZkNoteEditWhat model pt znew =
                         case slem.nlls of
                             fst :: rest ->
                                 let
-                                    ( st, cmd_ ) =
+                                    ( st, c ) =
                                         SlideShow.init model.fui model.noteCache (Maybe.map Data.Zni slem.ng.currentUuid) fst rest
                                 in
-                                ( SlideShow st model.state, Cmd.none )
+                                ( SlideShow (Just znew.znl.zknote.id) st model.state
+                                , case c of
+                                    SlideShow.GetNote id ->
+                                        makeNoteCacheGet model id
+
+                                    _ ->
+                                        Cmd.none
+                                )
 
                             _ ->
                                 ( displayMessageDialogState model "empty slideshow"
@@ -1947,24 +1966,6 @@ onZkNoteEditWhat model pt znew =
                         , Cmd.none
                         )
         in
-        -- SpecialNotesGui.initSpecialNoteStateLz
-        -- in
-        --         case model.state of
-        --             SlideShow ssmod instate ->
-        --                 let
-        --                     ( ss, c ) =
-        --                         SlideShow.updateNote noteCache ssmod
-        --                 in
-        --                 ( SlideShow ss instate
-        --                 , case c of
-        --                     SlideShow.GetNote id ->
-        --                         makeNoteCacheGets model id
-        --                     _ ->
-        --                         Cmd.none
-        --                 )
-        --             _ ->
-        --                 ( model.state, Cmd.none )
-        -- in
         ( { model
             | noteCache = noteCache
             , state = ns
@@ -3416,14 +3417,14 @@ actualupdate msg model =
                 View.OnPlaybackEnded ->
                     ( model, Cmd.none )
 
-        ( SlideShowMsg em, SlideShow es instate ) ->
+        ( SlideShowMsg em, SlideShow mbid es instate ) ->
             let
                 ( emod, ecmd ) =
                     SlideShow.update em model.noteCache es
             in
             case ecmd of
                 SlideShow.Noop ->
-                    ( { model | state = SlideShow emod instate }, Cmd.none )
+                    ( { model | state = SlideShow mbid emod instate }, Cmd.none )
 
                 SlideShow.Close mbcurrent ->
                     let
@@ -3438,7 +3439,7 @@ actualupdate msg model =
                     ( { model | state = ins }, Cmd.none )
 
                 SlideShow.GetNote id ->
-                    ( { model | state = SlideShow emod instate }
+                    ( { model | state = SlideShow mbid emod instate }
                     , makeNoteCacheGet model id
                     )
 
@@ -4412,7 +4413,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                                 ( ssmod, sscmd ) =
                                     SlideShow.init model.fui model.noteCache mbcurrent fst rest
                             in
-                            ( { model | state = SlideShow ssmod (EditZkNote emod login) }
+                            ( { model | state = SlideShow emod.id ssmod (EditZkNote emod login) }
                             , case sscmd of
                                 SlideShow.GetNote id ->
                                     makeNoteCacheGet model id

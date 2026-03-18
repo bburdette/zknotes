@@ -2350,7 +2350,7 @@ initFull fui ld zknote dtlinks lzlinks mbedittab mobile =
         edMarkdown =
             case JD.decodeString SpecialNotes.specialNoteDecoder zknote.content of
                 Ok sn ->
-                    EM.initSpecial (SNG.initSpecialNoteStateLz zknote.id sn lzlinks)
+                    EM.initSpecial (initSpecialNoteStateLz zknote.id sn lzlinks)
 
                 Err _ ->
                     EM.initMd zknote.content
