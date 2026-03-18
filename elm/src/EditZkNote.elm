@@ -807,11 +807,17 @@ dirty model =
                     (r.id == m.id)
                         && (r.pubid == toPubId (isPublic m) m.pubidtxt)
                         && (r.title == m.title)
-                        && (r.content == EM.getContent m.edMarkdown)
                         && (r.editable == m.editableValue)
                         && (r.showtitle == m.showtitle)
                         && (Dict.keys m.zklDict == Dict.keys m.initialZklDict)
-                        && (not <| SNG.dirty (EM.getSpecialNoteState m.edMarkdown) m.initialSnState)
+                        && (case m.initialSnState of
+                                Just _ ->
+                                    -- don't do text comparison for special notes, because json serialization may vary.
+                                    not <| SNG.dirty (EM.getSpecialNoteState m.edMarkdown) m.initialSnState
+
+                                Nothing ->
+                                    r.content == EM.getContent m.edMarkdown
+                           )
             )
         |> Maybe.withDefault True
 

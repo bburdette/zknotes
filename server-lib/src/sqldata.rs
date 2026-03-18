@@ -637,7 +637,8 @@ pub fn uuid_for_note_id(conn: &Connection, id: i64) -> Result<Uuid, zkerr::Error
 
 pub fn note_id_for_zknoteid(conn: &Connection, zknoteid: &ZkNoteId) -> Result<i64, zkerr::Error> {
   match zknoteid {
-    ZkNoteId::Zni(uuid) => note_id_for_uuid(conn, uuid),
+    ZkNoteId::Zni(uuid) => note_id_for_uuid(conn, uuid)
+      .map_err(|e| zkerr::annotate_string(format!("note_id_for_zknoteid"), e.into())),
     ZkNoteId::ArchiveZni(_, _) => Err(zkerr::Error::ArchiveNoteNotAllowed),
   }
 }
@@ -659,7 +660,7 @@ pub fn note_id_for_uuid(conn: &Connection, uuid: &Uuid) -> Result<i64, zkerr::Er
       params![uuid.to_string()],
       |row| Ok(row.get(0)?),
     )
-    .map_err(|e| zkerr::annotate_string("note not found".to_string(), e.into()))?;
+    .map_err(|e| zkerr::annotate_string(format!("note not found: {}", uuid), e.into()))?;
   Ok(id)
 }
 
@@ -671,7 +672,7 @@ pub fn archive_note_id_for_uuid(conn: &Connection, uuid: &Uuid) -> Result<i64, z
       params![uuid.to_string()],
       |row| Ok(row.get(0)?),
     )
-    .map_err(|e| zkerr::annotate_string("note not found".to_string(), e.into()))?;
+    .map_err(|e| zkerr::annotate_string(format!("archive note not found: {}", uuid), e.into()))?;
   Ok(id)
 }
 
@@ -794,6 +795,27 @@ pub fn is_zknote_mine(
       zknote
       where id = ?1 and user = ?2",
     params![zknoteid, userid.to_i64()],
+    |row| {
+      let i: i64 = row.get(0)?;
+      Ok(i)
+    },
+  ) {
+    Ok(count) => Ok(count > 0),
+    Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
+    Err(x) => Err(x.into()),
+  }
+}
+
+pub fn is_zknote_editable(
+  conn: &Connection,
+  zknoteid: i64,
+  userid: UserId,
+) -> Result<bool, zkerr::Error> {
+  match conn.query_row(
+    "select count(*) from
+      zknote
+      where id = ?1 and editable = true",
+    params![zknoteid],
     |row| {
       let i: i64 = row.get(0)?;
       Ok(i)
@@ -1499,16 +1521,27 @@ pub fn zknote_access_id(
   uid: Option<UserId>,
   noteid: i64,
 ) -> Result<Access, zkerr::Error> {
+  // TODO: streamline this stuff so less queries.
   match uid {
     Some(uid) => {
       if is_zknote_mine(&conn, noteid, uid)? {
         Ok(Access::ReadWrite)
       } else if is_zknote_usershared(conn, noteid, uid)? {
-        // editable and accessible.
-        Ok(Access::ReadWrite)
+        if is_zknote_editable(conn, noteid, uid)? {
+          // editable and accessible.
+          Ok(Access::ReadWrite)
+        } else {
+          // read only.
+          Ok(Access::Read)
+        }
       } else if is_zknote_shared(conn, noteid, uid)? {
-        // editable and accessible.
-        Ok(Access::ReadWrite)
+        if is_zknote_editable(conn, noteid, uid)? {
+          // editable and accessible.
+          Ok(Access::ReadWrite)
+        } else {
+          // read only.
+          Ok(Access::Read)
+        }
       } else if is_zknote_public(conn, noteid)? {
         // accessible but not editable.
         Ok(Access::Read)
