@@ -2617,6 +2617,28 @@ initLinkBackNote model title =
 onTASelection : Model -> Data.ZkListNoteSearchResult -> List Data.ZkListNote -> DataUtil.TASelection -> TACommand
 onTASelection model zknSearchResult recentZkns tas =
     let
+        taupdate s =
+            case
+                EM.updateMd
+                    (String.left tas.offset (EM.getContent model.edMarkdown)
+                        ++ s
+                        ++ String.dropLeft (tas.offset + String.length tas.text) (EM.getContent model.edMarkdown)
+                    )
+                    model.edMarkdown
+            of
+                Ok em ->
+                    TAUpdated
+                        { model | edMarkdown = em }
+                        (Just
+                            { id = "mdtext"
+                            , offset = tas.offset + String.length s
+                            , length = 0
+                            }
+                        )
+
+                Err e ->
+                    TAError e
+
         addLink _ id =
             let
                 linktext =
@@ -2631,20 +2653,7 @@ onTASelection model zknSearchResult recentZkns tas =
                             ++ zkNoteIdToString id
                             ++ ")"
             in
-            TAUpdated
-                { model
-                    | edMarkdown =
-                        EM.initMd <|
-                            String.left tas.offset (EM.getContent model.edMarkdown)
-                                ++ linktext
-                                ++ String.dropLeft (tas.offset + String.length tas.text) (EM.getContent model.edMarkdown)
-                }
-                (Just
-                    { id = "mdtext"
-                    , offset = tas.offset + String.length linktext
-                    , length = 0
-                    }
-                )
+            taupdate linktext
 
         addLinks ids =
             let
@@ -2656,20 +2665,7 @@ onTASelection model zknSearchResult recentZkns tas =
                         ids
                         |> String.concat
             in
-            TAUpdated
-                { model
-                    | edMarkdown =
-                        EM.initMd <|
-                            String.left tas.offset (EM.getContent model.edMarkdown)
-                                ++ linktext
-                                ++ String.dropLeft (tas.offset + String.length tas.text) (EM.getContent model.edMarkdown)
-                }
-                (Just
-                    { id = "mdtext"
-                    , offset = tas.offset + String.length linktext
-                    , length = 0
-                    }
-                )
+            taupdate linktext
     in
     if tas.what == "linkback" then
         case initLinkBackNote model tas.text of
@@ -2732,20 +2728,7 @@ onTASelection model zknSearchResult recentZkns tas =
     else if tas.what == "replacestring" then
         case model.mbReplaceString of
             Just s ->
-                TAUpdated
-                    { model
-                        | edMarkdown =
-                            EM.initMd <|
-                                String.left tas.offset (EM.getContent model.edMarkdown)
-                                    ++ s
-                                    ++ String.dropLeft (tas.offset + String.length tas.text) (EM.getContent model.edMarkdown)
-                    }
-                    (Just
-                        { id = "mdtext"
-                        , offset = tas.offset + String.length s
-                        , length = 0
-                        }
-                    )
+                taupdate s
 
             Nothing ->
                 TANoop
@@ -2781,7 +2764,7 @@ onLinkBackSaved model mbtas szn =
                     nmod =
                         { model
                             | edMarkdown =
-                                EM.updateMd <|
+                                EM.initMd <|
                                     String.slice 0 tas.offset (EM.getContent model.edMarkdown)
                                         ++ "["
                                         ++ tas.text
@@ -2841,7 +2824,7 @@ mergeEditBlock model =
                                 )
                             )
                         |> Result.map (String.concat >> String.trim)
-                        |> Result.map (\s -> EM.updateMd s)
+                        |> Result.map (\s -> EM.initMd s)
                         |> Result.withDefault model.edMarkdown
             in
             { model | edMarkdown = nb, blockEdit = Nothing }

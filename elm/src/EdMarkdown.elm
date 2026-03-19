@@ -41,12 +41,28 @@ type alias Special =
 
 initMd : String -> EdMarkdown
 initMd s =
-    updateMd s
+    EdMarkdown
+        { md = s
+        , elts =
+            s
+                |> Markdown.Parser.parse
+                |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
+        }
 
 
 initSpecial : SpecialNoteState -> EdMarkdown
 initSpecial sns =
     EdSpecial { snState = sns }
+
+
+updateMd : String -> EdMarkdown -> Result String EdMarkdown
+updateMd s em =
+    case em of
+        EdMarkdown _ ->
+            Ok (initMd s)
+
+        EdSpecial _ ->
+            Err "can't update special note text directly"
 
 
 getContent : EdMarkdown -> String
@@ -57,17 +73,6 @@ getContent em =
 
         EdMarkdown emd ->
             emd.md
-
-
-updateMd : String -> EdMarkdown
-updateMd md =
-    EdMarkdown
-        { md = md
-        , elts =
-            md
-                |> Markdown.Parser.parse
-                |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
-        }
 
 
 getBlocks : EdMarkdown -> Result String (List Block)
