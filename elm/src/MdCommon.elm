@@ -730,7 +730,20 @@ yeetView : MkrArgs a -> String -> Maybe String -> Maybe String -> Maybe String -
 yeetView args url audioOnly mbid show text _ =
     case mbid of
         Nothing ->
-            E.paragraph [] <| List.singleton <| E.text <| "yeet " ++ url ++ (audioOnly |> Maybe.map (\_ -> " -x") |> Maybe.withDefault "")
+            E.paragraph [] <|
+                [ E.text <|
+                    "yeet "
+                        ++ url
+                        ++ (audioOnly |> Maybe.map (\_ -> " -x") |> Maybe.withDefault "")
+                , nooplink url
+                    [ E.el
+                        [ E.inFront (E.el [ E.centerY ] <| E.text "↗")
+                        ]
+                      <|
+                        E.text "☐"
+                    ]
+                    args.noop
+                ]
 
         Just id ->
             E.column [ E.width E.fill ]
