@@ -44,6 +44,7 @@ viewConfig =
     , showPanel = True
     , loggedin = False
     , autoplay = True
+    , mobile = False
     }
 
 

@@ -426,8 +426,8 @@ dragHandleWidth =
     10
 
 
-editBlock : DragDropWhat -> Int -> Bool -> Element Msg -> Element Msg
-editBlock ddw i focus e =
+editBlock : Bool -> DragDropWhat -> Int -> Bool -> Element Msg -> Element Msg
+editBlock mobile ddw i focus e =
     let
         bid =
             blockId i
@@ -446,8 +446,17 @@ editBlock ddw i focus e =
                    , E.htmlAttribute (HA.id bid)
                    ]
 
+        dhw =
+            dragHandleWidth
+                * (if mobile then
+                    2
+
+                   else
+                    1
+                  )
+
         dragHandleAttrs =
-            [ E.width (E.px dragHandleWidth), E.height E.fill, EBk.color TC.gray, E.alignBottom ]
+            [ E.width (E.px dhw), E.height E.fill, EBk.color TC.gray, E.alignBottom ]
 
         spacer =
             E.el [ E.width (E.px dragHandleWidth), E.height E.fill ] E.none
@@ -538,7 +547,7 @@ viewBlock ma ddw i focusid b =
                 , EBd.color TC.darkGrey
                 , EBk.color TC.lightGrey
                 ]
-                (List.map (editBlock ddw i (Just i == focusid)) rendered)
+                (List.map (editBlock ma.mobile ddw i (Just i == focusid)) rendered)
 
         Err errors ->
             E.text errors
@@ -1158,6 +1167,7 @@ mkrargs model zone nc viewMode mdw =
     , viewMode = viewMode
     , addToSearchMsg = RestoreSearch
     , maxw = mdw
+    , mobile = model.mobile
     , cellDict = model.cells
     , showPanelElt = True
     , onchanged = OnSchelmeCodeChanged
@@ -1176,6 +1186,7 @@ renderReadMd zone fui cd noteCache vm md mdw =
                 , viewMode = vm
                 , addToSearchMsg = RestoreSearch
                 , maxw = mdw
+                , mobile = False
                 , cellDict = cd
                 , showPanelElt = True
                 , onchanged = OnSchelmeCodeChanged
@@ -1284,7 +1295,8 @@ blockEd (Text t) renderer =
 
 
 renderBlocks :
-    Time.Zone
+    Bool
+    -> Time.Zone
     -> FileUrlInfo
     -> CellDict
     -> NoteCache
@@ -1296,7 +1308,7 @@ renderBlocks :
     -> Bool
     -> List Block
     -> Element Msg
-renderBlocks zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo droplinkmode blocks =
+renderBlocks mobile zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo droplinkmode blocks =
     let
         renderer : Markdown.Renderer.Renderer (Element Msg)
         renderer =
@@ -1306,6 +1318,7 @@ renderBlocks zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo droplinkmod
                 , viewMode = vm
                 , addToSearchMsg = RestoreSearch
                 , maxw = mdw - dragHandleWidth
+                , mobile = mobile
                 , cellDict = cd
                 , showPanelElt = True
                 , onchanged = OnSchelmeCodeChanged
@@ -1360,7 +1373,7 @@ renderBlocks zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo droplinkmod
                                                         Nothing
                                                 )
                                 in
-                                editBlock
+                                editBlock mobile
                                     (let
                                         nm =
                                             case mbblockedit of
@@ -2005,7 +2018,8 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                         E.none
                 , case EM.getBlocks model.edMarkdown of
                     Ok blocks ->
-                        renderBlocks zone
+                        renderBlocks model.mobile
+                            zone
                             model.fui
                             model.cells
                             noteCache

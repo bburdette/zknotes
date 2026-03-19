@@ -61,6 +61,7 @@ type alias Config =
     , showPanel : Bool
     , loggedin : Bool
     , autoplay : Bool
+    , mobile : Bool
     }
 
 
@@ -74,6 +75,7 @@ defaultConfig =
     , showPanel = True
     , loggedin = True
     , autoplay = True
+    , mobile = False
     }
 
 
@@ -160,6 +162,7 @@ view zone maxw noteCache config model =
                                                 , viewMode = MC.PublicView
                                                 , addToSearchMsg = \_ -> Noop
                                                 , maxw = mw
+                                                , mobile = config.mobile
                                                 , cellDict = model.cells
                                                 , showPanelElt = False
                                                 , onchanged = OnSchelmeCodeChanged
@@ -233,6 +236,7 @@ view zone maxw noteCache config model =
                                     , viewMode = MC.PublicView
                                     , addToSearchMsg = \_ -> Noop
                                     , maxw = mw
+                                    , mobile = config.mobile
                                     , cellDict = model.cells
                                     , showPanelElt = False
                                     , onchanged = OnSchelmeCodeChanged

@@ -234,6 +234,7 @@ type alias MkrArgs a =
     , viewMode : ViewMode
     , addToSearchMsg : String -> a
     , maxw : Int
+    , mobile : Bool
     , cellDict : CellDict
     , showPanelElt : Bool
     , onchanged : String -> String -> a
