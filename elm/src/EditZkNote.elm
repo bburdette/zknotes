@@ -165,7 +165,6 @@ type Msg
     | AddFocusToSearchAsTag
     | TitleFocus Bool
     | TTMsg (TT.Msg Msg)
-    | SetFocus String
     | Noop
 
 
@@ -1719,42 +1718,6 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
 
         titleed =
             EI.text
-                (if editable then
-                    (if isdirty then
-                        [ E.focused [ EBd.glow TC.darkYellow 3 ] ]
-
-                     else
-                        []
-                    )
-                        ++ [ E.htmlAttribute (HA.id "title")
-                           ]
-
-                 else
-                    [ EF.color TC.darkGrey, E.htmlAttribute (HA.id "title") ]
-                )
-                { onChange =
-                    if editable then
-                        OnTitleChanged
-
-                    else
-                        always Noop
-                , text = model.title
-                , placeholder = Nothing
-                , label =
-                    EI.labelLeft
-                        edlabelattr
-                        (E.text
-                            (if model.filestatus /= Data.NotAFile then
-                                "filename"
-
-                             else
-                                "title"
-                            )
-                        )
-                }
-
-        titleed2 =
-            EI.text
                 (EE.onLoseFocus (TitleFocus False)
                     :: E.htmlAttribute (HA.id "title-edit")
                     :: (if editable then
@@ -1852,7 +1815,6 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                           else
                             EI.button disabledparabuttonstyle { onPress = Nothing, label = E.text "delete" }
                         ]
-                , titleed
                 , if mine then
                     EI.checkbox [ E.width E.shrink ]
                         { onChange =
@@ -2004,7 +1966,7 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                   )
                     [ E.width E.fill, E.spacing 8 ]
                     [ if model.titleEdit then
-                        titleed2
+                        titleed
 
                       else
                         E.paragraph [ EF.bold, EE.onClick (TitleFocus True) ]
@@ -3428,16 +3390,10 @@ update noteCache msg model =
         TitleFocus b ->
             ( { model | titleEdit = b }
             , if b then
-                -- Cmd (Task.attempt (\x -> Debug.log ("blah: " ++ Debug.toString x) Noop) (BD.focus "title-edit")) Nothing
-                Cmd (Task.perform identity <| Task.succeed (SetFocus "title-edit")) Nothing
+                Cmd (Task.attempt (always Noop) (BD.focus "title-edit")) Nothing
 
               else
                 None
-            )
-
-        SetFocus id ->
-            ( model
-            , Cmd (Task.attempt (\x -> Debug.log ("blah: " ++ Debug.toString x) Noop) (BD.focus id)) Nothing
             )
 
         GoHomeNotePress ->
