@@ -2214,11 +2214,9 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                                             DtEdit ->
                                                 EtEdit
 
-                                            -- TODO fix
                                             DtComments ->
                                                 EtComments
 
-                                            -- TODO fix
                                             DtLinks ->
                                                 EtLinks
                                         )
@@ -2364,11 +2362,9 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                                 DtEdit ->
                                     EtEdit
 
-                                -- TODO fix
                                 DtComments ->
                                     EtComments
 
-                                -- TODO fix
                                 DtLinks ->
                                     EtLinks
                           , "document"
