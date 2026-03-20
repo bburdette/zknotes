@@ -1830,22 +1830,6 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                 , E.row [ E.width E.fill, E.spacing 5, E.paddingXY 0 10 ]
                     (if model.titleEdit then
                         [ titleed
-                        , if search then
-                            EI.button (E.alignRight :: Common.buttonStyle)
-                                (case
-                                    JD.decodeString Data.tagSearchDecoder (EM.getContent model.edMarkdown)
-                                        |> Result.toMaybe
-                                 of
-                                    Just s ->
-                                        { label = E.text ">", onPress = Just <| SetSearch s }
-
-                                    Nothing ->
-                                        { label = E.text ">", onPress = Just <| SetSearchString model.title }
-                                )
-
-                          else
-                            EI.button (E.alignRight :: Common.buttonStyle)
-                                { label = E.text ">", onPress = Just <| AddToSearchAsTag model.title }
                         ]
 
                      else
@@ -1872,7 +1856,7 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                     )
                 , if model.showDeets then
                     E.column [ E.spacing 5, E.width E.fill ]
-                        [ E.row [ E.spacing 5 ]
+                        [ E.row [ E.spacing 5, E.width E.fill ]
                             [ if mine then
                                 EI.checkbox [ E.width E.shrink ]
                                     { onChange =
@@ -1907,6 +1891,8 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                                 , checked = model.showtitle
                                 , label = EI.labelLeft edlabelattr (E.text "show title")
                                 }
+                            , EI.button (E.alignRight :: Common.buttonStyle)
+                                { label = E.text "search >", onPress = Just <| AddToSearchAsTag model.title }
                             ]
                         , E.row [ E.spacing 8, E.width E.fill ]
                             [ EI.checkbox [ E.width E.shrink ]
