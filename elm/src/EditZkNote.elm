@@ -1950,59 +1950,64 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
         mdview =
             E.column
                 [ E.width E.fill
-                , E.centerX
+
+                -- , E.centerX
                 , E.alignTop
                 , E.spacing 8
                 , E.paddingXY 5 0
                 ]
             <|
-                [ E.row [ E.width E.fill, E.spacing 8 ]
-                    [ E.paragraph [ EF.bold ] [ E.text model.title ]
-                    , EI.checkbox (E.width E.shrink :: Common.buttonStyle)
-                        { onChange = SetDropLinkMode
-                        , icon = EI.defaultCheckbox
-                        , checked = model.droplinkmode
-                        , label = EI.labelLeft [] (E.text "DLMode")
-                        }
-                    , EI.button
-                        (if gotid then
-                            Common.buttonStyle
+                [ E.wrappedRow [ E.width E.fill, E.spacing 8 ]
+                    [ E.paragraph [ EF.bold ]
+                        [ E.text model.title ]
+                    , E.row
+                        [ E.alignRight, E.spacing 5 ]
+                        [ EI.checkbox (E.width E.shrink :: Common.buttonStyle)
+                            { onChange = SetDropLinkMode
+                            , icon = EI.defaultCheckbox
+                            , checked = model.droplinkmode
+                            , label = EI.labelLeft [] (E.text "DLMode")
+                            }
+                        , EI.button
+                            (if gotid then
+                                Common.buttonStyle
 
-                         else
-                            Common.disabledButtonStyle
-                        )
-                        { onPress =
-                            if gotid then
-                                Just MakeList
-
-                            else
-                                Nothing
-                        , label = E.text "list"
-                        }
-                    , EI.button Common.buttonStyle
-                        { onPress = Just NewBlock
-                        , label = E.text "+"
-                        }
-                    , EI.button Common.buttonStyle
-                        { onPress = Just ViewPress
-                        , label = ZC.fullScreen
-                        }
-                    , if search then
-                        EI.button (E.alignRight :: Common.buttonStyle)
-                            (case
-                                JD.decodeString Data.tagSearchDecoder (EM.getContent model.edMarkdown)
-                                    |> Result.toMaybe
-                             of
-                                Just s ->
-                                    { label = E.text ">", onPress = Just <| SetSearch s }
-
-                                Nothing ->
-                                    { label = E.text ">", onPress = Just <| SetSearchString model.title }
+                             else
+                                Common.disabledButtonStyle
                             )
+                            { onPress =
+                                if gotid then
+                                    Just MakeList
 
-                      else
-                        EI.button (E.alignRight :: Common.buttonStyle)
-                            { label = E.text ">", onPress = Just <| AddToSearchAsTag model.title }
+                                else
+                                    Nothing
+                            , label = E.text "list"
+                            }
+                        , EI.button Common.buttonStyle
+                            { onPress = Just NewBlock
+                            , label = E.text "+"
+                            }
+                        , EI.button Common.buttonStyle
+                            { onPress = Just ViewPress
+                            , label = ZC.fullScreen
+                            }
+                        , if search then
+                            EI.button (E.alignRight :: Common.buttonStyle)
+                                (case
+                                    JD.decodeString Data.tagSearchDecoder (EM.getContent model.edMarkdown)
+                                        |> Result.toMaybe
+                                 of
+                                    Just s ->
+                                        { label = E.text ">", onPress = Just <| SetSearch s }
+
+                                    Nothing ->
+                                        { label = E.text ">", onPress = Just <| SetSearchString model.title }
+                                )
+
+                          else
+                            EI.button (E.alignRight :: Common.buttonStyle)
+                                { label = E.text ">", onPress = Just <| AddToSearchAsTag model.title }
+                        ]
                     ]
                 , case ( model.filestatus, toZkNote model ) of
                     ( Data.FilePresent, Just zkn ) ->
