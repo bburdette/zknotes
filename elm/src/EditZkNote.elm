@@ -79,6 +79,7 @@ import Orgauth.Data exposing (UserId(..))
 import RequestsDialog exposing (TRequests)
 import Route exposing (parseUrl)
 import SearchStackPanel as SP
+import SetFocus
 import SnListEdit as SLE
 import SpecialNotes
 import SpecialNotesGui as SNG exposing (SpecialNoteState(..), initSpecialNoteState, initSpecialNoteStateLz)
@@ -162,7 +163,9 @@ type Msg
     | AddGraphNotes
     | AddFocusToSearch
     | AddFocusToSearchAsTag
+    | TitleFocus Bool
     | TTMsg (TT.Msg Msg)
+    | SetFocus String
     | Noop
 
 
@@ -227,6 +230,7 @@ type alias Model =
     , droplinkmode : Bool
     , tagThings : TT.Model
     , searchControlRowMode : SearchControlRowMode
+    , titleEdit : Bool
     }
 
 
@@ -1713,44 +1717,79 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
             else
                 [ EF.color TC.darkGrey ]
 
-        editmeta =
-            let
-                titleed =
-                    EI.text
-                        (if editable then
-                            (if isdirty then
-                                [ E.focused [ EBd.glow TC.darkYellow 3 ] ]
+        titleed =
+            EI.text
+                (if editable then
+                    (if isdirty then
+                        [ E.focused [ EBd.glow TC.darkYellow 3 ] ]
+
+                     else
+                        []
+                    )
+                        ++ [ E.htmlAttribute (HA.id "title")
+                           ]
+
+                 else
+                    [ EF.color TC.darkGrey, E.htmlAttribute (HA.id "title") ]
+                )
+                { onChange =
+                    if editable then
+                        OnTitleChanged
+
+                    else
+                        always Noop
+                , text = model.title
+                , placeholder = Nothing
+                , label =
+                    EI.labelLeft
+                        edlabelattr
+                        (E.text
+                            (if model.filestatus /= Data.NotAFile then
+                                "filename"
 
                              else
-                                []
+                                "title"
                             )
-                                ++ [ E.htmlAttribute (HA.id "title")
-                                   ]
-
-                         else
-                            [ EF.color TC.darkGrey, E.htmlAttribute (HA.id "title") ]
                         )
-                        { onChange =
-                            if editable then
-                                OnTitleChanged
+                }
+
+        titleed2 =
+            EI.text
+                (EE.onLoseFocus (TitleFocus False)
+                    :: E.htmlAttribute (HA.id "title-edit")
+                    :: (if editable then
+                            if isdirty then
+                                [ E.focused [ EBd.glow TC.darkYellow 3 ] ]
 
                             else
-                                always Noop
-                        , text = model.title
-                        , placeholder = Nothing
-                        , label =
-                            EI.labelLeft
-                                edlabelattr
-                                (E.text
-                                    (if model.filestatus /= Data.NotAFile then
-                                        "filename"
+                                []
 
-                                     else
-                                        "title"
-                                    )
-                                )
-                        }
-            in
+                        else
+                            [ EF.color TC.darkGrey ]
+                       )
+                )
+                { onChange =
+                    if editable then
+                        OnTitleChanged
+
+                    else
+                        always Noop
+                , text = model.title
+                , placeholder = Nothing
+                , label =
+                    EI.labelLeft
+                        edlabelattr
+                        (E.text
+                            (if model.filestatus /= Data.NotAFile then
+                                "filename"
+
+                             else
+                                "title"
+                            )
+                        )
+                }
+
+        editmeta =
             E.column
                 [ E.spacing 8
                 , E.alignTop
@@ -1957,9 +1996,19 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                 , E.paddingXY 5 0
                 ]
             <|
-                [ E.wrappedRow [ E.width E.fill, E.spacing 8 ]
-                    [ E.paragraph [ EF.bold ]
-                        [ E.text model.title ]
+                [ (if model.titleEdit then
+                    E.column
+
+                   else
+                    E.wrappedRow
+                  )
+                    [ E.width E.fill, E.spacing 8 ]
+                    [ if model.titleEdit then
+                        titleed2
+
+                      else
+                        E.paragraph [ EF.bold, EE.onClick (TitleFocus True) ]
+                            [ E.text model.title ]
                     , E.row
                         [ E.alignRight, E.spacing 5 ]
                         [ EI.checkbox (E.width E.shrink :: Common.buttonStyle)
@@ -2427,6 +2476,7 @@ initFull fui ld zknote dtlinks lzlinks mbedittab mobile =
       , droplinkmode = False
       , tagThings = TT.init True
       , searchControlRowMode = LinksTarget
+      , titleEdit = False
       }
         |> (\m ->
                 Maybe.map (\nc -> setTab nc m) mbedittab
@@ -2489,6 +2539,7 @@ initNew fui ld links mobile =
     , droplinkmode = False
     , tagThings = TT.init True
     , searchControlRowMode = LinksTarget
+    , titleEdit = False
     }
         |> (\m1 ->
                 -- for new EMPTY notes, the 'revert' should be the same as the model, so that you aren't
@@ -3372,6 +3423,21 @@ update noteCache msg model =
                     , SP.None
                     )
                 )
+            )
+
+        TitleFocus b ->
+            ( { model | titleEdit = b }
+            , if b then
+                -- Cmd (Task.attempt (\x -> Debug.log ("blah: " ++ Debug.toString x) Noop) (BD.focus "title-edit")) Nothing
+                Cmd (Task.perform identity <| Task.succeed (SetFocus "title-edit")) Nothing
+
+              else
+                None
+            )
+
+        SetFocus id ->
+            ( model
+            , Cmd (Task.attempt (\x -> Debug.log ("blah: " ++ Debug.toString x) Noop) (BD.focus id)) Nothing
             )
 
         GoHomeNotePress ->
