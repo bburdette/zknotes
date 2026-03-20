@@ -257,7 +257,6 @@ pub async fn zk_interface_loggedin(
 
       let znew = ZkNoteAndLinksWhat {
         what: gzne.what.clone(),
-        edittab: gzne.edittab.clone(),
         znl: note,
       };
 
@@ -567,7 +566,6 @@ pub fn public_interface(
       );
       Ok(PublicReply::PbyZkNoteAndLinksWhat(ZkNoteAndLinksWhat {
         what: gzne.what.clone(),
-        edittab: gzne.edittab.clone(),
         znl: ZkNoteAndLinks {
           lzlinks: sqldata::read_public_lzlinks(&conn, &note.id)?,
           links: sqldata::read_public_zklinks(&conn, &note.id)?,

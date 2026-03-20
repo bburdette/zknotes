@@ -5,8 +5,8 @@ import Browser
 import Browser.Events
 import Browser.Navigation
 import Common
-import Data exposing (EditTab(..), PrivateClosureRequest, ZkNoteId(..))
-import DataUtil exposing (FileUrlInfo, LoginData, jobComplete, showPrivateReply)
+import Data exposing (PrivateClosureRequest, ZkNoteId(..))
+import DataUtil exposing (EditTab(..), FileUrlInfo, LoginData, jobComplete, showPrivateReply)
 import Dict exposing (Dict)
 import DisplayMessage
 import EdMarkdown as EM
@@ -289,7 +289,6 @@ routeStateInternal model route =
                                 (Data.PbrGetZkNoteAndLinks
                                     { zknote = id
                                     , what = ""
-                                    , edittab = Nothing
                                     }
                                 )
 
@@ -298,7 +297,6 @@ routeStateInternal model route =
                                 (Data.PvqGetZkNoteAndLinks
                                     { zknote = id
                                     , what = ""
-                                    , edittab = Nothing
                                     }
                                 )
                     )
@@ -312,7 +310,6 @@ routeStateInternal model route =
                         (Data.PbrGetZkNoteAndLinks
                             { zknote = id
                             , what = ""
-                            , edittab = Nothing
                             }
                         )
                     )
@@ -334,24 +331,22 @@ routeStateInternal model route =
             , sendPIMsg model.fui (Data.PbrGetZkNotePubId pubid)
             )
 
-        EditZkNoteR id mbtab ->
+        EditZkNoteR id ->
             case model.state of
                 -- if the id is the same but the edit tab has changed, just change the edit tab.
                 EditZkNote st login ->
-                    case ( mbtab, st.id == Just id ) of
-                        ( Just et, True ) ->
-                            ( EditZkNote (EditZkNote.setTab et st) login, Cmd.none )
+                    if st.id == Just id then
+                        ( EditZkNote st login, Cmd.none )
 
-                        _ ->
-                            ( EditZkNote st login
-                            , sendZIMsg model.fui
-                                (Data.PvqGetZkNoteAndLinks
-                                    { zknote = id
-                                    , what = ""
-                                    , edittab = mbtab
-                                    }
-                                )
+                    else
+                        ( EditZkNote st login
+                        , sendZIMsg model.fui
+                            (Data.PvqGetZkNoteAndLinks
+                                { zknote = id
+                                , what = ""
+                                }
                             )
+                        )
 
                 EditZkNoteListing st login ->
                     ( EditZkNoteListing st login
@@ -359,7 +354,6 @@ routeStateInternal model route =
                         (Data.PvqGetZkNoteAndLinks
                             { zknote = id
                             , what = ""
-                            , edittab = mbtab
                             }
                         )
                     )
@@ -370,7 +364,6 @@ routeStateInternal model route =
                         (Data.PbrGetZkNoteAndLinks
                             { zknote = id
                             , what = ""
-                            , edittab = mbtab
                             }
                         )
                     )
@@ -385,7 +378,6 @@ routeStateInternal model route =
                                 (Data.PvqGetZkNoteAndLinks
                                     { zknote = id
                                     , what = ""
-                                    , edittab = mbtab
                                     }
                                 )
                             )
@@ -397,7 +389,6 @@ routeStateInternal model route =
                                 (Data.PbrGetZkNoteAndLinks
                                     { zknote = id
                                     , what = ""
-                                    , edittab = mbtab
                                     }
                                 )
                             )
@@ -450,14 +441,12 @@ routeStateInternal model route =
                                     { zknote = id
                                     , changeddate = rt
                                     , what = "slideshow"
-                                    , edittab = Nothing
                                     }
 
                             Nothing ->
                                 Data.PvqGetZkNoteAndLinks
                                     { zknote = id
                                     , what = "slideshow"
-                                    , edittab = Nothing
                                     }
                         )
                     )
@@ -472,14 +461,12 @@ routeStateInternal model route =
                                     { zknote = id
                                     , changeddate = rt
                                     , what = "slideshow"
-                                    , edittab = Nothing
                                     }
 
                             Nothing ->
                                 Data.PbrGetZkNoteAndLinks
                                     { zknote = id
                                     , what = "slideshow"
-                                    , edittab = Nothing
                                     }
                         )
                     )
@@ -561,7 +548,6 @@ routeStateInternal model route =
                                     (Data.PvqGetZkNoteAndLinks
                                         { zknote = id
                                         , what = ""
-                                        , edittab = Nothing
                                         }
                                     )
                                 ]
@@ -632,7 +618,7 @@ stateRoute state =
 
         EditZkNote st _ ->
             st.id
-                |> Maybe.map (\id -> { route = EditZkNoteR id (Just st.tab), save = True })
+                |> Maybe.map (\id -> { route = EditZkNoteR id, save = True })
                 |> Maybe.withDefault { route = EditZkNoteNew, save = False }
 
         ArchiveListing almod _ ->
@@ -1912,7 +1898,7 @@ onZkNoteEditWhat model pt znew =
                             znew.znl.zknote
                             znew.znl.links
                             znew.znl.lzlinks
-                            znew.edittab
+                            Nothing
                             model.mobile
 
                     ngets =
@@ -3291,7 +3277,6 @@ actualupdate msg model =
                         (Data.PbrGetZkNoteAndLinks
                             { zknote = id
                             , what = ""
-                            , edittab = Nothing
                             }
                         )
                     )
@@ -3322,7 +3307,6 @@ actualupdate msg model =
                                         (Data.PvqGetZkNoteAndLinks
                                             { zknote = id
                                             , what = ""
-                                            , edittab = Nothing
                                             }
                                         )
                                     )
@@ -3338,7 +3322,6 @@ actualupdate msg model =
                         (Data.PbrGetZkNoteAndLinks
                             { zknote = id
                             , what = ""
-                            , edittab = Nothing
                             }
                         )
                     )
@@ -3900,7 +3883,6 @@ makeNoteCacheGet model id =
                 (Data.PvqGetZknIfChanged
                     { zknote = id
                     , what = "cache"
-                    , edittab = Nothing
                     , changeddate = zkn.zknote.changeddate
                     }
                 )
@@ -3910,7 +3892,6 @@ makeNoteCacheGet model id =
                 (Data.PvqGetZkNoteAndLinks
                     { zknote = id
                     , what = "cache"
-                    , edittab = Nothing
                     }
                 )
 
@@ -3919,7 +3900,6 @@ makeNoteCacheGet model id =
                 (Data.PvqGetZkNoteAndLinks
                     { zknote = id
                     , what = "cache"
-                    , edittab = Nothing
                     }
                 )
 
@@ -3928,7 +3908,6 @@ makeNoteCacheGet model id =
                 (Data.PvqGetZkNoteAndLinks
                     { zknote = id
                     , what = "cache"
-                    , edittab = Nothing
                     }
                 )
 
@@ -3950,7 +3929,6 @@ makePubNoteCacheGet model id =
                 (Data.PbrGetZknIfChanged
                     { zknote = id
                     , what = "cache"
-                    , edittab = Nothing
                     , changeddate = zkn.zknote.changeddate
                     }
                 )
@@ -3961,7 +3939,6 @@ makePubNoteCacheGet model id =
                 (Data.PbrGetZkNoteAndLinks
                     { zknote = id
                     , what = "cache"
-                    , edittab = Nothing
                     }
                 )
 
@@ -3971,7 +3948,6 @@ makePubNoteCacheGet model id =
                 (Data.PbrGetZkNoteAndLinks
                     { zknote = id
                     , what = "cache"
-                    , edittab = Nothing
                     }
                 )
 
@@ -3981,7 +3957,6 @@ makePubNoteCacheGet model id =
                 (Data.PbrGetZkNoteAndLinks
                     { zknote = id
                     , what = "cache"
-                    , edittab = Nothing
                     }
                 )
 
@@ -4003,7 +3978,6 @@ makeNewNoteCacheGets md model =
                                 (Data.PvqGetZkNoteAndLinks
                                     { zknote = id
                                     , what = "cache"
-                                    , edittab = Nothing
                                     }
                                 )
             )
@@ -4126,7 +4100,6 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                                 (Data.PvqGetZkNoteAndLinks
                                     { zknote = id
                                     , what = ""
-                                    , edittab = Nothing
                                     }
                                 )
                             )
@@ -4143,7 +4116,6 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                                 (Data.PvqGetZkNoteAndLinks
                                     { zknote = id
                                     , what = ""
-                                    , edittab = Nothing
                                     }
                                 )
                             )

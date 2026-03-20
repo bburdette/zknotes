@@ -25,6 +25,13 @@ type alias NlLink =
     { id : ZkNoteId, title : String }
 
 
+type EditTab
+    = EtEdit
+    | EtView
+    | EtSearch
+    | EtRecent
+
+
 getPrNoteInfo : PublicReply -> Maybe ( ZkNoteId, Maybe String )
 getPrNoteInfo pr =
     case pr of
@@ -534,7 +541,6 @@ getErrorIndexNote location noteid tomsg =
                     (PbrGetZkNoteAndLinks
                         { zknote = noteid
                         , what = ""
-                        , edittab = Nothing
                         }
                     )
         , resolver =

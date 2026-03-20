@@ -49,8 +49,8 @@ import Browser.Dom as BD
 import Cellme.Cellme exposing (CellContainer(..), RunState(..), evalCellsFully)
 import Cellme.DictCellme exposing (CellDict(..), getCd, mkCc)
 import Common
-import Data exposing (ArchivesOrCurrent(..), Direction(..), EditLink, EditTab(..), ZkNoteId)
-import DataUtil exposing (FileUrlInfo, NlLink, lzlKey, zkNoteIdToString, zklKey, zniCompare, zniEq)
+import Data exposing (ArchivesOrCurrent(..), Direction(..), EditLink, ZkNoteId)
+import DataUtil exposing (EditTab(..), FileUrlInfo, NlLink, lzlKey, zkNoteIdToString, zklKey, zniCompare, zniEq)
 import Dialog as D
 import Dict exposing (Dict)
 import DnDList
@@ -171,6 +171,8 @@ type Msg
 type DocumentTab
     = DtRaw
     | DtEdit
+    | DtComment
+    | DtLinks
 
 
 type WClass
@@ -2182,6 +2184,14 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
 
                                             DtEdit ->
                                                 EtView
+
+                                            -- TODO fix
+                                            DtComment ->
+                                                EtView
+
+                                            -- TODO fix
+                                            DtLinks ->
+                                                EtView
                                         )
                                         TabChanged
                                         [ ( EtView, "eview" )
@@ -2193,6 +2203,12 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
 
                                         DtEdit ->
                                             mdview
+
+                                        DtComment ->
+                                            E.column [ E.width E.fill ] showComments
+
+                                        DtLinks ->
+                                            showLinks TC.white
                                     , if isdirty then
                                         EI.button perhapsdirtybutton { onPress = Just SavePress, label = E.text "save" }
 
@@ -2319,6 +2335,14 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
 
                                 DtEdit ->
                                     EtView
+
+                                -- TODO fix
+                                DtComment ->
+                                    EtView
+
+                                -- TODO fix
+                                DtLinks ->
+                                    EtView
                           , "document"
                           )
                         , ( EtSearch, "search" )
@@ -2365,6 +2389,14 @@ tabsOnLoad model =
                     EtEdit
 
                 DtEdit ->
+                    EtView
+
+                -- TODO fix
+                DtComment ->
+                    EtView
+
+                -- TODO fix
+                DtLinks ->
                     EtView
     }
 

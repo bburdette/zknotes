@@ -1,7 +1,7 @@
 module Route exposing (Route(..), parseUrl, routeTitle, routeUrl)
 
-import Data exposing (EditTab(..), ZkNoteId)
-import DataUtil exposing (zkNoteIdFromString, zkNoteIdToString)
+import Data exposing (ZkNoteId)
+import DataUtil exposing (EditTab(..), zkNoteIdFromString, zkNoteIdToString)
 import UUID exposing (UUID)
 import Url exposing (Url)
 import Url.Builder as UB
@@ -13,7 +13,7 @@ type Route
     = LoginR
     | PublicZkNote ZkNoteId
     | PublicZkPubId String
-    | EditZkNoteR ZkNoteId (Maybe EditTab)
+    | EditZkNoteR ZkNoteId
     | EditZkNoteNew
     | SlideShow ZkNoteId
     | ArchiveNoteListingR ZkNoteId
@@ -36,7 +36,7 @@ routeTitle route =
         PublicZkPubId id ->
             id ++ " - zknotes"
 
-        EditZkNoteR id _ ->
+        EditZkNoteR id ->
             "zknote " ++ zkNoteIdToString id
 
         EditZkNoteNew ->
@@ -92,7 +92,6 @@ parseUrl url =
                 UP.s
                     "editnote"
                     </> UP.custom "ZkNoteId" (zkNoteIdFromString >> Result.toMaybe)
-                    <?> UPQ.map (Maybe.andThen stringEditTab) (UPQ.string "tab")
             , UP.map EditZkNoteNew <|
                 UP.s
                     "editnote"
@@ -131,13 +130,8 @@ routeUrl route =
         PublicZkPubId pubid ->
             UB.absolute [ "page", pubid ] []
 
-        EditZkNoteR uuid mbedittab ->
-            UB.absolute [ "editnote", zkNoteIdToString uuid ]
-                (mbedittab
-                    |> Maybe.map
-                        (\x -> [ UB.string "tab" (editTabString x) ])
-                    |> Maybe.withDefault []
-                )
+        EditZkNoteR uuid ->
+            UB.absolute [ "editnote", zkNoteIdToString uuid ] []
 
         EditZkNoteNew ->
             UB.absolute [ "editnote", "new" ] []
