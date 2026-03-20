@@ -164,6 +164,7 @@ type Msg
     | AddFocusToSearch
     | AddFocusToSearchAsTag
     | TitleFocus Bool
+    | ShowDeets Bool
     | TTMsg (TT.Msg Msg)
     | Noop
 
@@ -230,6 +231,7 @@ type alias Model =
     , tagThings : TT.Model
     , searchControlRowMode : SearchControlRowMode
     , titleEdit : Bool
+    , showDeets : Bool
     }
 
 
@@ -1814,86 +1816,141 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
 
                           else
                             EI.button disabledparabuttonstyle { onPress = Nothing, label = E.text "delete" }
+                        , EI.button (E.alignRight :: Common.buttonStyle)
+                            { onPress = Just ViewPress
+                            , label = ZC.fullScreen
+                            }
                         ]
-                , if mine then
-                    EI.checkbox [ E.width E.shrink ]
-                        { onChange =
-                            if editable then
-                                EditablePress
+                , E.row [ E.width E.fill, E.spacing 5 ]
+                    (if model.titleEdit then
+                        [ titleed
+                        , if search then
+                            EI.button (E.alignRight :: Common.buttonStyle)
+                                (case
+                                    JD.decodeString Data.tagSearchDecoder (EM.getContent model.edMarkdown)
+                                        |> Result.toMaybe
+                                 of
+                                    Just s ->
+                                        { label = E.text ">", onPress = Just <| SetSearch s }
 
-                            else
-                                always Noop
-                        , icon = EI.defaultCheckbox
-                        , checked = model.editableValue
-                        , label = EI.labelLeft edlabelattr (E.text "editable")
-                        }
+                                    Nothing ->
+                                        { label = E.text ">", onPress = Just <| SetSearchString model.title }
+                                )
+
+                          else
+                            EI.button (E.alignRight :: Common.buttonStyle)
+                                { label = E.text ">", onPress = Just <| AddToSearchAsTag model.title }
+                        ]
+
+                     else
+                        [ E.paragraph [ EF.bold, EE.onClick (TitleFocus True) ]
+                            [ E.text model.title ]
+                        ]
+                    )
+                , EI.button
+                    [ EF.bold
+                    , E.focused []
+                    ]
+                    { onPress =
+                        Just (ShowDeets (not model.showDeets))
+                    , label =
+                        E.text
+                            ("deets "
+                                ++ (if model.showDeets then
+                                        "⯆"
+
+                                    else
+                                        "▶"
+                                   )
+                            )
+                    }
+                , if model.showDeets then
+                    E.column [ E.spacing 5, E.width E.fill ]
+                        [ E.row [ E.spacing 5 ]
+                            [ if mine then
+                                EI.checkbox [ E.width E.shrink ]
+                                    { onChange =
+                                        if editable then
+                                            EditablePress
+
+                                        else
+                                            always Noop
+                                    , icon = EI.defaultCheckbox
+                                    , checked = model.editableValue
+                                    , label = EI.labelLeft edlabelattr (E.text "editable")
+                                    }
+
+                              else
+                                E.row [ E.spacing 8, E.width E.fill ]
+                                    [ EI.checkbox [ E.width E.shrink ]
+                                        { onChange = always Noop -- can't change editable unless you're the owner.
+                                        , icon = EI.defaultCheckbox
+                                        , checked = model.editableValue
+                                        , label = EI.labelLeft edlabelattr (E.text "editable")
+                                        }
+                                    , E.row [ E.spacing 8, E.alignRight, EF.color TC.darkGrey ] [ E.text "creator", E.el [ EF.bold ] <| E.text model.noteUserName ]
+                                    ]
+                            , EI.checkbox [ E.width E.shrink ]
+                                { onChange =
+                                    if mine && editable then
+                                        ShowTitlePress
+
+                                    else
+                                        always Noop
+                                , icon = EI.defaultCheckbox
+                                , checked = model.showtitle
+                                , label = EI.labelLeft edlabelattr (E.text "show title")
+                                }
+                            ]
+                        , E.row [ E.spacing 8, E.width E.fill ]
+                            [ EI.checkbox [ E.width E.shrink ]
+                                { onChange =
+                                    if editable then
+                                        PublicPress
+
+                                    else
+                                        always Noop
+                                , icon = EI.defaultCheckbox
+                                , checked = public
+                                , label = EI.labelLeft edlabelattr (E.text "public")
+                                }
+                            , if public then
+                                EI.text [ E.width E.fill ]
+                                    { onChange =
+                                        if editable then
+                                            OnPubidChanged
+
+                                        else
+                                            always Noop
+                                    , text = model.pubidtxt
+                                    , placeholder = Nothing
+                                    , label = EI.labelLeft edlabelattr (E.text "article id")
+                                    }
+
+                              else
+                                E.none
+                            , if wclass /= Narrow then
+                                showpagelink
+
+                              else
+                                E.none
+                            ]
+                        , E.paragraph [ E.spacing 8, E.width E.fill ]
+                            [ E.text "server: "
+                            , E.text model.server
+                            , E.text
+                                (if model.server == model.ld.server then
+                                    " (local)"
+
+                                 else
+                                    " (remote)"
+                                )
+                            ]
+                        , dates
+                        ]
 
                   else
-                    E.row [ E.spacing 8, E.width E.fill ]
-                        [ EI.checkbox [ E.width E.shrink ]
-                            { onChange = always Noop -- can't change editable unless you're the owner.
-                            , icon = EI.defaultCheckbox
-                            , checked = model.editableValue
-                            , label = EI.labelLeft edlabelattr (E.text "editable")
-                            }
-                        , E.row [ E.spacing 8, E.alignRight, EF.color TC.darkGrey ] [ E.text "creator", E.el [ EF.bold ] <| E.text model.noteUserName ]
-                        ]
-                , EI.checkbox [ E.width E.shrink ]
-                    { onChange =
-                        if mine && editable then
-                            ShowTitlePress
-
-                        else
-                            always Noop
-                    , icon = EI.defaultCheckbox
-                    , checked = model.showtitle
-                    , label = EI.labelLeft edlabelattr (E.text "show title")
-                    }
-                , E.row [ E.spacing 8, E.width E.fill ]
-                    [ EI.checkbox [ E.width E.shrink ]
-                        { onChange =
-                            if editable then
-                                PublicPress
-
-                            else
-                                always Noop
-                        , icon = EI.defaultCheckbox
-                        , checked = public
-                        , label = EI.labelLeft edlabelattr (E.text "public")
-                        }
-                    , if public then
-                        EI.text [ E.width E.fill ]
-                            { onChange =
-                                if editable then
-                                    OnPubidChanged
-
-                                else
-                                    always Noop
-                            , text = model.pubidtxt
-                            , placeholder = Nothing
-                            , label = EI.labelLeft edlabelattr (E.text "article id")
-                            }
-
-                      else
-                        E.none
-                    , if wclass /= Narrow then
-                        showpagelink
-
-                      else
-                        E.none
-                    ]
-                , E.paragraph [ E.spacing 8, E.width E.fill ]
-                    [ E.text "server: "
-                    , E.text model.server
-                    , E.text
-                        (if model.server == model.ld.server then
-                            " (local)"
-
-                         else
-                            " (remote)"
-                        )
-                    ]
-                , dates
+                    E.none
                 ]
 
         editview =
@@ -1965,13 +2022,7 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                     E.wrappedRow
                   )
                     [ E.width E.fill, E.spacing 8 ]
-                    [ if model.titleEdit then
-                        titleed
-
-                      else
-                        E.paragraph [ EF.bold, EE.onClick (TitleFocus True) ]
-                            [ E.text model.title ]
-                    , E.row
+                    [ E.row
                         [ E.alignRight, E.spacing 5 ]
                         [ EI.checkbox (E.width E.shrink :: Common.buttonStyle)
                             { onChange = SetDropLinkMode
@@ -1998,26 +2049,6 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                             { onPress = Just NewBlock
                             , label = E.text "+"
                             }
-                        , EI.button Common.buttonStyle
-                            { onPress = Just ViewPress
-                            , label = ZC.fullScreen
-                            }
-                        , if search then
-                            EI.button (E.alignRight :: Common.buttonStyle)
-                                (case
-                                    JD.decodeString Data.tagSearchDecoder (EM.getContent model.edMarkdown)
-                                        |> Result.toMaybe
-                                 of
-                                    Just s ->
-                                        { label = E.text ">", onPress = Just <| SetSearch s }
-
-                                    Nothing ->
-                                        { label = E.text ">", onPress = Just <| SetSearchString model.title }
-                                )
-
-                          else
-                            EI.button (E.alignRight :: Common.buttonStyle)
-                                { label = E.text ">", onPress = Just <| AddToSearchAsTag model.title }
                         ]
                     ]
                 , case ( model.filestatus, toZkNote model ) of
@@ -2439,6 +2470,7 @@ initFull fui ld zknote dtlinks lzlinks mbedittab mobile =
       , tagThings = TT.init True
       , searchControlRowMode = LinksTarget
       , titleEdit = False
+      , showDeets = False
       }
         |> (\m ->
                 Maybe.map (\nc -> setTab nc m) mbedittab
@@ -2502,6 +2534,7 @@ initNew fui ld links mobile =
     , tagThings = TT.init True
     , searchControlRowMode = LinksTarget
     , titleEdit = False
+    , showDeets = False
     }
         |> (\m1 ->
                 -- for new EMPTY notes, the 'revert' should be the same as the model, so that you aren't
@@ -3395,6 +3428,9 @@ update noteCache msg model =
               else
                 None
             )
+
+        ShowDeets b ->
+            ( { model | showDeets = b }, None )
 
         GoHomeNotePress ->
             ( model, None )
