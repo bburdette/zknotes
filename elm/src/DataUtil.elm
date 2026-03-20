@@ -26,8 +26,10 @@ type alias NlLink =
 
 
 type EditTab
-    = EtEdit
-    | EtView
+    = EtRaw
+    | EtEdit
+    | EtLinks
+    | EtComments
     | EtSearch
     | EtRecent
 

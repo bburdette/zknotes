@@ -1898,7 +1898,6 @@ onZkNoteEditWhat model pt znew =
                             znew.znl.zknote
                             znew.znl.links
                             znew.znl.lzlinks
-                            Nothing
                             model.mobile
 
                     ngets =
@@ -3357,7 +3356,6 @@ actualupdate msg model =
                                                             zknl.zknote
                                                             zknl.links
                                                             zknl.lzlinks
-                                                            Nothing
                                                             model.mobile
 
                                                     ngets =

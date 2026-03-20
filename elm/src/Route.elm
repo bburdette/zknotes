@@ -158,36 +158,39 @@ routeUrl route =
             UB.absolute [] []
 
 
-editTabString : EditTab -> String
-editTabString et =
-    case et of
-        EtView ->
-            "View"
 
-        EtEdit ->
-            "Edit"
+{-
+   editTabString : EditTab -> String
+   editTabString et =
+       case et of
+           EtView ->
+               "View"
 
-        EtSearch ->
-            "Search"
+           EtEdit ->
+               "Edit"
 
-        EtRecent ->
-            "Recent"
+           EtSearch ->
+               "Search"
+
+           EtRecent ->
+               "Recent"
 
 
-stringEditTab : String -> Maybe EditTab
-stringEditTab et =
-    case et of
-        "View" ->
-            Just EtView
+   stringEditTab : String -> Maybe EditTab
+   stringEditTab et =
+       case et of
+           "View" ->
+               Just EtView
 
-        "Edit" ->
-            Just EtEdit
+           "Edit" ->
+               Just EtEdit
 
-        "Search" ->
-            Just EtSearch
+           "Search" ->
+               Just EtSearch
 
-        "Recent" ->
-            Just EtRecent
+           "Recent" ->
+               Just EtRecent
 
-        _ ->
-            Nothing
+           _ ->
+               Nothing
+-}

@@ -171,7 +171,7 @@ type Msg
 type DocumentTab
     = DtRaw
     | DtEdit
-    | DtComment
+    | DtComments
     | DtLinks
 
 
@@ -593,11 +593,17 @@ setTab nc model =
         | tab = nc
         , documentTab =
             case nc of
-                EtEdit ->
+                EtRaw ->
                     DtRaw
 
-                EtView ->
+                EtEdit ->
                     DtEdit
+
+                EtLinks ->
+                    DtLinks
+
+                EtComments ->
+                    DtComments
 
                 _ ->
                     model.documentTab
@@ -1953,7 +1959,7 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                     E.none
                 ]
 
-        editview =
+        rawview =
             E.column
                 [ E.spacing 8
                 , E.alignTop
@@ -2165,47 +2171,86 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                                     ++ (divider :: [ showLinks TC.white ])
 
                             Nothing ->
-                                (if wclass == Wide then
+                                if wclass == Wide then
                                     [ E.row
                                         [ E.width E.fill
                                         , E.alignTop
                                         , E.spacing 8
                                         ]
                                         [ headingPanel "eview" [ E.width E.fill ] mdview
-                                        , headingPanel "raw" [ E.width E.fill ] editview
+                                        , E.column
+                                            [ E.width E.fill
+                                            , E.alignTop
+                                            , E.spacing 8
+                                            ]
+                                            [ Common.navbar 2
+                                                (case model.documentTab of
+                                                    DtRaw ->
+                                                        EtRaw
+
+                                                    DtEdit ->
+                                                        EtLinks
+
+                                                    DtComments ->
+                                                        EtComments
+
+                                                    DtLinks ->
+                                                        EtLinks
+                                                )
+                                                TabChanged
+                                                [ ( EtLinks, "links" )
+                                                , ( EtRaw, "raw" )
+                                                , ( EtComments, "comments" )
+                                                ]
+                                            , case model.documentTab of
+                                                DtRaw ->
+                                                    rawview
+
+                                                DtEdit ->
+                                                    showLinks TC.white
+
+                                                -- editview
+                                                DtComments ->
+                                                    E.column [ E.width E.fill, E.spacing 5 ] showComments
+
+                                                DtLinks ->
+                                                    showLinks TC.white
+                                            ]
                                         ]
                                     ]
 
-                                 else
+                                else
                                     [ Common.navbar 2
                                         (case model.documentTab of
                                             DtRaw ->
-                                                EtEdit
+                                                EtRaw
 
                                             DtEdit ->
-                                                EtView
+                                                EtEdit
 
                                             -- TODO fix
-                                            DtComment ->
-                                                EtView
+                                            DtComments ->
+                                                EtComments
 
                                             -- TODO fix
                                             DtLinks ->
-                                                EtView
+                                                EtLinks
                                         )
                                         TabChanged
-                                        [ ( EtView, "eview" )
-                                        , ( EtEdit, "raw" )
+                                        [ ( EtEdit, "eview" )
+                                        , ( EtRaw, "raw" )
+                                        , ( EtLinks, "links" )
+                                        , ( EtComments, "comments" )
                                         ]
                                     , case model.documentTab of
                                         DtRaw ->
-                                            editview
+                                            rawview
 
                                         DtEdit ->
                                             mdview
 
-                                        DtComment ->
-                                            E.column [ E.width E.fill ] showComments
+                                        DtComments ->
+                                            E.column [ E.alignTop, E.width E.fill, E.spacing 5 ] showComments
 
                                         DtLinks ->
                                             showLinks TC.white
@@ -2215,9 +2260,6 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                                       else
                                         E.none
                                     ]
-                                )
-                                    ++ showComments
-                                    ++ (divider :: [ showLinks TC.white ])
                        )
     in
     E.column
@@ -2331,28 +2373,34 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                         TabChanged
                         [ ( case model.documentTab of
                                 DtRaw ->
-                                    EtEdit
+                                    EtRaw
 
                                 DtEdit ->
-                                    EtView
+                                    EtEdit
 
                                 -- TODO fix
-                                DtComment ->
-                                    EtView
+                                DtComments ->
+                                    EtComments
 
                                 -- TODO fix
                                 DtLinks ->
-                                    EtView
+                                    EtLinks
                           , "document"
                           )
                         , ( EtSearch, "search" )
                         , ( EtRecent, "recent" )
                         ]
                     , case model.tab of
+                        EtRaw ->
+                            documentPanel
+
                         EtEdit ->
                             documentPanel
 
-                        EtView ->
+                        EtComments ->
+                            documentPanel
+
+                        EtLinks ->
                             documentPanel
 
                         EtSearch ->
@@ -2386,18 +2434,18 @@ tabsOnLoad model =
         , tab =
             case model.documentTab of
                 DtRaw ->
-                    EtEdit
+                    EtRaw
 
                 DtEdit ->
-                    EtView
+                    EtEdit
 
                 -- TODO fix
-                DtComment ->
-                    EtView
+                DtComments ->
+                    EtComments
 
                 -- TODO fix
                 DtLinks ->
-                    EtView
+                    EtLinks
     }
 
 
@@ -2407,10 +2455,9 @@ initFull :
     -> Data.ZkNote
     -> List Data.EditLink
     -> List Data.LzLink
-    -> Maybe EditTab
     -> Bool
     -> ( Model, Data.GetZkNoteComments )
-initFull fui ld zknote dtlinks lzlinks mbedittab mobile =
+initFull fui ld zknote dtlinks lzlinks mobile =
     let
         cells =
             zknote.content
@@ -2477,7 +2524,7 @@ initFull fui ld zknote dtlinks lzlinks mbedittab mobile =
       , changeddate = Just zknote.changeddate
       , cells = getCd cc
       , revert = Just (DataUtil.saveZkNote zknote)
-      , tab = EtView
+      , tab = EtEdit
       , documentTab = DtEdit
       , dialog = Nothing
       , panelNote = Nothing
@@ -2493,10 +2540,6 @@ initFull fui ld zknote dtlinks lzlinks mbedittab mobile =
       , titleEdit = False
       , showDeets = False
       }
-        |> (\m ->
-                Maybe.map (\nc -> setTab nc m) mbedittab
-                    |> Maybe.withDefault m
-           )
     , { zknote = zknote.id, offset = 0, limit = Nothing }
     )
 
@@ -2541,7 +2584,7 @@ initNew fui ld links mobile =
     , changeddate = Nothing
     , cells = getCd cc
     , revert = Nothing
-    , tab = EtEdit
+    , tab = EtRaw
     , documentTab = DtRaw
     , dialog = Nothing
     , panelNote = Nothing
@@ -2911,12 +2954,12 @@ onWkKeyPress noteCache key model =
         Toop.T4 "e" True True False ->
             let
                 ( m, _ ) =
-                    update noteCache (TabChanged EtEdit) model
+                    update noteCache (TabChanged EtRaw) model
             in
             ( m, Cmd (BD.focus "mdtext" |> Task.attempt (\_ -> Noop)) Nothing )
 
         Toop.T4 "v" True True False ->
-            update noteCache (TabChanged EtView) model
+            update noteCache (TabChanged EtEdit) model
 
         Toop.T4 "s" True True False ->
             let
