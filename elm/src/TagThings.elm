@@ -237,7 +237,9 @@ makeViews stylePalette mbsize recentZkns spmodel zknSearchResult model controlRo
                     , if model.showBigSearch then
                         EI.button (E.alignRight :: Common.buttonStyle)
                             { onPress = Just <| BigSearchPress
-                            , label = ZC.fullScreen
+                            , label = E.text "⤢"
+
+                            -- , label = ZC.fullScreen
                             }
 
                       else

@@ -77,9 +77,8 @@ import MdGui as MG
 import NoteCache as NC exposing (NoteCache)
 import Orgauth.Data exposing (UserId(..))
 import RequestsDialog exposing (TRequests)
-import Route exposing (parseUrl)
+import Route
 import SearchStackPanel as SP
-import SetFocus
 import SnListEdit as SLE
 import SpecialNotes
 import SpecialNotesGui as SNG exposing (SpecialNoteState(..), initSpecialNoteState, initSpecialNoteStateLz)
@@ -1759,9 +1758,8 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                 [ E.spacing 8
                 , E.alignTop
                 , E.width E.fill
-                , E.paddingXY 5 0
                 ]
-                [ E.paragraph [ E.padding 10, E.width E.fill, E.spacingXY 3 17 ] <|
+                [ E.paragraph [ E.width E.fill, E.spacingXY 3 17 ] <|
                     List.intersperse (E.text " ")
                         [ if isdirty then
                             EI.button parabuttonstyle { onPress = Just RevertPress, label = E.text "revert" }
@@ -1816,12 +1814,12 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
 
                           else
                             EI.button disabledparabuttonstyle { onPress = Nothing, label = E.text "delete" }
-                        , EI.button (E.alignRight :: Common.buttonStyle)
+                        , EI.button parabuttonstyle
                             { onPress = Just ViewPress
-                            , label = ZC.fullScreen
+                            , label = E.text "⤢"
                             }
                         ]
-                , E.row [ E.width E.fill, E.spacing 5 ]
+                , E.row [ E.width E.fill, E.spacing 5, E.paddingXY 0 10 ]
                     (if model.titleEdit then
                         [ titleed
                         , if search then
@@ -1845,25 +1843,25 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                      else
                         [ E.paragraph [ EF.bold, EE.onClick (TitleFocus True) ]
                             [ E.text model.title ]
+                        , EI.button
+                            [ E.focused []
+                            ]
+                            { onPress =
+                                Just (ShowDeets (not model.showDeets))
+                            , label =
+                                E.text
+                                    ("info "
+                                        ++ (if model.showDeets then
+                                                "⯆"
+
+                                            else
+                                                -- "▶"
+                                                "⯈"
+                                           )
+                                    )
+                            }
                         ]
                     )
-                , EI.button
-                    [ EF.bold
-                    , E.focused []
-                    ]
-                    { onPress =
-                        Just (ShowDeets (not model.showDeets))
-                    , label =
-                        E.text
-                            ("deets "
-                                ++ (if model.showDeets then
-                                        "⯆"
-
-                                    else
-                                        "▶"
-                                   )
-                            )
-                    }
                 , if model.showDeets then
                     E.column [ E.spacing 5, E.width E.fill ]
                         [ E.row [ E.spacing 5 ]
@@ -2118,8 +2116,6 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                  , EBd.width 1
                  , EBd.color TC.darkGrey
                  , EBd.rounded 10
-
-                 -- , E.clip
                  , E.height E.fill
                  , EBk.color TC.white
                  ]
@@ -2137,12 +2133,11 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
             E.column
                 [ E.spacing 12
                 , E.alignTop
-                , EBd.width 1
                 , EBd.color TC.darkGrey
-                , EBd.rounded 10
                 , E.width E.fill
                 , E.height E.fill
                 , EBk.color TC.white
+                , E.padding 10
                 ]
             <|
                 editmeta
