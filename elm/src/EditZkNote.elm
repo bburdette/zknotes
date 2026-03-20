@@ -168,9 +168,9 @@ type Msg
     | Noop
 
 
-type EditOrView
-    = EditView
-    | ViewView
+type DocumentTab
+    = DtRaw
+    | DtEdit
 
 
 type WClass
@@ -217,7 +217,7 @@ type alias Model =
     , initialSnState : Maybe SpecialNoteState
     , initialLzls : Dict String Data.SaveLzLink
     , tab : EditTab
-    , editOrView : EditOrView
+    , documentTab : DocumentTab
     , dialog : Maybe D.Model
     , panelNote : Maybe Data.ZkNote
     , mbReplaceString : Maybe String
@@ -589,16 +589,16 @@ setTab : EditTab -> Model -> Model
 setTab nc model =
     { model
         | tab = nc
-        , editOrView =
+        , documentTab =
             case nc of
                 EtEdit ->
-                    EditView
+                    DtRaw
 
                 EtView ->
-                    ViewView
+                    DtEdit
 
                 _ ->
-                    model.editOrView
+                    model.documentTab
     }
 
 
@@ -2169,35 +2169,29 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                                         , E.alignTop
                                         , E.spacing 8
                                         ]
-                                        [ headingPanel "raw" [ E.width E.fill ] editview
-                                        , headingPanel "eview" [ E.width E.fill ] mdview
+                                        [ headingPanel "eview" [ E.width E.fill ] mdview
+                                        , headingPanel "raw" [ E.width E.fill ] editview
                                         ]
                                     ]
 
                                  else
                                     [ Common.navbar 2
-                                        (case model.editOrView of
-                                            EditView ->
+                                        (case model.documentTab of
+                                            DtRaw ->
                                                 EtEdit
 
-                                            ViewView ->
+                                            DtEdit ->
                                                 EtView
                                         )
                                         TabChanged
                                         [ ( EtView, "eview" )
-                                        , ( EtEdit
-                                          , if editable then
-                                                "raw"
-
-                                            else
-                                                "raw"
-                                          )
+                                        , ( EtEdit, "raw" )
                                         ]
-                                    , case model.editOrView of
-                                        EditView ->
+                                    , case model.documentTab of
+                                        DtRaw ->
                                             editview
 
-                                        ViewView ->
+                                        DtEdit ->
                                             mdview
                                     , if isdirty then
                                         EI.button perhapsdirtybutton { onPress = Just SavePress, label = E.text "save" }
@@ -2319,11 +2313,11 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                     [ Common.navbar 2
                         model.tab
                         TabChanged
-                        [ ( case model.editOrView of
-                                EditView ->
+                        [ ( case model.documentTab of
+                                DtRaw ->
                                     EtEdit
 
-                                ViewView ->
+                                DtEdit ->
                                     EtView
                           , "document"
                           )
@@ -2364,13 +2358,13 @@ isSearch model =
 tabsOnLoad : Model -> Model
 tabsOnLoad model =
     { model
-        | editOrView = model.editOrView
+        | documentTab = model.documentTab
         , tab =
-            case model.editOrView of
-                EditView ->
+            case model.documentTab of
+                DtRaw ->
                     EtEdit
 
-                ViewView ->
+                DtEdit ->
                     EtView
     }
 
@@ -2452,7 +2446,7 @@ initFull fui ld zknote dtlinks lzlinks mbedittab mobile =
       , cells = getCd cc
       , revert = Just (DataUtil.saveZkNote zknote)
       , tab = EtView
-      , editOrView = ViewView
+      , documentTab = DtEdit
       , dialog = Nothing
       , panelNote = Nothing
       , mbReplaceString = Nothing
@@ -2516,7 +2510,7 @@ initNew fui ld links mobile =
     , cells = getCd cc
     , revert = Nothing
     , tab = EtEdit
-    , editOrView = EditView
+    , documentTab = DtRaw
     , dialog = Nothing
     , panelNote = Nothing
     , mbReplaceString = Nothing
