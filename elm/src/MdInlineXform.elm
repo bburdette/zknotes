@@ -101,7 +101,7 @@ pathZkNoteId route =
         PublicZkNote znid ->
             Just znid
 
-        EditZkNoteR znid _ ->
+        EditZkNoteR znid ->
             Just znid
 
         LoginR ->

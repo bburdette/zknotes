@@ -2704,7 +2704,6 @@ pub fn read_zneifchanged(
       .map(|opt| {
         opt.map(|znl| ZkNoteAndLinksWhat {
           what: gzic.what.clone(),
-          edittab: gzic.edittab.clone(),
           znl,
         })
       });

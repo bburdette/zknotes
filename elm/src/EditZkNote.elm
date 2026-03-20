@@ -49,8 +49,8 @@ import Browser.Dom as BD
 import Cellme.Cellme exposing (CellContainer(..), RunState(..), evalCellsFully)
 import Cellme.DictCellme exposing (CellDict(..), getCd, mkCc)
 import Common
-import Data exposing (ArchivesOrCurrent(..), Direction(..), EditLink, EditTab(..), ZkNoteId)
-import DataUtil exposing (FileUrlInfo, NlLink, lzlKey, zkNoteIdToString, zklKey, zniCompare, zniEq)
+import Data exposing (ArchivesOrCurrent(..), Direction(..), EditLink, ZkNoteId)
+import DataUtil exposing (EditTab(..), FileUrlInfo, NlLink, lzlKey, zkNoteIdToString, zklKey, zniCompare, zniEq)
 import Dialog as D
 import Dict exposing (Dict)
 import DnDList
@@ -77,7 +77,7 @@ import MdGui as MG
 import NoteCache as NC exposing (NoteCache)
 import Orgauth.Data exposing (UserId(..))
 import RequestsDialog exposing (TRequests)
-import Route exposing (parseUrl)
+import Route
 import SearchStackPanel as SP
 import SnListEdit as SLE
 import SpecialNotes
@@ -162,13 +162,17 @@ type Msg
     | AddGraphNotes
     | AddFocusToSearch
     | AddFocusToSearchAsTag
+    | TitleFocus Bool
+    | ShowDeets Bool
     | TTMsg (TT.Msg Msg)
     | Noop
 
 
-type EditOrView
-    = EditView
-    | ViewView
+type DocumentTab
+    = DtRaw
+    | DtEdit
+    | DtComments
+    | DtLinks
 
 
 type WClass
@@ -215,7 +219,7 @@ type alias Model =
     , initialSnState : Maybe SpecialNoteState
     , initialLzls : Dict String Data.SaveLzLink
     , tab : EditTab
-    , editOrView : EditOrView
+    , documentTab : DocumentTab
     , dialog : Maybe D.Model
     , panelNote : Maybe Data.ZkNote
     , mbReplaceString : Maybe String
@@ -227,6 +231,8 @@ type alias Model =
     , droplinkmode : Bool
     , tagThings : TT.Model
     , searchControlRowMode : SearchControlRowMode
+    , titleEdit : Bool
+    , showDeets : Bool
     }
 
 
@@ -585,16 +591,22 @@ setTab : EditTab -> Model -> Model
 setTab nc model =
     { model
         | tab = nc
-        , editOrView =
+        , documentTab =
             case nc of
-                EtEdit ->
-                    EditView
+                EtRaw ->
+                    DtRaw
 
-                EtView ->
-                    ViewView
+                EtEdit ->
+                    DtEdit
+
+                EtLinks ->
+                    DtLinks
+
+                EtComments ->
+                    DtComments
 
                 _ ->
-                    model.editOrView
+                    model.documentTab
     }
 
 
@@ -1713,51 +1725,49 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
             else
                 [ EF.color TC.darkGrey ]
 
-        editmeta =
-            let
-                titleed =
-                    EI.text
-                        (if editable then
-                            (if isdirty then
+        titleed =
+            EI.text
+                (EE.onLoseFocus (TitleFocus False)
+                    :: E.htmlAttribute (HA.id "title-edit")
+                    :: (if editable then
+                            if isdirty then
                                 [ E.focused [ EBd.glow TC.darkYellow 3 ] ]
 
-                             else
-                                []
-                            )
-                                ++ [ E.htmlAttribute (HA.id "title")
-                                   ]
-
-                         else
-                            [ EF.color TC.darkGrey, E.htmlAttribute (HA.id "title") ]
-                        )
-                        { onChange =
-                            if editable then
-                                OnTitleChanged
-
                             else
-                                always Noop
-                        , text = model.title
-                        , placeholder = Nothing
-                        , label =
-                            EI.labelLeft
-                                edlabelattr
-                                (E.text
-                                    (if model.filestatus /= Data.NotAFile then
-                                        "filename"
+                                []
 
-                                     else
-                                        "title"
-                                    )
-                                )
-                        }
-            in
+                        else
+                            [ EF.color TC.darkGrey ]
+                       )
+                )
+                { onChange =
+                    if editable then
+                        OnTitleChanged
+
+                    else
+                        always Noop
+                , text = model.title
+                , placeholder = Nothing
+                , label =
+                    EI.labelLeft
+                        edlabelattr
+                        (E.text
+                            (if model.filestatus /= Data.NotAFile then
+                                "filename"
+
+                             else
+                                "title"
+                            )
+                        )
+                }
+
+        editmeta =
             E.column
                 [ E.spacing 8
                 , E.alignTop
                 , E.width E.fill
-                , E.paddingXY 5 0
                 ]
-                [ E.paragraph [ E.padding 10, E.width E.fill, E.spacingXY 3 17 ] <|
+                [ E.paragraph [ E.width E.fill, E.spacingXY 3 17 ] <|
                     List.intersperse (E.text " ")
                         [ if isdirty then
                             EI.button parabuttonstyle { onPress = Just RevertPress, label = E.text "revert" }
@@ -1812,90 +1822,130 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
 
                           else
                             EI.button disabledparabuttonstyle { onPress = Nothing, label = E.text "delete" }
+                        , EI.button parabuttonstyle
+                            { onPress = Just ViewPress
+                            , label = E.text "⤢"
+                            }
                         ]
-                , titleed
-                , if mine then
-                    EI.checkbox [ E.width E.shrink ]
-                        { onChange =
-                            if editable then
-                                EditablePress
+                , E.row [ E.width E.fill, E.spacing 5, E.paddingXY 0 10 ]
+                    (if model.titleEdit then
+                        [ titleed
+                        ]
 
-                            else
-                                always Noop
-                        , icon = EI.defaultCheckbox
-                        , checked = model.editableValue
-                        , label = EI.labelLeft edlabelattr (E.text "editable")
-                        }
+                     else
+                        [ E.paragraph [ EF.bold, EE.onClick (TitleFocus True) ]
+                            [ E.text model.title ]
+                        , EI.button
+                            [ E.focused []
+                            ]
+                            { onPress =
+                                Just (ShowDeets (not model.showDeets))
+                            , label =
+                                E.text
+                                    ("info "
+                                        ++ (if model.showDeets then
+                                                "⯆"
+
+                                            else
+                                                -- "▶"
+                                                "⯈"
+                                           )
+                                    )
+                            }
+                        ]
+                    )
+                , if model.showDeets then
+                    E.column [ E.spacing 5, E.width E.fill ]
+                        [ E.row [ E.spacing 5, E.width E.fill ]
+                            [ if mine then
+                                EI.checkbox [ E.width E.shrink ]
+                                    { onChange =
+                                        if editable then
+                                            EditablePress
+
+                                        else
+                                            always Noop
+                                    , icon = EI.defaultCheckbox
+                                    , checked = model.editableValue
+                                    , label = EI.labelLeft edlabelattr (E.text "editable")
+                                    }
+
+                              else
+                                E.row [ E.spacing 8, E.width E.fill ]
+                                    [ EI.checkbox [ E.width E.shrink ]
+                                        { onChange = always Noop -- can't change editable unless you're the owner.
+                                        , icon = EI.defaultCheckbox
+                                        , checked = model.editableValue
+                                        , label = EI.labelLeft edlabelattr (E.text "editable")
+                                        }
+                                    , E.row [ E.spacing 8, E.alignRight, EF.color TC.darkGrey ] [ E.text "creator", E.el [ EF.bold ] <| E.text model.noteUserName ]
+                                    ]
+                            , EI.checkbox [ E.width E.shrink ]
+                                { onChange =
+                                    if mine && editable then
+                                        ShowTitlePress
+
+                                    else
+                                        always Noop
+                                , icon = EI.defaultCheckbox
+                                , checked = model.showtitle
+                                , label = EI.labelLeft edlabelattr (E.text "show title")
+                                }
+                            , EI.button (E.alignRight :: Common.buttonStyle)
+                                { label = E.text "search >", onPress = Just <| AddToSearchAsTag model.title }
+                            ]
+                        , E.row [ E.spacing 8, E.width E.fill ]
+                            [ EI.checkbox [ E.width E.shrink ]
+                                { onChange =
+                                    if editable then
+                                        PublicPress
+
+                                    else
+                                        always Noop
+                                , icon = EI.defaultCheckbox
+                                , checked = public
+                                , label = EI.labelLeft edlabelattr (E.text "public")
+                                }
+                            , if public then
+                                EI.text [ E.width E.fill ]
+                                    { onChange =
+                                        if editable then
+                                            OnPubidChanged
+
+                                        else
+                                            always Noop
+                                    , text = model.pubidtxt
+                                    , placeholder = Nothing
+                                    , label = EI.labelLeft edlabelattr (E.text "article id")
+                                    }
+
+                              else
+                                E.none
+                            , if wclass /= Narrow then
+                                showpagelink
+
+                              else
+                                E.none
+                            ]
+                        , E.paragraph [ E.spacing 8, E.width E.fill ]
+                            [ E.text "server: "
+                            , E.text model.server
+                            , E.text
+                                (if model.server == model.ld.server then
+                                    " (local)"
+
+                                 else
+                                    " (remote)"
+                                )
+                            ]
+                        , dates
+                        ]
 
                   else
-                    E.row [ E.spacing 8, E.width E.fill ]
-                        [ EI.checkbox [ E.width E.shrink ]
-                            { onChange = always Noop -- can't change editable unless you're the owner.
-                            , icon = EI.defaultCheckbox
-                            , checked = model.editableValue
-                            , label = EI.labelLeft edlabelattr (E.text "editable")
-                            }
-                        , E.row [ E.spacing 8, E.alignRight, EF.color TC.darkGrey ] [ E.text "creator", E.el [ EF.bold ] <| E.text model.noteUserName ]
-                        ]
-                , EI.checkbox [ E.width E.shrink ]
-                    { onChange =
-                        if mine && editable then
-                            ShowTitlePress
-
-                        else
-                            always Noop
-                    , icon = EI.defaultCheckbox
-                    , checked = model.showtitle
-                    , label = EI.labelLeft edlabelattr (E.text "show title")
-                    }
-                , E.row [ E.spacing 8, E.width E.fill ]
-                    [ EI.checkbox [ E.width E.shrink ]
-                        { onChange =
-                            if editable then
-                                PublicPress
-
-                            else
-                                always Noop
-                        , icon = EI.defaultCheckbox
-                        , checked = public
-                        , label = EI.labelLeft edlabelattr (E.text "public")
-                        }
-                    , if public then
-                        EI.text [ E.width E.fill ]
-                            { onChange =
-                                if editable then
-                                    OnPubidChanged
-
-                                else
-                                    always Noop
-                            , text = model.pubidtxt
-                            , placeholder = Nothing
-                            , label = EI.labelLeft edlabelattr (E.text "article id")
-                            }
-
-                      else
-                        E.none
-                    , if wclass /= Narrow then
-                        showpagelink
-
-                      else
-                        E.none
-                    ]
-                , E.paragraph [ E.spacing 8, E.width E.fill ]
-                    [ E.text "server: "
-                    , E.text model.server
-                    , E.text
-                        (if model.server == model.ld.server then
-                            " (local)"
-
-                         else
-                            " (remote)"
-                        )
-                    ]
-                , dates
+                    E.none
                 ]
 
-        editview =
+        rawview =
             E.column
                 [ E.spacing 8
                 , E.alignTop
@@ -1950,59 +2000,48 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
         mdview =
             E.column
                 [ E.width E.fill
-                , E.centerX
+
+                -- , E.centerX
                 , E.alignTop
                 , E.spacing 8
                 , E.paddingXY 5 0
                 ]
             <|
-                [ E.row [ E.width E.fill, E.spacing 8 ]
-                    [ E.paragraph [ EF.bold ] [ E.text model.title ]
-                    , EI.checkbox (E.width E.shrink :: Common.buttonStyle)
-                        { onChange = SetDropLinkMode
-                        , icon = EI.defaultCheckbox
-                        , checked = model.droplinkmode
-                        , label = EI.labelLeft [] (E.text "DLMode")
-                        }
-                    , EI.button
-                        (if gotid then
-                            Common.buttonStyle
+                [ (if model.titleEdit then
+                    E.column
 
-                         else
-                            Common.disabledButtonStyle
-                        )
-                        { onPress =
-                            if gotid then
-                                Just MakeList
+                   else
+                    E.wrappedRow
+                  )
+                    [ E.width E.fill, E.spacing 8 ]
+                    [ E.row
+                        [ E.alignRight, E.spacing 5 ]
+                        [ EI.checkbox (E.width E.shrink :: Common.buttonStyle)
+                            { onChange = SetDropLinkMode
+                            , icon = EI.defaultCheckbox
+                            , checked = model.droplinkmode
+                            , label = EI.labelLeft [] (E.text "DLMode")
+                            }
+                        , EI.button
+                            (if gotid then
+                                Common.buttonStyle
 
-                            else
-                                Nothing
-                        , label = E.text "list"
-                        }
-                    , EI.button Common.buttonStyle
-                        { onPress = Just NewBlock
-                        , label = E.text "+"
-                        }
-                    , EI.button Common.buttonStyle
-                        { onPress = Just ViewPress
-                        , label = ZC.fullScreen
-                        }
-                    , if search then
-                        EI.button (E.alignRight :: Common.buttonStyle)
-                            (case
-                                JD.decodeString Data.tagSearchDecoder (EM.getContent model.edMarkdown)
-                                    |> Result.toMaybe
-                             of
-                                Just s ->
-                                    { label = E.text ">", onPress = Just <| SetSearch s }
-
-                                Nothing ->
-                                    { label = E.text ">", onPress = Just <| SetSearchString model.title }
+                             else
+                                Common.disabledButtonStyle
                             )
+                            { onPress =
+                                if gotid then
+                                    Just MakeList
 
-                      else
-                        EI.button (E.alignRight :: Common.buttonStyle)
-                            { label = E.text ">", onPress = Just <| AddToSearchAsTag model.title }
+                                else
+                                    Nothing
+                            , label = E.text "list"
+                            }
+                        , EI.button Common.buttonStyle
+                            { onPress = Just NewBlock
+                            , label = E.text "+"
+                            }
+                        ]
                     ]
                 , case ( model.filestatus, toZkNote model ) of
                     ( Data.FilePresent, Just zkn ) ->
@@ -2071,8 +2110,6 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                  , EBd.width 1
                  , EBd.color TC.darkGrey
                  , EBd.rounded 10
-
-                 -- , E.clip
                  , E.height E.fill
                  , EBk.color TC.white
                  ]
@@ -2090,12 +2127,11 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
             E.column
                 [ E.spacing 12
                 , E.alignTop
-                , EBd.width 1
                 , EBd.color TC.darkGrey
-                , EBd.rounded 10
                 , E.width E.fill
                 , E.height E.fill
                 , EBk.color TC.white
+                , E.padding 10
                 ]
             <|
                 editmeta
@@ -2121,51 +2157,93 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                                     ++ (divider :: [ showLinks TC.white ])
 
                             Nothing ->
-                                (if wclass == Wide then
+                                if wclass == Wide then
                                     [ E.row
                                         [ E.width E.fill
                                         , E.alignTop
                                         , E.spacing 8
                                         ]
-                                        [ headingPanel "raw" [ E.width E.fill ] editview
-                                        , headingPanel "eview" [ E.width E.fill ] mdview
+                                        [ headingPanel "eview" [ E.width E.fill ] mdview
+                                        , E.column
+                                            [ E.width E.fill
+                                            , E.alignTop
+                                            , E.spacing 8
+                                            ]
+                                            [ Common.navbar 2
+                                                (case model.documentTab of
+                                                    DtRaw ->
+                                                        EtRaw
+
+                                                    DtEdit ->
+                                                        EtLinks
+
+                                                    DtComments ->
+                                                        EtComments
+
+                                                    DtLinks ->
+                                                        EtLinks
+                                                )
+                                                TabChanged
+                                                [ ( EtLinks, "links" )
+                                                , ( EtRaw, "raw" )
+                                                , ( EtComments, "comments" )
+                                                ]
+                                            , case model.documentTab of
+                                                DtRaw ->
+                                                    rawview
+
+                                                DtEdit ->
+                                                    showLinks TC.white
+
+                                                -- editview
+                                                DtComments ->
+                                                    E.column [ E.width E.fill, E.spacing 5 ] showComments
+
+                                                DtLinks ->
+                                                    showLinks TC.white
+                                            ]
                                         ]
                                     ]
 
-                                 else
+                                else
                                     [ Common.navbar 2
-                                        (case model.editOrView of
-                                            EditView ->
+                                        (case model.documentTab of
+                                            DtRaw ->
+                                                EtRaw
+
+                                            DtEdit ->
                                                 EtEdit
 
-                                            ViewView ->
-                                                EtView
+                                            DtComments ->
+                                                EtComments
+
+                                            DtLinks ->
+                                                EtLinks
                                         )
                                         TabChanged
-                                        [ ( EtView, "eview" )
-                                        , ( EtEdit
-                                          , if editable then
-                                                "raw"
-
-                                            else
-                                                "raw"
-                                          )
+                                        [ ( EtEdit, "eview" )
+                                        , ( EtRaw, "raw" )
+                                        , ( EtLinks, "links" )
+                                        , ( EtComments, "comments" )
                                         ]
-                                    , case model.editOrView of
-                                        EditView ->
-                                            editview
+                                    , case model.documentTab of
+                                        DtRaw ->
+                                            rawview
 
-                                        ViewView ->
+                                        DtEdit ->
                                             mdview
+
+                                        DtComments ->
+                                            E.column [ E.alignTop, E.width E.fill, E.spacing 5 ] showComments
+
+                                        DtLinks ->
+                                            showLinks TC.white
                                     , if isdirty then
                                         EI.button perhapsdirtybutton { onPress = Just SavePress, label = E.text "save" }
 
                                       else
                                         E.none
                                     ]
-                                )
-                                    ++ showComments
-                                    ++ (divider :: [ showLinks TC.white ])
                        )
     in
     E.column
@@ -2277,22 +2355,34 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                     [ Common.navbar 2
                         model.tab
                         TabChanged
-                        [ ( case model.editOrView of
-                                EditView ->
+                        [ ( case model.documentTab of
+                                DtRaw ->
+                                    EtRaw
+
+                                DtEdit ->
                                     EtEdit
 
-                                ViewView ->
-                                    EtView
+                                DtComments ->
+                                    EtComments
+
+                                DtLinks ->
+                                    EtLinks
                           , "document"
                           )
                         , ( EtSearch, "search" )
                         , ( EtRecent, "recent" )
                         ]
                     , case model.tab of
+                        EtRaw ->
+                            documentPanel
+
                         EtEdit ->
                             documentPanel
 
-                        EtView ->
+                        EtComments ->
+                            documentPanel
+
+                        EtLinks ->
                             documentPanel
 
                         EtSearch ->
@@ -2322,14 +2412,22 @@ isSearch model =
 tabsOnLoad : Model -> Model
 tabsOnLoad model =
     { model
-        | editOrView = model.editOrView
+        | documentTab = model.documentTab
         , tab =
-            case model.editOrView of
-                EditView ->
+            case model.documentTab of
+                DtRaw ->
+                    EtRaw
+
+                DtEdit ->
                     EtEdit
 
-                ViewView ->
-                    EtView
+                -- TODO fix
+                DtComments ->
+                    EtComments
+
+                -- TODO fix
+                DtLinks ->
+                    EtLinks
     }
 
 
@@ -2339,10 +2437,9 @@ initFull :
     -> Data.ZkNote
     -> List Data.EditLink
     -> List Data.LzLink
-    -> Maybe EditTab
     -> Bool
     -> ( Model, Data.GetZkNoteComments )
-initFull fui ld zknote dtlinks lzlinks mbedittab mobile =
+initFull fui ld zknote dtlinks lzlinks mobile =
     let
         cells =
             zknote.content
@@ -2409,8 +2506,8 @@ initFull fui ld zknote dtlinks lzlinks mbedittab mobile =
       , changeddate = Just zknote.changeddate
       , cells = getCd cc
       , revert = Just (DataUtil.saveZkNote zknote)
-      , tab = EtView
-      , editOrView = ViewView
+      , tab = EtEdit
+      , documentTab = DtEdit
       , dialog = Nothing
       , panelNote = Nothing
       , mbReplaceString = Nothing
@@ -2422,11 +2519,9 @@ initFull fui ld zknote dtlinks lzlinks mbedittab mobile =
       , droplinkmode = False
       , tagThings = TT.init True
       , searchControlRowMode = LinksTarget
+      , titleEdit = False
+      , showDeets = False
       }
-        |> (\m ->
-                Maybe.map (\nc -> setTab nc m) mbedittab
-                    |> Maybe.withDefault m
-           )
     , { zknote = zknote.id, offset = 0, limit = Nothing }
     )
 
@@ -2471,8 +2566,8 @@ initNew fui ld links mobile =
     , changeddate = Nothing
     , cells = getCd cc
     , revert = Nothing
-    , tab = EtEdit
-    , editOrView = EditView
+    , tab = EtRaw
+    , documentTab = DtRaw
     , dialog = Nothing
     , panelNote = Nothing
     , mbReplaceString = Nothing
@@ -2484,6 +2579,8 @@ initNew fui ld links mobile =
     , droplinkmode = False
     , tagThings = TT.init True
     , searchControlRowMode = LinksTarget
+    , titleEdit = False
+    , showDeets = False
     }
         |> (\m1 ->
                 -- for new EMPTY notes, the 'revert' should be the same as the model, so that you aren't
@@ -2839,12 +2936,12 @@ onWkKeyPress noteCache key model =
         Toop.T4 "e" True True False ->
             let
                 ( m, _ ) =
-                    update noteCache (TabChanged EtEdit) model
+                    update noteCache (TabChanged EtRaw) model
             in
             ( m, Cmd (BD.focus "mdtext" |> Task.attempt (\_ -> Noop)) Nothing )
 
         Toop.T4 "v" True True False ->
-            update noteCache (TabChanged EtView) model
+            update noteCache (TabChanged EtEdit) model
 
         Toop.T4 "s" True True False ->
             let
@@ -3368,6 +3465,18 @@ update noteCache msg model =
                     )
                 )
             )
+
+        TitleFocus b ->
+            ( { model | titleEdit = b }
+            , if b then
+                Cmd (Task.attempt (always Noop) (BD.focus "title-edit")) Nothing
+
+              else
+                None
+            )
+
+        ShowDeets b ->
+            ( { model | showDeets = b }, None )
 
         GoHomeNotePress ->
             ( model, None )
