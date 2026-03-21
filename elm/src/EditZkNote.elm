@@ -1351,6 +1351,12 @@ renderBlocks mobile zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo drop
                   else
                     []
                  )
+                    ++ (if List.isEmpty rendered then
+                            [ EE.onClick NewBlock ]
+
+                        else
+                            []
+                       )
                     ++ [ E.spacing 3
                        , case vm of
                             MC.PublicView ->
