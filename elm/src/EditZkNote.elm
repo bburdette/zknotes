@@ -1766,6 +1766,7 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                 [ E.spacing 8
                 , E.alignTop
                 , E.width E.fill
+                , E.height E.shrink
                 ]
                 [ E.paragraph [ E.width E.fill, E.spacingXY 3 17 ] <|
                     List.intersperse (E.text " ")
@@ -1855,7 +1856,7 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                         ]
                     )
                 , if model.showDeets then
-                    E.column [ E.spacing 5, E.width E.fill ]
+                    E.column [ E.spacing 5, E.width E.fill, E.alignTop ]
                         [ E.row [ E.spacing 5, E.width E.fill ]
                             [ if mine then
                                 EI.checkbox [ E.width E.shrink ]
@@ -1892,7 +1893,15 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                                 , label = EI.labelLeft edlabelattr (E.text "show title")
                                 }
                             , EI.button (E.alignRight :: Common.buttonStyle)
-                                { label = E.text "search >", onPress = Just <| AddToSearchAsTag model.title }
+                                { label = E.text "search >"
+                                , onPress =
+                                    case EM.getSpecialNote model.edMarkdown of
+                                        Just (SpecialNotes.SnSearch (fst :: rest)) ->
+                                            Just <| SetSearch fst
+
+                                        _ ->
+                                            Just <| AddToSearchAsTag model.title
+                                }
                             ]
                         , E.row [ E.spacing 8, E.width E.fill ]
                             [ EI.checkbox [ E.width E.shrink ]
@@ -2000,19 +2009,12 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
         mdview =
             E.column
                 [ E.width E.fill
-
-                -- , E.centerX
                 , E.alignTop
                 , E.spacing 8
                 , E.paddingXY 5 0
                 ]
             <|
-                [ (if model.titleEdit then
-                    E.column
-
-                   else
-                    E.wrappedRow
-                  )
+                [ E.wrappedRow
                     [ E.width E.fill, E.spacing 8 ]
                     [ E.row
                         [ E.alignRight, E.spacing 5 ]
@@ -2118,10 +2120,28 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                 [ Common.navbar 2
                     ()
                     (\_ -> Noop)
-                    [ ( (), name )
-                    ]
+                    [ ( (), name ) ]
                 , elt
                 ]
+
+        snedit =
+            \sn ->
+                E.row
+                    [ E.padding 10
+                    , EBd.rounded 10
+                    , E.width E.fill
+                    , EBk.color TC.lightGray
+                    , E.height E.fill
+                    ]
+                    [ E.el
+                        [ EBd.color TC.black
+                        , EBd.width 1
+                        , E.width E.fill
+                        , E.centerX
+                        , E.padding 3
+                        ]
+                        (SNG.guiSn zone stylePalette.fontSize sn |> E.map SNGMsg)
+                    ]
 
         documentPanel =
             E.column
@@ -2129,7 +2149,6 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                 , E.alignTop
                 , EBd.color TC.darkGrey
                 , E.width E.fill
-                , E.height E.fill
                 , EBk.color TC.white
                 , E.padding 10
                 ]
@@ -2137,24 +2156,91 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                 editmeta
                     :: (case EM.getSpecialNoteState model.edMarkdown of
                             Just sn ->
-                                E.row
-                                    [ E.padding 10
-                                    , EBd.rounded 10
-                                    , E.width E.fill
-                                    , EBk.color TC.lightGray
-                                    , E.height E.fill
-                                    ]
-                                    [ E.el
-                                        [ EBd.color TC.black
-                                        , EBd.width 1
-                                        , E.width E.fill
-                                        , E.centerX
-                                        , E.padding 3
+                                if wclass == Wide then
+                                    [ E.row
+                                        [ E.width E.fill
+                                        , E.alignTop
+                                        , E.spacing 8
                                         ]
-                                        (SNG.guiSn zone stylePalette.fontSize sn |> E.map SNGMsg)
+                                        [ headingPanel "eview" [ E.width E.fill ] (snedit sn)
+                                        , E.column
+                                            [ E.width E.fill
+                                            , E.alignTop
+                                            , E.spacing 8
+                                            ]
+                                            [ Common.navbar 2
+                                                (case model.documentTab of
+                                                    DtRaw ->
+                                                        EtLinks
+
+                                                    DtEdit ->
+                                                        EtLinks
+
+                                                    DtComments ->
+                                                        EtComments
+
+                                                    DtLinks ->
+                                                        EtLinks
+                                                )
+                                                TabChanged
+                                                [ ( EtLinks, "links" )
+                                                , ( EtComments, "comments" )
+                                                ]
+                                            , case model.documentTab of
+                                                DtRaw ->
+                                                    showLinks TC.white
+
+                                                DtEdit ->
+                                                    showLinks TC.white
+
+                                                -- editview
+                                                DtComments ->
+                                                    E.column [ E.width E.fill, E.spacing 5 ] showComments
+
+                                                DtLinks ->
+                                                    showLinks TC.white
+                                            ]
+                                        ]
                                     ]
-                                    :: showComments
-                                    ++ (divider :: [ showLinks TC.white ])
+
+                                else
+                                    [ Common.navbar 2
+                                        (case model.documentTab of
+                                            DtRaw ->
+                                                EtLinks
+
+                                            DtEdit ->
+                                                EtEdit
+
+                                            DtComments ->
+                                                EtComments
+
+                                            DtLinks ->
+                                                EtLinks
+                                        )
+                                        TabChanged
+                                        [ ( EtEdit, "eview" )
+                                        , ( EtLinks, "links" )
+                                        , ( EtComments, "comments" )
+                                        ]
+                                    , case model.documentTab of
+                                        DtRaw ->
+                                            snedit sn
+
+                                        DtEdit ->
+                                            snedit sn
+
+                                        DtComments ->
+                                            E.column [ E.alignTop, E.width E.fill, E.spacing 5 ] showComments
+
+                                        DtLinks ->
+                                            showLinks TC.white
+                                    , if isdirty then
+                                        EI.button perhapsdirtybutton { onPress = Just SavePress, label = E.text "save" }
+
+                                      else
+                                        E.none
+                                    ]
 
                             Nothing ->
                                 if wclass == Wide then
@@ -2252,6 +2338,7 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
         , E.spacing 8
         , E.padding 8
         , EBk.color TC.lightGray
+        , E.alignTop
         ]
         [ E.wrappedRow [ E.width E.fill, E.spacing 8 ]
             [ model.ld.homenote
@@ -2337,6 +2424,7 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                     [ E.width E.fill
                     , E.spacing 8
                     , EBd.rounded 10
+                    , E.alignTop
                     ]
                     [ headingPanel "document"
                         [ E.width E.fill
@@ -2351,6 +2439,7 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                 E.column
                     [ E.width E.fill
                     , EBd.rounded 10
+                    , E.alignTop
                     ]
                     [ Common.navbar 2
                         model.tab
@@ -2519,7 +2608,7 @@ initFull fui ld zknote dtlinks lzlinks mobile =
       , droplinkmode = False
       , tagThings = TT.init True
       , searchControlRowMode = LinksTarget
-      , titleEdit = False
+      , titleEdit = String.trim zknote.title == ""
       , showDeets = False
       }
     , { zknote = zknote.id, offset = 0, limit = Nothing }
@@ -2579,7 +2668,7 @@ initNew fui ld links mobile =
     , droplinkmode = False
     , tagThings = TT.init True
     , searchControlRowMode = LinksTarget
-    , titleEdit = False
+    , titleEdit = True
     , showDeets = False
     }
         |> (\m1 ->
@@ -3467,7 +3556,7 @@ update noteCache msg model =
             )
 
         TitleFocus b ->
-            ( { model | titleEdit = b }
+            ( { model | titleEdit = b || model.title == "" }
             , if b then
                 Cmd (Task.attempt (always Noop) (BD.focus "title-edit")) Nothing
 

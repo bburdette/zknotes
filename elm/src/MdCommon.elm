@@ -638,7 +638,7 @@ videoNoteView fui maxw autoplay mbOnEnded zknote =
         fileurl =
             fui.filelocation ++ "/file/" ++ zkNoteIdToString zknote.id
     in
-    E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
+    E.column [ EBd.width 1, E.spacing 5, E.padding 5, E.centerX ]
         [ videoView fui maxw autoplay mbOnEnded fileurl (Just zknote.title) Nothing Nothing []
         ]
 
@@ -649,7 +649,7 @@ imageNoteView fui zknote =
         fileurl =
             fui.filelocation ++ "/file/" ++ zkNoteIdToString zknote.id
     in
-    E.column [ EBd.width 1, E.spacing 5, E.padding 5 ]
+    E.column [ EBd.width 1, E.spacing 5, E.padding 5, E.centerX ]
         [ imageView fui zknote.title fileurl Nothing []
         ]
 
