@@ -1211,6 +1211,7 @@ mkrargs model zone nc viewMode mdw =
     , showPanelElt = True
     , onchanged = OnSchelmeCodeChanged
     , noteCache = nc
+    , isDirty = dirty model
     , noop = Noop
     }
 
@@ -1230,6 +1231,7 @@ renderReadMd zone fui cd noteCache vm md mdw =
                 , showPanelElt = True
                 , onchanged = OnSchelmeCodeChanged
                 , noteCache = noteCache
+                , isDirty = False
                 , noop = Noop
                 }
             )
@@ -1362,6 +1364,7 @@ renderBlocks mobile zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo drop
                 , showPanelElt = True
                 , onchanged = OnSchelmeCodeChanged
                 , noteCache = noteCache
+                , isDirty = isdirty
                 , noop = Noop
                 }
     in

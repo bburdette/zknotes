@@ -168,6 +168,7 @@ view zone maxw noteCache config model =
                                                 , showPanelElt = False
                                                 , onchanged = OnSchelmeCodeChanged
                                                 , noteCache = noteCache
+                                                , isDirty = False
                                                 , noop = Noop
                                                 }
                                             )
@@ -242,6 +243,7 @@ view zone maxw noteCache config model =
                                     , showPanelElt = False
                                     , onchanged = OnSchelmeCodeChanged
                                     , noteCache = noteCache
+                                    , isDirty = False
                                     , noop = Noop
                                     }
                                 )

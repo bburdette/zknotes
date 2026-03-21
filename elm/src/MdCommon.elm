@@ -190,13 +190,20 @@ link destination body =
         }
 
 
-nooplink : String -> List (Element a) -> a -> Element a
-nooplink destination body noop =
-    (if String.contains ":" destination then
-        E.newTabLink
+nooplink : Bool -> String -> List (Element a) -> a -> Element a
+nooplink dirty destination body noop =
+    let
+        locallink =
+            Debug.log (destination ++ Debug.toString dirty)
+                not
+            <|
+                String.contains ":" destination
+    in
+    (if locallink then
+        E.link
 
      else
-        E.link
+        E.newTabLink
     )
         [ E.htmlAttribute (HA.style "display" "inline-flex")
         , E.htmlAttribute <| HE.stopPropagationOn "click" (JD.succeed ( noop, True ))
@@ -204,7 +211,12 @@ nooplink destination body noop =
         { url = destination
         , label =
             E.paragraph
-                [ EF.color (E.rgb255 0 0 255)
+                [ EF.color <|
+                    if dirty && locallink then
+                        TC.darkYellow
+
+                    else
+                        E.rgb255 0 0 255
                 , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
                 , E.htmlAttribute (HA.style "word-break" "break-word")
                 ]
@@ -239,6 +251,7 @@ type alias MkrArgs a =
     , showPanelElt : Bool
     , onchanged : String -> String -> a
     , noteCache : NoteCache
+    , isDirty : Bool
     , noop : a
     }
 
@@ -256,7 +269,7 @@ mkRenderer args =
     , strikethrough = \content -> E.paragraph [ EF.strike ] content
     , codeSpan = codeSpan
     , link =
-        \{ title, destination } body -> nooplink destination body args.noop
+        \{ title, destination } body -> nooplink args.isDirty destination body args.noop
     , hardLineBreak = Html.br [] [] |> E.html
     , image =
         \image ->
@@ -735,7 +748,8 @@ yeetView args url audioOnly mbid show text _ =
                     "yeet "
                         ++ url
                         ++ (audioOnly |> Maybe.map (\_ -> " -x") |> Maybe.withDefault "")
-                , nooplink url
+                , nooplink args.isDirty
+                    url
                     [ E.el
                         [ E.inFront (E.el [ E.centerY ] <| E.text "↗")
                         ]
@@ -749,7 +763,8 @@ yeetView args url audioOnly mbid show text _ =
             E.column [ E.width E.fill ]
                 [ E.paragraph [] <|
                     [ E.text <| "yeet " ++ url
-                    , nooplink url
+                    , nooplink args.isDirty
+                        url
                         [ E.el
                             [ E.inFront (E.el [ E.centerY ] <| E.text "↗")
                             ]
@@ -810,7 +825,12 @@ noteView args id show text _ =
                             { url = "/note/" ++ id -- don't use prefix here!
                             , label =
                                 E.paragraph
-                                    [ EF.color (E.rgb255 0 0 255)
+                                    [ EF.color <|
+                                        if args.isDirty then
+                                            TC.darkYellow
+
+                                        else
+                                            E.rgb255 0 0 255
                                     , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
                                     , E.htmlAttribute (HA.style "word-break" "break-word")
                                     ]
