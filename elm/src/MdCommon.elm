@@ -194,9 +194,7 @@ nooplink : Bool -> String -> List (Element a) -> a -> Element a
 nooplink dirty destination body noop =
     let
         locallink =
-            Debug.log (destination ++ Debug.toString dirty)
-                not
-            <|
+            not <|
                 String.contains ":" destination
     in
     (if locallink then
