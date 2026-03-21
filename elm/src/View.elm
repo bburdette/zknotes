@@ -68,7 +68,7 @@ type alias Config =
 defaultConfig : Config
 defaultConfig =
     { showLinks = True
-    , alwaysShowTitle = True
+    , alwaysShowTitle = False
     , showContents = True
     , showMedia = True
     , showDates = True
@@ -103,7 +103,8 @@ showZkl zkl =
             ]
             [ E.text (zkl.othername |> Maybe.withDefault "")
             ]
-        , EI.button (E.alignRight :: Common.buttonStyle) { onPress = Just (SwitchPress zkl.otherid), label = E.text "↗" }
+        , EI.button (E.alignRight :: Common.buttonStyle)
+            { onPress = Just (SwitchPress zkl.otherid), label = E.text "↗" }
         ]
 
 
