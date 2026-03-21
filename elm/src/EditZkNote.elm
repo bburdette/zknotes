@@ -1901,7 +1901,7 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                                             always Noop
                                     , icon = EI.defaultCheckbox
                                     , checked = model.editableValue
-                                    , label = EI.labelLeft edlabelattr (E.text "editable by others")
+                                    , label = EI.labelLeft edlabelattr (E.text "shared editing")
                                     }
 
                               else
@@ -1910,7 +1910,7 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                                         { onChange = always Noop -- can't change editable unless you're the owner.
                                         , icon = EI.defaultCheckbox
                                         , checked = model.editableValue
-                                        , label = EI.labelLeft edlabelattr (E.text "editable by others")
+                                        , label = EI.labelLeft edlabelattr (E.text "shared editing")
                                         }
                                     , E.row
                                         [ E.spacing 8
@@ -1932,9 +1932,28 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                                             Just <| AddToSearchAsTag model.title
                                 }
                             ]
+                        , showPageLink model PlEdit
+                            |> Maybe.map
+                                (\elt ->
+                                    E.row [ E.spacing 8, E.width E.fill ]
+                                        [ E.text "edit url:", elt ]
+                                )
+                            |> Maybe.withDefault E.none
+                        , E.paragraph [ E.spacing 8, E.width E.fill ]
+                            [ E.text "server: "
+                            , E.text model.server
+                            , E.text
+                                (if model.server == model.ld.server then
+                                    " (local)"
+
+                                 else
+                                    " (remote)"
+                                )
+                            ]
                         , if public then
                             E.column [ E.spacing 8, E.padding 8, E.width E.fill, EBk.color TC.lightGrey ]
-                                [ E.row [ E.spacing 8, E.width E.fill ]
+                                [ E.row [ E.width E.fill ] [ E.el [ EF.bold, E.centerX ] <| E.text "public deets" ]
+                                , E.row [ E.spacing 8, E.width E.fill ]
                                     [ EI.checkbox [ E.width E.shrink ]
                                         { onChange =
                                             if editable then
@@ -1962,17 +1981,6 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                                       else
                                         E.none
                                     ]
-                                , EI.checkbox [ E.width E.shrink ]
-                                    { onChange =
-                                        if mine && editable then
-                                            ShowTitlePress
-
-                                        else
-                                            always Noop
-                                    , icon = EI.defaultCheckbox
-                                    , checked = model.showtitle
-                                    , label = EI.labelLeft edlabelattr (E.text "show title on public page")
-                                    }
                                 , showPageLink model PlPubId
                                     |> Maybe.map
                                         (\elt ->
@@ -1994,6 +2002,17 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                                                 [ E.text "file url:", elt ]
                                         )
                                     |> Maybe.withDefault E.none
+                                , EI.checkbox [ E.width E.shrink ]
+                                    { onChange =
+                                        if mine && editable then
+                                            ShowTitlePress
+
+                                        else
+                                            always Noop
+                                    , icon = EI.defaultCheckbox
+                                    , checked = model.showtitle
+                                    , label = EI.labelLeft edlabelattr (E.text "show title on public page")
+                                    }
                                 ]
 
                           else
@@ -2019,24 +2038,6 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
 
                           else
                             E.none
-                        , showPageLink model PlEdit
-                            |> Maybe.map
-                                (\elt ->
-                                    E.row [ E.spacing 8, E.width E.fill ]
-                                        [ E.text "edit url:", elt ]
-                                )
-                            |> Maybe.withDefault E.none
-                        , E.paragraph [ E.spacing 8, E.width E.fill ]
-                            [ E.text "server: "
-                            , E.text model.server
-                            , E.text
-                                (if model.server == model.ld.server then
-                                    " (local)"
-
-                                 else
-                                    " (remote)"
-                                )
-                            ]
                         , dates
                         ]
 
