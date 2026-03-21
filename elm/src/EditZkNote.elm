@@ -1879,7 +1879,14 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                                         , checked = model.editableValue
                                         , label = EI.labelLeft edlabelattr (E.text "editable")
                                         }
-                                    , E.row [ E.spacing 8, E.alignRight, EF.color TC.darkGrey ] [ E.text "creator", E.el [ EF.bold ] <| E.text model.noteUserName ]
+                                    , E.row
+                                        [ E.spacing 8
+                                        , E.alignRight
+                                        , EF.color TC.darkGrey
+                                        ]
+                                        [ E.text "creator"
+                                        , E.el [ EF.bold ] <| E.text model.noteUserName
+                                        ]
                                     ]
                             , EI.checkbox [ E.width E.shrink ]
                                 { onChange =
@@ -2313,11 +2320,11 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                                         , ( EtComments, "comments" )
                                         ]
                                     , case model.documentTab of
-                                        DtRaw ->
-                                            rawview
-
                                         DtEdit ->
                                             mdview
+
+                                        DtRaw ->
+                                            rawview
 
                                         DtComments ->
                                             E.column [ E.alignTop, E.width E.fill, E.spacing 5 ] showComments
@@ -2655,8 +2662,8 @@ initNew fui ld links mobile =
     , changeddate = Nothing
     , cells = getCd cc
     , revert = Nothing
-    , tab = EtRaw
-    , documentTab = DtRaw
+    , tab = EtEdit
+    , documentTab = DtEdit
     , dialog = Nothing
     , panelNote = Nothing
     , mbReplaceString = Nothing
