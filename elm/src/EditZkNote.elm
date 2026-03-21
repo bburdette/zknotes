@@ -1943,12 +1943,9 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
 
                               else
                                 E.none
-                            , if wclass /= Narrow then
-                                showpagelink
-
-                              else
-                                E.none
                             ]
+                        , E.row [ E.spacing 8, E.width E.fill ]
+                            [ E.text "url:", showpagelink ]
                         , E.paragraph [ E.spacing 8, E.width E.fill ]
                             [ E.text "server: "
                             , E.text model.server
@@ -1974,12 +1971,7 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                 , E.width E.fill
                 , E.paddingXY 5 0
                 ]
-                [ if wclass == Narrow then
-                    showpagelink
-
-                  else
-                    E.none
-                , EI.multiline
+                [ EI.multiline
                     ([ if editable then
                         EF.color TC.black
 
@@ -2112,7 +2104,11 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
         showpagelink =
             case pageLink model of
                 Just pl ->
-                    E.newTabLink Common.linkStyle { url = pl, label = E.text pl }
+                    E.paragraph
+                        [ E.htmlAttribute (HA.style "overflow-wrap" "anywhere")
+                        ]
+                        [ E.newTabLink Common.linkStyle { url = pl, label = E.text pl }
+                        ]
 
                 Nothing ->
                     E.none
@@ -2182,6 +2178,7 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                                             , E.spacing 8
                                             ]
                                             [ Common.navbar 2
+                                                -- no raw tab for special notes
                                                 (case model.documentTab of
                                                     DtRaw ->
                                                         EtLinks
@@ -2206,7 +2203,6 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                                                 DtEdit ->
                                                     showLinks TC.white
 
-                                                -- editview
                                                 DtComments ->
                                                     E.column [ E.width E.fill, E.spacing 5 ] showComments
 
@@ -2218,6 +2214,7 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
 
                                 else
                                     [ Common.navbar 2
+                                        -- no raw tab for special notes
                                         (case model.documentTab of
                                             DtRaw ->
                                                 EtLinks
