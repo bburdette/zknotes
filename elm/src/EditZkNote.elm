@@ -1881,11 +1881,10 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                                 E.text
                                     ("info "
                                         ++ (if model.showDeets then
-                                                "⯆"
+                                                "▼"
 
                                             else
-                                                -- "▶"
-                                                "⯈"
+                                                "▶"
                                            )
                                     )
                             }
