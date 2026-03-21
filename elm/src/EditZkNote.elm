@@ -27,7 +27,6 @@ module EditZkNote exposing
     , onSaved
     , onTASelection
     , onWkKeyPress
-    , pageLink
     , replaceOrAdd
     , saveZkLinkList
     , setCurrentSlideNote
@@ -77,7 +76,6 @@ import MdGui as MG
 import NoteCache as NC exposing (NoteCache)
 import Orgauth.Data exposing (UserId(..))
 import RequestsDialog exposing (TRequests)
-import Route
 import SearchStackPanel as SP
 import SnListEdit as SLE
 import SpecialNotes
@@ -1007,23 +1005,52 @@ showZkl fontsize bkcolor isDirty editable focusLink ld _ sysColor showflip zkl =
         E.row [ E.spacing 8, E.width E.fill, E.height <| E.px 30 ] display
 
 
-pageLink : Model -> Maybe String
-pageLink model =
+type PageLink
+    = PlFile
+    | PlPublic
+    | PlEdit
+    | PlPubId
+
+
+pageLink : Model -> PageLink -> Maybe String
+pageLink model pl =
     model.id
         |> Maybe.andThen
             (\id ->
-                if model.filestatus /= Data.NotAFile then
-                    Just <| UB.absolute [ "file", zkNoteIdToString id ] []
+                case pl of
+                    PlFile ->
+                        if model.filestatus /= Data.NotAFile then
+                            Just <| UB.absolute [ "file", zkNoteIdToString id ] []
 
-                else if isPublic model then
-                    if model.pubidtxt /= "" then
-                        Just <| UB.absolute [ "page", model.pubidtxt ] []
+                        else
+                            Nothing
 
-                    else
-                        Just <| UB.absolute [ "note", zkNoteIdToString id ] []
+                    PlPublic ->
+                        if isPublic model then
+                            Just <| UB.absolute [ "note", zkNoteIdToString id ] []
 
-                else
-                    Just <| UB.absolute [ "editnote", zkNoteIdToString id ] []
+                        else
+                            Nothing
+
+                    PlPubId ->
+                        if isPublic model && model.pubidtxt /= "" then
+                            Just <| UB.absolute [ "page", model.pubidtxt ] []
+
+                        else
+                            Nothing
+
+                    PlEdit ->
+                        Just <| UB.absolute [ "editnote", zkNoteIdToString id ] []
+            )
+
+
+showPageLink : Model -> PageLink -> Maybe (E.Element a)
+showPageLink model pl =
+    pageLink model pl
+        |> Maybe.map
+            (\s ->
+                E.paragraph []
+                    [ E.newTabLink Common.linkStyle { url = s, label = E.text s } ]
             )
 
 
@@ -1874,7 +1901,7 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                                             always Noop
                                     , icon = EI.defaultCheckbox
                                     , checked = model.editableValue
-                                    , label = EI.labelLeft edlabelattr (E.text "editable")
+                                    , label = EI.labelLeft edlabelattr (E.text "editable by others")
                                     }
 
                               else
@@ -1883,7 +1910,7 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                                         { onChange = always Noop -- can't change editable unless you're the owner.
                                         , icon = EI.defaultCheckbox
                                         , checked = model.editableValue
-                                        , label = EI.labelLeft edlabelattr (E.text "editable")
+                                        , label = EI.labelLeft edlabelattr (E.text "editable by others")
                                         }
                                     , E.row
                                         [ E.spacing 8
@@ -1894,17 +1921,6 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                                         , E.el [ EF.bold ] <| E.text model.noteUserName
                                         ]
                                     ]
-                            , EI.checkbox [ E.width E.shrink ]
-                                { onChange =
-                                    if mine && editable then
-                                        ShowTitlePress
-
-                                    else
-                                        always Noop
-                                , icon = EI.defaultCheckbox
-                                , checked = model.showtitle
-                                , label = EI.labelLeft edlabelattr (E.text "show title")
-                                }
                             , EI.button (E.alignRight :: Common.buttonStyle)
                                 { label = E.text "search >"
                                 , onPress =
@@ -1916,8 +1932,72 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                                             Just <| AddToSearchAsTag model.title
                                 }
                             ]
-                        , E.row [ E.spacing 8, E.width E.fill ]
-                            [ EI.checkbox [ E.width E.shrink ]
+                        , if public then
+                            E.column [ E.spacing 8, E.padding 8, E.width E.fill, EBk.color TC.lightGrey ]
+                                [ E.row [ E.spacing 8, E.width E.fill ]
+                                    [ EI.checkbox [ E.width E.shrink ]
+                                        { onChange =
+                                            if editable then
+                                                PublicPress
+
+                                            else
+                                                always Noop
+                                        , icon = EI.defaultCheckbox
+                                        , checked = public
+                                        , label = EI.labelLeft edlabelattr (E.text "public")
+                                        }
+                                    , if public then
+                                        EI.text [ E.width E.fill ]
+                                            { onChange =
+                                                if editable then
+                                                    OnPubidChanged
+
+                                                else
+                                                    always Noop
+                                            , text = model.pubidtxt
+                                            , placeholder = Nothing
+                                            , label = EI.labelLeft edlabelattr (E.text "article id")
+                                            }
+
+                                      else
+                                        E.none
+                                    ]
+                                , EI.checkbox [ E.width E.shrink ]
+                                    { onChange =
+                                        if mine && editable then
+                                            ShowTitlePress
+
+                                        else
+                                            always Noop
+                                    , icon = EI.defaultCheckbox
+                                    , checked = model.showtitle
+                                    , label = EI.labelLeft edlabelattr (E.text "show title on public page")
+                                    }
+                                , showPageLink model PlPubId
+                                    |> Maybe.map
+                                        (\elt ->
+                                            E.row [ E.spacing 8, E.width E.fill ]
+                                                [ E.text "article id url:", elt ]
+                                        )
+                                    |> Maybe.withDefault E.none
+                                , showPageLink model PlPublic
+                                    |> Maybe.map
+                                        (\elt ->
+                                            E.row [ E.spacing 8, E.width E.fill ]
+                                                [ E.text "public url:", elt ]
+                                        )
+                                    |> Maybe.withDefault E.none
+                                , showPageLink model PlFile
+                                    |> Maybe.map
+                                        (\elt ->
+                                            E.row [ E.spacing 8, E.width E.fill ]
+                                                [ E.text "file url:", elt ]
+                                        )
+                                    |> Maybe.withDefault E.none
+                                ]
+
+                          else
+                            EI.checkbox [ E.width E.shrink ]
                                 { onChange =
                                     if editable then
                                         PublicPress
@@ -1928,24 +2008,24 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                                 , checked = public
                                 , label = EI.labelLeft edlabelattr (E.text "public")
                                 }
-                            , if public then
-                                EI.text [ E.width E.fill ]
-                                    { onChange =
-                                        if editable then
-                                            OnPubidChanged
+                        , if not public then
+                            showPageLink model PlFile
+                                |> Maybe.map
+                                    (\elt ->
+                                        E.row [ E.spacing 8, E.width E.fill ]
+                                            [ E.text "file url:", elt ]
+                                    )
+                                |> Maybe.withDefault E.none
 
-                                        else
-                                            always Noop
-                                    , text = model.pubidtxt
-                                    , placeholder = Nothing
-                                    , label = EI.labelLeft edlabelattr (E.text "article id")
-                                    }
-
-                              else
-                                E.none
-                            ]
-                        , E.row [ E.spacing 8, E.width E.fill ]
-                            [ E.text "url:", showpagelink ]
+                          else
+                            E.none
+                        , showPageLink model PlEdit
+                            |> Maybe.map
+                                (\elt ->
+                                    E.row [ E.spacing 8, E.width E.fill ]
+                                        [ E.text "edit url:", elt ]
+                                )
+                            |> Maybe.withDefault E.none
                         , E.paragraph [ E.spacing 8, E.width E.fill ]
                             [ E.text "server: "
                             , E.text model.server
@@ -2100,18 +2180,6 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
 
         ttviews =
             TT.makeViews stylePalette (Just size) recentZkns spmodel zknSearchResult model.tagThings (controlRow stylePalette isdirty model)
-
-        showpagelink =
-            case pageLink model of
-                Just pl ->
-                    E.paragraph
-                        [ E.htmlAttribute (HA.style "overflow-wrap" "anywhere")
-                        ]
-                        [ E.newTabLink Common.linkStyle { url = pl, label = E.text pl }
-                        ]
-
-                Nothing ->
-                    E.none
 
         headingPanel : String -> List (E.Attribute Msg) -> Element Msg -> Element Msg
         headingPanel name attribs elt =
