@@ -1,18 +1,20 @@
 module SpecialNotesGui exposing (..)
 
 import ArchiveListing exposing (Command)
+import Color
 import Common
 import Data exposing (AndOr(..), LzLink, SaveLzLink, SearchMod(..), TagSearch(..), ZkListNote, ZkNoteId(..))
 import DataUtil exposing (NlLink, zkNoteIdToString)
 import Dict exposing (Dict)
 import Element as E
+import Element.Background as EBg
 import Element.Font as EF
 import Element.Input as EI
 import Html.Attributes as HA
 import SearchUtil exposing (showTagSearch)
 import Set
 import SnListEdit as SLE exposing (DragDropWhat(..), nllDndSubscriptions)
-import SpecialNotes as SN exposing (CompletedSync, SpecialNote)
+import SpecialNotes as SN exposing (CompletedSync, SpecialNote, StyleColor, StylePalette)
 import TDict
 import Time
 import Util
@@ -24,6 +26,8 @@ type Msg
     | GraphFocusClick
     | SlideShowClick
     | ToMarkdownPress
+    | ChangeColorClick ScElement StyleColor
+    | ColorChanged ScElement StyleColor
     | SLEMsg SLE.Msg
     | Noop
 
@@ -35,6 +39,7 @@ type Command
     | DndCmd (Cmd Msg)
     | SlideShow (Maybe ZkNoteId) (List NlLink)
     | ToMarkdown String
+    | PickColor Color.Color (Color.Color -> Msg)
     | None
 
 
@@ -42,6 +47,101 @@ type SpecialNoteState
     = SnsSearch (List TagSearch)
     | SnsSync CompletedSync
     | SnsList SLE.Model
+    | SnsStylePalette StylePalette
+
+
+type ScElement
+    = ScButtons
+    | ScButtonFontColor
+    | ScTabs
+    | ScBackground
+    | ScTabBackground
+    | ScFontColor
+    | ScSavecolor
+
+
+getScColor : ScElement -> StylePalette -> StyleColor
+getScColor se stylePalette =
+    case se of
+        ScButtons ->
+            stylePalette.buttons
+
+        ScButtonFontColor ->
+            stylePalette.buttonFontColor
+
+        ScTabs ->
+            stylePalette.tabs
+
+        ScBackground ->
+            stylePalette.background
+
+        ScTabBackground ->
+            stylePalette.tabBackground
+
+        ScFontColor ->
+            stylePalette.fontColor
+
+        ScSavecolor ->
+            stylePalette.savecolor
+
+
+getSeName : ScElement -> String
+getSeName se =
+    case se of
+        ScButtons ->
+            "buttons"
+
+        ScButtonFontColor ->
+            "button font color"
+
+        ScTabs ->
+            "tabs"
+
+        ScBackground ->
+            "background"
+
+        ScTabBackground ->
+            "tab background"
+
+        ScFontColor ->
+            "font color"
+
+        ScSavecolor ->
+            "savecolor"
+
+
+getColor : ScElement -> StylePalette -> E.Color
+getColor se sp =
+    let
+        c =
+            getScColor se sp
+    in
+    E.rgb255 c.red c.green c.blue
+
+
+setScColor : ScElement -> StyleColor -> StylePalette -> StylePalette
+setScColor styleColors color stylePalette =
+    case styleColors of
+        ScButtons ->
+            { stylePalette | buttons = color }
+
+        ScButtonFontColor ->
+            { stylePalette | buttonFontColor = color }
+
+        ScTabs ->
+            { stylePalette | tabs = color }
+
+        ScBackground ->
+            { stylePalette | background = color }
+
+        ScTabBackground ->
+            { stylePalette | tabBackground = color }
+
+        ScFontColor ->
+            { stylePalette | fontColor = color }
+
+        ScSavecolor ->
+            { stylePalette | savecolor = color }
 
 
 initSpecialNoteStateLz : ZkNoteId -> SN.SpecialNote -> List LzLink -> SpecialNoteState
@@ -60,6 +160,9 @@ initSpecialNoteState sn lzls =
 
         SN.SnList notegraph ->
             SnsList (SLE.init notegraph lzls)
+
+        SN.SnStylePalette stylePalette ->
+            SnsStylePalette stylePalette
 
 
 dirty : Maybe SpecialNoteState -> Maybe SpecialNoteState -> Bool
@@ -84,6 +187,9 @@ getSpecialNote sns =
         SnsList slem ->
             SN.SnList slem.ng
 
+        SnsStylePalette stylePalette ->
+            SN.SnStylePalette stylePalette
+
 
 sngSubscriptions : SpecialNoteState -> List (Sub Msg)
 sngSubscriptions sns =
@@ -96,6 +202,9 @@ sngSubscriptions sns =
 
         SnsList slem ->
             List.map (Sub.map SLEMsg) <| nllDndSubscriptions slem
+
+        SnsStylePalette _ ->
+            []
 
 
 saveLzLinks : ZkNoteId -> SpecialNoteState -> List SaveLzLink
@@ -121,6 +230,9 @@ saveLzLinks this sns =
                 ( this, [] )
                 (filterNotes this slem.nlls)
                 |> Tuple.second
+
+        SnsStylePalette _ ->
+            []
 
 
 guiSn :
@@ -205,6 +317,25 @@ guiSn zone fontsize snote =
                 , E.map SLEMsg <| SLE.view fontsize slem
                 ]
 
+        SnsStylePalette sp ->
+            E.column []
+                (List.map
+                    (\sce ->
+                        E.row []
+                            [ E.text (getSeName sce)
+                            , E.row [ E.width <| E.px 15, EBg.color <| getColor sce sp ] []
+                            ]
+                    )
+                    [ ScButtons
+                    , ScButtonFontColor
+                    , ScTabs
+                    , ScBackground
+                    , ScTabBackground
+                    , ScFontColor
+                    , ScSavecolor
+                    ]
+                )
+
 
 lzToDict : Dict String LzLink -> DataUtil.LzlDict
 lzToDict lzls =
@@ -273,6 +404,9 @@ addNotes this zlns sns =
 
         SnsSync s ->
             SnsSync s
+
+        SnsStylePalette s ->
+            SnsStylePalette s
 
 
 filterNotes : ZkNoteId -> List NlLink -> List NlLink
@@ -383,6 +517,12 @@ updateSn msg snote =
                 GraphFocusClick ->
                     ( SnsSearch tagsearches, None )
 
+                ChangeColorClick _ _ ->
+                    ( SnsSearch tagsearches, None )
+
+                ColorChanged _ _ ->
+                    ( SnsSearch tagsearches, None )
+
                 SlideShowClick ->
                     ( SnsSearch tagsearches, None )
 
@@ -406,6 +546,12 @@ updateSn msg snote =
                 GraphFocusClick ->
                     ( SnsSync completedSync, None )
 
+                ChangeColorClick _ _ ->
+                    ( SnsSync completedSync, None )
+
+                ColorChanged _ _ ->
+                    ( SnsSync completedSync, None )
+
                 SlideShowClick ->
                     ( SnsSync completedSync, None )
 
@@ -427,6 +573,12 @@ updateSn msg snote =
         SnsList slem ->
             case msg of
                 GraphFocusClick ->
+                    ( SnsList slem, GraphFocus )
+
+                ChangeColorClick _ _ ->
+                    ( SnsList slem, GraphFocus )
+
+                ColorChanged _ _ ->
                     ( SnsList slem, GraphFocus )
 
                 SlideShowClick ->
@@ -460,3 +612,45 @@ updateSn msg snote =
 
                 Noop ->
                     ( SnsList slem, None )
+
+        SnsStylePalette ssp ->
+            case msg of
+                GraphFocusClick ->
+                    ( SnsStylePalette ssp, None )
+
+                ChangeColorClick se sc ->
+                    ( SnsStylePalette ssp
+                    , PickColor
+                        (Color.rgb255 sc.red sc.green sc.blue)
+                        (\c ->
+                            ColorChanged
+                                se
+                                (let
+                                    rgba =
+                                        Color.toRgba c
+                                 in
+                                 { red = rgba.red * 255 |> round, green = rgba.green * 255 |> round, blue = rgba.blue * 255 |> round }
+                                )
+                        )
+                    )
+
+                ColorChanged _ _ ->
+                    ( SnsStylePalette ssp, None )
+
+                SlideShowClick ->
+                    ( SnsStylePalette ssp, None )
+
+                CopySearchPress ->
+                    ( SnsStylePalette ssp, None )
+
+                ToMarkdownPress ->
+                    ( SnsStylePalette ssp, None )
+
+                CopySyncSearchPress _ ->
+                    ( SnsStylePalette ssp, None )
+
+                SLEMsg _ ->
+                    ( SnsStylePalette ssp, None )
+
+                Noop ->
+                    ( SnsStylePalette ssp, None )

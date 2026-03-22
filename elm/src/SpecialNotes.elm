@@ -47,6 +47,7 @@ type SpecialNote
     = SnSearch (List (TagSearch))
     | SnSync (CompletedSync)
     | SnList (Notegraph)
+    | SnStylePalette (StylePalette)
 
 
 specialNoteEncoder : SpecialNote -> Json.Encode.Value
@@ -58,6 +59,8 @@ specialNoteEncoder enum =
             Json.Encode.object [ ( "SnSync", completedSyncEncoder inner ) ]
         SnList inner ->
             Json.Encode.object [ ( "SnList", notegraphEncoder inner ) ]
+        SnStylePalette inner ->
+            Json.Encode.object [ ( "SnStylePalette", stylePaletteEncoder inner ) ]
 
 type alias CompletedSync =
     { after : Maybe (Int)
@@ -89,6 +92,46 @@ notegraphEncoder struct =
         ]
 
 
+type alias StyleColor =
+    { red : Int
+    , green : Int
+    , blue : Int
+    }
+
+
+styleColorEncoder : StyleColor -> Json.Encode.Value
+styleColorEncoder struct =
+    Json.Encode.object
+        [ ( "red", (Json.Encode.int) struct.red )
+        , ( "green", (Json.Encode.int) struct.green )
+        , ( "blue", (Json.Encode.int) struct.blue )
+        ]
+
+
+type alias StylePalette =
+    { buttons : StyleColor
+    , buttonFontColor : StyleColor
+    , tabs : StyleColor
+    , background : StyleColor
+    , tabBackground : StyleColor
+    , fontColor : StyleColor
+    , savecolor : StyleColor
+    }
+
+
+stylePaletteEncoder : StylePalette -> Json.Encode.Value
+stylePaletteEncoder struct =
+    Json.Encode.object
+        [ ( "buttons", (styleColorEncoder) struct.buttons )
+        , ( "buttonFontColor", (styleColorEncoder) struct.buttonFontColor )
+        , ( "tabs", (styleColorEncoder) struct.tabs )
+        , ( "Background", (styleColorEncoder) struct.background )
+        , ( "tabBackground", (styleColorEncoder) struct.tabBackground )
+        , ( "fontColor", (styleColorEncoder) struct.fontColor )
+        , ( "savecolor", (styleColorEncoder) struct.savecolor )
+        ]
+
+
 serverDecoder : Json.Decode.Decoder Server
 serverDecoder =
     Json.Decode.succeed Server
@@ -102,6 +145,7 @@ specialNoteDecoder =
         [ Json.Decode.map SnSearch (Json.Decode.field "SnSearch" (Json.Decode.list (tagSearchDecoder)))
         , Json.Decode.map SnSync (Json.Decode.field "SnSync" (completedSyncDecoder))
         , Json.Decode.map SnList (Json.Decode.field "SnList" (notegraphDecoder))
+        , Json.Decode.map SnStylePalette (Json.Decode.field "SnStylePalette" (stylePaletteDecoder))
         ]
 
 completedSyncDecoder : Json.Decode.Decoder CompletedSync
@@ -117,5 +161,25 @@ notegraphDecoder : Json.Decode.Decoder Notegraph
 notegraphDecoder =
     Json.Decode.succeed Notegraph
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "currentUuid" (Json.Decode.nullable (Json.Decode.string))))
+
+
+styleColorDecoder : Json.Decode.Decoder StyleColor
+styleColorDecoder =
+    Json.Decode.succeed StyleColor
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "red" (Json.Decode.int)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "green" (Json.Decode.int)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "blue" (Json.Decode.int)))
+
+
+stylePaletteDecoder : Json.Decode.Decoder StylePalette
+stylePaletteDecoder =
+    Json.Decode.succeed StylePalette
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "buttons" (styleColorDecoder)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "buttonFontColor" (styleColorDecoder)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "tabs" (styleColorDecoder)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "Background" (styleColorDecoder)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "tabBackground" (styleColorDecoder)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "fontColor" (styleColorDecoder)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "savecolor" (styleColorDecoder)))
 
 

@@ -179,12 +179,16 @@ import Orgauth.Data exposing (UserId(..), userIdDecoder, userIdEncoder)"#,
                     sn::SpecialNote,
                     sn::CompletedSync,
                     sn::Notegraph,
+                    sn::StyleColor,
+                    sn::StylePalette,
         ]
         // generates types and decoders for types implementing ElmDecoder
         decoders: [zc::Server,
                     sn::SpecialNote,
                     sn::CompletedSync,
                     sn::Notegraph,
+                    sn::StyleColor,
+                    sn::StylePalette,
         ]
         // generates types and functions for forming queries for types implementing ElmQuery
         queries: [],

@@ -47,6 +47,7 @@ module EditZkNote exposing
 import Browser.Dom as BD
 import Cellme.Cellme exposing (CellContainer(..), RunState(..), evalCellsFully)
 import Cellme.DictCellme exposing (CellDict(..), getCd, mkCc)
+import Color exposing (Color)
 import Common
 import Data exposing (ArchivesOrCurrent(..), Direction(..), EditLink, ZkNoteId)
 import DataUtil exposing (EditTab(..), FileUrlInfo, NlLink, lzlKey, zkNoteIdToString, zklKey, zniCompare, zniEq)
@@ -272,6 +273,7 @@ type Command
     | SPMod (SP.Model -> ( SP.Model, SP.Command ))
     | InlineXform Int MB.Inline (MB.Inline -> MG.Msg)
     | SlideShow (Maybe ZkNoteId) (List NlLink)
+    | PickColor Color (Color -> SNG.Msg)
     | Cmd (Cmd Msg) (Maybe Command)
 
 
@@ -4207,6 +4209,9 @@ update noteCache msg model =
                               }
                             , None
                             )
+
+                        SNG.PickColor scElement styleColor ->
+                            ( model, PickColor scElement styleColor )
 
                         SNG.None ->
                             ( umod

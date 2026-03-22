@@ -4,6 +4,7 @@ import ArchiveListing
 import Browser
 import Browser.Events
 import Browser.Navigation
+import Color exposing (Color)
 import Common
 import Data exposing (PrivateClosureRequest, ZkNoteId(..))
 import DataUtil exposing (EditTab(..), FileUrlInfo, LoginData, jobComplete, showPrivateReply)
@@ -42,6 +43,7 @@ import Orgauth.ResetPassword as ResetPassword
 import Orgauth.ShowUrl as ShowUrl
 import Orgauth.UserEdit as UserEdit
 import Orgauth.UserListing as UserListing
+import PickColorDialog as PCD
 import Platform.Cmd as Cmd
 import Random exposing (Seed, initialSeed)
 import RequestsDialog exposing (TRequest(..), TRequests)
@@ -123,6 +125,7 @@ type Msg
     | InviteUserMsg (TagAThing.Msg InviteUser.Msg)
     | JobsPollTick Time.Posix
     | SlideShowMsg SlideShow.Msg
+    | PickColorDialogMsg (GD.Msg PCD.Msg)
     | Noop
 
 
@@ -158,6 +161,7 @@ type State
     | MdInlineXform MdInlineXform.GDModel State
     | Wait State (Model -> Msg -> ( Model, Cmd Msg ))
     | SlideShow (Maybe ZkNoteId) SlideShow.Model State
+    | PickColorDialog PCD.GDModel (Color -> Msg) State
 
 
 decodeFlags : JD.Decoder Flags
@@ -636,7 +640,7 @@ stateRoute state =
             , save = True
             }
 
-        SlideShow mbid ssmod _ ->
+        SlideShow mbid _ _ ->
             case mbid of
                 Just id ->
                     { route = Route.SlideShow id
@@ -717,6 +721,9 @@ stateRoute state =
             top
 
         Wait _ _ ->
+            top
+
+        PickColorDialog _ _ _ ->
             top
 
 
@@ -928,6 +935,9 @@ showMessage msg =
         SlideShowMsg _ ->
             "SlideShowMsg"
 
+        PickColorDialogMsg _ ->
+            "PickColorDialogMsg"
+
 
 showState : State -> String
 showState state =
@@ -1024,6 +1034,9 @@ showState state =
 
         SlideShow _ _ _ ->
             "SlideShow"
+
+        PickColorDialog _ _ _ ->
+            "PickColorDialog_"
 
 
 unexpectedMsg : Model -> Msg -> Model
@@ -1147,6 +1160,9 @@ viewState size state model =
         SlideShow _ ssmodel _ ->
             E.map SlideShowMsg <| SlideShow.view model.timezone size.width model.noteCache ssmodel
 
+        PickColorDialog _ _ _ ->
+            E.none
+
 
 stateLogin : State -> Maybe LoginData
 stateLogin state =
@@ -1242,6 +1258,9 @@ stateLogin state =
             Just login
 
         SlideShow _ _ instate ->
+            stateLogin instate
+
+        PickColorDialog _ _ instate ->
             stateLogin instate
 
 
@@ -1566,6 +1585,18 @@ view model =
                             (Just { width = min 600 model.size.width, height = min 500 model.size.height })
                             -- use the live-updated model
                             { dm | model = model.trackedRequests }
+
+            PickColorDialog dm _ _ ->
+                if model.mobile then
+                    E.layout [] <|
+                        E.map PickColorDialogMsg <|
+                            GD.dialogView Nothing dm
+
+                else
+                    Html.map PickColorDialogMsg <|
+                        GD.layout
+                            (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                            dm
 
             _ ->
                 E.layout
@@ -3762,6 +3793,31 @@ actualupdate msg model =
         ( RequestsDialogMsg _, _ ) ->
             ( model, Cmd.none )
 
+        ( PickColorDialogMsg bm, PickColorDialog bs tomsg prevstate ) ->
+            case GD.update bm bs of
+                GD.Dialog nmod ->
+                    ( { model
+                        | state = PickColorDialog nmod tomsg prevstate
+                      }
+                    , Cmd.none
+                    )
+
+                GD.Ok return ->
+                    let
+                        pm =
+                            { model | state = prevstate }
+
+                        ( m, c ) =
+                            actualupdate (tomsg return) pm
+                    in
+                    ( m, Cmd.none )
+
+                GD.Cancel ->
+                    ( { model | state = prevstate }, Cmd.none )
+
+        ( PickColorDialogMsg _, _ ) ->
+            ( model, Cmd.none )
+
         ( x, _ ) ->
             ( unexpectedMsg model x
             , Cmd.none
@@ -4355,6 +4411,21 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                             ( model
                             , Cmd.none
                             )
+
+                EditZkNote.PickColor color tomsg ->
+                    ( { model
+                        | state =
+                            PickColorDialog
+                                (PCD.init
+                                    color
+                                    Common.buttonStyle
+                                    (E.map (\_ -> ()) (viewState model.size model.state model))
+                                )
+                                (\blah -> EditZkNoteMsg (EditZkNote.SNGMsg (tomsg blah)))
+                                model.state
+                      }
+                    , Cmd.none
+                    )
 
                 EditZkNote.Cmd cmd mbcommand ->
                     let

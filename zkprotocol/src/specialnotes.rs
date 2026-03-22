@@ -9,6 +9,7 @@ pub enum SpecialNote {
   SnSearch(Vec<TagSearch>),
   SnSync(CompletedSync),
   SnList(Notegraph),
+  SnStylePalette(StylePalette),
   // SnDateTime(DateTime),
   // SnAlert(Alert),
 }
@@ -29,6 +30,24 @@ pub struct CompletedSync {
   pub now: i64,
   pub local: Option<Uuid>,  // optional for backward compatibility
   pub remote: Option<Uuid>, // optional for backward compatibility
+}
+
+#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
+pub struct StyleColor {
+  pub red: u8,
+  pub green: u8,
+  pub blue: u8,
+}
+
+#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
+pub struct StylePalette {
+  pub buttons: StyleColor,
+  pub buttonFontColor: StyleColor,
+  pub tabs: StyleColor,
+  pub Background: StyleColor,
+  pub tabBackground: StyleColor,
+  pub fontColor: StyleColor,
+  pub savecolor: StyleColor,
 }
 
 #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
