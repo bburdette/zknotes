@@ -87,6 +87,7 @@ import TangoColors as TC
 import Task
 import Time
 import Toop
+import Toop.Apply exposing (applyT10)
 import UUID
 import Url as U
 import Url.Builder as UB
@@ -438,14 +439,17 @@ editBlock mobile ddw i focus e =
 
         baseAttr =
             (if focus then
-                [ EBd.width 5 ]
+                [ EBd.width 0
+                , EBd.color TC.charcoal
+                , EBd.glow TC.lightCharcoal 2
+                , E.padding 5
+                ]
 
              else
-                []
+                [ E.padding 3 ]
             )
                 ++ [ E.width E.fill
                    , E.height E.fill
-                   , E.padding 3
                    , E.spacing 2
                    , E.htmlAttribute (HA.id bid)
                    ]
@@ -1265,55 +1269,55 @@ blockEd (Text t) renderer =
         [ E.width E.fill
         , E.spacing 8
         ]
-        ([ E.column
+        ([ E.row [ E.width E.fill, EE.onClick EditBlockOk ]
+            [ headingText "rendered: "
+            , E.wrappedRow (E.alignTop :: MG.rowtrib)
+                [ if t.original /= t.s then
+                    EI.button (edButtonStyle RevertBlock ++ [ E.alignRight ])
+                        { onPress = Nothing
+                        , label = E.text "revert"
+                        }
+
+                  else
+                    E.none
+                , if t.idx > 0 then
+                    EI.button (edButtonStyle JoinAboveBlock ++ [ E.alignRight ])
+                        { onPress = Nothing
+                        , label = E.text "join ↑"
+                        }
+
+                  else
+                    E.none
+                , EI.button (edButtonStyle JoinBelowBlock ++ [ E.alignRight ])
+                    { onPress = Nothing
+                    , label = E.text "join ↓"
+                    }
+                , EI.button (edButtonStyle JoinBlock ++ [ E.alignRight ])
+                    { onPress = Nothing
+                    , label = E.text "join"
+                    }
+                , EI.button (edButtonStyle SplitBlock ++ [ E.alignRight ])
+                    { onPress = Nothing
+                    , label = E.text "split"
+                    }
+                , EI.button (edButtonStyle SpaceEndingsBlock ++ [ E.alignRight ])
+                    { onPress = Nothing
+                    , label = E.text "endings"
+                    }
+                , EI.button (edButtonStyle (RemoveBlock t.idx) ++ [ E.alignRight ])
+                    { onPress = Nothing
+                    , label = E.text "🗑"
+                    }
+                ]
+            ]
+         , E.column
             [ E.padding 2
-            , EBd.glow TC.darkGray 5.0
+            , EBd.glow TC.darkGray 2
             , EE.onClick EditBlockOk
             , E.width E.fill
             , E.spacing 8
             ]
-            [ E.row [ E.width E.fill ]
-                [ headingText "rendered: "
-                , E.wrappedRow (E.alignTop :: MG.rowtrib)
-                    [ if t.original /= t.s then
-                        EI.button (edButtonStyle RevertBlock ++ [ E.alignRight ])
-                            { onPress = Nothing
-                            , label = E.text "revert"
-                            }
-
-                      else
-                        E.none
-                    , if t.idx > 0 then
-                        EI.button (edButtonStyle JoinAboveBlock ++ [ E.alignRight ])
-                            { onPress = Nothing
-                            , label = E.text "join ↑"
-                            }
-
-                      else
-                        E.none
-                    , EI.button (edButtonStyle JoinBelowBlock ++ [ E.alignRight ])
-                        { onPress = Nothing
-                        , label = E.text "join ↓"
-                        }
-                    , EI.button (edButtonStyle JoinBlock ++ [ E.alignRight ])
-                        { onPress = Nothing
-                        , label = E.text "join"
-                        }
-                    , EI.button (edButtonStyle SplitBlock ++ [ E.alignRight ])
-                        { onPress = Nothing
-                        , label = E.text "split"
-                        }
-                    , EI.button (edButtonStyle SpaceEndingsBlock ++ [ E.alignRight ])
-                        { onPress = Nothing
-                        , label = E.text "endings"
-                        }
-                    , EI.button (edButtonStyle (RemoveBlock t.idx) ++ [ E.alignRight ])
-                        { onPress = Nothing
-                        , label = E.text "🗑"
-                        }
-                    ]
-                ]
-            , case MC.markdownView renderer t.s of
+            [ case MC.markdownView renderer t.s of
                 Ok elts ->
                     E.column [ E.width E.fill, E.spacing 8 ] elts
 
@@ -1393,12 +1397,10 @@ renderBlocks mobile zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo drop
                                 E.padding 20
 
                             MC.EditView ->
-                                E.paddingEach { top = 20, right = 20, bottom = 20, left = 2 }
+                                E.paddingEach { top = 20, right = 2, bottom = 20, left = 2 }
                        , E.width (E.fill |> E.maximum 1000)
                        , E.centerX
                        , E.alignTop
-                       , EBd.width 2
-                       , EBd.color TC.darkGrey
                        , EBk.color TC.lightGrey
                        ]
                 )
