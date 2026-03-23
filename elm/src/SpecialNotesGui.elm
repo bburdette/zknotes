@@ -8,6 +8,7 @@ import DataUtil exposing (NlLink, zkNoteIdToString)
 import Dict exposing (Dict)
 import Element as E
 import Element.Background as EBg
+import Element.Border as EBd
 import Element.Font as EF
 import Element.Input as EI
 import Html.Attributes as HA
@@ -58,6 +59,18 @@ type ScElement
     | ScTabBackground
     | ScFontColor
     | ScSavecolor
+
+
+defaultStylePalette : StylePalette
+defaultStylePalette =
+    { buttons = { red = 10, green = 10, blue = 10 }
+    , buttonFontColor = { red = 10, green = 10, blue = 10 }
+    , tabs = { red = 10, green = 10, blue = 10 }
+    , background = { red = 10, green = 10, blue = 10 }
+    , tabBackground = { red = 10, green = 10, blue = 10 }
+    , fontColor = { red = 10, green = 10, blue = 10 }
+    , savecolor = { red = 10, green = 10, blue = 10 }
+    }
 
 
 getScColor : ScElement -> StylePalette -> StyleColor
@@ -323,7 +336,11 @@ guiSn zone fontsize snote =
                     (\sce ->
                         E.row []
                             [ E.text (getSeName sce)
-                            , E.row [ E.width <| E.px 15, EBg.color <| getColor sce sp ] []
+                            , E.row [ E.width <| E.px 15, E.height <| E.px 15, EBg.color <| getColor sce sp, EBd.width 1 ] []
+                            , EI.button Common.buttonStyle
+                                { onPress = Just <| ChangeColorClick sce (getScColor sce sp)
+                                , label = E.text ">"
+                                }
                             ]
                     )
                     [ ScButtons
@@ -634,8 +651,8 @@ updateSn msg snote =
                         )
                     )
 
-                ColorChanged _ _ ->
-                    ( SnsStylePalette ssp, None )
+                ColorChanged se sc ->
+                    ( SnsStylePalette (setScColor se sc ssp), None )
 
                 SlideShowClick ->
                     ( SnsStylePalette ssp, None )

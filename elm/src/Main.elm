@@ -54,7 +54,7 @@ import SelectString as SS
 import ShowMessage
 import SlideShow
 import SpecialNotes as SN
-import SpecialNotesGui
+import SpecialNotesGui as SNG
 import TSet
 import TagAThing
 import TagFiles
@@ -1878,7 +1878,7 @@ onZkNoteEditWhat model pt znew =
             em =
                 case JD.decodeString SN.specialNoteDecoder znew.znl.zknote.content of
                     Ok sn ->
-                        EM.initSpecial (SpecialNotesGui.initSpecialNoteStateLz znew.znl.zknote.id sn znew.znl.lzlinks)
+                        EM.initSpecial (SNG.initSpecialNoteStateLz znew.znl.zknote.id sn znew.znl.lzlinks)
 
                     Err _ ->
                         EM.initMd znew.znl.zknote.content
@@ -1886,7 +1886,7 @@ onZkNoteEditWhat model pt znew =
             ( ns, cmd ) =
                 -- going into slideshow mode.
                 case EM.getSpecialNoteState em of
-                    Just (SpecialNotesGui.SnsList slem) ->
+                    Just (SNG.SnsList slem) ->
                         case slem.nlls of
                             fst :: rest ->
                                 let
@@ -2335,6 +2335,24 @@ actualupdate msg model =
                         , stylePalette = { s | fontSize = size }
                       }
                     , LS.storeLocalVal { name = "fontsize", value = String.fromInt size }
+                    )
+
+                UserSettings.NewStylePalette ->
+                    let
+                        st =
+                            EditZkNote.initNew model.fui login [] model.mobile
+                    in
+                    ( { model
+                        | state =
+                            EditZkNote
+                                { st
+                                    | edMarkdown =
+                                        EM.initSpecial
+                                            (SNG.initSpecialNoteState (SN.SnStylePalette SNG.defaultStylePalette) [])
+                                }
+                                login
+                      }
+                    , Cmd.none
                     )
 
                 UserSettings.None ->

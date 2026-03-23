@@ -18,6 +18,7 @@ type Msg
     | ChangeRemoteUrlPress
     | SetFontSize Int
     | LogOutPress
+    | NewStylePalettePress
 
 
 type Command
@@ -27,6 +28,7 @@ type Command
     | ChangeEmail
     | ChangeFontSize Int
     | ChangeRemoteUrl
+    | NewStylePalette
     | None
 
 
@@ -88,6 +90,7 @@ view model =
 
                     Nothing ->
                         E.el [ E.centerX ] <| E.text "local user"
+                , EI.button (E.centerX :: buttonStyle) { onPress = Just NewStylePalettePress, label = E.text "new style palette" }
                 , EI.slider
                     [ E.height (E.px 30)
                     , E.behindContent
@@ -137,6 +140,9 @@ update msg model =
 
         SetFontSize size ->
             ( { model | fontsize = size }, ChangeFontSize size )
+
+        NewStylePalettePress ->
+            ( model, NewStylePalette )
 
         Noop ->
             ( model, None )
