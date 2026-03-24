@@ -455,6 +455,11 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: Option<i64>) -> Result<Server,
     zkm::udpate40(&dbfile)?;
     set_single_value(&conn, "migration_level", "40")?;
   }
+  if nlevel < 41 {
+    info!("udpate41");
+    zkm::udpate41(&dbfile)?;
+    set_single_value(&conn, "migration_level", "41")?;
+  }
 
   info!("db up to date.");
 
@@ -587,8 +592,7 @@ pub fn save_zklink(
 
   // now create the new record or modify the existing.
   conn.execute(
-    "insert into zklink (fromid, toid, user, linkzknote, createdate) values (?1, ?2, ?3, ?4, ?5)
-      on conflict (fromid, toid, user) do update set linkzknote = ?4 where fromid = ?1 and toid = ?2 and user = ?3",
+    "insert into zklink (fromid, toid, user, linkzknote, createdate) values (?1, ?2, ?3, ?4, ?5)",
     params![fromid, toid, user.to_i64(), linkzknote, now],
   )?;
 

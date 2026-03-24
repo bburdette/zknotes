@@ -152,6 +152,8 @@ pub async fn save_sync(
   Ok(id)
 }
 
+// these are used to track new records we just downloaded from the remote
+// so we don't upload them back again.
 pub struct TempTableNames {
   pub notetemp: String,
   pub archivenotetemp: String,
@@ -160,7 +162,6 @@ pub struct TempTableNames {
 }
 
 pub fn temp_tables(conn: &Connection) -> Result<TempTableNames, zkerr::Error> {
-  // // create temporary tables for links and notes we get from the remote.
   // create temporary tables for links and notes we get from the remote.
   let id = sqldata::update_single_value(&conn, "sync_id", |x| match x.parse::<i64>() {
     Ok(n) => (n + 1).to_string(),
@@ -869,7 +870,7 @@ where
       Err(Err(e)) => Err(e),
     }?;
 
-    let ex =  conn.execute(
+    let ex = conn.execute(
         "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, file, server, createdate, changeddate)
          values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
       params![
@@ -1073,41 +1074,69 @@ where
   // let mut bytes = 0;
 
   while let SyncMessage::ArchiveZkLink(ref l) = sm {
-    let mbid = match conn.execute(
-      "insert into zklinkarchive (fromid, toid, user, linkzknote, createdate, deletedate)
-              select FN.id, TN.id, U.id, LN.id, ?1, ?2
-              from zknote FN, zknote TN, orgauth_user U, zknote LN
-              where FN.uuid = ?3
-                and TN.uuid = ?4
-                and U.uuid = ?5
-                and LN.uuid = ?6",
-      params![
-        l.createdate,
-        l.deletedate,
-        l.fromUuid,
-        l.toUuid,
-        l.userUuid,
-        l.linkUuid,
-      ],
-    ) {
-      Ok(_x) => Some(conn.last_insert_rowid()),
-      Err(rusqlite::Error::SqliteFailure(e, s)) => {
-        if e.code == rusqlite::ErrorCode::ConstraintViolation {
-          // if duplicate record, just ignore and go on.
-          debug!("duplicate archivelink: {:?}", l);
-          None
-        } else {
-          return Err(rusqlite::Error::SqliteFailure(e, s).into());
+    // need to accounty for LN.uuid = null??
+    let mbid = match &l.linkUuid {
+      Some(lnid) => match conn.execute(
+        "insert into zklinkarchive (fromid, toid, user, linkzknote, createdate, deletedate)
+                  select FN.id, TN.id, U.id, LN.id, ?1, ?2
+                  from zknote FN, zknote TN, orgauth_user U, zknote LN
+                  where FN.uuid = ?3
+                    and TN.uuid = ?4
+                    and U.uuid = ?5
+                    and LN.uuid = ?6",
+        params![
+          l.createdate,
+          l.deletedate,
+          l.fromUuid,
+          l.toUuid,
+          l.userUuid,
+          lnid,
+        ],
+      ) {
+        Ok(_x) => Some(conn.last_insert_rowid()),
+        Err(rusqlite::Error::SqliteFailure(e, s)) => {
+          // actually there is no unique index on zklinkarchive so can this even happen?
+          if e.code == rusqlite::ErrorCode::ConstraintViolation {
+            // if duplicate record, just ignore and go on.
+            println!("duplicate archivelink: {:?}", l);
+            None
+          } else {
+            return Err(rusqlite::Error::SqliteFailure(e, s).into());
+          }
         }
-      }
-      Err(e) => return Err(e)?,
+        Err(e) => return Err(e)?,
+      },
+      None => match conn.execute(
+        "insert into zklinkarchive (fromid, toid, user, linkzknote, createdate, deletedate)
+                  select FN.id, TN.id, U.id, null, ?1, ?2
+                  from zknote FN, zknote TN, orgauth_user U
+                  where FN.uuid = ?3
+                    and TN.uuid = ?4
+                    and U.uuid = ?5",
+        params![l.createdate, l.deletedate, l.fromUuid, l.toUuid, l.userUuid],
+      ) {
+        Ok(_x) => Some(conn.last_insert_rowid()),
+        Err(rusqlite::Error::SqliteFailure(e, s)) => {
+          // actually there is no unique index on zklinkarchive so can this even happen?
+          if e.code == rusqlite::ErrorCode::ConstraintViolation {
+            // if duplicate record, just ignore and go on.
+            println!("duplicate archivelink: {:?}", l);
+            None
+          } else {
+            return Err(rusqlite::Error::SqliteFailure(e, s).into());
+          }
+        }
+        Err(e) => return Err(e)?,
+      },
     };
+
     if let (Some(lt), Some(id)) = (&archivelinktemp, mbid) {
       conn.execute(
         format!("insert into {} values (?1)", lt).as_str(),
         params![id],
       )?;
     }
+
     count = count + 1;
     saved = saved + mbid.map_or(0, |_| 1);
     // bytes = bytes + nc;

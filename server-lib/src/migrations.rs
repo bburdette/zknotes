@@ -3113,3 +3113,14 @@ pub fn udpate40(dbfile: &Path) -> Result<(), zkerr::Error> {
   tr.commit()?;
   Ok(())
 }
+
+pub fn udpate41(dbfile: &Path) -> Result<(), zkerr::Error> {
+  // db connection without foreign key checking.
+  let conn = Connection::open(dbfile)?;
+  let tr = conn.unchecked_transaction()?;
+  conn.execute("drop index 'zklinkunq';", params![])?;
+  conn.execute("CREATE UNIQUE INDEX \"zklinkunq\" ON \"zklink\" (\"fromid\", \"toid\", \"user\", \"linkzknote\");", params![])?;
+
+  tr.commit()?;
+  Ok(())
+}
