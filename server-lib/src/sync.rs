@@ -152,6 +152,8 @@ pub async fn save_sync(
   Ok(id)
 }
 
+// these are used to track new records we just downloaded from the remote
+// so we don't upload them back again.
 pub struct TempTableNames {
   pub notetemp: String,
   pub archivenotetemp: String,
@@ -1127,19 +1129,12 @@ where
         Err(e) => return Err(e)?,
       },
     };
-    println!("archivezknlinkinserted: {:?}, {:?}", mbid, l);
 
     if let (Some(lt), Some(id)) = (&archivelinktemp, mbid) {
-      match conn.execute(
+      conn.execute(
         format!("insert into {} values (?1)", lt).as_str(),
         params![id],
-      ) {
-        Ok(_) => (),
-        Err(e) => {
-          println!("violation! {:?}, {:?}", mbid, l);
-          Err(e)?;
-        }
-      }
+      )?;
     }
 
     count = count + 1;
