@@ -2526,7 +2526,7 @@ pub fn read_zklinks_since_stream(
             ""
           },
           if let Some(el) = exclude_links {
-            format!(" and (ZL.fromid, ZL.toid, ZL.user) not in (select fromid, toid, user from {})", el)
+            format!(" and (ZL.fromid, ZL.toid, ZL.linkzknote, ZL.user) not in (select fromid, toid, linkzknote, user from {})", el)
           }
         else { "".to_string()
         }

@@ -197,6 +197,7 @@ pub fn temp_tables(conn: &Connection) -> Result<TempTableNames, zkerr::Error> {
       "create temporary table {} (
       \"fromid\" INTEGER NOT NULL,
       \"toid\" INTEGER NOT NULL,
+      \"linkzknote\" INTEGER,
       \"user\" INTEGER NOT NULL)",
       linktemp
     )
@@ -206,7 +207,7 @@ pub fn temp_tables(conn: &Connection) -> Result<TempTableNames, zkerr::Error> {
 
   conn.execute(
     format!(
-      "CREATE UNIQUE INDEX \"{}unq\" ON \"{}\" (\"fromid\", \"toid\", \"user\")",
+      "CREATE UNIQUE INDEX \"{}unq\" ON \"{}\" (\"fromid\", \"toid\", \"linkzknote\", \"user\")",
       linktemp, linktemp
     )
     .as_str(),
@@ -1207,16 +1208,18 @@ where
       if ins == 1 {
         conn.execute(
           format!(
-            "insert into {} (fromid, toid, user)
-            select FN.id, TN.id, U.id
+            "insert into {} (fromid, toid, linkzknote, user)
+            select FN.id, TN.id, LN.id, U.id
               from zknote FN, zknote TN, orgauth_user U
+                  left outer join zknote LN
+                   on LN.uuid = ?4
                   where FN.uuid = ?1
                     and TN.uuid = ?2
                     and U.uuid = ?3",
             lt
           )
           .as_str(),
-          params![l.fromUuid, l.toUuid, l.userUuid],
+          params![l.fromUuid, l.toUuid, l.userUuid, l.linkUuid],
         )?;
       }
     }
