@@ -18,9 +18,7 @@
   };
 
 
-  outputs = { self, nixpkgs, flake-utils, naersk, fenix
-  # , elm-language-server
-}:
+  outputs = { self, nixpkgs, flake-utils, naersk, fenix }:
     let
       makeElmPkg = { pkgs, additionalInputs ? [ ], pythonPackages ? (ps: [ ]) }:
         pkgs.stdenv.mkDerivation {
@@ -117,14 +115,12 @@
               elmPackages.elm-upgrade
               elmPackages.elm-xref
               elmPackages.elm-language-server
-              # elm-language-server.defaultPackage.${system}
               elmPackages.elm-verify-examples
-              # elmPackages.elmi-to-json
               elmPackages.elm-optimize-level-2
             ];
 
             # Need RUST_SRC_PATH so that rust-analyzer sees rust stdlib
-            shellHook = ''
+          shellHook = ''
               export RUST_SRC_PATH=${toolchain.rust-src}/lib/rustlib/src/rust/library
             '';
 
