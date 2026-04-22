@@ -15,7 +15,6 @@ import Html.Attributes as HA
 import Html.Events as HE
 import Json.Decode as JD
 import NoteCache exposing (NoteCache)
-import SpecialNotes exposing (Notegraph)
 import TSet
 import TangoColors as TC
 import Util
@@ -32,16 +31,16 @@ type Msg
 
 
 type alias Model =
-    { ng : Notegraph
+    { currentUuid : Maybe String
     , nlls : List NlLink
     , nllDnd : DnDList.Model
     , selected : ZniSet
     }
 
 
-init : Notegraph -> List NlLink -> Model
-init ng nlls =
-    { ng = ng
+init : Maybe String -> List NlLink -> Model
+init currentUuid nlls =
+    { currentUuid = currentUuid
     , nlls = nlls
     , nllDnd = nllDndSystem.model
     , selected = emptyZniSet
@@ -52,8 +51,8 @@ dirty : Model -> Model -> Bool
 dirty new old =
     -- leave 'selected' out of the comparison
     not
-        (new.ng
-            == old.ng
+        (new.currentUuid
+            == old.currentUuid
             && new.nlls
             == old.nlls
             && new.nllDnd
@@ -93,12 +92,8 @@ update msg model =
             }
 
         Play id ->
-            let
-                ng =
-                    model.ng
-            in
             { model
-                | ng = { ng | currentUuid = Just <| zkNoteIdToString id }
+                | currentUuid = Just <| zkNoteIdToString id
             }
 
         Remove ->
@@ -208,7 +203,7 @@ view fontsize model =
                                         ]
                                     <|
                                         [ E.text nl.title ]
-                                , if Just nl.id == Maybe.map Data.Zni model.ng.currentUuid then
+                                , if Just nl.id == Maybe.map Data.Zni model.currentUuid then
                                     E.el [ EF.bold ] (E.text "▶")
 
                                   else

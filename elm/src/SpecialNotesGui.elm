@@ -58,8 +58,8 @@ initSpecialNoteState sn lzls =
         SN.SnSync completedSync ->
             SnsSync completedSync
 
-        SN.SnList notegraph ->
-            SnsList (SLE.init notegraph lzls)
+        SN.SnList ->
+            SnsList (SLE.init Nothing lzls)
 
 
 dirty : Maybe SpecialNoteState -> Maybe SpecialNoteState -> Bool
@@ -81,8 +81,8 @@ getSpecialNote sns =
         SnsSync completedSync ->
             SN.SnSync completedSync
 
-        SnsList slem ->
-            SN.SnList slem.ng
+        SnsList _ ->
+            SN.SnList
 
 
 sngSubscriptions : SpecialNoteState -> List (Sub Msg)
@@ -241,7 +241,7 @@ addNotes this zlns sns =
                 notes =
                     List.map (\zln -> { id = zln.id, title = zln.title }) zlns
             in
-            case slem.ng.currentUuid of
+            case slem.currentUuid of
                 Nothing ->
                     SnsList
                         { slem | nlls = filterNotes this <| notes ++ slem.nlls }
@@ -430,7 +430,7 @@ updateSn msg snote =
                     ( SnsList slem, GraphFocus )
 
                 SlideShowClick ->
-                    ( SnsList slem, SlideShow (Maybe.map Zni slem.ng.currentUuid) slem.nlls )
+                    ( SnsList slem, SlideShow (Maybe.map Zni slem.currentUuid) slem.nlls )
 
                 ToMarkdownPress ->
                     ( SnsList slem

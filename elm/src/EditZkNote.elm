@@ -582,7 +582,7 @@ setCurrentSlideNote mbznid model =
         Just (SnsList slem) ->
             { model
                 | edMarkdown =
-                    EM.initSpecial (SnsList { slem | ng = { currentUuid = Maybe.map zkNoteIdToString mbznid } })
+                    EM.initSpecial (SnsList { slem | currentUuid = Maybe.map zkNoteIdToString mbznid })
             }
 
         _ ->
@@ -4120,7 +4120,7 @@ update noteCache msg model =
                                     )
 
                         sns =
-                            initSpecialNoteState (SpecialNotes.SnList { currentUuid = Nothing }) links
+                            initSpecialNoteState SpecialNotes.SnList links
                     in
                     ( { model
                         | edMarkdown = EM.updateSpecialNoteState sns

@@ -1860,7 +1860,7 @@ onZkNoteEditWhat model pt znew =
                             fst :: rest ->
                                 let
                                     ( st, c ) =
-                                        SlideShow.init model.fui model.noteCache (Maybe.map Data.Zni slem.ng.currentUuid) fst rest
+                                        SlideShow.init model.fui model.noteCache (Maybe.map Data.Zni slem.currentUuid) fst rest
                                 in
                                 ( SlideShow (Just znew.znl.zknote.id) st model.state
                                 , case c of
