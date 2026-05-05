@@ -44,6 +44,32 @@ type SpecialNoteState
     | SnsList SLE.Model
 
 
+saveLocalData : SpecialNoteState -> Maybe String
+saveLocalData sns =
+    case sns of
+        SnsSearch _ ->
+            Nothing
+
+        SnsSync _ ->
+            Nothing
+
+        SnsList m ->
+            m.currentUuid
+
+
+couldUseLocalData : SpecialNoteState -> Bool
+couldUseLocalData sns =
+    case sns of
+        SnsSearch _ ->
+            False
+
+        SnsSync _ ->
+            False
+
+        SnsList m ->
+            True
+
+
 initSpecialNoteStateLz : ZkNoteId -> SN.SpecialNote -> List LzLink -> SpecialNoteState
 initSpecialNoteStateLz znid sn lzls =
     initSpecialNoteState sn (mklzList znid lzls)
