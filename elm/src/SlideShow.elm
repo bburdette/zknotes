@@ -18,6 +18,7 @@ type alias Model =
     , current : Int
     , viewModel : Maybe View.Model
     , fui : FileUrlInfo
+    , mbparentid : Maybe ZkNoteId
     }
 
 
@@ -31,7 +32,56 @@ type Msg
 type Command
     = Close (Maybe ZkNoteId)
     | GetNote ZkNoteId
+    | SaveCurrent ZkNoteId ZkNoteId
+    | GetNoteAndSaveCurrent ZkNoteId ZkNoteId
     | Noop
+
+
+combineCommands : Command -> Command -> Command
+combineCommands l r =
+    case l of
+        Noop ->
+            r
+
+        Close _ ->
+            l
+
+        GetNote i ->
+            case r of
+                Close _ ->
+                    r
+
+                Noop ->
+                    l
+
+                SaveCurrent j k ->
+                    GetNoteAndSaveCurrent j k
+
+                GetNote _ ->
+                    l
+
+                GetNoteAndSaveCurrent x y ->
+                    GetNoteAndSaveCurrent x y
+
+        SaveCurrent i j ->
+            case r of
+                Close _ ->
+                    r
+
+                Noop ->
+                    l
+
+                SaveCurrent _ _ ->
+                    l
+
+                GetNote _ ->
+                    GetNoteAndSaveCurrent i j
+
+                GetNoteAndSaveCurrent _ _ ->
+                    GetNoteAndSaveCurrent i j
+
+        GetNoteAndSaveCurrent _ _ ->
+            l
 
 
 viewConfig : View.Config
@@ -48,8 +98,8 @@ viewConfig =
     }
 
 
-init : FileUrlInfo -> NoteCache -> Maybe ZkNoteId -> NlLink -> List NlLink -> ( Model, Command )
-init fui nc mbcurrent nl rnlls =
+init : FileUrlInfo -> NoteCache -> Maybe ZkNoteId -> Maybe ZkNoteId -> NlLink -> List NlLink -> ( Model, Command )
+init fui nc mbparent mbcurrent nl rnlls =
     let
         nlls =
             Array.fromList (nl :: rnlls)
@@ -80,6 +130,7 @@ init fui nc mbcurrent nl rnlls =
                 Nothing ->
                     Nothing
       , fui = fui
+      , mbparentid = mbparent
       }
     , case ce of
         Just (ZNAL _) ->
@@ -119,6 +170,16 @@ view tz maxw nc model =
         ]
 
 
+saveCurrent : Model -> Command
+saveCurrent model =
+    case ( Array.get model.current model.nlls, model.mbparentid ) of
+        ( Just nll, Just pid ) ->
+            SaveCurrent pid nll.id
+
+        _ ->
+            Noop
+
+
 update : Msg -> NoteCache -> Model -> ( Model, Command )
 update msg nc model =
     case msg of
@@ -130,6 +191,7 @@ update msg nc model =
                         (model.current + 1)
             }
                 |> updateNote nc
+                |> (\( m, c ) -> ( m, combineCommands (saveCurrent m) c ))
 
         PrevPress ->
             { model

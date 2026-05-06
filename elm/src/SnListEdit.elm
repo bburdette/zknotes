@@ -38,6 +38,11 @@ type alias Model =
     }
 
 
+type Command
+    = SaveLocalData String
+    | None
+
+
 init : Maybe String -> List NlLink -> Model
 init currentUuid nlls =
     { currentUuid = currentUuid
@@ -51,9 +56,7 @@ dirty : Model -> Model -> Bool
 dirty new old =
     -- leave 'selected' out of the comparison
     not
-        (new.currentUuid
-            == old.currentUuid
-            && new.nlls
+        (new.nlls
             == old.nlls
             && new.nllDnd
             == old.nllDnd
@@ -65,39 +68,43 @@ commands model =
     nllDndSystem.commands model.nllDnd
 
 
-update : Msg -> Model -> Model
+update : Msg -> Model -> ( Model, Command )
 update msg model =
     case msg of
         GraphFocusClick ->
-            model
+            ( model, None )
 
         EditItem _ ->
-            model
+            ( model, None )
 
         DnDMsg dmsg ->
             let
                 ( nm, lst ) =
                     nllDndSystem.update dmsg model.nllDnd model.nlls
             in
-            { model | nllDnd = nm, nlls = lst }
+            ( { model | nllDnd = nm, nlls = lst }, None )
 
         Select id ->
-            { model
+            ( { model
                 | selected =
                     if TSet.member id model.selected then
                         TSet.remove id model.selected
 
                     else
                         TSet.insert id model.selected
-            }
+              }
+            , None
+            )
 
         Play id ->
-            { model
+            ( { model
                 | currentUuid = Just <| zkNoteIdToString id
-            }
+              }
+            , SaveLocalData (zkNoteIdToString id)
+            )
 
         Remove ->
-            { model
+            ( { model
                 | nlls =
                     model.nlls
                         |> List.filter
@@ -106,7 +113,9 @@ update msg model =
                                     TSet.member nl.id model.selected
                             )
                 , selected = emptyZniSet
-            }
+              }
+            , None
+            )
 
 
 controlRow : ZkNoteId -> E.Element Msg

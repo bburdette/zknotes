@@ -35,6 +35,8 @@ type Command
     | DndCmd (Cmd Msg)
     | SlideShow (Maybe ZkNoteId) (List NlLink)
     | ToMarkdown String
+    | SaveLocalData String
+    | Batch (List Command)
     | None
 
 
@@ -57,26 +59,40 @@ saveLocalData sns =
             m.currentUuid
 
 
-couldUseLocalData : SpecialNoteState -> Bool
-couldUseLocalData sns =
+mbLocalDataId : ZkNoteId -> SpecialNote -> Maybe String
+mbLocalDataId zni sn =
+    if couldUseLocalState sn then
+        Just <| localDataId zni
+
+    else
+        Nothing
+
+
+couldUseLocalState : SpecialNote -> Bool
+couldUseLocalState sns =
     case sns of
-        SnsSearch _ ->
+        SN.SnSearch _ ->
             False
 
-        SnsSync _ ->
+        SN.SnSync _ ->
             False
 
-        SnsList m ->
+        SN.SnList ->
             True
 
 
-initSpecialNoteStateLz : ZkNoteId -> SN.SpecialNote -> List LzLink -> SpecialNoteState
-initSpecialNoteStateLz znid sn lzls =
-    initSpecialNoteState sn (mklzList znid lzls)
+localDataId : ZkNoteId -> String
+localDataId zni =
+    zkNoteIdToString zni ++ "-snstate"
 
 
-initSpecialNoteState : SN.SpecialNote -> List NlLink -> SpecialNoteState
-initSpecialNoteState sn lzls =
+initSpecialNoteStateLz : ZkNoteId -> SN.SpecialNote -> Maybe String -> List LzLink -> SpecialNoteState
+initSpecialNoteStateLz znid sn mbsnstate lzls =
+    initSpecialNoteState sn mbsnstate (mklzList znid lzls)
+
+
+initSpecialNoteState : SN.SpecialNote -> Maybe String -> List NlLink -> SpecialNoteState
+initSpecialNoteState sn mbsnstate lzls =
     case sn of
         SN.SnSearch tagSearch ->
             SnsSearch tagSearch
@@ -85,7 +101,7 @@ initSpecialNoteState sn lzls =
             SnsSync completedSync
 
         SN.SnList ->
-            SnsList (SLE.init Nothing lzls)
+            SnsList (SLE.init mbsnstate lzls)
 
 
 dirty : Maybe SpecialNoteState -> Maybe SpecialNoteState -> Bool
@@ -479,10 +495,28 @@ updateSn msg snote =
 
                 SLEMsg m ->
                     let
-                        nm =
+                        ( nm, c ) =
                             SLE.update m slem
+
+                        nc =
+                            case c of
+                                SLE.None ->
+                                    Nothing
+
+                                SLE.SaveLocalData s ->
+                                    Just <| SaveLocalData s
+
+                        dc =
+                            DndCmd <| Cmd.map SLEMsg <| SLE.commands nm
                     in
-                    ( SnsList nm, DndCmd <| Cmd.map SLEMsg <| SLE.commands nm )
+                    ( SnsList nm
+                    , case nc of
+                        Nothing ->
+                            dc
+
+                        Just s ->
+                            Batch [ dc, s ]
+                    )
 
                 Noop ->
                     ( SnsList slem, None )

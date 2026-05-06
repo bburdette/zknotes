@@ -204,6 +204,14 @@ maxCacheNotes =
     100
 
 
+type LocalValAction
+    = LocalValAction
+        { for : String
+        , name : String
+        , action : Maybe String -> ( Model, Cmd Msg )
+        }
+
+
 type alias Model =
     { state : State
     , size : Util.Size
@@ -225,6 +233,7 @@ type alias Model =
     , ziClosures : Dict Int (Result Http.Error ( Time.Posix, Data.PrivateReply ) -> Msg)
     , mobile : Bool
     , spmodel : SP.Model
+    , localValAction : Maybe LocalValAction
     , zknSearchResult : Data.ZkListNoteSearchResult
     }
 
@@ -1844,88 +1853,120 @@ onZkNoteEditWhat model pt znew =
                 NC.addNote pt znew.znl.zknote.id (NC.ZNAL znew.znl) model.noteCache
                     |> NC.purgeNotes
 
-            em =
+            lr =
                 case JD.decodeString SN.specialNoteDecoder znew.znl.zknote.content of
                     Ok sn ->
-                        EM.initSpecial (SpecialNotesGui.initSpecialNoteStateLz znew.znl.zknote.id sn znew.znl.lzlinks)
+                        case SpecialNotesGui.mbLocalDataId znew.znl.zknote.id sn of
+                            Just lid ->
+                                Left
+                                    ( lid
+                                    , \mbst ->
+                                        EM.initSpecial (SpecialNotesGui.initSpecialNoteStateLz znew.znl.zknote.id sn mbst znew.znl.lzlinks)
+                                    )
+
+                            Nothing ->
+                                Right <| EM.initSpecial (SpecialNotesGui.initSpecialNoteStateLz znew.znl.zknote.id sn Nothing znew.znl.lzlinks)
 
                     Err _ ->
-                        EM.initMd znew.znl.zknote.content
+                        Right <| EM.initMd znew.znl.zknote.content
 
-            ( ns, cmd ) =
-                -- going into slideshow mode.
-                case EM.getSpecialNoteState em of
-                    Just (SpecialNotesGui.SnsList slem) ->
-                        case slem.nlls of
-                            fst :: rest ->
-                                let
-                                    ( st, c ) =
-                                        SlideShow.init model.fui model.noteCache (Maybe.map Data.Zni slem.currentUuid) fst rest
-                                in
-                                ( SlideShow (Just znew.znl.zknote.id) st model.state
-                                , case c of
-                                    SlideShow.GetNote id ->
-                                        makeNoteCacheGet model id
+            toSt =
+                \em ->
+                    let
+                        ( ns, cmd ) =
+                            -- going into slideshow mode.
+                            case EM.getSpecialNoteState em of
+                                Just (SpecialNotesGui.SnsList slem) ->
+                                    case slem.nlls of
+                                        fst :: rest ->
+                                            let
+                                                ( st, c ) =
+                                                    SlideShow.init model.fui model.noteCache (Just znew.znl.zknote.id) (Maybe.map Data.Zni slem.currentUuid) fst rest
+                                            in
+                                            ( SlideShow (Just znew.znl.zknote.id) st model.state
+                                            , case c of
+                                                SlideShow.GetNote id ->
+                                                    makeNoteCacheGet model id
 
-                                    _ ->
-                                        Cmd.none
-                                )
+                                                _ ->
+                                                    Cmd.none
+                                            )
 
-                            _ ->
-                                ( displayMessageDialogState model "empty slideshow"
-                                , Cmd.none
-                                )
+                                        _ ->
+                                            ( displayMessageDialogState model "empty slideshow"
+                                            , Cmd.none
+                                            )
 
-                    _ ->
-                        ( displayMessageDialogState model "not a slideshow"
-                        , Cmd.none
-                        )
+                                _ ->
+                                    ( displayMessageDialogState model "not a slideshow"
+                                    , Cmd.none
+                                    )
+                    in
+                    ( { model
+                        | noteCache = noteCache
+                        , state = ns
+                      }
+                    , cmd
+                    )
         in
-        ( { model
-            | noteCache = noteCache
-            , state = ns
-          }
-        , cmd
-        )
+        case lr of
+            Right em ->
+                toSt em
+
+            Left ( lid, st2em ) ->
+                ( { model | localValAction = Just <| LocalValAction { for = "lva", name = lid, action = st2em >> toSt } }
+                , LS.getLocalVal { for = "lva", name = lid }
+                )
 
     else
         case stateLogin state of
             Just login ->
                 let
-                    ( nst, c ) =
-                        EditZkNote.initFull model.fui
-                            login
-                            znew.znl.zknote
-                            znew.znl.links
-                            znew.znl.lzlinks
-                            model.mobile
-
-                    ngets =
-                        makeNoteCacheGets (EM.getContent nst.edMarkdown) model
+                    tom =
+                        \( nst, c ) ->
+                            let
+                                ngets =
+                                    makeNoteCacheGets (EM.getContent nst.edMarkdown) model
+                            in
+                            ( { model
+                                | state =
+                                    EditZkNote
+                                        nst
+                                        login
+                                , recentNotes =
+                                    let
+                                        zknote =
+                                            znew.znl.zknote
+                                    in
+                                    addRecentZkListNote model.recentNotes
+                                        { id = zknote.id
+                                        , user = zknote.user
+                                        , title = zknote.title
+                                        , filestatus = zknote.filestatus
+                                        , createdate = zknote.createdate
+                                        , changeddate = zknote.changeddate
+                                        , sysids = zknote.sysids
+                                        }
+                                , noteCache = NC.setKeeps (MC.noteIds (EM.getContent nst.edMarkdown)) model.noteCache
+                              }
+                            , Cmd.batch ((sendZIMsg model.fui <| Data.PvqGetZkNoteComments c) :: ngets)
+                            )
                 in
-                ( { model
-                    | state =
-                        EditZkNote
-                            nst
-                            login
-                    , recentNotes =
-                        let
-                            zknote =
-                                znew.znl.zknote
-                        in
-                        addRecentZkListNote model.recentNotes
-                            { id = zknote.id
-                            , user = zknote.user
-                            , title = zknote.title
-                            , filestatus = zknote.filestatus
-                            , createdate = zknote.createdate
-                            , changeddate = zknote.changeddate
-                            , sysids = zknote.sysids
-                            }
-                    , noteCache = NC.setKeeps (MC.noteIds (EM.getContent nst.edMarkdown)) model.noteCache
-                  }
-                , Cmd.batch ((sendZIMsg model.fui <| Data.PvqGetZkNoteComments c) :: ngets)
-                )
+                case
+                    EditZkNote.initFull model.fui
+                        login
+                        znew.znl.zknote
+                        znew.znl.links
+                        znew.znl.lzlinks
+                        model.mobile
+                of
+                    EditZkNote.Ready x ->
+                        tom x
+
+                    EditZkNote.LoadLocal lid st2em ->
+                        ( { model | localValAction = Just <| LocalValAction { for = "lva", name = lid, action = st2em >> tom } }
+                        , LS.getLocalVal { for = "lva", name = lid }
+                        )
 
             _ ->
                 ( unexpectedMessage model "ZkNoteEditWhat"
@@ -2013,9 +2054,17 @@ actualupdate msg model =
             in
             ( nmd, cmd )
 
-        ( ReceiveLocalVal _, _ ) ->
-            -- update the font size
-            ( model, Cmd.none )
+        ( ReceiveLocalVal lv, _ ) ->
+            case model.localValAction of
+                Just (LocalValAction lva) ->
+                    if lv.for == lva.for && lv.name == lva.name then
+                        lva.action lv.value
+
+                    else
+                        ( model, Cmd.none )
+
+                Nothing ->
+                    ( model, Cmd.none )
 
         ( TauriZkReplyData jd, _ ) ->
             case JD.decodeValue (makeTDDecoder Data.privateClosureReplyDecoder) jd of
@@ -3351,12 +3400,19 @@ actualupdate msg model =
                                             (\zknl ->
                                                 let
                                                     ( nst, cmts ) =
-                                                        EditZkNote.initFull model.fui
-                                                            login
-                                                            zknl.zknote
-                                                            zknl.links
-                                                            zknl.lzlinks
-                                                            model.mobile
+                                                        case
+                                                            EditZkNote.initFull model.fui
+                                                                login
+                                                                zknl.zknote
+                                                                zknl.links
+                                                                zknl.lzlinks
+                                                                model.mobile
+                                                        of
+                                                            EditZkNote.LoadLocal name tox ->
+                                                                tox (Maybe.map DataUtil.zkNoteIdToString mbcurrent)
+
+                                                            EditZkNote.Ready x ->
+                                                                x
 
                                                     ngets =
                                                         makeNoteCacheGets (EM.getContent nst.edMarkdown) model
@@ -3378,6 +3434,19 @@ actualupdate msg model =
                 SlideShow.GetNote id ->
                     ( { model | state = SlideShow mbid emod instate }
                     , makeNoteCacheGet model id
+                    )
+
+                SlideShow.SaveCurrent pid id ->
+                    ( { model | state = SlideShow mbid emod instate }
+                    , LS.storeLocalVal { name = SpecialNotesGui.localDataId pid, value = DataUtil.zkNoteIdToString id }
+                    )
+
+                SlideShow.GetNoteAndSaveCurrent pid id ->
+                    ( { model | state = SlideShow mbid emod instate }
+                    , Cmd.batch
+                        [ makeNoteCacheGet model id
+                        , LS.storeLocalVal { name = SpecialNotesGui.localDataId pid, value = DataUtil.zkNoteIdToString id }
+                        ]
                     )
 
         ( EditZkNoteMsg em, EditZkNote es login ) ->
@@ -3982,17 +4051,20 @@ makeNewNoteCacheGets md model =
 
 
 handleEditZkNoteCmd : Model -> LoginData -> ( EditZkNote.Model, EditZkNote.Command ) -> ( Model, Cmd Msg )
-handleEditZkNoteCmd model login ( emod, ecmd ) =
+handleEditZkNoteCmd amodel login ( emod, aecmd ) =
     let
+        toarr =
+            \( l, r ) -> ( l, [ r ] )
+
         backtolisting =
             let
                 nm =
-                    { model
+                    { amodel
                         | state =
-                            EditZkNoteListing { dialog = Nothing, zone = model.timezone } login
+                            EditZkNoteListing { dialog = Nothing, zone = amodel.timezone } login
                     }
             in
-            case SP.getSearch model.spmodel of
+            case SP.getSearch amodel.spmodel of
                 Just s ->
                     sendSearch nm s
 
@@ -4000,9 +4072,10 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     ( nm, Cmd.none )
 
         ngets =
-            makeNewNoteCacheGets (EM.getContent emod.edMarkdown) model
+            makeNewNoteCacheGets (EM.getContent emod.edMarkdown) amodel
 
-        ( rm, rcmd ) =
+        oncmd : EditZkNote.Command -> Model -> ( Model, List (Cmd Msg) )
+        oncmd ecmd model =
             case ecmd of
                 EditZkNote.SaveExit snpl ->
                     let
@@ -4048,8 +4121,9 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                                 )
                                 onmsg
                       }
-                    , sendZIMsg model.fui
-                        (Data.PvqSaveZkNoteAndLinks snpl)
+                    , [ sendZIMsg model.fui
+                            (Data.PvqSaveZkNoteAndLinks snpl)
+                      ]
                     )
 
                 EditZkNote.Save snpl ->
@@ -4059,15 +4133,16 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                         -- reset keeps on save, to get rid of unused notes.
                         , noteCache = NC.setKeeps (MC.noteIds (EM.getContent emod.edMarkdown)) model.noteCache
                       }
-                    , sendZIMsg model.fui
-                        (Data.PvqSaveZkNoteAndLinks snpl)
+                    , [ sendZIMsg model.fui
+                            (Data.PvqSaveZkNoteAndLinks snpl)
+                      ]
                     )
 
                 EditZkNote.None ->
-                    ( { model | state = EditZkNote emod login }, Cmd.none )
+                    ( { model | state = EditZkNote emod login }, [ Cmd.none ] )
 
                 EditZkNote.Revert ->
-                    backtolisting
+                    backtolisting |> toarr
 
                 EditZkNote.Delete id ->
                     -- issue delete and go back to listing.
@@ -4087,6 +4162,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                     , sendZIMsg model.fui
                         (Data.PvqDeleteZkNote id)
                     )
+                        |> toarr
 
                 EditZkNote.Switch id ->
                     let
@@ -4102,7 +4178,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                                 )
                             )
                     in
-                    ( { model | state = st }, cmd )
+                    ( { model | state = st }, cmd ) |> toarr
 
                 EditZkNote.SaveSwitch s id ->
                     let
@@ -4119,11 +4195,10 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                             )
                     in
                     ( { model | state = st }
-                    , Cmd.batch
-                        [ cmd
-                        , sendZIMsg model.fui
+                    , [ cmd
+                      , sendZIMsg model.fui
                             (Data.PvqSaveZkNoteAndLinks s)
-                        ]
+                      ]
                     )
 
                 EditZkNote.View v ->
@@ -4144,50 +4219,54 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                                 )
                                 (EditZkNote emod login)
                       }
-                    , Cmd.batch <|
-                        makeNoteCacheGets
-                            (case v.note of
-                                Left szn ->
-                                    szn.content
+                    , makeNoteCacheGets
+                        (case v.note of
+                            Left szn ->
+                                szn.content
 
-                                Right zknal ->
-                                    zknal.zknote.content
-                            )
-                            model
+                            Right zknal ->
+                                zknal.zknote.content
+                        )
+                        model
                     )
 
                 EditZkNote.GetTASelection id what ->
                     ( { model | state = EditZkNote emod login }
                     , getTASelection (JE.object [ ( "id", JE.string id ), ( "what", JE.string what ) ])
                     )
+                        |> toarr
 
                 EditZkNote.SyncFiles s ->
                     ( { model | state = EditZkNote emod login }
                     , sendZIMsg model.fui (Data.PvqSyncFiles s)
                     )
+                        |> toarr
 
                 EditZkNote.SearchHistory ->
                     ( shDialog model
-                    , Cmd.none
+                    , [ Cmd.none ]
                     )
 
                 EditZkNote.BigSearch ->
                     backtolisting
+                        |> toarr
 
                 EditZkNote.Settings ->
                     ( { model | state = UserSettings (UserSettings.init login model.stylePalette.fontSize) login (EditZkNote emod login) }
-                    , Cmd.none
+                    , [ Cmd.none ]
                     )
 
                 EditZkNote.Admin ->
                     ( model
                     , sendAIMsg model.fui.location OD.ArqGetUsers
                     )
+                        |> toarr
 
                 EditZkNote.SetHomeNote id ->
                     ( { model | state = EditZkNote emod login }
                     , sendZIMsg model.fui (Data.PvqSetHomeNote id)
                     )
+                        |> toarr
 
                 EditZkNote.AddToRecent zklns ->
                     ( { model
@@ -4200,16 +4279,17 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                                 model.recentNotes
                                 zklns
                       }
-                    , Cmd.none
+                    , [ Cmd.none ]
                     )
 
                 EditZkNote.ShowMessage e ->
-                    ( displayMessageDialog model e, Cmd.none )
+                    ( displayMessageDialog model e, [ Cmd.none ] )
 
                 EditZkNote.ShowArchives id ->
                     ( model
                     , sendZIMsg model.fui (Data.PvqGetZkNoteArchives { zknote = id, offset = 0, limit = Just SU.defaultSearchLimit })
                     )
+                        |> toarr
 
                 EditZkNote.FileUpload ->
                     ( model
@@ -4225,11 +4305,13 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                         -- using normal http upload.
                         FS.files [] OnFileSelected
                     )
+                        |> toarr
 
                 EditZkNote.Sync ->
                     ( model
                     , sendZIMsg model.fui Data.PvqSyncRemote
                     )
+                        |> toarr
 
                 EditZkNote.PowerTag ->
                     ( { model
@@ -4244,7 +4326,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                                 login
                                 model.state
                       }
-                    , Cmd.none
+                    , [ Cmd.none ]
                     )
 
                 EditZkNote.Requests ->
@@ -4258,7 +4340,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                                 )
                                 model.state
                       }
-                    , Cmd.none
+                    , [ Cmd.none ]
                     )
 
                 EditZkNote.Jobs ->
@@ -4272,7 +4354,7 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                                 )
                                 model.state
                       }
-                    , Cmd.none
+                    , [ Cmd.none ]
                     )
 
                 EditZkNote.SPMod fn ->
@@ -4305,10 +4387,12 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                               }
                             , getTASelection (JE.object [ ( "id", JE.string "mdtext" ), ( "what", JE.string "replacestring" ) ])
                             )
+                                |> toarr
 
                         _ ->
                             -- otherwise its all the usual stuff.
                             handleSPCmd nmod spcmd
+                                |> toarr
 
                 EditZkNote.InlineXform i inline f ->
                     ( { model
@@ -4324,36 +4408,45 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                                 )
                                 model.state
                       }
-                    , Cmd.none
+                    , [ Cmd.none ]
                     )
 
                 EditZkNote.SaveLinks szl ->
                     ( { model | state = EditZkNote emod login }
                     , sendZIMsg model.fui (Data.PvqSaveZkLinks szl)
                     )
+                        |> toarr
 
                 EditZkNote.SlideShow mbcurrent lst ->
                     case lst of
                         fst :: rest ->
                             let
                                 ( ssmod, sscmd ) =
-                                    SlideShow.init model.fui model.noteCache mbcurrent fst rest
+                                    SlideShow.init model.fui model.noteCache emod.id mbcurrent fst rest
                             in
                             ( { model | state = SlideShow emod.id ssmod (EditZkNote emod login) }
                             , case sscmd of
                                 SlideShow.GetNote id ->
-                                    makeNoteCacheGet model id
+                                    [ makeNoteCacheGet model id ]
 
                                 SlideShow.Close _ ->
-                                    Cmd.none
+                                    [ Cmd.none ]
 
                                 SlideShow.Noop ->
-                                    Cmd.none
+                                    [ Cmd.none ]
+
+                                SlideShow.SaveCurrent pid id ->
+                                    [ LS.storeLocalVal { name = SpecialNotesGui.localDataId pid, value = DataUtil.zkNoteIdToString id } ]
+
+                                SlideShow.GetNoteAndSaveCurrent pid id ->
+                                    [ makeNoteCacheGet model id
+                                    , LS.storeLocalVal { name = SpecialNotesGui.localDataId pid, value = DataUtil.zkNoteIdToString id }
+                                    ]
                             )
 
                         [] ->
                             ( model
-                            , Cmd.none
+                            , [ Cmd.none ]
                             )
 
                 EditZkNote.Cmd cmd mbcommand ->
@@ -4367,10 +4460,28 @@ handleEditZkNoteCmd model login ( emod, ecmd ) =
                                     ( { model | state = EditZkNote emod login }, Cmd.none )
                     in
                     ( nmod
-                    , Cmd.batch [ Cmd.map EditZkNoteMsg cmd, mbcmd ]
+                    , [ Cmd.map EditZkNoteMsg cmd, mbcmd ]
                     )
+
+                EditZkNote.SaveLocalData id v ->
+                    ( model, [ LS.storeLocalVal { name = id, value = v } ] )
+
+                EditZkNote.Batch c ->
+                    List.foldl
+                        (\cmd ( fmodel, fcmds ) ->
+                            let
+                                ( nm, ncmds ) =
+                                    oncmd cmd fmodel
+                            in
+                            ( nm, ncmds ++ fcmds )
+                        )
+                        ( model, [] )
+                        c
+
+        ( rm, rcmd ) =
+            oncmd aecmd amodel
     in
-    ( rm, Cmd.batch (rcmd :: ngets) )
+    ( rm, Cmd.batch (rcmd ++ ngets) )
 
 
 handleEditZkNoteListing : Model -> LoginData -> ( EditZkNoteListing.Model, EditZkNoteListing.Command ) -> ( Model, Cmd Msg )
@@ -4807,6 +4918,7 @@ init flags url key zone fontsize =
             , ziClosures = Dict.empty
             , mobile = flags.mobile
             , spmodel = SP.initModel
+            , localValAction = Nothing
             , zknSearchResult =
                 { notes = []
                 , offset = 0

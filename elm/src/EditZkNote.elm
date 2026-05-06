@@ -1,5 +1,6 @@
 module EditZkNote exposing
     ( Command(..)
+    , InitModel(..)
     , Model
     , Msg(..)
     , TACommand(..)
@@ -79,7 +80,7 @@ import RequestsDialog exposing (TRequests)
 import SearchStackPanel as SP
 import SnListEdit as SLE
 import SpecialNotes
-import SpecialNotesGui as SNG exposing (SpecialNoteState(..), initSpecialNoteState, initSpecialNoteStateLz)
+import SpecialNotesGui as SNG exposing (SpecialNoteState(..), initSpecialNoteState, initSpecialNoteStateLz, mbLocalDataId)
 import TDict
 import TagSearchPanel exposing (Search(..))
 import TagThings as TT
@@ -273,7 +274,35 @@ type Command
     | SPMod (SP.Model -> ( SP.Model, SP.Command ))
     | InlineXform Int MB.Inline (MB.Inline -> MG.Msg)
     | SlideShow (Maybe ZkNoteId) (List NlLink)
+    | SaveLocalData String String
     | Cmd (Cmd Msg) (Maybe Command)
+    | Batch (List Command)
+
+
+combineCommands : Command -> Command -> Command
+combineCommands l r =
+    let
+        dor =
+            \ls ->
+                case r of
+                    None ->
+                        Batch ls
+
+                    Batch rs ->
+                        Batch (ls ++ rs)
+
+                    x ->
+                        Batch (ls ++ [ x ])
+    in
+    case l of
+        None ->
+            r
+
+        Batch ls ->
+            dor ls
+
+        x ->
+            dor [ x ]
 
 
 updateBlockEdit : String -> BlockEdit -> BlockEdit
@@ -2603,6 +2632,11 @@ tabsOnLoad model =
     }
 
 
+type InitModel
+    = LoadLocal String (Maybe String -> ( Model, Data.GetZkNoteComments ))
+    | Ready ( Model, Data.GetZkNoteComments )
+
+
 initFull :
     FileUrlInfo
     -> DataUtil.LoginData
@@ -2610,7 +2644,7 @@ initFull :
     -> List Data.EditLink
     -> List Data.LzLink
     -> Bool
-    -> ( Model, Data.GetZkNoteComments )
+    -> InitModel
 initFull fui ld zknote dtlinks lzlinks mobile =
     let
         cells =
@@ -2636,66 +2670,84 @@ initFull fui ld zknote dtlinks lzlinks mobile =
                 )
                 dtlinks
 
-        edMarkdown =
+        lrEdMarkdown =
             case JD.decodeString SpecialNotes.specialNoteDecoder zknote.content of
                 Ok sn ->
-                    EM.initSpecial (initSpecialNoteStateLz zknote.id sn lzlinks)
+                    case mbLocalDataId zknote.id sn of
+                        Just id ->
+                            Right
+                                ( id
+                                , \mbdata ->
+                                    EM.initSpecial (initSpecialNoteStateLz zknote.id sn mbdata lzlinks)
+                                )
+
+                        Nothing ->
+                            Left <| EM.initSpecial (initSpecialNoteStateLz zknote.id sn Nothing lzlinks)
 
                 Err _ ->
-                    EM.initMd zknote.content
-    in
-    ( { id = Just zknote.id
-      , fui = fui
-      , ld = ld
-      , noteUser = zknote.user
-      , noteUserName = zknote.username
-      , usernote = zknote.usernote
-      , zklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) links)
-      , initialZklDict =
-            Dict.fromList
-                (List.map
-                    (\zl -> ( zklKey zl, zl ))
-                    links
+                    Left <| EM.initMd zknote.content
+
+        toSt =
+            \edMarkdown ->
+                ( { id = Just zknote.id
+                  , fui = fui
+                  , ld = ld
+                  , noteUser = zknote.user
+                  , noteUserName = zknote.username
+                  , usernote = zknote.usernote
+                  , zklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) links)
+                  , initialZklDict =
+                        Dict.fromList
+                            (List.map
+                                (\zl -> ( zklKey zl, zl ))
+                                links
+                            )
+                  , initialSnState = EM.getSpecialNoteState edMarkdown
+                  , initialLzls =
+                        List.map
+                            (\lzl -> ( lzlKey lzl, { to = lzl.to, from = lzl.from, delete = Just False } ))
+                            lzlinks
+                            |> Dict.fromList
+                  , focusLink = Nothing
+                  , pubidtxt = zknote.pubid |> Maybe.withDefault ""
+                  , title = zknote.title
+                  , comments = []
+                  , newcomment = Nothing
+                  , pendingcomment = Nothing
+                  , editable = zknote.editable
+                  , editableValue = zknote.editableValue
+                  , deleted = zknote.deleted
+                  , filestatus = zknote.filestatus
+                  , showtitle = zknote.showtitle
+                  , createdate = Just zknote.createdate
+                  , changeddate = Just zknote.changeddate
+                  , cells = getCd cc
+                  , revert = Just (DataUtil.saveZkNote zknote)
+                  , tab = EtEdit
+                  , documentTab = DtEdit
+                  , dialog = Nothing
+                  , panelNote = Nothing
+                  , mbReplaceString = Nothing
+                  , mobile = mobile
+                  , server = zknote.server
+                  , blockDnd = blockDndSystem.model
+                  , edMarkdown = edMarkdown
+                  , blockEdit = Nothing
+                  , droplinkmode = False
+                  , tagThings = TT.init True
+                  , searchControlRowMode = LinksTarget
+                  , titleEdit = String.trim zknote.title == ""
+                  , showDeets = False
+                  }
+                , { zknote = zknote.id, offset = 0, limit = Nothing }
                 )
-      , initialSnState = EM.getSpecialNoteState edMarkdown
-      , initialLzls =
-            List.map
-                (\lzl -> ( lzlKey lzl, { to = lzl.to, from = lzl.from, delete = Just False } ))
-                lzlinks
-                |> Dict.fromList
-      , focusLink = Nothing
-      , pubidtxt = zknote.pubid |> Maybe.withDefault ""
-      , title = zknote.title
-      , comments = []
-      , newcomment = Nothing
-      , pendingcomment = Nothing
-      , editable = zknote.editable
-      , editableValue = zknote.editableValue
-      , deleted = zknote.deleted
-      , filestatus = zknote.filestatus
-      , showtitle = zknote.showtitle
-      , createdate = Just zknote.createdate
-      , changeddate = Just zknote.changeddate
-      , cells = getCd cc
-      , revert = Just (DataUtil.saveZkNote zknote)
-      , tab = EtEdit
-      , documentTab = DtEdit
-      , dialog = Nothing
-      , panelNote = Nothing
-      , mbReplaceString = Nothing
-      , mobile = mobile
-      , server = zknote.server
-      , blockDnd = blockDndSystem.model
-      , edMarkdown = edMarkdown
-      , blockEdit = Nothing
-      , droplinkmode = False
-      , tagThings = TT.init True
-      , searchControlRowMode = LinksTarget
-      , titleEdit = String.trim zknote.title == ""
-      , showDeets = False
-      }
-    , { zknote = zknote.id, offset = 0, limit = Nothing }
-    )
+    in
+    case lrEdMarkdown of
+        Left edMarkdown ->
+            Ready (toSt edMarkdown)
+
+        Right ( lid, toem ) ->
+            LoadLocal lid (toem >> toSt)
 
 
 initNew : FileUrlInfo -> DataUtil.LoginData -> List EditLink -> Bool -> Model
@@ -4120,7 +4172,7 @@ update noteCache msg model =
                                     )
 
                         sns =
-                            initSpecialNoteState SpecialNotes.SnList links
+                            initSpecialNoteState SpecialNotes.SnList Nothing links
                     in
                     ( { model
                         | edMarkdown = EM.updateSpecialNoteState sns
@@ -4143,77 +4195,100 @@ update noteCache msg model =
             case EM.getSpecialNoteState model.edMarkdown of
                 Just sns ->
                     let
-                        ( snmd, sncmd ) =
+                        ( snmd, usncmd ) =
                             SNG.updateSn sngmsg sns
 
-                        umod =
+                        updmod =
                             { model
                                 | edMarkdown = EM.updateSpecialNoteState snmd
                             }
+
+                        oncmd : SNG.Command -> Model -> ( Model, Command )
+                        oncmd sncmd umod =
+                            case sncmd of
+                                SNG.CopySearch tagSearch ->
+                                    ( umod
+                                    , SPMod
+                                        (\spm ->
+                                            ( SP.setSearch spm tagSearch
+                                            , SP.None
+                                            )
+                                        )
+                                    )
+
+                                SNG.CopySyncSearch tagSearch ->
+                                    ( umod
+                                    , SPMod
+                                        (\spm ->
+                                            let
+                                                nsspm =
+                                                    spm.spmodel
+
+                                                tsn =
+                                                    nsspm.tagSearchModel
+
+                                                x =
+                                                    { spm | spmodel = { nsspm | tagSearchModel = { tsn | archives = CurrentAndArchives } } }
+                                            in
+                                            ( SP.setSearch x [ tagSearch ]
+                                            , SP.None
+                                            )
+                                        )
+                                    )
+
+                                SNG.GraphFocus ->
+                                    ( { umod
+                                        | searchControlRowMode =
+                                            case umod.searchControlRowMode of
+                                                GraphTarget ->
+                                                    LinksTarget
+
+                                                LinksTarget ->
+                                                    GraphTarget
+                                      }
+                                    , None
+                                    )
+
+                                SNG.SlideShow current lst ->
+                                    ( umod, SlideShow current lst )
+
+                                SNG.DndCmd c ->
+                                    ( umod
+                                    , Cmd (Cmd.map SNGMsg c) Nothing
+                                    )
+
+                                SNG.Batch cmds ->
+                                    List.foldl
+                                        (\cmd ( fmod, fcmds ) ->
+                                            let
+                                                ( nm, ncmd ) =
+                                                    oncmd cmd fmod
+                                            in
+                                            ( nm, combineCommands ncmd fcmds )
+                                        )
+                                        ( umod, None )
+                                        cmds
+
+                                SNG.ToMarkdown s ->
+                                    ( { umod
+                                        | edMarkdown = EM.initMd s
+                                      }
+                                    , None
+                                    )
+
+                                SNG.SaveLocalData s ->
+                                    ( umod
+                                    , umod.id
+                                        |> Maybe.map (\i -> SaveLocalData (SNG.localDataId i) s)
+                                        |> Maybe.withDefault None
+                                    )
+
+                                SNG.None ->
+                                    ( umod
+                                    , None
+                                    )
                     in
-                    case sncmd of
-                        SNG.CopySearch tagSearch ->
-                            ( umod
-                            , SPMod
-                                (\spm ->
-                                    ( SP.setSearch spm tagSearch
-                                    , SP.None
-                                    )
-                                )
-                            )
-
-                        SNG.CopySyncSearch tagSearch ->
-                            ( umod
-                            , SPMod
-                                (\spm ->
-                                    let
-                                        nsspm =
-                                            spm.spmodel
-
-                                        tsn =
-                                            nsspm.tagSearchModel
-
-                                        x =
-                                            { spm | spmodel = { nsspm | tagSearchModel = { tsn | archives = CurrentAndArchives } } }
-                                    in
-                                    ( SP.setSearch x [ tagSearch ]
-                                    , SP.None
-                                    )
-                                )
-                            )
-
-                        SNG.GraphFocus ->
-                            ( { umod
-                                | searchControlRowMode =
-                                    case umod.searchControlRowMode of
-                                        GraphTarget ->
-                                            LinksTarget
-
-                                        LinksTarget ->
-                                            GraphTarget
-                              }
-                            , None
-                            )
-
-                        SNG.SlideShow current lst ->
-                            ( umod, SlideShow current lst )
-
-                        SNG.DndCmd c ->
-                            ( umod
-                            , Cmd (Cmd.map SNGMsg c) Nothing
-                            )
-
-                        SNG.ToMarkdown s ->
-                            ( { model
-                                | edMarkdown = EM.initMd s
-                              }
-                            , None
-                            )
-
-                        SNG.None ->
-                            ( umod
-                            , None
-                            )
+                    oncmd usncmd updmod
 
                 Nothing ->
                     ( model, None )
