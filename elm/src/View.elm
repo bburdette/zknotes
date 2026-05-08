@@ -328,16 +328,11 @@ view stylePalette zone maxw noteCache config model =
         ]
 
 
-type InitModel
-    = LoadLocal String (Maybe String -> Model)
-    | Ready Model
-
-
-initFull : FileUrlInfo -> Data.ZkNoteAndLinks -> InitModel
-initFull fui zknaa =
+initFull : FileUrlInfo -> DataUtil.ZkNoteAndState -> Model
+initFull fui zknas =
     let
         zknote =
-            zknaa.zknote
+            zknas.zknal.zknote
 
         cells =
             zknote.content
@@ -348,45 +343,33 @@ initFull fui zknaa =
             evalCellsFully
                 (mkCc cells)
 
-        lrEdMarkdown =
+        edMarkdown =
             case JD.decodeString SpecialNotes.specialNoteDecoder zknote.content of
                 Ok sn ->
                     case SNG.mbLocalDataId zknote.id sn of
                         Just id ->
-                            Right
-                                ( id
-                                , \mbdata ->
-                                    EM.initSpecial (SNG.initSpecialNoteStateLz zknote.id sn mbdata zknaa.lzlinks)
-                                )
+                            EM.initSpecial
+                                (SNG.initSpecialNoteStateLz zknote.id sn zknas.mbstate zknas.zknal.lzlinks)
 
                         Nothing ->
-                            Left <| EM.initSpecial (SNG.initSpecialNoteStateLz zknote.id sn Nothing zknaa.lzlinks)
+                            EM.initSpecial (SNG.initSpecialNoteStateLz zknote.id sn Nothing zknas.zknal.lzlinks)
 
                 Err _ ->
-                    Left <| EM.initMd zknote.content
-
-        tost =
-            \edm ->
-                { id = Just zknote.id
-                , fui = fui
-                , pubid = zknote.pubid
-                , title = zknote.title
-                , showtitle = zknote.showtitle
-                , md = zknote.content
-                , cells = getCd cc
-                , panelNote = zknote.content |> MC.mdPanel |> Maybe.map .noteid
-                , zklinks = zknaa.links
-                , createdate = Just zknote.createdate
-                , changeddate = Just zknote.changeddate
-                , zknote = Just zknote
-                }
+                    EM.initMd zknote.content
     in
-    case lrEdMarkdown of
-        Left em ->
-            Ready <| tost em
-
-        Right ( id, mbf ) ->
-            LoadLocal id (mbf >> tost)
+    { id = Just zknote.id
+    , fui = fui
+    , pubid = zknote.pubid
+    , title = zknote.title
+    , showtitle = zknote.showtitle
+    , md = zknote.content
+    , cells = getCd cc
+    , panelNote = zknote.content |> MC.mdPanel |> Maybe.map .noteid
+    , zklinks = zknas.zknal.links
+    , createdate = Just zknote.createdate
+    , changeddate = Just zknote.changeddate
+    , zknote = Just zknote
+    }
 
 
 initSzn : FileUrlInfo -> Data.SaveZkNote -> Maybe Int -> Maybe Int -> List Data.EditLink -> Maybe ZkNoteId -> Model

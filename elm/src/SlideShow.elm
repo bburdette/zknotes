@@ -99,8 +99,8 @@ viewConfig =
     }
 
 
-init : FileUrlInfo -> NoteCache -> Maybe ZkNoteId -> Maybe ZkNoteId -> NlLink -> List NlLink -> ( Model, Command )
-init fui nc mbparent mbcurrent nl rnlls =
+init : FileUrlInfo -> NoteCache -> Maybe ZkNoteId -> Maybe ZkNoteId -> Maybe String -> NlLink -> List NlLink -> ( Model, Command )
+init fui nc mbparent mbcurrent mbstate nl rnlls =
     let
         nlls =
             Array.fromList (nl :: rnlls)
@@ -148,8 +148,8 @@ init fui nc mbparent mbcurrent nl rnlls =
     )
 
 
-view : Time.Zone -> Int -> NoteCache -> Model -> E.Element Msg
-view tz maxw nc model =
+view : StylePalette -> Time.Zone -> Int -> NoteCache -> Model -> E.Element Msg
+view sp tz maxw nc model =
     E.column []
         [ E.row [ E.spacing 3 ]
             [ EI.button Common.buttonStyle
@@ -166,7 +166,7 @@ view tz maxw nc model =
                 }
             ]
         , model.viewModel
-            |> Maybe.map (\m -> E.map ViewMsg <| View.view tz maxw nc viewConfig m)
+            |> Maybe.map (\m -> E.map ViewMsg <| View.view sp tz maxw nc viewConfig m)
             |> Maybe.withDefault (E.text "loading... ")
         ]
 

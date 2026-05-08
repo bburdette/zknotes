@@ -1,6 +1,6 @@
 module EditZkNote exposing
     ( Command(..)
-    , InitModel(..)
+      -- , InitModel(..)
     , Model
     , Msg(..)
     , TACommand(..)
@@ -2632,21 +2632,23 @@ tabsOnLoad model =
     }
 
 
-type InitModel
-    = LoadLocal String (Maybe String -> ( Model, Data.GetZkNoteComments ))
-    | Ready ( Model, Data.GetZkNoteComments )
-
-
 initFull :
     FileUrlInfo
     -> DataUtil.LoginData
-    -> Data.ZkNote
-    -> List Data.EditLink
-    -> List Data.LzLink
+    -> DataUtil.ZkNoteAndState
     -> Bool
-    -> InitModel
-initFull fui ld zknote dtlinks lzlinks mobile =
+    -> ( Model, Data.GetZkNoteComments )
+initFull fui ld zknas mobile =
     let
+        zknote =
+            zknas.zknal.zknote
+
+        dtlinks =
+            zknas.zknal.links
+
+        lzlinks =
+            zknas.zknal.lzlinks
+
         cells =
             zknote.content
                 |> MC.mdCells
@@ -2670,84 +2672,71 @@ initFull fui ld zknote dtlinks lzlinks mobile =
                 )
                 dtlinks
 
-        lrEdMarkdown =
+        edMarkdown =
             case JD.decodeString SpecialNotes.specialNoteDecoder zknote.content of
                 Ok sn ->
                     case mbLocalDataId zknote.id sn of
                         Just id ->
-                            Right
-                                ( id
-                                , \mbdata ->
-                                    EM.initSpecial (initSpecialNoteStateLz zknote.id sn mbdata lzlinks)
-                                )
+                            EM.initSpecial (initSpecialNoteStateLz zknote.id sn zknas.mbstate lzlinks)
 
                         Nothing ->
-                            Left <| EM.initSpecial (initSpecialNoteStateLz zknote.id sn Nothing lzlinks)
+                            EM.initSpecial (initSpecialNoteStateLz zknote.id sn Nothing lzlinks)
 
                 Err _ ->
-                    Left <| EM.initMd zknote.content
-
-        toSt =
-            \edMarkdown ->
-                ( { id = Just zknote.id
-                  , fui = fui
-                  , ld = ld
-                  , noteUser = zknote.user
-                  , noteUserName = zknote.username
-                  , usernote = zknote.usernote
-                  , zklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) links)
-                  , initialZklDict =
-                        Dict.fromList
-                            (List.map
-                                (\zl -> ( zklKey zl, zl ))
-                                links
-                            )
-                  , initialSnState = EM.getSpecialNoteState edMarkdown
-                  , initialLzls =
-                        List.map
-                            (\lzl -> ( lzlKey lzl, { to = lzl.to, from = lzl.from, delete = Just False } ))
-                            lzlinks
-                            |> Dict.fromList
-                  , focusLink = Nothing
-                  , pubidtxt = zknote.pubid |> Maybe.withDefault ""
-                  , title = zknote.title
-                  , comments = []
-                  , newcomment = Nothing
-                  , pendingcomment = Nothing
-                  , editable = zknote.editable
-                  , editableValue = zknote.editableValue
-                  , deleted = zknote.deleted
-                  , filestatus = zknote.filestatus
-                  , showtitle = zknote.showtitle
-                  , createdate = Just zknote.createdate
-                  , changeddate = Just zknote.changeddate
-                  , cells = getCd cc
-                  , revert = Just (DataUtil.saveZkNote zknote)
-                  , tab = EtEdit
-                  , documentTab = DtEdit
-                  , dialog = Nothing
-                  , panelNote = Nothing
-                  , mbReplaceString = Nothing
-                  , mobile = mobile
-                  , server = zknote.server
-                  , blockDnd = blockDndSystem.model
-                  , edMarkdown = edMarkdown
-                  , blockEdit = Nothing
-                  , droplinkmode = False
-                  , tagThings = TT.init True
-                  , searchControlRowMode = LinksTarget
-                  , titleEdit = String.trim zknote.title == ""
-                  , showDeets = False
-                  }
-                , { zknote = zknote.id, offset = 0, limit = Nothing }
-                )
+                    EM.initMd zknote.content
     in
-    case lrEdMarkdown of
-        Left edMarkdown ->
-            Ready (toSt edMarkdown)
-
-        Right ( lid, toem ) ->
-            LoadLocal lid (toem >> toSt)
+    ( { id = Just zknote.id
+      , fui = fui
+      , ld = ld
+      , noteUser = zknote.user
+      , noteUserName = zknote.username
+      , usernote = zknote.usernote
+      , zklDict = Dict.fromList (List.map (\zl -> ( zklKey zl, zl )) links)
+      , initialZklDict =
+            Dict.fromList
+                (List.map
+                    (\zl -> ( zklKey zl, zl ))
+                    links
+                )
+      , initialSnState = EM.getSpecialNoteState edMarkdown
+      , initialLzls =
+            List.map
+                (\lzl -> ( lzlKey lzl, { to = lzl.to, from = lzl.from, delete = Just False } ))
+                lzlinks
+                |> Dict.fromList
+      , focusLink = Nothing
+      , pubidtxt = zknote.pubid |> Maybe.withDefault ""
+      , title = zknote.title
+      , comments = []
+      , newcomment = Nothing
+      , pendingcomment = Nothing
+      , editable = zknote.editable
+      , editableValue = zknote.editableValue
+      , deleted = zknote.deleted
+      , filestatus = zknote.filestatus
+      , showtitle = zknote.showtitle
+      , createdate = Just zknote.createdate
+      , changeddate = Just zknote.changeddate
+      , cells = getCd cc
+      , revert = Just (DataUtil.saveZkNote zknote)
+      , tab = EtEdit
+      , documentTab = DtEdit
+      , dialog = Nothing
+      , panelNote = Nothing
+      , mbReplaceString = Nothing
+      , mobile = mobile
+      , server = zknote.server
+      , blockDnd = blockDndSystem.model
+      , edMarkdown = edMarkdown
+      , blockEdit = Nothing
+      , droplinkmode = False
+      , tagThings = TT.init True
+      , searchControlRowMode = LinksTarget
+      , titleEdit = String.trim zknote.title == ""
+      , showDeets = False
+      }
+    , { zknote = zknote.id, offset = 0, limit = Nothing }
+    )
 
 
 initNew : FileUrlInfo -> DataUtil.LoginData -> List EditLink -> Bool -> Model
