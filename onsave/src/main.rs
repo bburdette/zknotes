@@ -749,10 +749,16 @@ pub fn yeet(
   url: String,
   yt_dlp_path: String,
 ) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
+  let format = if url.to_lowercase().contains("playlist") {
+    format!("-o%(playlist_index)s-%(title)s-%(id)s.%(ext)s")
+  } else {
+    format!("-o%(title)s-%(id)s.%(ext)s")
+  };
+
   let mut child = Command::new(yt_dlp_path.as_str())
     .current_dir(&savedir)
     .arg("-x")
-    .arg(format!("-o%(title)s-%(id)s.%(ext)s"))
+    .arg(format)
     .arg(url.clone())
     .arg("--extractor-args")
     .arg("youtube:player-client=default,-tv_simply")
