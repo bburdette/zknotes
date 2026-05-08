@@ -16,16 +16,23 @@ import Common
 import Data exposing (ZkNote, ZkNoteId)
 import DataUtil exposing (FileUrlInfo)
 import Dict
+import EdMarkdown as EM
+import Either exposing (..)
 import Element as E exposing (Element)
 import Element.Background as EBk
+import Element.Border as EBd
 import Element.Font as Font
 import Element.Input as EI
+import Json.Decode as JD
 import Markdown.Block exposing (ListItem(..), Task(..))
 import MdCommon as MC
 import NoteCache as NC exposing (CacheEntry(..), NoteCache)
+import SpecialNotes
+import SpecialNotesGui as SNG
 import TangoColors as TC
 import Time
 import Util
+import ZkCommon as ZC
 
 
 type Msg
@@ -33,6 +40,7 @@ type Msg
     | DonePress
     | SwitchPress ZkNoteId -- TODO: remove?
     | OnPlaybackEnd
+    | SNGMsg SNG.Msg
     | Noop
 
 
@@ -108,14 +116,33 @@ showZkl zkl =
         ]
 
 
-view : Time.Zone -> Int -> NoteCache -> Config -> Model -> Element Msg
-view zone maxw noteCache config model =
+view : ZC.StylePalette -> Time.Zone -> Int -> NoteCache -> Config -> Model -> Element Msg
+view stylePalette zone maxw noteCache config model =
     let
         mw =
             min maxw 1000 - 160
 
         narrow =
             maxw < 1300
+
+        snedit =
+            \sn ->
+                E.row
+                    [ E.padding 10
+                    , EBd.rounded 10
+                    , E.width E.fill
+                    , EBk.color TC.lightGray
+                    , E.height E.fill
+                    ]
+                    [ E.el
+                        [ EBd.color TC.black
+                        , EBd.width 1
+                        , E.width E.fill
+                        , E.centerX
+                        , E.padding 3
+                        ]
+                        (SNG.guiSn zone stylePalette.fontSize sn |> E.map SNGMsg)
+                    ]
     in
     E.column [ E.width E.fill ]
         [ if config.loggedin then
@@ -301,7 +328,12 @@ view zone maxw noteCache config model =
         ]
 
 
-initFull : FileUrlInfo -> Data.ZkNoteAndLinks -> Model
+type InitModel
+    = LoadLocal String (Maybe String -> Model)
+    | Ready Model
+
+
+initFull : FileUrlInfo -> Data.ZkNoteAndLinks -> InitModel
 initFull fui zknaa =
     let
         zknote =
@@ -315,20 +347,46 @@ initFull fui zknaa =
         ( cc, _ ) =
             evalCellsFully
                 (mkCc cells)
+
+        lrEdMarkdown =
+            case JD.decodeString SpecialNotes.specialNoteDecoder zknote.content of
+                Ok sn ->
+                    case SNG.mbLocalDataId zknote.id sn of
+                        Just id ->
+                            Right
+                                ( id
+                                , \mbdata ->
+                                    EM.initSpecial (SNG.initSpecialNoteStateLz zknote.id sn mbdata zknaa.lzlinks)
+                                )
+
+                        Nothing ->
+                            Left <| EM.initSpecial (SNG.initSpecialNoteStateLz zknote.id sn Nothing zknaa.lzlinks)
+
+                Err _ ->
+                    Left <| EM.initMd zknote.content
+
+        tost =
+            \edm ->
+                { id = Just zknote.id
+                , fui = fui
+                , pubid = zknote.pubid
+                , title = zknote.title
+                , showtitle = zknote.showtitle
+                , md = zknote.content
+                , cells = getCd cc
+                , panelNote = zknote.content |> MC.mdPanel |> Maybe.map .noteid
+                , zklinks = zknaa.links
+                , createdate = Just zknote.createdate
+                , changeddate = Just zknote.changeddate
+                , zknote = Just zknote
+                }
     in
-    { id = Just zknote.id
-    , fui = fui
-    , pubid = zknote.pubid
-    , title = zknote.title
-    , showtitle = zknote.showtitle
-    , md = zknote.content
-    , cells = getCd cc
-    , panelNote = zknote.content |> MC.mdPanel |> Maybe.map .noteid
-    , zklinks = zknaa.links
-    , createdate = Just zknote.createdate
-    , changeddate = Just zknote.changeddate
-    , zknote = Just zknote
-    }
+    case lrEdMarkdown of
+        Left em ->
+            Ready <| tost em
+
+        Right ( id, mbf ) ->
+            LoadLocal id (mbf >> tost)
 
 
 initSzn : FileUrlInfo -> Data.SaveZkNote -> Maybe Int -> Maybe Int -> List Data.EditLink -> Maybe ZkNoteId -> Model
@@ -362,6 +420,9 @@ update : Msg -> Model -> ( Model, Command )
 update msg model =
     case msg of
         Noop ->
+            ( model, None )
+
+        SNGMsg _ ->
             ( model, None )
 
         DonePress ->

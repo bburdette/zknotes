@@ -11,6 +11,7 @@ import NoteCache exposing (CacheEntry(..), NoteCache, getCacheEntry)
 import Time
 import Util
 import View
+import ZkCommon as ZC exposing (StylePalette)
 
 
 type alias Model =
