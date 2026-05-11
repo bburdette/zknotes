@@ -13,6 +13,18 @@ pub enum SpecialNote {
   // SnAlert(Alert),
 }
 
+// to decode old lists.
+pub enum SpecialNoteObsolete1 {
+  SnSearch(Vec<TagSearch>),
+  SnSync(CompletedSync),
+  SnList(NotegraphObsolete1),
+}
+
+#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
+pub struct NotegraphObsolete1 {
+  pub currentUuid: Option<Uuid>,
+}
+
 // #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
 // pub struct DateTime {
 //   pub datetime: i64,
@@ -30,11 +42,6 @@ pub struct CompletedSync {
   pub local: Option<Uuid>,  // optional for backward compatibility
   pub remote: Option<Uuid>, // optional for backward compatibility
 }
-
-// #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
-// pub struct Notegraph {
-//   pub currentUuid: Option<Uuid>,
-// }
 
 // #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
 // pub struct Alert {
