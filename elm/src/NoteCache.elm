@@ -1,4 +1,4 @@
-module NoteCache exposing (CacheEntry(..), NoteCache, addNote, empty, getCacheEntry, getNote, getZneEntry, purgeNotes, setKeeps)
+module NoteCache exposing (CacheEntry(..), NoteCache, addNote, empty, getCacheEntry, getNote, getZneEntry, purgeNotes, setKeeps, updateState)
 
 import Data exposing (ZkNoteAndLinks, ZkNoteId)
 import DataUtil exposing (ZkNoteAndState, ZniSet)

@@ -274,7 +274,7 @@ type Command
     | SPMod (SP.Model -> ( SP.Model, SP.Command ))
     | InlineXform Int MB.Inline (MB.Inline -> MG.Msg)
     | SlideShow (Maybe ZkNoteId) (List NlLink)
-    | SaveLocalData String String
+    | SaveLocalData ZkNoteId String
     | Cmd (Cmd Msg) (Maybe Command)
     | Batch (List Command)
 
@@ -4280,7 +4280,7 @@ update noteCache msg model =
                                 SNG.SaveLocalData s ->
                                     ( umod
                                     , umod.id
-                                        |> Maybe.map (\i -> SaveLocalData (SNG.localDataId i) s)
+                                        |> Maybe.map (\i -> SaveLocalData i s)
                                         |> Maybe.withDefault None
                                     )
 

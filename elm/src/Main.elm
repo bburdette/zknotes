@@ -30,7 +30,7 @@ import LocalStorage as LS
 import MdCommon as MC
 import MdInlineXform
 import MessageNLink
-import NoteCache as NC exposing (NoteCache)
+import NoteCache as NC exposing (NoteCache, updateState)
 import Orgauth.ChangeEmail as CE
 import Orgauth.ChangePassword as CP
 import Orgauth.ChangeRemoteUrl as CRU
@@ -3445,7 +3445,7 @@ actualupdate msg model =
                     in
                     ( { model
                         | state = SlideShow mbid emod instate
-                        , noteCache = updateState pid st model.noteCache
+                        , noteCache = updateState pid (Just st) model.noteCache
                       }
                     , LS.storeLocalVal { name = SNG.localDataId pid, value = st }
                     )
@@ -3457,7 +3457,7 @@ actualupdate msg model =
                     in
                     ( { model
                         | state = SlideShow mbid emod instate
-                        , noteCache = updateState pid st model.noteCache
+                        , noteCache = updateState pid (Just st) model.noteCache
                       }
                     , Cmd.batch
                         [ makeNoteCacheGet model id
@@ -4457,9 +4457,9 @@ handleEditZkNoteCmd amodel login ( emod, aecmd ) =
                                                     DataUtil.zkNoteIdToString id
                                             in
                                             ( { model
-                                                | noteCache = updateState pid v model.noteCache
+                                                | noteCache = updateState pid (Just st) model.noteCache
                                               }
-                                            , [ LS.storeLocalVal { name = SNG.localDataId pid, value = DataUtil.zkNoteIdToString id } ]
+                                            , [ LS.storeLocalVal { name = SNG.localDataId pid, value = st } ]
                                             )
 
                                         SlideShow.GetNoteAndSaveCurrent pid id ->
@@ -4468,10 +4468,10 @@ handleEditZkNoteCmd amodel login ( emod, aecmd ) =
                                                     DataUtil.zkNoteIdToString id
                                             in
                                             ( { model
-                                                | noteCache = updateState pid v model.noteCache
+                                                | noteCache = updateState pid (Just st) model.noteCache
                                               }
                                             , [ makeNoteCacheGet model id
-                                              , LS.storeLocalVal { name = SNG.localDataId pid, value = DataUtil.zkNoteIdToString id }
+                                              , LS.storeLocalVal { name = SNG.localDataId pid, value = st }
                                               ]
                                             )
                             in
@@ -4500,9 +4500,9 @@ handleEditZkNoteCmd amodel login ( emod, aecmd ) =
 
                 EditZkNote.SaveLocalData id v ->
                     ( { model
-                        | noteCache = updateState pid v model.noteCache
+                        | noteCache = updateState id (Just v) model.noteCache
                       }
-                    , [ LS.storeLocalVal { name = id, value = v } ]
+                    , [ LS.storeLocalVal { name = SNG.localDataId id, value = v } ]
                     )
 
                 EditZkNote.Batch c ->
