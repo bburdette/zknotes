@@ -1,7 +1,7 @@
 module NoteCache exposing (CacheEntry(..), NoteCache, addNote, empty, getCacheEntry, getNote, getZneEntry, purgeNotes, setKeeps)
 
 import Data exposing (ZkNoteAndLinks, ZkNoteId)
-import DataUtil exposing (ZniSet)
+import DataUtil exposing (ZkNoteAndState, ZniSet)
 import Dict exposing (Dict)
 import TDict exposing (TDict)
 import TSet
@@ -14,7 +14,7 @@ type alias ZneEntry =
 
 
 type CacheEntry
-    = ZNAL ZkNoteAndLinks
+    = ZNAL ZkNoteAndState
     | Private
     | NotFound
 
@@ -65,7 +65,7 @@ addNote pt id ce nc =
     }
 
 
-getNote : NoteCache -> ZkNoteId -> Maybe ZkNoteAndLinks
+getNote : NoteCache -> ZkNoteId -> Maybe ZkNoteAndState
 getNote nc id =
     getCacheEntry nc id
         |> Maybe.andThen

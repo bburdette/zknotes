@@ -52,7 +52,7 @@ import SelectString as SS
 import ShowMessage
 import SlideShow
 import SpecialNotes as SN
-import SpecialNotesGui
+import SpecialNotesGui as SNG
 import TSet
 import TagAThing
 import TagFiles
@@ -1084,10 +1084,10 @@ viewState size state model =
                 config =
                     View.defaultConfig
             in
-            E.map ViewMsg <| View.view model.timezone size.width model.noteCache { config | loggedin = False } em
+            E.map ViewMsg <| View.view model.stylePalette model.timezone size.width model.noteCache { config | loggedin = False } em
 
         EView em _ ->
-            E.map ViewMsg <| View.view model.timezone size.width model.noteCache View.defaultConfig em
+            E.map ViewMsg <| View.view model.stylePalette model.timezone size.width model.noteCache View.defaultConfig em
 
         UserSettings em _ _ ->
             E.map UserSettingsMsg <| UserSettings.view em
@@ -1154,7 +1154,7 @@ viewState size state model =
             E.map InviteUserMsg <| TagAThing.view model.stylePalette model.recentNotes (Just size) model.spmodel model.zknSearchResult tfmod
 
         SlideShow _ ssmodel _ ->
-            E.map SlideShowMsg <| SlideShow.view model.timezone size.width model.noteCache ssmodel
+            E.map SlideShowMsg <| SlideShow.view model.stylePalette model.timezone size.width model.noteCache ssmodel
 
 
 stateLogin : State -> Maybe LoginData
@@ -1809,8 +1809,8 @@ displayMessageNLinkDialog model message url text =
     }
 
 
-onZkNoteEditWhat : Model -> Time.Posix -> Data.ZkNoteAndLinksWhat -> ( Model, Cmd Msg )
-onZkNoteEditWhat model pt znew =
+onZkNoteStateEditWhat : Model -> Time.Posix -> DataUtil.ZkNoteAndStateWhat -> ( Model, Cmd Msg )
+onZkNoteStateEditWhat model pt znew =
     let
         state =
             model.state
@@ -1818,7 +1818,7 @@ onZkNoteEditWhat model pt znew =
     if znew.what == "cache" then
         let
             noteCache =
-                NC.addNote pt znew.znl.zknote.id (NC.ZNAL znew.znl) model.noteCache
+                NC.addNote pt znew.znl.znal.zknote.id (NC.ZNAL znew.znl) model.noteCache
                     |> NC.purgeNotes
 
             ( ns, cmd ) =
@@ -1850,123 +1850,93 @@ onZkNoteEditWhat model pt znew =
     else if znew.what == "slideshow" then
         let
             noteCache =
-                NC.addNote pt znew.znl.zknote.id (NC.ZNAL znew.znl) model.noteCache
+                NC.addNote pt znew.znl.znal.zknote.id (NC.ZNAL znew.znl) model.noteCache
                     |> NC.purgeNotes
 
-            lr =
-                case JD.decodeString SN.specialNoteDecoder znew.znl.zknote.content of
+            em =
+                case JD.decodeString SN.specialNoteDecoder znew.znl.znal.zknote.content of
                     Ok sn ->
-                        case SpecialNotesGui.mbLocalDataId znew.znl.zknote.id sn of
-                            Just lid ->
-                                Left
-                                    ( lid
-                                    , \mbst ->
-                                        EM.initSpecial (SpecialNotesGui.initSpecialNoteStateLz znew.znl.zknote.id sn mbst znew.znl.lzlinks)
-                                    )
-
-                            Nothing ->
-                                Right <| EM.initSpecial (SpecialNotesGui.initSpecialNoteStateLz znew.znl.zknote.id sn Nothing znew.znl.lzlinks)
+                        EM.initSpecial (SNG.initSpecialNoteStateLz znew.znl.znal.zknote.id sn znew.znl.mbstate znew.znl.znal.lzlinks)
 
                     Err _ ->
-                        Right <| EM.initMd znew.znl.zknote.content
+                        EM.initMd znew.znl.znal.zknote.content
 
-            toSt =
-                \em ->
-                    let
-                        ( ns, cmd ) =
-                            -- going into slideshow mode.
-                            case EM.getSpecialNoteState em of
-                                Just (SpecialNotesGui.SnsList slem) ->
-                                    case slem.nlls of
-                                        fst :: rest ->
-                                            let
-                                                ( st, c ) =
-                                                    SlideShow.init model.fui model.noteCache (Just znew.znl.zknote.id) (Maybe.map Data.Zni slem.currentUuid) fst rest
-                                            in
-                                            ( SlideShow (Just znew.znl.zknote.id) st model.state
-                                            , case c of
-                                                SlideShow.GetNote id ->
-                                                    makeNoteCacheGet model id
+            ( ns, cmd ) =
+                -- going into slideshow mode.
+                case EM.getSpecialNoteState em of
+                    Just (SNG.SnsList slem) ->
+                        case slem.nlls of
+                            fst :: rest ->
+                                let
+                                    ( st, c ) =
+                                        SlideShow.init
+                                            model.fui
+                                            model.noteCache
+                                            (Just znew.znl.znal.zknote.id)
+                                            (Maybe.map Data.Zni slem.currentUuid)
+                                            slem.currentUuid
+                                            fst
+                                            rest
+                                in
+                                ( SlideShow (Just znew.znl.znal.zknote.id) st model.state
+                                , case c of
+                                    SlideShow.GetNote id ->
+                                        makeNoteCacheGet model id
 
-                                                _ ->
-                                                    Cmd.none
-                                            )
+                                    _ ->
+                                        Cmd.none
+                                )
 
-                                        _ ->
-                                            ( displayMessageDialogState model "empty slideshow"
-                                            , Cmd.none
-                                            )
+                            _ ->
+                                ( displayMessageDialogState model "empty slideshow"
+                                , Cmd.none
+                                )
 
-                                _ ->
-                                    ( displayMessageDialogState model "not a slideshow"
-                                    , Cmd.none
-                                    )
-                    in
-                    ( { model
-                        | noteCache = noteCache
-                        , state = ns
-                      }
-                    , cmd
-                    )
+                    _ ->
+                        ( displayMessageDialogState model "not a slideshow"
+                        , Cmd.none
+                        )
         in
-        case lr of
-            Right em ->
-                toSt em
-
-            Left ( lid, st2em ) ->
-                ( { model | localValAction = Just <| LocalValAction { for = "lva", name = lid, action = st2em >> toSt } }
-                , LS.getLocalVal { for = "lva", name = lid }
-                )
+        ( { model
+            | noteCache = noteCache
+            , state = ns
+          }
+        , cmd
+        )
 
     else
         case stateLogin state of
             Just login ->
                 let
-                    tom =
-                        \( nst, c ) ->
-                            let
-                                ngets =
-                                    makeNoteCacheGets (EM.getContent nst.edMarkdown) model
-                            in
-                            ( { model
-                                | state =
-                                    EditZkNote
-                                        nst
-                                        login
-                                , recentNotes =
-                                    let
-                                        zknote =
-                                            znew.znl.zknote
-                                    in
-                                    addRecentZkListNote model.recentNotes
-                                        { id = zknote.id
-                                        , user = zknote.user
-                                        , title = zknote.title
-                                        , filestatus = zknote.filestatus
-                                        , createdate = zknote.createdate
-                                        , changeddate = zknote.changeddate
-                                        , sysids = zknote.sysids
-                                        }
-                                , noteCache = NC.setKeeps (MC.noteIds (EM.getContent nst.edMarkdown)) model.noteCache
-                              }
-                            , Cmd.batch ((sendZIMsg model.fui <| Data.PvqGetZkNoteComments c) :: ngets)
-                            )
-                in
-                case
-                    EditZkNote.initFull model.fui
-                        login
-                        znew.znl.zknote
-                        znew.znl.links
-                        znew.znl.lzlinks
-                        model.mobile
-                of
-                    EditZkNote.Ready x ->
-                        tom x
+                    ( nst, c ) =
+                        EditZkNote.initFull model.fui login znew.znl model.mobile
 
-                    EditZkNote.LoadLocal lid st2em ->
-                        ( { model | localValAction = Just <| LocalValAction { for = "lva", name = lid, action = st2em >> tom } }
-                        , LS.getLocalVal { for = "lva", name = lid }
-                        )
+                    ngets =
+                        makeNoteCacheGets (EM.getContent nst.edMarkdown) model
+                in
+                ( { model
+                    | state =
+                        EditZkNote
+                            nst
+                            login
+                    , recentNotes =
+                        let
+                            zknote =
+                                znew.znl.znal.zknote
+                        in
+                        addRecentZkListNote model.recentNotes
+                            { id = zknote.id
+                            , user = zknote.user
+                            , title = zknote.title
+                            , filestatus = zknote.filestatus
+                            , createdate = zknote.createdate
+                            , changeddate = zknote.changeddate
+                            , sysids = zknote.sysids
+                            }
+                    , noteCache = NC.setKeeps (MC.noteIds (EM.getContent nst.edMarkdown)) model.noteCache
+                  }
+                , Cmd.batch ((sendZIMsg model.fui <| Data.PvqGetZkNoteComments c) :: ngets)
+                )
 
             _ ->
                 ( unexpectedMessage model "ZkNoteEditWhat"
@@ -2571,81 +2541,105 @@ actualupdate msg model =
 
                         Data.PbyZkNoteAndLinks znl ->
                             let
-                                vstate =
-                                    case stateLogin state of
-                                        Just _ ->
-                                            EView
-                                                (View.initFull
-                                                    model.fui
-                                                    znl
-                                                )
-                                                state
+                                action =
+                                    \mbstate ->
+                                        let
+                                            znas =
+                                                { znal = znl, mbstate = mbstate }
 
-                                        Nothing ->
-                                            View (View.initFull model.fui znl)
+                                            vstate =
+                                                case stateLogin state of
+                                                    Just _ ->
+                                                        EView
+                                                            (View.initFull
+                                                                model.fui
+                                                                znas
+                                                            )
+                                                            state
 
-                                ngets =
-                                    makePubNoteCacheGets model znl.zknote.content
+                                                    Nothing ->
+                                                        View (View.initFull model.fui znas)
+
+                                            ngets =
+                                                makePubNoteCacheGets model znl.zknote.content
+                                        in
+                                        ( { model | state = vstate }
+                                        , Cmd.batch ngets
+                                        )
+
+                                lid =
+                                    SNG.localDataId znl.zknote.id
                             in
-                            ( { model | state = vstate }
-                            , Cmd.batch ngets
+                            ( { model | localValAction = Just <| LocalValAction { for = "lva", name = lid, action = action } }
+                            , LS.getLocalVal { for = "lva", name = lid }
                             )
 
                         Data.PbyZkNoteAndLinksWhat znlw ->
-                            if znlw.what == "cache" then
-                                let
-                                    gets =
-                                        (case state of
-                                            EView vs _ ->
-                                                Just vs
+                            let
+                                action =
+                                    \mbstate ->
+                                        let
+                                            znas =
+                                                { znal = znlw.znl, mbstate = mbstate }
+                                        in
+                                        if znlw.what == "cache" then
+                                            let
+                                                gets =
+                                                    (case state of
+                                                        EView vs _ ->
+                                                            Just vs
 
-                                            View vs ->
-                                                Just vs
+                                                        View vs ->
+                                                            Just vs
 
-                                            _ ->
-                                                Nothing
-                                        )
-                                            |> Maybe.andThen .panelNote
-                                            |> Maybe.andThen
-                                                (\pn ->
-                                                    if pn == znlw.znl.zknote.id then
-                                                        Just znlw.znl.zknote.content
-
-                                                    else
-                                                        Nothing
-                                                )
-                                            |> Maybe.map (makePubNoteCacheGets model >> Cmd.batch)
-                                            |> Maybe.withDefault Cmd.none
-                                in
-                                ( { model
-                                    | noteCache =
-                                        NC.addNote pt znlw.znl.zknote.id (NC.ZNAL znlw.znl) model.noteCache
-                                            |> NC.purgeNotes
-                                  }
-                                , gets
-                                )
-
-                            else
-                                let
-                                    vstate =
-                                        case stateLogin state of
-                                            Just _ ->
-                                                EView
-                                                    (View.initFull
-                                                        model.fui
-                                                        znlw.znl
+                                                        _ ->
+                                                            Nothing
                                                     )
-                                                    state
+                                                        |> Maybe.andThen .panelNote
+                                                        |> Maybe.andThen
+                                                            (\pn ->
+                                                                if pn == znas.znal.zknote.id then
+                                                                    Just znas.znal.zknote.content
 
-                                            Nothing ->
-                                                View (View.initFull model.fui znlw.znl)
+                                                                else
+                                                                    Nothing
+                                                            )
+                                                        |> Maybe.map (makePubNoteCacheGets model >> Cmd.batch)
+                                                        |> Maybe.withDefault Cmd.none
+                                            in
+                                            ( { model
+                                                | noteCache =
+                                                    NC.addNote pt znas.znal.zknote.id (NC.ZNAL znas) model.noteCache
+                                                        |> NC.purgeNotes
+                                              }
+                                            , gets
+                                            )
 
-                                    ngets =
-                                        makePubNoteCacheGets model znlw.znl.zknote.content
-                                in
-                                ( { model | state = vstate }
-                                , Cmd.batch ngets
-                                )
+                                        else
+                                            let
+                                                vstate =
+                                                    case stateLogin state of
+                                                        Just _ ->
+                                                            EView
+                                                                (View.initFull model.fui znas)
+                                                                state
+
+                                                        Nothing ->
+                                                            View (View.initFull model.fui znas)
+
+                                                ngets =
+                                                    makePubNoteCacheGets model znas.znal.zknote.content
+                                            in
+                                            ( { model | state = vstate }
+                                            , Cmd.batch ngets
+                                            )
+
+                                lid =
+                                    SNG.localDataId znlw.znl.zknote.id
+                            in
+                            ( { model | localValAction = Just <| LocalValAction { for = "lva", name = lid, action = action } }
+                            , LS.getLocalVal { for = "lva", name = lid }
+                            )
 
                         Data.PbyNoop ->
                             ( model, Cmd.none )
@@ -3126,7 +3120,24 @@ actualupdate msg model =
                                     )
 
                         Data.PvyZkNoteAndLinksWhat znew ->
-                            onZkNoteEditWhat model pt znew
+                            let
+                                action =
+                                    \mbstate ->
+                                        let
+                                            znas : DataUtil.ZkNoteAndStateWhat
+                                            znas =
+                                                { znl = { znal = znew.znl, mbstate = mbstate }
+                                                , what = znew.what
+                                                }
+                                        in
+                                        onZkNoteStateEditWhat model pt znas
+
+                                lid =
+                                    SNG.localDataId znew.znl.zknote.id
+                            in
+                            ( { model | localValAction = Just <| LocalValAction { for = "lva", name = lid, action = action } }
+                            , LS.getLocalVal { for = "lva", name = lid }
+                            )
 
                         Data.PvyZkNoteComments zc ->
                             case state of
@@ -3397,22 +3408,13 @@ actualupdate msg model =
                                     mbid
                                         |> Maybe.andThen (\id -> NC.getNote model.noteCache id)
                                         |> Maybe.map
-                                            (\zknl ->
+                                            (\znas ->
                                                 let
                                                     ( nst, cmts ) =
-                                                        case
-                                                            EditZkNote.initFull model.fui
-                                                                login
-                                                                zknl.zknote
-                                                                zknl.links
-                                                                zknl.lzlinks
-                                                                model.mobile
-                                                        of
-                                                            EditZkNote.LoadLocal name tox ->
-                                                                tox (Maybe.map DataUtil.zkNoteIdToString mbcurrent)
-
-                                                            EditZkNote.Ready x ->
-                                                                x
+                                                        EditZkNote.initFull model.fui
+                                                            login
+                                                            znas
+                                                            model.mobile
 
                                                     ngets =
                                                         makeNoteCacheGets (EM.getContent nst.edMarkdown) model
@@ -3438,14 +3440,14 @@ actualupdate msg model =
 
                 SlideShow.SaveCurrent pid id ->
                     ( { model | state = SlideShow mbid emod instate }
-                    , LS.storeLocalVal { name = SpecialNotesGui.localDataId pid, value = DataUtil.zkNoteIdToString id }
+                    , LS.storeLocalVal { name = SNG.localDataId pid, value = DataUtil.zkNoteIdToString id }
                     )
 
                 SlideShow.GetNoteAndSaveCurrent pid id ->
                     ( { model | state = SlideShow mbid emod instate }
                     , Cmd.batch
                         [ makeNoteCacheGet model id
-                        , LS.storeLocalVal { name = SpecialNotesGui.localDataId pid, value = DataUtil.zkNoteIdToString id }
+                        , LS.storeLocalVal { name = SNG.localDataId pid, value = DataUtil.zkNoteIdToString id }
                         ]
                     )
 
@@ -3950,7 +3952,7 @@ makeNoteCacheGet model id =
                 (Data.PvqGetZknIfChanged
                     { zknote = id
                     , what = "cache"
-                    , changeddate = zkn.zknote.changeddate
+                    , changeddate = zkn.znal.zknote.changeddate
                     }
                 )
 
@@ -3996,7 +3998,7 @@ makePubNoteCacheGet model id =
                 (Data.PbrGetZknIfChanged
                     { zknote = id
                     , what = "cache"
-                    , changeddate = zkn.zknote.changeddate
+                    , changeddate = zkn.znal.zknote.changeddate
                     }
                 )
 
@@ -4225,7 +4227,7 @@ handleEditZkNoteCmd amodel login ( emod, aecmd ) =
                                 szn.content
 
                             Right zknal ->
-                                zknal.zknote.content
+                                zknal.znal.zknote.content
                         )
                         model
                     )
@@ -4422,7 +4424,7 @@ handleEditZkNoteCmd amodel login ( emod, aecmd ) =
                         fst :: rest ->
                             let
                                 ( ssmod, sscmd ) =
-                                    SlideShow.init model.fui model.noteCache emod.id mbcurrent fst rest
+                                    SlideShow.init model.fui model.noteCache emod.id mbcurrent (EditZkNote.getSnState emod) fst rest
                             in
                             ( { model | state = SlideShow emod.id ssmod (EditZkNote emod login) }
                             , case sscmd of
@@ -4436,11 +4438,11 @@ handleEditZkNoteCmd amodel login ( emod, aecmd ) =
                                     [ Cmd.none ]
 
                                 SlideShow.SaveCurrent pid id ->
-                                    [ LS.storeLocalVal { name = SpecialNotesGui.localDataId pid, value = DataUtil.zkNoteIdToString id } ]
+                                    [ LS.storeLocalVal { name = SNG.localDataId pid, value = DataUtil.zkNoteIdToString id } ]
 
                                 SlideShow.GetNoteAndSaveCurrent pid id ->
                                     [ makeNoteCacheGet model id
-                                    , LS.storeLocalVal { name = SpecialNotesGui.localDataId pid, value = DataUtil.zkNoteIdToString id }
+                                    , LS.storeLocalVal { name = SNG.localDataId pid, value = DataUtil.zkNoteIdToString id }
                                     ]
                             )
 

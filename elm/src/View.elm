@@ -199,7 +199,7 @@ view stylePalette zone maxw noteCache config model =
                                                 , noop = Noop
                                                 }
                                             )
-                                            pn.zknote.content
+                                            pn.znal.zknote.content
                                      of
                                         Ok rendered ->
                                             E.column
@@ -332,7 +332,7 @@ initFull : FileUrlInfo -> DataUtil.ZkNoteAndState -> Model
 initFull fui zknas =
     let
         zknote =
-            zknas.zknal.zknote
+            zknas.znal.zknote
 
         cells =
             zknote.content
@@ -349,10 +349,10 @@ initFull fui zknas =
                     case SNG.mbLocalDataId zknote.id sn of
                         Just id ->
                             EM.initSpecial
-                                (SNG.initSpecialNoteStateLz zknote.id sn zknas.mbstate zknas.zknal.lzlinks)
+                                (SNG.initSpecialNoteStateLz zknote.id sn zknas.mbstate zknas.znal.lzlinks)
 
                         Nothing ->
-                            EM.initSpecial (SNG.initSpecialNoteStateLz zknote.id sn Nothing zknas.zknal.lzlinks)
+                            EM.initSpecial (SNG.initSpecialNoteStateLz zknote.id sn Nothing zknas.znal.lzlinks)
 
                 Err _ ->
                     EM.initMd zknote.content
@@ -365,7 +365,7 @@ initFull fui zknas =
     , md = zknote.content
     , cells = getCd cc
     , panelNote = zknote.content |> MC.mdPanel |> Maybe.map .noteid
-    , zklinks = zknas.zknal.links
+    , zklinks = zknas.znal.links
     , createdate = Just zknote.createdate
     , changeddate = Just zknote.changeddate
     , zknote = Just zknote

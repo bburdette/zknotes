@@ -13,6 +13,7 @@ module EditZkNote exposing
     , disabledLinkButtonStyle
     , dndSubscriptions
     , fullSave
+    , getSnState
     , ghostView
     , initFull
     , initLinkBackNote
@@ -247,7 +248,7 @@ type Command
     | SaveLinks Data.SaveZkLinks
     | Revert
     | View
-        { note : Either Data.SaveZkNote Data.ZkNoteAndLinks
+        { note : Either Data.SaveZkNote DataUtil.ZkNoteAndState
         , createdate : Maybe Int
         , changeddate : Maybe Int
         , panelnote : Maybe ZkNoteId
@@ -316,6 +317,12 @@ updateBlockEdit s (Text t) =
     in
     Text
         { t | s = s, b = b, original = t.original }
+
+
+getSnState : Model -> Maybe String
+getSnState model =
+    EM.getSpecialNoteState model.edMarkdown
+        |> Maybe.andThen SNG.saveLocalData
 
 
 
@@ -2641,13 +2648,13 @@ initFull :
 initFull fui ld zknas mobile =
     let
         zknote =
-            zknas.zknal.zknote
+            zknas.znal.zknote
 
         dtlinks =
-            zknas.zknal.links
+            zknas.znal.links
 
         lzlinks =
-            zknas.zknal.lzlinks
+            zknas.znal.lzlinks
 
         cells =
             zknote.content
@@ -3247,9 +3254,12 @@ update noteCache msg model =
                                 case toZkNote model of
                                     Just zkn ->
                                         Right
-                                            { zknote = zkn
-                                            , links = model.zklDict |> Dict.values |> List.filterMap elToDel
-                                            , lzlinks = [] -- TODO fix
+                                            { znal =
+                                                { zknote = zkn
+                                                , links = model.zklDict |> Dict.values |> List.filterMap elToDel
+                                                , lzlinks = [] -- TODO fix
+                                                }
+                                            , mbstate = getSnState model
                                             }
 
                                     Nothing ->
@@ -3268,9 +3278,12 @@ update noteCache msg model =
                             case toZkNote model of
                                 Just zkn ->
                                     Right
-                                        { zknote = zkn
-                                        , links = model.zklDict |> Dict.values |> List.filterMap elToDel
-                                        , lzlinks = [] -- TODO fix
+                                        { znal =
+                                            { zknote = zkn
+                                            , links = model.zklDict |> Dict.values |> List.filterMap elToDel
+                                            , lzlinks = [] -- TODO fix
+                                            }
+                                        , mbstate = getSnState model
                                         }
 
                                 Nothing ->
@@ -4122,7 +4135,7 @@ update noteCache msg model =
                                                     { id = zkid
                                                     , title =
                                                         NC.getNote noteCache zkid
-                                                            |> Maybe.map (\n -> n.zknote.title)
+                                                            |> Maybe.map (\n -> n.znal.zknote.title)
                                                             |> Maybe.withDefault (zkNoteIdToString zkid)
                                                     }
 

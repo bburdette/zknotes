@@ -26,8 +26,14 @@ type alias NlLink =
 
 
 type alias ZkNoteAndState =
-    { zknal : ZkNoteAndLinks
+    { znal : ZkNoteAndLinks
     , mbstate : Maybe String
+    }
+
+
+type alias ZkNoteAndStateWhat =
+    { what : String
+    , znl : ZkNoteAndState
     }
 
 
