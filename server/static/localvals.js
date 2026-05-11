@@ -1,4 +1,4 @@
-let localvalsdebug = true;
+let localvalsdebug = false;
 
 function storeVal( nv ) {
   localStorage.setItem(nv.name, nv.value);

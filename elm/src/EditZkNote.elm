@@ -1,6 +1,5 @@
 module EditZkNote exposing
     ( Command(..)
-      -- , InitModel(..)
     , Model
     , Msg(..)
     , TACommand(..)

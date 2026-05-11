@@ -3126,6 +3126,7 @@ pub fn udpate41(dbfile: &Path) -> Result<(), zkerr::Error> {
 }
 
 // to decode old special notes to migrate.
+// assumes TagSearch, CompletedSync are the same!
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub enum SpecialNoteObsolete1 {
   SnSearch(Vec<TagSearch>),
