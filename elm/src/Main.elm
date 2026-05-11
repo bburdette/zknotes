@@ -3439,15 +3439,29 @@ actualupdate msg model =
                     )
 
                 SlideShow.SaveCurrent pid id ->
-                    ( { model | state = SlideShow mbid emod instate }
-                    , LS.storeLocalVal { name = SNG.localDataId pid, value = DataUtil.zkNoteIdToString id }
+                    let
+                        st =
+                            DataUtil.zkNoteIdToString id
+                    in
+                    ( { model
+                        | state = SlideShow mbid emod instate
+                        , noteCache = updateState pid st model.noteCache
+                      }
+                    , LS.storeLocalVal { name = SNG.localDataId pid, value = st }
                     )
 
                 SlideShow.GetNoteAndSaveCurrent pid id ->
-                    ( { model | state = SlideShow mbid emod instate }
+                    let
+                        st =
+                            DataUtil.zkNoteIdToString id
+                    in
+                    ( { model
+                        | state = SlideShow mbid emod instate
+                        , noteCache = updateState pid st model.noteCache
+                      }
                     , Cmd.batch
                         [ makeNoteCacheGet model id
-                        , LS.storeLocalVal { name = SNG.localDataId pid, value = DataUtil.zkNoteIdToString id }
+                        , LS.storeLocalVal { name = SNG.localDataId pid, value = st }
                         ]
                     )
 
@@ -4425,25 +4439,44 @@ handleEditZkNoteCmd amodel login ( emod, aecmd ) =
                             let
                                 ( ssmod, sscmd ) =
                                     SlideShow.init model.fui model.noteCache emod.id mbcurrent (EditZkNote.getSnState emod) fst rest
+
+                                ( ncmod, nccmd ) =
+                                    case sscmd of
+                                        SlideShow.GetNote id ->
+                                            ( model, [ makeNoteCacheGet model id ] )
+
+                                        SlideShow.Close _ ->
+                                            ( model, [ Cmd.none ] )
+
+                                        SlideShow.Noop ->
+                                            ( model, [ Cmd.none ] )
+
+                                        SlideShow.SaveCurrent pid id ->
+                                            let
+                                                st =
+                                                    DataUtil.zkNoteIdToString id
+                                            in
+                                            ( { model
+                                                | noteCache = updateState pid v model.noteCache
+                                              }
+                                            , [ LS.storeLocalVal { name = SNG.localDataId pid, value = DataUtil.zkNoteIdToString id } ]
+                                            )
+
+                                        SlideShow.GetNoteAndSaveCurrent pid id ->
+                                            let
+                                                st =
+                                                    DataUtil.zkNoteIdToString id
+                                            in
+                                            ( { model
+                                                | noteCache = updateState pid v model.noteCache
+                                              }
+                                            , [ makeNoteCacheGet model id
+                                              , LS.storeLocalVal { name = SNG.localDataId pid, value = DataUtil.zkNoteIdToString id }
+                                              ]
+                                            )
                             in
-                            ( { model | state = SlideShow emod.id ssmod (EditZkNote emod login) }
-                            , case sscmd of
-                                SlideShow.GetNote id ->
-                                    [ makeNoteCacheGet model id ]
-
-                                SlideShow.Close _ ->
-                                    [ Cmd.none ]
-
-                                SlideShow.Noop ->
-                                    [ Cmd.none ]
-
-                                SlideShow.SaveCurrent pid id ->
-                                    [ LS.storeLocalVal { name = SNG.localDataId pid, value = DataUtil.zkNoteIdToString id } ]
-
-                                SlideShow.GetNoteAndSaveCurrent pid id ->
-                                    [ makeNoteCacheGet model id
-                                    , LS.storeLocalVal { name = SNG.localDataId pid, value = DataUtil.zkNoteIdToString id }
-                                    ]
+                            ( { ncmod | state = SlideShow emod.id ssmod (EditZkNote emod login) }
+                            , nccmd
                             )
 
                         [] ->
@@ -4466,7 +4499,11 @@ handleEditZkNoteCmd amodel login ( emod, aecmd ) =
                     )
 
                 EditZkNote.SaveLocalData id v ->
-                    ( model, [ LS.storeLocalVal { name = id, value = v } ] )
+                    ( { model
+                        | noteCache = updateState pid v model.noteCache
+                      }
+                    , [ LS.storeLocalVal { name = id, value = v } ]
+                    )
 
                 EditZkNote.Batch c ->
                     List.foldl

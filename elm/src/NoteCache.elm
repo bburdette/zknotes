@@ -65,6 +65,26 @@ addNote pt id ce nc =
     }
 
 
+updateState : ZkNoteId -> Maybe String -> NoteCache -> NoteCache
+updateState id mbs nc =
+    { nc
+        | byId =
+            TDict.get id nc.byId
+                |> Maybe.map
+                    (\x ->
+                        case x of
+                            { receivetime, ce } ->
+                                case ce of
+                                    ZNAL znas ->
+                                        TDict.insert id { x | ce = ZNAL { znas | mbstate = mbs } } nc.byId
+
+                                    _ ->
+                                        nc.byId
+                    )
+                |> Maybe.withDefault nc.byId
+    }
+
+
 getNote : NoteCache -> ZkNoteId -> Maybe ZkNoteAndState
 getNote nc id =
     getCacheEntry nc id
