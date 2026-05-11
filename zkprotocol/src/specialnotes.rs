@@ -8,9 +8,21 @@ use uuid::Uuid;
 pub enum SpecialNote {
   SnSearch(Vec<TagSearch>),
   SnSync(CompletedSync),
-  SnList(Notegraph),
+  SnList,
   // SnDateTime(DateTime),
   // SnAlert(Alert),
+}
+
+// to decode old lists.
+pub enum SpecialNoteObsolete1 {
+  SnSearch(Vec<TagSearch>),
+  SnSync(CompletedSync),
+  SnList(NotegraphObsolete1),
+}
+
+#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
+pub struct NotegraphObsolete1 {
+  pub currentUuid: Option<Uuid>,
 }
 
 // #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
@@ -29,11 +41,6 @@ pub struct CompletedSync {
   pub now: i64,
   pub local: Option<Uuid>,  // optional for backward compatibility
   pub remote: Option<Uuid>, // optional for backward compatibility
-}
-
-#[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]
-pub struct Notegraph {
-  pub currentUuid: Option<Uuid>,
 }
 
 // #[derive(Elm, ElmDecode, ElmEncode, Deserialize, Serialize, Debug, Clone)]

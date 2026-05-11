@@ -35,6 +35,8 @@ type Command
     | DndCmd (Cmd Msg)
     | SlideShow (Maybe ZkNoteId) (List NlLink)
     | ToMarkdown String
+    | SaveLocalData String
+    | Batch (List Command)
     | None
 
 
@@ -44,13 +46,53 @@ type SpecialNoteState
     | SnsList SLE.Model
 
 
-initSpecialNoteStateLz : ZkNoteId -> SN.SpecialNote -> List LzLink -> SpecialNoteState
-initSpecialNoteStateLz znid sn lzls =
-    initSpecialNoteState sn (mklzList znid lzls)
+saveLocalData : SpecialNoteState -> Maybe String
+saveLocalData sns =
+    case sns of
+        SnsSearch _ ->
+            Nothing
+
+        SnsSync _ ->
+            Nothing
+
+        SnsList m ->
+            m.currentUuid
 
 
-initSpecialNoteState : SN.SpecialNote -> List NlLink -> SpecialNoteState
-initSpecialNoteState sn lzls =
+mbLocalDataId : ZkNoteId -> SpecialNote -> Maybe String
+mbLocalDataId zni sn =
+    if couldUseLocalState sn then
+        Just <| localDataId zni
+
+    else
+        Nothing
+
+
+couldUseLocalState : SpecialNote -> Bool
+couldUseLocalState sns =
+    case sns of
+        SN.SnSearch _ ->
+            False
+
+        SN.SnSync _ ->
+            False
+
+        SN.SnList ->
+            True
+
+
+localDataId : ZkNoteId -> String
+localDataId zni =
+    zkNoteIdToString zni ++ "-snstate"
+
+
+initSpecialNoteStateLz : ZkNoteId -> SN.SpecialNote -> Maybe String -> List LzLink -> SpecialNoteState
+initSpecialNoteStateLz znid sn mbsnstate lzls =
+    initSpecialNoteState sn mbsnstate (mklzList znid lzls)
+
+
+initSpecialNoteState : SN.SpecialNote -> Maybe String -> List NlLink -> SpecialNoteState
+initSpecialNoteState sn mbsnstate lzls =
     case sn of
         SN.SnSearch tagSearch ->
             SnsSearch tagSearch
@@ -58,8 +100,8 @@ initSpecialNoteState sn lzls =
         SN.SnSync completedSync ->
             SnsSync completedSync
 
-        SN.SnList notegraph ->
-            SnsList (SLE.init notegraph lzls)
+        SN.SnList ->
+            SnsList (SLE.init mbsnstate lzls)
 
 
 dirty : Maybe SpecialNoteState -> Maybe SpecialNoteState -> Bool
@@ -81,8 +123,8 @@ getSpecialNote sns =
         SnsSync completedSync ->
             SN.SnSync completedSync
 
-        SnsList slem ->
-            SN.SnList slem.ng
+        SnsList _ ->
+            SN.SnList
 
 
 sngSubscriptions : SpecialNoteState -> List (Sub Msg)
@@ -241,7 +283,7 @@ addNotes this zlns sns =
                 notes =
                     List.map (\zln -> { id = zln.id, title = zln.title }) zlns
             in
-            case slem.ng.currentUuid of
+            case slem.currentUuid of
                 Nothing ->
                     SnsList
                         { slem | nlls = filterNotes this <| notes ++ slem.nlls }
@@ -430,7 +472,7 @@ updateSn msg snote =
                     ( SnsList slem, GraphFocus )
 
                 SlideShowClick ->
-                    ( SnsList slem, SlideShow (Maybe.map Zni slem.ng.currentUuid) slem.nlls )
+                    ( SnsList slem, SlideShow (Maybe.map Zni slem.currentUuid) slem.nlls )
 
                 ToMarkdownPress ->
                     ( SnsList slem
@@ -453,10 +495,28 @@ updateSn msg snote =
 
                 SLEMsg m ->
                     let
-                        nm =
+                        ( nm, c ) =
                             SLE.update m slem
+
+                        nc =
+                            case c of
+                                SLE.None ->
+                                    Nothing
+
+                                SLE.SaveLocalData s ->
+                                    Just <| SaveLocalData s
+
+                        dc =
+                            DndCmd <| Cmd.map SLEMsg <| SLE.commands nm
                     in
-                    ( SnsList nm, DndCmd <| Cmd.map SLEMsg <| SLE.commands nm )
+                    ( SnsList nm
+                    , case nc of
+                        Nothing ->
+                            dc
+
+                        Just s ->
+                            Batch [ dc, s ]
+                    )
 
                 Noop ->
                     ( SnsList slem, None )

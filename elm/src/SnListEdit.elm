@@ -15,7 +15,6 @@ import Html.Attributes as HA
 import Html.Events as HE
 import Json.Decode as JD
 import NoteCache exposing (NoteCache)
-import SpecialNotes exposing (Notegraph)
 import TSet
 import TangoColors as TC
 import Util
@@ -32,16 +31,21 @@ type Msg
 
 
 type alias Model =
-    { ng : Notegraph
+    { currentUuid : Maybe String
     , nlls : List NlLink
     , nllDnd : DnDList.Model
     , selected : ZniSet
     }
 
 
-init : Notegraph -> List NlLink -> Model
-init ng nlls =
-    { ng = ng
+type Command
+    = SaveLocalData String
+    | None
+
+
+init : Maybe String -> List NlLink -> Model
+init currentUuid nlls =
+    { currentUuid = currentUuid
     , nlls = nlls
     , nllDnd = nllDndSystem.model
     , selected = emptyZniSet
@@ -52,9 +56,7 @@ dirty : Model -> Model -> Bool
 dirty new old =
     -- leave 'selected' out of the comparison
     not
-        (new.ng
-            == old.ng
-            && new.nlls
+        (new.nlls
             == old.nlls
             && new.nllDnd
             == old.nllDnd
@@ -66,43 +68,43 @@ commands model =
     nllDndSystem.commands model.nllDnd
 
 
-update : Msg -> Model -> Model
+update : Msg -> Model -> ( Model, Command )
 update msg model =
     case msg of
         GraphFocusClick ->
-            model
+            ( model, None )
 
         EditItem _ ->
-            model
+            ( model, None )
 
         DnDMsg dmsg ->
             let
                 ( nm, lst ) =
                     nllDndSystem.update dmsg model.nllDnd model.nlls
             in
-            { model | nllDnd = nm, nlls = lst }
+            ( { model | nllDnd = nm, nlls = lst }, None )
 
         Select id ->
-            { model
+            ( { model
                 | selected =
                     if TSet.member id model.selected then
                         TSet.remove id model.selected
 
                     else
                         TSet.insert id model.selected
-            }
+              }
+            , None
+            )
 
         Play id ->
-            let
-                ng =
-                    model.ng
-            in
-            { model
-                | ng = { ng | currentUuid = Just <| zkNoteIdToString id }
-            }
+            ( { model
+                | currentUuid = Just <| zkNoteIdToString id
+              }
+            , SaveLocalData (zkNoteIdToString id)
+            )
 
         Remove ->
-            { model
+            ( { model
                 | nlls =
                     model.nlls
                         |> List.filter
@@ -111,7 +113,9 @@ update msg model =
                                     TSet.member nl.id model.selected
                             )
                 , selected = emptyZniSet
-            }
+              }
+            , None
+            )
 
 
 controlRow : ZkNoteId -> E.Element Msg
@@ -208,7 +212,7 @@ view fontsize model =
                                         ]
                                     <|
                                         [ E.text nl.title ]
-                                , if Just nl.id == Maybe.map Data.Zni model.ng.currentUuid then
+                                , if Just nl.id == Maybe.map Data.Zni model.currentUuid then
                                     E.el [ EF.bold ] (E.text "▶")
 
                                   else

@@ -25,6 +25,18 @@ type alias NlLink =
     { id : ZkNoteId, title : String }
 
 
+type alias ZkNoteAndState =
+    { znal : ZkNoteAndLinks
+    , mbstate : Maybe String
+    }
+
+
+type alias ZkNoteAndStateWhat =
+    { what : String
+    , znl : ZkNoteAndState
+    }
+
+
 type EditTab
     = EtRaw
     | EtEdit

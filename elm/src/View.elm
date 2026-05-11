@@ -16,16 +16,23 @@ import Common
 import Data exposing (ZkNote, ZkNoteId)
 import DataUtil exposing (FileUrlInfo)
 import Dict
+import EdMarkdown as EM
+import Either exposing (..)
 import Element as E exposing (Element)
 import Element.Background as EBk
+import Element.Border as EBd
 import Element.Font as Font
 import Element.Input as EI
+import Json.Decode as JD
 import Markdown.Block exposing (ListItem(..), Task(..))
 import MdCommon as MC
 import NoteCache as NC exposing (CacheEntry(..), NoteCache)
+import SpecialNotes
+import SpecialNotesGui as SNG
 import TangoColors as TC
 import Time
 import Util
+import ZkCommon as ZC
 
 
 type Msg
@@ -33,6 +40,7 @@ type Msg
     | DonePress
     | SwitchPress ZkNoteId -- TODO: remove?
     | OnPlaybackEnd
+    | SNGMsg SNG.Msg
     | Noop
 
 
@@ -108,14 +116,33 @@ showZkl zkl =
         ]
 
 
-view : Time.Zone -> Int -> NoteCache -> Config -> Model -> Element Msg
-view zone maxw noteCache config model =
+view : ZC.StylePalette -> Time.Zone -> Int -> NoteCache -> Config -> Model -> Element Msg
+view stylePalette zone maxw noteCache config model =
     let
         mw =
             min maxw 1000 - 160
 
         narrow =
             maxw < 1300
+
+        snedit =
+            \sn ->
+                E.row
+                    [ E.padding 10
+                    , EBd.rounded 10
+                    , E.width E.fill
+                    , EBk.color TC.lightGray
+                    , E.height E.fill
+                    ]
+                    [ E.el
+                        [ EBd.color TC.black
+                        , EBd.width 1
+                        , E.width E.fill
+                        , E.centerX
+                        , E.padding 3
+                        ]
+                        (SNG.guiSn zone stylePalette.fontSize sn |> E.map SNGMsg)
+                    ]
     in
     E.column [ E.width E.fill ]
         [ if config.loggedin then
@@ -172,7 +199,7 @@ view zone maxw noteCache config model =
                                                 , noop = Noop
                                                 }
                                             )
-                                            pn.zknote.content
+                                            pn.znal.zknote.content
                                      of
                                         Ok rendered ->
                                             E.column
@@ -301,11 +328,11 @@ view zone maxw noteCache config model =
         ]
 
 
-initFull : FileUrlInfo -> Data.ZkNoteAndLinks -> Model
-initFull fui zknaa =
+initFull : FileUrlInfo -> DataUtil.ZkNoteAndState -> Model
+initFull fui zknas =
     let
         zknote =
-            zknaa.zknote
+            zknas.znal.zknote
 
         cells =
             zknote.content
@@ -315,6 +342,20 @@ initFull fui zknaa =
         ( cc, _ ) =
             evalCellsFully
                 (mkCc cells)
+
+        edMarkdown =
+            case JD.decodeString SpecialNotes.specialNoteDecoder zknote.content of
+                Ok sn ->
+                    case SNG.mbLocalDataId zknote.id sn of
+                        Just id ->
+                            EM.initSpecial
+                                (SNG.initSpecialNoteStateLz zknote.id sn zknas.mbstate zknas.znal.lzlinks)
+
+                        Nothing ->
+                            EM.initSpecial (SNG.initSpecialNoteStateLz zknote.id sn Nothing zknas.znal.lzlinks)
+
+                Err _ ->
+                    EM.initMd zknote.content
     in
     { id = Just zknote.id
     , fui = fui
@@ -324,7 +365,7 @@ initFull fui zknaa =
     , md = zknote.content
     , cells = getCd cc
     , panelNote = zknote.content |> MC.mdPanel |> Maybe.map .noteid
-    , zklinks = zknaa.links
+    , zklinks = zknas.znal.links
     , createdate = Just zknote.createdate
     , changeddate = Just zknote.changeddate
     , zknote = Just zknote
@@ -362,6 +403,9 @@ update : Msg -> Model -> ( Model, Command )
 update msg model =
     case msg of
         Noop ->
+            ( model, None )
+
+        SNGMsg _ ->
             ( model, None )
 
         DonePress ->

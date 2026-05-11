@@ -11,7 +11,7 @@ use tracing::{error, info};
 use uuid::Uuid;
 use zkprotocol::constants::SpecialUuids;
 use zkprotocol::search::TagSearch;
-use zkprotocol::specialnotes as SN;
+use zkprotocol::specialnotes::{self as SN, CompletedSync, SpecialNote};
 
 pub fn initialdb() -> Migration {
   let mut m = Migration::new();
@@ -3120,6 +3120,61 @@ pub fn udpate41(dbfile: &Path) -> Result<(), zkerr::Error> {
   let tr = conn.unchecked_transaction()?;
   conn.execute("drop index 'zklinkunq';", params![])?;
   conn.execute("CREATE UNIQUE INDEX \"zklinkunq\" ON \"zklink\" (\"fromid\", \"toid\", \"user\", \"linkzknote\");", params![])?;
+
+  tr.commit()?;
+  Ok(())
+}
+
+// to decode old special notes to migrate.
+// assumes TagSearch, CompletedSync are the same!
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub enum SpecialNoteObsolete1 {
+  SnSearch(Vec<TagSearch>),
+  SnSync(CompletedSync),
+  SnList(NotegraphObsolete1),
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct NotegraphObsolete1 {
+  pub currentUuid: Option<Uuid>,
+}
+
+pub fn from_special_note_obsolete1(sno1: SpecialNoteObsolete1) -> SpecialNote {
+  match sno1 {
+    SpecialNoteObsolete1::SnSearch(x) => SpecialNote::SnSearch(x),
+    SpecialNoteObsolete1::SnSync(x) => SpecialNote::SnSync(x),
+    SpecialNoteObsolete1::SnList(_) => SpecialNote::SnList,
+  }
+}
+
+pub fn udpate42(dbfile: &Path) -> Result<(), zkerr::Error> {
+  // db connection without foreign key checking.
+  let conn = Connection::open(dbfile)?;
+  let tr = conn.unchecked_transaction()?;
+
+  fn old_sn(id: i64, content: String) -> Result<(i64, SpecialNoteObsolete1), zkerr::Error> {
+    let sno = serde_json::from_str::<SpecialNoteObsolete1>(content.as_str())?;
+    Ok((id, sno))
+  }
+
+  let mut pstmt = conn.prepare("select id, content from zknote")?;
+  let rows = pstmt
+    .query_and_then(params!(), |row| old_sn(row.get(0)?, row.get(1)?))?
+    .filter_map(|x| x.ok());
+
+  for (id, sno) in rows {
+    println!("updating special note:");
+    println!("id, sno: {}, {:?}", id, sno);
+    let fsno = from_special_note_obsolete1(sno);
+    println!("id, fsno: {}, {:?}", id, fsno);
+
+    if let Ok(s) = serde_json::to_string(&fsno) {
+      conn.execute(
+        "update zknote set content = ?1 where id = ?2",
+        params![s, id],
+      )?;
+    }
+  }
 
   tr.commit()?;
   Ok(())

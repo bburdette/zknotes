@@ -46,7 +46,7 @@ serverEncoder struct =
 type SpecialNote
     = SnSearch (List (TagSearch))
     | SnSync (CompletedSync)
-    | SnList (Notegraph)
+    | SnList
 
 
 specialNoteEncoder : SpecialNote -> Json.Encode.Value
@@ -56,8 +56,8 @@ specialNoteEncoder enum =
             Json.Encode.object [ ( "SnSearch", Json.Encode.list (tagSearchEncoder) inner ) ]
         SnSync inner ->
             Json.Encode.object [ ( "SnSync", completedSyncEncoder inner ) ]
-        SnList inner ->
-            Json.Encode.object [ ( "SnList", notegraphEncoder inner ) ]
+        SnList ->
+            Json.Encode.string "SnList"
 
 type alias CompletedSync =
     { after : Maybe (Int)
@@ -77,18 +77,6 @@ completedSyncEncoder struct =
         ]
 
 
-type alias Notegraph =
-    { currentUuid : Maybe (String)
-    }
-
-
-notegraphEncoder : Notegraph -> Json.Encode.Value
-notegraphEncoder struct =
-    Json.Encode.object
-        [ ( "currentUuid", (Maybe.withDefault Json.Encode.null << Maybe.map (Json.Encode.string)) struct.currentUuid )
-        ]
-
-
 serverDecoder : Json.Decode.Decoder Server
 serverDecoder =
     Json.Decode.succeed Server
@@ -101,7 +89,15 @@ specialNoteDecoder =
     Json.Decode.oneOf
         [ Json.Decode.map SnSearch (Json.Decode.field "SnSearch" (Json.Decode.list (tagSearchDecoder)))
         , Json.Decode.map SnSync (Json.Decode.field "SnSync" (completedSyncDecoder))
-        , Json.Decode.map SnList (Json.Decode.field "SnList" (notegraphDecoder))
+        , Json.Decode.string
+            |> Json.Decode.andThen
+                (\x ->
+                    case x of
+                        "SnList" ->
+                            Json.Decode.succeed SnList
+                        unexpected ->
+                            Json.Decode.fail <| "Unexpected variant " ++ unexpected
+                )
         ]
 
 completedSyncDecoder : Json.Decode.Decoder CompletedSync
@@ -111,11 +107,5 @@ completedSyncDecoder =
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "now" (Json.Decode.int)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "local" (Json.Decode.nullable (Json.Decode.string))))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "remote" (Json.Decode.nullable (Json.Decode.string))))
-
-
-notegraphDecoder : Json.Decode.Decoder Notegraph
-notegraphDecoder =
-    Json.Decode.succeed Notegraph
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "currentUuid" (Json.Decode.nullable (Json.Decode.string))))
 
 

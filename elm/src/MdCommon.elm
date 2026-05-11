@@ -814,7 +814,7 @@ noteView args id show text _ =
                                         t
 
                                     Nothing ->
-                                        zne.zknote.title
+                                        zne.znal.zknote.title
                         in
                         E.link
                             [ E.htmlAttribute <| HE.stopPropagationOn "click" (JD.succeed ( args.noop, True ))
@@ -838,7 +838,7 @@ noteView args id show text _ =
                       else
                         E.none
                     , if ns.title && not ns.link then
-                        E.text zne.zknote.title
+                        E.text zne.znal.zknote.title
 
                       else
                         E.none
@@ -850,7 +850,7 @@ noteView args id show text _ =
                     , if ns.createdate || ns.changedate then
                         E.row []
                             [ if ns.createdate then
-                                zne.zknote.createdate
+                                zne.znal.zknote.createdate
                                     |> (\cd ->
                                             E.row []
                                                 [ E.text "created: "
@@ -862,7 +862,7 @@ noteView args id show text _ =
                               else
                                 E.none
                             , if ns.changedate then
-                                zne.zknote.changeddate
+                                zne.znal.zknote.changeddate
                                     |> (\cd ->
                                             E.row []
                                                 [ E.text "updated: "
@@ -879,7 +879,7 @@ noteView args id show text _ =
                     , if ns.contents then
                         case
                             markdownView (mkRenderer args)
-                                zne.zknote.content
+                                zne.znal.zknote.content
                         of
                             Ok le ->
                                 E.column [] le
@@ -890,9 +890,9 @@ noteView args id show text _ =
                       else
                         E.none
                     , if ns.file then
-                        case zne.zknote.filestatus of
+                        case zne.znal.zknote.filestatus of
                             Data.FilePresent ->
-                                noteFile args.fui args.maxw False Nothing zne.zknote.title zne.zknote
+                                noteFile args.fui args.maxw False Nothing zne.znal.zknote.title zne.znal.zknote
 
                             Data.FileMissing ->
                                 E.paragraph []
@@ -905,7 +905,7 @@ noteView args id show text _ =
                                                 , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
                                                 , E.htmlAttribute (HA.style "word-break" "break-word")
                                                 ]
-                                                [ E.text zne.zknote.title ]
+                                                [ E.text zne.znal.zknote.title ]
                                         }
                                     , E.text " file missing"
                                     ]
@@ -920,7 +920,7 @@ noteView args id show text _ =
                                             , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
                                             , E.htmlAttribute (HA.style "word-break" "break-word")
                                             ]
-                                            [ E.text zne.zknote.title ]
+                                            [ E.text zne.znal.zknote.title ]
                                     }
 
                       else
