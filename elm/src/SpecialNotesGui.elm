@@ -505,7 +505,7 @@ updateSn msg snote =
 
                                 SLE.PlayNSave s ->
                                     [ SaveLocalData s
-                                    , SlideShow (Maybe.map Zni slem.currentUuid) slem.nlls
+                                    , SlideShow (Maybe.map Zni nm.currentUuid) nm.nlls
                                     ]
 
                         dc =
@@ -516,9 +516,7 @@ updateSn msg snote =
                         dc
 
                       else
-                        -- Batch (dc :: nc)
                         Batch nc
-                      -- None
                     )
 
                 Noop ->
