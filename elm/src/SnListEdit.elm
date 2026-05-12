@@ -93,10 +93,6 @@ update msg model =
             )
 
         Play id ->
-            let
-                _ =
-                    Debug.log "play id" id
-            in
             ( { model
                 | currentUuid = Just <| zkNoteIdToString id
               }

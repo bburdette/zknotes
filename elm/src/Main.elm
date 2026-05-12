@@ -1040,8 +1040,7 @@ showState state =
 
 unexpectedMsg : Model -> Msg -> Model
 unexpectedMsg model msg =
-    -- unexpectedMessage model (showMessage msg)
-    unexpectedMessage model (Debug.toString msg)
+    unexpectedMessage model (showMessage msg)
 
 
 unexpectedMessage : Model -> String -> Model
@@ -4081,9 +4080,6 @@ makeNewNoteCacheGets md model =
 handleEditZkNoteCmd : Model -> LoginData -> EditZkNote.Command -> ( Model, Cmd Msg )
 handleEditZkNoteCmd amodel login aecmd =
     let
-        _ =
-            Debug.log "aecmd" aecmd
-
         mbemod =
             \mod ->
                 case mod.state of
@@ -4530,10 +4526,6 @@ onEznCmd ecmd model login =
         EditZkNote.SlideShow mbcurrent lst ->
             case mbemod model of
                 Just emod ->
-                    let
-                        _ =
-                            Debug.log "EditZkNote.SlideShow mbcurrent" mbcurrent
-                    in
                     case lst of
                         fst :: rest ->
                             let
@@ -4575,10 +4567,6 @@ onEznCmd ecmd model login =
                                               ]
                                             )
                             in
-                            let
-                                _ =
-                                    Debug.log "SlideShow" emod.id
-                            in
                             ( { ncmod | state = SlideShow emod.id ssmod (EditZkNote emod login) }
                             , nccmd
                             )
@@ -4594,14 +4582,6 @@ onEznCmd ecmd model login =
                     )
 
         EditZkNote.Cmd cmd ->
-            -- let
-            --     ( nmod, mbcmd ) =
-            --         case mbcommand of
-            --             Just emd ->
-            --                 handleEditZkNoteCmd model login ( emod, emd )
-            --             Nothing ->
-            --                 ( { model | state = EditZkNote emod login }, Cmd.none )
-            -- in
             ( model
             , [ Cmd.map EditZkNoteMsg cmd ]
             )
@@ -4614,29 +4594,16 @@ onEznCmd ecmd model login =
             )
 
         EditZkNote.Batch c ->
-            let
-                meh =
-                    List.foldl
-                        (\cmd ( fmodel, fcmds ) ->
-                            let
-                                ( nm, ncmds ) =
-                                    onEznCmd cmd fmodel login
-
-                                _ =
-                                    Debug.log "cmd" cmd
-
-                                _ =
-                                    Debug.log "folds showsteaet" (showState nm.state)
-                            in
-                            ( nm, ncmds ++ fcmds )
-                        )
-                        ( model, [] )
-                        c
-
-                _ =
-                    Debug.log "blahmcds" (Tuple.second meh)
-            in
-            meh
+            List.foldl
+                (\cmd ( fmodel, fcmds ) ->
+                    let
+                        ( nm, ncmds ) =
+                            onEznCmd cmd fmodel login
+                    in
+                    ( nm, ncmds ++ fcmds )
+                )
+                ( model, [] )
+                c
 
 
 handleEditZkNoteListing : Model -> LoginData -> ( EditZkNoteListing.Model, EditZkNoteListing.Command ) -> ( Model, Cmd Msg )

@@ -4308,21 +4308,16 @@ onSngCmd sncmd umod =
             )
 
         SNG.Batch cmds ->
-            let
-                _ =
-                    Debug.log "cmds" cmds
-            in
-            Debug.log "batchcmds" <|
-                List.foldl
-                    (\cmd ( fmod, fcmds ) ->
-                        let
-                            ( nm, ncmd ) =
-                                onSngCmd cmd fmod
-                        in
-                        ( nm, combineCommands ncmd fcmds )
-                    )
-                    ( umod, None )
-                    cmds
+            List.foldl
+                (\cmd ( fmod, fcmds ) ->
+                    let
+                        ( nm, ncmd ) =
+                            onSngCmd cmd fmod
+                    in
+                    ( nm, combineCommands ncmd fcmds )
+                )
+                ( umod, None )
+                cmds
 
         SNG.ToMarkdown s ->
             ( { umod
