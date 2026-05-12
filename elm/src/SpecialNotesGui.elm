@@ -497,25 +497,17 @@ updateSn msg snote =
                     let
                         ( nm, c ) =
                             SLE.update m slem
-
-                        nc =
-                            case c of
-                                SLE.None ->
-                                    Nothing
-
-                                SLE.SaveLocalData s ->
-                                    Just <| SaveLocalData s
-
-                        dc =
-                            DndCmd <| Cmd.map SLEMsg <| SLE.commands nm
                     in
                     ( SnsList nm
-                    , case nc of
-                        Nothing ->
-                            dc
+                    , case c of
+                        SLE.None ->
+                            DndCmd <| Cmd.map SLEMsg <| SLE.commands nm
 
-                        Just s ->
-                            Batch [ dc, s ]
+                        SLE.PlayNSave s ->
+                            Batch
+                                [ SaveLocalData s
+                                , SlideShow (Maybe.map Zni nm.currentUuid) nm.nlls
+                                ]
                     )
 
                 Noop ->

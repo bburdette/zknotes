@@ -5,6 +5,7 @@ module EditZkNote exposing
     , TACommand(..)
     , WClass(..)
     , addComment
+    , combineCommands
     , commentsRecieved
     , commonButtonStyle
     , compareZklinks
@@ -275,7 +276,7 @@ type Command
     | InlineXform Int MB.Inline (MB.Inline -> MG.Msg)
     | SlideShow (Maybe ZkNoteId) (List NlLink)
     | SaveLocalData ZkNoteId String
-    | Cmd (Cmd Msg) (Maybe Command)
+    | Cmd (Cmd Msg)
     | Batch (List Command)
 
 
@@ -3157,7 +3158,7 @@ onWkKeyPress noteCache key model =
                 ( m, _ ) =
                     update noteCache (TabChanged EtRaw) model
             in
-            ( m, Cmd (BD.focus "mdtext" |> Task.attempt (\_ -> Noop)) Nothing )
+            ( m, Cmd (BD.focus "mdtext" |> Task.attempt (\_ -> Noop)) )
 
         Toop.T4 "v" True True False ->
             update noteCache (TabChanged EtEdit) model
@@ -3167,7 +3168,7 @@ onWkKeyPress noteCache key model =
                 ( m, _ ) =
                     update noteCache (TabChanged EtSearch) model
             in
-            ( m, Cmd (BD.focus "searchtext" |> Task.attempt (\_ -> Noop)) Nothing )
+            ( m, Cmd (BD.focus "searchtext" |> Task.attempt (\_ -> Noop)) )
 
         Toop.T4 "r" True True False ->
             update noteCache (TabChanged EtRecent) model
@@ -3694,7 +3695,7 @@ update noteCache msg model =
         TitleFocus b ->
             ( { model | titleEdit = b || model.title == "" }
             , if b then
-                Cmd (Task.attempt (always Noop) (BD.focus "title-edit")) Nothing
+                Cmd (Task.attempt (always Noop) (BD.focus "title-edit"))
 
               else
                 None
@@ -3808,7 +3809,12 @@ update noteCache msg model =
                                         ( Ok model.edMarkdown, Nothing )
                         in
                         ( { model | blockDnd = dnd, edMarkdown = Result.withDefault model.edMarkdown em }
-                        , Cmd (blockDndSystem.commands dnd) mbsavelinks
+                        , case mbsavelinks of
+                            Just mbs ->
+                                Batch [ Cmd (blockDndSystem.commands dnd), mbs ]
+
+                            Nothing ->
+                                Cmd (blockDndSystem.commands dnd)
                         )
 
                     Err e ->
@@ -3830,7 +3836,7 @@ update noteCache msg model =
                                     items
                         in
                         ( { model | blockDnd = dnd, edMarkdown = Result.withDefault model.edMarkdown em }
-                        , Cmd (blockDndSystem.commands dnd) Nothing
+                        , Cmd (blockDndSystem.commands dnd)
                         )
 
                     Err e ->
@@ -4203,93 +4209,8 @@ update noteCache msg model =
                             { model
                                 | edMarkdown = EM.updateSpecialNoteState snmd
                             }
-
-                        oncmd : SNG.Command -> Model -> ( Model, Command )
-                        oncmd sncmd umod =
-                            case sncmd of
-                                SNG.CopySearch tagSearch ->
-                                    ( umod
-                                    , SPMod
-                                        (\spm ->
-                                            ( SP.setSearch spm tagSearch
-                                            , SP.None
-                                            )
-                                        )
-                                    )
-
-                                SNG.CopySyncSearch tagSearch ->
-                                    ( umod
-                                    , SPMod
-                                        (\spm ->
-                                            let
-                                                nsspm =
-                                                    spm.spmodel
-
-                                                tsn =
-                                                    nsspm.tagSearchModel
-
-                                                x =
-                                                    { spm | spmodel = { nsspm | tagSearchModel = { tsn | archives = CurrentAndArchives } } }
-                                            in
-                                            ( SP.setSearch x [ tagSearch ]
-                                            , SP.None
-                                            )
-                                        )
-                                    )
-
-                                SNG.GraphFocus ->
-                                    ( { umod
-                                        | searchControlRowMode =
-                                            case umod.searchControlRowMode of
-                                                GraphTarget ->
-                                                    LinksTarget
-
-                                                LinksTarget ->
-                                                    GraphTarget
-                                      }
-                                    , None
-                                    )
-
-                                SNG.SlideShow current lst ->
-                                    ( umod, SlideShow current lst )
-
-                                SNG.DndCmd c ->
-                                    ( umod
-                                    , Cmd (Cmd.map SNGMsg c) Nothing
-                                    )
-
-                                SNG.Batch cmds ->
-                                    List.foldl
-                                        (\cmd ( fmod, fcmds ) ->
-                                            let
-                                                ( nm, ncmd ) =
-                                                    oncmd cmd fmod
-                                            in
-                                            ( nm, combineCommands ncmd fcmds )
-                                        )
-                                        ( umod, None )
-                                        cmds
-
-                                SNG.ToMarkdown s ->
-                                    ( { umod
-                                        | edMarkdown = EM.initMd s
-                                      }
-                                    , None
-                                    )
-
-                                SNG.SaveLocalData s ->
-                                    ( umod
-                                    , umod.id
-                                        |> Maybe.map (\i -> SaveLocalData i s)
-                                        |> Maybe.withDefault None
-                                    )
-
-                                SNG.None ->
-                                    ( umod
-                                    , None
-                                    )
                     in
-                    oncmd usncmd updmod
+                    onSngCmd usncmd updmod
 
                 Nothing ->
                     ( model, None )
@@ -4330,6 +4251,92 @@ update noteCache msg model =
 
         Noop ->
             ( model, None )
+
+
+onSngCmd : SNG.Command -> Model -> ( Model, Command )
+onSngCmd sncmd umod =
+    case sncmd of
+        SNG.CopySearch tagSearch ->
+            ( umod
+            , SPMod
+                (\spm ->
+                    ( SP.setSearch spm tagSearch
+                    , SP.None
+                    )
+                )
+            )
+
+        SNG.CopySyncSearch tagSearch ->
+            ( umod
+            , SPMod
+                (\spm ->
+                    let
+                        nsspm =
+                            spm.spmodel
+
+                        tsn =
+                            nsspm.tagSearchModel
+
+                        x =
+                            { spm | spmodel = { nsspm | tagSearchModel = { tsn | archives = CurrentAndArchives } } }
+                    in
+                    ( SP.setSearch x [ tagSearch ]
+                    , SP.None
+                    )
+                )
+            )
+
+        SNG.GraphFocus ->
+            ( { umod
+                | searchControlRowMode =
+                    case umod.searchControlRowMode of
+                        GraphTarget ->
+                            LinksTarget
+
+                        LinksTarget ->
+                            GraphTarget
+              }
+            , None
+            )
+
+        SNG.SlideShow current lst ->
+            ( umod, SlideShow current lst )
+
+        SNG.DndCmd c ->
+            ( umod
+            , Cmd (Cmd.map SNGMsg c)
+            )
+
+        SNG.Batch cmds ->
+            List.foldl
+                (\cmd ( fmod, fcmds ) ->
+                    let
+                        ( nm, ncmd ) =
+                            onSngCmd cmd fmod
+                    in
+                    ( nm, combineCommands ncmd fcmds )
+                )
+                ( umod, None )
+                cmds
+
+        SNG.ToMarkdown s ->
+            ( { umod
+                | edMarkdown = EM.initMd s
+              }
+            , None
+            )
+
+        SNG.SaveLocalData s ->
+            ( umod
+            , umod.id
+                |> Maybe.map (\i -> SaveLocalData i s)
+                |> Maybe.withDefault None
+            )
+
+        SNG.None ->
+            ( umod
+            , None
+            )
 
 
 updateEditBlock : Int -> MG.Msg -> Model -> Model
