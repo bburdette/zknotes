@@ -23,7 +23,6 @@ import ZkCommon as ZC
 
 type Msg
     = GraphFocusClick
-    | EditItem Int
     | DnDMsg DnDList.Msg
     | Select ZkNoteId
     | Remove
@@ -39,7 +38,7 @@ type alias Model =
 
 
 type Command
-    = SaveLocalData String
+    = PlayNSave String
     | None
 
 
@@ -74,9 +73,6 @@ update msg model =
         GraphFocusClick ->
             ( model, None )
 
-        EditItem _ ->
-            ( model, None )
-
         DnDMsg dmsg ->
             let
                 ( nm, lst ) =
@@ -97,10 +93,14 @@ update msg model =
             )
 
         Play id ->
+            let
+                _ =
+                    Debug.log "play id" id
+            in
             ( { model
                 | currentUuid = Just <| zkNoteIdToString id
               }
-            , SaveLocalData (zkNoteIdToString id)
+            , PlayNSave (zkNoteIdToString id)
             )
 
         Remove ->
@@ -362,11 +362,7 @@ dndRow toid ddw i focus e =
                     )
                     E.none
                 , spacer
-                , if focus then
-                    E.el [ E.width E.fill ] e
-
-                  else
-                    E.el [ EE.onClick (EditItem i), E.width E.fill ] e
+                , E.el [ E.width E.fill ] e
                 ]
 
         Drop ->
@@ -411,7 +407,7 @@ dndRow toid ddw i focus e =
                 baseAttr
                 [ E.el (dragHandleAttrs ++ [ EBk.color TC.lightGray ]) E.none
                 , spacer
-                , E.el [ EE.onClick (EditItem i), E.width E.fill ] e
+                , E.el [ E.width E.fill ] e
                 ]
 
         DdwItemEdit ->
