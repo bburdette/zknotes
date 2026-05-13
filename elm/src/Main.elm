@@ -4168,10 +4168,7 @@ onSlideShowCommand : Model -> SlideShow.Command -> ( Model, List (Cmd Msg) )
 onSlideShowCommand model sscmd =
     case sscmd of
         SlideShow.GetNote id ->
-            ( model
-            , [ makeNoteCacheGet model id
-              ]
-            )
+            ( model, [ makeNoteCacheGet model id ] )
 
         SlideShow.Close _ ->
             ( model, [ Cmd.none ] )
