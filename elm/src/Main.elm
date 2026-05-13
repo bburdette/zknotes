@@ -1931,7 +1931,12 @@ onZkNoteStateEditWhat model pt znew =
                         ( SlideShow mbid ss instate
                         , case c of
                             SlideShow.GetNote id ->
-                                makeNoteCacheGet model id
+                                case stateLogin model.state of
+                                    Just _ ->
+                                        makeNoteCacheGet model id
+
+                                    Nothing ->
+                                        makePubNoteCacheGet model id
 
                             _ ->
                                 Cmd.none
@@ -1981,7 +1986,12 @@ onZkNoteStateEditWhat model pt znew =
                                 ( SlideShow (Just znew.znl.znal.zknote.id) st model.state
                                 , case c of
                                     SlideShow.GetNote id ->
-                                        makeNoteCacheGet model id
+                                        case stateLogin model.state of
+                                            Just _ ->
+                                                makeNoteCacheGet model id
+
+                                            Nothing ->
+                                                makePubNoteCacheGet model id
 
                                     _ ->
                                         Cmd.none
@@ -3483,7 +3493,12 @@ actualupdate msg model =
 
                 SlideShow.GetNote id ->
                     ( { model | state = SlideShow mbid emod instate }
-                    , makeNoteCacheGet model id
+                    , case stateLogin model.state of
+                        Just _ ->
+                            makeNoteCacheGet model id
+
+                        Nothing ->
+                            makePubNoteCacheGet model id
                     )
 
                 SlideShow.SaveCurrent pid id ->
@@ -4122,7 +4137,15 @@ onSlideShowCommand : Model -> SlideShow.Command -> ( Model, List (Cmd Msg) )
 onSlideShowCommand model sscmd =
     case sscmd of
         SlideShow.GetNote id ->
-            ( model, [ makeNoteCacheGet model id ] )
+            ( model
+            , [ case stateLogin model.state of
+                    Just _ ->
+                        makeNoteCacheGet model id
+
+                    Nothing ->
+                        makePubNoteCacheGet model id
+              ]
+            )
 
         SlideShow.Close _ ->
             ( model, [ Cmd.none ] )
