@@ -1257,6 +1257,103 @@ stateLogin state =
             stateLogin instate
 
 
+prevState : State -> Maybe State
+prevState st =
+    case st of
+        Login _ _ ->
+            Nothing
+
+        Invited _ ->
+            Nothing
+
+        EditZkNote _ _ ->
+            Nothing
+
+        EditZkNoteListing _ _ ->
+            Nothing
+
+        ArchiveAwait _ _ _ ->
+            Nothing
+
+        ArchiveListing _ _ ->
+            Nothing
+
+        View _ ->
+            Nothing
+
+        EView _ state ->
+            Just state
+
+        Import _ _ ->
+            Nothing
+
+        ShowMessage _ _ mbstate ->
+            mbstate
+
+        PubShowMessage _ mbstate ->
+            mbstate
+
+        LoginShowMessage _ _ _ ->
+            Nothing
+
+        SelectDialog _ state ->
+            Just state
+
+        ChangePasswordDialog _ state ->
+            Just state
+
+        ChangeEmailDialog _ state ->
+            Just state
+
+        ChangeRemoteUrlDialog _ state ->
+            Just state
+
+        ResetPassword _ ->
+            Nothing
+
+        UserListing _ _ ->
+            Nothing
+
+        UserEdit _ _ ->
+            Nothing
+
+        UserSettings _ _ state ->
+            Just state
+
+        ShowUrl _ _ ->
+            Nothing
+
+        DisplayMessage _ state ->
+            Just state
+
+        MessageNLink _ state ->
+            Just state
+
+        RequestsDialog _ state ->
+            Just state
+
+        JobsDialog _ state ->
+            Just state
+
+        TagFiles _ _ state ->
+            Just state
+
+        TagNotes _ _ state ->
+            Just state
+
+        InviteUser _ _ state ->
+            Just state
+
+        MdInlineXform _ state ->
+            Just state
+
+        Wait state _ ->
+            Just state
+
+        SlideShow _ _ state ->
+            Just state
+
+
 sendUIMsg : FileUrlInfo -> OD.UserRequest -> Cmd Msg
 sendUIMsg fui msg =
     if fui.tauri then
@@ -3323,77 +3420,21 @@ actualupdate msg model =
             let
                 ( emod, ecmd ) =
                     View.update em es
+
+                ( nm, c ) =
+                    onViewCmd ecmd { model | state = View emod }
             in
-            case ecmd of
-                View.None ->
-                    ( { model | state = View emod }, Cmd.none )
-
-                View.Done ->
-                    ( { model | state = View emod }, Cmd.none )
-
-                View.Switch id ->
-                    ( { model
-                        | state =
-                            PubShowMessage
-                                { message = "loading article"
-                                }
-                                (Just model.state)
-                      }
-                    , sendPIMsg model.fui
-                        (Data.PbrGetZkNoteAndLinks
-                            { zknote = id
-                            , what = ""
-                            }
-                        )
-                    )
-
-                View.OnPlaybackEnded ->
-                    ( model, Cmd.none )
+            ( nm, c )
 
         ( ViewMsg em, EView es state ) ->
             let
                 ( emod, ecmd ) =
                     View.update em es
+
+                ( nm, c ) =
+                    onViewCmd ecmd { model | state = EView emod state }
             in
-            case ecmd of
-                View.None ->
-                    ( { model | state = EView emod state }, Cmd.none )
-
-                View.Done ->
-                    case state of
-                        EditZkNote _ _ ->
-                            -- revert to the edit state.
-                            ( { model | state = state }, Cmd.none )
-
-                        _ ->
-                            case es.id of
-                                Just id ->
-                                    ( { model | state = state }
-                                    , sendZIMsg model.fui
-                                        (Data.PvqGetZkNoteAndLinks
-                                            { zknote = id
-                                            , what = ""
-                                            }
-                                        )
-                                    )
-
-                                Nothing ->
-                                    -- uh, initial page I guess.  would expect prev state to be edit if no id.
-                                    -- initialPage model ((stateRoute state).route) |> Maybe.withDefault Top)
-                                    initToRoute model (stateRoute state).route
-
-                View.Switch id ->
-                    ( model
-                    , sendPIMsg model.fui
-                        (Data.PbrGetZkNoteAndLinks
-                            { zknote = id
-                            , what = ""
-                            }
-                        )
-                    )
-
-                View.OnPlaybackEnded ->
-                    ( model, Cmd.none )
+            ( nm, c )
 
         ( SlideShowMsg em, SlideShow mbid es instate ) ->
             let
@@ -4077,6 +4118,43 @@ makeNewNoteCacheGets md model =
             )
 
 
+onSlideShowCommand : Model -> SlideShow.Command -> ( Model, List (Cmd Msg) )
+onSlideShowCommand model sscmd =
+    case sscmd of
+        SlideShow.GetNote id ->
+            ( model, [ makeNoteCacheGet model id ] )
+
+        SlideShow.Close _ ->
+            ( model, [ Cmd.none ] )
+
+        SlideShow.Noop ->
+            ( model, [ Cmd.none ] )
+
+        SlideShow.SaveCurrent pid id ->
+            let
+                st =
+                    DataUtil.zkNoteIdToString id
+            in
+            ( { model
+                | noteCache = updateState pid (Just st) model.noteCache
+              }
+            , [ LS.storeLocalVal { name = SNG.localDataId pid, value = st } ]
+            )
+
+        SlideShow.GetNoteAndSaveCurrent pid id ->
+            let
+                st =
+                    DataUtil.zkNoteIdToString id
+            in
+            ( { model
+                | noteCache = updateState pid (Just st) model.noteCache
+              }
+            , [ makeNoteCacheGet model id
+              , LS.storeLocalVal { name = SNG.localDataId pid, value = st }
+              ]
+            )
+
+
 handleEditZkNoteCmd : Model -> LoginData -> EditZkNote.Command -> ( Model, Cmd Msg )
 handleEditZkNoteCmd amodel login aecmd =
     let
@@ -4532,43 +4610,11 @@ onEznCmd ecmd model login =
                                 ( ssmod, sscmd ) =
                                     SlideShow.init model.fui model.noteCache emod.id mbcurrent (EditZkNote.getSnState emod) fst rest
 
-                                ( ncmod, nccmd ) =
-                                    case sscmd of
-                                        SlideShow.GetNote id ->
-                                            ( model, [ makeNoteCacheGet model id ] )
-
-                                        SlideShow.Close _ ->
-                                            ( model, [ Cmd.none ] )
-
-                                        SlideShow.Noop ->
-                                            ( model, [ Cmd.none ] )
-
-                                        SlideShow.SaveCurrent pid id ->
-                                            let
-                                                st =
-                                                    DataUtil.zkNoteIdToString id
-                                            in
-                                            ( { model
-                                                | noteCache = updateState pid (Just st) model.noteCache
-                                              }
-                                            , [ LS.storeLocalVal { name = SNG.localDataId pid, value = st } ]
-                                            )
-
-                                        SlideShow.GetNoteAndSaveCurrent pid id ->
-                                            let
-                                                st =
-                                                    DataUtil.zkNoteIdToString id
-                                            in
-                                            ( { model
-                                                | noteCache = updateState pid (Just st) model.noteCache
-                                              }
-                                            , [ makeNoteCacheGet model id
-                                              , LS.storeLocalVal { name = SNG.localDataId pid, value = st }
-                                              ]
-                                            )
+                                ( nmod, ncmd ) =
+                                    onSlideShowCommand { model | state = SlideShow emod.id ssmod (EditZkNote emod login) } sscmd
                             in
-                            ( { ncmod | state = SlideShow emod.id ssmod (EditZkNote emod login) }
-                            , nccmd
+                            ( nmod
+                            , ncmd
                             )
 
                         [] ->
@@ -4604,6 +4650,107 @@ onEznCmd ecmd model login =
                 )
                 ( model, [] )
                 c
+
+
+onViewCmd : View.Command -> Model -> ( Model, Cmd Msg )
+onViewCmd vcmd model =
+    case vcmd of
+        View.None ->
+            ( model, Cmd.none )
+
+        View.Done ->
+            case model.state of
+                EditZkNote _ _ ->
+                    -- revert to the edit state.
+                    case prevState model.state of
+                        Just ps ->
+                            ( { model | state = ps }, Cmd.none )
+
+                        Nothing ->
+                            ( model, Cmd.none )
+
+                EView es state ->
+                    case es.id of
+                        Just id ->
+                            ( { model | state = state }
+                            , sendZIMsg model.fui
+                                (Data.PvqGetZkNoteAndLinks
+                                    { zknote = id
+                                    , what = ""
+                                    }
+                                )
+                            )
+
+                        Nothing ->
+                            -- uh, initial page I guess.  would expect prev state to be edit if no id.
+                            -- initialPage model ((stateRoute state).route) |> Maybe.withDefault Top)
+                            initToRoute model (stateRoute model.state).route
+
+                _ ->
+                    ( model, Cmd.none )
+
+        View.SlideShow mbcurrent [] ->
+            ( model, Cmd.none )
+
+        View.SlideShow mbcurrent (fst :: rest) ->
+            let
+                mbvs =
+                    case model.state of
+                        View vs ->
+                            Just vs
+
+                        EView ev _ ->
+                            Just ev
+
+                        _ ->
+                            Nothing
+            in
+            case ( mbvs, Maybe.map .id mbvs ) of
+                ( Just vs, Just id ) ->
+                    let
+                        _ =
+                            Debug.log "view.slidehosw" mbcurrent
+
+                        ( ssmod, sscmd ) =
+                            SlideShow.init model.fui model.noteCache id mbcurrent (View.getSnState vs) fst rest
+
+                        ( nmod, c ) =
+                            onSlideShowCommand { model | state = SlideShow id ssmod (View vs) } sscmd
+                    in
+                    ( nmod
+                    , Cmd.batch c
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        View.Batch c ->
+            List.foldl
+                (\cmd ( fmodel, fcmds ) ->
+                    let
+                        ( nm, ncmds ) =
+                            onViewCmd cmd fmodel
+                    in
+                    ( nm, Cmd.batch [ ncmds, fcmds ] )
+                )
+                ( model, Cmd.none )
+                c
+
+        View.SaveLocalData _ _ ->
+            ( model, Cmd.none )
+
+        View.Switch id ->
+            ( model
+            , sendPIMsg model.fui
+                (Data.PbrGetZkNoteAndLinks
+                    { zknote = id
+                    , what = ""
+                    }
+                )
+            )
+
+        View.OnPlaybackEnded ->
+            ( model, Cmd.none )
 
 
 handleEditZkNoteListing : Model -> LoginData -> ( EditZkNoteListing.Model, EditZkNoteListing.Command ) -> ( Model, Cmd Msg )
