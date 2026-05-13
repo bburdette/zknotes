@@ -4708,9 +4708,6 @@ onViewCmd vcmd model =
             case ( mbvs, Maybe.map .id mbvs ) of
                 ( Just vs, Just id ) ->
                     let
-                        _ =
-                            Debug.log "view.slidehosw" mbcurrent
-
                         ( ssmod, sscmd ) =
                             SlideShow.init model.fui model.noteCache id mbcurrent (View.getSnState vs) fst rest
 

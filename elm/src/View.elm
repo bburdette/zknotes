@@ -444,9 +444,6 @@ update msg model =
 
                         ( nm, c ) =
                             onSnvCmd sc { model | mbsns = Just snm }
-
-                        _ =
-                            Debug.log "smvcmd" c
                     in
                     ( nm, c )
 
