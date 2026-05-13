@@ -29,6 +29,7 @@ import MdCommon as MC
 import NoteCache as NC exposing (CacheEntry(..), NoteCache)
 import SpecialNotes
 import SpecialNotesGui as SNG
+import SpecialNotesView as SNV
 import TangoColors as TC
 import Time
 import Util
