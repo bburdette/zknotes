@@ -225,6 +225,15 @@ update msg nc model =
                         View.Switch _ ->
                             ( { model | viewModel = Just vmod }, Noop )
 
+                        View.SlideShow _ _ ->
+                            ( { model | viewModel = Just vmod }, Noop )
+
+                        View.Batch _ ->
+                            ( { model | viewModel = Just vmod }, Noop )
+
+                        View.SaveLocalData _ _ ->
+                            ( { model | viewModel = Just vmod }, Noop )
+
                         View.OnPlaybackEnded ->
                             { model
                                 | current =

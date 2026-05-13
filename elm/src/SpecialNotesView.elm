@@ -25,9 +25,7 @@ type Msg
 
 
 type Command
-    = CopySearch (List TagSearch)
-    | CopySyncSearch TagSearch
-    | SlideShow (Maybe ZkNoteId) (List NlLink)
+    = SlideShow (Maybe ZkNoteId) (List NlLink)
     | SaveLocalData String
     | Batch (List Command)
     | None

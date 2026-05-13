@@ -4,6 +4,7 @@ module View exposing
     , Model
     , Msg(..)
     , defaultConfig
+    , getSnState
     , initFull
     , initSzn
     , update
@@ -14,7 +15,7 @@ import Cellme.Cellme exposing (CellContainer(..), RunState(..), evalCellsFully)
 import Cellme.DictCellme exposing (CellDict(..), getCd, mkCc)
 import Common
 import Data exposing (ZkNote, ZkNoteId)
-import DataUtil exposing (FileUrlInfo)
+import DataUtil exposing (FileUrlInfo, NlLink)
 import Dict
 import EdMarkdown as EM
 import Either exposing (..)
@@ -28,7 +29,6 @@ import Markdown.Block exposing (ListItem(..), Task(..))
 import MdCommon as MC
 import NoteCache as NC exposing (CacheEntry(..), NoteCache)
 import SpecialNotes
-import SpecialNotesGui as SNG
 import SpecialNotesView as SNV
 import TangoColors as TC
 import Time
@@ -41,7 +41,7 @@ type Msg
     | DonePress
     | SwitchPress ZkNoteId -- TODO: remove?
     | OnPlaybackEnd
-    | SNGMsg SNG.Msg
+    | SNVMsg SNV.Msg
     | Noop
 
 
@@ -52,6 +52,7 @@ type alias Model =
     , title : String
     , showtitle : Bool
     , md : String
+    , mbsns : Maybe SNV.SpecialNoteState
     , cells : CellDict
     , panelNote : Maybe ZkNoteId
     , zklinks : List Data.EditLink
@@ -93,6 +94,15 @@ type Command
     | Done
     | Switch ZkNoteId
     | OnPlaybackEnded
+    | SlideShow (Maybe ZkNoteId) (List NlLink)
+    | SaveLocalData ZkNoteId String
+    | Batch (List Command)
+
+
+getSnState : Model -> Maybe String
+getSnState model =
+    model.mbsns
+        |> Maybe.andThen SNV.saveLocalData
 
 
 showZkl : Data.EditLink -> Element Msg
@@ -126,7 +136,8 @@ view stylePalette zone maxw noteCache config model =
         narrow =
             maxw < 1300
 
-        snedit =
+        snview : SNV.SpecialNoteState -> Element Msg
+        snview =
             \sn ->
                 E.row
                     [ E.padding 10
@@ -142,7 +153,7 @@ view stylePalette zone maxw noteCache config model =
                         , E.centerX
                         , E.padding 3
                         ]
-                        (SNG.guiSn zone stylePalette.fontSize sn |> E.map SNGMsg)
+                        (SNV.guiSn zone stylePalette.fontSize sn |> E.map SNVMsg)
                     ]
     in
     E.column [ E.width E.fill ]
@@ -257,37 +268,42 @@ view stylePalette zone maxw noteCache config model =
                         )
                     |> Maybe.withDefault E.none
                 , if config.showContents then
-                    E.row [ E.width E.fill ]
-                        [ case
-                            MC.markdownView
-                                (MC.mkRenderer
-                                    { zone = zone
-                                    , fui = model.fui
-                                    , viewMode = MC.PublicView
-                                    , addToSearchMsg = \_ -> Noop
-                                    , maxw = mw
-                                    , mobile = config.mobile
-                                    , cellDict = model.cells
-                                    , showPanelElt = False
-                                    , onchanged = OnSchelmeCodeChanged
-                                    , noteCache = noteCache
-                                    , isDirty = False
-                                    , noop = Noop
-                                    }
-                                )
-                                model.md
-                          of
-                            Ok rendered ->
-                                E.column
-                                    [ E.spacing 8
-                                    , E.width E.fill
-                                    , E.centerX
-                                    ]
-                                    rendered
+                    case model.mbsns of
+                        Just sns ->
+                            E.map SNVMsg <| SNV.guiSn zone stylePalette.fontSize sns
 
-                            Err errors ->
-                                E.text errors
-                        ]
+                        Nothing ->
+                            E.row [ E.width E.fill ]
+                                [ case
+                                    MC.markdownView
+                                        (MC.mkRenderer
+                                            { zone = zone
+                                            , fui = model.fui
+                                            , viewMode = MC.PublicView
+                                            , addToSearchMsg = \_ -> Noop
+                                            , maxw = mw
+                                            , mobile = config.mobile
+                                            , cellDict = model.cells
+                                            , showPanelElt = False
+                                            , onchanged = OnSchelmeCodeChanged
+                                            , noteCache = noteCache
+                                            , isDirty = False
+                                            , noop = Noop
+                                            }
+                                        )
+                                        model.md
+                                  of
+                                    Ok rendered ->
+                                        E.column
+                                            [ E.spacing 8
+                                            , E.width E.fill
+                                            , E.centerX
+                                            ]
+                                            rendered
+
+                                    Err errors ->
+                                        E.text errors
+                                ]
 
                   else
                     E.none
@@ -344,19 +360,30 @@ initFull fui zknas =
             evalCellsFully
                 (mkCc cells)
 
-        edMarkdown =
+        mbsns =
             case JD.decodeString SpecialNotes.specialNoteDecoder zknote.content of
                 Ok sn ->
-                    case SNG.mbLocalDataId zknote.id sn of
+                    case SNV.mbLocalDataId zknote.id sn of
                         Just id ->
-                            EM.initSpecial
-                                (SNG.initSpecialNoteStateLz zknote.id sn zknas.mbstate zknas.znal.lzlinks)
+                            Just
+                                (SNV.initSpecialNoteStateLz
+                                    zknote.id
+                                    sn
+                                    zknas.mbstate
+                                    zknas.znal.lzlinks
+                                )
 
                         Nothing ->
-                            EM.initSpecial (SNG.initSpecialNoteStateLz zknote.id sn Nothing zknas.znal.lzlinks)
+                            Just
+                                (SNV.initSpecialNoteStateLz
+                                    zknote.id
+                                    sn
+                                    Nothing
+                                    zknas.znal.lzlinks
+                                )
 
                 Err _ ->
-                    EM.initMd zknote.content
+                    Nothing
     in
     { id = Just zknote.id
     , fui = fui
@@ -364,6 +391,7 @@ initFull fui zknas =
     , title = zknote.title
     , showtitle = zknote.showtitle
     , md = zknote.content
+    , mbsns = mbsns
     , cells = getCd cc
     , panelNote = zknote.content |> MC.mdPanel |> Maybe.map .noteid
     , zklinks = zknas.znal.links
@@ -391,6 +419,7 @@ initSzn fui zknote mbcreatedate mbchangeddate links mbpanelid =
     , title = zknote.title
     , showtitle = zknote.showtitle
     , md = zknote.content
+    , mbsns = Nothing
     , cells = getCd cc
     , panelNote = mbpanelid
     , zklinks = links
@@ -406,8 +435,23 @@ update msg model =
         Noop ->
             ( model, None )
 
-        SNGMsg _ ->
-            ( model, None )
+        SNVMsg sm ->
+            case model.mbsns of
+                Just sns ->
+                    let
+                        ( snm, sc ) =
+                            SNV.updateSn sm sns
+
+                        ( nm, c ) =
+                            onSnvCmd sc { model | mbsns = Just snm }
+
+                        _ =
+                            Debug.log "smvcmd" c
+                    in
+                    ( nm, c )
+
+                Nothing ->
+                    ( model, None )
 
         DonePress ->
             ( model, Done )
@@ -436,3 +480,60 @@ update msg model =
 
         OnPlaybackEnd ->
             ( model, OnPlaybackEnded )
+
+
+onSnvCmd : SNV.Command -> Model -> ( Model, Command )
+onSnvCmd sncmd umod =
+    case sncmd of
+        SNV.SlideShow current lst ->
+            ( umod, SlideShow current lst )
+
+        SNV.Batch cmds ->
+            List.foldl
+                (\cmd ( fmod, fcmds ) ->
+                    let
+                        ( nm, ncmd ) =
+                            onSnvCmd cmd fmod
+                    in
+                    ( nm, combineCommands ncmd fcmds )
+                )
+                ( umod, None )
+                cmds
+
+        SNV.SaveLocalData s ->
+            ( umod
+            , umod.id
+                |> Maybe.map (\i -> SaveLocalData i s)
+                |> Maybe.withDefault None
+            )
+
+        SNV.None ->
+            ( umod
+            , None
+            )
+
+
+combineCommands : Command -> Command -> Command
+combineCommands l r =
+    let
+        dor =
+            \ls ->
+                case r of
+                    None ->
+                        Batch ls
+
+                    Batch rs ->
+                        Batch (ls ++ rs)
+
+                    x ->
+                        Batch (ls ++ [ x ])
+    in
+    case l of
+        None ->
+            r
+
+        Batch ls ->
+            dor ls
+
+        x ->
+            dor [ x ]
