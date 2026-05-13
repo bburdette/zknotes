@@ -1931,12 +1931,7 @@ onZkNoteStateEditWhat model pt znew =
                         ( SlideShow mbid ss instate
                         , case c of
                             SlideShow.GetNote id ->
-                                case stateLogin model.state of
-                                    Just _ ->
-                                        makeNoteCacheGet model id
-
-                                    Nothing ->
-                                        makePubNoteCacheGet model id
+                                makeNoteCacheGet model id
 
                             _ ->
                                 Cmd.none
@@ -1986,12 +1981,7 @@ onZkNoteStateEditWhat model pt znew =
                                 ( SlideShow (Just znew.znl.znal.zknote.id) st model.state
                                 , case c of
                                     SlideShow.GetNote id ->
-                                        case stateLogin model.state of
-                                            Just _ ->
-                                                makeNoteCacheGet model id
-
-                                            Nothing ->
-                                                makePubNoteCacheGet model id
+                                        makeNoteCacheGet model id
 
                                     _ ->
                                         Cmd.none
@@ -2099,12 +2089,7 @@ onZkNoteStatePbWhat model pt znas =
                         ( SlideShow mbid ss instate
                         , case c of
                             SlideShow.GetNote id ->
-                                case stateLogin model.state of
-                                    Just _ ->
-                                        makeNoteCacheGet model id
-
-                                    Nothing ->
-                                        makePubNoteCacheGet model id
+                                makeNoteCacheGet model id
 
                             _ ->
                                 Cmd.none
@@ -3532,12 +3517,7 @@ actualupdate msg model =
 
                 SlideShow.GetNote id ->
                     ( { model | state = SlideShow mbid emod instate }
-                    , case stateLogin model.state of
-                        Just _ ->
-                            makeNoteCacheGet model id
-
-                        Nothing ->
-                            makePubNoteCacheGet model id
+                    , makeNoteCacheGet model id
                     )
 
                 SlideShow.SaveCurrent pid id ->
@@ -3562,12 +3542,7 @@ actualupdate msg model =
                         , noteCache = updateState pid (Just st) model.noteCache
                       }
                     , Cmd.batch
-                        [ case stateLogin model.state of
-                            Just _ ->
-                                makeNoteCacheGet model id
-
-                            Nothing ->
-                                makePubNoteCacheGet model id
+                        [ makeNoteCacheGet model id
                         , LS.storeLocalVal { name = SNG.localDataId pid, value = st }
                         ]
                     )
@@ -4069,8 +4044,20 @@ makeNoteCacheGets md model =
         |> List.map (makeNoteCacheGet model)
 
 
+{-| public or private cache get, as necessary
+-}
 makeNoteCacheGet : Model -> ZkNoteId -> Cmd Msg
 makeNoteCacheGet model id =
+    case stateLogin model.state of
+        Just _ ->
+            makePvNoteCacheGet model id
+
+        Nothing ->
+            makePubNoteCacheGet model id
+
+
+makePvNoteCacheGet : Model -> ZkNoteId -> Cmd Msg
+makePvNoteCacheGet model id =
     case NC.getCacheEntry model.noteCache id of
         Just (NC.ZNAL zkn) ->
             sendZIMsg model.fui
@@ -4182,12 +4169,7 @@ onSlideShowCommand model sscmd =
     case sscmd of
         SlideShow.GetNote id ->
             ( model
-            , [ case stateLogin model.state of
-                    Just _ ->
-                        makeNoteCacheGet model id
-
-                    Nothing ->
-                        makePubNoteCacheGet model id
+            , [ makeNoteCacheGet model id
               ]
             )
 
@@ -4216,12 +4198,7 @@ onSlideShowCommand model sscmd =
             ( { model
                 | noteCache = updateState pid (Just st) model.noteCache
               }
-            , [ case stateLogin model.state of
-                    Just _ ->
-                        makeNoteCacheGet model id
-
-                    Nothing ->
-                        makePubNoteCacheGet model id
+            , [ makeNoteCacheGet model id
               , LS.storeLocalVal { name = SNG.localDataId pid, value = st }
               ]
             )
