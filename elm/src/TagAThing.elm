@@ -16,6 +16,7 @@ import Json.Decode as JD
 import Orgauth.Data exposing (UserId(..))
 import SearchPanel
 import SearchStackPanel as SP
+import SearchUtil as SU
 import TDict
 import TagSearchPanel
 import TangoColors as TC
@@ -481,7 +482,7 @@ view stylePalette recentZkns mbsize spmodel zknSearchResult model =
 
         pagView =
             E.row [ E.width E.fill ]
-                (if List.length zknSearchResult.notes < 15 then
+                (if List.length zknSearchResult.notes < SU.defaultSearchLimit && zknSearchResult.offset == 0 then
                     []
 
                  else
