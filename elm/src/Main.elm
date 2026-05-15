@@ -553,16 +553,12 @@ routeStateInternal model route =
                     case login.homenote of
                         Just id ->
                             ( model.state
-                            , Cmd.batch
-                                [ sendZIMsg model.fui
-                                    (Data.PvqSearchZkNotes <| prevSearchQuery login)
-                                , sendZIMsg model.fui
-                                    (Data.PvqGetZkNoteAndLinks
-                                        { zknote = id
-                                        , what = ""
-                                        }
-                                    )
-                                ]
+                            , sendZIMsg model.fui
+                                (Data.PvqGetZkNoteAndLinks
+                                    { zknote = id
+                                    , what = ""
+                                    }
+                                )
                             )
 
                         Nothing ->
@@ -573,8 +569,7 @@ routeStateInternal model route =
                                     model.mobile
                                 )
                                 login
-                            , sendZIMsg model.fui
-                                (Data.PvqSearchZkNotes <| prevSearchQuery login)
+                            , Cmd.none
                             )
 
                 Nothing ->
@@ -5172,11 +5167,20 @@ initToRoute model route =
             routeState model route
     in
     ( { model | state = initialstate }
-    , Cmd.batch
-        [ Browser.Navigation.replaceUrl model.navkey
-            (routeUrl (stateRoute initialstate).route)
-        , c
-        ]
+    , Cmd.batch <|
+        List.filterMap identity
+            [ stateLogin initialstate
+                |> Maybe.map
+                    (\login ->
+                        sendZIMsg model.fui
+                            (Data.PvqSearchZkNotes <| prevSearchQuery login)
+                    )
+            , Just <|
+                Browser.Navigation.replaceUrl
+                    model.navkey
+                    (routeUrl (stateRoute initialstate).route)
+            , Just c
+            ]
     )
 
 
