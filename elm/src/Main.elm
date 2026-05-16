@@ -3481,6 +3481,9 @@ actualupdate msg model =
                                 EditZkNote ezn login ->
                                     ( EditZkNote (EditZkNote.setCurrentSlideNote mbcurrent ezn) login, Cmd.none )
 
+                                View vm ->
+                                    ( View (View.setCurrentSlideNote mbcurrent vm), Cmd.none )
+
                                 ShowMessage _ login _ ->
                                     mbid
                                         |> Maybe.andThen (\id -> NC.getNote model.noteCache id)

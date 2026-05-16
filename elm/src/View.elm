@@ -7,6 +7,7 @@ module View exposing
     , getSnState
     , initFull
     , initSzn
+    , setCurrentSlideNote
     , update
     , view
     )
@@ -477,6 +478,21 @@ update msg model =
 
         OnPlaybackEnd ->
             ( model, OnPlaybackEnded )
+
+
+setCurrentSlideNote : Maybe ZkNoteId -> Model -> Model
+setCurrentSlideNote mbznid model =
+    case model.mbsns of
+        Just (SNV.SnsList slem) ->
+            { model
+                | mbsns =
+                    Just <|
+                        SNV.SnsList
+                            { slem | currentUuid = Maybe.map DataUtil.zkNoteIdToString mbznid }
+            }
+
+        _ ->
+            model
 
 
 onSnvCmd : SNV.Command -> Model -> ( Model, Command )
