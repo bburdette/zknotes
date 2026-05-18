@@ -172,11 +172,12 @@ async fn user(
   item: web::Json<orgauth::data::UserRequest>,
   req: HttpRequest,
 ) -> HttpResponse {
-  info!(
-    "user msg: {:?}  \n connection_info: {:?}",
-    &item,
-    req.connection_info()
-  );
+  // DON'T print login messages to the log!
+  // info!(
+  //   "user msg: {:?}  \n connection_info: {:?}",
+  //   &item,
+  //   req.connection_info()
+  // );
   match async {
     let conn = sqldata::connection_open(data.config.orgauth_config.db.as_path())?;
 
@@ -205,11 +206,12 @@ async fn admin(
   item: web::Json<orgauth::data::AdminRequest>,
   req: HttpRequest,
 ) -> HttpResponse {
-  info!(
-    "admin msg: {:?}  \n connection_info: {:?}",
-    &item,
-    req.connection_info()
-  );
+  // DON'T print login data to the log!
+  // info!(
+  //   "admin msg: {:?}  \n connection_info: {:?}",
+  //   &item,
+  //   req.connection_info()
+  // );
   let mut cb = sqldata::zknotes_callbacks();
   match orgauth::endpoints::admin_interface_check(
     &mut ActixTokener { session: &session },
