@@ -1179,7 +1179,21 @@ where
       Ok(c) => Ok(c),
       Err(rusqlite::Error::SqliteFailure(e, s)) => {
         if e.code == rusqlite::ErrorCode::ConstraintViolation {
-          // do update, since we can't ON CONFLICT without a values () clause.
+          // archive the link with the old create date.
+          conn.execute(
+            "with vals(a,b,c,d,e,f) as (
+                    select FN.id, TN.id, U.id, LN.id, ?1, ?2
+                    from zknote FN, zknote TN, orgauth_user U
+                      left outer join zknote LN
+                       on LN.uuid = ?6
+                    where FN.uuid = ?3
+                      and TN.uuid = ?4
+                      and U.uuid = ?5)
+                    insert into zklinkarchive (fromid, toid, user, linkzknote, createdate, deletedate)
+                      select * from vals",
+            params![l.createdate, now, l.fromUuid, l.toUuid, l.userUuid, l.linkUuid],
+          )?;
+          // update create date.
           let count = conn.execute(
             "with vals(a,b,c,d,e) as (
                     select FN.id, TN.id, U.id, LN.id, ?1
@@ -1189,11 +1203,12 @@ where
                     where FN.uuid = ?2
                       and TN.uuid = ?3
                       and U.uuid = ?4)
-                    update zklink set linkzknote = vals.d, createdate = vals.e
+                    update zklink set createdate = vals.e
                       from vals
                       where fromid = vals.a
                         and toid = vals.b
-                        and user = vals.c",
+                        and user = vals.c
+                        and linkzknote = vals.d",
             params![l.createdate, l.fromUuid, l.toUuid, l.userUuid, l.linkUuid],
           )?;
           Ok(count)
@@ -1229,15 +1244,16 @@ where
     // bytes = bytes + nc;
     sm = read_sync_message(&mut line, br).await?;
   }
+
   // drop zklinks which have a zklinkarchive with newer deletedate
   let _dropped = conn.execute(
-    "with dels as (select ZL.fromid, ZL.toid, ZL.user from zklink ZL, zklinkarchive ZLA
+    "with dels as (select ZL.fromid, ZL.toid, ZL.user, ZL.linkzknote from zklink ZL, zklinkarchive ZLA
         where ZL.fromid = ZLA.fromid
         and ZL.toid = ZLA.toid
         and ZL.user = ZLA.user
         and ZL.createdate < ZLA.deletedate)
         delete from zklink where
-          (zklink.fromid, zklink.toid, zklink.user) in dels ",
+          (zklink.fromid, zklink.toid, zklink.user, zklink.linkzknote) in dels ",
     params![],
   )?;
 
