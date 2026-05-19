@@ -1039,7 +1039,7 @@ pub async fn save_zknote(
           note.editable,
           note.showtitle,
           note.deleted,
-          server.id,
+          server.id, // should have createserver and lastserver??
           id,
           uid.to_i64(),
         ],

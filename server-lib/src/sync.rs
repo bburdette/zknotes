@@ -305,6 +305,7 @@ pub enum DownloadResult {
   Downloaded,
   AlreadyDownloaded,
   NoSource,
+  NoteNotAFile,
   DownloadFailed,
 }
 
@@ -316,6 +317,7 @@ pub async fn download_file(
   files_dir: &Path,
   note_id: i64,
 ) -> Result<DownloadResult, zkerr::Error> {
+  info!("downloading file for note: {}", note_id);
   // get the note hash, and verify there's a source with this user's id.
   let (uuid, title, ohash, fs_user_id): (String, String, Option<String>, Option<i64>) = conn
     .query_row(
@@ -327,12 +329,21 @@ pub async fn download_file(
       |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
     )?;
 
+  info!(
+    "(uuid, title, ohash, fs_user_id): {:?}",
+    (&uuid, &title, &ohash, fs_user_id)
+  );
+
   let hash = match ohash {
     Some(h) => h,
-    None => return Ok(DownloadResult::DownloadFailed),
+    None => {
+      info!("DownloadResult::NoteNotAFile");
+      return Ok(DownloadResult::NoteNotAFile);
+    }
   };
 
   if fs_user_id == None {
+    info!("DownloadResult::NoSource");
     return Ok(DownloadResult::NoSource);
   }
 
@@ -342,6 +353,7 @@ pub async fn download_file(
   // file exists?
   if finalhashpath.exists() {
     // file already exists.
+    info!("DownloadResult::AlreadyDownloaded");
     return Ok(DownloadResult::AlreadyDownloaded);
   }
 
@@ -402,6 +414,8 @@ pub async fn download_file(
     // move into hashed-files dir.
     std::fs::rename(temphashpath, finalhashpath)?;
   }
+
+  info!("downloaded file for note: {}, {} ", uuid, title);
 
   if let Some(li) = lapin_info {
     let oszn = OnMakeFileNote {
@@ -481,6 +495,7 @@ pub async fn upload_file(
   let private_uri = awc::http::Uri::try_from(format!("{}/private", url).as_str())
     .map_err(|x| zkerr::Error::String(x.to_string()))?;
 
+  info!("checking for file existence on remote for note: {}", uuid);
   let getzknote = PrivateRequest::PvqGetZkNote(ZkNoteId::Zni(Uuid::from_str(uuid.as_str())?));
   let gj = serde_json::to_value(getzknote)?;
 
@@ -536,6 +551,7 @@ pub async fn upload_file(
       .await?
       .as_ref(),
   )?;
+  info!("uploaded file for note: {}; {:?}", uuid, prm);
 
   match prm {
     UploadReply::UrFilesUploaded(_) => Ok(UploadResult::Uploaded),
@@ -570,6 +586,7 @@ pub async fn sync_files_down(
           DownloadResult::AlreadyDownloaded => (), // resvec.push(DownloadResult::AlreadyDownloaded),
           DownloadResult::NoSource => resvec.push(DownloadResult::NoSource),
           DownloadResult::DownloadFailed => resvec.push(DownloadResult::DownloadFailed),
+          DownloadResult::NoteNotAFile => resvec.push(DownloadResult::NoteNotAFile),
         };
       }
       Err(_) => (),
