@@ -243,6 +243,9 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
 
         while let Some(rdelivery) = consumer.next().await {
           let delivery = rdelivery?;
+          // go ahead and ack whether we succeed or fail.
+          // to prevent failing over and over.
+          delivery.ack(BasicAckOptions::default()).await?;
           let omfn = serde_json::from_slice::<OnMakeFileNote>(&delivery.data)?;
           info!("on_make_file_note: OnMakeFileNote: {:?}", omfn.title);
           if let Some(suffix) = omfn.title.split('.').last() {
@@ -264,8 +267,6 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
               }
             }
           }
-
-          delivery.ack(BasicAckOptions::default()).await?;
         }
       };
 
