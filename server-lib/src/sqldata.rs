@@ -182,6 +182,10 @@ pub fn connection_open(dbfile: &Path) -> Result<Connection, zkerr::Error> {
 
   conn.execute("PRAGMA foreign_keys = true;", params![])?;
 
+  // give this a go with sync!
+  // doesn't get the busy handle message at least.
+  conn.query_row("PRAGMA journal_mode = WAL;", params![], |_row| Ok(()))?;
+
   Ok(conn)
 }
 
