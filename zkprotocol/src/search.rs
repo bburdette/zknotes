@@ -67,7 +67,8 @@ pub enum TagSearch {
 pub enum SearchMod {
   ExactMatch,
   ZkNoteId,
-  Tag,
+  TagTo,
+  TagFrom,
   Note,
   User,
   File,

@@ -5125,7 +5125,11 @@ prevSearchQuery login =
         ts : Data.TagSearch
         ts =
             Data.Boolex
-                { ts1 = Data.SearchTerm { mods = [ Data.ExactMatch, Data.Tag ], term = "search" }
+                { ts1 =
+                    Data.SearchTerm
+                        { mods = [ Data.ExactMatch, Data.TagTo ]
+                        , term = "search"
+                        }
                 , ao = Data.And
                 , ts2 =
                     Data.SearchTerm { mods = [ Data.User ], term = login.name }

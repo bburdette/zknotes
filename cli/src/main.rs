@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   let matches = clap::Command::new("zknotes cli")
     .version("1.0")
     .author("Ben Burdette")
-    .about("zettelkasten web server")
+    .about("zknotes cli client")
     .arg(
       Arg::new("command")
         .short('c')

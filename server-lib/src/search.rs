@@ -716,7 +716,8 @@ fn build_tagsearch_clause(
     TagSearch::SearchTerm { mods, term } => {
       let mut exact = false;
       let mut zknoteid = false;
-      let mut tag = false;
+      let mut tagto = false;
+      let mut tagfrom = false;
       let mut desc = false;
       let mut user = false;
       let mut file = false;
@@ -729,7 +730,8 @@ fn build_tagsearch_clause(
       for m in mods {
         match m {
           SearchMod::ExactMatch => exact = true,
-          SearchMod::Tag => tag = true,
+          SearchMod::TagTo => tagto = true,
+          SearchMod::TagFrom => tagfrom = true,
           SearchMod::Note => desc = true,
           SearchMod::User => user = true,
           SearchMod::File => file = true,
@@ -789,7 +791,7 @@ fn build_tagsearch_clause(
           vec![format!("{}", serverid)],
         )
       } else {
-        if tag {
+        if tagfrom || tagto {
           let fileclause = if file { "and zkn.file is not null" } else { "" };
 
           let clause = if exact {
@@ -811,61 +813,124 @@ fn build_tagsearch_clause(
             ArchivesOrCurrent::CurrentAndArchives => Aocid::Both,
           };
           match ai {
-            Aocid::AocS(nid) => (
+            Aocid::AocS(nid) => {
               // clause
-              format!(
-                "{} (N.{} in (select zklink.toid from zknote as zkn, zklink
+              let tocls = if tagto {
+                Some(format!(
+                  "N.{} in (select zklink.fromid from zknote as zkn, zklink
+                 where zkn.id = zklink.toid
+                   and {})",
+                  nid, clause
+                ))
+              } else {
+                None
+              };
+              let fromcls = if tagfrom {
+                Some(format!(
+                  "N.{} in (select zklink.toid from zknote as zkn, zklink
+                 where zkn.id = zklink.fromid
+                   and {})",
+                  nid, clause
+                ))
+              } else {
+                None
+              };
+
+              let cls = match (fromcls, tocls) {
+                (Some(from), Some(to)) => format!("{} ({} or {})", notstr, from, to),
+                (Some(from), None) => format!("{} ({})", notstr, from),
+                (None, Some(to)) => format!("{} ({})", notstr, to),
+                (None, None) => "".to_string(),
+              };
+
+              println!("nid cls {}", cls);
+              (
+                cls,
+                // args
+                if exact {
+                  if tagfrom && tagto {
+                    vec![term.clone(), term.clone()]
+                  } else {
+                    vec![term.clone()]
+                  }
+                } else {
+                  if tagfrom && tagto {
+                    vec![
+                      format!("%{}%", term).to_string(),
+                      format!("%{}%", term).to_string(),
+                    ]
+                  } else {
+                    vec![format!("%{}%", term).to_string()]
+                  }
+                },
+              )
+            }
+            Aocid::Both => {
+              let fromcls = if tagfrom {
+                Some(format!(
+                  "((N.id in (select zklink.toid from zknote as zkn, zklink
                  where zkn.id = zklink.fromid
                    and {})
                 or
-                    N.{} in (select zklink.fromid from zknote as zkn, zklink
+                    N.zknote in (select zklink.toid from zknote as zkn, zklink
+                 where zkn.id = zklink.fromid
+                   and {}))",
+                  clause, clause
+                ))
+              } else {
+                None
+              };
+
+              let tocls = if tagto {
+                Some(format!(
+                  "(N.id in (select zklink.fromid from zknote as zkn, zklink
+                 where zkn.id = zklink.toid
+                   and {})
+                or
+                    N.zknote in (select zklink.fromid from zknote as zkn, zklink
                  where zkn.id = zklink.toid
                    and {}))",
-                notstr, nid, clause, nid, clause
-              ),
-              // args
-              if exact {
-                vec![term.clone(), term.clone()]
+                  clause, clause
+                ))
               } else {
-                vec![
-                  format!("%{}%", term).to_string(),
-                  format!("%{}%", term).to_string(),
-                ]
-              },
-            ),
-            Aocid::Both => (
-              // clause
-              format!(
-                "{} (N.id in (select zklink.toid from zknote as zkn, zklink
-                 where zkn.id = zklink.fromid
-                   and {})
-                or
-                    N.id in (select zklink.fromid from zknote as zkn, zklink
-                 where zkn.id = zklink.toid
-                   and {})
-                or
-                    N.zknote in (select zklink.fromid from zknote as zkn, zklink
-                 where zkn.id = zklink.toid
-                   and {})
-                or
-                    N.zknote in (select zklink.fromid from zknote as zkn, zklink
-                 where zkn.id = zklink.toid
-                   and {})
-                   )",
-                notstr, clause, clause, clause, clause
-              ),
-              // args
-              if exact {
-                vec![term.clone(), term.clone(), term.clone(), term.clone()]
-              } else {
-                vec![
-                  format!("%{}%", term).to_string(),
-                  format!("%{}%", term).to_string(),
-                  format!("%{}%", term).to_string(),
-                  format!("%{}%", term).to_string(),
-                ]
-              },
-            ),
+                None
+              };
+
+              let cls = match (fromcls, tocls) {
+                (Some(from), Some(to)) => format!("{} ({} or {})", notstr, from, to),
+                (Some(from), None) => format!("{} {}", notstr, from),
+                (None, Some(to)) => format!("{} {}", notstr, to),
+                (None, None) => "".to_string(),
+              };
+
+              println!("both cls {}", cls);
+
+              (
+                cls,
+                // args
+                if exact {
+                  if tagfrom && tagto {
+                    vec![term.clone(), term.clone(), term.clone(), term.clone()]
+                  } else {
+                    vec![term.clone(), term.clone()]
+                  }
+                } else {
+                  if tagfrom && tagto {
+                    vec![
+                      format!("%{}%", term).to_string(),
+                      format!("%{}%", term).to_string(),
+                      format!("%{}%", term).to_string(),
+                      format!("%{}%", term).to_string(),
+                    ]
+                  } else {
+                    vec![
+                      format!("%{}%", term).to_string(),
+                      format!("%{}%", term).to_string(),
+                    ]
+                  }
+                },
+              )
+            }
           }
         } else {
           let fileclause = if file { "and N.file is not null" } else { "" };

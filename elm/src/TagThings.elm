@@ -408,7 +408,7 @@ addToSearchAsTag notes =
         f =
             List.foldl
                 (\zkln g ->
-                    \m -> SSP.addToSearch (g m) [ Data.ExactMatch, Data.Tag ] zkln.title
+                    \m -> SSP.addToSearch (g m) [ Data.ExactMatch, Data.TagTo ] zkln.title
                 )
                 Basics.identity
                 notes

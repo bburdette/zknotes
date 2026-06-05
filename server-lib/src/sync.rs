@@ -61,7 +61,7 @@ pub async fn prev_sync(
     tagsearch: vec![TagSearch::Boolex {
       ts1: Box::new(TagSearch::Boolex {
         ts1: Box::new(TagSearch::SearchTerm {
-          mods: vec![SearchMod::Tag, SearchMod::ZkNoteId],
+          mods: vec![SearchMod::TagTo, SearchMod::ZkNoteId],
           term: SpecialUuids::Sync.str().to_string(),
         }),
         ao: zkprotocol::search::AndOr::And,
@@ -72,7 +72,7 @@ pub async fn prev_sync(
       }),
       ao: zkprotocol::search::AndOr::And,
       ts2: Box::new(TagSearch::SearchTerm {
-        mods: vec![SearchMod::Tag, SearchMod::ZkNoteId],
+        mods: vec![SearchMod::TagTo, SearchMod::ZkNoteId],
         term: usernoteid.to_string(),
       }),
     }],
@@ -1463,7 +1463,7 @@ pub fn sync_stream(
   let exclude_sync = TagSearch::Not {
     ts: Box::new(TagSearch::Boolex {
       ts1: Box::new(TagSearch::SearchTerm {
-        mods: vec![SearchMod::ZkNoteId, SearchMod::Tag],
+        mods: vec![SearchMod::ZkNoteId, SearchMod::TagTo],
         term: SpecialUuids::Sync.str().to_string(),
       }),
       ao: AndOr::And,
@@ -1478,12 +1478,12 @@ pub fn sync_stream(
   let exclude_user = TagSearch::Not {
     ts: Box::new(TagSearch::Boolex {
       ts1: Box::new(TagSearch::SearchTerm {
-        mods: vec![SearchMod::ZkNoteId, SearchMod::Tag],
+        mods: vec![SearchMod::ZkNoteId, SearchMod::TagTo],
         term: SpecialUuids::User.str().to_string(),
       }),
       ao: AndOr::And,
       ts2: Box::new(TagSearch::SearchTerm {
-        mods: vec![SearchMod::User, SearchMod::Tag],
+        mods: vec![SearchMod::User, SearchMod::TagTo],
         term: "system".to_string(),
       }),
     }),
@@ -1576,7 +1576,7 @@ pub fn sync_stream(
       ns.into_iter().fold(anyafter, |ts, sh| TagSearch::Boolex {
         ts1: Box::new(TagSearch::Boolex {
           ts1: Box::new(TagSearch::SearchTerm {
-            mods: vec![SearchMod::ZkNoteId, SearchMod::Tag],
+            mods: vec![SearchMod::ZkNoteId, SearchMod::TagTo],
             term: sh.1.to_string(),
           }),
           ao: AndOr::Or,

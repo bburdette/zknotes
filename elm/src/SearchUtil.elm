@@ -71,8 +71,11 @@ showSearchMod mod =
         ZkNoteId ->
             "ZkNoteId"
 
-        Tag ->
-            "Tag"
+        TagTo ->
+            "TagTo"
+
+        TagFrom ->
+            "TagFrom"
 
         Note ->
             "Note"
@@ -282,8 +285,11 @@ printSearchMod mod =
         ZkNoteId ->
             "z"
 
-        Tag ->
-            "t"
+        TagTo ->
+            ">"
+
+        TagFrom ->
+            "<"
 
         Note ->
             "n"
@@ -340,8 +346,10 @@ searchMod =
             |. symbol "e"
         , succeed ZkNoteId
             |. symbol "z"
-        , succeed Tag
-            |. symbol "t"
+        , succeed TagTo
+            |. symbol ">"
+        , succeed TagFrom
+            |. symbol "<"
         , succeed Note
             |. symbol "n"
         , succeed User
