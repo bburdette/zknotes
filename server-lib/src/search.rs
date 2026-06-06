@@ -613,7 +613,7 @@ pub fn build_base_sql(
 
   let cur_tsc: Option<Tsc> = if current {
     let (cls, clsargs) =
-      build_tagsearch_clause(&conn, uid, &ArchivesOrCurrent::Current, false, &ts)?;
+      build_tagsearch_clause(&conn, uid, &TsArchivesOrCurrent::Current, false, &ts)?;
     Some(Tsc {
       cls: cls,
       clsargs: clsargs,
@@ -623,7 +623,7 @@ pub fn build_base_sql(
   };
   let arch_tsc: Option<Tsc> = if archives {
     let (cls, clsargs) =
-      build_tagsearch_clause(&conn, uid, &ArchivesOrCurrent::Archives, false, &ts)?;
+      build_tagsearch_clause(&conn, uid, &TsArchivesOrCurrent::Archives, false, &ts)?;
     Some(Tsc {
       cls: cls,
       clsargs: clsargs,
@@ -705,10 +705,15 @@ pub fn build_base_sql(
   Ok((rsql, rargs))
 }
 
+pub enum TsArchivesOrCurrent {
+  Current,
+  Archives,
+}
+
 fn build_tagsearch_clause(
   conn: &Connection,
   uid: UserId,
-  aoc: &ArchivesOrCurrent,
+  aoc: &TsArchivesOrCurrent,
   not: bool,
   search: &TagSearch,
 ) -> Result<(String, Vec<String>), zkerr::Error> {
@@ -802,15 +807,14 @@ fn build_tagsearch_clause(
 
           let notstr = if not { "not" } else { "" };
 
+          #[derive(Debug)]
           enum Aocid {
             AocS(&'static str),
-            Both,
           }
 
           let ai = match aoc {
-            ArchivesOrCurrent::Current => Aocid::AocS("id"),
-            ArchivesOrCurrent::Archives => Aocid::AocS("zknote"),
-            ArchivesOrCurrent::CurrentAndArchives => Aocid::Both,
+            TsArchivesOrCurrent::Current => Aocid::AocS("id"),
+            TsArchivesOrCurrent::Archives => Aocid::AocS("zknote"),
           };
           match ai {
             Aocid::AocS(nid) => {
@@ -842,8 +846,6 @@ fn build_tagsearch_clause(
                 (None, Some(to)) => format!("{} ({})", notstr, to),
                 (None, None) => "".to_string(),
               };
-
-              println!("nid cls {}", cls);
               (
                 cls,
                 // args
@@ -861,72 +863,6 @@ fn build_tagsearch_clause(
                     ]
                   } else {
                     vec![format!("%{}%", term).to_string()]
-                  }
-                },
-              )
-            }
-            Aocid::Both => {
-              let fromcls = if tagfrom {
-                Some(format!(
-                  "((N.id in (select zklink.toid from zknote as zkn, zklink
-                 where zkn.id = zklink.fromid
-                   and {})
-                or
-                    N.zknote in (select zklink.toid from zknote as zkn, zklink
-                 where zkn.id = zklink.fromid
-                   and {}))",
-                  clause, clause
-                ))
-              } else {
-                None
-              };
-
-              let tocls = if tagto {
-                Some(format!(
-                  "(N.id in (select zklink.fromid from zknote as zkn, zklink
-                 where zkn.id = zklink.toid
-                   and {})
-                or
-                    N.zknote in (select zklink.fromid from zknote as zkn, zklink
-                 where zkn.id = zklink.toid
-                   and {}))",
-                  clause, clause
-                ))
-              } else {
-                None
-              };
-
-              let cls = match (fromcls, tocls) {
-                (Some(from), Some(to)) => format!("{} ({} or {})", notstr, from, to),
-                (Some(from), None) => format!("{} {}", notstr, from),
-                (None, Some(to)) => format!("{} {}", notstr, to),
-                (None, None) => "".to_string(),
-              };
-
-              println!("both cls {}", cls);
-
-              (
-                cls,
-                // args
-                if exact {
-                  if tagfrom && tagto {
-                    vec![term.clone(), term.clone(), term.clone(), term.clone()]
-                  } else {
-                    vec![term.clone(), term.clone()]
-                  }
-                } else {
-                  if tagfrom && tagto {
-                    vec![
-                      format!("%{}%", term).to_string(),
-                      format!("%{}%", term).to_string(),
-                      format!("%{}%", term).to_string(),
-                      format!("%{}%", term).to_string(),
-                    ]
-                  } else {
-                    vec![
-                      format!("%{}%", term).to_string(),
-                      format!("%{}%", term).to_string(),
-                    ]
                   }
                 },
               )
