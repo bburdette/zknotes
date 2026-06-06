@@ -17,7 +17,7 @@ use futures::future;
 use futures::Stream;
 use futures_util::TryStreamExt;
 use futures_util::{StreamExt, TryFutureExt};
-use log::{debug, error, info};
+use log::{error, info};
 use orgauth;
 use orgauth::data::{User, UserId};
 use orgauth::dbfun::user_id;

@@ -3134,6 +3134,7 @@ pub enum SpecialNoteObsolete1 {
   SnList(NotegraphObsolete1),
 }
 
+#[allow(non_snake_case)] // doesn't suppress warning.  maybe in future?
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct NotegraphObsolete1 {
   pub currentUuid: Option<Uuid>,
