@@ -807,67 +807,58 @@ fn build_tagsearch_clause(
 
           let notstr = if not { "not" } else { "" };
 
-          #[derive(Debug)]
-          enum Aocid {
-            AocS(&'static str),
-          }
-
-          let ai = match aoc {
-            TsArchivesOrCurrent::Current => Aocid::AocS("id"),
-            TsArchivesOrCurrent::Archives => Aocid::AocS("zknote"),
+          let nid = match aoc {
+            TsArchivesOrCurrent::Current => "id",
+            TsArchivesOrCurrent::Archives => "zknote",
           };
-          match ai {
-            Aocid::AocS(nid) => {
-              // clause
-              let tocls = if tagto {
-                Some(format!(
-                  "N.{} in (select zklink.fromid from zknote as zkn, zklink
+          // clause
+          let tocls = if tagto {
+            Some(format!(
+              "N.{} in (select zklink.fromid from zknote as zkn, zklink
                  where zkn.id = zklink.toid
                    and {})",
-                  nid, clause
-                ))
-              } else {
-                None
-              };
-              let fromcls = if tagfrom {
-                Some(format!(
-                  "N.{} in (select zklink.toid from zknote as zkn, zklink
+              nid, clause
+            ))
+          } else {
+            None
+          };
+          let fromcls = if tagfrom {
+            Some(format!(
+              "N.{} in (select zklink.toid from zknote as zkn, zklink
                  where zkn.id = zklink.fromid
                    and {})",
-                  nid, clause
-                ))
-              } else {
-                None
-              };
+              nid, clause
+            ))
+          } else {
+            None
+          };
 
-              let cls = match (fromcls, tocls) {
-                (Some(from), Some(to)) => format!("{} ({} or {})", notstr, from, to),
-                (Some(from), None) => format!("{} ({})", notstr, from),
-                (None, Some(to)) => format!("{} ({})", notstr, to),
-                (None, None) => "".to_string(),
-              };
-              (
-                cls,
-                // args
-                if exact {
-                  if tagfrom && tagto {
-                    vec![term.clone(), term.clone()]
-                  } else {
-                    vec![term.clone()]
-                  }
-                } else {
-                  if tagfrom && tagto {
-                    vec![
-                      format!("%{}%", term).to_string(),
-                      format!("%{}%", term).to_string(),
-                    ]
-                  } else {
-                    vec![format!("%{}%", term).to_string()]
-                  }
-                },
-              )
-            }
-          }
+          let cls = match (fromcls, tocls) {
+            (Some(from), Some(to)) => format!("{} ({} or {})", notstr, from, to),
+            (Some(from), None) => format!("{} ({})", notstr, from),
+            (None, Some(to)) => format!("{} ({})", notstr, to),
+            (None, None) => "".to_string(),
+          };
+          (
+            cls,
+            // args
+            if exact {
+              if tagfrom && tagto {
+                vec![term.clone(), term.clone()]
+              } else {
+                vec![term.clone()]
+              }
+            } else {
+              if tagfrom && tagto {
+                vec![
+                  format!("%{}%", term).to_string(),
+                  format!("%{}%", term).to_string(),
+                ]
+              } else {
+                vec![format!("%{}%", term).to_string()]
+              }
+            },
+          )
         } else {
           let fileclause = if file { "and N.file is not null" } else { "" };
 
