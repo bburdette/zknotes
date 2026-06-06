@@ -3685,7 +3685,7 @@ update noteCache msg model =
             , SPMod
                 (\spm ->
                     ( SP.addToSearch spm
-                        [ Data.ExactMatch, Data.Tag ]
+                        [ Data.ExactMatch, Data.TagTo ]
                         title
                     , SP.None
                     )

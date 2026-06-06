@@ -624,7 +624,7 @@ update msg model =
                 ( model, SPMod (\m -> ( SP.addToSearch m [ Data.ExactMatch ] zkln.title, SP.None )) )
 
         AddToSearchAsTag title ->
-            ( model, SPMod (\m -> ( SP.addToSearch m [ Data.ExactMatch, Data.Tag ] title, SP.None )) )
+            ( model, SPMod (\m -> ( SP.addToSearch m [ Data.ExactMatch, Data.TagTo ] title, SP.None )) )
 
         ToLinkPress ->
             let

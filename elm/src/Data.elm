@@ -984,7 +984,8 @@ tagSearchEncoder enum =
 type SearchMod
     = ExactMatch
     | ZkNoteId
-    | Tag
+    | TagTo
+    | TagFrom
     | Note
     | User
     | File
@@ -1002,8 +1003,10 @@ searchModEncoder enum =
             Json.Encode.string "ExactMatch"
         ZkNoteId ->
             Json.Encode.string "ZkNoteId"
-        Tag ->
-            Json.Encode.string "Tag"
+        TagTo ->
+            Json.Encode.string "TagTo"
+        TagFrom ->
+            Json.Encode.string "TagFrom"
         Note ->
             Json.Encode.string "Note"
         User ->
@@ -1864,8 +1867,17 @@ searchModDecoder =
             |> Json.Decode.andThen
                 (\x ->
                     case x of
-                        "Tag" ->
-                            Json.Decode.succeed Tag
+                        "TagTo" ->
+                            Json.Decode.succeed TagTo
+                        unexpected ->
+                            Json.Decode.fail <| "Unexpected variant " ++ unexpected
+                )
+        , Json.Decode.string
+            |> Json.Decode.andThen
+                (\x ->
+                    case x of
+                        "TagFrom" ->
+                            Json.Decode.succeed TagFrom
                         unexpected ->
                             Json.Decode.fail <| "Unexpected variant " ++ unexpected
                 )

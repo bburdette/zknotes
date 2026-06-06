@@ -170,7 +170,6 @@ async fn user(
   session: Session,
   data: web::Data<State>,
   item: web::Json<orgauth::data::UserRequest>,
-  req: HttpRequest,
 ) -> HttpResponse {
   // DON'T print login messages to the log!
   // info!(
@@ -204,7 +203,6 @@ async fn admin(
   session: Session,
   data: web::Data<State>,
   item: web::Json<orgauth::data::AdminRequest>,
-  req: HttpRequest,
 ) -> HttpResponse {
   // DON'T print login data to the log!
   // info!(

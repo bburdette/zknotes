@@ -382,7 +382,8 @@ viewSearchHelper mbfocusloc indent lts ts =
                         , E.row
                             [ E.padding 8, E.spacing 8, E.centerX ]
                             [ modbutton ExactMatch "e"
-                            , modbutton Tag "t"
+                            , modbutton TagTo ">"
+                            , modbutton TagFrom "<"
                             , modbutton Note "n"
                             , modbutton User "u"
                             , modbutton File "f"

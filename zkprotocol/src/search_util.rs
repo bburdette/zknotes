@@ -15,7 +15,8 @@ fn search_mod(input: &str) -> IResult<&str, SearchMod> {
   alt((
     value(SearchMod::ExactMatch, tag("e")),
     value(SearchMod::ZkNoteId, tag("z")),
-    value(SearchMod::Tag, tag("t")),
+    value(SearchMod::TagTo, tag(">")),
+    value(SearchMod::TagFrom, tag("<")),
     value(SearchMod::Note, tag("n")),
     value(SearchMod::User, tag("u")),
     value(SearchMod::File, tag("f")),

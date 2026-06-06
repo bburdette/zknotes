@@ -819,11 +819,7 @@ pub fn is_zknote_mine(
   }
 }
 
-pub fn is_zknote_editable(
-  conn: &Connection,
-  zknoteid: i64,
-  userid: UserId,
-) -> Result<bool, zkerr::Error> {
+pub fn is_zknote_editable(conn: &Connection, zknoteid: i64) -> Result<bool, zkerr::Error> {
   match conn.query_row(
     "select count(*) from
       zknote
@@ -1540,7 +1536,7 @@ pub fn zknote_access_id(
       if is_zknote_mine(&conn, noteid, uid)? {
         Ok(Access::ReadWrite)
       } else if is_zknote_usershared(conn, noteid, uid)? {
-        if is_zknote_editable(conn, noteid, uid)? {
+        if is_zknote_editable(conn, noteid)? {
           // editable and accessible.
           Ok(Access::ReadWrite)
         } else {
@@ -1548,7 +1544,7 @@ pub fn zknote_access_id(
           Ok(Access::Read)
         }
       } else if is_zknote_shared(conn, noteid, uid)? {
-        if is_zknote_editable(conn, noteid, uid)? {
+        if is_zknote_editable(conn, noteid)? {
           // editable and accessible.
           Ok(Access::ReadWrite)
         } else {

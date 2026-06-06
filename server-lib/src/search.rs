@@ -613,7 +613,7 @@ pub fn build_base_sql(
 
   let cur_tsc: Option<Tsc> = if current {
     let (cls, clsargs) =
-      build_tagsearch_clause(&conn, uid, &ArchivesOrCurrent::Current, false, &ts)?;
+      build_tagsearch_clause(&conn, uid, &TsArchivesOrCurrent::Current, false, &ts)?;
     Some(Tsc {
       cls: cls,
       clsargs: clsargs,
@@ -623,7 +623,7 @@ pub fn build_base_sql(
   };
   let arch_tsc: Option<Tsc> = if archives {
     let (cls, clsargs) =
-      build_tagsearch_clause(&conn, uid, &ArchivesOrCurrent::Archives, false, &ts)?;
+      build_tagsearch_clause(&conn, uid, &TsArchivesOrCurrent::Archives, false, &ts)?;
     Some(Tsc {
       cls: cls,
       clsargs: clsargs,
@@ -705,10 +705,15 @@ pub fn build_base_sql(
   Ok((rsql, rargs))
 }
 
+pub enum TsArchivesOrCurrent {
+  Current,
+  Archives,
+}
+
 fn build_tagsearch_clause(
   conn: &Connection,
   uid: UserId,
-  aoc: &ArchivesOrCurrent,
+  aoc: &TsArchivesOrCurrent,
   not: bool,
   search: &TagSearch,
 ) -> Result<(String, Vec<String>), zkerr::Error> {
@@ -716,7 +721,8 @@ fn build_tagsearch_clause(
     TagSearch::SearchTerm { mods, term } => {
       let mut exact = false;
       let mut zknoteid = false;
-      let mut tag = false;
+      let mut tagto = false;
+      let mut tagfrom = false;
       let mut desc = false;
       let mut user = false;
       let mut file = false;
@@ -729,7 +735,8 @@ fn build_tagsearch_clause(
       for m in mods {
         match m {
           SearchMod::ExactMatch => exact = true,
-          SearchMod::Tag => tag = true,
+          SearchMod::TagTo => tagto = true,
+          SearchMod::TagFrom => tagfrom = true,
           SearchMod::Note => desc = true,
           SearchMod::User => user = true,
           SearchMod::File => file = true,
@@ -789,7 +796,7 @@ fn build_tagsearch_clause(
           vec![format!("{}", serverid)],
         )
       } else {
-        if tag {
+        if tagfrom || tagto {
           let fileclause = if file { "and zkn.file is not null" } else { "" };
 
           let clause = if exact {
@@ -800,73 +807,58 @@ fn build_tagsearch_clause(
 
           let notstr = if not { "not" } else { "" };
 
-          enum Aocid {
-            AocS(&'static str),
-            Both,
-          }
-
-          let ai = match aoc {
-            ArchivesOrCurrent::Current => Aocid::AocS("id"),
-            ArchivesOrCurrent::Archives => Aocid::AocS("zknote"),
-            ArchivesOrCurrent::CurrentAndArchives => Aocid::Both,
+          let nid = match aoc {
+            TsArchivesOrCurrent::Current => "id",
+            TsArchivesOrCurrent::Archives => "zknote",
           };
-          match ai {
-            Aocid::AocS(nid) => (
-              // clause
-              format!(
-                "{} (N.{} in (select zklink.toid from zknote as zkn, zklink
-                 where zkn.id = zklink.fromid
-                   and {})
-                or
-                    N.{} in (select zklink.fromid from zknote as zkn, zklink
+          // clause
+          let tocls = if tagto {
+            Some(format!(
+              "N.{} in (select zklink.fromid from zknote as zkn, zklink
                  where zkn.id = zklink.toid
-                   and {}))",
-                notstr, nid, clause, nid, clause
-              ),
-              // args
-              if exact {
+                   and {})",
+              nid, clause
+            ))
+          } else {
+            None
+          };
+          let fromcls = if tagfrom {
+            Some(format!(
+              "N.{} in (select zklink.toid from zknote as zkn, zklink
+                 where zkn.id = zklink.fromid
+                   and {})",
+              nid, clause
+            ))
+          } else {
+            None
+          };
+
+          let cls = match (fromcls, tocls) {
+            (Some(from), Some(to)) => format!("{} ({} or {})", notstr, from, to),
+            (Some(from), None) => format!("{} ({})", notstr, from),
+            (None, Some(to)) => format!("{} ({})", notstr, to),
+            (None, None) => "".to_string(),
+          };
+          (
+            cls,
+            // args
+            if exact {
+              if tagfrom && tagto {
                 vec![term.clone(), term.clone()]
               } else {
+                vec![term.clone()]
+              }
+            } else {
+              if tagfrom && tagto {
                 vec![
                   format!("%{}%", term).to_string(),
                   format!("%{}%", term).to_string(),
                 ]
-              },
-            ),
-            Aocid::Both => (
-              // clause
-              format!(
-                "{} (N.id in (select zklink.toid from zknote as zkn, zklink
-                 where zkn.id = zklink.fromid
-                   and {})
-                or
-                    N.id in (select zklink.fromid from zknote as zkn, zklink
-                 where zkn.id = zklink.toid
-                   and {})
-                or
-                    N.zknote in (select zklink.fromid from zknote as zkn, zklink
-                 where zkn.id = zklink.toid
-                   and {})
-                or
-                    N.zknote in (select zklink.fromid from zknote as zkn, zklink
-                 where zkn.id = zklink.toid
-                   and {})
-                   )",
-                notstr, clause, clause, clause, clause
-              ),
-              // args
-              if exact {
-                vec![term.clone(), term.clone(), term.clone(), term.clone()]
               } else {
-                vec![
-                  format!("%{}%", term).to_string(),
-                  format!("%{}%", term).to_string(),
-                  format!("%{}%", term).to_string(),
-                  format!("%{}%", term).to_string(),
-                ]
-              },
-            ),
-          }
+                vec![format!("%{}%", term).to_string()]
+              }
+            },
+          )
         } else {
           let fileclause = if file { "and N.file is not null" } else { "" };
 
