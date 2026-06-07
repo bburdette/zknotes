@@ -892,6 +892,14 @@ pub async fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
     None => None,
   };
 
+  {
+    let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+
+    let tr = conn.unchecked_transaction()?;
+    sqldata::update_filetable(&conn, &config.file_path)?;
+    tr.commit()?;
+  }
+
   // create here, not in the HttpServer::new() call,
   // to prevent multiple copies of jobcounter etc.
   let state = web::Data::new(State {
