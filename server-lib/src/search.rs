@@ -745,8 +745,8 @@ fn build_tagsearch_clause(
       let mut desc = false;
       let mut user = false;
       let mut file = false;
-      let mut plus = false;
-      let mut minus = false;
+      let mut fileplus = false;
+      let mut fileminus = false;
       let mut before = false;
       let mut after = false;
       let mut create = false;
@@ -763,8 +763,8 @@ fn build_tagsearch_clause(
           SearchMod::Note => desc = true,
           SearchMod::User => user = true,
           SearchMod::File => file = true,
-          SearchMod::Plus => plus = true,
-          SearchMod::Minus => minus = true,
+          SearchMod::FilePlus => fileplus = true,
+          SearchMod::FileMinus => fileminus = true,
           SearchMod::Before => before = true,
           SearchMod::After => after = true,
           SearchMod::Create => create = true,
@@ -785,6 +785,11 @@ fn build_tagsearch_clause(
       } else {
         "title"
       };
+
+      println!(
+        "(file, fileplus, fileminus) {:?}",
+        (file, fileplus, fileminus)
+      );
 
       if create || modd {
         let op = if before {
@@ -822,13 +827,25 @@ fn build_tagsearch_clause(
         )
       } else {
         if tagfrom || tagto {
-          let fileclause = match (file, plus, minus) {
+          let fjoin = if file || fileplus || fileminus {
+            "    left join file as LF
+                 on LF.id = zkn.file
+                 left join files_dir as LFD
+                 on LFD.filename = LF.hash"
+          } else {
+            ""
+          };
+          let fileclause = match (file, fileplus, fileminus) {
             (true, false, false) => "and zkn.file is not null",
-            (true, true, false) => "and LFD.filename is not null",
-            (true, false, true) => "and (zkn.file is not null and LFD.filename is null)",
+            (false, true, false) => "and LFD.filename is not null",
+            (false, false, true) => "and (zkn.file is not null and LFD.filename is null)",
             _ => "",
           };
-          println!("tf fielclause: {} {:?}", fileclause, (file, plus, minus));
+          println!(
+            "tf fielclause: {} {:?}",
+            fileclause,
+            (file, fileplus, fileminus)
+          );
 
           let clause = if exact {
             format!("zkn.{} = ? {}", field, fileclause)
@@ -846,14 +863,11 @@ fn build_tagsearch_clause(
           let tocls = if tagto {
             Some(format!(
               "N.{} in (select zklink.fromid from zknote as zkn, zklink
-                 left join file as LF
-                 on LF.id = zkn.file
-                 left join files_dir as LFD
-                 on LFD.filename = LF.hash
+                 {}
                  where zkn.id = zklink.toid
                    and zklink.linkzknote is null
                    and {})",
-              nid, clause
+              nid, fjoin, clause
             ))
           } else {
             None
@@ -861,14 +875,11 @@ fn build_tagsearch_clause(
           let fromcls = if tagfrom {
             Some(format!(
               "N.{} in (select zklink.toid from zknote as zkn, zklink
-                 left join file as LF
-                 on LF.id = zkn.file
-                 left join files_dir as LFD
-                 on LFD.filename = LF.hash
+                {}
                  where zkn.id = zklink.fromid
                    and zklink.linkzknote is null
                    and {})",
-              nid, clause
+              nid, fjoin, clause
             ))
           } else {
             None
@@ -901,13 +912,17 @@ fn build_tagsearch_clause(
             },
           )
         } else {
-          let fileclause = match (file, plus, minus) {
+          let fileclause = match (file, fileplus, fileminus) {
             (true, false, false) => "and N.file is not null",
-            (true, true, false) => "and FD.filename is not null",
-            (true, false, true) => "and (N.file is not null and FD.filename is null)",
+            (false, true, false) => "and FD.filename is not null",
+            (false, false, true) => "and (N.file is not null and FD.filename is null)",
             _ => "",
           };
-          println!("fielclause 2: {} {:?}", fileclause, (file, plus, minus));
+          println!(
+            "fielclause 2: {} {:?}",
+            fileclause,
+            (file, fileplus, fileminus)
+          );
           // let fileclause = if file { "and N.file is not null" } else { "" };
 
           let notstr = match (not, exact) {
