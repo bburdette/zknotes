@@ -418,9 +418,9 @@ pub fn build_base_sql(
 
   let ordclause = if let Some(o) = &search.ordering {
     let ord = match o.field {
-      OrderField::Title => "order by N.title",
-      OrderField::Created => "order by N.createdate",
-      OrderField::Changed => "order by N.changeddate",
+      OrderField::Title => " order by N.title",
+      OrderField::Created => " order by N.createdate",
+      OrderField::Changed => " order by N.changeddate",
     };
     let dir = match o.direction {
       OrderDirection::Ascending => " asc",
@@ -440,7 +440,7 @@ pub fn build_base_sql(
   let deleted = if search.deleted {
     ""
   } else {
-    "and N.deleted = 0"
+    " and N.deleted = 0"
   };
 
   // sql, sqlargs, current (or archives = false)
@@ -449,7 +449,7 @@ pub fn build_base_sql(
   // e = file exists
   // m = file missing
   // n = not a file
-  let filex = "case when N.file then (case when FD.filename then 'e' else 'm' end) else 'n' end";
+  let filex = "case when N.file is not null then (case when FD.filename is not null then 'e' else 'm' end) else 'n' end";
 
   // left joins allow null F.id or FD.filename in results
   let fjoin = "left join file as F
