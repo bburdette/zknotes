@@ -113,6 +113,9 @@ pub fn search_zknotes(
 ) -> Result<SearchResult, zkerr::Error> {
   let (sql, args) = build_sql(&conn, user, &search, None)?;
 
+  println!("sql: {}", sql);
+  println!("args: {:?}", args);
+
   let mut pstmt = conn.prepare(sql.as_str())?;
   let sysid = user_id(&conn, "system")?;
   let rec_iter = pstmt.query_and_then(rusqlite::params_from_iter(args.iter()), |row| {
@@ -130,17 +133,12 @@ pub fn search_zknotes(
       },
       title: row.get(3)?,
       filestatus: {
-        let wat: Option<i64> = row.get(4)?;
-
-        match wat {
-          Some(file_id) => {
-            if sqldata::file_exists(&conn, filedir, file_id)? {
-              FileStatus::FilePresent
-            } else {
-              FileStatus::FileMissing
-            }
-          }
-          None => FileStatus::NotAFile,
+        let fs: String = row.get(4)?;
+        match fs.as_str() {
+          "n" => FileStatus::NotAFile,
+          "m" => FileStatus::FileMissing,
+          "e" => FileStatus::FilePresent,
+          _ => Err(zkerr::Error::String(format!("invalid filestatus: {}", fs)))?,
         }
       },
       user: UserId::Uid(row.get(5)?),
@@ -448,14 +446,27 @@ pub fn build_base_sql(
   // sql, sqlargs, current (or archives = false)
   let mut sqlargs: Vec<(String, Vec<String>, bool)> = Vec::new();
 
+  // e = file exists
+  // m = file missing
+  // n = not a file
+  let filex = "case when N.file then (case when FD.filename then 'e' else 'm' end) else 'n' end";
+
+  // left joins allow null F.id or FD.filename in results
+  let fjoin = "left join file as F
+      on F.id = N.file
+      left join files_dir as FD
+      on FD.filename = F.hash";
+
   if archives {
     let (sqlbase, baseargs) = (
       // archives of notes that are mine.
       format!(
-        "select N.id, N.uuid, PN.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
-      from zkarch N, zknote PN where N.user = ? and PN.id = N.zknote
+        "select N.id, N.uuid, PN.uuid, N.title, {}, N.user, N.createdate, N.changeddate
+      from zkarch N, zknote PN
+      {}
+      where N.user = ? and PN.id = N.zknote
         {}",
-        deleted
+        filex, fjoin, deleted
       ),
       vec![uid.to_string()],
     );
@@ -468,10 +479,12 @@ pub fn build_base_sql(
     // notes that are mine.
     (
       format!(
-        "select N.id, N.uuid, null, N.title, N.file, N.user, N.createdate, N.changeddate
-      from zknote N where N.user = ?
+        "select N.id, N.uuid, null, N.title, {}, N.user, N.createdate, N.changeddate
+      from zknote N
+      {}
+       where N.user = ?
         {}",
-        deleted
+        filex, fjoin, deleted
       ),
       vec![uid.to_string()],
     );
@@ -483,12 +496,13 @@ pub fn build_base_sql(
     let (sqlpub, pubargs) = (
       // archives of notes that are public, and not mine.
       format!(
-        "select N.id, N.uuid, PN.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
+        "select N.id, N.uuid, PN.uuid, N.title, {}, N.user, N.createdate, N.changeddate
       from zkarch N, zklink L, zknote PN
+      {}
       where ((N.user != ? and L.fromid = N.zknote and L.toid = ?) or N.zknote = ?)
         and PN.id = N.zknote
         {}",
-        deleted
+        filex, fjoin, deleted
       ),
       vec![uid.to_string(), publicid.to_string(), publicid.to_string()],
     );
@@ -498,11 +512,12 @@ pub fn build_base_sql(
   if current {
     let (sqlpub, pubargs) = (
       format!(
-        "select N.id, N.uuid, null, N.title, N.file, N.user, N.createdate, N.changeddate
+        "select N.id, N.uuid, null, N.title, {}, N.user, N.createdate, N.changeddate
       from zknote N, zklink L
+      {}
       where ((N.user != ? and L.fromid = N.id and L.toid = ?) or N.id = ?)
       {}",
-        deleted
+        filex, fjoin, deleted
       ),
       vec![uid.to_string(), publicid.to_string(), publicid.to_string()],
     );
@@ -520,8 +535,9 @@ pub fn build_base_sql(
   if archives {
     let (sqlshare, shareargs) = (
       format!(
-        "select N.id, N.uuid, PN.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
+        "select N.id, N.uuid, PN.uuid, N.title, {}, N.user, N.createdate, N.changeddate
       from zkarch N, zklink L, zklink M, zklink U, zknote PN
+      {}
       where N.user != ?
       and
         (M.toid = ? and
@@ -531,7 +547,7 @@ pub fn build_base_sql(
         ((U.fromid = ? and U.toid = M.fromid) or (U.fromid = M.fromid and U.toid = ?))
         and PN.id = N.zknote
         {}",
-        deleted
+        filex, fjoin, deleted
       ),
       vec![
         uid.to_string(),
@@ -545,8 +561,9 @@ pub fn build_base_sql(
   if current {
     let (sqlshare, shareargs) = (
       format!(
-        "select N.id, N.uuid, null, N.title, N.file, N.user, N.createdate, N.changeddate
+        "select N.id, N.uuid, null, N.title, {}, N.user, N.createdate, N.changeddate
       from zknote N, zklink L, zklink M, zklink U
+      {}
       where (N.user != ?
         and M.toid = ?
         and ((L.fromid = N.id and L.toid = M.fromid )
@@ -554,7 +571,7 @@ pub fn build_base_sql(
       and
         ((U.fromid = ? and U.toid = M.fromid) or (U.fromid = M.fromid and U.toid = ?)))
         {}",
-        deleted,
+        filex, fjoin, deleted,
       ),
       vec![
         uid.to_string(),
@@ -570,13 +587,14 @@ pub fn build_base_sql(
   if archives {
     let (sqluser, userargs) = (
       format!(
-        "select N.id, N.uuid, PN.uuid, N.title, N.file, N.user, N.createdate, N.changeddate
+        "select N.id, N.uuid, PN.uuid, N.title, {}, N.user, N.createdate, N.changeddate
       from zkarch N, zklink L, zknote PN
+      {}
       where N.user != ?
         and ((L.fromid = N.zknote and L.toid = ?) or (L.toid = N.zknote and L.fromid = ?))
         and PN.id = N.zknote
         {}",
-        deleted
+        filex, fjoin, deleted
       ),
       vec![
         uid.to_string(),
@@ -589,13 +607,14 @@ pub fn build_base_sql(
   if current {
     let (sqluser, userargs) = (
       format!(
-        "select N.id, N.uuid, null, N.title, N.file, N.user, N.createdate, N.changeddate
+        "select N.id, N.uuid, null, N.title, {}, N.user, N.createdate, N.changeddate
       from zknote N, zklink L
+      {}
       where (
         N.user != ? and
         ((L.fromid = N.id and L.toid = ?) or (L.toid = N.id and L.fromid = ?)))
         {}",
-        deleted
+        filex, fjoin, deleted
       ),
       vec![
         uid.to_string(),
@@ -726,11 +745,15 @@ fn build_tagsearch_clause(
       let mut desc = false;
       let mut user = false;
       let mut file = false;
+      let mut plus = false;
+      let mut minus = false;
       let mut before = false;
       let mut after = false;
       let mut create = false;
       let mut modd = false;
       let mut server = false;
+
+      println!("modes: {:?}", mods);
 
       for m in mods {
         match m {
@@ -740,6 +763,8 @@ fn build_tagsearch_clause(
           SearchMod::Note => desc = true,
           SearchMod::User => user = true,
           SearchMod::File => file = true,
+          SearchMod::Plus => plus = true,
+          SearchMod::Minus => minus = true,
           SearchMod::Before => before = true,
           SearchMod::After => after = true,
           SearchMod::Create => create = true,
@@ -797,12 +822,18 @@ fn build_tagsearch_clause(
         )
       } else {
         if tagfrom || tagto {
-          let fileclause = if file { "and zkn.file is not null" } else { "" };
+          let fileclause = match (file, plus, minus) {
+            (true, false, false) => "and zkn.file is not null",
+            (true, true, false) => "and LFD.filename is not null",
+            (true, false, true) => "and (zkn.file is not null and LFD.filename is null)",
+            _ => "",
+          };
+          println!("tf fielclause: {} {:?}", fileclause, (file, plus, minus));
 
           let clause = if exact {
             format!("zkn.{} = ? {}", field, fileclause)
           } else {
-            format!("zkn.{}  like ? {}", field, fileclause)
+            format!("zkn.{} like ? {}", field, fileclause)
           };
 
           let notstr = if not { "not" } else { "" };
@@ -815,7 +846,12 @@ fn build_tagsearch_clause(
           let tocls = if tagto {
             Some(format!(
               "N.{} in (select zklink.fromid from zknote as zkn, zklink
+                 left join file as LF
+                 on LF.id = zkn.file
+                 left join files_dir as LFD
+                 on LFD.filename = LF.hash
                  where zkn.id = zklink.toid
+                   and zklink.linkzknote is null
                    and {})",
               nid, clause
             ))
@@ -825,7 +861,12 @@ fn build_tagsearch_clause(
           let fromcls = if tagfrom {
             Some(format!(
               "N.{} in (select zklink.toid from zknote as zkn, zklink
+                 left join file as LF
+                 on LF.id = zkn.file
+                 left join files_dir as LFD
+                 on LFD.filename = LF.hash
                  where zkn.id = zklink.fromid
+                   and zklink.linkzknote is null
                    and {})",
               nid, clause
             ))
@@ -860,7 +901,14 @@ fn build_tagsearch_clause(
             },
           )
         } else {
-          let fileclause = if file { "and N.file is not null" } else { "" };
+          let fileclause = match (file, plus, minus) {
+            (true, false, false) => "and N.file is not null",
+            (true, true, false) => "and FD.filename is not null",
+            (true, false, true) => "and (N.file is not null and FD.filename is null)",
+            _ => "",
+          };
+          println!("fielclause 2: {} {:?}", fileclause, (file, plus, minus));
+          // let fileclause = if file { "and N.file is not null" } else { "" };
 
           let notstr = match (not, exact) {
             (true, false) => "not",

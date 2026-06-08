@@ -387,6 +387,8 @@ viewSearchHelper mbfocusloc indent lts ts =
                             , modbutton Note "n"
                             , modbutton User "u"
                             , modbutton File "f"
+                            , modbutton Plus "+"
+                            , modbutton Minus "-"
                             , EI.button
                                 buttonStyle
                                 { onPress = Just (NotTerm tloc)

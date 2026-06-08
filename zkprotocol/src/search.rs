@@ -72,6 +72,8 @@ pub enum SearchMod {
   Note,
   User,
   File,
+  Plus,
+  Minus,
   Before,
   After,
   Create,
