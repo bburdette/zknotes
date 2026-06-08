@@ -469,6 +469,11 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: Option<i64>) -> Result<Server,
     zkm::udpate42(&dbfile)?;
     set_single_value(&conn, "migration_level", "42")?;
   }
+  if nlevel < 43 {
+    info!("udpate43");
+    zkm::udpate43(&dbfile)?;
+    set_single_value(&conn, "migration_level", "43")?;
+  }
 
   info!("db up to date.");
 
@@ -2939,6 +2944,15 @@ pub async fn make_file_note(
     }
   };
 
+  // add to files_dir table.
+  match conn.execute("insert into files_dir (filename) values (?1)", params![fh]) {
+    Ok(_) => (),
+    Err(e) => {
+      // if insert error, log it but proceed.
+      error!("insert into files_dir error {:?}", e);
+    }
+  }
+
   // make a new note.
   let (id, sn) = save_zknote(
     &conn,
@@ -3054,4 +3068,38 @@ pub fn export_db(_dbfile: &Path) -> Result<ZkDatabase, zkerr::Error> {
   })*/
 
   bail!("unimplemented");
+}
+
+// clear out the filename table and refresh with the names in the passed
+// files_dir.
+pub fn update_filetable(conn: &Connection, files_dir: &Path) -> Result<(), zkerr::Error> {
+  // delete all rows from files table.
+  conn.execute("delete from files_dir", params![])?;
+
+  // read filenames.
+  let mut fnames = std::fs::read_dir(files_dir)?.filter_map(|x| x.map(|x| x.file_name()).ok());
+
+  let mut fns = String::new();
+
+  if let Some(first) = fnames.next() {
+    let s = first
+      .into_string()
+      .map_err(|x| zkerr::Error::String(format!("invalid filename: {:?}", x)))?;
+    fns.push_str(format!("(\'{}\')", s).as_str());
+
+    while let Some(item) = fnames.next() {
+      fns.push_str(", ");
+      let s = item
+        .into_string()
+        .map_err(|x| zkerr::Error::String(format!("invalid filename: {:?}", x)))?;
+      fns.push_str(format!("(\'{}\')", s).as_str());
+    }
+  }
+
+  conn.execute(
+    format!("insert into files_dir (filename) values {}", fns).as_str(),
+    params![],
+  )?;
+
+  Ok(())
 }

@@ -988,6 +988,8 @@ type SearchMod
     | TagFrom
     | Note
     | User
+    | FilePlus
+    | FileMinus
     | File
     | Before
     | After
@@ -1011,6 +1013,10 @@ searchModEncoder enum =
             Json.Encode.string "Note"
         User ->
             Json.Encode.string "User"
+        FilePlus ->
+            Json.Encode.string "FilePlus"
+        FileMinus ->
+            Json.Encode.string "FileMinus"
         File ->
             Json.Encode.string "File"
         Before ->
@@ -1896,6 +1902,24 @@ searchModDecoder =
                     case x of
                         "User" ->
                             Json.Decode.succeed User
+                        unexpected ->
+                            Json.Decode.fail <| "Unexpected variant " ++ unexpected
+                )
+        , Json.Decode.string
+            |> Json.Decode.andThen
+                (\x ->
+                    case x of
+                        "FilePlus" ->
+                            Json.Decode.succeed FilePlus
+                        unexpected ->
+                            Json.Decode.fail <| "Unexpected variant " ++ unexpected
+                )
+        , Json.Decode.string
+            |> Json.Decode.andThen
+                (\x ->
+                    case x of
+                        "FileMinus" ->
+                            Json.Decode.succeed FileMinus
                         unexpected ->
                             Json.Decode.fail <| "Unexpected variant " ++ unexpected
                 )

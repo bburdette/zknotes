@@ -3180,3 +3180,22 @@ pub fn udpate42(dbfile: &Path) -> Result<(), zkerr::Error> {
   tr.commit()?;
   Ok(())
 }
+
+pub fn udpate43(dbfile: &Path) -> Result<(), zkerr::Error> {
+  // db connection without foreign key checking.
+  let conn = Connection::open(dbfile)?;
+  let tr = conn.unchecked_transaction()?;
+
+  conn.execute(
+    "CREATE TABLE IF NOT EXISTS \"files_dir\" ( \"filename\" TEXT NOT NULL UNIQUE)",
+    params![],
+  )?;
+
+  conn.execute(
+    "CREATE UNIQUE INDEX \"unq_filename\" ON \"files_dir\" (\"filename\")",
+    params![],
+  )?;
+
+  tr.commit()?;
+  Ok(())
+}

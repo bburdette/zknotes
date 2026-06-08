@@ -18,6 +18,8 @@ fn search_mod(input: &str) -> IResult<&str, SearchMod> {
     value(SearchMod::Tag, tag("t")),
     value(SearchMod::Note, tag("n")),
     value(SearchMod::User, tag("u")),
+    value(SearchMod::FilePlus, tag("f+")),
+    value(SearchMod::FileMinus, tag("f-")),
     value(SearchMod::File, tag("f")),
     value(SearchMod::Before, tag("b")),
     value(SearchMod::After, tag("a")),

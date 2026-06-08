@@ -71,6 +71,8 @@ pub enum SearchMod {
   TagFrom,
   Note,
   User,
+  FilePlus,
+  FileMinus,
   File,
   Before,
   After,

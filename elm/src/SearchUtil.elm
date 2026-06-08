@@ -86,6 +86,12 @@ showSearchMod mod =
         File ->
             "File"
 
+        FilePlus ->
+            "FileExists"
+
+        FileMinus ->
+            "FileMissing"
+
         Before ->
             "Before"
 
@@ -300,6 +306,12 @@ printSearchMod mod =
         File ->
             "f"
 
+        FilePlus ->
+            "f+"
+
+        FileMinus ->
+            "f-"
+
         Before ->
             "b"
 
@@ -354,8 +366,10 @@ searchMod =
             |. symbol "n"
         , succeed User
             |. symbol "u"
-        , succeed File
-            |. symbol "f"
+        , succeed FilePlus
+            |. symbol "f+"
+        , succeed FileMinus
+            |. symbol "f-"
         , succeed File
             |. symbol "f"
         , succeed Before
