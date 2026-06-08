@@ -11,7 +11,6 @@ use orgauth::data::{RegistrationData, UserId};
 use orgauth::dbfun::user_id;
 use orgauth::endpoints::Callbacks;
 use orgauth::util::now;
-use rusqlite::ffi::SQLITE_CANTOPEN_CONVPATH;
 use rusqlite::Row;
 use rusqlite::{params, Connection};
 use serde_derive::{Deserialize, Serialize};
@@ -3079,7 +3078,6 @@ pub fn update_filetable(conn: &Connection, files_dir: &Path) -> Result<(), zkerr
 
   // read filenames.
   let mut fnames = std::fs::read_dir(files_dir)?.filter_map(|x| x.map(|x| x.file_name()).ok());
-  // .map(|x| x.into_os_string());
 
   let mut fns = String::new();
 
@@ -3102,8 +3100,6 @@ pub fn update_filetable(conn: &Connection, files_dir: &Path) -> Result<(), zkerr
     format!("insert into files_dir (filename) values {}", fns).as_str(),
     params![],
   )?;
-
-  // let allnames = SQLITE_CANTOPEN_CONVPATH
 
   Ok(())
 }
