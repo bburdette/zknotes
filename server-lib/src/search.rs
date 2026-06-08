@@ -113,9 +113,6 @@ pub fn search_zknotes(
 ) -> Result<SearchResult, zkerr::Error> {
   let (sql, args) = build_sql(&conn, user, &search, None)?;
 
-  println!("sql: {}", sql);
-  println!("args: {:?}", args);
-
   let mut pstmt = conn.prepare(sql.as_str())?;
   let sysid = user_id(&conn, "system")?;
   let rec_iter = pstmt.query_and_then(rusqlite::params_from_iter(args.iter()), |row| {
@@ -753,8 +750,6 @@ fn build_tagsearch_clause(
       let mut modd = false;
       let mut server = false;
 
-      println!("modes: {:?}", mods);
-
       for m in mods {
         match m {
           SearchMod::ExactMatch => exact = true,
@@ -785,11 +780,6 @@ fn build_tagsearch_clause(
       } else {
         "title"
       };
-
-      println!(
-        "(file, fileplus, fileminus) {:?}",
-        (file, fileplus, fileminus)
-      );
 
       if create || modd {
         let op = if before {
@@ -841,11 +831,6 @@ fn build_tagsearch_clause(
             (false, false, true) => "and (zkn.file is not null and LFD.filename is null)",
             _ => "",
           };
-          println!(
-            "tf fielclause: {} {:?}",
-            fileclause,
-            (file, fileplus, fileminus)
-          );
 
           let clause = if exact {
             format!("zkn.{} = ? {}", field, fileclause)
@@ -918,12 +903,6 @@ fn build_tagsearch_clause(
             (false, false, true) => "and (N.file is not null and FD.filename is null)",
             _ => "",
           };
-          println!(
-            "fielclause 2: {} {:?}",
-            fileclause,
-            (file, fileplus, fileminus)
-          );
-          // let fileclause = if file { "and N.file is not null" } else { "" };
 
           let notstr = match (not, exact) {
             (true, false) => "not",
