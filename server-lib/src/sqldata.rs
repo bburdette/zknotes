@@ -2945,6 +2945,15 @@ pub async fn make_file_note(
     }
   };
 
+  // add to files_dir table.
+  match conn.execute("insert into files_dir (filename) values (?1)", params![fh]) {
+    Ok(_) => (),
+    Err(e) => {
+      // if insert error, log it but proceed.
+      error!("insert into files_dir error {:?}", e);
+    }
+  }
+
   // make a new note.
   let (id, sn) = save_zknote(
     &conn,
