@@ -386,9 +386,19 @@ viewSearchHelper mbfocusloc indent lts ts =
                             , modbutton TagFrom "<"
                             , modbutton Note "n"
                             , modbutton User "u"
-                            , modbutton File "f"
-                            , modbutton FilePlus "f+"
-                            , modbutton FileMinus "f-"
+
+                            -- ZkNoteId
+                            -- Before
+                            -- After
+                            -- Create
+                            -- Mod
+                            -- Server
+                            -- File
+                            -- FilePlus
+                            -- FileMinus
+                            -- , modbutton File "f"
+                            -- , modbutton FilePlus "f+"
+                            -- , modbutton FileMinus "f-"
                             , EI.button
                                 buttonStyle
                                 { onPress = Just (NotTerm tloc)
