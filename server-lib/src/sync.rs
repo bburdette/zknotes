@@ -361,6 +361,11 @@ pub async fn download_file(
     .await
     .map_err(|e| zkerr::Error::String(e.to_string()))?;
 
+  if res.status() == 404 {
+    println!("404 for {}!", title);
+    return Ok(DownloadResult::DownloadFailed);
+  }
+
   // Write the body to a file.
   let mut file = tokio::fs::OpenOptions::new()
     .write(true)
@@ -553,7 +558,15 @@ pub async fn sync_files_down(
   // TODO pass this in from calling ftn?
   let user = orgauth::dbfun::read_user_by_id(&conn, uid)?;
 
-  let (sql, args) = build_sql(&conn, uid, &search, None)?;
+  // get files that are missing locally.
+  let mut idsearch = search.clone();
+  idsearch.resulttype = ResultType::RtId;
+  idsearch.tagsearch.push(TagSearch::SearchTerm {
+    mods: vec![SearchMod::FileMinus],
+    term: "".to_string(),
+  });
+
+  let (sql, args) = build_sql(&conn, uid, &idsearch, None)?;
 
   let mut pstmt = conn.prepare(sql.as_str())?;
 
@@ -588,28 +601,86 @@ pub async fn sync_files_up(
   // TODO pass this in from calling ftn?
   let user = orgauth::dbfun::read_user_by_id(&conn, uid)?;
 
-  let (sql, args) = build_sql(&conn, uid, &search, None)?;
+  // query remote with search + f-''.
+  // of files missing on remote, upload any that we have.
+  // probably will be fast!
 
-  let mut pstmt = conn.prepare(sql.as_str())?;
+  let (c, url) = match (user.cookie.clone(), user.remote_url.clone()) {
+    (Some(c), Some(url)) => (c, url),
+    _ => return Err("can't remote sync - not a remote user".into()),
+  };
 
-  let rec_iter = pstmt.query_and_then(rusqlite::params_from_iter(args.iter()), |row| {
-    Ok::<i64, rusqlite::Error>(row.get(0)?)
-  })?;
+  let user_url = awc::http::Uri::try_from(url).map_err(|x| zkerr::Error::String(x.to_string()))?;
+  let mut parts = awc::http::uri::Parts::default();
+  parts.scheme = user_url.scheme().cloned();
+  parts.authority = user_url.authority().cloned();
+  parts.path_and_query = Some(awc::http::uri::PathAndQuery::from_static("/stream"));
+  let uri = awc::http::Uri::from_parts(parts).map_err(|x| zkerr::Error::String(x.to_string()))?;
+
+  info!("file syncing to uri: {}", uri);
+  // write!(monitor, "syncing files to uri: {}", uri);
+  //
+  let mut idsearch = search.clone();
+  idsearch.resulttype = ResultType::RtId;
+  idsearch.tagsearch.push(TagSearch::SearchTerm {
+    mods: vec![SearchMod::FileMinus],
+    term: "".to_string(),
+  });
+
+  let cookie = cookie::Cookie::parse_encoded(c)?;
+  let res = awc::Client::new()
+    .post(uri)
+    .cookie(cookie)
+    .timeout(Duration::from_secs(60 * 60))
+    .send_json(&serde_json::to_value(PrivateStreamingMessage {
+      what: PrivateStreamingRequests::SearchZkNotes,
+      data: Some(serde_json::to_value(idsearch)?),
+    })?)
+    .map_err(|e| zkerr::Error::String(format!("send error: {:?}", e)))
+    .await?;
+
+  let mut sr = StreamReader::new(res.map_err(convert_payloaderr));
+
+  let mut line = String::new();
+
+  let mut sm = read_sync_message(&mut line, &mut sr)
+    .map_err(|e| zkerr::Error::String(format!("read sync error: {:?}", e)))
+    .await?;
+
+  if let SyncMessage::ZkSearchResultHeader(ref _zsrh) = sm {
+  } else {
+    return Err(
+      format!(
+        "unexpected syncmessage, expected ZkSearchResultHeader: {:?}",
+        sm
+      )
+      .into(),
+    );
+  }
+
+  sm = read_sync_message(&mut line, &mut sr)
+    .map_err(|e| zkerr::Error::String(format!("read sync error: {:?}", e)))
+    .await?;
 
   let mut resvec = Vec::new();
+  while let SyncMessage::ZkNoteId(ref id) = sm {
+    let nid = note_id_for_uuid(&conn, &Uuid::from_str(id.as_str())?)?;
 
-  for rec in rec_iter {
-    match rec {
-      Ok(id) => {
-        match upload_file(&conn, &user, file_path, id).await? {
-          UploadResult::Uploaded => resvec.push(UploadResult::Uploaded),
-          UploadResult::NotAFile => resvec.push(UploadResult::NotAFile),
-          UploadResult::ExistsOnRemote => resvec.push(UploadResult::ExistsOnRemote),
-          UploadResult::FileNotPresent => resvec.push(UploadResult::FileNotPresent),
-          UploadResult::UploadFailed => resvec.push(UploadResult::UploadFailed),
-        };
-      }
-      Err(_) => (),
+    // upload_file.
+    match upload_file(&conn, &user, file_path, nid).await? {
+      UploadResult::Uploaded => resvec.push(UploadResult::Uploaded),
+      UploadResult::NotAFile => resvec.push(UploadResult::NotAFile),
+      UploadResult::ExistsOnRemote => resvec.push(UploadResult::ExistsOnRemote),
+      UploadResult::FileNotPresent => resvec.push(UploadResult::FileNotPresent),
+      UploadResult::UploadFailed => resvec.push(UploadResult::UploadFailed),
+    };
+
+    sm = match read_sync_message(&mut line, &mut sr).await {
+      Ok(x) => x,
+      Err(e) => match e {
+        zkerr::Error::EmptyStream => break,
+        _ => return Err(e),
+      },
     }
   }
 
@@ -678,15 +749,13 @@ pub async fn sync_from_remote(
 pub async fn read_sync_message<S>(
   line: &mut String,
   br: &mut StreamReader<S, bytes::Bytes>,
-) -> Result<SyncMessage, Box<dyn std::error::Error>>
+) -> Result<SyncMessage, zkerr::Error>
 where
   S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin,
 {
   line.clear();
   if br.read_line(line).await? == 0 {
-    return Err::<SyncMessage, Box<dyn std::error::Error>>(
-      zkerr::Error::String("empty stream!".to_string()).into(),
-    );
+    return Err::<SyncMessage, zkerr::Error>(zkerr::Error::EmptyStream);
   }
   let sm = serde_json::from_str(line.trim())?;
   Ok(sm)
