@@ -363,7 +363,7 @@ pub async fn download_file(
 
   if res.status() == 404 {
     println!("404 for {}!", title);
-    return Ok(DownloadResult::NoSource);
+    return Ok(DownloadResult::DownloadFailed);
   }
 
   // Write the body to a file.
