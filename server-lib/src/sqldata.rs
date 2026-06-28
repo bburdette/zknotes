@@ -1730,6 +1730,8 @@ pub fn delete_zknote(
         std::fs::remove_file(rpath.as_path())?;
 
         conn.execute("delete from file where id = ?1", params![fileid])?;
+
+        conn.execute("delete from files_dir where filename = ?1", params![hash])?;
       }
     }
     None => (),
