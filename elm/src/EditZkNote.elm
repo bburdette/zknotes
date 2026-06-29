@@ -4128,8 +4128,13 @@ update noteCache msg model =
             ( mergeEditBlock model, None )
 
         NewBlock nbo ->
+            let
+                -- first mergeeditblock.
+                mergedmod =
+                    mergeEditBlock model
+            in
             case
-                EM.getBlocks model.edMarkdown
+                EM.getBlocks mergedmod.edMarkdown
                     |> Result.andThen
                         (\blks ->
                             EM.updateBlocks
@@ -4144,7 +4149,7 @@ update noteCache msg model =
                         )
             of
                 Ok ( blen, em ) ->
-                    ( { model
+                    ( { mergedmod
                         | edMarkdown = em
                         , blockEdit =
                             Just <|
