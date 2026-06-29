@@ -148,15 +148,12 @@ type Msg
     | SplitBlock
     | JoinBlock
     | SpaceEndingsBlock
-    | DuplicateBlock
-    | InsertAboveBlock
-    | InsertBelowBlock
     | JoinAboveBlock
     | JoinBelowBlock
     | EditBlock Int
     | EditBlockInput String
     | EditBlockOk
-    | NewBlock NewBlockOption
+    | NewBlock
     | EditBlockMsg Int MG.Msg
     | MakeList
     | SNGMsg SNG.Msg
@@ -170,11 +167,6 @@ type Msg
     | ShowDeets Bool
     | TTMsg (TT.Msg Msg)
     | Noop
-
-
-type NewBlockOption
-    = NboTop
-    | NboBottom
 
 
 type DocumentTab
@@ -1316,19 +1308,7 @@ blockEd (Text t) renderer =
         ([ E.row [ E.width E.fill, EE.onClick EditBlockOk ]
             [ headingText "rendered: "
             , E.wrappedRow (E.alignTop :: MG.rowtrib)
-                [ EI.button (edButtonStyle DuplicateBlock ++ [ E.alignRight ])
-                    { onPress = Nothing
-                    , label = E.text "⧉"
-                    }
-                , EI.button (edButtonStyle InsertAboveBlock ++ [ E.alignRight ])
-                    { onPress = Nothing
-                    , label = E.text "+ ↑"
-                    }
-                , EI.button (edButtonStyle InsertBelowBlock ++ [ E.alignRight ])
-                    { onPress = Nothing
-                    , label = E.text "+ ↓"
-                    }
-                , if t.original /= t.s then
+                [ if t.original /= t.s then
                     EI.button (edButtonStyle RevertBlock ++ [ E.alignRight ])
                         { onPress = Nothing
                         , label = E.text "revert"
@@ -1434,10 +1414,6 @@ renderBlocks mobile zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo drop
             blocks
     of
         Ok rendered ->
-            let
-                rempty =
-                    List.isEmpty rendered
-            in
             E.column
                 ((if isdirty then
                     [ EBd.glow TC.darkYellow 3 ]
@@ -1445,107 +1421,86 @@ renderBlocks mobile zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo drop
                   else
                     []
                  )
+                    ++ (if List.isEmpty rendered then
+                            [ EE.onClick NewBlock ]
+
+                        else
+                            []
+                       )
                     ++ [ E.spacing 3
                        , case vm of
                             MC.PublicView ->
                                 E.padding 20
 
                             MC.EditView ->
-                                E.paddingEach { top = 2, right = 2, bottom = 2, left = 2 }
+                                E.paddingEach { top = 20, right = 2, bottom = 20, left = 2 }
                        , E.width (E.fill |> E.maximum 1000)
                        , E.centerX
                        , E.alignTop
                        , EBk.color TC.lightGrey
                        ]
                 )
-                (E.row
-                    [ E.width (E.fill |> E.maximum 1000)
-                    , E.centerX
-                    , E.alignTop
-                    , EBk.color TC.lightGrey
-                    , EE.onClick (NewBlock NboTop)
-                    ]
-                    [ E.el
-                        [ E.centerX, EF.color TC.darkGrey ]
-                        (E.text "+")
-                    ]
-                    :: List.indexedMap
-                        (\i ( b, r ) ->
-                            case vm of
-                                MC.PublicView ->
-                                    r
+                (List.indexedMap
+                    (\i ( b, r ) ->
+                        case vm of
+                            MC.PublicView ->
+                                r
 
-                                MC.EditView ->
-                                    let
-                                        mbeb =
-                                            mbblockedit
-                                                |> Maybe.andThen
-                                                    (\(Text t) ->
-                                                        if t.idx == i then
-                                                            Just <| blockEd (Text t) renderer
+                            MC.EditView ->
+                                let
+                                    mbeb =
+                                        mbblockedit
+                                            |> Maybe.andThen
+                                                (\(Text t) ->
+                                                    if t.idx == i then
+                                                        Just <| blockEd (Text t) renderer
 
-                                                        else
-                                                            Nothing
-                                                    )
-                                    in
-                                    editBlock mobile
-                                        (let
-                                            nm =
-                                                case mbblockedit of
-                                                    Nothing ->
-                                                        case mbinfo of
-                                                            Nothing ->
-                                                                Drag
-
-                                                            Just { dragIndex, dropIndex } ->
-                                                                if i == dragIndex then
-                                                                    Ghost
-
-                                                                else if i == dropIndex then
-                                                                    DropH
-
-                                                                else
-                                                                    Drop
-
-                                                    Just (Text t) ->
-                                                        if t.idx == i then
-                                                            DDWBlockEdit
-
-                                                        else
-                                                            Inactive
-                                         in
-                                         if droplinkmode then
-                                            case getBlockNoteId b of
-                                                Just _ ->
-                                                    nm
-
+                                                    else
+                                                        Nothing
+                                                )
+                                in
+                                editBlock mobile
+                                    (let
+                                        nm =
+                                            case mbblockedit of
                                                 Nothing ->
-                                                    Inactive
+                                                    case mbinfo of
+                                                        Nothing ->
+                                                            Drag
 
-                                         else
-                                            nm
-                                        )
-                                        i
-                                        (mbeb |> Maybe.map (always True) |> Maybe.withDefault False)
-                                        (mbeb |> Maybe.withDefault r)
-                        )
-                        (List.map2 (\l r -> ( l, r )) blocks rendered)
-                    ++ [ if rempty then
-                            E.none
+                                                        Just { dragIndex, dropIndex } ->
+                                                            if i == dragIndex then
+                                                                Ghost
 
-                         else
-                            E.row
-                                [ E.width (E.fill |> E.maximum 1000)
-                                , E.centerX
-                                , E.alignTop
-                                , EBk.color TC.lightGrey
-                                , EE.onClick (NewBlock NboBottom)
-                                ]
-                                [ E.el
-                                    [ E.centerX, EF.color TC.darkGrey ]
-                                    (E.text "+")
-                                ]
-                       ]
+                                                            else if i == dropIndex then
+                                                                DropH
+
+                                                            else
+                                                                Drop
+
+                                                Just (Text t) ->
+                                                    if t.idx == i then
+                                                        DDWBlockEdit
+
+                                                    else
+                                                        Inactive
+                                     in
+                                     if droplinkmode then
+                                        case getBlockNoteId b of
+                                            Just _ ->
+                                                nm
+
+                                            Nothing ->
+                                                Inactive
+
+                                     else
+                                        nm
+                                    )
+                                    i
+                                    (mbeb |> Maybe.map (always True) |> Maybe.withDefault False)
+                                    (mbeb |> Maybe.withDefault r)
+                    )
+                    (List.map2 (\l r -> ( l, r )) blocks rendered)
                 )
 
         Err errors ->
@@ -2210,6 +2165,10 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                                     Nothing
                             , label = E.text "list"
                             }
+                        , EI.button Common.buttonStyle
+                            { onPress = Just NewBlock
+                            , label = E.text "+"
+                            }
                         ]
                     ]
                 , case ( model.filestatus, toZkNote model ) of
@@ -2441,6 +2400,7 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                                                 DtEdit ->
                                                     showLinks TC.white
 
+                                                -- editview
                                                 DtComments ->
                                                     E.column [ E.width E.fill, E.spacing 5 ] showComments
 
@@ -2669,9 +2629,11 @@ tabsOnLoad model =
                 DtEdit ->
                     EtEdit
 
+                -- TODO fix
                 DtComments ->
                     EtComments
 
+                -- TODO fix
                 DtLinks ->
                     EtLinks
     }
@@ -3239,43 +3201,6 @@ onWkKeyPress noteCache key model =
 
         _ ->
             ( model, None )
-
-
-insertAboveBlock model idx nbl =
-    EM.getBlocks model.edMarkdown
-        |> Result.toMaybe
-        |> Maybe.andThen
-            (\blocks ->
-                (List.take idx blocks
-                    ++ (MB.Paragraph []
-                            :: List.drop idx blocks
-                       )
-                )
-                    |> (\blks ->
-                            EM.updateBlocks blks
-                                |> Result.toMaybe
-                       )
-                    |> Maybe.map
-                        (\db ->
-                            Markdown.Renderer.render EM.stringRenderer nbl
-                                |> Result.toMaybe
-                                |> Maybe.map
-                                    (\ls ->
-                                        let
-                                            nbe =
-                                                Text
-                                                    { idx = idx
-                                                    , s = String.trim <| String.concat ls
-                                                    , b = nbl
-                                                    , original = ""
-                                                    }
-                                        in
-                                        ( { model | blockEdit = Just nbe, edMarkdown = db }, None )
-                                    )
-                                |> Maybe.withDefault ( model, None )
-                        )
-            )
-        |> Maybe.withDefault ( model, None )
 
 
 update : NoteCache -> Msg -> Model -> ( Model, Command )
@@ -3990,33 +3915,7 @@ update noteCache msg model =
                 Nothing ->
                     ( model, None )
 
-        DuplicateBlock ->
-            let
-                mergedmod =
-                    mergeEditBlock model
-            in
-            case model.blockEdit of
-                Just (Text be) ->
-                    insertAboveBlock mergedmod be.idx be.b
-
-                Nothing ->
-                    ( model, None )
-
-        InsertAboveBlock ->
-            let
-                    mergeEditBlock model
-            in
-            case model.blockEdit of
-                    insertAboveBlock mergedmod be.idx [ MB.Paragraph [ MB.Text "" ] ]
-
-                Nothing ->
-            let
-                    mergeEditBlock model
-            in
-            case model.blockEdit of
-                    insertAboveBlock mergedmod (be.idx + 1) [ MB.Paragraph [ MB.Text "" ] ]
-
-                Nothing ->
+        JoinAboveBlock ->
             case model.blockEdit of
                 Just (Text be) ->
                     EM.getBlocks model.edMarkdown
@@ -4202,43 +4101,19 @@ update noteCache msg model =
         EditBlockOk ->
             ( mergeEditBlock model, None )
 
-        NewBlock nbo ->
-            let
-                mergedmod =
-                    mergeEditBlock model
-            in
+        NewBlock ->
             case
-                EM.getBlocks mergedmod.edMarkdown
+                EM.getBlocks model.edMarkdown
                     |> Result.andThen
                         (\blks ->
-                            EM.updateBlocks
-                                (case nbo of
-                                    NboTop ->
-                                        MB.Paragraph [ MB.Text "" ] :: blks
-
-                                    NboBottom ->
-                                        blks ++ [ MB.Paragraph [ MB.Text "" ] ]
-                                )
+                            EM.updateBlocks (MB.Paragraph [ MB.Text "" ] :: blks)
                                 |> Result.map (\em -> ( List.length blks, em ))
                         )
             of
-                Ok ( blen, em ) ->
-                    ( { mergedmod
+                Ok ( _, em ) ->
+                    ( { model
                         | edMarkdown = em
-                        , blockEdit =
-                            Just <|
-                                Text
-                                    { idx =
-                                        case nbo of
-                                            NboTop ->
-                                                0
-
-                                            NboBottom ->
-                                                blen
-                                    , s = ""
-                                    , b = [ Paragraph [] ]
-                                    , original = ""
-                                    }
+                        , blockEdit = Just <| Text { idx = 0, s = "", b = [ Paragraph [] ], original = "" }
                       }
                     , None
                     )
