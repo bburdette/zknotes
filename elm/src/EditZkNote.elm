@@ -3249,29 +3249,17 @@ insertAboveBlock model idx nbl =
         |> Result.toMaybe
         |> Maybe.andThen
             (\blocks ->
-                let
-                    _ =
-                        Debug.log "0 idx=" (String.fromInt idx)
-                in
                 (List.take idx blocks
                     ++ (MB.Paragraph []
                             :: List.drop idx blocks
                        )
                 )
                     |> (\blks ->
-                            let
-                                _ =
-                                    Debug.log "a" ""
-                            in
                             EM.updateBlocks blks
                                 |> Result.toMaybe
                        )
                     |> Maybe.map
                         (\db ->
-                            let
-                                _ =
-                                    Debug.log "b" ""
-                            in
                             Markdown.Renderer.render EM.stringRenderer nbl
                                 |> Result.toMaybe
                                 |> Maybe.map
@@ -4033,9 +4021,6 @@ update noteCache msg model =
 
         InsertBelowBlock ->
             let
-                _ =
-                    Debug.log "blah" ""
-
                 -- first mergeeditblock.
                 mergedmod =
                     mergeEditBlock model
