@@ -3244,7 +3244,7 @@ onWkKeyPress noteCache key model =
             ( model, None )
 
 
-insertAboveBlock model idx nb =
+insertAboveBlock model idx nbl =
     EM.getBlocks model.edMarkdown
         |> Result.toMaybe
         |> Maybe.andThen
@@ -3254,7 +3254,7 @@ insertAboveBlock model idx nb =
                         Debug.log "0 idx=" (String.fromInt idx)
                 in
                 (List.take idx blocks
-                    ++ (nb
+                    ++ (MB.Paragraph []
                             :: List.drop idx blocks
                        )
                 )
@@ -3272,21 +3272,16 @@ insertAboveBlock model idx nb =
                                 _ =
                                     Debug.log "b" ""
                             in
-                            List.drop idx blocks
-                                |> List.head
-                                |> Maybe.andThen
-                                    (\lb ->
-                                        Markdown.Renderer.render EM.stringRenderer [ lb ]
-                                            |> Result.toMaybe
-                                    )
+                            Markdown.Renderer.render EM.stringRenderer nbl
+                                |> Result.toMaybe
                                 |> Maybe.map
                                     (\ls ->
                                         let
                                             nbe =
                                                 Text
                                                     { idx = idx
-                                                    , s = ""
-                                                    , b = [ nb ]
+                                                    , s = String.trim <| String.concat ls
+                                                    , b = nbl
                                                     , original = ""
                                                     }
                                         in
@@ -3296,71 +3291,6 @@ insertAboveBlock model idx nb =
                         )
             )
         |> Maybe.withDefault ( model, None )
-
-
-
--- let
---     _ =
---         Debug.log "blah" ""
---     -- first mergeeditblock.
---     mergedmod =
---         mergeEditBlock model
--- in
--- case model.blockEdit of
---     Just (Text be) ->
---         EM.getBlocks mergedmod.edMarkdown
---             |> Result.toMaybe
---             |> Maybe.andThen
---                 (\blocks ->
---                     let
---                         _ =
---                             Debug.log "0" ""
---                     in
---                     (List.take (be.idx - 1) blocks
---                         ++ (MB.Paragraph [ MB.Text "" ]
---                                 :: List.drop (be.idx - 1) blocks
---                            )
---                     )
---                         |> (\blks ->
---                                 let
---                                     _ =
---                                         Debug.log "a" ""
---                                 in
---                                 EM.updateBlocks blks
---                                     |> Result.toMaybe
---                            )
---                         |> Maybe.map
---                             (\db ->
---                                 let
---                                     _ =
---                                         Debug.log "b" ""
---                                 in
---                                 List.drop (be.idx - 1) blocks
---                                     |> List.head
---                                     |> Maybe.andThen
---                                         (\lb ->
---                                             Markdown.Renderer.render EM.stringRenderer [ lb ]
---                                                 |> Result.toMaybe
---                                         )
---                                     |> Maybe.map
---                                         (\ls ->
---                                             let
---                                                 nbe =
---                                                     Text
---                                                         { idx = be.idx
---                                                         , s = ""
---                                                         , b = [ Paragraph [] ]
---                                                         , original = ""
---                                                         }
---                                             in
---                                             ( { mergedmod | blockEdit = Just nbe, edMarkdown = db }, None )
---                                         )
---                                     |> Maybe.withDefault ( mergedmod, None )
---                             )
---                 )
---             |> Maybe.withDefault ( model, None )
---     Nothing ->
---         ( model, None )
 
 
 update : NoteCache -> Msg -> Model -> ( Model, Command )
@@ -4083,7 +4013,7 @@ update noteCache msg model =
             in
             case model.blockEdit of
                 Just (Text be) ->
-                    insertAboveBlock mergedmod be.idx (MB.Paragraph [ MB.Text "" ])
+                    insertAboveBlock mergedmod be.idx be.b
 
                 Nothing ->
                     ( model, None )
@@ -4096,7 +4026,7 @@ update noteCache msg model =
             in
             case model.blockEdit of
                 Just (Text be) ->
-                    insertAboveBlock mergedmod be.idx (MB.Paragraph [ MB.Text "" ])
+                    insertAboveBlock mergedmod be.idx [ MB.Paragraph [ MB.Text "" ] ]
 
                 Nothing ->
                     ( model, None )
@@ -4112,7 +4042,7 @@ update noteCache msg model =
             in
             case model.blockEdit of
                 Just (Text be) ->
-                    insertAboveBlock mergedmod (be.idx + 1) (MB.Paragraph [ MB.Text "" ])
+                    insertAboveBlock mergedmod (be.idx + 1) [ MB.Paragraph [ MB.Text "" ] ]
 
                 Nothing ->
                     ( model, None )
