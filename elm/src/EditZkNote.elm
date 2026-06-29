@@ -2441,7 +2441,6 @@ zknview stylePalette zone size spmodel zknSearchResult recentZkns trqs tjobs not
                                                 DtEdit ->
                                                     showLinks TC.white
 
-                                                -- editview
                                                 DtComments ->
                                                     E.column [ E.width E.fill, E.spacing 5 ] showComments
 
@@ -2670,11 +2669,9 @@ tabsOnLoad model =
                 DtEdit ->
                     EtEdit
 
-                -- TODO fix
                 DtComments ->
                     EtComments
 
-                -- TODO fix
                 DtLinks ->
                     EtLinks
     }
@@ -3995,7 +3992,6 @@ update noteCache msg model =
 
         DuplicateBlock ->
             let
-                -- first mergeeditblock.
                 mergedmod =
                     mergeEditBlock model
             in
@@ -4008,31 +4004,19 @@ update noteCache msg model =
 
         InsertAboveBlock ->
             let
-                -- first mergeeditblock.
-                mergedmod =
                     mergeEditBlock model
             in
             case model.blockEdit of
-                Just (Text be) ->
                     insertAboveBlock mergedmod be.idx [ MB.Paragraph [ MB.Text "" ] ]
 
                 Nothing ->
-                    ( model, None )
-
-        InsertBelowBlock ->
             let
-                -- first mergeeditblock.
-                mergedmod =
                     mergeEditBlock model
             in
             case model.blockEdit of
-                Just (Text be) ->
                     insertAboveBlock mergedmod (be.idx + 1) [ MB.Paragraph [ MB.Text "" ] ]
 
                 Nothing ->
-                    ( model, None )
-
-        JoinAboveBlock ->
             case model.blockEdit of
                 Just (Text be) ->
                     EM.getBlocks model.edMarkdown
@@ -4220,7 +4204,6 @@ update noteCache msg model =
 
         NewBlock nbo ->
             let
-                -- first mergeeditblock.
                 mergedmod =
                     mergeEditBlock model
             in
