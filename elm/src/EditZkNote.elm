@@ -3995,7 +3995,6 @@ update noteCache msg model =
 
         DuplicateBlock ->
             let
-                -- first mergeeditblock.
                 mergedmod =
                     mergeEditBlock model
             in
@@ -4008,7 +4007,6 @@ update noteCache msg model =
 
         InsertAboveBlock ->
             let
-                -- first mergeeditblock.
                 mergedmod =
                     mergeEditBlock model
             in
@@ -4021,7 +4019,6 @@ update noteCache msg model =
 
         InsertBelowBlock ->
             let
-                -- first mergeeditblock.
                 mergedmod =
                     mergeEditBlock model
             in
@@ -4220,7 +4217,6 @@ update noteCache msg model =
 
         NewBlock nbo ->
             let
-                -- first mergeeditblock.
                 mergedmod =
                     mergeEditBlock model
             in
