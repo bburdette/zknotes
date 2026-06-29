@@ -148,6 +148,9 @@ type Msg
     | SplitBlock
     | JoinBlock
     | SpaceEndingsBlock
+    | DuplicateBlock
+    | InsertAboveBlock
+    | InsertBelowBlock
     | JoinAboveBlock
     | JoinBelowBlock
     | EditBlock Int
@@ -1313,7 +1316,19 @@ blockEd (Text t) renderer =
         ([ E.row [ E.width E.fill, EE.onClick EditBlockOk ]
             [ headingText "rendered: "
             , E.wrappedRow (E.alignTop :: MG.rowtrib)
-                [ if t.original /= t.s then
+                [ EI.button (edButtonStyle DuplicateBlock ++ [ E.alignRight ])
+                    { onPress = Nothing
+                    , label = E.text "⧉"
+                    }
+                , EI.button (edButtonStyle InsertAboveBlock ++ [ E.alignRight ])
+                    { onPress = Nothing
+                    , label = E.text "+ ↑"
+                    }
+                , EI.button (edButtonStyle InsertBelowBlock ++ [ E.alignRight ])
+                    { onPress = Nothing
+                    , label = E.text "+ ↓"
+                    }
+                , if t.original /= t.s then
                     EI.button (edButtonStyle RevertBlock ++ [ E.alignRight ])
                         { onPress = Nothing
                         , label = E.text "revert"
@@ -1419,6 +1434,10 @@ renderBlocks mobile zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo drop
             blocks
     of
         Ok rendered ->
+            let
+                rempty =
+                    List.isEmpty rendered
+            in
             E.column
                 ((if isdirty then
                     [ EBd.glow TC.darkYellow 3 ]
@@ -1426,19 +1445,13 @@ renderBlocks mobile zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo drop
                   else
                     []
                  )
-                    ++ (if List.isEmpty rendered then
-                            [ EE.onClick (NewBlock NboTop) ]
-
-                        else
-                            []
-                       )
                     ++ [ E.spacing 3
                        , case vm of
                             MC.PublicView ->
                                 E.padding 20
 
                             MC.EditView ->
-                                E.paddingEach { top = 20, right = 2, bottom = 20, left = 2 }
+                                E.paddingEach { top = 2, right = 2, bottom = 2, left = 2 }
                        , E.width (E.fill |> E.maximum 1000)
                        , E.centerX
                        , E.alignTop
@@ -1450,12 +1463,11 @@ renderBlocks mobile zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo drop
                     , E.centerX
                     , E.alignTop
                     , EBk.color TC.lightGrey
+                    , EE.onClick (NewBlock NboTop)
                     ]
-                    [ EI.button
-                        (E.centerX :: Common.buttonStyle)
-                        { onPress = Just (NewBlock NboTop)
-                        , label = E.text "+"
-                        }
+                    [ E.el
+                        [ E.centerX, EF.color TC.darkGrey ]
+                        (E.text "+")
                     ]
                     :: List.indexedMap
                         (\i ( b, r ) ->
@@ -1518,18 +1530,21 @@ renderBlocks mobile zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo drop
                                         (mbeb |> Maybe.withDefault r)
                         )
                         (List.map2 (\l r -> ( l, r )) blocks rendered)
-                    ++ [ E.row
-                            [ E.width (E.fill |> E.maximum 1000)
-                            , E.centerX
-                            , E.alignTop
-                            , EBk.color TC.lightGrey
-                            ]
-                            [ EI.button
-                                (E.centerX :: Common.buttonStyle)
-                                { onPress = Just (NewBlock NboBottom)
-                                , label = E.text "+"
-                                }
-                            ]
+                    ++ [ if rempty then
+                            E.none
+
+                         else
+                            E.row
+                                [ E.width (E.fill |> E.maximum 1000)
+                                , E.centerX
+                                , E.alignTop
+                                , EBk.color TC.lightGrey
+                                , EE.onClick (NewBlock NboBottom)
+                                ]
+                                [ E.el
+                                    [ E.centerX, EF.color TC.darkGrey ]
+                                    (E.text "+")
+                                ]
                        ]
                 )
 
@@ -3229,6 +3244,125 @@ onWkKeyPress noteCache key model =
             ( model, None )
 
 
+insertAboveBlock model idx nb =
+    EM.getBlocks model.edMarkdown
+        |> Result.toMaybe
+        |> Maybe.andThen
+            (\blocks ->
+                let
+                    _ =
+                        Debug.log "0 idx=" (String.fromInt idx)
+                in
+                (List.take idx blocks
+                    ++ (nb
+                            :: List.drop idx blocks
+                       )
+                )
+                    |> (\blks ->
+                            let
+                                _ =
+                                    Debug.log "a" ""
+                            in
+                            EM.updateBlocks blks
+                                |> Result.toMaybe
+                       )
+                    |> Maybe.map
+                        (\db ->
+                            let
+                                _ =
+                                    Debug.log "b" ""
+                            in
+                            List.drop idx blocks
+                                |> List.head
+                                |> Maybe.andThen
+                                    (\lb ->
+                                        Markdown.Renderer.render EM.stringRenderer [ lb ]
+                                            |> Result.toMaybe
+                                    )
+                                |> Maybe.map
+                                    (\ls ->
+                                        let
+                                            nbe =
+                                                Text
+                                                    { idx = idx
+                                                    , s = ""
+                                                    , b = [ nb ]
+                                                    , original = ""
+                                                    }
+                                        in
+                                        ( { model | blockEdit = Just nbe, edMarkdown = db }, None )
+                                    )
+                                |> Maybe.withDefault ( model, None )
+                        )
+            )
+        |> Maybe.withDefault ( model, None )
+
+
+
+-- let
+--     _ =
+--         Debug.log "blah" ""
+--     -- first mergeeditblock.
+--     mergedmod =
+--         mergeEditBlock model
+-- in
+-- case model.blockEdit of
+--     Just (Text be) ->
+--         EM.getBlocks mergedmod.edMarkdown
+--             |> Result.toMaybe
+--             |> Maybe.andThen
+--                 (\blocks ->
+--                     let
+--                         _ =
+--                             Debug.log "0" ""
+--                     in
+--                     (List.take (be.idx - 1) blocks
+--                         ++ (MB.Paragraph [ MB.Text "" ]
+--                                 :: List.drop (be.idx - 1) blocks
+--                            )
+--                     )
+--                         |> (\blks ->
+--                                 let
+--                                     _ =
+--                                         Debug.log "a" ""
+--                                 in
+--                                 EM.updateBlocks blks
+--                                     |> Result.toMaybe
+--                            )
+--                         |> Maybe.map
+--                             (\db ->
+--                                 let
+--                                     _ =
+--                                         Debug.log "b" ""
+--                                 in
+--                                 List.drop (be.idx - 1) blocks
+--                                     |> List.head
+--                                     |> Maybe.andThen
+--                                         (\lb ->
+--                                             Markdown.Renderer.render EM.stringRenderer [ lb ]
+--                                                 |> Result.toMaybe
+--                                         )
+--                                     |> Maybe.map
+--                                         (\ls ->
+--                                             let
+--                                                 nbe =
+--                                                     Text
+--                                                         { idx = be.idx
+--                                                         , s = ""
+--                                                         , b = [ Paragraph [] ]
+--                                                         , original = ""
+--                                                         }
+--                                             in
+--                                             ( { mergedmod | blockEdit = Just nbe, edMarkdown = db }, None )
+--                                         )
+--                                     |> Maybe.withDefault ( mergedmod, None )
+--                             )
+--                 )
+--             |> Maybe.withDefault ( model, None )
+--     Nothing ->
+--         ( model, None )
+
+
 update : NoteCache -> Msg -> Model -> ( Model, Command )
 update noteCache msg model =
     case msg of
@@ -3937,6 +4071,48 @@ update noteCache msg model =
                                 (Text t)
                     in
                     ( { model | blockEdit = Just be }, None )
+
+                Nothing ->
+                    ( model, None )
+
+        DuplicateBlock ->
+            let
+                -- first mergeeditblock.
+                mergedmod =
+                    mergeEditBlock model
+            in
+            case model.blockEdit of
+                Just (Text be) ->
+                    insertAboveBlock mergedmod be.idx (MB.Paragraph [ MB.Text "" ])
+
+                Nothing ->
+                    ( model, None )
+
+        InsertAboveBlock ->
+            let
+                -- first mergeeditblock.
+                mergedmod =
+                    mergeEditBlock model
+            in
+            case model.blockEdit of
+                Just (Text be) ->
+                    insertAboveBlock mergedmod be.idx (MB.Paragraph [ MB.Text "" ])
+
+                Nothing ->
+                    ( model, None )
+
+        InsertBelowBlock ->
+            let
+                _ =
+                    Debug.log "blah" ""
+
+                -- first mergeeditblock.
+                mergedmod =
+                    mergeEditBlock model
+            in
+            case model.blockEdit of
+                Just (Text be) ->
+                    insertAboveBlock mergedmod (be.idx + 1) (MB.Paragraph [ MB.Text "" ])
 
                 Nothing ->
                     ( model, None )
