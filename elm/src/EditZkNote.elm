@@ -1313,59 +1313,57 @@ blockEd (Text t) renderer =
         [ E.width E.fill
         , E.spacing 8
         ]
-        ([ E.row [ E.width E.fill, EE.onClick EditBlockOk ]
-            [ headingText "rendered: "
-            , E.wrappedRow (E.alignTop :: MG.rowtrib)
-                [ EI.button (edButtonStyle DuplicateBlock ++ [ E.alignRight ])
+        ([ E.wrappedRow (E.alignTop :: MG.rowtrib)
+            [ if t.original /= t.s then
+                EI.button (edButtonStyle RevertBlock ++ [ E.alignRight ])
                     { onPress = Nothing
-                    , label = E.text "⧉"
+                    , label = E.text "revert"
                     }
-                , EI.button (edButtonStyle InsertAboveBlock ++ [ E.alignRight ])
-                    { onPress = Nothing
-                    , label = E.text "+ ↑"
-                    }
-                , EI.button (edButtonStyle InsertBelowBlock ++ [ E.alignRight ])
-                    { onPress = Nothing
-                    , label = E.text "+ ↓"
-                    }
-                , if t.original /= t.s then
-                    EI.button (edButtonStyle RevertBlock ++ [ E.alignRight ])
-                        { onPress = Nothing
-                        , label = E.text "revert"
-                        }
 
-                  else
-                    E.none
-                , if t.idx > 0 then
-                    EI.button (edButtonStyle JoinAboveBlock ++ [ E.alignRight ])
-                        { onPress = Nothing
-                        , label = E.text "join ↑"
-                        }
+              else
+                E.none
+            , EI.button (edButtonStyle DuplicateBlock ++ [ E.alignRight ])
+                { onPress = Nothing
+                , label = E.text "⧉"
+                }
+            , EI.button (edButtonStyle InsertAboveBlock ++ [ E.alignRight ])
+                { onPress = Nothing
+                , label = E.text "+ ↑"
+                }
+            , EI.button (edButtonStyle InsertBelowBlock ++ [ E.alignRight ])
+                { onPress = Nothing
+                , label = E.text "+ ↓"
+                }
+            , if t.idx > 0 then
+                EI.button (edButtonStyle JoinAboveBlock ++ [ E.alignRight ])
+                    { onPress = Nothing
+                    , label = E.text "join ↑"
+                    }
 
-                  else
-                    E.none
-                , EI.button (edButtonStyle JoinBelowBlock ++ [ E.alignRight ])
-                    { onPress = Nothing
-                    , label = E.text "join ↓"
-                    }
-                , EI.button (edButtonStyle JoinBlock ++ [ E.alignRight ])
-                    { onPress = Nothing
-                    , label = E.text "join"
-                    }
-                , EI.button (edButtonStyle SplitBlock ++ [ E.alignRight ])
-                    { onPress = Nothing
-                    , label = E.text "split"
-                    }
-                , EI.button (edButtonStyle SpaceEndingsBlock ++ [ E.alignRight ])
-                    { onPress = Nothing
-                    , label = E.text "endings"
-                    }
-                , EI.button (edButtonStyle (RemoveBlock t.idx) ++ [ E.alignRight ])
-                    { onPress = Nothing
-                    , label = E.text "🗑"
-                    }
-                ]
+              else
+                E.none
+            , EI.button (edButtonStyle JoinBelowBlock ++ [ E.alignRight ])
+                { onPress = Nothing
+                , label = E.text "join ↓"
+                }
+            , EI.button (edButtonStyle JoinBlock ++ [ E.alignRight ])
+                { onPress = Nothing
+                , label = E.text "join"
+                }
+            , EI.button (edButtonStyle SplitBlock ++ [ E.alignRight ])
+                { onPress = Nothing
+                , label = E.text "split"
+                }
+            , EI.button (edButtonStyle SpaceEndingsBlock ++ [ E.alignRight ])
+                { onPress = Nothing
+                , label = E.text "endings"
+                }
+            , EI.button (edButtonStyle (RemoveBlock t.idx) ++ [ E.alignRight ])
+                { onPress = Nothing
+                , label = E.text "🗑"
+                }
             ]
+         , headingText "rendered: "
          , E.column
             [ E.padding 2
             , EBd.glow TC.darkGray 2
