@@ -65,6 +65,7 @@ import Url exposing (Url)
 import UserSettings
 import Util exposing (andMap)
 import View
+import WebSocket
 import WindowKeys
 import ZkCommon exposing (StylePalette)
 
@@ -93,6 +94,7 @@ type Msg
     | TauriAdminReplyData JD.Value
     | TauriPublicReplyData JD.Value
     | TauriTauriReplyData JD.Value
+    | ReceiveSocketMsg JD.Value
     | LoadUrl String
     | InternalUrl Url
     | TASelection JD.Value
@@ -174,6 +176,7 @@ decodeFlags =
         |> andMap (JD.field "login" (JD.maybe DataUtil.decodeLoginData))
         |> andMap (JD.field "adminsettings" OD.adminSettingsDecoder)
         |> andMap (JD.field "tauri" JD.bool)
+        |> andMap (JD.field "websockets" JD.bool)
         |> andMap (JD.field "mobile" JD.bool)
 
 
@@ -189,6 +192,7 @@ type alias Flags =
     , login : Maybe DataUtil.LoginData
     , adminsettings : OD.AdminSettings
     , tauri : Bool
+    , websockets : Bool
     , mobile : Bool
     }
 
@@ -869,6 +873,12 @@ showMessage msg =
         TauriTauriReplyData _ ->
             "TauriTauriReplyData"
 
+        ReceiveSocketMsg _ ->
+            "ReceiveSocketMsg"
+
+        SelectDialogMsg _ ->
+            "SelectDialogMsg"
+
         SelectDialogMsg _ ->
             "SelectDialogMsg"
 
@@ -1380,6 +1390,9 @@ sendZIMsg : FileUrlInfo -> Data.PrivateRequest -> Cmd Msg
 sendZIMsg fui msg =
     if fui.tauri then
         sendZIMsgTauri <| PrivateClosureRequest Nothing msg
+
+    else if fui.websockets then
+        sendSocketCommand (WebSocket.encodeCmd <| WebSocket.Send { name = "private", content = JE.encode 2 (Data.privateRequestEncoder msg) })
 
     else
         HE.postJsonTask
@@ -5223,6 +5236,7 @@ init flags url key zone fontsize =
                 { location = flags.location
                 , filelocation = flags.filelocation
                 , tauri = flags.tauri
+                , websockets = flags.websockets
                 }
             , navkey = key
             , seed = seed
@@ -5270,6 +5284,24 @@ init flags url key zone fontsize =
                     , { key = "l", ctrl = True, alt = True, shift = False, preventDefault = True }
                     ]
 
+        opensock =
+            if flags.websockets then
+                sendSocketCommand
+                    (WebSocket.encodeCmd <|
+                        WebSocket.Connect
+                            { name = "private"
+                            , address =
+                                flags.location
+                                    -- |> String.replace "https" "ws"
+                                    |> String.replace "http" "ws"
+                                    |> (\s -> s ++ "/privatews")
+                            , protocol = ""
+                            }
+                    )
+
+            else
+                Cmd.none
+
         ( m, c ) =
             initToRoute imodel imodel.initialRoute
     in
@@ -5278,6 +5310,7 @@ init flags url key zone fontsize =
         [ c
         , geterrornote
         , setkeys
+        , opensock
         ]
     )
 
@@ -5349,6 +5382,7 @@ main =
                     , receiveUITauriResponse TauriUserReplyData
                     , receivePITauriResponse TauriPublicReplyData
                     , receiveTITauriResponse TauriTauriReplyData
+                    , receiveSocketMsg ReceiveSocketMsg
                     ]
                         ++ rdysubs
         , onUrlRequest = urlRequest
@@ -5412,3 +5446,9 @@ port sendKeyCommand : JE.Value -> Cmd msg
 skcommand : WindowKeys.WindowKeyCmd -> Cmd Msg
 skcommand =
     WindowKeys.send sendKeyCommand
+
+
+port receiveSocketMsg : (JD.Value -> msg) -> Sub msg
+
+
+port sendSocketCommand : JE.Value -> Cmd msg

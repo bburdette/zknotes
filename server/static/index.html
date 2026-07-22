@@ -1,96 +1,157 @@
 <!DOCTYPE HTML>
 <html>
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width">
-    <style>html,head,body { padding:0; margin:0; } 
-      body { font-family: mono, calibri, helvetica, arial, sans-serif; background-color:#EEEEEC; }</style>
-    <script src="/static/main.js"></script>
-    <script src="/static/localvals.js"></script>
-    <script src="/static/windowkey.js"></script>
-  </head>
-  <body>
-    <div id="elm"></div> 
-    <script type="text/javascript">
-      function getTASelection(request) {
-          var range = { text: "", offset: null };
-          var activeEl = document.getElementById(request.id);
-          var activeElTagName = activeEl ? activeEl.tagName.toLowerCase() : null;
-          if (
-            (activeElTagName == "textarea") || (activeElTagName == "input" &&
-            /^(?:text|search|password|tel|url)$/i.test(activeEl.type)) &&
-            (typeof activeEl.selectionStart == "number")
-          ) {
-              range.text = activeEl.value.slice(activeEl.selectionStart, activeEl.selectionEnd);
-              range.offset = activeEl.selectionStart;
-              range.what = request.what;
-              app.ports.receiveTASelection.send(range);
-          }
-          else {
-              var error = { what: request.what };
-              app.ports.receiveTAError.send(error);
-          }
-      }
-
-      function setTASelection(request) {
-          var activeEl = document.getElementById(request.id);
-          var activeElTagName = activeEl ? activeEl.tagName.toLowerCase() : null;
-          if (
-            (activeElTagName == "textarea") || (activeElTagName == "input" &&
-            /^(?:text|search|password|tel|url)$/i.test(activeEl.type)) &&
-            (typeof activeEl.selectionStart == "number")
-          ) {
-              activeEl.setSelectionRange(request.offset, request.offset + request.length);
-              activeEl.focus();
-          }
-      }
-
-      login = {{logindata}};
-      errorid = {{errorid}};
-      adminsettings = {{adminsettings}};
-
-      if (login && login.data)
-      {
-        login.data = JSON.parse(login.data);
-      }
-
-      app = Elm.Main.init({
-        node: document.getElementById('elm'),
-        flags: { seed : Math.floor(Math.random()*0x0FFFFFFF), 
-                 location : document.location.origin || "", 
-                 filelocation: "",
-                 useragent : navigator.userAgent, 
-                 debugstring : "initial-info", 
-                 width : window.innerWidth, 
-                 height : window.innerHeight,
-                 errorid : errorid,
-                 login : login,
-                 tauri : false,
-                 mobile : false,
-                 adminsettings : adminsettings}});
-      // local storage
-      app.ports.storeLocalVal.subscribe(storeVal);
-      app.ports.getLocalVal.subscribe(getVal);
-      // app.ports.clearLocalStorage.subscribe(clearStorage);
-
-      // selected text
-      app.ports.getTASelection.subscribe(getTASelection);
-      app.ports.setTASelection.subscribe(setTASelection);
-      // keydown events
-      app.ports.sendKeyCommand.subscribe(sendKeyCommand);
-      window.addEventListener( "keydown", keycheck, false );
-
-      // DNDList
-      app.ports.releasePointerCapture.subscribe( event => {
-        event.target.releasePointerCapture(event.pointerId)
-      })
-      window.addEventListener("pointermove", (event) => {
-        app.ports.onPointerMove.send(event);
-      });
-      window.addEventListener("pointerup", (event) => {
-        app.ports.onPointerUp.send(event);
-      });
-
-    </script>
-  </body>
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width">
+		<style>html,head,body { padding:0; margin:0; }
+			body { font-family: mono, calibri, helvetica, arial, sans-serif; background-color:#EEEEEC; }</style>
+		<script src="/static/main.js"></script>
+		<script src="/static/localvals.js"></script>
+		<script src="/static/windowkey.js"></script>
+		<!-- <script src="/static/socket.js"></script> -->
+	</head>
+	<body>
+		<div id="elm"></div>
+		<script type="text/javascript">
+			function getTASelection(request) {
+				var range = { text: "", offset: null };
+				var activeEl = document.getElementById(request.id);
+				var activeElTagName = activeEl ? activeEl.tagName.toLowerCase() : null;
+				if (
+				(activeElTagName == "textarea") || (activeElTagName == "input" &&
+				/^(?:text|search|password|tel|url)$/i.test(activeEl.type)) &&
+				(typeof activeEl.selectionStart == "number")
+				) {
+					range.text = activeEl.value.slice(activeEl.selectionStart, activeEl.selectionEnd);
+					range.offset = activeEl.selectionStart;
+					range.what = request.what;
+					app.ports.receiveTASelection.send(range);
+				}
+				else {
+					var error = { what: request.what };
+					app.ports.receiveTAError.send(error);
+				}
+			}
+			
+			function setTASelection(request) {
+				var activeEl = document.getElementById(request.id);
+				var activeElTagName = activeEl ? activeEl.tagName.toLowerCase() : null;
+				if (
+				(activeElTagName == "textarea") || (activeElTagName == "input" &&
+				/^(?:text|search|password|tel|url)$/i.test(activeEl.type)) &&
+				(typeof activeEl.selectionStart == "number")
+				) {
+					activeEl.setSelectionRange(request.offset, request.offset + request.length);
+					activeEl.focus();
+				}
+			}
+			
+			login = {{logindata}};
+			errorid = {{errorid}};
+			adminsettings = {{adminsettings}};
+			
+			if (login && login.data)
+			{
+				login.data = JSON.parse(login.data);
+			}
+			
+			app = Elm.Main.init({
+				node: document.getElementById('elm'),
+				flags: { seed : Math.floor(Math.random()*0x0FFFFFFF),
+				location : document.location.origin || "",
+				filelocation: "",
+				useragent : navigator.userAgent,
+				debugstring : "initial-info",
+				width : window.innerWidth,
+				height : window.innerHeight,
+				errorid : errorid,
+				login : login,
+				tauri : false,
+				mobile : false,
+				websockets : true,
+				adminsettings : adminsettings}
+			}
+			);
+			// local storage
+			app.ports.storeLocalVal.subscribe(storeVal);
+			app.ports.getLocalVal.subscribe(getVal);
+			// app.ports.clearLocalStorage.subscribe(clearStorage);
+			
+			// selected text
+			app.ports.getTASelection.subscribe(getTASelection);
+			app.ports.setTASelection.subscribe(setTASelection);
+			// keydown events
+			app.ports.sendKeyCommand.subscribe(sendKeyCommand);
+			window.addEventListener( "keydown", keycheck, false );
+			
+			// DNDList
+			app.ports.releasePointerCapture.subscribe( event => {
+				event.target.releasePointerCapture(event.pointerId)
+			}
+			);
+			window.addEventListener("pointermove", (event) => {
+				app.ports.onPointerMove.send(event);
+			}
+			);
+			window.addEventListener("pointerup", (event) => {
+				app.ports.onPointerUp.send(event);
+			}
+			);
+			// websockets
+			app.ports.sendSocketCommand.subscribe(sendSocketCommand);
+			var mySockets = {};
+			var sockQueue = {};
+			
+			function sendSocketCommand(wat) {
+				console.log( "ssc: " +  JSON.stringify(wat, null, 4));
+				if (wat.cmd == "connect")
+				{
+					console.log("connecting!");
+					// let socket = new WebSocket(wat.address, wat.protocol);
+					let socket = new WebSocket(wat.address);
+					socket.onmessage = function (event) {
+						console.log( "onmessage: " +  JSON.stringify(event.data, null, 4));
+						app.ports.receiveSocketMsg.send({ name : wat.name
+						, msg : "data"
+						, data : event.data} );
+					}
+					socket.onopen = function (event) {
+						console.log( "onopen: " +  JSON.stringify(event.data, null, 4));
+						// send queued messages.
+						let sq = sockQueue[wat.name];
+						if (sq) {
+							for (let msg of sq) {
+								mySockets[wat.name].send(msg);
+							}
+							sockQueue[wat.name] = [];
+						}
+					}
+					mySockets[wat.name] = socket;
+				}
+				else if (wat.cmd == "send")
+				{
+					console.log("sending to socket: " + wat.name, mySockets[wat.name].readyState);
+					if (mySockets[wat.name].readyState) {
+						mySockets[wat.name].send(wat.content);
+						} else
+						{
+							console.log("queuing message", wat.name, wat.content);
+							let sq = sockQueue[wat.name];
+							if (sq) {
+								sq.push(wat.content);
+								} else {
+									sq = [wat.content];
+								}
+								sockQueue[wat.name] = sq;
+							}
+						}
+						else if (wat.cmd == "close")
+						{
+							console.log("closing socket: " + wat.name);
+							mySockets[wat.name].close();
+							delete mySockets[wat.name];
+						}
+					}
+		</script>
+	</body>
 </html>

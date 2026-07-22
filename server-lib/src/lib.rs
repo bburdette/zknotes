@@ -19,7 +19,7 @@ use actix_session::{
 use actix_web::{
   cookie::{self, Key},
   dev::Server,
-  rt, web, App, HttpRequest, HttpResponse, HttpServer, Result,
+  rt, web, App, HttpRequest, HttpResponse, HttpServer, ResponseError, Result,
 };
 use actix_ws::AggregatedMessage;
 use chrono;
@@ -436,6 +436,7 @@ async fn private_ws(
   req: HttpRequest,
   stream: web::Payload,
 ) -> Result<HttpResponse, zkerr::Error> {
+  info!("private_ws");
   let mut state = data.clone();
 
   let token = get_cookie_id(&req);
@@ -1037,7 +1038,7 @@ pub async fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
       .service(web::resource("/upload").route(web::post().to(receive_files)))
       .service(web::resource("/public").route(web::post().to(public)))
       .service(web::resource("/private").route(web::post().to(private)))
-      .service(web::resource("/privatews").route(web::post().to(private_ws)))
+      .service(web::resource("/privatews").route(web::get().to(private_ws)))
       .service(web::resource("/stream").route(web::post().to(private_streaming)))
       .service(web::resource("/upstream").route(web::post().to(private_upstreaming)))
       .service(web::resource("/user").route(web::post().to(user)))
