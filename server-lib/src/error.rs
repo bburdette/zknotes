@@ -1,5 +1,6 @@
 use actix_session;
 use actix_web::error as awe;
+use actix_web::ResponseError;
 use cookie;
 use girlboss;
 use regex;
@@ -48,6 +49,8 @@ pub fn annotate(e: Error, source: Error) -> Error {
 pub fn annotate_string(s: String, source: Error) -> Error {
   annotate(Error::String(s), source)
 }
+
+impl ResponseError for Error {}
 
 impl fmt::Display for AnnotatedE {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

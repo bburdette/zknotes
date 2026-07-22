@@ -19,11 +19,13 @@ use actix_session::{
 use actix_web::{
   cookie::{self, Key},
   dev::Server,
-  web, App, HttpRequest, HttpResponse, HttpServer, Result,
+  rt, web, App, HttpRequest, HttpResponse, HttpServer, Result,
 };
+use actix_ws::AggregatedMessage;
 use chrono;
 use clap::Arg;
 use config::Config;
+use futures_util::StreamExt as _;
 use futures_util::TryStreamExt as _;
 use girlboss::Girlboss;
 use interfaces::connect_and_make_lapin_info;
@@ -323,7 +325,7 @@ async fn receive_files(
   mut payload: Multipart,
   req: HttpRequest,
 ) -> HttpResponse {
-  let li = connect_and_make_lapin_info(config.get_ref(), get_cookie_id(&req)).await;
+  let li = connect_and_make_lapin_info(config.get_ref(), &get_cookie_id(&req)).await;
   match make_file_notes(session, &config, &li, &mut payload).await {
     Ok(r) => HttpResponse::Ok().json(r),
     Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
@@ -428,6 +430,82 @@ fn get_cookie_id(req: &HttpRequest) -> Option<String> {
   req.cookie("id").map(|c| c.value().to_string())
 }
 
+async fn private_ws(
+  session: Session,
+  data: web::Data<State>,
+  req: HttpRequest,
+  stream: web::Payload,
+) -> Result<HttpResponse, zkerr::Error> {
+  let mut state = data.clone();
+
+  let token = get_cookie_id(&req);
+
+  let (res, mut wssession, stream) = actix_ws::handle(&req, stream)?;
+
+  let mut stream = stream
+    .aggregate_continuations()
+    // aggregate continuation frames up to 1MiB
+    .max_continuation_size(2_usize.pow(20));
+
+  rt::spawn(async move {
+    while let Some(msg) = stream.next().await {
+      match async {
+        match msg {
+          Ok(AggregatedMessage::Text(t)) => {
+            let prq: PrivateRequest = serde_json::from_str(&t)?;
+
+            match zk_interface_check(&session, &mut state, &token, prq).await {
+              Ok(sr) => wssession.text(serde_json::to_string(&sr)?).await?,
+              Err(e) => {
+                error!("'private' err: {:?}", e);
+                wssession
+                  .text(serde_json::to_string(&PrivateReply::PvyServerError(
+                    PrivateError::PveString(e.to_string()),
+                  ))?)
+                  .await?;
+              }
+            }
+          }
+          Ok(AggregatedMessage::Binary(b)) => {
+            wssession.binary(b).await?;
+          }
+          Ok(AggregatedMessage::Ping(msg)) => {
+            wssession.pong(&msg).await?;
+          }
+          Ok(AggregatedMessage::Pong(msg)) => {
+            wssession.ping(&msg).await?; // ping?
+          }
+          Ok(AggregatedMessage::Close(_msg)) => {
+            // wssession.close(msg);
+            return Ok::<(), Box<dyn Error>>(());
+          }
+
+          Err(e) => {
+            error!("error {e}");
+          }
+        };
+        Ok(())
+      }
+      .await
+      {
+        Ok(()) => (),
+        Err(e) => {
+          error!("'user' err: {:?}", e);
+          let se = UserResponse::UrpServerError(e.to_string());
+          match serde_json::to_string(&se) {
+            Ok(s) => {
+              wssession.text(s).await;
+            }
+            Err(_) => (),
+          }
+        }
+      }
+    }
+  });
+
+  Ok(res)
+}
+
 async fn private(
   session: Session,
   data: web::Data<State>,
@@ -438,7 +516,7 @@ async fn private(
 
   let token = get_cookie_id(&req);
 
-  match zk_interface_check(&session, &mut state, token, item.into_inner()).await {
+  match zk_interface_check(&session, &mut state, &token, item.into_inner()).await {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'private' err: {:?}", e);
@@ -468,7 +546,7 @@ async fn private_streaming(
 async fn zk_interface_check(
   session: &Session,
   state: &State,
-  token: Option<String>,
+  token: &Option<String>,
   msg: PrivateRequest,
 ) -> Result<PrivateReply, zkerr::Error> {
   match session.get::<Uuid>("token")? {
@@ -536,7 +614,7 @@ async fn private_upstreaming(
   body: web::Payload,
   req: HttpRequest,
 ) -> HttpResponse {
-  let li = connect_and_make_lapin_info(data.get_ref(), get_cookie_id(&req)).await;
+  let li = connect_and_make_lapin_info(data.get_ref(), &get_cookie_id(&req)).await;
   match zk_interface_check_upstreaming(&session, &data.config, &li, body).await {
     Ok(hr) => hr,
     Err(e) => {
@@ -959,6 +1037,7 @@ pub async fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
       .service(web::resource("/upload").route(web::post().to(receive_files)))
       .service(web::resource("/public").route(web::post().to(public)))
       .service(web::resource("/private").route(web::post().to(private)))
+      .service(web::resource("/privatews").route(web::post().to(private_ws)))
       .service(web::resource("/stream").route(web::post().to(private_streaming)))
       .service(web::resource("/upstream").route(web::post().to(private_upstreaming)))
       .service(web::resource("/user").route(web::post().to(user)))

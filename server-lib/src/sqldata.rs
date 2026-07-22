@@ -928,11 +928,14 @@ pub struct LapinInfo {
 
 pub async fn make_lapin_info(
   conn: Option<&lapin::Connection>,
-  token: Option<String>,
+  token: &Option<String>,
 ) -> Option<LapinInfo> {
   match (conn, token) {
     (Some(conn), Some(token)) => match make_lapin_channels(conn).await {
-      Ok(lc) => Some(LapinInfo { channel: lc, token }),
+      Ok(lc) => Some(LapinInfo {
+        channel: lc,
+        token: token.clone(),
+      }),
       Err(e) => {
         error!("{e}");
         None
