@@ -879,9 +879,6 @@ showMessage msg =
         SelectDialogMsg _ ->
             "SelectDialogMsg"
 
-        SelectDialogMsg _ ->
-            "SelectDialogMsg"
-
         ChangePasswordDialogMsg _ ->
             "ChangePasswordDialogMsg"
 
@@ -1392,7 +1389,15 @@ sendZIMsg fui msg =
         sendZIMsgTauri <| PrivateClosureRequest Nothing msg
 
     else if fui.websockets then
-        sendSocketCommand (WebSocket.encodeCmd <| WebSocket.Send { name = "private", content = JE.encode 2 (Data.privateRequestEncoder msg) })
+        sendSocketCommand
+            (WebSocket.encodeCmd <|
+                WebSocket.Send
+                    { name = "private"
+                    , content =
+                        JE.encode 0
+                            (Data.privateClosureRequestEncoder (PrivateClosureRequest Nothing msg))
+                    }
+            )
 
     else
         HE.postJsonTask
@@ -2243,6 +2248,52 @@ actualupdate msg model =
 
                         Nothing ->
                             actualupdate (ZkReplyData (Ok ( td.utc, td.data.reply ))) model
+
+                Err e ->
+                    ( displayMessageDialog model <| JD.errorToString e ++ "\n" ++ JE.encode 2 jd
+                    , Cmd.none
+                    )
+
+        ( ReceiveSocketMsg jd, _ ) ->
+            case JD.decodeValue WebSocket.decodeMsg jd of
+                Ok (WebSocket.Error wsm) ->
+                    ( displayMessageDialog model <| "websocket error: " ++ wsm.error
+                    , Cmd.none
+                    )
+
+                Ok (WebSocket.Data wsm) ->
+                    if wsm.name == "private" then
+                        case JD.decodeString (makeTDDecoder Data.privateClosureReplyDecoder) wsm.data of
+                            Ok td ->
+                                let
+                                    _ =
+                                        Debug.log "td data" td
+                                in
+                                case td.data.closureId of
+                                    Just id ->
+                                        case Dict.get id model.ziClosures of
+                                            Just closure ->
+                                                let
+                                                    cmsg =
+                                                        closure (Ok ( td.utc, td.data.reply ))
+                                                in
+                                                actualupdate cmsg model
+
+                                            Nothing ->
+                                                actualupdate (ZkReplyData (Ok ( td.utc, td.data.reply ))) model
+
+                                    Nothing ->
+                                        actualupdate (ZkReplyData (Ok ( td.utc, td.data.reply ))) model
+
+                            Err e ->
+                                ( displayMessageDialog model <| JD.errorToString e ++ "\n" ++ JE.encode 2 jd
+                                , Cmd.none
+                                )
+
+                    else
+                        ( displayMessageDialog model <| "unknown websocket connection - \"" ++ wsm.name ++ "\""
+                        , Cmd.none
+                        )
 
                 Err e ->
                     ( displayMessageDialog model <| JD.errorToString e ++ "\n" ++ JE.encode 2 jd
