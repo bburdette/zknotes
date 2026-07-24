@@ -103,20 +103,20 @@
 			var sockQueue = {};
 			
 			function sendSocketCommand(wat) {
-				console.log( "ssc: " +  JSON.stringify(wat, null, 4));
+				// console.log( "ssc: " +  JSON.stringify(wat, null, 4));
 				if (wat.cmd == "connect")
 				{
-					console.log("connecting!");
+					// console.log("connecting!");
 					// let socket = new WebSocket(wat.address, wat.protocol);
 					let socket = new WebSocket(wat.address);
 					socket.onmessage = function (event) {
-						console.log( "onmessage: " +  JSON.stringify(event.data, null, 4));
+						// console.log( "onmessage: " +  JSON.stringify(event.data, null, 4));
 						app.ports.receiveSocketMsg.send({ name : wat.name
 						, msg : "data"
 						, data : event.data} );
 					}
 					socket.onopen = function (event) {
-						console.log( "onopen: " +  JSON.stringify(event.data, null, 4));
+						// console.log( "onopen: " +  JSON.stringify(event.data, null, 4));
 						// send queued messages.
 						let sq = sockQueue[wat.name];
 						if (sq) {
@@ -130,12 +130,12 @@
 				}
 				else if (wat.cmd == "send")
 				{
-					console.log("sending to socket: " + wat.name, mySockets[wat.name].readyState);
+					// console.log("sending to socket: " + wat.name, mySockets[wat.name].readyState);
 					if (mySockets[wat.name].readyState) {
 						mySockets[wat.name].send(wat.content);
 						} else
 						{
-							console.log("queuing message", wat.name, wat.content);
+							// console.log("queuing message", wat.name, wat.content);
 							let sq = sockQueue[wat.name];
 							if (sq) {
 								sq.push(wat.content);
@@ -147,7 +147,7 @@
 						}
 						else if (wat.cmd == "close")
 						{
-							console.log("closing socket: " + wat.name);
+							// console.log("closing socket: " + wat.name);
 							mySockets[wat.name].close();
 							delete mySockets[wat.name];
 						}

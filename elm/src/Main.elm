@@ -1925,11 +1925,17 @@ displayMessageNLinkDialog model message url text =
 onZkNoteStateEditWhat : Model -> Time.Posix -> DataUtil.ZkNoteAndStateWhat -> ( Model, Cmd Msg )
 onZkNoteStateEditWhat model pt znew =
     let
+        _ =
+            Debug.log "onZkNoteStateEditWhat what=?" ""
+
         state =
             model.state
     in
     if znew.what == "cache" then
         let
+            _ =
+                Debug.log "onZkNoteStateEditWhat what=cache" ""
+
             noteCache =
                 NC.addNote pt znew.znl.znal.zknote.id (NC.ZNAL znew.znl) model.noteCache
                     |> NC.purgeNotes
@@ -2265,10 +2271,10 @@ actualupdate msg model =
                     if wsm.name == "private" then
                         case JD.decodeString (makeTDDecoder Data.privateClosureReplyDecoder) wsm.data of
                             Ok td ->
-                                let
-                                    _ =
-                                        Debug.log "td data" td
-                                in
+                                -- let
+                                --     _ =
+                                --         Debug.log "td data" ( td.data.reply.what, td.reply.zknote.id )
+                                -- in
                                 case td.data.closureId of
                                     Just id ->
                                         case Dict.get id model.ziClosures of
@@ -2280,9 +2286,17 @@ actualupdate msg model =
                                                 actualupdate cmsg model
 
                                             Nothing ->
+                                                let
+                                                    _ =
+                                                        Debug.log "actualupdate 1" ""
+                                                in
                                                 actualupdate (ZkReplyData (Ok ( td.utc, td.data.reply ))) model
 
                                     Nothing ->
+                                        let
+                                            _ =
+                                                Debug.log "actualupdate 2" ""
+                                        in
                                         actualupdate (ZkReplyData (Ok ( td.utc, td.data.reply ))) model
 
                             Err e ->
@@ -3318,6 +3332,9 @@ actualupdate msg model =
 
                         Data.PvyZkNoteAndLinksWhat znew ->
                             let
+                                _ =
+                                    Debug.log "Data.PvyZkNoteAndLinksWhat znew" znew.what
+
                                 action =
                                     \mbstate ->
                                         let
