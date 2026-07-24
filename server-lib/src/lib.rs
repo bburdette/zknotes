@@ -537,7 +537,8 @@ async fn private_ws(
           let se = UserResponse::UrpServerError(e.to_string());
           match serde_json::to_string(&se) {
             Ok(s) => {
-              wssession.text(s).await;
+              // we're ignoring it if reporting the error fails too.
+              let _ = wssession.text(s).await;
             }
             Err(_) => (),
           }
