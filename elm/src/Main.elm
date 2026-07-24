@@ -5340,7 +5340,7 @@ init flags url key zone fontsize =
                             { name = "private"
                             , address =
                                 flags.location
-                                    -- |> String.replace "https" "ws"
+                                    -- http -> ws, https -> wss
                                     |> String.replace "http" "ws"
                                     |> (\s -> s ++ "/privatews")
                             , protocol = ""

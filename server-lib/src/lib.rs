@@ -448,7 +448,6 @@ async fn private_ws(
   let mut state = data.clone();
 
   let token = get_cookie_id(&req);
-  info!("private_ws token {:?}", token);
 
   let token_uuid = match session.get::<Uuid>("token")? {
     Some(tu) => tu,
@@ -458,7 +457,6 @@ async fn private_ws(
       )
     }
   };
-  info!("private_ws sess token {:?}", token_uuid);
 
   let (res, mut wssession, stream) = actix_ws::handle(&req, stream)?;
 
@@ -473,7 +471,6 @@ async fn private_ws(
         match msg {
           Ok(AggregatedMessage::Text(t)) => {
             let pcr: PrivateClosureRequest = serde_json::from_str(&t)?;
-            info!("private_ws sess token 2 {:?}", session.get::<Uuid>("token"));
             match (
               zk_interface_check(&token_uuid, &mut state, &token, pcr.request).await,
               SystemTime::now()
@@ -604,8 +601,6 @@ async fn zk_interface_check(
   token: &Option<String>,
   msg: PrivateRequest,
 ) -> Result<PrivateReply, zkerr::Error> {
-  // println!("zkcheck token: {:?}", session.get::<Uuid>("token")?);
-
   let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
   match orgauth::dbfun::read_user_by_token_api(
     &conn,
