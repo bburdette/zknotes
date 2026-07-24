@@ -1926,17 +1926,11 @@ displayMessageNLinkDialog model message url text =
 onZkNoteStateEditWhat : Model -> Time.Posix -> DataUtil.ZkNoteAndStateWhat -> ( Model, Cmd Msg )
 onZkNoteStateEditWhat model pt znew =
     let
-        _ =
-            Debug.log "onZkNoteStateEditWhat what=?" ""
-
         state =
             model.state
     in
     if znew.what == "cache" then
         let
-            _ =
-                Debug.log "onZkNoteStateEditWhat what=cache" ""
-
             noteCache =
                 NC.addNote pt znew.znl.znal.zknote.id (NC.ZNAL znew.znl) model.noteCache
                     |> NC.purgeNotes
@@ -2226,19 +2220,8 @@ actualupdate msg model =
             ( nmd, cmd )
 
         ( ReceiveLocalVal lv, _ ) ->
-            let
-                _ =
-                    Debug.log "recievelocalval" lv
-
-                _ =
-                    Debug.log "localValAction keys" <| Dict.keys model.localValAction
-            in
             case Dict.get lv.name model.localValAction of
                 Just (LocalValAction lva) ->
-                    let
-                        _ =
-                            Debug.log "recievelocalval got action " lv
-                    in
                     if lv.for == lva.for && lv.name == lva.name then
                         lva.action { model | localValAction = Dict.remove lv.name model.localValAction } lv.value
 
@@ -2246,10 +2229,6 @@ actualupdate msg model =
                         ( model, Cmd.none )
 
                 Nothing ->
-                    let
-                        _ =
-                            Debug.log "recievelocalval nothing " lv
-                    in
                     ( model, Cmd.none )
 
         ( TauriZkReplyData jd, _ ) ->
@@ -2287,10 +2266,6 @@ actualupdate msg model =
                     if wsm.name == "private" then
                         case JD.decodeString (makeTDDecoder Data.privateClosureReplyDecoder) wsm.data of
                             Ok td ->
-                                -- let
-                                --     _ =
-                                --         Debug.log "td data" ( td.data.reply.what, td.reply.zknote.id )
-                                -- in
                                 case td.data.closureId of
                                     Just id ->
                                         case Dict.get id model.ziClosures of
@@ -2302,17 +2277,9 @@ actualupdate msg model =
                                                 actualupdate cmsg model
 
                                             Nothing ->
-                                                let
-                                                    _ =
-                                                        Debug.log "actualupdate 1" ""
-                                                in
                                                 actualupdate (ZkReplyData (Ok ( td.utc, td.data.reply ))) model
 
                                     Nothing ->
-                                        let
-                                            _ =
-                                                Debug.log "actualupdate 2" ""
-                                        in
                                         actualupdate (ZkReplyData (Ok ( td.utc, td.data.reply ))) model
 
                             Err e ->
@@ -2845,7 +2812,7 @@ actualupdate msg model =
                                     SNG.localDataId znl.zknote.id
                             in
                             ( { model | localValAction = Dict.insert lid (LocalValAction { for = "lva", name = lid, action = action }) model.localValAction }
-                            , LS.getLocalVal { for = "lva", name = Debug.log "getlocalval1" lid }
+                            , LS.getLocalVal { for = "lva", name = lid }
                             )
 
                         Data.PbyZkNoteAndLinksWhat znlw ->
@@ -2865,7 +2832,7 @@ actualupdate msg model =
                                     SNG.localDataId znlw.znl.zknote.id
                             in
                             ( { model | localValAction = Dict.insert lid (LocalValAction { for = "lva", name = lid, action = action }) model.localValAction }
-                            , LS.getLocalVal { for = "lva", name = Debug.log "getlocalval2" lid }
+                            , LS.getLocalVal { for = "lva", name = lid }
                             )
 
                         Data.PbyNoop ->
@@ -3348,9 +3315,6 @@ actualupdate msg model =
 
                         Data.PvyZkNoteAndLinksWhat znew ->
                             let
-                                _ =
-                                    Debug.log "Data.PvyZkNoteAndLinksWhat znew" znew.what
-
                                 action =
                                     \amodel mbstate ->
                                         let
@@ -3366,7 +3330,7 @@ actualupdate msg model =
                                     SNG.localDataId znew.znl.zknote.id
                             in
                             ( { model | localValAction = Dict.insert lid (LocalValAction { for = "lva", name = lid, action = action }) model.localValAction }
-                            , LS.getLocalVal { for = "lva", name = Debug.log "getlocalval3" lid }
+                            , LS.getLocalVal { for = "lva", name = lid }
                             )
 
                         Data.PvyZkNoteComments zc ->
