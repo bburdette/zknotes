@@ -53,6 +53,7 @@ import ShowMessage
 import SlideShow
 import SpecialNotes as SN
 import SpecialNotesGui as SNG
+import TDict
 import TSet
 import TagAThing
 import TagFiles
@@ -212,7 +213,7 @@ type LocalValAction
     = LocalValAction
         { for : String
         , name : String
-        , action : Maybe String -> ( Model, Cmd Msg )
+        , action : Model -> Maybe String -> ( Model, Cmd Msg )
         }
 
 
@@ -237,7 +238,7 @@ type alias Model =
     , ziClosures : Dict Int (Result Http.Error ( Time.Posix, Data.PrivateReply ) -> Msg)
     , mobile : Bool
     , spmodel : SP.Model
-    , localValAction : Maybe LocalValAction
+    , localValAction : Dict String LocalValAction
     , zknSearchResult : Data.ZkListNoteSearchResult
     }
 
@@ -2225,15 +2226,30 @@ actualupdate msg model =
             ( nmd, cmd )
 
         ( ReceiveLocalVal lv, _ ) ->
-            case model.localValAction of
+            let
+                _ =
+                    Debug.log "recievelocalval" lv
+
+                _ =
+                    Debug.log "localValAction keys" <| Dict.keys model.localValAction
+            in
+            case Dict.get lv.name model.localValAction of
                 Just (LocalValAction lva) ->
+                    let
+                        _ =
+                            Debug.log "recievelocalval got action " lv
+                    in
                     if lv.for == lva.for && lv.name == lva.name then
-                        lva.action lv.value
+                        lva.action { model | localValAction = Dict.remove lv.name model.localValAction } lv.value
 
                     else
                         ( model, Cmd.none )
 
                 Nothing ->
+                    let
+                        _ =
+                            Debug.log "recievelocalval nothing " lv
+                    in
                     ( model, Cmd.none )
 
         ( TauriZkReplyData jd, _ ) ->
@@ -2800,7 +2816,7 @@ actualupdate msg model =
                         Data.PbyZkNoteAndLinks znl ->
                             let
                                 action =
-                                    \mbstate ->
+                                    \amodel mbstate ->
                                         let
                                             znas =
                                                 { znal = znl, mbstate = mbstate }
@@ -2821,21 +2837,21 @@ actualupdate msg model =
                                             ngets =
                                                 makePubNoteCacheGets model znl.zknote.content
                                         in
-                                        ( { model | state = vstate }
+                                        ( { amodel | state = vstate }
                                         , Cmd.batch ngets
                                         )
 
                                 lid =
                                     SNG.localDataId znl.zknote.id
                             in
-                            ( { model | localValAction = Just <| LocalValAction { for = "lva", name = lid, action = action } }
-                            , LS.getLocalVal { for = "lva", name = lid }
+                            ( { model | localValAction = Dict.insert lid (LocalValAction { for = "lva", name = lid, action = action }) model.localValAction }
+                            , LS.getLocalVal { for = "lva", name = Debug.log "getlocalval1" lid }
                             )
 
                         Data.PbyZkNoteAndLinksWhat znlw ->
                             let
                                 action =
-                                    \mbstate ->
+                                    \amodel mbstate ->
                                         let
                                             znas : DataUtil.ZkNoteAndStateWhat
                                             znas =
@@ -2843,13 +2859,13 @@ actualupdate msg model =
                                                 , what = znlw.what
                                                 }
                                         in
-                                        onZkNoteStatePbWhat model pt znas
+                                        onZkNoteStatePbWhat amodel pt znas
 
                                 lid =
                                     SNG.localDataId znlw.znl.zknote.id
                             in
-                            ( { model | localValAction = Just <| LocalValAction { for = "lva", name = lid, action = action } }
-                            , LS.getLocalVal { for = "lva", name = lid }
+                            ( { model | localValAction = Dict.insert lid (LocalValAction { for = "lva", name = lid, action = action }) model.localValAction }
+                            , LS.getLocalVal { for = "lva", name = Debug.log "getlocalval2" lid }
                             )
 
                         Data.PbyNoop ->
@@ -3336,7 +3352,7 @@ actualupdate msg model =
                                     Debug.log "Data.PvyZkNoteAndLinksWhat znew" znew.what
 
                                 action =
-                                    \mbstate ->
+                                    \amodel mbstate ->
                                         let
                                             znas : DataUtil.ZkNoteAndStateWhat
                                             znas =
@@ -3344,13 +3360,13 @@ actualupdate msg model =
                                                 , what = znew.what
                                                 }
                                         in
-                                        onZkNoteStateEditWhat model pt znas
+                                        onZkNoteStateEditWhat amodel pt znas
 
                                 lid =
                                     SNG.localDataId znew.znl.zknote.id
                             in
-                            ( { model | localValAction = Just <| LocalValAction { for = "lva", name = lid, action = action } }
-                            , LS.getLocalVal { for = "lva", name = lid }
+                            ( { model | localValAction = Dict.insert lid (LocalValAction { for = "lva", name = lid, action = action }) model.localValAction }
+                            , LS.getLocalVal { for = "lva", name = Debug.log "getlocalval3" lid }
                             )
 
                         Data.PvyZkNoteComments zc ->
@@ -5323,7 +5339,7 @@ init flags url key zone fontsize =
             , ziClosures = Dict.empty
             , mobile = flags.mobile
             , spmodel = SP.initModel
-            , localValAction = Nothing
+            , localValAction = Dict.empty
             , zknSearchResult =
                 { notes = []
                 , offset = 0
