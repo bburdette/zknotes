@@ -115,7 +115,7 @@ view nblevel hmod =
                 FullMonty ->
                     column [ width fill, spacing 10 ]
                         [ showLine "put all the elements together to make complex queries!  For instance "
-                        , thingAndDef 2 "t'sheet music' & 'tango' & te'G'" "match items linked to 'sheet music', with 'tango' in the name, and also linking to an item named 'G'"
+                        , thingAndDef 2 ">'sheet music' & 'tango' & >e'G'" "match items linked to 'sheet music', with 'tango' in the name, and also linking to an item named 'G'"
                         ]
             ]
         ]
