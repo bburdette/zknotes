@@ -191,7 +191,12 @@ link destination body =
                 , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
                 , E.htmlAttribute (HA.style "word-break" "break-word")
                 ]
-                (if locallink then body else (body ++ [E.text "⇗"]) )
+                (if locallink then
+                    body
+
+                 else
+                    body ++ [ E.text " ⇗" ]
+                )
         }
 
 
@@ -223,7 +228,12 @@ nooplink dirty destination body noop =
                 , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
                 , E.htmlAttribute (HA.style "word-break" "break-word")
                 ]
-                (if locallink then body else (body ++ [E.text " ⇗"]) )
+                (if locallink then
+                    body
+
+                 else
+                    body ++ [ E.text " ⇗" ]
+                )
         }
 
 
@@ -753,12 +763,7 @@ yeetView args url audioOnly mbid show text _ =
                         ++ (audioOnly |> Maybe.map (\_ -> " -x") |> Maybe.withDefault "")
                 , nooplink args.isDirty
                     url
-                    [ E.el
-                        [ E.inFront (E.el [ E.centerY ] <| E.text "↗")
-                        ]
-                      <|
-                        E.text "☐"
-                    ]
+                    []
                     args.noop
                 ]
 
@@ -768,12 +773,7 @@ yeetView args url audioOnly mbid show text _ =
                     [ E.text <| "yeet " ++ url
                     , nooplink args.isDirty
                         url
-                        [ E.el
-                            [ E.inFront (E.el [ E.centerY ] <| E.text "↗")
-                            ]
-                          <|
-                            E.text "☐"
-                        ]
+                        []
                         args.noop
                     , E.text (audioOnly |> Maybe.map (\_ -> " -x") |> Maybe.withDefault "")
                     ]
