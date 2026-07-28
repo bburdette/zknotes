@@ -172,7 +172,12 @@ type ViewMode
 
 link : String -> List (Element a) -> Element a
 link destination body =
-    (if String.contains ":" destination then
+    let
+        locallink =
+            not <|
+                String.contains ":" destination
+    in
+    (if locallink then
         E.newTabLink
 
      else
@@ -186,7 +191,7 @@ link destination body =
                 , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
                 , E.htmlAttribute (HA.style "word-break" "break-word")
                 ]
-                body
+                (if locallink then body else (body ++ [E.text "⇗"]) )
         }
 
 
@@ -218,7 +223,7 @@ nooplink dirty destination body noop =
                 , E.htmlAttribute (HA.style "overflow-wrap" "break-word")
                 , E.htmlAttribute (HA.style "word-break" "break-word")
                 ]
-                body
+                (if locallink then body else (body ++ [E.text " ⇗"]) )
         }
 
 
