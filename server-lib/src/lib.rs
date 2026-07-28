@@ -19,11 +19,13 @@ use actix_session::{
 use actix_web::{
   cookie::{self, Key},
   dev::Server,
-  web, App, HttpRequest, HttpResponse, HttpServer, Result,
+  rt, web, App, HttpRequest, HttpResponse, HttpServer, ResponseError, Result,
 };
+use actix_ws::AggregatedMessage;
 use chrono;
 use clap::Arg;
 use config::Config;
+use futures_util::StreamExt as _;
 use futures_util::TryStreamExt as _;
 use girlboss::Girlboss;
 use interfaces::connect_and_make_lapin_info;
@@ -37,16 +39,17 @@ pub use orgauth::{
 };
 pub use rusqlite;
 use rusqlite::Connection;
+use serde::{Deserialize, Serialize};
 use serde_json;
 use simple_error::simple_error;
 use sqldata::{get_single_value, local_server_id, LapinInfo};
-use std::fs::File;
 use std::io::{stdin, Write};
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::{env, sync::RwLock};
 use std::{error::Error, sync::Arc};
+use std::{fs::File, time::SystemTime};
 use timer;
 use tokio_util::io::StreamReader;
 use tracing_actix_web::TracingLogger;
@@ -56,7 +59,9 @@ pub use zkprotocol::content as zc;
 pub use zkprotocol::messages::PrivateStreamingMessage;
 pub use zkprotocol::search as zs;
 use zkprotocol::{
-  private::{PrivateError, PrivateReply, PrivateRequest},
+  private::{
+    PrivateClosureReply, PrivateClosureRequest, PrivateError, PrivateReply, PrivateRequest,
+  },
   public::{PublicError, PublicReply, PublicRequest},
   upload::UploadReply,
 };
@@ -235,7 +240,7 @@ fn session_user(
     None => Err(zkerr::Error::NotLoggedIn)?,
     Some(token) => orgauth::dbfun::read_user_by_token_api(
       &conn,
-      token,
+      &token,
       state.config.orgauth_config.login_token_expiration_ms,
       state.config.orgauth_config.regen_login_tokens,
     )
@@ -323,7 +328,7 @@ async fn receive_files(
   mut payload: Multipart,
   req: HttpRequest,
 ) -> HttpResponse {
-  let li = connect_and_make_lapin_info(config.get_ref(), get_cookie_id(&req)).await;
+  let li = connect_and_make_lapin_info(config.get_ref(), &get_cookie_id(&req)).await;
   match make_file_notes(session, &config, &li, &mut payload).await {
     Ok(r) => HttpResponse::Ok().json(r),
     Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
@@ -428,6 +433,120 @@ fn get_cookie_id(req: &HttpRequest) -> Option<String> {
   req.cookie("id").map(|c| c.value().to_string())
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct PrivateTimedData {
+  utcmillis: u128,
+  data: PrivateClosureReply,
+}
+async fn private_ws(
+  session: Session,
+  data: web::Data<State>,
+  req: HttpRequest,
+  stream: web::Payload,
+) -> Result<HttpResponse, zkerr::Error> {
+  info!("private_ws");
+  let mut state = data.clone();
+
+  let token = get_cookie_id(&req);
+
+  let token_uuid = match session.get::<Uuid>("token")? {
+    Some(tu) => tu,
+    None => {
+      return Ok(
+        HttpResponse::Ok().json(PrivateReply::PvyServerError(PrivateError::PveNotLoggedIn)),
+      )
+    }
+  };
+
+  let (res, mut wssession, stream) = actix_ws::handle(&req, stream)?;
+
+  let mut stream = stream
+    .aggregate_continuations()
+    // aggregate continuation frames up to 1MiB
+    .max_continuation_size(2_usize.pow(20));
+
+  rt::spawn(async move {
+    while let Some(msg) = stream.next().await {
+      match async {
+        match msg {
+          Ok(AggregatedMessage::Text(t)) => {
+            let pcr: PrivateClosureRequest = serde_json::from_str(&t)?;
+            match (
+              zk_interface_check(&token_uuid, &mut state, &token, pcr.request).await,
+              SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .map(|n| n.as_millis()),
+            ) {
+              (Ok(sr), Ok(t)) => {
+                let pcreply = PrivateTimedData {
+                  utcmillis: t,
+                  data: PrivateClosureReply {
+                    closure_id: pcr.closure_id,
+                    reply: sr,
+                  },
+                };
+
+                wssession.text(serde_json::to_string(&pcreply)?).await?
+              }
+              (_, Err(e)) => {
+                error!("'private' err: {:?}", e);
+                wssession
+                  .text(serde_json::to_string(&PrivateReply::PvyServerError(
+                    PrivateError::PveString(e.to_string()),
+                  ))?)
+                  .await?;
+              }
+              (Err(e), _) => {
+                error!("'private' err: {:?}", e);
+                wssession
+                  .text(serde_json::to_string(&PrivateReply::PvyServerError(
+                    PrivateError::PveString(e.to_string()),
+                  ))?)
+                  .await?;
+              }
+            }
+          }
+          Ok(AggregatedMessage::Binary(b)) => {
+            wssession.binary(b).await?;
+          }
+          Ok(AggregatedMessage::Ping(msg)) => {
+            wssession.pong(&msg).await?;
+          }
+          Ok(AggregatedMessage::Pong(msg)) => {
+            wssession.ping(&msg).await?; // ping?
+          }
+          Ok(AggregatedMessage::Close(_msg)) => {
+            // wssession.close(msg);
+            return Ok::<(), Box<dyn Error>>(());
+          }
+
+          Err(e) => {
+            error!("error {e}");
+          }
+        };
+        Ok(())
+      }
+      .await
+      {
+        Ok(()) => (),
+        Err(e) => {
+          error!("'user' err: {:?}", e);
+          let se = UserResponse::UrpServerError(e.to_string());
+          match serde_json::to_string(&se) {
+            Ok(s) => {
+              // we're ignoring it if reporting the error fails too.
+              let _ = wssession.text(s).await;
+            }
+            Err(_) => (),
+          }
+        }
+      }
+    }
+  });
+
+  Ok(res)
+}
+
 async fn private(
   session: Session,
   data: web::Data<State>,
@@ -437,8 +556,19 @@ async fn private(
   let mut state = data.clone();
 
   let token = get_cookie_id(&req);
+  let token_uuid = match session.get::<Uuid>("token") {
+    Ok(None) => {
+      return HttpResponse::Ok().json(PrivateReply::PvyServerError(PrivateError::PveNotLoggedIn))
+    }
+    Ok(Some(token_uuid)) => token_uuid,
+    Err(e) => {
+      return HttpResponse::Ok().json(PrivateReply::PvyServerError(PrivateError::PveString(
+        e.to_string(),
+      )))
+    }
+  };
 
-  match zk_interface_check(&session, &mut state, token, item.into_inner()).await {
+  match zk_interface_check(&token_uuid, &mut state, &token, item.into_inner()).await {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
       error!("'private' err: {:?}", e);
@@ -466,33 +596,28 @@ async fn private_streaming(
 }
 
 async fn zk_interface_check(
-  session: &Session,
+  token_uuid: &Uuid,
   state: &State,
-  token: Option<String>,
+  token: &Option<String>,
   msg: PrivateRequest,
 ) -> Result<PrivateReply, zkerr::Error> {
-  match session.get::<Uuid>("token")? {
-    None => Ok(PrivateReply::PvyServerError(PrivateError::PveNotLoggedIn)),
-    Some(token_uuid) => {
-      let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
-      match orgauth::dbfun::read_user_by_token_api(
-        &conn,
-        token_uuid,
-        state.config.orgauth_config.login_token_expiration_ms,
-        state.config.orgauth_config.regen_login_tokens,
-      ) {
-        Err(e) => {
-          info!("read_user_by_token_api error2: {:?}, {:?}", token_uuid, e);
+  let conn = sqldata::connection_open(state.config.orgauth_config.db.as_path())?;
+  match orgauth::dbfun::read_user_by_token_api(
+    &conn,
+    token_uuid,
+    state.config.orgauth_config.login_token_expiration_ms,
+    state.config.orgauth_config.regen_login_tokens,
+  ) {
+    Err(e) => {
+      info!("read_user_by_token_api error2: {:?}, {:?}", token_uuid, e);
 
-          Ok(PrivateReply::PvyServerError(PrivateError::PveLoginError(
-            e.to_string(),
-          )))
-        }
-        Ok(userdata) => {
-          // finally!  processing messages as logged in user.
-          interfaces::zk_interface_loggedin(state, &conn, token, userdata.id, &msg).await
-        }
-      }
+      Ok(PrivateReply::PvyServerError(PrivateError::PveLoginError(
+        e.to_string(),
+      )))
+    }
+    Ok(userdata) => {
+      // finally!  processing messages as logged in user.
+      interfaces::zk_interface_loggedin(state, &conn, token, userdata.id, &msg).await
     }
   }
 }
@@ -509,7 +634,7 @@ async fn zk_interface_check_streaming(
       let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
       match orgauth::dbfun::read_user_by_token_api(
         &conn,
-        token,
+        &token,
         config.orgauth_config.login_token_expiration_ms,
         config.orgauth_config.regen_login_tokens,
       ) {
@@ -536,7 +661,7 @@ async fn private_upstreaming(
   body: web::Payload,
   req: HttpRequest,
 ) -> HttpResponse {
-  let li = connect_and_make_lapin_info(data.get_ref(), get_cookie_id(&req)).await;
+  let li = connect_and_make_lapin_info(data.get_ref(), &get_cookie_id(&req)).await;
   match zk_interface_check_upstreaming(&session, &data.config, &li, body).await {
     Ok(hr) => hr,
     Err(e) => {
@@ -568,7 +693,7 @@ async fn zk_interface_check_upstreaming(
 
       match orgauth::dbfun::read_user_by_token_api(
         &conn,
-        token,
+        &token,
         config.orgauth_config.login_token_expiration_ms,
         config.orgauth_config.regen_login_tokens,
       ) {
@@ -959,6 +1084,7 @@ pub async fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
       .service(web::resource("/upload").route(web::post().to(receive_files)))
       .service(web::resource("/public").route(web::post().to(public)))
       .service(web::resource("/private").route(web::post().to(private)))
+      .service(web::resource("/privatews").route(web::get().to(private_ws)))
       .service(web::resource("/stream").route(web::post().to(private_streaming)))
       .service(web::resource("/upstream").route(web::post().to(private_upstreaming)))
       .service(web::resource("/user").route(web::post().to(user)))

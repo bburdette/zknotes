@@ -18,6 +18,7 @@ type alias FileUrlInfo =
     { location : String
     , filelocation : String
     , tauri : Bool
+    , websockets : Bool
     }
 
 
