@@ -649,11 +649,11 @@ audioNoteView fui autoplay mbOnEnded zkn =
             , if fui.tauri || List.filter (\i -> i == DataUtil.sysids.publicid) zkn.sysids /= [] then
                 link
                     ("https://29a.ch/timestretch/#a=" ++ fui.location ++ "/file/" ++ zkNoteIdToString zkn.id)
-                    [ E.text "ts↗" ]
+                    [ E.text "ts" ]
 
               else
                 E.el [ Util.addToolTip E.below (ZkCommon.stringToolTip "disabled for private notes") ]
-                    (E.el [ EF.color TC.darkGrey ] <| E.text "ts↗")
+                    (E.el [ EF.color TC.darkGrey ] <| E.text "ts⇗")
             ]
         ]
 
