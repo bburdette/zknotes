@@ -11,6 +11,7 @@
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    nixpkgs = { url = "github:nixos/nixpkgs/nixos-26.05"; };
     # elm-language-server = {
     #   url = "github:WhileTruu/elm-language-server";
     #   inputs.nixpkgs.follows = "nixpkgs";
