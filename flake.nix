@@ -49,7 +49,7 @@
       (
         system:
         let
-          toolchain = fenix.packages.${system}.latest;
+          toolchain = fenix.packages.${system}.stable;
           rs_compiler = (with toolchain; [ rustc cargo rust-analyzer rust-src ]);
 
           pname = "zknotes";
