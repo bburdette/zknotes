@@ -1083,8 +1083,7 @@ codeSpan snippet =
 codeBlock : { body : String, language : Maybe String } -> Element msg
 codeBlock details =
     E.column
-        [ EBk.color (E.rgba 0 0 0 0.13)
-        , E.padding 5
+        [ E.padding 5
         , EF.family [ EF.monospace ]
         , E.width E.fill
         ]
@@ -1092,6 +1091,7 @@ codeBlock details =
             Html.div
                 [ HA.style "white-space" "pre-wrap"
                 , HA.style "word-break" "break-word"
+                , HA.style "background-color" "rgb(40,44,52)"
                 ]
                 [ SyntaxHighlight.useTheme SyntaxHighlight.oneDark
                 , SyntaxMd.showLang details.body details.language
