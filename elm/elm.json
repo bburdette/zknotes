@@ -31,6 +31,7 @@
             "elm/url": "1.0.0",
             "elm-community/maybe-extra": "5.3.0",
             "mdgriffith/elm-ui": "1.1.8",
+            "pablohirafuji/elm-syntax-highlight": "3.8.0",
             "prikhi/http-tasks": "1.0.0",
             "toastal/either": "3.6.3"
         },

@@ -54,6 +54,8 @@ import Maybe.Extra as ME
 import NoteCache as NC exposing (NoteCache)
 import Schelme.Show exposing (showTerm)
 import Set exposing (Set(..))
+import SyntaxHighlight
+import SyntaxMd
 import TSet
 import TangoColors as TC
 import Time
@@ -1091,8 +1093,8 @@ codeBlock details =
                 [ HA.style "white-space" "pre-wrap"
                 , HA.style "word-break" "break-word"
                 ]
-                [ Html.text <|
-                    details.body
+                [ SyntaxHighlight.useTheme SyntaxHighlight.oneDark
+                , SyntaxMd.showLang details.body details.language
                 ]
         ]
 
