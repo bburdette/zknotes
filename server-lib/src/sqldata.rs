@@ -3101,10 +3101,12 @@ pub fn update_filetable(conn: &Connection, files_dir: &Path) -> Result<(), zkerr
     }
   }
 
-  conn.execute(
-    format!("insert into files_dir (filename) values {}", fns).as_str(),
-    params![],
-  )?;
+  if !fns.is_empty() {
+    conn.execute(
+      format!("insert into files_dir (filename) values {}", fns).as_str(),
+      params![],
+    )?;
+  }
 
   Ok(())
 }

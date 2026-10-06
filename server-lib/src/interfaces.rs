@@ -40,6 +40,7 @@ use zkprotocol::private::PrivateReply;
 use zkprotocol::private::PrivateRequest;
 use zkprotocol::public::{PublicReply, PublicRequest};
 use zkprotocol::search::{ZkListNoteSearchResult, ZkNoteSearch};
+
 pub fn login_data_for_token(
   session: Session,
   config: &Config,
@@ -54,7 +55,7 @@ pub fn login_data_for_token(
       match orgauth::dbfun::read_user_with_token_pageload(
         &mut conn,
         &session,
-        token,
+        &token,
         config.orgauth_config.regen_login_tokens,
         config.orgauth_config.login_token_expiration_ms,
       ) {

@@ -3225,18 +3225,13 @@ onWkKeyPress noteCache key model =
         Toop.T4 "Enter" False False False ->
             ( model, SPMod SP.onEnter )
 
+        Toop.T4 "Enter" True False False ->
+            -- ctrl-enter to merge block changes.
+            ( mergeEditBlock model, None )
+
         Toop.T4 "Escape" False False False ->
-            -- close blockedit if no changes.
-            case model.blockEdit of
-                Just (Text t) ->
-                    if t.s == t.original then
-                        ( { model | blockEdit = Nothing }, None )
-
-                    else
-                        ( model, None )
-
-                Nothing ->
-                    ( model, None )
+            -- close blockedit, cancel changes.
+            ( { model | blockEdit = Nothing }, None )
 
         _ ->
             ( model, None )
