@@ -11,6 +11,7 @@
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    nixpkgs = { url = "github:nixos/nixpkgs/nixos-26.05"; };
     # elm-language-server = {
     #   url = "github:WhileTruu/elm-language-server";
     #   inputs.nixpkgs.follows = "nixpkgs";
@@ -48,7 +49,7 @@
       (
         system:
         let
-          toolchain = fenix.packages.${system}.latest;
+          toolchain = fenix.packages.${system}.stable;
           rs_compiler = (with toolchain; [ rustc cargo rust-analyzer rust-src ]);
 
           pname = "zknotes";
@@ -107,15 +108,15 @@
               openssl.dev
               elm2nix
               elmPackages.elm
-              elmPackages.elm-analyse
-              elmPackages.elm-doc-preview
+              # elmPackages.elm-analyse
+              # elmPackages.elm-doc-preview
               elmPackages.elm-format
               elmPackages.elm-live
               elmPackages.elm-test
               elmPackages.elm-upgrade
-              elmPackages.elm-xref
+              # elmPackages.elm-xref
               elmPackages.elm-language-server
-              elmPackages.elm-verify-examples
+              # elmPackages.elm-verify-examples
               elmPackages.elm-optimize-level-2
             ];
 
