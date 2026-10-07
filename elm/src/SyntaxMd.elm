@@ -46,9 +46,6 @@ langParser s =
 showLang : String -> Maybe String -> Html m
 showLang body mblang =
     let
-        _ =
-            Debug.log "showlang " ( body, mblang )
-
         ps =
             mblang |> Maybe.map langParser |> Maybe.withDefault SyntaxHighlight.noLang
 
