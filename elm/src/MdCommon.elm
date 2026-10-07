@@ -180,10 +180,10 @@ link destination body =
                 String.contains ":" destination
     in
     (if locallink then
-        E.newTabLink
+        E.link
 
      else
-        E.link
+        E.newTabLink
     )
         [ E.htmlAttribute (HA.style "display" "inline-flex") ]
         { url = destination
