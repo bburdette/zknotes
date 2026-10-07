@@ -115,6 +115,11 @@
         version = "1.1.8";
       };
 
+      "pablohirafuji/elm-syntax-highlight" = {
+        sha256 = "0yngvbrcn93q60mh5v4ypjr1hrmz7jcjllha851gw2bnzir8d8q4";
+        version = "3.8.0";
+      };
+
       "prikhi/http-tasks" = {
         sha256 = "0b84zhq9cxpk2fp8n8drsh47gwqn9hdzjkcgqmh4fi98yi5aard5";
         version = "1.0.0";

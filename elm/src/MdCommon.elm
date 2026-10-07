@@ -54,6 +54,8 @@ import Maybe.Extra as ME
 import NoteCache as NC exposing (NoteCache)
 import Schelme.Show exposing (showTerm)
 import Set exposing (Set(..))
+import SyntaxHighlight
+import SyntaxMd
 import TSet
 import TangoColors as TC
 import Time
@@ -1081,8 +1083,7 @@ codeSpan snippet =
 codeBlock : { body : String, language : Maybe String } -> Element msg
 codeBlock details =
     E.column
-        [ EBk.color (E.rgba 0 0 0 0.13)
-        , E.padding 5
+        [ E.padding 5
         , EF.family [ EF.monospace ]
         , E.width E.fill
         ]
@@ -1090,9 +1091,10 @@ codeBlock details =
             Html.div
                 [ HA.style "white-space" "pre-wrap"
                 , HA.style "word-break" "break-word"
+                , HA.style "background-color" "rgb(40,44,52)"
                 ]
-                [ Html.text <|
-                    details.body
+                [ SyntaxHighlight.useTheme SyntaxHighlight.oneDark
+                , SyntaxMd.showLang details.body details.language
                 ]
         ]
 
