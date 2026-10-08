@@ -139,7 +139,27 @@ guiBlock block =
             E.column coltrib
                 [ E.el [ E.alignTop ] <| E.text "code block"
                 , E.column indentrib
-                    [ EI.text []
+                    [ E.wrappedRow [ E.spacing 3 ]
+                        (List.map
+                            (\lang ->
+                                EI.button (E.alignTop :: buttonStyle)
+                                    { onPress = Just <| CbLanguage lang
+                                    , label = E.text lang
+                                    }
+                            )
+                            [ "elm"
+                            , "xml"
+                            , "javascript"
+                            , "css"
+                            , "python"
+                            , "go"
+                            , "sql"
+                            , "json"
+                            , "nix"
+                            , "kotlin"
+                            ]
+                        )
+                    , EI.text []
                         { onChange = CbLanguage
                         , text = cb.language |> Maybe.withDefault ""
                         , placeholder = Nothing
