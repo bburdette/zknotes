@@ -2267,6 +2267,11 @@ actualupdate msg model =
                     , Cmd.none
                     )
 
+                Ok (WebSocket.OnOpen wsm) ->
+                    ( displayMessageDialog model <| "websocket opened: \"" ++ wsm.name ++ "\""
+                    , Cmd.none
+                    )
+
                 Ok (WebSocket.OnData wsm) ->
                     if wsm.name == "private" then
                         case JD.decodeString (makeTDDecoder Data.privateClosureReplyDecoder) wsm.data of

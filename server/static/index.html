@@ -119,6 +119,9 @@
           socket.onopen = function (event) {
             // console.log( "onopen, websocket: \"" + sc.name + "\"");
             let sq = sockQueue[sc.name];
+            app.ports.receiveSocketMsg.send(
+              { name : sc.name
+              , msg : "open" });
             if (sq) {
               for (let msg of sq) {
                 mySockets[sc.name].send(msg);
@@ -154,7 +157,7 @@
               // console.log("queuing message", sc.name, sc.content);
               let sq = sockQueue[sc.name];
               if (sq) {
-                sq.push(sc.content);
+                  sq.push(sc.content);
                 } else {
                   sq = [sc.content];
                 }
