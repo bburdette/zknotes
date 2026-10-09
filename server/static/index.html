@@ -109,14 +109,17 @@
 					// console.log("connecting!");
 					let socket = new WebSocket(wat.address);
 					socket.onmessage = function (event) {
-						// console.log( "onmessage: " +  JSON.stringify(event.data, null, 4));
-						app.ports.receiveSocketMsg.send({ name : wat.name
-						, msg : "data"
-						, data : event.data} );
-					}
+						console.log( "onmessage");
+						<!-- console.log( "onmessage: " +  JSON.stringify(event.data, null, 4)); -->
+						app.ports.receiveSocketMsg.send(
+							{ name : wat.name
+							, msg : "data"
+							, data : event.data}
+						);
+					};
 					socket.onopen = function (event) {
-						// console.log( "onopen: " +  JSON.stringify(event.data, null, 4));
-						// send queued messages.
+						console.log( "onopen");
+						<!-- console.log( "onopen: " +  JSON.stringify(event.data, null, 4)); -->
 						let sq = sockQueue[wat.name];
 						if (sq) {
 							for (let msg of sq) {
@@ -124,7 +127,24 @@
 							}
 							sockQueue[wat.name] = [];
 						}
-					}
+					};
+					<!-- socket.addEventListener("close", function (event) { -->
+					socket.addEventListener("close", function (event) {
+						console.log( "socket close: ", event);
+						app.ports.receiveSocketMsg.send(
+							{ name : wat.name
+							, msg : "close"
+							, code : event.code }
+						);
+					});
+					socket.addEventListener("error", function (event) {
+						console.log( "socket error: " +  JSON.stringify(event.data, null, 4));
+						app.ports.receiveSocketMsg.send(
+							{ name : wat.name
+							, msg : "error"
+							, error : event.data}
+						);
+					});
 					mySockets[wat.name] = socket;
 				}
 				else if (wat.cmd == "send")
@@ -147,6 +167,7 @@
 						else if (wat.cmd == "close")
 						{
 							// console.log("closing socket: " + wat.name);
+							mySockets[wat.name].onclose = Null;
 							mySockets[wat.name].close();
 							delete mySockets[wat.name];
 						}

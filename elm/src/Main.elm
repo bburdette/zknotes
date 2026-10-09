@@ -2257,12 +2257,17 @@ actualupdate msg model =
 
         ( ReceiveSocketMsg jd, _ ) ->
             case JD.decodeValue WebSocket.decodeMsg jd of
-                Ok (WebSocket.Error wsm) ->
-                    ( displayMessageDialog model <| "websocket error: " ++ wsm.error
+                Ok (WebSocket.OnError wsm) ->
+                    ( displayMessageDialog model <| "websocket \"" ++ wsm.name ++ "\" error: " ++ wsm.error
                     , Cmd.none
                     )
 
-                Ok (WebSocket.Data wsm) ->
+                Ok (WebSocket.OnClose wsm) ->
+                    ( displayMessageDialog model <| "websocket closed: \"" ++ wsm.name ++ "\" with code: " ++ String.fromInt wsm.code
+                    , Cmd.none
+                    )
+
+                Ok (WebSocket.OnData wsm) ->
                     if wsm.name == "private" then
                         case JD.decodeString (makeTDDecoder Data.privateClosureReplyDecoder) wsm.data of
                             Ok td ->

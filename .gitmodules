@@ -1,3 +1,6 @@
 [submodule "orgauth"]
 	path = orgauth
 	url = https://github.com/bburdette/orgauth.git
+[submodule "websocket"]
+	path = websocket
+	url = git@github.com:bburdette/websocket.git
