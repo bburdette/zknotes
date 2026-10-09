@@ -2263,7 +2263,17 @@ actualupdate msg model =
                     )
 
                 Ok (WebSocket.OnClose wsm) ->
-                    ( displayMessageDialog model <| "websocket closed: \"" ++ wsm.name ++ "\" with code: " ++ String.fromInt wsm.code
+                    ( displayMessageDialog model <|
+                        "websocket  \""
+                            ++ wsm.name
+                            ++ "\" closed: "
+                            ++ " with code: "
+                            ++ String.fromInt wsm.code
+                            ++ " string: "
+                            ++ (WebSocket.socketClosure wsm.code
+                                    |> Maybe.map WebSocket.showSocketClosure
+                                    |> Maybe.withDefault "unknown code"
+                               )
                     , Cmd.none
                     )
 
