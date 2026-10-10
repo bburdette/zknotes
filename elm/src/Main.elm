@@ -217,6 +217,29 @@ type LocalValAction
         }
 
 
+type SocketState
+    = SsOpenRequested
+    | SsIsOpen
+    | SsIsClosed Int
+    | SsError
+
+
+opensocket : String -> Cmd Msg
+opensocket location =
+    sendSocketCommand
+        (WebSocket.encodeCmd <|
+            WebSocket.Connect
+                { name = "private"
+                , address =
+                    location
+                        -- http -> ws, https -> wss
+                        |> String.replace "http" "ws"
+                        |> (\s -> s ++ "/privatews")
+                , protocol = ""
+                }
+        )
+
+
 type alias Model =
     { state : State
     , size : Util.Size
@@ -240,6 +263,7 @@ type alias Model =
     , spmodel : SP.Model
     , localValAction : Dict String LocalValAction
     , zknSearchResult : Data.ZkListNoteSearchResult
+    , socketState : Maybe SocketState
     }
 
 
@@ -1610,94 +1634,128 @@ view model =
             _ ->
                 routeTitle model.savedRoute.route
     , body =
-        [ case model.state of
-            DisplayMessage dm _ ->
-                Html.map DisplayMessageMsg <|
-                    GD.layout
-                        (Just { width = min 600 model.size.width, height = min 500 model.size.height })
-                        dm
+        (case model.socketState of
+            Nothing ->
+                []
 
-            MessageNLink dm _ ->
-                Html.map MessageNLinkMsg <|
-                    GD.layout
-                        (Just { width = min 600 model.size.width, height = min 500 model.size.height })
-                        dm
+            Just ss ->
+                case ss of
+                    SsOpenRequested ->
+                        [ Html.text "connecting websocket" ]
 
-            SelectDialog sdm _ ->
-                if model.mobile then
-                    E.layout [] <|
-                        E.map SelectDialogMsg <|
-                            GD.dialogView Nothing sdm
+                    SsIsOpen ->
+                        []
 
-                else
-                    Html.map SelectDialogMsg <|
-                        GD.layout
-                            (Just { width = min 600 model.size.width, height = min 500 model.size.height })
-                            sdm
+                    SsIsClosed code ->
+                        [ Html.div []
+                            [ Html.div []
+                                [ Html.text <|
+                                    "websocket closed with code: "
+                                        ++ String.fromInt code
+                                        ++ " string: "
+                                        ++ (WebSocket.socketClosure code
+                                                |> Maybe.map WebSocket.showSocketClosure
+                                                |> Maybe.withDefault "unknown code"
+                                           )
+                                ]
+                            , Html.div []
+                                [ Html.text
+                                    "reconnecting..."
+                                ]
+                            ]
+                        ]
 
-            ChangePasswordDialog cdm _ ->
-                Html.map ChangePasswordDialogMsg <|
-                    GD.layout
-                        (Just { width = min 600 model.size.width, height = min 200 model.size.height })
-                        cdm
+                    SsError ->
+                        [ Html.text <| "websocket error" ]
+        )
+            ++ [ case model.state of
+                    DisplayMessage dm _ ->
+                        Html.map DisplayMessageMsg <|
+                            GD.layout
+                                (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                                dm
 
-            ChangeEmailDialog cdm _ ->
-                Html.map ChangeEmailDialogMsg <|
-                    GD.layout
-                        (Just { width = min 600 model.size.width, height = min 200 model.size.height })
-                        cdm
+                    MessageNLink dm _ ->
+                        Html.map MessageNLinkMsg <|
+                            GD.layout
+                                (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                                dm
 
-            ChangeRemoteUrlDialog cdm _ ->
-                Html.map ChangeRemoteUrlDialogMsg <|
-                    GD.layout
-                        (Just { width = min 600 model.size.width, height = min 200 model.size.height })
-                        cdm
+                    SelectDialog sdm _ ->
+                        if model.mobile then
+                            E.layout [] <|
+                                E.map SelectDialogMsg <|
+                                    GD.dialogView Nothing sdm
 
-            JobsDialog dm _ ->
-                if model.mobile then
-                    E.layout [] <|
-                        E.map JobsDialogMsg <|
-                            GD.dialogView Nothing { dm | model = model.jobs }
+                        else
+                            Html.map SelectDialogMsg <|
+                                GD.layout
+                                    (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                                    sdm
 
-                else
-                    Html.map JobsDialogMsg <|
-                        GD.layout
-                            (Just { width = min 600 model.size.width, height = min 500 model.size.height })
-                            { dm | model = model.jobs }
+                    ChangePasswordDialog cdm _ ->
+                        Html.map ChangePasswordDialogMsg <|
+                            GD.layout
+                                (Just { width = min 600 model.size.width, height = min 200 model.size.height })
+                                cdm
 
-            MdInlineXform gdm _ ->
-                if model.mobile then
-                    E.layout [] <|
-                        E.map MdInlineXformMsg <|
-                            GD.dialogView Nothing gdm
+                    ChangeEmailDialog cdm _ ->
+                        Html.map ChangeEmailDialogMsg <|
+                            GD.layout
+                                (Just { width = min 600 model.size.width, height = min 200 model.size.height })
+                                cdm
 
-                else
-                    Html.map MdInlineXformMsg <|
-                        GD.layout
-                            (Just { width = min 600 model.size.width, height = min 500 model.size.height })
-                            gdm
+                    ChangeRemoteUrlDialog cdm _ ->
+                        Html.map ChangeRemoteUrlDialogMsg <|
+                            GD.layout
+                                (Just { width = min 600 model.size.width, height = min 200 model.size.height })
+                                cdm
 
-            RequestsDialog dm _ ->
-                if model.mobile then
-                    E.layout [] <|
-                        E.map RequestsDialogMsg <|
-                            GD.dialogView Nothing { dm | model = model.trackedRequests }
+                    JobsDialog dm _ ->
+                        if model.mobile then
+                            E.layout [] <|
+                                E.map JobsDialogMsg <|
+                                    GD.dialogView Nothing { dm | model = model.jobs }
 
-                else
-                    Html.map RequestsDialogMsg <|
-                        GD.layout
-                            (Just { width = min 600 model.size.width, height = min 500 model.size.height })
-                            -- use the live-updated model
-                            { dm | model = model.trackedRequests }
+                        else
+                            Html.map JobsDialogMsg <|
+                                GD.layout
+                                    (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                                    { dm | model = model.jobs }
 
-            _ ->
-                E.layout
-                    ([ EF.size model.stylePalette.fontSize, E.width E.fill ]
-                        ++ dndif
-                    )
-                <|
-                    viewState model.size model.state model
-        ]
+                    MdInlineXform gdm _ ->
+                        if model.mobile then
+                            E.layout [] <|
+                                E.map MdInlineXformMsg <|
+                                    GD.dialogView Nothing gdm
+
+                        else
+                            Html.map MdInlineXformMsg <|
+                                GD.layout
+                                    (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                                    gdm
+
+                    RequestsDialog dm _ ->
+                        if model.mobile then
+                            E.layout [] <|
+                                E.map RequestsDialogMsg <|
+                                    GD.dialogView Nothing { dm | model = model.trackedRequests }
+
+                        else
+                            Html.map RequestsDialogMsg <|
+                                GD.layout
+                                    (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                                    -- use the live-updated model
+                                    { dm | model = model.trackedRequests }
+
+                    _ ->
+                        E.layout
+                            ([ EF.size model.stylePalette.fontSize, E.width E.fill ]
+                                ++ dndif
+                            )
+                        <|
+                            viewState model.size model.state model
+               ]
     }
 
 
@@ -2258,27 +2316,30 @@ actualupdate msg model =
         ( ReceiveSocketMsg jd, _ ) ->
             case JD.decodeValue WebSocket.decodeMsg jd of
                 Ok (WebSocket.OnError wsm) ->
-                    ( displayMessageDialog model <| "websocket \"" ++ wsm.name ++ "\" error: " ++ wsm.error
+                    ( { model | socketState = Just <| SsError }
+                      -- ( displayMessageDialog model <| "websocket \"" ++ wsm.name ++ "\" error: " ++ wsm.error
                     , Cmd.none
                     )
 
                 Ok (WebSocket.OnClose wsm) ->
-                    ( displayMessageDialog model <|
-                        "websocket  \""
-                            ++ wsm.name
-                            ++ "\" closed: "
-                            ++ " with code: "
-                            ++ String.fromInt wsm.code
-                            ++ " string: "
-                            ++ (WebSocket.socketClosure wsm.code
-                                    |> Maybe.map WebSocket.showSocketClosure
-                                    |> Maybe.withDefault "unknown code"
-                               )
-                    , Cmd.none
+                    ( { model | socketState = Just <| SsIsClosed wsm.code }
+                      -- ( displayMessageDialog model <|
+                      --     "websocket  \""
+                      --         ++ wsm.name
+                      --         ++ "\" closed: "
+                      --         ++ " with code: "
+                      --         ++ String.fromInt wsm.code
+                      --         ++ " string: "
+                      --         ++ (WebSocket.socketClosure wsm.code
+                      --                 |> Maybe.map WebSocket.showSocketClosure
+                      --                 |> Maybe.withDefault "unknown code"
+                      --            )
+                    , opensocket model.fui.location
                     )
 
                 Ok (WebSocket.OnOpen wsm) ->
-                    ( displayMessageDialog model <| "websocket opened: \"" ++ wsm.name ++ "\""
+                    ( { model | socketState = Just SsIsOpen }
+                      -- ( displayMessageDialog model <| "websocket opened: \"" ++ wsm.name ++ "\""
                     , Cmd.none
                     )
 
@@ -5329,6 +5390,12 @@ init flags url key zone fontsize =
                 , offset = 0
                 , what = ""
                 }
+            , socketState =
+                if flags.websockets then
+                    Just SsOpenRequested
+
+                else
+                    Nothing
             }
 
         geterrornote =
@@ -5355,18 +5422,7 @@ init flags url key zone fontsize =
 
         opensock =
             if flags.websockets then
-                sendSocketCommand
-                    (WebSocket.encodeCmd <|
-                        WebSocket.Connect
-                            { name = "private"
-                            , address =
-                                flags.location
-                                    -- http -> ws, https -> wss
-                                    |> String.replace "http" "ws"
-                                    |> (\s -> s ++ "/privatews")
-                            , protocol = ""
-                            }
-                    )
+                opensocket flags.location
 
             else
                 Cmd.none

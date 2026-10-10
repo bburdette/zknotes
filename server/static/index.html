@@ -138,7 +138,7 @@
             );
           });
           socket.addEventListener("error", function (event) {
-            // console.log( "socket error: " +  JSON.stringify(event.data, null, 4));
+            console.log( "socket error: " +  event);
             app.ports.receiveSocketMsg.send(
               { name : sc.name
               , msg : "error"
