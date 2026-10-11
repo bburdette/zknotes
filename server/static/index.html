@@ -138,11 +138,10 @@
             );
           });
           socket.addEventListener("error", function (event) {
-            console.log( "socket error: " +  event);
+            // console.log( "socket error: " +  event);
             app.ports.receiveSocketMsg.send(
               { name : sc.name
-              , msg : "error"
-              , error : event.data}
+              , msg : "error" }
             );
           });
           mySockets[sc.name] = socket;

@@ -2317,29 +2317,16 @@ actualupdate msg model =
             case JD.decodeValue WebSocket.decodeMsg jd of
                 Ok (WebSocket.OnError wsm) ->
                     ( { model | socketState = Just <| SsError }
-                      -- ( displayMessageDialog model <| "websocket \"" ++ wsm.name ++ "\" error: " ++ wsm.error
                     , Cmd.none
                     )
 
                 Ok (WebSocket.OnClose wsm) ->
                     ( { model | socketState = Just <| SsIsClosed wsm.code }
-                      -- ( displayMessageDialog model <|
-                      --     "websocket  \""
-                      --         ++ wsm.name
-                      --         ++ "\" closed: "
-                      --         ++ " with code: "
-                      --         ++ String.fromInt wsm.code
-                      --         ++ " string: "
-                      --         ++ (WebSocket.socketClosure wsm.code
-                      --                 |> Maybe.map WebSocket.showSocketClosure
-                      --                 |> Maybe.withDefault "unknown code"
-                      --            )
                     , opensocket model.fui.location
                     )
 
                 Ok (WebSocket.OnOpen wsm) ->
                     ( { model | socketState = Just SsIsOpen }
-                      -- ( displayMessageDialog model <| "websocket opened: \"" ++ wsm.name ++ "\""
                     , Cmd.none
                     )
 
