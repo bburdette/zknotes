@@ -5327,7 +5327,11 @@ initToRoute model route =
                     model.navkey
                     (routeUrl (stateRoute initialstate).route)
             , Just c
-            , Just <| opensocket model.fui.location
+            , if model.fui.websockets then
+                Just <| opensocket model.fui.location
+
+              else
+                Nothing
             ]
     )
 
@@ -5419,13 +5423,6 @@ init flags url key zone fontsize =
                     , { key = "l", ctrl = True, alt = True, shift = False, preventDefault = True }
                     ]
 
-        opensock =
-            if flags.websockets then
-                opensocket flags.location
-
-            else
-                Cmd.none
-
         ( m, c ) =
             initToRoute imodel imodel.initialRoute
     in
@@ -5434,7 +5431,6 @@ init flags url key zone fontsize =
         [ c
         , geterrornote
         , setkeys
-        , opensock
         ]
     )
 
