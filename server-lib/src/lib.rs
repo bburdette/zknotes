@@ -21,16 +21,18 @@ use actix_web::{
   dev::Server,
   rt, web, App, HttpRequest, HttpResponse, HttpServer, ResponseError, Result,
 };
-use actix_ws::AggregatedMessage;
+use actix_ws::{AggregatedMessage, CloseReason};
 use chrono;
 use clap::Arg;
 use config::Config;
+use either::IntoEither;
+use futures::SinkExt;
 use futures_util::StreamExt as _;
 use futures_util::TryStreamExt as _;
 use girlboss::Girlboss;
 use interfaces::connect_and_make_lapin_info;
 use lapin;
-use log::{error, info};
+use log::{error, info, warn};
 pub use orgauth;
 use orgauth::{data::UserId, util};
 pub use orgauth::{
@@ -43,14 +45,18 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 use simple_error::simple_error;
 use sqldata::{get_single_value, local_server_id, LapinInfo};
-use std::io::{stdin, Write};
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::{env, sync::RwLock};
 use std::{error::Error, sync::Arc};
 use std::{fs::File, time::SystemTime};
+use std::{
+  io::{stdin, Write},
+  time::Duration,
+};
 use timer;
+use tokio::time::sleep;
 use tokio_util::io::StreamReader;
 use tracing_actix_web::TracingLogger;
 use uuid::Uuid;
@@ -449,21 +455,29 @@ async fn private_ws(
 
   let token = get_cookie_id(&req);
 
-  let token_uuid = match session.get::<Uuid>("token")? {
-    Some(tu) => tu,
-    None => {
-      return Ok(
-        HttpResponse::Ok().json(PrivateReply::PvyServerError(PrivateError::PveNotLoggedIn)),
-      )
-    }
-  };
-
+  info!("getting handle");
   let (res, mut wssession, stream) = actix_ws::handle(&req, stream)?;
 
   let mut stream = stream
     .aggregate_continuations()
     // aggregate continuation frames up to 1MiB
     .max_continuation_size(2_usize.pow(20));
+
+  let token_uuid = match session.get::<Uuid>("token")? {
+    Some(tu) => tu,
+    None => {
+      warn!("closing socket");
+      wssession
+        .close(Some(actix_ws::CloseReason {
+          code: actix_ws::CloseCode::Policy,
+          description: Some("not logged in".to_string()),
+        }))
+        .await
+        .map_err(|e| zkerr::Error::String(e.to_string()))?;
+
+      return Ok(res); // have to return this special 'res' for the above to work.
+    }
+  };
 
   rt::spawn(async move {
     while let Some(msg) = stream.next().await {

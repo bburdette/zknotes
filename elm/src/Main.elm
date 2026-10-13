@@ -220,7 +220,7 @@ type LocalValAction
 type SocketState
     = SsOpenRequested
     | SsIsOpen
-    | SsIsClosed Int
+    | SsIsClosed WebSocket.SocketClosure
     | SsError
 
 
@@ -1646,17 +1646,17 @@ view model =
                     SsIsOpen ->
                         []
 
-                    SsIsClosed code ->
+                    SsIsClosed WebSocket.PolicyViolation ->
+                        []
+
+                    SsIsClosed sc ->
                         [ Html.div []
                             [ Html.div []
                                 [ Html.text <|
                                     "websocket closed with code: "
-                                        ++ String.fromInt code
+                                        ++ (String.fromInt <| WebSocket.socketClosureCode sc)
                                         ++ " string: "
-                                        ++ (WebSocket.socketClosure code
-                                                |> Maybe.map WebSocket.showSocketClosure
-                                                |> Maybe.withDefault "unknown code"
-                                           )
+                                        ++ WebSocket.showSocketClosure sc
                                 ]
                             , Html.div []
                                 [ Html.text
@@ -2322,7 +2322,18 @@ actualupdate msg model =
 
                 Ok (WebSocket.OnClose wsm) ->
                     ( { model | socketState = Just <| SsIsClosed wsm.code }
-                    , opensocket model.fui.location
+                    , case wsm.code of
+                        WebSocket.PolicyViolation ->
+                            -- don't keep trying, bad login.
+                            sendSocketCommand
+                                (WebSocket.encodeCmd <|
+                                    WebSocket.Close
+                                        { name = "private"
+                                        }
+                                )
+
+                        _ ->
+                            opensocket model.fui.location
                     )
 
                 Ok (WebSocket.OnOpen wsm) ->
@@ -5316,6 +5327,7 @@ initToRoute model route =
                     model.navkey
                     (routeUrl (stateRoute initialstate).route)
             , Just c
+            , Just <| opensocket model.fui.location
             ]
     )
 

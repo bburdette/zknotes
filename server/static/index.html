@@ -165,9 +165,7 @@
             }
             else if (sc.cmd == "close")
             {
-              // don't trigger close event when initiated from elm.
-              mySockets[sc.name].removeEventListener("close");
-              mySockets[sc.name].close();
+              // console.log("removing socket: ", sc.name)
               delete mySockets[sc.name];
             }
           }
