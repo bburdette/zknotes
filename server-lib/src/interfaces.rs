@@ -40,6 +40,7 @@ use zkprotocol::private::PrivateReply;
 use zkprotocol::private::PrivateRequest;
 use zkprotocol::public::{PublicReply, PublicRequest};
 use zkprotocol::search::{ZkListNoteSearchResult, ZkNoteSearch};
+
 pub fn login_data_for_token(
   session: Session,
   config: &Config,
@@ -54,7 +55,7 @@ pub fn login_data_for_token(
       match orgauth::dbfun::read_user_with_token_pageload(
         &mut conn,
         &session,
-        token,
+        &token,
         config.orgauth_config.regen_login_tokens,
         config.orgauth_config.login_token_expiration_ms,
       ) {
@@ -81,7 +82,7 @@ pub fn login_data_for_token(
 
 pub async fn connect_and_make_lapin_info(
   state: &State,
-  token: Option<String>,
+  token: &Option<String>,
 ) -> Option<LapinInfo> {
   // TODO: maybe attempt reconnect only every X seconds, so as not to
   // slow processing during rmq outage.
@@ -236,7 +237,7 @@ pub async fn zk_interface_loggedin_streaming(
 pub async fn zk_interface_loggedin(
   state: &State,
   conn: &Connection,
-  token: Option<String>,
+  token: &Option<String>,
   uid: UserId,
   msg: &PrivateRequest,
 ) -> Result<PrivateReply, zkerr::Error> {
@@ -351,8 +352,9 @@ pub async fn zk_interface_loggedin(
       let jid = new_jobid(state, uid);
       let lgb = state.girlboss.clone();
       let server = state.server.clone();
-      let li = connect_and_make_lapin_info(state, token.clone()).await;
+      let li = connect_and_make_lapin_info(state, token).await;
       let lapin_channelx = li.map(|li| li.channel).clone();
+      let token = token.clone();
 
       std::thread::spawn(move || {
         let rt = actix_rt::System::new();
@@ -410,7 +412,7 @@ pub async fn zk_interface_loggedin(
           jid,
           server,
           lapin_channelx,
-          token,
+          token.clone(),
         ));
         rt.run()
           .map_err(|e| {
