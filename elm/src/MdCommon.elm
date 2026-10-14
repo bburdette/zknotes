@@ -1082,21 +1082,26 @@ codeSpan snippet =
 
 codeBlock : { body : String, language : Maybe String } -> Element msg
 codeBlock details =
-    E.column
+    E.el
         [ E.padding 5
         , EF.family [ EF.monospace ]
         , E.width E.fill
         ]
-        [ E.html <|
+        (E.html <|
             Html.div
-                [ HA.style "white-space" "pre-wrap"
-                , HA.style "word-break" "break-word"
-                , HA.style "background-color" "rgb(40,44,52)"
+                [ HA.style "background-color" "rgb(40,44,52)"
+
+                -- Use these for line break when narrow. ---------
+                -- , HA.style "white-space" "pre-wrap"
+                -- , HA.style "word-break" "break-word"
+                -- Use these for horizontal scroll when narrow. --
+                , HA.style "overflow" "auto clip"
+                , HA.style "contain" "inline-size"
                 ]
                 [ SyntaxHighlight.useTheme SyntaxHighlight.oneDark
                 , SyntaxMd.showLang details.body details.language
                 ]
-        ]
+        )
 
 
 linkDict : String -> Dict String String
