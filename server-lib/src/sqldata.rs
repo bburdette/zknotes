@@ -172,12 +172,8 @@ pub fn set_homenote(
 fn sqlog(meh: &str) {
   info!("sqlog: {}", meh);
 }
-// unsafe extern "C" fn trace_callback(
-//     evt: c_uint,
-//     ctx: *mut c_void,
-//     p: *mut c_void,
-//     x: *mut c_void,
-// ) -> c_int {
+
+const SQLITE_TRACING: bool = false;
 
 pub fn connection_open(connid: &str, dbfile: &Path) -> Result<Connection, zkerr::Error> {
   debug!("connection id: {}", connid);
@@ -193,7 +189,10 @@ pub fn connection_open(connid: &str, dbfile: &Path) -> Result<Connection, zkerr:
     true
   }))?;
 
-  conn.trace(Some(sqlog));
+  if SQLITE_TRACING {
+    #[allow(deprecated)]
+    conn.trace(Some(sqlog));
+  }
 
   debug!("connection_open 2");
   conn.execute("PRAGMA foreign_keys = true;", params![])?;
@@ -1861,14 +1860,14 @@ pub fn save_savelzlinks(
     if link.delete == Some(true) {
       // create archive record.
       let now = now()?;
-      let ac = conn.execute(
+      let _ac = conn.execute(
         "insert into zklinkarchive (fromid, toid, user, linkzknote, createdate, deletedate)
             select fromid, toid, user, linkzknote, createdate, ?1 from zklink
             where fromid = ?2 and toid = ?3 and user = ?4",
         params![now, from, to, uid.to_i64()],
       )?;
       // delete the link.
-      let dc = conn.execute(
+      let _dc = conn.execute(
         "delete from zklink where fromid = ?1 and toid = ?2 and user = ?3",
         params![from, to, uid.to_i64()],
       )?;

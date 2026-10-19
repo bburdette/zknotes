@@ -19,14 +19,12 @@ use actix_session::{
 use actix_web::{
   cookie::{self, Key},
   dev::Server,
-  rt, web, App, HttpRequest, HttpResponse, HttpServer, ResponseError, Result,
+  rt, web, App, HttpRequest, HttpResponse, HttpServer, Result,
 };
-use actix_ws::{AggregatedMessage, CloseReason};
+use actix_ws::AggregatedMessage;
 use chrono;
 use clap::Arg;
 use config::Config;
-use either::IntoEither;
-use futures::SinkExt;
 use futures_util::StreamExt as _;
 use futures_util::TryStreamExt as _;
 use girlboss::Girlboss;
@@ -45,18 +43,14 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 use simple_error::simple_error;
 use sqldata::{get_single_value, local_server_id, LapinInfo};
+use std::io::{stdin, Write};
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::{env, sync::RwLock};
 use std::{error::Error, sync::Arc};
 use std::{ffi::c_int, path::Path};
 use std::{fs::File, time::SystemTime};
-use std::{
-  io::{stdin, Write},
-  time::Duration,
-};
 use timer;
-use tokio::time::sleep;
 use tokio_util::io::StreamReader;
 use tracing_actix_web::TracingLogger;
 use uuid::Uuid;
@@ -693,7 +687,7 @@ async fn private_upstreaming(
 }
 
 fn convert_bodyerr(err: actix_web::error::PayloadError) -> std::io::Error {
-  // error!("convert_err {:?}", err);
+  error!("convert_bodyerr {:?}", err);
   todo!()
 }
 
@@ -817,13 +811,18 @@ fn rulog(cint: c_int, meh: &str) {
   info!("rulog: {}; {}", cint, meh);
 }
 
+const SQLITE_LOGGING: bool = false;
+
 #[actix_web::main]
 pub async fn err_main(
   oconfig: Option<Config>,
   logfile: Option<PathBuf>,
 ) -> Result<(), Box<dyn Error>> {
-  unsafe {
-    config_log(Some(rulog))?;
+  // sqlite logging
+  if SQLITE_LOGGING {
+    unsafe {
+      config_log(Some(rulog))?;
+    }
   }
 
   match logfile {

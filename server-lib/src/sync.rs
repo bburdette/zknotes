@@ -11,15 +11,13 @@ use actix_multipart_rfc7578 as multipart;
 use actix_web::error::PayloadError;
 use async_stream::try_stream;
 use awc;
-use awc::http::uri::Scheme;
-use awc::ws::Frame;
-use bytes::{Buf, Bytes};
+use bytes::Bytes;
 use futures::executor::block_on;
 use futures::future;
 use futures::Stream;
 use futures_util::TryStreamExt;
-use futures_util::{SinkExt, StreamExt, TryFutureExt};
-use log::{debug, error, info};
+use futures_util::{StreamExt, TryFutureExt};
+use log::{debug, error, info, warn};
 use orgauth;
 use orgauth::data::{User, UserId};
 use orgauth::dbfun::user_id;
@@ -35,7 +33,6 @@ use std::time::Duration;
 use tokio::io::AsyncBufReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio_util::io::StreamReader;
-use tracing::instrument::WithSubscriber;
 use uuid::Uuid;
 use zkprotocol::constants::{PrivateStreamingRequests, SpecialUuids};
 use zkprotocol::content::{FileStatus, OnMakeFileNote, SaveZkNote, Server, SyncSince, ZkNoteId};
@@ -1221,7 +1218,7 @@ where
           // actually there is no unique index on zklinkarchive so can this even happen?
           if e.code == rusqlite::ErrorCode::ConstraintViolation {
             // if duplicate record, just ignore and go on.
-            warning!("duplicate archivelink: {:?}", l);
+            warn!("duplicate archivelink: {:?}", l);
             None
           } else {
             return Err(rusqlite::Error::SqliteFailure(e, s).into());
@@ -1243,7 +1240,7 @@ where
           // actually there is no unique index on zklinkarchive so can this even happen?
           if e.code == rusqlite::ErrorCode::ConstraintViolation {
             // if duplicate record, just ignore and go on.
-            warning!("duplicate archivelink: {:?}", l);
+            warn!("duplicate archivelink: {:?}", l);
             None
           } else {
             return Err(rusqlite::Error::SqliteFailure(e, s).into());
