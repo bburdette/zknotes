@@ -361,6 +361,7 @@ pub async fn zk_interface_loggedin(
       let lapin_channelx = li.map(|li| li.channel).clone();
       let token = token.clone();
 
+      // not really necessary.  trying to ensure no sqlite blocking.
       conn.close().map_err(|(_conn, err)| err)?;
 
       std::thread::spawn(move || {
@@ -429,12 +430,11 @@ pub async fn zk_interface_loggedin(
           .unwrap()
       });
 
-      // Ok(PrivateReply::PvyJobStatus(JobStatus {
-      //   jobno: jid.jobno,
-      //   state: JobState::Started,
-      //   message: "".to_string(),
-      // }))
-      Ok(PrivateReply::PvyNoop)
+      Ok(PrivateReply::PvyJobStatus(JobStatus {
+        jobno: jid.jobno,
+        state: JobState::Started,
+        message: "".to_string(),
+      }))
     }
     PrivateRequest::PvqSyncFiles(znsrq) => {
       let dbpath: PathBuf = state.config.orgauth_config.db.to_path_buf();

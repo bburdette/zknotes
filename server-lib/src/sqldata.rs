@@ -1867,13 +1867,11 @@ pub fn save_savelzlinks(
             where fromid = ?2 and toid = ?3 and user = ?4",
         params![now, from, to, uid.to_i64()],
       )?;
-      println!("inserted {} archive lzlink", ac);
       // delete the link.
       let dc = conn.execute(
         "delete from zklink where fromid = ?1 and toid = ?2 and user = ?3",
         params![from, to, uid.to_i64()],
       )?;
-      println!("deleted {} lzlink", dc);
     } else {
       save_zklink(&conn, from, to, uid, Some(linkzknote))?;
     }
