@@ -17,7 +17,7 @@ use futures::future;
 use futures::Stream;
 use futures_util::TryStreamExt;
 use futures_util::{StreamExt, TryFutureExt};
-use log::{debug, error, info, warn};
+use log::{error, info, warn};
 use orgauth;
 use orgauth::data::{User, UserId};
 use orgauth::dbfun::user_id;
@@ -877,7 +877,6 @@ where
   // ----------------------------------------------------------------------------------
   // current zknotes
   // ----------------------------------------------------------------------------------
-  debug!("current notes");
   // First should be the current notes.
   if let SyncMessage::ZkSearchResultHeader(ref _zsrh) = sm {
   } else {
@@ -898,20 +897,17 @@ where
 
   while let SyncMessage::ZkNote(ref note, ref mbf) = sm {
     notecount = notecount + 1;
-    debug!("notecount {}", notecount);
     let uid = UserId::Uid(
       *userhash
         .get(note.user.to_i64())
         .ok_or_else(|| zkerr::Error::String("user not found".to_string()))?,
     );
 
-    debug!("note5");
     let file_id: Option<i64> = match mbf {
       None => None,
       Some(fileinfo) =>
       // already have a file for this hash?
       {
-        debug!("fileinfo {:?}", fileinfo);
         match conn.query_row(
           "select id from file where hash = ?1",
           params![fileinfo.hash],
@@ -957,34 +953,29 @@ where
       }
     };
 
-    debug!("note4");
     let server_id: i64 = match serverhash.get(&note.server) {
       Some(id) => id.clone(),
-      None => {
-        debug!("getting server id");
-        match server_id(&conn, note.server.as_str()) {
-          Ok(id) => {
-            serverhash.insert(note.server.clone(), id);
-            id.clone()
-          }
-          Err(_e) => {
-            match conn.execute(
-              "insert into server (uuid, createdate) values (?1, ?2)",
-              params![note.server, now],
-            ) {
-              Ok(_) => {
-                let id = conn.last_insert_rowid();
-                serverhash.insert(note.server.clone(), id);
-                id.clone()
-              }
-              Err(e) => Err(zkerr::Error::from(e))?,
+      None => match server_id(&conn, note.server.as_str()) {
+        Ok(id) => {
+          serverhash.insert(note.server.clone(), id);
+          id.clone()
+        }
+        Err(_e) => {
+          match conn.execute(
+            "insert into server (uuid, createdate) values (?1, ?2)",
+            params![note.server, now],
+          ) {
+            Ok(_) => {
+              let id = conn.last_insert_rowid();
+              serverhash.insert(note.server.clone(), id);
+              id.clone()
             }
+            Err(e) => Err(zkerr::Error::from(e))?,
           }
         }
-      }
+      },
     };
 
-    debug!("note3");
     let ex = conn.execute(
         "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, file, server, createdate, changeddate)
          values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
@@ -1003,7 +994,6 @@ where
         note.changeddate,
       ]
       );
-    debug!("note2");
     let id: i64 = match ex {
       Ok(_) => Ok(conn.last_insert_rowid()),
       Err(rusqlite::Error::SqliteFailure(e, Some(s))) => {
@@ -1064,23 +1054,24 @@ where
       Err(e) => Err(e.into()),
     }?;
 
-    debug!("note1");
     if let Some(ref nt) = notetemp {
       conn.execute(
         format!("insert into {} values (?1)", nt).as_str(),
         params![id],
       )?;
     }
-    debug!("note0");
 
     sm = read_sync_message(&mut line, br).await?;
   }
+
+  info!("synced {} zknotes", notecount);
 
   // ----------------------------------------------------------------------------------
   // archive notes
   // ----------------------------------------------------------------------------------
   // After the current notes are the archivenotes.
-  debug!("archive notes");
+  //
+  notecount = 0;
   if let SyncMessage::ZkSearchResultHeader(ref _zsrh) = sm {
   } else {
     return Err(
@@ -1094,6 +1085,7 @@ where
 
   sm = read_sync_message(&mut line, br).await?;
   while let SyncMessage::ZkNote(ref note, ref _mbf) = sm {
+    notecount = notecount + 1;
     // TODO: make file source record (?)
 
     let uid = UserId::Uid(
@@ -1172,6 +1164,8 @@ where
     sm = read_sync_message(&mut line, br).await?;
   }
 
+  info!("synced {} archive zknotes", notecount);
+
   if let SyncMessage::ArchiveZkLinkHeader = sm {
   } else {
     return Err(
@@ -1186,7 +1180,6 @@ where
   // ----------------------------------------------------------------------------------
   // archive links
   // ----------------------------------------------------------------------------------
-  debug!("archive links");
   sm = read_sync_message(&mut line, br).await?;
 
   let mut count = 0;
@@ -1266,7 +1259,6 @@ where
   // ----------------------------------------------------------------------------------
   // current links
   // ----------------------------------------------------------------------------------
-  debug!("current links");
   if let SyncMessage::UuidZkLinkHeader = sm {
   } else {
     return Err(

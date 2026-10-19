@@ -176,10 +176,7 @@ fn sqlog(meh: &str) {
 const SQLITE_TRACING: bool = false;
 
 pub fn connection_open(connid: &str, dbfile: &Path) -> Result<Connection, zkerr::Error> {
-  debug!("connection id: {}", connid);
   let mut conn = Connection::open(dbfile)?;
-
-  debug!("after connection_open");
 
   // conn.busy_timeout(Duration::from_millis(500))?;
   conn.busy_handler(Some(|count| {
@@ -194,16 +191,13 @@ pub fn connection_open(connid: &str, dbfile: &Path) -> Result<Connection, zkerr:
     conn.trace(Some(sqlog));
   }
 
-  debug!("connection_open 2");
   conn.execute("PRAGMA foreign_keys = true;", params![])?;
 
-  debug!("connection_open 3");
   // give this a go with sync!
   // doesn't get the busy handle message at least.
   // conn.query_row("PRAGMA journal_mode = WAL;", params![], |_row| Ok(()))?;
   // conn.execute("PRAGMA journal_mode = WAL;", params![])?;
 
-  debug!("end of connection_open");
   Ok(conn)
 }
 
