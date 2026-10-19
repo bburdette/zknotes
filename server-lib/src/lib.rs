@@ -619,13 +619,9 @@ async fn zk_interface_check(
     state.config.orgauth_config.login_token_expiration_ms,
     state.config.orgauth_config.regen_login_tokens,
   ) {
-    Err(e) => {
-      info!("read_user_by_token_api error2: {:?}, {:?}", token_uuid, e);
-
-      Ok(PrivateReply::PvyServerError(PrivateError::PveLoginError(
-        e.to_string(),
-      )))
-    }
+    Err(e) => Ok(PrivateReply::PvyServerError(PrivateError::PveLoginError(
+      e.to_string(),
+    ))),
     Ok(userdata) => {
       // finally!  processing messages as logged in user.
       interfaces::zk_interface_loggedin(state, conn, token, userdata.id, &msg).await
@@ -652,14 +648,9 @@ async fn zk_interface_check_streaming(
         config.orgauth_config.login_token_expiration_ms,
         config.orgauth_config.regen_login_tokens,
       ) {
-        Err(e) => {
-          info!("read_user_by_token_api error3: {:?}, {:?}", token, e);
-          Ok(
-            HttpResponse::Ok().json(PrivateReply::PvyServerError(PrivateError::PveLoginError(
-              format!("{:?}", e),
-            ))),
-          )
-        }
+        Err(e) => Ok(HttpResponse::Ok().json(PrivateReply::PvyServerError(
+          PrivateError::PveLoginError(format!("{:?}", e)),
+        ))),
         Ok(userdata) => {
           // finally!  processing messages as logged in user.
           interfaces::zk_interface_loggedin_streaming(&config, userdata.id, &msg).await
@@ -714,15 +705,9 @@ async fn zk_interface_check_upstreaming(
         config.orgauth_config.login_token_expiration_ms,
         config.orgauth_config.regen_login_tokens,
       ) {
-        Err(e) => {
-          info!("read_user_by_token_api error4: {:?}, {:?}", token, e);
-
-          Ok(
-            HttpResponse::Ok().json(PrivateReply::PvyServerError(PrivateError::PveLoginError(
-              format!("{:?}", e),
-            ))),
-          )
-        }
+        Err(e) => Ok(HttpResponse::Ok().json(PrivateReply::PvyServerError(
+          PrivateError::PveLoginError(format!("{:?}", e)),
+        ))),
         Ok(user) => {
           // finally!  processing messages as logged in user.
           let rstream =
