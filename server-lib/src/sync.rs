@@ -11,13 +11,15 @@ use actix_multipart_rfc7578 as multipart;
 use actix_web::error::PayloadError;
 use async_stream::try_stream;
 use awc;
-use bytes::Bytes;
+use awc::http::uri::Scheme;
+use awc::ws::Frame;
+use bytes::{Buf, Bytes};
 use futures::executor::block_on;
 use futures::future;
 use futures::Stream;
 use futures_util::TryStreamExt;
-use futures_util::{StreamExt, TryFutureExt};
-use log::{error, info};
+use futures_util::{SinkExt, StreamExt, TryFutureExt};
+use log::{debug, error, info};
 use orgauth;
 use orgauth::data::{User, UserId};
 use orgauth::dbfun::user_id;
@@ -33,6 +35,7 @@ use std::time::Duration;
 use tokio::io::AsyncBufReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio_util::io::StreamReader;
+use tracing::instrument::WithSubscriber;
 use uuid::Uuid;
 use zkprotocol::constants::{PrivateStreamingRequests, SpecialUuids};
 use zkprotocol::content::{FileStatus, OnMakeFileNote, SaveZkNote, Server, SyncSince, ZkNoteId};
@@ -185,8 +188,26 @@ pub fn temp_tables(conn: &Connection) -> Result<TempTableNames, zkerr::Error> {
 
   conn.execute(
     format!(
+      "CREATE UNIQUE INDEX \"{}unq\" ON \"{}\" (\"id\")",
+      notetemp, notetemp
+    )
+    .as_str(),
+    params![],
+  )?;
+
+  conn.execute(
+    format!(
       "create temporary table {} (\"id\" integer primary key not null)",
       archivenotetemp
+    )
+    .as_str(),
+    params![],
+  )?;
+
+  conn.execute(
+    format!(
+      "CREATE UNIQUE INDEX \"{}unq\" ON \"{}\" (\"id\")",
+      archivenotetemp, archivenotetemp
     )
     .as_str(),
     params![],
@@ -223,6 +244,15 @@ pub fn temp_tables(conn: &Connection) -> Result<TempTableNames, zkerr::Error> {
     params![],
   )?;
 
+  conn.execute(
+    format!(
+      "CREATE UNIQUE INDEX \"{}unq\" ON \"{}\" (\"id\")",
+      archivelinktemp, archivelinktemp
+    )
+    .as_str(),
+    params![],
+  )?;
+
   Ok(TempTableNames {
     notetemp,
     archivenotetemp,
@@ -240,7 +270,7 @@ pub async fn sync(
   callbacks: &mut Callbacks,
   monitor: &dyn JobMonitor,
 ) -> Result<PrivateReply, Box<dyn std::error::Error>> {
-  let conn = Arc::new(sqldata::connection_open(dbpath)?);
+  let conn = Arc::new(sqldata::connection_open("sync", dbpath)?);
   let user = orgauth::dbfun::read_user_by_id(&conn, uid)?; // TODO pass this in from calling ftn?
   let extra_login_data = sqldata::read_extra_login_data(&conn, user.id)?;
   // let mut callbacks = &mut zknotes_callbacks();
@@ -276,19 +306,19 @@ pub async fn sync(
   match res {
     PrivateReply::PvySyncComplete => {
       write!(monitor, "starting sync to remote");
-      let _reply = sync_to_remote(
-        conn.clone(),
-        file_path,
-        &user,
-        Some(ttn.notetemp.clone()),
-        Some(ttn.archivenotetemp.clone()),
-        Some(ttn.linktemp.clone()),
-        Some(ttn.archivelinktemp.clone()),
-        after,
-        callbacks,
-        monitor,
-      )
-      .await?;
+      // let _reply = sync_to_remote(
+      //   conn.clone(),
+      //   file_path,
+      //   &user,
+      //   Some(ttn.notetemp.clone()),
+      //   Some(ttn.archivenotetemp.clone()),
+      //   Some(ttn.linktemp.clone()),
+      //   Some(ttn.archivelinktemp.clone()),
+      //   after,
+      //   callbacks,
+      //   monitor,
+      // )
+      // .await?;
 
       tr.commit()?;
 
@@ -687,6 +717,110 @@ pub async fn sync_files_up(
   Ok(resvec)
 }
 
+// pub async fn read_sync_message_ws<S>(line: &mut String, br: &S) -> Result<SyncMessage, zkerr::Error>
+// where
+//   // S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin,
+//   S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin,
+// {
+//   line.clear();
+//   if br.read_line(line).await? == 0 {
+//     return Err::<SyncMessage, zkerr::Error>(zkerr::Error::EmptyStream);
+//   }
+//   let sm = serde_json::from_str(line.trim())?;
+//   Ok(sm)
+// }
+
+pub async fn sync_from_remote_ws(
+  conn: &Connection,
+  lapin_info: &Option<LapinInfo>,
+  server: &Server,
+  user: &User,
+  after: Option<i64>,
+  file_path: &Path,
+  notetemp: &String,
+  archivenotetemp: &String,
+  linktemp: &String,
+  archivelinktemp: &String,
+  callbacks: &mut Callbacks,
+  monitor: &dyn JobMonitor,
+) -> Result<PrivateReply, Box<dyn std::error::Error>> {
+  let (c, url) = match (user.cookie.clone(), user.remote_url.clone()) {
+    (Some(c), Some(url)) => (c, url),
+    _ => return Err("can't remote sync - not a remote user".into()),
+  };
+
+  let user_url = awc::http::Uri::try_from(url).map_err(|x| zkerr::Error::String(x.to_string()))?;
+  let mut parts = awc::http::uri::Parts::default();
+  parts.scheme = if user_url.scheme() == Some(&Scheme::HTTP) {
+    Some("ws".parse().unwrap())
+  } else {
+    Some("wss".parse().unwrap())
+  };
+  parts.authority = user_url.authority().cloned();
+  parts.path_and_query = Some(awc::http::uri::PathAndQuery::from_static("/stream"));
+  let uri = awc::http::Uri::from_parts(parts).map_err(|x| zkerr::Error::String(x.to_string()))?;
+
+  info!("syncing from uri: {}", uri);
+  write!(monitor, "syncing from uri: {}", uri);
+
+  let cookie = cookie::Cookie::parse_encoded(c)?;
+  // ClientResponse, Framed<BoxedSocket, Codec
+  let (res, mut bs) = awc::Client::new().ws(uri).cookie(cookie).connect().await?;
+
+  let sm: SyncMessage = match bs.next().await {
+    None => return Ok(PrivateReply::PvyNoop),
+    // will this be on a line, or totally arbitrary?
+    Some(Ok(Frame::Text(s))) => serde_json::from_str(&*String::from_utf8_lossy(s.chunk()))?,
+    // Binary frame.
+    Some(Ok(Frame::Binary(_b))) => SyncMessage::SyncEnd,
+
+    // Continuation.
+    Some(Ok(Frame::Continuation(_i))) => SyncMessage::SyncEnd,
+
+    // Ping message.
+    Some(Ok(Frame::Ping(_b))) => SyncMessage::SyncEnd,
+
+    // Pong message.
+    Some(Ok(Frame::Pong(_b))) => SyncMessage::SyncEnd,
+
+    // Close message with optional reason.
+    Some(Ok(Frame::Close(_scr))) => SyncMessage::SyncEnd,
+    Some(Err(_e)) => SyncMessage::SyncEnd,
+  };
+
+  // let (snk, strm) = bs.split();
+  // let mut line = String::new();
+  // // nope!
+  // let sr = StreamReader::new(strm);
+  // read_sync_message_ws(&mut line, &strm);
+
+  // let mut sr = StreamReader::new(bs.map_err(convert_payloaderr));
+  // let mut sr = StreamReader::new(bs);
+  //
+  //
+
+  // let _ = bs.send(rq);
+  //
+  // let mut r = bs.io_ref();
+
+  // let reply = sync_from_stream(
+  //   conn,
+  //   lapin_info,
+  //   &server,
+  //   &user,
+  //   file_path,
+  //   Some(notetemp),
+  //   Some(archivenotetemp),
+  //   Some(linktemp),
+  //   Some(archivelinktemp),
+  //   callbacks,
+  //   &mut sr,
+  // )
+  // .await?;
+  // Ok(reply)
+  Ok(PrivateReply::PvyNoop)
+}
+
 pub async fn sync_from_remote(
   conn: &Connection,
   lapin_info: &Option<LapinInfo>,
@@ -850,6 +984,7 @@ where
   // ----------------------------------------------------------------------------------
   // current zknotes
   // ----------------------------------------------------------------------------------
+  debug!("current notes");
   // First should be the current notes.
   if let SyncMessage::ZkSearchResultHeader(ref _zsrh) = sm {
   } else {
@@ -864,20 +999,26 @@ where
 
   sm = read_sync_message(&mut line, br).await?;
 
-  let serverhash = HashMap::<String, i64>::new();
+  let mut serverhash = HashMap::<String, i64>::new();
+
+  let mut notecount: u64 = 0;
 
   while let SyncMessage::ZkNote(ref note, ref mbf) = sm {
+    notecount = notecount + 1;
+    debug!("notecount {}", notecount);
     let uid = UserId::Uid(
       *userhash
         .get(note.user.to_i64())
         .ok_or_else(|| zkerr::Error::String("user not found".to_string()))?,
     );
 
+    debug!("note5");
     let file_id: Option<i64> = match mbf {
       None => None,
       Some(fileinfo) =>
       // already have a file for this hash?
       {
+        debug!("fileinfo {:?}", fileinfo);
         match conn.query_row(
           "select id from file where hash = ?1",
           params![fileinfo.hash],
@@ -923,23 +1064,54 @@ where
       }
     };
 
-    let server_id = match serverhash.get(&note.server).ok_or_else(|| {
-      match server_id(&conn, note.server.as_str()) {
-        Ok(id) => Ok(id),
-        Err(_e) => conn
-          .execute(
-            "insert into server (uuid, createdate) values (?1, ?2)",
-            params![note.server, now],
-          )
-          .map(|_| conn.last_insert_rowid())
-          .map_err(|e| zkerr::Error::from(e)),
+    debug!("note4");
+    let server_id: i64 = match serverhash.get(&note.server) {
+      Some(id) => id.clone(),
+      None => {
+        debug!("getting server id");
+        match server_id(&conn, note.server.as_str()) {
+          Ok(id) => {
+            serverhash.insert(note.server.clone(), id);
+            id.clone()
+          }
+          Err(_e) => {
+            match conn.execute(
+              "insert into server (uuid, createdate) values (?1, ?2)",
+              params![note.server, now],
+            ) {
+              Ok(_) => {
+                let id = conn.last_insert_rowid();
+                serverhash.insert(note.server.clone(), id);
+                id.clone()
+              }
+              Err(e) => Err(zkerr::Error::from(e))?,
+            }
+          }
+        }
       }
-    }) {
-      Ok(id) => Ok(id.clone()),
-      Err(Ok(id)) => Ok(id),
-      Err(Err(e)) => Err(e),
-    }?;
+    };
+    // let server_id = match serverhash.get(&note.server).ok_or_else(|| {
+    //   match server_id(&conn, note.server.as_str()) {
+    //     Ok(id) => Ok(id),
+    //     Err(_e) => conn
+    //       .execute(
+    //         "insert into server (uuid, createdate) values (?1, ?2)",
+    //         params![note.server, now],
+    //       )
+    //       .map(|_| {
+    //         let id = conn.last_insert_rowid();
+    //         serverhash.insert(note.server.clone(), id);
+    //         id
+    //       })
+    //       .map_err(|e| zkerr::Error::from(e)),
+    //   }
+    // }) {
+    //   Ok(id) => Ok(id.clone()), // Ok(id.clone()),
+    //   Err(Ok(id)) => Ok(id),
+    //   Err(Err(e)) => Err(e),
+    // }?;
 
+    debug!("note3");
     let ex = conn.execute(
         "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, file, server, createdate, changeddate)
          values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
@@ -958,6 +1130,7 @@ where
         note.changeddate,
       ]
       );
+    debug!("note2");
     let id: i64 = match ex {
       Ok(_) => Ok(conn.last_insert_rowid()),
       Err(rusqlite::Error::SqliteFailure(e, Some(s))) => {
@@ -1018,12 +1191,14 @@ where
       Err(e) => Err(e.into()),
     }?;
 
+    debug!("note1");
     if let Some(ref nt) = notetemp {
       conn.execute(
         format!("insert into {} values (?1)", nt).as_str(),
         params![id],
       )?;
     }
+    debug!("note0");
 
     sm = read_sync_message(&mut line, br).await?;
   }
@@ -1032,6 +1207,7 @@ where
   // archive notes
   // ----------------------------------------------------------------------------------
   // After the current notes are the archivenotes.
+  debug!("archive notes");
   if let SyncMessage::ZkSearchResultHeader(ref _zsrh) = sm {
   } else {
     return Err(
@@ -1137,6 +1313,7 @@ where
   // ----------------------------------------------------------------------------------
   // archive links
   // ----------------------------------------------------------------------------------
+  debug!("archive links");
   sm = read_sync_message(&mut line, br).await?;
 
   let mut count = 0;
@@ -1216,6 +1393,7 @@ where
   // ----------------------------------------------------------------------------------
   // current links
   // ----------------------------------------------------------------------------------
+  debug!("current links");
   if let SyncMessage::UuidZkLinkHeader = sm {
   } else {
     return Err(

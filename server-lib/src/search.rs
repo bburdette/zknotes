@@ -5,6 +5,7 @@ use crate::sqldata::server_id;
 use crate::sqldata::{delete_zknote, get_sysids, note_id};
 use async_stream::try_stream;
 use futures::Stream;
+use log::{debug, error, info};
 use orgauth::data::UserId;
 use orgauth::dbfun::user_id;
 use rusqlite::Connection;
@@ -238,9 +239,11 @@ pub fn search_zknotes_stream(
   try_stream! {
     let (sql, args) = build_sql(&conn, user, &search, exclude_notes)?;
 
+    debug!("search_zknotes_stream sql\n {}", sql);
 
     let mut stmt = conn.prepare(sql.as_str())?;
     let mut rows = stmt.query(rusqlite::params_from_iter(args.iter()))?;
+
     yield SyncMessage::from(ZkSearchResultHeader {
       what: search.what,
       resulttype: search.resulttype,

@@ -584,7 +584,7 @@ mod tests {
       let mut br = StreamReader::new(ss);
       println!("0.27");
 
-      match sync_from_stream(
+      match sync_from_ws(
         &caconn,
         &None,
         &caserver,
@@ -785,7 +785,7 @@ mod tests {
     pin_mut!(ss);
     let mut br = StreamReader::new(ss);
 
-    sync_from_stream(
+    sync_from_ws(
       &caconn,
       &None,
       &caserver,
@@ -823,7 +823,7 @@ mod tests {
     pin_mut!(cs);
     let mut cbr = StreamReader::new(cs);
 
-    sync_from_stream(
+    sync_from_ws(
       &saconn,
       &None,
       &saserver,
@@ -1152,7 +1152,7 @@ mod tests {
     pin_mut!(ss);
     let mut br = StreamReader::new(ss);
 
-    sync_from_stream(
+    sync_from_ws(
       &caconn,
       &None,
       &caserver,
@@ -1186,7 +1186,7 @@ mod tests {
     pin_mut!(cs);
     let mut cbr = StreamReader::new(cs);
 
-    sync_from_stream(
+    sync_from_ws(
       &saconn,
       &None,
       &saserver,

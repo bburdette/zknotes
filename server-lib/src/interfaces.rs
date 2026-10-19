@@ -45,7 +45,8 @@ pub fn login_data_for_token(
   session: Session,
   config: &Config,
 ) -> Result<Option<orgauth::data::LoginData>, Box<dyn Error>> {
-  let mut conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+  let mut conn =
+    sqldata::connection_open("login_data_for_token", config.orgauth_config.db.as_path())?;
   conn.busy_timeout(Duration::from_millis(500))?;
 
   let mut cb = sqldata::zknotes_callbacks();
@@ -178,6 +179,7 @@ pub async fn zk_interface_loggedin_streaming(
     PrivateStreamingRequests::SearchZkNotes => {
       let search: ZkNoteSearch = serde_json::from_value(msgdata.clone())?;
       let conn = Arc::new(sqldata::connection_open(
+        "PrivateStreamingRequests::SearchZkNotes",
         config.orgauth_config.db.as_path(),
       )?);
       let znsstream =
@@ -188,6 +190,7 @@ pub async fn zk_interface_loggedin_streaming(
     PrivateStreamingRequests::GetArchiveZkLinks => {
       let rq: GetArchiveZkLinks = serde_json::from_value(msgdata.clone())?;
       let conn = Arc::new(sqldata::connection_open(
+        "psr:GetArchiveZkLinks",
         config.orgauth_config.db.as_path(),
       )?);
       let bstream = sqldata::read_archivezklinks_stream(conn, uid, rq.createddate_after, None)
@@ -197,6 +200,7 @@ pub async fn zk_interface_loggedin_streaming(
     PrivateStreamingRequests::GetZkLinksSince => {
       let rq: GetZkLinksSince = serde_json::from_value(msgdata.clone())?;
       let conn = Arc::new(sqldata::connection_open(
+        "psr:GetZkLinksSince",
         config.orgauth_config.db.as_path(),
       )?);
       let bstream = sqldata::read_zklinks_since_stream(conn, uid, rq.createddate_after, None)
@@ -205,6 +209,7 @@ pub async fn zk_interface_loggedin_streaming(
     }
     PrivateStreamingRequests::Sync => {
       let conn = Arc::new(sqldata::connection_open(
+        "psr:Sync",
         config.orgauth_config.db.as_path(),
       )?);
       let rq: SyncSince = serde_json::from_value(msgdata.clone())?;
@@ -236,7 +241,7 @@ pub async fn zk_interface_loggedin_streaming(
 
 pub async fn zk_interface_loggedin(
   state: &State,
-  conn: &Connection,
+  conn: Connection,
   token: &Option<String>,
   uid: UserId,
   msg: &PrivateRequest,
@@ -356,6 +361,8 @@ pub async fn zk_interface_loggedin(
       let lapin_channelx = li.map(|li| li.channel).clone();
       let token = token.clone();
 
+      conn.close().map_err(|(_conn, err)| err)?;
+
       std::thread::spawn(move || {
         let rt = actix_rt::System::new();
 
@@ -422,11 +429,12 @@ pub async fn zk_interface_loggedin(
           .unwrap()
       });
 
-      Ok(PrivateReply::PvyJobStatus(JobStatus {
-        jobno: jid.jobno,
-        state: JobState::Started,
-        message: "".to_string(),
-      }))
+      // Ok(PrivateReply::PvyJobStatus(JobStatus {
+      //   jobno: jid.jobno,
+      //   state: JobState::Started,
+      //   message: "".to_string(),
+      // }))
+      Ok(PrivateReply::PvyNoop)
     }
     PrivateRequest::PvqSyncFiles(znsrq) => {
       let dbpath: PathBuf = state.config.orgauth_config.db.to_path_buf();
@@ -463,7 +471,7 @@ pub async fn zk_interface_loggedin(
               write!(gbm, "starting file sync");
 
               let r = async {
-                let conn = sqldata::connection_open(&dbpath.as_path())?;
+                let conn = sqldata::connection_open("startit", &dbpath.as_path())?;
                 let _dv = sync::sync_files_down(
                   &conn,
                   &lapin_info,
@@ -560,7 +568,10 @@ pub fn public_interface(
 ) -> Result<PublicReply, zkerr::Error> {
   match msg {
     PublicRequest::PbrGetZkNoteAndLinks(gzne) => {
-      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+      let conn = sqldata::connection_open(
+        "PublicRequest::PbrGetZkNoteAndLinks",
+        config.orgauth_config.db.as_path(),
+      )?;
       let (_, note) = sqldata::read_zknote(&conn, &config.file_path, None, &gzne.zknote)?;
       info!(
         "public#getzknote: {:?} - {} - {:?}",
@@ -580,7 +591,10 @@ pub fn public_interface(
         "user#getzneifchanged: {:?} - {}",
         gzic.zknote, gzic.changeddate
       );
-      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+      let conn = sqldata::connection_open(
+        "PublicRequest::PbrGetZknIfChanged",
+        config.orgauth_config.db.as_path(),
+      )?;
       let ozkne = sqldata::read_zneifchanged(&conn, &config.file_path, None, &gzic)?;
 
       match ozkne {
@@ -589,7 +603,10 @@ pub fn public_interface(
       }
     }
     PublicRequest::PbrGetZkNotePubId(pubid) => {
-      let conn = sqldata::connection_open(config.orgauth_config.db.as_path())?;
+      let conn = sqldata::connection_open(
+        "PublicRequest::PbrGetZkNotePubId",
+        config.orgauth_config.db.as_path(),
+      )?;
       let note = sqldata::read_zknotepubid(&conn, &config.file_path, None, pubid.as_str())?;
       info!(
         "public#getzknotepubid: {} - {} - {:?}",

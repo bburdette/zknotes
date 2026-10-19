@@ -6,7 +6,7 @@ use barrel::backend::Sqlite;
 use lapin::options::QueueDeclareOptions;
 use lapin::types::FieldTable;
 use lapin::Channel;
-use log::{error, info};
+use log::{debug, error, info};
 use orgauth::data::{RegistrationData, UserId};
 use orgauth::dbfun::user_id;
 use orgauth::endpoints::Callbacks;
@@ -169,8 +169,21 @@ pub fn set_homenote(
   Ok(())
 }
 
-pub fn connection_open(dbfile: &Path) -> Result<Connection, zkerr::Error> {
-  let conn = Connection::open(dbfile)?;
+fn sqlog(meh: &str) {
+  info!("sqlog: {}", meh);
+}
+// unsafe extern "C" fn trace_callback(
+//     evt: c_uint,
+//     ctx: *mut c_void,
+//     p: *mut c_void,
+//     x: *mut c_void,
+// ) -> c_int {
+
+pub fn connection_open(connid: &str, dbfile: &Path) -> Result<Connection, zkerr::Error> {
+  debug!("connection id: {}", connid);
+  let mut conn = Connection::open(dbfile)?;
+
+  debug!("after connection_open");
 
   // conn.busy_timeout(Duration::from_millis(500))?;
   conn.busy_handler(Some(|count| {
@@ -180,12 +193,18 @@ pub fn connection_open(dbfile: &Path) -> Result<Connection, zkerr::Error> {
     true
   }))?;
 
+  conn.trace(Some(sqlog));
+
+  debug!("connection_open 2");
   conn.execute("PRAGMA foreign_keys = true;", params![])?;
 
+  debug!("connection_open 3");
   // give this a go with sync!
   // doesn't get the busy handle message at least.
-  conn.query_row("PRAGMA journal_mode = WAL;", params![], |_row| Ok(()))?;
+  // conn.query_row("PRAGMA journal_mode = WAL;", params![], |_row| Ok(()))?;
+  // conn.execute("PRAGMA journal_mode = WAL;", params![])?;
 
+  debug!("end of connection_open");
   Ok(conn)
 }
 
@@ -240,7 +259,7 @@ pub fn update_single_value(
 pub fn dbinit(dbfile: &Path, token_expiration_ms: Option<i64>) -> Result<Server, zkerr::Error> {
   let exists = dbfile.exists();
 
-  let conn = connection_open(dbfile)?;
+  let conn = connection_open("dbinit", dbfile)?;
 
   if !exists {
     info!("initialdb");
@@ -473,6 +492,11 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: Option<i64>) -> Result<Server,
     info!("udpate43");
     zkm::udpate43(&dbfile)?;
     set_single_value(&conn, "migration_level", "43")?;
+  }
+  if nlevel < 44 {
+    info!("udpate44");
+    zkm::udpate44(&dbfile)?;
+    set_single_value(&conn, "migration_level", "44")?;
   }
 
   info!("db up to date.");
@@ -1748,7 +1772,7 @@ pub fn save_zklinks(
   uid: UserId,
   zklinks: &Vec<SaveZkLink2>,
 ) -> Result<(), zkerr::Error> {
-  let conn = connection_open(dbfile)?;
+  let conn = connection_open("save_zklinks", dbfile)?;
 
   for zklink in zklinks.iter() {
     // TODO: integrate into sql instead of separate queries.
