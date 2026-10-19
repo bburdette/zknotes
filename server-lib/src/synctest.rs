@@ -480,7 +480,7 @@ mod tests {
         fs::copy(dbp_server, Path::new("server.db.saved"))?;
       }
     }
-    let server_conn = connection_open(dbp_server)?;
+    let server_conn = connection_open("dbp_server", dbp_server)?;
     let server_ts = setup_db(&server_conn, &mut cb, "".to_string(), None, None, "server").await?;
 
     println!("0.1");
@@ -506,7 +506,7 @@ mod tests {
         fs::copy(dbp_client, Path::new("client.db.saved"))?;
       }
     }
-    let client_conn = connection_open(dbp_client)?;
+    let client_conn = connection_open("dbp_client", dbp_client)?;
     let client_ts = setup_db(
       &client_conn,
       &mut cb,
@@ -584,7 +584,7 @@ mod tests {
       let mut br = StreamReader::new(ss);
       println!("0.27");
 
-      match sync_from_ws(
+      match sync_from_stream(
         &caconn,
         &None,
         &caserver,
@@ -785,7 +785,7 @@ mod tests {
     pin_mut!(ss);
     let mut br = StreamReader::new(ss);
 
-    sync_from_ws(
+    sync_from_stream(
       &caconn,
       &None,
       &caserver,
@@ -823,7 +823,7 @@ mod tests {
     pin_mut!(cs);
     let mut cbr = StreamReader::new(cs);
 
-    sync_from_ws(
+    sync_from_stream(
       &saconn,
       &None,
       &saserver,
@@ -1152,7 +1152,7 @@ mod tests {
     pin_mut!(ss);
     let mut br = StreamReader::new(ss);
 
-    sync_from_ws(
+    sync_from_stream(
       &caconn,
       &None,
       &caserver,
@@ -1186,7 +1186,7 @@ mod tests {
     pin_mut!(cs);
     let mut cbr = StreamReader::new(cs);
 
-    sync_from_ws(
+    sync_from_stream(
       &saconn,
       &None,
       &saserver,

@@ -6,7 +6,7 @@ use barrel::backend::Sqlite;
 use lapin::options::QueueDeclareOptions;
 use lapin::types::FieldTable;
 use lapin::Channel;
-use log::{debug, error, info};
+use log::{error, info};
 use orgauth::data::{RegistrationData, UserId};
 use orgauth::dbfun::user_id;
 use orgauth::endpoints::Callbacks;
@@ -175,7 +175,7 @@ fn sqlog(meh: &str) {
 
 const SQLITE_TRACING: bool = false;
 
-pub fn connection_open(connid: &str, dbfile: &Path) -> Result<Connection, zkerr::Error> {
+pub fn connection_open(_connid: &str, dbfile: &Path) -> Result<Connection, zkerr::Error> {
   let mut conn = Connection::open(dbfile)?;
 
   // conn.busy_timeout(Duration::from_millis(500))?;

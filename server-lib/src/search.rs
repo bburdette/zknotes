@@ -5,7 +5,6 @@ use crate::sqldata::server_id;
 use crate::sqldata::{delete_zknote, get_sysids, note_id};
 use async_stream::try_stream;
 use futures::Stream;
-use log::debug;
 use orgauth::data::UserId;
 use orgauth::dbfun::user_id;
 use rusqlite::Connection;
