@@ -482,11 +482,9 @@ async fn private_ws(
   rt::spawn(async move {
     while let Some(msg) = stream.next().await {
       match async {
-        println!("after stream.next()");
         match msg {
           Ok(AggregatedMessage::Text(t)) => {
             let pcr: PrivateClosureRequest = serde_json::from_str(&t)?;
-            println!("after let pcr: PrivateClosureRequest =");
             match (
               zk_interface_check(&token_uuid, &mut state, &token, pcr.request).await,
               SystemTime::now()
@@ -621,7 +619,6 @@ async fn zk_interface_check(
     "zk_interface_check",
     state.config.orgauth_config.db.as_path(),
   )?;
-  println!("before read_user_by_token_api");
   match orgauth::dbfun::read_user_by_token_api(
     &conn,
     token_uuid,
@@ -636,7 +633,6 @@ async fn zk_interface_check(
       )))
     }
     Ok(userdata) => {
-      println!("after read_user_by_token_api");
       // finally!  processing messages as logged in user.
       interfaces::zk_interface_loggedin(state, conn, token, userdata.id, &msg).await
     }
