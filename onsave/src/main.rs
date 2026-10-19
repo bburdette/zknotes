@@ -147,7 +147,6 @@ async fn err_main() -> Result<(), Box<dyn std::error::Error>> {
 
   loop {
     let r: Result<(), Box<dyn std::error::Error>> = async {
-      println!("here!!");
       let conn = match (amqp_uid.clone(), amqp_pwd.clone()) {
         (Some(uid), Some(pwd)) => {
           // Hack in the uid and pwd to the url.
@@ -429,8 +428,6 @@ pub async fn yeet_service(
 
                           match res {
                             Ok(res) => {
-                              println!("res: {:?}", res);
-
                               if !res.status().is_success() {
                                 error!("error saving yeet error note: {}, {:?}", zkn.id, res);
                               }

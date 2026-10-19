@@ -480,7 +480,7 @@ mod tests {
         fs::copy(dbp_server, Path::new("server.db.saved"))?;
       }
     }
-    let server_conn = connection_open(dbp_server)?;
+    let server_conn = connection_open("dbp_server", dbp_server)?;
     let server_ts = setup_db(&server_conn, &mut cb, "".to_string(), None, None, "server").await?;
 
     println!("0.1");
@@ -506,7 +506,7 @@ mod tests {
         fs::copy(dbp_client, Path::new("client.db.saved"))?;
       }
     }
-    let client_conn = connection_open(dbp_client)?;
+    let client_conn = connection_open("dbp_client", dbp_client)?;
     let client_ts = setup_db(
       &client_conn,
       &mut cb,

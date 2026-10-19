@@ -169,8 +169,14 @@ pub fn set_homenote(
   Ok(())
 }
 
-pub fn connection_open(dbfile: &Path) -> Result<Connection, zkerr::Error> {
-  let conn = Connection::open(dbfile)?;
+fn sqlog(meh: &str) {
+  info!("sqlog: {}", meh);
+}
+
+const SQLITE_TRACING: bool = false;
+
+pub fn connection_open(_connid: &str, dbfile: &Path) -> Result<Connection, zkerr::Error> {
+  let mut conn = Connection::open(dbfile)?;
 
   // conn.busy_timeout(Duration::from_millis(500))?;
   conn.busy_handler(Some(|count| {
@@ -179,6 +185,11 @@ pub fn connection_open(dbfile: &Path) -> Result<Connection, zkerr::Error> {
     std::thread::sleep(d);
     true
   }))?;
+
+  if SQLITE_TRACING {
+    #[allow(deprecated)]
+    conn.trace(Some(sqlog));
+  }
 
   conn.execute("PRAGMA foreign_keys = true;", params![])?;
 
@@ -240,7 +251,7 @@ pub fn update_single_value(
 pub fn dbinit(dbfile: &Path, token_expiration_ms: Option<i64>) -> Result<Server, zkerr::Error> {
   let exists = dbfile.exists();
 
-  let conn = connection_open(dbfile)?;
+  let conn = connection_open("dbinit", dbfile)?;
 
   if !exists {
     info!("initialdb");
@@ -473,6 +484,11 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: Option<i64>) -> Result<Server,
     info!("udpate43");
     zkm::udpate43(&dbfile)?;
     set_single_value(&conn, "migration_level", "43")?;
+  }
+  if nlevel < 44 {
+    info!("udpate44");
+    zkm::udpate44(&dbfile)?;
+    set_single_value(&conn, "migration_level", "44")?;
   }
 
   info!("db up to date.");
@@ -1748,7 +1764,7 @@ pub fn save_zklinks(
   uid: UserId,
   zklinks: &Vec<SaveZkLink2>,
 ) -> Result<(), zkerr::Error> {
-  let conn = connection_open(dbfile)?;
+  let conn = connection_open("save_zklinks", dbfile)?;
 
   for zklink in zklinks.iter() {
     // TODO: integrate into sql instead of separate queries.
@@ -1837,19 +1853,17 @@ pub fn save_savelzlinks(
     if link.delete == Some(true) {
       // create archive record.
       let now = now()?;
-      let ac = conn.execute(
+      let _ac = conn.execute(
         "insert into zklinkarchive (fromid, toid, user, linkzknote, createdate, deletedate)
             select fromid, toid, user, linkzknote, createdate, ?1 from zklink
             where fromid = ?2 and toid = ?3 and user = ?4",
         params![now, from, to, uid.to_i64()],
       )?;
-      println!("inserted {} archive lzlink", ac);
       // delete the link.
-      let dc = conn.execute(
+      let _dc = conn.execute(
         "delete from zklink where fromid = ?1 and toid = ?2 and user = ?3",
         params![from, to, uid.to_i64()],
       )?;
-      println!("deleted {} lzlink", dc);
     } else {
       save_zklink(&conn, from, to, uid, Some(linkzknote))?;
     }

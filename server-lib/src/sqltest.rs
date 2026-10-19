@@ -40,7 +40,7 @@ mod tests {
 
     dbinit(dbp, None)?;
 
-    let conn = connection_open(dbp)?;
+    let conn = connection_open("dbp", dbp)?;
 
     let server = local_server_id(&conn)?;
 
@@ -754,10 +754,10 @@ mod tests {
     }
     println!("25");
 
-    // should be 4 notes tagged with et'user' - 3 users and 1 'system'.
+    // should be 3 notes tagged with e>'user' - 3 users
     let u1pubnote2_exact_search = ZkNoteSearch {
       tagsearch: vec![TagSearch::SearchTerm {
-        mods: vec![SearchMod::ExactMatch, SearchMod::Tag],
+        mods: vec![SearchMod::ExactMatch, SearchMod::TagTo],
         term: "user".to_string(),
       }],
       offset: 0,
@@ -771,10 +771,10 @@ mod tests {
 
     match search_zknotes(&conn, filesdir, uid1, &u1pubnote2_exact_search)? {
       SearchResult::SrListNote(zklr) => {
-        if zklr.notes.len() == 4 {
+        if zklr.notes.len() == 3 {
           ()
         } else {
-          panic!("test failed")
+          panic!("test failed, len was {}", zklr.notes.len())
         }
       }
       _ => panic!("test failed"),
@@ -784,7 +784,7 @@ mod tests {
     // should be 9 notes for 'user1'
     let u1pubnote2_exact_search = ZkNoteSearch {
       tagsearch: vec![TagSearch::SearchTerm {
-        mods: vec![SearchMod::ExactMatch, SearchMod::Tag, SearchMod::User],
+        mods: vec![SearchMod::ExactMatch, SearchMod::TagTo, SearchMod::User],
         term: "user1".to_string(),
       }],
       offset: 0,

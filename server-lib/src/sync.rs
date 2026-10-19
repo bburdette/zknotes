@@ -17,7 +17,7 @@ use futures::future;
 use futures::Stream;
 use futures_util::TryStreamExt;
 use futures_util::{StreamExt, TryFutureExt};
-use log::{error, info};
+use log::{error, info, warn};
 use orgauth;
 use orgauth::data::{User, UserId};
 use orgauth::dbfun::user_id;
@@ -185,8 +185,26 @@ pub fn temp_tables(conn: &Connection) -> Result<TempTableNames, zkerr::Error> {
 
   conn.execute(
     format!(
+      "CREATE UNIQUE INDEX \"{}unq\" ON \"{}\" (\"id\")",
+      notetemp, notetemp
+    )
+    .as_str(),
+    params![],
+  )?;
+
+  conn.execute(
+    format!(
       "create temporary table {} (\"id\" integer primary key not null)",
       archivenotetemp
+    )
+    .as_str(),
+    params![],
+  )?;
+
+  conn.execute(
+    format!(
+      "CREATE UNIQUE INDEX \"{}unq\" ON \"{}\" (\"id\")",
+      archivenotetemp, archivenotetemp
     )
     .as_str(),
     params![],
@@ -223,6 +241,15 @@ pub fn temp_tables(conn: &Connection) -> Result<TempTableNames, zkerr::Error> {
     params![],
   )?;
 
+  conn.execute(
+    format!(
+      "CREATE UNIQUE INDEX \"{}unq\" ON \"{}\" (\"id\")",
+      archivelinktemp, archivelinktemp
+    )
+    .as_str(),
+    params![],
+  )?;
+
   Ok(TempTableNames {
     notetemp,
     archivenotetemp,
@@ -240,7 +267,7 @@ pub async fn sync(
   callbacks: &mut Callbacks,
   monitor: &dyn JobMonitor,
 ) -> Result<PrivateReply, Box<dyn std::error::Error>> {
-  let conn = Arc::new(sqldata::connection_open(dbpath)?);
+  let conn = Arc::new(sqldata::connection_open("sync", dbpath)?);
   let user = orgauth::dbfun::read_user_by_id(&conn, uid)?; // TODO pass this in from calling ftn?
   let extra_login_data = sqldata::read_extra_login_data(&conn, user.id)?;
   // let mut callbacks = &mut zknotes_callbacks();
@@ -362,7 +389,7 @@ pub async fn download_file(
     .map_err(|e| zkerr::Error::String(e.to_string()))?;
 
   if res.status() == 404 {
-    println!("404 for {}!", title);
+    info!("404 for {}!", title);
     return Ok(DownloadResult::DownloadFailed);
   }
 
@@ -864,9 +891,12 @@ where
 
   sm = read_sync_message(&mut line, br).await?;
 
-  let serverhash = HashMap::<String, i64>::new();
+  let mut serverhash = HashMap::<String, i64>::new();
+
+  let mut notecount: u64 = 0;
 
   while let SyncMessage::ZkNote(ref note, ref mbf) = sm {
+    notecount = notecount + 1;
     let uid = UserId::Uid(
       *userhash
         .get(note.user.to_i64())
@@ -923,22 +953,28 @@ where
       }
     };
 
-    let server_id = match serverhash.get(&note.server).ok_or_else(|| {
-      match server_id(&conn, note.server.as_str()) {
-        Ok(id) => Ok(id),
-        Err(_e) => conn
-          .execute(
+    let server_id: i64 = match serverhash.get(&note.server) {
+      Some(id) => id.clone(),
+      None => match server_id(&conn, note.server.as_str()) {
+        Ok(id) => {
+          serverhash.insert(note.server.clone(), id);
+          id.clone()
+        }
+        Err(_e) => {
+          match conn.execute(
             "insert into server (uuid, createdate) values (?1, ?2)",
             params![note.server, now],
-          )
-          .map(|_| conn.last_insert_rowid())
-          .map_err(|e| zkerr::Error::from(e)),
-      }
-    }) {
-      Ok(id) => Ok(id.clone()),
-      Err(Ok(id)) => Ok(id),
-      Err(Err(e)) => Err(e),
-    }?;
+          ) {
+            Ok(_) => {
+              let id = conn.last_insert_rowid();
+              serverhash.insert(note.server.clone(), id);
+              id.clone()
+            }
+            Err(e) => Err(zkerr::Error::from(e))?,
+          }
+        }
+      },
+    };
 
     let ex = conn.execute(
         "insert into zknote (title, content, user, pubid, editable, showtitle, deleted, uuid, file, server, createdate, changeddate)
@@ -1028,10 +1064,14 @@ where
     sm = read_sync_message(&mut line, br).await?;
   }
 
+  info!("synced {} zknotes", notecount);
+
   // ----------------------------------------------------------------------------------
   // archive notes
   // ----------------------------------------------------------------------------------
   // After the current notes are the archivenotes.
+  //
+  notecount = 0;
   if let SyncMessage::ZkSearchResultHeader(ref _zsrh) = sm {
   } else {
     return Err(
@@ -1045,6 +1085,7 @@ where
 
   sm = read_sync_message(&mut line, br).await?;
   while let SyncMessage::ZkNote(ref note, ref _mbf) = sm {
+    notecount = notecount + 1;
     // TODO: make file source record (?)
 
     let uid = UserId::Uid(
@@ -1123,6 +1164,8 @@ where
     sm = read_sync_message(&mut line, br).await?;
   }
 
+  info!("synced {} archive zknotes", notecount);
+
   if let SyncMessage::ArchiveZkLinkHeader = sm {
   } else {
     return Err(
@@ -1168,7 +1211,7 @@ where
           // actually there is no unique index on zklinkarchive so can this even happen?
           if e.code == rusqlite::ErrorCode::ConstraintViolation {
             // if duplicate record, just ignore and go on.
-            println!("duplicate archivelink: {:?}", l);
+            warn!("duplicate archivelink: {:?}", l);
             None
           } else {
             return Err(rusqlite::Error::SqliteFailure(e, s).into());
@@ -1190,7 +1233,7 @@ where
           // actually there is no unique index on zklinkarchive so can this even happen?
           if e.code == rusqlite::ErrorCode::ConstraintViolation {
             // if duplicate record, just ignore and go on.
-            println!("duplicate archivelink: {:?}", l);
+            warn!("duplicate archivelink: {:?}", l);
             None
           } else {
             return Err(rusqlite::Error::SqliteFailure(e, s).into());
@@ -1434,7 +1477,6 @@ pub async fn sync_to_remote(
     .await?;
 
   // TODO: send back Sync results... how many records and etc.
-
   Ok(PrivateReply::PvySyncComplete)
 }
 
