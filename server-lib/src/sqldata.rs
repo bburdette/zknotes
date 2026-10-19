@@ -195,8 +195,7 @@ pub fn connection_open(connid: &str, dbfile: &Path) -> Result<Connection, zkerr:
 
   // give this a go with sync!
   // doesn't get the busy handle message at least.
-  // conn.query_row("PRAGMA journal_mode = WAL;", params![], |_row| Ok(()))?;
-  // conn.execute("PRAGMA journal_mode = WAL;", params![])?;
+  conn.query_row("PRAGMA journal_mode = WAL;", params![], |_row| Ok(()))?;
 
   Ok(conn)
 }
