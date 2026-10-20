@@ -674,9 +674,13 @@ pub async fn sync_files_up(
 
   let mut line = String::new();
 
-  let mut sm = read_sync_message(&mut line, &mut sr)
-    .map_err(|e| zkerr::Error::String(format!("read sync error: {:?}", e)))
-    .await?;
+  let mut resvec = Vec::new();
+
+  let mut sm = match read_sync_message(&mut line, &mut sr).await {
+    Err(zkerr::Error::EmptyStream) => return Ok(resvec),
+    Err(e) => return Err(zkerr::Error::String(format!("read sync error: {:?}", e))),
+    Ok(sm) => sm,
+  };
 
   if let SyncMessage::ZkSearchResultHeader(ref _zsrh) = sm {
   } else {
@@ -689,11 +693,12 @@ pub async fn sync_files_up(
     );
   }
 
-  sm = read_sync_message(&mut line, &mut sr)
-    .map_err(|e| zkerr::Error::String(format!("read sync error: {:?}", e)))
-    .await?;
+  sm = match read_sync_message(&mut line, &mut sr).await {
+    Err(zkerr::Error::EmptyStream) => return Ok(resvec),
+    Err(e) => return Err(zkerr::Error::String(format!("read sync error: {:?}", e))),
+    Ok(sm) => sm,
+  };
 
-  let mut resvec = Vec::new();
   while let SyncMessage::ZkNoteId(ref id) = sm {
     let nid = note_id_for_uuid(&conn, &Uuid::from_str(id.as_str())?)?;
 
