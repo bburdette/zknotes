@@ -4,7 +4,7 @@ use crate::search::build_sql;
 use crate::search::{search_zknotes, search_zknotes_stream, sync_users, system_user, SearchResult};
 use crate::sqldata::{
   self, local_server_id, note_id_for_uuid, save_zklink, save_zknote, server_id, user_note_id,
-  LapinInfo, NoteDates,
+  ConnFig, LapinInfo, NoteDates,
 };
 use crate::util::now;
 use actix_multipart_rfc7578 as multipart;
@@ -267,7 +267,11 @@ pub async fn sync(
   callbacks: &mut Callbacks,
   monitor: &dyn JobMonitor,
 ) -> Result<PrivateReply, Box<dyn std::error::Error>> {
-  let conn = Arc::new(sqldata::connection_open("sync", false, dbpath)?);
+  let conn = Arc::new(sqldata::connection_open(
+    "sync",
+    ConnFig::ReadWrite,
+    dbpath,
+  )?);
   let user = orgauth::dbfun::read_user_by_id(&conn, uid)?; // TODO pass this in from calling ftn?
   let extra_login_data = sqldata::read_extra_login_data(&conn, user.id)?;
   // let mut callbacks = &mut zknotes_callbacks();

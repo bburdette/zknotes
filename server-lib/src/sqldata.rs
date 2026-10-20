@@ -175,24 +175,30 @@ fn sqlog(meh: &str) {
 
 const SQLITE_TRACING: bool = false;
 
+pub enum ConnFig {
+  ReadWrite,
+  ReadOnly,
+}
+
 pub fn connection_open(
   _connid: &str,
-  read_only: bool,
+  conn_fig: ConnFig,
   dbfile: &Path,
 ) -> Result<Connection, zkerr::Error> {
-  let mut conn = if read_only {
-    let c = Connection::open_with_flags(
-      dbfile,
-      OpenFlags::SQLITE_OPEN_READ_ONLY
-        | OpenFlags::SQLITE_OPEN_NO_MUTEX
-        | OpenFlags::SQLITE_OPEN_URI, // OpenFlags::SQLITE_OPEN_READ_ONLY
-                                      //   | OpenFlags::SQLITE_OPEN_CREATE
-                                      //   | OpenFlags::SQLITE_OPEN_URI
-                                      //   | OpenFlags::SQLITE_OPEN_NO_MUTEX,
-    )?;
-    c
-  } else {
-    Connection::open(dbfile)?
+  let mut conn = match conn_fig {
+    ConnFig::ReadOnly => {
+      let c = Connection::open_with_flags(
+        dbfile,
+        OpenFlags::SQLITE_OPEN_READ_ONLY
+          | OpenFlags::SQLITE_OPEN_NO_MUTEX
+          | OpenFlags::SQLITE_OPEN_URI, // OpenFlags::SQLITE_OPEN_READ_ONLY
+                                        //   | OpenFlags::SQLITE_OPEN_CREATE
+                                        //   | OpenFlags::SQLITE_OPEN_URI
+                                        //   | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+      )?;
+      c
+    }
+    ConnFig::ReadWrite => Connection::open(dbfile)?,
   };
 
   // conn.busy_timeout(Duration::from_millis(500))?;
@@ -268,7 +274,7 @@ pub fn update_single_value(
 pub fn dbinit(dbfile: &Path, token_expiration_ms: Option<i64>) -> Result<Server, zkerr::Error> {
   let exists = dbfile.exists();
 
-  let conn = connection_open("dbinit", false, dbfile)?;
+  let conn = connection_open("dbinit", ConnFig::ReadWrite, dbfile)?;
 
   if !exists {
     info!("initialdb");

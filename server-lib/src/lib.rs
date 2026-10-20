@@ -9,7 +9,7 @@ mod sqltest;
 pub mod state;
 mod sync;
 mod synctest;
-use crate::{error as zkerr, state::State};
+use crate::{error as zkerr, sqldata::ConnFig, state::State};
 use actix_cors::Cors;
 use actix_files::NamedFile;
 use actix_multipart::Multipart;
@@ -183,7 +183,11 @@ async fn user(
   //   req.connection_info()
   // );
   match async {
-    let conn = sqldata::connection_open("user", false, data.config.orgauth_config.db.as_path())?;
+    let conn = sqldata::connection_open(
+      "user",
+      ConnFig::ReadWrite,
+      data.config.orgauth_config.db.as_path(),
+    )?;
 
     interfaces::user_interface(
       &conn,
@@ -259,8 +263,11 @@ pub fn get_tauri_uid(conn: &Connection) -> Result<Option<UserId>, zkerr::Error> 
 }
 
 async fn file(session: Session, state: web::Data<State>, req: HttpRequest) -> HttpResponse {
-  let conn = match sqldata::connection_open("file", true, state.config.orgauth_config.db.as_path())
-  {
+  let conn = match sqldata::connection_open(
+    "file",
+    ConnFig::ReadOnly,
+    state.config.orgauth_config.db.as_path(),
+  ) {
     Ok(c) => c,
     Err(e) => return HttpResponse::InternalServerError().body(format!("{:?}", e)),
   };
@@ -344,7 +351,7 @@ async fn make_file_notes(
 ) -> Result<UploadReply, Box<dyn Error>> {
   let conn = sqldata::connection_open(
     "make_file_notes",
-    false,
+    ConnFig::ReadWrite,
     state.config.orgauth_config.db.as_path(),
   )?;
   let uid = if state.config.tauri_mode {
@@ -616,7 +623,7 @@ async fn zk_interface_check(
 ) -> Result<PrivateReply, zkerr::Error> {
   let conn = sqldata::connection_open(
     "zk_interface_check",
-    true,
+    ConnFig::ReadOnly,
     state.config.orgauth_config.db.as_path(),
   )?;
   info!("pre read_user_by_token_api");
@@ -647,7 +654,7 @@ async fn zk_interface_check_streaming(
     Some(token) => {
       let conn = sqldata::connection_open(
         "zk_interface_check_streaming",
-        true,
+        ConnFig::ReadOnly,
         config.orgauth_config.db.as_path(),
       )?;
       match orgauth::dbfun::read_user_by_token_api(
@@ -702,7 +709,7 @@ async fn zk_interface_check_upstreaming(
     Some(token) => {
       let conn = sqldata::connection_open(
         "zk_interface_check_upstreaming",
-        true,
+        ConnFig::ReadOnly,
         config.orgauth_config.db.as_path(),
       )?;
 
@@ -937,7 +944,7 @@ pub async fn err_main(
   if let Some(uid) = matches.value_of("promote_to_admin") {
     let conn = sqldata::connection_open(
       "promote to admin",
-      false,
+      ConnFig::ReadWrite,
       config.orgauth_config.db.as_path(),
     )?;
     let mut user = orgauth::dbfun::read_user_by_name(&conn, uid)?;
@@ -956,8 +963,11 @@ pub async fn err_main(
     stdin().read_line(&mut pwd)?;
     let mut cb = sqldata::zknotes_callbacks();
 
-    let conn =
-      sqldata::connection_open("creating admin", false, config.orgauth_config.db.as_path())?;
+    let conn = sqldata::connection_open(
+      "creating admin",
+      ConnFig::ReadWrite,
+      config.orgauth_config.db.as_path(),
+    )?;
     // make new registration i
     let rd = orgauth::data::RegistrationData {
       uid: username.to_string(),
@@ -1048,7 +1058,11 @@ pub async fn init_server(mut config: Config) -> Result<Server, Box<dyn Error>> {
   };
 
   {
-    let conn = sqldata::connection_open("init_server", false, config.orgauth_config.db.as_path())?;
+    let conn = sqldata::connection_open(
+      "init_server",
+      ConnFig::ReadWrite,
+      config.orgauth_config.db.as_path(),
+    )?;
 
     let tr = conn.unchecked_transaction()?;
     sqldata::update_filetable(&conn, &config.file_path)?;
