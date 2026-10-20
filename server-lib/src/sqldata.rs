@@ -11,8 +11,8 @@ use orgauth::data::{RegistrationData, UserId};
 use orgauth::dbfun::user_id;
 use orgauth::endpoints::Callbacks;
 use orgauth::util::now;
-use rusqlite::Row;
 use rusqlite::{params, Connection};
+use rusqlite::{OpenFlags, Row};
 use serde_derive::{Deserialize, Serialize};
 use simple_error::bail;
 use std::iter::FromIterator;
@@ -175,8 +175,27 @@ fn sqlog(meh: &str) {
 
 const SQLITE_TRACING: bool = false;
 
-pub fn connection_open(_connid: &str, dbfile: &Path) -> Result<Connection, zkerr::Error> {
-  let mut conn = Connection::open(dbfile)?;
+pub fn connection_open(
+  _connid: &str,
+  read_only: bool,
+  dbfile: &Path,
+) -> Result<Connection, zkerr::Error> {
+  let mut conn = if read_only {
+    info!("beefore");
+    let c = Connection::open_with_flags(
+      dbfile,
+      OpenFlags::SQLITE_OPEN_READ_ONLY
+        | OpenFlags::SQLITE_OPEN_NO_MUTEX
+        | OpenFlags::SQLITE_OPEN_URI, // OpenFlags::SQLITE_OPEN_READ_ONLY
+                                      //   | OpenFlags::SQLITE_OPEN_CREATE
+                                      //   | OpenFlags::SQLITE_OPEN_URI
+                                      //   | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )?;
+    info!("eefter");
+    c
+  } else {
+    Connection::open(dbfile)?
+  };
 
   // conn.busy_timeout(Duration::from_millis(500))?;
   conn.busy_handler(Some(|count| {
@@ -251,7 +270,7 @@ pub fn update_single_value(
 pub fn dbinit(dbfile: &Path, token_expiration_ms: Option<i64>) -> Result<Server, zkerr::Error> {
   let exists = dbfile.exists();
 
-  let conn = connection_open("dbinit", dbfile)?;
+  let conn = connection_open("dbinit", false, dbfile)?;
 
   if !exists {
     info!("initialdb");
@@ -489,6 +508,11 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: Option<i64>) -> Result<Server,
     info!("udpate44");
     zkm::udpate44(&dbfile)?;
     set_single_value(&conn, "migration_level", "44")?;
+  }
+  if nlevel < 45 {
+    info!("udpate45");
+    zkm::udpate45(&dbfile)?;
+    set_single_value(&conn, "migration_level", "45")?;
   }
 
   info!("db up to date.");
@@ -1764,7 +1788,7 @@ pub fn save_zklinks(
   uid: UserId,
   zklinks: &Vec<SaveZkLink2>,
 ) -> Result<(), zkerr::Error> {
-  let conn = connection_open("save_zklinks", dbfile)?;
+  let conn = connection_open("save_zklinks", false, dbfile)?;
 
   for zklink in zklinks.iter() {
     // TODO: integrate into sql instead of separate queries.

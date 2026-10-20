@@ -267,7 +267,7 @@ pub async fn sync(
   callbacks: &mut Callbacks,
   monitor: &dyn JobMonitor,
 ) -> Result<PrivateReply, Box<dyn std::error::Error>> {
-  let conn = Arc::new(sqldata::connection_open("sync", dbpath)?);
+  let conn = Arc::new(sqldata::connection_open("sync", false, dbpath)?);
   let user = orgauth::dbfun::read_user_by_id(&conn, uid)?; // TODO pass this in from calling ftn?
   let extra_login_data = sqldata::read_extra_login_data(&conn, user.id)?;
   // let mut callbacks = &mut zknotes_callbacks();
@@ -768,6 +768,7 @@ pub async fn sync_from_remote(
     Some(archivelinktemp),
     callbacks,
     &mut sr,
+    Some(monitor),
   )
   .await?;
   Ok(reply)
@@ -800,6 +801,7 @@ pub async fn sync_from_stream<S>(
   archivelinktemp: Option<&str>,
   callbacks: &mut Callbacks,
   br: &mut StreamReader<S, bytes::Bytes>,
+  monitor: Option<&dyn JobMonitor>,
 ) -> Result<PrivateReply, Box<dyn std::error::Error>>
 where
   S: Stream<Item = Result<Bytes, std::io::Error>> + Unpin,
@@ -897,6 +899,9 @@ where
 
   while let SyncMessage::ZkNote(ref note, ref mbf) = sm {
     notecount = notecount + 1;
+    if notecount % 100 == 0 {
+      monitor.map(|m| write!(m, "sync downloaded {} notes", notecount));
+    }
     let uid = UserId::Uid(
       *userhash
         .get(note.user.to_i64())
@@ -1065,6 +1070,7 @@ where
   }
 
   info!("synced {} zknotes", notecount);
+  monitor.map(|m| write!(m, "sync downloaded {} notes total", notecount));
 
   // ----------------------------------------------------------------------------------
   // archive notes
@@ -1086,6 +1092,9 @@ where
   sm = read_sync_message(&mut line, br).await?;
   while let SyncMessage::ZkNote(ref note, ref _mbf) = sm {
     notecount = notecount + 1;
+    if notecount % 100 == 0 {
+      monitor.map(|m| write!(m, "sync downloaded {} archive notes", notecount));
+    }
     // TODO: make file source record (?)
 
     let uid = UserId::Uid(
@@ -1165,6 +1174,7 @@ where
   }
 
   info!("synced {} archive zknotes", notecount);
+  monitor.map(|m| write!(m, "sync downloaded {} archive notes total", notecount));
 
   if let SyncMessage::ArchiveZkLinkHeader = sm {
   } else {
