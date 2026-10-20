@@ -48,7 +48,7 @@ pub fn login_data_for_token(
 ) -> Result<Option<orgauth::data::LoginData>, Box<dyn Error>> {
   let mut conn = sqldata::connection_open(
     "login_data_for_token",
-    ConnFig::ReadOnly,
+    ConnFig::ReadWrite,
     config.orgauth_config.db.as_path(),
   )?;
   conn.busy_timeout(Duration::from_millis(500))?;

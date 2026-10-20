@@ -228,7 +228,7 @@ async fn admin(
   ) {
     Ok(sr) => HttpResponse::Ok().json(sr),
     Err(e) => {
-      error!("'user' err: {:?}", e);
+      error!("'admin' err: {:?}", e);
       let se = AdminResponse::ArpServerError(e.to_string());
       HttpResponse::Ok().json(se)
     }
@@ -623,7 +623,7 @@ async fn zk_interface_check(
 ) -> Result<PrivateReply, zkerr::Error> {
   let conn = sqldata::connection_open(
     "zk_interface_check",
-    ConnFig::ReadOnly,
+    ConnFig::ReadWrite,
     state.config.orgauth_config.db.as_path(),
   )?;
   info!("pre read_user_by_token_api");
@@ -654,7 +654,7 @@ async fn zk_interface_check_streaming(
     Some(token) => {
       let conn = sqldata::connection_open(
         "zk_interface_check_streaming",
-        ConnFig::ReadOnly,
+        ConnFig::ReadWrite,
         config.orgauth_config.db.as_path(),
       )?;
       match orgauth::dbfun::read_user_by_token_api(
@@ -709,7 +709,7 @@ async fn zk_interface_check_upstreaming(
     Some(token) => {
       let conn = sqldata::connection_open(
         "zk_interface_check_upstreaming",
-        ConnFig::ReadOnly,
+        ConnFig::ReadWrite,
         config.orgauth_config.db.as_path(),
       )?;
 
