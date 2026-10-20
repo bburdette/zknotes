@@ -325,7 +325,6 @@ pub async fn zk_interface_loggedin(
     }
     PrivateRequest::PvqPowerDelete(search) => {
       conn.close().map_err(|e| e.1)?;
-
       let conn = sqldata::connection_open(
         "PvqPowerDelete",
         false,
@@ -336,9 +335,8 @@ pub async fn zk_interface_loggedin(
     }
     PrivateRequest::PvqDeleteZkNote(id) => {
       conn.close().map_err(|e| e.1)?;
-
       let conn = sqldata::connection_open(
-        "PvqPowerDelete",
+        "PvqDeleteZkNote",
         false,
         state.config.orgauth_config.db.as_path(),
       )?;
@@ -347,9 +345,8 @@ pub async fn zk_interface_loggedin(
     }
     PrivateRequest::PvqSaveZkNote(sbe) => {
       conn.close().map_err(|e| e.1)?;
-
       let conn = sqldata::connection_open(
-        "PvqPowerDelete",
+        "PvqSaveZkNote",
         false,
         state.config.orgauth_config.db.as_path(),
       )?;
@@ -359,20 +356,23 @@ pub async fn zk_interface_loggedin(
     }
     PrivateRequest::PvqSaveZkLinks(msg) => {
       conn.close().map_err(|e| e.1)?;
-
       let conn = sqldata::connection_open(
-        "PvqPowerDelete",
+        "PvqSaveZkLinks",
         false,
         state.config.orgauth_config.db.as_path(),
       )?;
-      let _ = sqldata::save_zklinks(&state.config.orgauth_config.db.as_path(), uid, &msg.links)?;
+      let _ = sqldata::save_zklinks(
+        &conn,
+        &state.config.orgauth_config.db.as_path(),
+        uid,
+        &msg.links,
+      )?;
       Ok(PrivateReply::PvySavedZkLinks)
     }
     PrivateRequest::PvqSaveZkNoteAndLinks(sznpl) => {
       conn.close().map_err(|e| e.1)?;
-
       let conn = sqldata::connection_open(
-        "PvqPowerDelete",
+        "PvqSaveZkNoteAndLinks",
         false,
         state.config.orgauth_config.db.as_path(),
       )?;
@@ -385,7 +385,6 @@ pub async fn zk_interface_loggedin(
     }
     PrivateRequest::PvqSaveImportZkNotes(gzl) => {
       conn.close().map_err(|e| e.1)?;
-
       let conn = sqldata::connection_open(
         "PvqPowerDelete",
         false,
