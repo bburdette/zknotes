@@ -249,7 +249,7 @@ pub async fn zk_interface_loggedin_streaming(
 
 pub async fn zk_interface_loggedin(
   state: &State,
-  conn: Connection,
+  conn: Connection, // assumed to be ConnFig::ReadOnly
   token: &Option<String>,
   uid: UserId,
   msg: &PrivateRequest,
